@@ -1,0 +1,119 @@
+# Stored Procedure Index
+
+The legacy database has about 550 stored procedures. This index groups the ones most relevant to a read-only public rebuild.
+
+## News
+
+- `Q_NEWS_FRONT_PAGE_DISPLAY_SP`
+- `Q_NEWS_ITEM_DISPLAY_SP`
+- `Q_NEWS_VIEW_PAGE_SP`
+- `Q_NEWS_LIST_ALL_SP`
+- `Q_NEWS_BY_YEAR_SP`
+- `Q_NEWS_BY_YEAR_AND_MONTH_SP`
+- `Q_NEWS_BY_YEAR_MONTH_SP`
+
+## Articles
+
+- `Q_ARTICLE_FRONT_SP`
+- `Q_ARTICLE_DISPLAY_SP`
+- `Q_ARTICLE_LIST_BY_CATEGORY_SP`
+- `Q_ARTICLES_LIST_ALL_SP`
+- `Q_ARTICLE_CATEGORY_LIST_SP`
+- `Q_ARTICLE_CATEGORY_LIST_GROUP_SP`
+
+## Biography
+
+- `Q_BIO_LIST_SP`
+- `Q_BIO_DISPLAY_SP`
+- `Q_BIO_T_PAGE_SP`
+
+## Discography
+
+- `Q_ALBUM_T_LIST_SP`
+- `Q_ALBUM_T_DISPLAY_SP`
+- `Q_ALBUM_LIST_SP`
+- `Q_ALBUM_LIST_SHORT_SP`
+- `Q_ALBUM_SONG_T_LIST_SP`
+- `Q_ALBUM_SONG_T_DISPLAY_SP`
+- `Q_ALBUM_SONG_LIST_BY_SONG_ID_SP`
+- `Q_ALBUM_SONG_TITLE_LIST_SP`
+- `Q_ALBUM_SONG_LIST_SITEMAP_SP`
+- `Q_ARTIST_LIST_SP`
+- `Q_MUSIC_CHART_T_ALBUM_LIST_SP`
+- `Q_MUSIC_CHART_T_SONG_LIST_SP`
+
+## Pictures
+
+- `Q_PICTURES_FRONT_SP`
+- `Q_PIC_DISPLAY_SP`
+- `Q_PIC_LIST_ALL_SP`
+- `Q_PIC_LIST_FILES_SP`
+- `Q_PIC_CAT_PAGE_SP`
+- `Q_PIC_CAT_PAGE2_SP`
+- `Q_PIC_CAT_PAGE4_SP`
+- `Q_PICTURE_CAT_SP`
+- `Q_PICTURE_CATEGORY_SP`
+- `Q_PICTURE_RANDOM_BY_CAT_SP`
+- `Q_PICTURES_BY_SONG_TITLE_SP`
+
+## FAQ / Knowledge Base
+
+- `Q_FAQ_LIST_SP`
+- `Q_FAQ_CATEGORY_DISPLAY_SP`
+- `Q_KNOWLEDGE_BASE_DISPLAY_SP`
+- `Q_KNOWLEDGE_BASE_CATEGORY_LIST_SP`
+- `Q_KNOWLEDGE_BASE_CATEGORY_LIST_COUNT_SP`
+- `Q_KNOWLEDGE_BASE_QUESTIONS_BY_CATEGORY_SP`
+
+## Links, Quotes, Featured Sites
+
+- `Q_LINK_CAT_LIST_SP`
+- `Q_LINK_CATEGORY_LIST_SP`
+- `Q_LINKS_ALL_LIST_SP`
+- `QUEEN_QUOTE_T_LIST_SP`
+- `QUEEN_QUOTE_T_DISPLAY_SP`
+- `Q_QUOTE_FRONT_PAGE_DISPLAY_SP`
+- `QUEEN_FEATURED_SITE_T_LIST_SP`
+- `QUEEN_FEATURED_SITE_T_DISPLAY_SP`
+- `Q_FEATURED_SITE_FRONT_PAGE_SP`
+
+## Timeline, Tour, Video
+
+- `Q_TIMELINE_T_LIST_SP`
+- `Q_TIMELINE_T_DISPLAY_SP`
+- `Q_TOUR_DATE_LIST_SP`
+- `Q_TOUR_DATE_DISPLAY_SP`
+- `Q_YOUTUBE_T_LIST_SP`
+- `Q_YOUTUBE_T_DISPLAY_SP`
+- `Q_VIDEO_RANDOM_SP`
+- `Q_VIDEOS_BY_ALBUM_SP`
+
+## Forum Archive
+
+- `Q_LIST_FORUM_SP`
+- `Q_LIST_FORUM_NAME_ONLY_SP`
+- `Q_FORUM_VIEW_SP`
+- `Q_FORUM_VIEW_PAGE_SP`
+- `Q_FORUM_VIEW_PAGE_ALL_SP`
+- `Q_FORUM_TOPIC_VIEW_SP`
+- `Q_FORUM_TOPIC_PARENT_LIST_SP`
+- `Q_FORUM_TOPIC_PARENT_LIST_BY_FORUM_SP`
+- `Q_FORUM_SEARCH_SP`
+- `Q_FORUM_SEARCH_USER_SP`
+- `Q_FORUM_HOT_TOPICS_FRONT_SP`
+
+## Avoid In Read-Only Launch
+
+Avoid write/admin procedures in the first release:
+
+- Procedures ending in `_ADD_SP`
+- Procedures ending in `_UPDATE_SP`
+- Procedures ending in `_DELETE_SP`
+- User validation/login procedures.
+- Private message procedures.
+- Mail queue procedures.
+- Tracker/torrent procedures.
+- IP address and moderation procedures.
+
+Exceptions should be explicitly documented in an ADR.
+
