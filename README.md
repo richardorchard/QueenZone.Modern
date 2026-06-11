@@ -1,13 +1,14 @@
-# QueenZone Modern - Repository Seed
+# QueenZone Modern
 
-This folder is a documentation seed for the new QueenZone modernization repository.
+This repository contains the new QueenZone modernization project.
 
 The goal is to restart QueenZone as a clean, modern, read-only public site first, using the legacy database and application as reference material rather than carrying the whole Web Forms codebase forward.
 
-## Recommended Repository Shape
+## Repository Shape
 
 ```text
 /
+  QueenZone.sln
   src/
     QueenZone.Web/
     QueenZone.Data/
@@ -21,6 +22,19 @@ The goal is to restart QueenZone as a clean, modern, read-only public site first
     decisions/
     backlog/
 ```
+
+## Local Development
+
+The app targets .NET 10.
+
+```powershell
+dotnet restore QueenZone.sln
+dotnet build QueenZone.sln
+dotnet test QueenZone.sln
+dotnet run --project src/QueenZone.Web/QueenZone.Web.csproj
+```
+
+Local secrets belong in `src/QueenZone.Web/appsettings.Local.json`, which is ignored by git. You can also set `ConnectionStrings__QueenZoneLegacy` in your shell or a local `.env` file for tooling that loads dotenv values. If no `ConnectionStrings:QueenZoneLegacy` value is present, the site uses sample news data so the first slice can still run locally.
 
 ## First Milestone
 
@@ -47,4 +61,3 @@ Useful reference files belong in `docs/legacy`:
 - content inventory
 
 The old source is only copied or ported when a specific page or behavior needs to be understood.
-
