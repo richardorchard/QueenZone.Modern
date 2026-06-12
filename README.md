@@ -36,6 +36,22 @@ dotnet run --project src/QueenZone.Web/QueenZone.Web.csproj
 
 Local secrets belong in `src/QueenZone.Web/appsettings.Local.json`, which is ignored by git. You can also set `ConnectionStrings__QueenZoneLegacy` in your shell or a local `.env` file for tooling that loads dotenv values. If no `ConnectionStrings:QueenZoneLegacy` value is present, the site uses sample news data so the first slice can still run locally.
 
+## Testing And Workflow
+
+Follow the layered testing policy in `docs/architecture/testing-policy.md`.
+
+Default verification:
+
+```powershell
+dotnet restore QueenZone.sln
+dotnet build QueenZone.sln --configuration Release --no-restore
+dotnet test QueenZone.sln --configuration Release --no-build
+```
+
+Normal CI and pull request checks should not require the restored legacy database. Real legacy database checks are opt-in until a controlled test database exists.
+
+Feature work should happen on an agent/model-named branch and be reviewed through a pull request before it reaches `main`. See `AGENTS.md` for the branch and PR policy.
+
 ## First Milestone
 
 Build the first vertical slice around news:
