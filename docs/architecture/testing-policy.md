@@ -7,7 +7,7 @@ QueenZone Modern should have enough automated coverage to make the migration saf
 The first release is read-only, so the highest-risk areas are:
 
 - Legacy data mapping.
-- Old URL compatibility.
+- Stable canonical URL behavior.
 - Public/hidden content rules.
 - Unsafe legacy HTML rendering.
 - Deployment and configuration drift.
@@ -25,7 +25,7 @@ Good targets:
 
 - Slug generation.
 - Canonical route generation.
-- Legacy URL parsing.
+- Canonical URL parsing.
 - Pagination calculations.
 - Content visibility rules such as `DISPLAY = 1`.
 - Date and metadata formatting helpers.
@@ -44,7 +44,7 @@ Good targets:
 - `/news/{id}/{slug}` renders detail pages.
 - Wrong slugs redirect to canonical slugs.
 - Missing or hidden records return 404.
-- Old URLs redirect to modern canonical URLs.
+- Canonical URLs are emitted in page links.
 - Basic health and error behavior.
 
 These tests are the default place to cover user-visible route behavior.
@@ -78,7 +78,7 @@ For every content area, produce a repeatable validation check or report that cov
 
 - Count of public legacy records.
 - Count of rendered, imported, or projected modern records.
-- Old URL mapping coverage.
+- Canonical URL coverage.
 - Broken internal links and media references.
 - Encoding and legacy HTML edge cases.
 - Private, hidden, deleted, or moderated fields are not exposed.
@@ -95,7 +95,7 @@ Good targets:
 - Homepage loads.
 - News archive navigation works.
 - News detail pages are crawlable.
-- Legacy news redirects work in a browser.
+- News archive and detail pages are crawlable in a browser.
 - Mobile viewport smoke checks.
 - Basic accessibility smoke checks.
 
@@ -136,4 +136,4 @@ Every pull request should state:
 - Whether legacy database tests were run or intentionally skipped.
 - Any remaining manual checks.
 
-If a change touches legacy data access, redirects, content rendering, or publication rules, it should include tests or validation evidence for the affected behavior.
+If a change touches legacy data access, canonical routes, content rendering, or publication rules, it should include tests or validation evidence for the affected behavior.

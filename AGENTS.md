@@ -24,7 +24,7 @@ codex-gpt-5
 If multiple parallel efforts are needed, append a short task suffix while keeping the agent/model prefix, for example:
 
 ```text
-codex-gpt-5-news-redirects
+codex-gpt-5-news-routes
 ```
 
 Before merging to `main`, open a pull request and get a review. The pull request should include:
@@ -66,5 +66,5 @@ Commit only examples such as `.env.example`.
 - Do not port Web Forms architecture.
 - Keep legacy SQL access inside `QueenZone.Data`.
 - Treat the legacy database as an import source, not the permanent domain model.
-- Preserve old URLs through tested redirects.
+- Prefer clean, stable, search-friendly canonical URLs over preserving legacy URL shapes.
 - Never expose private, hidden, deleted, moderated, or credential-related data by default.

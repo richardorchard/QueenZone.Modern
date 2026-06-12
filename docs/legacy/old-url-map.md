@@ -1,12 +1,12 @@
-# Old URL Map
+# Legacy URL Notes
 
-Old URL preservation is important for SEO, fan-site backlinks, forum links, and archive quality.
+The legacy site has been offline for years, so old Web Forms URL preservation is not a launch requirement.
 
-This is a starter map. Validate against legacy `web.config`, IIS rewrite rules, sitemap, and real traffic if logs are available.
+Keep these notes only as historical reference when identifying content relationships and legacy IDs. New public pages should use clean, stable, search-friendly canonical URLs.
 
-## High Priority Redirects
+## Historical URL Shapes
 
-| Old URL | New URL | Notes |
+| Legacy URL Shape | Modern Canonical Shape | Notes |
 | --- | --- | --- |
 | `/` | `/` | Homepage. |
 | `/default.aspx` | `/` | Legacy homepage. |
@@ -29,13 +29,12 @@ This is a starter map. Validate against legacy `web.config`, IIS rewrite rules, 
 | `/forums/default.aspx` | `/archive/forums` | Forum archive landing. |
 | `/forums/forum_view.aspx?q={id}` | `/archive/forums/{id}/{slug}` | Forum category. |
 | `/forums/forum_topic_view.aspx?q={id}` | `/archive/forums/topics/{id}/{slug}` | Forum topic. |
-| `/profile.aspx?q={id}` | `/archive/members/{id}` | Only if member archive is enabled. |
+| `/profile.aspx?q={id}` | `/archive/members/{id}` | Only if a public member archive is deliberately enabled later. |
 
-## Redirect Implementation Notes
+## Implementation Notes
 
-- Prefer permanent redirects only after validating content exists.
-- Use temporary redirects in preview while testing.
-- Preserve query-string IDs.
-- Generate slugs from titles but keep legacy IDs canonical.
-- For missing/unsafe content, redirect to a parent archive page or return 404/410 deliberately.
-
+- Do not implement legacy URL redirects by default.
+- Use legacy IDs where they help stable content identity.
+- Generate readable slugs from titles.
+- Return normal 404 responses for old Web Forms paths unless a specific redirect is later justified.
+- Keep canonical URLs documented per content type.

@@ -18,7 +18,7 @@ The new site should be built for fast, crawlable, canonical, durable pages.
 
 - Static or server-rendered HTML for all important pages.
 - Stable canonical URLs.
-- Legacy URL redirects.
+- Stable canonical URLs.
 - XML sitemap split by content type if needed.
 - RSS feeds for news.
 - Schema.org structured data where appropriate.
@@ -141,7 +141,7 @@ Track:
 - Page speed.
 - Ad revenue by page type, if ads are enabled.
 - Image search traffic.
-- Old URL redirect hits.
+- 404s and canonical URL traffic.
 - 404s from old links.
 
 Tools:
@@ -160,6 +160,5 @@ For the first deploy:
 - News detail pages are crawlable.
 - Sitemap XML exists.
 - Robots.txt exists.
-- Old news URLs redirect.
+- News detail pages use stable canonical URLs.
 - Page titles and descriptions are unique.
-

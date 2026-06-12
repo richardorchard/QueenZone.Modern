@@ -57,6 +57,5 @@ The application should not need write access for Phase 1.
 - App starts without database write permissions.
 - Health endpoint returns OK.
 - Application Insights receives requests.
-- Old URL redirects are tested.
+- Canonical URLs are tested.
 - No connection strings or secrets are committed.
-

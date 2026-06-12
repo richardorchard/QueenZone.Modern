@@ -45,6 +45,5 @@ Benefits:
 Tradeoffs:
 
 - Community functionality is delayed.
-- Some legacy URLs may initially redirect to archive placeholders.
+- Old Web Forms URL shapes are not preserved by default because the site has been offline for years.
 - Admin workflows need a separate future design.
-

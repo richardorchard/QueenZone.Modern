@@ -61,7 +61,7 @@ Build the first vertical slice around news:
 3. Render latest news on the homepage.
 4. Render `/news` archive.
 5. Render `/news/{id}/{slug}` detail pages.
-6. Add redirects for old news URLs.
+6. Use stable, search-friendly canonical URLs.
 7. Deploy a preview to Azure App Service.
 
 ## Legacy Reference Policy
@@ -73,7 +73,7 @@ Useful reference files belong in `docs/legacy`:
 - `db-schema.sql`
 - table map
 - stored procedure index
-- old URL map
+- legacy URL notes, only when they help understand content relationships
 - content inventory
 
 The old source is only copied or ported when a specific page or behavior needs to be understood.
