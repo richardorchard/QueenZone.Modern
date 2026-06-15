@@ -62,7 +62,20 @@ Repository secrets required:
 
 App Service configuration required:
 
-- `ConnectionStrings__QueenZoneLegacy`: the Azure SQL connection string for the copied legacy tables.
+- `ConnectionStrings__QueenZoneLegacy`: the Azure SQL connection string for the copied legacy tables, using Managed Identity authentication.
+
+The `queenzone-dev` App Service uses its system-assigned Managed Identity to connect to Azure SQL. The matching database user is created in the target database, not `master`, and should have only the permissions the app needs:
+
+```sql
+CREATE USER [queenzone-dev] FROM EXTERNAL PROVIDER;
+ALTER ROLE db_datareader ADD MEMBER [queenzone-dev];
+```
+
+Only add write permissions if the deployed app has an intentional write path:
+
+```sql
+ALTER ROLE db_datawriter ADD MEMBER [queenzone-dev];
+```
 
 Do not commit publish profiles, `.pubxml` files, local app settings, or connection strings. Rotate the App Service publish profile if it has ever been saved outside GitHub Secrets.
 

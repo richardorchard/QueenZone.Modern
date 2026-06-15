@@ -8,17 +8,30 @@ public sealed class LegacyNewsRepository(string connectionString) : INewsReposit
     public async Task<IReadOnlyList<NewsItem>> GetLatestAsync(int count, CancellationToken cancellationToken = default)
     {
         const string sql = """
+            WITH PublishedNews AS (
+                SELECT
+                    NEWS_ID AS Id,
+                    TITLE AS Title,
+                    ISNULL(EXCERPT, '') AS Excerpt,
+                    ISNULL(ARTICLE, '') AS Body,
+                    [DATE] AS PublishedAt,
+                    SOURCE_URL AS SourceUrl,
+                    CAST(CASE WHEN DISPLAY = 1 THEN 1 ELSE 0 END AS bit) AS IsPublished,
+                    ROW_NUMBER() OVER (PARTITION BY NEWS_ID ORDER BY [DATE] DESC, NEWS_ID DESC) AS RowNumber
+                FROM NEWS_T
+                WHERE DISPLAY = 1
+            )
             SELECT TOP (@Count)
-                NEWS_ID AS Id,
-                TITLE AS Title,
-                ISNULL(EXCERPT, '') AS Excerpt,
-                ISNULL(ARTICLE, '') AS Body,
-                [DATE] AS PublishedAt,
-                SOURCE_URL AS SourceUrl,
-                CAST(CASE WHEN DISPLAY = 1 THEN 1 ELSE 0 END AS bit) AS IsPublished
-            FROM NEWS_T
-            WHERE DISPLAY = 1
-            ORDER BY [DATE] DESC, NEWS_ID DESC
+                Id,
+                Title,
+                Excerpt,
+                Body,
+                PublishedAt,
+                SourceUrl,
+                IsPublished
+            FROM PublishedNews
+            WHERE RowNumber = 1
+            ORDER BY PublishedAt DESC, Id DESC
             """;
 
         return await QueryAsync(sql, new { Count = count }, cancellationToken);
@@ -27,17 +40,30 @@ public sealed class LegacyNewsRepository(string connectionString) : INewsReposit
     public async Task<IReadOnlyList<NewsItem>> GetArchivePageAsync(int page, int pageSize, CancellationToken cancellationToken = default)
     {
         const string sql = """
+            WITH PublishedNews AS (
+                SELECT
+                    NEWS_ID AS Id,
+                    TITLE AS Title,
+                    ISNULL(EXCERPT, '') AS Excerpt,
+                    ISNULL(ARTICLE, '') AS Body,
+                    [DATE] AS PublishedAt,
+                    SOURCE_URL AS SourceUrl,
+                    CAST(CASE WHEN DISPLAY = 1 THEN 1 ELSE 0 END AS bit) AS IsPublished,
+                    ROW_NUMBER() OVER (PARTITION BY NEWS_ID ORDER BY [DATE] DESC, NEWS_ID DESC) AS RowNumber
+                FROM NEWS_T
+                WHERE DISPLAY = 1
+            )
             SELECT
-                NEWS_ID AS Id,
-                TITLE AS Title,
-                ISNULL(EXCERPT, '') AS Excerpt,
-                ISNULL(ARTICLE, '') AS Body,
-                [DATE] AS PublishedAt,
-                SOURCE_URL AS SourceUrl,
-                CAST(CASE WHEN DISPLAY = 1 THEN 1 ELSE 0 END AS bit) AS IsPublished
-            FROM NEWS_T
-            WHERE DISPLAY = 1
-            ORDER BY [DATE] DESC, NEWS_ID DESC
+                Id,
+                Title,
+                Excerpt,
+                Body,
+                PublishedAt,
+                SourceUrl,
+                IsPublished
+            FROM PublishedNews
+            WHERE RowNumber = 1
+            ORDER BY PublishedAt DESC, Id DESC
             OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY
             """;
 
@@ -48,7 +74,7 @@ public sealed class LegacyNewsRepository(string connectionString) : INewsReposit
     public async Task<NewsItem?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         const string sql = """
-            SELECT
+            SELECT TOP (1)
                 NEWS_ID AS Id,
                 TITLE AS Title,
                 ISNULL(EXCERPT, '') AS Excerpt,
@@ -59,10 +85,11 @@ public sealed class LegacyNewsRepository(string connectionString) : INewsReposit
             FROM NEWS_T
             WHERE NEWS_ID = @Id
               AND DISPLAY = 1
+            ORDER BY [DATE] DESC, NEWS_ID DESC
             """;
 
         var results = await QueryAsync(sql, new { Id = id }, cancellationToken);
-        return results.SingleOrDefault();
+        return results.FirstOrDefault();
     }
 
     private async Task<IReadOnlyList<NewsItem>> QueryAsync(string sql, object parameters, CancellationToken cancellationToken)

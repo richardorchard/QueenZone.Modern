@@ -46,7 +46,22 @@ Use configuration keys like:
 
 ## Database Access
 
-For the first release, use a SQL login or managed identity with read-only access wherever possible.
+The `queenzone-dev` App Service connects to Azure SQL with its system-assigned Managed Identity.
+
+Create the matching SQL user inside the target database, not `master`:
+
+```sql
+CREATE USER [queenzone-dev] FROM EXTERNAL PROVIDER;
+ALTER ROLE db_datareader ADD MEMBER [queenzone-dev];
+```
+
+The App Service setting `ConnectionStrings__QueenZoneLegacy` should use Managed Identity authentication and should not include a SQL password.
+
+Only grant write permissions when the deployed app has an intentional write path:
+
+```sql
+ALTER ROLE db_datawriter ADD MEMBER [queenzone-dev];
+```
 
 The application should not need write access for Phase 1.
 
