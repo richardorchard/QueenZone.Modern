@@ -20,7 +20,12 @@ public sealed class SampleNewsRepository : INewsRepository
         Task.FromResult(PublishedItems.Count);
 
     public Task<NewsItem?> GetByIdAsync(int id, CancellationToken cancellationToken = default) =>
-        Task.FromResult(PublishedItems.SingleOrDefault(item => item.Id == id));
+        Task.FromResult(
+            PublishedItems
+                .Where(item => item.Id == id)
+                .OrderByDescending(item => item.PublishedAt)
+                .ThenByDescending(item => item.Id)
+                .FirstOrDefault());
 
     private static IReadOnlyList<NewsItem> BuildItems()
     {
