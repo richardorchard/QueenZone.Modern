@@ -21,10 +21,8 @@ public sealed class SampleNewsRepository : INewsRepository
 
     public Task<NewsItem?> GetByIdAsync(int id, CancellationToken cancellationToken = default) =>
         Task.FromResult(
-            PublishedItems
-                .Where(item => item.Id == id)
-                .OrderByDescending(item => item.PublishedAt)
-                .ThenByDescending(item => item.Id)
+            NewsItemOrdering.ByCreatedDateDescending(
+                    PublishedItems.Where(item => item.Id == id))
                 .FirstOrDefault());
 
     private static IReadOnlyList<NewsItem> BuildItems()
@@ -78,9 +76,6 @@ public sealed class SampleNewsRepository : INewsRepository
                 true));
         }
 
-        return items
-            .OrderByDescending(item => item.PublishedAt)
-            .ThenByDescending(item => item.Id)
-            .ToList();
+        return NewsItemOrdering.ByCreatedDateDescending(items);
     }
 }

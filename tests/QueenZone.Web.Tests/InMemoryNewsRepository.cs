@@ -8,13 +8,11 @@ internal sealed class InMemoryNewsRepository : INewsRepository
 
     public InMemoryNewsRepository(IEnumerable<NewsItem> rawItems)
     {
-        publishedItems = rawItems
-            .Where(item => item.IsPublished)
-            .GroupBy(item => item.Id)
-            .Select(group => group.OrderByDescending(item => item.PublishedAt).ThenByDescending(item => item.Id).First())
-            .OrderByDescending(item => item.PublishedAt)
-            .ThenByDescending(item => item.Id)
-            .ToList();
+        publishedItems = NewsItemOrdering.ByCreatedDateDescending(
+            rawItems
+                .Where(item => item.IsPublished)
+                .GroupBy(item => item.Id)
+                .Select(group => NewsItemOrdering.ByCreatedDateDescending(group).First()));
     }
 
     public Task<IReadOnlyList<NewsItem>> GetLatestAsync(int count, CancellationToken cancellationToken = default) =>
