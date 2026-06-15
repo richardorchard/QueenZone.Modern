@@ -57,6 +57,8 @@ Feature work should happen on an agent-prefixed branch such as `grok/news-pagina
 
 The `Deploy App Service` GitHub Actions workflow deploys `main` to the `queenzone-dev` Azure App Service at `https://queenzone-dev.azurewebsites.net`.
 
+The planned public canonical domain for the site is `https://www.queenzone.org`. SEO features that emit absolute public URLs, such as sitemaps and robots.txt, should use that host in production configuration.
+
 Repository secrets required:
 
 - `AZURE_WEBAPP_PUBLISH_PROFILE`: the App Service publish profile XML.
