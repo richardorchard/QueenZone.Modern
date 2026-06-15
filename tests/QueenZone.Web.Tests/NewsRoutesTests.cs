@@ -64,7 +64,7 @@ public sealed class NewsRoutesTests : IClassFixture<WebApplicationFactory<Progra
         Assert.Contains("/news/1005/archive-sample-article-1005", pageTwo);
         Assert.DoesNotContain("/news/1005/archive-sample-article-1005", pageOne);
         Assert.Contains("<link rel=\"canonical\" href=\"/news/page/2\">", pageTwo);
-        Assert.Contains("<title>QueenZone news – Page 2</title>", pageTwo);
+        Assert.Contains("<title>QueenZone news &#x2013; Page 2</title>", pageTwo);
         Assert.Contains("archive-pagination-controls", pageOne);
         Assert.Contains("archive-pagination-prev is-disabled", pageOne);
         Assert.Contains("rel=\"next\" href=\"/news/page/2\"", pageOne);
