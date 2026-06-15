@@ -76,47 +76,67 @@ public static partial class NewsRoutes
         }
 
         var builder = new StringBuilder();
-        builder.Append("<nav class=\"pagination\" aria-label=\"News archive pagination\">");
-
-        if (currentPage > 1)
-        {
-            builder.Append("<a rel=\"prev\" href=\"");
-            builder.Append(WebUtility.HtmlEncode(GetArchiveCanonicalPath(currentPage - 1)));
-            builder.Append("\">Previous</a> ");
-        }
+        builder.Append("<nav class=\"archive-pagination\" aria-label=\"News archive pagination\">");
+        builder.Append("<p class=\"archive-pagination-summary\">Page ");
+        builder.Append(currentPage);
+        builder.Append(" of ");
+        builder.Append(totalPages);
+        builder.Append("</p>");
+        builder.Append("<div class=\"archive-pagination-controls\">");
+        builder.Append(RenderArchivePaginationPrevious(currentPage));
+        builder.Append("<ol class=\"archive-pagination-pages\">");
 
         foreach (var pageNumber in GetVisiblePageNumbers(currentPage, totalPages))
         {
+            builder.Append("<li>");
             if (pageNumber is null)
             {
-                builder.Append("<span class=\"pagination-ellipsis\">…</span> ");
-                continue;
+                builder.Append("<span class=\"archive-pagination-ellipsis\" aria-hidden=\"true\">…</span>");
             }
-
-            if (pageNumber == currentPage)
+            else if (pageNumber == currentPage)
             {
                 builder.Append("<span aria-current=\"page\">");
                 builder.Append(pageNumber);
-                builder.Append("</span> ");
-                continue;
+                builder.Append("</span>");
+            }
+            else
+            {
+                builder.Append("<a href=\"");
+                builder.Append(WebUtility.HtmlEncode(GetArchiveCanonicalPath(pageNumber.Value)));
+                builder.Append("\">");
+                builder.Append(pageNumber);
+                builder.Append("</a>");
             }
 
-            builder.Append("<a href=\"");
-            builder.Append(WebUtility.HtmlEncode(GetArchiveCanonicalPath(pageNumber.Value)));
-            builder.Append("\">");
-            builder.Append(pageNumber);
-            builder.Append("</a> ");
+            builder.Append("</li>");
         }
 
-        if (currentPage < totalPages)
-        {
-            builder.Append("<a rel=\"next\" href=\"");
-            builder.Append(WebUtility.HtmlEncode(GetArchiveCanonicalPath(currentPage + 1)));
-            builder.Append("\">Next</a>");
-        }
-
-        builder.Append("</nav>");
+        builder.Append("</ol>");
+        builder.Append(RenderArchivePaginationNext(currentPage, totalPages));
+        builder.Append("</div></nav>");
         return builder.ToString();
+    }
+
+    private static string RenderArchivePaginationPrevious(int currentPage)
+    {
+        if (currentPage <= 1)
+        {
+            return "<span class=\"archive-pagination-prev is-disabled\" aria-disabled=\"true\">Previous</span>";
+        }
+
+        var previousPath = WebUtility.HtmlEncode(GetArchiveCanonicalPath(currentPage - 1));
+        return $"<a class=\"archive-pagination-prev\" rel=\"prev\" href=\"{previousPath}\">Previous</a>";
+    }
+
+    private static string RenderArchivePaginationNext(int currentPage, int totalPages)
+    {
+        if (currentPage >= totalPages)
+        {
+            return "<span class=\"archive-pagination-next is-disabled\" aria-disabled=\"true\">Next</span>";
+        }
+
+        var nextPath = WebUtility.HtmlEncode(GetArchiveCanonicalPath(currentPage + 1));
+        return $"<a class=\"archive-pagination-next\" rel=\"next\" href=\"{nextPath}\">Next</a>";
     }
 
     public static string Slugify(string value)
@@ -124,6 +144,21 @@ public static partial class NewsRoutes
         var lower = value.Trim().ToLowerInvariant();
         var replaced = NonAlphaNumericRegex().Replace(lower, "-");
         return DuplicateDashRegex().Replace(replaced, "-").Trim('-');
+    }
+
+    public static int ResolveArchiveTotalPages(int currentPage, int itemCount, int publishedCount, int totalPages)
+    {
+        if (itemCount == ArchivePageSize && totalPages <= currentPage)
+        {
+            return Math.Max(totalPages, currentPage + 1);
+        }
+
+        if (publishedCount > 0)
+        {
+            return totalPages;
+        }
+
+        return itemCount == 0 ? 0 : Math.Max(totalPages, currentPage);
     }
 
     private static async Task<IResult> RenderArchivePageAsync(
@@ -137,7 +172,12 @@ public static partial class NewsRoutes
         }
 
         var publishedCount = await newsRepository.GetPublishedCountAsync(cancellationToken);
-        var totalPages = GetArchiveTotalPages(publishedCount);
+        var archive = await newsRepository.GetArchivePageAsync(page, ArchivePageSize, cancellationToken);
+        var totalPages = ResolveArchiveTotalPages(
+            page,
+            archive.Count,
+            publishedCount,
+            GetArchiveTotalPages(publishedCount));
 
         if (totalPages == 0)
         {
@@ -151,7 +191,6 @@ public static partial class NewsRoutes
             return Results.NotFound();
         }
 
-        var archive = await newsRepository.GetArchivePageAsync(page, ArchivePageSize, cancellationToken);
         var body = RenderNewsList("News archive", archive);
         body += BuildArchivePaginationNav(page, totalPages);
 
@@ -288,14 +327,24 @@ public static partial class NewsRoutes
             {{headExtras}}  <style>
                 body { font-family: Arial, sans-serif; line-height: 1.5; margin: 0 auto; max-width: 880px; padding: 2rem; }
                 header { border-bottom: 1px solid #d0d7de; margin-bottom: 2rem; padding-bottom: 1rem; }
-                nav a { margin-right: 1rem; }
+                header nav a { margin-right: 1rem; }
                 .news-list { padding-left: 1.5rem; }
                 .news-list li { margin-bottom: 1.5rem; }
                 .date, time { color: #57606a; }
                 .lede { font-size: 1.15rem; }
-                .pagination { margin-top: 2rem; }
-                .pagination a, .pagination span { margin-right: 0.75rem; }
-                .pagination-ellipsis { color: #57606a; }
+                .archive-pagination { border-top: 1px solid #d0d7de; margin-top: 2.5rem; padding-top: 1.5rem; }
+                .archive-pagination-summary { color: #57606a; margin: 0 0 1rem; }
+                .archive-pagination-controls { align-items: center; display: flex; flex-wrap: wrap; gap: 0.75rem 1rem; }
+                .archive-pagination-pages { display: flex; flex-wrap: wrap; gap: 0.5rem; list-style: none; margin: 0; padding: 0; }
+                .archive-pagination-pages a,
+                .archive-pagination-prev,
+                .archive-pagination-next { border: 1px solid #d0d7de; border-radius: 0.375rem; color: #0969da; display: inline-block; padding: 0.35rem 0.75rem; text-decoration: none; }
+                .archive-pagination-pages [aria-current="page"],
+                .archive-pagination-pages .archive-pagination-ellipsis { border: 1px solid #d0d7de; border-radius: 0.375rem; color: #1f2328; display: inline-block; padding: 0.35rem 0.75rem; }
+                .archive-pagination-pages [aria-current="page"] { background: #f6f8fa; font-weight: 700; }
+                .archive-pagination-ellipsis { color: #57606a; }
+                .archive-pagination-prev.is-disabled,
+                .archive-pagination-next.is-disabled { border-color: #eaeef2; color: #8c959f; }
               </style>
             </head>
             <body>

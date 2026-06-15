@@ -44,9 +44,38 @@ public sealed class NewsPaginationTests
     {
         var nav = NewsRoutes.BuildArchivePaginationNav(2, 4);
 
+        Assert.Contains("Page 2 of 4", nav);
+        Assert.Contains("archive-pagination-controls", nav);
+        Assert.Contains("archive-pagination-pages", nav);
         Assert.Contains("rel=\"prev\" href=\"/news\"", nav);
         Assert.Contains("href=\"/news/page/3\"", nav);
         Assert.Contains("rel=\"next\" href=\"/news/page/3\"", nav);
         Assert.Contains("aria-current=\"page\">2</span>", nav);
+    }
+
+    [Fact]
+    public void BuildArchivePaginationNav_ShowsDisabledPreviousOnFirstPage()
+    {
+        var nav = NewsRoutes.BuildArchivePaginationNav(1, 3);
+
+        Assert.Contains("archive-pagination-prev is-disabled", nav);
+        Assert.Contains("rel=\"next\" href=\"/news/page/2\"", nav);
+        Assert.Contains("href=\"/news/page/2\"", nav);
+    }
+
+    [Theory]
+    [InlineData(1, 20, 0, 1, 2)]
+    [InlineData(2, 5, 25, 2, 2)]
+    [InlineData(1, 15, 15, 1, 1)]
+    public void ResolveArchiveTotalPages_UsesFallbackWhenCountIsUnavailable(
+        int currentPage,
+        int itemCount,
+        int publishedCount,
+        int initialTotalPages,
+        int expectedTotalPages)
+    {
+        Assert.Equal(
+            expectedTotalPages,
+            NewsRoutes.ResolveArchiveTotalPages(currentPage, itemCount, publishedCount, initialTotalPages));
     }
 }
