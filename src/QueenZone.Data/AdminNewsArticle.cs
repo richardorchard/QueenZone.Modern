@@ -1,11 +1,14 @@
 namespace QueenZone.Data;
 
-public sealed record NewsItem(
+public sealed record AdminNewsArticle(
     int Id,
     string Title,
+    string Slug,
     string Excerpt,
     string Body,
     DateTime PublishedAt,
     string? SourceUrl,
     bool IsPublished,
-    string? Slug = null);
+    DateTime? CreatedAt,
+    DateTime? UpdatedAt,
+    string? EditorEmail);

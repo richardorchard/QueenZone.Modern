@@ -77,6 +77,35 @@ Only add write permissions if the deployed app has an intentional write path:
 ALTER ROLE db_datawriter ADD MEMBER [queenzone-dev];
 ```
 
+Admin news publishing writes to `NEWS_T` and `NewsAuditLog`, so the deployed App Service identity needs `db_datawriter` once the admin workflow is enabled. Keep read-only environments on `db_datareader` only.
+
+Before enabling admin writes in a database, run:
+
+```text
+docs/sql/001-news-admin-columns.sql
+```
+
+### Admin authentication (Microsoft Entra ID)
+
+Admin routes require Microsoft Entra ID sign-in and an allowed admin email address.
+
+1. Create an Entra app registration for `QueenZone.Web`.
+2. Add a web redirect URI such as `https://queenzone-dev.azurewebsites.net/signin-oidc`.
+3. Create a client secret for the app registration.
+4. Configure these App Service settings:
+
+```text
+AzureAd__TenantId
+AzureAd__ClientId
+AzureAd__ClientSecret
+Admin__AllowedEmails__0
+Admin__AllowedEmails__1
+```
+
+Use `src/QueenZone.Web/appsettings.Local.json` for local Entra values. If `AzureAd:ClientId` is empty locally, the app falls back to test-header authentication for development only.
+
+For automated tests, send `X-Test-User-Email` with an allowed admin email address.
+
 Do not commit publish profiles, `.pubxml` files, local app settings, or connection strings. Rotate the App Service publish profile if it has ever been saved outside GitHub Secrets.
 
 ## First Milestone
