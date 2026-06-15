@@ -26,8 +26,25 @@ jobs:
       - name: Build
         run: dotnet build QueenZone.sln --configuration Release --no-restore
 
-      - name: Test
-        run: dotnet test QueenZone.sln --configuration Release --no-build
+      - name: Test with coverage
+        run: dotnet test QueenZone.sln --configuration Release --no-build --collect:"XPlat Code Coverage" --settings coverlet.runsettings --results-directory ./TestResults
+
+      - name: Generate coverage report
+        uses: danielpalme/ReportGenerator-GitHub-Action@v5
+        with:
+          reports: TestResults/**/coverage.cobertura.xml
+          targetdir: coverage-report
+          reporttypes: HtmlInline;Cobertura;MarkdownSummaryGithub
+
+      - name: Add coverage summary
+        run: cat coverage-report/SummaryGithub.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v5
+        with:
+          name: coverage-report-${{ github.run_id }}
+          path: coverage-report
+          retention-days: 14
 
   smoke-test:
     runs-on: ubuntu-latest
