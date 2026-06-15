@@ -22,7 +22,7 @@ For a public archive, we need a schema optimized for:
 - Thread pages.
 - Post pagination.
 - Author display names without private fields.
-- Old URL redirects.
+- Canonical route metadata.
 - Full-text search.
 - Content hiding or takedown.
 
@@ -121,4 +121,3 @@ Fields:
 - Should forum archive content be indexed in Azure SQL full-text or Azure AI Search?
 - Should old user profile links be preserved, anonymized, or disabled?
 - How should takedown/moderation requests be handled after launch?
-

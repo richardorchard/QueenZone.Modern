@@ -36,6 +36,36 @@ dotnet run --project src/QueenZone.Web/QueenZone.Web.csproj
 
 Local secrets belong in `src/QueenZone.Web/appsettings.Local.json`, which is ignored by git. You can also set `ConnectionStrings__QueenZoneLegacy` in your shell or a local `.env` file for tooling that loads dotenv values. If no `ConnectionStrings:QueenZoneLegacy` value is present, the site uses sample news data so the first slice can still run locally.
 
+## Testing And Workflow
+
+Follow the layered testing policy in `docs/architecture/testing-policy.md`.
+
+Default verification:
+
+```powershell
+dotnet restore QueenZone.sln
+dotnet build QueenZone.sln --configuration Release --no-restore
+dotnet test QueenZone.sln --configuration Release --no-build
+```
+
+Normal CI and pull request checks should not require the restored legacy database. Real legacy database checks are opt-in until a controlled test database exists.
+
+Feature work should happen on an agent/model-named branch and be reviewed through a pull request before it reaches `main`. See `AGENTS.md` for the branch and PR policy.
+
+## Deployment
+
+The `Deploy App Service` GitHub Actions workflow deploys `main` to the `queenzone-dev` Azure App Service at `https://queenzone-dev.azurewebsites.net`.
+
+Repository secrets required:
+
+- `AZURE_WEBAPP_PUBLISH_PROFILE`: the App Service publish profile XML.
+
+App Service configuration required:
+
+- `ConnectionStrings__QueenZoneLegacy`: the Azure SQL connection string for the copied legacy tables.
+
+Do not commit publish profiles, `.pubxml` files, local app settings, or connection strings. Rotate the App Service publish profile if it has ever been saved outside GitHub Secrets.
+
 ## First Milestone
 
 Build the first vertical slice around news:
@@ -45,7 +75,7 @@ Build the first vertical slice around news:
 3. Render latest news on the homepage.
 4. Render `/news` archive.
 5. Render `/news/{id}/{slug}` detail pages.
-6. Add redirects for old news URLs.
+6. Use stable, search-friendly canonical URLs.
 7. Deploy a preview to Azure App Service.
 
 ## Legacy Reference Policy
@@ -57,7 +87,7 @@ Useful reference files belong in `docs/legacy`:
 - `db-schema.sql`
 - table map
 - stored procedure index
-- old URL map
+- legacy URL notes, only when they help understand content relationships
 - content inventory
 
 The old source is only copied or ported when a specific page or behavior needs to be understood.

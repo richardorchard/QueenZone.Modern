@@ -39,12 +39,12 @@ Acceptance criteria:
 - Preview deploy works in Azure Static Web Apps.
 - A short decision note compares Static Web Apps with App Service based on the prototype.
 
-### Prototype Function-backed legacy redirect
+### Prototype Function-backed search endpoint
 
 Acceptance criteria:
 
-- A Function accepts an old legacy URL/query-string shape.
-- Function returns a canonical modern URL.
+- A Function accepts a simple search or lookup request.
+- Function returns crawl-safe structured results or metadata.
 - Static Web Apps can route or proxy to the Function.
 - Timeout and API constraints are documented.
 
@@ -104,13 +104,14 @@ Acceptance criteria:
 - Missing IDs return 404.
 - Hidden items do not render publicly.
 
-### Add old news redirects
+### Confirm canonical news URLs
 
 Acceptance criteria:
 
-- `/news.aspx` redirects to `/news`.
-- `/process/news_view.aspx?news_id={id}` redirects to `/news/{id}/{slug}`.
-- Redirect behavior is covered by tests.
+- `/news` is the canonical archive URL.
+- `/news/{id}/{slug}` is the canonical detail URL.
+- Wrong slugs redirect to the canonical slug.
+- Canonical route behavior is covered by tests.
 
 ## Epic: Articles And Biography
 
@@ -135,7 +136,7 @@ Acceptance criteria:
 Acceptance criteria:
 
 - Biography pages are included in sitemap.
-- Legacy biography URLs redirect.
+- Biography pages use stable canonical URLs.
 - Metadata is tuned for search.
 - Rendering preserves old content while improving readability.
 
@@ -147,7 +148,7 @@ Acceptance criteria:
 
 - `/discography` lists active albums.
 - Album detail includes notes, artwork if available, and songs.
-- Old album URLs redirect.
+- Album pages use stable canonical URLs.
 
 ### Treat album information as core archive content
 
@@ -211,7 +212,7 @@ Acceptance criteria:
 - Required indexes documented.
 - Legacy `Q_FORUM_TOPIC_T` mapping documented.
 - Private fields excluded by design.
-- Old URL mapping preserved.
+- Canonical URL strategy documented.
 
 ### Build forum import proof of concept
 

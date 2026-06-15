@@ -15,8 +15,8 @@ public sealed class SampleNewsRepository : INewsRepository
         new(
             1002,
             "Legacy news archive mapped",
-            "The first migration target is NEWS_T, with old news URLs preserved through redirects.",
-            "News gives the rebuild a narrow, valuable slice through data access, routing, page rendering, redirects, and deployment.",
+            "The first migration target is NEWS_T, with clean canonical routes for the modern archive.",
+            "News gives the rebuild a narrow, valuable slice through data access, routing, page rendering, search-friendly URLs, and deployment.",
             new DateTime(2026, 6, 10, 9, 0, 0, DateTimeKind.Utc),
             null,
             true),

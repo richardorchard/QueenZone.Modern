@@ -29,7 +29,7 @@ For high-value content, create modern read models:
 - `Album`
 - `Song`
 - `Picture`
-- `LegacyRedirect`
+- `CanonicalRoute`
 
 These can be built by an import job and stored in new tables, or materialized into static JSON for selected pages.
 
@@ -56,7 +56,7 @@ Good candidates:
 
 - Forum archive: normalized thread/post/read-model tables with indexes for archive browsing.
 - Search documents: flattened searchable content rows.
-- Redirects: legacy URL to canonical route table.
+- Canonical route metadata for stable public URLs.
 - Media assets: canonical media records pointing at Blob Storage.
 - Content pages: sanitized, rendered, and metadata-enriched public content.
 
@@ -109,11 +109,11 @@ Initial route mapping:
 - `/news`
 - `/news/{id}/{slug}`
 
-Old URL redirects:
+URL policy:
 
-- `/news.aspx`
-- `/process/news_view.aspx?news_id={id}`
-- Any rewrite-backed news paths from old `web.config`.
+- Do not preserve old Web Forms URL shapes by default.
+- Use stable, search-friendly canonical URLs for newly published archive pages.
+- Keep legacy URL notes only when they help understand content identity or relationships.
 
 ## Validation Checklist Per Content Area
 
@@ -123,5 +123,5 @@ Old URL redirects:
 - Check HTML rendering.
 - Check links and media paths.
 - Check encoding and special characters.
-- Check old URL redirect.
+- Check canonical URL generation.
 - Check no private fields are exposed.

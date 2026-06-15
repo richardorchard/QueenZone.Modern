@@ -1,4 +1,3 @@
-using System.Net;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using QueenZone.Web;
@@ -47,24 +46,23 @@ public sealed class NewsRoutesTests : IClassFixture<WebApplicationFactory<Progra
     }
 
     [Fact]
-    public async Task OldNewsArchiveUrlRedirects()
+    public async Task WrongNewsSlugRedirectsToCanonicalSlug()
     {
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
-        var response = await client.GetAsync("/news.aspx");
+        var response = await client.GetAsync("/news/1003/not-the-right-slug");
 
-        Assert.Equal(HttpStatusCode.MovedPermanently, response.StatusCode);
-        Assert.Equal("/news", response.Headers.Location?.OriginalString);
+        Assert.Equal(System.Net.HttpStatusCode.MovedPermanently, response.StatusCode);
+        Assert.Equal("/news/1003/queenzone-modernisation-begins", response.Headers.Location?.OriginalString);
     }
 
     [Fact]
-    public async Task OldNewsDetailUrlRedirectsToCanonicalRoute()
+    public async Task OldNewsUrlsAreNotSpecialCased()
     {
-        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var client = factory.CreateClient();
 
         var response = await client.GetAsync("/process/news_view.aspx?news_id=1003");
 
-        Assert.Equal(HttpStatusCode.MovedPermanently, response.StatusCode);
-        Assert.Equal("/news/1003/queenzone-modernisation-begins", response.Headers.Location?.OriginalString);
+        Assert.Equal(System.Net.HttpStatusCode.NotFound, response.StatusCode);
     }
 }

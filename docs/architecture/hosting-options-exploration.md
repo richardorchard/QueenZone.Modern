@@ -29,7 +29,7 @@ flowchart LR
 - Picture category and picture detail pages, once image URLs are stable.
 - XML sitemap.
 - RSS feeds if generated at build time.
-- Old URL redirects via static route rules where possible.
+- Clean canonical URLs via static route rules where possible.
 
 ### What Functions Can Handle
 
@@ -57,7 +57,7 @@ flowchart LR
 - API requests have execution limits.
 - If every page needs live database rendering, Static Web Apps becomes less natural.
 - Bring-your-own APIs require Standard plan.
-- Complex legacy redirects may need a Function or an edge/front-door rule.
+- Search or dynamic lookup may need a Function or an edge/front-door rule.
 
 ## Option B: Azure App Service With ASP.NET Core
 
@@ -73,7 +73,7 @@ flowchart LR
 
 - Server-rendered Razor Pages or MVC.
 - Database-driven content.
-- Complex legacy redirects.
+- Dynamic search or lookup behavior.
 - Admin tools.
 - Auth.
 - Future interactive features.
@@ -127,7 +127,7 @@ The first experiment should generate static pages for:
 - Albums.
 - Picture category index using known Blob/image URLs.
 
-If prerendering feels clean, continue with Static Web Apps as the public host. If legacy redirects, search, and import complexity become awkward, move to the hybrid model before defaulting to full App Service.
+If prerendering feels clean, continue with Static Web Apps as the public host. If search, dynamic lookup, and import complexity become awkward, move to the hybrid model before defaulting to full App Service.
 
 ## Decision Criteria
 
@@ -137,7 +137,7 @@ If prerendering feels clean, continue with Static Web Apps as the public host. I
 | Need live per-request SQL rendering? | Weak fit | Strong fit |
 | Need admin/auth soon? | Possible, but limited | Strong fit |
 | Need lowest public-page latency? | Strong fit | Needs caching/CDN |
-| Need complex legacy URL handling? | Possible with Functions/rules | Strong fit |
+| Need dynamic search or lookup handling? | Possible with Functions/rules | Strong fit |
 | Need future community features? | Likely hybrid | Strong fit |
 
 ## Proof Of Concept
@@ -147,9 +147,8 @@ Build a small generator/import path:
 1. Read legacy news, biography, albums, and picture categories.
 2. Generate static HTML.
 3. Generate sitemap XML.
-4. Generate redirect rules for known old URLs.
+4. Generate canonical routes for known public pages.
 5. Deploy to Azure Static Web Apps preview.
-6. Add one Function for complex legacy redirect lookup.
+6. Add one Function for search or dynamic lookup.
 
 The result will tell us whether Static Web Apps should be the primary public host.
-

@@ -4,7 +4,7 @@
 
 Bring the QueenZone picture library forward as a major public archive feature.
 
-The legacy site had extensive picture records, and the image files may exist in backup or existing Blob Storage. The migration should preserve metadata, URLs where possible, and image quality while improving performance.
+The legacy site had extensive picture records, and the image files may exist in backup or existing Blob Storage. The migration should preserve metadata and image quality while improving performance.
 
 ## Legacy Sources
 
@@ -86,7 +86,7 @@ Possible modern tables:
 Keep:
 
 - Legacy `PIC_ID`.
-- Original legacy URL.
+- Original legacy source path for audit purposes.
 - Blob URL.
 - Dimensions.
 - Caption/name.
@@ -110,5 +110,4 @@ Keep:
 - Are user-submitted/member images part of the initial picture library?
 - Should originals be downloadable?
 - Should EXIF metadata be stripped from public variants?
-- Are current Blob URLs stable enough to preserve?
-
+- Are current Blob URLs stable enough to become canonical asset URLs?

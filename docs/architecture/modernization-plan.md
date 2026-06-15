@@ -41,7 +41,7 @@ Recommended target:
 Alternative target to explore:
 
 - Prerendered/static public site hosted on Azure Static Web Apps.
-- Azure Functions for search, complex redirects, contact forms, and import utilities.
+- Azure Functions for search, contact forms, and import utilities.
 - App Service only for backend/admin needs if Functions become too limiting.
 
 ## Principles
@@ -49,7 +49,7 @@ Alternative target to explore:
 - Preserve content first.
 - Avoid copying old Web Forms architecture.
 - Use simple direct SQL or stored procedure calls first.
-- Keep old URLs working with redirects.
+- Prefer clean, stable, search-friendly canonical URLs over preserving legacy URL shapes.
 - Treat personal/community data cautiously.
 - Make public read-only pages safe before bringing back any write feature.
 - Favor small vertical slices over broad rewrites.
@@ -68,7 +68,7 @@ Alternative target to explore:
 - Implement homepage latest news.
 - Implement news archive.
 - Implement news detail.
-- Add old news redirects.
+- Use stable, search-friendly canonical news URLs.
 - Deploy to Azure preview.
 
 ### Phase 2: Core Content
@@ -84,7 +84,7 @@ Alternative target to explore:
 - Picture categories.
 - Picture details.
 - Blob Storage migration plan.
-- Old media URL redirects.
+- Stable canonical media URLs.
 
 Biography, album information, and the picture library are not optional nice-to-haves. They are core archive pillars for the relaunch and should be planned as first-class content sections.
 

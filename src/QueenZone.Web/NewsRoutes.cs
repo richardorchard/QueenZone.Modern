@@ -40,21 +40,6 @@ public static partial class NewsRoutes
             return Results.Content(RenderPage(item.Title, RenderNewsDetail(item)), "text/html; charset=utf-8");
         });
 
-        endpoints.MapGet("/news.aspx", () => Results.Redirect("/news", permanent: true));
-
-        endpoints.MapGet("/process/news_view.aspx", async (HttpRequest request, INewsRepository newsRepository, CancellationToken cancellationToken) =>
-        {
-            if (!int.TryParse(request.Query["news_id"], out var id))
-            {
-                return Results.Redirect("/news", permanent: true);
-            }
-
-            var item = await newsRepository.GetByIdAsync(id, cancellationToken);
-            return item is null
-                ? Results.Redirect("/news", permanent: true)
-                : Results.Redirect($"/news/{item.Id}/{Slugify(item.Title)}", permanent: true);
-        });
-
         return endpoints;
     }
 
