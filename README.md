@@ -79,11 +79,20 @@ ALTER ROLE db_datawriter ADD MEMBER [queenzone-dev];
 
 Admin news publishing writes to `NEWS_T` and `NewsAuditLog`, so the deployed App Service identity needs `db_datawriter` once the admin workflow is enabled. Keep read-only environments on `db_datareader` only.
 
-Before enabling admin writes in a database, run:
+Before enabling admin writes in a database, apply the admin schema using either:
 
 ```text
 docs/sql/001-news-admin-columns.sql
 ```
+
+or the EF Core migration:
+
+```powershell
+dotnet tool install --global dotnet-ef
+dotnet ef database update --project src/QueenZone.Data/QueenZone.Data.csproj --startup-project src/QueenZone.Web/QueenZone.Web.csproj
+```
+
+Public news reads still use Dapper. Admin writes and audit logging use EF Core (`QueenZoneDbContext`).
 
 ### Admin authentication (Microsoft Entra ID)
 

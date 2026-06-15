@@ -55,7 +55,7 @@ Tradeoffs:
 
 ## Database Changes
 
-Run `docs/sql/001-news-admin-columns.sql` against the target database before enabling admin writes.
+Run `docs/sql/001-news-admin-columns.sql` or apply the EF Core migration in `src/QueenZone.Data/Migrations` before enabling admin writes. See ADR 0006 for the hybrid Dapper/EF Core data-access split.
 
 ## Security
 

@@ -22,17 +22,11 @@ var useLegacySql = !string.IsNullOrWhiteSpace(legacyConnectionString);
 
 if (useLegacySql)
 {
-    builder.Services.AddSingleton<INewsRepository>(_ => new LegacyNewsRepository(legacyConnectionString!));
-    builder.Services.AddSingleton<IAdminNewsRepository>(_ => new LegacyAdminNewsRepository(legacyConnectionString!));
-    builder.Services.AddSingleton<INewsAuditRepository>(_ => new LegacyNewsAuditRepository(legacyConnectionString!));
+    builder.Services.AddQueenZoneLegacyData(legacyConnectionString!);
 }
 else
 {
-    var store = new SharedNewsStore(SampleNewsData.CreateSeedArticles());
-    builder.Services.AddSingleton(store);
-    builder.Services.AddSingleton<INewsRepository, InMemoryNewsRepository>();
-    builder.Services.AddSingleton<IAdminNewsRepository, InMemoryAdminNewsRepository>();
-    builder.Services.AddSingleton<INewsAuditRepository, InMemoryNewsAuditRepository>();
+    builder.Services.AddQueenZoneInMemoryData();
 }
 
 ConfigureAuthentication(builder);
