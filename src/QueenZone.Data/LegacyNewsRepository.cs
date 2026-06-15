@@ -94,18 +94,30 @@ public sealed class LegacyNewsRepository(string connectionString) : INewsReposit
     public async Task<NewsItem?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         const string sql = """
-            SELECT TOP (1)
-                NEWS_ID AS Id,
-                TITLE AS Title,
-                ISNULL(EXCERPT, '') AS Excerpt,
-                ISNULL(ARTICLE, '') AS Body,
-                [DATE] AS PublishedAt,
-                SOURCE_URL AS SourceUrl,
-                CAST(CASE WHEN DISPLAY = 1 THEN 1 ELSE 0 END AS bit) AS IsPublished
-            FROM NEWS_T
-            WHERE NEWS_ID = @Id
-              AND DISPLAY = 1
-            ORDER BY [DATE] DESC, NEWS_ID DESC
+            WITH PublishedNews AS (
+                SELECT
+                    NEWS_ID AS Id,
+                    TITLE AS Title,
+                    ISNULL(EXCERPT, '') AS Excerpt,
+                    ISNULL(ARTICLE, '') AS Body,
+                    [DATE] AS PublishedAt,
+                    SOURCE_URL AS SourceUrl,
+                    CAST(CASE WHEN DISPLAY = 1 THEN 1 ELSE 0 END AS bit) AS IsPublished,
+                    ROW_NUMBER() OVER (PARTITION BY NEWS_ID ORDER BY [DATE] DESC, NEWS_ID DESC) AS RowNumber
+                FROM NEWS_T
+                WHERE NEWS_ID = @Id
+                  AND DISPLAY = 1
+            )
+            SELECT
+                Id,
+                Title,
+                Excerpt,
+                Body,
+                PublishedAt,
+                SourceUrl,
+                IsPublished
+            FROM PublishedNews
+            WHERE RowNumber = 1
             """;
 
         var results = await QueryAsync(sql, new { Id = id }, cancellationToken);

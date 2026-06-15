@@ -121,13 +121,139 @@ public sealed class NewsRoutesTests : IClassFixture<WebApplicationFactory<Progra
     }
 
     [Fact]
-    public async Task NewsDetailRendersByIdAndSlug()
+    public async Task NewsDetailRendersCompletePublishedArticle()
     {
         var client = factory.CreateClient();
 
         var body = await client.GetStringAsync("/news/1003/queenzone-modernisation-begins");
 
         Assert.Contains("The first local vertical slice", body);
+        Assert.Contains("Back to news archive", body);
+        Assert.Contains("<time datetime=\"2026-06-11\">", body);
+        Assert.Contains("<link rel=\"canonical\" href=\"/news/1003/queenzone-modernisation-begins\">", body);
+        Assert.Contains("<meta name=\"description\" content=\"The first local vertical slice", body);
+        Assert.Contains("<title>QueenZone modernisation begins | QueenZone news</title>", body);
+    }
+
+    [Fact]
+    public async Task MissingNewsArticleReturnsNotFound()
+    {
+        var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/news/999999/does-not-exist");
+
+        Assert.Equal(System.Net.HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task HiddenNewsArticleReturnsNotFound()
+    {
+        var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/news/9001/hidden-moderation-draft");
+
+        Assert.Equal(System.Net.HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task NewsDetailRendersSafeSourceLinkAndRejectsUnsafeUrls()
+    {
+        var items = new[]
+        {
+            new NewsItem(
+                5001,
+                "Article with source",
+                "Excerpt with source.",
+                "Published body.",
+                new DateTime(2026, 5, 1, 9, 0, 0, DateTimeKind.Utc),
+                "https://example.com/original-story",
+                true),
+            new NewsItem(
+                5002,
+                "Article with unsafe source",
+                "Unsafe source excerpt.",
+                "Published body.",
+                new DateTime(2026, 5, 2, 9, 0, 0, DateTimeKind.Utc),
+                "javascript:alert(1)",
+                true)
+        };
+
+        var client = factory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+            {
+                services.AddSingleton<INewsRepository>(new InMemoryNewsRepository(items));
+            })).CreateClient();
+
+        var safeBody = await client.GetStringAsync("/news/5001/article-with-source");
+        var unsafeBody = await client.GetStringAsync("/news/5002/article-with-unsafe-source");
+
+        Assert.Contains("href=\"https://example.com/original-story\"", safeBody);
+        Assert.Contains("rel=\"noopener noreferrer\">Source</a>", safeBody);
+        Assert.DoesNotContain("javascript:", unsafeBody, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(">Source</a>", unsafeBody);
+    }
+
+    [Fact]
+    public async Task NewsDetailSanitizesUnsafeLegacyHtmlInBody()
+    {
+        var items = new[]
+        {
+            new NewsItem(
+                5003,
+                "Unsafe HTML article",
+                "Unsafe excerpt.",
+                "<script>alert('xss')</script><p>Safe <strong>legacy</strong> paragraph</p>",
+                new DateTime(2026, 5, 3, 9, 0, 0, DateTimeKind.Utc),
+                null,
+                true)
+        };
+
+        var client = factory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+            {
+                services.AddSingleton<INewsRepository>(new InMemoryNewsRepository(items));
+            })).CreateClient();
+
+        var body = await client.GetStringAsync("/news/5003/unsafe-html-article");
+
+        Assert.DoesNotContain("alert", body, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("<p>Safe <strong>legacy</strong> paragraph</p>", body);
+    }
+
+    [Fact]
+    public async Task DuplicateLegacyRowsResolveToLatestPublishedDetailWithoutError()
+    {
+        var items = new[]
+        {
+            new NewsItem(
+                4242,
+                "Latest duplicate title",
+                "Latest excerpt",
+                "<p>Latest duplicate body</p>",
+                new DateTime(2026, 4, 2, 9, 0, 0, DateTimeKind.Utc),
+                null,
+                true),
+            new NewsItem(
+                4242,
+                "Older duplicate title",
+                "Older excerpt",
+                "<p>Older duplicate body</p>",
+                new DateTime(2026, 3, 1, 9, 0, 0, DateTimeKind.Utc),
+                null,
+                true)
+        };
+
+        var client = factory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+            {
+                services.AddSingleton<INewsRepository>(new InMemoryNewsRepository(items));
+            })).CreateClient();
+
+        var body = await client.GetStringAsync("/news/4242/latest-duplicate-title");
+
+        Assert.Contains("Latest duplicate body", body);
+        Assert.DoesNotContain("Older duplicate body", body);
+        Assert.DoesNotContain("Older duplicate title", body);
     }
 
     [Fact]

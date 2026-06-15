@@ -46,7 +46,13 @@ public static partial class NewsRoutes
                 return Results.Redirect($"/news/{item.Id}/{canonicalSlug}", permanent: true);
             }
 
-            return Results.Content(RenderPage(item.Title, RenderNewsDetail(item)), "text/html; charset=utf-8");
+            var metadata = new PageHeadMetadata(
+                CanonicalPath: NewsArticleContent.GetDetailCanonicalPath(item.Id, item.Title),
+                Description: item.Excerpt);
+
+            return Results.Content(
+                RenderPage($"{item.Title} | QueenZone news", RenderNewsDetail(item), metadata),
+                "text/html; charset=utf-8");
         });
 
         return endpoints;
@@ -272,22 +278,25 @@ public static partial class NewsRoutes
     private static string RenderNewsDetail(NewsItem item)
     {
         var builder = new StringBuilder();
+        builder.Append("<p class=\"article-nav\"><a href=\"/news\">Back to news archive</a></p>");
         builder.Append(CultureSafeHeading(item.Title));
-        builder.Append("<p class=\"date\">");
+        builder.Append("<p class=\"date\"><time datetime=\"");
+        builder.Append(item.PublishedAt.ToString("yyyy-MM-dd"));
+        builder.Append("\">");
         builder.Append(item.PublishedAt.ToString("dd MMMM yyyy"));
-        builder.Append("</p>");
+        builder.Append("</time></p>");
         builder.Append("<p class=\"lede\">");
         builder.Append(WebUtility.HtmlEncode(item.Excerpt));
         builder.Append("</p>");
-        builder.Append("<article>");
-        builder.Append(WebUtility.HtmlEncode(item.Body).Replace("\n", "<br>"));
+        builder.Append("<article class=\"article-body\">");
+        builder.Append(NewsArticleContent.FormatBody(item.Body));
         builder.Append("</article>");
 
-        if (!string.IsNullOrWhiteSpace(item.SourceUrl))
+        if (NewsArticleContent.IsSafePublicUrl(item.SourceUrl))
         {
-            builder.Append("<p><a href=\"");
+            builder.Append("<p class=\"article-source\"><a href=\"");
             builder.Append(WebUtility.HtmlEncode(item.SourceUrl));
-            builder.Append("\">Source</a></p>");
+            builder.Append("\" rel=\"noopener noreferrer\">Source</a></p>");
         }
 
         return builder.ToString();
@@ -317,6 +326,13 @@ public static partial class NewsRoutes
             headExtras.Append("\">\n");
         }
 
+        if (!string.IsNullOrWhiteSpace(metadata?.Description))
+        {
+            headExtras.Append("  <meta name=\"description\" content=\"");
+            headExtras.Append(WebUtility.HtmlEncode(metadata.Description));
+            headExtras.Append("\">\n");
+        }
+
         return $$"""
             <!doctype html>
             <html lang="en">
@@ -332,6 +348,9 @@ public static partial class NewsRoutes
                 .news-list li { margin-bottom: 1.5rem; }
                 .date, time { color: #57606a; }
                 .lede { font-size: 1.15rem; }
+                .article-nav { margin: 0 0 1.5rem; }
+                .article-body { margin-top: 1.5rem; }
+                .article-source { margin-top: 2rem; }
                 .archive-pagination { border-top: 1px solid #d0d7de; margin-top: 2.5rem; padding-top: 1.5rem; }
                 .archive-pagination-summary { color: #57606a; margin: 0 0 1rem; }
                 .archive-pagination-controls { align-items: center; display: flex; flex-wrap: wrap; gap: 0.75rem 1rem; }
@@ -360,7 +379,11 @@ public static partial class NewsRoutes
             """;
     }
 
-    private sealed record PageHeadMetadata(string? CanonicalPath = null, string? PrevPath = null, string? NextPath = null);
+    private sealed record PageHeadMetadata(
+        string? CanonicalPath = null,
+        string? PrevPath = null,
+        string? NextPath = null,
+        string? Description = null);
 
     private static string CultureSafeHeading(string heading) => $"<h1>{WebUtility.HtmlEncode(heading)}</h1>";
 
