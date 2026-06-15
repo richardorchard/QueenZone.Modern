@@ -37,6 +37,18 @@ dotnet run --project src/QueenZone.Web/QueenZone.Web.csproj
 
 Local secrets belong in `src/QueenZone.Web/appsettings.Local.json`, which is ignored by git. You can also set `ConnectionStrings__QueenZoneLegacy` in your shell or a local `.env` file for tooling that loads dotenv values. If no `ConnectionStrings:QueenZoneLegacy` value is present, the site uses sample news data so the first slice can still run locally.
 
+To point a local app instance at the Azure SQL development database, use your signed-in Entra identity rather than a SQL password:
+
+```json
+{
+  "ConnectionStrings": {
+    "QueenZoneLegacy": "Server=tcp:queenzone-sql-server.database.windows.net,1433;Database=queenzone-dev-db;Authentication=Active Directory Default;Encrypt=True;TrustServerCertificate=False;"
+  }
+}
+```
+
+The local Entra database user is `richard@thinkingwebsites.com.au`. It should be granted only the permissions needed for local testing, usually `db_datareader` and only `db_datawriter` when write-path testing is intentional.
+
 ## Testing And Workflow
 
 Follow the layered testing policy in `docs/architecture/testing-policy.md`.
