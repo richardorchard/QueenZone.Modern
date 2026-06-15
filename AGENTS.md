@@ -15,17 +15,27 @@ Keep durable workflow guidance in this file and keep user-facing setup guidance 
 
 Do not push feature work directly to `main`.
 
-Use a branch named after the agent or model doing the work. For this agent, use:
+Use a branch named after the agent doing the work, not a single shared prefix. The agent slug must match whoever is performing the task so parallel work from different tools stays distinguishable.
+
+Branch format:
 
 ```text
-codex-gpt-5
+{agent}-{task}
 ```
 
-If multiple parallel efforts are needed, append a short task suffix while keeping the agent/model prefix, for example:
+- `{agent}`: lowercase slug for the active agent or assistant (for example `grok`, `claude`, `codex`, `cursor`).
+- `{task}`: short kebab-case description of the work (for example `news-pagination`, `seo-foundation`).
+
+Examples:
 
 ```text
+grok-news-pagination
+claude-news-pagination
 codex-gpt-5-news-routes
+cursor-health-check
 ```
+
+Use the prefix for the agent you are, not a default from an earlier session or another tool. Different agents working on the same area should use different branch names, such as `grok-news-pagination` and `claude-news-pagination`, rather than reusing one shared branch.
 
 Before merging to `main`, open a pull request and get a review. The pull request should include:
 
