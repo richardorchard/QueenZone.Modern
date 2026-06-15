@@ -33,6 +33,8 @@ Good targets:
 
 Unit tests must run on every build and in every pull request.
 
+Code coverage is reported for the default automated test suite. Treat coverage as a review signal, not as a replacement for useful assertions. New or changed pure logic should normally include targeted unit coverage, especially for canonical routes, pagination, visibility rules, date formatting, and HTML sanitisation.
+
 ### Web Integration Tests
 
 Use ASP.NET Core integration tests for route and page behavior. These tests should use fake, in-memory, or sample repositories by default so they can run in CI without SQL Server.
@@ -111,6 +113,18 @@ dotnet build QueenZone.sln --configuration Release --no-restore
 dotnet test QueenZone.sln --configuration Release --no-build
 ```
 
+CI should also collect coverage from the deterministic test suite and publish an HTML/Cobertura report artifact. The coverage report is expected to help reviewers spot untested risk, but the project does not enforce a global percentage threshold yet because early migration work will mix framework glue, Razor rendering, and legacy-data boundaries.
+
+For local coverage reports:
+
+```powershell
+dotnet tool restore
+dotnet test QueenZone.sln --configuration Release --collect:"XPlat Code Coverage" --settings coverlet.runsettings --results-directory ./TestResults
+dotnet tool run reportgenerator -reports:".\TestResults\**\coverage.cobertura.xml" -targetdir:".\coverage-report" -reporttypes:"HtmlInline;Cobertura;MarkdownSummary"
+```
+
+Do not commit generated `TestResults/` or `coverage-report/` output.
+
 Add these checks when the project is ready:
 
 ```powershell
@@ -137,3 +151,5 @@ Every pull request should state:
 - Any remaining manual checks.
 
 If a change touches legacy data access, canonical routes, content rendering, or publication rules, it should include tests or validation evidence for the affected behavior.
+
+Pull requests should mention any meaningful coverage movement when the change adds risky logic or intentionally leaves a path untested.
