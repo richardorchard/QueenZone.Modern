@@ -16,7 +16,7 @@ concurrency:
 jobs:
   deploy:
     name: Build, test, and deploy
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     environment:
       name: dev
       url: https://queenzone-dev.azurewebsites.net
