@@ -12,3 +12,5 @@ appsettings.Local.json
 .env
 *.db
 *.bak
+*.PublishSettings
+*.pubxml

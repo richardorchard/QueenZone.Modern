@@ -52,6 +52,20 @@ Normal CI and pull request checks should not require the restored legacy databas
 
 Feature work should happen on an agent/model-named branch and be reviewed through a pull request before it reaches `main`. See `AGENTS.md` for the branch and PR policy.
 
+## Deployment
+
+The `Deploy App Service` GitHub Actions workflow deploys `main` to the `queenzone-dev` Azure App Service at `https://queenzone-dev.azurewebsites.net`.
+
+Repository secrets required:
+
+- `AZURE_WEBAPP_PUBLISH_PROFILE`: the App Service publish profile XML.
+
+App Service configuration required:
+
+- `ConnectionStrings__QueenZoneLegacy`: the Azure SQL connection string for the copied legacy tables.
+
+Do not commit publish profiles, `.pubxml` files, local app settings, or connection strings. Rotate the App Service publish profile if it has ever been saved outside GitHub Secrets.
+
 ## First Milestone
 
 Build the first vertical slice around news:
