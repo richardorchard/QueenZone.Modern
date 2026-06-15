@@ -14,6 +14,8 @@ QueenZone has the kind of archive content that can still perform well in search:
 
 The new site should be built for fast, crawlable, canonical, durable pages.
 
+The planned public canonical domain is `https://www.queenzone.org`. Sitemaps, robots.txt, canonical links that require absolute public URLs, and webmaster tooling should use that host for production.
+
 ## SEO Requirements
 
 - Static or server-rendered HTML for all important pages.

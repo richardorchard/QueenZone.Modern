@@ -37,6 +37,18 @@ dotnet run --project src/QueenZone.Web/QueenZone.Web.csproj
 
 Local secrets belong in `src/QueenZone.Web/appsettings.Local.json`, which is ignored by git. You can also set `ConnectionStrings__QueenZoneLegacy` in your shell or a local `.env` file for tooling that loads dotenv values. If no `ConnectionStrings:QueenZoneLegacy` value is present, the site uses sample news data so the first slice can still run locally.
 
+To point a local app instance at the Azure SQL development database, use your signed-in Entra identity rather than a SQL password:
+
+```json
+{
+  "ConnectionStrings": {
+    "QueenZoneLegacy": "Server=tcp:queenzone-sql-server.database.windows.net,1433;Database=queenzone-dev-db;Authentication=Active Directory Default;Encrypt=True;TrustServerCertificate=False;"
+  }
+}
+```
+
+The local Entra database user is `richard@thinkingwebsites.com.au`. It should be granted only the permissions needed for local testing, usually `db_datareader` and only `db_datawriter` when write-path testing is intentional.
+
 ## Testing And Workflow
 
 Follow the layered testing policy in `docs/architecture/testing-policy.md`.
@@ -56,6 +68,8 @@ Feature work should happen on an agent-prefixed branch such as `grok/news-pagina
 ## Deployment
 
 The `Deploy App Service` GitHub Actions workflow deploys `main` to the `queenzone-dev` Azure App Service at `https://queenzone-dev.azurewebsites.net`.
+
+The planned public canonical domain for the site is `https://www.queenzone.org`. SEO features that emit absolute public URLs, such as sitemaps and robots.txt, should use that host in production configuration.
 
 Repository secrets required:
 
