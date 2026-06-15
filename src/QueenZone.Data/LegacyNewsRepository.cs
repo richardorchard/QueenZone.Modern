@@ -37,6 +37,26 @@ public sealed class LegacyNewsRepository(string connectionString) : INewsReposit
         return await QueryAsync(sql, new { Count = count }, cancellationToken);
     }
 
+    public async Task<int> GetPublishedCountAsync(CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+            WITH PublishedNews AS (
+                SELECT
+                    NEWS_ID AS Id,
+                    ROW_NUMBER() OVER (PARTITION BY NEWS_ID ORDER BY [DATE] DESC, NEWS_ID DESC) AS RowNumber
+                FROM NEWS_T
+                WHERE DISPLAY = 1
+            )
+            SELECT COUNT(*)
+            FROM PublishedNews
+            WHERE RowNumber = 1
+            """;
+
+        await using var connection = new SqlConnection(connectionString);
+        var command = new CommandDefinition(sql, cancellationToken: cancellationToken);
+        return await connection.ExecuteScalarAsync<int>(command);
+    }
+
     public async Task<IReadOnlyList<NewsItem>> GetArchivePageAsync(int page, int pageSize, CancellationToken cancellationToken = default)
     {
         const string sql = """

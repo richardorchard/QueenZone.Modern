@@ -7,6 +7,8 @@ namespace QueenZone.Web;
 
 public static partial class NewsRoutes
 {
+    public const int ArchivePageSize = 20;
+
     public static IEndpointRouteBuilder MapNewsRoutes(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet("/", async (INewsRepository newsRepository, CancellationToken cancellationToken) =>
@@ -18,9 +20,16 @@ public static partial class NewsRoutes
         endpoints.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 
         endpoints.MapGet("/news", async (INewsRepository newsRepository, CancellationToken cancellationToken) =>
+            await RenderArchivePageAsync(1, newsRepository, cancellationToken));
+
+        endpoints.MapGet("/news/page/{page:int}", async (int page, INewsRepository newsRepository, CancellationToken cancellationToken) =>
         {
-            var archive = await newsRepository.GetArchivePageAsync(1, 20, cancellationToken);
-            return Results.Content(RenderPage("QueenZone news", RenderNewsList("News archive", archive)), "text/html; charset=utf-8");
+            if (page == 1)
+            {
+                return Results.Redirect("/news", permanent: true);
+            }
+
+            return await RenderArchivePageAsync(page, newsRepository, cancellationToken);
         });
 
         endpoints.MapGet("/news/{id:int}/{slug}", async (int id, string slug, INewsRepository newsRepository, CancellationToken cancellationToken) =>
@@ -43,11 +52,151 @@ public static partial class NewsRoutes
         return endpoints;
     }
 
+    public static int GetArchiveTotalPages(int publishedCount, int pageSize = ArchivePageSize)
+    {
+        if (publishedCount <= 0)
+        {
+            return 0;
+        }
+
+        return (publishedCount + pageSize - 1) / pageSize;
+    }
+
+    public static string GetArchiveCanonicalPath(int page) =>
+        page <= 1 ? "/news" : $"/news/page/{page}";
+
+    public static string GetArchivePageTitle(int page) =>
+        page <= 1 ? "QueenZone news" : $"QueenZone news – Page {page}";
+
+    public static string BuildArchivePaginationNav(int currentPage, int totalPages)
+    {
+        if (totalPages <= 1)
+        {
+            return string.Empty;
+        }
+
+        var builder = new StringBuilder();
+        builder.Append("<nav class=\"pagination\" aria-label=\"News archive pagination\">");
+
+        if (currentPage > 1)
+        {
+            builder.Append("<a rel=\"prev\" href=\"");
+            builder.Append(WebUtility.HtmlEncode(GetArchiveCanonicalPath(currentPage - 1)));
+            builder.Append("\">Previous</a> ");
+        }
+
+        foreach (var pageNumber in GetVisiblePageNumbers(currentPage, totalPages))
+        {
+            if (pageNumber is null)
+            {
+                builder.Append("<span class=\"pagination-ellipsis\">…</span> ");
+                continue;
+            }
+
+            if (pageNumber == currentPage)
+            {
+                builder.Append("<span aria-current=\"page\">");
+                builder.Append(pageNumber);
+                builder.Append("</span> ");
+                continue;
+            }
+
+            builder.Append("<a href=\"");
+            builder.Append(WebUtility.HtmlEncode(GetArchiveCanonicalPath(pageNumber.Value)));
+            builder.Append("\">");
+            builder.Append(pageNumber);
+            builder.Append("</a> ");
+        }
+
+        if (currentPage < totalPages)
+        {
+            builder.Append("<a rel=\"next\" href=\"");
+            builder.Append(WebUtility.HtmlEncode(GetArchiveCanonicalPath(currentPage + 1)));
+            builder.Append("\">Next</a>");
+        }
+
+        builder.Append("</nav>");
+        return builder.ToString();
+    }
+
     public static string Slugify(string value)
     {
         var lower = value.Trim().ToLowerInvariant();
         var replaced = NonAlphaNumericRegex().Replace(lower, "-");
         return DuplicateDashRegex().Replace(replaced, "-").Trim('-');
+    }
+
+    private static async Task<IResult> RenderArchivePageAsync(
+        int page,
+        INewsRepository newsRepository,
+        CancellationToken cancellationToken)
+    {
+        if (page < 1)
+        {
+            return Results.NotFound();
+        }
+
+        var publishedCount = await newsRepository.GetPublishedCountAsync(cancellationToken);
+        var totalPages = GetArchiveTotalPages(publishedCount);
+
+        if (totalPages == 0)
+        {
+            if (page > 1)
+            {
+                return Results.NotFound();
+            }
+        }
+        else if (page > totalPages)
+        {
+            return Results.NotFound();
+        }
+
+        var archive = await newsRepository.GetArchivePageAsync(page, ArchivePageSize, cancellationToken);
+        var body = RenderNewsList("News archive", archive);
+        body += BuildArchivePaginationNav(page, totalPages);
+
+        var metadata = new PageHeadMetadata(
+            CanonicalPath: GetArchiveCanonicalPath(page),
+            PrevPath: page > 1 ? GetArchiveCanonicalPath(page - 1) : null,
+            NextPath: totalPages > 0 && page < totalPages ? GetArchiveCanonicalPath(page + 1) : null);
+
+        return Results.Content(
+            RenderPage(GetArchivePageTitle(page), body, metadata),
+            "text/html; charset=utf-8");
+    }
+
+    private static IEnumerable<int?> GetVisiblePageNumbers(int currentPage, int totalPages)
+    {
+        if (totalPages <= 7)
+        {
+            for (var page = 1; page <= totalPages; page++)
+            {
+                yield return page;
+            }
+
+            yield break;
+        }
+
+        yield return 1;
+
+        if (currentPage > 3)
+        {
+            yield return null;
+        }
+
+        var start = Math.Max(2, currentPage - 1);
+        var end = Math.Min(totalPages - 1, currentPage + 1);
+        for (var page = start; page <= end; page++)
+        {
+            yield return page;
+        }
+
+        if (currentPage < totalPages - 2)
+        {
+            yield return null;
+        }
+
+        yield return totalPages;
     }
 
     private static string RenderNewsList(string heading, IReadOnlyList<NewsItem> items)
@@ -105,35 +254,64 @@ public static partial class NewsRoutes
         return builder.ToString();
     }
 
-    private static string RenderPage(string title, string body) =>
-        $$"""
-        <!doctype html>
-        <html lang="en">
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1">
-          <title>{{WebUtility.HtmlEncode(title)}}</title>
-          <style>
-            body { font-family: Arial, sans-serif; line-height: 1.5; margin: 0 auto; max-width: 880px; padding: 2rem; }
-            header { border-bottom: 1px solid #d0d7de; margin-bottom: 2rem; padding-bottom: 1rem; }
-            nav a { margin-right: 1rem; }
-            .news-list { padding-left: 1.5rem; }
-            .news-list li { margin-bottom: 1.5rem; }
-            .date, time { color: #57606a; }
-            .lede { font-size: 1.15rem; }
-          </style>
-        </head>
-        <body>
-          <header>
-            <strong>QueenZone</strong>
-            <nav><a href="/">Home</a><a href="/news">News</a></nav>
-          </header>
-          <main>
-            {{body}}
-          </main>
-        </body>
-        </html>
-        """;
+    private static string RenderPage(string title, string body, PageHeadMetadata? metadata = null)
+    {
+        var headExtras = new StringBuilder();
+        if (!string.IsNullOrWhiteSpace(metadata?.CanonicalPath))
+        {
+            headExtras.Append("  <link rel=\"canonical\" href=\"");
+            headExtras.Append(WebUtility.HtmlEncode(metadata.CanonicalPath));
+            headExtras.Append("\">\n");
+        }
+
+        if (!string.IsNullOrWhiteSpace(metadata?.PrevPath))
+        {
+            headExtras.Append("  <link rel=\"prev\" href=\"");
+            headExtras.Append(WebUtility.HtmlEncode(metadata.PrevPath));
+            headExtras.Append("\">\n");
+        }
+
+        if (!string.IsNullOrWhiteSpace(metadata?.NextPath))
+        {
+            headExtras.Append("  <link rel=\"next\" href=\"");
+            headExtras.Append(WebUtility.HtmlEncode(metadata.NextPath));
+            headExtras.Append("\">\n");
+        }
+
+        return $$"""
+            <!doctype html>
+            <html lang="en">
+            <head>
+              <meta charset="utf-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1">
+              <title>{{WebUtility.HtmlEncode(title)}}</title>
+            {{headExtras}}  <style>
+                body { font-family: Arial, sans-serif; line-height: 1.5; margin: 0 auto; max-width: 880px; padding: 2rem; }
+                header { border-bottom: 1px solid #d0d7de; margin-bottom: 2rem; padding-bottom: 1rem; }
+                nav a { margin-right: 1rem; }
+                .news-list { padding-left: 1.5rem; }
+                .news-list li { margin-bottom: 1.5rem; }
+                .date, time { color: #57606a; }
+                .lede { font-size: 1.15rem; }
+                .pagination { margin-top: 2rem; }
+                .pagination a, .pagination span { margin-right: 0.75rem; }
+                .pagination-ellipsis { color: #57606a; }
+              </style>
+            </head>
+            <body>
+              <header>
+                <strong>QueenZone</strong>
+                <nav><a href="/">Home</a><a href="/news">News</a></nav>
+              </header>
+              <main>
+                {{body}}
+              </main>
+            </body>
+            </html>
+            """;
+    }
+
+    private sealed record PageHeadMetadata(string? CanonicalPath = null, string? PrevPath = null, string? NextPath = null);
 
     private static string CultureSafeHeading(string heading) => $"<h1>{WebUtility.HtmlEncode(heading)}</h1>";
 
