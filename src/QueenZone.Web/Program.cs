@@ -12,6 +12,7 @@ if (!builder.Environment.IsEnvironment("Testing"))
 
 var legacyConnectionString = builder.Configuration.GetConnectionString("QueenZoneLegacy");
 
+builder.Services.AddRazorPages();
 builder.Services.AddSingleton<INewsRepository>(_ =>
     string.IsNullOrWhiteSpace(legacyConnectionString)
         ? new SampleNewsRepository()
@@ -19,7 +20,8 @@ builder.Services.AddSingleton<INewsRepository>(_ =>
 
 var app = builder.Build();
 
-app.MapNewsRoutes();
+app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+app.MapRazorPages();
 
 app.Run();
 

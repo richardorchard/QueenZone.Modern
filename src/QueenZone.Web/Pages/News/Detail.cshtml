@@ -1,0 +1,16 @@
+@page "/news/{id:int}/{slug}"
+@model DetailModel
+
+@if (Model.Item is not null)
+{
+  <p class="article-nav"><a href="/news">Back to news archive</a></p>
+  <h1>@Model.Item.Title</h1>
+  <p class="date"><time datetime="@Model.Item.PublishedAt.ToString("yyyy-MM-dd")">@Model.Item.PublishedAt.ToString("dd MMMM yyyy")</time></p>
+  <p class="lede">@Model.Item.Excerpt</p>
+  <article class="article-body">@Html.Raw(NewsArticleContent.FormatBody(Model.Item.Body))</article>
+
+  @if (NewsArticleContent.IsSafePublicUrl(Model.Item.SourceUrl))
+  {
+    <p class="article-source"><a href="@Model.Item.SourceUrl" rel="noopener noreferrer">Source</a></p>
+  }
+}

@@ -11,6 +11,7 @@ The goal is to restart QueenZone as a clean, modern, read-only public site first
   QueenZone.sln
   src/
     QueenZone.Web/
+      Pages/
     QueenZone.Data/
     QueenZone.Import/
   tests/
