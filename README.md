@@ -50,7 +50,7 @@ dotnet test QueenZone.sln --configuration Release --no-build
 
 Normal CI and pull request checks should not require the restored legacy database. Real legacy database checks are opt-in until a controlled test database exists.
 
-Feature work should happen on an agent/model-named branch and be reviewed through a pull request before it reaches `main`. See `AGENTS.md` for the branch and PR policy.
+Feature work should happen on an agent-prefixed branch such as `grok/news-pagination` and be reviewed through a pull request before it reaches `main`. See `AGENTS.md` for the branch and PR policy.
 
 ## Deployment
 

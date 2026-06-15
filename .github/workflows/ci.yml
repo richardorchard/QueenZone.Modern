@@ -28,3 +28,59 @@ jobs:
 
       - name: Test
         run: dotnet test QueenZone.sln --configuration Release --no-build
+
+  smoke-test:
+    runs-on: ubuntu-latest
+    needs: build
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore QueenZone.sln
+
+      - name: Build
+        run: dotnet build QueenZone.sln --configuration Release --no-restore
+
+      - name: Publish web app
+        run: dotnet publish src/QueenZone.Web/QueenZone.Web.csproj --configuration Release --no-build --output ./smoke-app
+
+      - name: Start app in background
+        run: |
+          ASPNETCORE_ENVIRONMENT=Testing ASPNETCORE_URLS=http://127.0.0.1:5099 ./smoke-app/QueenZone.Web > smoke-app.log 2>&1 &
+          echo $! > smoke-app.pid
+
+      - name: Wait for app to be ready
+        run: |
+          echo "Waiting for web app..."
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:5099/health > /dev/null; then
+              echo "App is up after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "App failed to start in time"
+          cat smoke-app.log || true
+          exit 1
+
+      - name: Smoke checks for key routes
+        run: |
+          curl -sf http://127.0.0.1:5099/health | grep -q '"status":"ok"' || { echo "Health endpoint failed"; exit 1; }
+          curl -sf http://127.0.0.1:5099/ | grep -q "Latest news" || { echo "Homepage content missing"; exit 1; }
+          curl -sf http://127.0.0.1:5099/news | grep -q "News archive" || { echo "News archive content missing"; exit 1; }
+
+      - name: Upload app log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-app-log-${{ github.run_id }}
+          path: smoke-app.log
+          retention-days: 7

@@ -20,29 +20,35 @@ Use a branch named after the agent doing the work, not a single shared prefix. T
 Branch format:
 
 ```text
-{agent}-{task}
+{agent}/{task}
 ```
 
-- `{agent}`: lowercase slug for the active agent or assistant (for example `grok`, `claude`, `codex`, `cursor`).
+- `{agent}`: lowercase slug for the active agent or assistant (for example `grok`, `claude`, `codex`, `composer`).
 - `{task}`: short kebab-case description of the work (for example `news-pagination`, `seo-foundation`).
 
 Examples:
 
-```text
-grok-news-pagination
-claude-news-pagination
-codex-gpt-5-news-routes
-cursor-health-check
-```
+| Agent / tool    | Prefix      | Example branch                | Auto label     |
+| --------------- | ----------- | ----------------------------- | -------------- |
+| Grok            | `grok/`     | `grok/news-pagination`        | `agent:grok`   |
+| Claude Code     | `claude/`   | `claude/seo-foundation`       | `agent:claude` |
+| Codex           | `codex/`    | `codex/legacy-news-dedup`       | `agent:codex`  |
+| Cursor Composer | `composer/` | `composer/health-smoke-tests` | `agent:composer` |
+| New tool        | `{name}/`   | `my-tool/forum-archive-review`| `agent:{name}` |
 
-Use the prefix for the agent you are, not a default from an earlier session or another tool. Different agents working on the same area should use different branch names, such as `grok-news-pagination` and `claude-news-pagination`, rather than reusing one shared branch.
+GitHub Actions applies the matching `agent:*` label from the branch prefix via `.github/workflows/agent-pr-label.yml`.
 
-Before merging to `main`, open a pull request and get a review. The pull request should include:
+Use the prefix for the agent you are, not a default from an earlier session or another tool. Different agents working on the same area should use different branch names, such as `grok/news-pagination` and `claude/news-pagination`, rather than reusing one shared branch.
 
+Before merging to `main`, open a pull request and fill in `.github/pull_request_template.md`. The pull request should include:
+
+- Which agent authored the change.
 - Summary of the change.
 - Tests run.
 - Whether real legacy database checks were run.
 - Any skipped checks or known follow-up work.
+
+For multi-session work, use `docs/agent-handoff-cheatsheet.md`.
 
 ## Testing Expectations
 
