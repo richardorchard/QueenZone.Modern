@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
+using QueenZone.Data;
 
 namespace QueenZone.Web;
 
@@ -12,8 +13,8 @@ public static partial class NewsArticleContent
         "h2", "h3", "h4", "blockquote"
     };
 
-    public static string GetDetailCanonicalPath(int id, string title) =>
-        $"/news/{id}/{NewsRoutes.Slugify(title)}";
+    public static string GetDetailCanonicalPath(int id, string title, string? slug = null) =>
+        $"/news/{id}/{NewsSlug.Resolve(title, slug)}";
 
     public static bool IsSafePublicUrl(string? url)
     {

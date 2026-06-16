@@ -1,0 +1,135 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using QueenZone.Data.Entities;
+
+#nullable disable
+
+namespace QueenZone.Data.Migrations;
+
+[DbContext(typeof(QueenZoneDbContext))]
+partial class QueenZoneDbContextModelSnapshot : ModelSnapshot
+{
+    protected override void BuildModel(ModelBuilder modelBuilder)
+    {
+#pragma warning disable 612, 618
+        modelBuilder
+            .HasAnnotation("ProductVersion", "10.0.0")
+            .HasAnnotation("Relational:MaxIdentifierLength", 128);
+
+        SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
+
+        modelBuilder.Entity("QueenZone.Data.Entities.NewsAuditLogEntity", b =>
+            {
+                b.Property<int>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("int");
+
+                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                b.Property<string>("Action")
+                    .IsRequired()
+                    .HasMaxLength(50)
+                    .HasColumnType("nvarchar(50)");
+
+                b.Property<string>("ActorEmail")
+                    .IsRequired()
+                    .HasMaxLength(256)
+                    .HasColumnType("nvarchar(256)");
+
+                b.Property<string>("Details")
+                    .HasMaxLength(2000)
+                    .HasColumnType("nvarchar(2000)");
+
+                b.Property<int>("NewsId")
+                    .HasColumnType("int");
+
+                b.Property<DateTime>("OccurredAt")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("datetime2(0)")
+                    .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                b.HasKey("Id");
+
+                b.HasIndex("NewsId", "OccurredAt")
+                    .IsDescending(false, true)
+                    .HasDatabaseName("IX_NewsAuditLog_NewsId_OccurredAt");
+
+                b.ToTable("NewsAuditLog");
+            });
+
+        modelBuilder.Entity("QueenZone.Data.Entities.NewsTableRow", b =>
+            {
+                b.Property<int>("NewsId")
+                    .HasColumnType("int")
+                    .HasColumnName("NEWS_ID");
+
+                b.Property<string>("Body")
+                    .IsRequired()
+                    .HasColumnType("nvarchar(max)")
+                    .HasColumnName("ARTICLE");
+
+                b.Property<DateTime?>("CreatedAt")
+                    .HasColumnType("datetime2(0)")
+                    .HasColumnName("CREATED_AT");
+
+                b.Property<string>("EditorEmail")
+                    .HasMaxLength(256)
+                    .HasColumnType("nvarchar(256)")
+                    .HasColumnName("EDITOR_EMAIL");
+
+                b.Property<string>("Excerpt")
+                    .IsRequired()
+                    .HasColumnType("nvarchar(max)")
+                    .HasColumnName("EXCERPT");
+
+                b.Property<bool>("IsPublished")
+                    .HasColumnType("int")
+                    .HasColumnName("DISPLAY");
+
+                b.Property<int>("QueenOnline")
+                    .HasColumnType("int")
+                    .HasColumnName("QUEEN_ONLINE");
+
+                b.Property<DateTime>("PublishedAt")
+                    .HasColumnType("datetime2")
+                    .HasColumnName("DATE");
+
+                b.Property<string>("Slug")
+                    .HasMaxLength(200)
+                    .HasColumnType("nvarchar(200)")
+                    .HasColumnName("SLUG");
+
+                b.Property<string>("SourceUrl")
+                    .HasColumnType("nvarchar(max)")
+                    .HasColumnName("SOURCE_URL");
+
+                b.Property<string>("Title")
+                    .IsRequired()
+                    .HasMaxLength(500)
+                    .HasColumnType("nvarchar(500)")
+                    .HasColumnName("TITLE");
+
+                b.Property<int>("Type")
+                    .HasColumnType("int")
+                    .HasColumnName("TYPE");
+
+                b.Property<DateTime?>("UpdatedAt")
+                    .HasColumnType("datetime2(0)")
+                    .HasColumnName("UPDATED_AT");
+
+                b.Property<int?>("UserId")
+                    .HasColumnType("int")
+                    .HasColumnName("USER_ID");
+
+                b.HasKey("NewsId");
+
+                b.ToTable("NEWS_T", null, t =>
+                    {
+                        t.ExcludeFromMigrations();
+                    });
+            });
+#pragma warning restore 612, 618
+    }
+}

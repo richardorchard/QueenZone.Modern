@@ -1,0 +1,70 @@
+using System.Text.RegularExpressions;
+
+namespace QueenZone.Data;
+
+public static partial class NewsValidation
+{
+    public static IReadOnlyList<string> ValidateDraft(AdminNewsDraft draft, bool slugInUse)
+    {
+        var errors = new List<string>();
+
+        if (string.IsNullOrWhiteSpace(draft.Title))
+        {
+            errors.Add("Title is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(draft.Excerpt))
+        {
+            errors.Add("Excerpt is required.");
+        }
+
+        if (draft.PublishedAt == default)
+        {
+            errors.Add("Publication date is required.");
+        }
+
+        if (draft.PublishedAt > DateTime.UtcNow.AddDays(1))
+        {
+            errors.Add("Publication date cannot be more than one day in the future.");
+        }
+
+        var resolvedSlug = NewsSlug.Resolve(draft.Title, draft.Slug);
+        if (string.IsNullOrWhiteSpace(resolvedSlug))
+        {
+            errors.Add("Slug cannot be empty.");
+        }
+
+        if (slugInUse)
+        {
+            errors.Add("Slug is already in use by another article.");
+        }
+
+        if (!string.IsNullOrEmpty(draft.Body) && LooksLikeHtml(draft.Body))
+        {
+            errors.Add("Article body must be plain text.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(draft.SourceUrl) && !IsSafePublicUrl(draft.SourceUrl))
+        {
+            errors.Add("Source URL must be a safe http or https link.");
+        }
+
+        return errors;
+    }
+
+    public static bool IsSafePublicUrl(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            return false;
+        }
+
+        return Uri.TryCreate(url.Trim(), UriKind.Absolute, out var uri)
+            && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
+    }
+
+    private static bool LooksLikeHtml(string value) => HtmlTagRegex().IsMatch(value);
+
+    [GeneratedRegex("<[^>]+>", RegexOptions.IgnoreCase)]
+    private static partial Regex HtmlTagRegex();
+}

@@ -86,6 +86,7 @@ The planned public canonical domain for the site is `https://www.queenzone.org`.
 Repository secrets required:
 
 - `AZURE_WEBAPP_PUBLISH_PROFILE`: the App Service publish profile XML.
+- `QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING`: Azure SQL connection string used by the deploy workflow to apply EF Core migrations before each release. This is separate from the App Service runtime connection because GitHub Actions cannot use the App Service Managed Identity. Use a dedicated SQL login or Entra principal with permission to create or alter tables.
 
 App Service configuration required:
 
@@ -103,6 +104,46 @@ Only add write permissions if the deployed app has an intentional write path:
 ```sql
 ALTER ROLE db_datawriter ADD MEMBER [queenzone-dev];
 ```
+
+Admin news publishing writes to `NEWS_T` and `NewsAuditLog`, so the deployed App Service identity needs `db_datawriter` once the admin workflow is enabled. Keep read-only environments on `db_datareader` only.
+
+The `Deploy App Service` workflow applies pending EF Core migrations automatically after tests and before deploy. Configure `QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING` in the GitHub `dev` environment secrets.
+
+For manual bootstrap or recovery, you can still run:
+
+```text
+docs/sql/001-news-admin-columns.sql
+```
+
+or:
+
+```powershell
+dotnet tool restore
+dotnet ef database update --project src/QueenZone.Data/QueenZone.Data.csproj --startup-project src/QueenZone.Web/QueenZone.Web.csproj
+```
+
+Public news reads still use Dapper. Admin writes and audit logging use EF Core (`QueenZoneDbContext`).
+
+### Admin authentication (Microsoft Entra ID)
+
+Admin routes require Microsoft Entra ID sign-in and an allowed admin email address.
+
+1. Create an Entra app registration for `QueenZone.Web`.
+2. Add a web redirect URI such as `https://queenzone-dev.azurewebsites.net/signin-oidc`.
+3. Create a client secret for the app registration.
+4. Configure these App Service settings:
+
+```text
+AzureAd__TenantId
+AzureAd__ClientId
+AzureAd__ClientSecret
+Admin__AllowedEmails__0
+Admin__AllowedEmails__1
+```
+
+Use `src/QueenZone.Web/appsettings.Local.json` for local Entra values. If `AzureAd:ClientId` is empty locally, the app falls back to test-header authentication for development only.
+
+For automated tests, send `X-Test-User-Email` with an allowed admin email address.
 
 Do not commit publish profiles, `.pubxml` files, local app settings, or connection strings. Rotate the App Service publish profile if it has ever been saved outside GitHub Secrets.
 

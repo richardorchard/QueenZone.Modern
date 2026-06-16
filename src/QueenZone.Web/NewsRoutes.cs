@@ -1,6 +1,5 @@
 using System.Net;
 using System.Text;
-using System.Text.RegularExpressions;
 using QueenZone.Data;
 
 namespace QueenZone.Web;
@@ -96,12 +95,7 @@ public static partial class NewsRoutes
         return $"<a class=\"archive-pagination-next\" rel=\"next\" href=\"{nextPath}\">Next</a>";
     }
 
-    public static string Slugify(string value)
-    {
-        var lower = value.Trim().ToLowerInvariant();
-        var replaced = NonAlphaNumericRegex().Replace(lower, "-");
-        return DuplicateDashRegex().Replace(replaced, "-").Trim('-');
-    }
+    public static string Slugify(string value) => NewsSlug.Slugify(value);
 
     public static int ResolveArchiveTotalPages(int currentPage, int itemCount, int publishedCount, int totalPages)
     {
@@ -153,11 +147,5 @@ public static partial class NewsRoutes
     }
 
     public static string GetNewsDetailPath(NewsItem item) =>
-        $"/news/{item.Id}/{Slugify(item.Title)}";
-
-    [GeneratedRegex("[^a-z0-9]+")]
-    private static partial Regex NonAlphaNumericRegex();
-
-    [GeneratedRegex("-+")]
-    private static partial Regex DuplicateDashRegex();
+        $"/news/{item.Id}/{NewsSlug.ResolveForArticle(item)}";
 }

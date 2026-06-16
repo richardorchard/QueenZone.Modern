@@ -16,7 +16,7 @@ public sealed class DetailModel(INewsRepository newsRepository) : PageModel
             return NotFound();
         }
 
-        var canonicalSlug = NewsRoutes.Slugify(item.Title);
+        var canonicalSlug = NewsSlug.ResolveForArticle(item);
         if (!string.Equals(canonicalSlug, slug, StringComparison.OrdinalIgnoreCase))
         {
             return RedirectPermanent(NewsRoutes.GetNewsDetailPath(item));
@@ -24,7 +24,7 @@ public sealed class DetailModel(INewsRepository newsRepository) : PageModel
 
         Item = item;
         ViewData["Title"] = $"{item.Title} | QueenZone news";
-        ViewData["CanonicalPath"] = NewsArticleContent.GetDetailCanonicalPath(item.Id, item.Title);
+        ViewData["CanonicalPath"] = NewsArticleContent.GetDetailCanonicalPath(item.Id, item.Title, item.Slug);
         ViewData["Description"] = item.Excerpt;
 
         return Page();

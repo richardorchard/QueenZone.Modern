@@ -1,0 +1,36 @@
+-- Admin news publishing support for QueenZone.Modern
+-- Run against the legacy QueenZone database before enabling admin writes.
+
+IF COL_LENGTH('NEWS_T', 'SLUG') IS NULL
+BEGIN
+    ALTER TABLE NEWS_T ADD SLUG NVARCHAR(200) NULL;
+END;
+
+IF COL_LENGTH('NEWS_T', 'CREATED_AT') IS NULL
+BEGIN
+    ALTER TABLE NEWS_T ADD CREATED_AT DATETIME2(0) NULL;
+END;
+
+IF COL_LENGTH('NEWS_T', 'UPDATED_AT') IS NULL
+BEGIN
+    ALTER TABLE NEWS_T ADD UPDATED_AT DATETIME2(0) NULL;
+END;
+
+IF COL_LENGTH('NEWS_T', 'EDITOR_EMAIL') IS NULL
+BEGIN
+    ALTER TABLE NEWS_T ADD EDITOR_EMAIL NVARCHAR(256) NULL;
+END;
+
+IF OBJECT_ID('NewsAuditLog', 'U') IS NULL
+BEGIN
+    CREATE TABLE NewsAuditLog (
+        Id INT IDENTITY(1, 1) NOT NULL PRIMARY KEY,
+        NewsId INT NOT NULL,
+        Action NVARCHAR(50) NOT NULL,
+        ActorEmail NVARCHAR(256) NOT NULL,
+        OccurredAt DATETIME2(0) NOT NULL CONSTRAINT DF_NewsAuditLog_OccurredAt DEFAULT (SYSUTCDATETIME()),
+        Details NVARCHAR(2000) NULL
+    );
+
+    CREATE INDEX IX_NewsAuditLog_NewsId_OccurredAt ON NewsAuditLog (NewsId, OccurredAt DESC);
+END;
