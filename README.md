@@ -59,6 +59,7 @@ The `Deploy App Service` GitHub Actions workflow deploys `main` to the `queenzon
 Repository secrets required:
 
 - `AZURE_WEBAPP_PUBLISH_PROFILE`: the App Service publish profile XML.
+- `QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING`: Azure SQL connection string used by the deploy workflow to apply EF Core migrations before each release. This is separate from the App Service runtime connection because GitHub Actions cannot use the App Service Managed Identity. Use a dedicated SQL login or Entra principal with permission to create or alter tables.
 
 App Service configuration required:
 
@@ -79,16 +80,18 @@ ALTER ROLE db_datawriter ADD MEMBER [queenzone-dev];
 
 Admin news publishing writes to `NEWS_T` and `NewsAuditLog`, so the deployed App Service identity needs `db_datawriter` once the admin workflow is enabled. Keep read-only environments on `db_datareader` only.
 
-Before enabling admin writes in a database, apply the admin schema using either:
+The `Deploy App Service` workflow applies pending EF Core migrations automatically after tests and before deploy. Configure `QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING` in the GitHub `dev` environment secrets.
+
+For manual bootstrap or recovery, you can still run:
 
 ```text
 docs/sql/001-news-admin-columns.sql
 ```
 
-or the EF Core migration:
+or:
 
 ```powershell
-dotnet tool install --global dotnet-ef
+dotnet tool restore
 dotnet ef database update --project src/QueenZone.Data/QueenZone.Data.csproj --startup-project src/QueenZone.Web/QueenZone.Web.csproj
 ```
 

@@ -39,6 +39,20 @@ jobs:
       - name: Test
         run: dotnet test QueenZone.sln --configuration Release --no-build
 
+      - name: Apply database migrations
+        env:
+          ConnectionStrings__QueenZoneLegacy: ${{ secrets.QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING }}
+        run: |
+          if [ -z "$ConnectionStrings__QueenZoneLegacy" ]; then
+            echo "::error::QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING is not configured. Add it to the dev environment secrets before deploying."
+            exit 1
+          fi
+
+          dotnet tool restore
+          dotnet ef database update \
+            --project src/QueenZone.Data/QueenZone.Data.csproj \
+            --startup-project src/QueenZone.Web/QueenZone.Web.csproj
+
       - name: Publish
         run: dotnet publish src/QueenZone.Web/QueenZone.Web.csproj --configuration Release --no-build --output publish
 
