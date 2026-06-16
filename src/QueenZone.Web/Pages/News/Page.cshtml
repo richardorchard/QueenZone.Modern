@@ -1,0 +1,8 @@
+@page "/news/page/{pageNumber:int}"
+@model ArchivePageModel
+
+<h1>News archive</h1>
+
+<partial name="_NewsArchiveList" model="Model.Items" />
+
+@Html.Raw(NewsRoutes.BuildArchivePaginationNav(Model.CurrentPage, Model.TotalPages))

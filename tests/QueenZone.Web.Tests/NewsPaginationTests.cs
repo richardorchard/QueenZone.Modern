@@ -27,7 +27,7 @@ public sealed class NewsPaginationTests
 
     [Theory]
     [InlineData(1, "QueenZone news")]
-    [InlineData(2, "QueenZone news – Page 2")]
+    [InlineData(2, "QueenZone news \u2013 Page 2")]
     public void GetArchivePageTitle_IncludesPageNumberAfterFirstPage(int page, string expectedTitle)
     {
         Assert.Equal(expectedTitle, NewsRoutes.GetArchivePageTitle(page));

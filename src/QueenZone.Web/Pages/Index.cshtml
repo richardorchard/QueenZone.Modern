@@ -1,0 +1,22 @@
+@page "/"
+@model IndexModel
+
+<h1><a href="/news">Latest news</a></h1>
+
+@if (Model.Latest.Count == 0)
+{
+  <p>No published news is available yet.</p>
+}
+else
+{
+  <ol class="news-list">
+    @foreach (var item in Model.Latest)
+    {
+      <li>
+        <a href="@NewsRoutes.GetNewsDetailPath(item)">@item.Title</a>
+        <p>@item.Excerpt</p>
+        <time datetime="@item.PublishedAt.ToString("yyyy-MM-dd")">@item.PublishedAt.ToString("dd MMMM yyyy")</time>
+      </li>
+    }
+  </ol>
+}

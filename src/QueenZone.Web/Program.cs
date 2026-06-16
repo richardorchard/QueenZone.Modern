@@ -20,6 +20,8 @@ builder.Services.AddAntiforgery();
 var legacyConnectionString = builder.Configuration.GetConnectionString("QueenZoneLegacy");
 var useLegacySql = !string.IsNullOrWhiteSpace(legacyConnectionString);
 
+builder.Services.AddRazorPages();
+
 if (useLegacySql)
 {
     builder.Services.AddQueenZoneLegacyData(legacyConnectionString!);
@@ -44,7 +46,8 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.UseAntiforgery();
 
-app.MapNewsRoutes();
+app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+app.MapRazorPages();
 app.MapAdminNewsRoutes();
 
 app.Run();

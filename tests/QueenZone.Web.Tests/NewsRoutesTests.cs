@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
@@ -63,7 +64,7 @@ public sealed class NewsRoutesTests : IClassFixture<WebApplicationFactory<Progra
         Assert.Contains("/news/1005/archive-sample-article-1005", pageTwo);
         Assert.DoesNotContain("/news/1005/archive-sample-article-1005", pageOne);
         Assert.Contains("<link rel=\"canonical\" href=\"/news/page/2\">", pageTwo);
-        Assert.Contains("<title>QueenZone news – Page 2</title>", pageTwo);
+        Assert.Contains("<title>QueenZone news &#x2013; Page 2</title>", pageTwo);
         Assert.Contains("archive-pagination-controls", pageOne);
         Assert.Contains("archive-pagination-prev is-disabled", pageOne);
         Assert.Contains("rel=\"next\" href=\"/news/page/2\"", pageOne);
@@ -275,6 +276,57 @@ public sealed class NewsRoutesTests : IClassFixture<WebApplicationFactory<Progra
         var response = await client.GetAsync("/process/news_view.aspx?news_id=1003");
 
         Assert.Equal(System.Net.HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task NewsArchiveOrdersByCreatedDateDescending()
+    {
+        var items = new[]
+        {
+            new NewsItem(
+                3001,
+                "Oldest article",
+                "Oldest excerpt.",
+                "Oldest body.",
+                new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                null,
+                true),
+            new NewsItem(
+                3002,
+                "Newest article",
+                "Newest excerpt.",
+                "Newest body.",
+                new DateTime(2024, 6, 1, 0, 0, 0, DateTimeKind.Utc),
+                null,
+                true),
+            new NewsItem(
+                3003,
+                "Middle article",
+                "Middle excerpt.",
+                "Middle body.",
+                new DateTime(2022, 3, 15, 0, 0, 0, DateTimeKind.Utc),
+                null,
+                true)
+        };
+
+        var client = factory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+            {
+                services.AddSingleton<INewsRepository>(new InMemoryNewsRepository(items));
+            })).CreateClient();
+
+        var body = await client.GetStringAsync("/news");
+        var dates = Regex.Matches(body, "<time datetime=\"(\\d{4}-\\d{2}-\\d{2})\">")
+            .Select(match => DateOnly.Parse(match.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture))
+            .Take(3)
+            .ToList();
+
+        Assert.Equal(
+            new[] { new DateOnly(2024, 6, 1), new DateOnly(2022, 3, 15), new DateOnly(2020, 1, 1) },
+            dates);
+        Assert.Contains("Newest article", body);
+        Assert.Contains("Middle article", body);
+        Assert.Contains("Oldest article", body);
     }
 
     [Fact]

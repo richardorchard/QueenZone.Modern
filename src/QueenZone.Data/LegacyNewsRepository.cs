@@ -37,7 +37,7 @@ public sealed class LegacyNewsRepository(string connectionString) : INewsReposit
                 IsPublished
             FROM PublishedNews
             WHERE RowNumber = 1
-            ORDER BY PublishedAt DESC, Id DESC
+            ORDER BY PublishedAt DESC, Id DESC -- legacy [DATE] descending, then NEWS_ID
             """;
 
         return await QueryAsync(sql, new { Count = count }, cancellationToken);
@@ -72,7 +72,7 @@ public sealed class LegacyNewsRepository(string connectionString) : INewsReposit
                 IsPublished
             FROM PublishedNews
             WHERE RowNumber = 1
-            ORDER BY PublishedAt DESC, Id DESC
+            ORDER BY PublishedAt DESC, Id DESC -- legacy [DATE] descending, then NEWS_ID
             OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY
             """;
 

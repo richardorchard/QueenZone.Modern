@@ -5,6 +5,7 @@ obj/
 *.user
 *.suo
 TestResults/
+coverage-report/
 *.trx
 *.coverage
 *.coveragexml

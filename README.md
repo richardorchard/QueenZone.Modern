@@ -11,6 +11,7 @@ The goal is to restart QueenZone as a clean, modern, read-only public site first
   QueenZone.sln
   src/
     QueenZone.Web/
+      Pages/
     QueenZone.Data/
     QueenZone.Import/
   tests/
@@ -34,7 +35,29 @@ dotnet test QueenZone.sln
 dotnet run --project src/QueenZone.Web/QueenZone.Web.csproj
 ```
 
+To generate a local code coverage report:
+
+```powershell
+dotnet tool restore
+dotnet test QueenZone.sln --configuration Release --collect:"XPlat Code Coverage" --settings coverlet.runsettings --results-directory ./TestResults
+dotnet tool run reportgenerator -reports:".\TestResults\**\coverage.cobertura.xml" -targetdir:".\coverage-report" -reporttypes:"HtmlInline;Cobertura;MarkdownSummary"
+```
+
+Open `coverage-report/index.html` to inspect the report. Coverage reports and raw test result folders are local artifacts and should not be committed.
+
 Local secrets belong in `src/QueenZone.Web/appsettings.Local.json`, which is ignored by git. You can also set `ConnectionStrings__QueenZoneLegacy` in your shell or a local `.env` file for tooling that loads dotenv values. If no `ConnectionStrings:QueenZoneLegacy` value is present, the site uses sample news data so the first slice can still run locally.
+
+To point a local app instance at the Azure SQL development database, use your signed-in Entra identity rather than a SQL password:
+
+```json
+{
+  "ConnectionStrings": {
+    "QueenZoneLegacy": "Server=tcp:queenzone-sql-server.database.windows.net,1433;Database=queenzone-dev-db;Authentication=Active Directory Default;Encrypt=True;TrustServerCertificate=False;"
+  }
+}
+```
+
+The local Entra database user is `richard@thinkingwebsites.com.au`. It should be granted only the permissions needed for local testing, usually `db_datareader` and only `db_datawriter` when write-path testing is intentional.
 
 ## Testing And Workflow
 
@@ -48,6 +71,8 @@ dotnet build QueenZone.sln --configuration Release --no-restore
 dotnet test QueenZone.sln --configuration Release --no-build
 ```
 
+CI also publishes a code coverage artifact for pull requests and pushes. Use it to guide test review around risky changes, especially canonical routing, publication rules, legacy data mapping, and HTML sanitisation.
+
 Normal CI and pull request checks should not require the restored legacy database. Real legacy database checks are opt-in until a controlled test database exists.
 
 Feature work should happen on an agent-prefixed branch such as `grok/news-pagination` and be reviewed through a pull request before it reaches `main`. See `AGENTS.md` for the branch and PR policy.
@@ -55,6 +80,8 @@ Feature work should happen on an agent-prefixed branch such as `grok/news-pagina
 ## Deployment
 
 The `Deploy App Service` GitHub Actions workflow deploys `main` to the `queenzone-dev` Azure App Service at `https://queenzone-dev.azurewebsites.net`.
+
+The planned public canonical domain for the site is `https://www.queenzone.org`. SEO features that emit absolute public URLs, such as sitemaps and robots.txt, should use that host in production configuration.
 
 Repository secrets required:
 
