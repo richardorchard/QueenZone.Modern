@@ -29,12 +29,12 @@ public sealed class LegacyNewsRepository(string connectionString) : INewsReposit
             SELECT TOP (@Count)
                 Id,
                 Title,
-                Slug,
                 Excerpt,
                 Body,
                 PublishedAt,
                 SourceUrl,
-                IsPublished
+                IsPublished,
+                Slug
             FROM PublishedNews
             WHERE RowNumber = 1
             ORDER BY PublishedAt DESC, Id DESC -- legacy [DATE] descending, then NEWS_ID
@@ -64,12 +64,12 @@ public sealed class LegacyNewsRepository(string connectionString) : INewsReposit
             SELECT
                 Id,
                 Title,
-                Slug,
                 Excerpt,
                 Body,
                 PublishedAt,
                 SourceUrl,
-                IsPublished
+                IsPublished,
+                Slug
             FROM PublishedNews
             WHERE RowNumber = 1
             ORDER BY PublishedAt DESC, Id DESC -- legacy [DATE] descending, then NEWS_ID
@@ -87,12 +87,12 @@ public sealed class LegacyNewsRepository(string connectionString) : INewsReposit
             SELECT
                 Id,
                 Title,
-                Slug,
                 Excerpt,
                 Body,
                 PublishedAt,
                 SourceUrl,
-                IsPublished
+                IsPublished,
+                Slug
             FROM PublishedNews
             WHERE RowNumber = 1
               AND Id = @Id
