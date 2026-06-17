@@ -20,7 +20,10 @@ builder.Services.AddAntiforgery();
 var legacyConnectionString = builder.Configuration.GetConnectionString("QueenZoneLegacy");
 var useLegacySql = !string.IsNullOrWhiteSpace(legacyConnectionString);
 
-builder.Services.AddRazorPages();
+builder.Services.AddRazorPages(options =>
+{
+    options.Conventions.AuthorizeFolder("/Admin", "Admin");
+});
 
 if (useLegacySql)
 {
@@ -48,7 +51,6 @@ app.UseAntiforgery();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 app.MapRazorPages();
-app.MapAdminNewsRoutes();
 
 app.Run();
 

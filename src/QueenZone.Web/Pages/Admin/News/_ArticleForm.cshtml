@@ -1,0 +1,61 @@
+@model QueenZone.Web.Pages.Admin.News.ArticleFormViewModel
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+
+<h1>@Model.Title</h1>
+
+@if (Model.Errors is { Count: > 0 })
+{
+  <ul class="admin-errors">
+    @foreach (var error in Model.Errors)
+    {
+      <li>@error</li>
+    }
+  </ul>
+}
+
+<form method="post" action="@Model.Action" class="admin-form">
+  <input type="hidden" name="@AdminNewsPageModel.AntiforgeryTokenFieldName" value="@Antiforgery.GetAndStoreTokens(Context).RequestToken">
+  <label>
+    Title
+    <input type="text" name="title" value="@Model.Draft.Title" required>
+  </label>
+  <label>
+    Slug
+    <input type="text" name="slug" value="@Model.Draft.Slug" placeholder="@NewsSlug.Resolve(Model.Draft.Title, null)">
+  </label>
+  <p class="admin-help">Leave blank to auto-generate from the title.</p>
+  <label>
+    Excerpt
+    <input type="text" name="excerpt" value="@Model.Draft.Excerpt" required>
+  </label>
+  <label>
+    Body
+    <textarea name="body" rows="16">@Model.Draft.Body</textarea>
+  </label>
+  <label>
+    Publication date
+    <input type="date" name="publishedAt" value="@Model.Draft.PublishedAt.ToString("yyyy-MM-dd")" required>
+  </label>
+  <label>
+    Source URL
+    <input type="text" name="sourceUrl" value="@Model.Draft.SourceUrl">
+  </label>
+
+  <div class="admin-form-actions">
+    <button type="submit">Save</button>
+    <a href="/admin/news">Cancel</a>
+    @if (Model.Article is not null)
+    {
+      <span>|</span>
+      <a href="/admin/news/@Model.Article.Id/preview">Preview</a>
+      @if (Model.Article.IsPublished)
+      {
+        <partial name="_PostAction" model="@(new PostActionViewModel($"/admin/news/{Model.Article.Id}/unpublish", "Unpublish"))" />
+      }
+      else
+      {
+        <partial name="_PostAction" model="@(new PostActionViewModel($"/admin/news/{Model.Article.Id}/publish", "Publish"))" />
+      }
+    }
+  </div>
+</form>

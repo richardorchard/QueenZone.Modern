@@ -11,6 +11,12 @@ This repository is the modern QueenZone rebuild. The project is archive-first: i
 
 Keep durable workflow guidance in this file and keep user-facing setup guidance in `README.md`.
 
+## UI Architecture
+
+`QueenZone.Web` uses ASP.NET Core Razor Pages for server-rendered pages. Public archive pages, news pages, and admin editorial screens should live under `src/QueenZone.Web/Pages` as `.cshtml` files with page models.
+
+Do not build visitor-facing or admin pages by streaming inline HTML from minimal route handlers. Minimal endpoints are appropriate for small non-page responses such as `/health` or future JSON APIs.
+
 ## Branch And Pull Request Policy
 
 Do not push feature work directly to `main`.

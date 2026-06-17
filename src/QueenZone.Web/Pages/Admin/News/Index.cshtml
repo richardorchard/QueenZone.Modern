@@ -1,0 +1,53 @@
+@page "/admin/news"
+@model IndexModel
+
+@if (Model.CreateForm is not null)
+{
+  <partial name="_ArticleForm" model="Model.CreateForm" />
+}
+else
+{
+  <h1>Admin news</h1>
+  <p><a href="/admin/news/new">Create article</a></p>
+
+  @if (Model.Articles.Count == 0)
+  {
+    <p>No news articles yet.</p>
+  }
+  else
+  {
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Title</th>
+          <th>Status</th>
+          <th>Published</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        @foreach (var article in Model.Articles)
+        {
+          <tr>
+            <td>@article.Title</td>
+            <td>@(article.IsPublished ? "Published" : "Draft")</td>
+            <td>@article.PublishedAt.ToString("dd MMM yyyy")</td>
+            <td class="admin-actions">
+              <a href="/admin/news/@article.Id/edit">Edit</a>
+              <a href="/admin/news/@article.Id/preview">Preview</a>
+              @if (article.IsPublished)
+              {
+                <partial name="_PostAction" model="@(new PostActionViewModel($"/admin/news/{article.Id}/unpublish", "Unpublish"))" />
+              }
+              else
+              {
+                <partial name="_PostAction" model="@(new PostActionViewModel($"/admin/news/{article.Id}/publish", "Publish"))" />
+              }
+              <partial name="_PostAction" model="@(new PostActionViewModel($"/admin/news/{article.Id}/delete", "Delete", Confirm: true))" />
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+}
