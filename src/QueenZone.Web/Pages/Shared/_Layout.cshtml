@@ -24,6 +24,17 @@
     body { font-family: Arial, sans-serif; line-height: 1.5; margin: 0 auto; max-width: 880px; padding: 2rem; }
     header { border-bottom: 1px solid #d0d7de; margin-bottom: 2rem; padding-bottom: 1rem; }
     header nav a { margin-right: 1rem; }
+    .admin-table { border-collapse: collapse; width: 100%; }
+    .admin-table th, .admin-table td { border-bottom: 1px solid #d0d7de; padding: 0.5rem; text-align: left; vertical-align: top; }
+    .admin-actions form { display: inline; margin: 0; }
+    .admin-inline-form { display: inline; margin: 0 0.25rem; }
+    .admin-form label { display: block; margin-bottom: 1rem; }
+    .admin-form input, .admin-form textarea { display: block; margin-top: 0.35rem; width: 100%; }
+    .admin-form textarea { font-family: Consolas, monospace; }
+    .admin-form-actions { margin-top: 1.5rem; }
+    .admin-errors { background: #fff8f8; border: 1px solid #ff8182; color: #a40e26; padding: 0.75rem 1rem; }
+    .admin-help { color: #57606a; font-size: 0.9rem; margin: -0.5rem 0 1rem; }
+    .admin-preview-banner { background: #fff8c5; border: 1px solid #d4a72c; padding: 0.75rem 1rem; }
     .news-list { padding-left: 1.5rem; }
     .news-list li { margin-bottom: 1.5rem; }
     .date, time { color: #57606a; }
@@ -49,7 +60,13 @@
 <body>
   <header>
     <strong>QueenZone</strong>
-    <nav><a href="/">Home</a><a href="/news">News</a></nav>
+    <nav>
+      <a href="/">Home</a><a href="/news">News</a>
+      @if (ViewData["ShowAdminNav"] is true)
+      {
+        <a href="/admin/news">Admin news</a>
+      }
+    </nav>
   </header>
   <main>
     @RenderBody()

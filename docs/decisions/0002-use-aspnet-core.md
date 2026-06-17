@@ -14,15 +14,16 @@ The new project needs long-term maintainability, modern hosting, modern dependen
 
 Use ASP.NET Core for the new application.
 
-Preferred UI style:
+Use Razor Pages for server-rendered public and admin UI.
 
-- Razor Pages or MVC for server-rendered pages.
+Minimal endpoints may still be used for small non-page responses such as health checks or future JSON APIs.
 
 Avoid:
 
 - Porting Web Forms pages.
 - Copying Telerik Web UI controls.
 - Recreating the old page lifecycle.
+- Rendering visitor-facing or admin pages by manually streaming inline HTML from route handlers.
 
 ## Consequences
 
@@ -38,4 +39,3 @@ Tradeoffs:
 
 - Old VB.NET page code is reference material, not reusable UI code.
 - Some old behavior must be reimplemented deliberately.
-

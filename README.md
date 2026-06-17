@@ -6,6 +6,8 @@ The goal is to restart QueenZone as a clean, modern public site that fully expos
 
 ## Repository Shape
 
+`QueenZone.Web` uses ASP.NET Core Razor Pages for server-rendered public and admin UI. Keep page rendering in `Pages/` with `.cshtml` and page-model classes; use endpoint routes only for small non-page endpoints such as health checks or future APIs.
+
 ```text
 /
   QueenZone.sln
