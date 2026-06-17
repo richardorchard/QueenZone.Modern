@@ -113,6 +113,17 @@ Acceptance criteria:
 - Wrong slugs redirect to the canonical slug.
 - Canonical route behavior is covered by tests.
 
+### Design automated news discovery and draft ingestion
+
+Acceptance criteria:
+
+- Architecture plan documents the discovery, dedupe, AI assistance, review, and explicit publish workflow.
+- Candidate and draft data model is defined outside the legacy `NEWS_T` table.
+- First source strategy starts with curated official/RSS-style sources.
+- AI output is stored only as editor-review draft material.
+- No candidate can publish publicly without an explicit admin action.
+- Tests are planned for source fetching, dedupe, draft creation, rejection handling, and no-auto-publish safeguards.
+
 ## Epic: Articles And Biography
 
 ### Render articles archive and detail

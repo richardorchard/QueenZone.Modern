@@ -4,11 +4,12 @@
 
 QueenZone Modern should have enough automated coverage to make the migration safe without making everyday development slow.
 
-The first release is read-only, so the highest-risk areas are:
+The first release is archive-first and visitor read-only, with news as the first protected editorial workflow. The highest-risk areas are:
 
 - Legacy data mapping.
 - Stable canonical URL behavior.
 - Public/hidden content rules.
+- News publication safeguards.
 - Unsafe legacy HTML rendering.
 - Deployment and configuration drift.
 - Crawlable public pages.
@@ -28,6 +29,7 @@ Good targets:
 - Canonical URL parsing.
 - Pagination calculations.
 - Content visibility rules such as `DISPLAY = 1`.
+- Editorial publication rules for new news items.
 - Date and metadata formatting helpers.
 - HTML sanitisation helpers when they are introduced.
 

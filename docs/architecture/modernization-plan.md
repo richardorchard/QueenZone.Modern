@@ -2,9 +2,9 @@
 
 ## Objective
 
-Rebuild QueenZone as a modern, maintainable Azure-hosted site while preserving the valuable public content from the legacy ASP.NET Web Forms application.
+Rebuild QueenZone as a modern, maintainable Azure-hosted site while preserving the valuable public content from the legacy ASP.NET Web Forms application and re-establishing QueenZone news as a live editorial surface.
 
-The first release is intentionally read-only. Accounts, posting, uploads, private messages, newsletters, and administration are out of scope until the public archive is stable.
+The first release is archive-first and visitor read-only. Accounts, public posting, uploads, private messages, newsletters, and community administration are out of scope until the public archive is stable. News is the exception to the archive-only shape: it is the first vertical slice and should support new editor-approved articles through a deliberate editorial workflow.
 
 ## Current Legacy Shape
 
@@ -51,7 +51,8 @@ Alternative target to explore:
 - Use simple direct SQL or stored procedure calls first.
 - Prefer clean, stable, search-friendly canonical URLs over preserving legacy URL shapes.
 - Treat personal/community data cautiously.
-- Make public read-only pages safe before bringing back any write feature.
+- Make public archive pages safe before bringing back visitor-facing write features.
+- Support new news articles through explicit editorial approval rather than public submission or automatic publication.
 - Favor small vertical slices over broad rewrites.
 
 ## Phases
@@ -69,6 +70,8 @@ Alternative target to explore:
 - Implement news archive.
 - Implement news detail.
 - Use stable, search-friendly canonical news URLs.
+- Establish a modern news read/editorial model that can combine legacy archive news with newly approved articles.
+- Design automated discovery and AI-assisted draft ingestion as an internal review workflow, not an automatic publisher.
 - Deploy to Azure preview.
 
 ### Phase 2: Core Content

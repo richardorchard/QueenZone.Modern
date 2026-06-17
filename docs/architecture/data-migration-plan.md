@@ -2,11 +2,11 @@
 
 ## Strategy
 
-For the read-only launch, do not transform the whole database up front.
+For the archive-first launch, do not transform the whole database up front.
 
 Use the restored legacy SQL Server database as a read source, then introduce modern projection tables or import jobs only when the shape of each content area is understood.
 
-The legacy schema is not considered permanent. It is acceptable, and likely necessary, to introduce modern tables for high-value areas once the read-only import proves what content and relationships matter. Forum data is the clearest candidate for redesign because the legacy topic/reply model is old, large, and not optimized for modern archive browsing.
+The legacy schema is not considered permanent for new product workflows, but preserved legacy tables should remain stable historical sources. News is the first slice that should combine archived legacy records from `NEWS_T` with newly approved articles stored in separate modern tables. Forum data is the clearest candidate for redesign because the legacy topic/reply model is old, large, and not optimized for modern archive browsing.
 
 ## Data Access Stages
 
@@ -32,6 +32,8 @@ For high-value content, create modern read models:
 - `CanonicalRoute`
 
 These can be built by an import job and stored in new tables, or materialized into static JSON for selected pages.
+
+News should move toward a combined read model early so new approved articles can be added without mutating `NEWS_T`.
 
 ### Stage 3: Asset Migration
 
@@ -83,6 +85,14 @@ Legacy table:
 
 - `NEWS_T`
 
+Storage policy:
+
+- Leave `NEWS_T` as the historical archive source.
+- Do not insert new live articles into `NEWS_T`.
+- Create separate modern SQL tables for live news articles, draft/review workflow, source metadata, and review events.
+- Build the public news query layer so archived `NEWS_T` rows and new article rows appear as one seamless news collection.
+- Keep the storage origin available internally for audit, dedupe, and troubleshooting.
+
 Relevant columns:
 
 - `NEWS_ID`
@@ -109,10 +119,16 @@ Initial route mapping:
 - `/news`
 - `/news/{id}/{slug}`
 
+Visitor-facing behavior:
+
+- The homepage and `/news` list should interleave legacy and new articles by publication date.
+- Detail pages should use one canonical URL pattern regardless of whether an item came from `NEWS_T` or modern live-news tables.
+- The UI should not label articles as "legacy" or "new" unless there is an editorial reason to do so.
+
 URL policy:
 
 - Do not preserve old Web Forms URL shapes by default.
-- Use stable, search-friendly canonical URLs for newly published archive pages.
+- Use stable, search-friendly canonical URLs for archived and newly published pages.
 - Keep legacy URL notes only when they help understand content identity or relationships.
 
 ## Validation Checklist Per Content Area
