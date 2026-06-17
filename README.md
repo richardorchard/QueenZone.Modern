@@ -2,7 +2,7 @@
 
 This repository contains the new QueenZone modernization project.
 
-The goal is to restart QueenZone as a clean, modern, read-only public site first, using the legacy database and application as reference material rather than carrying the whole Web Forms codebase forward.
+The goal is to restart QueenZone as a clean, modern public site that fully exposes the valuable legacy archive while also making news the first live editorial slice. The public archive should be read-only for visitors, but approved editors will be able to add new news articles once the news workflow is in place.
 
 ## Repository Shape
 
@@ -108,15 +108,17 @@ Do not commit publish profiles, `.pubxml` files, local app settings, or connecti
 
 ## First Milestone
 
-Build the first vertical slice around news:
+Build the first vertical slice around news. This slice should prove both archive rendering and the path for new approved news articles:
 
 1. Connect to the restored legacy SQL Server database.
-2. Read published rows from `NEWS_T`, either directly or through `Q_NEWS_*` stored procedures.
-3. Render latest news on the homepage.
-4. Render `/news` archive.
-5. Render `/news/{id}/{slug}` detail pages.
-6. Use stable, search-friendly canonical URLs.
-7. Deploy a preview to Azure App Service.
+2. Read archived published rows from `NEWS_T`, either directly or through `Q_NEWS_*` stored procedures.
+3. Add separate modern tables for newly approved live news articles and draft/review workflow.
+4. Render latest news on the homepage as one seamless list across archived and new articles.
+5. Render `/news` archive across both archived and new articles.
+6. Render `/news/{id}/{slug}` detail pages without exposing the storage split to visitors.
+7. Use stable, search-friendly canonical URLs.
+8. Keep automated discovery and AI-assisted drafts behind explicit editorial approval.
+9. Deploy a preview to Azure App Service.
 
 ## Legacy Reference Policy
 

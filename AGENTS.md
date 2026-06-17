@@ -1,6 +1,6 @@
 # Agent Guide
 
-This repository is the modern QueenZone rebuild. The first release is a read-only public archive backed by legacy content.
+This repository is the modern QueenZone rebuild. The project is archive-first: it should fully expose valuable legacy public content while keeping visitor-facing archive pages read-only. News is the first live editorial slice, so the architecture should also support newly approved news articles.
 
 ## Source Of Truth
 
@@ -78,7 +78,8 @@ Commit only examples such as `.env.example`.
 ## Migration Principles
 
 - Preserve public content first.
-- Keep the first release read-only.
+- Keep the public archive read-only for visitors.
+- Allow deliberately designed editorial workflows for new approved news articles.
 - Do not port Web Forms architecture.
 - Keep legacy SQL access inside `QueenZone.Data`.
 - Treat the legacy database as an import source, not the permanent domain model.
