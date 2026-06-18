@@ -49,7 +49,7 @@ Benefits:
 Tradeoffs:
 
 - `NEWS_T` gains nullable extension columns and a companion audit table.
-- The deployed App Service identity needs scoped `db_datawriter` permission.
+- The deployed runtime database principal needs scoped write permission for the admin publishing path.
 - Entra app registration and App Service settings are required before admin works in Azure.
 - ADR 0001's "no admin editing" constraint is lifted for news only.
 

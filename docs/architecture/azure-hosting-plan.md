@@ -46,32 +46,32 @@ Use configuration keys like:
 
 ## Database Access
 
-The `queenzone-dev` App Service connects to the `queenzone-dev-db` Azure SQL database on `queenzone-sql-server.database.windows.net` with its system-assigned Managed Identity.
+The `queenzone-dev` App Service connects to the `queenzone-db` Azure SQL database on `queenzone-sql-server.database.windows.net`.
 
-Create the matching SQL user inside the target database, not `master`:
-
-```sql
-CREATE USER [queenzone-dev] FROM EXTERNAL PROVIDER;
-ALTER ROLE db_datareader ADD MEMBER [queenzone-dev];
-```
-
-The App Service setting `ConnectionStrings__QueenZoneLegacy` should use Managed Identity authentication and should not include a SQL password.
-
-Local development can connect to the same Azure SQL database with Entra authentication:
+The current runtime route uses SQL authentication. Store the runtime connection string only in the App Service setting `ConnectionStrings__QueenZoneLegacy`:
 
 ```text
-Server=tcp:queenzone-sql-server.database.windows.net,1433;Database=queenzone-dev-db;Authentication=Active Directory Default;Encrypt=True;TrustServerCertificate=False;
+Server=tcp:queenzone-sql-server.database.windows.net,1433;Database=queenzone-db;User ID=...;Password=...;Encrypt=True;TrustServerCertificate=False;
 ```
 
-The local Entra principal is `richard@thinkingwebsites.com.au`. Grant it database permissions explicitly in `queenzone-dev-db`, starting with `db_datareader` and adding write permissions only for intentional write-path testing.
+GitHub Actions uses a separate `QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING` environment secret for EF Core migrations during deployment. Updating that GitHub secret does not update the live App Service runtime setting.
+
+Create the runtime database user inside the target database, not `master`, and grant only the permissions required by the enabled application paths:
+
+```sql
+CREATE USER [app_login_name] FOR LOGIN [app_login_name];
+ALTER ROLE db_datareader ADD MEMBER [app_login_name];
+```
+
+Local development should use local-only secrets in `appsettings.Local.json`, shell environment variables, or `.env`. Do not commit copied Azure connection strings.
 
 Only grant write permissions when the deployed app has an intentional write path:
 
 ```sql
-ALTER ROLE db_datawriter ADD MEMBER [queenzone-dev];
+ALTER ROLE db_datawriter ADD MEMBER [app_login_name];
 ```
 
-The application should not need write access for Phase 1.
+Admin news publishing is an intentional write path, so the production runtime login needs write access for `NEWS_T` and `NewsAuditLog` once that workflow is enabled.
 
 ## Deployment Checklist
 
@@ -82,3 +82,4 @@ The application should not need write access for Phase 1.
 - Application Insights receives requests.
 - Canonical URLs are tested.
 - No connection strings or secrets are committed.
+- App Service runtime settings and GitHub environment secrets are both updated when database credentials rotate.

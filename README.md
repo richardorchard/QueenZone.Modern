@@ -49,17 +49,17 @@ Open `coverage-report/index.html` to inspect the report. Coverage reports and ra
 
 Local secrets belong in `src/QueenZone.Web/appsettings.Local.json`, which is ignored by git. You can also set `ConnectionStrings__QueenZoneLegacy` in your shell or a local `.env` file for tooling that loads dotenv values. If no `ConnectionStrings:QueenZoneLegacy` value is present, the site uses sample news data so the first slice can still run locally.
 
-To point a local app instance at the Azure SQL development database, use your signed-in Entra identity rather than a SQL password:
+The hosted App Service currently connects to Azure SQL with SQL authentication. For local development, use a local-only SQL auth connection string or another explicitly granted development principal:
 
 ```json
 {
   "ConnectionStrings": {
-    "QueenZoneLegacy": "Server=tcp:queenzone-sql-server.database.windows.net,1433;Database=queenzone-dev-db;Authentication=Active Directory Default;Encrypt=True;TrustServerCertificate=False;"
+    "QueenZoneLegacy": "Server=tcp:queenzone-sql-server.database.windows.net,1433;Database=queenzone-db;User ID=...;Password=...;Encrypt=True;TrustServerCertificate=False;"
   }
 }
 ```
 
-The local Entra database user is `richard@thinkingwebsites.com.au`. It should be granted only the permissions needed for local testing, usually `db_datareader` and only `db_datawriter` when write-path testing is intentional.
+Do not commit real usernames, passwords, publish profiles, or copied Azure setting values. If a SQL password contains semicolons or other connection-string delimiters, wrap it using the standard connection-string escaping rules before saving it in Azure or local settings.
 
 ## Testing And Workflow
 
@@ -88,26 +88,25 @@ The planned public canonical domain for the site is `https://www.queenzone.org`.
 Repository secrets required:
 
 - `AZURE_WEBAPP_PUBLISH_PROFILE`: the App Service publish profile XML.
-- `QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING`: Azure SQL connection string used by the deploy workflow to apply EF Core migrations before each release. This is separate from the App Service runtime connection because GitHub Actions cannot use the App Service Managed Identity. Use a dedicated SQL login or Entra principal with permission to create or alter tables.
+- `QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING`: Azure SQL connection string used by the deploy workflow to apply EF Core migrations before each release. This is separate from the App Service runtime connection. Use a dedicated SQL login or other deliberately granted principal with permission to create or alter tables.
 
 App Service configuration required:
 
-- `ConnectionStrings__QueenZoneLegacy`: the Azure SQL connection string for the copied legacy tables, using Managed Identity authentication.
+- `ConnectionStrings__QueenZoneLegacy`: the Azure SQL connection string for the copied legacy tables. The current runtime path uses SQL authentication against `queenzone-db` on `queenzone-sql-server.database.windows.net`.
 
-The `queenzone-dev` App Service uses its system-assigned Managed Identity to connect to Azure SQL. The matching database user is created in the target database, not `master`, and should have only the permissions the app needs:
+The runtime App Service setting and the GitHub Actions migration secret are intentionally separate. Updating `QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING` in GitHub does not update the live App Service setting. If the database name, login, or password changes, update both places as needed and restart the App Service so the running container reloads the connection string.
 
-```sql
-CREATE USER [queenzone-dev] FROM EXTERNAL PROVIDER;
-ALTER ROLE db_datareader ADD MEMBER [queenzone-dev];
-```
+The runtime SQL login should be created in the target database and granted only the permissions the app needs. Public archive reads need read access to the legacy news tables. Admin news publishing writes to `NEWS_T` and `NewsAuditLog`, so the runtime login also needs scoped write permissions once the admin workflow is enabled.
 
-Only add write permissions if the deployed app has an intentional write path:
+Example permission shape:
 
 ```sql
-ALTER ROLE db_datawriter ADD MEMBER [queenzone-dev];
+CREATE USER [app_login_name] FOR LOGIN [app_login_name];
+ALTER ROLE db_datareader ADD MEMBER [app_login_name];
+ALTER ROLE db_datawriter ADD MEMBER [app_login_name];
 ```
 
-Admin news publishing writes to `NEWS_T` and `NewsAuditLog`, so the deployed App Service identity needs `db_datawriter` once the admin workflow is enabled. Keep read-only environments on `db_datareader` only.
+Keep read-only environments on `db_datareader` only.
 
 The `Deploy App Service` workflow applies pending EF Core migrations automatically after tests and before deploy. Configure `QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING` in the GitHub `dev` environment secrets.
 

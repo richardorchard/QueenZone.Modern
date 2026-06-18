@@ -42,7 +42,7 @@ Also fill in the **Agent** line when opening the pull request (see `.github/pull
 | **Public rendering** | Never expose hidden, deleted, moderated, draft, or private records in public output |
 | **SEO / crawlability** | Unique page titles, canonical links, and crawlable HTML matter; avoid duplicate canonical pages |
 | **Testing** | Pure logic in unit tests; route behavior in web integration tests with sample/fake data by default; report whether legacy DB checks ran |
-| **Secrets / deploy** | No secrets in git; App Service uses Managed Identity for Azure SQL; say what was tested before merge |
+| **Secrets / deploy** | No secrets in git; App Service runtime uses `ConnectionStrings__QueenZoneLegacy` with SQL authentication; GitHub migrations use the separate `QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING` secret; say what was tested before merge |
 
 ## Most-Used Minimal Template
 

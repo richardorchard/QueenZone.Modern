@@ -15,3 +15,7 @@ appsettings.Local.json
 *.bak
 *.PublishSettings
 *.pubxml
+
+appservice-logs.zip
+
+appservice-logs/
