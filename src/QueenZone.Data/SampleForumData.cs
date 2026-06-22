@@ -62,4 +62,33 @@ public static class SampleForumData
             12_600,
             categories.Sum(category => (long)category.PostCount));
     }
+
+    public static IReadOnlyList<ForumTopicItem> CreateSeedTopics(int forumId)
+    {
+        if (forumId != 1)
+        {
+            return [];
+        }
+
+        var topics = new List<ForumTopicItem>
+        {
+            new(1001, "Forum Guidelines", new DateTime(2024, 6, 12, 20, 4, 0, DateTimeKind.Utc), "Richard Orchard", 44, "waunakonor", true),
+            new(1002, "Ranking every studio album", new DateTime(2024, 6, 12, 14, 0, 0, DateTimeKind.Utc), "brightonrock", 1284, "brightonrock", false),
+            new(1003, "Queen 2017 NOTW expanded release?", new DateTime(2024, 6, 11, 13, 10, 0, DateTimeKind.Utc), "Sam99", 12, "SpaceGrey", false)
+        };
+
+        for (var id = 1004; id <= 1030; id++)
+        {
+            topics.Add(new ForumTopicItem(
+                id,
+                $"Archive sample thread {id}",
+                new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddDays(1030 - id),
+                "archive_member",
+                id % 50,
+                "archive_member",
+                false));
+        }
+
+        return topics;
+    }
 }

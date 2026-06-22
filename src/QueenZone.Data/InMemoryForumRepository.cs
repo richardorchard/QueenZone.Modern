@@ -7,6 +7,25 @@ public sealed class InMemoryForumRepository(
     public Task<IReadOnlyList<ForumCategoryItem>> GetCategoriesAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(seedCategories);
 
+    public Task<ForumCategoryItem?> GetCategoryByIdAsync(int id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(seedCategories.SingleOrDefault(category => category.Id == id));
+
+    public Task<ForumCategoryTopicsPage> GetCategoryTopicsPageAsync(
+        int forumId,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        var topics = SampleForumData.CreateSeedTopics(forumId)
+            .OrderByDescending(topic => topic.IsSticky)
+            .ThenByDescending(topic => topic.LastActivityAt)
+            .ToList();
+
+        var skip = Math.Max(page - 1, 0) * pageSize;
+        var pageItems = topics.Skip(skip).Take(pageSize).ToList();
+        return Task.FromResult(new ForumCategoryTopicsPage(pageItems, topics.Count, page, pageSize));
+    }
+
     public Task<ForumArchiveStats> GetArchiveStatsAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(seedStats);
 }
