@@ -7,7 +7,7 @@ public sealed class LegacyArticlesRepository(string connectionString) : IArticle
 {
     private const string PublishedArticlesSelect = """
         SELECT
-            a.Q_ARTICLE_ID AS Id,
+            CAST(a.Q_ARTICLE_ID AS int) AS Id,
             a.ARTICLE_NAME AS Title,
             ISNULL(a.ARTICLE_TEXT, '') AS Body,
             a.DATE_CREATED AS PublishedAt,
