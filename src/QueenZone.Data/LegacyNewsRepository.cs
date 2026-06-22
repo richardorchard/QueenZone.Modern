@@ -3,29 +3,21 @@ using Microsoft.Data.SqlClient;
 
 namespace QueenZone.Data;
 
-public sealed class LegacyNewsRepository(string connectionString) : INewsRepository
+public sealed class LegacyNewsRepository : INewsRepository
 {
-    private const string PublishedNewsCte = """
-        WITH PublishedNews AS (
-            SELECT
-                NEWS_ID AS Id,
-                TITLE AS Title,
-                SLUG AS Slug,
-                ISNULL(EXCERPT, '') AS Excerpt,
-                ISNULL(ARTICLE, '') AS Body,
-                [DATE] AS PublishedAt,
-                SOURCE_URL AS SourceUrl,
-                CAST(CASE WHEN DISPLAY = 1 THEN 1 ELSE 0 END AS bit) AS IsPublished,
-                ROW_NUMBER() OVER (PARTITION BY NEWS_ID ORDER BY [DATE] DESC, NEWS_ID DESC) AS RowNumber
-            FROM NEWS_T
-            WHERE DISPLAY = 1
-        )
-        """;
+    private readonly string connectionString;
+    private readonly string publishedNewsCte;
+
+    public LegacyNewsRepository(string connectionString)
+    {
+        this.connectionString = connectionString;
+        publishedNewsCte = LegacyNewsSchema.BuildPublishedNewsCte(LegacyNewsSchema.HasSlugColumn(connectionString));
+    }
 
     public async Task<IReadOnlyList<NewsItem>> GetLatestAsync(int count, CancellationToken cancellationToken = default)
     {
         var sql = $"""
-            {PublishedNewsCte}
+            {publishedNewsCte}
             SELECT TOP (@Count)
                 Id,
                 Title,
@@ -46,7 +38,7 @@ public sealed class LegacyNewsRepository(string connectionString) : INewsReposit
     public async Task<int> GetPublishedCountAsync(CancellationToken cancellationToken = default)
     {
         var sql = $"""
-            {PublishedNewsCte}
+            {publishedNewsCte}
             SELECT COUNT(*)
             FROM PublishedNews
             WHERE RowNumber = 1
@@ -60,7 +52,7 @@ public sealed class LegacyNewsRepository(string connectionString) : INewsReposit
     public async Task<IReadOnlyList<NewsItem>> GetArchivePageAsync(int page, int pageSize, CancellationToken cancellationToken = default)
     {
         var sql = $"""
-            {PublishedNewsCte}
+            {publishedNewsCte}
             SELECT
                 Id,
                 Title,
@@ -83,7 +75,7 @@ public sealed class LegacyNewsRepository(string connectionString) : INewsReposit
     public async Task<NewsItem?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         var sql = $"""
-            {PublishedNewsCte}
+            {publishedNewsCte}
             SELECT
                 Id,
                 Title,
