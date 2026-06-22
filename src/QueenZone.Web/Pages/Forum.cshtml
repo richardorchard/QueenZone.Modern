@@ -1,0 +1,47 @@
+@page "/forum"
+@{
+  ViewData["Title"] = "Forum";
+  ViewData["Description"] = "A holding page for read-only Queenzone forum archive browsing.";
+}
+
+<section class="qz-page-hero">
+  <img class="qz-page-hero__crest" src="/design-system/assets/crest-white.png" alt="">
+  <div class="qz-container">
+    <div class="qz-eyebrow" style="color: var(--qz-gold);">Community Archive</div>
+    <h1>Forum</h1>
+    <p class="lede" style="max-width: var(--container-text);">A read-only modern index for the original community discussions, boards and recent thread patterns.</p>
+    <div class="qz-forum-stats">
+      <span><strong>18,400</strong> members</span>
+      <span><strong>12,600</strong> threads</span>
+      <span><strong>100,000+</strong> posts</span>
+    </div>
+  </div>
+</section>
+
+<section class="qz-section qz-section--warm">
+  <div class="qz-container">
+    <partial name="_SectionHeader" model="@(("Boards", "Browse the community archive", false, (string?)null, (string?)null))" />
+    <div class="qz-grid qz-grid--three">
+      <a class="qz-card" href="#"><div class="qz-card__kicker">The Music</div><h3>Albums, songs and lyrics</h3><p>Latest: Ranking every studio album</p></a>
+      <a class="qz-card" href="#"><div class="qz-card__kicker">Live & Tours</div><h3>Setlists and memories</h3><p>Latest: Magic Tour night by night</p></a>
+      <a class="qz-card" href="#"><div class="qz-card__kicker">Rarities</div><h3>Sessions and lost tapes</h3><p>Latest: Montreux session tapes</p></a>
+      <a class="qz-card" href="#"><div class="qz-card__kicker">Archive Project</div><h3>Restoration work</h3><p>Latest: Earls Court negatives</p></a>
+      <a class="qz-card" href="#"><div class="qz-card__kicker">Gear</div><h3>Technique and equipment</h3><p>Latest: Red Special modifications</p></a>
+      <a class="qz-card" href="#"><div class="qz-card__kicker">The Lounge</div><h3>Introductions and off-topic</h3><p>Latest: How did you find Queenzone?</p></a>
+    </div>
+  </div>
+</section>
+
+<section class="qz-section">
+  <div class="qz-container">
+    <partial name="_SectionHeader" model="@(("Recent Threads", "Activity pattern", false, (string?)null, (string?)null))" />
+    <table class="qz-table">
+      <thead><tr><th>Thread</th><th>Board</th><th>Replies</th><th>Latest</th></tr></thead>
+      <tbody>
+        <tr><td>The definitive ranking of every studio album</td><td>The Music</td><td>1,284</td><td>2h ago</td></tr>
+        <tr><td>Unheard Montreux session tapes</td><td>Rarities</td><td>642</td><td>5h ago</td></tr>
+        <tr><td>Restoring the 1977 News of the World tour photos</td><td>Archive Project</td><td>318</td><td>1d ago</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>

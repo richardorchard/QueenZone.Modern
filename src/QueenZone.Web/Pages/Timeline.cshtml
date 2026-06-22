@@ -1,0 +1,18 @@
+@page "/timeline"
+@{
+  ViewData["Title"] = "Timeline";
+  ViewData["Description"] = "A holding page for Queen timeline highlights.";
+}
+
+<partial name="_PageHero" model='@(("Archive Chronology", "Timeline", "A warm-white vertical timeline for major Queen moments and future archive milestones.", "1970 onwards"))' />
+
+<section class="qz-section qz-section--warm">
+  <div class="qz-container">
+    <div class="qz-timeline">
+      <div class="qz-timeline-item"><div class="qz-card qz-timeline-card"><h3>A band is named</h3><p>Brian May and Roger Taylor are joined by a new singer, who renames the band Queen.</p></div><div class="qz-timeline-year">1970</div></div>
+      <div class="qz-timeline-item"><div class="qz-card qz-timeline-card"><h3>The line-up completes</h3><p>John Deacon joins on bass, completing the classic four-piece.</p></div><div class="qz-timeline-year">1971</div></div>
+      <div class="qz-timeline-item"><div class="qz-card qz-timeline-card"><h3>A Night at the Opera</h3><p>The album arrives with Bohemian Rhapsody and changes the band's scale.</p></div><div class="qz-timeline-year">1975</div></div>
+      <div class="qz-timeline-item"><div class="qz-card qz-timeline-card"><h3>Live Aid</h3><p>Twenty-one minutes that cement Queen as one of the defining live bands.</p></div><div class="qz-timeline-year">1985</div></div>
+    </div>
+  </div>
+</section>

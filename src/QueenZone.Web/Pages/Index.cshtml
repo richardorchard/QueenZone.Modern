@@ -1,22 +1,87 @@
 @page "/"
 @model IndexModel
 
-<h1><a href="/news">Latest news</a></h1>
+<section class="qz-hero">
+  <img class="qz-hero__image" src="/design-system/assets/img-hero.jpg" alt="">
+  <div class="qz-container qz-hero__content">
+    <div class="qz-eyebrow" style="color: var(--qz-gold);">The Queenzone.com Archive</div>
+    <h1>The Day Queen Stole Live Aid</h1>
+    <p class="lede">Twenty-one minutes on a July afternoon in 1985 that rewrote the rules of the stadium show.</p>
+    <a class="qz-button qz-button--cta" href="/article">Read the story</a>
+  </div>
+</section>
 
-@if (Model.Latest.Count == 0)
-{
-  <p>No published news is available yet.</p>
-}
-else
-{
-  <ol class="news-list">
-    @foreach (var item in Model.Latest)
+<section class="qz-section qz-section--warm">
+  <div class="qz-container">
+    <partial name="_SectionHeader" model="@(("Explore the Archive", "Four ways into Queenzone", false, (string?)null, (string?)null))" />
+    <div class="qz-grid qz-grid--four">
+      <a class="qz-card" href="/news"><div class="qz-card__kicker">News archive</div><h3>4,000+ articles</h3><p>Chronological archive entries and newly approved editorial news.</p></a>
+      <a class="qz-card" href="/stories"><div class="qz-card__kicker">Long-form stories</div><h3>Features and essays</h3><p>Holding space for restored editorial features and archive packages.</p></a>
+      <a class="qz-card" href="/photography"><div class="qz-card__kicker">Photography</div><h3>Restored images</h3><p>A cinematic gallery pattern for the future photographic archive.</p></a>
+      <a class="qz-card" href="/forum"><div class="qz-card__kicker">Forum history</div><h3>100,000+ posts</h3><p>Read-only community history prepared for modern browsing.</p></a>
+    </div>
+  </div>
+</section>
+
+<section class="qz-section qz-band-dark">
+  <img class="qz-band-dark__crest" src="/design-system/assets/crest-white.png" alt="">
+  <div class="qz-container">
+    <partial name="_SectionHeader" model="@(("Featured", "Stories from the archive", true, "/stories", "View all"))" />
+    <div class="qz-tag-row">
+      <span class="qz-tag qz-tag--active">All</span><span class="qz-tag qz-tag--dark">Live Aid</span><span class="qz-tag qz-tag--dark">Freddie Mercury</span><span class="qz-tag qz-tag--dark">Recordings</span>
+    </div>
+    <div class="qz-grid qz-grid--three">
+      <partial name="_ArticleCard" model="@("/design-system/assets/img-studio.jpg", "Recording", "Inside the Making of Bohemian Rhapsody", "Six weeks, three studios and a chorus recorded more than 180 times.", "Restored archive", "/article", true)" />
+      <partial name="_ArticleCard" model="@("/design-system/assets/img-portrait.jpg", "In Memoriam", "Freddie: The Voice That Defined an Era", "A presence no stadium could contain, preserved through archive voices.", "9 min read", "/article", true)" />
+      <partial name="_ArticleCard" model="@("/design-system/assets/img-crowd.jpg", "Live History", "The Magic Tour, Night by Night", "The 1986 run that became the final tour with all four members.", "15 min read", "/article", true)" />
+    </div>
+  </div>
+</section>
+
+<section class="qz-section">
+  <div class="qz-container">
+    <partial name="_SectionHeader" model="@(("Latest", "Latest news", false, "/news", "View all"))" />
+    @if (Model.Latest.Count == 0)
     {
-      <li>
-        <a href="@NewsRoutes.GetNewsDetailPath(item)">@item.Title</a>
-        <p>@item.Excerpt</p>
-        <time datetime="@item.PublishedAt.ToString("yyyy-MM-dd")">@item.PublishedAt.ToString("dd MMMM yyyy")</time>
-      </li>
+      <p>No published news is available yet.</p>
     }
-  </ol>
-}
+    else
+    {
+      <ol class="qz-news-list">
+        @foreach (var item in Model.Latest)
+        {
+          <li class="qz-news-row">
+            <div class="qz-meta"><time datetime="@item.PublishedAt.ToString("yyyy-MM-dd")">@item.PublishedAt.ToString("dd MMMM yyyy")</time></div>
+            <div>
+              <h3><a href="@NewsRoutes.GetNewsDetailPath(item)">@item.Title</a></h3>
+              <p>@item.Excerpt</p>
+            </div>
+          </li>
+        }
+      </ol>
+    }
+  </div>
+</section>
+
+<section class="qz-section qz-section--warm">
+  <div class="qz-container">
+    <partial name="_SectionHeader" model="@(("Featured Photography", "A visual archive in progress", false, "/photography", "Browse gallery"))" />
+    <div class="qz-gallery-grid">
+      <figure class="qz-gallery-tile qz-gallery-tile--tall"><img src="/design-system/assets/img-stage.jpg" alt=""><figcaption><span>Wembley Stadium</span><span>1986</span></figcaption></figure>
+      <figure class="qz-gallery-tile"><img src="/design-system/assets/img-portrait.jpg" alt=""><figcaption><span>Studio portrait</span><span>1974</span></figcaption></figure>
+      <figure class="qz-gallery-tile qz-gallery-tile--wide"><img src="/design-system/assets/img-crowd.jpg" alt=""><figcaption><span>Hyde Park</span><span>1976</span></figcaption></figure>
+      <figure class="qz-gallery-tile"><img src="/design-system/assets/img-studio.jpg" alt=""><figcaption><span>Mountain Studios</span><span>1978</span></figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<section class="qz-section qz-band-dark">
+  <div class="qz-container">
+    <partial name="_SectionHeader" model="@(("On This Day", "This Day in Queen History", true, "/timeline", "View timeline"))" />
+    <div class="qz-grid qz-grid--three qz-on-dark">
+      <div><div class="qz-card__kicker">13 Jul 1985</div><p>Queen perform at Live Aid, Wembley Stadium, in a set later voted among the greatest live performances in rock history.</p></div>
+      <div><div class="qz-card__kicker">31 Oct 1975</div><p>Bohemian Rhapsody is released as a single, breaking contemporary radio convention.</p></div>
+      <div><div class="qz-card__kicker">20 Apr 1992</div><p>The Freddie Mercury Tribute Concert is held at Wembley before 72,000 people.</p></div>
+    </div>
+  </div>
+</section>

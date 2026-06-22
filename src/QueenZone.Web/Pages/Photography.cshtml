@@ -1,0 +1,21 @@
+@page "/photography"
+@{
+  ViewData["Title"] = "Photography";
+  ViewData["Description"] = "A holding page for the Queenzone photographic archive.";
+}
+
+<partial name="_PageHero" model='@(("The Photographic Archive", "Photography", "A filterable masonry pattern for restored photographs, contact sheets and archive image collections.", "Tens of thousands of images"))' />
+
+<section class="qz-section">
+  <div class="qz-container">
+    <div class="qz-tag-row"><span class="qz-tag qz-tag--active">All</span><span class="qz-tag">Live</span><span class="qz-tag">Studio</span><span class="qz-tag">Portrait</span><span class="qz-tag">Backstage</span></div>
+    <div class="qz-gallery-grid">
+      <figure class="qz-gallery-tile qz-gallery-tile--tall"><img src="/design-system/assets/img-stage.jpg" alt=""><figcaption><span>Wembley Stadium</span><span>1986</span></figcaption></figure>
+      <figure class="qz-gallery-tile qz-gallery-tile--tall"><img src="/design-system/assets/img-portrait.jpg" alt=""><figcaption><span>Studio portrait</span><span>1974</span></figcaption></figure>
+      <figure class="qz-gallery-tile qz-gallery-tile--wide"><img src="/design-system/assets/img-crowd.jpg" alt=""><figcaption><span>Hyde Park</span><span>1976</span></figcaption></figure>
+      <figure class="qz-gallery-tile"><img src="/design-system/assets/img-studio.jpg" alt=""><figcaption><span>Mountain Studios</span><span>1978</span></figcaption></figure>
+      <figure class="qz-gallery-tile qz-gallery-tile--wide"><img src="/design-system/assets/img-hero.jpg" alt=""><figcaption><span>Live Aid</span><span>1985</span></figcaption></figure>
+      <figure class="qz-gallery-tile"><img src="/design-system/assets/img-stage.jpg" alt=""><figcaption><span>Earls Court</span><span>1977</span></figcaption></figure>
+    </div>
+  </div>
+</section>
