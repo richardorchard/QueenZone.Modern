@@ -13,6 +13,7 @@ public static class QueenZoneDataServiceCollectionExtensions
             options.UseSqlServer(connectionString));
 
         services.AddSingleton<INewsRepository>(_ => new LegacyNewsRepository(connectionString));
+        services.AddSingleton<IArticlesRepository>(_ => new LegacyArticlesRepository(connectionString));
         services.AddScoped<IAdminNewsRepository, EfAdminNewsRepository>();
         services.AddScoped<INewsAuditRepository, EfNewsAuditRepository>();
 
@@ -24,6 +25,7 @@ public static class QueenZoneDataServiceCollectionExtensions
         var store = new SharedNewsStore(SampleNewsData.CreateSeedArticles());
         services.AddSingleton(store);
         services.AddSingleton<INewsRepository, InMemoryNewsRepository>();
+        services.AddSingleton<IArticlesRepository>(_ => new InMemoryArticlesRepository(SampleArticlesData.CreateSeedArticles()));
         services.AddSingleton<IAdminNewsRepository, InMemoryAdminNewsRepository>();
         services.AddSingleton<INewsAuditRepository, InMemoryNewsAuditRepository>();
 

@@ -2,7 +2,7 @@
 
 A complete implementation package for **Queenzone.org**, the relaunch of the long-running independent Queen fan community as a premium editorial archive. Hand this folder to a designer or developer (human or AI) to implement the site in a production codebase.
 
-> **Positioning:** *The preserved archive of Queenzone.com.* The original community ran for years, then went dormant (the domain was lost). The goal now is to **publish the preserved archive** — news, stories, photography and forums — as a timeless, cinematic, editorial platform. It is **not** a recreation of the old site, and deliberately does **not** imitate the official queenonline.com. Queenzone owns a darker, "collector's box-set" identity.
+> **Positioning:** *The preserved archive of Queenzone.com.* The original community ran for years, then went dormant (the domain was lost). The goal now is to **publish the preserved archive** — news, articles, photography and forums — as a timeless, cinematic, editorial platform. It is **not** a recreation of the old site, and deliberately does **not** imitate the official queenonline.com. Queenzone owns a darker, "collector's box-set" identity.
 
 ---
 
@@ -28,7 +28,7 @@ Final colours, typography, spacing, motion and interactions. Recreate the UI pix
 
 **Devices:** mobile-first (primary), desktop secondary but important, tablet supported.
 
-**The signature move:** an **alternating dark / light section rhythm**. Rich-black `#111111` bands (Featured Stories, This Day in Queen History, Timeline, page mastheads, footer) carry **antique-gold** accents; warm-white bands (Explore, Photography, Discussions) carry the lighter content. This dual-tone cadence is what differentiates Queenzone from the all-bright official site.
+**The signature move:** an **alternating dark / light section rhythm**. Rich-black `#111111` bands (Featured Articles, This Day in Queen History, Timeline, page mastheads, footer) carry **antique-gold** accents; warm-white bands (Explore, Photography, Discussions) carry the lighter content. This dual-tone cadence is what differentiates Queenzone from the all-bright official site.
 
 ---
 
@@ -110,9 +110,9 @@ Full click-through recreation source is in **`UI_KIT_SOURCE.md`** (desktop + mob
 **Pages** (routed by header nav; see `App.jsx`)
 | View | File | Purpose |
 |---|---|---|
-| Home | `Hero.jsx` + `Sections1.jsx` + `Sections2.jsx` | Cinematic hero feature → Explore the Archive (4 cards) → **Featured Stories** (dark, tag filter) → Featured Photography (masonry) → **This Day in Queen History** (dark, gold dates) → Popular Discussions → Recently Restored → **Timeline Highlights** (dark) |
+| Home | `Hero.jsx` + `Sections1.jsx` + `Sections2.jsx` | Cinematic hero feature → Explore the Archive (4 cards) → **Featured Articles** (dark, tag filter) → Featured Photography (masonry) → **This Day in Queen History** (dark, gold dates) → Popular Discussions → Recently Restored → **Timeline Highlights** (dark) |
 | News | `Pages1.jsx` → `NewsIndex` | Dark page-hero + year filter + chronological list rows (date · category · title · excerpt) |
-| Stories | `Pages1.jsx` → `StoriesIndex` | Lead feature (image + standfirst) + tag filter + 3-col card grid |
+| Articles | `Pages1.jsx` → `ArticlesIndex` | Lead feature (image + standfirst) + tag filter + 3-col card grid |
 | Photography | `Pages2.jsx` → `PhotoGallery` | Filterable masonry (tall/wide/normal spans) with full-screen **lightbox** |
 | Timeline | `Pages2.jsx` → `TimelinePage` | Warm-white vertical timeline, alternating sides, gold year markers on a centre rule |
 | Forum | `Forum.jsx` → `ForumPage` | Dark community masthead (gold stats), 6-board index with latest-activity, recent-threads table (pinned markers, replies/views, Latest/Top/Unanswered tabs) |
@@ -132,7 +132,7 @@ Full click-through recreation source is in **`UI_KIT_SOURCE.md`** (desktop + mob
 ## Interactions & behaviour
 - **Navigation** — header nav + Explore-the-Archive cards route between pages (SPA-style here; use real routes in production).
 - **Read** — hero CTA, Featured Story cards and News rows open the article view.
-- **Filter** — tag/year/category chips on Stories, News, Gallery, Forum (cosmetic in the prototype).
+- **Filter** — tag/year/category chips on Articles, News, Gallery, Forum (cosmetic in the prototype).
 - **Lightbox** — clicking a gallery photo opens it full-screen on a dark blur scrim; click out or ✕ to close.
 - **Search** — header search opens a full-screen overlay.
 - **Header** — gilt hairline always present; translucent blur + drop-shadow engage after 12px scroll.

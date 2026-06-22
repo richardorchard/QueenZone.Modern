@@ -1,0 +1,12 @@
+@page "/articles"
+@model IndexModel
+
+<partial name="_PageHero" model='@(("Long-form Archive", "Articles", "In-depth features, essays and editorial packages from the preserved Queenzone archive.", "100+ features"))' />
+
+<section class="qz-section">
+  <div class="qz-container">
+    <partial name="_ArticlesArchiveList" model="Model.Items" />
+
+    @Html.Raw(ArticlesRoutes.BuildArchivePaginationNav(Model.CurrentPage, Model.TotalPages))
+  </div>
+</section>
