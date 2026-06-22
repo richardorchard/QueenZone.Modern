@@ -1,0 +1,24 @@
+@model IReadOnlyList<StoryItem>
+
+@if (Model.Count == 0)
+{
+  <p>No published stories are available yet.</p>
+}
+else
+{
+  <ol class="qz-news-list">
+    @foreach (var item in Model)
+    {
+      <li class="qz-news-row">
+        <div>
+          <div class="qz-card__kicker"><time datetime="@item.PublishedAt.ToString("yyyy-MM-dd")">@item.PublishedAt.ToString("dd MMMM yyyy")</time></div>
+          <div class="qz-meta">@(string.IsNullOrWhiteSpace(item.CategoryName) ? "Story" : item.CategoryName)</div>
+        </div>
+        <div>
+          <h2><a href="@StoriesRoutes.GetStoryDetailPath(item)">@item.Title</a></h2>
+          <p>@item.Excerpt</p>
+        </div>
+      </li>
+    }
+  </ol>
+}

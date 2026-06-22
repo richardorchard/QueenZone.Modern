@@ -1,0 +1,8 @@
+@page "/stories/page/{pageNumber:int}"
+@model ArchivePageModel
+
+<h1>Stories archive</h1>
+
+<partial name="_StoriesArchiveList" model="Model.Items" />
+
+@Html.Raw(StoriesRoutes.BuildArchivePaginationNav(Model.CurrentPage, Model.TotalPages))
