@@ -1,0 +1,15 @@
+@page "/search"
+@{
+  ViewData["Title"] = "Search";
+  ViewData["Description"] = "Search holding page for the Queenzone archive.";
+}
+
+<partial name="_PageHero" model='@(("Search the Archive", "Search", "A holding surface for unified search across news, stories, photographs and forum history.", "Articles, photos and discussions"))' />
+
+<section class="qz-section">
+  <div class="qz-container" style="max-width: 760px;">
+    <label class="qz-eyebrow" for="qz-search">Search query</label>
+    <input id="qz-search" type="search" placeholder="Search 4,000+ articles, photos and discussions..." style="width: 100%; margin-top: var(--space-3); padding: 1rem 1.125rem; border: 1px solid var(--border-strong); border-radius: var(--radius-xs); font: var(--type-body);">
+    <div class="qz-tag-row" style="margin-top: var(--space-5);"><span class="qz-tag">Bohemian Rhapsody</span><span class="qz-tag">Live Aid 1985</span><span class="qz-tag">Freddie Mercury</span><span class="qz-tag">Wembley 1986</span></div>
+  </div>
+</section>

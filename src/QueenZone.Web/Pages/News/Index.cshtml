@@ -1,8 +1,15 @@
 @page "/news"
 @model IndexModel
 
-<h1>News archive</h1>
+<partial name="_PageHero" model='@(("The Archive", "News", "Chronological entries from the preserved Queenzone.com archive, with space for newly approved news articles.", "4,000+ articles"))' />
 
-<partial name="_NewsArchiveList" model="Model.Items" />
+<section class="qz-section">
+  <div class="qz-container">
+    <div class="qz-tag-row">
+      <span class="qz-tag qz-tag--active">All</span><span class="qz-tag">1985</span><span class="qz-tag">1986</span><span class="qz-tag">1991</span><span class="qz-tag">1992</span>
+    </div>
+    <partial name="_NewsArchiveList" model="Model.Items" />
 
-@Html.Raw(NewsRoutes.BuildArchivePaginationNav(Model.CurrentPage, Model.TotalPages))
+    @Html.Raw(NewsRoutes.BuildArchivePaginationNav(Model.CurrentPage, Model.TotalPages))
+  </div>
+</section>

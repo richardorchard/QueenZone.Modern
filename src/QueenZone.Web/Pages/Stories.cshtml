@@ -1,0 +1,30 @@
+@page "/stories"
+@{
+  ViewData["Title"] = "Stories";
+  ViewData["Description"] = "Long-form Queen archive stories and restored editorial features.";
+}
+
+<partial name="_PageHero" model='@(("Long-form Archive", "Stories", "A holding page for restored features, essays and editorial packages from the Queenzone archive.", "100+ features"))' />
+
+<section class="qz-section qz-section--warm">
+  <div class="qz-container">
+    <partial name="_SectionHeader" model="@(("Lead Feature", "The archive as a magazine", false, (string?)null, (string?)null))" />
+    <div class="qz-grid qz-grid--two">
+      <partial name="_ArticleCard" model="@("/design-system/assets/img-studio.jpg", "Recording", "Inside the Making of Bohemian Rhapsody", "Six weeks, three studios and a chorus recorded more than 180 times.", "12 min read", "/article", false)" />
+      <div>
+        <p class="lede">This route applies the mocked Stories index pattern: a prominent lead feature, taxonomy filters, and a restrained card grid ready for restored archive content.</p>
+        <div class="qz-tag-row"><span class="qz-tag qz-tag--active">All</span><span class="qz-tag">Albums</span><span class="qz-tag">Live history</span><span class="qz-tag">Interviews</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="qz-section">
+  <div class="qz-container">
+    <div class="qz-grid qz-grid--three">
+      <partial name="_ArticleCard" model="@("/design-system/assets/img-portrait.jpg", "In Memoriam", "Freddie: The Voice That Defined an Era", "A thoughtful restored archive feature for the modern site.", "9 min read", "/article", false)" />
+      <partial name="_ArticleCard" model="@("/design-system/assets/img-crowd.jpg", "Live History", "The Magic Tour, Night by Night", "A structured long-form treatment for tour history.", "15 min read", "/article", false)" />
+      <partial name="_ArticleCard" model="@("/design-system/assets/img-stage.jpg", "Performance", "Wembley and the Art of Scale", "A holding story card using the shared article-card partial.", "8 min read", "/article", false)" />
+    </div>
+  </div>
+</section>

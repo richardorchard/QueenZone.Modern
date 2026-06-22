@@ -1,0 +1,14 @@
+@model (string Eyebrow, string Title, string Standfirst, string Meta)
+
+<section class="qz-page-hero">
+  <img class="qz-page-hero__crest" src="/design-system/assets/crest-white.png" alt="">
+  <div class="qz-container">
+    <div class="qz-eyebrow" style="color: var(--qz-gold);">@Model.Eyebrow</div>
+    <h1>@Model.Title</h1>
+    <p class="lede" style="max-width: var(--container-text);">@Model.Standfirst</p>
+    @if (!string.IsNullOrWhiteSpace(Model.Meta))
+    {
+      <div class="qz-meta" style="color: rgba(255,255,255,0.52);">@Model.Meta</div>
+    }
+  </div>
+</section>

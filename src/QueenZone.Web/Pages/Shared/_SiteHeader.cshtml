@@ -1,0 +1,26 @@
+@{
+  var path = Context.Request.Path.Value ?? "/";
+  bool IsActive(string route) => route == "/" ? path == "/" : path.StartsWith(route, StringComparison.OrdinalIgnoreCase);
+}
+
+<header class="qz-masthead">
+  <div class="qz-masthead__inner">
+    <a class="qz-brand" href="/">
+      <img src="/design-system/assets/crest-white.png" alt="Queen crest">
+      <span>Queenzone</span>
+    </a>
+    <nav class="qz-nav" aria-label="Primary navigation">
+      <a href="/" aria-current="@(IsActive("/") ? "page" : null)">Home</a>
+      <a href="/news" aria-current="@(IsActive("/news") ? "page" : null)">News</a>
+      <a href="/stories" aria-current="@(IsActive("/stories") ? "page" : null)">Stories</a>
+      <a href="/photography" aria-current="@(IsActive("/photography") ? "page" : null)">Photography</a>
+      <a href="/forum" aria-current="@(IsActive("/forum") ? "page" : null)">Forum</a>
+      <a href="/timeline" aria-current="@(IsActive("/timeline") ? "page" : null)">Timeline</a>
+      <a href="/search" aria-current="@(IsActive("/search") ? "page" : null)">Search</a>
+      @if (ViewData["ShowAdminNav"] is true)
+      {
+        <a href="/admin/news" aria-current="@(IsActive("/admin/news") ? "page" : null)">Admin</a>
+      }
+    </nav>
+  </div>
+</header>

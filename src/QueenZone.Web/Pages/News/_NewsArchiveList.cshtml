@@ -6,13 +6,18 @@
 }
 else
 {
-  <ol class="news-list">
+  <ol class="qz-news-list">
     @foreach (var item in Model)
     {
-      <li>
-        <a href="@NewsRoutes.GetNewsDetailPath(item)">@item.Title</a>
-        <p>@item.Excerpt</p>
-        <time datetime="@item.PublishedAt.ToString("yyyy-MM-dd")">@item.PublishedAt.ToString("dd MMMM yyyy")</time>
+      <li class="qz-news-row">
+        <div>
+          <div class="qz-card__kicker"><time datetime="@item.PublishedAt.ToString("yyyy-MM-dd")">@item.PublishedAt.ToString("dd MMMM yyyy")</time></div>
+          <div class="qz-meta">News</div>
+        </div>
+        <div>
+          <h2><a href="@NewsRoutes.GetNewsDetailPath(item)">@item.Title</a></h2>
+          <p>@item.Excerpt</p>
+        </div>
       </li>
     }
   </ol>

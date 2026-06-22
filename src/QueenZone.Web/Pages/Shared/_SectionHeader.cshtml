@@ -1,0 +1,12 @@
+@model (string Eyebrow, string Title, bool OnDark, string? ActionHref, string? ActionText)
+
+<div class="qz-section-header @(Model.OnDark ? "qz-section-header--dark" : "")">
+  <div>
+    <div class="qz-eyebrow">@Model.Eyebrow</div>
+    <h2>@Model.Title</h2>
+  </div>
+  @if (!string.IsNullOrWhiteSpace(Model.ActionHref) && !string.IsNullOrWhiteSpace(Model.ActionText))
+  {
+    <a class="qz-button qz-button--ghost" href="@Model.ActionHref">@Model.ActionText</a>
+  }
+</div>
