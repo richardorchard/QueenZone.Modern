@@ -2,9 +2,9 @@
 
 **Queenzone — The Queenzone.com Archive** — a premium fan archive preserving and publishing the content of the original Queenzone.com community.
 
-This design system powers the relaunch of **Queenzone.org**. The original **Queenzone.com** ran for many years as one of the longest-running independent Queen fan communities, then went dormant (the domain was lost and the site sat untouched for years). The goal now is to **publish the preserved archive** — its news, stories, photography and forums — as a modern, timeless, editorial platform that respects Queen's legacy and the community's own history. The aim is **not** to recreate the old site, nor to imitate the official queenonline.com; Queenzone owns a darker, more cinematic "collector's box-set" identity.
+This design system powers the relaunch of **Queenzone.org**. The original **Queenzone.com** ran for many years as one of the longest-running independent Queen fan communities, then went dormant (the domain was lost and the site sat untouched for years). The goal now is to **publish the preserved archive** — its news, articles, photography and forums — as a modern, timeless, editorial platform that respects Queen's legacy and the community's own history. The aim is **not** to recreate the old site, nor to imitate the official queenonline.com; Queenzone owns a darker, more cinematic "collector's box-set" identity.
 
-> **Key statement:** *"A beautifully curated, modern archive celebrating Queen's legacy through news, photography, stories and community history."* Visitors should feel they are exploring a premium publication and historical archive — not browsing a traditional fan site.
+> **Key statement:** *"A beautifully curated, modern archive celebrating Queen's legacy through news, photography, articles and community history."* Visitors should feel they are exploring a premium publication and historical archive — not browsing a traditional fan site.
 
 The content archive is the product's greatest asset: **4,000+ news articles, 100+ long-form features, tens of thousands of photographs, 100,000+ forum posts.**
 
@@ -47,7 +47,7 @@ No codebase or Figma was provided — the written brief is the source of truth.
 
 **Emoji:** never. No emoji anywhere in the interface or copy.
 
-**Section naming follows the homepage structure:** Hero Feature · Explore the Archive · Featured Stories · Featured Photography · This Day in Queen History · Popular Discussions · Recently Restored · Timeline Highlights.
+**Section naming follows the homepage structure:** Hero Feature · Explore the Archive · Featured Articles · Featured Photography · This Day in Queen History · Popular Discussions · Recently Restored · Timeline Highlights.
 
 **Example copy (on-brand):**
 - Eyebrow: *THE QUEENZONE.COM ARCHIVE*
@@ -69,7 +69,7 @@ No codebase or Figma was provided — the written brief is the source of truth.
 - **Inter** — body, navigation, UI. Modern, clean, highly readable. 17px body / 1.6 line-height; long-form at 18px / 1.75.
 - **Cinzel** — titling accent only: eyebrows, timeline markers, anniversary content. Uppercase, wide tracking (`0.22em`). **Never body text.**
 
-**Backgrounds & imagery:** large hero imagery, one strong image over competing elements. **Black-and-white, documentary/archival** photography — no heavy filters, no modern social grading. The site uses an **alternating dark/light section rhythm** as its signature (distinct from the bright official queenonline.com): rich-black `#111111` bands carry Featured Stories, This Day in Queen History, the Timeline and footer, with gold accents; light warm-white bands carry Explore, Photography and Discussions. The crest appears as a faint watermark (~5–7% opacity) behind dark sections. Imagery eases gently from greyscale toward colour on hover in cards. No gradients as decoration — only the cinematic scrim over photography (`--scrim-bottom` / `--scrim-soft`).
+**Backgrounds & imagery:** large hero imagery, one strong image over competing elements. **Black-and-white, documentary/archival** photography — no heavy filters, no modern social grading. The site uses an **alternating dark/light section rhythm** as its signature (distinct from the bright official queenonline.com): rich-black `#111111` bands carry Featured Articles, This Day in Queen History, the Timeline and footer, with gold accents; light warm-white bands carry Explore, Photography and Discussions. The crest appears as a faint watermark (~5–7% opacity) behind dark sections. Imagery eases gently from greyscale toward colour on hover in cards. No gradients as decoration — only the cinematic scrim over photography (`--scrim-bottom` / `--scrim-soft`).
 
 **Spacing & layout** (see `tokens/spacing.css`): 4px base scale; section vertical rhythm ~88px. Magazine-inspired structured grids (1280px max editorial width; 680px reading measure) — **not** social-media card walls. Generous gutters.
 
@@ -114,6 +114,6 @@ No bespoke icon set was provided in the brief. The system uses **[Lucide](https:
 
 **Foundation cards** (`guidelines/`) — specimen cards for the Design System tab (Colors, Type, Spacing, Brand).
 
-**UI kit** (`ui_kits/website/`) — the Queenzone site: multi-page desktop click-through (`index.html` — home, news, stories, photography gallery + lightbox, timeline, article view) and a mobile showcase (`mobile.html` — four iPhone screens). Distinct dark/light section rhythm. See its `README.md`.
+**UI kit** (`ui_kits/website/`) — the Queenzone site: multi-page desktop click-through (`index.html` — home, news, articles, photography gallery + lightbox, timeline, article view) and a mobile showcase (`mobile.html` — four iPhone screens). Distinct dark/light section rhythm. See its `README.md`.
 
 > Fonts ship via a Google Fonts `@import` (Cormorant Garamond, Inter, Cinzel) rather than self-hosted binaries — the compiler reports 0 self-hosted fonts, which is expected.

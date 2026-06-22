@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using QueenZone.Data;
 
-namespace QueenZone.Web.Pages.Stories;
+namespace QueenZone.Web.Pages.Articles;
 
-public sealed class ArchivePageModel(IStoriesRepository storiesRepository) : StoriesArchivePageModel(storiesRepository)
+public sealed class ArchivePageModel(IArticlesRepository articlesRepository) : ArticlesArchivePageModel(articlesRepository)
 {
     [BindProperty(SupportsGet = true)]
     public int PageNumber { get; set; }
@@ -12,7 +12,7 @@ public sealed class ArchivePageModel(IStoriesRepository storiesRepository) : Sto
     {
         if (PageNumber == 1)
         {
-            return RedirectPermanent("/stories");
+            return RedirectPermanent("/articles");
         }
 
         return await LoadArchivePageAsync(PageNumber, cancellationToken);

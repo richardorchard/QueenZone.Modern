@@ -645,7 +645,7 @@ Section heading — Cinzel eyebrow over a Cormorant Garamond title, with a hairl
   title="This Day in Queen History"
   action={<Button variant="ghost" size="sm">View all</Button>} />
 
-<SectionHeader eyebrow="Featured" title="Stories" align="center" />
+<SectionHeader eyebrow="Featured" title="Articles" align="center" />
 ```
 
 Use `onDark` on rich-black sections (eyebrow turns gold). `align="center"` drops the underline and action for hero-style intros.

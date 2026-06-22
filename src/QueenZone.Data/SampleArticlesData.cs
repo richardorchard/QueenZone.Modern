@@ -1,10 +1,10 @@
 namespace QueenZone.Data;
 
-public static class SampleStoriesData
+public static class SampleArticlesData
 {
-    public static IReadOnlyList<StoryItem> CreateSeedStories()
+    public static IReadOnlyList<ArticleItem> CreateSeedArticles()
     {
-        var stories = new List<StoryItem>
+        var articles = new List<ArticleItem>
         {
             new(
                 101,
@@ -47,17 +47,17 @@ public static class SampleStoriesData
         for (var id = 104; id <= 122; id++)
         {
             var dayOffset = 122 - id;
-            stories.Add(new StoryItem(
+            articles.Add(new ArticleItem(
                 id,
-                $"Archive sample story {id}",
-                $"Excerpt for archive sample story {id}.",
-                $"<p>Body for archive sample story {id}.</p>",
+                $"Archive sample article {id}",
+                $"Excerpt for archive sample article {id}.",
+                $"<p>Body for archive sample article {id}.</p>",
                 new DateTime(2022, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddDays(dayOffset),
                 "Queenzone archive",
                 "Features",
                 true));
         }
 
-        return stories;
+        return articles;
     }
 }

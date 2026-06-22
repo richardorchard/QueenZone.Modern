@@ -4,7 +4,7 @@ using QueenZone.Data;
 
 namespace QueenZone.Web;
 
-public static partial class StoriesRoutes
+public static partial class ArticlesRoutes
 {
     public const int ArchivePageSize = 20;
 
@@ -19,10 +19,10 @@ public static partial class StoriesRoutes
     }
 
     public static string GetArchiveCanonicalPath(int page) =>
-        page <= 1 ? "/stories" : $"/stories/page/{page}";
+        page <= 1 ? "/articles" : $"/articles/page/{page}";
 
     public static string GetArchivePageTitle(int page) =>
-        page <= 1 ? "QueenZone stories" : $"QueenZone stories – Page {page}";
+        page <= 1 ? "QueenZone articles" : $"QueenZone articles – Page {page}";
 
     public static string BuildArchivePaginationNav(int currentPage, int totalPages)
     {
@@ -32,7 +32,7 @@ public static partial class StoriesRoutes
         }
 
         var builder = new StringBuilder();
-        builder.Append("<nav class=\"archive-pagination\" aria-label=\"Stories archive pagination\">");
+        builder.Append("<nav class=\"archive-pagination\" aria-label=\"Articles archive pagination\">");
         builder.Append("<p class=\"archive-pagination-summary\">Page ");
         builder.Append(currentPage);
         builder.Append(" of ");
@@ -144,6 +144,6 @@ public static partial class StoriesRoutes
         yield return totalPages;
     }
 
-    public static string GetStoryDetailPath(StoryItem item) =>
-        $"/stories/{item.Id}/{NewsSlug.Slugify(item.Title)}";
+    public static string GetArticleDetailPath(ArticleItem item) =>
+        $"/articles/{item.Id}/{NewsSlug.Slugify(item.Title)}";
 }

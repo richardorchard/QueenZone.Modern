@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 
 namespace QueenZone.Data;
 
-public static partial class LegacyStoryText
+public static partial class LegacyArticleText
 {
     public static string GetExcerpt(string? body, int maxLength = 200)
     {

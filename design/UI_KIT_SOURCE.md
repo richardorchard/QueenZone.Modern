@@ -10,7 +10,7 @@ Full source for the website recreation (desktop + mobile). These compose the pri
 ```md
 # Queenzone Website — UI Kit
 
-A high-fidelity recreation of **Queenzone.org** — the preserved archive of the original Queenzone.com community. Editorial, cinematic and mobile-first; ~90% monochrome with sparing accent colour, built entirely from the design system's components and tokens. An alternating dark/light section rhythm (rich-black Featured Stories, This Day and footer) gives it a distinct "collector's box-set" identity rather than a bright official-site look.
+A high-fidelity recreation of **Queenzone.org** — the preserved archive of the original Queenzone.com community. Editorial, cinematic and mobile-first; ~90% monochrome with sparing accent colour, built entirely from the design system's components and tokens. An alternating dark/light section rhythm (rich-black Featured Articles, This Day and footer) gives it a distinct "collector's box-set" identity rather than a bright official-site look.
 
 ## Run it
 - **Desktop:** open `index.html` — full multi-page click-through.
@@ -19,16 +19,16 @@ A high-fidelity recreation of **Queenzone.org** — the preserved archive of the
 Both load the compiled bundle (`window.QueenzoneDesignSystem_6c12e8`), then the local `.jsx` surfaces.
 
 ## Pages (desktop — `index.html`)
-The header nav routes between full pages: **News · Stories · Photography · Forum · Timeline**, plus the homepage and article view. The masthead is the **inverted (dark) variant** — rich-black background, white wordmark, gold active state — set via `<Header dark />`; every page opens on a dark hero or page-hero so it flows seamlessly.
+The header nav routes between full pages: **News · Articles · Photography · Forum · Timeline**, plus the homepage and article view. The masthead is the **inverted (dark) variant** — rich-black background, white wordmark, gold active state — set via `<Header dark />`; every page opens on a dark hero or page-hero so it flows seamlessly.
 
 | File | Surface |
 |---|---|
-| `App.jsx` | Root router (home · news · stories · gallery · timeline · article) + search overlay |
+| `App.jsx` | Root router (home · news · articles · gallery · timeline · article) + search overlay |
 | `Header.jsx` | Sticky header — crest mark, wordmark, page nav (active state), search, sign-in |
 | `Hero.jsx` | Full-bleed cinematic hero feature |
-| `Sections1.jsx` | Explore the Archive · **Featured Stories** (dark, tag filter) · Featured Photography |
+| `Sections1.jsx` | Explore the Archive · **Featured Articles** (dark, tag filter) · Featured Photography |
 | `Sections2.jsx` | **This Day in Queen History** (dark) · Popular Discussions · Recently Restored · Timeline Highlights |
-| `Pages1.jsx` | `PageHero` · **News Index** (year filter, list) · **Stories Index** (lead feature + grid) |
+| `Pages1.jsx` | `PageHero` · **News Index** (year filter, list) · **Articles Index** (lead feature + grid) |
 | `Pages2.jsx` | **Photo Gallery** (filterable masonry + lightbox) · **Timeline** (vertical, alternating) |
 | `Forum.jsx` | **Forum** — community masthead with stats, board index, recent-threads table |
 | `Footer.jsx` | Rich-black footer with crest watermark + newsletter |
@@ -40,8 +40,8 @@ The header nav routes between full pages: **News · Stories · Photography · Fo
 
 ## Interactions
 - **Navigate** — header nav and the Explore-the-Archive cards route between pages.
-- **Read a story** — hero CTA, Featured Story cards and News rows open the article view; "Back" returns home.
-- **Filter** — tag/year/category chips on Stories, News and Gallery.
+- **Read an article** — hero CTA, Featured Article cards and News rows open the article view; "Back" returns home.
+- **Filter** — tag/year/category chips on Articles, News and Gallery.
 - **Lightbox** — click any photo in the Gallery to open it full-screen.
 - **Search** — header search opens a full-screen overlay; header blurs on scroll.
 
@@ -63,7 +63,7 @@ All page content (`window.QZ_DATA`). Replace with your CMS / data layer.
 // Tone: knowledgeable, passionate, respectful. No clickbait.
 window.QZ_DATA = {
   hero: {
-    category: 'Featured Story',
+    category: 'Featured Article',
     title: 'The Day Queen Stole Live Aid',
     standfirst: 'Twenty-one minutes on a July afternoon in 1985 that rewrote the rules of the stadium show — and turned a struggling band\u2019s fortunes on their head.',
     meta: '13 July 1985 · 8 min read',
@@ -72,7 +72,7 @@ window.QZ_DATA = {
 
   explore: [
     { label: 'News Archive', count: '4,000+ articles', icon: 'newspaper', tone: 'cta' },
-    { label: 'Long-form Stories', count: '100+ features', icon: 'book-open', tone: 'editorial' },
+    { label: 'Articles', count: '100+ features', icon: 'book-open', tone: 'editorial' },
     { label: 'Photography', count: 'Tens of thousands', icon: 'camera', tone: 'archive' },
     { label: 'Forum History', count: '100,000+ posts', icon: 'messages-square', tone: 'cta' },
   ],
@@ -209,7 +209,7 @@ function SearchOverlay({ open, onClose }) {
 // Root app — routes between homepage, index pages and article reading view.
 function App() {
   const [view, setView] = React.useState('home');
-  const [story, setStory] = React.useState(null);
+  const [article, setArticle] = React.useState(null);
   const [search, setSearch] = React.useState(false);
 
   React.useEffect(() => {
@@ -217,7 +217,7 @@ function App() {
     const el = document.querySelector('.qz-scroll'); if (el) el.scrollTop = 0;
   }, [view, search]);
 
-  const openStory = (s) => { setStory(s); setView('article'); };
+  const openArticle = (s) => { setArticle(s); setView('article'); };
   const go = (page) => setView(page);
 
   return (
@@ -225,9 +225,9 @@ function App() {
       <Header onSearch={() => setSearch(true)} onHome={() => setView('home')} onNav={go} active={view} dark />
       {view === 'home' && (
         <React.Fragment>
-          <Hero onOpen={() => openStory(window.QZ_DATA.featured[0])} />
+          <Hero onOpen={() => openArticle(window.QZ_DATA.featured[0])} />
           <ExploreArchive onNav={go} />
-          <FeaturedStories onOpen={openStory} />
+          <FeaturedArticles onOpen={openArticle} />
           <Photography />
           <ThisDay />
           <Discussions />
@@ -235,12 +235,12 @@ function App() {
           <Timeline />
         </React.Fragment>
       )}
-      {view === 'news' && <NewsIndex onOpen={openStory} />}
-      {view === 'stories' && <StoriesIndex onOpen={openStory} />}
+      {view === 'news' && <NewsIndex onOpen={openArticle} />}
+      {view === 'articles' && <ArticlesIndex onOpen={openArticle} />}
       {view === 'gallery' && <PhotoGallery />}
       {view === 'timeline' && <TimelinePage />}
-      {view === 'forum' && <ForumPage onOpenThread={() => openStory(window.QZ_DATA.featured[0])} />}
-      {view === 'article' && <ArticleView story={story} onBack={() => setView('home')} />}
+      {view === 'forum' && <ForumPage onOpenThread={() => openArticle(window.QZ_DATA.featured[0])} />}
+      {view === 'article' && <ArticleView article={article} onBack={() => setView('home')} />}
       <Footer />
       <SearchOverlay open={search} onClose={() => setSearch(false)} />
     </div>
@@ -271,7 +271,7 @@ function Header({ onSearch, onHome, onNav, active, dark = false }) {
 
   const nav = [
     { label: 'News', page: 'news' },
-    { label: 'Stories', page: 'stories' },
+    { label: 'Articles', page: 'articles' },
     { label: 'Photography', page: 'gallery' },
     { label: 'Forum', page: 'forum' },
     { label: 'Timeline', page: 'timeline' },
@@ -351,7 +351,7 @@ function Hero({ onOpen }) {
           <h1 style={{ font: 'var(--fw-medium) clamp(44px, 6vw, 80px)/1.02 var(--font-display)', letterSpacing: '-0.015em', color: 'var(--qz-white)', margin: '0 0 22px' }}>{h.title}</h1>
           <p style={{ font: 'var(--fw-regular) 20px/1.55 var(--font-body)', color: 'rgba(255,255,255,0.84)', margin: '0 0 30px', maxWidth: 620 }}>{h.standfirst}</p>
           <div style={{ display: 'flex', alignItems: 'center', gap: 22, flexWrap: 'wrap' }}>
-            <Button variant="cta" size="lg" onClick={onOpen}>Read the story</Button>
+            <Button variant="cta" size="lg" onClick={onOpen}>Read the article</Button>
             <span style={{ font: 'var(--fw-medium) 13px/1 var(--font-body)', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(255,255,255,0.6)' }}>{h.meta}</span>
           </div>
         </div>
@@ -367,7 +367,7 @@ window.Hero = Hero;
 ## `ui_kits/website/Sections1.jsx`
 
 ```jsx
-// Homepage sections — part 1: Explore the Archive, Featured Stories, Photography.
+// Homepage sections — part 1: Explore the Archive, Featured Articles, Photography.
 const QZWrap = ({ children, bg, style }) => (
   <section style={{ background: bg || 'transparent', ...style }}>
     <div style={{ maxWidth: 'var(--container-max)', margin: '0 auto', padding: '88px var(--gutter-lg)' }}>{children}</div>
@@ -377,13 +377,13 @@ const QZWrap = ({ children, bg, style }) => (
 function ExploreArchive({ onNav }) {
   const { Badge } = window.QueenzoneDesignSystem_6c12e8;
   const items = window.QZ_DATA.explore;
-  const pageFor = { 'News Archive': 'news', 'Long-form Stories': 'stories', 'Photography': 'gallery', 'Forum History': 'home' };
+  const pageFor = { 'News Archive': 'news', 'Articles': 'articles', 'Photography': 'gallery', 'Forum History': 'home' };
   return (
     <QZWrap bg="var(--qz-warm-white)">
       <div style={{ textAlign: 'center', marginBottom: 48 }}>
         <div className="qz-eyebrow" style={{ color: 'var(--accent-archive)', marginBottom: 14 }}>The Queenzone.com Archive</div>
         <h2 style={{ font: 'var(--type-h2)', margin: 0 }}>Explore the Archive</h2>
-        <p style={{ font: 'var(--type-lead)', color: 'var(--text-secondary)', maxWidth: 580, margin: '16px auto 0' }}>Decades of news, stories, photography and conversation from the original community — preserved, organised and published.</p>
+        <p style={{ font: 'var(--type-lead)', color: 'var(--text-secondary)', maxWidth: 580, margin: '16px auto 0' }}>Decades of news, articles, photography and conversation from the original community — preserved, organised and published.</p>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 20 }}>
         {items.map((it) => (
@@ -406,20 +406,20 @@ function ExploreArchive({ onNav }) {
   );
 }
 
-function FeaturedStories({ onOpen }) {
+function FeaturedArticles({ onOpen }) {
   const { SectionHeader, ArticleCard, Badge, Button, Tag } = window.QueenzoneDesignSystem_6c12e8;
-  const stories = window.QZ_DATA.featured;
+  const articles = window.QZ_DATA.featured;
   const tags = window.QZ_DATA.tags;
   const [active, setActive] = React.useState('All');
   return (
     <QZWrap bg="var(--qz-black)">
-      <SectionHeader onDark eyebrow="Editorial" title="Featured Stories"
+      <SectionHeader onDark eyebrow="Editorial" title="Featured Articles"
         action={<Button variant="ghost" size="sm" style={{ color: 'var(--qz-white)' }} iconRight={<i data-lucide="arrow-right" style={{ width: 15, height: 15 }}></i>}>View all</Button>} />
       <div style={{ display: 'flex', gap: 9, flexWrap: 'wrap', margin: '24px 0 40px' }}>
         {tags.map((t) => <Tag key={t} href="#" onDark active={t === active} onClick={(e) => { e.preventDefault(); setActive(t); }}>{t}</Tag>)}
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 36 }}>
-        {stories.map((s) => (
+        {articles.map((s) => (
           <ArticleCard key={s.title} onDark image={s.image} category={s.category} title={s.title}
             excerpt={s.excerpt} meta={s.meta} onClick={(e) => { e.preventDefault(); onOpen && onOpen(s); }}
             badge={s.badge ? <Badge tone={s.badge.tone} variant="solid">{s.badge.label}</Badge> : null} />
@@ -452,7 +452,7 @@ function Photography() {
   );
 }
 window.ExploreArchive = ExploreArchive;
-window.FeaturedStories = FeaturedStories;
+window.FeaturedArticles = FeaturedArticles;
 window.Photography = Photography;
 window.QZWrap = QZWrap;
 ```
@@ -568,7 +568,7 @@ window.Timeline = Timeline;
 ## `ui_kits/website/Pages1.jsx`
 
 ```jsx
-// Shared page hero band + News Index + Stories Index.
+// Shared page hero band + News Index + Articles Index.
 function PageHero({ eyebrow, title, lead, count }) {
   return (
     <section style={{ background: 'var(--qz-black)', position: 'relative', overflow: 'hidden' }}>
@@ -624,16 +624,16 @@ function NewsIndex({ onOpen }) {
   );
 }
 
-function StoriesIndex({ onOpen }) {
+function ArticlesIndex({ onOpen }) {
   const { SectionHeader, ArticleCard, Badge, Tag } = window.QueenzoneDesignSystem_6c12e8;
-  const stories = window.QZ_DATA.featured;
-  const all = stories.concat(window.QZ_DATA.restored.map((r) => ({ ...r, excerpt: 'A restored feature from the Queenzone.com archive.' })));
+  const articles = window.QZ_DATA.featured;
+  const all = articles.concat(window.QZ_DATA.restored.map((r) => ({ ...r, excerpt: 'A restored feature from the Queenzone.com archive.' })));
   const tags = window.QZ_DATA.tags;
   const [active, setActive] = React.useState('All');
   const lead = all[0];
   return (
     <React.Fragment>
-      <PageHero eyebrow="Long-form" title="Stories" lead="In-depth features, essays and oral histories — the long reads from the Queenzone.com archive." count="100+ features" />
+      <PageHero eyebrow="Long-form" title="Articles" lead="In-depth features, essays and oral histories — the long reads from the Queenzone.com archive." count="100+ features" />
       <section style={{ maxWidth: 'var(--container-max)', margin: '0 auto', padding: '56px var(--gutter-lg) 40px' }}>
         <a href="#" onClick={(e) => { e.preventDefault(); onOpen && onOpen(lead); }} style={{ display: 'grid', gridTemplateColumns: '1.15fr 1fr', gap: 48, alignItems: 'center', textDecoration: 'none', paddingBottom: 56, marginBottom: 8, borderBottom: '1px solid var(--hairline)' }}>
           <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 'var(--radius-md)', aspectRatio: '3 / 2', background: 'var(--qz-grey-200)' }}>
@@ -664,7 +664,7 @@ function StoriesIndex({ onOpen }) {
 }
 window.PageHero = PageHero;
 window.NewsIndex = NewsIndex;
-window.StoriesIndex = StoriesIndex;
+window.ArticlesIndex = ArticlesIndex;
 ```
 
 ---
@@ -872,9 +872,9 @@ window.ForumPage = ForumPage;
 
 ```jsx
 // Long-form article reading view — editorial measure, archival hero.
-function ArticleView({ story, onBack }) {
+function ArticleView({ article, onBack }) {
   const { Badge, Tag, Button, IconButton } = window.QueenzoneDesignSystem_6c12e8;
-  const s = story || window.QZ_DATA.featured[0];
+  const s = article || window.QZ_DATA.featured[0];
   const body = [
     'It began, as these things often do, with low expectations. By the summer of 1985 the band had weathered a difficult few years — a patchy reception for recent records, and whispers that their finest moment had already passed.',
     'What unfolded across twenty-one minutes at Wembley Stadium would settle the argument for a generation. From the opening bars, the performance was less a set than a conversation with ninety thousand people, every one of them held in the palm of a single hand.',
@@ -939,8 +939,8 @@ window.ArticleView = ArticleView;
 function Footer() {
   const { Input, Button } = window.QueenzoneDesignSystem_6c12e8;
   const cols = [
-    { h: 'Archive', links: ['News', 'Long-form Stories', 'Photography', 'Discography', 'Timeline'] },
-    { h: 'Community', links: ['Forum', 'Members', 'Submit a Story', 'Restoration Project'] },
+    { h: 'Archive', links: ['News', 'Articles', 'Photography', 'Discography', 'Timeline'] },
+    { h: 'Community', links: ['Forum', 'Members', 'Submit an Article', 'Restoration Project'] },
     { h: 'About', links: ['Our History', 'The Mission', 'Contact', 'Privacy'] },
   ];
   return (
@@ -952,7 +952,7 @@ function Footer() {
               <img src="../../assets/crest-white.png" alt="" style={{ height: 44 }} />
               <span style={{ fontFamily: 'var(--font-titling)', fontWeight: 600, fontSize: 18, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--qz-white)' }}>Queenzone</span>
             </div>
-            <p style={{ font: 'var(--fw-regular) 15px/1.6 var(--font-body)', color: 'rgba(255,255,255,0.6)', maxWidth: 320, marginBottom: 22 }}>The preserved archive of Queenzone.com — one of the longest-running independent Queen fan communities. Its news, stories, photography and forums, published at last.</p>
+            <p style={{ font: 'var(--fw-regular) 15px/1.6 var(--font-body)', color: 'rgba(255,255,255,0.6)', maxWidth: 320, marginBottom: 22 }}>The preserved archive of Queenzone.com — one of the longest-running independent Queen fan communities. Its news, articles, photography and forums, published at last.</p>
             <div style={{ display: 'flex', gap: 8, maxWidth: 320 }}>
               <Input placeholder="Email for archive updates" size="sm" style={{ background: 'rgba(255,255,255,0.06)', borderColor: 'var(--border-on-dark)', color: 'var(--qz-white)' }} />
               <Button variant="cta" size="sm">Join</Button>
@@ -1031,7 +1031,7 @@ function MobileHome() {
             <div style={{ marginBottom: 14 }}><Badge tone="editorial" variant="solid">{h.category}</Badge></div>
             <h1 style={{ font: 'var(--fw-medium) 34px/1.05 var(--font-display)', letterSpacing: '-0.015em', color: 'var(--qz-white)', margin: '0 0 12px' }}>{h.title}</h1>
             <p style={{ font: 'var(--fw-regular) 15px/1.5 var(--font-body)', color: 'rgba(255,255,255,0.82)', margin: '0 0 18px' }}>{h.standfirst}</p>
-            <Button variant="cta" size="md" fullWidth>Read the story</Button>
+            <Button variant="cta" size="md" fullWidth>Read the article</Button>
           </div>
         </section>
       </div>

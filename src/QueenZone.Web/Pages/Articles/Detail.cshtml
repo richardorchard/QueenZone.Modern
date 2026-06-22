@@ -1,4 +1,4 @@
-@page "/stories/{id:int}/{slug}"
+@page "/articles/{id:int}/{slug}"
 @model DetailModel
 
 @if (Model.Item is not null)
@@ -6,14 +6,14 @@
   <section class="qz-article-hero">
     <img src="/design-system/assets/img-hero.jpg" alt="">
     <div class="qz-container qz-article-hero__content">
-      <p class="article-nav"><a class="qz-button qz-button--ghost" style="color: var(--qz-white);" href="/stories">Back to stories archive</a></p>
+      <p class="article-nav"><a class="qz-button qz-button--ghost" style="color: var(--qz-white);" href="/articles">Back to articles archive</a></p>
       @if (!string.IsNullOrWhiteSpace(Model.Item.CategoryName))
       {
         <div class="qz-eyebrow" style="color: var(--qz-gold);">@Model.Item.CategoryName</div>
       }
       else
       {
-        <div class="qz-eyebrow" style="color: var(--qz-gold);">Stories archive</div>
+        <div class="qz-eyebrow" style="color: var(--qz-gold);">Articles archive</div>
       }
       <h1>@Model.Item.Title</h1>
       <div class="qz-meta" style="color: rgba(255,255,255,0.52);"><time datetime="@Model.Item.PublishedAt.ToString("yyyy-MM-dd")">@Model.Item.PublishedAt.ToString("dd MMMM yyyy")</time></div>
@@ -24,7 +24,7 @@
     {
       <p class="lede">@Model.Item.Excerpt</p>
     }
-    <article class="article-body">@Html.Raw(StoriesArticleContent.FormatBody(Model.Item.Body))</article>
+    <article class="article-body">@Html.Raw(ArticleContent.FormatBody(Model.Item.Body))</article>
 
     @if (!string.IsNullOrWhiteSpace(Model.Item.Source))
     {

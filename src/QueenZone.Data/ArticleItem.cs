@@ -1,6 +1,6 @@
 namespace QueenZone.Data;
 
-public sealed record StoryItem(
+public sealed record ArticleItem(
     int Id,
     string Title,
     string Excerpt,

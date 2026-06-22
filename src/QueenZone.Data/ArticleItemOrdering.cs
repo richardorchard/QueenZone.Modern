@@ -1,8 +1,8 @@
 namespace QueenZone.Data;
 
-public static class StoryItemOrdering
+public static class ArticleItemOrdering
 {
-    public static IReadOnlyList<StoryItem> ByCreatedDateDescending(IEnumerable<StoryItem> items) =>
+    public static IReadOnlyList<ArticleItem> ByCreatedDateDescending(IEnumerable<ArticleItem> items) =>
         items
             .OrderByDescending(item => item.PublishedAt)
             .ThenByDescending(item => item.Id)

@@ -3,9 +3,9 @@ using Microsoft.Data.SqlClient;
 
 namespace QueenZone.Data;
 
-public sealed class LegacyStoriesRepository(string connectionString) : IStoriesRepository
+public sealed class LegacyArticlesRepository(string connectionString) : IArticlesRepository
 {
-    private const string PublishedStoriesSelect = """
+    private const string PublishedArticlesSelect = """
         SELECT
             a.Q_ARTICLE_ID AS Id,
             a.ARTICLE_NAME AS Title,
@@ -20,10 +20,10 @@ public sealed class LegacyStoriesRepository(string connectionString) : IStoriesR
         WHERE a.DISPLAY = 1
         """;
 
-    public async Task<IReadOnlyList<StoryItem>> GetLatestAsync(int count, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<ArticleItem>> GetLatestAsync(int count, CancellationToken cancellationToken = default)
     {
         var sql = $"""
-            {PublishedStoriesSelect}
+            {PublishedArticlesSelect}
             ORDER BY a.DATE_CREATED DESC, a.Q_ARTICLE_ID DESC
             OFFSET 0 ROWS FETCH NEXT @Count ROWS ONLY
             """;
@@ -44,10 +44,10 @@ public sealed class LegacyStoriesRepository(string connectionString) : IStoriesR
         return await connection.ExecuteScalarAsync<int>(command);
     }
 
-    public async Task<IReadOnlyList<StoryItem>> GetArchivePageAsync(int page, int pageSize, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<ArticleItem>> GetArchivePageAsync(int page, int pageSize, CancellationToken cancellationToken = default)
     {
         var sql = $"""
-            {PublishedStoriesSelect}
+            {PublishedArticlesSelect}
             ORDER BY a.DATE_CREATED DESC, a.Q_ARTICLE_ID DESC
             OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY
             """;
@@ -56,10 +56,10 @@ public sealed class LegacyStoriesRepository(string connectionString) : IStoriesR
         return await QueryAsync(sql, new { Offset = offset, PageSize = pageSize }, cancellationToken);
     }
 
-    public async Task<StoryItem?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
+    public async Task<ArticleItem?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         var sql = $"""
-            {PublishedStoriesSelect}
+            {PublishedArticlesSelect}
               AND a.Q_ARTICLE_ID = @Id
             """;
 
@@ -67,26 +67,26 @@ public sealed class LegacyStoriesRepository(string connectionString) : IStoriesR
         return results.FirstOrDefault();
     }
 
-    private async Task<IReadOnlyList<StoryItem>> QueryAsync(string sql, object parameters, CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<ArticleItem>> QueryAsync(string sql, object parameters, CancellationToken cancellationToken)
     {
         await using var connection = new SqlConnection(connectionString);
         var command = new CommandDefinition(sql, parameters, cancellationToken: cancellationToken);
-        var rows = await connection.QueryAsync<StoryRow>(command);
+        var rows = await connection.QueryAsync<ArticleRow>(command);
         return rows.Select(Map).ToList();
     }
 
-    private static StoryItem Map(StoryRow row) =>
+    private static ArticleItem Map(ArticleRow row) =>
         new(
             row.Id,
             row.Title,
-            LegacyStoryText.GetExcerpt(row.Body),
+            LegacyArticleText.GetExcerpt(row.Body),
             row.Body,
             row.PublishedAt,
             row.Source,
             row.CategoryName,
             row.IsPublished);
 
-    private sealed record StoryRow(
+    private sealed record ArticleRow(
         int Id,
         string Title,
         string Body,

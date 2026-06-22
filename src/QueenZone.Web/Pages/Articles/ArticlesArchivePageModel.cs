@@ -2,11 +2,11 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using QueenZone.Data;
 
-namespace QueenZone.Web.Pages.Stories;
+namespace QueenZone.Web.Pages.Articles;
 
-public abstract class StoriesArchivePageModel(IStoriesRepository storiesRepository) : PageModel
+public abstract class ArticlesArchivePageModel(IArticlesRepository articlesRepository) : PageModel
 {
-    public IReadOnlyList<StoryItem> Items { get; private set; } = [];
+    public IReadOnlyList<ArticleItem> Items { get; private set; } = [];
 
     public int CurrentPage { get; private set; }
 
@@ -19,13 +19,13 @@ public abstract class StoriesArchivePageModel(IStoriesRepository storiesReposito
             return NotFound();
         }
 
-        var publishedCount = await storiesRepository.GetPublishedCountAsync(cancellationToken);
-        var archive = await storiesRepository.GetArchivePageAsync(page, StoriesRoutes.ArchivePageSize, cancellationToken);
-        var totalPages = StoriesRoutes.ResolveArchiveTotalPages(
+        var publishedCount = await articlesRepository.GetPublishedCountAsync(cancellationToken);
+        var archive = await articlesRepository.GetArchivePageAsync(page, ArticlesRoutes.ArchivePageSize, cancellationToken);
+        var totalPages = ArticlesRoutes.ResolveArchiveTotalPages(
             page,
             archive.Count,
             publishedCount,
-            StoriesRoutes.GetArchiveTotalPages(publishedCount));
+            ArticlesRoutes.GetArchiveTotalPages(publishedCount));
 
         if (totalPages == 0)
         {
@@ -43,16 +43,16 @@ public abstract class StoriesArchivePageModel(IStoriesRepository storiesReposito
         CurrentPage = page;
         TotalPages = totalPages;
 
-        ViewData["Title"] = StoriesRoutes.GetArchivePageTitle(page);
-        ViewData["CanonicalPath"] = StoriesRoutes.GetArchiveCanonicalPath(page);
+        ViewData["Title"] = ArticlesRoutes.GetArchivePageTitle(page);
+        ViewData["CanonicalPath"] = ArticlesRoutes.GetArchiveCanonicalPath(page);
         if (page > 1)
         {
-            ViewData["PrevPath"] = StoriesRoutes.GetArchiveCanonicalPath(page - 1);
+            ViewData["PrevPath"] = ArticlesRoutes.GetArchiveCanonicalPath(page - 1);
         }
 
         if (totalPages > 0 && page < totalPages)
         {
-            ViewData["NextPath"] = StoriesRoutes.GetArchiveCanonicalPath(page + 1);
+            ViewData["NextPath"] = ArticlesRoutes.GetArchiveCanonicalPath(page + 1);
         }
 
         return Page();
