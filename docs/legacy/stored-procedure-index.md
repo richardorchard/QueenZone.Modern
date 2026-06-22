@@ -90,8 +90,15 @@ The legacy database has about 550 stored procedures. This index groups the ones 
 
 ## Forum Archive
 
-- `Q_LIST_FORUM_SP`
+Schema reference: `docs/legacy/db-schema.txt`.
+
+Category list (same shape as direct `Q_FORUM_T` read):
+
+- `Q_LIST_FORUM_SP` — categories ordered by `FORUM_ORDER`
+- `Q_FORUM_MAIN_SP` — legacy home-page category list
 - `Q_LIST_FORUM_NAME_ONLY_SP`
+
+Category detail and threads:
 - `Q_FORUM_VIEW_SP`
 - `Q_FORUM_VIEW_PAGE_SP`
 - `Q_FORUM_VIEW_PAGE_ALL_SP`

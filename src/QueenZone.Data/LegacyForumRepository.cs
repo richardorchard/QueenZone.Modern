@@ -3,6 +3,11 @@ using Microsoft.Data.SqlClient;
 
 namespace QueenZone.Data;
 
+/// <summary>
+/// Reads forum categories from legacy <c>Q_FORUM_T</c>.
+/// Column map and stored procedures are documented in <c>docs/legacy/db-schema.txt</c>
+/// and <c>docs/legacy/table-map.md</c> (equivalent to <c>Q_LIST_FORUM_SP</c> / <c>Q_FORUM_MAIN_SP</c>).
+/// </summary>
 public sealed class LegacyForumRepository(string connectionString) : IForumRepository
 {
     private const string CategoriesSelect = """

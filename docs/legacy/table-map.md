@@ -1,6 +1,6 @@
 # Legacy Table Map
 
-Source: `MAIN2_DB` schema exported on 2026-06-10.
+Source: `MAIN2_DB` schema export in `docs/legacy/db-schema.txt` (2026-06-22).
 
 The legacy schema contains 129 tables. This file focuses on the tables relevant to the new read-only public site.
 
@@ -34,9 +34,44 @@ The legacy schema contains 129 tables. This file focuses on the tables relevant 
 
 | Table | Purpose | Initial Treatment |
 | --- | --- | --- |
-| `Q_FORUM_T` | Forum categories. | Later read-only archive. |
+| `Q_FORUM_T` | Forum categories. | Read-only archive (categories wired on `/forum`). |
 | `Q_FORUM_TOPIC_T` | Forum topics and replies. | Later read-only archive. |
 | `Q_FORUM_TOPIC_SUBJECT_T` | Forum subject metadata. | Later read-only archive. |
+
+### `Q_FORUM_T` columns
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `Q_FORUM_ID` | `int` | Primary key. |
+| `Q_FORUM_NAME` | `varchar(50)` | Board name shown in the archive index. |
+| `Q_FORUM_DESCRIPTION` | `varchar(200)` | Board description. |
+| `Q_FORUM_POST_COUNT` | `int` | Denormalised post total maintained by legacy app logic. |
+| `Q_FORUM_LAST_POST` | `datetime` | Last activity timestamp for the board. |
+| `FORUM_ORDER` | `tinyint` | Sort order for category lists (`Q_LIST_FORUM_SP`, `Q_FORUM_MAIN_SP`). |
+| `TITLE_WORDS` | `varchar(50)` | Legacy SEO/search helper text. |
+
+### `Q_FORUM_TOPIC_T` columns (selected)
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `Q_FORUM_TOPIC_ID` | `int` identity | Topic/reply id. |
+| `Q_FORUM_ID` | `tinyint` | Parent forum category. |
+| `TOPIC_SUBJECT` | `char` | Thread title (trim on read). |
+| `TOPIC_REPLIES` | `smallint` | Reply count on parent topics. |
+| `TOPIC_LAST_POST` | `smalldatetime` | Last activity on the thread. |
+| `Q_FORUM_TOPIC_PARENT_ID` | `int` | `0` marks a top-level thread; non-zero marks a reply. |
+| `TOPIC_STARTER` | `tinyint` | Used by `Q_FORUM_TOPIC_NO_PARENT_V` (`1` = starter post). |
+| `STICKY` | `tinyint` | Pinned thread marker. |
+| `DISCOGRAPHY` | `tinyint` | Legacy moderation/filter flag (`2` excluded from hot-topic procs). |
+
+### Useful forum views
+
+| View | Purpose |
+| --- | --- |
+| `Q_FORUM_TOPIC_V` | Top-level threads with username, reply count, forum name. |
+| `Q_FORUM_TOPIC_NO_PARENT_V` | Starter posts (`TOPIC_STARTER = 1`). |
+| `dbUser.Q_FORUM_TOPIC_THREAD_COUNT_V` | Thread count per forum (`Q_FORUM_TOPIC_PARENT_ID = 0`). |
+| `FORUM_VIEW_V` | Forum topics joined to users (used by `Q_FORUM_VIEW_SP`). |
 | `Q_BLOG_T` | Blog posts. | Later archive. |
 | `Q_BLOG_TITLE_T` | Blog ownership/title metadata. | Later archive. |
 | `Q_BLOG_COMMENT_T` | Blog comments. | Later archive, privacy/moderation review. |
