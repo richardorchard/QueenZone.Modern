@@ -1,7 +1,8 @@
 @page "/forum"
+@model ForumModel
 @{
   ViewData["Title"] = "Forum";
-  ViewData["Description"] = "A holding page for read-only Queenzone forum archive browsing.";
+  ViewData["Description"] = "Read-only Queenzone forum archive boards and community history.";
 }
 
 <section class="qz-page-hero">
@@ -11,9 +12,9 @@
     <h1>Forum</h1>
     <p class="lede" style="max-width: var(--container-text);">A read-only modern index for the original community discussions, boards and recent thread patterns.</p>
     <div class="qz-forum-stats">
-      <span><strong>18,400</strong> members</span>
-      <span><strong>12,600</strong> threads</span>
-      <span><strong>100,000+</strong> posts</span>
+      <span><strong>@Model.Stats.ForumCount.ToString("N0")</strong> boards</span>
+      <span><strong>@ForumRoutes.FormatCount(Model.Stats.ThreadCount)</strong> threads</span>
+      <span><strong>@ForumRoutes.FormatCount(Model.Stats.PostCount)</strong> posts</span>
     </div>
   </div>
 </section>
@@ -21,14 +22,41 @@
 <section class="qz-section qz-section--warm">
   <div class="qz-container">
     <partial name="_SectionHeader" model="@(("Boards", "Browse the community archive", false, (string?)null, (string?)null))" />
-    <div class="qz-grid qz-grid--three">
-      <a class="qz-card" href="#"><div class="qz-card__kicker">The Music</div><h3>Albums, songs and lyrics</h3><p>Latest: Ranking every studio album</p></a>
-      <a class="qz-card" href="#"><div class="qz-card__kicker">Live & Tours</div><h3>Setlists and memories</h3><p>Latest: Magic Tour night by night</p></a>
-      <a class="qz-card" href="#"><div class="qz-card__kicker">Rarities</div><h3>Sessions and lost tapes</h3><p>Latest: Montreux session tapes</p></a>
-      <a class="qz-card" href="#"><div class="qz-card__kicker">Archive Project</div><h3>Restoration work</h3><p>Latest: Earls Court negatives</p></a>
-      <a class="qz-card" href="#"><div class="qz-card__kicker">Gear</div><h3>Technique and equipment</h3><p>Latest: Red Special modifications</p></a>
-      <a class="qz-card" href="#"><div class="qz-card__kicker">The Lounge</div><h3>Introductions and off-topic</h3><p>Latest: How did you find Queenzone?</p></a>
-    </div>
+    @if (Model.Categories.Count == 0)
+    {
+      <p>No forum boards are available yet.</p>
+    }
+    else
+    {
+      <div class="qz-grid qz-grid--three">
+        @foreach (var category in Model.Categories)
+        {
+          <a class="qz-card" href="@ForumRoutes.GetCategoryPath(category)">
+            <div class="qz-card__kicker">@category.Name</div>
+            <h3>@(string.IsNullOrWhiteSpace(category.Description) ? category.Name : category.Description)</h3>
+            @if (!string.IsNullOrWhiteSpace(category.LatestThreadTitle))
+            {
+              <p>
+                Latest:
+                @category.LatestThreadTitle
+                @if (category.LastActivityAt is not null)
+                {
+                  <span class="qz-meta"> · <time datetime="@category.LastActivityAt.Value.ToString("yyyy-MM-dd")">@category.LastActivityAt.Value.ToString("dd MMMM yyyy")</time></span>
+                }
+              </p>
+            }
+            else if (category.LastActivityAt is not null)
+            {
+              <p class="qz-meta"><time datetime="@category.LastActivityAt.Value.ToString("yyyy-MM-dd")">Last activity @category.LastActivityAt.Value.ToString("dd MMMM yyyy")</time></p>
+            }
+            else
+            {
+              <p class="qz-meta">@ForumRoutes.FormatCount(category.PostCount) posts</p>
+            }
+          </a>
+        }
+      </div>
+    }
   </div>
 </section>
 
