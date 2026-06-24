@@ -88,4 +88,81 @@ public static class SampleForumData
 
         return topics;
     }
+
+    public static IReadOnlyList<ForumPostItem> CreateSeedPosts(int topicId)
+    {
+        if (topicId == 1002)
+        {
+            var posts = new List<ForumPostItem>
+            {
+                new(
+                    1002,
+                    "Where would you put <strong>A Night at the Opera</strong> in the ranking?",
+                    new DateTime(2024, 6, 1, 10, 0, 0, DateTimeKind.Utc),
+                    "brightonrock",
+                    "Queen collector since 1989.",
+                    4_812,
+                    new DateTime(2004, 3, 12, 0, 0, 0, DateTimeKind.Utc)),
+                new(
+                    1101,
+                    "Top tier for me — side two is basically perfect.",
+                    new DateTime(2024, 6, 1, 11, 15, 0, DateTimeKind.Utc),
+                    "jazzfanz",
+                    null,
+                    921,
+                    new DateTime(2011, 8, 2, 0, 0, 0, DateTimeKind.Utc)),
+                new(
+                    1102,
+                    "I still prefer <em>Sheer Heart Attack</em> for raw energy.",
+                    new DateTime(2024, 6, 2, 9, 30, 0, DateTimeKind.Utc),
+                    "nightattheopera",
+                    null,
+                    388,
+                    new DateTime(2016, 1, 20, 0, 0, 0, DateTimeKind.Utc))
+            };
+
+            for (var id = 1103; id <= 1125; id++)
+            {
+                posts.Add(new ForumPostItem(
+                    id,
+                    $"Archive reply {id} in the studio album ranking thread.",
+                    new DateTime(2024, 6, 3, 8, 0, 0, DateTimeKind.Utc).AddHours(id - 1103),
+                    "archive_member",
+                    null,
+                    id % 200,
+                    new DateTime(2010, 5, 1, 0, 0, 0, DateTimeKind.Utc)));
+            }
+
+            return posts;
+        }
+
+        if (topicId == 1001)
+        {
+            return
+            [
+                new ForumPostItem(
+                    1001,
+                    "Please keep discussion civil and on-topic. This is a read-only archive.",
+                    new DateTime(2024, 6, 12, 20, 4, 0, DateTimeKind.Utc),
+                    "Richard Orchard",
+                    "Site owner",
+                    12_400,
+                    new DateTime(1999, 1, 1, 0, 0, 0, DateTimeKind.Utc))
+            ];
+        }
+
+        return [];
+    }
+
+    public static ForumTopicHeader? TryGetSeedTopicHeader(int topicId)
+    {
+        var topics = CreateSeedTopics(1).Concat(CreateSeedTopics(2)).ToList();
+        var topic = topics.SingleOrDefault(item => item.Id == topicId);
+        if (topic is null)
+        {
+            return null;
+        }
+
+        return new ForumTopicHeader(topicId, topic.Title, 1, "The Music");
+    }
 }

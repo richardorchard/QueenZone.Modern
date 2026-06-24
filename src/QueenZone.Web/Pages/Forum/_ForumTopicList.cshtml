@@ -24,7 +24,7 @@ else
             {
               <span class="qz-meta">Pinned · </span>
             }
-            @topic.Title
+            <a href="@ForumRoutes.GetTopicPath(topic)">@topic.Title</a>
           </td>
           <td>@topic.AuthorUsername</td>
           <td>@topic.ReplyCount.ToString("N0")</td>

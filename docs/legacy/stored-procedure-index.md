@@ -110,6 +110,7 @@ Category detail and threads:
 - `Q_FORUM_PAGE_CACHE_SP` — first 500 topics for cache warm-up
 - `Q_FORUM_VIEW_SP`
 - `Q_FORUM_VIEW_PAGE_ALL_SP` — unpaged topic list for one category
+- `Q_FORUM_TOPIC_NEW_SP` — paged posts for one thread (`@CurrentPage`, `@PageSize`, `@Q_FORUM_TOPIC_ID`, `@TotalRecords` output, plus thread/board header outputs)
 - `Q_FORUM_TOPIC_VIEW_SP`
 - `Q_FORUM_TOPIC_PARENT_LIST_SP`
 - `Q_FORUM_TOPIC_PARENT_LIST_BY_FORUM_SP`

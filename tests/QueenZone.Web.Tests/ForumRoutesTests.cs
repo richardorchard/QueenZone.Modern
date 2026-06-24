@@ -43,4 +43,18 @@ public sealed class ForumRoutesTests
     [InlineData(13075, 523)]
     public void GetTopicsTotalPages_MatchesLegacyStoredProcedurePaging(int totalCount, int expectedPages) =>
         Assert.Equal(expectedPages, ForumRoutes.GetTopicsTotalPages(totalCount));
+
+    [Fact]
+    public void GetTopicCanonicalPath_UsesPageSegmentAfterFirstPage()
+    {
+        Assert.Equal("/forum/topic/1002/ranking-every-studio-album", ForumRoutes.GetTopicCanonicalPath(1002, "Ranking every studio album"));
+        Assert.Equal("/forum/topic/1002/ranking-every-studio-album/page/3", ForumRoutes.GetTopicCanonicalPath(1002, "Ranking every studio album", 3));
+    }
+
+    [Theory]
+    [InlineData(15, 1)]
+    [InlineData(16, 2)]
+    [InlineData(31, 3)]
+    public void GetPostsTotalPages_UsesFifteenPostPageSize(int totalCount, int expectedPages) =>
+        Assert.Equal(expectedPages, ForumRoutes.GetPostsTotalPages(totalCount));
 }
