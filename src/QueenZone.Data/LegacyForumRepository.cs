@@ -203,9 +203,16 @@ public sealed class LegacyForumRepository(string connectionString) : IForumRepos
         int USER_ID,
         string? USERNAME,
         string? SIGNATURE,
-        int NUMBER_OF_POSTS,
+        short NUMBER_OF_POSTS,
         DateTime? DATE_CREATED,
-        int Q_FORUM_TOPIC_ID);
+        int Q_FORUM_TOPIC_ID,
+        string? ATTACHMENT,
+        string? FILESIZE,
+        short ATTACH_COUNT,
+        byte ONLINE,
+        string? AVATAR,
+        string? DISPLAY_MESSAGE,
+        byte DISCO);
 
     private sealed record ForumTopicRow(
         int Id,
