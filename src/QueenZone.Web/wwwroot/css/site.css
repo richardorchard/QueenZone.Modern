@@ -447,6 +447,41 @@
   font-size: 2rem;
 }
 
+.qz-forum-posts {
+  display: grid;
+  gap: var(--space-6);
+}
+
+.qz-forum-post {
+  padding: var(--space-5);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: var(--qz-warm-white);
+}
+
+.qz-forum-post__header {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--hairline);
+}
+
+.qz-forum-post__author {
+  font-family: var(--font-display);
+}
+
+.qz-forum-post__body {
+  margin: 0;
+}
+
+.qz-forum-post__signature {
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px dashed var(--hairline);
+}
+
 .qz-table {
   width: 100%;
   border-collapse: collapse;

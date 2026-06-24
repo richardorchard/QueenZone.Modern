@@ -26,6 +26,27 @@ public sealed class InMemoryForumRepository(
         return Task.FromResult(new ForumCategoryTopicsPage(pageItems, topics.Count, page, pageSize));
     }
 
+    public Task<ForumTopicPostsPage?> GetTopicPostsPageAsync(
+        int topicId,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        var header = SampleForumData.TryGetSeedTopicHeader(topicId);
+        if (header is null)
+        {
+            return Task.FromResult<ForumTopicPostsPage?>(null);
+        }
+
+        var posts = SampleForumData.CreateSeedPosts(topicId)
+            .OrderBy(post => post.PostedAt)
+            .ToList();
+        var skip = Math.Max(page - 1, 0) * pageSize;
+        var pageItems = posts.Skip(skip).Take(pageSize).ToList();
+        return Task.FromResult<ForumTopicPostsPage?>(
+            new ForumTopicPostsPage(header, pageItems, posts.Count, page, pageSize));
+    }
+
     public Task<int> GetTotalThreadCountAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(seedStats.ThreadCount);
 
