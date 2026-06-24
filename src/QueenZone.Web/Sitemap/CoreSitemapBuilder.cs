@@ -27,18 +27,12 @@ public sealed class CoreSitemapBuilder(
             entries.Add(new(NewsRoutes.GetArchiveCanonicalPath(page)));
         }
 
-        for (var page = 1; page <= totalPages; page++)
+        var newsItems = await newsRepository.GetPublishedSitemapEntriesAsync(cancellationToken);
+        foreach (var item in newsItems)
         {
-            var archivePage = await newsRepository.GetArchivePageAsync(
-                page,
-                NewsRoutes.ArchivePageSize,
-                cancellationToken);
-            foreach (var item in archivePage)
-            {
-                entries.Add(new(
-                    NewsArticleContent.GetDetailCanonicalPath(item.Id, item.Title, item.Slug),
-                    item.PublishedAt));
-            }
+            entries.Add(new(
+                NewsArticleContent.GetDetailCanonicalPath(item.Id, item.Title, item.Slug),
+                item.PublishedAt));
         }
     }
 
@@ -51,18 +45,12 @@ public sealed class CoreSitemapBuilder(
             entries.Add(new(ArticlesRoutes.GetArchiveCanonicalPath(page)));
         }
 
-        for (var page = 1; page <= totalPages; page++)
+        var articleItems = await articlesRepository.GetPublishedSitemapEntriesAsync(cancellationToken);
+        foreach (var item in articleItems)
         {
-            var archivePage = await articlesRepository.GetArchivePageAsync(
-                page,
-                ArticlesRoutes.ArchivePageSize,
-                cancellationToken);
-            foreach (var item in archivePage)
-            {
-                entries.Add(new(
-                    ArticlesRoutes.GetArticleDetailPath(item),
-                    item.PublishedAt));
-            }
+            entries.Add(new(
+                ArticlesRoutes.GetArticleDetailPath(item.Id, item.Title),
+                item.PublishedAt));
         }
     }
 
