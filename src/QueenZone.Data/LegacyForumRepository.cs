@@ -102,6 +102,54 @@ public sealed class LegacyForumRepository(string connectionString) : IForumRepos
             pageSize);
     }
 
+    public async Task<ForumTopicPostsPage?> GetTopicPostsPageAsync(
+        int topicId,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = new SqlConnection(connectionString);
+        var parameters = new DynamicParameters();
+        parameters.Add("CurrentPage", page);
+        parameters.Add("PageSize", pageSize);
+        parameters.Add("Q_FORUM_TOPIC_ID", topicId);
+        parameters.Add("USER_ID", 0);
+        parameters.Add("TotalRecords", dbType: DbType.Int32, direction: ParameterDirection.Output);
+        parameters.Add("SUBSCRIBED", dbType: DbType.Int32, direction: ParameterDirection.Output);
+        parameters.Add("forum_name", dbType: DbType.String, size: 30, direction: ParameterDirection.Output);
+        parameters.Add("SUBJECT", dbType: DbType.String, size: 75, direction: ParameterDirection.Output);
+        parameters.Add("Q_FORUM_ID", dbType: DbType.Int32, direction: ParameterDirection.Output);
+        parameters.Add("DISCO", dbType: DbType.Byte, direction: ParameterDirection.Output);
+
+        var command = new CommandDefinition(
+            "Q_FORUM_TOPIC_NEW_SP",
+            parameters,
+            commandType: CommandType.StoredProcedure,
+            cancellationToken: cancellationToken,
+            commandTimeout: CommandTimeoutSeconds);
+
+        var rows = await connection.QueryAsync<ForumPostRow>(command);
+        var forumId = parameters.Get<int?>("Q_FORUM_ID") ?? 0;
+        var title = parameters.Get<string>("SUBJECT")?.Trim();
+        if (forumId <= 0 || string.IsNullOrWhiteSpace(title))
+        {
+            return null;
+        }
+
+        var header = new ForumTopicHeader(
+            topicId,
+            title,
+            forumId,
+            parameters.Get<string>("forum_name")?.Trim() ?? string.Empty);
+
+        return new ForumTopicPostsPage(
+            header,
+            rows.Select(MapPost).ToList(),
+            parameters.Get<int>("TotalRecords"),
+            page,
+            pageSize);
+    }
+
     public async Task<int> GetTotalThreadCountAsync(CancellationToken cancellationToken = default)
     {
         await using var connection = new SqlConnection(connectionString);
@@ -129,6 +177,16 @@ public sealed class LegacyForumRepository(string connectionString) : IForumRepos
             row.LatestThreadTitle,
             row.SortOrder);
 
+    private static ForumPostItem MapPost(ForumPostRow row) =>
+        new(
+            row.Q_FORUM_TOPIC_ID,
+            row.TOPIC_MESSAGE?.Trim() ?? string.Empty,
+            row.TOPIC_DATE,
+            row.USERNAME?.Trim() ?? "Unknown",
+            string.IsNullOrWhiteSpace(row.SIGNATURE) ? null : row.SIGNATURE.Trim(),
+            row.NUMBER_OF_POSTS,
+            row.DATE_CREATED);
+
     private static ForumTopicItem MapTopic(ForumTopicRow row) =>
         new(
             row.Q_FORUM_TOPIC_ID,
@@ -138,6 +196,23 @@ public sealed class LegacyForumRepository(string connectionString) : IForumRepos
             row.NUMBEROFREPLIES,
             string.IsNullOrWhiteSpace(row.LAST_POST_USERNAME) ? null : row.LAST_POST_USERNAME.Trim(),
             row.STICKY == 1);
+
+    private sealed record ForumPostRow(
+        string? TOPIC_MESSAGE,
+        DateTime TOPIC_DATE,
+        int USER_ID,
+        string? USERNAME,
+        string? SIGNATURE,
+        short NUMBER_OF_POSTS,
+        DateTime? DATE_CREATED,
+        int Q_FORUM_TOPIC_ID,
+        string? ATTACHMENT,
+        string? FILESIZE,
+        short ATTACH_COUNT,
+        byte ONLINE,
+        string? AVATAR,
+        string? DISPLAY_MESSAGE,
+        byte DISCO);
 
     private sealed record ForumTopicRow(
         int Id,

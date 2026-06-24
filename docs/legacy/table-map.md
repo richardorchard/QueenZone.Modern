@@ -83,6 +83,7 @@ Avoid ad-hoc `COUNT(*)` scans on `Q_FORUM_TOPIC_T` in production. The table is l
 | Board/post hero stats | Derive board count and post total from the category read (`Q_FORUM_POST_COUNT` per row). Sum thread totals from `dbUser.Q_FORUM_TOPIC_THREAD_COUNT_V`. |
 | Category header (`/forum/{id}/{slug}`) | `Q_FORUM_T` for one board; optional `OUTER APPLY` for latest thread title on a single row only. |
 | Paged topic list | `Q_FORUM_VIEW_PAGE_SP` with `@TotalRecords` output. Do not add a separate manual `COUNT(*)` query. |
+| Thread detail (`/forum/topic/{id}/{slug}`) | `Q_FORUM_TOPIC_NEW_SP` for paged posts in chronological order. Pass `@USER_ID = 0` for anonymous archive reads. |
 
 ## Private Or Sensitive
 

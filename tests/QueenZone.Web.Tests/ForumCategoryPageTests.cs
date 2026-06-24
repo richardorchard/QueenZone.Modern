@@ -21,6 +21,7 @@ public sealed class ForumCategoryPageTests : IClassFixture<WebApplicationFactory
 
         Assert.Contains("The Music", body);
         Assert.Contains("Ranking every studio album", body);
+        Assert.Contains("/forum/topic/1002/ranking-every-studio-album", body);
         Assert.Contains("Forum Guidelines", body);
         Assert.Contains("<strong>30</strong> threads", body);
     }
