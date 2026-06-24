@@ -70,13 +70,19 @@ The legacy schema contains 129 tables. This file focuses on the tables relevant 
 | --- | --- |
 | `Q_FORUM_TOPIC_V` | Top-level threads with username, reply count, forum name. |
 | `Q_FORUM_TOPIC_NO_PARENT_V` | Starter posts (`TOPIC_STARTER = 1`). |
-| `dbUser.Q_FORUM_TOPIC_THREAD_COUNT_V` | Thread count per forum (`Q_FORUM_TOPIC_PARENT_ID = 0`). |
+| `dbUser.Q_FORUM_TOPIC_THREAD_COUNT_V` | Pre-aggregated thread count per forum. Sum for site-wide thread totals. |
 | `FORUM_VIEW_V` | Forum topics joined to users (used by `Q_FORUM_VIEW_SP`). |
-| `Q_BLOG_T` | Blog posts. | Later archive. |
-| `Q_BLOG_TITLE_T` | Blog ownership/title metadata. | Later archive. |
-| `Q_BLOG_COMMENT_T` | Blog comments. | Later archive, privacy/moderation review. |
-| `Q_COMMENT_T` | Generic comments. | Later review. |
-| `Q_GENERAL_COMMENT_T` | Generic comments. | Later review. |
+
+### Modern forum read patterns (`LegacyForumRepository`)
+
+Avoid ad-hoc `COUNT(*)` scans on `Q_FORUM_TOPIC_T` in production. The table is large and causes App Service timeouts.
+
+| Page need | Preferred source |
+| --- | --- |
+| Category index (`/forum`) | Direct read of `Q_FORUM_T` ordered by `FORUM_ORDER` (same shape as `Q_LIST_FORUM_SP`). |
+| Board/post hero stats | Derive board count and post total from the category read (`Q_FORUM_POST_COUNT` per row). Sum thread totals from `dbUser.Q_FORUM_TOPIC_THREAD_COUNT_V`. |
+| Category header (`/forum/{id}/{slug}`) | `Q_FORUM_T` for one board; optional `OUTER APPLY` for latest thread title on a single row only. |
+| Paged topic list | `Q_FORUM_VIEW_PAGE_SP` with `@TotalRecords` output. Do not add a separate manual `COUNT(*)` query. |
 
 ## Private Or Sensitive
 

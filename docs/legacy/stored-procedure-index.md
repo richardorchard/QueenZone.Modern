@@ -92,6 +92,12 @@ The legacy database has about 550 stored procedures. This index groups the ones 
 
 Schema reference: `docs/legacy/db-schema.txt`.
 
+Modern read-model notes (`LegacyForumRepository`):
+
+- Prefer denormalised `Q_FORUM_T.Q_FORUM_POST_COUNT` and `dbUser.Q_FORUM_TOPIC_THREAD_COUNT_V` for hero stats.
+- Do not add manual `COUNT(*)` queries on `Q_FORUM_TOPIC_T` for archive pages.
+- Use `Q_FORUM_VIEW_PAGE_SP` for category pagination totals via `@TotalRecords`.
+
 Category list (same shape as direct `Q_FORUM_T` read):
 
 - `Q_LIST_FORUM_SP` — categories ordered by `FORUM_ORDER`

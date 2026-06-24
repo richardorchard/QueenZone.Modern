@@ -11,7 +11,8 @@ public sealed class ForumModel(IForumRepository forumRepository) : PageModel
 
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
-        Stats = await forumRepository.GetArchiveStatsAsync(cancellationToken);
         Categories = await forumRepository.GetCategoriesAsync(cancellationToken);
+        var threadCount = await forumRepository.GetTotalThreadCountAsync(cancellationToken);
+        Stats = ForumArchiveStats.FromCategories(Categories, threadCount);
     }
 }

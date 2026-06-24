@@ -11,6 +11,8 @@ namespace QueenZone.Data;
 /// </summary>
 public sealed class LegacyForumRepository(string connectionString) : IForumRepository
 {
+    private const int CommandTimeoutSeconds = 120;
+
     private const string CategoriesSelect = """
         SELECT
             CAST(f.Q_FORUM_ID AS int) AS Id,
@@ -18,16 +20,9 @@ public sealed class LegacyForumRepository(string connectionString) : IForumRepos
             NULLIF(LTRIM(RTRIM(f.Q_FORUM_DESCRIPTION)), '') AS Description,
             ISNULL(f.Q_FORUM_POST_COUNT, 0) AS PostCount,
             f.Q_FORUM_LAST_POST AS LastActivityAt,
-            NULLIF(LTRIM(RTRIM(latest.TOPIC_SUBJECT)), '') AS LatestThreadTitle,
+            CAST(NULL AS nvarchar(200)) AS LatestThreadTitle,
             ISNULL(CAST(f.FORUM_ORDER AS int), 0) AS SortOrder
         FROM Q_FORUM_T f
-        OUTER APPLY (
-            SELECT TOP 1 t.TOPIC_SUBJECT
-            FROM Q_FORUM_TOPIC_T t
-            WHERE t.Q_FORUM_ID = f.Q_FORUM_ID
-              AND (t.Q_FORUM_TOPIC_PARENT_ID = 0 OR t.Q_FORUM_TOPIC_PARENT_ID IS NULL)
-            ORDER BY t.TOPIC_LAST_POST DESC
-        ) latest
         ORDER BY f.FORUM_ORDER ASC, f.Q_FORUM_ID ASC
         """;
 
@@ -45,16 +40,24 @@ public sealed class LegacyForumRepository(string connectionString) : IForumRepos
             SELECT TOP 1 t.TOPIC_SUBJECT
             FROM Q_FORUM_TOPIC_T t
             WHERE t.Q_FORUM_ID = f.Q_FORUM_ID
-              AND (t.Q_FORUM_TOPIC_PARENT_ID = 0 OR t.Q_FORUM_TOPIC_PARENT_ID IS NULL)
+              AND t.TOPIC_STARTER = 1
             ORDER BY t.TOPIC_LAST_POST DESC
         ) latest
         WHERE f.Q_FORUM_ID = @Id
         """;
 
+    private const string TotalThreadCountSelect = """
+        SELECT ISNULL(SUM(CAST(THREADCOUNT AS bigint)), 0)
+        FROM dbUser.Q_FORUM_TOPIC_THREAD_COUNT_V
+        """;
+
     public async Task<IReadOnlyList<ForumCategoryItem>> GetCategoriesAsync(CancellationToken cancellationToken = default)
     {
         await using var connection = new SqlConnection(connectionString);
-        var command = new CommandDefinition(CategoriesSelect, cancellationToken: cancellationToken);
+        var command = new CommandDefinition(
+            CategoriesSelect,
+            cancellationToken: cancellationToken,
+            commandTimeout: CommandTimeoutSeconds);
         var rows = await connection.QueryAsync<ForumCategoryRow>(command);
         return rows.Select(Map).ToList();
     }
@@ -62,7 +65,11 @@ public sealed class LegacyForumRepository(string connectionString) : IForumRepos
     public async Task<ForumCategoryItem?> GetCategoryByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         await using var connection = new SqlConnection(connectionString);
-        var command = new CommandDefinition(CategoryByIdSelect, new { Id = id }, cancellationToken: cancellationToken);
+        var command = new CommandDefinition(
+            CategoryByIdSelect,
+            new { Id = id },
+            cancellationToken: cancellationToken,
+            commandTimeout: CommandTimeoutSeconds);
         var row = await connection.QuerySingleOrDefaultAsync<ForumCategoryRow>(command);
         return row is null ? null : Map(row);
     }
@@ -84,7 +91,8 @@ public sealed class LegacyForumRepository(string connectionString) : IForumRepos
             "Q_FORUM_VIEW_PAGE_SP",
             parameters,
             commandType: CommandType.StoredProcedure,
-            cancellationToken: cancellationToken);
+            cancellationToken: cancellationToken,
+            commandTimeout: CommandTimeoutSeconds);
 
         var rows = await connection.QueryAsync<ForumTopicRow>(command);
         return new ForumCategoryTopicsPage(
@@ -94,29 +102,27 @@ public sealed class LegacyForumRepository(string connectionString) : IForumRepos
             pageSize);
     }
 
+    public async Task<int> GetTotalThreadCountAsync(CancellationToken cancellationToken = default)
+    {
+        await using var connection = new SqlConnection(connectionString);
+        var command = new CommandDefinition(
+            TotalThreadCountSelect,
+            cancellationToken: cancellationToken,
+            commandTimeout: CommandTimeoutSeconds);
+        return await connection.ExecuteScalarAsync<int>(command);
+    }
+
     public async Task<ForumArchiveStats> GetArchiveStatsAsync(CancellationToken cancellationToken = default)
     {
-        const string sql = """
-            SELECT
-                (SELECT COUNT(*) FROM Q_FORUM_T) AS ForumCount,
-                (
-                    SELECT COUNT(*)
-                    FROM Q_FORUM_TOPIC_T
-                    WHERE Q_FORUM_TOPIC_PARENT_ID = 0 OR Q_FORUM_TOPIC_PARENT_ID IS NULL
-                ) AS ThreadCount,
-                (SELECT ISNULL(SUM(CAST(Q_FORUM_POST_COUNT AS bigint)), 0) FROM Q_FORUM_T) AS PostCount
-            """;
-
-        await using var connection = new SqlConnection(connectionString);
-        var command = new CommandDefinition(sql, cancellationToken: cancellationToken);
-        var row = await connection.QuerySingleAsync<ForumArchiveStatsRow>(command);
-        return new ForumArchiveStats(row.ForumCount, row.ThreadCount, row.PostCount);
+        var categories = await GetCategoriesAsync(cancellationToken);
+        var threadCount = await GetTotalThreadCountAsync(cancellationToken);
+        return ForumArchiveStats.FromCategories(categories, threadCount);
     }
 
     private static ForumCategoryItem Map(ForumCategoryRow row) =>
         new(
             row.Id,
-            row.Name.Trim(),
+            row.Name?.Trim() ?? string.Empty,
             row.Description,
             row.PostCount,
             row.LastActivityAt,
@@ -126,9 +132,9 @@ public sealed class LegacyForumRepository(string connectionString) : IForumRepos
     private static ForumTopicItem MapTopic(ForumTopicRow row) =>
         new(
             row.Q_FORUM_TOPIC_ID,
-            row.TOPIC_SUBJECT.Trim(),
+            row.TOPIC_SUBJECT?.Trim() ?? string.Empty,
             row.TOPIC_LAST_POST,
-            row.USERNAME.Trim(),
+            row.USERNAME?.Trim() ?? "Unknown",
             row.NUMBEROFREPLIES,
             string.IsNullOrWhiteSpace(row.LAST_POST_USERNAME) ? null : row.LAST_POST_USERNAME.Trim(),
             row.STICKY == 1);
@@ -146,15 +152,10 @@ public sealed class LegacyForumRepository(string connectionString) : IForumRepos
 
     private sealed record ForumCategoryRow(
         int Id,
-        string Name,
+        string? Name,
         string? Description,
         int PostCount,
         DateTime? LastActivityAt,
         string? LatestThreadTitle,
         int SortOrder);
-
-    private sealed record ForumArchiveStatsRow(
-        int ForumCount,
-        int ThreadCount,
-        long PostCount);
 }

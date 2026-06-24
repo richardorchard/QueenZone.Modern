@@ -62,6 +62,64 @@ Key rules:
 Read the TODO in [specific file] and the GitHub issue first.
 ```
 
+## Production Debugging (Azure)
+
+App Service: `queenzone-dev` in resource group `Queenzone-RG` (Australia East).
+
+Public hostnames: `queenzone.org`, `www.queenzone.org`, `queenzone-dev.azurewebsites.net`.
+
+### Azure CLI (preferred for agents)
+
+Requires `az login` as a user with access to subscription **Base Thinking**.
+
+Live log stream:
+
+```powershell
+az webapp log tail --name queenzone-dev --resource-group Queenzone-RG
+```
+
+Download recent logs:
+
+```powershell
+az webapp log download --name queenzone-dev --resource-group Queenzone-RG --log-file appservice-logs.zip
+```
+
+Quick health checks:
+
+```powershell
+az webapp show --name queenzone-dev --resource-group Queenzone-RG --query "{hostNames:hostNames, state:state}"
+Invoke-WebRequest -Uri https://queenzone.org/health -UseBasicParsing | Select-Object StatusCode
+```
+
+Application logging should be enabled at Information level on the filesystem. If the stream is quiet, hit the failing route to generate entries.
+
+### Azure MCP
+
+The Azure MCP server must authenticate to tenant `c9f094fd-23bf-4a35-a406-bcaacd7e1a8e`. If tools return `InvalidAuthenticationTokenTenant`, run:
+
+```powershell
+az login --tenant c9f094fd-23bf-4a35-a406-bcaacd7e1a8e
+```
+
+Then restart the Azure MCP server in Cursor. `az account show` succeeding does not guarantee MCP is on the same tenant.
+
+Useful MCP tools after auth is fixed:
+
+- `subscription_list`
+- `appservice` → `appservice_webapp_get` for site details
+- `appservice` → `appservice_webapp_diagnostic_list` / `appservice_webapp_diagnostic_diagnose` for health probes
+
+When MCP auth fails, fall back to Azure CLI commands above.
+
+### Forum production smoke checks
+
+After a forum deploy, verify:
+
+- `GET https://queenzone.org/forum` → 200
+- `GET https://queenzone.org/forum/1/queen-serious-discussion` → 200
+
+In the log stream, `SqlException: Execution Timeout` in `LegacyForumRepository` usually means a full-table `COUNT(*)` on `Q_FORUM_TOPIC_T` or other heavy ad-hoc SQL. The modern read path should use denormalised `Q_FORUM_T.Q_FORUM_POST_COUNT`, `dbUser.Q_FORUM_TOPIC_THREAD_COUNT_V`, and `Q_FORUM_VIEW_PAGE_SP` instead. See `docs/legacy/table-map.md`.
+
 ## Quick Links
 
 - Primary agent instructions: [AGENTS.md](../AGENTS.md)

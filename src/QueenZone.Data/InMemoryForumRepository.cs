@@ -26,6 +26,9 @@ public sealed class InMemoryForumRepository(
         return Task.FromResult(new ForumCategoryTopicsPage(pageItems, topics.Count, page, pageSize));
     }
 
+    public Task<int> GetTotalThreadCountAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(seedStats.ThreadCount);
+
     public Task<ForumArchiveStats> GetArchiveStatsAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(seedStats);
 }
