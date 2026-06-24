@@ -85,6 +85,8 @@ The deployed App Service runtime database setting is `ConnectionStrings__QueenZo
 
 The GitHub environment secret `QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING` is separate and is used by the deploy workflow for EF Core migrations. Updating the GitHub secret does not update the live App Service runtime connection string. When database credentials rotate, update both places as needed and restart the App Service before verifying production.
 
+For production debugging (log stream, Azure CLI, Azure MCP tenant setup, and forum smoke checks), see `docs/agent-handoff-cheatsheet.md`.
+
 ## Migration Principles
 
 - Preserve public content first.
