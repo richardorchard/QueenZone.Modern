@@ -1,3 +1,4 @@
+using System.Data;
 using Dapper;
 using Microsoft.Data.SqlClient;
 
@@ -45,22 +46,9 @@ public sealed class LegacyForumRepository(string connectionString) : IForumRepos
         WHERE f.Q_FORUM_ID = @Id
         """;
 
-    private const string CategoryTopicsSelect = """
-        SELECT
-            t.Q_FORUM_TOPIC_ID,
-            t.TOPIC_SUBJECT,
-            t.TOPIC_LAST_POST,
-            u.USERNAME,
-            t.TOPIC_REPLIES AS NUMBEROFREPLIES,
-            lu.USERNAME AS LAST_POST_USERNAME,
-            CAST(ISNULL(t.STICKY, 0) AS tinyint) AS STICKY
-        FROM Q_FORUM_TOPIC_T t
-        INNER JOIN USERS_T u ON t.USER_ID = u.USER_ID
-        LEFT JOIN USERS_T lu ON t.LAST_USER_ID = lu.USER_ID
-        WHERE t.Q_FORUM_ID = @ForumId
-          AND t.TOPIC_STARTER = 1
-        ORDER BY t.STICKY DESC, t.TOPIC_LAST_POST DESC
-        OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY
+    private const string TotalThreadCountSelect = """
+        SELECT ISNULL(SUM(CAST(THREADCOUNT AS bigint)), 0)
+        FROM dbUser.Q_FORUM_TOPIC_THREAD_COUNT_V
         """;
 
     public async Task<IReadOnlyList<ForumCategoryItem>> GetCategoriesAsync(CancellationToken cancellationToken = default)
@@ -93,56 +81,42 @@ public sealed class LegacyForumRepository(string connectionString) : IForumRepos
         CancellationToken cancellationToken = default)
     {
         await using var connection = new SqlConnection(connectionString);
-        var offset = Math.Max(page - 1, 0) * pageSize;
+        var parameters = new DynamicParameters();
+        parameters.Add("CurrentPage", page);
+        parameters.Add("PageSize", pageSize);
+        parameters.Add("Q_FORUM_ID", forumId);
+        parameters.Add("TotalRecords", dbType: DbType.Int32, direction: ParameterDirection.Output);
 
-        const string countSql = """
-            SELECT COUNT(*)
-            FROM Q_FORUM_TOPIC_T
-            WHERE Q_FORUM_ID = @ForumId
-              AND TOPIC_STARTER = 1
-            """;
-
-        var countCommand = new CommandDefinition(
-            countSql,
-            new { ForumId = forumId },
+        var command = new CommandDefinition(
+            "Q_FORUM_VIEW_PAGE_SP",
+            parameters,
+            commandType: CommandType.StoredProcedure,
             cancellationToken: cancellationToken,
             commandTimeout: CommandTimeoutSeconds);
-        var totalCount = await connection.ExecuteScalarAsync<int>(countCommand);
 
-        var topicsCommand = new CommandDefinition(
-            CategoryTopicsSelect,
-            new { ForumId = forumId, Offset = offset, PageSize = pageSize },
-            cancellationToken: cancellationToken,
-            commandTimeout: CommandTimeoutSeconds);
-        var rows = await connection.QueryAsync<ForumTopicRow>(topicsCommand);
-
+        var rows = await connection.QueryAsync<ForumTopicRow>(command);
         return new ForumCategoryTopicsPage(
             rows.Select(MapTopic).ToList(),
-            totalCount,
+            parameters.Get<int>("TotalRecords"),
             page,
             pageSize);
     }
 
-    public async Task<ForumArchiveStats> GetArchiveStatsAsync(CancellationToken cancellationToken = default)
+    public async Task<int> GetTotalThreadCountAsync(CancellationToken cancellationToken = default)
     {
-        const string sql = """
-            SELECT
-                (SELECT COUNT(*) FROM Q_FORUM_T) AS ForumCount,
-                (
-                    SELECT COUNT(*)
-                    FROM Q_FORUM_TOPIC_T
-                    WHERE TOPIC_STARTER = 1
-                ) AS ThreadCount,
-                (SELECT ISNULL(SUM(CAST(Q_FORUM_POST_COUNT AS bigint)), 0) FROM Q_FORUM_T) AS PostCount
-            """;
-
         await using var connection = new SqlConnection(connectionString);
         var command = new CommandDefinition(
-            sql,
+            TotalThreadCountSelect,
             cancellationToken: cancellationToken,
             commandTimeout: CommandTimeoutSeconds);
-        var row = await connection.QuerySingleAsync<ForumArchiveStatsRow>(command);
-        return new ForumArchiveStats(row.ForumCount, row.ThreadCount, row.PostCount);
+        return await connection.ExecuteScalarAsync<int>(command);
+    }
+
+    public async Task<ForumArchiveStats> GetArchiveStatsAsync(CancellationToken cancellationToken = default)
+    {
+        var categories = await GetCategoriesAsync(cancellationToken);
+        var threadCount = await GetTotalThreadCountAsync(cancellationToken);
+        return ForumArchiveStats.FromCategories(categories, threadCount);
     }
 
     private static ForumCategoryItem Map(ForumCategoryRow row) =>
@@ -166,9 +140,11 @@ public sealed class LegacyForumRepository(string connectionString) : IForumRepos
             row.STICKY == 1);
 
     private sealed record ForumTopicRow(
+        int Id,
         int Q_FORUM_TOPIC_ID,
         string TOPIC_SUBJECT,
         DateTime TOPIC_LAST_POST,
+        int USER_ID,
         string USERNAME,
         short NUMBEROFREPLIES,
         string? LAST_POST_USERNAME,
@@ -182,9 +158,4 @@ public sealed class LegacyForumRepository(string connectionString) : IForumRepos
         DateTime? LastActivityAt,
         string? LatestThreadTitle,
         int SortOrder);
-
-    private sealed record ForumArchiveStatsRow(
-        int ForumCount,
-        int ThreadCount,
-        long PostCount);
 }
