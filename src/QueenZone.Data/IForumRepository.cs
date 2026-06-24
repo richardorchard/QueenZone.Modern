@@ -12,5 +12,7 @@ public interface IForumRepository
         int pageSize,
         CancellationToken cancellationToken = default);
 
+    Task<int> GetTotalThreadCountAsync(CancellationToken cancellationToken = default);
+
     Task<ForumArchiveStats> GetArchiveStatsAsync(CancellationToken cancellationToken = default);
 }

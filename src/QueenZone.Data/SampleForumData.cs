@@ -57,10 +57,7 @@ public static class SampleForumData
     public static ForumArchiveStats CreateSeedStats()
     {
         var categories = CreateSeedCategories();
-        return new ForumArchiveStats(
-            categories.Count,
-            12_600,
-            categories.Sum(category => (long)category.PostCount));
+        return ForumArchiveStats.FromCategories(categories, 12_600);
     }
 
     public static IReadOnlyList<ForumTopicItem> CreateSeedTopics(int forumId)
