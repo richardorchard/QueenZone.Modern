@@ -85,6 +85,8 @@ The `Deploy App Service` GitHub Actions workflow deploys `main` to the `queenzon
 
 The planned public canonical domain for the site is `https://www.queenzone.org`. SEO features that emit absolute public URLs, such as sitemaps and robots.txt, should use that host in production configuration.
 
+Set `Site:PublicBaseUrl` in App Service configuration (or `appsettings.Local.json` for local overrides) when the public host differs from the default in `appsettings.json`.
+
 Repository secrets required:
 
 - `AZURE_WEBAPP_PUBLISH_PROFILE`: the App Service publish profile XML.
