@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.Identity.Web;
 using QueenZone.Data;
 using QueenZone.Web;
+using QueenZone.Web.Sitemap;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Logging.ClearProviders();
@@ -15,6 +16,8 @@ if (!builder.Environment.IsEnvironment("Testing"))
 }
 
 builder.Services.Configure<AdminOptions>(builder.Configuration.GetSection(AdminOptions.SectionName));
+builder.Services.Configure<SiteOptions>(builder.Configuration.GetSection(SiteOptions.SectionName));
+builder.Services.AddSingleton<CoreSitemapBuilder>();
 builder.Services.AddAntiforgery();
 
 var legacyConnectionString = builder.Configuration.GetConnectionString("QueenZoneLegacy");
@@ -51,6 +54,7 @@ app.UseAuthorization();
 app.UseAntiforgery();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+app.MapSitemapEndpoints();
 app.MapRazorPages();
 
 app.Run();
