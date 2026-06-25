@@ -1,0 +1,36 @@
+@if (BuildMetadata.IsAvailable)
+{
+  <div class="qz-build-stamp"
+       data-build-version="@BuildMetadata.Version"
+       data-build-utc="@BuildMetadata.BuiltAtUtc"
+       hidden>
+    <span class="qz-build-stamp__text"></span>
+  </div>
+  <script>
+    (function () {
+      const stamp = document.querySelector(".qz-build-stamp");
+      if (!stamp) {
+        return;
+      }
+
+      const version = stamp.dataset.buildVersion;
+      const builtAtUtc = stamp.dataset.buildUtc;
+      const builtAt = new Date(builtAtUtc);
+      if (!version || Number.isNaN(builtAt.getTime())) {
+        return;
+      }
+
+      const localTime = builtAt.toLocaleString(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit"
+      });
+
+      stamp.querySelector(".qz-build-stamp__text").textContent =
+        "Build " + version + " · " + localTime;
+      stamp.hidden = false;
+    })();
+  </script>
+}
