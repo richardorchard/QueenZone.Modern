@@ -140,12 +140,34 @@ jobs:
         run: dotnet publish src/QueenZone.Web/QueenZone.Web.csproj --configuration Release --no-build --output ./e2e-app
 
       - name: Start app in background
-        env:
-          ASPNETCORE_ENVIRONMENT: Testing
-          ASPNETCORE_URLS: http://127.0.0.1:5099
         run: |
-          $process = Start-Process -FilePath ".\e2e-app\QueenZone.Web.exe" -RedirectStandardOutput "e2e-app.log" -RedirectStandardError "e2e-app.err.log" -PassThru
-          $process.Id | Out-File -Encoding ascii e2e-app.pid
+          # Start-Process makes the app a child of this step's process, which is
+          # tied to the runner's Windows Job Object and gets killed when this step
+          # exits. Launch via WMI instead so it survives into later steps.
+          $exePath = (Resolve-Path ".\e2e-app\QueenZone.Web.exe").Path
+          $logPath = Join-Path (Get-Location).Path "e2e-app.log"
+          $errPath = Join-Path (Get-Location).Path "e2e-app.err.log"
+          $cmdLine = "cmd.exe /c `"set ASPNETCORE_ENVIRONMENT=Testing&&set ASPNETCORE_URLS=http://127.0.0.1:5099&&`"$exePath`" > `"$logPath`" 2> `"$errPath`"`""
+          $result = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = $cmdLine }
+          if ($result.ReturnValue -ne 0) {
+            throw "Failed to start app via WMI, return code $($result.ReturnValue)"
+          }
+          $cmdPid = $result.ProcessId
+          $cmdPid | Out-File -Encoding ascii e2e-app-cmd.pid
+
+          # $cmdPid is cmd.exe's PID, not QueenZone.Web.exe's. Find the real child
+          # so "Stop app" can target the actual listener.
+          $appPid = $cmdPid
+          for ($i = 1; $i -le 10; $i++) {
+            $child = Get-CimInstance Win32_Process -Filter "ParentProcessId=$cmdPid" -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($child) {
+              $appPid = $child.ProcessId
+              break
+            }
+            Start-Sleep -Milliseconds 500
+          }
+          $appPid | Out-File -Encoding ascii e2e-app.pid
+          Write-Host "Started app: cmd.exe PID $cmdPid, QueenZone.Web.exe PID $appPid"
 
       - name: Wait for app to be ready
         run: |
@@ -182,8 +204,10 @@ jobs:
         if: always()
         run: |
           if (Test-Path e2e-app.pid) {
-            $pidValue = Get-Content e2e-app.pid
-            Stop-Process -Id $pidValue -Force -ErrorAction SilentlyContinue
+            Stop-Process -Id (Get-Content e2e-app.pid) -Force -ErrorAction SilentlyContinue
+          }
+          if (Test-Path e2e-app-cmd.pid) {
+            Stop-Process -Id (Get-Content e2e-app-cmd.pid) -Force -ErrorAction SilentlyContinue
           }
 
       - name: Upload app log on failure
