@@ -1,0 +1,27 @@
+@model IReadOnlyList<BiographyChapterItem>
+
+<ol class="qz-bio-chapters">
+  @for (var index = 0; index < Model.Count; index++)
+  {
+    var chapter = Model[index];
+    <li>
+      <a class="qz-bio-chapter-row" href="@BiographyRoutes.GetChapterDetailPath(chapter)">
+        <div class="qz-bio-chapter-row__marker">
+          <div class="qz-bio-chapter-row__numeral">Chapter @BiographyRoutes.GetChapterNumeral(index)</div>
+          <div class="qz-bio-chapter-row__range">@BiographyRoutes.GetChapterMarker(chapter)</div>
+        </div>
+        <div class="qz-bio-chapter-row__content">
+          <h2>@chapter.Title</h2>
+          @if (!string.IsNullOrWhiteSpace(chapter.Summary))
+          {
+            <p>@chapter.Summary</p>
+          }
+          <span class="qz-bio-chapter-row__cta">
+            Read the chapter
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+          </span>
+        </div>
+      </a>
+    </li>
+  }
+</ol>

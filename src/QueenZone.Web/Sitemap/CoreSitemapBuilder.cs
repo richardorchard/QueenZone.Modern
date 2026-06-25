@@ -5,6 +5,7 @@ namespace QueenZone.Web.Sitemap;
 public sealed class CoreSitemapBuilder(
     INewsRepository newsRepository,
     IArticlesRepository articlesRepository,
+    IBiographyRepository biographyRepository,
     IForumRepository forumRepository)
 {
     public async Task<IReadOnlyList<SitemapEntry>> BuildAsync(CancellationToken cancellationToken = default)
@@ -13,6 +14,7 @@ public sealed class CoreSitemapBuilder(
 
         await AddNewsEntriesAsync(entries, cancellationToken);
         await AddArticleEntriesAsync(entries, cancellationToken);
+        await AddBiographyEntriesAsync(entries, cancellationToken);
         await AddForumEntriesAsync(entries, cancellationToken);
 
         return entries;
@@ -63,6 +65,19 @@ public sealed class CoreSitemapBuilder(
                     ArticlesRoutes.GetArticleDetailPath(item),
                     item.PublishedAt));
             }
+        }
+    }
+
+    private async Task AddBiographyEntriesAsync(List<SitemapEntry> entries, CancellationToken cancellationToken)
+    {
+        entries.Add(new(BiographyRoutes.IndexPath));
+
+        var chapters = await biographyRepository.GetChaptersAsync(cancellationToken);
+        foreach (var chapter in chapters)
+        {
+            entries.Add(new(
+                BiographyRoutes.GetChapterDetailPath(chapter),
+                chapter.CreatedAt == DateTime.MinValue ? null : chapter.CreatedAt));
         }
     }
 
