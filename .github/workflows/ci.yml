@@ -150,15 +150,15 @@ jobs:
       - name: Wait for app to be ready
         run: |
           Write-Host "Waiting for web app..."
-          for ($i = 1; $i -le 30; $i++) {
+          for ($i = 1; $i -le 60; $i++) {
             try {
               $response = Invoke-WebRequest -Uri "http://127.0.0.1:5099/health" -UseBasicParsing -TimeoutSec 2
               if ($response.StatusCode -eq 200) {
-                Write-Host "App is up after ${i}s"
+                Write-Host "App is up after $($i * 2)s"
                 exit 0
               }
             } catch {}
-            Start-Sleep -Seconds 1
+            Start-Sleep -Seconds 2
           }
           Write-Host "App failed to start in time"
           Get-Content e2e-app.log -ErrorAction SilentlyContinue
