@@ -1,27 +1,152 @@
 @{
   var path = Context.Request.Path.Value ?? "/";
   bool IsActive(string route) => route == "/" ? path == "/" : path.StartsWith(route, StringComparison.OrdinalIgnoreCase);
+  var mastheadDark = ViewData["MastheadDark"] is bool dark ? dark : true;
+  var navGroups = new[]
+  {
+    new
+    {
+      Id = "band",
+      Label = "The Band",
+      Eyebrow = "About Queen",
+      Accent = "purple",
+      Items = new[]
+      {
+        new { Title = "Biography", Href = "/biography", Description = "The story of the band, member by member", Tag = "New" },
+        new { Title = "Discography", Href = "/discography", Description = "Every studio album, single and release", Tag = "New" },
+        new { Title = "Timeline", Href = "/timeline", Description = "Five decades, year by year", Tag = "" }
+      }
+    },
+    new
+    {
+      Id = "archive",
+      Label = "Archive",
+      Eyebrow = "The Publication",
+      Accent = "blue",
+      Items = new[]
+      {
+        new { Title = "News", Href = "/news", Description = "4,000+ articles from the original archive", Tag = "" },
+        new { Title = "Stories", Href = "/articles", Description = "Long-form features and editorial", Tag = "" },
+        new { Title = "Photography", Href = "/photography", Description = "Tens of thousands of restored images", Tag = "" }
+      }
+    },
+    new
+    {
+      Id = "community",
+      Label = "Community",
+      Eyebrow = "The Fans",
+      Accent = "burgundy",
+      Items = new[]
+      {
+        new { Title = "Forum", Href = "/forum", Description = "100,000+ posts from the membership", Tag = "" },
+        new { Title = "Fan Performances", Href = "/fan-performances", Description = "Covers, tributes and live sets", Tag = "New" }
+      }
+    }
+  };
 }
 
-<header class="qz-masthead">
+<header class="qz-masthead @(mastheadDark ? "qz-masthead--dark" : "qz-masthead--light")" data-masthead>
   <div class="qz-masthead__inner">
     <a class="qz-brand" href="/">
-      <img src="/design-system/assets/crest-white.png" alt="Queen crest">
+      <img src="@(mastheadDark ? "/design-system/assets/crest-white.png" : "/design-system/assets/crest-black.png")" alt="Queen crest">
       <span>Queenzone</span>
     </a>
-    <nav class="qz-nav" aria-label="Primary navigation">
-      <a href="/" aria-current="@(IsActive("/") ? "page" : null)">Home</a>
-      <a href="/news" aria-current="@(IsActive("/news") ? "page" : null)">News</a>
-      <a href="/articles" aria-current="@(IsActive("/articles") ? "page" : null)">Articles</a>
-      <a href="/biography" aria-current="@(IsActive("/biography") ? "page" : null)">Biography</a>
-      <a href="/photography" aria-current="@(IsActive("/photography") ? "page" : null)">Photography</a>
-      <a href="/forum" aria-current="@(IsActive("/forum") ? "page" : null)">Forum</a>
-      <a href="/timeline" aria-current="@(IsActive("/timeline") ? "page" : null)">Timeline</a>
-      <a href="/search" aria-current="@(IsActive("/search") ? "page" : null)">Search</a>
-      @if (ViewData["ShowAdminNav"] is true)
+
+    <nav class="qz-nav" aria-label="Primary navigation" data-masthead-nav>
+      @foreach (var group in navGroups)
       {
-        <a href="/admin/news" aria-current="@(IsActive("/admin/news") ? "page" : null)">Admin</a>
+        var panelId = $"qz-nav-panel-{group.Id}";
+        <div class="qz-nav-group qz-nav-group--@group.Accent" data-nav-group>
+          <button class="qz-nav-group__button" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="@panelId" data-nav-trigger>
+            <span>@group.Label</span>
+            <svg class="qz-nav-group__chevron" width="12" height="12" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </button>
+          <div class="qz-nav-panel" id="@panelId" role="menu" hidden data-nav-panel>
+            <p class="qz-nav-panel__eyebrow">@group.Eyebrow</p>
+            <ul class="qz-nav-panel__list">
+              @foreach (var item in group.Items)
+              {
+                <li>
+                  <a class="qz-nav-panel__link" href="@item.Href" role="menuitem" aria-current="@(IsActive(item.Href) ? "page" : null)">
+                    <span class="qz-nav-panel__title">
+                      <span>@item.Title</span>
+                      @if (!string.IsNullOrWhiteSpace(item.Tag))
+                      {
+                        <span class="qz-nav-panel__tag">@item.Tag</span>
+                      }
+                    </span>
+                    <span class="qz-nav-panel__desc">@item.Description</span>
+                  </a>
+                </li>
+              }
+            </ul>
+          </div>
+        </div>
       }
     </nav>
+
+    <div class="qz-masthead__actions">
+      <a class="qz-icon-button" href="/search" aria-label="Search" aria-current="@(IsActive("/search") ? "page" : null)">
+        <svg width="19" height="19" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <circle cx="11" cy="11" r="8" />
+          <path d="m21 21-4.35-4.35" />
+        </svg>
+      </a>
+      @if (ViewData["ShowAdminNav"] is true)
+      {
+        <a class="qz-masthead__admin-link" href="/admin/news" aria-current="@(IsActive("/admin/news") ? "page" : null)">Admin</a>
+      }
+      <a class="qz-masthead__signin" href="/admin/news">Sign in</a>
+      <button class="qz-menu-button" type="button" aria-label="Open navigation menu" aria-controls="qz-mobile-menu" aria-expanded="false" data-menu-open>
+        <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M4 7h16M4 12h16M4 17h16" />
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="qz-mobile-menu" id="qz-mobile-menu" hidden data-mobile-menu>
+    <div class="qz-mobile-menu__scrim" data-menu-close></div>
+    <div class="qz-mobile-menu__panel" role="dialog" aria-modal="true" aria-label="Primary navigation">
+      <div class="qz-mobile-menu__top">
+        <button class="qz-icon-button" type="button" aria-label="Close navigation menu" data-menu-close>
+          <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M18 6 6 18M6 6l12 12" />
+          </svg>
+        </button>
+        <a class="qz-icon-button" href="/search" aria-label="Search">
+          <svg width="19" height="19" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <circle cx="11" cy="11" r="8" />
+            <path d="m21 21-4.35-4.35" />
+          </svg>
+        </a>
+      </div>
+      <nav class="qz-mobile-nav" aria-label="Mobile primary navigation">
+        @foreach (var group in navGroups)
+        {
+          <section class="qz-mobile-nav__section qz-nav-group--@group.Accent" aria-labelledby="qz-mobile-nav-@group.Id">
+            <h2 id="qz-mobile-nav-@group.Id">@group.Label</h2>
+            <p>@group.Eyebrow</p>
+            <ul>
+              @foreach (var item in group.Items)
+              {
+                <li>
+                  <a href="@item.Href" aria-current="@(IsActive(item.Href) ? "page" : null)">
+                    <span>@item.Title</span>
+                    @if (!string.IsNullOrWhiteSpace(item.Tag))
+                    {
+                      <span class="qz-nav-panel__tag">@item.Tag</span>
+                    }
+                  </a>
+                </li>
+              }
+            </ul>
+          </section>
+        }
+        <a class="qz-masthead__signin qz-masthead__signin--mobile" href="/admin/news">Sign in</a>
+      </nav>
+    </div>
   </div>
 </header>
