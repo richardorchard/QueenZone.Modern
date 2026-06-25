@@ -85,4 +85,15 @@ public sealed class SitemapEndpointsTests : IClassFixture<WebApplicationFactory<
 
         Assert.Equal("2026-06-11", newsDetail.Element(ns + "lastmod")?.Value);
     }
+
+    [Fact]
+    public async Task CoreSitemap_SetsPublicCacheControlHeader()
+    {
+        var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/sitemap-core.xml");
+
+        response.EnsureSuccessStatusCode();
+        Assert.Equal("public, max-age=86400", response.Headers.CacheControl?.ToString());
+    }
 }
