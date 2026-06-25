@@ -9,4 +9,6 @@ public interface INewsRepository
     Task<int> GetPublishedCountAsync(CancellationToken cancellationToken = default);
 
     Task<NewsItem?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<SitemapContentEntry>> GetPublishedSitemapEntriesAsync(CancellationToken cancellationToken = default);
 }

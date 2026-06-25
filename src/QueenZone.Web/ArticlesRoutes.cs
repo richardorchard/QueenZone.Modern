@@ -145,5 +145,8 @@ public static partial class ArticlesRoutes
     }
 
     public static string GetArticleDetailPath(ArticleItem item) =>
-        $"/articles/{item.Id}/{NewsSlug.Slugify(item.Title)}";
+        GetArticleDetailPath(item.Id, item.Title);
+
+    public static string GetArticleDetailPath(int id, string title) =>
+        $"/articles/{id}/{NewsSlug.Slugify(title)}";
 }

@@ -18,7 +18,10 @@ if (!builder.Environment.IsEnvironment("Testing"))
 builder.Services.Configure<AdminOptions>(builder.Configuration.GetSection(AdminOptions.SectionName));
 builder.Services.Configure<SiteOptions>(builder.Configuration.GetSection(SiteOptions.SectionName));
 builder.Services.Configure<AnalyticsOptions>(builder.Configuration.GetSection(AnalyticsOptions.SectionName));
+builder.Services.Configure<SitemapOptions>(builder.Configuration.GetSection(SitemapOptions.SectionName));
+builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<CoreSitemapBuilder>();
+builder.Services.AddSingleton<CoreSitemapService>();
 builder.Services.AddAntiforgery();
 
 var legacyConnectionString = builder.Configuration.GetConnectionString("QueenZoneLegacy");
