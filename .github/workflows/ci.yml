@@ -6,6 +6,7 @@ on:
     branches:
       - main
       - master
+  workflow_dispatch:
 
 jobs:
   build:
@@ -100,4 +101,84 @@ jobs:
         with:
           name: smoke-app-log-${{ github.run_id }}
           path: smoke-app.log
+          retention-days: 7
+
+  e2e-test:
+    # Runs on a self-hosted Windows runner (this machine) instead of a
+    # GitHub-hosted runner, so it does not consume billed Actions minutes.
+    # continue-on-error keeps it from blocking merges if the runner is offline.
+    runs-on: [self-hosted, Windows]
+    needs: build
+    timeout-minutes: 15
+    continue-on-error: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: |
+          dotnet restore QueenZone.sln
+          dotnet restore tests/QueenZone.Web.E2E/QueenZone.Web.E2E.csproj
+
+      - name: Build
+        run: |
+          dotnet build QueenZone.sln --configuration Release --no-restore
+          dotnet build tests/QueenZone.Web.E2E/QueenZone.Web.E2E.csproj --configuration Release --no-restore
+
+      - name: Install Playwright browsers
+        run: pwsh tests/QueenZone.Web.E2E/bin/Release/net10.0/playwright.ps1 install chromium
+
+      - name: Publish web app
+        run: dotnet publish src/QueenZone.Web/QueenZone.Web.csproj --configuration Release --no-build --output ./e2e-app
+
+      - name: Start app in background
+        env:
+          ASPNETCORE_ENVIRONMENT: Testing
+          ASPNETCORE_URLS: http://127.0.0.1:5099
+        run: |
+          $process = Start-Process -FilePath ".\e2e-app\QueenZone.Web.exe" -RedirectStandardOutput "e2e-app.log" -RedirectStandardError "e2e-app.err.log" -PassThru
+          $process.Id | Out-File -Encoding ascii e2e-app.pid
+
+      - name: Wait for app to be ready
+        run: |
+          Write-Host "Waiting for web app..."
+          for ($i = 1; $i -le 30; $i++) {
+            try {
+              $response = Invoke-WebRequest -Uri "http://127.0.0.1:5099/health" -UseBasicParsing -TimeoutSec 2
+              if ($response.StatusCode -eq 200) {
+                Write-Host "App is up after ${i}s"
+                exit 0
+              }
+            } catch {}
+            Start-Sleep -Seconds 1
+          }
+          Write-Host "App failed to start in time"
+          Get-Content e2e-app.log -ErrorAction SilentlyContinue
+          exit 1
+
+      - name: Run Playwright e2e tests
+        env:
+          E2E_BASE_URL: http://127.0.0.1:5099
+        run: dotnet test tests/QueenZone.Web.E2E/QueenZone.Web.E2E.csproj --configuration Release --no-build
+
+      - name: Stop app
+        if: always()
+        run: |
+          if (Test-Path e2e-app.pid) {
+            $pidValue = Get-Content e2e-app.pid
+            Stop-Process -Id $pidValue -Force -ErrorAction SilentlyContinue
+          }
+
+      - name: Upload app log on failure
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: e2e-app-log-${{ github.run_id }}
+          path: e2e-app.log
           retention-days: 7

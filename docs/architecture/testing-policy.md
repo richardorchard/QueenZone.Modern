@@ -133,7 +133,7 @@ Add these checks when the project is ready:
 dotnet format QueenZone.sln --verify-no-changes
 ```
 
-Add Playwright browser smoke tests when stable user-facing pages exist.
+Playwright browser smoke tests live in `tests/QueenZone.Web.E2E` and run in CI on a self-hosted Windows runner to avoid consuming GitHub Actions minutes. See `docs/architecture/self-hosted-e2e-runner.md` for runner setup and operational notes.
 
 ## Test Selection Rules
 
