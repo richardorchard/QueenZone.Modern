@@ -734,3 +734,16 @@
     grid-template-columns: 1fr;
   }
 }
+
+.qz-build-stamp {
+  padding: var(--space-3) var(--gutter-lg) var(--space-4);
+  text-align: center;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: rgba(17, 17, 17, 0.42);
+  background: var(--qz-paper, #f7f4ee);
+}
+
+.qz-build-stamp__text {
+  letter-spacing: 0.02em;
+}
