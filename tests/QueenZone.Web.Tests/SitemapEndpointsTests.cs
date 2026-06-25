@@ -66,6 +66,8 @@ public sealed class SitemapEndpointsTests : IClassFixture<WebApplicationFactory<
         Assert.Contains($"{BaseUrl}/articles", locations);
         Assert.Contains($"{BaseUrl}/articles/101/inside-the-making-of-bohemian-rhapsody", locations);
         Assert.DoesNotContain($"{BaseUrl}/articles/9001/hidden-moderation-draft", locations);
+        Assert.Contains($"{BaseUrl}/biography", locations);
+        Assert.Contains($"{BaseUrl}/biography/1/1946-1969", locations);
         Assert.Contains($"{BaseUrl}/forum", locations);
         Assert.Contains($"{BaseUrl}/forum/1/the-music", locations);
     }

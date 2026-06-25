@@ -1,0 +1,74 @@
+@page "/biography/{id:int}/{slug}"
+@model DetailModel
+
+@if (Model.Chapter is not null)
+{
+  var chapter = Model.Chapter;
+  var nav = Model.Navigation;
+
+  <section class="qz-bio-detail-hero">
+    <img class="qz-bio-detail-hero__crest" src="/design-system/assets/crest-white.png" alt="">
+    <div class="qz-container qz-bio-detail-hero__content">
+      <p class="article-nav">
+        <a class="qz-bio-back-link" href="/biography">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+          Biography
+        </a>
+      </p>
+      <div class="qz-eyebrow" style="color: var(--qz-gold);">
+        Chapter @BiographyRoutes.GetChapterNumeral(Math.Max(Model.ChapterIndex, 0)) · @BiographyRoutes.GetChapterMarker(chapter)
+      </div>
+      <h1>@chapter.Title</h1>
+      @{
+        var summary = BiographyContent.GetListSummary(chapter);
+      }
+      @if (!string.IsNullOrWhiteSpace(summary))
+      {
+        <p class="lede">@summary</p>
+      }
+    </div>
+  </section>
+
+  <div class="qz-reading">
+    <div class="qz-bio-detail-meta">
+      <span>@BiographyRoutes.GetChapterMarker(chapter)</span>
+      <span class="qz-bio-detail-meta__dot" aria-hidden="true"></span>
+      <span>@BiographyRoutes.GetReadTimeLabel(chapter.Body)</span>
+    </div>
+
+    <article class="article-body">@Html.Raw(BiographyContent.FormatBody(chapter.Body))</article>
+  </div>
+
+  @if (nav.Previous is not null || nav.Next is not null)
+  {
+    <nav class="qz-bio-chapter-nav" aria-label="Biography chapter navigation">
+      <div class="qz-bio-chapter-nav__grid">
+        @if (nav.Previous is not null)
+        {
+          <a class="qz-bio-chapter-nav__link" href="@BiographyRoutes.GetChapterDetailPath(nav.Previous)">
+            <span class="qz-bio-chapter-nav__label">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+              Previous Chapter
+            </span>
+            <span class="qz-bio-chapter-nav__title">@nav.Previous.Title</span>
+          </a>
+        }
+        else
+        {
+          <span class="qz-bio-chapter-nav__spacer"></span>
+        }
+
+        @if (nav.Next is not null)
+        {
+          <a class="qz-bio-chapter-nav__link qz-bio-chapter-nav__link--next" href="@BiographyRoutes.GetChapterDetailPath(nav.Next)">
+            <span class="qz-bio-chapter-nav__label">
+              Next Chapter
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+            </span>
+            <span class="qz-bio-chapter-nav__title">@nav.Next.Title</span>
+          </a>
+        }
+      </div>
+    </nav>
+  }
+}
