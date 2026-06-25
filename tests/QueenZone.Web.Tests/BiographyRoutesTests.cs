@@ -16,23 +16,33 @@ public sealed class BiographyRoutesTests : IClassFixture<WebApplicationFactory<P
     }
 
     [Fact]
-    public async Task BiographyIndexRendersChaptersInDisplaySequenceOrder()
+    public async Task BiographyIndexRendersChaptersInDisplaySequenceDescendingOrder()
     {
         var client = factory.CreateClient();
 
         var body = await client.GetStringAsync("/biography");
 
         Assert.Contains("Biography", body);
-        Assert.Contains("/biography/1/the-formation-of-a-band", body);
-        Assert.Contains("/biography/5/legacy", body);
+        Assert.Contains("/biography/5/1992", body);
+        Assert.Contains("/biography/1/1946-1969", body);
         Assert.Contains("5 chapters", body);
         Assert.Contains("<link rel=\"canonical\" href=\"/biography\">", body);
         Assert.Contains("<title>QueenZone biography</title>", body);
 
-        var formationIndex = body.IndexOf("The Formation of a Band", StringComparison.Ordinal);
-        var legacyIndex = body.IndexOf("Legacy", StringComparison.Ordinal);
-        Assert.True(formationIndex >= 0);
-        Assert.True(legacyIndex > formationIndex);
+        var newestIndex = body.IndexOf("/biography/5/1992", StringComparison.Ordinal);
+        var oldestIndex = body.IndexOf("/biography/1/1946-1969", StringComparison.Ordinal);
+        Assert.True(newestIndex >= 0);
+        Assert.True(oldestIndex > newestIndex);
+    }
+
+    [Fact]
+    public async Task BiographyIndexFallsBackToBodyExcerptWhenSummaryIsEmpty()
+    {
+        var client = factory.CreateClient();
+
+        var body = await client.GetStringAsync("/biography");
+
+        Assert.Contains("When the band Smile lost its singer", body);
     }
 
     [Fact]
@@ -40,16 +50,16 @@ public sealed class BiographyRoutesTests : IClassFixture<WebApplicationFactory<P
     {
         var client = factory.CreateClient();
 
-        var body = await client.GetStringAsync("/biography/2/breakthrough");
+        var body = await client.GetStringAsync("/biography/2/1970");
 
-        Assert.Contains("Breakthrough", body);
+        Assert.Contains("1970", body);
         Assert.Contains("Killer Queen", body);
         Assert.Contains("Previous Chapter", body);
         Assert.Contains("Next Chapter", body);
-        Assert.Contains("/biography/1/the-formation-of-a-band", body);
-        Assert.Contains("/biography/3/a-night-at-the-opera", body);
-        Assert.Contains("<link rel=\"canonical\" href=\"/biography/2/breakthrough\">", body);
-        Assert.Contains("<title>Breakthrough | QueenZone biography</title>", body);
+        Assert.Contains("/biography/1/1946-1969", body);
+        Assert.Contains("/biography/3/1975", body);
+        Assert.Contains("<link rel=\"canonical\" href=\"/biography/2/1970\">", body);
+        Assert.Contains("<title>1970 | QueenZone biography</title>", body);
     }
 
     [Fact]
@@ -57,7 +67,7 @@ public sealed class BiographyRoutesTests : IClassFixture<WebApplicationFactory<P
     {
         var client = factory.CreateClient();
 
-        var body = await client.GetStringAsync("/biography/1/the-formation-of-a-band");
+        var body = await client.GetStringAsync("/biography/1/1946-1969");
 
         Assert.DoesNotContain("Previous Chapter", body);
         Assert.Contains("Next Chapter", body);
@@ -68,7 +78,7 @@ public sealed class BiographyRoutesTests : IClassFixture<WebApplicationFactory<P
     {
         var client = factory.CreateClient();
 
-        var body = await client.GetStringAsync("/biography/5/legacy");
+        var body = await client.GetStringAsync("/biography/5/1992");
 
         Assert.Contains("Previous Chapter", body);
         Assert.DoesNotContain("Next Chapter", body);
@@ -92,7 +102,7 @@ public sealed class BiographyRoutesTests : IClassFixture<WebApplicationFactory<P
         var response = await client.GetAsync("/biography/2/not-the-right-slug");
 
         Assert.Equal(System.Net.HttpStatusCode.MovedPermanently, response.StatusCode);
-        Assert.Equal("/biography/2/breakthrough", response.Headers.Location?.OriginalString);
+        Assert.Equal("/biography/2/1970", response.Headers.Location?.OriginalString);
     }
 
     [Fact]
@@ -102,8 +112,8 @@ public sealed class BiographyRoutesTests : IClassFixture<WebApplicationFactory<P
         {
             new BiographyChapterItem(
                 7001,
-                "Unsafe HTML chapter",
-                "Unsafe summary.",
+                "2026",
+                string.Empty,
                 "<script>alert('xss')</script><p>Safe <strong>legacy</strong> paragraph</p>",
                 1,
                 new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Utc))
@@ -115,10 +125,13 @@ public sealed class BiographyRoutesTests : IClassFixture<WebApplicationFactory<P
                 services.AddSingleton<IBiographyRepository>(new InMemoryBiographyRepository(chapters));
             })).CreateClient();
 
-        var body = await client.GetStringAsync("/biography/7001/unsafe-html-chapter");
+        var body = await client.GetStringAsync("/biography/7001/2026");
 
-        Assert.DoesNotContain("alert", body, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("<p>Safe <strong>legacy</strong> paragraph</p>", body);
+        var articleStart = body.IndexOf("<article class=\"article-body\">", StringComparison.Ordinal);
+        Assert.True(articleStart >= 0);
+        var articleBody = body[articleStart..];
+        Assert.DoesNotContain("alert", articleBody, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("<p>Safe <strong>legacy</strong> paragraph</p>", articleBody);
     }
 
     [Fact]
@@ -135,6 +148,18 @@ public sealed class BiographyRoutesTests : IClassFixture<WebApplicationFactory<P
         Assert.Contains("No biography chapters are available yet.", body);
     }
 
+    [Fact]
+    public async Task HomePageIncludesBiographyArchiveCard()
+    {
+        var client = factory.CreateClient();
+
+        var body = await client.GetStringAsync("/");
+
+        Assert.Contains("href=\"/biography\"", body);
+        Assert.Contains("The Queen story", body);
+        Assert.Contains("Five ways into Queenzone", body);
+    }
+
     [Theory]
     [InlineData(1, "I")]
     [InlineData(4, "IV")]
@@ -143,5 +168,15 @@ public sealed class BiographyRoutesTests : IClassFixture<WebApplicationFactory<P
     public void GetChapterNumeral_ReturnsExpectedRomanNumerals(int index, string expected)
     {
         Assert.Equal(expected, BiographyRoutes.GetChapterNumeral(index - 1));
+    }
+
+    [Theory]
+    [InlineData("1946 - 1969", "1946–1969")]
+    [InlineData("1946 – 1969", "1946–1969")]
+    [InlineData("1970", "1970")]
+    [InlineData("1992", "1992")]
+    public void GetYearMarker_ParsesLegacyTitleYears(string title, string expected)
+    {
+        Assert.Equal(expected, BiographyTitle.GetYearMarker(title));
     }
 }

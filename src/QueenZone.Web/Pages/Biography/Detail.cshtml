@@ -19,9 +19,12 @@
         Chapter @BiographyRoutes.GetChapterNumeral(Math.Max(Model.ChapterIndex, 0)) · @BiographyRoutes.GetChapterMarker(chapter)
       </div>
       <h1>@chapter.Title</h1>
-      @if (!string.IsNullOrWhiteSpace(chapter.Summary))
+      @{
+        var summary = BiographyContent.GetListSummary(chapter);
+      }
+      @if (!string.IsNullOrWhiteSpace(summary))
       {
-        <p class="lede">@chapter.Summary</p>
+        <p class="lede">@summary</p>
       }
     </div>
   </section>

@@ -214,6 +214,10 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.qz-grid--five {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
 .qz-grid--three {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
@@ -863,6 +867,7 @@
     white-space: nowrap;
   }
 
+  .qz-grid--five,
   .qz-grid--four,
   .qz-grid--three,
   .qz-grid--two {

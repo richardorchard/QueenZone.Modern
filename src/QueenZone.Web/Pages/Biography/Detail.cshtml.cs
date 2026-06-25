@@ -27,13 +27,14 @@ public sealed class DetailModel(IBiographyRepository biographyRepository) : Page
         }
 
         var chapters = await biographyRepository.GetChaptersAsync(cancellationToken);
-        ChapterIndex = chapters.ToList().FindIndex(item => item.Id == id);
+        var readingOrder = BiographyChapterOrdering.ByDisplaySequenceAscending(chapters);
+        ChapterIndex = readingOrder.ToList().FindIndex(item => item.Id == id);
 
         Chapter = chapter;
         Navigation = await biographyRepository.GetAdjacentChaptersAsync(id, cancellationToken);
         ViewData["Title"] = $"{chapter.Title} | QueenZone biography";
         ViewData["CanonicalPath"] = BiographyContent.GetDetailCanonicalPath(chapter);
-        ViewData["Description"] = chapter.Summary;
+        ViewData["Description"] = BiographyContent.GetListSummary(chapter);
 
         return Page();
     }

@@ -8,4 +8,11 @@ public static class BiographyChapterOrdering
             .OrderBy(chapter => chapter.DisplaySequence)
             .ThenBy(chapter => chapter.Id)
             .ToList();
+
+    public static IReadOnlyList<BiographyChapterItem> ByDisplaySequenceDescending(
+        IEnumerable<BiographyChapterItem> chapters) =>
+        chapters
+            .OrderByDescending(chapter => chapter.DisplaySequence)
+            .ThenByDescending(chapter => chapter.Id)
+            .ToList();
 }

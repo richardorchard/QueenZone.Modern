@@ -13,7 +13,7 @@ public sealed class LegacyBiographyRepository(string connectionString) : IBiogra
             commandType: System.Data.CommandType.StoredProcedure,
             cancellationToken: cancellationToken);
         var rows = await connection.QueryAsync<ListRow>(command);
-        return BiographyChapterOrdering.ByDisplaySequenceAscending(rows.Select(MapListRow));
+        return rows.Select(MapListRow).ToList();
     }
 
     public async Task<BiographyChapterItem?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
@@ -30,7 +30,8 @@ public sealed class LegacyBiographyRepository(string connectionString) : IBiogra
 
     public async Task<BiographyChapterNav> GetAdjacentChaptersAsync(int id, CancellationToken cancellationToken = default)
     {
-        var chapters = await GetChaptersAsync(cancellationToken);
+        var chapters = BiographyChapterOrdering.ByDisplaySequenceAscending(
+            await GetChaptersAsync(cancellationToken));
         var index = chapters.ToList().FindIndex(chapter => chapter.Id == id);
         if (index < 0)
         {
@@ -46,7 +47,7 @@ public sealed class LegacyBiographyRepository(string connectionString) : IBiogra
         new(
             row.Q_BIO_ID,
             row.TITLE?.Trim() ?? string.Empty,
-            ResolveSummary(row.SUMMARY, row.TITLE),
+            ResolveSummary(row.SUMMARY),
             string.Empty,
             row.DISPLAY_SEQUENCE,
             row.CREATE_DATE);
@@ -55,19 +56,19 @@ public sealed class LegacyBiographyRepository(string connectionString) : IBiogra
         new(
             id,
             row.TITLE?.Trim() ?? string.Empty,
-            row.SUMMARY?.Trim() ?? string.Empty,
+            ResolveSummary(row.SUMMARY, row.BIO_TEXT),
             row.BIO_TEXT ?? string.Empty,
             row.DISPLAY_SEQUENCE,
             DateTime.MinValue);
 
-    private static string ResolveSummary(string? summary, string? title)
+    private static string ResolveSummary(string? summary, string? body = null)
     {
         if (!string.IsNullOrWhiteSpace(summary))
         {
             return summary.Trim();
         }
 
-        return title?.Trim() ?? string.Empty;
+        return LegacyArticleText.GetExcerpt(body);
     }
 
     private sealed record ListRow(

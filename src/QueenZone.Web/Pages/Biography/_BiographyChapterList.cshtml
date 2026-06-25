@@ -7,14 +7,17 @@
     <li>
       <a class="qz-bio-chapter-row" href="@BiographyRoutes.GetChapterDetailPath(chapter)">
         <div class="qz-bio-chapter-row__marker">
-          <div class="qz-bio-chapter-row__numeral">Chapter @BiographyRoutes.GetChapterNumeral(index)</div>
+          <div class="qz-bio-chapter-row__numeral">Chapter @BiographyRoutes.GetChapterNumeral(chapter, Model)</div>
           <div class="qz-bio-chapter-row__range">@BiographyRoutes.GetChapterMarker(chapter)</div>
         </div>
         <div class="qz-bio-chapter-row__content">
           <h2>@chapter.Title</h2>
-          @if (!string.IsNullOrWhiteSpace(chapter.Summary))
+          @{
+            var summary = BiographyContent.GetListSummary(chapter);
+          }
+          @if (!string.IsNullOrWhiteSpace(summary))
           {
-            <p>@chapter.Summary</p>
+            <p>@summary</p>
           }
           <span class="qz-bio-chapter-row__cta">
             Read the chapter

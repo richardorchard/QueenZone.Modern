@@ -12,10 +12,23 @@ public static class BiographyRoutes
     public static string GetChapterNumeral(int index, bool useRoman = true) =>
         useRoman ? ToRoman(index + 1) : (index + 1).ToString();
 
-    public static string GetChapterMarker(BiographyChapterItem chapter) =>
-        chapter.CreatedAt == DateTime.MinValue
+    public static string GetChapterNumeral(
+        BiographyChapterItem chapter,
+        IEnumerable<BiographyChapterItem> chapters,
+        bool useRoman = true)
+    {
+        var readingOrder = BiographyChapterOrdering.ByDisplaySequenceAscending(chapters);
+        var index = readingOrder.ToList().FindIndex(item => item.Id == chapter.Id);
+        return GetChapterNumeral(Math.Max(index, 0), useRoman);
+    }
+
+    public static string GetChapterMarker(BiographyChapterItem chapter)
+    {
+        var marker = BiographyTitle.GetYearMarker(chapter.Title);
+        return string.IsNullOrWhiteSpace(marker)
             ? $"Chapter {chapter.DisplaySequence}"
-            : chapter.CreatedAt.Year.ToString();
+            : marker;
+    }
 
     public static string GetReadTimeLabel(string body)
     {

@@ -8,4 +8,9 @@ public static class BiographyContent
 
     public static string GetDetailCanonicalPath(BiographyChapterItem chapter) =>
         BiographyRoutes.GetChapterDetailPath(chapter);
+
+    public static string GetListSummary(BiographyChapterItem chapter) =>
+        !string.IsNullOrWhiteSpace(chapter.Summary)
+            ? chapter.Summary
+            : LegacyArticleText.GetExcerpt(chapter.Body);
 }
