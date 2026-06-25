@@ -116,10 +116,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v5
-        with:
-          dotnet-version: 10.0.x
+      # actions/setup-dotnet tries to (re)install into C:\Program Files\dotnet,
+      # which the runner service account cannot write to without elevation.
+      # This machine already has the .NET 10 SDK installed and on PATH, so
+      # use that directly instead of running the action here.
+      - name: Verify .NET SDK
+        run: dotnet --version
 
       - name: Restore
         run: |
