@@ -49,6 +49,18 @@ Important columns in `PIC_FILES_T`:
 
 Use Azure Blob Storage as canonical storage for public images.
 
+Current public media delivery configuration:
+
+```text
+Public base URL: https://pictures.queenzone.org
+Cloudflare Worker: pictures-queenzone-org
+Azure storage account: queenzone
+Azure blob endpoint: https://queenzone.blob.core.windows.net
+URL shape: https://pictures.queenzone.org/{container}/{blob}
+```
+
+Use `https://pictures.queenzone.org` for new public image references instead of direct `*.blob.core.windows.net` URLs. The Cloudflare Worker maps public URLs to the Azure Blob endpoint and caches successful non-range `GET` responses at the edge.
+
 Suggested containers:
 
 - `pictures-original`

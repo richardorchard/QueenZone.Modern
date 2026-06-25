@@ -44,6 +44,47 @@ Use configuration keys like:
 - `FeatureFlags:ForumArchiveEnabled`
 - `FeatureFlags:LegacyRedirectsEnabled`
 
+## Public Media Delivery
+
+Public archive media is served from Azure Blob Storage through Cloudflare:
+
+```text
+Visitor URL: https://pictures.queenzone.org/{container}/{blob}
+Cloudflare Worker: pictures-queenzone-org
+Worker route: pictures.queenzone.org/*
+Azure origin: https://queenzone.blob.core.windows.net
+Storage account: queenzone
+```
+
+The Worker is used because Cloudflare Free supports proxied DNS and Workers, but Host header, SNI, and DNS origin overrides in Origin Rules are Enterprise-only. Azure Blob Storage rejects direct proxied requests to `pictures.queenzone.org` unless the request to Azure uses the storage account host. The Worker fetches the equivalent Azure Blob URL directly, avoiding the need for Enterprise Origin Rules.
+
+The Cloudflare DNS record should remain:
+
+```text
+Type: CNAME
+Name: pictures
+Target: queenzone.blob.core.windows.net
+Proxy status: Proxied
+TTL: Auto
+```
+
+Worker behavior as configured on 2026-06-25:
+
+- Accepts `GET` and `HEAD` only.
+- Maps the request path and query string to `https://queenzone.blob.core.windows.net`.
+- Adds `Access-Control-Allow-Origin: *`.
+- Adds `X-Content-Type-Options: nosniff`.
+- Sets `Cache-Control: public, max-age=86400, s-maxage=2592000`.
+- Uses Cloudflare edge cache for non-range `GET` responses.
+
+Azure requirements:
+
+- `queenzone` must keep blob public access enabled.
+- Public archive containers must remain public where visitor access is expected.
+- Private containers such as `databasebackup` and `songfiles` should remain private.
+
+Do not configure Azure CDN, Azure Front Door, or an Azure Storage custom domain for `pictures.queenzone.org` unless the architecture is deliberately changed.
+
 ## Database Access
 
 The `queenzone-dev` App Service connects to the `queenzone-db` Azure SQL database on `queenzone-sql-server.database.windows.net`.

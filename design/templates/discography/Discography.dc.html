@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<!-- @template name="Discography" description="Queen studio-album archive — sleeve grid (or editorial list) opening to a cinematic album detail with full tracklist." -->
+<helmet>
+<script src="./ds-base.js"></script>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--qz-white)}
+  @keyframes qzRise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+  @media (prefers-reduced-motion: reduce){*{animation:none !important}}
+</style>
+</helmet>
+
+<div style="background:var(--qz-white);font-family:var(--font-body);color:var(--text-primary);min-height:100vh">
+
+  <!-- ===================== LIST VIEW ===================== -->
+  <sc-if value="{{ isList }}" hint-placeholder-val="{{ true }}">
+  <div style="animation:qzRise var(--dur-base) var(--ease-out)">
+
+    <section style="background:var(--qz-black);position:relative;overflow:hidden">
+      <img src="../../assets/crest-white.png" alt="" style="position:absolute;right:-70px;top:-60px;width:340px;opacity:0.06;pointer-events:none"/>
+      <div style="max-width:var(--container-max);margin:0 auto;padding:clamp(56px,8vw,88px) var(--gutter-lg) clamp(46px,6vw,62px);position:relative">
+        <div style="font-family:var(--font-titling);font-size:12px;font-weight:600;letter-spacing:0.22em;text-transform:uppercase;color:var(--qz-gold);margin-bottom:18px">The Queenzone.com Archive</div>
+        <h1 style="font:500 clamp(42px,6.4vw,68px)/1.0 var(--font-display);letter-spacing:-0.015em;color:var(--qz-white);margin:0">Discography</h1>
+        <p style="font:400 clamp(16px,1.6vw,19px)/1.6 var(--font-body);color:rgba(255,255,255,0.7);margin:22px 0 0;max-width:600px">The complete studio catalogue, restored sleeve by sleeve — fifteen records that traced a band from a Trident basement to the largest stages on earth.</p>
+        <div style="font:500 13px/1 var(--font-body);text-transform:uppercase;letter-spacing:0.1em;color:rgba(255,255,255,0.45);margin-top:28px">{{ count }}</div>
+      </div>
+    </section>
+
+    <section style="max-width:var(--container-max);margin:0 auto;padding:clamp(40px,5vw,64px) var(--gutter-lg) clamp(72px,9vw,112px)">
+
+      <!-- GRID layout -->
+      <sc-if value="{{ isGrid }}" hint-placeholder-val="{{ true }}">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(196px,1fr));gap:clamp(28px,3.4vw,48px) clamp(18px,2.4vw,32px)">
+          <sc-for list="{{ albums }}" as="album" hint-placeholder-count="8">
+            <a href="#" onClick="{{ album.onOpen }}" style="text-decoration:none;display:block;transition:transform var(--dur-base) var(--ease-out)" style-hover="transform:translateY(-5px)">
+              <div style="position:relative;aspect-ratio:1/1;border:1px solid var(--hairline);border-radius:var(--radius-md);overflow:hidden;box-shadow:var(--shadow-card)">
+                <div style="position:absolute;inset:0;background:repeating-linear-gradient(135deg,var(--qz-grey-100) 0,var(--qz-grey-100) 11px,var(--qz-grey-50) 11px,var(--qz-grey-50) 22px)"></div>
+                <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:22px">
+                  <div style="font-family:var(--font-titling);font-size:10px;font-weight:600;letter-spacing:0.24em;color:var(--qz-grey-500);text-transform:uppercase">{{ album.num }}</div>
+                  <div style="width:26px;height:1px;background:var(--qz-grey-300);margin:14px 0"></div>
+                  <div style="font:500 clamp(19px,2.3vw,25px)/1.08 var(--font-display);color:var(--qz-charcoal);letter-spacing:-0.01em">{{ album.title }}</div>
+                  <div style="font-family:var(--font-titling);font-size:11px;font-weight:600;letter-spacing:0.2em;color:var(--qz-grey-500);margin-top:14px">{{ album.year }}</div>
+                </div>
+              </div>
+              <div style="margin-top:15px">
+                <div style="font:600 19px/1.2 var(--font-display);color:var(--text-primary);letter-spacing:-0.01em">{{ album.title }}</div>
+                <div style="font:500 12px/1 var(--font-body);text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);margin-top:7px">{{ album.year }} · {{ album.trackCount }} tracks</div>
+              </div>
+            </a>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <!-- LIST layout -->
+      <sc-if value="{{ isRows }}">
+        <div>
+          <sc-for list="{{ albums }}" as="album" hint-placeholder-count="6">
+            <a href="#" onClick="{{ album.onOpen }}" style="display:flex;flex-wrap:wrap;align-items:baseline;gap:10px 30px;padding:26px 10px;text-decoration:none;border-bottom:1px solid var(--hairline);transition:background var(--dur-fast) var(--ease-out)" style-hover="background:var(--qz-grey-50)">
+              <div style="flex:0 0 50px;font-family:var(--font-titling);font-size:13px;font-weight:600;letter-spacing:0.14em;color:var(--accent-archive)">{{ album.num }}</div>
+              <div style="flex:1 1 360px;min-width:0">
+                <div style="font:600 clamp(22px,2.6vw,28px)/1.16 var(--font-display);color:var(--text-primary);letter-spacing:-0.01em">{{ album.title }}</div>
+                <div style="font:400 15px/1.55 var(--font-body);color:var(--text-secondary);margin-top:7px;max-width:560px">{{ album.summary }}</div>
+              </div>
+              <div style="flex:0 0 auto;font:500 12px/1.5 var(--font-body);text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);text-align:right">{{ album.year }}<br/>{{ album.trackCount }} tracks</div>
+            </a>
+          </sc-for>
+        </div>
+      </sc-if>
+
+    </section>
+  </div>
+  </sc-if>
+
+  <!-- ===================== DETAIL VIEW ===================== -->
+  <sc-if value="{{ isDetail }}">
+  <article style="animation:qzRise var(--dur-base) var(--ease-out)">
+
+    <section style="background:var(--qz-black);position:relative;overflow:hidden">
+      <img src="../../assets/crest-white.png" alt="" style="position:absolute;right:-80px;bottom:-90px;width:360px;opacity:0.05;pointer-events:none"/>
+      <div style="max-width:var(--container-max);margin:0 auto;padding:30px var(--gutter-lg) clamp(48px,6vw,72px);position:relative">
+
+        <a href="#" onClick="{{ onBack }}" style="display:inline-flex;align-items:center;gap:9px;text-decoration:none;font:500 12px/1 var(--font-body);text-transform:uppercase;letter-spacing:0.12em;color:rgba(255,255,255,0.6);margin-bottom:clamp(36px,5vw,56px);transition:color var(--dur-fast) var(--ease-out)" style-hover="color:var(--qz-white)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+          Discography
+        </a>
+
+        <div style="display:flex;flex-wrap:wrap;gap:clamp(32px,4vw,56px);align-items:center">
+          <div style="flex:0 0 min(330px,100%);aspect-ratio:1/1;border:1px solid rgba(255,255,255,0.14);border-radius:var(--radius-md);overflow:hidden;position:relative">
+            <div style="position:absolute;inset:0;background:repeating-linear-gradient(135deg,#1a1a1a 0,#1a1a1a 11px,#161616 11px,#161616 22px)"></div>
+            <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:26px">
+              <div style="font-family:var(--font-titling);font-size:11px;font-weight:600;letter-spacing:0.24em;color:rgba(255,255,255,0.4);text-transform:uppercase">{{ cur.num }}</div>
+              <div style="width:30px;height:1px;background:rgba(255,255,255,0.2);margin:16px 0"></div>
+              <div style="font:500 clamp(26px,3vw,34px)/1.05 var(--font-display);color:var(--qz-white);letter-spacing:-0.01em">{{ cur.title }}</div>
+              <div style="font-family:var(--font-titling);font-size:12px;font-weight:600;letter-spacing:0.2em;color:rgba(255,255,255,0.4);margin-top:16px">{{ cur.year }}</div>
+            </div>
+          </div>
+          <div style="flex:1 1 340px">
+            <div style="font-family:var(--font-titling);font-size:11px;font-weight:600;letter-spacing:0.22em;text-transform:uppercase;color:var(--qz-gold);margin-bottom:16px">Studio Album · No. {{ cur.num }}</div>
+            <h1 style="font:500 clamp(38px,5.2vw,60px)/1.0 var(--font-display);letter-spacing:-0.015em;color:var(--qz-white);margin:0">{{ cur.title }}</h1>
+            <div style="font:500 13px/1 var(--font-body);text-transform:uppercase;letter-spacing:0.1em;color:rgba(255,255,255,0.55);margin-top:20px">{{ cur.year }} · {{ cur.label }}</div>
+            <p style="font:400 clamp(17px,1.7vw,20px)/1.6 var(--font-display);color:rgba(255,255,255,0.82);margin:24px 0 0;max-width:520px">{{ cur.blurb }}</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section style="max-width:var(--container-max);margin:0 auto;padding:clamp(48px,6vw,80px) var(--gutter-lg) clamp(72px,9vw,112px)">
+      <div style="display:flex;flex-wrap:wrap;gap:clamp(40px,5vw,80px)">
+
+        <div style="flex:1 1 380px;min-width:0">
+          <div style="font-family:var(--font-titling);font-size:12px;font-weight:600;letter-spacing:0.22em;text-transform:uppercase;color:var(--accent-archive);margin-bottom:8px">Tracklist</div>
+          <div style="font:500 13px/1 var(--font-body);text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);margin-bottom:24px;padding-bottom:20px;border-bottom:1px solid var(--hairline)">{{ cur.trackCount }} tracks · {{ cur.label }}</div>
+          <ol style="list-style:none;margin:0;padding:0">
+            <sc-for list="{{ tracks }}" as="track" hint-placeholder-count="10">
+              <li style="display:flex;align-items:baseline;gap:18px;padding:13px 4px;border-bottom:1px solid var(--qz-grey-100)">
+                <span style="flex:0 0 28px;font-family:var(--font-titling);font-size:12px;font-weight:600;letter-spacing:0.08em;color:var(--qz-grey-400)">{{ track.n }}</span>
+                <span style="font:400 clamp(17px,1.8vw,20px)/1.35 var(--font-display);color:var(--text-primary)">{{ track.title }}</span>
+              </li>
+            </sc-for>
+          </ol>
+        </div>
+
+        <aside style="flex:0 0 280px;flex-grow:1;max-width:340px">
+          <div style="background:var(--qz-warm-white);border-radius:var(--radius-md);padding:clamp(24px,3vw,32px)">
+            <div style="font-family:var(--font-titling);font-size:12px;font-weight:600;letter-spacing:0.22em;text-transform:uppercase;color:var(--text-secondary);margin-bottom:22px">Record Details</div>
+            <dl style="margin:0;display:grid;gap:18px">
+              <div style="display:flex;justify-content:space-between;gap:16px;align-items:baseline;border-bottom:1px solid var(--hairline);padding-bottom:18px"><dt style="font:500 12px/1 var(--font-body);text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted)">Released</dt><dd style="margin:0;font:600 17px/1 var(--font-display);color:var(--text-primary)">{{ cur.year }}</dd></div>
+              <div style="display:flex;justify-content:space-between;gap:16px;align-items:baseline;border-bottom:1px solid var(--hairline);padding-bottom:18px"><dt style="font:500 12px/1 var(--font-body);text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted)">Label</dt><dd style="margin:0;font:600 17px/1.2 var(--font-display);color:var(--text-primary);text-align:right">{{ cur.label }}</dd></div>
+              <div style="display:flex;justify-content:space-between;gap:16px;align-items:baseline;border-bottom:1px solid var(--hairline);padding-bottom:18px"><dt style="font:500 12px/1 var(--font-body);text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted)">Tracks</dt><dd style="margin:0;font:600 17px/1 var(--font-display);color:var(--text-primary)">{{ cur.trackCount }}</dd></div>
+              <div style="display:flex;justify-content:space-between;gap:16px;align-items:baseline"><dt style="font:500 12px/1 var(--font-body);text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted)">Era</dt><dd style="margin:0;font:600 17px/1.2 var(--font-display);color:var(--accent-archive);text-align:right">{{ cur.era }}</dd></div>
+            </dl>
+          </div>
+          <a href="#" onClick="{{ onBack }}" style="display:inline-flex;align-items:center;gap:9px;margin-top:26px;text-decoration:none;font:500 12px/1 var(--font-body);text-transform:uppercase;letter-spacing:0.1em;color:var(--link);transition:color var(--dur-fast) var(--ease-out)" style-hover="color:var(--link-hover)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+            All studio albums
+          </a>
+        </aside>
+
+      </div>
+    </section>
+  </article>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1280,&quot;height&quot;:900},&quot;layout&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;grid&quot;,&quot;list&quot;],&quot;default&quot;:&quot;grid&quot;,&quot;tsType&quot;:&quot;'grid' | 'list'&quot;}}">
+class Component extends DCLogic {
+  state = { view: 'list', selected: 0 };
+
+  data = [
+    { title:"Queen", year:1973, label:"EMI · Elektra", era:"The Early Years",
+      summary:"The hungry, heavy debut — recorded in stolen night-time hours at Trident and announcing a band already certain of its own ambition.",
+      blurb:"A debut of restless ambition: hard rock shot through with the operatic instincts that would soon define them.",
+      tracks:["Keep Yourself Alive","Doing All Right","Great King Rat","My Fairy King","Liar","The Night Comes Down","Modern Times Rock 'n' Roll","Son and Daughter","Jesus","Seven Seas of Rhye"] },
+    { title:"Queen II", year:1974, label:"EMI · Elektra", era:"The Early Years",
+      summary:"A dark fairy-tale of a record, split between a 'White' and a 'Black' side, where the band's multi-tracked grandeur first fully bloomed.",
+      blurb:"The 'White' and 'Black' sides — a dense, ambitious song-cycle and the first true glimpse of the band's operatic scale.",
+      tracks:["Procession","Father to Son","White Queen (As It Began)","Some Day One Day","The Loser in the End","Ogre Battle","The Fairy Feller's Master-Stroke","Nevermore","The March of the Black Queen","Funny How Love Is","Seven Seas of Rhye"] },
+    { title:"Sheer Heart Attack", year:1974, label:"EMI · Elektra", era:"The Early Years",
+      summary:"The breakthrough. 'Killer Queen' carried them onto the radio and into the charts, sharpening the sprawl into pop precision.",
+      blurb:"The record that turned promise into success — sharper, leaner, and crowned by the radio glide of 'Killer Queen'.",
+      tracks:["Brighton Rock","Killer Queen","Tenement Funster","Flick of the Wrist","Lily of the Valley","Now I'm Here","In the Lap of the Gods","Stone Cold Crazy","Dear Friends","Misfire","Bring Back That Leroy Brown","She Makes Me (Stormtrooper in Stilettos)","In the Lap of the Gods... Revisited"] },
+    { title:"A Night at the Opera", year:1975, label:"EMI · Elektra", era:"The Opera Years",
+      summary:"Reputedly the most expensive album ever made at the time, and home to 'Bohemian Rhapsody' — the song that rewrote what a single could be.",
+      blurb:"Their masterpiece — a maximalist tour through vaudeville, ballad and rock, anchored by 'Bohemian Rhapsody'.",
+      tracks:["Death on Two Legs (Dedicated to...)","Lazing on a Sunday Afternoon","I'm in Love with My Car","You're My Best Friend","'39","Sweet Lady","Seaside Rendezvous","The Prophet's Song","Love of My Life","Good Company","Bohemian Rhapsody","God Save the Queen"] },
+    { title:"A Day at the Races", year:1976, label:"EMI · Elektra", era:"The Opera Years",
+      summary:"The companion piece to 'Opera', self-produced and confident, ranging from the gospel swell of 'Somebody to Love' to a tender Japanese farewell.",
+      blurb:"A self-assured sequel, from the gospel uplift of 'Somebody to Love' to the tender close of 'Teo Torriatte'.",
+      tracks:["Tie Your Mother Down","You Take My Breath Away","Long Away","The Millionaire Waltz","You and I","Somebody to Love","White Man","Good Old-Fashioned Lover Boy","Drowse","Teo Torriatte (Let Us Cling Together)"] },
+    { title:"News of the World", year:1977, label:"EMI · Elektra", era:"Stadium Rock",
+      summary:"Stripped back and stadium-built. Its opening one-two of 'We Will Rock You' and 'We Are the Champions' became the sound of crowds everywhere.",
+      blurb:"Leaner and harder, opening with the eternal stadium anthem 'We Will Rock You' / 'We Are the Champions'.",
+      tracks:["We Will Rock You","We Are the Champions","Sheer Heart Attack","All Dead, All Dead","Spread Your Wings","Fight from the Inside","Get Down, Make Love","Sleeping on the Sidewalk","Who Needs You","It's Late","My Melancholy Blues"] },
+    { title:"Jazz", year:1978, label:"EMI · Elektra", era:"Stadium Rock",
+      summary:"Restless and eclectic — bicycle bells, the unstoppable rush of 'Don't Stop Me Now', and a band touring the world at full tilt.",
+      blurb:"Eclectic and exuberant, home to the unstoppable rush of 'Don't Stop Me Now'.",
+      tracks:["Mustapha","Fat Bottomed Girls","Jealousy","Bicycle Race","If You Can't Beat Them","Let Me Entertain You","Dead on Time","In Only Seven Days","Dreamer's Ball","Fun It","Leaving Home Ain't Easy","Don't Stop Me Now","More of That Jazz"] },
+    { title:"The Game", year:1980, label:"EMI · Elektra", era:"Reinvention",
+      summary:"Synthesisers arrive and the band conquers America — 'Crazy Little Thing Called Love' and 'Another One Bites the Dust' both topping the US chart.",
+      blurb:"The American breakthrough — rockabilly and funk converge on two US number ones.",
+      tracks:["Play the Game","Dragon Attack","Another One Bites the Dust","Need Your Loving Tonight","Crazy Little Thing Called Love","Rock It (Prime Jive)","Don't Try Suicide","Sail Away Sweet Sister","Coming Soon","Save Me"] },
+    { title:"Flash Gordon", year:1980, label:"EMI · Elektra", era:"Reinvention",
+      summary:"A full orchestral-electronic film score for the cult sci-fi epic — the band as cinematic composers, dialogue and all.",
+      blurb:"Their soundtrack to the cult film — an electronic-orchestral score threaded with dialogue and theme.",
+      tracks:["Flash's Theme","In the Space Capsule (The Love Theme)","Ming's Theme (In the Court of Ming the Merciless)","The Ring (Hypnotic Seduction of Dale)","Football Fight","In the Death Cell (Love Theme Reprise)","Execution of Flash","The Kiss (Aura Resurrects Flash)","Arboria (Planet of the Tree Men)","Escape from the Swamp","Flash to the Rescue","Vultan's Theme (Attack of the Hawk Men)","Battle Theme","The Wedding March","Marriage of Dale and Ming","Crash Dive on Mingo City","Flash's Theme Reprise","The Hero"] },
+    { title:"Hot Space", year:1982, label:"EMI · Elektra", era:"Reinvention",
+      summary:"A divisive plunge into funk, disco and dance — and yet it gave the world the David Bowie duet 'Under Pressure'.",
+      blurb:"A bold, divisive turn to funk and dance, redeemed by the towering 'Under Pressure'.",
+      tracks:["Staying Power","Dancer","Back Chat","Body Language","Action This Day","Put Out the Fire","Life Is Real (Song for Lennon)","Calling All Girls","Las Palabras de Amor (The Words of Love)","Cool Cat","Under Pressure"] },
+    { title:"The Works", year:1984, label:"EMI · Capitol", era:"The Comeback",
+      summary:"A deliberate return to form, balancing the future-shock of 'Radio Ga Ga' with the unifying chant of 'I Want to Break Free'.",
+      blurb:"A confident comeback — 'Radio Ga Ga' and 'I Want to Break Free' restored them to the front rank.",
+      tracks:["Radio Ga Ga","Tear It Up","It's a Hard Life","Man on the Prowl","Machines (or 'Back to Humans')","I Want to Break Free","Keep Passing the Open Windows","Hammer to Fall","Is This the World We Created?"] },
+    { title:"A Kind of Magic", year:1986, label:"EMI · Capitol", era:"The Comeback",
+      summary:"Loosely tied to the film 'Highlander', and the studio companion to the triumphant final tour — peaking with 'Who Wants to Live Forever'.",
+      blurb:"Born of the 'Highlander' soundtrack and the soundtrack to their last great tour.",
+      tracks:["One Vision","A Kind of Magic","One Year of Love","Pain Is So Close to Pleasure","Friends Will Be Friends","Who Wants to Live Forever","Gimme the Prize (Kurgan's Theme)","Don't Lose Your Head","Princes of the Universe"] },
+    { title:"The Miracle", year:1989, label:"Parlophone · Capitol", era:"The Final Sessions",
+      summary:"A renewed studio partnership — all songs now credited simply to Queen — recorded as the band quietly drew closer than ever.",
+      blurb:"A unified record, every song credited to Queen, made as the band pulled together.",
+      tracks:["Party","Khashoggi's Ship","The Miracle","I Want It All","The Invisible Man","Breakthru","Rain Must Fall","Scandal","My Baby Does Me","Was It All Worth It"] },
+    { title:"Innuendo", year:1991, label:"Parlophone · Hollywood", era:"The Final Sessions",
+      summary:"The last album released in Freddie Mercury's lifetime — a defiant, towering record closing on 'The Show Must Go On'.",
+      blurb:"The final album of Mercury's lifetime — defiant, ambitious, closing on 'The Show Must Go On'.",
+      tracks:["Innuendo","I'm Going Slightly Mad","Headlong","I Can't Live with You","Don't Try So Hard","Ride the Wild Wind","All God's People","These Are the Days of Our Lives","Delilah","The Hitman","Bijou","The Show Must Go On"] },
+    { title:"Made in Heaven", year:1995, label:"Parlophone · Hollywood", era:"Legacy",
+      summary:"Completed four years after Freddie's death from his final vocals — an elegiac, luminous farewell from the surviving band.",
+      blurb:"A posthumous farewell, built from Mercury's last recordings into a luminous final statement.",
+      tracks:["It's a Beautiful Day","Made in Heaven","Let Me Live","Mother Love","My Life Has Been Saved","I Was Born to Love You","Heaven for Everyone","Too Much Love Will Kill You","You Don't Fool Me","A Winter's Tale","It's a Beautiful Day (reprise)","Yeah","Track 13"] }
+  ];
+
+  open(e, i) { if (e) e.preventDefault(); this.setState({ view:'detail', selected:i }); this.toTop(); }
+  back(e) { if (e) e.preventDefault(); this.setState({ view:'list' }); this.toTop(); }
+  toTop() { try { requestAnimationFrame(() => window.scrollTo({ top:0, behavior:'auto' })); } catch (err) {} }
+
+  renderVals() {
+    const layout = this.props.layout ?? 'grid';
+    const albums = this.data.map((a, i) => ({
+      ...a,
+      num: String(i + 1).padStart(2, '0'),
+      trackCount: a.tracks.length,
+      onOpen: (e) => this.open(e, i),
+    }));
+    const cur = albums[this.state.selected] || albums[0];
+    const tracks = (cur.tracks || []).map((t, i) => ({ n: String(i + 1).padStart(2, '0'), title: t }));
+    return {
+      isList: this.state.view === 'list',
+      isDetail: this.state.view === 'detail',
+      isGrid: layout === 'grid',
+      isRows: layout === 'list',
+      albums,
+      cur,
+      tracks,
+      count: this.data.length + ' studio albums · 1973–1995',
+      onBack: (e) => this.back(e),
+    };
+  }
+}
+</script>
+</body>
+</html>

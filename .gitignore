@@ -2,6 +2,8 @@ bin/
 obj/
 .vs/
 .vscode/
+.codex/
+.tools/
 *.user
 *.suo
 TestResults/
@@ -11,6 +13,7 @@ coverage-report/
 *.coveragexml
 appsettings.Local.json
 .env
+.cloudflare-token.txt
 *.db
 *.bak
 *.PublishSettings
