@@ -78,7 +78,7 @@ CI also publishes a code coverage artifact for pull requests and pushes. Use it 
 A Playwright browser smoke suite (`tests/QueenZone.Web.E2E`) runs in CI on a self-hosted Windows runner so it does not consume GitHub Actions minutes. See `docs/architecture/self-hosted-e2e-runner.md` for runner setup. To run it locally:
 
 ```powershell
-pwsh tests/QueenZone.Web.E2E/bin/Release/net10.0/playwright.ps1 install chromium
+.\tests\QueenZone.Web.E2E\bin\Release\net10.0\playwright.ps1 install chromium
 dotnet publish src/QueenZone.Web/QueenZone.Web.csproj --configuration Release --output ./e2e-app
 # start the published app on http://127.0.0.1:5099, then:
 dotnet test tests/QueenZone.Web.E2E/QueenZone.Web.E2E.csproj --configuration Release

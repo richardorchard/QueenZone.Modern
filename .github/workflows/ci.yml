@@ -134,7 +134,7 @@ jobs:
           dotnet build tests/QueenZone.Web.E2E/QueenZone.Web.E2E.csproj --configuration Release --no-restore
 
       - name: Install Playwright browsers
-        run: pwsh tests/QueenZone.Web.E2E/bin/Release/net10.0/playwright.ps1 install chromium
+        run: .\tests\QueenZone.Web.E2E\bin\Release\net10.0\playwright.ps1 install chromium
 
       - name: Publish web app
         run: dotnet publish src/QueenZone.Web/QueenZone.Web.csproj --configuration Release --no-build --output ./e2e-app
