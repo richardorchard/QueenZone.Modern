@@ -71,16 +71,29 @@ public sealed class LegacyBiographyRepository(string connectionString) : IBiogra
         return LegacyArticleText.GetExcerpt(body);
     }
 
-    private sealed record ListRow(
-        int Q_BIO_ID,
-        string? TITLE,
-        string? SUMMARY,
-        byte DISPLAY_SEQUENCE,
-        DateTime CREATE_DATE);
+    private sealed class ListRow
+    {
+        public string? BIOTITLE { get; init; }
 
-    private sealed record DetailRow(
-        string? TITLE,
-        string? SUMMARY,
-        string? BIO_TEXT,
-        byte DISPLAY_SEQUENCE);
+        public short Q_BIO_ID { get; init; }
+
+        public DateTime CREATE_DATE { get; init; }
+
+        public string? TITLE { get; init; }
+
+        public byte DISPLAY_SEQUENCE { get; init; }
+
+        public string? SUMMARY { get; init; }
+    }
+
+    private sealed class DetailRow
+    {
+        public string? TITLE { get; init; }
+
+        public string? SUMMARY { get; init; }
+
+        public string? BIO_TEXT { get; init; }
+
+        public byte DISPLAY_SEQUENCE { get; init; }
+    }
 }
