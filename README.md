@@ -75,6 +75,15 @@ dotnet test QueenZone.sln --configuration Release --no-build
 
 CI also publishes a code coverage artifact for pull requests and pushes. Use it to guide test review around risky changes, especially canonical routing, publication rules, legacy data mapping, and HTML sanitisation.
 
+A Playwright browser smoke suite (`tests/QueenZone.Web.E2E`) runs in CI on a self-hosted Windows runner so it does not consume GitHub Actions minutes. See `docs/architecture/self-hosted-e2e-runner.md` for runner setup. To run it locally:
+
+```powershell
+.\tests\QueenZone.Web.E2E\bin\Release\net10.0\playwright.ps1 install chromium
+dotnet publish src/QueenZone.Web/QueenZone.Web.csproj --configuration Release --output ./e2e-app
+# start the published app on http://127.0.0.1:5099, then:
+dotnet test tests/QueenZone.Web.E2E/QueenZone.Web.E2E.csproj --configuration Release
+```
+
 Normal CI and pull request checks should not require the restored legacy database. Real legacy database checks are opt-in until a controlled test database exists.
 
 Feature work should happen on an agent-prefixed branch such as `grok/news-pagination` and be reviewed through a pull request before it reaches `main`. See `AGENTS.md` for the branch and PR policy.

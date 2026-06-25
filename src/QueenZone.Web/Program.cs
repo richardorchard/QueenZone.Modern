@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Identity.Web;
 using QueenZone.Data;
 using QueenZone.Web;
@@ -13,6 +14,12 @@ builder.Logging.AddConsole();
 if (!builder.Environment.IsEnvironment("Testing"))
 {
     builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
+}
+else
+{
+    // Avoid DPAPI-backed key persistence under the service profile, which is slow
+    // (and unnecessary for short-lived smoke test runs) on the self-hosted CI runner.
+    builder.Services.AddDataProtection().UseEphemeralDataProtectionProvider();
 }
 
 builder.Services.Configure<AdminOptions>(builder.Configuration.GetSection(AdminOptions.SectionName));
