@@ -59,15 +59,15 @@ public static class ForumRoutes
                 ? $"{value / 1_000.0:0.#}k+"
                 : value.ToString("N0");
 
-    public static string BuildCategoryPaginationNav(ForumCategoryItem category, int currentPage, int totalPages) =>
-        ArchivePagination.BuildNav(
+    public static ArchivePaginationViewModel? GetCategoryPaginationViewModel(ForumCategoryItem category, int currentPage, int totalPages) =>
+        ArchivePagination.BuildViewModel(
             "Forum topics pagination",
             currentPage,
             totalPages,
             page => GetCategoryCanonicalPath(category, page));
 
-    public static string BuildTopicPaginationNav(ForumTopicHeader header, int currentPage, int totalPages) =>
-        ArchivePagination.BuildNav(
+    public static ArchivePaginationViewModel? GetTopicPaginationViewModel(ForumTopicHeader header, int currentPage, int totalPages) =>
+        ArchivePagination.BuildViewModel(
             "Forum posts pagination",
             currentPage,
             totalPages,

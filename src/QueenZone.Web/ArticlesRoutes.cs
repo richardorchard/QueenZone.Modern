@@ -15,8 +15,8 @@ public static partial class ArticlesRoutes
     public static string GetArchivePageTitle(int page) =>
         page <= 1 ? "QueenZone articles" : $"QueenZone articles – Page {page}";
 
-    public static string BuildArchivePaginationNav(int currentPage, int totalPages) =>
-        ArchivePagination.BuildNav("Articles archive pagination", currentPage, totalPages, GetArchiveCanonicalPath);
+    public static ArchivePaginationViewModel? GetArchivePaginationViewModel(int currentPage, int totalPages) =>
+        ArchivePagination.BuildViewModel("Articles archive pagination", currentPage, totalPages, GetArchiveCanonicalPath);
 
     public static int ResolveArchiveTotalPages(int currentPage, int itemCount, int publishedCount, int totalPages) =>
         ArchivePagination.ResolveTotalPages(currentPage, itemCount, publishedCount, totalPages, ArchivePageSize);

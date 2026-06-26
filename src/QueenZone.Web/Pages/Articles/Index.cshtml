@@ -7,6 +7,6 @@
   <div class="qz-container">
     <partial name="_ArticlesArchiveList" model="Model.Items" />
 
-    @Html.Raw(ArticlesRoutes.BuildArchivePaginationNav(Model.CurrentPage, Model.TotalPages))
+    <partial name="_ArchivePagination" model="ArticlesRoutes.GetArchivePaginationViewModel(Model.CurrentPage, Model.TotalPages)" />
   </div>
 </section>

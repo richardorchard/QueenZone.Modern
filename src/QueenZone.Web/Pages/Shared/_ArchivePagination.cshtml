@@ -1,0 +1,44 @@
+@model QueenZone.Web.ArchivePaginationViewModel?
+@if (Model is not null)
+{
+  <nav class="archive-pagination" aria-label="@Model.AriaLabel">
+    <p class="archive-pagination-summary">Page @Model.CurrentPage of @Model.TotalPages</p>
+    <div class="archive-pagination-controls">
+      @if (Model.PreviousHref is null)
+      {
+        <span class="archive-pagination-prev is-disabled" aria-disabled="true">Previous</span>
+      }
+      else
+      {
+        <a class="archive-pagination-prev" rel="prev" href="@Model.PreviousHref">Previous</a>
+      }
+      <ol class="archive-pagination-pages">
+        @foreach (var pageLink in Model.Pages)
+        {
+          <li>
+            @if (pageLink.PageNumber is null)
+            {
+              <span class="archive-pagination-ellipsis" aria-hidden="true">…</span>
+            }
+            else if (pageLink.IsCurrent)
+            {
+              <span aria-current="page">@pageLink.PageNumber</span>
+            }
+            else
+            {
+              <a href="@pageLink.Href">@pageLink.PageNumber</a>
+            }
+          </li>
+        }
+      </ol>
+      @if (Model.NextHref is null)
+      {
+        <span class="archive-pagination-next is-disabled" aria-disabled="true">Next</span>
+      }
+      else
+      {
+        <a class="archive-pagination-next" rel="next" href="@Model.NextHref">Next</a>
+      }
+    </div>
+  </nav>
+}

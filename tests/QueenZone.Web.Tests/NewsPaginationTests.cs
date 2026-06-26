@@ -34,33 +34,35 @@ public sealed class NewsPaginationTests
     }
 
     [Fact]
-    public void BuildArchivePaginationNav_OmitsNavigationForSinglePageArchive()
+    public void GetArchivePaginationViewModel_OmitsNavigationForSinglePageArchive()
     {
-        Assert.Equal(string.Empty, NewsRoutes.BuildArchivePaginationNav(1, 1));
+        Assert.Null(NewsRoutes.GetArchivePaginationViewModel(1, 1));
     }
 
     [Fact]
-    public void BuildArchivePaginationNav_IncludesPreviousNextAndPageLinks()
+    public void GetArchivePaginationViewModel_IncludesPreviousNextAndPageLinks()
     {
-        var nav = NewsRoutes.BuildArchivePaginationNav(2, 4);
+        var nav = NewsRoutes.GetArchivePaginationViewModel(2, 4);
 
-        Assert.Contains("Page 2 of 4", nav);
-        Assert.Contains("archive-pagination-controls", nav);
-        Assert.Contains("archive-pagination-pages", nav);
-        Assert.Contains("rel=\"prev\" href=\"/news\"", nav);
-        Assert.Contains("href=\"/news/page/3\"", nav);
-        Assert.Contains("rel=\"next\" href=\"/news/page/3\"", nav);
-        Assert.Contains("aria-current=\"page\">2</span>", nav);
+        Assert.NotNull(nav);
+        Assert.Equal("News archive pagination", nav.AriaLabel);
+        Assert.Equal(2, nav.CurrentPage);
+        Assert.Equal(4, nav.TotalPages);
+        Assert.Equal("/news", nav.PreviousHref);
+        Assert.Equal("/news/page/3", nav.NextHref);
+        Assert.Contains(nav.Pages, p => p.PageNumber == 2 && p.IsCurrent && p.Href is null);
+        Assert.Contains(nav.Pages, p => p.PageNumber == 3 && !p.IsCurrent && p.Href == "/news/page/3");
     }
 
     [Fact]
-    public void BuildArchivePaginationNav_ShowsDisabledPreviousOnFirstPage()
+    public void GetArchivePaginationViewModel_ShowsDisabledPreviousOnFirstPage()
     {
-        var nav = NewsRoutes.BuildArchivePaginationNav(1, 3);
+        var nav = NewsRoutes.GetArchivePaginationViewModel(1, 3);
 
-        Assert.Contains("archive-pagination-prev is-disabled", nav);
-        Assert.Contains("rel=\"next\" href=\"/news/page/2\"", nav);
-        Assert.Contains("href=\"/news/page/2\"", nav);
+        Assert.NotNull(nav);
+        Assert.Null(nav.PreviousHref);
+        Assert.Equal("/news/page/2", nav.NextHref);
+        Assert.Contains(nav.Pages, p => p.PageNumber == 2 && p.Href == "/news/page/2");
     }
 
     [Theory]

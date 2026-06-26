@@ -23,12 +23,14 @@ public sealed class ArticlesPaginationTests
     }
 
     [Fact]
-    public void BuildArchivePaginationNav_IncludesPreviousNextAndPageLinks()
+    public void GetArchivePaginationViewModel_IncludesPreviousNextAndPageLinks()
     {
-        var nav = ArticlesRoutes.BuildArchivePaginationNav(2, 4);
+        var nav = ArticlesRoutes.GetArchivePaginationViewModel(2, 4);
 
-        Assert.Contains("Page 2 of 4", nav);
-        Assert.Contains("rel=\"prev\" href=\"/articles\"", nav);
-        Assert.Contains("rel=\"next\" href=\"/articles/page/3\"", nav);
+        Assert.NotNull(nav);
+        Assert.Equal(2, nav.CurrentPage);
+        Assert.Equal(4, nav.TotalPages);
+        Assert.Equal("/articles", nav.PreviousHref);
+        Assert.Equal("/articles/page/3", nav.NextHref);
     }
 }
