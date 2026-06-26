@@ -7,6 +7,8 @@ public sealed class IndexModel(IBiographyRepository biographyRepository) : PageM
 {
     public IReadOnlyList<BiographyChapterItem> Chapters { get; private set; } = [];
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; } = [BreadcrumbItem.Home, new BreadcrumbItem("Biography", "/biography")];
+
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
         Chapters = await biographyRepository.GetChaptersAsync(cancellationToken);

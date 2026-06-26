@@ -17,6 +17,8 @@ public abstract class ForumTopicPageModel(IForumRepository forumRepository) : Pa
 
     public int TotalPosts { get; private set; }
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
     protected async Task<IActionResult> LoadTopicPageAsync(
         int topicId,
         string slug,
@@ -62,6 +64,13 @@ public abstract class ForumTopicPageModel(IForumRepository forumRepository) : Pa
         CurrentPage = page;
         TotalPages = totalPages;
         TotalPosts = topicPage.TotalCount;
+        Breadcrumbs =
+        [
+            BreadcrumbItem.Home,
+            new BreadcrumbItem("Forum", "/forum"),
+            new BreadcrumbItem(topicPage.Header.ForumName.Trim(), ForumRoutes.GetCategoryCanonicalPath(topicPage.Header.ForumId, topicPage.Header.ForumName)),
+            new BreadcrumbItem(topicPage.Header.Title.Trim(), ForumRoutes.GetTopicCanonicalPath(topicPage.Header)),
+        ];
 
         ViewData["Title"] = ForumRoutes.GetTopicPageTitle(topicPage.Header, page);
         ViewData["CanonicalPath"] = ForumRoutes.GetTopicCanonicalPath(topicPage.Header, page);

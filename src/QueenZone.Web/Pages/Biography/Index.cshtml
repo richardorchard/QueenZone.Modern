@@ -5,6 +5,7 @@
 
 <section class="qz-section qz-bio-index">
   <div class="qz-container">
+    <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
     @if (Model.Chapters.Count == 0)
     {
       <p>No biography chapters are available yet.</p>

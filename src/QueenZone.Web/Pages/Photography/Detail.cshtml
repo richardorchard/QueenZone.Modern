@@ -2,6 +2,10 @@
 @model DetailModel
 
 <section class="qz-lightbox">
+  <div class="qz-breadcrumbs-on-dark">
+    <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
+  </div>
+
   <div class="qz-lightbox__header">
     <a class="qz-lightbox__back" href="@Model.BackToGridHref">&larr; Back to @Model.Category.Name</a>
     <span class="qz-lightbox__counter">@(Model.Index + 1) / @Model.Count</span>

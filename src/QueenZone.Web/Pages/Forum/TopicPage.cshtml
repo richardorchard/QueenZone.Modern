@@ -2,17 +2,12 @@
 @model TopicPageModel
 @{
   var header = Model.Header!;
-  var categoryPath = ForumRoutes.GetCategoryCanonicalPath(header.ForumId, header.ForumName);
 }
 
 <section class="qz-page-hero">
   <img class="qz-page-hero__crest" src="/design-system/assets/crest-white.png" alt="">
-  <div class="qz-container">
-    <div class="qz-eyebrow" style="color: var(--qz-gold);">
-      <a href="/forum" style="color: inherit;">Forum</a>
-      <span aria-hidden="true"> · </span>
-      <a href="@categoryPath" style="color: inherit;">@header.ForumName</a>
-    </div>
+  <div class="qz-container qz-breadcrumbs-on-dark">
+    <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
     <h1>@header.Title</h1>
     <div class="qz-forum-stats">
       <span><strong>@Model.TotalPosts.ToString("N0")</strong> posts</span>

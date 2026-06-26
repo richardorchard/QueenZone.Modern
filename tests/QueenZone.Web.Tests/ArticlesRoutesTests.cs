@@ -110,7 +110,9 @@ public sealed class ArticlesRoutesTests : IClassFixture<WebApplicationFactory<Pr
         var body = await client.GetStringAsync("/articles/101/inside-the-making-of-bohemian-rhapsody");
 
         Assert.Contains("Six weeks, three studios", body);
-        Assert.Contains("Back to articles archive", body);
+        Assert.Contains("qz-breadcrumbs", body);
+        Assert.Contains("href=\"/articles\">Articles</a>", body);
+        Assert.Contains("\"@type\":\"BreadcrumbList\"", body);
         Assert.Contains("Recording", body);
         Assert.Contains(TestSiteConfiguration.CanonicalLink("/articles/101/inside-the-making-of-bohemian-rhapsody"), body);
         Assert.Contains("<title>Inside the Making of Bohemian Rhapsody | QueenZone articles</title>", body);
