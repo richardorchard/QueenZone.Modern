@@ -26,7 +26,7 @@ public sealed class BiographyRoutesTests : IClassFixture<WebApplicationFactory<P
         Assert.Contains("/biography/5/1992", body);
         Assert.Contains("/biography/1/1946-1969", body);
         Assert.Contains("5 chapters", body);
-        Assert.Contains("<link rel=\"canonical\" href=\"/biography\">", body);
+        Assert.Contains(TestSiteConfiguration.CanonicalLink("/biography"), body);
         Assert.Contains("<title>QueenZone biography</title>", body);
 
         var newestIndex = body.IndexOf("/biography/5/1992", StringComparison.Ordinal);
@@ -58,7 +58,7 @@ public sealed class BiographyRoutesTests : IClassFixture<WebApplicationFactory<P
         Assert.Contains("Next Chapter", body);
         Assert.Contains("/biography/1/1946-1969", body);
         Assert.Contains("/biography/3/1975", body);
-        Assert.Contains("<link rel=\"canonical\" href=\"/biography/2/1970\">", body);
+        Assert.Contains(TestSiteConfiguration.CanonicalLink("/biography/2/1970"), body);
         Assert.Contains("<title>1970 | QueenZone biography</title>", body);
     }
 

@@ -45,7 +45,7 @@ public sealed class NewsRoutesTests : IClassFixture<WebApplicationFactory<Progra
 
         var body = await client.GetStringAsync("/news");
 
-        Assert.Contains("<link rel=\"canonical\" href=\"/news\">", body);
+        Assert.Contains(TestSiteConfiguration.CanonicalLink("/news"), body);
         Assert.Contains("<title>QueenZone news</title>", body);
         Assert.Contains("Page 1 of 2", body);
         Assert.DoesNotContain("QueenZone news – Page 1", body);
@@ -63,12 +63,12 @@ public sealed class NewsRoutesTests : IClassFixture<WebApplicationFactory<Progra
         Assert.DoesNotContain("/news/1003/queenzone-modernisation-begins", pageTwo);
         Assert.Contains("/news/1005/archive-sample-article-1005", pageTwo);
         Assert.DoesNotContain("/news/1005/archive-sample-article-1005", pageOne);
-        Assert.Contains("<link rel=\"canonical\" href=\"/news/page/2\">", pageTwo);
+        Assert.Contains(TestSiteConfiguration.CanonicalLink("/news/page/2"), pageTwo);
         Assert.Contains("<title>QueenZone news &#x2013; Page 2</title>", pageTwo);
         Assert.Contains("archive-pagination-controls", pageOne);
         Assert.Contains("archive-pagination-prev is-disabled", pageOne);
-        Assert.Contains("rel=\"next\" href=\"/news/page/2\"", pageOne);
-        Assert.Contains("rel=\"prev\" href=\"/news\"", pageTwo);
+        Assert.Contains(TestSiteConfiguration.NextLink("/news/page/2"), pageOne);
+        Assert.Contains(TestSiteConfiguration.PrevLink("/news"), pageTwo);
         Assert.Contains("archive-pagination-next is-disabled", pageTwo);
     }
 
@@ -106,7 +106,7 @@ public sealed class NewsRoutesTests : IClassFixture<WebApplicationFactory<Progra
         var response = await client.GetAsync("/news/page/2");
 
         Assert.Contains("No published news is available yet.", body);
-        Assert.Contains("<link rel=\"canonical\" href=\"/news\">", body);
+        Assert.Contains(TestSiteConfiguration.CanonicalLink("/news"), body);
         Assert.Equal(System.Net.HttpStatusCode.NotFound, response.StatusCode);
     }
 
@@ -131,7 +131,7 @@ public sealed class NewsRoutesTests : IClassFixture<WebApplicationFactory<Progra
         Assert.Contains("The first local vertical slice", body);
         Assert.Contains("Back to news archive", body);
         Assert.Contains("<time datetime=\"2026-06-11\">", body);
-        Assert.Contains("<link rel=\"canonical\" href=\"/news/1003/queenzone-modernisation-begins\">", body);
+        Assert.Contains(TestSiteConfiguration.CanonicalLink("/news/1003/queenzone-modernisation-begins"), body);
         Assert.Contains("<meta name=\"description\" content=\"The first local vertical slice", body);
         Assert.Contains("<title>QueenZone modernisation begins | QueenZone news</title>", body);
     }
