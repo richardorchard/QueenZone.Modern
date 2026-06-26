@@ -12,6 +12,8 @@ public sealed class DetailModel(IBiographyRepository biographyRepository) : Page
 
     public int ChapterIndex { get; private set; }
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
     public async Task<IActionResult> OnGetAsync(int id, string slug, CancellationToken cancellationToken)
     {
         var chapter = await biographyRepository.GetByIdAsync(id, cancellationToken);
@@ -31,6 +33,7 @@ public sealed class DetailModel(IBiographyRepository biographyRepository) : Page
         ChapterIndex = readingOrder.ToList().FindIndex(item => item.Id == id);
 
         Chapter = chapter;
+        Breadcrumbs = [BreadcrumbItem.Home, new BreadcrumbItem("Biography", "/biography"), new BreadcrumbItem(chapter.Title, BiographyRoutes.GetChapterDetailPath(chapter))];
         Navigation = await biographyRepository.GetAdjacentChaptersAsync(id, cancellationToken);
         ViewData["Title"] = $"{chapter.Title} | QueenZone biography";
         ViewData["CanonicalPath"] = BiographyContent.GetDetailCanonicalPath(chapter);

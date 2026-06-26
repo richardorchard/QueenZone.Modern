@@ -20,6 +20,8 @@ public sealed class DetailModel(IPhotoRepository photoRepository) : PageModel
 
     public string BackToGridHref { get; private set; } = string.Empty;
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
     public async Task<IActionResult> OnGetAsync(string slug, int picId, CancellationToken cancellationToken)
     {
         var category = await photoRepository.GetCategoryBySlugAsync(slug, cancellationToken);
@@ -45,6 +47,14 @@ public sealed class DetailModel(IPhotoRepository photoRepository) : PageModel
 
         var page = (index / PhotoRoutes.CategoryPageSize) + 1;
         BackToGridHref = PhotoRoutes.GetCategoryPagePath(category.Slug, page);
+
+        Breadcrumbs =
+        [
+            BreadcrumbItem.Home,
+            new BreadcrumbItem("Photography", PhotoRoutes.GetCategoriesPath()),
+            new BreadcrumbItem(category.Name, PhotoRoutes.GetCategoryPath(category.Slug)),
+            new BreadcrumbItem(Photo.Title, PhotoRoutes.GetDetailPath(category.Slug, Photo.PicId)),
+        ];
 
         ViewData["Title"] = $"{Photo.Title} | {category.Name} | Photography | QueenZone";
 

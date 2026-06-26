@@ -1,6 +1,8 @@
 @page "/news/page/{pageNumber:int}"
 @model ArchivePageModel
 
+<partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
+
 <h1>News archive</h1>
 
 <partial name="_NewsArchiveList" model="Model.Items" />

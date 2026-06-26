@@ -1,0 +1,26 @@
+@using Microsoft.Extensions.Options
+@model IReadOnlyList<BreadcrumbItem>
+@inject IOptions<SiteOptions> SiteOptionsAccessor
+@if (Model is { Count: > 1 })
+{
+  <nav class="qz-breadcrumbs" aria-label="Breadcrumb">
+    <ol>
+      @for (var i = 0; i < Model.Count; i++)
+      {
+        var item = Model[i];
+        var isCurrent = i == Model.Count - 1;
+        <li>
+          @if (isCurrent)
+          {
+            <span aria-current="page">@item.Label</span>
+          }
+          else
+          {
+            <a href="@item.Href">@item.Label</a>
+          }
+        </li>
+      }
+    </ol>
+  </nav>
+  @Html.Raw($"""<script type="application/ld+json">{BreadcrumbJsonLd.Build(Model, SiteOptionsAccessor.Value.PublicBaseUrl)}</script>""")
+}

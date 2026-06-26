@@ -5,8 +5,8 @@
 {
   <section class="qz-article-hero">
     <img src="/design-system/assets/img-hero.jpg" alt="">
-    <div class="qz-container qz-article-hero__content">
-      <p class="article-nav"><a class="qz-button qz-button--ghost" style="color: var(--qz-white);" href="/articles">Back to articles archive</a></p>
+    <div class="qz-container qz-article-hero__content qz-breadcrumbs-on-dark">
+      <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
       @if (!string.IsNullOrWhiteSpace(Model.Item.CategoryName))
       {
         <div class="qz-eyebrow" style="color: var(--qz-gold);">@Model.Item.CategoryName</div>

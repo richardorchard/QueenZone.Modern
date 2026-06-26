@@ -129,7 +129,10 @@ public sealed class NewsRoutesTests : IClassFixture<WebApplicationFactory<Progra
         var body = await client.GetStringAsync("/news/1003/queenzone-modernisation-begins");
 
         Assert.Contains("The first local vertical slice", body);
-        Assert.Contains("Back to news archive", body);
+        Assert.Contains("qz-breadcrumbs", body);
+        Assert.Contains("href=\"/news\">News</a>", body);
+        Assert.Contains("aria-current=\"page\">QueenZone modernisation begins</span>", body);
+        Assert.Contains("\"@type\":\"BreadcrumbList\"", body);
         Assert.Contains("<time datetime=\"2026-06-11\">", body);
         Assert.Contains(TestSiteConfiguration.CanonicalLink("/news/1003/queenzone-modernisation-begins"), body);
         Assert.Contains("<meta name=\"description\" content=\"The first local vertical slice", body);

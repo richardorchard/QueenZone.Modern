@@ -5,7 +5,7 @@
 
 <section class="qz-section">
   <div class="qz-container">
-    <p><a class="qz-button qz-button--ghost" href="@PhotoRoutes.GetCategoriesPath()">&larr; All collections</a></p>
+    <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
     <p class="qz-photo-range">Showing @Model.RangeStart&ndash;@Model.RangeEnd of @Model.TotalCount</p>
     <partial name="_PhotoThumbnailGrid" model="Model.Items" />
     <partial name="_ArchivePagination" model="PhotoRoutes.GetCategoryPaginationViewModel(Model.Category.Slug, Model.CurrentPage, Model.TotalPages)" />

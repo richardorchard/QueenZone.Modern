@@ -8,6 +8,8 @@ public sealed class DetailModel(IArticlesRepository articlesRepository) : PageMo
 {
     public ArticleItem? Item { get; private set; }
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
     public async Task<IActionResult> OnGetAsync(int id, string slug, CancellationToken cancellationToken)
     {
         var item = await articlesRepository.GetByIdAsync(id, cancellationToken);
@@ -23,6 +25,7 @@ public sealed class DetailModel(IArticlesRepository articlesRepository) : PageMo
         }
 
         Item = item;
+        Breadcrumbs = [BreadcrumbItem.Home, new BreadcrumbItem("Articles", "/articles"), new BreadcrumbItem(item.Title, ArticlesRoutes.GetArticleDetailPath(item))];
         ViewData["Title"] = $"{item.Title} | QueenZone articles";
         ViewData["CanonicalPath"] = ArticleContent.GetDetailCanonicalPath(item.Id, item.Title);
         ViewData["Description"] = item.Excerpt;

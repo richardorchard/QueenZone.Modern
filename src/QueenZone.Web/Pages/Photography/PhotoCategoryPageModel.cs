@@ -20,6 +20,8 @@ public abstract class PhotoCategoryPageModel(IPhotoRepository photoRepository) :
 
     public int RangeEnd { get; private set; }
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
     protected async Task<IActionResult> LoadCategoryPageAsync(string slug, int page, CancellationToken cancellationToken)
     {
         if (page < 1)
@@ -48,6 +50,7 @@ public abstract class PhotoCategoryPageModel(IPhotoRepository photoRepository) :
         TotalCount = result.TotalCount;
         RangeStart = result.TotalCount == 0 ? 0 : ((page - 1) * PhotoRoutes.CategoryPageSize) + 1;
         RangeEnd = result.TotalCount == 0 ? 0 : RangeStart + result.Items.Count - 1;
+        Breadcrumbs = [BreadcrumbItem.Home, new BreadcrumbItem("Photography", PhotoRoutes.GetCategoriesPath()), new BreadcrumbItem(category.Name, PhotoRoutes.GetCategoryPath(category.Slug))];
 
         ViewData["Title"] = page <= 1 ? $"{category.Name} | Photography | QueenZone" : $"{category.Name} | Photography – Page {page} | QueenZone";
         ViewData["CanonicalPath"] = PhotoRoutes.GetCategoryPagePath(category.Slug, page);

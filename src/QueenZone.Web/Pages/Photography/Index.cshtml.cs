@@ -9,6 +9,8 @@ public sealed class IndexModel(IPhotoRepository photoRepository) : PageModel
 
     public IReadOnlyDictionary<int, string> CoverImageUrls { get; private set; } = new Dictionary<int, string>();
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; } = [BreadcrumbItem.Home, new BreadcrumbItem("Photography", PhotoRoutes.GetCategoriesPath())];
+
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
         Categories = await photoRepository.GetCategoriesAsync(cancellationToken);

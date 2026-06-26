@@ -5,7 +5,7 @@
 
 <section class="qz-section">
   <div class="qz-container">
-    <p><a class="qz-button qz-button--ghost" href="@PhotoRoutes.GetCategoriesPath()">&larr; All collections</a></p>
+    <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
     @if (Model.TotalCount == 0)
     {
       <p>No images are available in this collection yet.</p>

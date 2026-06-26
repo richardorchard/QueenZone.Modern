@@ -9,6 +9,8 @@ public sealed class ForumModel(IForumRepository forumRepository) : PageModel
 
     public IReadOnlyList<ForumCategoryItem> Categories { get; private set; } = Array.Empty<ForumCategoryItem>();
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; } = [BreadcrumbItem.Home, new BreadcrumbItem("Forum", "/forum")];
+
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
         Categories = await forumRepository.GetCategoriesAsync(cancellationToken);
