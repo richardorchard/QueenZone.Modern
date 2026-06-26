@@ -1071,16 +1071,14 @@ body.qz-menu-lock {
 .qz-photo-thumb img {
   width: 100%;
   aspect-ratio: 1 / 1;
-  object-fit: cover;
+  object-fit: contain;
   border-radius: var(--radius-sm);
   background: var(--qz-grey-200);
-  filter: grayscale(1);
-  transition: transform var(--dur-fast) var(--ease-out), filter var(--dur-fast) var(--ease-out);
+  transition: transform var(--dur-fast) var(--ease-out);
 }
 
 .qz-photo-thumb:hover img {
   transform: translateY(-3px);
-  filter: grayscale(0);
 }
 
 .qz-photo-thumb figcaption {
