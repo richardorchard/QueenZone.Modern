@@ -51,6 +51,25 @@ public sealed class LegacyForumRepository(string connectionString) : IForumRepos
         FROM dbUser.Q_FORUM_TOPIC_THREAD_COUNT_V
         """;
 
+    private const string TopicSitemapCountSelect = """
+        SELECT COUNT(*)
+        FROM Q_FORUM_TOPIC_T
+        WHERE Q_FORUM_TOPIC_PARENT_ID = 0
+          AND LTRIM(RTRIM(ISNULL(TOPIC_SUBJECT, ''))) <> ''
+        """;
+
+    private const string TopicSitemapPageSelect = """
+        SELECT
+            t.Q_FORUM_TOPIC_ID AS TopicId,
+            LTRIM(RTRIM(t.TOPIC_SUBJECT)) AS Title,
+            t.TOPIC_LAST_POST AS LastActivityAt
+        FROM Q_FORUM_TOPIC_T t
+        WHERE t.Q_FORUM_TOPIC_PARENT_ID = 0
+          AND LTRIM(RTRIM(ISNULL(t.TOPIC_SUBJECT, ''))) <> ''
+        ORDER BY t.Q_FORUM_TOPIC_ID ASC
+        OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY
+        """;
+
     public async Task<IReadOnlyList<ForumCategoryItem>> GetCategoriesAsync(CancellationToken cancellationToken = default)
     {
         await using var connection = new SqlConnection(connectionString);
@@ -167,6 +186,36 @@ public sealed class LegacyForumRepository(string connectionString) : IForumRepos
         return ForumArchiveStats.FromCategories(categories, threadCount);
     }
 
+    public async Task<int> GetTopicSitemapCountAsync(CancellationToken cancellationToken = default)
+    {
+        await using var connection = new SqlConnection(connectionString);
+        var command = new CommandDefinition(
+            TopicSitemapCountSelect,
+            cancellationToken: cancellationToken,
+            commandTimeout: CommandTimeoutSeconds);
+        return await connection.ExecuteScalarAsync<int>(command);
+    }
+
+    public async Task<IReadOnlyList<ForumTopicSitemapItem>> GetTopicSitemapPageAsync(
+        int offset,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = new SqlConnection(connectionString);
+        var command = new CommandDefinition(
+            TopicSitemapPageSelect,
+            new { Offset = Math.Max(offset, 0), PageSize = pageSize },
+            cancellationToken: cancellationToken,
+            commandTimeout: CommandTimeoutSeconds);
+        var rows = await connection.QueryAsync<ForumTopicSitemapRow>(command);
+        return rows
+            .Select(row => new ForumTopicSitemapItem(
+                row.TopicId,
+                row.Title?.Trim() ?? string.Empty,
+                row.LastActivityAt))
+            .ToList();
+    }
+
     private static ForumCategoryItem Map(ForumCategoryRow row) =>
         new(
             row.Id,
@@ -233,4 +282,9 @@ public sealed class LegacyForumRepository(string connectionString) : IForumRepos
         DateTime? LastActivityAt,
         string? LatestThreadTitle,
         int SortOrder);
+
+    private sealed record ForumTopicSitemapRow(
+        int TopicId,
+        string? Title,
+        DateTime? LastActivityAt);
 }

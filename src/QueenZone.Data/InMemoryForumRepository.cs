@@ -52,4 +52,19 @@ public sealed class InMemoryForumRepository(
 
     public Task<ForumArchiveStats> GetArchiveStatsAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(seedStats);
+
+    public Task<int> GetTopicSitemapCountAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(SampleForumData.CreateSeedTopicSitemapItems().Count);
+
+    public Task<IReadOnlyList<ForumTopicSitemapItem>> GetTopicSitemapPageAsync(
+        int offset,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        var page = SampleForumData.CreateSeedTopicSitemapItems()
+            .Skip(Math.Max(offset, 0))
+            .Take(pageSize)
+            .ToList();
+        return Task.FromResult<IReadOnlyList<ForumTopicSitemapItem>>(page);
+    }
 }
