@@ -154,6 +154,16 @@ public static class SampleForumData
         return [];
     }
 
+    public static IReadOnlyList<ForumTopicSitemapItem> CreateSeedTopicSitemapItems()
+    {
+        return CreateSeedCategories()
+            .SelectMany(category => CreateSeedTopics(category.Id))
+            .Where(topic => !string.IsNullOrWhiteSpace(topic.Title))
+            .OrderBy(topic => topic.Id)
+            .Select(topic => new ForumTopicSitemapItem(topic.Id, topic.Title, topic.LastActivityAt))
+            .ToList();
+    }
+
     public static ForumTopicHeader? TryGetSeedTopicHeader(int topicId)
     {
         var topics = CreateSeedTopics(1).Concat(CreateSeedTopics(2)).ToList();

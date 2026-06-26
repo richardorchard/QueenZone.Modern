@@ -29,6 +29,8 @@ builder.Services.Configure<SitemapOptions>(builder.Configuration.GetSection(Site
 builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<CoreSitemapBuilder>();
 builder.Services.AddSingleton<CoreSitemapService>();
+builder.Services.AddSingleton<ForumSitemapBuilder>();
+builder.Services.AddSingleton<SitemapIndexBuilder>();
 builder.Services.AddAntiforgery();
 
 var legacyConnectionString = builder.Configuration.GetConnectionString("QueenZoneLegacy");

@@ -21,4 +21,11 @@ public interface IForumRepository
     Task<int> GetTotalThreadCountAsync(CancellationToken cancellationToken = default);
 
     Task<ForumArchiveStats> GetArchiveStatsAsync(CancellationToken cancellationToken = default);
+
+    Task<int> GetTopicSitemapCountAsync(CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<ForumTopicSitemapItem>> GetTopicSitemapPageAsync(
+        int offset,
+        int pageSize,
+        CancellationToken cancellationToken = default);
 }

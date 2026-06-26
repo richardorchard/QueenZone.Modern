@@ -27,7 +27,7 @@ public sealed class SitemapEndpointsTests : IClassFixture<WebApplicationFactory<
     }
 
     [Fact]
-    public async Task SitemapIndex_ReferencesCoreSitemap()
+    public async Task SitemapIndex_ReferencesCoreAndForumChildSitemaps()
     {
         var client = factory.CreateClient();
 
@@ -40,8 +40,37 @@ public sealed class SitemapEndpointsTests : IClassFixture<WebApplicationFactory<
             .Select(element => element.Value)
             .ToList();
 
-        Assert.Single(locations);
+        Assert.Equal(2, locations.Count);
         Assert.Equal($"{BaseUrl}/sitemap-core.xml", locations[0]);
+        Assert.Equal($"{BaseUrl}/sitemap-forum-1.xml", locations[1]);
+    }
+
+    [Fact]
+    public async Task ForumSitemap_IncludesStarterThreadCanonicalUrlsOnly()
+    {
+        var client = factory.CreateClient();
+
+        var xml = await client.GetStringAsync("/sitemap-forum-1.xml");
+        var document = XDocument.Parse(xml);
+        XNamespace ns = "http://www.sitemaps.org/schemas/sitemap/0.9";
+
+        var locations = document
+            .Descendants(ns + "loc")
+            .Select(element => element.Value)
+            .ToList();
+
+        Assert.Contains($"{BaseUrl}/forum/topic/1002/ranking-every-studio-album", locations);
+        Assert.DoesNotContain(locations, location => location.Contains("/page/", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ForumSitemap_ReturnsNotFoundForOutOfRangeFileNumber()
+    {
+        var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/sitemap-forum-2.xml");
+
+        Assert.Equal(System.Net.HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Fact]

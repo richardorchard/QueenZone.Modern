@@ -22,12 +22,29 @@ public static class SitemapEndpoints
             return Results.Text(body, "text/plain");
         });
 
-        app.MapGet("/sitemap.xml", (IOptions<SiteOptions> options) =>
+        app.MapGet("/sitemap.xml", async (
+            SitemapIndexBuilder indexBuilder,
+            IOptions<SiteOptions> options,
+            CancellationToken cancellationToken) =>
         {
-            var xml = SitemapXmlWriter.WriteSitemapIndex(
-                [new SitemapIndexEntry("/sitemap-core.xml", DateTime.UtcNow)],
-                options.Value.PublicBaseUrl);
+            var entries = await indexBuilder.BuildAsync(cancellationToken);
+            var xml = SitemapXmlWriter.WriteSitemapIndex(entries, options.Value.PublicBaseUrl);
+            return Results.Content(xml, "application/xml; charset=utf-8");
+        });
 
+        app.MapGet("/sitemap-forum-{fileNumber:int}.xml", async (
+            int fileNumber,
+            ForumSitemapBuilder builder,
+            IOptions<SiteOptions> options,
+            CancellationToken cancellationToken) =>
+        {
+            var entries = await builder.BuildFileAsync(fileNumber, cancellationToken);
+            if (entries is null || entries.Count == 0)
+            {
+                return Results.NotFound();
+            }
+
+            var xml = SitemapXmlWriter.WriteUrlSet(entries, options.Value.PublicBaseUrl);
             return Results.Content(xml, "application/xml; charset=utf-8");
         });
 
