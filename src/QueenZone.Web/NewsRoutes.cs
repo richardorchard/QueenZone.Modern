@@ -15,8 +15,8 @@ public static partial class NewsRoutes
     public static string GetArchivePageTitle(int page) =>
         page <= 1 ? "QueenZone news" : $"QueenZone news – Page {page}";
 
-    public static string BuildArchivePaginationNav(int currentPage, int totalPages) =>
-        ArchivePagination.BuildNav("News archive pagination", currentPage, totalPages, GetArchiveCanonicalPath);
+    public static ArchivePaginationViewModel? GetArchivePaginationViewModel(int currentPage, int totalPages) =>
+        ArchivePagination.BuildViewModel("News archive pagination", currentPage, totalPages, GetArchiveCanonicalPath);
 
     public static string Slugify(string value) => NewsSlug.Slugify(value);
 

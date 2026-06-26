@@ -25,6 +25,6 @@
   <div class="qz-container">
     <partial name="_SectionHeader" model="@(("Thread", "Posts in chronological order", false, (string?)null, (string?)null))" />
     <partial name="_ForumPostList" model="Model.Posts" />
-    @Html.Raw(ForumRoutes.BuildTopicPaginationNav(header, Model.CurrentPage, Model.TotalPages))
+    <partial name="_ArchivePagination" model="ForumRoutes.GetTopicPaginationViewModel(header, Model.CurrentPage, Model.TotalPages)" />
   </div>
 </section>
