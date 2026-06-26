@@ -1,0 +1,27 @@
+@page "/photography"
+@model IndexModel
+
+<partial name="_PageHero" model='@(("The Photographic Archive", "Photography", "Restored photographs, contact sheets and archive image collections, organised by collection.", $"{Model.Categories.Sum(c => c.ImageCount):N0}+ images"))' />
+
+<section class="qz-section">
+  <div class="qz-container">
+    <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
+    <div class="qz-photo-cat-grid">
+      @foreach (var category in Model.Categories)
+      {
+        <a class="qz-photo-cat-card" href="@PhotoRoutes.GetCategoryPath(category.Slug)">
+          <div class="qz-photo-cat-card__media">
+            @if (Model.CoverImageUrls.TryGetValue(category.CatId, out var coverUrl))
+            {
+              <img src="@coverUrl" alt="" loading="lazy">
+            }
+          </div>
+          <div class="qz-photo-cat-card__overlay">
+            <h2>@category.Name</h2>
+            <span class="qz-photo-cat-card__count">@category.ImageCount.ToString("N0") @(category.ImageCount == 1 ? "image" : "images")</span>
+          </div>
+        </a>
+      }
+    </div>
+  </div>
+</section>

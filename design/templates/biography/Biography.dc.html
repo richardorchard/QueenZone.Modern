@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<!-- @template name="Biography" description="The story of Queen as an editorial timeline — year-marked chapters with summaries opening to long-form chapter pages with drop-cap, pull-quote and key events." -->
+<helmet>
+<script src="./ds-base.js"></script>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--qz-white)}
+  @keyframes qzRise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+  @media (prefers-reduced-motion: reduce){*{animation:none !important}}
+</style>
+</helmet>
+
+<div style="background:var(--qz-white);font-family:var(--font-body);color:var(--text-primary);min-height:100vh">
+
+  <!-- ===================== TIMELINE / LIST VIEW ===================== -->
+  <sc-if value="{{ isList }}" hint-placeholder-val="{{ true }}">
+  <div style="animation:qzRise var(--dur-base) var(--ease-out)">
+
+    <section style="background:var(--qz-black);position:relative;overflow:hidden">
+      <img src="../../assets/crest-white.png" alt="" style="position:absolute;right:-70px;top:-60px;width:340px;opacity:0.06;pointer-events:none"/>
+      <div style="max-width:var(--container-max);margin:0 auto;padding:clamp(56px,8vw,88px) var(--gutter-lg) clamp(46px,6vw,62px);position:relative">
+        <div style="font-family:var(--font-titling);font-size:12px;font-weight:600;letter-spacing:0.22em;text-transform:uppercase;color:var(--qz-gold);margin-bottom:18px">The Queenzone.com Archive</div>
+        <h1 style="font:500 clamp(42px,6.4vw,68px)/1.0 var(--font-display);letter-spacing:-0.015em;color:var(--qz-white);margin:0">Biography</h1>
+        <p style="font:400 clamp(16px,1.6vw,19px)/1.6 var(--font-body);color:rgba(255,255,255,0.7);margin:22px 0 0;max-width:600px">The story of Queen, told in ten chapters — from a London college band to one of the most enduring acts in the history of recorded music.</p>
+        <div style="font:500 13px/1 var(--font-body);text-transform:uppercase;letter-spacing:0.1em;color:rgba(255,255,255,0.45);margin-top:28px">{{ count }}</div>
+      </div>
+    </section>
+
+    <section style="max-width:var(--container-max);margin:0 auto;padding:clamp(40px,5vw,68px) var(--gutter-lg) clamp(72px,9vw,112px)">
+      <sc-for list="{{ chapters }}" as="ch" hint-placeholder-count="6">
+        <a href="#" onClick="{{ ch.onOpen }}" style="display:flex;flex-wrap:wrap;gap:8px clamp(28px,4vw,56px);text-decoration:none;padding:clamp(28px,3.6vw,44px) 4px;border-top:1px solid var(--hairline)" style-hover="background:var(--qz-grey-50)">
+          <div style="flex:0 0 170px">
+            <div style="font-family:var(--font-titling);font-size:11px;font-weight:600;letter-spacing:0.2em;text-transform:uppercase;color:var(--accent-archive)">Chapter {{ ch.numeral }}</div>
+            <div style="font:500 clamp(30px,3.4vw,40px)/1.04 var(--font-display);color:var(--text-primary);margin-top:10px;letter-spacing:-0.01em">{{ ch.range }}</div>
+          </div>
+          <div style="flex:1 1 360px;min-width:0">
+            <h2 style="font:500 clamp(24px,2.8vw,32px)/1.16 var(--font-display);color:var(--text-primary);margin:0;letter-spacing:-0.01em">{{ ch.title }}</h2>
+            <p style="font:400 clamp(15px,1.6vw,17px)/1.62 var(--font-body);color:var(--text-secondary);margin:12px 0 18px;max-width:600px">{{ ch.summary }}</p>
+            <span style="display:inline-flex;align-items:center;gap:9px;font:500 12px/1 var(--font-body);text-transform:uppercase;letter-spacing:0.1em;color:var(--link)">
+              Read the chapter
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+            </span>
+          </div>
+        </a>
+      </sc-for>
+      <div style="border-top:1px solid var(--hairline)"></div>
+    </section>
+  </div>
+  </sc-if>
+
+  <!-- ===================== CHAPTER DETAIL VIEW ===================== -->
+  <sc-if value="{{ isDetail }}">
+  <article style="animation:qzRise var(--dur-base) var(--ease-out)">
+
+    <section style="background:var(--qz-black);position:relative;overflow:hidden">
+      <img src="../../assets/crest-white.png" alt="" style="position:absolute;right:-80px;bottom:-90px;width:360px;opacity:0.05;pointer-events:none"/>
+      <div style="max-width:var(--container-text);margin:0 auto;padding:30px var(--gutter-lg) clamp(44px,6vw,68px);position:relative">
+        <a href="#" onClick="{{ onBack }}" style="display:inline-flex;align-items:center;gap:9px;text-decoration:none;font:500 12px/1 var(--font-body);text-transform:uppercase;letter-spacing:0.12em;color:rgba(255,255,255,0.6);margin-bottom:clamp(32px,5vw,52px);transition:color var(--dur-fast) var(--ease-out)" style-hover="color:var(--qz-white)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+          Biography
+        </a>
+        <div style="font-family:var(--font-titling);font-size:11px;font-weight:600;letter-spacing:0.22em;text-transform:uppercase;color:var(--qz-gold);margin-bottom:16px">Chapter {{ cur.numeral }} · {{ cur.range }}</div>
+        <h1 style="font:500 clamp(36px,5.2vw,58px)/1.02 var(--font-display);letter-spacing:-0.015em;color:var(--qz-white);margin:0;max-width:680px">{{ cur.title }}</h1>
+        <p style="font:400 clamp(17px,1.7vw,21px)/1.6 var(--font-display);color:rgba(255,255,255,0.82);margin:24px 0 0;max-width:600px">{{ cur.summary }}</p>
+      </div>
+    </section>
+
+    <div style="max-width:var(--container-text);margin:0 auto;padding:clamp(40px,5vw,64px) var(--gutter-lg) clamp(64px,8vw,104px)">
+      <div style="display:flex;align-items:center;gap:14px;padding-bottom:26px;margin-bottom:38px;border-bottom:1px solid var(--hairline)">
+        <div style="font:500 12px/1 var(--font-body);text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted)">{{ cur.range }}</div>
+        <div style="width:4px;height:4px;border-radius:50%;background:var(--qz-grey-300)"></div>
+        <div style="font:500 12px/1 var(--font-body);text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted)">{{ cur.readtime }}</div>
+      </div>
+
+      <div>
+        <sc-for list="{{ body }}" as="para" hint-placeholder-count="4">
+          <p style="font:400 clamp(17px,1.5vw,18px)/1.78 var(--font-body);color:var(--qz-grey-700);margin:0 0 26px">
+            <sc-if value="{{ para.drop }}"><span style="float:left;font:500 76px/0.78 var(--font-display);color:var(--qz-charcoal);margin:7px 14px 0 0">{{ para.lead }}</span></sc-if>{{ para.text }}
+          </p>
+        </sc-for>
+      </div>
+
+      <blockquote style="margin:clamp(36px,4vw,52px) 0;padding:clamp(24px,3vw,34px) 0;border-top:1px solid var(--hairline);border-bottom:1px solid var(--hairline)">
+        <p style="font:500 clamp(24px,3vw,32px)/1.32 var(--font-display);color:var(--qz-charcoal);margin:0;letter-spacing:-0.01em">{{ cur.quote }}</p>
+        <cite style="display:block;font:500 12px/1 var(--font-body);font-style:normal;text-transform:uppercase;letter-spacing:0.12em;color:var(--accent-archive);margin-top:18px">{{ cur.quoteBy }}</cite>
+      </blockquote>
+
+      <div style="font-family:var(--font-titling);font-size:12px;font-weight:600;letter-spacing:0.22em;text-transform:uppercase;color:var(--accent-archive);margin:0 0 22px">Key Moments</div>
+      <ul style="list-style:none;margin:0 0 8px;padding:0">
+        <sc-for list="{{ cur.events }}" as="ev" hint-placeholder-count="3">
+          <li style="display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 22px;padding:16px 0;border-bottom:1px solid var(--qz-grey-100)">
+            <span style="flex:0 0 64px;font-family:var(--font-titling);font-size:14px;font-weight:600;letter-spacing:0.08em;color:var(--text-primary)">{{ ev.year }}</span>
+            <span style="flex:1 1 320px;font:400 16px/1.5 var(--font-body);color:var(--text-secondary)">{{ ev.text }}</span>
+          </li>
+        </sc-for>
+      </ul>
+    </div>
+
+    <nav style="border-top:1px solid var(--hairline);max-width:var(--container-max);margin:0 auto;padding:0 var(--gutter-lg)">
+      <div style="display:flex;flex-wrap:wrap;gap:1px;background:var(--hairline)">
+        <a href="#" onClick="{{ onPrev }}" style="flex:1 1 280px;background:var(--qz-white);text-decoration:none;padding:clamp(28px,3.4vw,40px) clamp(8px,2vw,24px);transition:background var(--dur-fast) var(--ease-out)" style-hover="background:var(--qz-grey-50)">
+          <sc-if value="{{ hasPrev }}" hint-placeholder-val="{{ true }}">
+            <div style="display:inline-flex;align-items:center;gap:8px;font:500 11px/1 var(--font-body);text-transform:uppercase;letter-spacing:0.12em;color:var(--text-muted);margin-bottom:12px">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+              Previous Chapter
+            </div>
+            <div style="font:500 clamp(20px,2.2vw,26px)/1.2 var(--font-display);color:var(--text-primary);letter-spacing:-0.01em">{{ prevTitle }}</div>
+          </sc-if>
+        </a>
+        <a href="#" onClick="{{ onNext }}" style="flex:1 1 280px;background:var(--qz-white);text-decoration:none;padding:clamp(28px,3.4vw,40px) clamp(8px,2vw,24px);text-align:right;transition:background var(--dur-fast) var(--ease-out)" style-hover="background:var(--qz-grey-50)">
+          <sc-if value="{{ hasNext }}" hint-placeholder-val="{{ true }}">
+            <div style="display:inline-flex;align-items:center;gap:8px;font:500 11px/1 var(--font-body);text-transform:uppercase;letter-spacing:0.12em;color:var(--text-muted);margin-bottom:12px">
+              Next Chapter
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+            </div>
+            <div style="font:500 clamp(20px,2.2vw,26px)/1.2 var(--font-display);color:var(--text-primary);letter-spacing:-0.01em">{{ nextTitle }}</div>
+          </sc-if>
+        </a>
+      </div>
+    </nav>
+  </article>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1280,&quot;height&quot;:900},&quot;numerals&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;roman&quot;,&quot;arabic&quot;],&quot;default&quot;:&quot;roman&quot;,&quot;tsType&quot;:&quot;'roman' | 'arabic'&quot;}}">
+class Component extends DCLogic {
+  state = { view: 'list', selected: 0 };
+
+  data = [
+    { range:"1970–1973", title:"The Formation of a Band", roma:"I",
+      summary:"From the ashes of Smile, a guitarist, a drummer and an art-student singer found their final shape — and a name nobody else would have dared to choose.",
+      quote:"It's a strong name, very universal and very regal — and it has a lot of visual potential.", quoteBy:"On the name 'Queen'",
+      readtime:"6 min read",
+      body:[
+        "When the band Smile lost its singer in 1970, guitarist Brian May and drummer Roger Taylor were left with songs and no voice for them. The voice arrived in the form of a flamboyant art student, born Farrokh Bulsara, who had been quietly studying them from the wings — and who promptly renamed himself Freddie Mercury and the group Queen.",
+        "The line-up was completed in early 1971 when bassist John Deacon, the quietest and most technically minded of the four, answered an advertisement. With that, the chemistry was set: two virtuoso instrumentalists, an inventive rhythm section, and a frontman of limitless theatrical ambition.",
+        "They spent two years sharpening their craft in and around London, recording in stolen night-time hours at Trident Studios in exchange for cleaning and odd jobs. The self-titled debut, released in July 1973, announced a band already certain of its identity — heavy, ornate, and unafraid of grandeur.",
+        "It was not yet a commercial breakthrough, but it drew a line in the sand. Queen had arrived fully formed, and they had no intention of sounding like anyone else."
+      ],
+      events:[
+        { year:"1970", text:"Freddie Mercury joins May and Taylor; the band is named Queen." },
+        { year:"1971", text:"John Deacon completes the classic line-up on bass." },
+        { year:"1973", text:"The debut album 'Queen' is released on EMI." }
+      ] },
+    { range:"1974–1975", title:"Breakthrough", roma:"II",
+      summary:"Two albums in a single year carried Queen from promising newcomers to genuine chart contenders, with 'Killer Queen' the moment radio finally caught on.",
+      quote:"We were never going to be a band that played it safe. We wanted every record to be an event.", quoteBy:"On the band's ambition",
+      readtime:"7 min read",
+      body:[
+        "Nineteen seventy-four was the year Queen refused to wait their turn. 'Queen II' arrived in the spring, a dense and theatrical song-cycle split between a luminous 'White' side and a darker 'Black' one, and it pushed the band into the upper reaches of the UK chart for the first time.",
+        "Before the year was out they returned with 'Sheer Heart Attack'. Leaner and more focused, it traded some of the sprawl for sharp, radio-ready songwriting — and at its centre sat 'Killer Queen', a glittering miniature that finally delivered the hit single that had so far eluded them.",
+        "Touring intensified, both at home and across the Atlantic. The band that had spent years on the margins was suddenly playing to crowds who knew the words, and the press began to take them seriously as something more than a curiosity.",
+        "By the end of 1975 the foundations were laid for the record that would change everything."
+      ],
+      events:[
+        { year:"1974", text:"'Queen II' and 'Sheer Heart Attack' are both released." },
+        { year:"1974", text:"'Killer Queen' becomes the band's first major hit single." },
+        { year:"1975", text:"First headline tours of the UK, US and Japan." }
+      ] },
+    { range:"1975–1976", title:"A Night at the Opera", roma:"III",
+      summary:"The most expensive album ever made at the time produced a six-minute single with no chorus — and Queen became a global phenomenon overnight.",
+      quote:"Nobody had heard anything like it. It broke every rule, and that was exactly the point.", quoteBy:"On 'Bohemian Rhapsody'",
+      readtime:"8 min read",
+      body:[
+        "Determined to make a definitive statement, Queen poured months and an unprecedented budget into 'A Night at the Opera', released in late 1975. The result was a maximalist tour through vaudeville, ballad, hard rock and mock-operatic excess — and, improbably, it held together.",
+        "At its heart was 'Bohemian Rhapsody', a near-six-minute suite with no conventional chorus that the band insisted on releasing as a single despite considerable scepticism. Propelled by one of the earliest promotional videos, it spent nine weeks at the top of the UK chart and became a cultural landmark.",
+        "The album made Queen a household name across the world. The companion record, 'A Day at the Races', followed in 1976, self-produced and assured, confirming that the breakthrough had been no accident.",
+        "From here, the only question was how large the stages could become."
+      ],
+      events:[
+        { year:"1975", text:"'A Night at the Opera' and 'Bohemian Rhapsody' are released." },
+        { year:"1975", text:"'Bohemian Rhapsody' tops the UK chart for nine weeks." },
+        { year:"1976", text:"A free concert in Hyde Park draws an enormous crowd." }
+      ] },
+    { range:"1977–1979", title:"The Stadium Years", roma:"IV",
+      summary:"With 'We Will Rock You' and 'We Are the Champions', Queen wrote the songs that would echo around sports grounds for generations.",
+      quote:"We wanted to write something the whole audience could sing — to make them part of the band.", quoteBy:"On the stadium anthems",
+      readtime:"6 min read",
+      body:[
+        "By 1977 Queen had grasped something few of their peers understood: that the stadium was not just a bigger room, but a different instrument entirely. 'News of the World' was built for it, opening with the stomp-stomp-clap of 'We Will Rock You' and the raised-fist swell of 'We Are the Champions'.",
+        "Those two songs, designed to be sung back by tens of thousands, became permanent fixtures of public life far beyond rock music. The album stripped away some of the operatic detail in favour of directness and force.",
+        "1978's 'Jazz' showed the restless other side of the band — eclectic, playful and global, home to the irrepressible 'Don't Stop Me Now'. Throughout these years Queen toured relentlessly, refining a live show of growing scale and spectacle.",
+        "They had become one of the biggest live acts in the world, and they were only getting started."
+      ],
+      events:[
+        { year:"1977", text:"'News of the World' delivers two enduring stadium anthems." },
+        { year:"1978", text:"'Jazz' is released; world touring intensifies." },
+        { year:"1979", text:"The 'Live Killers' concert album captures the band on stage." }
+      ] },
+    { range:"1980–1983", title:"Reinvention", roma:"V",
+      summary:"Synthesisers, funk and a US number one — Queen conquered America, then divided opinion, before a duet with David Bowie towered above it all.",
+      quote:"You can't stand still. The moment you repeat yourself, you've stopped being interesting.", quoteBy:"On changing direction",
+      readtime:"7 min read",
+      body:[
+        "The new decade opened with 'The Game', the first Queen album to use synthesisers and the one that finally cracked America wide open. 'Crazy Little Thing Called Love' and 'Another One Bites the Dust' both reached number one in the United States, the latter a funk-driven groove that crossed over far beyond rock radio.",
+        "The same year brought the unexpected detour of the 'Flash Gordon' soundtrack, the band reimagined as cinematic composers. Then came 'Hot Space' in 1982 — a divisive plunge into dance, disco and funk that tested the loyalty of some long-time fans.",
+        "Whatever the reservations, the era produced one undeniable peak: 'Under Pressure', a spontaneous collaboration with David Bowie that became one of the most beloved songs in either artist's catalogue.",
+        "Queen ended this period restless and questioning — and ready, once again, to reinvent."
+      ],
+      events:[
+        { year:"1980", text:"'The Game' yields two US number-one singles." },
+        { year:"1981", text:"'Under Pressure', with David Bowie, tops the UK chart." },
+        { year:"1982", text:"'Hot Space' marks a bold turn toward dance and funk." }
+      ] },
+    { range:"1984–1985", title:"The Works & Live Aid", roma:"VI",
+      summary:"A deliberate return to form set up the twenty-one minutes at Wembley that are still regarded as the greatest live performance in rock history.",
+      quote:"For those twenty-one minutes, the whole stadium belonged to them — and they knew it.", quoteBy:"On Live Aid, 1985",
+      readtime:"8 min read",
+      body:[
+        "After the turbulence of 'Hot Space', 1984's 'The Works' was a conscious recalibration, balancing the future-shock of 'Radio Ga Ga' with the universal chant of 'I Want to Break Free'. The band was back in commanding form just as its defining moment approached.",
+        "On 13 July 1985, Queen took the stage at Wembley Stadium for the Live Aid benefit concert. In a tightly drilled set of barely twenty-one minutes, Freddie Mercury held ninety thousand people — and a global television audience of many millions — in the palm of his hand.",
+        "It was a masterclass in pacing, economy and connection: a held note, a raised fist, a chorus handed back to the crowd and sung straight back word for word. By common consent it remains the high-water mark of the live stadium performance.",
+        "In a single afternoon, Queen reminded the world of exactly who they were."
+      ],
+      events:[
+        { year:"1984", text:"'The Works' restores Queen to the front rank." },
+        { year:"1985", text:"The Live Aid set at Wembley becomes legendary." },
+        { year:"1985", text:"'One Vision' signals a creative resurgence." }
+      ] },
+    { range:"1986", title:"The Magic Tour", roma:"VII",
+      summary:"'A Kind of Magic' soundtracked a triumphant return to the road — a tour of record-breaking crowds that would, unknowingly, be their last.",
+      quote:"Nobody in those crowds imagined it would be the final time. Least of all the band.", quoteBy:"On the 1986 tour",
+      readtime:"5 min read",
+      body:[
+        "Riding the resurgence, Queen released 'A Kind of Magic' in 1986, an album partly born of their work on the film 'Highlander'. It served as the studio companion to one of the most ambitious tours they ever mounted.",
+        "The Magic Tour swept across Europe through the summer, playing to enormous open-air crowds. Its climax came at Knebworth Park before a vast audience, and at two nights at Wembley Stadium that were later immortalised on film and record.",
+        "The shows were spectacular — elaborate, joyous and supremely confident, a band entirely in command of its powers and its audience.",
+        "It would prove to be the last time Queen performed live with Freddie Mercury. At the time, no one knew."
+      ],
+      events:[
+        { year:"1986", text:"'A Kind of Magic' is released." },
+        { year:"1986", text:"The Magic Tour plays Wembley and Knebworth." },
+        { year:"1986", text:"Queen perform live with Mercury for the final time." }
+      ] },
+    { range:"1987–1990", title:"The Studio Years", roma:"VIII",
+      summary:"Stepping back from the road, the four members drew closer than ever, crediting every song simply to Queen and quietly recording against the clock.",
+      quote:"We just wanted to keep making music together, for as long as we possibly could.", quoteBy:"On the later sessions",
+      readtime:"6 min read",
+      body:[
+        "After the Magic Tour the band withdrew from live performance and turned inward, toward the studio. The years that followed were marked by a deepening unity — most visibly in the decision that all songs on 1989's 'The Miracle' would be credited collectively to Queen, rather than to individual writers.",
+        "It was a quietly profound gesture from a group that had long divided its songwriting credits, and it reflected a new closeness. 'The Miracle' produced hits in 'I Want It All' and 'Breakthru', and found the band working with renewed purpose.",
+        "Behind the scenes, the sessions carried an unspoken urgency. The band kept the reasons private, choosing instead to let the work speak.",
+        "They were, in fact, racing to make as much music as they could."
+      ],
+      events:[
+        { year:"1988", text:"Recording begins on what becomes 'The Miracle'." },
+        { year:"1989", text:"'The Miracle' is released; all songs credited to Queen." },
+        { year:"1990", text:"Work begins on the next, and most defiant, album." }
+      ] },
+    { range:"1991", title:"Innuendo & Farewell", roma:"IX",
+      summary:"The last album of Freddie Mercury's lifetime was also one of their boldest — and 'The Show Must Go On' became an unflinching final statement.",
+      quote:"I'll do it, darling. I'll give it everything I've got.", quoteBy:"Freddie Mercury, on the final vocals",
+      readtime:"7 min read",
+      body:[
+        "Released in early 1991, 'Innuendo' was Queen at their most defiant and ambitious — a sprawling, six-minute title track topping the chart, and a closing song, 'The Show Must Go On', that took on almost unbearable weight in light of what was to come.",
+        "Freddie Mercury recorded his vocals with extraordinary resolve even as his health failed, determined to leave behind as much music as possible. The band shielded him and the truth from public view for as long as they could.",
+        "On 23 November 1991, Mercury confirmed publicly that he had AIDS. He died the following evening, 24 November, at his home in London. The news brought an outpouring of grief from around the world.",
+        "Queen, as the world had known them, had played their final note — but the music, and the mourning, were only beginning."
+      ],
+      events:[
+        { year:"1991", text:"'Innuendo' is released to acclaim." },
+        { year:"1991", text:"'These Are the Days of Our Lives' becomes a poignant farewell." },
+        { year:"1991", text:"Freddie Mercury dies on 24 November, aged 45." }
+      ] },
+    { range:"1992–Present", title:"Legacy", roma:"X",
+      summary:"From a tribute concert watched by a billion to a posthumous final album, Queen's music has only grown — carried forward by each new generation.",
+      quote:"The songs outlived all of us. That was always the point.", quoteBy:"On Queen's legacy",
+      readtime:"6 min read",
+      body:[
+        "In April 1992, the surviving members staged The Freddie Mercury Tribute Concert at Wembley Stadium, a star-studded benefit watched by an estimated billion people worldwide and raising awareness and funds in the fight against AIDS.",
+        "Three years later came 'Made in Heaven', completed from Mercury's final recordings into a luminous, elegiac farewell. It was the last word from the band as a creative force, and a fittingly graceful one.",
+        "In the decades since, Queen's catalogue has only expanded its reach — through compilations, stage musicals, a record-breaking biographical film, and continued touring under the Queen name with guest vocalists.",
+        "The original Queenzone.com community grew out of exactly this devotion. The archive you are reading preserves it: a band whose songs, improbably, seem only to grow larger with time."
+      ],
+      events:[
+        { year:"1992", text:"The Freddie Mercury Tribute Concert is held at Wembley." },
+        { year:"1995", text:"'Made in Heaven', the posthumous final album, is released." },
+        { year:"Present", text:"Queen's music endures across film, stage and new generations." }
+      ] }
+  ];
+
+  romanFor(i, useRoman) {
+    if (useRoman) return this.data[i].roma;
+    return String(i + 1);
+  }
+  open(e, i) { if (e) e.preventDefault(); this.setState({ view:'detail', selected:i }); this.toTop(); }
+  back(e) { if (e) e.preventDefault(); this.setState({ view:'list' }); this.toTop(); }
+  goto(e, i) { if (e) e.preventDefault(); if (i < 0 || i >= this.data.length) return; this.setState({ selected:i }); this.toTop(); }
+  toTop() { try { requestAnimationFrame(() => window.scrollTo({ top:0, behavior:'auto' })); } catch (err) {} }
+
+  renderVals() {
+    const useRoman = (this.props.numerals ?? 'roman') === 'roman';
+    const chapters = this.data.map((c, i) => ({
+      ...c,
+      numeral: this.romanFor(i, useRoman),
+      onOpen: (e) => this.open(e, i),
+    }));
+    const sel = this.state.selected;
+    const cur = chapters[sel] || chapters[0];
+    const body = (cur.body || []).map((text, i) => (
+      i === 0 ? { drop:true, lead:text.charAt(0), text:text.slice(1) } : { drop:false, lead:'', text }
+    ));
+    const hasPrev = sel > 0;
+    const hasNext = sel < this.data.length - 1;
+    return {
+      isList: this.state.view === 'list',
+      isDetail: this.state.view === 'detail',
+      chapters,
+      cur,
+      body,
+      count: this.data.length + ' chapters · 1970–present',
+      hasPrev, hasNext,
+      prevTitle: hasPrev ? this.data[sel - 1].title : '',
+      nextTitle: hasNext ? this.data[sel + 1].title : '',
+      onBack: (e) => this.back(e),
+      onPrev: (e) => this.goto(e, sel - 1),
+      onNext: (e) => this.goto(e, sel + 1),
+    };
+  }
+}
+</script>
+</body>
+</html>

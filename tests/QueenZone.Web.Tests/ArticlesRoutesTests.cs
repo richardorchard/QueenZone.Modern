@@ -34,7 +34,7 @@ public sealed class ArticlesRoutesTests : IClassFixture<WebApplicationFactory<Pr
 
         var body = await client.GetStringAsync("/articles");
 
-        Assert.Contains("<link rel=\"canonical\" href=\"/articles\">", body);
+        Assert.Contains(TestSiteConfiguration.CanonicalLink("/articles"), body);
         Assert.Contains("<title>QueenZone articles</title>", body);
         Assert.Contains("Page 1 of 2", body);
     }
@@ -50,8 +50,8 @@ public sealed class ArticlesRoutesTests : IClassFixture<WebApplicationFactory<Pr
         Assert.Contains("/articles/101/inside-the-making-of-bohemian-rhapsody", pageOne);
         Assert.DoesNotContain("/articles/101/inside-the-making-of-bohemian-rhapsody", pageTwo);
         Assert.Contains("/articles/121/archive-sample-article-121", pageTwo);
-        Assert.Contains("<link rel=\"canonical\" href=\"/articles/page/2\">", pageTwo);
-        Assert.Contains("rel=\"prev\" href=\"/articles\"", pageTwo);
+        Assert.Contains(TestSiteConfiguration.CanonicalLink("/articles/page/2"), pageTwo);
+        Assert.Contains(TestSiteConfiguration.PrevLink("/articles"), pageTwo);
     }
 
     [Fact]
@@ -110,9 +110,11 @@ public sealed class ArticlesRoutesTests : IClassFixture<WebApplicationFactory<Pr
         var body = await client.GetStringAsync("/articles/101/inside-the-making-of-bohemian-rhapsody");
 
         Assert.Contains("Six weeks, three studios", body);
-        Assert.Contains("Back to articles archive", body);
+        Assert.Contains("qz-breadcrumbs", body);
+        Assert.Contains("href=\"/articles\">Articles</a>", body);
+        Assert.Contains("\"@type\":\"BreadcrumbList\"", body);
         Assert.Contains("Recording", body);
-        Assert.Contains("<link rel=\"canonical\" href=\"/articles/101/inside-the-making-of-bohemian-rhapsody\">", body);
+        Assert.Contains(TestSiteConfiguration.CanonicalLink("/articles/101/inside-the-making-of-bohemian-rhapsody"), body);
         Assert.Contains("<title>Inside the Making of Bohemian Rhapsody | QueenZone articles</title>", body);
     }
 

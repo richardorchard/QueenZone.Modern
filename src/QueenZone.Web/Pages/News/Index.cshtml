@@ -5,11 +5,12 @@
 
 <section class="qz-section">
   <div class="qz-container">
+    <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
     <div class="qz-tag-row">
       <span class="qz-tag qz-tag--active">All</span><span class="qz-tag">1985</span><span class="qz-tag">1986</span><span class="qz-tag">1991</span><span class="qz-tag">1992</span>
     </div>
     <partial name="_NewsArchiveList" model="Model.Items" />
 
-    @Html.Raw(NewsRoutes.BuildArchivePaginationNav(Model.CurrentPage, Model.TotalPages))
+    <partial name="_ArchivePagination" model="NewsRoutes.GetArchivePaginationViewModel(Model.CurrentPage, Model.TotalPages)" />
   </div>
 </section>

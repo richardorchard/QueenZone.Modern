@@ -5,6 +5,7 @@ namespace QueenZone.Web.Sitemap;
 public sealed class CoreSitemapBuilder(
     INewsRepository newsRepository,
     IArticlesRepository articlesRepository,
+    IBiographyRepository biographyRepository,
     IForumRepository forumRepository)
 {
     public async Task<IReadOnlyList<SitemapEntry>> BuildAsync(CancellationToken cancellationToken = default)
@@ -13,6 +14,7 @@ public sealed class CoreSitemapBuilder(
 
         await AddNewsEntriesAsync(entries, cancellationToken);
         await AddArticleEntriesAsync(entries, cancellationToken);
+        await AddBiographyEntriesAsync(entries, cancellationToken);
         await AddForumEntriesAsync(entries, cancellationToken);
 
         return entries;
@@ -27,18 +29,12 @@ public sealed class CoreSitemapBuilder(
             entries.Add(new(NewsRoutes.GetArchiveCanonicalPath(page)));
         }
 
-        for (var page = 1; page <= totalPages; page++)
+        var newsItems = await newsRepository.GetPublishedSitemapEntriesAsync(cancellationToken);
+        foreach (var item in newsItems)
         {
-            var archivePage = await newsRepository.GetArchivePageAsync(
-                page,
-                NewsRoutes.ArchivePageSize,
-                cancellationToken);
-            foreach (var item in archivePage)
-            {
-                entries.Add(new(
-                    NewsArticleContent.GetDetailCanonicalPath(item.Id, item.Title, item.Slug),
-                    item.PublishedAt));
-            }
+            entries.Add(new(
+                NewsArticleContent.GetDetailCanonicalPath(item.Id, item.Title, item.Slug),
+                item.PublishedAt));
         }
     }
 
@@ -51,18 +47,25 @@ public sealed class CoreSitemapBuilder(
             entries.Add(new(ArticlesRoutes.GetArchiveCanonicalPath(page)));
         }
 
-        for (var page = 1; page <= totalPages; page++)
+        var articleItems = await articlesRepository.GetPublishedSitemapEntriesAsync(cancellationToken);
+        foreach (var item in articleItems)
         {
-            var archivePage = await articlesRepository.GetArchivePageAsync(
-                page,
-                ArticlesRoutes.ArchivePageSize,
-                cancellationToken);
-            foreach (var item in archivePage)
-            {
-                entries.Add(new(
-                    ArticlesRoutes.GetArticleDetailPath(item),
-                    item.PublishedAt));
-            }
+            entries.Add(new(
+                ArticlesRoutes.GetArticleDetailPath(item.Id, item.Title),
+                item.PublishedAt));
+        }
+    }
+
+    private async Task AddBiographyEntriesAsync(List<SitemapEntry> entries, CancellationToken cancellationToken)
+    {
+        entries.Add(new(BiographyRoutes.IndexPath));
+
+        var chapters = await biographyRepository.GetChaptersAsync(cancellationToken);
+        foreach (var chapter in chapters)
+        {
+            entries.Add(new(
+                BiographyRoutes.GetChapterDetailPath(chapter),
+                chapter.CreatedAt == DateTime.MinValue ? null : chapter.CreatedAt));
         }
     }
 

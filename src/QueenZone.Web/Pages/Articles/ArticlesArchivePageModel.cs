@@ -12,6 +12,8 @@ public abstract class ArticlesArchivePageModel(IArticlesRepository articlesRepos
 
     public int TotalPages { get; private set; }
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
     protected async Task<IActionResult> LoadArchivePageAsync(int page, CancellationToken cancellationToken)
     {
         if (page < 1)
@@ -42,6 +44,7 @@ public abstract class ArticlesArchivePageModel(IArticlesRepository articlesRepos
         Items = archive;
         CurrentPage = page;
         TotalPages = totalPages;
+        Breadcrumbs = [BreadcrumbItem.Home, new BreadcrumbItem("Articles", "/articles")];
 
         ViewData["Title"] = ArticlesRoutes.GetArchivePageTitle(page);
         ViewData["CanonicalPath"] = ArticlesRoutes.GetArchiveCanonicalPath(page);

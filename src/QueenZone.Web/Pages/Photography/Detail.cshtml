@@ -1,0 +1,55 @@
+@page "/photography/{slug}/{picId:int}"
+@model DetailModel
+
+<section class="qz-lightbox">
+  <div class="qz-breadcrumbs-on-dark">
+    <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
+  </div>
+
+  <div class="qz-lightbox__header">
+    <a class="qz-lightbox__back" href="@Model.BackToGridHref">&larr; Back to @Model.Category.Name</a>
+    <span class="qz-lightbox__counter">@(Model.Index + 1) / @Model.Count</span>
+  </div>
+
+  <div class="qz-lightbox__body">
+    @if (Model.PreviousHref is null)
+    {
+      <span class="qz-lightbox__arrow is-disabled" aria-hidden="true">&#8249;</span>
+    }
+    else
+    {
+      <a class="qz-lightbox__arrow" href="@Model.PreviousHref" rel="prev" aria-label="Previous image" data-lightbox-prev>&#8249;</a>
+    }
+
+    <img class="qz-lightbox__image" src="@Model.Photo.ImageUrl" alt="@Model.Photo.Title">
+
+    @if (Model.NextHref is null)
+    {
+      <span class="qz-lightbox__arrow is-disabled" aria-hidden="true">&#8250;</span>
+    }
+    else
+    {
+      <a class="qz-lightbox__arrow" href="@Model.NextHref" rel="next" aria-label="Next image" data-lightbox-next>&#8250;</a>
+    }
+  </div>
+
+  <figcaption class="qz-lightbox__caption">
+    <h1>@Model.Photo.Title</h1>
+    <p class="qz-lightbox__meta">@Model.Photo.Year &middot; @Model.Category.Name</p>
+  </figcaption>
+</section>
+
+<script data-back-href="@Model.BackToGridHref" data-prev-href="@Model.PreviousHref" data-next-href="@Model.NextHref">
+  (function () {
+    var script = document.currentScript;
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape') {
+        window.location.href = script.dataset.backHref;
+      } else if (event.key === 'ArrowLeft' && script.dataset.prevHref) {
+        window.location.href = script.dataset.prevHref;
+      } else if (event.key === 'ArrowRight' && script.dataset.nextHref) {
+        window.location.href = script.dataset.nextHref;
+      }
+    });
+  })();
+</script>

@@ -1,0 +1,20 @@
+@page "/photography/{slug}"
+@model CategoryModel
+
+<partial name="_PageHero" model='@(("Photography", Model.Category.Name, $"Part of the Queenzone photographic archive — {Model.Category.ImageCount:N0} images.", ""))' />
+
+<section class="qz-section">
+  <div class="qz-container">
+    <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
+    @if (Model.TotalCount == 0)
+    {
+      <p>No images are available in this collection yet.</p>
+    }
+    else
+    {
+      <p class="qz-photo-range">Showing @Model.RangeStart&ndash;@Model.RangeEnd of @Model.TotalCount</p>
+      <partial name="_PhotoThumbnailGrid" model="Model.Items" />
+      <partial name="_ArchivePagination" model="PhotoRoutes.GetCategoryPaginationViewModel(Model.Category.Slug, Model.CurrentPage, Model.TotalPages)" />
+    }
+  </div>
+</section>

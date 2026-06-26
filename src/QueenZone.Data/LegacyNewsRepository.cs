@@ -94,6 +94,26 @@ public sealed class LegacyNewsRepository : INewsRepository
         return results.FirstOrDefault();
     }
 
+    public async Task<IReadOnlyList<SitemapContentEntry>> GetPublishedSitemapEntriesAsync(CancellationToken cancellationToken = default)
+    {
+        var sql = $"""
+            {publishedNewsCte}
+            SELECT
+                Id,
+                Title,
+                PublishedAt,
+                Slug
+            FROM PublishedNews
+            WHERE RowNumber = 1
+            ORDER BY PublishedAt DESC, Id DESC
+            """;
+
+        await using var connection = new SqlConnection(connectionString);
+        var command = new CommandDefinition(sql, cancellationToken: cancellationToken);
+        var rows = await connection.QueryAsync<SitemapContentEntry>(command);
+        return rows.AsList();
+    }
+
     private async Task<IReadOnlyList<NewsItem>> QueryAsync(string sql, object parameters, CancellationToken cancellationToken)
     {
         await using var connection = new SqlConnection(connectionString);

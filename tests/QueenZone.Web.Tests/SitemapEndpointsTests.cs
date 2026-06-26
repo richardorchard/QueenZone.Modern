@@ -95,6 +95,8 @@ public sealed class SitemapEndpointsTests : IClassFixture<WebApplicationFactory<
         Assert.Contains($"{BaseUrl}/articles", locations);
         Assert.Contains($"{BaseUrl}/articles/101/inside-the-making-of-bohemian-rhapsody", locations);
         Assert.DoesNotContain($"{BaseUrl}/articles/9001/hidden-moderation-draft", locations);
+        Assert.Contains($"{BaseUrl}/biography", locations);
+        Assert.Contains($"{BaseUrl}/biography/1/1946-1969", locations);
         Assert.Contains($"{BaseUrl}/forum", locations);
         Assert.Contains($"{BaseUrl}/forum/1/the-music", locations);
     }
@@ -113,5 +115,16 @@ public sealed class SitemapEndpointsTests : IClassFixture<WebApplicationFactory<
             .Single(url => url.Element(ns + "loc")?.Value == $"{BaseUrl}/news/1003/queenzone-modernisation-begins");
 
         Assert.Equal("2026-06-11", newsDetail.Element(ns + "lastmod")?.Value);
+    }
+
+    [Fact]
+    public async Task CoreSitemap_SetsPublicCacheControlHeader()
+    {
+        var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/sitemap-core.xml");
+
+        response.EnsureSuccessStatusCode();
+        Assert.Equal("public, max-age=86400", response.Headers.CacheControl?.ToString());
     }
 }

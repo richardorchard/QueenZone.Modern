@@ -25,6 +25,11 @@ public sealed class SampleNewsRepository : INewsRepository
                     PublishedItems.Where(item => item.Id == id))
                 .FirstOrDefault());
 
+    public Task<IReadOnlyList<SitemapContentEntry>> GetPublishedSitemapEntriesAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<SitemapContentEntry>>(PublishedItems
+            .Select(item => new SitemapContentEntry(item.Id, item.Title, item.PublishedAt, item.Slug))
+            .ToList());
+
     private static IReadOnlyList<NewsItem> BuildItems()
     {
         var items = new List<NewsItem>

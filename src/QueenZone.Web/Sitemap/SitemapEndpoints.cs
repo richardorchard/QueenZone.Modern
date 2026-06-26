@@ -49,12 +49,16 @@ public static class SitemapEndpoints
         });
 
         app.MapGet("/sitemap-core.xml", async (
-            CoreSitemapBuilder builder,
+            HttpContext httpContext,
+            CoreSitemapService sitemapService,
             IOptions<SiteOptions> options,
+            IOptions<SitemapOptions> sitemapOptions,
             CancellationToken cancellationToken) =>
         {
-            var entries = await builder.BuildAsync(cancellationToken);
-            var xml = SitemapXmlWriter.WriteUrlSet(entries, options.Value.PublicBaseUrl);
+            var maxAgeSeconds = Math.Max(sitemapOptions.Value.CacheHours, 1) * 3600;
+            httpContext.Response.Headers.CacheControl = $"public, max-age={maxAgeSeconds}";
+
+            var xml = await sitemapService.GetXmlAsync(options.Value.PublicBaseUrl, cancellationToken);
             return Results.Content(xml, "application/xml; charset=utf-8");
         });
     }

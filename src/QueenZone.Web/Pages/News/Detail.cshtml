@@ -5,8 +5,8 @@
 {
   <section class="qz-article-hero">
     <img src="/design-system/assets/img-hero.jpg" alt="">
-    <div class="qz-container qz-article-hero__content">
-      <p class="article-nav"><a class="qz-button qz-button--ghost" style="color: var(--qz-white);" href="/news">Back to news archive</a></p>
+    <div class="qz-container qz-article-hero__content qz-breadcrumbs-on-dark">
+      <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
       <div class="qz-eyebrow" style="color: var(--qz-gold);">News archive</div>
       <h1>@Model.Item.Title</h1>
       <div class="qz-meta" style="color: rgba(255,255,255,0.52);"><time datetime="@Model.Item.PublishedAt.ToString("yyyy-MM-dd")">@Model.Item.PublishedAt.ToString("dd MMMM yyyy")</time></div>

@@ -19,4 +19,9 @@ public sealed class InMemoryArticlesRepository(IReadOnlyList<ArticleItem> seedAr
 
     public Task<ArticleItem?> GetByIdAsync(int id, CancellationToken cancellationToken = default) =>
         Task.FromResult(publishedItems.SingleOrDefault(item => item.Id == id));
+
+    public Task<IReadOnlyList<SitemapContentEntry>> GetPublishedSitemapEntriesAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<SitemapContentEntry>>(publishedItems
+            .Select(item => new SitemapContentEntry(item.Id, item.Title, item.PublishedAt))
+            .ToList());
 }

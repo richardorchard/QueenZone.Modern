@@ -5,6 +5,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="HtmlSanitizer" Version="9.0.892" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -16,6 +17,30 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <RepositoryRoot>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\..'))</RepositoryRoot>
   </PropertyGroup>
+
+  <Target Name="SetBuildMetadata" BeforeTargets="GetAssemblyVersion;GetAssemblyAttributes;GenerateAssemblyInfo">
+    <Exec Command="git rev-parse --short HEAD"
+          ConsoleToMSBuild="true"
+          IgnoreExitCode="true"
+          StandardOutputImportance="low"
+          WorkingDirectory="$(RepositoryRoot)">
+      <Output TaskParameter="ConsoleOutput" PropertyName="GitCommitShort" />
+    </Exec>
+    <PropertyGroup>
+      <GitCommitShort>$([System.String]::Copy('$(GitCommitShort)').Trim())</GitCommitShort>
+      <GitCommitShort Condition="'$(GitCommitShort)' == ''">local</GitCommitShort>
+      <BuildTimestampUtc>$([System.DateTime]::UtcNow.ToString("o"))</BuildTimestampUtc>
+      <InformationalVersion>$(GitCommitShort)</InformationalVersion>
+    </PropertyGroup>
+    <ItemGroup>
+      <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+        <_Parameter1>BuildTimestampUtc</_Parameter1>
+        <_Parameter2>$(BuildTimestampUtc)</_Parameter2>
+      </AssemblyAttribute>
+    </ItemGroup>
+  </Target>
 
 </Project>

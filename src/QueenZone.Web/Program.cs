@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Identity.Web;
 using QueenZone.Data;
 using QueenZone.Web;
@@ -14,10 +15,20 @@ if (!builder.Environment.IsEnvironment("Testing"))
 {
     builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
 }
+else
+{
+    // Avoid DPAPI-backed key persistence under the service profile, which is slow
+    // (and unnecessary for short-lived smoke test runs) on the self-hosted CI runner.
+    builder.Services.AddDataProtection().UseEphemeralDataProtectionProvider();
+}
 
 builder.Services.Configure<AdminOptions>(builder.Configuration.GetSection(AdminOptions.SectionName));
 builder.Services.Configure<SiteOptions>(builder.Configuration.GetSection(SiteOptions.SectionName));
+builder.Services.Configure<AnalyticsOptions>(builder.Configuration.GetSection(AnalyticsOptions.SectionName));
+builder.Services.Configure<SitemapOptions>(builder.Configuration.GetSection(SitemapOptions.SectionName));
+builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<CoreSitemapBuilder>();
+builder.Services.AddSingleton<CoreSitemapService>();
 builder.Services.AddSingleton<ForumSitemapBuilder>();
 builder.Services.AddSingleton<SitemapIndexBuilder>();
 builder.Services.AddAntiforgery();
@@ -55,6 +66,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.UseAntiforgery();
 
+// Minimal liveness probe used by CI smoke/e2e checks and any future uptime monitoring.
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 app.MapSitemapEndpoints();
 app.MapRazorPages();

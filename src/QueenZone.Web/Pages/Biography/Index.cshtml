@@ -1,0 +1,18 @@
+@page "/biography"
+@model IndexModel
+
+<partial name="_PageHero" model='@(("The Queenzone.com Archive", "Biography", "The story of Queen, told in chapters — from a London college band to one of the most enduring acts in the history of recorded music.", BiographyRoutes.GetIndexMetaLine(Model.Chapters.Count)))' />
+
+<section class="qz-section qz-bio-index">
+  <div class="qz-container">
+    <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
+    @if (Model.Chapters.Count == 0)
+    {
+      <p>No biography chapters are available yet.</p>
+    }
+    else
+    {
+      <partial name="_BiographyChapterList" model="Model.Chapters" />
+    }
+  </div>
+</section>

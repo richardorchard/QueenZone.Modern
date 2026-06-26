@@ -6,8 +6,8 @@
 
 <section class="qz-page-hero">
   <img class="qz-page-hero__crest" src="/design-system/assets/crest-white.png" alt="">
-  <div class="qz-container">
-    <div class="qz-eyebrow" style="color: var(--qz-gold);"><a href="/forum" style="color: inherit;">Forum</a></div>
+  <div class="qz-container qz-breadcrumbs-on-dark">
+    <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
     <h1>@category.Name</h1>
     @if (!string.IsNullOrWhiteSpace(category.Description))
     {
@@ -24,6 +24,6 @@
   <div class="qz-container">
     <partial name="_SectionHeader" model="@(("Topics", "Threads in this board", false, (string?)null, (string?)null))" />
     <partial name="_ForumTopicList" model="@(category, Model.Topics)" />
-    @Html.Raw(ForumRoutes.BuildCategoryPaginationNav(category, Model.CurrentPage, Model.TotalPages))
+    <partial name="_ArchivePagination" model="ForumRoutes.GetCategoryPaginationViewModel(category, Model.CurrentPage, Model.TotalPages)" />
   </div>
 </section>

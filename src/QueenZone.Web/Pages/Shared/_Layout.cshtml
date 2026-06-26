@@ -1,3 +1,6 @@
+@using Microsoft.Extensions.Options
+@using QueenZone.Web.Sitemap
+@inject IOptions<SiteOptions> SiteOptionsAccessor
 <!doctype html>
 <html lang="en">
 <head>
@@ -6,22 +9,27 @@
   <title>@ViewData["Title"]</title>
   @if (ViewData["CanonicalPath"] is string canonicalPath)
   {
-    <link rel="canonical" href="@canonicalPath">
+    <link rel="canonical" href="@SiteUrl.ToAbsolute(SiteOptionsAccessor.Value.PublicBaseUrl, canonicalPath)">
   }
   @if (ViewData["PrevPath"] is string prevPath)
   {
-    <link rel="prev" href="@prevPath">
+    <link rel="prev" href="@SiteUrl.ToAbsolute(SiteOptionsAccessor.Value.PublicBaseUrl, prevPath)">
   }
   @if (ViewData["NextPath"] is string nextPath)
   {
-    <link rel="next" href="@nextPath">
+    <link rel="next" href="@SiteUrl.ToAbsolute(SiteOptionsAccessor.Value.PublicBaseUrl, nextPath)">
   }
   @if (ViewData["Description"] is string description)
   {
     <meta name="description" content="@description">
   }
-  <link rel="stylesheet" href="/design-system/styles.css">
-  <link rel="stylesheet" href="/css/site.css">
+  <partial name="_GoogleAnalytics" />
+  <link rel="stylesheet" href="/design-system/tokens/fonts.css" asp-append-version="true">
+  <link rel="stylesheet" href="/design-system/tokens/colors.css" asp-append-version="true">
+  <link rel="stylesheet" href="/design-system/tokens/typography.css" asp-append-version="true">
+  <link rel="stylesheet" href="/design-system/tokens/spacing.css" asp-append-version="true">
+  <link rel="stylesheet" href="/design-system/tokens/base.css" asp-append-version="true">
+  <link rel="stylesheet" href="/css/site.css" asp-append-version="true">
 </head>
 <body>
   <partial name="_SiteHeader" />
@@ -29,5 +37,7 @@
     @RenderBody()
   </main>
   <partial name="_SiteFooter" />
+  <partial name="_BuildStamp" />
+  <script src="/js/site.js"></script>
 </body>
 </html>

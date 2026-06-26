@@ -6,6 +6,7 @@ on:
     branches:
       - main
       - master
+  workflow_dispatch:
 
 jobs:
   build:
@@ -100,4 +101,147 @@ jobs:
         with:
           name: smoke-app-log-${{ github.run_id }}
           path: smoke-app.log
+          retention-days: 7
+
+  e2e-test:
+    # Runs on a self-hosted Windows runner (this machine) instead of a
+    # GitHub-hosted runner, so it does not consume billed Actions minutes.
+    # continue-on-error keeps it from blocking merges if the runner is offline.
+    runs-on: [self-hosted, Windows]
+    needs: build
+    timeout-minutes: 15
+    continue-on-error: true
+
+    steps:
+      # If a previous run's "Stop app" step failed to terminate the real
+      # QueenZone.Web.exe child process (see that step's comment below), it
+      # is left running and holding its own exe file locked, which makes
+      # actions/checkout's workspace clean fail with an EPERM unlink error
+      # before any of our own steps even run. Clear out any leftover process
+      # from a prior run first so checkout can clean the workspace.
+      - name: Kill stray app processes from a previous run
+        run: |
+          Get-Process -Name "QueenZone.Web" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      # actions/setup-dotnet tries to (re)install into C:\Program Files\dotnet,
+      # which the runner service account cannot write to without elevation.
+      # This machine already has the .NET 10 SDK installed and on PATH, so
+      # use that directly instead of running the action here.
+      - name: Verify .NET SDK
+        run: dotnet --version
+
+      - name: Restore
+        run: |
+          dotnet restore QueenZone.sln
+          dotnet restore tests/QueenZone.Web.E2E/QueenZone.Web.E2E.csproj
+
+      - name: Build
+        run: |
+          dotnet build QueenZone.sln --configuration Release --no-restore
+          dotnet build tests/QueenZone.Web.E2E/QueenZone.Web.E2E.csproj --configuration Release --no-restore
+
+      - name: Install Playwright browsers
+        run: .\tests\QueenZone.Web.E2E\bin\Release\net10.0\playwright.ps1 install chromium
+
+      - name: Publish web app
+        run: dotnet publish src/QueenZone.Web/QueenZone.Web.csproj --configuration Release --no-build --output ./e2e-app
+
+      - name: Start app in background
+        run: |
+          # Start-Process makes the app a child of this step's process, which is
+          # tied to the runner's Windows Job Object and gets killed when this step
+          # exits. Launch via WMI instead so it survives into later steps.
+          $exePath = (Resolve-Path ".\e2e-app\QueenZone.Web.exe").Path
+          $logPath = Join-Path (Get-Location).Path "e2e-app.log"
+          $errPath = Join-Path (Get-Location).Path "e2e-app.err.log"
+          $cmdLine = "cmd.exe /c `"set ASPNETCORE_ENVIRONMENT=Testing&&set ASPNETCORE_URLS=http://127.0.0.1:5099&&`"$exePath`" > `"$logPath`" 2> `"$errPath`"`""
+          $result = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = $cmdLine }
+          if ($result.ReturnValue -ne 0) {
+            throw "Failed to start app via WMI, return code $($result.ReturnValue)"
+          }
+          $cmdPid = $result.ProcessId
+          $cmdPid | Out-File -Encoding ascii e2e-app-cmd.pid
+
+          # $cmdPid is cmd.exe's PID, not QueenZone.Web.exe's. Find the real child
+          # so "Stop app" can target the actual listener.
+          $appPid = $cmdPid
+          for ($i = 1; $i -le 10; $i++) {
+            $child = Get-CimInstance Win32_Process -Filter "ParentProcessId=$cmdPid" -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($child) {
+              $appPid = $child.ProcessId
+              break
+            }
+            Start-Sleep -Milliseconds 500
+          }
+          $appPid | Out-File -Encoding ascii e2e-app.pid
+          Write-Host "Started app: cmd.exe PID $cmdPid, QueenZone.Web.exe PID $appPid"
+
+      - name: Wait for app to be ready
+        run: |
+          Write-Host "Waiting for web app..."
+          $appPid = Get-Content e2e-app.pid
+          for ($i = 1; $i -le 60; $i++) {
+            $proc = Get-Process -Id $appPid -ErrorAction SilentlyContinue
+            if (-not $proc) {
+              Write-Host "App process (PID $appPid) exited unexpectedly after $($i * 2)s"
+              break
+            }
+            try {
+              $response = Invoke-WebRequest -Uri "http://127.0.0.1:5099/health" -UseBasicParsing -TimeoutSec 2
+              if ($response.StatusCode -eq 200) {
+                Write-Host "App is up after $($i * 2)s"
+                exit 0
+              }
+            } catch {
+              Write-Host "Attempt ${i}: $($_.Exception.Message)"
+            }
+            Start-Sleep -Seconds 2
+          }
+          Write-Host "App failed to start in time. Process running: $([bool](Get-Process -Id $appPid -ErrorAction SilentlyContinue))"
+          Get-Content e2e-app.log -ErrorAction SilentlyContinue
+          Get-Content e2e-app.err.log -ErrorAction SilentlyContinue
+          exit 1
+
+      - name: Run Playwright e2e tests
+        env:
+          E2E_BASE_URL: http://127.0.0.1:5099
+        run: dotnet test tests/QueenZone.Web.E2E/QueenZone.Web.E2E.csproj --configuration Release --no-build
+
+      - name: Stop app
+        if: always()
+        run: |
+          if (Test-Path e2e-app.pid) {
+            Stop-Process -Id (Get-Content e2e-app.pid) -Force -ErrorAction SilentlyContinue
+          }
+          if (Test-Path e2e-app-cmd.pid) {
+            Stop-Process -Id (Get-Content e2e-app-cmd.pid) -Force -ErrorAction SilentlyContinue
+          }
+
+          # Belt-and-suspenders: "Start app in background" can fall back to
+          # cmd.exe's PID if its child-process lookup doesn't find the real
+          # QueenZone.Web.exe PID in time, which orphans it. An orphaned
+          # QueenZone.Web.exe keeps its own exe file locked, which makes the
+          # *next* run's checkout fail before any of that run's steps even
+          # execute. Kill by image name too, and confirm it actually exited
+          # (Stop-Process returning doesn't guarantee the OS has released the
+          # file handle yet) before finishing this step.
+          Get-Process -Name "QueenZone.Web" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+
+          for ($i = 1; $i -le 15; $i++) {
+            if (-not (Get-Process -Name "QueenZone.Web" -ErrorAction SilentlyContinue)) {
+              Write-Host "QueenZone.Web.exe confirmed stopped"
+              break
+            }
+            Start-Sleep -Milliseconds 500
+          }
+
+      - name: Upload app log on failure
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: e2e-app-log-${{ github.run_id }}
+          path: e2e-app.log
           retention-days: 7

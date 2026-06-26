@@ -1,0 +1,21 @@
+@model IReadOnlyList<QueenZone.Data.PhotoItem>
+
+<div class="qz-photo-grid">
+  @foreach (var photo in Model)
+  {
+    <figure class="qz-photo-thumb">
+      <a href="@PhotoRoutes.GetDetailPath(photo.CategorySlug, photo.PicId)">
+        <img
+          src="@photo.ThumbnailUrl"
+          alt="@photo.Title"
+          width="@photo.ThumbWidth"
+          height="@photo.ThumbHeight"
+          loading="lazy">
+      </a>
+      <figcaption>
+        <a class="qz-photo-thumb__title" href="@PhotoRoutes.GetDetailPath(photo.CategorySlug, photo.PicId)">@photo.Title</a>
+        <span class="qz-photo-thumb__meta">@photo.Year</span>
+      </figcaption>
+    </figure>
+  }
+</div>

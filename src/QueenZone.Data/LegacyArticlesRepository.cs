@@ -67,6 +67,24 @@ public sealed class LegacyArticlesRepository(string connectionString) : IArticle
         return results.FirstOrDefault();
     }
 
+    public async Task<IReadOnlyList<SitemapContentEntry>> GetPublishedSitemapEntriesAsync(CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+            SELECT
+                CAST(a.Q_ARTICLE_ID AS int) AS Id,
+                a.ARTICLE_NAME AS Title,
+                a.DATE_CREATED AS PublishedAt
+            FROM Q_ARTICLE_T a
+            WHERE a.DISPLAY = 1
+            ORDER BY a.DATE_CREATED DESC, a.Q_ARTICLE_ID DESC
+            """;
+
+        await using var connection = new SqlConnection(connectionString);
+        var command = new CommandDefinition(sql, cancellationToken: cancellationToken);
+        var rows = await connection.QueryAsync<SitemapContentEntry>(command);
+        return rows.AsList();
+    }
+
     private async Task<IReadOnlyList<ArticleItem>> QueryAsync(string sql, object parameters, CancellationToken cancellationToken)
     {
         await using var connection = new SqlConnection(connectionString);
