@@ -16,6 +16,7 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddSingleton<IArticlesRepository>(_ => new LegacyArticlesRepository(connectionString));
         services.AddSingleton<IBiographyRepository>(_ => new LegacyBiographyRepository(connectionString));
         services.AddSingleton<IForumRepository>(_ => new LegacyForumRepository(connectionString));
+        services.AddSingleton<IPhotoRepository>(_ => new LegacyPhotoRepository(connectionString));
         services.AddScoped<IAdminNewsRepository, EfAdminNewsRepository>();
         services.AddScoped<INewsAuditRepository, EfNewsAuditRepository>();
 
@@ -32,6 +33,7 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddSingleton<IForumRepository>(_ => new InMemoryForumRepository(
             SampleForumData.CreateSeedCategories(),
             SampleForumData.CreateSeedStats()));
+        services.AddSingleton<IPhotoRepository>(_ => new InMemoryPhotoRepository(SamplePhotoData.CreateSeedCategories()));
         services.AddSingleton<IAdminNewsRepository, InMemoryAdminNewsRepository>();
         services.AddSingleton<INewsAuditRepository, InMemoryNewsAuditRepository>();
 

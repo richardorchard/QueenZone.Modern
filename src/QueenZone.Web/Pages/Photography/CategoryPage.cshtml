@@ -1,0 +1,13 @@
+@page "/photography/{slug}/page/{pageNumber:int}"
+@model CategoryPageModel
+
+<partial name="_PageHero" model='@(("Photography", Model.Category.Name, $"Part of the Queenzone photographic archive — {Model.Category.ImageCount:N0} images.", ""))' />
+
+<section class="qz-section">
+  <div class="qz-container">
+    <p><a class="qz-button qz-button--ghost" href="@PhotoRoutes.GetCategoriesPath()">&larr; All collections</a></p>
+    <p class="qz-photo-range">Showing @Model.RangeStart&ndash;@Model.RangeEnd of @Model.TotalCount</p>
+    <partial name="_PhotoThumbnailGrid" model="Model.Items" />
+    <partial name="_ArchivePagination" model="PhotoRoutes.GetCategoryPaginationViewModel(Model.Category.Slug, Model.CurrentPage, Model.TotalPages)" />
+  </div>
+</section>
