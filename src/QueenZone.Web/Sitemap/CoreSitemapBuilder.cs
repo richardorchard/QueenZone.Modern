@@ -6,7 +6,8 @@ public sealed class CoreSitemapBuilder(
     INewsRepository newsRepository,
     IArticlesRepository articlesRepository,
     IBiographyRepository biographyRepository,
-    IForumRepository forumRepository)
+    IForumRepository forumRepository,
+    IPhotoRepository photoRepository)
 {
     public async Task<IReadOnlyList<SitemapEntry>> BuildAsync(CancellationToken cancellationToken = default)
     {
@@ -16,6 +17,7 @@ public sealed class CoreSitemapBuilder(
         await AddArticleEntriesAsync(entries, cancellationToken);
         await AddBiographyEntriesAsync(entries, cancellationToken);
         await AddForumEntriesAsync(entries, cancellationToken);
+        await AddPhotographyEntriesAsync(entries, cancellationToken);
 
         return entries;
     }
@@ -79,6 +81,35 @@ public sealed class CoreSitemapBuilder(
             entries.Add(new(
                 ForumRoutes.GetCategoryCanonicalPath(category),
                 category.LastActivityAt));
+        }
+    }
+
+    private async Task AddPhotographyEntriesAsync(List<SitemapEntry> entries, CancellationToken cancellationToken)
+    {
+        entries.Add(new(PhotoRoutes.GetCategoriesPath()));
+
+        var categories = await photoRepository.GetCategoriesAsync(cancellationToken);
+        foreach (var category in categories)
+        {
+            var photos = await photoRepository.GetCategoryAllAsync(category.CatId, cancellationToken);
+            var latestPhotoAt = photos.Count > 0
+                ? photos.Max(photo => photo.DateTime)
+                : (DateTime?)null;
+
+            entries.Add(new(PhotoRoutes.GetCategoryPath(category.Slug), latestPhotoAt));
+
+            var totalPages = PhotoRoutes.GetCategoryTotalPages(category.ImageCount);
+            for (var page = 2; page <= totalPages; page++)
+            {
+                entries.Add(new(PhotoRoutes.GetCategoryPagePath(category.Slug, page), latestPhotoAt));
+            }
+
+            foreach (var photo in photos)
+            {
+                entries.Add(new(
+                    PhotoRoutes.GetDetailPath(category.Slug, photo.PicId),
+                    photo.DateTime));
+            }
         }
     }
 }

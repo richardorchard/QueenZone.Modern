@@ -70,6 +70,11 @@ public sealed class SitemapEndpointsTests : IClassFixture<WebApplicationFactory<
         Assert.Contains($"{BaseUrl}/biography/1/1946-1969", locations);
         Assert.Contains($"{BaseUrl}/forum", locations);
         Assert.Contains($"{BaseUrl}/forum/1/the-music", locations);
+        Assert.Contains($"{BaseUrl}/photography", locations);
+        Assert.Contains($"{BaseUrl}/photography/brian-may", locations);
+        Assert.Contains($"{BaseUrl}/photography/queen", locations);
+        Assert.Contains($"{BaseUrl}/photography/queen/201", locations);
+        Assert.DoesNotContain($"{BaseUrl}/photography/empty-category", locations);
     }
 
     [Fact]
