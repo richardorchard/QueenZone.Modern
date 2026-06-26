@@ -113,6 +113,16 @@ jobs:
     continue-on-error: true
 
     steps:
+      # If a previous run's "Stop app" step failed to terminate the real
+      # QueenZone.Web.exe child process (see that step's comment below), it
+      # is left running and holding its own exe file locked, which makes
+      # actions/checkout's workspace clean fail with an EPERM unlink error
+      # before any of our own steps even run. Clear out any leftover process
+      # from a prior run first so checkout can clean the workspace.
+      - name: Kill stray app processes from a previous run
+        run: |
+          Get-Process -Name "QueenZone.Web" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+
       - name: Checkout
         uses: actions/checkout@v6
 
@@ -208,6 +218,24 @@ jobs:
           }
           if (Test-Path e2e-app-cmd.pid) {
             Stop-Process -Id (Get-Content e2e-app-cmd.pid) -Force -ErrorAction SilentlyContinue
+          }
+
+          # Belt-and-suspenders: "Start app in background" can fall back to
+          # cmd.exe's PID if its child-process lookup doesn't find the real
+          # QueenZone.Web.exe PID in time, which orphans it. An orphaned
+          # QueenZone.Web.exe keeps its own exe file locked, which makes the
+          # *next* run's checkout fail before any of that run's steps even
+          # execute. Kill by image name too, and confirm it actually exited
+          # (Stop-Process returning doesn't guarantee the OS has released the
+          # file handle yet) before finishing this step.
+          Get-Process -Name "QueenZone.Web" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+
+          for ($i = 1; $i -le 15; $i++) {
+            if (-not (Get-Process -Name "QueenZone.Web" -ErrorAction SilentlyContinue)) {
+              Write-Host "QueenZone.Web.exe confirmed stopped"
+              break
+            }
+            Start-Sleep -Milliseconds 500
           }
 
       - name: Upload app log on failure
