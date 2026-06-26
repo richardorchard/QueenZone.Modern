@@ -64,6 +64,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.UseAntiforgery();
 
+// Minimal liveness probe used by CI smoke/e2e checks and any future uptime monitoring.
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 app.MapSitemapEndpoints();
 app.MapRazorPages();
