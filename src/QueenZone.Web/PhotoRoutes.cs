@@ -4,7 +4,7 @@ namespace QueenZone.Web;
 
 public static class PhotoRoutes
 {
-    public const int CategoryPageSize = 12;
+    public const int CategoryPageSize = 24;
 
     public static string GetCategoriesPath() => "/photography";
 
