@@ -39,6 +39,7 @@ Also fill in the **Agent** line when opening the pull request (see `.github/pull
 | -------- | ------------- |
 | **Routes / canonical URLs** | `/news` is canonical page 1; use `/news/page/{n}` for later pages; wrong slugs redirect to canonical detail URLs; do not preserve legacy Web Forms URL shapes by default |
 | **Legacy SQL / data** | Keep SQL in `QueenZone.Data`; treat `DISPLAY = 1` as the public visibility gate; deduplicate by stable article ID before paging; legacy DB tests are opt-in |
+| **SQL MCP** | Local agents can expose a narrow read-only DAB MCP server for legacy DB inspection; see `docs/sql/data-api-builder-mcp.md`; do not expose private/user/mail/IP/moderation data |
 | **Public rendering** | Never expose hidden, deleted, moderated, draft, or private records in public output |
 | **SEO / crawlability** | Unique page titles, canonical links, and crawlable HTML matter; avoid duplicate canonical pages |
 | **Testing** | Pure logic in unit tests; route behavior in web integration tests with sample/fake data by default; report whether legacy DB checks ran |
@@ -125,4 +126,5 @@ In the log stream, `SqlException: Execution Timeout` in `LegacyForumRepository` 
 - Primary agent instructions: [AGENTS.md](../AGENTS.md)
 - Claude entry point: [CLAUDE.md](../CLAUDE.md)
 - Testing policy: [docs/architecture/testing-policy.md](architecture/testing-policy.md)
+- SQL MCP setup: [docs/sql/data-api-builder-mcp.md](sql/data-api-builder-mcp.md)
 - Migration backlog: [docs/backlog/migration-backlog.md](backlog/migration-backlog.md)

@@ -8,6 +8,7 @@ This repository is the modern QueenZone rebuild. The project is archive-first: i
 - `docs/architecture/testing-policy.md` defines the required testing layers.
 - `docs/decisions/` contains accepted architectural decisions.
 - `docs/backlog/migration-backlog.md` tracks migration work.
+- `docs/sql/data-api-builder-mcp.md` explains the local SQL MCP setup for read-only legacy database investigation.
 
 Keep durable workflow guidance in this file and keep user-facing setup guidance in `README.md`.
 
@@ -86,6 +87,8 @@ The deployed App Service runtime database setting is `ConnectionStrings__QueenZo
 The GitHub environment secret `QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING` is separate and is used by the deploy workflow for EF Core migrations. Updating the GitHub secret does not update the live App Service runtime connection string. When database credentials rotate, update both places as needed and restart the App Service before verifying production.
 
 For production debugging (log stream, Azure CLI, Azure MCP tenant setup, and forum smoke checks), see `docs/agent-handoff-cheatsheet.md`.
+
+For local SQL MCP access through Azure Data API Builder, see `docs/sql/data-api-builder-mcp.md`. Keep the MCP surface narrow and read-oriented by default.
 
 ## Migration Principles
 
