@@ -61,6 +61,8 @@ The hosted App Service currently connects to Azure SQL with SQL authentication. 
 
 Do not commit real usernames, passwords, publish profiles, or copied Azure setting values. If a SQL password contains semicolons or other connection-string delimiters, wrap it using the standard connection-string escaping rules before saving it in Azure or local settings.
 
+Agents can use Azure Data API Builder as a local SQL MCP server for controlled read-only legacy database investigation. Setup lives in `docs/sql/data-api-builder-mcp.md`; the DAB tool, config, and smoke-test artifacts should stay under ignored local paths such as `.tools`.
+
 ## Testing And Workflow
 
 Follow the layered testing policy in `docs/architecture/testing-policy.md`.
