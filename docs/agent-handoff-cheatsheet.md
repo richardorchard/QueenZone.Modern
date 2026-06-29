@@ -121,6 +121,19 @@ After a forum deploy, verify:
 
 In the log stream, `SqlException: Execution Timeout` in `LegacyForumRepository` usually means a full-table `COUNT(*)` on `Q_FORUM_TOPIC_T` or other heavy ad-hoc SQL. The modern read path should use denormalised `Q_FORUM_T.Q_FORUM_POST_COUNT`, `dbUser.Q_FORUM_TOPIC_THREAD_COUNT_V`, and `Q_FORUM_VIEW_PAGE_SP` instead. See `docs/legacy/table-map.md`.
 
+### Modern forum import status
+
+`docs/sql/004-modern-forum-batched-import.sql` creates the first modern forum archive read-model tables and resumable import procedures:
+
+- `ModernForumCategory`
+- `ModernForumThread`
+- `ModernForumPost`
+- `ImportCheckpoint`
+
+It was applied to `queenzone-db` on 2026-06-29 while the database was on the 5 DTU tier. The completed live import produced 10 categories, 5,969 threads, and 68,208 posts. `ModernForum.Threads` and `ModernForum.Posts` checkpoints both ended with `LastRowsImported = 0`.
+
+The public site still reads forum pages through `LegacyForumRepository`; switching public reads to the modern tables is follow-up work and should include parity checks against the legacy routes before production rollout.
+
 ## Quick Links
 
 - Primary agent instructions: [AGENTS.md](../AGENTS.md)
