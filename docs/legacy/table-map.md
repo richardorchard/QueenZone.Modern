@@ -37,6 +37,27 @@ The legacy schema contains 129 tables. This file focuses on the tables relevant 
 | `Q_FORUM_T` | Forum categories. | Read-only archive (categories wired on `/forum`). |
 | `Q_FORUM_TOPIC_T` | Forum topics and replies. | Later read-only archive. |
 | `Q_FORUM_TOPIC_SUBJECT_T` | Forum subject metadata. | Later read-only archive. |
+| `Q_STAGE_T` | Fan-submitted song performances ("fan stage"). | Read-only archive, wired on `/fan-performances` (`DISPLAY = 1` rows only). |
+
+### `Q_STAGE_T` columns
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `Q_STAGE_ID` | `smallint` | Primary key. |
+| `TITLE` | `varchar(100)` | Track title. |
+| `PERFORMED_BY` | `varchar(100)` | Performer/band name. |
+| `DESCRIPTION` | `varchar(1000)` | Free-text notes from the submitter. |
+| `URL` | `varchar(200)` | Bare audio filename (e.g. `2014417798057369.mp3`), not a path — served from the `songfiles` Azure Blob Storage container behind `pictures.queenzone.org`. |
+| `THESIZE` | varies | File size in bytes, stored as text by `Q_STAGE_T_PAGE_SP`. |
+| `DATE_ADDED` | `smalldatetime` | Submission date; archive sort key (`DESC`). |
+| `DISPLAY` | `tinyint` | Public visibility gate; only `1` is shown. |
+| `CONTACT` | `varchar(300)` | Legacy contact field; always empty in current data but excluded from the read model defensively (PII-shaped column). |
+| `USER_ID` | `int` | Legacy submitter account id; not exposed. |
+| `ALLOW_RATING` | `tinyint` | Leftover legacy rating-feature flag; not used (no rating feature in scope). |
+
+Related stored procedures: `Q_STAGE_T_LIST_SP` (unfiltered full list, unused by the modern app), `Q_STAGE_T_PAGE_SP` (paged, `DISPLAY = 1` only, ordered by `DATE_ADDED DESC` — used by `LegacyFanPerformanceRepository`), `Q_STAGE_T_DISPLAY_SP` (single row by id, does **not** filter `DISPLAY` — unused since the modern feature has no detail page).
+
+`Q_STAGE_T_PAGE_SP`'s own `@ItemCount` output counts every row in the table, not just visible ones, so `LegacyFanPerformanceRepository.GetVisibleCountAsync` runs a direct `COUNT(*) WHERE DISPLAY = 1` instead of trusting it.
 
 ### `Q_FORUM_T` columns
 

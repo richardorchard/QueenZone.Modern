@@ -1,0 +1,12 @@
+@page "/fan-performances"
+@model IndexModel
+
+<partial name="_PageHero" model='@(("The Fan Stage", "Fan Performances", "Covers, tributes and live sets recorded by the QueenZone community.", ""))' />
+
+<section class="qz-section">
+  <div class="qz-container">
+    <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
+    <partial name="_FanPerformanceList" model="Model.Items" />
+    <partial name="_ArchivePagination" model="FanPerformanceRoutes.GetPaginationViewModel(Model.CurrentPage, Model.TotalPages)" />
+  </div>
+</section>
