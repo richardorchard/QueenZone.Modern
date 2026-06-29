@@ -10,8 +10,10 @@ Scope:
   - Creates new dbo.ModernForum* tables and dbo.ImportCheckpoint.
   - Reads legacy forum tables.
   - Does not mutate legacy Q_FORUM_* or USERS_T data.
-  - Imports public archive-shaped data only; private fields such as emails,
+  - Imports forum archive-shaped data only; private fields such as emails,
     passwords, IP addresses, and private messages are not copied.
+  - Carries legacy visibility/moderation flags so public reads can filter
+    deliberately instead of losing data during import.
 
 Recommended 5 DTU run order:
   1. EXEC dbo.ModernForum_EnsureSchema;
@@ -24,14 +26,28 @@ Recommended 5 DTU run order:
 Notes:
   - Keep @MaxBatches low on 5 DTU so each call commits quickly.
   - Lower @BatchSize to 50-100 if TOPIC_MESSAGE rows are causing timeouts.
-  - Import all threads before posts. Replies are attached to imported parent
-    threads and use the post checkpoint only after their thread exists.
+  - The corrected full post import does not fit in the current 2 GB Basic
+    database alongside the legacy schema. Use a larger/separate database or
+    scale the Azure SQL tier before attempting the full import.
+  - Import all threads before posts. A legacy thread is any row where
+    TOPIC_STARTER = 1 OR Q_FORUM_TOPIC_PARENT_ID = 0. Most legacy threads are
+    self-parented TOPIC_STARTER = 1 rows, but older rows use parent_id = 0.
+  - Replies are attached to imported parent threads and use the post checkpoint
+    only after their thread exists.
 
 Live run:
-  Applied to queenzone-db on 2026-06-29 while the database was on the 5 DTU
-  tier. Threads completed at 5,969 rows; posts completed at 68,208 rows.
-  Final checkpoints for ModernForum.Threads and ModernForum.Posts both had
-  LastRowsImported = 0.
+  First applied to queenzone-db on 2026-06-29 while the database was on the
+  5 DTU tier. The initial run used the too-narrow parent_id = 0 thread rule.
+  This script was then corrected to import both TOPIC_STARTER = 1 and
+  parent_id = 0 thread shapes, include attachment fields, and provide
+  reconciliation procedures.
+
+  The corrected live import successfully imported 88,679 threads, then hit the
+  2 GB Basic database size quota after 570,000 of the 1,164,816 legacy
+  Q_FORUM_TOPIC_T rows had been imported as posts. The partial ModernForum*
+  tables were reset and the data file was shrunk back to 1.8 GB allocated
+  afterward. Keep this script as the import mechanism, but do not expect the
+  full forum post corpus to fit in the current Basic database.
 */
 
 SET NOCOUNT ON;
@@ -69,6 +85,7 @@ BEGIN
             SortOrder int NOT NULL,
             LegacyPostCount int NOT NULL,
             LastActivityAt datetime2(0) NULL,
+            IsSynthetic bit NOT NULL CONSTRAINT DF_ModernForumCategory_IsSynthetic DEFAULT (0),
             ImportedAt datetime2(0) NOT NULL CONSTRAINT DF_ModernForumCategory_ImportedAt DEFAULT (sysutcdatetime()),
             UpdatedAt datetime2(0) NOT NULL CONSTRAINT DF_ModernForumCategory_UpdatedAt DEFAULT (sysutcdatetime()),
             CONSTRAINT UQ_ModernForumCategory_LegacyForumId UNIQUE (LegacyForumId)
@@ -90,6 +107,12 @@ BEGIN
             LastActivityAt datetime2(0) NULL,
             ReplyCount int NOT NULL,
             IsSticky bit NOT NULL,
+            IsLegacyTopicStarter bit NOT NULL,
+            LegacyDiscography tinyint NOT NULL,
+            StartedByUserValidated bit NULL,
+            StarterAttachment varchar(120) NULL,
+            StarterFileSize varchar(12) NULL,
+            StarterAttachCount int NOT NULL,
             ImportedAt datetime2(0) NOT NULL CONSTRAINT DF_ModernForumThread_ImportedAt DEFAULT (sysutcdatetime()),
             UpdatedAt datetime2(0) NOT NULL CONSTRAINT DF_ModernForumThread_UpdatedAt DEFAULT (sysutcdatetime()),
             CONSTRAINT UQ_ModernForumThread_LegacyTopicId UNIQUE (LegacyTopicId),
@@ -118,6 +141,11 @@ BEGIN
             BodyHtml varchar(8000) NOT NULL,
             SignatureHtml varchar(8000) NULL,
             PostedAt datetime2(0) NULL,
+            LegacyDiscography tinyint NOT NULL,
+            AuthorUserValidated bit NULL,
+            Attachment varchar(120) NULL,
+            FileSize varchar(12) NULL,
+            AttachCount int NOT NULL,
             ImportedAt datetime2(0) NOT NULL CONSTRAINT DF_ModernForumPost_ImportedAt DEFAULT (sysutcdatetime()),
             UpdatedAt datetime2(0) NOT NULL CONSTRAINT DF_ModernForumPost_UpdatedAt DEFAULT (sysutcdatetime()),
             CONSTRAINT UQ_ModernForumPost_LegacyPostId UNIQUE (LegacyPostId),
@@ -128,6 +156,24 @@ BEGIN
         CREATE INDEX IX_ModernForumPost_Thread_Posted
         ON dbo.ModernForumPost (ThreadId, LegacyPostId ASC)
         INCLUDE (PostedAt, AuthorDisplayName);
+    END;
+END;
+GO
+
+CREATE OR ALTER PROCEDURE dbo.ModernForum_ResetImport
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    DROP TABLE IF EXISTS dbo.ModernForumPost;
+    DROP TABLE IF EXISTS dbo.ModernForumThread;
+    DROP TABLE IF EXISTS dbo.ModernForumCategory;
+
+    IF OBJECT_ID(N'dbo.ImportCheckpoint', N'U') IS NOT NULL
+    BEGIN
+        DELETE FROM dbo.ImportCheckpoint
+        WHERE Name IN (N'ModernForum.Threads', N'ModernForum.Posts');
     END;
 END;
 GO
@@ -149,9 +195,30 @@ BEGIN
             NULLIF(CONVERT(nvarchar(400), LTRIM(RTRIM(ISNULL(Q_FORUM_DESCRIPTION, '')))), '') AS Description,
             ISNULL(CAST(FORUM_ORDER AS int), 0) AS SortOrder,
             ISNULL(Q_FORUM_POST_COUNT, 0) AS LegacyPostCount,
-            CAST(Q_FORUM_LAST_POST AS datetime2(0)) AS LastActivityAt
+            CAST(Q_FORUM_LAST_POST AS datetime2(0)) AS LastActivityAt,
+            CONVERT(bit, 0) AS IsSynthetic
         FROM dbo.Q_FORUM_T
         WHERE LTRIM(RTRIM(ISNULL(Q_FORUM_NAME, ''))) <> ''
+
+        UNION ALL
+
+        SELECT
+            referenced.LegacyForumId,
+            CONCAT(N'Legacy Forum ', referenced.LegacyForumId) AS Name,
+            N'Synthetic category for legacy forum rows that reference a missing Q_FORUM_T record.' AS Description,
+            10000 + referenced.LegacyForumId AS SortOrder,
+            0 AS LegacyPostCount,
+            NULL AS LastActivityAt,
+            CONVERT(bit, 1) AS IsSynthetic
+        FROM (
+            SELECT DISTINCT CAST(Q_FORUM_ID AS int) AS LegacyForumId
+            FROM dbo.Q_FORUM_TOPIC_T
+        ) referenced
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM dbo.Q_FORUM_T existing
+            WHERE existing.Q_FORUM_ID = referenced.LegacyForumId
+        )
     ) AS source
     ON target.LegacyForumId = source.LegacyForumId
     WHEN MATCHED THEN
@@ -161,10 +228,11 @@ BEGIN
             SortOrder = source.SortOrder,
             LegacyPostCount = source.LegacyPostCount,
             LastActivityAt = source.LastActivityAt,
+            IsSynthetic = source.IsSynthetic,
             UpdatedAt = sysutcdatetime()
     WHEN NOT MATCHED BY TARGET THEN
-        INSERT (LegacyForumId, Name, Description, SortOrder, LegacyPostCount, LastActivityAt)
-        VALUES (source.LegacyForumId, source.Name, source.Description, source.SortOrder, source.LegacyPostCount, source.LastActivityAt);
+        INSERT (LegacyForumId, Name, Description, SortOrder, LegacyPostCount, LastActivityAt, IsSynthetic)
+        VALUES (source.LegacyForumId, source.Name, source.Description, source.SortOrder, source.LegacyPostCount, source.LastActivityAt, source.IsSynthetic);
 END;
 GO
 
@@ -200,7 +268,13 @@ BEGIN
         StartedAt datetime2(0) NULL,
         LastActivityAt datetime2(0) NULL,
         ReplyCount int NOT NULL,
-        IsSticky bit NOT NULL
+        IsSticky bit NOT NULL,
+        IsLegacyTopicStarter bit NOT NULL,
+        LegacyDiscography tinyint NOT NULL,
+        StartedByUserValidated bit NULL,
+        StarterAttachment varchar(120) NULL,
+        StarterFileSize varchar(12) NULL,
+        StarterAttachCount int NOT NULL
     );
 
     IF NOT EXISTS (SELECT 1 FROM dbo.ImportCheckpoint WHERE Name = @checkpointName)
@@ -228,28 +302,38 @@ BEGIN
             StartedAt,
             LastActivityAt,
             ReplyCount,
-            IsSticky
+            IsSticky,
+            IsLegacyTopicStarter,
+            LegacyDiscography,
+            StartedByUserValidated,
+            StarterAttachment,
+            StarterFileSize,
+            StarterAttachCount
         )
         SELECT TOP (@BatchSize)
             t.Q_FORUM_TOPIC_ID,
             CAST(t.Q_FORUM_ID AS int),
             c.Id,
-            CONVERT(nvarchar(200), LTRIM(RTRIM(t.TOPIC_SUBJECT))),
+            COALESCE(NULLIF(CONVERT(nvarchar(200), LTRIM(RTRIM(t.TOPIC_SUBJECT))), N''), N'(untitled)'),
             t.USER_ID,
             COALESCE(NULLIF(CONVERT(nvarchar(100), LTRIM(RTRIM(u.USERNAME))), ''), N'Unknown'),
             CAST(t.TOPIC_DATE AS datetime2(0)),
             CAST(t.TOPIC_LAST_POST AS datetime2(0)),
             ISNULL(CAST(t.TOPIC_REPLIES AS int), 0),
-            CASE WHEN ISNULL(t.STICKY, 0) = 1 THEN CONVERT(bit, 1) ELSE CONVERT(bit, 0) END
+            CASE WHEN ISNULL(t.STICKY, 0) = 1 THEN CONVERT(bit, 1) ELSE CONVERT(bit, 0) END,
+            CASE WHEN ISNULL(t.TOPIC_STARTER, 0) = 1 THEN CONVERT(bit, 1) ELSE CONVERT(bit, 0) END,
+            ISNULL(t.DISCOGRAPHY, 0),
+            CASE WHEN u.USER_ID IS NULL THEN NULL WHEN ISNULL(u.VALIDATED, 0) = 1 THEN CONVERT(bit, 1) ELSE CONVERT(bit, 0) END,
+            NULLIF(t.ATTACHMENT, ''),
+            NULLIF(CONVERT(varchar(12), LTRIM(RTRIM(ISNULL(t.FILESIZE, '')))), ''),
+            ISNULL(CAST(t.ATTACH_COUNT AS int), 0)
         FROM dbo.Q_FORUM_TOPIC_T t
         INNER JOIN dbo.ModernForumCategory c
             ON c.LegacyForumId = CAST(t.Q_FORUM_ID AS int)
         LEFT JOIN dbo.USERS_T u
             ON u.USER_ID = t.USER_ID
         WHERE t.Q_FORUM_TOPIC_ID > @lastLegacyId
-          AND t.Q_FORUM_TOPIC_PARENT_ID = 0
-          AND LTRIM(RTRIM(ISNULL(t.TOPIC_SUBJECT, ''))) <> ''
-          AND ISNULL(t.DISCOGRAPHY, 0) <> 2
+          AND (t.TOPIC_STARTER = 1 OR t.Q_FORUM_TOPIC_PARENT_ID = 0)
         ORDER BY t.Q_FORUM_TOPIC_ID ASC;
 
         BEGIN TRANSACTION;
@@ -265,7 +349,13 @@ BEGIN
             StartedAt,
             LastActivityAt,
             ReplyCount,
-            IsSticky
+            IsSticky,
+            IsLegacyTopicStarter,
+            LegacyDiscography,
+            StartedByUserValidated,
+            StarterAttachment,
+            StarterFileSize,
+            StarterAttachCount
         )
         SELECT
             b.LegacyTopicId,
@@ -277,7 +367,13 @@ BEGIN
             b.StartedAt,
             b.LastActivityAt,
             b.ReplyCount,
-            b.IsSticky
+            b.IsSticky,
+            b.IsLegacyTopicStarter,
+            b.LegacyDiscography,
+            b.StartedByUserValidated,
+            b.StarterAttachment,
+            b.StarterFileSize,
+            b.StarterAttachCount
         FROM @threadBatch b
         WHERE NOT EXISTS (
             SELECT 1
@@ -323,6 +419,17 @@ BEGIN
 
     EXEC dbo.ModernForum_EnsureSchema;
 
+    IF NOT EXISTS (
+        SELECT 1
+        FROM dbo.ImportCheckpoint
+        WHERE Name = N'ModernForum.Threads'
+          AND LastRowsImported = 0
+    )
+    BEGIN
+        RAISERROR('ModernForum_ImportPosts requires ModernForum_ImportThreads to finish first. Repeat thread imports until RowsImported = 0, then run posts.', 16, 1);
+        RETURN;
+    END;
+
     IF EXISTS (
         SELECT 1
         FROM dbo.ImportCheckpoint
@@ -356,7 +463,12 @@ BEGIN
         AuthorJoinedAt datetime2(0) NULL,
         BodyHtml varchar(8000) NOT NULL,
         SignatureHtml varchar(8000) NULL,
-        PostedAt datetime2(0) NULL
+        PostedAt datetime2(0) NULL,
+        LegacyDiscography tinyint NOT NULL,
+        AuthorUserValidated bit NULL,
+        Attachment varchar(120) NULL,
+        FileSize varchar(12) NULL,
+        AttachCount int NOT NULL
     );
 
     IF NOT EXISTS (SELECT 1 FROM dbo.ImportCheckpoint WHERE Name = @checkpointName)
@@ -385,7 +497,12 @@ BEGIN
             AuthorJoinedAt,
             BodyHtml,
             SignatureHtml,
-            PostedAt
+            PostedAt,
+            LegacyDiscography,
+            AuthorUserValidated,
+            Attachment,
+            FileSize,
+            AttachCount
         )
         SELECT TOP (@BatchSize)
             t.Q_FORUM_TOPIC_ID,
@@ -398,18 +515,21 @@ BEGIN
             CAST(u.DATE_CREATED AS datetime2(0)),
             ISNULL(t.TOPIC_MESSAGE, ''),
             NULLIF(u.SIGNATURE, ''),
-            CAST(t.TOPIC_DATE AS datetime2(0))
+            CAST(t.TOPIC_DATE AS datetime2(0)),
+            ISNULL(t.DISCOGRAPHY, 0),
+            CASE WHEN u.USER_ID IS NULL THEN NULL WHEN ISNULL(u.VALIDATED, 0) = 1 THEN CONVERT(bit, 1) ELSE CONVERT(bit, 0) END,
+            NULLIF(t.ATTACHMENT, ''),
+            NULLIF(CONVERT(varchar(12), LTRIM(RTRIM(ISNULL(t.FILESIZE, '')))), ''),
+            ISNULL(CAST(t.ATTACH_COUNT AS int), 0)
         FROM dbo.Q_FORUM_TOPIC_T t
         INNER JOIN dbo.ModernForumThread mt
             ON mt.LegacyTopicId = CASE
-                WHEN t.Q_FORUM_TOPIC_PARENT_ID = 0 THEN t.Q_FORUM_TOPIC_ID
+                WHEN t.TOPIC_STARTER = 1 OR t.Q_FORUM_TOPIC_PARENT_ID = 0 THEN t.Q_FORUM_TOPIC_ID
                 ELSE t.Q_FORUM_TOPIC_PARENT_ID
             END
         LEFT JOIN dbo.USERS_T u
             ON u.USER_ID = t.USER_ID
         WHERE t.Q_FORUM_TOPIC_ID > @lastLegacyId
-          AND ISNULL(t.DISCOGRAPHY, 0) <> 2
-          AND ISNULL(t.TOPIC_MESSAGE, '') <> ''
         ORDER BY t.Q_FORUM_TOPIC_ID ASC;
 
         BEGIN TRANSACTION;
@@ -426,7 +546,12 @@ BEGIN
             AuthorJoinedAt,
             BodyHtml,
             SignatureHtml,
-            PostedAt
+            PostedAt,
+            LegacyDiscography,
+            AuthorUserValidated,
+            Attachment,
+            FileSize,
+            AttachCount
         )
         SELECT
             b.LegacyPostId,
@@ -439,7 +564,12 @@ BEGIN
             b.AuthorJoinedAt,
             b.BodyHtml,
             b.SignatureHtml,
-            b.PostedAt
+            b.PostedAt,
+            b.LegacyDiscography,
+            b.AuthorUserValidated,
+            b.Attachment,
+            b.FileSize,
+            b.AttachCount
         FROM @postBatch b
         WHERE NOT EXISTS (
             SELECT 1
@@ -474,6 +604,69 @@ BEGIN
 END;
 GO
 
+CREATE OR ALTER PROCEDURE dbo.ModernForum_GetImportReconciliation
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    WITH CategorySource AS
+    (
+        SELECT CAST(Q_FORUM_ID AS int) AS LegacyForumId
+        FROM dbo.Q_FORUM_T
+        WHERE LTRIM(RTRIM(ISNULL(Q_FORUM_NAME, ''))) <> ''
+
+        UNION
+
+        SELECT DISTINCT CAST(Q_FORUM_ID AS int) AS LegacyForumId
+        FROM dbo.Q_FORUM_TOPIC_T
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM dbo.Q_FORUM_T existing
+            WHERE existing.Q_FORUM_ID = CAST(Q_FORUM_TOPIC_T.Q_FORUM_ID AS int)
+        )
+    ),
+    ThreadSource AS
+    (
+        SELECT Q_FORUM_TOPIC_ID
+        FROM dbo.Q_FORUM_TOPIC_T
+        WHERE TOPIC_STARTER = 1
+           OR Q_FORUM_TOPIC_PARENT_ID = 0
+    ),
+    PostSource AS
+    (
+        SELECT p.Q_FORUM_TOPIC_ID
+        FROM dbo.Q_FORUM_TOPIC_T p
+        INNER JOIN ThreadSource threads
+            ON threads.Q_FORUM_TOPIC_ID = CASE
+                WHEN p.TOPIC_STARTER = 1 OR p.Q_FORUM_TOPIC_PARENT_ID = 0 THEN p.Q_FORUM_TOPIC_ID
+                ELSE p.Q_FORUM_TOPIC_PARENT_ID
+            END
+    )
+    SELECT 'source categories' AS Metric, COUNT_BIG(*) AS Rows FROM CategorySource
+    UNION ALL SELECT 'imported categories', COUNT_BIG(*) FROM dbo.ModernForumCategory
+    UNION ALL SELECT 'source threads', COUNT_BIG(*) FROM ThreadSource
+    UNION ALL SELECT 'imported threads', COUNT_BIG(*) FROM dbo.ModernForumThread
+    UNION ALL SELECT 'source posts mapped to source threads', COUNT_BIG(*) FROM PostSource
+    UNION ALL SELECT 'imported posts', COUNT_BIG(*) FROM dbo.ModernForumPost
+    UNION ALL
+    SELECT 'legacy rows not mapped to a source thread', COUNT_BIG(*)
+    FROM dbo.Q_FORUM_TOPIC_T p
+    WHERE NOT EXISTS (
+        SELECT 1
+        FROM ThreadSource threads
+        WHERE threads.Q_FORUM_TOPIC_ID = CASE
+            WHEN p.TOPIC_STARTER = 1 OR p.Q_FORUM_TOPIC_PARENT_ID = 0 THEN p.Q_FORUM_TOPIC_ID
+            ELSE p.Q_FORUM_TOPIC_PARENT_ID
+        END
+    );
+
+    SELECT Name, LastLegacyId, LastRowsImported, LastRunStartedAt, LastRunCompletedAt, UpdatedAt
+    FROM dbo.ImportCheckpoint
+    WHERE Name LIKE N'ModernForum.%'
+    ORDER BY Name;
+END;
+GO
+
 /*
 Progress checks:
 
@@ -482,12 +675,15 @@ SELECT * FROM dbo.ImportCheckpoint WHERE Name LIKE N'ModernForum.%';
 SELECT COUNT(*) AS Categories FROM dbo.ModernForumCategory;
 SELECT COUNT(*) AS Threads FROM dbo.ModernForumThread;
 SELECT COUNT(*) AS Posts FROM dbo.ModernForumPost;
+EXEC dbo.ModernForum_GetImportReconciliation;
 
 Rollback for proof-of-concept environments:
 
+DROP PROCEDURE IF EXISTS dbo.ModernForum_GetImportReconciliation;
 DROP PROCEDURE IF EXISTS dbo.ModernForum_ImportPosts;
 DROP PROCEDURE IF EXISTS dbo.ModernForum_ImportThreads;
 DROP PROCEDURE IF EXISTS dbo.ModernForum_ImportCategories;
+DROP PROCEDURE IF EXISTS dbo.ModernForum_ResetImport;
 DROP PROCEDURE IF EXISTS dbo.ModernForum_EnsureSchema;
 DROP TABLE IF EXISTS dbo.ModernForumPost;
 DROP TABLE IF EXISTS dbo.ModernForumThread;

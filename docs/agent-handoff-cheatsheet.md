@@ -130,7 +130,9 @@ In the log stream, `SqlException: Execution Timeout` in `LegacyForumRepository` 
 - `ModernForumPost`
 - `ImportCheckpoint`
 
-It was applied to `queenzone-db` on 2026-06-29 while the database was on the 5 DTU tier. The completed live import produced 10 categories, 5,969 threads, and 68,208 posts. `ModernForum.Threads` and `ModernForum.Posts` checkpoints both ended with `LastRowsImported = 0`.
+It was applied to `queenzone-db` on 2026-06-29 while the database was on the 5 DTU / 2 GB Basic tier. The initial import used a too-narrow `Q_FORUM_TOPIC_PARENT_ID = 0` thread rule and was reset. The corrected import treats `TOPIC_STARTER = 1 OR Q_FORUM_TOPIC_PARENT_ID = 0` as legacy threads and carries attachment fields.
+
+The corrected live run imported 88,679 threads, but the post import hit Azure SQL error `40544` at 570,000 imported posts because the database reached its 2 GB size quota before the full 1,164,816-row `Q_FORUM_TOPIC_T` corpus could fit alongside the legacy schema. The partial `ModernForum*` tables were reset, and `DBCC SHRINKFILE (data_0, 1800)` reduced the data file back to 1.8 GB allocated. As of that cleanup, the modern tables are not populated in production; the procedures remain available for a future run on a larger or separate database.
 
 The public site still reads forum pages through `LegacyForumRepository`; switching public reads to the modern tables is follow-up work and should include parity checks against the legacy routes before production rollout.
 
