@@ -1,0 +1,10 @@
+@page "/fan-performances/page/{pageNumber:int}"
+@model ArchivePageModel
+
+<partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
+
+<h1>Fan performances archive</h1>
+
+<partial name="_FanPerformanceList" model="Model.Items" />
+
+<partial name="_ArchivePagination" model="FanPerformanceRoutes.GetPaginationViewModel(Model.CurrentPage, Model.TotalPages)" />

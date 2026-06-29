@@ -7,7 +7,8 @@ public sealed class CoreSitemapBuilder(
     IArticlesRepository articlesRepository,
     IBiographyRepository biographyRepository,
     IForumRepository forumRepository,
-    IPhotoRepository photoRepository)
+    IPhotoRepository photoRepository,
+    IFanPerformanceRepository fanPerformanceRepository)
 {
     public async Task<IReadOnlyList<SitemapEntry>> BuildAsync(CancellationToken cancellationToken = default)
     {
@@ -18,6 +19,7 @@ public sealed class CoreSitemapBuilder(
         await AddBiographyEntriesAsync(entries, cancellationToken);
         await AddForumEntriesAsync(entries, cancellationToken);
         await AddPhotographyEntriesAsync(entries, cancellationToken);
+        await AddFanPerformanceEntriesAsync(entries, cancellationToken);
 
         return entries;
     }
@@ -110,6 +112,22 @@ public sealed class CoreSitemapBuilder(
                     PhotoRoutes.GetDetailPath(category.Slug, photo.PicId),
                     photo.DateTime));
             }
+        }
+    }
+
+    private async Task AddFanPerformanceEntriesAsync(List<SitemapEntry> entries, CancellationToken cancellationToken)
+    {
+        var visibleCount = await fanPerformanceRepository.GetVisibleCountAsync(cancellationToken);
+        var totalPages = FanPerformanceRoutes.GetTotalPages(visibleCount);
+
+        for (var page = 1; page <= totalPages; page++)
+        {
+            entries.Add(new(FanPerformanceRoutes.GetPagePath(page)));
+        }
+
+        if (totalPages == 0)
+        {
+            entries.Add(new(FanPerformanceRoutes.GetIndexPath()));
         }
     }
 }
