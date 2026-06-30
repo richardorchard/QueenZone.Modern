@@ -1060,6 +1060,135 @@ body.qz-menu-lock {
   gap: var(--space-4);
 }
 
+.qz-album-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));
+  gap: var(--space-6) var(--space-4);
+}
+
+.qz-album-card {
+  display: block;
+  text-decoration: none;
+  color: var(--text-primary);
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
+.qz-album-card:hover {
+  transform: translateY(-5px);
+}
+
+.qz-album-card__cover {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+  background: var(--qz-grey-100);
+}
+
+.qz-album-card__cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.qz-album-card__title {
+  margin-top: var(--space-3);
+  font: var(--fw-semibold) 1.1rem/1.2 var(--font-display);
+}
+
+.qz-album-card__year {
+  margin-top: var(--space-1);
+  font: var(--type-meta);
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.qz-album-hero {
+  position: relative;
+  overflow: hidden;
+  background: var(--qz-black);
+  color: var(--text-on-dark);
+  padding: var(--space-8) 0;
+}
+
+.qz-album-hero h1 {
+  color: var(--qz-white);
+}
+
+.qz-album-hero__layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-6);
+  align-items: center;
+}
+
+.qz-album-hero__cover {
+  flex: 0 0 min(280px, 100%);
+  aspect-ratio: 1 / 1;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.qz-album-hero__cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.qz-album-tracklist {
+  list-style: none;
+  margin: 0 0 var(--space-6);
+  padding: 0;
+  max-width: var(--container-text);
+}
+
+.qz-album-track {
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.qz-album-track__row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.qz-album-tracklist__single {
+  font: var(--type-meta);
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+  color: var(--qz-gold);
+}
+
+.qz-album-track__notes {
+  margin: var(--space-2) 0 0;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+.qz-album-track__lyrics {
+  margin-top: var(--space-2);
+}
+
+.qz-album-track__lyrics summary {
+  cursor: pointer;
+  font: var(--type-meta);
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.qz-album-track__lyrics p {
+  margin: var(--space-2) 0 0;
+  white-space: pre-line;
+  color: var(--text-secondary);
+}
+
 .qz-photo-thumb {
   margin: 0;
 }

@@ -8,7 +8,8 @@ public sealed class CoreSitemapBuilder(
     IBiographyRepository biographyRepository,
     IForumRepository forumRepository,
     IPhotoRepository photoRepository,
-    IFanPerformanceRepository fanPerformanceRepository)
+    IFanPerformanceRepository fanPerformanceRepository,
+    IDiscographyRepository discographyRepository)
 {
     public async Task<IReadOnlyList<SitemapEntry>> BuildAsync(CancellationToken cancellationToken = default)
     {
@@ -20,6 +21,7 @@ public sealed class CoreSitemapBuilder(
         await AddForumEntriesAsync(entries, cancellationToken);
         await AddPhotographyEntriesAsync(entries, cancellationToken);
         await AddFanPerformanceEntriesAsync(entries, cancellationToken);
+        await AddDiscographyEntriesAsync(entries, cancellationToken);
 
         return entries;
     }
@@ -128,6 +130,17 @@ public sealed class CoreSitemapBuilder(
         if (totalPages == 0)
         {
             entries.Add(new(FanPerformanceRoutes.GetIndexPath()));
+        }
+    }
+
+    private async Task AddDiscographyEntriesAsync(List<SitemapEntry> entries, CancellationToken cancellationToken)
+    {
+        entries.Add(new(DiscographyRoutes.GetIndexPath()));
+
+        var albums = await discographyRepository.GetAlbumsAsync(cancellationToken);
+        foreach (var album in albums)
+        {
+            entries.Add(new(DiscographyRoutes.GetAlbumPath(album)));
         }
     }
 }
