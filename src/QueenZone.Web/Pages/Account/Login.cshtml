@@ -1,0 +1,32 @@
+@page "/account/login"
+@model LoginModel
+
+<partial name="_PageHero" model='@(("Members", "Sign in", "Sign in to QueenZone with Google, Microsoft, Facebook, or your Queenzone.org account.", ""))' />
+
+<section class="qz-section">
+  <div class="qz-container qz-prose">
+    <div class="qz-account-providers">
+      @if (Model.GoogleEnabled)
+      {
+        <a class="qz-button" href="/account/external-login?provider=Google&returnUrl=@Uri.EscapeDataString(Model.ReturnUrl)">Continue with Google</a>
+      }
+      @if (Model.MicrosoftEnabled)
+      {
+        <a class="qz-button" href="/account/external-login?provider=Microsoft&returnUrl=@Uri.EscapeDataString(Model.ReturnUrl)">Continue with Microsoft</a>
+      }
+      @if (Model.FacebookEnabled)
+      {
+        <a class="qz-button" href="/account/external-login?provider=Facebook&returnUrl=@Uri.EscapeDataString(Model.ReturnUrl)">Continue with Facebook</a>
+      }
+    </div>
+
+    <hr>
+
+    <p>Or sign in with your Queenzone.org account.</p>
+    <p>
+      <a href="/account/sign-in?returnUrl=@Uri.EscapeDataString(Model.ReturnUrl)">Sign in with email</a>
+      &middot;
+      <a href="/account/register?returnUrl=@Uri.EscapeDataString(Model.ReturnUrl)">Create a Queenzone.org account</a>
+    </p>
+  </div>
+</section>

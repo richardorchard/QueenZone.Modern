@@ -6,10 +6,14 @@
 
   <ItemGroup>
     <PackageReference Include="HtmlSanitizer" Version="9.0.892" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.Facebook" Version="10.0.9" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.Google" Version="10.0.9" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.MicrosoftAccount" Version="10.0.9" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <PackageReference Include="Microsoft.Extensions.Identity.Core" Version="10.0.9" />
     <PackageReference Include="Microsoft.Identity.Web" Version="3.8.4" />
   </ItemGroup>
 
@@ -22,11 +26,7 @@
   </PropertyGroup>
 
   <Target Name="SetBuildMetadata" BeforeTargets="GetAssemblyVersion;GetAssemblyAttributes;GenerateAssemblyInfo">
-    <Exec Command="git rev-parse --short HEAD"
-          ConsoleToMSBuild="true"
-          IgnoreExitCode="true"
-          StandardOutputImportance="low"
-          WorkingDirectory="$(RepositoryRoot)">
+    <Exec Command="git rev-parse --short HEAD" ConsoleToMSBuild="true" IgnoreExitCode="true" StandardOutputImportance="low" WorkingDirectory="$(RepositoryRoot)">
       <Output TaskParameter="ConsoleOutput" PropertyName="GitCommitShort" />
     </Exec>
     <PropertyGroup>

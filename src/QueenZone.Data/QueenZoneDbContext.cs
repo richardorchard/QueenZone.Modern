@@ -9,6 +9,10 @@ public sealed class QueenZoneDbContext(DbContextOptions<QueenZoneDbContext> opti
 
     public DbSet<NewsAuditLogEntity> NewsAuditLogs => Set<NewsAuditLogEntity>();
 
+    public DbSet<MemberAccount> MemberAccounts => Set<MemberAccount>();
+
+    public DbSet<MemberExternalLogin> MemberExternalLogins => Set<MemberExternalLogin>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<NewsTableRow>(entity =>
@@ -52,6 +56,42 @@ public sealed class QueenZoneDbContext(DbContextOptions<QueenZoneDbContext> opti
             entity.HasIndex(log => new { log.NewsId, log.OccurredAt })
                 .IsDescending(false, true)
                 .HasDatabaseName("IX_NewsAuditLog_NewsId_OccurredAt");
+        });
+
+        modelBuilder.Entity<MemberAccount>(entity =>
+        {
+            entity.ToTable("MemberAccounts");
+            entity.HasKey(account => account.Id);
+
+            entity.Property(account => account.Email).HasMaxLength(256).IsRequired();
+            entity.Property(account => account.NormalizedEmail).HasMaxLength(256).IsRequired();
+            entity.Property(account => account.DisplayName).HasMaxLength(100).IsRequired();
+            entity.Property(account => account.PasswordHash).HasMaxLength(512);
+            entity.Property(account => account.CreatedAt).IsRequired();
+
+            entity.HasIndex(account => account.NormalizedEmail)
+                .IsUnique()
+                .HasDatabaseName("IX_MemberAccounts_NormalizedEmail");
+        });
+
+        modelBuilder.Entity<MemberExternalLogin>(entity =>
+        {
+            entity.ToTable("MemberExternalLogins");
+            entity.HasKey(login => login.Id);
+
+            entity.Property(login => login.Provider).HasMaxLength(50).IsRequired();
+            entity.Property(login => login.ProviderKey).HasMaxLength(256).IsRequired();
+            entity.Property(login => login.Email).HasMaxLength(256).IsRequired();
+            entity.Property(login => login.LinkedAt).IsRequired();
+
+            entity.HasIndex(login => new { login.Provider, login.ProviderKey })
+                .IsUnique()
+                .HasDatabaseName("IX_MemberExternalLogins_Provider_ProviderKey");
+
+            entity.HasOne<MemberAccount>()
+                .WithMany()
+                .HasForeignKey(login => login.MemberAccountId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }
