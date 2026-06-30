@@ -136,7 +136,7 @@ The corrected live run first hit Azure SQL error `40544` at 570,000 imported pos
 
 After the database max size was increased to 5 GB, the corrected import completed successfully: 18 categories, 89,070 threads, and 1,164,816 posts. Reconciliation reported 0 legacy rows unmapped to a source thread. Attachment fields are present in the modern tables: 4,754 thread rows with starter attachments and 11,690 post rows with attachments. After import, the data file was about 2.5 GB allocated of 5 GB max.
 
-The public site still reads forum pages through `LegacyForumRepository`; switching public reads to the modern tables is follow-up work and should include parity checks against the legacy routes before production rollout.
+The public site can read forum pages through `ModernForumRepository` when `ForumData:UseModernForumReads` is enabled. This is the default for SQL-backed runtime configuration after PR #86. Set `ForumData__UseModernForumReads=false` in App Service configuration for an emergency rollback to `LegacyForumRepository`.
 
 ## Quick Links
 
