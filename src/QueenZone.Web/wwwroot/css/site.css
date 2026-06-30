@@ -275,6 +275,28 @@
   text-decoration: none;
 }
 
+.qz-masthead__member-name {
+  display: inline-flex;
+  align-items: center;
+  max-width: 9rem;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--qz-masthead-ink-strong);
+  font: var(--fw-medium) 0.8125rem/1 var(--font-body);
+  letter-spacing: 0.04em;
+}
+
+.qz-masthead__member-name--mobile {
+  max-width: none;
+  margin-top: var(--space-5);
+  color: var(--qz-charcoal);
+}
+
+.qz-masthead__member-name--mobile + .qz-masthead__signin--mobile {
+  margin-top: var(--space-2);
+}
+
 .qz-masthead__signin:hover,
 .qz-masthead__admin-link:hover {
   color: var(--qz-masthead-accent);

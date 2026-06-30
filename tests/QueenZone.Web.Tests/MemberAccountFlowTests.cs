@@ -33,6 +33,28 @@ public sealed partial class MemberAccountFlowTests : IClassFixture<WebApplicatio
     }
 
     [Fact]
+    public async Task SiteHeader_ShowsDisplayNameAndSignOut_AfterRegistering()
+    {
+        var client = CreateClient();
+
+        var homeBeforeSignIn = await client.GetStringAsync("/");
+        Assert.Contains("Sign in", homeBeforeSignIn);
+        Assert.DoesNotContain("Sign out", homeBeforeSignIn);
+
+        await PostFormAsync(client, "/account/register", "/account/register", new Dictionary<string, string>
+        {
+            ["email"] = "headerstate@example.com",
+            ["password"] = "S3curePassword!",
+            ["displayName"] = "Header Tester",
+            ["returnUrl"] = "/",
+        });
+
+        var homeAfterSignIn = await client.GetStringAsync("/");
+        Assert.Contains("Header Tester", homeAfterSignIn);
+        Assert.Contains("Sign out", homeAfterSignIn);
+    }
+
+    [Fact]
     public async Task Register_RejectsDuplicateEmail()
     {
         var client = CreateClient();
