@@ -243,7 +243,7 @@ BEGIN
 
     INSERT @ModernTopics
     SELECT
-        CAST(ROW_NUMBER() OVER (ORDER BY t.IsSticky DESC, t.LastActivityAt DESC, t.LegacyTopicId ASC) AS int) AS Id,
+        CAST(0 AS int) AS Id,
         t.LegacyTopicId AS Q_FORUM_TOPIC_ID,
         t.Title AS TOPIC_SUBJECT,
         t.LastActivityAt AS TOPIC_LAST_POST,
@@ -257,18 +257,17 @@ BEGIN
     WHERE c.LegacyForumId = @ForumId
       AND c.IsSynthetic = 0
       AND t.IsLegacyTopicStarter = 1
-      AND ISNULL(t.StartedByUserValidated, 0) = 1
+      AND t.StartedByUserValidated = 1
     ORDER BY t.IsSticky DESC, t.LastActivityAt DESC, t.LegacyTopicId ASC
     OFFSET ((@TopicsPage - 1) * @TopicsPageSize) ROWS FETCH NEXT @TopicsPageSize ROWS ONLY;
 
     SET @RowsRead = @@ROWCOUNT;
 
-    SELECT @TotalRows = COUNT_BIG(*)
-    FROM dbo.ModernForumThread t
-    INNER JOIN dbo.ModernForumCategory c ON c.Id = t.CategoryId
+    SELECT @TotalRows = s.TotalThreads
+    FROM dbo.ModernForumCategory c
+    INNER JOIN dbo.ModernForumCategoryReadStats s ON s.CategoryId = c.Id
     WHERE c.LegacyForumId = @ForumId
-      AND c.IsSynthetic = 0
-      AND t.IsLegacyTopicStarter = 1;
+      AND c.IsSynthetic = 0;
 
     INSERT @Results
     VALUES (@Run, 'category topics', 'modern', CONCAT('forum ', @ForumId, ' page ', @TopicsPage), @RowsRead, @TotalRows, DATEDIFF(millisecond, @StartedAt, SYSUTCDATETIME()));
@@ -294,7 +293,7 @@ BEGIN
 
     INSERT @ModernTopics
     SELECT
-        CAST(ROW_NUMBER() OVER (ORDER BY t.IsSticky DESC, t.LastActivityAt DESC, t.LegacyTopicId ASC) AS int) AS Id,
+        CAST(0 AS int) AS Id,
         t.LegacyTopicId AS Q_FORUM_TOPIC_ID,
         t.Title AS TOPIC_SUBJECT,
         t.LastActivityAt AS TOPIC_LAST_POST,
@@ -308,18 +307,17 @@ BEGIN
     WHERE c.LegacyForumId = @ForumId
       AND c.IsSynthetic = 0
       AND t.IsLegacyTopicStarter = 1
-      AND ISNULL(t.StartedByUserValidated, 0) = 1
+      AND t.StartedByUserValidated = 1
     ORDER BY t.IsSticky DESC, t.LastActivityAt DESC, t.LegacyTopicId ASC
     OFFSET ((@DeepTopicsPage - 1) * @TopicsPageSize) ROWS FETCH NEXT @TopicsPageSize ROWS ONLY;
 
     SET @RowsRead = @@ROWCOUNT;
 
-    SELECT @TotalRows = COUNT_BIG(*)
-    FROM dbo.ModernForumThread t
-    INNER JOIN dbo.ModernForumCategory c ON c.Id = t.CategoryId
+    SELECT @TotalRows = s.TotalThreads
+    FROM dbo.ModernForumCategory c
+    INNER JOIN dbo.ModernForumCategoryReadStats s ON s.CategoryId = c.Id
     WHERE c.LegacyForumId = @ForumId
-      AND c.IsSynthetic = 0
-      AND t.IsLegacyTopicStarter = 1;
+      AND c.IsSynthetic = 0;
 
     INSERT @Results
     VALUES (@Run, 'category topics', 'modern', CONCAT('forum ', @ForumId, ' page ', @DeepTopicsPage), @RowsRead, @TotalRows, DATEDIFF(millisecond, @StartedAt, SYSUTCDATETIME()));
@@ -415,10 +413,9 @@ BEGIN
 
     SET @RowsRead = @@ROWCOUNT;
 
-    SELECT @TotalRows = COUNT_BIG(*)
-    FROM dbo.ModernForumPost p
-    INNER JOIN dbo.ModernForumThread t ON t.Id = p.ThreadId
-    WHERE t.LegacyTopicId = @TopicId;
+    SELECT @TotalRows = s.PostCount
+    FROM dbo.ModernForumThreadReadStats s
+    WHERE s.LegacyTopicId = @TopicId;
 
     INSERT @Results
     VALUES (@Run, 'topic posts', 'modern', CONCAT('topic ', @TopicId, ' page ', @TopicPostsPage), @RowsRead, @TotalRows, DATEDIFF(millisecond, @StartedAt, SYSUTCDATETIME()));
@@ -478,10 +475,9 @@ BEGIN
 
     SET @RowsRead = @@ROWCOUNT;
 
-    SELECT @TotalRows = COUNT_BIG(*)
-    FROM dbo.ModernForumPost p
-    INNER JOIN dbo.ModernForumThread t ON t.Id = p.ThreadId
-    WHERE t.LegacyTopicId = @TopicId;
+    SELECT @TotalRows = s.PostCount
+    FROM dbo.ModernForumThreadReadStats s
+    WHERE s.LegacyTopicId = @TopicId;
 
     INSERT @Results
     VALUES (@Run, 'topic posts', 'modern', CONCAT('topic ', @TopicId, ' page ', @DeepTopicPostsPage), @RowsRead, @TotalRows, DATEDIFF(millisecond, @StartedAt, SYSUTCDATETIME()));
@@ -496,8 +492,9 @@ BEGIN
 
     SET @StartedAt = SYSUTCDATETIME();
 
-    SELECT @TotalRows = COUNT_BIG(*)
-    FROM dbo.ModernForumThread;
+    SELECT @TotalRows = TotalThreads
+    FROM dbo.ModernForumArchiveReadStats
+    WHERE Id = 1;
 
     INSERT @Results
     VALUES (@Run, 'thread count', 'modern', 'archive stats', 1, @TotalRows, DATEDIFF(millisecond, @StartedAt, SYSUTCDATETIME()));
@@ -541,9 +538,9 @@ BEGIN
 
     SET @StartedAt = SYSUTCDATETIME();
 
-    SELECT @TotalRows = COUNT_BIG(*)
-    FROM dbo.ModernForumThread
-    WHERE NULLIF(LTRIM(RTRIM(Title)), '') IS NOT NULL;
+    SELECT @TotalRows = SitemapTopicCount
+    FROM dbo.ModernForumArchiveReadStats
+    WHERE Id = 1;
 
     INSERT @ModernSitemap
     SELECT

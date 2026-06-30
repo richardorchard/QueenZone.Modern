@@ -3,9 +3,9 @@
 
   Purpose
   -------
-  Adds read-only stored procedures and covering indexes for serving the public
-  forum archive from dbo.ModernForumCategory, dbo.ModernForumThread, and
-  dbo.ModernForumPost.
+  Adds read-only stored procedures, cached read statistics, and covering
+  indexes for serving the public forum archive from dbo.ModernForumCategory,
+  dbo.ModernForumThread, and dbo.ModernForumPost.
 
   This script is safe to rerun. It creates indexes only when they are missing
   and uses CREATE OR ALTER for stored procedures.
@@ -75,6 +75,128 @@ BEGIN
 END;
 GO
 
+IF OBJECT_ID(N'dbo.ModernForumCategoryReadStats', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.ModernForumCategoryReadStats
+    (
+        CategoryId int NOT NULL CONSTRAINT PK_ModernForumCategoryReadStats PRIMARY KEY,
+        LegacyForumId int NOT NULL CONSTRAINT UQ_ModernForumCategoryReadStats_LegacyForumId UNIQUE,
+        TotalThreads int NOT NULL,
+        ValidatedDisplayThreads int NOT NULL,
+        UpdatedAt datetime2(0) NOT NULL CONSTRAINT DF_ModernForumCategoryReadStats_UpdatedAt DEFAULT (sysutcdatetime()),
+        CONSTRAINT FK_ModernForumCategoryReadStats_Category FOREIGN KEY (CategoryId)
+            REFERENCES dbo.ModernForumCategory (Id)
+    );
+END;
+GO
+
+IF OBJECT_ID(N'dbo.ModernForumThreadReadStats', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.ModernForumThreadReadStats
+    (
+        ThreadId bigint NOT NULL CONSTRAINT PK_ModernForumThreadReadStats PRIMARY KEY,
+        LegacyTopicId int NOT NULL CONSTRAINT UQ_ModernForumThreadReadStats_LegacyTopicId UNIQUE,
+        PostCount int NOT NULL,
+        UpdatedAt datetime2(0) NOT NULL CONSTRAINT DF_ModernForumThreadReadStats_UpdatedAt DEFAULT (sysutcdatetime()),
+        CONSTRAINT FK_ModernForumThreadReadStats_Thread FOREIGN KEY (ThreadId)
+            REFERENCES dbo.ModernForumThread (Id)
+    );
+END;
+GO
+
+IF OBJECT_ID(N'dbo.ModernForumArchiveReadStats', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.ModernForumArchiveReadStats
+    (
+        Id tinyint NOT NULL CONSTRAINT PK_ModernForumArchiveReadStats PRIMARY KEY,
+        TotalThreads int NOT NULL,
+        SitemapTopicCount int NOT NULL,
+        UpdatedAt datetime2(0) NOT NULL CONSTRAINT DF_ModernForumArchiveReadStats_UpdatedAt DEFAULT (sysutcdatetime()),
+        CONSTRAINT CK_ModernForumArchiveReadStats_SingleRow CHECK (Id = 1)
+    );
+END;
+GO
+
+CREATE OR ALTER PROCEDURE dbo.ModernForum_RefreshReadStats
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    MERGE dbo.ModernForumCategoryReadStats AS target
+    USING
+    (
+        SELECT
+            c.Id AS CategoryId,
+            c.LegacyForumId,
+            COUNT_BIG(CASE WHEN t.IsLegacyTopicStarter = 1 THEN 1 END) AS TotalThreads,
+            COUNT_BIG(CASE WHEN t.IsLegacyTopicStarter = 1 AND t.StartedByUserValidated = 1 THEN 1 END) AS ValidatedDisplayThreads
+        FROM dbo.ModernForumCategory c
+        LEFT JOIN dbo.ModernForumThread t ON t.CategoryId = c.Id
+        GROUP BY c.Id, c.LegacyForumId
+    ) AS source
+    ON target.CategoryId = source.CategoryId
+    WHEN MATCHED THEN
+        UPDATE SET
+            LegacyForumId = source.LegacyForumId,
+            TotalThreads = CONVERT(int, source.TotalThreads),
+            ValidatedDisplayThreads = CONVERT(int, source.ValidatedDisplayThreads),
+            UpdatedAt = sysutcdatetime()
+    WHEN NOT MATCHED BY TARGET THEN
+        INSERT (CategoryId, LegacyForumId, TotalThreads, ValidatedDisplayThreads)
+        VALUES
+        (
+            source.CategoryId,
+            source.LegacyForumId,
+            CONVERT(int, source.TotalThreads),
+            CONVERT(int, source.ValidatedDisplayThreads)
+        )
+    WHEN NOT MATCHED BY SOURCE THEN
+        DELETE;
+
+    MERGE dbo.ModernForumThreadReadStats AS target
+    USING
+    (
+        SELECT
+            t.Id AS ThreadId,
+            t.LegacyTopicId,
+            COUNT_BIG(p.Id) AS PostCount
+        FROM dbo.ModernForumThread t
+        LEFT JOIN dbo.ModernForumPost p ON p.ThreadId = t.Id
+        GROUP BY t.Id, t.LegacyTopicId
+    ) AS source
+    ON target.ThreadId = source.ThreadId
+    WHEN MATCHED THEN
+        UPDATE SET
+            LegacyTopicId = source.LegacyTopicId,
+            PostCount = CONVERT(int, source.PostCount),
+            UpdatedAt = sysutcdatetime()
+    WHEN NOT MATCHED BY TARGET THEN
+        INSERT (ThreadId, LegacyTopicId, PostCount)
+        VALUES (source.ThreadId, source.LegacyTopicId, CONVERT(int, source.PostCount))
+    WHEN NOT MATCHED BY SOURCE THEN
+        DELETE;
+
+    MERGE dbo.ModernForumArchiveReadStats AS target
+    USING
+    (
+        SELECT
+            CONVERT(tinyint, 1) AS Id,
+            CONVERT(int, COUNT_BIG(*)) AS TotalThreads,
+            CONVERT(int, COUNT_BIG(CASE WHEN NULLIF(LTRIM(RTRIM(Title)), '') IS NOT NULL THEN 1 END)) AS SitemapTopicCount
+        FROM dbo.ModernForumThread
+    ) AS source
+    ON target.Id = source.Id
+    WHEN MATCHED THEN
+        UPDATE SET
+            TotalThreads = source.TotalThreads,
+            SitemapTopicCount = source.SitemapTopicCount,
+            UpdatedAt = sysutcdatetime()
+    WHEN NOT MATCHED BY TARGET THEN
+        INSERT (Id, TotalThreads, SitemapTopicCount)
+        VALUES (source.Id, source.TotalThreads, source.SitemapTopicCount);
+END;
+GO
+
 CREATE OR ALTER PROCEDURE dbo.ModernForum_GetCategories
 AS
 BEGIN
@@ -133,15 +255,24 @@ BEGIN
 
     DECLARE @Offset int = (CASE WHEN @CurrentPage > 1 THEN @CurrentPage - 1 ELSE 0 END) * @PageSize;
 
-    SELECT @TotalRecords = COUNT_BIG(*)
-    FROM dbo.ModernForumThread t WITH (INDEX(IX_ModernForumThread_PublicCategoryPage))
-    INNER JOIN dbo.ModernForumCategory c ON c.Id = t.CategoryId
+    SELECT @TotalRecords = s.TotalThreads
+    FROM dbo.ModernForumCategory c
+    INNER JOIN dbo.ModernForumCategoryReadStats s ON s.CategoryId = c.Id
     WHERE c.LegacyForumId = @Q_FORUM_ID
-      AND c.IsSynthetic = 0
-      AND t.IsLegacyTopicStarter = 1;
+      AND c.IsSynthetic = 0;
+
+    IF @TotalRecords IS NULL
+    BEGIN
+        SELECT @TotalRecords = COUNT_BIG(*)
+        FROM dbo.ModernForumThread t WITH (INDEX(IX_ModernForumThread_PublicCategoryPage))
+        INNER JOIN dbo.ModernForumCategory c ON c.Id = t.CategoryId
+        WHERE c.LegacyForumId = @Q_FORUM_ID
+          AND c.IsSynthetic = 0
+          AND t.IsLegacyTopicStarter = 1;
+    END;
 
     SELECT
-        CAST(ROW_NUMBER() OVER (ORDER BY t.IsSticky DESC, t.LastActivityAt DESC, t.LegacyTopicId ASC) AS int) AS Id,
+        CAST(0 AS int) AS Id,
         t.LegacyTopicId AS Q_FORUM_TOPIC_ID,
         t.Title AS TOPIC_SUBJECT,
         t.LastActivityAt AS TOPIC_LAST_POST,
@@ -155,7 +286,7 @@ BEGIN
     WHERE c.LegacyForumId = @Q_FORUM_ID
       AND c.IsSynthetic = 0
       AND t.IsLegacyTopicStarter = 1
-      AND ISNULL(t.StartedByUserValidated, 0) = 1
+      AND t.StartedByUserValidated = 1
     ORDER BY t.IsSticky DESC, t.LastActivityAt DESC, t.LegacyTopicId ASC
     OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;
 END;
@@ -193,9 +324,16 @@ BEGIN
         RETURN;
     END;
 
-    SELECT @TotalRecords = COUNT_BIG(*)
-    FROM dbo.ModernForumPost p WITH (INDEX(IX_ModernForumPost_Thread_Posted))
-    WHERE p.ThreadId = @ThreadId;
+    SELECT @TotalRecords = PostCount
+    FROM dbo.ModernForumThreadReadStats
+    WHERE ThreadId = @ThreadId;
+
+    IF @TotalRecords IS NULL
+    BEGIN
+        SELECT @TotalRecords = COUNT_BIG(*)
+        FROM dbo.ModernForumPost p WITH (INDEX(IX_ModernForumPost_Thread_Posted))
+        WHERE p.ThreadId = @ThreadId;
+    END;
 
     SELECT
         p.BodyHtml AS TOPIC_MESSAGE,
@@ -225,8 +363,9 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
-    SELECT COUNT_BIG(*)
-    FROM dbo.ModernForumThread;
+    SELECT COALESCE(
+        (SELECT TotalThreads FROM dbo.ModernForumArchiveReadStats WHERE Id = 1),
+        (SELECT CONVERT(int, COUNT_BIG(*)) FROM dbo.ModernForumThread));
 END;
 GO
 
@@ -235,9 +374,9 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
-    SELECT COUNT_BIG(*)
-    FROM dbo.ModernForumThread
-    WHERE NULLIF(LTRIM(RTRIM(Title)), '') IS NOT NULL;
+    SELECT COALESCE(
+        (SELECT SitemapTopicCount FROM dbo.ModernForumArchiveReadStats WHERE Id = 1),
+        (SELECT CONVERT(int, COUNT_BIG(*)) FROM dbo.ModernForumThread WHERE NULLIF(LTRIM(RTRIM(Title)), '') IS NOT NULL));
 END;
 GO
 
@@ -257,4 +396,7 @@ BEGIN
     ORDER BY t.LegacyTopicId ASC
     OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;
 END;
+GO
+
+EXEC dbo.ModernForum_RefreshReadStats;
 GO
