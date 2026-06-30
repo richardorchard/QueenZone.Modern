@@ -121,6 +121,23 @@ After a forum deploy, verify:
 
 In the log stream, `SqlException: Execution Timeout` in `LegacyForumRepository` usually means a full-table `COUNT(*)` on `Q_FORUM_TOPIC_T` or other heavy ad-hoc SQL. The modern read path should use denormalised `Q_FORUM_T.Q_FORUM_POST_COUNT`, `dbUser.Q_FORUM_TOPIC_THREAD_COUNT_V`, and `Q_FORUM_VIEW_PAGE_SP` instead. See `docs/legacy/table-map.md`.
 
+### Modern forum import status
+
+`docs/sql/004-modern-forum-batched-import.sql` creates the first modern forum archive read-model tables and resumable import procedures:
+
+- `ModernForumCategory`
+- `ModernForumThread`
+- `ModernForumPost`
+- `ImportCheckpoint`
+
+It was applied to `queenzone-db` on 2026-06-29. The initial import used a too-narrow `Q_FORUM_TOPIC_PARENT_ID = 0` thread rule and was reset. The corrected import treats `TOPIC_STARTER = 1 OR Q_FORUM_TOPIC_PARENT_ID = 0` as legacy threads, recovers orphaned replies into synthetic thread containers, and carries attachment fields.
+
+The corrected live run first hit Azure SQL error `40544` at 570,000 imported posts because the database reached its 2 GB size quota before the full 1,164,816-row `Q_FORUM_TOPIC_T` corpus could fit alongside the legacy schema. The partial `ModernForum*` tables were reset, and `DBCC SHRINKFILE (data_0, 1800)` reduced the data file back to 1.8 GB allocated.
+
+After the database max size was increased to 5 GB, the corrected import completed successfully: 18 categories, 89,070 threads, and 1,164,816 posts. Reconciliation reported 0 legacy rows unmapped to a source thread. Attachment fields are present in the modern tables: 4,754 thread rows with starter attachments and 11,690 post rows with attachments. After import, the data file was about 2.5 GB allocated of 5 GB max.
+
+The public site can read forum pages through `ModernForumRepository` when `ForumData:UseModernForumReads` is enabled. This is the default for SQL-backed runtime configuration after PR #86. Set `ForumData__UseModernForumReads=false` in App Service configuration for an emergency rollback to `LegacyForumRepository`.
+
 ## Quick Links
 
 - Primary agent instructions: [AGENTS.md](../AGENTS.md)

@@ -7,15 +7,20 @@ public static class QueenZoneDataServiceCollectionExtensions
 {
     public static IServiceCollection AddQueenZoneLegacyData(
         this IServiceCollection services,
-        string connectionString)
+        string connectionString,
+        ForumDataOptions? forumDataOptions = null)
     {
+        forumDataOptions ??= new ForumDataOptions();
+
         services.AddDbContext<QueenZoneDbContext>(options =>
             options.UseSqlServer(connectionString));
 
         services.AddSingleton<INewsRepository>(_ => new LegacyNewsRepository(connectionString));
         services.AddSingleton<IArticlesRepository>(_ => new LegacyArticlesRepository(connectionString));
         services.AddSingleton<IBiographyRepository>(_ => new LegacyBiographyRepository(connectionString));
-        services.AddSingleton<IForumRepository>(_ => new LegacyForumRepository(connectionString));
+        services.AddSingleton<IForumRepository>(_ => forumDataOptions.UseModernForumReads
+            ? new ModernForumRepository(connectionString)
+            : new LegacyForumRepository(connectionString));
         services.AddSingleton<IPhotoRepository>(_ => new LegacyPhotoRepository(connectionString));
         services.AddSingleton<IFanPerformanceRepository>(_ => new LegacyFanPerformanceRepository(connectionString));
         services.AddScoped<IAdminNewsRepository, EfAdminNewsRepository>();
