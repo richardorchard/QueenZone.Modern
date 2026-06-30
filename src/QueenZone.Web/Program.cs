@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Identity.Web;
 using QueenZone.Data;
 using QueenZone.Web;
@@ -71,6 +72,21 @@ builder.Services.AddAuthorization(options =>
 });
 
 var app = builder.Build();
+
+// Azure App Service (and any CDN/proxy in front of it, e.g. Cloudflare) terminates TLS and
+// forwards plain HTTP internally. Without this, Request.Scheme/Host reflect the internal
+// hop, so OAuth providers (Google/Microsoft/Facebook) get built redirect_uri values like
+// http://<internal-host> instead of https://queenzone.org — which then fail to match the
+// redirect URI registered with each provider. KnownIPNetworks/KnownProxies are cleared because
+// the edge proxy IP isn't a fixed, known address; the app already trusts App Service/Cloudflare
+// as its only ingress.
+var forwardedHeadersOptions = new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost,
+};
+forwardedHeadersOptions.KnownIPNetworks.Clear();
+forwardedHeadersOptions.KnownProxies.Clear();
+app.UseForwardedHeaders(forwardedHeadersOptions);
 
 app.UseStaticFiles();
 app.UseAuthentication();
