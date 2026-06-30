@@ -54,8 +54,8 @@
             @if (track.Lyrics is not null)
             {
               <details class="qz-album-track__lyrics">
-                <summary>Lyrics</summary>
-                <p>@Html.Raw(NewsArticleContent.FormatBody(track.Lyrics))</p>
+                <summary class="qz-album-track__lyrics-link">View lyrics</summary>
+                <p>@Html.Raw(LyricsFormatter.Format(track.Lyrics))</p>
               </details>
             }
           </li>

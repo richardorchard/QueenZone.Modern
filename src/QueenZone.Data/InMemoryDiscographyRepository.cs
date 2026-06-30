@@ -38,7 +38,10 @@ public sealed class InMemoryDiscographyRepository : IDiscographyRepository
                 SongId: (seed.AlbumId * 1000) + index + 1,
                 Title: title,
                 IsSingle: false,
-                Lyrics: null,
+                // The first track of each album carries sample lyrics containing a
+                // line that looks like raw markup ("</li></ol>"), to guard against
+                // lyrics text breaking the surrounding tracklist when rendered.
+                Lyrics: index == 0 ? $"First line of {title}\nSecond line </li></ol> third line" : null,
                 Notes: null))
             .ToList();
 
