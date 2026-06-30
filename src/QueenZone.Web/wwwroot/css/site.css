@@ -1176,11 +1176,28 @@ body.qz-menu-lock {
 }
 
 .qz-album-track__lyrics summary {
+  list-style: none;
   cursor: pointer;
+}
+
+.qz-album-track__lyrics summary::-webkit-details-marker {
+  display: none;
+}
+
+.qz-album-track__lyrics-link {
   font: var(--type-meta);
   letter-spacing: var(--ls-caps);
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--link);
+  text-decoration: underline;
+}
+
+.qz-album-track__lyrics-link:hover {
+  color: var(--link-hover);
+}
+
+.qz-album-track__lyrics[open] .qz-album-track__lyrics-link::after {
+  content: " (hide)";
 }
 
 .qz-album-track__lyrics p {
