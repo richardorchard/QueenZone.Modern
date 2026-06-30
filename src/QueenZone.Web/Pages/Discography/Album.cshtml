@@ -26,7 +26,7 @@
           </div>
           @if (Model.Album.GeneralNotes is not null)
           {
-            <p class="lede" style="color: rgba(255,255,255,0.82); max-width: var(--container-text);">@Model.Album.GeneralNotes</p>
+            <div class="lede" style="color: rgba(255,255,255,0.82); max-width: var(--container-text);">@Html.Raw(NewsArticleContent.FormatBody(Model.Album.GeneralNotes))</div>
           }
         </div>
       </div>

@@ -29,7 +29,7 @@ public sealed class AlbumModel(IDiscographyRepository discographyRepository) : P
         ViewData["CanonicalPath"] = DiscographyRoutes.GetAlbumPath(album.AlbumId, album.Slug);
         if (album.GeneralNotes is not null)
         {
-            ViewData["Description"] = album.GeneralNotes;
+            ViewData["Description"] = NewsArticleContent.ToPlainText(album.GeneralNotes);
         }
 
         return Page();

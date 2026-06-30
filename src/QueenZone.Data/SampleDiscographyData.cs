@@ -24,7 +24,7 @@ public static class SampleDiscographyData
             "Now I'm Here", "In the Lap of the Gods", "Stone Cold Crazy", "Dear Friends", "Misfire",
             "Bring Back That Leroy Brown", "She Makes Me (Stormtrooper in Stilettos)", "In the Lap of the Gods... Revisited",
         ]),
-        new AlbumSeed(4, "A Night at the Opera", 1975, "Reputedly the most expensive album ever made at the time, and home to 'Bohemian Rhapsody', the song that rewrote what a single could be.",
+        new AlbumSeed(4, "A Night at the Opera", 1975, "<p>Reputedly the most expensive album ever made at the time, and home to <strong>'Bohemian Rhapsody'</strong>, the song that rewrote what a single could be.</p>",
         [
             "Death on Two Legs (Dedicated to...)", "Lazing on a Sunday Afternoon", "I'm in Love with My Car", "You're My Best Friend", "'39",
             "Sweet Lady", "Seaside Rendezvous", "The Prophet's Song", "Love of My Life", "Good Company", "Bohemian Rhapsody", "God Save the Queen",

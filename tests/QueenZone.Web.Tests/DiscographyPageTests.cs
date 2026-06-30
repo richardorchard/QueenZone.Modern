@@ -41,6 +41,23 @@ public sealed class DiscographyPageTests : IClassFixture<WebApplicationFactory<P
     }
 
     [Fact]
+    public async Task DiscographyAlbumDetail_RendersGeneralNotesAsHtmlInsteadOfEscapingIt()
+    {
+        var client = factory.CreateClient();
+
+        var body = await client.GetStringAsync("/discography/albums/4/a-night-at-the-opera");
+
+        Assert.Contains("<strong>'Bohemian Rhapsody'</strong>", body);
+        Assert.DoesNotContain("&lt;strong&gt;", body);
+
+        var metaDescriptionStart = body.IndexOf("name=\"description\"", StringComparison.Ordinal);
+        Assert.True(metaDescriptionStart >= 0);
+        var metaDescriptionTag = body.Substring(metaDescriptionStart, 200);
+        Assert.DoesNotContain("&lt;p&gt;", metaDescriptionTag);
+        Assert.DoesNotContain("<p>", metaDescriptionTag);
+    }
+
+    [Fact]
     public async Task DiscographyAlbumDetail_EscapesLyricsInsteadOfRenderingMarkup()
     {
         var client = factory.CreateClient();
