@@ -27,6 +27,7 @@ builder.Services.Configure<SiteOptions>(builder.Configuration.GetSection(SiteOpt
 builder.Services.Configure<AnalyticsOptions>(builder.Configuration.GetSection(AnalyticsOptions.SectionName));
 builder.Services.Configure<SitemapOptions>(builder.Configuration.GetSection(SitemapOptions.SectionName));
 builder.Services.Configure<MemberAuthenticationOptions>(builder.Configuration.GetSection(MemberAuthenticationOptions.SectionName));
+builder.Services.Configure<ForumDataOptions>(builder.Configuration.GetSection(ForumDataOptions.SectionName));
 builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<CoreSitemapBuilder>();
 builder.Services.AddSingleton<CoreSitemapService>();
@@ -45,7 +46,11 @@ builder.Services.AddRazorPages(options =>
 
 if (useLegacySql)
 {
-    builder.Services.AddQueenZoneLegacyData(legacyConnectionString!);
+    var forumDataOptions = builder.Configuration
+        .GetSection(ForumDataOptions.SectionName)
+        .Get<ForumDataOptions>() ?? new ForumDataOptions();
+
+    builder.Services.AddQueenZoneLegacyData(legacyConnectionString!, forumDataOptions);
 }
 else
 {

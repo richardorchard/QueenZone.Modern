@@ -7,18 +7,24 @@ public static class QueenZoneDataServiceCollectionExtensions
 {
     public static IServiceCollection AddQueenZoneLegacyData(
         this IServiceCollection services,
-        string connectionString)
+        string connectionString,
+        ForumDataOptions? forumDataOptions = null)
     {
+        forumDataOptions ??= new ForumDataOptions();
+
         services.AddDbContext<QueenZoneDbContext>(options =>
             options.UseSqlServer(connectionString));
 
         services.AddSingleton<INewsRepository>(_ => new LegacyNewsRepository(connectionString));
         services.AddSingleton<IArticlesRepository>(_ => new LegacyArticlesRepository(connectionString));
         services.AddSingleton<IBiographyRepository>(_ => new LegacyBiographyRepository(connectionString));
-        services.AddSingleton<IForumRepository>(_ => new LegacyForumRepository(connectionString));
+        services.AddSingleton<IForumRepository>(_ => forumDataOptions.UseModernForumReads
+            ? new ModernForumRepository(connectionString)
+            : new LegacyForumRepository(connectionString));
         services.AddSingleton<IPhotoRepository>(_ => new LegacyPhotoRepository(connectionString));
         services.AddSingleton<IFanPerformanceRepository>(_ => new LegacyFanPerformanceRepository(connectionString));
         services.AddSingleton<ILegacyMemberLookupRepository>(_ => new LegacyMemberLookupRepository(connectionString));
+        services.AddSingleton<IDiscographyRepository>(_ => new LegacyDiscographyRepository(connectionString));
         services.AddScoped<IAdminNewsRepository, EfAdminNewsRepository>();
         services.AddScoped<INewsAuditRepository, EfNewsAuditRepository>();
         services.AddScoped<IMemberAccountRepository, EfMemberAccountRepository>();
@@ -39,6 +45,7 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddSingleton<IPhotoRepository>(_ => new InMemoryPhotoRepository(SamplePhotoData.CreateSeedCategories()));
         services.AddSingleton<IFanPerformanceRepository>(_ => new InMemoryFanPerformanceRepository(SampleFanPerformanceData.CreateSeedPerformances()));
         services.AddSingleton<ILegacyMemberLookupRepository>(_ => new InMemoryLegacyMemberLookupRepository(SampleLegacyMemberData.CreateSeedMatches()));
+        services.AddSingleton<IDiscographyRepository>(_ => new InMemoryDiscographyRepository(SampleDiscographyData.CreateSeedAlbums()));
         services.AddSingleton<IAdminNewsRepository, InMemoryAdminNewsRepository>();
         services.AddSingleton<INewsAuditRepository, InMemoryNewsAuditRepository>();
         services.AddSingleton<IMemberAccountRepository, InMemoryMemberAccountRepository>();

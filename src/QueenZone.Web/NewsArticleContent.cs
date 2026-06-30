@@ -36,6 +36,22 @@ public static partial class NewsArticleContent
             : WebUtility.HtmlEncode(body).Replace("\n", "<br>", StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// Strips markup from a body field for use as plain text (e.g. a meta description),
+    /// so legacy HTML-formatted fields don't leak literal tags into non-HTML contexts.
+    /// </summary>
+    public static string ToPlainText(string body)
+    {
+        if (string.IsNullOrEmpty(body))
+        {
+            return string.Empty;
+        }
+
+        var withoutTags = HtmlTagRegex().Replace(body, " ");
+        var decoded = WebUtility.HtmlDecode(withoutTags);
+        return WhitespaceRegex().Replace(decoded, " ").Trim();
+    }
+
     private static bool LooksLikeHtml(string value) =>
         HtmlTagRegex().IsMatch(value);
 
@@ -71,4 +87,7 @@ public static partial class NewsArticleContent
 
     [GeneratedRegex("<[^>]+>", RegexOptions.IgnoreCase)]
     private static partial Regex HtmlTagRegex();
+
+    [GeneratedRegex(@"\s+")]
+    private static partial Regex WhitespaceRegex();
 }

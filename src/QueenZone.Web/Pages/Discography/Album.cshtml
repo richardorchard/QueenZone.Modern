@@ -1,0 +1,67 @@
+@page "/discography/albums/{id:int}/{slug}"
+@model AlbumModel
+
+@if (Model.Album is not null)
+{
+  <section class="qz-album-hero">
+    <div class="qz-container qz-album-hero__content qz-breadcrumbs-on-dark">
+      <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
+      <div class="qz-album-hero__layout">
+        <div class="qz-album-hero__cover">
+          @if (Model.Album.CoverUrl is not null)
+          {
+            <img src="@Model.Album.CoverUrl" alt="">
+          }
+        </div>
+        <div>
+          <div class="qz-eyebrow" style="color: var(--qz-gold);">Studio Album</div>
+          <h1>@Model.Album.Name</h1>
+          <div class="qz-meta" style="color: rgba(255,255,255,0.55);">
+            @Model.Album.ArtistName
+            @if (Model.Album.ReleaseYear is int year)
+            {
+              @(" · " + year)
+            }
+            @(" · " + Model.Album.Songs.Count) tracks
+          </div>
+          @if (Model.Album.GeneralNotes is not null)
+          {
+            <div class="lede" style="color: rgba(255,255,255,0.82); max-width: var(--container-text);">@Html.Raw(NewsArticleContent.FormatBody(Model.Album.GeneralNotes))</div>
+          }
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="qz-section">
+    <div class="qz-container">
+      <h2 class="qz-eyebrow">Tracklist</h2>
+      <ol class="qz-album-tracklist">
+        @foreach (var track in Model.Album.Songs)
+        {
+          <li class="qz-album-track">
+            <div class="qz-album-track__row">
+              <span class="qz-album-tracklist__title">@track.Title</span>
+              @if (track.IsSingle)
+              {
+                <span class="qz-album-tracklist__single">Single</span>
+              }
+            </div>
+            @if (track.Notes is not null)
+            {
+              <p class="qz-album-track__notes">@track.Notes</p>
+            }
+            @if (track.Lyrics is not null)
+            {
+              <details class="qz-album-track__lyrics">
+                <summary class="qz-album-track__lyrics-link">View lyrics</summary>
+                <p>@Html.Raw(LyricsFormatter.Format(track.Lyrics))</p>
+              </details>
+            }
+          </li>
+        }
+      </ol>
+      <a href="@DiscographyRoutes.GetIndexPath()">All studio albums</a>
+    </div>
+  </section>
+}
