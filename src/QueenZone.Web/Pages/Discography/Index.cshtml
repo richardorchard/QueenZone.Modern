@@ -1,0 +1,35 @@
+@page "/discography"
+@model IndexModel
+
+<partial name="_PageHero" model='@(("The Queenzone.com Archive", "Discography", "The complete studio catalogue, restored sleeve by sleeve.", $"{Model.Albums.Count} studio albums"))' />
+
+<section class="qz-section">
+  <div class="qz-container">
+    <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
+    @if (Model.Albums.Count == 0)
+    {
+      <p>No albums are available yet.</p>
+    }
+    else
+    {
+      <div class="qz-album-grid">
+        @foreach (var album in Model.Albums)
+        {
+          <a class="qz-album-card" href="@DiscographyRoutes.GetAlbumPath(album)">
+            <div class="qz-album-card__cover">
+              @if (album.ThumbnailUrl is not null)
+              {
+                <img src="@album.ThumbnailUrl" alt="" loading="lazy">
+              }
+            </div>
+            <div class="qz-album-card__title">@album.Name</div>
+            @if (album.ReleaseYear is int year)
+            {
+              <div class="qz-album-card__year">@year</div>
+            }
+          </a>
+        }
+      </div>
+    }
+  </div>
+</section>
