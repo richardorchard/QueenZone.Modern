@@ -95,8 +95,13 @@ app.UseForwardedHeaders(forwardedHeadersOptions);
 // UseStaticFiles() below would 404 on /.well-known/* (used for Microsoft's domain
 // association file, and any future well-known files like ACME challenges). Map it
 // explicitly with exclusion filtering turned off before the catch-all static handler.
-var wellKnownPath = Path.Combine(app.Environment.WebRootPath, ".well-known");
-if (Directory.Exists(wellKnownPath))
+// WebRootPath can be null if no physical wwwroot folder is found relative to whatever
+// the process's working directory happens to be at startup (e.g. a misconfigured launch
+// script) — guard rather than crash the whole app over an optional route.
+var wellKnownPath = string.IsNullOrEmpty(app.Environment.WebRootPath)
+    ? null
+    : Path.Combine(app.Environment.WebRootPath, ".well-known");
+if (wellKnownPath is not null && Directory.Exists(wellKnownPath))
 {
     app.UseStaticFiles(new StaticFileOptions
     {
