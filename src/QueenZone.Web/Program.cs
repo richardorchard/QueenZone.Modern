@@ -3,6 +3,9 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.StaticFiles;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.FileProviders.Physical;
 using Microsoft.Identity.Web;
 using QueenZone.Data;
 using QueenZone.Web;
@@ -87,6 +90,20 @@ var forwardedHeadersOptions = new ForwardedHeadersOptions
 forwardedHeadersOptions.KnownIPNetworks.Clear();
 forwardedHeadersOptions.KnownProxies.Clear();
 app.UseForwardedHeaders(forwardedHeadersOptions);
+
+// PhysicalFileProvider excludes dot-prefixed files/folders by default, so the generic
+// UseStaticFiles() below would 404 on /.well-known/* (used for Microsoft's domain
+// association file, and any future well-known files like ACME challenges). Map it
+// explicitly with exclusion filtering turned off before the catch-all static handler.
+var wellKnownPath = Path.Combine(app.Environment.WebRootPath, ".well-known");
+if (Directory.Exists(wellKnownPath))
+{
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = new PhysicalFileProvider(wellKnownPath, ExclusionFilters.None),
+        RequestPath = "/.well-known",
+    });
+}
 
 app.UseStaticFiles();
 app.UseAuthentication();
