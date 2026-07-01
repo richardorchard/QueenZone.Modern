@@ -13,7 +13,7 @@ This handoff gives a future agent the full context for building the first automa
 | AI triage (#103) | Done |
 | Draft generation (#104) | Done |
 | Admin review queue (#105) | Done — `/admin/news-discovery` |
-| Promote to live news (#106) | Partial — promote creates unpublished admin news draft |
+| Promote to live news (#106) | Done — provenance on admin news edit/preview, richer audit, bidirectional links |
 | Scheduled hosting (#107) | Done — DB run lease, `--scheduled`, `scripts/Run-NewsAgentDiscovery.ps1`, `docs/architecture/news-agent-scheduling.md` |
 | Tests / observability (#108) | Partial — CI uses fakes; `scripts/Smoke-NewsAgent.bat` for manual OpenRouter check |
 | Source registry doc (#99) | Partial — `news-discovery-sources.json` exists; editorial rules issue may narrow |
@@ -56,7 +56,7 @@ Current implementation issues:
 - #103 Implement AI triage for relevance, deduplication, and confidence scoring of discovered news. *(done)*
 - #104 Generate editor-reviewable news drafts with citations from approved candidates. *(done)*
 - #105 Build admin review queue for discovered candidates and generated drafts. *(done)*
-- #106 Promote approved AI-assisted drafts into the live news article workflow. *(partial)*
+- #106 Promote approved AI-assisted drafts into the live news article workflow. *(done)*
 - #107 Add scheduled news discovery worker with local-first and Azure hosting options. *(done — lease, scheduling doc, Task Scheduler script)*
 - #108 Add tests, observability, and safety checks for the automated news agent MVP. *(partial)*
 

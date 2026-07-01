@@ -3,6 +3,11 @@
 
 <h1>@Model.Title</h1>
 
+@if (Model.DiscoveryProvenance is not null)
+{
+  <partial name="_DiscoveryProvenance" model="Model.DiscoveryProvenance" />
+}
+
 @if (Model.Errors is { Count: > 0 })
 {
   <ul class="admin-errors">

@@ -53,6 +53,12 @@ public sealed class InMemoryNewsDiscoveryRepository(SharedNewsDiscoveryStore sto
         return Task.FromResult(candidate is null ? null : MapCandidate(candidate));
     }
 
+    public Task<NewsCandidate?> GetCandidateByPromotedNewsIdAsync(int promotedNewsId, CancellationToken cancellationToken = default)
+    {
+        var candidate = store.GetCandidateByPromotedNewsId(promotedNewsId);
+        return Task.FromResult(candidate is null ? null : MapCandidate(candidate));
+    }
+
     public Task<IReadOnlyList<NewsCandidate>> GetCandidatesAsync(
         NewsCandidateStatus? status = null,
         int? sourceId = null,
