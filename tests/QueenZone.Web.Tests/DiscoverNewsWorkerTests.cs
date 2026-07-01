@@ -31,20 +31,16 @@ public sealed class DiscoverNewsWorkerTests
             true,
             null));
 
-        var triageService = CreateTriageService(repository, enabled: false);
-        var worker = new DiscoverNewsWorker(
-            discoveryService,
-            triageService,
-            CreateExecutor(repository, enabled: false),
-            Options.Create(new OpenRouterOptions()),
-            NullLogger<DiscoverNewsWorker>.Instance);
+        var worker = CreateWorker(repository, discoveryService, aiEnabled: false);
 
         var exitCode = await worker.RunAsync(new DiscoverNewsCommandOptions(
             SeedSources: false,
             DryRun: false,
             Force: true,
             Triage: true,
-            TriageOnly: false));
+            TriageOnly: false,
+            Draft: false,
+            DraftOnly: false));
 
         Assert.Equal(0, exitCode);
         Assert.Equal(2, (await repository.GetCandidatesAsync()).Count);
@@ -69,19 +65,16 @@ public sealed class DiscoverNewsWorkerTests
             true,
             null));
 
-        var worker = new DiscoverNewsWorker(
-            discoveryService,
-            CreateTriageService(repository, enabled: false),
-            CreateExecutor(repository, enabled: false),
-            Options.Create(new OpenRouterOptions()),
-            NullLogger<DiscoverNewsWorker>.Instance);
+        var worker = CreateWorker(repository, discoveryService, aiEnabled: false);
 
         var exitCode = await worker.RunAsync(new DiscoverNewsCommandOptions(
             SeedSources: false,
             DryRun: false,
             Force: true,
             Triage: false,
-            TriageOnly: false));
+            TriageOnly: false,
+            Draft: false,
+            DraftOnly: false));
 
         Assert.Equal(1, exitCode);
     }
@@ -90,23 +83,72 @@ public sealed class DiscoverNewsWorkerTests
     public async Task RunAsync_triage_only_skips_discovery_fetch()
     {
         var repository = new InMemoryNewsDiscoveryRepository(new SharedNewsDiscoveryStore());
-        var worker = new DiscoverNewsWorker(
-            NewsAgentTestSupport.CreateDiscoveryService(
-                repository,
-                new FakeNewsDiscoveryHttpClient(new Dictionary<string, string>())),
-            CreateTriageService(repository, enabled: false),
-            CreateExecutor(repository, enabled: false),
-            Options.Create(new OpenRouterOptions { DryRun = true, ApiKey = "test-key" }),
-            NullLogger<DiscoverNewsWorker>.Instance);
+        var discoveryService = NewsAgentTestSupport.CreateDiscoveryService(
+            repository,
+            new FakeNewsDiscoveryHttpClient(new Dictionary<string, string>()));
+        var worker = CreateWorker(repository, discoveryService, aiEnabled: true, dryRun: true);
 
         var exitCode = await worker.RunAsync(new DiscoverNewsCommandOptions(
             SeedSources: false,
             DryRun: false,
             Force: false,
             Triage: true,
-            TriageOnly: true));
+            TriageOnly: true,
+            Draft: false,
+            DraftOnly: false));
 
         Assert.Equal(0, exitCode);
+    }
+
+    [Fact]
+    public async Task RunAsync_draft_only_generates_drafts_for_needs_review_candidates()
+    {
+        var repository = new InMemoryNewsDiscoveryRepository(new SharedNewsDiscoveryStore());
+        var sourceId = await repository.UpsertSourceAsync(new NewsDiscoverySourceDraft(
+            "queen-online",
+            "Queen Online",
+            "https://www.queenonline.com/",
+            "https://www.queenonline.com/feed/",
+            NewsDiscoverySourceType.Rss,
+            NewsDiscoveryTrustTier.Primary,
+            60,
+            true,
+            null));
+        var candidateId = await repository.CreateCandidateAsync(new NewsCandidateCreateRequest(
+            sourceId,
+            "https://www.queenonline.com/news/tour-2026",
+            "Queen announce 2026 tour",
+            DateTime.UtcNow,
+            "Official dates announced.",
+            DateTime.UtcNow));
+        await repository.TryUpdateCandidateStatusAsync(
+            candidateId,
+            new NewsCandidateStatusUpdate(
+                NewsCandidateStatus.NeedsReview,
+                ConfidenceScore: 0.90m,
+                RelevanceScore: 0.92m));
+
+        var discoveryService = NewsAgentTestSupport.CreateDiscoveryService(
+            repository,
+            new FakeNewsDiscoveryHttpClient(new Dictionary<string, string>()));
+        var worker = CreateWorker(
+            repository,
+            discoveryService,
+            aiEnabled: true,
+            draftJson: NewsAgentTestSupport.SampleDraftJson);
+
+        var exitCode = await worker.RunAsync(new DiscoverNewsCommandOptions(
+            SeedSources: false,
+            DryRun: false,
+            Force: false,
+            Triage: false,
+            TriageOnly: false,
+            Draft: true,
+            DraftOnly: true));
+
+        Assert.Equal(0, exitCode);
+        Assert.NotNull(await repository.GetDraftByCandidateIdAsync(candidateId));
+        Assert.Equal(NewsCandidateStatus.Drafted, (await repository.GetCandidateByIdAsync(candidateId))!.Status);
     }
 
     [Fact]
@@ -129,6 +171,26 @@ public sealed class DiscoverNewsWorkerTests
 
         Assert.Equal(0.80m, options.SecondaryMinRelevanceScore);
     }
+
+    private static DiscoverNewsWorker CreateWorker(
+        INewsDiscoveryRepository repository,
+        NewsDiscoveryService discoveryService,
+        bool aiEnabled,
+        bool dryRun = false,
+        string draftJson = "{}") =>
+        new(
+            discoveryService,
+            CreateTriageService(repository, aiEnabled),
+            NewsAgentTestSupport.CreateDraftGenerationService(
+                repository,
+                new DiscoverNewsWorkerTestsFakeAiClient(aiEnabled, draftJson)),
+            CreateExecutor(repository, aiEnabled),
+            Options.Create(new OpenRouterOptions
+            {
+                ApiKey = aiEnabled ? "test-key" : null,
+                DryRun = dryRun
+            }),
+            NullLogger<DiscoverNewsWorker>.Instance);
 
     private static NewsTriageService CreateTriageService(INewsDiscoveryRepository repository, bool enabled) =>
         new(
@@ -154,13 +216,19 @@ public sealed class DiscoverNewsWorkerTests
             Options.Create(new OpenRouterOptions { ApiKey = enabled ? "test-key" : null }),
             NullLogger<NewsAiRunExecutor>.Instance);
 
-    private sealed class DiscoverNewsWorkerTestsFakeAiClient(bool enabled) : INewsAiClient
+    private sealed class DiscoverNewsWorkerTestsFakeAiClient(bool enabled, string content = "{}") : INewsAiClient
     {
         public bool IsEnabled { get; } = enabled;
 
         public Task<NewsAiChatCompletion> CompleteChatAsync(
             NewsAiChatRequest request,
             CancellationToken cancellationToken = default) =>
-            Task.FromResult(new NewsAiChatCompletion("{}", "openai/gpt-4.1-nano", 1, 1, 0.0001m, false));
+            Task.FromResult(new NewsAiChatCompletion(
+                content,
+                request.ModelRole == NewsAiModelRole.Drafting ? "openai/gpt-4.1-mini" : "openai/gpt-4.1-nano",
+                1,
+                1,
+                0.0001m,
+                false));
     }
 }

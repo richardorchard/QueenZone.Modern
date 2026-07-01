@@ -170,7 +170,7 @@ namespace QueenZone.Data.Migrations
                         column: x => x.CandidateId,
                         principalTable: "NewsCandidates",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.NoAction);
                 });
 
             migrationBuilder.CreateIndex(

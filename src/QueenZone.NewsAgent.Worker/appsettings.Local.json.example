@@ -1,0 +1,8 @@
+{
+  "ConnectionStrings": {
+    "QueenZoneLegacy": ""
+  },
+  "OpenRouter": {
+    "ApiKey": "sk-or-v1-..."
+  }
+}

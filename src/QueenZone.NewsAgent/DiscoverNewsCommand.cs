@@ -5,7 +5,9 @@ public sealed record DiscoverNewsCommandOptions(
     bool DryRun,
     bool Force,
     bool Triage,
-    bool TriageOnly)
+    bool TriageOnly,
+    bool Draft,
+    bool DraftOnly)
 {
     public static DiscoverNewsCommandOptions? Parse(string[] args)
     {
@@ -19,6 +21,8 @@ public sealed record DiscoverNewsCommandOptions(
         var force = false;
         var triage = false;
         var triageOnly = false;
+        var draft = false;
+        var draftOnly = false;
         for (var index = 1; index < args.Length; index++)
         {
             switch (args[index].ToLowerInvariant())
@@ -41,11 +45,18 @@ public sealed record DiscoverNewsCommandOptions(
                     triage = true;
                     triageOnly = true;
                     break;
+                case "--draft":
+                    draft = true;
+                    break;
+                case "--draft-only":
+                    draft = true;
+                    draftOnly = true;
+                    break;
                 default:
                     return null;
             }
         }
 
-        return new DiscoverNewsCommandOptions(seedSources, dryRun, force, triage, triageOnly);
+        return new DiscoverNewsCommandOptions(seedSources, dryRun, force, triage, triageOnly, draft, draftOnly);
     }
 }
