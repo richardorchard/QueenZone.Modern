@@ -5,6 +5,7 @@ The news agent discovers public Queen-related stories from configured sources, t
 See also:
 
 - `docs/backlog/news-agent-mvp-handoff.md` — product rules, source strategy, and GitHub issue tracking
+- `docs/architecture/news-agent-editorial-rules.md` — trust tiers, source registry, relevance scope, and safety rules
 - `docs/architecture/automated-news-discovery-plan.md` — original architecture plan
 
 ## Pipeline
@@ -156,7 +157,7 @@ Admin routes require sign-in plus an email listed in `Admin:AllowedEmails`.
 
 | Issue | Status | Notes |
 |-------|--------|-------|
-| #99 Source registry | Partial | Embedded `news-discovery-sources.json`; editorial rules doc still open |
+| #99 Source registry | Done | `news-discovery-sources.json` + `news-agent-editorial-rules.md` |
 | #100 Data model | Done | Discovery tables + repositories in `QueenZone.Data` |
 | #101 Fetchers + worker | Done | RSS, sitemap, allowlisted pages; `discover-news` command |
 | #102 OpenRouter client | Done | Budget guard, model defaults, AI run logging |

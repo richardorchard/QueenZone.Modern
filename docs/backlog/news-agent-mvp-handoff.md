@@ -16,7 +16,7 @@ This handoff gives a future agent the full context for building the first automa
 | Promote to live news (#106) | Done — provenance on admin news edit/preview, richer audit, bidirectional links |
 | Scheduled hosting (#107) | Done — DB run lease, `--scheduled`, `scripts/Run-NewsAgentDiscovery.ps1`, `docs/architecture/news-agent-scheduling.md` |
 | Tests / observability (#108) | Partial — CI uses fakes; `scripts/Smoke-NewsAgent.bat` for manual OpenRouter check |
-| Source registry doc (#99) | Partial — `news-discovery-sources.json` exists; editorial rules issue may narrow |
+| Source registry doc (#99) | Done — `news-discovery-sources.json` + `docs/architecture/news-agent-editorial-rules.md` |
 
 Safe boundary in production today: discovery and drafting run via the worker; editors review at `/admin/news-discovery`; public pages only change after explicit publish in `/admin/news`.
 
@@ -49,7 +49,7 @@ Area labels:
 
 Current implementation issues:
 
-- #99 Define trusted source registry and editorial rules for automated Queen news discovery. *(partial — JSON registry shipped)*
+- #99 Define trusted source registry and editorial rules for automated Queen news discovery. *(done)*
 - #100 Add database model for news discovery sources, candidates, evidence, and AI draft metadata. *(done)*
 - #101 Implement source fetchers for RSS, sitemap, and allowlisted web pages. *(done)*
 - #102 Add OpenRouter client configuration with low-cost model defaults and budget controls. *(done)*
