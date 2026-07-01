@@ -2,10 +2,12 @@ using System.Net;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using QueenZone.Data;
 using QueenZone.Web;
+using QueenZone.Web.Pages.Admin.News;
 
 namespace QueenZone.Web.Tests;
 
@@ -219,6 +221,204 @@ public sealed partial class AdminNewsRoutesTests : IClassFixture<WebApplicationF
     }
 
     [Fact]
+    public async Task DeleteForeignKeyViolation_showsErrorMessageOnAdminList()
+    {
+        var store = new SharedNewsStore(
+        [
+            new AdminNewsArticle(
+                3101,
+                "Linked article",
+                "linked-article",
+                "Excerpt",
+                "Body",
+                new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc),
+                null,
+                false,
+                DateTime.UtcNow,
+                DateTime.UtcNow,
+                AdminEmail)
+        ]);
+        var discoveryStore = new SharedNewsDiscoveryStore();
+        var discoveryInner = new InMemoryNewsDiscoveryRepository(discoveryStore);
+        using var _ = AdminNewsDeleteError.UseForeignKeyViolationClassifier(_ => true);
+        var client = CreateClient(
+            AdminEmail,
+            store,
+            services =>
+            {
+                services.RemoveAll<IAdminNewsRepository>();
+                services.AddSingleton<IAdminNewsRepository>(_ =>
+                    new FailingDeleteAdminNewsRepository(
+                        new InMemoryAdminNewsRepository(store),
+                        new DbUpdateException("FK violation", new InvalidOperationException("blocked"))));
+            },
+            discoveryInner);
+
+        var deleteResponse = await PostActionAsync(client, "/admin/news/3101/delete");
+        Assert.Equal(HttpStatusCode.Redirect, deleteResponse.StatusCode);
+
+        var listBody = await client.GetStringAsync(deleteResponse.Headers.Location!.OriginalString);
+        Assert.Contains("could not be deleted", listBody, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("admin-status--error", listBody);
+        Assert.Contains("Linked article", listBody);
+    }
+
+    [Fact]
+    public async Task DeleteNotFound_showsErrorMessageOnAdminList()
+    {
+        var store = new SharedNewsStore(
+        [
+            new AdminNewsArticle(
+                3102,
+                "Missing on delete",
+                "missing-on-delete",
+                "Excerpt",
+                "Body",
+                new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc),
+                null,
+                false,
+                DateTime.UtcNow,
+                DateTime.UtcNow,
+                AdminEmail)
+        ]);
+        var discoveryStore = new SharedNewsDiscoveryStore();
+        var discoveryInner = new InMemoryNewsDiscoveryRepository(discoveryStore);
+        var client = CreateClient(
+            AdminEmail,
+            store,
+            services =>
+            {
+                services.RemoveAll<IAdminNewsRepository>();
+                services.AddSingleton<IAdminNewsRepository>(_ =>
+                    new FailingDeleteAdminNewsRepository(
+                        new InMemoryAdminNewsRepository(store),
+                        new InvalidOperationException("News article 3102 was not found.")));
+            },
+            discoveryInner);
+
+        var deleteResponse = await PostActionAsync(client, "/admin/news/3102/delete");
+        Assert.Equal(HttpStatusCode.Redirect, deleteResponse.StatusCode);
+
+        var listBody = await client.GetStringAsync(deleteResponse.Headers.Location!.OriginalString);
+        Assert.Contains("News article 3102 was not found.", listBody);
+        Assert.Contains("admin-status--error", listBody);
+    }
+
+    [Fact]
+    public async Task Delete_continues_when_discovery_link_cleanup_fails()
+    {
+        var store = new SharedNewsStore(
+        [
+            new AdminNewsArticle(
+                3103,
+                "Cleanup failure article",
+                "cleanup-failure",
+                "Excerpt",
+                "Body",
+                new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc),
+                null,
+                false,
+                DateTime.UtcNow,
+                DateTime.UtcNow,
+                AdminEmail)
+        ]);
+        var discoveryStore = new SharedNewsDiscoveryStore();
+        var discoveryInner = new InMemoryNewsDiscoveryRepository(discoveryStore);
+        var client = CreateClient(
+            AdminEmail,
+            store,
+            _ => { },
+            new ConfigurableNewsDiscoveryRepository(discoveryInner)
+            {
+                ClearPromotedNewsLinksHandler = (_, _) =>
+                    throw new InvalidOperationException("Discovery tables unavailable.")
+            });
+
+        var deleteResponse = await PostActionAsync(client, "/admin/news/3103/delete");
+        Assert.Equal(HttpStatusCode.Redirect, deleteResponse.StatusCode);
+
+        var listBody = await client.GetStringAsync("/admin/news");
+        Assert.DoesNotContain("Cleanup failure article", listBody);
+    }
+
+    [Fact]
+    public async Task EditPage_loads_when_provenance_lookup_fails()
+    {
+        var store = new SharedNewsStore(
+        [
+            new AdminNewsArticle(
+                4101,
+                "Provenance failure article",
+                "provenance-failure",
+                "Excerpt",
+                "Body",
+                new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc),
+                null,
+                false,
+                DateTime.UtcNow,
+                DateTime.UtcNow,
+                AdminEmail)
+        ]);
+        var discoveryStore = new SharedNewsDiscoveryStore();
+        var discoveryInner = new InMemoryNewsDiscoveryRepository(discoveryStore);
+        var client = CreateClient(
+            AdminEmail,
+            store,
+            _ => { },
+            new ConfigurableNewsDiscoveryRepository(discoveryInner)
+            {
+                GetCandidateByPromotedNewsIdHandler = (_, _) =>
+                    throw new InvalidOperationException("Discovery lookup failed.")
+            });
+
+        var response = await client.GetAsync("/admin/news/4101/edit");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("Edit article", body);
+        Assert.Contains("Provenance failure article", body);
+        Assert.DoesNotContain("Discovery provenance", body);
+    }
+
+    [Fact]
+    public async Task PreviewPage_loads_when_provenance_lookup_fails()
+    {
+        var store = new SharedNewsStore(
+        [
+            new AdminNewsArticle(
+                4102,
+                "Preview provenance failure",
+                "preview-provenance-failure",
+                "Excerpt",
+                "Body",
+                new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc),
+                null,
+                false,
+                DateTime.UtcNow,
+                DateTime.UtcNow,
+                AdminEmail)
+        ]);
+        var discoveryStore = new SharedNewsDiscoveryStore();
+        var discoveryInner = new InMemoryNewsDiscoveryRepository(discoveryStore);
+        var client = CreateClient(
+            AdminEmail,
+            store,
+            _ => { },
+            new ConfigurableNewsDiscoveryRepository(discoveryInner)
+            {
+                GetCandidateByPromotedNewsIdHandler = (_, _) =>
+                    throw new InvalidOperationException("Discovery lookup failed.")
+            });
+
+        var response = await client.GetAsync("/admin/news/4102/preview");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("Preview provenance failure", body);
+        Assert.DoesNotContain("Discovery provenance", body);
+    }
+
+    [Fact]
     public async Task AuthorizedAdminCanDeleteArticle()
     {
         var store = new SharedNewsStore(
@@ -281,7 +481,10 @@ public sealed partial class AdminNewsRoutesTests : IClassFixture<WebApplicationF
         Assert.Contains(publishAudit, entry => entry.ActorEmail == AdminEmail);
     }
 
-    private WebApplicationFactory<Program> CreateFactory(SharedNewsStore store) =>
+    private WebApplicationFactory<Program> CreateFactory(
+        SharedNewsStore store,
+        Action<IServiceCollection>? configureServices = null,
+        INewsDiscoveryRepository? discoveryRepository = null) =>
         factory.WithWebHostBuilder(builder =>
             builder.ConfigureServices(services =>
             {
@@ -289,17 +492,40 @@ public sealed partial class AdminNewsRoutesTests : IClassFixture<WebApplicationF
                 services.RemoveAll<INewsRepository>();
                 services.RemoveAll<IAdminNewsRepository>();
                 services.RemoveAll<INewsAuditRepository>();
+                services.RemoveAll<INewsDiscoveryRepository>();
+                services.RemoveAll<SharedNewsDiscoveryStore>();
                 services.AddSingleton(store);
                 services.AddSingleton<INewsRepository>(_ => new QueenZone.Data.InMemoryNewsRepository(store));
                 services.AddSingleton<IAdminNewsRepository>(_ => new InMemoryAdminNewsRepository(store));
                 services.AddSingleton<INewsAuditRepository>(_ => new InMemoryNewsAuditRepository(store));
+                if (discoveryRepository is not null)
+                {
+                    services.AddSingleton(discoveryRepository);
+                }
+                else
+                {
+                    services.AddSingleton<SharedNewsDiscoveryStore>();
+                    services.AddSingleton<INewsDiscoveryRepository, InMemoryNewsDiscoveryRepository>();
+                }
+
+                configureServices?.Invoke(services);
             }));
 
-    private HttpClient CreateClient(string? email = null, SharedNewsStore? store = null)
+    private HttpClient CreateClient(
+        string? email = null,
+        SharedNewsStore? store = null,
+        Action<IServiceCollection>? configureServices = null,
+        INewsDiscoveryRepository? discoveryRepository = null)
     {
-        var appFactory = store is null ? factory : CreateFactory(store);
+        var appFactory = store is null ? factory : CreateFactory(store, configureServices, discoveryRepository);
         return CreateClientFromFactory(appFactory, email);
     }
+
+    private HttpClient CreateClient(string? email, SharedNewsStore store) =>
+        CreateClient(email, store, null, null);
+
+    private WebApplicationFactory<Program> CreateFactory(SharedNewsStore store) =>
+        CreateFactory(store, null, null);
 
     private static HttpClient CreateClientFromFactory(WebApplicationFactory<Program> appFactory, string? email)
     {
