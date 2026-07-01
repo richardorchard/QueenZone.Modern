@@ -9,6 +9,7 @@ public sealed class DiscoverNewsWorker(
     NewsTriageService triageService,
     NewsDraftGenerationService draftGenerationService,
     NewsAiRunExecutor aiRunExecutor,
+    INewsDiscoveryRepository discoveryRepository,
     IOptions<OpenRouterOptions> openRouterOptions,
     ILogger<DiscoverNewsWorker> logger)
 {
@@ -18,25 +19,56 @@ public sealed class DiscoverNewsWorker(
     {
         LogAiStatus();
 
+        NewsDiscoveryRunResult? discoveryResult = null;
+        NewsTriageRunResult? triageResult = null;
+        NewsDraftRunResult? draftResult = null;
         var exitCode = 0;
 
         if (!options.TriageOnly && !options.DraftOnly)
         {
             exitCode = await RunDiscoveryAsync(options, cancellationToken);
+            discoveryResult = LastDiscoveryResult;
         }
 
         if (options.Triage)
         {
-            exitCode = Math.Max(exitCode, await RunTriageAsync(options, cancellationToken));
+            var triageExit = await RunTriageAsync(options, cancellationToken);
+            exitCode = Math.Max(exitCode, triageExit);
+            triageResult = LastTriageResult;
         }
 
         if (options.Draft)
         {
-            exitCode = Math.Max(exitCode, await RunDraftGenerationAsync(options, cancellationToken));
+            var draftExit = await RunDraftGenerationAsync(options, cancellationToken);
+            exitCode = Math.Max(exitCode, draftExit);
+            draftResult = LastDraftResult;
         }
+
+        var spend = await discoveryRepository.GetEstimatedAiSpendUsdAsync(
+            DateTime.UtcNow.Date,
+            DateTime.UtcNow.Date.AddDays(1),
+            cancellationToken);
+
+        NewsAgentRunTelemetry.LogRunCompleted(
+            logger,
+            new NewsAgentRunSummary(
+                SkippedDueToLease: false,
+                AiEnabled: aiRunExecutor.IsAiEnabled,
+                DryRun: options.DryRun || openRouterOptions.Value.DryRun,
+                Discovery: discoveryResult,
+                Triage: triageResult,
+                Draft: draftResult,
+                EstimatedAiSpendUsd: spend,
+                ExitCode: exitCode));
 
         return exitCode;
     }
+
+    private NewsDiscoveryRunResult? LastDiscoveryResult { get; set; }
+
+    private NewsTriageRunResult? LastTriageResult { get; set; }
+
+    private NewsDraftRunResult? LastDraftResult { get; set; }
 
     private void LogAiStatus()
     {
@@ -63,6 +95,7 @@ public sealed class DiscoverNewsWorker(
             Force: options.Force);
 
         var result = await discoveryService.RunFetchAsync(runOptions, cancellationToken);
+        LastDiscoveryResult = result;
 
         logger.LogInformation(
             "Discovery finished. Sources checked={SourcesChecked}, skipped={SourcesSkipped}, items={ItemsFetched}, created={CandidatesCreated}, duplicates={DuplicatesSkipped}, keyword filtered={KeywordFiltered}, failures={Failures}.",
@@ -89,6 +122,7 @@ public sealed class DiscoverNewsWorker(
         var triageResult = await triageService.RunTriageAsync(
             new NewsTriageRunOptions(DryRun: options.DryRun),
             cancellationToken);
+        LastTriageResult = triageResult;
 
         logger.LogInformation(
             "Triage finished. Considered={CandidatesConsidered}, promoted={PromotedToReview}, rejected={Rejected}, duplicates={MarkedDuplicate}, skipped={Skipped}, failures={Failures}.",
@@ -116,6 +150,7 @@ public sealed class DiscoverNewsWorker(
                 DryRun: options.DryRun,
                 ForceRegenerate: options.Force),
             cancellationToken);
+        LastDraftResult = draftResult;
 
         logger.LogInformation(
             "Draft generation finished. Considered={CandidatesConsidered}, created={DraftsCreated}, skipped={Skipped}, failures={Failures}.",

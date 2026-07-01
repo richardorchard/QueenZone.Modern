@@ -185,6 +185,7 @@ public sealed class DiscoverNewsWorkerTests
                 repository,
                 new DiscoverNewsWorkerTestsFakeAiClient(aiEnabled, draftJson)),
             CreateExecutor(repository, aiEnabled),
+            repository,
             Options.Create(new OpenRouterOptions
             {
                 ApiKey = aiEnabled ? "test-key" : null,

@@ -152,7 +152,25 @@ Admin routes require sign-in plus an email listed in `Admin:AllowedEmails`.
 | #105 Admin review queue | Done | `/admin/news-discovery` |
 | #106 Promote workflow | Partial | Promote creates admin news draft; fuller workflow polish remains |
 | #107 Scheduled hosting | Not started | Local bat/worker only; no Azure timer yet |
-| #108 Tests/observability | Partial | Unit/integration tests in CI; no live OpenRouter in default tests |
+| #108 Tests/observability | Done | Run summary telemetry, failure-mode tests, test matrix in docs |
+
+## Observability
+
+Each `discover-news` run emits a structured **`NewsAgentRunCompleted`** log event (event id `4100`) with fetch, triage, draft, failure, and estimated AI spend totals. Step-level logs (`Discovery finished`, `Triage finished`, `Draft generation finished`) remain for troubleshooting.
+
+Search application logs for `NewsAgentRunCompleted` or `EventId=4100` when monitoring scheduled runs.
+
+## Test matrix
+
+| Layer | Default CI | Opt-in manual |
+|-------|------------|---------------|
+| Source fetchers | Fake HTTP fixtures | `scripts/Smoke-NewsAgent.bat` (live feeds) |
+| OpenRouter triage/draft | Fake `INewsAiClient` | `Smoke-NewsAgent.bat` + real API key |
+| Admin review / no auto-publish | Web integration tests | — |
+| Failure modes (malformed AI, disabled key) | `NewsAgentFailureModeTests` | — |
+| Legacy SQL discovery tables | In-memory / SQLite tests | Real DB migration apply |
+
+Report in pull requests whether opt-in smoke and legacy database checks were run or skipped.
 
 ## Testing
 
