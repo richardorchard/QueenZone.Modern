@@ -44,6 +44,28 @@ public sealed class NewsFeedParserTests
     }
 
     [Fact]
+    public void ParseAllowlistedPageLinks_skips_static_asset_links()
+    {
+        const string html = """
+            <!DOCTYPE html>
+            <html>
+              <body>
+                <a href="/news/tour-update">Tour update</a>
+                <a href="/wp-content/themes/site/style.css">Stylesheet</a>
+                <a href="/wp-content/uploads/hero.jpg">Hero image</a>
+                <a href="/news/feed/">Feed</a>
+              </body>
+            </html>
+            """;
+        var pageUri = new Uri("https://www.rogertaylorofficial.com/news");
+
+        var items = NewsFeedParser.ParseAllowlistedPageLinks(html, pageUri);
+
+        Assert.Single(items);
+        Assert.Equal("https://www.rogertaylorofficial.com/news/tour-update", items[0].SourceUrl);
+    }
+
+    [Fact]
     public void Parse_reads_atom_entries()
     {
         const string atom = """

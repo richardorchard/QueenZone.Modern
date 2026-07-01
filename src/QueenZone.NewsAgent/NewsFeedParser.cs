@@ -51,7 +51,7 @@ public static partial class NewsFeedParser
                 }
             }
 
-            if (string.IsNullOrWhiteSpace(location))
+            if (string.IsNullOrWhiteSpace(location) || !NewsDiscoveryUrlFilter.IsLikelyArticleUrl(location))
             {
                 continue;
             }
@@ -97,7 +97,9 @@ public static partial class NewsFeedParser
                 continue;
             }
 
-            if (absoluteUri.AbsolutePath.Length < 2 || seen.Contains(absoluteUri.AbsoluteUri))
+            if (absoluteUri.AbsolutePath.Length < 2
+                || seen.Contains(absoluteUri.AbsoluteUri)
+                || !NewsDiscoveryUrlFilter.IsLikelyArticleUrl(absoluteUri.AbsoluteUri))
             {
                 continue;
             }
@@ -162,7 +164,9 @@ public static partial class NewsFeedParser
                 }
             }
 
-            if (string.IsNullOrWhiteSpace(link) || string.IsNullOrWhiteSpace(title))
+            if (string.IsNullOrWhiteSpace(link)
+                || string.IsNullOrWhiteSpace(title)
+                || !NewsDiscoveryUrlFilter.IsLikelyArticleUrl(link))
             {
                 continue;
             }
@@ -219,7 +223,9 @@ public static partial class NewsFeedParser
                 }
             }
 
-            if (string.IsNullOrWhiteSpace(link) || string.IsNullOrWhiteSpace(title))
+            if (string.IsNullOrWhiteSpace(link)
+                || string.IsNullOrWhiteSpace(title)
+                || !NewsDiscoveryUrlFilter.IsLikelyArticleUrl(link))
             {
                 continue;
             }

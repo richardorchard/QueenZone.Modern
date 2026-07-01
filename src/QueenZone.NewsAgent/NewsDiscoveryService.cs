@@ -53,6 +53,11 @@ public sealed class NewsDiscoveryService(
                 var filtered = 0;
                 foreach (var item in items)
                 {
+                    if (!NewsDiscoveryUrlFilter.IsLikelyArticleUrl(item.SourceUrl))
+                    {
+                        continue;
+                    }
+
                     if (!NewsDiscoveryKeywordFilter.Matches(source, item))
                     {
                         filtered++;
