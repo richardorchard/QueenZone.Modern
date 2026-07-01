@@ -33,7 +33,7 @@ public sealed class EditPostModel(
                 discoveryRepository,
                 id,
                 cancellationToken);
-            ViewData["Title"] = $"Edit: {existing.Title}";
+            ViewData["Title"] = "Edit article";
             Form = EditModel.BuildForm(existing, draft, errors, provenance);
             return Page();
         }

@@ -1,7 +1,12 @@
 @model QueenZone.Web.Pages.Admin.News.ArticleFormViewModel
 @inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
 
+<div class="admin-form-panel">
 <h1>@Model.Title</h1>
+@if (!string.IsNullOrWhiteSpace(Model.Subtitle))
+{
+  <p class="admin-article-subtitle">@Model.Subtitle</p>
+}
 
 @if (Model.DiscoveryProvenance is not null)
 {
@@ -22,7 +27,7 @@
   <input type="hidden" name="@AdminNewsPageModel.AntiforgeryTokenFieldName" value="@Antiforgery.GetAndStoreTokens(Context).RequestToken">
   <label>
     Title
-    <input type="text" name="title" value="@Model.Draft.Title" required>
+    <input type="text" name="title" value="@Model.Draft.Title" maxlength="@NewsValidation.MaxTitleLength" required>
   </label>
   <label>
     Slug
@@ -64,3 +69,4 @@
     }
   </div>
 </form>
+</div>

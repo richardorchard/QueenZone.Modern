@@ -168,9 +168,23 @@ public sealed class EfNewsDiscoveryRepository(QueenZoneDbContext dbContext) : IN
         var candidate = await dbContext.NewsCandidates
             .AsNoTracking()
             .Include(item => item.Source)
-            .SingleOrDefaultAsync(item => item.PromotedNewsId == promotedNewsId, cancellationToken);
+            .Where(item => item.PromotedNewsId == promotedNewsId)
+            .OrderByDescending(item => item.Id)
+            .FirstOrDefaultAsync(cancellationToken);
 
         return candidate is null ? null : MapCandidate(candidate);
+    }
+
+    public async Task ClearPromotedNewsLinksAsync(int promotedNewsId, CancellationToken cancellationToken = default)
+    {
+        var timestamp = DateTime.UtcNow;
+        await dbContext.NewsCandidates
+            .Where(candidate => candidate.PromotedNewsId == promotedNewsId)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(candidate => candidate.PromotedNewsId, (int?)null)
+                    .SetProperty(candidate => candidate.UpdatedAt, timestamp),
+                cancellationToken);
     }
 
     public async Task<IReadOnlyList<NewsCandidate>> GetCandidatesAsync(
@@ -565,9 +579,9 @@ public sealed class EfNewsDiscoveryRepository(QueenZoneDbContext dbContext) : IN
             candidate.ReviewNotes,
             candidate.CreatedAt,
             candidate.UpdatedAt,
-            candidate.Source.Key,
-            candidate.Source.DisplayName,
-            candidate.Source.TrustTier);
+            candidate.Source?.Key ?? "unknown",
+            candidate.Source?.DisplayName ?? "Unknown source",
+            candidate.Source?.TrustTier ?? NewsDiscoveryTrustTier.LowConfidence);
 
     private static NewsCandidateEvidence MapEvidence(NewsCandidateEvidenceEntity evidence) =>
         new(

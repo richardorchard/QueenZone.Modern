@@ -26,6 +26,10 @@
     <RepositoryRoot>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\..'))</RepositoryRoot>
   </PropertyGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="QueenZone.Web.Tests" />
+  </ItemGroup>
+
   <Target Name="SetBuildMetadata" BeforeTargets="GetAssemblyVersion;GetAssemblyAttributes;GenerateAssemblyInfo">
     <Exec Command="git rev-parse --short HEAD" ConsoleToMSBuild="true" IgnoreExitCode="true" StandardOutputImportance="low" WorkingDirectory="$(RepositoryRoot)">
       <Output TaskParameter="ConsoleOutput" PropertyName="GitCommitShort" />

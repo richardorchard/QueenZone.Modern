@@ -38,6 +38,22 @@ public sealed class NewsValidationTests
     }
 
     [Fact]
+    public void ValidateDraftRejectsOverlongTitle()
+    {
+        var draft = new AdminNewsDraft(
+            new string('x', NewsValidation.MaxTitleLength + 1),
+            null,
+            "Excerpt",
+            "Body",
+            new DateTime(2026, 6, 10, 0, 0, 0, DateTimeKind.Utc),
+            null);
+
+        var errors = NewsValidation.ValidateDraft(draft, slugInUse: false);
+
+        Assert.Contains($"Title must be {NewsValidation.MaxTitleLength} characters or fewer.", errors);
+    }
+
+    [Fact]
     public void NewsSlugResolveUsesOverrideWhenProvided()
     {
         Assert.Equal("custom-slug", NewsSlug.Resolve("Any title", "Custom Slug!"));

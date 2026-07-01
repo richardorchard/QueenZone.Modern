@@ -393,4 +393,95 @@ public sealed class EfNewsDiscoveryRepositoryTests : IAsyncDisposable
         await dbContext.DisposeAsync();
         await connection.DisposeAsync();
     }
+
+    [Fact]
+    public async Task GetCandidateByPromotedNewsId_returns_latest_linked_candidate()
+    {
+        var sourceId = await repository.UpsertSourceAsync(new NewsDiscoverySourceDraft(
+            "queen-online",
+            "Queen Online",
+            "https://www.queenonline.com/",
+            null,
+            NewsDiscoverySourceType.Rss,
+            NewsDiscoveryTrustTier.Primary,
+            60,
+            true,
+            null));
+        var discoveredAt = DateTime.UtcNow;
+        var firstCandidateId = await repository.CreateCandidateAsync(new NewsCandidateCreateRequest(
+            sourceId,
+            "https://www.queenonline.com/news/first",
+            "First story",
+            discoveredAt,
+            "First excerpt.",
+            discoveredAt));
+        var secondCandidateId = await repository.CreateCandidateAsync(new NewsCandidateCreateRequest(
+            sourceId,
+            "https://www.queenonline.com/news/second",
+            "Second story",
+            discoveredAt,
+            "Second excerpt.",
+            discoveredAt));
+
+        await PromoteCandidateAsync(firstCandidateId, 501);
+        await PromoteCandidateAsync(secondCandidateId, 501);
+
+        var linked = await repository.GetCandidateByPromotedNewsIdAsync(501);
+        Assert.NotNull(linked);
+        Assert.Equal(secondCandidateId, linked.Id);
+    }
+
+    [Fact]
+    public async Task ClearPromotedNewsLinks_clears_all_matching_candidates()
+    {
+        var sourceId = await repository.UpsertSourceAsync(new NewsDiscoverySourceDraft(
+            "queen-online",
+            "Queen Online",
+            "https://www.queenonline.com/",
+            null,
+            NewsDiscoverySourceType.Rss,
+            NewsDiscoveryTrustTier.Primary,
+            60,
+            true,
+            null));
+        var discoveredAt = DateTime.UtcNow;
+        var firstCandidateId = await repository.CreateCandidateAsync(new NewsCandidateCreateRequest(
+            sourceId,
+            "https://www.queenonline.com/news/clear-first",
+            "First story",
+            discoveredAt,
+            "First excerpt.",
+            discoveredAt));
+        var secondCandidateId = await repository.CreateCandidateAsync(new NewsCandidateCreateRequest(
+            sourceId,
+            "https://www.queenonline.com/news/clear-second",
+            "Second story",
+            discoveredAt,
+            "Second excerpt.",
+            discoveredAt));
+
+        await PromoteCandidateAsync(firstCandidateId, 502);
+        await PromoteCandidateAsync(secondCandidateId, 502);
+
+        await repository.ClearPromotedNewsLinksAsync(502);
+
+        dbContext.ChangeTracker.Clear();
+        var first = await dbContext.NewsCandidates.AsNoTracking().SingleAsync(candidate => candidate.Id == firstCandidateId);
+        var second = await dbContext.NewsCandidates.AsNoTracking().SingleAsync(candidate => candidate.Id == secondCandidateId);
+        Assert.Null(first.PromotedNewsId);
+        Assert.Null(second.PromotedNewsId);
+    }
+
+    private async Task PromoteCandidateAsync(int candidateId, int promotedNewsId)
+    {
+        await repository.TryUpdateCandidateStatusAsync(
+            candidateId,
+            new NewsCandidateStatusUpdate(NewsCandidateStatus.NeedsReview));
+        await repository.TryUpdateCandidateStatusAsync(
+            candidateId,
+            new NewsCandidateStatusUpdate(NewsCandidateStatus.Drafted, ConfidenceScore: 0.9m));
+        await repository.TryUpdateCandidateStatusAsync(
+            candidateId,
+            new NewsCandidateStatusUpdate(NewsCandidateStatus.PromotedToArticle, PromotedNewsId: promotedNewsId));
+    }
 }

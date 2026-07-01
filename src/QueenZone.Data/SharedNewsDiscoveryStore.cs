@@ -157,7 +157,23 @@ public sealed class SharedNewsDiscoveryStore
     {
         lock (sync)
         {
-            return candidates.SingleOrDefault(candidate => candidate.PromotedNewsId == promotedNewsId);
+            return candidates
+                .Where(candidate => candidate.PromotedNewsId == promotedNewsId)
+                .OrderByDescending(candidate => candidate.Id)
+                .FirstOrDefault();
+        }
+    }
+
+    public void ClearPromotedNewsLinks(int promotedNewsId)
+    {
+        lock (sync)
+        {
+            var timestamp = DateTime.UtcNow;
+            foreach (var candidate in candidates.Where(candidate => candidate.PromotedNewsId == promotedNewsId))
+            {
+                candidate.PromotedNewsId = null;
+                candidate.UpdatedAt = timestamp;
+            }
         }
     }
 

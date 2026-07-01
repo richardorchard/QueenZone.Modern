@@ -59,6 +59,12 @@ public sealed class InMemoryNewsDiscoveryRepository(SharedNewsDiscoveryStore sto
         return Task.FromResult(candidate is null ? null : MapCandidate(candidate));
     }
 
+    public Task ClearPromotedNewsLinksAsync(int promotedNewsId, CancellationToken cancellationToken = default)
+    {
+        store.ClearPromotedNewsLinks(promotedNewsId);
+        return Task.CompletedTask;
+    }
+
     public Task<IReadOnlyList<NewsCandidate>> GetCandidatesAsync(
         NewsCandidateStatus? status = null,
         int? sourceId = null,
@@ -144,9 +150,9 @@ public sealed class InMemoryNewsDiscoveryRepository(SharedNewsDiscoveryStore sto
             candidate.ReviewNotes,
             candidate.CreatedAt,
             candidate.UpdatedAt,
-            candidate.Source.Key,
-            candidate.Source.DisplayName,
-            candidate.Source.TrustTier);
+            candidate.Source?.Key ?? "unknown",
+            candidate.Source?.DisplayName ?? "Unknown source",
+            candidate.Source?.TrustTier ?? NewsDiscoveryTrustTier.LowConfidence);
 
     private static NewsCandidateEvidence MapEvidence(Entities.NewsCandidateEvidenceEntity evidence) =>
         new(

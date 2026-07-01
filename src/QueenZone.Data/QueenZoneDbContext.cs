@@ -38,7 +38,7 @@ public sealed class QueenZoneDbContext : DbContext
             entity.HasKey(row => row.NewsId);
 
             entity.Property(row => row.NewsId).HasColumnName("NEWS_ID");
-            entity.Property(row => row.Title).HasColumnName("TITLE").HasMaxLength(500);
+            entity.Property(row => row.Title).HasColumnName("TITLE").HasMaxLength(150);
             entity.Property(row => row.Excerpt).HasColumnName("EXCERPT");
             entity.Property(row => row.Body).HasColumnName("ARTICLE");
             entity.Property(row => row.PublishedAt).HasColumnName("DATE");
