@@ -25,7 +25,7 @@ namespace QueenZone.Data.Migrations
 
             migrationBuilder.Sql("""
                 IF NOT EXISTS (SELECT 1 FROM sys.fulltext_indexes WHERE object_id = OBJECT_ID(N'dbo.ModernForumPost'))
-                    CREATE FULLTEXT INDEX ON dbo.ModernForumPost (Body)
+                    CREATE FULLTEXT INDEX ON dbo.ModernForumPost (BodyHtml)
                         KEY INDEX PK_ModernForumPost
                         ON FT_ForumCatalog
                         WITH CHANGE_TRACKING AUTO;
@@ -55,7 +55,7 @@ namespace QueenZone.Data.Migrations
                     (
                         SELECT p.ThreadId AS ThreadPk, MAX(ft.[RANK]) AS SearchRank
                         FROM dbo.ModernForumPost p
-                        INNER JOIN FREETEXTTABLE(dbo.ModernForumPost, Body, @Query) ft ON ft.[KEY] = p.Id
+                        INNER JOIN FREETEXTTABLE(dbo.ModernForumPost, BodyHtml, @Query) ft ON ft.[KEY] = p.Id
                         INNER JOIN dbo.ModernForumThread t ON t.Id = p.ThreadId
                         INNER JOIN dbo.ModernForumCategory c ON c.Id = t.CategoryId
                         WHERE t.IsLegacyTopicStarter = 1
@@ -99,7 +99,7 @@ namespace QueenZone.Data.Migrations
                     (
                         SELECT DISTINCT p.ThreadId AS ThreadPk
                         FROM dbo.ModernForumPost p
-                        INNER JOIN FREETEXTTABLE(dbo.ModernForumPost, Body, @Query) ft ON ft.[KEY] = p.Id
+                        INNER JOIN FREETEXTTABLE(dbo.ModernForumPost, BodyHtml, @Query) ft ON ft.[KEY] = p.Id
                         INNER JOIN dbo.ModernForumThread t ON t.Id = p.ThreadId
                         INNER JOIN dbo.ModernForumCategory c ON c.Id = t.CategoryId
                         WHERE t.IsLegacyTopicStarter = 1
