@@ -13,7 +13,7 @@ namespace QueenZone.Data.Migrations
             migrationBuilder.Sql("""
                 IF NOT EXISTS (SELECT 1 FROM sys.fulltext_catalogs WHERE name = N'FT_ForumCatalog')
                     CREATE FULLTEXT CATALOG FT_ForumCatalog;
-                """);
+                """, suppressTransaction: true);
 
             migrationBuilder.Sql("""
                 IF NOT EXISTS (SELECT 1 FROM sys.fulltext_indexes WHERE object_id = OBJECT_ID(N'dbo.ModernForumThread'))
@@ -21,7 +21,7 @@ namespace QueenZone.Data.Migrations
                         KEY INDEX PK_ModernForumThread
                         ON FT_ForumCatalog
                         WITH CHANGE_TRACKING AUTO;
-                """);
+                """, suppressTransaction: true);
 
             migrationBuilder.Sql("""
                 IF NOT EXISTS (SELECT 1 FROM sys.fulltext_indexes WHERE object_id = OBJECT_ID(N'dbo.ModernForumPost'))
@@ -29,7 +29,7 @@ namespace QueenZone.Data.Migrations
                         KEY INDEX PK_ModernForumPost
                         ON FT_ForumCatalog
                         WITH CHANGE_TRACKING AUTO;
-                """);
+                """, suppressTransaction: true);
 
             migrationBuilder.Sql("""
                 CREATE OR ALTER PROCEDURE dbo.ModernForum_SearchThreads
@@ -125,17 +125,17 @@ namespace QueenZone.Data.Migrations
             migrationBuilder.Sql("""
                 IF EXISTS (SELECT 1 FROM sys.fulltext_indexes WHERE object_id = OBJECT_ID(N'dbo.ModernForumPost'))
                     DROP FULLTEXT INDEX ON dbo.ModernForumPost;
-                """);
+                """, suppressTransaction: true);
 
             migrationBuilder.Sql("""
                 IF EXISTS (SELECT 1 FROM sys.fulltext_indexes WHERE object_id = OBJECT_ID(N'dbo.ModernForumThread'))
                     DROP FULLTEXT INDEX ON dbo.ModernForumThread;
-                """);
+                """, suppressTransaction: true);
 
             migrationBuilder.Sql("""
                 IF EXISTS (SELECT 1 FROM sys.fulltext_catalogs WHERE name = N'FT_ForumCatalog')
                     DROP FULLTEXT CATALOG FT_ForumCatalog;
-                """);
+                """, suppressTransaction: true);
         }
     }
 }
