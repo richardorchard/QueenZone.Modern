@@ -28,6 +28,7 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddScoped<IAdminNewsRepository, EfAdminNewsRepository>();
         services.AddScoped<INewsAuditRepository, EfNewsAuditRepository>();
         services.AddScoped<IMemberAccountRepository, EfMemberAccountRepository>();
+        services.AddScoped<INewsDiscoveryRepository, EfNewsDiscoveryRepository>();
 
         return services;
     }
@@ -49,6 +50,8 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddSingleton<IAdminNewsRepository, InMemoryAdminNewsRepository>();
         services.AddSingleton<INewsAuditRepository, InMemoryNewsAuditRepository>();
         services.AddSingleton<IMemberAccountRepository, InMemoryMemberAccountRepository>();
+        services.AddSingleton<SharedNewsDiscoveryStore>();
+        services.AddSingleton<INewsDiscoveryRepository, InMemoryNewsDiscoveryRepository>();
 
         return services;
     }
