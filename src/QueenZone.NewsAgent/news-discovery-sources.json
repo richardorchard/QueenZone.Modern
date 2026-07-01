@@ -44,6 +44,17 @@
     "relevanceKeywords": "adam lambert,queen"
   },
   {
+    "key": "queen-fan-club",
+    "displayName": "Queen Fan Club (QueenWorld)",
+    "homepageUrl": "https://queenworld.com/",
+    "feedOrSiteUrl": "https://queenworld.com/news.php",
+    "sourceType": "AllowlistedPage",
+    "trustTier": "Primary",
+    "pollIntervalMinutes": 120,
+    "enabled": true,
+    "relevanceKeywords": "queen,freddie mercury,brian may,roger taylor,john deacon,adam lambert"
+  },
+  {
     "key": "rolling-stone-music",
     "displayName": "Rolling Stone Music",
     "homepageUrl": "https://www.rollingstone.com/music/",

@@ -120,6 +120,7 @@ public sealed class NewsDiscoveryServiceTests
         Assert.Contains(sources, source => source.Key == "queen-online" && source.SourceType == NewsDiscoverySourceType.AllowlistedPage);
         Assert.Contains(sources, source => source.Key == "roger-taylor" && source.SourceType == NewsDiscoverySourceType.Rss);
         Assert.Contains(sources, source => source.Key == "brian-may" && source.FeedOrSiteUrl == "https://brianmay.com/feed/");
+        Assert.Contains(sources, source => source.Key == "queen-fan-club" && source.SourceType == NewsDiscoverySourceType.AllowlistedPage);
         Assert.Contains(sources, source => source.Key == "nme-music" && source.TrustTier == NewsDiscoveryTrustTier.Secondary);
         Assert.Contains(sources, source => source.Key == "gold-radio" && !source.Enabled);
     }

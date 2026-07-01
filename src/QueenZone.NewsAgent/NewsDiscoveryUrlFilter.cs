@@ -68,6 +68,7 @@ public static class NewsDiscoveryUrlFilter
 
         var trimmedPath = path.Trim('/');
         if (trimmedPath.Equals("news", StringComparison.OrdinalIgnoreCase)
+            || trimmedPath.Equals("news.php", StringComparison.OrdinalIgnoreCase)
             || trimmedPath.Equals("feed", StringComparison.OrdinalIgnoreCase)
             || trimmedPath.EndsWith("/feed", StringComparison.OrdinalIgnoreCase)
             || trimmedPath.EndsWith("/feed/rss", StringComparison.OrdinalIgnoreCase))

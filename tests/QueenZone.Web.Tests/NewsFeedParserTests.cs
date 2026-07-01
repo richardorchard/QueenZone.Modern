@@ -66,6 +66,29 @@ public sealed class NewsFeedParserTests
     }
 
     [Fact]
+    public void ParseAllowlistedPageLinks_keeps_php_news_detail_links_only()
+    {
+        const string html = """
+            <!DOCTYPE html>
+            <html>
+              <body>
+                <a href="/news_detail.php?Roger-Taylor-Album-Tour-895">Roger Taylor Album &amp; Tour</a>
+                <a href="/fanclub_about.php">About</a>
+                <a href="/news.php?page=2">Next page</a>
+              </body>
+            </html>
+            """;
+        var pageUri = new Uri("https://queenworld.com/news.php");
+
+        var items = NewsFeedParser.ParseAllowlistedPageLinks(html, pageUri);
+
+        Assert.Single(items);
+        Assert.Equal(
+            "https://queenworld.com/news_detail.php?Roger-Taylor-Album-Tour-895",
+            items[0].SourceUrl);
+    }
+
+    [Fact]
     public void ParseAllowlistedPageLinks_limits_links_to_page_path_prefix()
     {
         const string html = """
