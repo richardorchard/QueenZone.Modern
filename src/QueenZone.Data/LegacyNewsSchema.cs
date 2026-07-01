@@ -86,6 +86,7 @@ public static class LegacyNewsSchema
                 EXCERPT,
                 ARTICLE,
                 [DATE],
+                [DATE] AS PublishedAt,
                 SOURCE_URL,
                 CAST(CASE WHEN DISPLAY = 1 THEN 1 ELSE 0 END AS bit) AS DISPLAY,
                 SLUG,
@@ -93,6 +94,7 @@ public static class LegacyNewsSchema
                 UPDATED_AT,
                 EDITOR_EMAIL,
                 USER_ID,
+                NEWS_ID AS NewsId,
                 TYPE,
                 QUEEN_ONLINE
             FROM LatestNews
