@@ -41,6 +41,8 @@ public sealed class LegacyNewsSchemaTests
         Assert.Contains("CAST(NULL AS nvarchar(256)) AS EDITOR_EMAIL", sql);
         Assert.Contains("ISNULL(TYPE, 0) AS TYPE", sql);
         Assert.Contains("ISNULL(QUEEN_ONLINE, 0) AS QUEEN_ONLINE", sql);
+        Assert.Contains("NEWS_ID", sql);
+        Assert.DoesNotContain("AS NewsId", sql);
     }
 
     [Fact]

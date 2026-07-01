@@ -81,20 +81,20 @@ public static class LegacyNewsSchema
                 FROM NEWS_T
             )
             SELECT
-                NEWS_ID AS NewsId,
-                TITLE AS Title,
-                EXCERPT AS Excerpt,
-                ARTICLE AS Body,
-                [DATE] AS PublishedAt,
-                SOURCE_URL AS SourceUrl,
-                CAST(CASE WHEN DISPLAY = 1 THEN 1 ELSE 0 END AS bit) AS IsPublished,
-                SLUG AS Slug,
-                CREATED_AT AS CreatedAt,
-                UPDATED_AT AS UpdatedAt,
-                EDITOR_EMAIL AS EditorEmail,
-                USER_ID AS UserId,
-                TYPE AS Type,
-                QUEEN_ONLINE AS QueenOnline
+                NEWS_ID,
+                TITLE,
+                EXCERPT,
+                ARTICLE,
+                [DATE],
+                SOURCE_URL,
+                CAST(CASE WHEN DISPLAY = 1 THEN 1 ELSE 0 END AS bit) AS DISPLAY,
+                SLUG,
+                CREATED_AT,
+                UPDATED_AT,
+                EDITOR_EMAIL,
+                USER_ID,
+                TYPE,
+                QUEEN_ONLINE
             FROM LatestNews
             WHERE RowNumber = 1
             """;
