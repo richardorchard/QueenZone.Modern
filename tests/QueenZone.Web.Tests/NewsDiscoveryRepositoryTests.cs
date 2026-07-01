@@ -162,4 +162,128 @@ public sealed class NewsDiscoveryRepositoryTests
         Assert.Equal(NewsAiRunStatus.Succeeded, runs[0].Status);
         Assert.Equal(0.0025m, runs[0].EstimatedCostUsd);
     }
+
+    [Fact]
+    public async Task Source_registry_supports_lookup_update_and_enabled_filter()
+    {
+        var repository = CreateRepository();
+        var sourceId = await repository.UpsertSourceAsync(new NewsDiscoverySourceDraft(
+            "rogertaylor",
+            "Roger Taylor",
+            "https://www.rogertaylorofficial.com/",
+            null,
+            NewsDiscoverySourceType.AllowlistedPage,
+            NewsDiscoveryTrustTier.Primary,
+            120,
+            true,
+            null));
+
+        await repository.MarkSourceFetchedAsync(sourceId, new DateTime(2026, 7, 1, 9, 0, 0, DateTimeKind.Utc));
+
+        var source = await repository.GetSourceByKeyAsync("rogertaylor");
+        Assert.NotNull(source);
+        Assert.NotNull(source.LastFetchedAt);
+
+        await repository.UpsertSourceAsync(new NewsDiscoverySourceDraft(
+            "rogertaylor",
+            "Roger Taylor Official",
+            "https://www.rogertaylorofficial.com/",
+            null,
+            NewsDiscoverySourceType.AllowlistedPage,
+            NewsDiscoveryTrustTier.Primary,
+            180,
+            false,
+            null));
+
+        Assert.Empty(await repository.GetSourcesAsync(enabledOnly: true));
+        Assert.Single(await repository.GetSourcesAsync());
+    }
+
+    [Fact]
+    public async Task AddCandidateEvidence_and_candidate_filters_work_in_memory_store()
+    {
+        var repository = CreateRepository();
+        var sourceId = await repository.UpsertSourceAsync(new NewsDiscoverySourceDraft(
+            "queen-online",
+            "Queen Online",
+            "https://www.queenonline.com/",
+            null,
+            NewsDiscoverySourceType.Rss,
+            NewsDiscoveryTrustTier.Primary,
+            60,
+            true,
+            null));
+        var discoveredAt = DateTime.UtcNow;
+        var candidateId = await repository.CreateCandidateAsync(new NewsCandidateCreateRequest(
+            sourceId,
+            "https://www.queenonline.com/news/live",
+            "Live release",
+            discoveredAt,
+            "Initial excerpt.",
+            discoveredAt));
+
+        await repository.AddCandidateEvidenceAsync(candidateId, new NewsCandidateEvidenceDraft(
+            "https://www.queenonline.com/news/live",
+            "Queen Online",
+            NewsDiscoveryTrustTier.Primary,
+            "Live release",
+            discoveredAt,
+            "Refreshed excerpt.",
+            "\"etag\"",
+            discoveredAt.AddMinutes(10)));
+
+        var evidence = await repository.GetCandidateEvidenceAsync(candidateId);
+        Assert.Equal(2, evidence.Count);
+
+        await repository.TryUpdateCandidateStatusAsync(
+            candidateId,
+            new NewsCandidateStatusUpdate(NewsCandidateStatus.Rejected, ReviewNotes: "Not relevant"));
+
+        var rejected = await repository.GetCandidatesAsync(NewsCandidateStatus.Rejected, sourceId);
+        Assert.Single(rejected);
+        Assert.Equal("Not relevant", rejected[0].ReviewNotes);
+    }
+
+    [Fact]
+    public async Task CreateCandidate_throws_when_source_or_duplicate_url_is_invalid()
+    {
+        var repository = CreateRepository();
+        var discoveredAt = DateTime.UtcNow;
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            repository.CreateCandidateAsync(new NewsCandidateCreateRequest(
+                999,
+                "https://www.queenonline.com/news/missing-source",
+                "Missing source",
+                discoveredAt,
+                "Excerpt",
+                discoveredAt)));
+
+        var sourceId = await repository.UpsertSourceAsync(new NewsDiscoverySourceDraft(
+            "queen-online",
+            "Queen Online",
+            "https://www.queenonline.com/",
+            null,
+            NewsDiscoverySourceType.Rss,
+            NewsDiscoveryTrustTier.Primary,
+            60,
+            true,
+            null));
+        await repository.CreateCandidateAsync(new NewsCandidateCreateRequest(
+            sourceId,
+            "https://www.queenonline.com/news/duplicate",
+            "First story",
+            discoveredAt,
+            "Excerpt",
+            discoveredAt));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            repository.CreateCandidateAsync(new NewsCandidateCreateRequest(
+                sourceId,
+                "https://www.queenonline.com/news/duplicate?utm_campaign=test",
+                "Duplicate story",
+                discoveredAt,
+                "Excerpt",
+                discoveredAt)));
+    }
 }

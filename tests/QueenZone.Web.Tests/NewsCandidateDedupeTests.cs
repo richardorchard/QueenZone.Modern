@@ -37,4 +37,8 @@ public sealed class NewsCandidateDedupeTests
 
         Assert.Equal(first, second);
     }
+
+    [Fact]
+    public void NormalizeCanonicalUrl_falls_back_for_non_absolute_urls() =>
+        Assert.Equal("not-a-valid-url", NewsCandidateDedupe.NormalizeCanonicalUrl("  NOT-a-valid-url  "));
 }
