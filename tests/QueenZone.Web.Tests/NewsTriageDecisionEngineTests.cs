@@ -73,4 +73,44 @@ public sealed class NewsTriageDecisionEngineTests
 
         Assert.Equal(NewsCandidateStatus.Rejected, decision.TargetStatus);
     }
+
+    [Fact]
+    public void Decide_rejects_unsafe_blocked_ai_verdict()
+    {
+        var decision = NewsTriageDecisionEngine.Decide(
+            NewsDiscoveryTrustTier.Primary,
+            new NewsTriageDeterministicSignals(true, true, null, null),
+            new NewsTriageStructuredResult(
+                NewsTriageVerdict.UnsafeBlocked,
+                0.10m,
+                0.99m,
+                "Unverified rumor.",
+                "other",
+                [],
+                "Blocked."),
+            Options);
+
+        Assert.Equal(NewsCandidateStatus.Rejected, decision.TargetStatus);
+        Assert.Equal(NewsTriageVerdict.UnsafeBlocked, decision.Verdict);
+    }
+
+    [Fact]
+    public void Decide_marks_ai_duplicate_verdict_as_ignored_duplicate()
+    {
+        var decision = NewsTriageDecisionEngine.Decide(
+            NewsDiscoveryTrustTier.Primary,
+            new NewsTriageDeterministicSignals(true, true, 42, "Earlier candidate."),
+            new NewsTriageStructuredResult(
+                NewsTriageVerdict.Duplicate,
+                0.95m,
+                0.95m,
+                "Same story as earlier item.",
+                "tour",
+                ["Queen"],
+                null),
+            Options);
+
+        Assert.Equal(NewsCandidateStatus.IgnoredDuplicate, decision.TargetStatus);
+        Assert.Equal(42, decision.DuplicateOfCandidateId);
+    }
 }

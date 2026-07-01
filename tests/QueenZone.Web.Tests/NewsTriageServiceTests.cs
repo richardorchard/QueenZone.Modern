@@ -98,6 +98,87 @@ public sealed class NewsTriageServiceTests
         Assert.Equal(0, result.Failures);
     }
 
+    [Fact]
+    public async Task RunTriageAsync_returns_zero_counts_when_no_candidates()
+    {
+        var repository = new InMemoryNewsDiscoveryRepository(new SharedNewsDiscoveryStore());
+        var service = CreateService(repository, new FakeNewsAiClient(true));
+
+        var result = await service.RunTriageAsync(new NewsTriageRunOptions());
+
+        Assert.Equal(0, result.CandidatesConsidered);
+    }
+
+    [Fact]
+    public async Task TriageCandidateAsync_rejects_not_relevant_ai_verdict()
+    {
+        var repository = new InMemoryNewsDiscoveryRepository(new SharedNewsDiscoveryStore());
+        var candidateId = await SeedDiscoveredCandidateAsync(repository);
+        var service = CreateService(
+            repository,
+            new FakeNewsAiClient(
+                true,
+                """
+                {
+                  "verdict": "not_relevant",
+                  "relevance_score": 0.12,
+                  "confidence_score": 0.95,
+                  "rationale": "Generic guitar pedal review.",
+                  "suggested_category": "other",
+                  "entities": [],
+                  "review_notes": null
+                }
+                """));
+
+        var result = await service.TriageCandidateAsync(
+            (await repository.GetCandidateByIdAsync(candidateId))!,
+            new NewsTriageRunOptions());
+
+        Assert.Equal(NewsCandidateStatus.Rejected, result.Decision.TargetStatus);
+    }
+
+    [Fact]
+    public async Task TriageCandidateAsync_dry_run_does_not_persist_status_changes()
+    {
+        var repository = new InMemoryNewsDiscoveryRepository(new SharedNewsDiscoveryStore());
+        var candidateId = await SeedDiscoveredCandidateAsync(repository);
+        var service = CreateService(
+            repository,
+            new FakeNewsAiClient(
+                true,
+                """
+                {
+                  "verdict": "relevant",
+                  "relevance_score": 0.93,
+                  "confidence_score": 0.90,
+                  "rationale": "Official Queen tour announcement.",
+                  "suggested_category": "tour",
+                  "entities": ["Queen"],
+                  "review_notes": null
+                }
+                """));
+
+        await service.TriageCandidateAsync(
+            (await repository.GetCandidateByIdAsync(candidateId))!,
+            new NewsTriageRunOptions(DryRun: true));
+
+        var candidate = await repository.GetCandidateByIdAsync(candidateId);
+        Assert.Equal(NewsCandidateStatus.Discovered, candidate!.Status);
+    }
+
+    [Fact]
+    public async Task RunTriageAsync_records_failure_when_ai_returns_invalid_json()
+    {
+        var repository = new InMemoryNewsDiscoveryRepository(new SharedNewsDiscoveryStore());
+        await SeedDiscoveredCandidateAsync(repository);
+        var service = CreateService(repository, new FakeNewsAiClient(true, "not-json"));
+
+        var result = await service.RunTriageAsync(new NewsTriageRunOptions());
+
+        Assert.Equal(1, result.Failures);
+        Assert.Single(result.Errors);
+    }
+
     private static NewsTriageService CreateService(INewsDiscoveryRepository repository, FakeNewsAiClient fakeClient)
     {
         var budgetGuard = new NewsAiBudgetGuard(

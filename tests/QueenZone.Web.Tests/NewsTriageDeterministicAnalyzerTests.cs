@@ -66,6 +66,13 @@ public sealed class NewsTriageDeterministicAnalyzerTests
         Assert.False(signals.KeywordMatch);
     }
 
+    [Fact]
+    public void DuplicateRules_treats_rejected_candidates_as_inactive_duplicate_sources()
+    {
+        Assert.False(NewsTriageDuplicateRules.IsActiveDuplicateSource(NewsCandidateStatus.Rejected));
+        Assert.True(NewsTriageDuplicateRules.IsActiveDuplicateSource(NewsCandidateStatus.NeedsReview));
+    }
+
     private static NewsDiscoverySourceDraft CreatePrimarySource() =>
         new(
             "queen-online",

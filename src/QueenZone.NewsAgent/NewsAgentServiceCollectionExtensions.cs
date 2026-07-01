@@ -61,6 +61,7 @@ public static class NewsAgentServiceCollectionExtensions
         services.AddScoped<NewsAiRunExecutor>();
         services.AddScoped<NewsTriageDeterministicAnalyzer>();
         services.AddScoped<NewsTriageService>();
+        services.AddScoped<DiscoverNewsWorker>();
 
         return services;
     }

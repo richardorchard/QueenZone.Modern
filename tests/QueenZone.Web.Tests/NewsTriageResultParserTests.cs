@@ -46,4 +46,10 @@ public sealed class NewsTriageResultParserTests
 
         Assert.Equal(NewsTriageVerdict.NotRelevant, result.Verdict);
     }
+
+    [Fact]
+    public void Parse_throws_for_empty_payload()
+    {
+        Assert.Throws<InvalidOperationException>(() => NewsTriageResultParser.Parse("   "));
+    }
 }
