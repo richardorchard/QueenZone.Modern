@@ -115,7 +115,14 @@ dotnet build QueenZone.sln --configuration Release --no-restore
 dotnet test QueenZone.sln --configuration Release --no-build
 ```
 
-CI should also collect coverage from the deterministic test suite and publish an HTML/Cobertura report artifact. The coverage report is expected to help reviewers spot untested risk, but the project does not enforce a global percentage threshold yet because early migration work will mix framework glue, Razor rendering, and legacy-data boundaries.
+CI should also collect coverage from the deterministic test suite and publish an HTML/Cobertura report artifact. The coverage report is expected to help reviewers spot untested risk.
+
+CI enforces two coverage gates:
+
+- Global line coverage must stay at or above 51%. This is the initial ratchet baseline from the deterministic test suite and should be raised deliberately as coverage improves.
+- Changed coverable C# lines in pull requests must be at least 80% covered. If a pull request changes no coverable C# lines, the changed-line gate is skipped.
+
+These gates are guardrails, not a replacement for useful assertions. New or changed pure logic should still normally include targeted unit coverage, especially for canonical routes, pagination, visibility rules, date formatting, and HTML sanitisation.
 
 For local coverage reports:
 

@@ -180,3 +180,58 @@
   window.addEventListener("scroll", setScrolled, { passive: true });
   setScrolled();
 })();
+
+// ── Homepage archive hero — era montage ──────────────────────────────────────
+(() => {
+  const ERAS = [
+    { year: "1999", img: "/assets/eras/queenzone-1999.png", label: "The Queen Internet Zone", glow: "#c81e2e" },
+    { year: "2000", img: "/assets/eras/queenzone-2000.png", label: "Queen Internet Zone",     glow: "#3c4a5a" },
+    { year: "2002", img: "/assets/eras/queenzone-2002.png", label: "www.queenzone.com",       glow: "#9c1414" },
+    { year: "2004", img: "/assets/eras/queenzone-2004.png", label: "Queenzone.com",           glow: "#1668ad" },
+    { year: "2020", img: "/assets/eras/queenzone-2020.png", label: "QUEENZONE.COM",           glow: "#8b95a1" },
+  ];
+
+  const hero    = document.getElementById("qz-hero-archive");
+  if (!hero) return;
+
+  const glowEl  = document.getElementById("qz-era-glow");
+  const labelEl = document.getElementById("qz-era-label");
+  const yearEl  = document.getElementById("qz-era-year");
+  const imgEl   = document.getElementById("qz-era-img");
+  const btns    = Array.from(hero.querySelectorAll(".qz-era-btn"));
+
+  let current = 0;
+  let timer;
+
+  function applyEra(index) {
+    current = index;
+    const era = ERAS[index];
+
+    glowEl.style.background = `radial-gradient(closest-side, ${era.glow}55, transparent 72%)`;
+    labelEl.textContent     = era.label;
+    yearEl.textContent      = era.year;
+    imgEl.src               = era.img;
+    imgEl.alt               = `Queenzone.com in ${era.year}`;
+
+    btns.forEach((btn, n) => {
+      const active = n === index;
+      btn.classList.toggle("qz-era-btn--active", active);
+      btn.setAttribute("aria-pressed", String(active));
+    });
+  }
+
+  function startTimer() {
+    clearInterval(timer);
+    timer = setInterval(() => applyEra((current + 1) % ERAS.length), 3600);
+  }
+
+  btns.forEach((btn, n) => {
+    btn.addEventListener("click", () => {
+      applyEra(n);
+      startTimer(); // restart interval after manual jump
+    });
+  });
+
+  applyEra(0);
+  startTimer();
+})();

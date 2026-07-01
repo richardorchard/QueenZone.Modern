@@ -555,6 +555,254 @@ body.qz-menu-lock {
   letter-spacing: var(--ls-display);
 }
 
+/* ================================================================
+   HOMEPAGE ARCHIVE HERO — living montage of Queenzone eras
+   ================================================================ */
+.qz-hero-archive {
+  position: relative;
+  min-height: min(84vh, 760px);
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  background: var(--qz-black);
+  color: var(--text-on-dark);
+}
+
+.qz-hero-archive__glow {
+  position: absolute;
+  top: -10%;
+  right: -6%;
+  width: 70%;
+  height: 120%;
+  pointer-events: none;
+  border-radius: 50%;
+  filter: blur(8px);
+  transition: background 900ms var(--ease-out);
+}
+
+.qz-hero-archive__crest {
+  position: absolute;
+  top: 40px;
+  right: 48px;
+  width: 120px;
+  opacity: 0.08;
+  pointer-events: none;
+}
+
+.qz-hero-archive__inner {
+  position: relative;
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+  gap: clamp(32px, 5vw, 80px);
+  align-items: center;
+  padding-top: var(--space-8);
+  padding-bottom: 80px;
+}
+
+.qz-hero-archive__editorial {
+  max-width: 560px;
+}
+
+.qz-hero-archive__badge {
+  color: var(--qz-gold);
+  margin-bottom: 22px;
+}
+
+.qz-hero-archive__title {
+  font: var(--fw-medium) clamp(40px, 5vw, 68px)/1.03 var(--font-display);
+  letter-spacing: -0.015em;
+  color: var(--qz-white);
+  margin: 0 0 22px;
+}
+
+.qz-hero-archive__standfirst {
+  font: var(--fw-regular) 19px/1.55 var(--font-body);
+  color: rgba(255, 255, 255, 0.82);
+  margin: 0 0 30px;
+  max-width: 500px;
+}
+
+.qz-hero-archive__actions {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  flex-wrap: wrap;
+}
+
+.qz-hero-archive__meta {
+  font: var(--fw-medium) 13px/1 var(--font-body);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+/* Stage */
+.qz-hero-archive__stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  max-height: 520px;
+}
+
+.qz-hero-archive__ghost {
+  position: absolute;
+  border-radius: 10px;
+}
+
+.qz-hero-archive__ghost--far {
+  inset: 18px -22px -20px 26px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  transform: rotate(2.2deg);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.qz-hero-archive__ghost--near {
+  inset: 9px -11px -10px 13px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  transform: rotate(1deg);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.qz-hero-archive__window {
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(184, 154, 74, 0.5);
+  box-shadow: 0 40px 90px rgba(0, 0, 0, 0.6);
+  background: #0d0d0d;
+}
+
+.qz-hero-archive__titlebar {
+  position: relative;
+  z-index: 3;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  background: #171717;
+  border-bottom: 1px solid rgba(184, 154, 74, 0.35);
+}
+
+.qz-hero-archive__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #3a3a3a;
+  flex-shrink: 0;
+}
+
+.qz-hero-archive__era-label {
+  margin-left: 10px;
+  font: var(--fw-semibold) 11px/1 var(--font-titling);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.6);
+  transition: color 500ms var(--ease-out);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.qz-hero-archive__era-year {
+  margin-left: auto;
+  font: var(--fw-medium) 12px/1 var(--font-titling);
+  letter-spacing: 0.12em;
+  color: var(--qz-gold);
+  flex-shrink: 0;
+}
+
+.qz-hero-archive__viewport {
+  position: absolute;
+  top: 38px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+}
+
+.qz-hero-archive__screenshot {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+  opacity: 1;
+}
+
+/* Scanline texture + bottom fade — combined in one layer */
+.qz-hero-archive__overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.14) 0 1px, transparent 1px 3px),
+    linear-gradient(180deg, transparent 55%, rgba(13, 13, 13, 0.35));
+}
+
+/* Era ticker */
+.qz-hero-archive__ticker {
+  position: absolute;
+  left: 0;
+  bottom: -46px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.qz-era-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 0;
+  font: var(--fw-medium) 12px/1 var(--font-titling);
+  letter-spacing: 0.14em;
+  color: rgba(255, 255, 255, 0.4);
+  transition: color 300ms var(--ease-out);
+  position: relative;
+}
+
+.qz-era-btn:hover,
+.qz-era-btn--active {
+  color: var(--qz-gold);
+}
+
+.qz-era-btn__pip {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -6px;
+  height: 2px;
+  background: var(--qz-gold);
+  border-radius: 2px;
+  opacity: 0;
+  transition: opacity 300ms var(--ease-out);
+}
+
+.qz-era-btn--active .qz-era-btn__pip {
+  opacity: 1;
+}
+
+/* Responsive — stack to single column below 768px */
+@media (max-width: 767px) {
+  .qz-hero-archive__inner {
+    grid-template-columns: 1fr;
+    padding-bottom: var(--space-8);
+  }
+
+  .qz-hero-archive__stage {
+    max-height: 280px;
+    margin-bottom: 56px;
+  }
+
+  .qz-hero-archive__crest {
+    display: none;
+  }
+}
+
 .qz-section {
   padding: 88px 0;
 }

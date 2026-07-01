@@ -28,4 +28,10 @@ public interface IForumRepository
         int offset,
         int pageSize,
         CancellationToken cancellationToken = default);
+
+    Task<ForumSearchPage> SearchForumAsync(
+        string query,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default);
 }
