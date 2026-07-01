@@ -1,0 +1,103 @@
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using QueenZone.Data;
+
+namespace QueenZone.NewsAgent;
+
+public sealed class DiscoverNewsWorker(
+    NewsDiscoveryService discoveryService,
+    NewsTriageService triageService,
+    NewsAiRunExecutor aiRunExecutor,
+    IOptions<OpenRouterOptions> openRouterOptions,
+    ILogger<DiscoverNewsWorker> logger)
+{
+    public async Task<int> RunAsync(
+        DiscoverNewsCommandOptions options,
+        CancellationToken cancellationToken = default)
+    {
+        LogAiStatus();
+
+        var exitCode = 0;
+
+        if (!options.TriageOnly)
+        {
+            exitCode = await RunDiscoveryAsync(options, cancellationToken);
+        }
+
+        if (options.Triage)
+        {
+            exitCode = Math.Max(exitCode, await RunTriageAsync(options, cancellationToken));
+        }
+
+        return exitCode;
+    }
+
+    private void LogAiStatus()
+    {
+        if (!aiRunExecutor.IsAiEnabled)
+        {
+            logger.LogWarning("OpenRouter AI processing is disabled. Fetch-only discovery will continue without AI triage or drafting.");
+            return;
+        }
+
+        if (openRouterOptions.Value.DryRun)
+        {
+            logger.LogInformation("OpenRouter dry-run mode is enabled. AI requests will be logged without calling the provider.");
+        }
+    }
+
+    private async Task<int> RunDiscoveryAsync(
+        DiscoverNewsCommandOptions options,
+        CancellationToken cancellationToken)
+    {
+        var runOptions = new NewsDiscoveryRunOptions(
+            SeedSources: options.SeedSources,
+            FetchOnly: true,
+            DryRun: options.DryRun,
+            Force: options.Force);
+
+        var result = await discoveryService.RunFetchAsync(runOptions, cancellationToken);
+
+        logger.LogInformation(
+            "Discovery finished. Sources checked={SourcesChecked}, skipped={SourcesSkipped}, items={ItemsFetched}, created={CandidatesCreated}, duplicates={DuplicatesSkipped}, keyword filtered={KeywordFiltered}, failures={Failures}.",
+            result.SourcesChecked,
+            result.SourcesSkipped,
+            result.ItemsFetched,
+            result.CandidatesCreated,
+            result.DuplicatesSkipped,
+            result.KeywordFiltered,
+            result.Failures);
+
+        foreach (var error in result.Errors)
+        {
+            logger.LogError("Discovery error: {Error}", error);
+        }
+
+        return result.Failures > 0 ? 1 : 0;
+    }
+
+    private async Task<int> RunTriageAsync(
+        DiscoverNewsCommandOptions options,
+        CancellationToken cancellationToken)
+    {
+        var triageResult = await triageService.RunTriageAsync(
+            new NewsTriageRunOptions(DryRun: options.DryRun),
+            cancellationToken);
+
+        logger.LogInformation(
+            "Triage finished. Considered={CandidatesConsidered}, promoted={PromotedToReview}, rejected={Rejected}, duplicates={MarkedDuplicate}, skipped={Skipped}, failures={Failures}.",
+            triageResult.CandidatesConsidered,
+            triageResult.PromotedToReview,
+            triageResult.Rejected,
+            triageResult.MarkedDuplicate,
+            triageResult.Skipped,
+            triageResult.Failures);
+
+        foreach (var error in triageResult.Errors)
+        {
+            logger.LogError("Triage error: {Error}", error);
+        }
+
+        return triageResult.Failures > 0 ? 1 : 0;
+    }
+}

@@ -6,6 +6,8 @@ public interface INewsDiscoveryRepository
 
     Task<NewsDiscoverySource?> GetSourceByKeyAsync(string key, CancellationToken cancellationToken = default);
 
+    Task<NewsDiscoverySource?> GetSourceByIdAsync(int sourceId, CancellationToken cancellationToken = default);
+
     Task<int> UpsertSourceAsync(NewsDiscoverySourceDraft source, CancellationToken cancellationToken = default);
 
     Task MarkSourceFetchedAsync(int sourceId, DateTime fetchedAt, CancellationToken cancellationToken = default);
@@ -13,6 +15,12 @@ public interface INewsDiscoveryRepository
     Task<NewsCandidate?> GetCandidateByCanonicalUrlHashAsync(string canonicalUrlHash, CancellationToken cancellationToken = default);
 
     Task<NewsCandidate?> GetCandidateByContentHashAsync(string contentHash, CancellationToken cancellationToken = default);
+
+    Task<NewsCandidate?> FindEarlierDuplicateCandidateAsync(
+        int candidateId,
+        string sourceTitle,
+        string? contentHash,
+        CancellationToken cancellationToken = default);
 
     Task<NewsCandidate?> GetCandidateByIdAsync(int candidateId, CancellationToken cancellationToken = default);
 
