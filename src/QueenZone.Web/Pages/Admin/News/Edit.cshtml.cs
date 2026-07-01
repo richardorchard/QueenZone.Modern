@@ -5,7 +5,8 @@ namespace QueenZone.Web.Pages.Admin.News;
 
 public sealed class EditModel(
     IAdminNewsRepository adminNewsRepository,
-    INewsDiscoveryRepository discoveryRepository) : AdminNewsPageModel
+    INewsDiscoveryRepository discoveryRepository,
+    ILogger<EditModel> logger) : AdminNewsPageModel
 {
     public ArticleFormViewModel? Form { get; private set; }
 
@@ -17,12 +18,20 @@ public sealed class EditModel(
             return NotFound();
         }
 
-        var provenance = await NewsDiscoveryProvenanceBuilder.LoadForPromotedArticleAsync(
-            discoveryRepository,
-            id,
-            cancellationToken);
+        NewsDiscoveryProvenance? provenance = null;
+        try
+        {
+            provenance = await NewsDiscoveryProvenanceBuilder.LoadForPromotedArticleAsync(
+                discoveryRepository,
+                id,
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to load discovery provenance for admin news {NewsId}", id);
+        }
 
-        ViewData["Title"] = $"Edit: {article.Title}";
+        ViewData["Title"] = "Edit article";
         Form = BuildForm(article, ToDraft(article), null, provenance);
         return Page();
     }
@@ -32,5 +41,12 @@ public sealed class EditModel(
         AdminNewsDraft draft,
         IReadOnlyList<string>? errors,
         NewsDiscoveryProvenance? discoveryProvenance = null) =>
-        new($"Edit: {article.Title}", $"/admin/news/{article.Id}", draft, errors, article, discoveryProvenance);
+        new(
+            "Edit article",
+            $"/admin/news/{article.Id}",
+            draft,
+            errors,
+            article,
+            discoveryProvenance,
+            article.Title);
 }

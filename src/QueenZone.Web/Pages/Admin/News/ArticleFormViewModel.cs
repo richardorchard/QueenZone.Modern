@@ -8,4 +8,5 @@ public sealed record ArticleFormViewModel(
     AdminNewsDraft Draft,
     IReadOnlyList<string>? Errors,
     AdminNewsArticle? Article = null,
-    NewsDiscoveryProvenance? DiscoveryProvenance = null);
+    NewsDiscoveryProvenance? DiscoveryProvenance = null,
+    string? Subtitle = null);

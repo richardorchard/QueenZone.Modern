@@ -88,6 +88,26 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
     }
 
     [Fact]
+    public async Task DeletePromotedArticle_clears_discovery_link()
+    {
+        var newsStore = new SharedNewsStore();
+        var discoveryStore = new SharedNewsDiscoveryStore();
+        var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
+        var candidateId = await SeedDraftedCandidateAsync(discoveryRepository);
+        var client = CreateClient(AdminEmail, newsStore, discoveryStore);
+
+        var promoteResponse = await PostActionAsync(client, $"/admin/news-discovery/{candidateId}/promote", candidateId);
+        var articleId = int.Parse(promoteResponse.Headers.Location!.OriginalString.Split('/')[3], System.Globalization.CultureInfo.InvariantCulture);
+
+        var deleteResponse = await PostAdminNewsActionAsync(client, $"/admin/news/{articleId}/delete");
+        Assert.Equal(HttpStatusCode.Redirect, deleteResponse.StatusCode);
+
+        var candidate = await discoveryRepository.GetCandidateByIdAsync(candidateId);
+        Assert.NotNull(candidate);
+        Assert.Null(candidate.PromotedNewsId);
+    }
+
+    [Fact]
     public async Task AuthorizedAdminCanRegenerateDraftFromReviewPage()
     {
         var discoveryStore = new SharedNewsDiscoveryStore();
@@ -633,6 +653,16 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
         return await client.PostAsync(actionPath, new FormUrlEncodedContent(new Dictionary<string, string>
         {
             [AdminNewsDiscoveryPageModel.AntiforgeryTokenFieldName] = token
+        }));
+    }
+
+    private static async Task<HttpResponseMessage> PostAdminNewsActionAsync(HttpClient client, string actionPath)
+    {
+        var listPage = await client.GetStringAsync("/admin/news");
+        var token = ExtractAntiforgeryToken(listPage);
+        return await client.PostAsync(actionPath, new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            [QueenZone.Web.Pages.Admin.News.AdminNewsPageModel.AntiforgeryTokenFieldName] = token
         }));
     }
 

@@ -1,11 +1,14 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
 using QueenZone.Data;
 
 namespace QueenZone.Web.Pages.Admin.News;
 
 public sealed class ActionModel(
     IAdminNewsRepository adminNewsRepository,
-    INewsAuditRepository auditRepository) : AdminNewsPageModel
+    INewsAuditRepository auditRepository,
+    INewsDiscoveryRepository discoveryRepository) : AdminNewsPageModel
 {
     public async Task<IActionResult> OnPostPublishAsync(int id, CancellationToken cancellationToken)
     {
@@ -41,8 +44,37 @@ public sealed class ActionModel(
             return NotFound();
         }
 
-        await auditRepository.AppendAsync(id, "delete", EditorEmail, $"Deleted \"{article.Title}\"", cancellationToken);
-        await adminNewsRepository.DeleteAsync(id, EditorEmail, cancellationToken);
+        try
+        {
+            await discoveryRepository.ClearPromotedNewsLinksAsync(id, cancellationToken);
+        }
+        catch (Exception)
+        {
+            // Best-effort cleanup when discovery tables are unavailable or unmigrated.
+        }
+
+        try
+        {
+            await auditRepository.AppendAsync(id, "delete", EditorEmail, $"Deleted \"{article.Title}\"", cancellationToken);
+            await adminNewsRepository.DeleteAsync(id, EditorEmail, cancellationToken);
+        }
+        catch (DbUpdateException ex) when (IsForeignKeyViolation(ex))
+        {
+            TempData[AdminNewsMessages.MessageKey] =
+                "This article could not be deleted because other archive records still reference it. Unpublish it instead to hide it from the public site.";
+            TempData[AdminNewsMessages.MessageKindKey] = "error";
+            return Redirect("/admin/news");
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData[AdminNewsMessages.MessageKey] = ex.Message;
+            TempData[AdminNewsMessages.MessageKindKey] = "error";
+            return Redirect("/admin/news");
+        }
+
         return Redirect("/admin/news");
     }
+
+    private static bool IsForeignKeyViolation(DbUpdateException exception) =>
+        exception.InnerException is SqlException { Number: 547 };
 }

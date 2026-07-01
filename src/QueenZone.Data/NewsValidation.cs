@@ -4,6 +4,8 @@ namespace QueenZone.Data;
 
 public static partial class NewsValidation
 {
+    public const int MaxTitleLength = 150;
+
     public static IReadOnlyList<string> ValidateDraft(AdminNewsDraft draft, bool slugInUse)
     {
         var errors = new List<string>();
@@ -11,6 +13,10 @@ public static partial class NewsValidation
         if (string.IsNullOrWhiteSpace(draft.Title))
         {
             errors.Add("Title is required.");
+        }
+        else if (draft.Title.Length > MaxTitleLength)
+        {
+            errors.Add($"Title must be {MaxTitleLength} characters or fewer.");
         }
 
         if (string.IsNullOrWhiteSpace(draft.Excerpt))

@@ -3,6 +3,7 @@
 
 @if (Model.Article is not null && Model.Item is not null)
 {
+  <div class="admin-shell">
   <p class="admin-preview-banner">Preview mode. @(Model.Article.IsPublished ? "This article is published." : "This article is not published.")</p>
   <p class="article-nav"><a href="/admin/news">Back to admin</a> | <a href="/admin/news/@Model.Article.Id/edit">Edit</a></p>
 
@@ -25,4 +26,5 @@
   {
     <p><em>This draft is hidden from the public archive.</em></p>
   }
+  </div>
 }

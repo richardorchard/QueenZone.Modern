@@ -11,9 +11,15 @@ public sealed class IndexModel(
 
     public ArticleFormViewModel? CreateForm { get; private set; }
 
+    public string? StatusMessage { get; private set; }
+
+    public string? StatusMessageKind { get; private set; }
+
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
         Articles = await adminNewsRepository.GetAllAsync(cancellationToken);
+        StatusMessage = TempData[AdminNewsMessages.MessageKey] as string;
+        StatusMessageKind = TempData[AdminNewsMessages.MessageKindKey] as string;
         ViewData["Title"] = "Admin news";
     }
 

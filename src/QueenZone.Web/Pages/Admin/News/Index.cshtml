@@ -1,6 +1,7 @@
 @page "/admin/news"
 @model IndexModel
 
+<div class="admin-shell">
 @if (Model.CreateForm is not null)
 {
   <partial name="_ArticleForm" model="Model.CreateForm" />
@@ -8,6 +9,12 @@
 else
 {
   <h1>Admin news</h1>
+
+  @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+  {
+    <p class="admin-status admin-status--@Model.StatusMessageKind">@Model.StatusMessage</p>
+  }
+
   <p>
     <a href="/admin/news/new">Create article</a>
     <span aria-hidden="true"> · </span>
@@ -33,7 +40,7 @@ else
         @foreach (var article in Model.Articles)
         {
           <tr>
-            <td>@article.Title</td>
+            <td class="admin-title-cell">@article.Title</td>
             <td>@(article.IsPublished ? "Published" : "Draft")</td>
             <td>@article.PublishedAt.ToString("dd MMM yyyy")</td>
             <td class="admin-actions">
@@ -55,3 +62,4 @@ else
     </table>
   }
 }
+</div>

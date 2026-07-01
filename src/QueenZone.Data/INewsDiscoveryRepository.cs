@@ -26,6 +26,8 @@ public interface INewsDiscoveryRepository
 
     Task<NewsCandidate?> GetCandidateByPromotedNewsIdAsync(int promotedNewsId, CancellationToken cancellationToken = default);
 
+    Task ClearPromotedNewsLinksAsync(int promotedNewsId, CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<NewsCandidate>> GetCandidatesAsync(
         NewsCandidateStatus? status = null,
         int? sourceId = null,

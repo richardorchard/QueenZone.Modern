@@ -165,6 +165,60 @@ public sealed partial class AdminNewsRoutesTests : IClassFixture<WebApplicationF
     }
 
     [Fact]
+    public async Task AuthorizedAdminCanOpenEditPage()
+    {
+        var store = new SharedNewsStore(
+        [
+            new AdminNewsArticle(
+                4001,
+                "Editable article",
+                "editable-article",
+                "Editable excerpt",
+                "Editable body",
+                new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc),
+                null,
+                false,
+                DateTime.UtcNow,
+                DateTime.UtcNow,
+                AdminEmail)
+        ]);
+
+        var client = CreateClient(AdminEmail, store);
+
+        var response = await client.GetAsync("/admin/news/4001/edit");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("Edit article", body);
+        Assert.Contains("Editable article", body);
+        Assert.Contains("admin-form-panel", body);
+        Assert.DoesNotContain("<h1>Edit: Editable article</h1>", body);
+    }
+
+    [Fact]
+    public async Task OverlongTitleIsRejected()
+    {
+        var store = new SharedNewsStore();
+        var client = CreateClient(AdminEmail, store);
+
+        var response = await PostArticleAsync(
+            client,
+            "/admin/news/new",
+            "/admin/news",
+            new Dictionary<string, string>
+            {
+                ["title"] = new string('x', NewsValidation.MaxTitleLength + 1),
+                ["excerpt"] = "Excerpt",
+                ["body"] = "Body",
+                ["publishedAt"] = "2026-06-14"
+            });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains($"Title must be {NewsValidation.MaxTitleLength} characters or fewer.", body);
+    }
+
+    [Fact]
     public async Task AuthorizedAdminCanDeleteArticle()
     {
         var store = new SharedNewsStore(

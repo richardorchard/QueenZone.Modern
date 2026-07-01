@@ -5,7 +5,8 @@ namespace QueenZone.Web.Pages.Admin.News;
 
 public sealed class PreviewModel(
     IAdminNewsRepository adminNewsRepository,
-    INewsDiscoveryRepository discoveryRepository) : AdminNewsPageModel
+    INewsDiscoveryRepository discoveryRepository,
+    ILogger<PreviewModel> logger) : AdminNewsPageModel
 {
     public AdminNewsArticle? Article { get; private set; }
 
@@ -21,10 +22,17 @@ public sealed class PreviewModel(
             return NotFound();
         }
 
-        DiscoveryProvenance = await NewsDiscoveryProvenanceBuilder.LoadForPromotedArticleAsync(
-            discoveryRepository,
-            id,
-            cancellationToken);
+        try
+        {
+            DiscoveryProvenance = await NewsDiscoveryProvenanceBuilder.LoadForPromotedArticleAsync(
+                discoveryRepository,
+                id,
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to load discovery provenance for admin news preview {NewsId}", id);
+        }
 
         Item = ToNewsItem(Article);
         ViewData["Title"] = $"Preview: {Article.Title}";
