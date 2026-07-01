@@ -47,12 +47,16 @@ public static class NewsAgentServiceCollectionExtensions
             services.AddOptions<NewsDraftGenerationOptions>()
                 .Bind(configuration.GetSection(NewsDraftGenerationOptions.SectionName))
                 .ValidateOnStart();
+
+            services.AddOptions<NewsAgentSchedulerOptions>()
+                .Bind(configuration.GetSection(NewsAgentSchedulerOptions.SectionName));
         }
         else
         {
             services.AddOptions<OpenRouterOptions>();
             services.AddOptions<NewsTriageOptions>();
             services.AddOptions<NewsDraftGenerationOptions>();
+            services.AddOptions<NewsAgentSchedulerOptions>();
         }
 
         services.AddSingleton<IValidateOptions<OpenRouterOptions>, OpenRouterOptionsValidator>();

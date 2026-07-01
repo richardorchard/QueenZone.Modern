@@ -23,6 +23,8 @@ public sealed class QueenZoneDbContext(DbContextOptions<QueenZoneDbContext> opti
 
     public DbSet<NewsAgentDraftEntity> NewsAgentDrafts => Set<NewsAgentDraftEntity>();
 
+    public DbSet<NewsAgentRunLeaseEntity> NewsAgentRunLeases => Set<NewsAgentRunLeaseEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<NewsTableRow>(entity =>
@@ -244,6 +246,17 @@ public sealed class QueenZoneDbContext(DbContextOptions<QueenZoneDbContext> opti
                 .WithMany()
                 .HasForeignKey(draft => draft.AiRunId)
                 .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<NewsAgentRunLeaseEntity>(entity =>
+        {
+            entity.ToTable("NewsAgentRunLeases");
+            entity.HasKey(lease => lease.LeaseName);
+
+            entity.Property(lease => lease.LeaseName).HasMaxLength(100).IsRequired();
+            entity.Property(lease => lease.HolderId).HasMaxLength(64).IsRequired();
+            entity.Property(lease => lease.AcquiredAtUtc).IsRequired();
+            entity.Property(lease => lease.ExpiresAtUtc).IsRequired();
         });
     }
 }
