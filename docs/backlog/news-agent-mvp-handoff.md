@@ -2,6 +2,24 @@
 
 This handoff gives a future agent the full context for building the first automated Queen-related news discovery workflow.
 
+**Operational guide:** `docs/architecture/news-agent.md` (worker commands, local secrets, smoke test, admin review queue).
+
+## Implementation status (March 2026)
+
+| Area | Status |
+|------|--------|
+| Source fetchers + worker (#101) | Done — `QueenZone.NewsAgent`, `QueenZone.NewsAgent.Worker`, `discover-news` |
+| OpenRouter + budgets (#102) | Done |
+| AI triage (#103) | Done |
+| Draft generation (#104) | Done |
+| Admin review queue (#105) | Done — `/admin/news-discovery` |
+| Promote to live news (#106) | Partial — promote creates unpublished admin news draft |
+| Scheduled hosting (#107) | Not started |
+| Tests / observability (#108) | Partial — CI uses fakes; `scripts/Smoke-NewsAgent.bat` for manual OpenRouter check |
+| Source registry doc (#99) | Partial — `news-discovery-sources.json` exists; editorial rules issue may narrow |
+
+Safe boundary in production today: discovery and drafting run via the worker; editors review at `/admin/news-discovery`; public pages only change after explicit publish in `/admin/news`.
+
 ## Objective
 
 Build an automatic discovery and drafting pipeline for QueenZone news while keeping publication deliberately human-approved.
@@ -31,16 +49,16 @@ Area labels:
 
 Current implementation issues:
 
-- #99 Define trusted source registry and editorial rules for automated Queen news discovery.
-- #100 Add database model for news discovery sources, candidates, evidence, and AI draft metadata.
-- #101 Implement source fetchers for RSS, sitemap, and allowlisted web pages.
-- #102 Add OpenRouter client configuration with low-cost model defaults and budget controls.
-- #103 Implement AI triage for relevance, deduplication, and confidence scoring of discovered news.
-- #104 Generate editor-reviewable news drafts with citations from approved candidates.
-- #105 Build admin review queue for discovered candidates and generated drafts.
-- #106 Promote approved AI-assisted drafts into the live news article workflow.
+- #99 Define trusted source registry and editorial rules for automated Queen news discovery. *(partial — JSON registry shipped)*
+- #100 Add database model for news discovery sources, candidates, evidence, and AI draft metadata. *(done)*
+- #101 Implement source fetchers for RSS, sitemap, and allowlisted web pages. *(done)*
+- #102 Add OpenRouter client configuration with low-cost model defaults and budget controls. *(done)*
+- #103 Implement AI triage for relevance, deduplication, and confidence scoring of discovered news. *(done)*
+- #104 Generate editor-reviewable news drafts with citations from approved candidates. *(done)*
+- #105 Build admin review queue for discovered candidates and generated drafts. *(done)*
+- #106 Promote approved AI-assisted drafts into the live news article workflow. *(partial)*
 - #107 Add scheduled news discovery worker with local-first and Azure hosting options.
-- #108 Add tests, observability, and safety checks for the automated news agent MVP.
+- #108 Add tests, observability, and safety checks for the automated news agent MVP. *(partial)*
 
 ## Product Shape
 
@@ -153,9 +171,19 @@ Do not make candidates public just because they exist.
 
 ## Admin Workflow
 
-Admin pages should live under `src/QueenZone.Web/Pages` as Razor Pages.
+Admin pages live under `src/QueenZone.Web/Pages` as Razor Pages.
 
-Expected editor actions:
+**Implemented (#105):** `Pages/Admin/NewsDiscovery/`
+
+- `/admin/news-discovery` — filterable candidate list
+- `/admin/news-discovery/{id}` — review detail (source URLs, evidence, AI rationale, draft)
+- `/admin/news-discovery/{id}/edit-draft` — edit generated draft fields
+
+Editor actions: reject, ignore duplicate, edit draft, promote to admin news (creates unpublished article in `/admin/news`).
+
+**Existing manual news workflow:** `Pages/Admin/News/` — publish remains explicit here.
+
+Expected editor actions (full MVP):
 
 - Filter by status, source, trust tier, confidence, related entity, and date.
 - Inspect source URLs and source notes.
@@ -173,9 +201,11 @@ All state-changing admin actions must use existing admin authentication/authoriz
 
 Start local-first:
 
-- Provide a command or worker that can run once from the current development machine.
-- Support fetch-only, dry-run, AI-enabled, and full candidate-generation modes.
-- Document Windows Task Scheduler setup for local scheduled runs.
+- Run `QueenZone.NewsAgent.Worker` with the `discover-news` command (see `docs/architecture/news-agent.md`).
+- One-time OpenRouter setup: `src/QueenZone.NewsAgent.Worker/appsettings.Local.json` (from `appsettings.Local.json.example`).
+- Windows smoke test: `scripts/Smoke-NewsAgent.bat` (fetch + triage; reports OpenRouter pass separately from feed errors).
+- Support fetch-only, dry-run, AI-enabled, and full candidate-generation modes via worker flags.
+- Document Windows Task Scheduler setup for local scheduled runs. *(not documented yet — #107)*
 
 Production path:
 
@@ -185,8 +215,10 @@ Production path:
 
 Secrets belong only in ignored local config or Azure configuration:
 
-- `OPENROUTER_API_KEY`
+- `OpenRouter:ApiKey` in `src/QueenZone.NewsAgent.Worker/appsettings.Local.json`, or `OPENROUTER_API_KEY` env var
 - Any future source-specific credentials, if ever needed.
+
+See `.env.example` and `docs/architecture/news-agent.md`.
 
 ## Testing Expectations
 
@@ -199,7 +231,7 @@ Use:
 - Unit tests for canonical URL normalization, dedupe keys, source classification, status transitions, and structured AI output parsing.
 - Web integration tests for admin access control and public unpublished-content isolation.
 - Worker tests with fake fetchers and fake AI clients.
-- Optional/manual real-source smoke checks that are clearly reported when skipped.
+- Optional/manual real-source smoke checks that are clearly reported when skipped. Use `scripts/Smoke-NewsAgent.bat` on Windows.
 
 Before a pull request, run the usual gate:
 
@@ -226,6 +258,7 @@ Resume the News Agent MVP in QueenZone.Modern.
 
 Read:
 - AGENTS.md
+- docs/architecture/news-agent.md
 - docs/backlog/news-agent-mvp-handoff.md
 - docs/architecture/testing-policy.md
 - The GitHub issue you are implementing under milestone `News Agent MVP`.

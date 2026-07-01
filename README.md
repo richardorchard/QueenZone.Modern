@@ -15,6 +15,8 @@ The goal is to restart QueenZone as a clean, modern public site that fully expos
     QueenZone.Web/
       Pages/
     QueenZone.Data/
+    QueenZone.NewsAgent/
+    QueenZone.NewsAgent.Worker/
     QueenZone.Import/
   tests/
     QueenZone.Data.Tests/
@@ -24,6 +26,8 @@ The goal is to restart QueenZone as a clean, modern public site that fully expos
     legacy/
     decisions/
     backlog/
+  scripts/
+    Smoke-NewsAgent.bat
 ```
 
 ## Local Development
@@ -48,6 +52,25 @@ dotnet tool run reportgenerator -reports:".\TestResults\**\coverage.cobertura.xm
 Open `coverage-report/index.html` to inspect the report. Coverage reports and raw test result folders are local artifacts and should not be committed.
 
 Local secrets belong in `src/QueenZone.Web/appsettings.Local.json`, which is ignored by git. You can also set `ConnectionStrings__QueenZoneLegacy` in your shell or a local `.env` file for tooling that loads dotenv values. If no `ConnectionStrings:QueenZoneLegacy` value is present, the site uses sample news data so the first slice can still run locally.
+
+### News agent (discovery worker)
+
+The news agent fetches configured public sources, triages items with OpenRouter, generates editor-reviewable drafts, and stores candidates for the admin review queue. It does not publish to public pages automatically.
+
+Full setup, worker flags, and admin review UI are documented in `docs/architecture/news-agent.md`.
+
+Quick start:
+
+```powershell
+copy src\QueenZone.NewsAgent.Worker\appsettings.Local.json.example src\QueenZone.NewsAgent.Worker\appsettings.Local.json
+# Edit appsettings.Local.json: set OpenRouter:ApiKey and optionally ConnectionStrings:QueenZoneLegacy
+
+dotnet run --project src/QueenZone.NewsAgent.Worker -- discover-news --seed-sources --triage --draft
+```
+
+OpenRouter smoke test (Windows): double-click `scripts/Smoke-NewsAgent.bat`.
+
+Admin review queue (after signing in as an allowed admin): `/admin/news-discovery`. Promoted drafts are edited and published through the existing `/admin/news` workflow.
 
 The hosted App Service currently connects to Azure SQL with SQL authentication. For local development, use a local-only SQL auth connection string or another explicitly granted development principal:
 
@@ -158,6 +181,13 @@ Admin__AllowedEmails__1
 Use `src/QueenZone.Web/appsettings.Local.json` for local Entra values. If `AzureAd:ClientId` is empty locally, the app falls back to test-header authentication for development only.
 
 For automated tests, send `X-Test-User-Email` with an allowed admin email address.
+
+Member sign-in at `/account/login` (Google, Microsoft, Facebook OAuth) is separate from admin access. Stripping member OAuth does not remove the admin requirement: admins still need Entra sign-in in production, or the test-header fallback locally as described above.
+
+Admin editorial surfaces:
+
+- `/admin/news` — create, edit, preview, publish news articles
+- `/admin/news-discovery` — review discovered candidates and AI-generated drafts (see `docs/architecture/news-agent.md`)
 
 Do not commit publish profiles, `.pubxml` files, local app settings, or connection strings. Rotate the App Service publish profile if it has ever been saved outside GitHub Secrets.
 
