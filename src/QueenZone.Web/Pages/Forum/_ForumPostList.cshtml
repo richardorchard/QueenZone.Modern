@@ -21,6 +21,35 @@ else
           <time class="qz-meta" datetime="@post.PostedAt.ToString("yyyy-MM-ddTHH:mm:ss")">@post.PostedAt.ToString("dd MMMM yyyy HH:mm")</time>
         </header>
         <div class="qz-forum-post__body article-body">@Html.Raw(NewsArticleContent.FormatBody(post.Body))</div>
+        @if (post.Attachments is { Count: > 0 })
+        {
+          <div class="qz-forum-post__attachments">
+            <p class="qz-forum-post__attachments-label qz-meta">ATTACHMENT@(post.Attachments.Count > 1 ? "S" : "")</p>
+            <ul class="qz-forum-post__attachment-list">
+              @foreach (var attachment in post.Attachments)
+              {
+                <li>
+                  <a class="qz-forum-post__attachment-link" href="@attachment.Url" target="_blank" rel="noopener noreferrer">
+                    <svg class="qz-forum-post__attachment-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+                    </svg>
+                    <span class="qz-forum-post__attachment-name">@attachment.FileName</span>
+                    <span class="qz-forum-post__attachment-meta qz-meta">
+                      @if (!string.IsNullOrEmpty(attachment.Extension))
+                      {
+                        <span>@attachment.Extension</span>
+                      }
+                      @if (!string.IsNullOrEmpty(attachment.FormattedSize))
+                      {
+                        <span>@attachment.FormattedSize</span>
+                      }
+                    </span>
+                  </a>
+                </li>
+              }
+            </ul>
+          </div>
+        }
         @if (!string.IsNullOrWhiteSpace(post.Signature))
         {
           <footer class="qz-forum-post__signature qz-meta">@post.Signature</footer>

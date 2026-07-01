@@ -102,7 +102,8 @@ public static class SampleForumData
                     "brightonrock",
                     "Queen collector since 1989.",
                     4_812,
-                    new DateTime(2004, 3, 12, 0, 0, 0, DateTimeKind.Utc)),
+                    new DateTime(2004, 3, 12, 0, 0, 0, DateTimeKind.Utc),
+                    [new ForumPostAttachment("anoto-setlist-scan.jpg", 284_712)]),
                 new(
                     1101,
                     "Top tier for me — side two is basically perfect.",

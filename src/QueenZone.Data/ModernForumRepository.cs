@@ -238,7 +238,8 @@ public sealed class ModernForumRepository(string connectionString) : IForumRepos
             row.USERNAME?.Trim() ?? "Unknown",
             string.IsNullOrWhiteSpace(row.SIGNATURE) ? null : row.SIGNATURE.Trim(),
             row.NUMBER_OF_POSTS ?? 0,
-            row.DATE_CREATED);
+            row.DATE_CREATED,
+            ForumPostAttachment.Parse(row.ATTACHMENT, row.FILESIZE));
 
     private static ForumTopicItem MapTopic(ForumTopicRow row) =>
         new(

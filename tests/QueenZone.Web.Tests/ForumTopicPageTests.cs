@@ -59,4 +59,17 @@ public sealed class ForumTopicPageTests : IClassFixture<WebApplicationFactory<Pr
 
         Assert.Equal(System.Net.HttpStatusCode.NotFound, response.StatusCode);
     }
+
+    [Fact]
+    public async Task ForumTopicPageRendersAttachmentLink()
+    {
+        var client = factory.CreateClient();
+
+        var body = await client.GetStringAsync("/forum/topic/1002/ranking-every-studio-album");
+
+        Assert.Contains("pictures.queenzone.org/attachments/anoto-setlist-scan.jpg", body);
+        Assert.Contains("anoto-setlist-scan.jpg", body);
+        Assert.Contains("JPG", body);
+        Assert.Contains("278.0 KB", body);
+    }
 }
