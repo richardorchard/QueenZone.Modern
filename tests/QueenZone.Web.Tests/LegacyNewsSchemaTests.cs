@@ -42,7 +42,8 @@ public sealed class LegacyNewsSchemaTests
         Assert.Contains("ISNULL(TYPE, 0) AS TYPE", sql);
         Assert.Contains("ISNULL(QUEEN_ONLINE, 0) AS QUEEN_ONLINE", sql);
         Assert.Contains("NEWS_ID", sql);
-        Assert.DoesNotContain("AS NewsId", sql);
+        Assert.Contains("[DATE] AS PublishedAt", sql);
+        Assert.Contains("NEWS_ID AS NewsId", sql);
     }
 
     [Fact]
