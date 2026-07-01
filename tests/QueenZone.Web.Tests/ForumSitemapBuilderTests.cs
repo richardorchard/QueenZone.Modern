@@ -67,5 +67,12 @@ public sealed class ForumSitemapBuilderTests
             int pageSize,
             CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<ForumTopicSitemapItem>>([]);
+
+        public Task<ForumSearchPage> SearchForumAsync(
+            string query,
+            int page,
+            int pageSize,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new ForumSearchPage([], 0, page, pageSize));
     }
 }

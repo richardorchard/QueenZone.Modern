@@ -67,4 +67,34 @@ public sealed class InMemoryForumRepository(
             .ToList();
         return Task.FromResult<IReadOnlyList<ForumTopicSitemapItem>>(page);
     }
+
+    public Task<ForumSearchPage> SearchForumAsync(
+        string query,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return Task.FromResult(new ForumSearchPage([], 0, page, pageSize));
+        }
+
+        var allResults = seedCategories
+            .SelectMany(category => SampleForumData.CreateSeedTopics(category.Id)
+                .Where(topic => topic.Title.Contains(query, StringComparison.OrdinalIgnoreCase))
+                .Select(topic => new ForumSearchResult(
+                    topic.Id,
+                    topic.Title,
+                    category.Id,
+                    category.Name,
+                    topic.ReplyCount,
+                    topic.LastActivityAt,
+                    topic.AuthorUsername)))
+            .OrderByDescending(r => r.LastActivityAt)
+            .ToList();
+
+        var skip = Math.Max(page - 1, 0) * pageSize;
+        var pageItems = allResults.Skip(skip).Take(pageSize).ToList();
+        return Task.FromResult(new ForumSearchPage(pageItems, allResults.Count, page, pageSize));
+    }
 }

@@ -173,6 +173,42 @@ public sealed class ModernForumRepository(string connectionString) : IForumRepos
             .ToList();
     }
 
+    public async Task<ForumSearchPage> SearchForumAsync(
+        string query,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return new ForumSearchPage([], 0, page, pageSize);
+        }
+
+        await using var connection = new SqlConnection(connectionString);
+        var offset = Math.Max(page - 1, 0) * pageSize;
+        var parameters = new DynamicParameters();
+        parameters.Add("Query", query);
+        parameters.Add("Offset", offset);
+        parameters.Add("PageSize", pageSize);
+        parameters.Add("TotalRecords", dbType: DbType.Int32, direction: ParameterDirection.Output);
+
+        var command = new CommandDefinition(
+            "ModernForum_SearchThreads",
+            parameters,
+            commandType: CommandType.StoredProcedure,
+            cancellationToken: cancellationToken,
+            commandTimeout: CommandTimeoutSeconds);
+
+        var rows = await connection.QueryAsync<ForumSearchRow>(command);
+        var totalRecords = parameters.Get<int?>("TotalRecords") ?? 0;
+
+        return new ForumSearchPage(
+            rows.Select(MapSearch).ToList(),
+            totalRecords,
+            page,
+            pageSize);
+    }
+
     private static ForumCategoryItem Map(ForumCategoryRow row) =>
         new(
             row.Id,
@@ -239,6 +275,25 @@ public sealed class ModernForumRepository(string connectionString) : IForumRepos
         DateTime? LastActivityAt,
         string? LatestThreadTitle,
         int SortOrder);
+
+    private static ForumSearchResult MapSearch(ForumSearchRow row) =>
+        new(
+            row.TopicId,
+            row.Title?.Trim() ?? string.Empty,
+            row.CategoryId,
+            row.CategoryName?.Trim() ?? string.Empty,
+            row.ReplyCount,
+            row.LastActivityAt,
+            string.IsNullOrWhiteSpace(row.StartedByDisplayName) ? null : row.StartedByDisplayName.Trim());
+
+    private sealed record ForumSearchRow(
+        int TopicId,
+        string? Title,
+        int CategoryId,
+        string? CategoryName,
+        int ReplyCount,
+        DateTime? LastActivityAt,
+        string? StartedByDisplayName);
 
     private sealed record ForumTopicSitemapRow(
         int TopicId,

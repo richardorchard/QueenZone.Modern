@@ -216,6 +216,13 @@ public sealed class LegacyForumRepository(string connectionString) : IForumRepos
             .ToList();
     }
 
+    public Task<ForumSearchPage> SearchForumAsync(
+        string query,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("Forum search is not supported on the legacy forum path.");
+
     private static ForumCategoryItem Map(ForumCategoryRow row) =>
         new(
             row.Id,
