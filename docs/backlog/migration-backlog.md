@@ -115,6 +115,8 @@ Acceptance criteria:
 
 ### Design automated news discovery and draft ingestion
 
+Status: **in progress** — worker, OpenRouter triage/drafting, and admin review queue shipped. See `docs/architecture/news-agent.md`.
+
 Acceptance criteria:
 
 - Architecture plan documents the discovery, dedupe, AI assistance, review, and explicit publish workflow.

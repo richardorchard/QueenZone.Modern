@@ -1,0 +1,169 @@
+# News Agent
+
+The news agent discovers public Queen-related stories from configured sources, triages them with OpenRouter, generates editor-reviewable drafts, and places results in an admin review queue. It does **not** publish to visitor-facing pages automatically.
+
+See also:
+
+- `docs/backlog/news-agent-mvp-handoff.md` — product rules, source strategy, and GitHub issue tracking
+- `docs/architecture/automated-news-discovery-plan.md` — original architecture plan
+
+## Pipeline
+
+```text
+Configured sources (RSS / sitemap / allowlisted pages)
+  → fetch + dedupe → NewsCandidate records
+  → AI triage (relevance, confidence, duplicates)
+  → AI draft generation (for needs-review candidates)
+  → admin review queue (/admin/news-discovery)
+  → promote to admin news draft → editor publish (existing /admin/news workflow)
+```
+
+Public `/news` shows only published articles. Promoted discovery drafts remain hidden until an editor publishes them through admin news.
+
+## Repository layout
+
+```text
+src/
+  QueenZone.NewsAgent/           # discovery, triage, drafting, OpenRouter client
+  QueenZone.NewsAgent.Worker/    # console worker (discover-news command)
+  QueenZone.Data/                # discovery tables, repositories, workflow rules
+  QueenZone.Web/Pages/Admin/
+    News/                        # manual news editorial workflow
+    NewsDiscovery/               # discovery candidate + draft review queue
+```
+
+Source registry: `src/QueenZone.NewsAgent/news-discovery-sources.json` (seeded into the database with `--seed-sources`).
+
+## Local setup
+
+### Database
+
+The worker persists candidates, AI runs, and drafts through `QueenZone.Data`. For real data, set `ConnectionStrings:QueenZoneLegacy` in the worker local settings file (see below). Without a connection string, the worker uses in-memory sample data (useful for quick runs, not for reviewing real discoveries).
+
+The web app's admin review queue reads the same discovery tables when the site is configured with the same database connection.
+
+### OpenRouter API key (one-time)
+
+Copy the example secrets file:
+
+```powershell
+copy src\QueenZone.NewsAgent.Worker\appsettings.Local.json.example src\QueenZone.NewsAgent.Worker\appsettings.Local.json
+```
+
+Edit `src/QueenZone.NewsAgent.Worker/appsettings.Local.json`:
+
+```json
+{
+  "ConnectionStrings": {
+    "QueenZoneLegacy": ""
+  },
+  "OpenRouter": {
+    "ApiKey": "sk-or-v1-..."
+  }
+}
+```
+
+That file is git-ignored. The worker copies it to the build output automatically. You can also set `OPENROUTER_API_KEY` in the environment.
+
+Fetch-only discovery works without an API key. Triage and drafting require a key (or `--dry-run`).
+
+### Budget and model defaults
+
+Configured in `src/QueenZone.NewsAgent.Worker/appsettings.json` under `OpenRouter`, `NewsTriage`, and `NewsDraftGeneration`. Defaults include per-run and daily spend caps.
+
+## Worker commands
+
+```powershell
+dotnet run --project src/QueenZone.NewsAgent.Worker -- discover-news [options]
+```
+
+| Flag | Purpose |
+|------|---------|
+| `--seed-sources` | Upsert sources from `news-discovery-sources.json` |
+| `--fetch-only` | Fetch feeds only (no AI) |
+| `--triage` | Run AI triage after fetch |
+| `--triage-only` | Triage existing `Discovered` candidates only |
+| `--draft` | Generate drafts after fetch/triage |
+| `--draft-only` | Draft existing `NeedsReview` candidates only |
+| `--dry-run` | Log AI steps without calling OpenRouter or persisting status changes |
+| `--force` | Bypass source poll-interval skip; force draft regeneration where applicable |
+
+Examples:
+
+```powershell
+# Seed sources and fetch new items
+dotnet run --project src/QueenZone.NewsAgent.Worker -- discover-news --seed-sources
+
+# Full local pipeline: fetch, triage, draft
+dotnet run --project src/QueenZone.NewsAgent.Worker -- discover-news --seed-sources --triage --draft
+
+# Re-run triage on candidates already in the database
+dotnet run --project src/QueenZone.NewsAgent.Worker -- discover-news --triage-only
+```
+
+## OpenRouter smoke test (Windows)
+
+Double-click `scripts/Smoke-NewsAgent.bat` or run it from a terminal. The script:
+
+1. Checks that `appsettings.Local.json` exists with a real API key
+2. Runs fetch (`--seed-sources`)
+3. Runs triage (`--triage-only`)
+
+Pass criteria: triage completes with `failures=0` and log lines such as `OpenRouter completed`. Some feed fetch errors are common and do not fail the smoke test if triage succeeds.
+
+## Admin review queue
+
+Authenticated admins use Razor Pages under `/admin/news-discovery`:
+
+| Route | Purpose |
+|-------|---------|
+| `/admin/news-discovery` | Filterable list (status, source, trust tier, confidence, entity, dates, has-draft) |
+| `/admin/news-discovery/{id}` | Candidate detail: source URL, evidence, AI rationale, draft fields |
+| `/admin/news-discovery/{id}/edit-draft` | Edit generated draft fields |
+
+Editor actions (POST, anti-forgery protected):
+
+- **Mark not relevant** → `Rejected`
+- **Ignore duplicate** → `IgnoredDuplicate`
+- **Edit draft** → save fields; moves `NeedsReview` → `Drafted` when appropriate
+- **Promote to admin news** → creates an unpublished article in `/admin/news` and marks the candidate `PromotedToArticle`
+
+Link from **Admin news** (`/admin/news`) → “Review discovered candidates”.
+
+Regenerating a draft still requires running the worker with `--draft-only` (or `--draft` after new candidates appear). A one-click regenerate button is not implemented yet.
+
+### Admin authentication
+
+Admin routes require sign-in plus an email listed in `Admin:AllowedEmails`.
+
+- **Production:** Microsoft Entra ID (`AzureAd:*` settings). See `README.md` → Admin authentication.
+- **Local dev without Entra:** set `AzureAd:ClientId` to `""` in `src/QueenZone.Web/appsettings.Local.json` and send the `X-Test-User-Email` header with an allowed admin email. Automated tests use this path. There is no separate admin password login; member OAuth at `/account/login` does not grant admin access.
+
+## Implementation status (News Agent MVP)
+
+| Issue | Status | Notes |
+|-------|--------|-------|
+| #99 Source registry | Partial | Embedded `news-discovery-sources.json`; editorial rules doc still open |
+| #100 Data model | Done | Discovery tables + repositories in `QueenZone.Data` |
+| #101 Fetchers + worker | Done | RSS, sitemap, allowlisted pages; `discover-news` command |
+| #102 OpenRouter client | Done | Budget guard, model defaults, AI run logging |
+| #103 AI triage | Done | Structured triage + deterministic duplicate checks |
+| #104 Draft generation | Done | Citations/attribution; `--draft` flags |
+| #105 Admin review queue | Done | `/admin/news-discovery` |
+| #106 Promote workflow | Partial | Promote creates admin news draft; fuller workflow polish remains |
+| #107 Scheduled hosting | Not started | Local bat/worker only; no Azure timer yet |
+| #108 Tests/observability | Partial | Unit/integration tests in CI; no live OpenRouter in default tests |
+
+## Testing
+
+Default CI tests use fake fetchers and fake AI clients. They do not call OpenRouter or live RSS feeds.
+
+Before a pull request touching the news agent:
+
+```powershell
+dotnet restore QueenZone.sln
+dotnet build QueenZone.sln --configuration Release --no-restore
+dotnet test QueenZone.sln --configuration Release --no-build
+```
+
+Report in the PR whether manual smoke tests (`scripts/Smoke-NewsAgent.bat`) and real legacy database checks were run or skipped.

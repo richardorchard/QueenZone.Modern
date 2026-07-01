@@ -1,5 +1,16 @@
 # Automated News Discovery Plan
 
+## As implemented (2026)
+
+The first code slice is live in the repository:
+
+- `QueenZone.NewsAgent` + `QueenZone.NewsAgent.Worker` — fetch, triage, draft generation
+- Discovery data in modern tables via `QueenZone.Data` (not `NEWS_T`)
+- Admin review at `/admin/news-discovery`; publish still explicit via `/admin/news`
+- Operational docs: `docs/architecture/news-agent.md`
+
+Remaining MVP work: scheduled hosting (#107), fuller promote workflow polish (#106), observability (#108).
+
 ## Goal
 
 Issue #7 proposes a daily workflow that discovers Queen-related news, prepares AI-assisted draft material, and leaves publication decisions with a human editor.

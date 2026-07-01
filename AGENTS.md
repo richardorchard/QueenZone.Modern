@@ -112,6 +112,7 @@ Do not commit secrets.
 Local secrets belong in ignored files such as:
 
 - `src/QueenZone.Web/appsettings.Local.json`
+- `src/QueenZone.NewsAgent.Worker/appsettings.Local.json`
 - `.env`
 
 Commit only examples such as `.env.example`.
@@ -123,6 +124,8 @@ The GitHub environment secret `QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING` is 
 For production debugging (log stream, Azure CLI, Azure MCP tenant setup, and forum smoke checks), see `docs/agent-handoff-cheatsheet.md`.
 
 For local SQL MCP access through Azure Data API Builder, see `docs/sql/data-api-builder-mcp.md`. Keep the MCP surface narrow and read-oriented by default.
+
+News agent worker and admin review queue: see `docs/architecture/news-agent.md`. OpenRouter key goes in `src/QueenZone.NewsAgent.Worker/appsettings.Local.json`. Manual OpenRouter smoke test: `scripts/Smoke-NewsAgent.bat`. Admin review UI: `/admin/news-discovery` (requires `Admin:AllowedEmails`; member OAuth at `/account/login` is unrelated).
 
 ## Migration Principles
 

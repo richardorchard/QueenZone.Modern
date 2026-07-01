@@ -169,6 +169,10 @@ Use `pwsh` instead of `powershell` on Linux or macOS.
 3. Re-run the checklist until changed-line coverage is at least 80%.
 4. Do not rely on live network, OpenRouter, or legacy SQL for default tests.
 
+Optional manual checks (report skipped in PRs when not run):
+
+- News agent OpenRouter smoke: `scripts/Smoke-NewsAgent.bat` (Windows). See `docs/architecture/news-agent.md`.
+
 Common gaps: new repository implementations, console/worker entry points, DI registration-only code (cover via integration tests that resolve services), and error branches.
 
 For local HTML coverage inspection:
