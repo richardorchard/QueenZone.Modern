@@ -33,7 +33,7 @@ public static partial class NewsArticleContent
 
         return LooksLikeHtml(body)
             ? Sanitizer.Sanitize(body)
-            : WebUtility.HtmlEncode(body).Replace("\n", "<br>", StringComparison.Ordinal);
+            : AutoLinkUrls(body);
     }
 
     /// <summary>
@@ -54,6 +54,27 @@ public static partial class NewsArticleContent
 
     private static bool LooksLikeHtml(string value) =>
         HtmlTagRegex().IsMatch(value);
+
+    private static string AutoLinkUrls(string plainText)
+    {
+        // Split on URLs, encode non-URL parts, wrap URLs in anchor tags.
+        var parts = UrlRegex().Split(plainText);
+        var sb = new System.Text.StringBuilder();
+        foreach (var part in parts)
+        {
+            if (Uri.TryCreate(part, UriKind.Absolute, out var uri)
+                && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
+            {
+                var encoded = WebUtility.HtmlEncode(part);
+                sb.Append($"<a href=\"{encoded}\" rel=\"noopener noreferrer\" target=\"_blank\">{encoded}</a>");
+            }
+            else
+            {
+                sb.Append(WebUtility.HtmlEncode(part).Replace("\n", "<br>", StringComparison.Ordinal));
+            }
+        }
+        return sb.ToString();
+    }
 
     private static HtmlSanitizer CreateSanitizer()
     {
@@ -79,6 +100,7 @@ public static partial class NewsArticleContent
                 && element.HasAttribute("href"))
             {
                 element.SetAttribute("rel", "noopener noreferrer");
+                element.SetAttribute("target", "_blank");
             }
         };
 
@@ -90,4 +112,7 @@ public static partial class NewsArticleContent
 
     [GeneratedRegex(@"\s+")]
     private static partial Regex WhitespaceRegex();
+
+    [GeneratedRegex(@"(https?://\S+)", RegexOptions.IgnoreCase)]
+    private static partial Regex UrlRegex();
 }
