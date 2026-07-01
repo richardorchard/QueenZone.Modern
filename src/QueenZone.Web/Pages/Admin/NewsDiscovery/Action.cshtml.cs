@@ -120,7 +120,7 @@ public sealed class ActionModel(
             id,
             new NewsCandidateStatusUpdate(
                 NewsCandidateStatus.PromotedToArticle,
-                ReviewNotes: $"Promoted to admin news draft #{newsId} by {EditorEmail}.",
+                ReviewNotes: $"Promoted to admin news draft #{newsId} by {EditorEmail} at {DateTime.UtcNow:yyyy-MM-dd HH:mm} UTC.",
                 PromotedNewsId: newsId),
             cancellationToken);
         if (!promoted)
@@ -128,11 +128,14 @@ public sealed class ActionModel(
             return Redirect($"/admin/news-discovery/{id}");
         }
 
+        var aiRuns = await discoveryRepository.GetAiRunsForCandidateAsync(id, cancellationToken);
+        var provenance = NewsDiscoveryProvenanceBuilder.Build(candidate, agentDraft, aiRuns);
+
         await auditRepository.AppendAsync(
             newsId,
-            "create-from-discovery",
+            "promote-from-discovery",
             EditorEmail,
-            $"Created from discovery candidate #{id}.",
+            NewsDiscoveryPromoteAudit.Format(provenance),
             cancellationToken);
 
         return Redirect($"/admin/news/{newsId}/edit");

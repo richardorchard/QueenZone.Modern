@@ -60,6 +60,25 @@ public sealed class NewsDraftGenerationServiceTests
   }
 
   [Fact]
+  public async Task GenerateDraftAsync_throws_when_drafted_without_force_regenerate()
+  {
+    var repository = new InMemoryNewsDiscoveryRepository(new SharedNewsDiscoveryStore());
+    var candidateId = await SeedNeedsReviewCandidateAsync(repository);
+    var service = NewsAgentTestSupport.CreateDraftGenerationService(
+      repository,
+      new DraftGenerationFakeAiClient(NewsAgentTestSupport.SampleDraftJson));
+
+    await service.GenerateDraftAsync(
+      (await repository.GetCandidateByIdAsync(candidateId))!,
+      new NewsDraftRunOptions());
+
+    var candidate = await repository.GetCandidateByIdAsync(candidateId);
+
+    await Assert.ThrowsAsync<InvalidOperationException>(() =>
+      service.GenerateDraftAsync(candidate!, new NewsDraftRunOptions()));
+  }
+
+  [Fact]
   public async Task GenerateDraftAsync_regenerates_when_drafted_and_forced()
   {
     var repository = new InMemoryNewsDiscoveryRepository(new SharedNewsDiscoveryStore());

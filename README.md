@@ -53,6 +53,48 @@ Open `coverage-report/index.html` to inspect the report. Coverage reports and ra
 
 Local secrets belong in `src/QueenZone.Web/appsettings.Local.json`, which is ignored by git. You can also set `ConnectionStrings__QueenZoneLegacy` in your shell or a local `.env` file for tooling that loads dotenv values. If no `ConnectionStrings:QueenZoneLegacy` value is present, the site uses sample news data so the first slice can still run locally.
 
+### Using the live legacy database locally
+
+Live-database development is opt-in. Use it when you need to reproduce a production-only data mapping, SQL, or admin editorial issue.
+
+Create `src/QueenZone.Web/appsettings.Local.json` and add the live SQL connection string under `ConnectionStrings:QueenZoneLegacy`. This file is ignored by git; do not commit it, paste it into a pull request, or include it in logs.
+
+For local admin testing without real Entra sign-in, also set `AzureAd:ClientId` to an empty string and include your admin email in `Admin:AllowedEmails`:
+
+```json
+{
+  "ConnectionStrings": {
+    "QueenZoneLegacy": "Server=tcp:...;Database=...;User ID=...;Password=...;Encrypt=True;TrustServerCertificate=False;"
+  },
+  "AzureAd": {
+    "ClientId": ""
+  },
+  "Admin": {
+    "AllowedEmails": [
+      "richard@thinkingwebsites.com.au",
+      "me@richardorchard.com"
+    ]
+  }
+}
+```
+
+Run the web app normally:
+
+```powershell
+dotnet run --project src/QueenZone.Web/QueenZone.Web.csproj
+```
+
+To exercise admin pages locally with the test-header fallback, send the allowlisted email header:
+
+```powershell
+Invoke-WebRequest `
+  -Uri http://localhost:5146/admin/news `
+  -Headers @{ "X-Test-User-Email" = "richard@thinkingwebsites.com.au" } `
+  -UseBasicParsing
+```
+
+If you already have `src/QueenZone.NewsAgent.Worker/appsettings.Local.json` configured with `ConnectionStrings:QueenZoneLegacy`, you can copy that value into the web app's local settings. Keep both files local-only.
+
 ### News agent (discovery worker)
 
 The news agent fetches configured public sources, triages items with OpenRouter, generates editor-reviewable drafts, and stores candidates for the admin review queue. It does not publish to public pages automatically.

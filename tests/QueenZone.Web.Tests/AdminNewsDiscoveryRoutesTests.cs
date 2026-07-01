@@ -70,6 +70,10 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
         Assert.Matches("/admin/news/\\d+/edit", editPath);
 
         var articleId = int.Parse(editPath.Split('/')[3], System.Globalization.CultureInfo.InvariantCulture);
+        var editBody = await client.GetStringAsync(editPath);
+        Assert.Contains("Discovery provenance", editBody);
+        Assert.Contains($"/admin/news-discovery/{candidateId}", editBody);
+
         var publicAfterPromote = await client.GetStringAsync("/news");
         Assert.DoesNotContain("Discovery draft title", publicAfterPromote);
 
@@ -101,6 +105,102 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
         var draft = await discoveryRepository.GetDraftByCandidateIdAsync(candidateId);
         Assert.NotNull(draft);
         Assert.Equal("Queen announce 2026 tour", draft.ProposedTitle);
+    }
+
+    [Fact]
+    public async Task RegenerateDraft_reports_error_when_openrouter_is_not_configured()
+    {
+        var discoveryStore = new SharedNewsDiscoveryStore();
+        var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
+        var candidateId = await SeedDraftedCandidateAsync(discoveryRepository);
+        var client = CreateClient(
+            AdminEmail,
+            new SharedNewsStore(),
+            discoveryStore,
+            openRouterApiKey: null,
+            aiClientEnabled: false);
+
+        var response = await PostActionAsync(client, $"/admin/news-discovery/{candidateId}/regeneratedraft", candidateId);
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+
+        var reviewBody = await client.GetStringAsync($"/admin/news-discovery/{candidateId}");
+        Assert.Contains("Draft regeneration requires OpenRouter configuration", reviewBody);
+    }
+
+    [Fact]
+    public async Task RegenerateDraft_reports_error_for_rejected_candidate()
+    {
+        var discoveryStore = new SharedNewsDiscoveryStore();
+        var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
+        var candidateId = await SeedNeedsReviewCandidateAsync(discoveryRepository);
+        await discoveryRepository.TryUpdateCandidateStatusAsync(
+            candidateId,
+            new NewsCandidateStatusUpdate(NewsCandidateStatus.Rejected));
+        var client = CreateClient(AdminEmail, new SharedNewsStore(), discoveryStore);
+
+        var response = await PostActionAsync(client, $"/admin/news-discovery/{candidateId}/regeneratedraft", candidateId);
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+
+        var reviewBody = await client.GetStringAsync($"/admin/news-discovery/{candidateId}");
+        Assert.Contains("Only needs-review or drafted candidates can regenerate a draft", reviewBody);
+    }
+
+    [Fact]
+    public async Task RegenerateDraft_reports_failure_when_ai_returns_invalid_json()
+    {
+        var discoveryStore = new SharedNewsDiscoveryStore();
+        var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
+        var candidateId = await SeedDraftedCandidateAsync(discoveryRepository);
+        var client = CreateClient(
+            AdminEmail,
+            new SharedNewsStore(),
+            discoveryStore,
+            draftResponseJson: "{not-json");
+
+        var response = await PostActionAsync(client, $"/admin/news-discovery/{candidateId}/regeneratedraft", candidateId);
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+
+        var reviewBody = await client.GetStringAsync($"/admin/news-discovery/{candidateId}");
+        Assert.Contains("Draft regeneration failed", reviewBody);
+    }
+
+    [Fact]
+    public async Task RegenerateDraft_reports_when_ai_returns_no_structured_content()
+    {
+        var discoveryStore = new SharedNewsDiscoveryStore();
+        var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
+        var candidateId = await SeedDraftedCandidateAsync(discoveryRepository);
+        var client = CreateClient(
+            AdminEmail,
+            new SharedNewsStore(),
+            discoveryStore,
+            draftResponseJson: string.Empty);
+
+        var response = await PostActionAsync(client, $"/admin/news-discovery/{candidateId}/regeneratedraft", candidateId);
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+
+        var reviewBody = await client.GetStringAsync($"/admin/news-discovery/{candidateId}");
+        Assert.Contains("Draft regeneration did not produce a new draft", reviewBody);
+    }
+
+    [Fact]
+    public async Task RegenerateDraft_returns_not_found_for_missing_candidate()
+    {
+        var discoveryStore = new SharedNewsDiscoveryStore();
+        var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
+        var candidateId = await SeedDraftedCandidateAsync(discoveryRepository);
+        var client = CreateClient(AdminEmail, new SharedNewsStore(), discoveryStore);
+        var reviewPage = await client.GetStringAsync($"/admin/news-discovery/{candidateId}");
+        var token = ExtractAntiforgeryToken(reviewPage);
+
+        var response = await client.PostAsync(
+            "/admin/news-discovery/99999/regeneratedraft",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                [AdminNewsDiscoveryPageModel.AntiforgeryTokenFieldName] = token
+            }));
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Fact]
@@ -457,16 +557,26 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
         return (firstId, secondId);
     }
 
-    private WebApplicationFactory<Program> CreateFactory(SharedNewsStore newsStore, SharedNewsDiscoveryStore discoveryStore) =>
+    private WebApplicationFactory<Program> CreateFactory(
+        SharedNewsStore newsStore,
+        SharedNewsDiscoveryStore discoveryStore,
+        string? openRouterApiKey = "test-key",
+        string? draftResponseJson = null,
+        bool aiClientEnabled = true) =>
         factory.WithWebHostBuilder(builder =>
         {
-            builder.ConfigureAppConfiguration((_, config) =>
+            if (openRouterApiKey is not null)
             {
-                config.AddInMemoryCollection(new Dictionary<string, string?>
+                builder.ConfigureAppConfiguration((_, config) =>
                 {
-                    ["OpenRouter:ApiKey"] = "test-key"
+                    config.AddInMemoryCollection(new Dictionary<string, string?>
+                    {
+                        ["OpenRouter:ApiKey"] = openRouterApiKey
+                    });
                 });
-            });
+            }
+
+            var draftJson = draftResponseJson ?? NewsAgentTestSupport.SampleDraftJson;
             builder.ConfigureServices(services =>
             {
                 services.RemoveAll<SharedNewsStore>();
@@ -482,15 +592,21 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
                 services.AddSingleton<IAdminNewsRepository>(_ => new InMemoryAdminNewsRepository(newsStore));
                 services.AddSingleton<INewsAuditRepository>(_ => new InMemoryNewsAuditRepository(newsStore));
                 services.AddSingleton<INewsDiscoveryRepository>(_ => new InMemoryNewsDiscoveryRepository(discoveryStore));
-                services.AddSingleton<INewsAiClient>(_ => new RegenerateDraftFakeAiClient(NewsAgentTestSupport.SampleDraftJson));
+                services.AddSingleton<INewsAiClient>(_ => new RegenerateDraftFakeAiClient(draftJson, aiClientEnabled));
             });
         });
 
-    private HttpClient CreateClient(string? email = null, SharedNewsStore? newsStore = null, SharedNewsDiscoveryStore? discoveryStore = null)
+    private HttpClient CreateClient(
+        string? email = null,
+        SharedNewsStore? newsStore = null,
+        SharedNewsDiscoveryStore? discoveryStore = null,
+        string? openRouterApiKey = "test-key",
+        string? draftResponseJson = null,
+        bool aiClientEnabled = true)
     {
         newsStore ??= new SharedNewsStore();
         discoveryStore ??= new SharedNewsDiscoveryStore();
-        var appFactory = CreateFactory(newsStore, discoveryStore);
+        var appFactory = CreateFactory(newsStore, discoveryStore, openRouterApiKey, draftResponseJson, aiClientEnabled);
         return CreateClientFromFactory(appFactory, email);
     }
 
@@ -540,9 +656,9 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
     [GeneratedRegex("""name="__RequestVerificationToken" value="(?<token>[^"]+)""", RegexOptions.IgnoreCase)]
     private static partial Regex AntiforgeryTokenRegex();
 
-    private sealed class RegenerateDraftFakeAiClient(string content) : INewsAiClient
+    private sealed class RegenerateDraftFakeAiClient(string content, bool enabled = true) : INewsAiClient
     {
-        public bool IsEnabled => true;
+        public bool IsEnabled { get; } = enabled;
 
         public Task<NewsAiChatCompletion> CompleteChatAsync(
             NewsAiChatRequest request,

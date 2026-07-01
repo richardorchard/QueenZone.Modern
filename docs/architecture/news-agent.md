@@ -85,6 +85,7 @@ dotnet run --project src/QueenZone.NewsAgent.Worker -- discover-news [options]
 | `--triage-only` | Triage existing `Discovered` candidates only |
 | `--draft` | Generate drafts after fetch/triage |
 | `--draft-only` | Draft existing `NeedsReview` candidates only |
+| `--scheduled` | Preset for automation: `--seed-sources --triage --draft` |
 | `--dry-run` | Log AI steps without calling OpenRouter or persisting status changes |
 | `--force` | Bypass source poll-interval skip; force draft regeneration where applicable |
 
@@ -100,6 +101,18 @@ dotnet run --project src/QueenZone.NewsAgent.Worker -- discover-news --seed-sour
 # Re-run triage on candidates already in the database
 dotnet run --project src/QueenZone.NewsAgent.Worker -- discover-news --triage-only
 ```
+
+## Scheduled runs
+
+For Task Scheduler, Azure Container Apps Jobs, Functions, or WebJobs, see **`docs/architecture/news-agent-scheduling.md`**.
+
+Quick local scheduled preset:
+
+```powershell
+scripts/Run-NewsAgentDiscovery.ps1 -Scheduled
+```
+
+Overlapping runs are skipped via a database lease (`NewsAgentScheduler` in worker `appsettings.json`). Use `--force` to bypass the lease for manual reruns.
 
 ## OpenRouter smoke test (Windows)
 
@@ -150,8 +163,8 @@ Admin routes require sign-in plus an email listed in `Admin:AllowedEmails`.
 | #103 AI triage | Done | Structured triage + deterministic duplicate checks |
 | #104 Draft generation | Done | Citations/attribution; `--draft` flags |
 | #105 Admin review queue | Done | `/admin/news-discovery` + in-admin regenerate draft |
-| #106 Promote workflow | Partial | Promote creates admin news draft; fuller workflow polish remains |
-| #107 Scheduled hosting | Not started | Local bat/worker only; no Azure timer yet |
+| #106 Promote workflow | Done | Provenance panel on admin news, richer promote audit, bidirectional links |
+| #107 Scheduled hosting | Done | DB run lease, `--scheduled`, `Run-NewsAgentDiscovery.ps1`, scheduling doc |
 | #108 Tests/observability | Partial | Unit/integration tests in CI; no live OpenRouter in default tests |
 
 ## Testing

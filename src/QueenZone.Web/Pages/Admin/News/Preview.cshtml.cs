@@ -3,11 +3,15 @@ using QueenZone.Data;
 
 namespace QueenZone.Web.Pages.Admin.News;
 
-public sealed class PreviewModel(IAdminNewsRepository adminNewsRepository) : AdminNewsPageModel
+public sealed class PreviewModel(
+    IAdminNewsRepository adminNewsRepository,
+    INewsDiscoveryRepository discoveryRepository) : AdminNewsPageModel
 {
     public AdminNewsArticle? Article { get; private set; }
 
     public NewsItem? Item { get; private set; }
+
+    public NewsDiscoveryProvenance? DiscoveryProvenance { get; private set; }
 
     public async Task<IActionResult> OnGetAsync(int id, CancellationToken cancellationToken)
     {
@@ -16,6 +20,11 @@ public sealed class PreviewModel(IAdminNewsRepository adminNewsRepository) : Adm
         {
             return NotFound();
         }
+
+        DiscoveryProvenance = await NewsDiscoveryProvenanceBuilder.LoadForPromotedArticleAsync(
+            discoveryRepository,
+            id,
+            cancellationToken);
 
         Item = ToNewsItem(Article);
         ViewData["Title"] = $"Preview: {Article.Title}";
