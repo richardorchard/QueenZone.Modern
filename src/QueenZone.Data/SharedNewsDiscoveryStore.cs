@@ -153,6 +153,14 @@ public sealed class SharedNewsDiscoveryStore
         }
     }
 
+    public NewsCandidateEntity? GetCandidateByPromotedNewsId(int promotedNewsId)
+    {
+        lock (sync)
+        {
+            return candidates.SingleOrDefault(candidate => candidate.PromotedNewsId == promotedNewsId);
+        }
+    }
+
     public IReadOnlyList<NewsCandidateEntity> GetCandidates(NewsCandidateStatus? status, int? sourceId)
     {
         lock (sync)

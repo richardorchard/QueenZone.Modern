@@ -68,6 +68,10 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
         Assert.Matches("/admin/news/\\d+/edit", editPath);
 
         var articleId = int.Parse(editPath.Split('/')[3], System.Globalization.CultureInfo.InvariantCulture);
+        var editBody = await client.GetStringAsync(editPath);
+        Assert.Contains("Discovery provenance", editBody);
+        Assert.Contains($"/admin/news-discovery/{candidateId}", editBody);
+
         var publicAfterPromote = await client.GetStringAsync("/news");
         Assert.DoesNotContain("Discovery draft title", publicAfterPromote);
 

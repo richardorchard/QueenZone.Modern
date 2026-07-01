@@ -150,7 +150,7 @@ Admin routes require sign-in plus an email listed in `Admin:AllowedEmails`.
 | #103 AI triage | Done | Structured triage + deterministic duplicate checks |
 | #104 Draft generation | Done | Citations/attribution; `--draft` flags |
 | #105 Admin review queue | Done | `/admin/news-discovery` |
-| #106 Promote workflow | Partial | Promote creates admin news draft; fuller workflow polish remains |
+| #106 Promote workflow | Done | Provenance panel on admin news, richer promote audit, bidirectional links |
 | #107 Scheduled hosting | Not started | Local bat/worker only; no Azure timer yet |
 | #108 Tests/observability | Partial | Unit/integration tests in CI; no live OpenRouter in default tests |
 
