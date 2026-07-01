@@ -39,8 +39,8 @@ public sealed class LegacyNewsSchemaTests
         Assert.Contains("CAST(NULL AS datetime2) AS CREATED_AT", sql);
         Assert.Contains("CAST(NULL AS datetime2) AS UPDATED_AT", sql);
         Assert.Contains("CAST(NULL AS nvarchar(256)) AS EDITOR_EMAIL", sql);
-        Assert.Contains("ISNULL(TYPE, 0) AS TYPE", sql);
-        Assert.Contains("ISNULL(QUEEN_ONLINE, 0) AS QUEEN_ONLINE", sql);
+        Assert.Contains("CAST(ISNULL(TYPE, 0) AS int) AS TYPE", sql);
+        Assert.Contains("CAST(ISNULL(QUEEN_ONLINE, 0) AS int) AS QUEEN_ONLINE", sql);
         Assert.Contains("CASE WHEN DISPLAY = 1 THEN 1 ELSE 0 END AS DISPLAY", sql);
         Assert.DoesNotContain("CAST(CASE WHEN DISPLAY = 1 THEN 1 ELSE 0 END AS bit) AS DISPLAY", sql);
         Assert.Contains("NEWS_ID", sql);
