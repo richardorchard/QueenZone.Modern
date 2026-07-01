@@ -95,6 +95,35 @@ Invoke-WebRequest -Uri https://queenzone.org/health -UseBasicParsing | Select-Ob
 
 Application logging should be enabled at Information level on the filesystem. If the stream is quiet, hit the failing route to generate entries.
 
+### Reproducing live database issues locally
+
+Use the live legacy database locally only for production-only SQL, mapping, or data-shape debugging. The web app reads `src/QueenZone.Web/appsettings.Local.json`, which is ignored by git. Put the live value in:
+
+```json
+{
+  "ConnectionStrings": {
+    "QueenZoneLegacy": "..."
+  },
+  "AzureAd": {
+    "ClientId": ""
+  },
+  "Admin": {
+    "AllowedEmails": [
+      "richard@thinkingwebsites.com.au",
+      "me@richardorchard.com"
+    ]
+  }
+}
+```
+
+Then run:
+
+```powershell
+dotnet run --project src/QueenZone.Web/QueenZone.Web.csproj
+```
+
+Admin routes can be exercised locally with `X-Test-User-Email` when `AzureAd:ClientId` is empty. Never print, commit, or paste the connection string into logs or pull requests. If `src/QueenZone.NewsAgent.Worker/appsettings.Local.json` already has `ConnectionStrings:QueenZoneLegacy`, copy that value into the web app local settings.
+
 ### Azure MCP
 
 The Azure MCP server must authenticate to tenant `c9f094fd-23bf-4a35-a406-bcaacd7e1a8e`. If tools return `InvalidAuthenticationTokenTenant`, run:

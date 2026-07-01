@@ -11,6 +11,11 @@ else
   <h1>Review candidate #@candidate.Id</h1>
   <p><a href="/admin/news-discovery">Back to review queue</a></p>
 
+  @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+  {
+    <p class="admin-status admin-status-@(Model.StatusMessageKind ?? "info")">@Model.StatusMessage</p>
+  }
+
   <section class="admin-review-section">
     <h2>Source item</h2>
     <dl class="admin-review-meta">
@@ -120,13 +125,25 @@ else
         }
       </dl>
       <p><a href="/admin/news-discovery/@candidate.Id/edit-draft">Edit draft</a></p>
+      @if (candidate.Status is QueenZone.Data.NewsCandidateStatus.NeedsReview or QueenZone.Data.NewsCandidateStatus.Drafted)
+      {
+        <partial name="_PostAction" model="@(new PostActionViewModel($"/admin/news-discovery/{candidate.Id}/regeneratedraft", "Regenerate draft with AI", Confirm: true))" />
+      }
     </section>
   }
   else
   {
     <section class="admin-review-section">
       <h2>Generated draft</h2>
-      <p>No draft yet. Run the news agent worker with <code>--draft-only</code> to generate one.</p>
+      <p>No draft yet.</p>
+      @if (candidate.Status is QueenZone.Data.NewsCandidateStatus.NeedsReview)
+      {
+        <partial name="_PostAction" model="@(new PostActionViewModel($"/admin/news-discovery/{candidate.Id}/regeneratedraft", "Generate draft with AI"))" />
+      }
+      else
+      {
+        <p>Run the news agent worker with <code>--draft-only</code> if AI is only configured on the worker.</p>
+      }
     </section>
   }
 

@@ -7,4 +7,5 @@ public sealed record ArticleFormViewModel(
     string Action,
     AdminNewsDraft Draft,
     IReadOnlyList<string>? Errors,
-    AdminNewsArticle? Article = null);
+    AdminNewsArticle? Article = null,
+    NewsDiscoveryProvenance? DiscoveryProvenance = null);

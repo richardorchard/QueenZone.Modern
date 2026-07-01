@@ -7,4 +7,5 @@ public sealed record ForumPostItem(
     string AuthorUsername,
     string? Signature,
     int AuthorPostCount,
-    DateTime? AuthorMemberSince);
+    DateTime? AuthorMemberSince,
+    IReadOnlyList<ForumPostAttachment>? Attachments = null);

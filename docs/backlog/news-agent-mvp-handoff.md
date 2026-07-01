@@ -12,11 +12,11 @@ This handoff gives a future agent the full context for building the first automa
 | OpenRouter + budgets (#102) | Done |
 | AI triage (#103) | Done |
 | Draft generation (#104) | Done |
-| Admin review queue (#105) | Done — `/admin/news-discovery` |
-| Promote to live news (#106) | Partial — promote creates unpublished admin news draft |
-| Scheduled hosting (#107) | Not started |
+| Admin review queue (#105) | Done — `/admin/news-discovery` + in-admin regenerate draft |
+| Promote to live news (#106) | Done — provenance on admin news edit/preview, richer audit, bidirectional links |
+| Scheduled hosting (#107) | Done — DB run lease, `--scheduled`, `scripts/Run-NewsAgentDiscovery.ps1`, `docs/architecture/news-agent-scheduling.md` |
 | Tests / observability (#108) | Done — run telemetry, failure-mode tests, documented test matrix |
-| Source registry doc (#99) | Partial — `news-discovery-sources.json` exists; editorial rules issue may narrow |
+| Source registry doc (#99) | Done — `news-discovery-sources.json` + `docs/architecture/news-agent-editorial-rules.md` |
 
 Safe boundary in production today: discovery and drafting run via the worker; editors review at `/admin/news-discovery`; public pages only change after explicit publish in `/admin/news`.
 
@@ -49,15 +49,15 @@ Area labels:
 
 Current implementation issues:
 
-- #99 Define trusted source registry and editorial rules for automated Queen news discovery. *(partial — JSON registry shipped)*
+- #99 Define trusted source registry and editorial rules for automated Queen news discovery. *(done)*
 - #100 Add database model for news discovery sources, candidates, evidence, and AI draft metadata. *(done)*
 - #101 Implement source fetchers for RSS, sitemap, and allowlisted web pages. *(done)*
 - #102 Add OpenRouter client configuration with low-cost model defaults and budget controls. *(done)*
 - #103 Implement AI triage for relevance, deduplication, and confidence scoring of discovered news. *(done)*
 - #104 Generate editor-reviewable news drafts with citations from approved candidates. *(done)*
 - #105 Build admin review queue for discovered candidates and generated drafts. *(done)*
-- #106 Promote approved AI-assisted drafts into the live news article workflow. *(partial)*
-- #107 Add scheduled news discovery worker with local-first and Azure hosting options.
+- #106 Promote approved AI-assisted drafts into the live news article workflow. *(done)*
+- #107 Add scheduled news discovery worker with local-first and Azure hosting options. *(done — lease, scheduling doc, Task Scheduler script)*
 - #108 Add tests, observability, and safety checks for the automated news agent MVP. *(done)*
 
 ## Product Shape

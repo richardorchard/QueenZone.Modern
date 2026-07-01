@@ -5,6 +5,7 @@ namespace QueenZone.Web.Pages.Admin.News;
 
 public sealed class EditPostModel(
     IAdminNewsRepository adminNewsRepository,
+    INewsDiscoveryRepository discoveryRepository,
     INewsAuditRepository auditRepository) : AdminNewsPageModel
 {
     public ArticleFormViewModel? Form { get; private set; }
@@ -28,8 +29,12 @@ public sealed class EditPostModel(
         var errors = NewsValidation.ValidateDraft(draft, slugInUse);
         if (errors.Count > 0)
         {
+            var provenance = await NewsDiscoveryProvenanceBuilder.LoadForPromotedArticleAsync(
+                discoveryRepository,
+                id,
+                cancellationToken);
             ViewData["Title"] = $"Edit: {existing.Title}";
-            Form = EditModel.BuildForm(existing, draft, errors);
+            Form = EditModel.BuildForm(existing, draft, errors, provenance);
             return Page();
         }
 

@@ -76,9 +76,14 @@ public sealed class NewsDraftGenerationService(
         NewsDraftRunOptions options,
         CancellationToken cancellationToken = default)
     {
-        if (candidate.Status != NewsCandidateStatus.NeedsReview)
+        if (candidate.Status is not NewsCandidateStatus.NeedsReview and not NewsCandidateStatus.Drafted)
         {
             throw new InvalidOperationException($"Candidate {candidate.Id} is not ready for draft generation.");
+        }
+
+        if (candidate.Status == NewsCandidateStatus.Drafted && !options.ForceRegenerate)
+        {
+            throw new InvalidOperationException($"Candidate {candidate.Id} already has a draft. Use force regenerate.");
         }
 
         if (!MeetsConfidenceThreshold(candidate))

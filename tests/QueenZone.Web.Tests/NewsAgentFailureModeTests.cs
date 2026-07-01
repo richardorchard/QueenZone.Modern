@@ -62,7 +62,9 @@ public sealed class NewsAgentFailureModeTests
             NewsAgentTestSupport.CreateDraftGenerationService(repository, new FailureModeFakeAiClient("{}")),
             CreateExecutor(repository, new FailureModeFakeAiClient("{}")),
             repository,
+            new InMemoryNewsAgentRunLeaseService(new SharedNewsAgentLeaseStore()),
             Options.Create(new OpenRouterOptions { ApiKey = "test-key" }),
+            Options.Create(new NewsAgentSchedulerOptions()),
             NullLogger<DiscoverNewsWorker>.Instance);
 
         var exitCode = await worker.RunAsync(new DiscoverNewsCommandOptions(

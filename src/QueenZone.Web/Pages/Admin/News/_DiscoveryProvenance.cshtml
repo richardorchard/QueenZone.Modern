@@ -1,0 +1,36 @@
+@model QueenZone.Data.NewsDiscoveryProvenance
+
+<section class="admin-review-section admin-discovery-provenance">
+  <h2>Discovery provenance</h2>
+  <p class="admin-help">This article was promoted from an automated discovery candidate. Public visitors only see it after you publish.</p>
+  <dl class="admin-review-meta">
+    <dt>Discovery candidate</dt>
+    <dd><a href="/admin/news-discovery/@Model.CandidateId">Candidate #@Model.CandidateId</a></dd>
+    <dt>Original source</dt>
+    <dd><a href="@Model.SourceUrl" rel="noopener noreferrer" target="_blank">@Model.SourceTitle</a></dd>
+    <dt>Source registry</dt>
+    <dd>@Model.SourceDisplayName (@Model.SourceTrustTier)</dd>
+    <dt>Discovered</dt>
+    <dd>@Model.DiscoveredAtUtc.ToString("dd MMM yyyy HH:mm") UTC</dd>
+    @if (Model.RelevanceScore is not null || Model.ConfidenceScore is not null)
+    {
+      <dt>AI scores</dt>
+      <dd>Relevance @(Model.RelevanceScore?.ToString("0.00") ?? "—"), confidence @(Model.ConfidenceScore?.ToString("0.00") ?? "—")</dd>
+    }
+    @if (!string.IsNullOrWhiteSpace(Model.TriageRationale))
+    {
+      <dt>AI rationale</dt>
+      <dd>@Model.TriageRationale</dd>
+    }
+    @if (!string.IsNullOrWhiteSpace(Model.DraftModelId))
+    {
+      <dt>Draft model</dt>
+      <dd>@Model.DraftModelId</dd>
+    }
+    @if (Model.SuggestedPublishAt is DateTime suggested)
+    {
+      <dt>Suggested publish date</dt>
+      <dd>@suggested.ToString("dd MMM yyyy") (from AI draft; edit publication date below before publishing)</dd>
+    }
+  </dl>
+</section>

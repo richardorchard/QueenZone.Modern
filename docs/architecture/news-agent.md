@@ -5,6 +5,7 @@ The news agent discovers public Queen-related stories from configured sources, t
 See also:
 
 - `docs/backlog/news-agent-mvp-handoff.md` — product rules, source strategy, and GitHub issue tracking
+- `docs/architecture/news-agent-editorial-rules.md` — trust tiers, source registry, relevance scope, and safety rules
 - `docs/architecture/automated-news-discovery-plan.md` — original architecture plan
 
 ## Pipeline
@@ -85,6 +86,7 @@ dotnet run --project src/QueenZone.NewsAgent.Worker -- discover-news [options]
 | `--triage-only` | Triage existing `Discovered` candidates only |
 | `--draft` | Generate drafts after fetch/triage |
 | `--draft-only` | Draft existing `NeedsReview` candidates only |
+| `--scheduled` | Preset for automation: `--seed-sources --triage --draft` |
 | `--dry-run` | Log AI steps without calling OpenRouter or persisting status changes |
 | `--force` | Bypass source poll-interval skip; force draft regeneration where applicable |
 
@@ -100,6 +102,18 @@ dotnet run --project src/QueenZone.NewsAgent.Worker -- discover-news --seed-sour
 # Re-run triage on candidates already in the database
 dotnet run --project src/QueenZone.NewsAgent.Worker -- discover-news --triage-only
 ```
+
+## Scheduled runs
+
+For Task Scheduler, Azure Container Apps Jobs, Functions, or WebJobs, see **`docs/architecture/news-agent-scheduling.md`**.
+
+Quick local scheduled preset:
+
+```powershell
+scripts/Run-NewsAgentDiscovery.ps1 -Scheduled
+```
+
+Overlapping runs are skipped via a database lease (`NewsAgentScheduler` in worker `appsettings.json`). Use `--force` to bypass the lease for manual reruns.
 
 ## OpenRouter smoke test (Windows)
 
@@ -130,7 +144,7 @@ Editor actions (POST, anti-forgery protected):
 
 Link from **Admin news** (`/admin/news`) → “Review discovered candidates”.
 
-Regenerating a draft still requires running the worker with `--draft-only` (or `--draft` after new candidates appear). A one-click regenerate button is not implemented yet.
+Regenerating a draft: use **Regenerate draft with AI** on the candidate review page (requires `OpenRouter:ApiKey` in `src/QueenZone.Web/appsettings.Local.json` or `OPENROUTER_API_KEY`), or run the worker with `--draft-only` / `--force`.
 
 ### Admin authentication
 
@@ -143,15 +157,15 @@ Admin routes require sign-in plus an email listed in `Admin:AllowedEmails`.
 
 | Issue | Status | Notes |
 |-------|--------|-------|
-| #99 Source registry | Partial | Embedded `news-discovery-sources.json`; editorial rules doc still open |
+| #99 Source registry | Done | `news-discovery-sources.json` + `news-agent-editorial-rules.md` |
 | #100 Data model | Done | Discovery tables + repositories in `QueenZone.Data` |
 | #101 Fetchers + worker | Done | RSS, sitemap, allowlisted pages; `discover-news` command |
 | #102 OpenRouter client | Done | Budget guard, model defaults, AI run logging |
 | #103 AI triage | Done | Structured triage + deterministic duplicate checks |
 | #104 Draft generation | Done | Citations/attribution; `--draft` flags |
-| #105 Admin review queue | Done | `/admin/news-discovery` |
-| #106 Promote workflow | Partial | Promote creates admin news draft; fuller workflow polish remains |
-| #107 Scheduled hosting | Not started | Local bat/worker only; no Azure timer yet |
+| #105 Admin review queue | Done | `/admin/news-discovery` + in-admin regenerate draft |
+| #106 Promote workflow | Done | Provenance panel on admin news, richer promote audit, bidirectional links |
+| #107 Scheduled hosting | Done | DB run lease, `--scheduled`, `Run-NewsAgentDiscovery.ps1`, scheduling doc |
 | #108 Tests/observability | Done | Run summary telemetry, failure-mode tests, test matrix in docs |
 
 ## Observability

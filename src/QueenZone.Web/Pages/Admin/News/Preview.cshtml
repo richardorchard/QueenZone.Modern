@@ -5,6 +5,12 @@
 {
   <p class="admin-preview-banner">Preview mode. @(Model.Article.IsPublished ? "This article is published." : "This article is not published.")</p>
   <p class="article-nav"><a href="/admin/news">Back to admin</a> | <a href="/admin/news/@Model.Article.Id/edit">Edit</a></p>
+
+  @if (Model.DiscoveryProvenance is not null)
+  {
+    <partial name="_DiscoveryProvenance" model="Model.DiscoveryProvenance" />
+  }
+
   <h1>@Model.Item.Title</h1>
   <p class="date"><time datetime="@Model.Item.PublishedAt.ToString("yyyy-MM-dd")">@Model.Item.PublishedAt.ToString("dd MMMM yyyy")</time></p>
   <p class="lede">@Model.Item.Excerpt</p>

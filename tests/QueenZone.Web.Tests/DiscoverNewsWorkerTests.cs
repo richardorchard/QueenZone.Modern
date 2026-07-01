@@ -172,12 +172,104 @@ public sealed class DiscoverNewsWorkerTests
         Assert.Equal(0.80m, options.SecondaryMinRelevanceScore);
     }
 
+    [Fact]
+    public async Task RunAsync_skips_when_run_lease_is_held()
+    {
+        var leaseStore = new SharedNewsAgentLeaseStore();
+        var leaseService = new InMemoryNewsAgentRunLeaseService(leaseStore);
+        await using var held = (await leaseService.TryAcquireAsync("discover-news", TimeSpan.FromMinutes(30)))!;
+
+        var repository = new InMemoryNewsDiscoveryRepository(new SharedNewsDiscoveryStore());
+        var discoveryService = NewsAgentTestSupport.CreateDiscoveryService(
+            repository,
+            new FakeNewsDiscoveryHttpClient(new Dictionary<string, string>()));
+        var worker = CreateWorker(
+            repository,
+            discoveryService,
+            aiEnabled: false,
+            leaseService: leaseService,
+            useRunLease: true);
+
+        var exitCode = await worker.RunAsync(new DiscoverNewsCommandOptions(
+            SeedSources: false,
+            DryRun: false,
+            Force: false,
+            Triage: false,
+            TriageOnly: false,
+            Draft: false,
+            DraftOnly: false));
+
+        Assert.Equal(0, exitCode);
+        Assert.Empty(await repository.GetCandidatesAsync());
+    }
+
+    [Fact]
+    public async Task RunAsync_force_bypasses_run_lease_when_another_holder_is_active()
+    {
+        var leaseStore = new SharedNewsAgentLeaseStore();
+        var leaseService = new InMemoryNewsAgentRunLeaseService(leaseStore);
+        await using var held = (await leaseService.TryAcquireAsync("discover-news", TimeSpan.FromMinutes(30)))!;
+
+        var repository = new InMemoryNewsDiscoveryRepository(new SharedNewsDiscoveryStore());
+        var feedUrl = "https://www.queenonline.com/feed/";
+        var discoveryService = NewsAgentTestSupport.CreateDiscoveryService(
+            repository,
+            new FakeNewsDiscoveryHttpClient(new Dictionary<string, string>
+            {
+                [feedUrl] = NewsAgentTestSupport.ReadFixture("sample-rss.xml")
+            }));
+        await repository.UpsertSourceAsync(new NewsDiscoverySourceDraft(
+            "queen-online",
+            "Queen Online",
+            "https://www.queenonline.com/",
+            feedUrl,
+            NewsDiscoverySourceType.Rss,
+            NewsDiscoveryTrustTier.Primary,
+            60,
+            true,
+            null));
+
+        var worker = CreateWorker(
+            repository,
+            discoveryService,
+            aiEnabled: false,
+            leaseService: leaseService,
+            useRunLease: true);
+
+        var exitCode = await worker.RunAsync(new DiscoverNewsCommandOptions(
+            SeedSources: false,
+            DryRun: false,
+            Force: true,
+            Triage: false,
+            TriageOnly: false,
+            Draft: false,
+            DraftOnly: false));
+
+        Assert.Equal(0, exitCode);
+        Assert.Equal(2, (await repository.GetCandidatesAsync()).Count);
+    }
+
+    [Fact]
+    public void DiscoverNewsCommandOptions_Parse_scheduled_enables_full_pipeline_flags()
+    {
+        var options = DiscoverNewsCommandOptions.Parse(["discover-news", "--scheduled"]);
+
+        Assert.NotNull(options);
+        Assert.True(options.SeedSources);
+        Assert.True(options.Triage);
+        Assert.True(options.Draft);
+        Assert.False(options.TriageOnly);
+        Assert.False(options.DraftOnly);
+    }
+
     private static DiscoverNewsWorker CreateWorker(
         INewsDiscoveryRepository repository,
         NewsDiscoveryService discoveryService,
         bool aiEnabled,
         bool dryRun = false,
-        string draftJson = "{}") =>
+        string draftJson = "{}",
+        INewsAgentRunLeaseService? leaseService = null,
+        bool useRunLease = false) =>
         new(
             discoveryService,
             CreateTriageService(repository, aiEnabled),
@@ -186,10 +278,16 @@ public sealed class DiscoverNewsWorkerTests
                 new DiscoverNewsWorkerTestsFakeAiClient(aiEnabled, draftJson)),
             CreateExecutor(repository, aiEnabled),
             repository,
+            leaseService ?? new InMemoryNewsAgentRunLeaseService(new SharedNewsAgentLeaseStore()),
             Options.Create(new OpenRouterOptions
             {
                 ApiKey = aiEnabled ? "test-key" : null,
                 DryRun = dryRun
+            }),
+            Options.Create(new NewsAgentSchedulerOptions
+            {
+                UseRunLease = useRunLease,
+                LeaseName = "discover-news"
             }),
             NullLogger<DiscoverNewsWorker>.Instance);
 
