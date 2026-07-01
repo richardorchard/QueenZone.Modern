@@ -1,0 +1,112 @@
+[
+  {
+    "key": "queen-online",
+    "displayName": "Queen Online",
+    "homepageUrl": "https://www.queenonline.com/",
+    "feedOrSiteUrl": "https://www.queenonline.com/feed/",
+    "sourceType": "Rss",
+    "trustTier": "Primary",
+    "pollIntervalMinutes": 60,
+    "enabled": true,
+    "relevanceKeywords": "queen,freddie mercury,brian may,roger taylor,john deacon,adam lambert"
+  },
+  {
+    "key": "brian-may",
+    "displayName": "Brian May",
+    "homepageUrl": "https://brianmay.com/",
+    "feedOrSiteUrl": "https://brianmay.com/blog/feed/",
+    "sourceType": "Rss",
+    "trustTier": "Primary",
+    "pollIntervalMinutes": 120,
+    "enabled": true,
+    "relevanceKeywords": "brian may,queen"
+  },
+  {
+    "key": "roger-taylor",
+    "displayName": "Roger Taylor",
+    "homepageUrl": "https://www.rogertaylorofficial.com/",
+    "feedOrSiteUrl": "https://www.rogertaylorofficial.com/news",
+    "sourceType": "AllowlistedPage",
+    "trustTier": "Primary",
+    "pollIntervalMinutes": 120,
+    "enabled": true,
+    "relevanceKeywords": "roger taylor,queen"
+  },
+  {
+    "key": "adam-lambert",
+    "displayName": "Adam Lambert",
+    "homepageUrl": "https://adamlambert.net/",
+    "feedOrSiteUrl": "https://adamlambert.net/feed/",
+    "sourceType": "Rss",
+    "trustTier": "Primary",
+    "pollIntervalMinutes": 120,
+    "enabled": true,
+    "relevanceKeywords": "adam lambert,queen"
+  },
+  {
+    "key": "rolling-stone-music",
+    "displayName": "Rolling Stone Music",
+    "homepageUrl": "https://www.rollingstone.com/music/",
+    "feedOrSiteUrl": "https://www.rollingstone.com/music/feed/",
+    "sourceType": "Rss",
+    "trustTier": "Secondary",
+    "pollIntervalMinutes": 60,
+    "enabled": true,
+    "relevanceKeywords": "queen,freddie mercury,brian may,roger taylor,adam lambert"
+  },
+  {
+    "key": "billboard-music",
+    "displayName": "Billboard Music",
+    "homepageUrl": "https://www.billboard.com/music/",
+    "feedOrSiteUrl": "https://www.billboard.com/feed/",
+    "sourceType": "Rss",
+    "trustTier": "Secondary",
+    "pollIntervalMinutes": 60,
+    "enabled": true,
+    "relevanceKeywords": "queen,freddie mercury,brian may,roger taylor,adam lambert"
+  },
+  {
+    "key": "nme-music",
+    "displayName": "NME Music",
+    "homepageUrl": "https://www.nme.com/music",
+    "feedOrSiteUrl": "https://www.nme.com/feed",
+    "sourceType": "Rss",
+    "trustTier": "Secondary",
+    "pollIntervalMinutes": 60,
+    "enabled": true,
+    "relevanceKeywords": "queen,freddie mercury,brian may,roger taylor,adam lambert"
+  },
+  {
+    "key": "louder",
+    "displayName": "Louder / Classic Rock",
+    "homepageUrl": "https://www.loudersound.com/",
+    "feedOrSiteUrl": "https://www.loudersound.com/feeds/all",
+    "sourceType": "Rss",
+    "trustTier": "Secondary",
+    "pollIntervalMinutes": 90,
+    "enabled": true,
+    "relevanceKeywords": "queen,freddie mercury,brian may,roger taylor"
+  },
+  {
+    "key": "ultimate-classic-rock",
+    "displayName": "Ultimate Classic Rock",
+    "homepageUrl": "https://ultimateclassicrock.com/",
+    "feedOrSiteUrl": "https://ultimateclassicrock.com/feed",
+    "sourceType": "Rss",
+    "trustTier": "Secondary",
+    "pollIntervalMinutes": 90,
+    "enabled": true,
+    "relevanceKeywords": "queen,freddie mercury,brian may,roger taylor"
+  },
+  {
+    "key": "gold-radio",
+    "displayName": "Gold Radio",
+    "homepageUrl": "https://www.goldradiouk.com/",
+    "feedOrSiteUrl": "https://www.goldradiouk.com/feed/",
+    "sourceType": "Rss",
+    "trustTier": "Secondary",
+    "pollIntervalMinutes": 120,
+    "enabled": false,
+    "relevanceKeywords": "queen,freddie mercury,brian may,roger taylor"
+  }
+]

@@ -15,6 +15,7 @@
 - [ ] `dotnet restore QueenZone.sln`
 - [ ] `dotnet build QueenZone.sln --configuration Release --no-restore`
 - [ ] `dotnet test QueenZone.sln --configuration Release --no-build`
+- [ ] Coverage gate passed locally (`scripts/Test-CoverageGate.ps1` with `-BaseRef origin/main`; see `AGENTS.md`)
 
 ## Legacy database checks
 

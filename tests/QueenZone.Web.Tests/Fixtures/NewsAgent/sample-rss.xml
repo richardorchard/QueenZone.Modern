@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Queen Online</title>
+    <item>
+      <title>Queen announce 2026 tour</title>
+      <link>https://www.queenonline.com/news/tour-2026?utm_source=test</link>
+      <pubDate>2026-07-01T10:00:00Z</pubDate>
+      <description><![CDATA[Official tour dates announced.]]></description>
+    </item>
+    <item>
+      <title>Collector box set revealed</title>
+      <link>https://www.queenonline.com/news/box-set-2026</link>
+      <pubDate>2026-06-30T09:00:00Z</pubDate>
+      <description>Collector edition details.</description>
+    </item>
+  </channel>
+</rss>

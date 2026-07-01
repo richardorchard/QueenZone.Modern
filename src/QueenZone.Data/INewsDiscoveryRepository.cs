@@ -12,6 +12,8 @@ public interface INewsDiscoveryRepository
 
     Task<NewsCandidate?> GetCandidateByCanonicalUrlHashAsync(string canonicalUrlHash, CancellationToken cancellationToken = default);
 
+    Task<NewsCandidate?> GetCandidateByContentHashAsync(string contentHash, CancellationToken cancellationToken = default);
+
     Task<NewsCandidate?> GetCandidateByIdAsync(int candidateId, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<NewsCandidate>> GetCandidatesAsync(

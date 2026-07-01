@@ -26,6 +26,12 @@ public sealed class InMemoryNewsDiscoveryRepository(SharedNewsDiscoveryStore sto
         return Task.FromResult(candidate is null ? null : MapCandidate(candidate));
     }
 
+    public Task<NewsCandidate?> GetCandidateByContentHashAsync(string contentHash, CancellationToken cancellationToken = default)
+    {
+        var candidate = store.GetCandidateByContentHash(contentHash);
+        return Task.FromResult(candidate is null ? null : MapCandidate(candidate));
+    }
+
     public Task<NewsCandidate?> GetCandidateByIdAsync(int candidateId, CancellationToken cancellationToken = default)
     {
         var candidate = store.GetCandidateById(candidateId);

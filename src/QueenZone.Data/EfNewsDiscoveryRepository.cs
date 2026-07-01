@@ -93,6 +93,21 @@ public sealed class EfNewsDiscoveryRepository(QueenZoneDbContext dbContext) : IN
         return candidate is null ? null : MapCandidate(candidate);
     }
 
+    public async Task<NewsCandidate?> GetCandidateByContentHashAsync(string contentHash, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(contentHash))
+        {
+            return null;
+        }
+
+        var candidate = await dbContext.NewsCandidates
+            .AsNoTracking()
+            .Include(item => item.Source)
+            .SingleOrDefaultAsync(item => item.ContentHash == contentHash, cancellationToken);
+
+        return candidate is null ? null : MapCandidate(candidate);
+    }
+
     public async Task<NewsCandidate?> GetCandidateByIdAsync(int candidateId, CancellationToken cancellationToken = default)
     {
         var candidate = await dbContext.NewsCandidates
