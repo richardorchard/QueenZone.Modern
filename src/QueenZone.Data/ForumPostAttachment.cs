@@ -13,4 +13,15 @@ public sealed record ForumPostAttachment(string FileName, long? FileSizeBytes)
         < 1024 * 1024 => $"{FileSizeBytes / 1024.0:F1} KB",
         _ => $"{FileSizeBytes / (1024.0 * 1024.0):F1} MB"
     };
+
+    public static IReadOnlyList<ForumPostAttachment>? Parse(string? attachment, string? filesize)
+    {
+        if (string.IsNullOrWhiteSpace(attachment))
+        {
+            return null;
+        }
+
+        long? bytes = long.TryParse(filesize?.Trim(), out var parsed) ? parsed : null;
+        return [new ForumPostAttachment(attachment.Trim(), bytes)];
+    }
 }
