@@ -405,6 +405,7 @@ body.qz-menu-lock {
 }
 
 body.qz-menu-lock .qz-masthead {
+  -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
 
