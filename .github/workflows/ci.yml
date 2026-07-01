@@ -15,6 +15,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
@@ -39,6 +41,10 @@ jobs:
 
       - name: Add coverage summary
         run: cat coverage-report/SummaryGithub.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Enforce coverage gate
+        shell: pwsh
+        run: ./scripts/Test-CoverageGate.ps1 -Reports ./TestResults -GlobalLineThreshold 51 -ChangedLineThreshold 80
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v5
