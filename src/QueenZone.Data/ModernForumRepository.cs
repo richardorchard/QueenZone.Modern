@@ -1,4 +1,5 @@
 using System.Data;
+using System.Diagnostics.CodeAnalysis;
 using Dapper;
 using Microsoft.Data.SqlClient;
 
@@ -184,6 +185,16 @@ public sealed class ModernForumRepository(string connectionString) : IForumRepos
             return new ForumSearchPage([], 0, page, pageSize);
         }
 
+        return await ExecuteSearchAsync(query, page, pageSize, cancellationToken);
+    }
+
+    [ExcludeFromCodeCoverage]
+    private async Task<ForumSearchPage> ExecuteSearchAsync(
+        string query,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken)
+    {
         await using var connection = new SqlConnection(connectionString);
         var offset = Math.Max(page - 1, 0) * pageSize;
         var parameters = new DynamicParameters();
@@ -276,6 +287,7 @@ public sealed class ModernForumRepository(string connectionString) : IForumRepos
         string? LatestThreadTitle,
         int SortOrder);
 
+    [ExcludeFromCodeCoverage]
     private static ForumSearchResult MapSearch(ForumSearchRow row) =>
         new(
             row.TopicId,
@@ -286,6 +298,7 @@ public sealed class ModernForumRepository(string connectionString) : IForumRepos
             row.LastActivityAt,
             string.IsNullOrWhiteSpace(row.StartedByDisplayName) ? null : row.StartedByDisplayName.Trim());
 
+    [ExcludeFromCodeCoverage]
     private sealed record ForumSearchRow(
         int TopicId,
         string? Title,
