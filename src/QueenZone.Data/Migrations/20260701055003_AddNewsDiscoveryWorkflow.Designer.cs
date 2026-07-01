@@ -593,7 +593,7 @@ namespace QueenZone.Data.Migrations
                     b.HasOne("QueenZone.Data.Entities.NewsCandidateEntity", "Candidate")
                         .WithOne("Draft")
                         .HasForeignKey("QueenZone.Data.Entities.NewsAgentDraftEntity", "CandidateId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.ClientCascade)
                         .IsRequired();
 
                     b.Navigation("AiRun");
