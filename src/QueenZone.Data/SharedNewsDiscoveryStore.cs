@@ -175,6 +175,91 @@ public sealed class SharedNewsDiscoveryStore
         }
     }
 
+    public IReadOnlyList<NewsCandidateReviewListItem> ListCandidatesForReview(NewsCandidateListQuery query)
+    {
+        lock (sync)
+        {
+            IEnumerable<NewsCandidateEntity> queryable = candidates;
+            if (query.Status is not null)
+            {
+                queryable = queryable.Where(candidate => candidate.Status == query.Status);
+            }
+
+            if (query.SourceId is not null)
+            {
+                queryable = queryable.Where(candidate => candidate.SourceId == query.SourceId);
+            }
+
+            if (query.TrustTier is not null)
+            {
+                queryable = queryable.Where(candidate =>
+                {
+                    var source = sources.SingleOrDefault(item => item.Id == candidate.SourceId);
+                    return source?.TrustTier == query.TrustTier;
+                });
+            }
+
+            if (query.MinConfidence is not null)
+            {
+                queryable = queryable.Where(candidate =>
+                    candidate.ConfidenceScore is not null
+                    && candidate.ConfidenceScore >= query.MinConfidence);
+            }
+
+            if (query.DiscoveredFromUtc is not null)
+            {
+                queryable = queryable.Where(candidate => candidate.DiscoveredAt >= query.DiscoveredFromUtc);
+            }
+
+            if (query.DiscoveredToUtc is not null)
+            {
+                queryable = queryable.Where(candidate => candidate.DiscoveredAt < query.DiscoveredToUtc);
+            }
+
+            if (query.HasDraft == true)
+            {
+                queryable = queryable.Where(candidate => drafts.Any(draft => draft.CandidateId == candidate.Id));
+            }
+            else if (query.HasDraft == false)
+            {
+                queryable = queryable.Where(candidate => drafts.All(draft => draft.CandidateId != candidate.Id));
+            }
+
+            if (!string.IsNullOrWhiteSpace(query.Entity))
+            {
+                var entity = query.Entity.Trim();
+                queryable = queryable.Where(candidate =>
+                    aiRuns.Any(run =>
+                        run.CandidateId == candidate.Id
+                        && run.Kind == NewsAiRunKind.Triage
+                        && run.StructuredResultJson != null
+                        && run.StructuredResultJson.Contains(entity, StringComparison.OrdinalIgnoreCase)));
+            }
+
+            return queryable
+                .OrderByDescending(candidate => candidate.DiscoveredAt)
+                .ThenByDescending(candidate => candidate.Id)
+                .Select(candidate =>
+                {
+                    var source = sources.Single(item => item.Id == candidate.SourceId);
+                    var draft = drafts.SingleOrDefault(item => item.CandidateId == candidate.Id);
+                    return new NewsCandidateReviewListItem(
+                        candidate.Id,
+                        candidate.SourceTitle,
+                        candidate.SourceUrl,
+                        source.DisplayName,
+                        source.TrustTier,
+                        candidate.Status,
+                        candidate.RelevanceScore,
+                        candidate.ConfidenceScore,
+                        candidate.DiscoveredAt,
+                        candidate.DuplicateOfCandidateId,
+                        draft?.ProposedTitle);
+                })
+                .ToList();
+        }
+    }
+
     public int CreateCandidate(NewsCandidateCreateRequest request)
     {
         lock (sync)

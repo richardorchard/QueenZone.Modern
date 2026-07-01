@@ -1,0 +1,150 @@
+@page "/admin/news-discovery/{id:int}"
+@model ReviewModel
+
+@if (Model.Candidate is null)
+{
+  <p>Candidate not found.</p>
+}
+else
+{
+  var candidate = Model.Candidate;
+  <h1>Review candidate #@candidate.Id</h1>
+  <p><a href="/admin/news-discovery">Back to review queue</a></p>
+
+  <section class="admin-review-section">
+    <h2>Source item</h2>
+    <dl class="admin-review-meta">
+      <dt>Title</dt>
+      <dd>@candidate.SourceTitle</dd>
+      <dt>Source URL</dt>
+      <dd><a href="@candidate.SourceUrl" rel="noopener noreferrer" target="_blank">@candidate.SourceUrl</a></dd>
+      <dt>Source</dt>
+      <dd>@candidate.SourceDisplayName (@NewsDiscoveryStatusLabels.FormatTrustTier(candidate.SourceTrustTier))</dd>
+      <dt>Status</dt>
+      <dd>@NewsDiscoveryStatusLabels.Format(candidate.Status)</dd>
+      <dt>Discovered</dt>
+      <dd>@candidate.DiscoveredAt.ToString("dd MMM yyyy HH:mm") UTC</dd>
+      <dt>Published</dt>
+      <dd>@(candidate.SourcePublishedAt?.ToString("dd MMM yyyy") ?? "Unknown")</dd>
+      <dt>Scores</dt>
+      <dd>Relevance @(candidate.RelevanceScore?.ToString("0.00") ?? "—"), confidence @(candidate.ConfidenceScore?.ToString("0.00") ?? "—")</dd>
+      @if (!string.IsNullOrWhiteSpace(candidate.ReviewNotes))
+      {
+        <dt>Review notes</dt>
+        <dd>@candidate.ReviewNotes</dd>
+      }
+      @if (Model.DuplicateCandidate is not null)
+      {
+        <dt>Duplicate of</dt>
+        <dd><a href="/admin/news-discovery/@Model.DuplicateCandidate.Id">Candidate #@Model.DuplicateCandidate.Id — @Model.DuplicateCandidate.SourceTitle</a></dd>
+      }
+      @if (candidate.PromotedNewsId is int promotedNewsId)
+      {
+        <dt>Promoted article</dt>
+        <dd><a href="/admin/news/@promotedNewsId/edit">Admin news #@promotedNewsId</a></dd>
+      }
+    </dl>
+  </section>
+
+  @if (Model.LatestTriageSummary is not null)
+  {
+    <section class="admin-review-section">
+      <h2>AI triage</h2>
+      <dl class="admin-review-meta">
+        @if (!string.IsNullOrWhiteSpace(Model.LatestTriageSummary.Verdict))
+        {
+          <dt>Verdict</dt>
+          <dd>@Model.LatestTriageSummary.Verdict</dd>
+        }
+        <dt>Rationale</dt>
+        <dd>@Model.LatestTriageSummary.Rationale</dd>
+        @if (Model.LatestTriageSummary.Entities.Count > 0)
+        {
+          <dt>Entities</dt>
+          <dd>@string.Join(", ", Model.LatestTriageSummary.Entities)</dd>
+        }
+        @if (!string.IsNullOrWhiteSpace(Model.LatestTriageSummary.ReviewNotes))
+        {
+          <dt>AI review notes</dt>
+          <dd>@Model.LatestTriageSummary.ReviewNotes</dd>
+        }
+      </dl>
+    </section>
+  }
+
+  @if (Model.Evidence.Count > 0)
+  {
+    <section class="admin-review-section">
+      <h2>Evidence</h2>
+      <ul class="admin-review-list">
+        @foreach (var item in Model.Evidence)
+        {
+          <li>
+            <a href="@item.SourceUrl" rel="noopener noreferrer" target="_blank">@item.FetchedTitle</a>
+            <span class="admin-muted">(@item.SourceName, @item.FetchedAt.ToString("dd MMM yyyy"))</span>
+            @if (!string.IsNullOrWhiteSpace(item.Excerpt))
+            {
+              <p>@item.Excerpt</p>
+            }
+          </li>
+        }
+      </ul>
+    </section>
+  }
+
+  @if (Model.Draft is not null)
+  {
+    <section class="admin-review-section">
+      <h2>Generated draft</h2>
+      <dl class="admin-review-meta">
+        <dt>Title</dt>
+        <dd>@Model.Draft.ProposedTitle</dd>
+        <dt>Excerpt</dt>
+        <dd>@Model.Draft.ProposedExcerpt</dd>
+        <dt>Body</dt>
+        <dd><pre class="admin-review-pre">@Model.Draft.ProposedBody</pre></dd>
+        @if (!string.IsNullOrWhiteSpace(Model.Draft.AttributionText))
+        {
+          <dt>Attribution</dt>
+          <dd>@Model.Draft.AttributionText</dd>
+        }
+        @if (!string.IsNullOrWhiteSpace(Model.Draft.SourceNotes))
+        {
+          <dt>Source notes</dt>
+          <dd>@Model.Draft.SourceNotes</dd>
+        }
+        @if (!string.IsNullOrWhiteSpace(Model.Draft.ConfidenceNotes))
+        {
+          <dt>Confidence notes</dt>
+          <dd>@Model.Draft.ConfidenceNotes</dd>
+        }
+      </dl>
+      <p><a href="/admin/news-discovery/@candidate.Id/edit-draft">Edit draft</a></p>
+    </section>
+  }
+  else
+  {
+    <section class="admin-review-section">
+      <h2>Generated draft</h2>
+      <p>No draft yet. Run the news agent worker with <code>--draft-only</code> to generate one.</p>
+    </section>
+  }
+
+  <section class="admin-review-section">
+    <h2>Actions</h2>
+    <div class="admin-actions">
+      @if (Model.Draft is not null)
+      {
+        <partial name="_PostAction" model="@(new PostActionViewModel($"/admin/news-discovery/{candidate.Id}/promote", "Promote to admin news"))" />
+      }
+      @if (candidate.Status is not QueenZone.Data.NewsCandidateStatus.Rejected)
+      {
+        <partial name="_PostAction" model="@(new PostActionViewModel($"/admin/news-discovery/{candidate.Id}/reject", "Mark not relevant", Confirm: true))" />
+      }
+      @if (candidate.Status is not QueenZone.Data.NewsCandidateStatus.IgnoredDuplicate)
+      {
+        <partial name="_PostAction" model="@(new PostActionViewModel($"/admin/news-discovery/{candidate.Id}/ignore-duplicate", "Ignore duplicate", Confirm: true))" />
+      }
+    </div>
+  </section>
+}

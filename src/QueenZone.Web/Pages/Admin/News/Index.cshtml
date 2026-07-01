@@ -8,7 +8,11 @@
 else
 {
   <h1>Admin news</h1>
-  <p><a href="/admin/news/new">Create article</a></p>
+  <p>
+    <a href="/admin/news/new">Create article</a>
+    <span aria-hidden="true"> · </span>
+    <a href="/admin/news-discovery">Review discovered candidates</a>
+  </p>
 
   @if (Model.Articles.Count == 0)
   {

@@ -59,6 +59,11 @@ public sealed class InMemoryNewsDiscoveryRepository(SharedNewsDiscoveryStore sto
         CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<NewsCandidate>>(store.GetCandidates(status, sourceId).Select(MapCandidate).ToList());
 
+    public Task<IReadOnlyList<NewsCandidateReviewListItem>> ListCandidatesForReviewAsync(
+        NewsCandidateListQuery query,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<NewsCandidateReviewListItem>>(store.ListCandidatesForReview(query));
+
     public Task<int> CreateCandidateAsync(NewsCandidateCreateRequest request, CancellationToken cancellationToken = default) =>
         Task.FromResult(store.CreateCandidate(request));
 

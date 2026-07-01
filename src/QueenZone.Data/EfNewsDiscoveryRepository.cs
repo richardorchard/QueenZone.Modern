@@ -186,6 +186,86 @@ public sealed class EfNewsDiscoveryRepository(QueenZoneDbContext dbContext) : IN
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<NewsCandidateReviewListItem>> ListCandidatesForReviewAsync(
+        NewsCandidateListQuery query,
+        CancellationToken cancellationToken = default)
+    {
+        var candidates = dbContext.NewsCandidates.AsNoTracking().Include(item => item.Source).AsQueryable();
+        if (query.Status is not null)
+        {
+            candidates = candidates.Where(candidate => candidate.Status == query.Status);
+        }
+
+        if (query.SourceId is not null)
+        {
+            candidates = candidates.Where(candidate => candidate.SourceId == query.SourceId);
+        }
+
+        if (query.TrustTier is not null)
+        {
+            candidates = candidates.Where(candidate => candidate.Source.TrustTier == query.TrustTier);
+        }
+
+        if (query.MinConfidence is not null)
+        {
+            candidates = candidates.Where(candidate =>
+                candidate.ConfidenceScore != null
+                && candidate.ConfidenceScore >= query.MinConfidence);
+        }
+
+        if (query.DiscoveredFromUtc is not null)
+        {
+            candidates = candidates.Where(candidate => candidate.DiscoveredAt >= query.DiscoveredFromUtc);
+        }
+
+        if (query.DiscoveredToUtc is not null)
+        {
+            candidates = candidates.Where(candidate => candidate.DiscoveredAt < query.DiscoveredToUtc);
+        }
+
+        if (query.HasDraft == true)
+        {
+            candidates = candidates.Where(candidate =>
+                dbContext.NewsAgentDrafts.Any(draft => draft.CandidateId == candidate.Id));
+        }
+        else if (query.HasDraft == false)
+        {
+            candidates = candidates.Where(candidate =>
+                !dbContext.NewsAgentDrafts.Any(draft => draft.CandidateId == candidate.Id));
+        }
+
+        if (!string.IsNullOrWhiteSpace(query.Entity))
+        {
+            var entity = query.Entity.Trim();
+            candidates = candidates.Where(candidate =>
+                dbContext.NewsAiRuns.Any(run =>
+                    run.CandidateId == candidate.Id
+                    && run.Kind == NewsAiRunKind.Triage
+                    && run.StructuredResultJson != null
+                    && run.StructuredResultJson.Contains(entity)));
+        }
+
+        return await candidates
+            .OrderByDescending(candidate => candidate.DiscoveredAt)
+            .ThenByDescending(candidate => candidate.Id)
+            .Select(candidate => new NewsCandidateReviewListItem(
+                candidate.Id,
+                candidate.SourceTitle,
+                candidate.SourceUrl,
+                candidate.Source.DisplayName,
+                candidate.Source.TrustTier,
+                candidate.Status,
+                candidate.RelevanceScore,
+                candidate.ConfidenceScore,
+                candidate.DiscoveredAt,
+                candidate.DuplicateOfCandidateId,
+                dbContext.NewsAgentDrafts
+                    .Where(draft => draft.CandidateId == candidate.Id)
+                    .Select(draft => draft.ProposedTitle)
+                    .FirstOrDefault()))
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<int> CreateCandidateAsync(NewsCandidateCreateRequest request, CancellationToken cancellationToken = default)
     {
         var source = await dbContext.NewsDiscoverySources
