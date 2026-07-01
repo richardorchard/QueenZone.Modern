@@ -3,7 +3,9 @@ namespace QueenZone.NewsAgent;
 public sealed record DiscoverNewsCommandOptions(
     bool SeedSources,
     bool DryRun,
-    bool Force)
+    bool Force,
+    bool Triage,
+    bool TriageOnly)
 {
     public static DiscoverNewsCommandOptions? Parse(string[] args)
     {
@@ -15,6 +17,8 @@ public sealed record DiscoverNewsCommandOptions(
         var seedSources = false;
         var dryRun = false;
         var force = false;
+        var triage = false;
+        var triageOnly = false;
         for (var index = 1; index < args.Length; index++)
         {
             switch (args[index].ToLowerInvariant())
@@ -30,11 +34,18 @@ public sealed record DiscoverNewsCommandOptions(
                 case "--force":
                     force = true;
                     break;
+                case "--triage":
+                    triage = true;
+                    break;
+                case "--triage-only":
+                    triage = true;
+                    triageOnly = true;
+                    break;
                 default:
                     return null;
             }
         }
 
-        return new DiscoverNewsCommandOptions(seedSources, dryRun, force);
+        return new DiscoverNewsCommandOptions(seedSources, dryRun, force, triage, triageOnly);
     }
 }

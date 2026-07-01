@@ -11,6 +11,12 @@ public sealed class InMemoryNewsDiscoveryRepository(SharedNewsDiscoveryStore sto
         return Task.FromResult(source is null ? null : MapSource(source));
     }
 
+    public Task<NewsDiscoverySource?> GetSourceByIdAsync(int sourceId, CancellationToken cancellationToken = default)
+    {
+        var source = store.GetSourceById(sourceId);
+        return Task.FromResult(source is null ? null : MapSource(source));
+    }
+
     public Task<int> UpsertSourceAsync(NewsDiscoverySourceDraft source, CancellationToken cancellationToken = default) =>
         Task.FromResult(store.UpsertSource(source));
 
@@ -31,6 +37,15 @@ public sealed class InMemoryNewsDiscoveryRepository(SharedNewsDiscoveryStore sto
         var candidate = store.GetCandidateByContentHash(contentHash);
         return Task.FromResult(candidate is null ? null : MapCandidate(candidate));
     }
+
+    public Task<NewsCandidate?> FindEarlierDuplicateCandidateAsync(
+        int candidateId,
+        string sourceTitle,
+        string? contentHash,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(store.FindEarlierDuplicateCandidate(candidateId, sourceTitle, contentHash) is { } candidate
+            ? MapCandidate(candidate)
+            : null);
 
     public Task<NewsCandidate?> GetCandidateByIdAsync(int candidateId, CancellationToken cancellationToken = default)
     {

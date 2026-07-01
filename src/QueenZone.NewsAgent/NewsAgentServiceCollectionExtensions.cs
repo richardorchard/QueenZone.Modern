@@ -39,13 +39,19 @@ public static class NewsAgentServiceCollectionExtensions
                     }
                 })
                 .ValidateOnStart();
+
+            services.AddOptions<NewsTriageOptions>()
+                .Bind(configuration.GetSection(NewsTriageOptions.SectionName))
+                .ValidateOnStart();
         }
         else
         {
             services.AddOptions<OpenRouterOptions>();
+            services.AddOptions<NewsTriageOptions>();
         }
 
         services.AddSingleton<IValidateOptions<OpenRouterOptions>, OpenRouterOptionsValidator>();
+        services.AddSingleton<IValidateOptions<NewsTriageOptions>, NewsTriageOptionsValidator>();
         services.AddHttpClient<INewsAiClient, OpenRouterNewsAiClient>((serviceProvider, client) =>
         {
             var options = serviceProvider.GetRequiredService<IOptions<OpenRouterOptions>>().Value;
@@ -53,6 +59,8 @@ public static class NewsAgentServiceCollectionExtensions
         });
         services.AddScoped<NewsAiBudgetGuard>();
         services.AddScoped<NewsAiRunExecutor>();
+        services.AddScoped<NewsTriageDeterministicAnalyzer>();
+        services.AddScoped<NewsTriageService>();
 
         return services;
     }
