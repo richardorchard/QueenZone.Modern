@@ -105,6 +105,19 @@ public sealed class SharedNewsDiscoveryStore
         }
     }
 
+    public NewsCandidateEntity? GetCandidateByContentHash(string contentHash)
+    {
+        if (string.IsNullOrWhiteSpace(contentHash))
+        {
+            return null;
+        }
+
+        lock (sync)
+        {
+            return candidates.SingleOrDefault(candidate => candidate.ContentHash == contentHash);
+        }
+    }
+
     public NewsCandidateEntity? GetCandidateById(int candidateId)
     {
         lock (sync)
