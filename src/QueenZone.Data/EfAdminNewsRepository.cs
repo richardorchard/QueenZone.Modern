@@ -5,61 +5,30 @@ namespace QueenZone.Data;
 
 public sealed class EfAdminNewsRepository(QueenZoneDbContext dbContext) : IAdminNewsRepository
 {
-    private const string LatestNewsSql = """
-        WITH LatestNews AS (
-            SELECT
-                NEWS_ID,
-                TITLE,
-                EXCERPT,
-                ARTICLE,
-                [DATE],
-                SOURCE_URL,
-                DISPLAY,
-                SLUG,
-                CREATED_AT,
-                UPDATED_AT,
-                EDITOR_EMAIL,
-                USER_ID,
-                TYPE,
-                QUEEN_ONLINE,
-                ROW_NUMBER() OVER (PARTITION BY NEWS_ID ORDER BY [DATE] DESC, NEWS_ID DESC) AS RowNumber
-            FROM NEWS_T
-        )
-        SELECT
-            NEWS_ID AS NewsId,
-            TITLE AS Title,
-            ISNULL(EXCERPT, '') AS Excerpt,
-            ISNULL(ARTICLE, '') AS Body,
-            [DATE] AS PublishedAt,
-            SOURCE_URL AS SourceUrl,
-            CAST(CASE WHEN DISPLAY = 1 THEN 1 ELSE 0 END AS bit) AS IsPublished,
-            SLUG AS Slug,
-            CREATED_AT AS CreatedAt,
-            UPDATED_AT AS UpdatedAt,
-            EDITOR_EMAIL AS EditorEmail,
-            USER_ID AS UserId,
-            TYPE AS Type,
-            QUEEN_ONLINE AS QueenOnline
-        FROM LatestNews
-        WHERE RowNumber = 1
-        """;
+    private readonly string latestNewsSql = LegacyNewsSchema.BuildAdminLatestNewsSql(
+        LegacyNewsSchema.GetNewsColumnAvailability(dbContext.Database.GetConnectionString()
+            ?? throw new InvalidOperationException("QueenZone legacy database connection string is not configured.")));
 
     public async Task<IReadOnlyList<AdminNewsArticle>> GetAllAsync(CancellationToken cancellationToken = default)
     {
+#pragma warning disable EF1003 // SQL is generated from fixed schema-detection branches, not user input.
         var rows = await dbContext.NewsRows
-            .FromSqlRaw($"{LatestNewsSql} ORDER BY PublishedAt DESC, NewsId DESC")
+            .FromSqlRaw(latestNewsSql + " ORDER BY PublishedAt DESC, NewsId DESC")
             .AsNoTracking()
             .ToListAsync(cancellationToken);
+#pragma warning restore EF1003
 
         return rows.Select(NewsTableRowMapper.ToAdminArticle).ToList();
     }
 
     public async Task<AdminNewsArticle?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
+#pragma warning disable EF1003 // SQL is generated from fixed schema-detection branches, not user input.
         var row = await dbContext.NewsRows
-            .FromSqlRaw($"{LatestNewsSql} AND NEWS_ID = {{0}}", id)
+            .FromSqlRaw(latestNewsSql + " AND NEWS_ID = {0}", id)
             .AsNoTracking()
             .SingleOrDefaultAsync(cancellationToken);
+#pragma warning restore EF1003
 
         return row is null ? null : NewsTableRowMapper.ToAdminArticle(row);
     }

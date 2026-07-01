@@ -161,9 +161,11 @@ dotnet ef database update --project src/QueenZone.Data/QueenZone.Data.csproj --s
 
 Public news reads still use Dapper. Admin writes and audit logging use EF Core (`QueenZoneDbContext`).
 
-### Admin authentication (Microsoft Entra ID)
+### Admin authentication
 
-Admin routes require Microsoft Entra ID sign-in and an allowed admin email address.
+Admin routes require a signed-in user whose email address is listed in `Admin:AllowedEmails`.
+The signed-in identity may come from the site OAuth member login (Google, Microsoft, or Facebook)
+or from the dedicated Microsoft Entra ID admin sign-in when Entra is configured.
 
 1. Create an Entra app registration for `QueenZone.Web`.
 2. Add a web redirect URI such as `https://queenzone-dev.azurewebsites.net/signin-oidc`.
@@ -180,7 +182,7 @@ Admin__AllowedEmails__1
 
 Use `src/QueenZone.Web/appsettings.Local.json` for local Entra values. If `AzureAd:ClientId` is empty locally, the app falls back to test-header authentication for development only.
 
-For automated tests, send `X-Test-User-Email` with an allowed admin email address.
+For automated tests, send `X-Test-User-Email` with an allowed admin email address, or sign in through the OAuth callback test double with an allowlisted email.
 
 Member sign-in at `/account/login` (Google, Microsoft, Facebook OAuth) is separate from admin access. Stripping member OAuth does not remove the admin requirement: admins still need Entra sign-in in production, or the test-header fallback locally as described above.
 

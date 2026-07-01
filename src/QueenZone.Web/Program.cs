@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -66,7 +67,8 @@ ConfigureAuthentication(builder);
 builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("Admin", policy =>
-        policy.RequireAuthenticatedUser()
+        policy.AddAuthenticationSchemes(AdminAuthenticationSchemes.CompositeScheme)
+            .RequireAuthenticatedUser()
             .RequireAssertion(context => IsAdminEmail(context.User, builder.Configuration)));
 
     options.AddPolicy(MemberAuthenticationSchemes.MemberPolicy, policy =>
@@ -146,9 +148,15 @@ app.Run();
 
 static void ConfigureAuthentication(WebApplicationBuilder builder)
 {
+    var azureAdSection = builder.Configuration.GetSection("AzureAd");
+    var clientId = azureAdSection["ClientId"];
+    var useAzureAd = !builder.Environment.IsEnvironment("Testing") && !string.IsNullOrWhiteSpace(clientId);
+
     if (builder.Environment.IsEnvironment("Testing"))
     {
         builder.Services.AddAuthentication(TestAuthHandler.SchemeName)
+            .AddPolicyScheme(AdminAuthenticationSchemes.CompositeScheme, null, options =>
+                ConfigureAdminAuthenticationScheme(options, useAzureAd: false))
             .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestAuthHandler.SchemeName, null)
             // A real (not test-shortcut) cookie scheme: native register/sign-in pages call
             // SignInAsync, which requires a handler that actually implements sign-in, and a
@@ -161,13 +169,12 @@ static void ConfigureAuthentication(WebApplicationBuilder builder)
         return;
     }
 
-    var azureAdSection = builder.Configuration.GetSection("AzureAd");
-    var clientId = azureAdSection["ClientId"];
-
     if (string.IsNullOrWhiteSpace(clientId))
     {
         builder.Services
             .AddAuthentication(TestAuthHandler.SchemeName)
+            .AddPolicyScheme(AdminAuthenticationSchemes.CompositeScheme, null, options =>
+                ConfigureAdminAuthenticationScheme(options, useAzureAd: false))
             .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestAuthHandler.SchemeName, null);
     }
     else
@@ -175,12 +182,30 @@ static void ConfigureAuthentication(WebApplicationBuilder builder)
         builder.Services
             .AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
             .AddMicrosoftIdentityWebApp(builder.Configuration);
+
+        builder.Services.AddAuthentication()
+            .AddPolicyScheme(AdminAuthenticationSchemes.CompositeScheme, null, options =>
+                ConfigureAdminAuthenticationScheme(options, useAzureAd: true));
     }
 
     // A second AddAuthentication() call doesn't reset the default scheme set above; it just
     // returns a plain AuthenticationBuilder bound to the same AuthenticationOptions so the
     // member schemes can be chained on without fighting Microsoft.Identity.Web's own builder type.
     ConfigureMemberAuthentication(builder, builder.Services.AddAuthentication());
+}
+
+static void ConfigureAdminAuthenticationScheme(PolicySchemeOptions options, bool useAzureAd)
+{
+    options.ForwardDefaultSelector = context =>
+        context.Request.Cookies.ContainsKey(AdminAuthenticationSchemes.MemberCookieName)
+            ? MemberAuthenticationSchemes.MembersCookie
+            : useAzureAd
+                ? CookieAuthenticationDefaults.AuthenticationScheme
+                : TestAuthHandler.SchemeName;
+
+    options.ForwardChallenge = useAzureAd
+        ? MemberAuthenticationSchemes.MembersCookie
+        : TestAuthHandler.SchemeName;
 }
 
 static void ConfigureMemberAuthentication(WebApplicationBuilder builder, AuthenticationBuilder authenticationBuilder)

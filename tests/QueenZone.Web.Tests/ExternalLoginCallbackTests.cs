@@ -71,6 +71,28 @@ public sealed class ExternalLoginCallbackTests : IClassFixture<WebApplicationFac
         Assert.Equal(HttpStatusCode.OK, probeResponse.StatusCode);
     }
 
+    [Theory]
+    [InlineData("me@richardorchard.com")]
+    [InlineData("richard@thinkingwebsites.com.au")]
+    public async Task Callback_WithAllowedAdminEmail_GrantsAdminAccess(string email)
+    {
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            HandleCookies = true,
+            AllowAutoRedirect = false,
+        });
+        client.DefaultRequestHeaders.Add(ExternalCookieTestHandler.ProviderHeader, "Google");
+        client.DefaultRequestHeaders.Add(ExternalCookieTestHandler.SubjectHeader, "google-admin-subject");
+        client.DefaultRequestHeaders.Add(ExternalCookieTestHandler.EmailHeader, email);
+        client.DefaultRequestHeaders.Add(ExternalCookieTestHandler.NameHeader, "Richard Orchard");
+
+        var callbackResponse = await client.GetAsync("/account/external-login-callback");
+        Assert.Equal(HttpStatusCode.Redirect, callbackResponse.StatusCode);
+
+        var adminResponse = await client.GetAsync("/admin/news");
+        Assert.Equal(HttpStatusCode.OK, adminResponse.StatusCode);
+    }
+
     [Fact]
     public async Task Callback_WithValidExternalCookie_HonoursSafeReturnUrl()
     {
