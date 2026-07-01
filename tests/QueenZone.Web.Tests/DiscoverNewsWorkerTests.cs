@@ -277,6 +277,7 @@ public sealed class DiscoverNewsWorkerTests
                 repository,
                 new DiscoverNewsWorkerTestsFakeAiClient(aiEnabled, draftJson)),
             CreateExecutor(repository, aiEnabled),
+            repository,
             leaseService ?? new InMemoryNewsAgentRunLeaseService(new SharedNewsAgentLeaseStore()),
             Options.Create(new OpenRouterOptions
             {
