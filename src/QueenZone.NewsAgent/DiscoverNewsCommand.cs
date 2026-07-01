@@ -52,6 +52,11 @@ public sealed record DiscoverNewsCommandOptions(
                     draft = true;
                     draftOnly = true;
                     break;
+                case "--scheduled":
+                    seedSources = true;
+                    triage = true;
+                    draft = true;
+                    break;
                 default:
                     return null;
             }

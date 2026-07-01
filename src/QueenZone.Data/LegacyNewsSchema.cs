@@ -75,8 +75,8 @@ public static class LegacyNewsSchema
                     {updatedAtProjection},
                     {editorEmailProjection},
                     USER_ID,
-                    ISNULL(TYPE, 0) AS TYPE,
-                    ISNULL(QUEEN_ONLINE, 0) AS QUEEN_ONLINE,
+                    CAST(ISNULL(TYPE, 0) AS int) AS TYPE,
+                    CAST(ISNULL(QUEEN_ONLINE, 0) AS int) AS QUEEN_ONLINE,
                     ROW_NUMBER() OVER (PARTITION BY NEWS_ID ORDER BY [DATE] DESC, NEWS_ID DESC) AS RowNumber
                 FROM NEWS_T
             )
@@ -86,13 +86,15 @@ public static class LegacyNewsSchema
                 EXCERPT,
                 ARTICLE,
                 [DATE],
+                [DATE] AS PublishedAt,
                 SOURCE_URL,
-                CAST(CASE WHEN DISPLAY = 1 THEN 1 ELSE 0 END AS bit) AS DISPLAY,
+                CASE WHEN DISPLAY = 1 THEN 1 ELSE 0 END AS DISPLAY,
                 SLUG,
                 CREATED_AT,
                 UPDATED_AT,
                 EDITOR_EMAIL,
                 USER_ID,
+                NEWS_ID AS NewsId,
                 TYPE,
                 QUEEN_ONLINE
             FROM LatestNews
