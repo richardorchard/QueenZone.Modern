@@ -324,6 +324,70 @@ public sealed class EfNewsDiscoveryRepositoryTests : IAsyncDisposable
         Assert.Equal(firstId, duplicate.Id);
     }
 
+    [Fact]
+    public async Task ListCandidatesForReview_filters_by_status_draft_and_entity()
+    {
+        var sourceId = await repository.UpsertSourceAsync(new NewsDiscoverySourceDraft(
+            "queen-online",
+            "Queen Online",
+            "https://www.queenonline.com/",
+            null,
+            NewsDiscoverySourceType.Rss,
+            NewsDiscoveryTrustTier.Primary,
+            60,
+            true,
+            null));
+        var discoveredAt = DateTime.UtcNow;
+        var candidateId = await repository.CreateCandidateAsync(new NewsCandidateCreateRequest(
+            sourceId,
+            "https://www.queenonline.com/news/ef-filter-test",
+            "Queen EF filter test",
+            discoveredAt,
+            "Excerpt",
+            discoveredAt));
+        await repository.TryUpdateCandidateStatusAsync(
+            candidateId,
+            new NewsCandidateStatusUpdate(
+                NewsCandidateStatus.NeedsReview,
+                ConfidenceScore: 0.91m));
+        await repository.UpsertDraftAsync(candidateId, new NewsAgentDraftUpsert(
+            "EF filtered draft",
+            null,
+            "Excerpt",
+            "Body",
+            null,
+            null,
+            null,
+            null,
+            null));
+        var aiRunId = await repository.CreateAiRunAsync(new NewsAiRunCreateRequest(
+            candidateId,
+            NewsAiRunKind.Triage,
+            "openrouter",
+            "openai/gpt-4.1-nano",
+            "triage-v1",
+            discoveredAt));
+        await repository.CompleteAiRunAsync(aiRunId, new NewsAiRunCompletion(
+            NewsAiRunStatus.Succeeded,
+            10,
+            10,
+            0.0001m,
+            """{"rationale":"Roger Taylor mentioned.","entities":["Roger Taylor"]}""",
+            null,
+            discoveredAt));
+
+        var matches = await repository.ListCandidatesForReviewAsync(new NewsCandidateListQuery(
+            Status: NewsCandidateStatus.NeedsReview,
+            TrustTier: NewsDiscoveryTrustTier.Primary,
+            HasDraft: true,
+            Entity: "Roger Taylor",
+            MinConfidence: 0.9m));
+
+        Assert.Single(matches);
+        Assert.Equal(candidateId, matches[0].Id);
+        Assert.Equal("EF filtered draft", matches[0].DraftTitle);
+    }
+
     public async ValueTask DisposeAsync()
     {
         await dbContext.DisposeAsync();

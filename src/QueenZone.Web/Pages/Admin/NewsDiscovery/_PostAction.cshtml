@@ -1,0 +1,7 @@
+@model QueenZone.Web.Pages.Admin.NewsDiscovery.PostActionViewModel
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+
+<form method="post" action="@Model.Action" class="admin-inline-form" onsubmit="@(Model.Confirm ? "return confirm('Are you sure?');" : null)">
+  <input type="hidden" name="@AdminNewsDiscoveryPageModel.AntiforgeryTokenFieldName" value="@Antiforgery.GetAndStoreTokens(Context).RequestToken">
+  <button type="submit">@Model.Label</button>
+</form>

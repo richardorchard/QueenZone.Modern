@@ -331,4 +331,68 @@ public sealed class NewsDiscoveryRepositoryTests
                 "Excerpt",
                 discoveredAt)));
     }
+
+    [Fact]
+    public async Task ListCandidatesForReview_filters_by_status_draft_and_entity()
+    {
+        var repository = CreateRepository();
+        var sourceId = await repository.UpsertSourceAsync(new NewsDiscoverySourceDraft(
+            "queen-online",
+            "Queen Online",
+            "https://www.queenonline.com/",
+            null,
+            NewsDiscoverySourceType.Rss,
+            NewsDiscoveryTrustTier.Primary,
+            60,
+            true,
+            null));
+        var discoveredAt = DateTime.UtcNow;
+        var candidateId = await repository.CreateCandidateAsync(new NewsCandidateCreateRequest(
+            sourceId,
+            "https://www.queenonline.com/news/filter-test",
+            "Queen filter test",
+            discoveredAt,
+            "Excerpt",
+            discoveredAt));
+        await repository.TryUpdateCandidateStatusAsync(
+            candidateId,
+            new NewsCandidateStatusUpdate(
+                NewsCandidateStatus.NeedsReview,
+                ConfidenceScore: 0.82m));
+        await repository.UpsertDraftAsync(candidateId, new NewsAgentDraftUpsert(
+            "Filtered draft title",
+            null,
+            "Excerpt",
+            "Body",
+            null,
+            null,
+            null,
+            null,
+            null));
+        var aiRunId = await repository.CreateAiRunAsync(new NewsAiRunCreateRequest(
+            candidateId,
+            NewsAiRunKind.Triage,
+            "openrouter",
+            "openai/gpt-4.1-nano",
+            "triage-v1",
+            discoveredAt));
+        await repository.CompleteAiRunAsync(aiRunId, new NewsAiRunCompletion(
+            NewsAiRunStatus.Succeeded,
+            10,
+            10,
+            0.0001m,
+            """{"rationale":"Brian May mentioned.","entities":["Brian May"]}""",
+            null,
+            discoveredAt));
+
+        var matches = await repository.ListCandidatesForReviewAsync(new NewsCandidateListQuery(
+            Status: NewsCandidateStatus.NeedsReview,
+            HasDraft: true,
+            Entity: "Brian May",
+            MinConfidence: 0.8m));
+
+        Assert.Single(matches);
+        Assert.Equal(candidateId, matches[0].Id);
+        Assert.Equal("Filtered draft title", matches[0].DraftTitle);
+    }
 }

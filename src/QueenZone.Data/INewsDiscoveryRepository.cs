@@ -29,6 +29,10 @@ public interface INewsDiscoveryRepository
         int? sourceId = null,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<NewsCandidateReviewListItem>> ListCandidatesForReviewAsync(
+        NewsCandidateListQuery query,
+        CancellationToken cancellationToken = default);
+
     Task<int> CreateCandidateAsync(NewsCandidateCreateRequest request, CancellationToken cancellationToken = default);
 
     Task<bool> TryUpdateCandidateStatusAsync(
