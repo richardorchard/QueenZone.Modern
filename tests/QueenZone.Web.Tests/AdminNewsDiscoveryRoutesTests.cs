@@ -2,9 +2,11 @@ using System.Net;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using QueenZone.Data;
+using QueenZone.NewsAgent;
 using QueenZone.Web;
 using QueenZone.Web.Pages.Admin.NewsDiscovery;
 
@@ -79,6 +81,26 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
         Assert.NotNull(promotedCandidate);
         Assert.Equal(NewsCandidateStatus.PromotedToArticle, promotedCandidate.Status);
         Assert.Equal(articleId, promotedCandidate.PromotedNewsId);
+    }
+
+    [Fact]
+    public async Task AuthorizedAdminCanRegenerateDraftFromReviewPage()
+    {
+        var discoveryStore = new SharedNewsDiscoveryStore();
+        var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
+        var candidateId = await SeedDraftedCandidateAsync(discoveryRepository);
+        var client = CreateClient(AdminEmail, new SharedNewsStore(), discoveryStore);
+
+        var response = await PostActionAsync(client, $"/admin/news-discovery/{candidateId}/regeneratedraft", candidateId);
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+
+        var reviewBody = await client.GetStringAsync($"/admin/news-discovery/{candidateId}");
+        Assert.Contains("Draft regenerated successfully", reviewBody);
+        Assert.Contains("Queen announce 2026 tour", reviewBody);
+
+        var draft = await discoveryRepository.GetDraftByCandidateIdAsync(candidateId);
+        Assert.NotNull(draft);
+        Assert.Equal("Queen announce 2026 tour", draft.ProposedTitle);
     }
 
     [Fact]
@@ -437,6 +459,14 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
 
     private WebApplicationFactory<Program> CreateFactory(SharedNewsStore newsStore, SharedNewsDiscoveryStore discoveryStore) =>
         factory.WithWebHostBuilder(builder =>
+        {
+            builder.ConfigureAppConfiguration((_, config) =>
+            {
+                config.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["OpenRouter:ApiKey"] = "test-key"
+                });
+            });
             builder.ConfigureServices(services =>
             {
                 services.RemoveAll<SharedNewsStore>();
@@ -445,13 +475,16 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
                 services.RemoveAll<IAdminNewsRepository>();
                 services.RemoveAll<INewsAuditRepository>();
                 services.RemoveAll<INewsDiscoveryRepository>();
+                services.RemoveAll<INewsAiClient>();
                 services.AddSingleton(newsStore);
                 services.AddSingleton(discoveryStore);
                 services.AddSingleton<INewsRepository>(_ => new QueenZone.Data.InMemoryNewsRepository(newsStore));
                 services.AddSingleton<IAdminNewsRepository>(_ => new InMemoryAdminNewsRepository(newsStore));
                 services.AddSingleton<INewsAuditRepository>(_ => new InMemoryNewsAuditRepository(newsStore));
                 services.AddSingleton<INewsDiscoveryRepository>(_ => new InMemoryNewsDiscoveryRepository(discoveryStore));
-            }));
+                services.AddSingleton<INewsAiClient>(_ => new RegenerateDraftFakeAiClient(NewsAgentTestSupport.SampleDraftJson));
+            });
+        });
 
     private HttpClient CreateClient(string? email = null, SharedNewsStore? newsStore = null, SharedNewsDiscoveryStore? discoveryStore = null)
     {
@@ -506,4 +539,20 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
 
     [GeneratedRegex("""name="__RequestVerificationToken" value="(?<token>[^"]+)""", RegexOptions.IgnoreCase)]
     private static partial Regex AntiforgeryTokenRegex();
+
+    private sealed class RegenerateDraftFakeAiClient(string content) : INewsAiClient
+    {
+        public bool IsEnabled => true;
+
+        public Task<NewsAiChatCompletion> CompleteChatAsync(
+            NewsAiChatRequest request,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new NewsAiChatCompletion(
+                content,
+                "openai/gpt-4.1-mini",
+                1,
+                1,
+                0.0001m,
+                false));
+    }
 }

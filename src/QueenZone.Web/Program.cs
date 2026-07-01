@@ -9,6 +9,7 @@ using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.FileProviders.Physical;
 using Microsoft.Identity.Web;
 using QueenZone.Data;
+using QueenZone.NewsAgent;
 using QueenZone.Web;
 using QueenZone.Web.Sitemap;
 
@@ -61,6 +62,8 @@ else
 {
     builder.Services.AddQueenZoneInMemoryData();
 }
+
+builder.Services.AddQueenZoneNewsAgent(builder.Configuration);
 
 ConfigureAuthentication(builder);
 

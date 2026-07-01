@@ -17,6 +17,10 @@ public sealed class ReviewModel(INewsDiscoveryRepository discoveryRepository) : 
 
     public NewsTriageDisplaySummary? LatestTriageSummary { get; private set; }
 
+    public string? StatusMessage { get; private set; }
+
+    public string? StatusMessageKind { get; private set; }
+
     public async Task<IActionResult> OnGetAsync(int id, CancellationToken cancellationToken)
     {
         var loaded = await LoadAsync(id, cancellationToken);
@@ -24,6 +28,9 @@ public sealed class ReviewModel(INewsDiscoveryRepository discoveryRepository) : 
         {
             return NotFound();
         }
+
+        StatusMessage = TempData["DiscoveryMessage"] as string;
+        StatusMessageKind = TempData["DiscoveryMessageKind"] as string;
 
         ViewData["Title"] = $"Review candidate #{id}";
         return Page();

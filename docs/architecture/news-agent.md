@@ -130,7 +130,7 @@ Editor actions (POST, anti-forgery protected):
 
 Link from **Admin news** (`/admin/news`) → “Review discovered candidates”.
 
-Regenerating a draft still requires running the worker with `--draft-only` (or `--draft` after new candidates appear). A one-click regenerate button is not implemented yet.
+Regenerating a draft: use **Regenerate draft with AI** on the candidate review page (requires `OpenRouter:ApiKey` in `src/QueenZone.Web/appsettings.Local.json` or `OPENROUTER_API_KEY`), or run the worker with `--draft-only` / `--force`.
 
 ### Admin authentication
 
@@ -149,7 +149,7 @@ Admin routes require sign-in plus an email listed in `Admin:AllowedEmails`.
 | #102 OpenRouter client | Done | Budget guard, model defaults, AI run logging |
 | #103 AI triage | Done | Structured triage + deterministic duplicate checks |
 | #104 Draft generation | Done | Citations/attribution; `--draft` flags |
-| #105 Admin review queue | Done | `/admin/news-discovery` |
+| #105 Admin review queue | Done | `/admin/news-discovery` + in-admin regenerate draft |
 | #106 Promote workflow | Partial | Promote creates admin news draft; fuller workflow polish remains |
 | #107 Scheduled hosting | Not started | Local bat/worker only; no Azure timer yet |
 | #108 Tests/observability | Partial | Unit/integration tests in CI; no live OpenRouter in default tests |

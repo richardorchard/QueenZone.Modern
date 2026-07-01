@@ -60,6 +60,28 @@ public sealed class NewsDraftGenerationServiceTests
   }
 
   [Fact]
+  public async Task GenerateDraftAsync_regenerates_when_drafted_and_forced()
+  {
+    var repository = new InMemoryNewsDiscoveryRepository(new SharedNewsDiscoveryStore());
+    var candidateId = await SeedNeedsReviewCandidateAsync(repository);
+    var service = NewsAgentTestSupport.CreateDraftGenerationService(
+      repository,
+      new DraftGenerationFakeAiClient(NewsAgentTestSupport.SampleDraftJson));
+
+    await service.GenerateDraftAsync(
+      (await repository.GetCandidateByIdAsync(candidateId))!,
+      new NewsDraftRunOptions());
+
+    var result = await service.GenerateDraftAsync(
+      (await repository.GetCandidateByIdAsync(candidateId))!,
+      new NewsDraftRunOptions(ForceRegenerate: true));
+
+    Assert.True(result.Succeeded);
+    var draft = await repository.GetDraftByCandidateIdAsync(candidateId);
+    Assert.Equal("Queen announce 2026 tour", draft!.ProposedTitle);
+  }
+
+  [Fact]
   public async Task RunDraftGenerationAsync_skips_when_openrouter_disabled()
   {
     var repository = new InMemoryNewsDiscoveryRepository(new SharedNewsDiscoveryStore());
