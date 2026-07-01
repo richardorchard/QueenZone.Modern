@@ -40,6 +40,17 @@ public sealed partial class AdminNewsRoutesTests : IClassFixture<WebApplicationF
     }
 
     [Fact]
+    public async Task AdminRootRedirectsToNewsAdmin()
+    {
+        var client = CreateClient(AdminEmail);
+
+        var response = await client.GetAsync("/admin");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal("/admin/news", response.Headers.Location!.OriginalString);
+    }
+
+    [Fact]
     public async Task AuthorizedAdminCanCreatePreviewPublishAndUnpublishArticle()
     {
         var store = new SharedNewsStore();
