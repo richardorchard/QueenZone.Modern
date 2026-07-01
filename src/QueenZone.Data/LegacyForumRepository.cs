@@ -241,7 +241,19 @@ public sealed class LegacyForumRepository(string connectionString) : IForumRepos
             row.USERNAME?.Trim() ?? "Unknown",
             string.IsNullOrWhiteSpace(row.SIGNATURE) ? null : row.SIGNATURE.Trim(),
             row.NUMBER_OF_POSTS,
-            row.DATE_CREATED);
+            row.DATE_CREATED,
+            ParseAttachments(row.ATTACHMENT, row.FILESIZE));
+
+    private static IReadOnlyList<ForumPostAttachment>? ParseAttachments(string? attachment, string? filesize)
+    {
+        if (string.IsNullOrWhiteSpace(attachment))
+        {
+            return null;
+        }
+
+        long? bytes = long.TryParse(filesize?.Trim(), out var parsed) ? parsed : null;
+        return [new ForumPostAttachment(attachment.Trim(), bytes)];
+    }
 
     private static ForumTopicItem MapTopic(ForumTopicRow row) =>
         new(
