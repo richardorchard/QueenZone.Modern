@@ -66,6 +66,27 @@ public sealed class NewsFeedParserTests
     }
 
     [Fact]
+    public void ParseAllowlistedPageLinks_limits_links_to_page_path_prefix()
+    {
+        const string html = """
+            <!DOCTYPE html>
+            <html>
+              <body>
+                <a href="/news/tour-update">Tour update</a>
+                <a href="/music">Music section</a>
+                <a href="/news/feed/">Feed</a>
+              </body>
+            </html>
+            """;
+        var pageUri = new Uri("https://www.queenonline.com/news");
+
+        var items = NewsFeedParser.ParseAllowlistedPageLinks(html, pageUri);
+
+        Assert.Single(items);
+        Assert.Equal("https://www.queenonline.com/news/tour-update", items[0].SourceUrl);
+    }
+
+    [Fact]
     public void Parse_reads_atom_entries()
     {
         const string atom = """

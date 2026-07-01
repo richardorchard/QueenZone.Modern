@@ -117,8 +117,9 @@ public sealed class NewsDiscoveryServiceTests
         var sources = NewsDiscoverySourceSeeder.LoadSeedSources();
 
         Assert.True(sources.Count >= 10);
-        Assert.Contains(sources, source => source.Key == "queen-online" && source.TrustTier == NewsDiscoveryTrustTier.Primary);
+        Assert.Contains(sources, source => source.Key == "queen-online" && source.SourceType == NewsDiscoverySourceType.AllowlistedPage);
         Assert.Contains(sources, source => source.Key == "roger-taylor" && source.SourceType == NewsDiscoverySourceType.Rss);
+        Assert.Contains(sources, source => source.Key == "brian-may" && source.FeedOrSiteUrl == "https://brianmay.com/feed/");
         Assert.Contains(sources, source => source.Key == "nme-music" && source.TrustTier == NewsDiscoveryTrustTier.Secondary);
         Assert.Contains(sources, source => source.Key == "gold-radio" && !source.Enabled);
     }

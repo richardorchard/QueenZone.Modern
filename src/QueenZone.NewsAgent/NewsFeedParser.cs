@@ -78,6 +78,8 @@ public static partial class NewsFeedParser
     {
         var items = new List<FetchedNewsItem>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var pagePath = pageUri.AbsolutePath.TrimEnd('/');
+        var requireChildPaths = pagePath.Length > 1;
 
         foreach (Match match in HrefRegex().Matches(html))
         {
@@ -95,6 +97,15 @@ public static partial class NewsFeedParser
             if (!string.Equals(absoluteUri.Host, pageUri.Host, StringComparison.OrdinalIgnoreCase))
             {
                 continue;
+            }
+
+            if (requireChildPaths)
+            {
+                var linkPath = absoluteUri.AbsolutePath.TrimEnd('/');
+                if (!linkPath.StartsWith(pagePath + "/", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
             }
 
             if (absoluteUri.AbsolutePath.Length < 2
