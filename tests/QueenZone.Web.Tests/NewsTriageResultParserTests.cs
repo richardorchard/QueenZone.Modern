@@ -48,6 +48,28 @@ public sealed class NewsTriageResultParserTests
     }
 
     [Fact]
+    public void Parse_reads_entity_objects_from_model_output()
+    {
+        const string json = """
+            {
+              "verdict": "relevant",
+              "relevance_score": 0.92,
+              "confidence_score": 0.88,
+              "rationale": "Official Queen tour announcement.",
+              "suggested_category": "tour",
+              "entities": [
+                { "name": "Queen", "type": "band" },
+                "Brian May"
+              ]
+            }
+            """;
+
+        var result = NewsTriageResultParser.Parse(json);
+
+        Assert.Equal(["Queen", "Brian May"], result.Entities);
+    }
+
+    [Fact]
     public void Parse_throws_for_empty_payload()
     {
         Assert.Throws<InvalidOperationException>(() => NewsTriageResultParser.Parse("   "));

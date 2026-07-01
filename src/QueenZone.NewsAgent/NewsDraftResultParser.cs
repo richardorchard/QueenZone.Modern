@@ -9,7 +9,11 @@ public static class NewsDraftResultParser
     {
         PropertyNameCaseInsensitive = true,
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
-        NumberHandling = JsonNumberHandling.AllowReadingFromString
+        NumberHandling = JsonNumberHandling.AllowReadingFromString,
+        Converters =
+        {
+            new FlexibleNullableStringListJsonConverter()
+        }
     };
 
     public static NewsDraftStructuredResult Parse(string json)

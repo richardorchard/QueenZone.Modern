@@ -116,8 +116,13 @@ public sealed class NewsDiscoveryServiceTests
     {
         var sources = NewsDiscoverySourceSeeder.LoadSeedSources();
 
-        Assert.True(sources.Count >= 10);
-        Assert.Contains(sources, source => source.Key == "queen-online" && source.TrustTier == NewsDiscoveryTrustTier.Primary);
+        Assert.True(sources.Count >= 15);
+        Assert.Contains(sources, source => source.Key == "queen-online" && source.SourceType == NewsDiscoverySourceType.AllowlistedPage);
+        Assert.Contains(sources, source => source.Key == "roger-taylor" && source.SourceType == NewsDiscoverySourceType.Rss);
+        Assert.Contains(sources, source => source.Key == "brian-may" && source.FeedOrSiteUrl == "https://brianmay.com/feed/");
+        Assert.Contains(sources, source => source.Key == "queen-fan-club" && source.SourceType == NewsDiscoverySourceType.AllowlistedPage);
+        Assert.Contains(sources, source => source.Key == "google-news-freddie-mercury" && source.SourceType == NewsDiscoverySourceType.Rss);
+        Assert.Contains(sources, source => source.Key == "official-charts" && source.FeedOrSiteUrl == "https://www.officialcharts.com/chart-news/");
         Assert.Contains(sources, source => source.Key == "nme-music" && source.TrustTier == NewsDiscoveryTrustTier.Secondary);
         Assert.Contains(sources, source => source.Key == "gold-radio" && !source.Enabled);
     }
@@ -297,5 +302,45 @@ public sealed class NewsDiscoveryServiceTests
 
         Assert.Equal(2, result.SourcesChecked);
         Assert.Equal(4, result.CandidatesCreated);
+    }
+
+    [Fact]
+    public async Task RunFetchAsync_skips_static_asset_links_from_allowlisted_page_source()
+    {
+        var repository = new InMemoryNewsDiscoveryRepository(new SharedNewsDiscoveryStore());
+        var pageUrl = "https://www.rogertaylorofficial.com/news";
+        var service = NewsAgentTestSupport.CreateDiscoveryService(
+            repository,
+            new FakeNewsDiscoveryHttpClient(new Dictionary<string, string>
+            {
+                [pageUrl] = """
+                    <!DOCTYPE html>
+                    <html>
+                      <body>
+                        <a href="/news/tour-update">Tour update</a>
+                        <a href="/wp-content/themes/site/style.css">Stylesheet</a>
+                        <a href="/wp-content/uploads/hero.jpg">Hero image</a>
+                      </body>
+                    </html>
+                    """
+            }));
+        await repository.UpsertSourceAsync(new NewsDiscoverySourceDraft(
+            "roger-taylor",
+            "Roger Taylor",
+            "https://www.rogertaylorofficial.com/",
+            pageUrl,
+            NewsDiscoverySourceType.AllowlistedPage,
+            NewsDiscoveryTrustTier.Primary,
+            60,
+            true,
+            null));
+
+        var result = await service.RunFetchAsync(new NewsDiscoveryRunOptions(Force: true));
+
+        Assert.Equal(1, result.ItemsFetched);
+        Assert.Equal(1, result.CandidatesCreated);
+        var candidates = await repository.GetCandidatesAsync();
+        Assert.Single(candidates);
+        Assert.Equal("https://www.rogertaylorofficial.com/news/tour-update", candidates[0].SourceUrl);
     }
 }

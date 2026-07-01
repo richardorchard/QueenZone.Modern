@@ -36,6 +36,22 @@ public sealed class OpenRouterOptions
 
     public bool IsConfigured => !string.IsNullOrWhiteSpace(ApiKey);
 
+    public static string? NormalizeApiKey(string? apiKey)
+    {
+        if (string.IsNullOrWhiteSpace(apiKey))
+        {
+            return null;
+        }
+
+        var normalized = apiKey.Trim().Trim('"').Trim('\'').Trim();
+        if (normalized.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        {
+            normalized = normalized["Bearer ".Length..].Trim();
+        }
+
+        return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
+    }
+
     public string ResolveModel(NewsAiModelRole role) =>
         role switch
         {

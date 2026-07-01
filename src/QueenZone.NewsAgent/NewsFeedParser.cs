@@ -51,7 +51,7 @@ public static partial class NewsFeedParser
                 }
             }
 
-            if (string.IsNullOrWhiteSpace(location))
+            if (string.IsNullOrWhiteSpace(location) || !NewsDiscoveryUrlFilter.IsLikelyArticleUrl(location))
             {
                 continue;
             }
@@ -78,6 +78,9 @@ public static partial class NewsFeedParser
     {
         var items = new List<FetchedNewsItem>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var pagePath = pageUri.AbsolutePath.TrimEnd('/');
+        var pageFileName = Path.GetFileName(pagePath);
+        var isPhpListingPage = pageFileName.EndsWith(".php", StringComparison.OrdinalIgnoreCase);
 
         foreach (Match match in HrefRegex().Matches(html))
         {
@@ -97,7 +100,27 @@ public static partial class NewsFeedParser
                 continue;
             }
 
-            if (absoluteUri.AbsolutePath.Length < 2 || seen.Contains(absoluteUri.AbsoluteUri))
+            if (isPhpListingPage)
+            {
+                var listingStem = Path.GetFileNameWithoutExtension(pageFileName);
+                var expectedDetailPath = "/" + listingStem + "_detail.php";
+                if (!absoluteUri.AbsolutePath.Equals(expectedDetailPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+            }
+            else if (pagePath.Length > 1)
+            {
+                var linkPath = absoluteUri.AbsolutePath.TrimEnd('/');
+                if (!linkPath.StartsWith(pagePath + "/", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+            }
+
+            if (absoluteUri.AbsolutePath.Length < 2
+                || seen.Contains(absoluteUri.AbsoluteUri)
+                || !NewsDiscoveryUrlFilter.IsLikelyArticleUrl(absoluteUri.AbsoluteUri))
             {
                 continue;
             }
@@ -162,7 +185,9 @@ public static partial class NewsFeedParser
                 }
             }
 
-            if (string.IsNullOrWhiteSpace(link) || string.IsNullOrWhiteSpace(title))
+            if (string.IsNullOrWhiteSpace(link)
+                || string.IsNullOrWhiteSpace(title)
+                || !NewsDiscoveryUrlFilter.IsLikelyArticleUrl(link))
             {
                 continue;
             }
@@ -219,7 +244,9 @@ public static partial class NewsFeedParser
                 }
             }
 
-            if (string.IsNullOrWhiteSpace(link) || string.IsNullOrWhiteSpace(title))
+            if (string.IsNullOrWhiteSpace(link)
+                || string.IsNullOrWhiteSpace(title)
+                || !NewsDiscoveryUrlFilter.IsLikelyArticleUrl(link))
             {
                 continue;
             }

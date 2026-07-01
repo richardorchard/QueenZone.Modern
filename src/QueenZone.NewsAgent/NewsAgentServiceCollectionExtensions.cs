@@ -37,6 +37,8 @@ public static class NewsAgentServiceCollectionExtensions
                     {
                         options.ApiKey = configuration["OPENROUTER_API_KEY"];
                     }
+
+                    options.ApiKey = OpenRouterOptions.NormalizeApiKey(options.ApiKey);
                 })
                 .ValidateOnStart();
 

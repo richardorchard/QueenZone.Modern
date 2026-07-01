@@ -9,7 +9,11 @@ public static class NewsTriageResultParser
     {
         PropertyNameCaseInsensitive = true,
         NumberHandling = JsonNumberHandling.AllowReadingFromString,
-        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower) }
+        Converters =
+        {
+            new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower),
+            new FlexibleStringListJsonConverter()
+        }
     };
 
     public static NewsTriageStructuredResult Parse(string json)

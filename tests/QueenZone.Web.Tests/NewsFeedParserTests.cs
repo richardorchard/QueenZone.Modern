@@ -44,6 +44,94 @@ public sealed class NewsFeedParserTests
     }
 
     [Fact]
+    public void ParseAllowlistedPageLinks_skips_static_asset_links()
+    {
+        const string html = """
+            <!DOCTYPE html>
+            <html>
+              <body>
+                <a href="/news/tour-update">Tour update</a>
+                <a href="/wp-content/themes/site/style.css">Stylesheet</a>
+                <a href="/wp-content/uploads/hero.jpg">Hero image</a>
+                <a href="/news/feed/">Feed</a>
+              </body>
+            </html>
+            """;
+        var pageUri = new Uri("https://www.rogertaylorofficial.com/news");
+
+        var items = NewsFeedParser.ParseAllowlistedPageLinks(html, pageUri);
+
+        Assert.Single(items);
+        Assert.Equal("https://www.rogertaylorofficial.com/news/tour-update", items[0].SourceUrl);
+    }
+
+    [Fact]
+    public void ParseAllowlistedPageLinks_keeps_chart_news_article_links()
+    {
+        const string html = """
+            <!DOCTYPE html>
+            <html>
+              <body>
+                <a href="/chart-news/queen-bohemian-rhapsody-50-years/">Queen Bohemian Rhapsody 50 years</a>
+                <a href="/news/features">Features section</a>
+              </body>
+            </html>
+            """;
+        var pageUri = new Uri("https://www.officialcharts.com/chart-news/");
+
+        var items = NewsFeedParser.ParseAllowlistedPageLinks(html, pageUri);
+
+        Assert.Single(items);
+        Assert.Equal(
+            "https://www.officialcharts.com/chart-news/queen-bohemian-rhapsody-50-years/",
+            items[0].SourceUrl);
+    }
+
+    [Fact]
+    public void ParseAllowlistedPageLinks_keeps_php_news_detail_links_only()
+    {
+        const string html = """
+            <!DOCTYPE html>
+            <html>
+              <body>
+                <a href="/news_detail.php?Roger-Taylor-Album-Tour-895">Roger Taylor Album &amp; Tour</a>
+                <a href="/fanclub_about.php">About</a>
+                <a href="/news.php?page=2">Next page</a>
+              </body>
+            </html>
+            """;
+        var pageUri = new Uri("https://queenworld.com/news.php");
+
+        var items = NewsFeedParser.ParseAllowlistedPageLinks(html, pageUri);
+
+        Assert.Single(items);
+        Assert.Equal(
+            "https://queenworld.com/news_detail.php?Roger-Taylor-Album-Tour-895",
+            items[0].SourceUrl);
+    }
+
+    [Fact]
+    public void ParseAllowlistedPageLinks_limits_links_to_page_path_prefix()
+    {
+        const string html = """
+            <!DOCTYPE html>
+            <html>
+              <body>
+                <a href="/news/tour-update">Tour update</a>
+                <a href="/music">Music section</a>
+                <a href="/news/feed/">Feed</a>
+              </body>
+            </html>
+            """;
+        var pageUri = new Uri("https://www.queenonline.com/news");
+
+        var items = NewsFeedParser.ParseAllowlistedPageLinks(html, pageUri);
+
+        Assert.Single(items);
+        Assert.Equal("https://www.queenonline.com/news/tour-update", items[0].SourceUrl);
+    }
+
+    [Fact]
     public void Parse_reads_atom_entries()
     {
         const string atom = """
