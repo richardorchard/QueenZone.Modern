@@ -88,7 +88,7 @@ public static class LegacyNewsSchema
                 [DATE],
                 [DATE] AS PublishedAt,
                 SOURCE_URL,
-                CAST(CASE WHEN DISPLAY = 1 THEN 1 ELSE 0 END AS bit) AS DISPLAY,
+                CASE WHEN DISPLAY = 1 THEN 1 ELSE 0 END AS DISPLAY,
                 SLUG,
                 CREATED_AT,
                 UPDATED_AT,
