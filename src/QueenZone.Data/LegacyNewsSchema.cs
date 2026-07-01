@@ -75,8 +75,8 @@ public static class LegacyNewsSchema
                     {updatedAtProjection},
                     {editorEmailProjection},
                     USER_ID,
-                    ISNULL(TYPE, 0) AS TYPE,
-                    ISNULL(QUEEN_ONLINE, 0) AS QUEEN_ONLINE,
+                    CAST(ISNULL(TYPE, 0) AS int) AS TYPE,
+                    CAST(ISNULL(QUEEN_ONLINE, 0) AS int) AS QUEEN_ONLINE,
                     ROW_NUMBER() OVER (PARTITION BY NEWS_ID ORDER BY [DATE] DESC, NEWS_ID DESC) AS RowNumber
                 FROM NEWS_T
             )
