@@ -53,11 +53,70 @@ Open `coverage-report/index.html` to inspect the report. Coverage reports and ra
 
 Local secrets belong in `src/QueenZone.Web/appsettings.Local.json`, which is ignored by git. You can also set `ConnectionStrings__QueenZoneLegacy` in your shell or a local `.env` file for tooling that loads dotenv values. If no `ConnectionStrings:QueenZoneLegacy` value is present, the site uses sample news data so the first slice can still run locally.
 
-### Using the live legacy database locally
+### Using live legacy data locally
 
-Live-database development is opt-in. Use it when you need to reproduce a production-only data mapping, SQL, or admin editorial issue.
+Live-data development is opt-in. Use it when you need to reproduce a production-only data mapping, SQL, or admin editorial issue. Prefer a local SQL Server copy for repeat debugging so normal local work does not depend on Azure SQL latency, firewall rules, or live database load.
 
-Create `src/QueenZone.Web/appsettings.Local.json` and add the live SQL connection string under `ConnectionStrings:QueenZoneLegacy`. This file is ignored by git; do not commit it, paste it into a pull request, or include it in logs.
+#### Option A: point at a local SQL Server copy
+
+Install or use a local SQL Server instance such as SQL Server Express. On Richard's workstation the instance is:
+
+```text
+glory11\sqlexpress
+```
+
+Export the Azure SQL database to a BACPAC. Read the source connection string from an ignored local settings file, or paste it into a temporary shell variable; do not print it to the console or commit it.
+
+```powershell
+$settings = Get-Content -Raw .\src\QueenZone.Web\appsettings.Local.json | ConvertFrom-Json
+$sourceConnectionString = [string]$settings.ConnectionStrings.QueenZoneLegacy
+
+New-Item -ItemType Directory -Force C:\Backups | Out-Null
+SqlPackage /Action:Export `
+  /SourceConnectionString:$sourceConnectionString `
+  /TargetFile:C:\Backups\queenzone-live.bacpac `
+  /p:CommandTimeout=1200
+```
+
+Import the BACPAC into SQL Express:
+
+```powershell
+SqlPackage /Action:Import `
+  /SourceFile:C:\Backups\queenzone-live.bacpac `
+  /TargetConnectionString:"Server=glory11\sqlexpress;Initial Catalog=QueenZoneLocal;Integrated Security=True;Encrypt=False;TrustServerCertificate=True;" `
+  /p:CommandTimeout=1200
+```
+
+Verify the import:
+
+```powershell
+sqlcmd -S "glory11\sqlexpress" -E -d QueenZoneLocal -Q "SELECT DB_NAME() AS DatabaseName; SELECT COUNT_BIG(*) AS NewsRows FROM dbo.NEWS_T;"
+```
+
+Point the web app at the local copy in `src/QueenZone.Web/appsettings.Local.json`:
+
+```json
+{
+  "ConnectionStrings": {
+    "QueenZoneLegacy": "Server=glory11\\sqlexpress;Database=QueenZoneLocal;Integrated Security=True;Encrypt=False;TrustServerCertificate=True;"
+  },
+  "AzureAd": {
+    "ClientId": ""
+  },
+  "Admin": {
+    "AllowedEmails": [
+      "richard@thinkingwebsites.com.au",
+      "me@richardorchard.com"
+    ]
+  }
+}
+```
+
+SQL Server Express has a 10 GB database-size limit. The imported QueenZone copy was about 3 GB on 2026-07-01, so Express was sufficient then. Use SQL Server Developer edition if the local copy grows beyond the Express limit.
+
+#### Option B: point directly at Azure SQL
+
+Create `src/QueenZone.Web/appsettings.Local.json` and add the live Azure SQL connection string under `ConnectionStrings:QueenZoneLegacy`. This file is ignored by git; do not commit it, paste it into a pull request, or include it in logs.
 
 For local admin testing without real Entra sign-in, also set `AzureAd:ClientId` to an empty string and include your admin email in `Admin:AllowedEmails`:
 
@@ -94,6 +153,8 @@ Invoke-WebRequest `
 ```
 
 If you already have `src/QueenZone.NewsAgent.Worker/appsettings.Local.json` configured with `ConnectionStrings:QueenZoneLegacy`, you can copy that value into the web app's local settings. Keep both files local-only.
+
+The local SQL copy may contain production user, mail, IP, moderation, and private-message data. Treat local BACPAC and MDF/LDF files as sensitive data: store them outside the repository, do not attach them to issues or pull requests, and delete or refresh them deliberately when they are no longer needed.
 
 ### News agent (discovery worker)
 

@@ -97,7 +97,50 @@ Application logging should be enabled at Information level on the filesystem. If
 
 ### Reproducing live database issues locally
 
-Use the live legacy database locally only for production-only SQL, mapping, or data-shape debugging. The web app reads `src/QueenZone.Web/appsettings.Local.json`, which is ignored by git. Put the live value in:
+Use live legacy data locally only for production-only SQL, mapping, or data-shape debugging. Prefer an imported local SQL Server copy when you will run repeated checks.
+
+#### Local SQL Server copy
+
+Export Azure SQL to a BACPAC, then import it to local SQL Server Express:
+
+```powershell
+$settings = Get-Content -Raw .\src\QueenZone.Web\appsettings.Local.json | ConvertFrom-Json
+$sourceConnectionString = [string]$settings.ConnectionStrings.QueenZoneLegacy
+
+New-Item -ItemType Directory -Force C:\Backups | Out-Null
+SqlPackage /Action:Export `
+  /SourceConnectionString:$sourceConnectionString `
+  /TargetFile:C:\Backups\queenzone-live.bacpac `
+  /p:CommandTimeout=1200
+
+SqlPackage /Action:Import `
+  /SourceFile:C:\Backups\queenzone-live.bacpac `
+  /TargetConnectionString:"Server=glory11\sqlexpress;Initial Catalog=QueenZoneLocal;Integrated Security=True;Encrypt=False;TrustServerCertificate=True;" `
+  /p:CommandTimeout=1200
+```
+
+Use this local web connection string:
+
+```json
+{
+  "ConnectionStrings": {
+    "QueenZoneLegacy": "Server=glory11\\sqlexpress;Database=QueenZoneLocal;Integrated Security=True;Encrypt=False;TrustServerCertificate=True;"
+  },
+  "AzureAd": {
+    "ClientId": ""
+  },
+  "Admin": {
+    "AllowedEmails": [
+      "richard@thinkingwebsites.com.au",
+      "me@richardorchard.com"
+    ]
+  }
+}
+```
+
+#### Direct Azure SQL
+
+The web app also reads `src/QueenZone.Web/appsettings.Local.json`, which is ignored by git. To connect directly to Azure SQL, put the live value in:
 
 ```json
 {
@@ -123,6 +166,8 @@ dotnet run --project src/QueenZone.Web/QueenZone.Web.csproj
 ```
 
 Admin routes can be exercised locally with `X-Test-User-Email` when `AzureAd:ClientId` is empty. Never print, commit, or paste the connection string into logs or pull requests. If `src/QueenZone.NewsAgent.Worker/appsettings.Local.json` already has `ConnectionStrings:QueenZoneLegacy`, copy that value into the web app local settings.
+
+Local BACPAC and SQL Server data files contain production data. Keep them outside the repository, do not attach them to issues or pull requests, and treat them as sensitive.
 
 ### Azure MCP
 
