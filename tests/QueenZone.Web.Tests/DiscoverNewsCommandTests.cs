@@ -46,4 +46,18 @@ public sealed class DiscoverNewsCommandTests
         Assert.True(options.TriageOnly);
         Assert.True(options.DryRun);
     }
+
+    [Fact]
+    public void Parse_reads_draft_flags()
+    {
+        var options = DiscoverNewsCommandOptions.Parse([
+            "discover-news",
+            "--draft-only",
+            "--force"]);
+
+        Assert.NotNull(options);
+        Assert.True(options.Draft);
+        Assert.True(options.DraftOnly);
+        Assert.True(options.Force);
+    }
 }

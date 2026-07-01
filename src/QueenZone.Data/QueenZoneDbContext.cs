@@ -238,7 +238,7 @@ public sealed class QueenZoneDbContext(DbContextOptions<QueenZoneDbContext> opti
             entity.HasOne(draft => draft.Candidate)
                 .WithOne(candidate => candidate.Draft)
                 .HasForeignKey<NewsAgentDraftEntity>(draft => draft.CandidateId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.ClientCascade);
 
             entity.HasOne(draft => draft.AiRun)
                 .WithMany()
