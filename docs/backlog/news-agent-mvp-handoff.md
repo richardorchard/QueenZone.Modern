@@ -12,7 +12,7 @@ This handoff gives a future agent the full context for building the first automa
 | OpenRouter + budgets (#102) | Done |
 | AI triage (#103) | Done |
 | Draft generation (#104) | Done |
-| Admin review queue (#105) | Done — `/admin/news-discovery` |
+| Admin review queue (#105) | Done — `/admin/news-discovery` + in-admin regenerate draft |
 | Promote to live news (#106) | Done — provenance on admin news edit/preview, richer audit, bidirectional links |
 | Scheduled hosting (#107) | Done — DB run lease, `--scheduled`, `scripts/Run-NewsAgentDiscovery.ps1`, `docs/architecture/news-agent-scheduling.md` |
 | Tests / observability (#108) | Partial — CI uses fakes; `scripts/Smoke-NewsAgent.bat` for manual OpenRouter check |

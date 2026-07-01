@@ -1,12 +1,14 @@
 using Microsoft.AspNetCore.Mvc;
 using QueenZone.Data;
+using QueenZone.NewsAgent;
 
 namespace QueenZone.Web.Pages.Admin.NewsDiscovery;
 
 public sealed class ActionModel(
     INewsDiscoveryRepository discoveryRepository,
     IAdminNewsRepository adminNewsRepository,
-    INewsAuditRepository auditRepository) : AdminNewsDiscoveryPageModel
+    INewsAuditRepository auditRepository,
+    NewsDraftGenerationService draftGenerationService) : AdminNewsDiscoveryPageModel
 {
     public async Task<IActionResult> OnPostRejectAsync(int id, CancellationToken cancellationToken)
     {
@@ -137,5 +139,54 @@ public sealed class ActionModel(
             cancellationToken);
 
         return Redirect($"/admin/news/{newsId}/edit");
+    }
+
+    public async Task<IActionResult> OnPostRegenerateDraftAsync(int id, CancellationToken cancellationToken)
+    {
+        var candidate = await discoveryRepository.GetCandidateByIdAsync(id, cancellationToken);
+        if (candidate is null)
+        {
+            return NotFound();
+        }
+
+        if (!draftGenerationService.IsAiEnabled)
+        {
+            TempData["DiscoveryMessage"] = "Draft regeneration requires OpenRouter configuration on the web app.";
+            TempData["DiscoveryMessageKind"] = "error";
+            return Redirect($"/admin/news-discovery/{id}");
+        }
+
+        if (candidate.Status is not NewsCandidateStatus.NeedsReview and not NewsCandidateStatus.Drafted)
+        {
+            TempData["DiscoveryMessage"] = "Only needs-review or drafted candidates can regenerate a draft.";
+            TempData["DiscoveryMessageKind"] = "error";
+            return Redirect($"/admin/news-discovery/{id}");
+        }
+
+        try
+        {
+            var result = await draftGenerationService.GenerateDraftAsync(
+                candidate,
+                new NewsDraftRunOptions(ForceRegenerate: true),
+                cancellationToken);
+
+            if (result.Succeeded && result.DraftId is not null)
+            {
+                TempData["DiscoveryMessage"] = "Draft regenerated successfully.";
+                TempData["DiscoveryMessageKind"] = "success";
+            }
+            else
+            {
+                TempData["DiscoveryMessage"] = "Draft regeneration did not produce a new draft.";
+                TempData["DiscoveryMessageKind"] = "error";
+            }
+        }
+        catch (Exception ex)
+        {
+            TempData["DiscoveryMessage"] = $"Draft regeneration failed: {ex.Message}";
+            TempData["DiscoveryMessageKind"] = "error";
+        }
+
+        return Redirect($"/admin/news-discovery/{id}");
     }
 }
