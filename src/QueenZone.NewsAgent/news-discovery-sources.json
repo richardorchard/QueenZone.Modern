@@ -119,5 +119,49 @@
     "pollIntervalMinutes": 120,
     "enabled": false,
     "relevanceKeywords": "queen,freddie mercury,brian may,roger taylor"
+  },
+  {
+    "key": "google-news-freddie-mercury",
+    "displayName": "Google News (Freddie Mercury)",
+    "homepageUrl": "https://news.google.com/",
+    "feedOrSiteUrl": "https://news.google.com/rss/search?q=Freddie+Mercury+Queen&hl=en-GB&gl=GB&ceid=GB:en",
+    "sourceType": "Rss",
+    "trustTier": "Secondary",
+    "pollIntervalMinutes": 90,
+    "enabled": true,
+    "relevanceKeywords": "queen,freddie mercury,brian may,roger taylor,adam lambert"
+  },
+  {
+    "key": "google-news-brian-may",
+    "displayName": "Google News (Brian May)",
+    "homepageUrl": "https://news.google.com/",
+    "feedOrSiteUrl": "https://news.google.com/rss/search?q=Brian+May+Queen&hl=en-GB&gl=GB&ceid=GB:en",
+    "sourceType": "Rss",
+    "trustTier": "Secondary",
+    "pollIntervalMinutes": 90,
+    "enabled": true,
+    "relevanceKeywords": "queen,freddie mercury,brian may,roger taylor,adam lambert"
+  },
+  {
+    "key": "google-news-roger-taylor",
+    "displayName": "Google News (Roger Taylor)",
+    "homepageUrl": "https://news.google.com/",
+    "feedOrSiteUrl": "https://news.google.com/rss/search?q=Roger+Taylor+Queen&hl=en-GB&gl=GB&ceid=GB:en",
+    "sourceType": "Rss",
+    "trustTier": "Secondary",
+    "pollIntervalMinutes": 90,
+    "enabled": true,
+    "relevanceKeywords": "queen,freddie mercury,brian may,roger taylor,adam lambert"
+  },
+  {
+    "key": "official-charts",
+    "displayName": "Official Charts Company",
+    "homepageUrl": "https://www.officialcharts.com/news/",
+    "feedOrSiteUrl": "https://www.officialcharts.com/chart-news/",
+    "sourceType": "AllowlistedPage",
+    "trustTier": "Secondary",
+    "pollIntervalMinutes": 120,
+    "enabled": true,
+    "relevanceKeywords": "queen,freddie mercury,brian may,roger taylor,john deacon,bohemian rhapsody,adam lambert"
   }
 ]

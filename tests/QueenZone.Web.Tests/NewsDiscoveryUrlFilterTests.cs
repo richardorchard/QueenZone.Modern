@@ -25,6 +25,8 @@ public sealed class NewsDiscoveryUrlFilterTests
     [InlineData("https://www.queenonline.com/news/tour-2026")]
     [InlineData("https://www.billboard.com/music/pop/madonna-preview-confessions-album-livestream-1236285561/")]
     [InlineData("https://queenworld.com/news_detail.php?Roger-Taylor-Album-Tour-895")]
+    [InlineData("https://news.google.com/rss/articles/CBMijAFBVV95cUxQX0luWFd2VEZzRV83ejFVQzNXcTN3UGRNRXliR0VaZDlnNjlkU1hlLVdRdnYxME1TeXZLcFZKY3hBVWZ6QXFyRkZvVXlpaDdlNkFfdWxhMFRtM3RSYnpQbDQ3UzNtaFR3ZHRtQ0tVWnFlMHJMVzVoYkRTM2JnTkU2X1pMb0ZpemZTSTV0Vg?oc=5")]
+    [InlineData("https://www.officialcharts.com/chart-news/queen-bohemian-rhapsody-50-years/")]
     public void IsLikelyArticleUrl_accepts_story_urls(string url)
     {
         Assert.True(NewsDiscoveryUrlFilter.IsLikelyArticleUrl(url));

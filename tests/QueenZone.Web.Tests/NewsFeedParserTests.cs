@@ -66,6 +66,28 @@ public sealed class NewsFeedParserTests
     }
 
     [Fact]
+    public void ParseAllowlistedPageLinks_keeps_chart_news_article_links()
+    {
+        const string html = """
+            <!DOCTYPE html>
+            <html>
+              <body>
+                <a href="/chart-news/queen-bohemian-rhapsody-50-years/">Queen Bohemian Rhapsody 50 years</a>
+                <a href="/news/features">Features section</a>
+              </body>
+            </html>
+            """;
+        var pageUri = new Uri("https://www.officialcharts.com/chart-news/");
+
+        var items = NewsFeedParser.ParseAllowlistedPageLinks(html, pageUri);
+
+        Assert.Single(items);
+        Assert.Equal(
+            "https://www.officialcharts.com/chart-news/queen-bohemian-rhapsody-50-years/",
+            items[0].SourceUrl);
+    }
+
+    [Fact]
     public void ParseAllowlistedPageLinks_keeps_php_news_detail_links_only()
     {
         const string html = """
