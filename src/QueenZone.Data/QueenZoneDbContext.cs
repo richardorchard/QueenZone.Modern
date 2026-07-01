@@ -3,8 +3,13 @@ using QueenZone.Data.Entities;
 
 namespace QueenZone.Data;
 
-public sealed class QueenZoneDbContext(DbContextOptions<QueenZoneDbContext> options) : DbContext(options)
+public sealed class QueenZoneDbContext : DbContext
 {
+    public QueenZoneDbContext(DbContextOptions<QueenZoneDbContext> options)
+        : base(options)
+    {
+    }
+
     public DbSet<NewsTableRow> NewsRows => Set<NewsTableRow>();
 
     public DbSet<NewsAuditLogEntity> NewsAuditLogs => Set<NewsAuditLogEntity>();
