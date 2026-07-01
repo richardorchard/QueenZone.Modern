@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using QueenZone.Data;
 using QueenZone.NewsAgent;
 
@@ -20,7 +21,7 @@ var configuration = new ConfigurationBuilder()
 
 var services = new ServiceCollection();
 services.AddLogging(builder => builder.AddConsole());
-services.AddQueenZoneNewsAgent();
+services.AddQueenZoneNewsAgent(configuration);
 
 var connectionString = configuration.GetConnectionString("QueenZoneLegacy");
 if (string.IsNullOrWhiteSpace(connectionString))
@@ -35,6 +36,17 @@ else
 await using var provider = services.BuildServiceProvider();
 var logger = provider.GetRequiredService<ILoggerFactory>().CreateLogger("QueenZone.NewsAgent.Worker");
 var discoveryService = provider.GetRequiredService<NewsDiscoveryService>();
+var aiRunExecutor = provider.GetRequiredService<NewsAiRunExecutor>();
+var openRouterOptions = provider.GetRequiredService<IOptions<OpenRouterOptions>>().Value;
+
+if (!aiRunExecutor.IsAiEnabled)
+{
+    logger.LogWarning("OpenRouter AI processing is disabled. Fetch-only discovery will continue without AI triage or drafting.");
+}
+else if (openRouterOptions.DryRun)
+{
+    logger.LogInformation("OpenRouter dry-run mode is enabled. AI requests will be logged without calling the provider.");
+}
 
 var runOptions = new NewsDiscoveryRunOptions(
     SeedSources: options.SeedSources,

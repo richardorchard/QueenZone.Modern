@@ -325,6 +325,20 @@ public sealed class SharedNewsDiscoveryStore
         }
     }
 
+    public decimal GetEstimatedAiSpendUsd(DateTime fromUtc, DateTime toUtc)
+    {
+        lock (sync)
+        {
+            return aiRuns
+                .Where(run =>
+                    run.CompletedAt is not null
+                    && run.CompletedAt >= fromUtc
+                    && run.CompletedAt < toUtc
+                    && run.EstimatedCostUsd is not null)
+                .Sum(run => run.EstimatedCostUsd!.Value);
+        }
+    }
+
     public NewsAgentDraftEntity? GetDraftByCandidateId(int candidateId)
     {
         lock (sync)

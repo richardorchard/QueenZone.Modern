@@ -324,6 +324,21 @@ public sealed class EfNewsDiscoveryRepository(QueenZoneDbContext dbContext) : IN
             .Select(run => MapAiRun(run))
             .ToListAsync(cancellationToken);
 
+    public async Task<decimal> GetEstimatedAiSpendUsdAsync(DateTime fromUtc, DateTime toUtc, CancellationToken cancellationToken = default)
+    {
+        var spend = await dbContext.NewsAiRuns
+            .AsNoTracking()
+            .Where(run =>
+                run.CompletedAt != null
+                && run.CompletedAt >= fromUtc
+                && run.CompletedAt < toUtc
+                && run.EstimatedCostUsd != null)
+            .Select(run => run.EstimatedCostUsd!.Value)
+            .SumAsync(cancellationToken);
+
+        return spend;
+    }
+
     public async Task<NewsAgentDraft?> GetDraftByCandidateIdAsync(int candidateId, CancellationToken cancellationToken = default)
     {
         var draft = await dbContext.NewsAgentDrafts
