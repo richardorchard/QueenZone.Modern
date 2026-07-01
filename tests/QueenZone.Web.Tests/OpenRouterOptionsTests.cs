@@ -51,4 +51,25 @@ public sealed class OpenRouterOptionsTests
 
         Assert.Contains("PerRunCandidateLimit", exception.Message, StringComparison.Ordinal);
     }
+
+    [Theory]
+    [InlineData("  sk-or-v1-test  ", "sk-or-v1-test")]
+    [InlineData("\"sk-or-v1-test\"", "sk-or-v1-test")]
+    [InlineData("'sk-or-v1-test'", "sk-or-v1-test")]
+    [InlineData("Bearer sk-or-v1-test", "sk-or-v1-test")]
+    [InlineData("  \"sk-or-v1-test\"  ", "sk-or-v1-test")]
+    public void NormalizeApiKey_trims_whitespace_quotes_and_bearer_prefix(string input, string expected)
+    {
+        Assert.Equal(expected, OpenRouterOptions.NormalizeApiKey(input));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("\"   \"")]
+    public void NormalizeApiKey_returns_null_for_blank_values(string? input)
+    {
+        Assert.Null(OpenRouterOptions.NormalizeApiKey(input));
+    }
 }

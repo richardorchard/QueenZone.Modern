@@ -1,4 +1,6 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using QueenZone.Data;
 using QueenZone.NewsAgent;
 
@@ -43,5 +45,27 @@ public sealed class NewsAgentServiceCollectionTests
 
         Assert.False(aiClient.IsEnabled);
         Assert.False(executor.IsAiEnabled);
+    }
+
+    [Fact]
+    public void AddQueenZoneNewsAgent_normalizes_openrouter_api_key_from_configuration()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["OPENROUTER_API_KEY"] = "  \"sk-or-v1-test\"  "
+            })
+            .Build();
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddQueenZoneInMemoryData();
+        services.AddQueenZoneNewsAgent(configuration);
+
+        using var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptions<OpenRouterOptions>>().Value;
+
+        Assert.Equal("sk-or-v1-test", options.ApiKey);
+        Assert.True(options.IsConfigured);
     }
 }
