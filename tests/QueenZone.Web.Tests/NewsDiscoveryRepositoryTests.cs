@@ -164,6 +164,51 @@ public sealed class NewsDiscoveryRepositoryTests
     }
 
     [Fact]
+    public async Task GetEstimatedAiSpendUsdAsync_sums_completed_runs_in_range()
+    {
+        var repository = CreateRepository();
+        var sourceId = await repository.UpsertSourceAsync(new NewsDiscoverySourceDraft(
+            "queen-online",
+            "Queen Online",
+            "https://www.queenonline.com/",
+            "https://www.queenonline.com/feed/",
+            NewsDiscoverySourceType.Rss,
+            NewsDiscoveryTrustTier.Primary,
+            60,
+            true,
+            null));
+        var candidateId = await repository.CreateCandidateAsync(new NewsCandidateCreateRequest(
+            sourceId,
+            "https://www.queenonline.com/news/test",
+            "Queen test headline",
+            DateTime.UtcNow,
+            "Excerpt",
+            DateTime.UtcNow));
+        var completedAt = new DateTime(2026, 7, 1, 10, 0, 0, DateTimeKind.Utc);
+        var aiRunId = await repository.CreateAiRunAsync(new NewsAiRunCreateRequest(
+            candidateId,
+            NewsAiRunKind.Triage,
+            "openrouter",
+            "openai/gpt-4.1-nano",
+            "triage-v1",
+            completedAt));
+        await repository.CompleteAiRunAsync(aiRunId, new NewsAiRunCompletion(
+            NewsAiRunStatus.Succeeded,
+            50,
+            10,
+            0.0015m,
+            """{"relevant":true}""",
+            null,
+            completedAt));
+
+        var spend = await repository.GetEstimatedAiSpendUsdAsync(
+            new DateTime(2026, 7, 1, 0, 0, 0, DateTimeKind.Utc),
+            new DateTime(2026, 7, 2, 0, 0, 0, DateTimeKind.Utc));
+
+        Assert.Equal(0.0015m, spend);
+    }
+
+    [Fact]
     public async Task Source_registry_supports_lookup_update_and_enabled_filter()
     {
         var repository = CreateRepository();

@@ -28,6 +28,15 @@ public sealed class EfNewsDiscoveryRepository(QueenZoneDbContext dbContext) : IN
         return source is null ? null : MapSource(source);
     }
 
+    public async Task<NewsDiscoverySource?> GetSourceByIdAsync(int sourceId, CancellationToken cancellationToken = default)
+    {
+        var source = await dbContext.NewsDiscoverySources
+            .AsNoTracking()
+            .SingleOrDefaultAsync(item => item.Id == sourceId, cancellationToken);
+
+        return source is null ? null : MapSource(source);
+    }
+
     public async Task<int> UpsertSourceAsync(NewsDiscoverySourceDraft source, CancellationToken cancellationToken = default)
     {
         var existing = await dbContext.NewsDiscoverySources
@@ -91,6 +100,57 @@ public sealed class EfNewsDiscoveryRepository(QueenZoneDbContext dbContext) : IN
             .SingleOrDefaultAsync(item => item.CanonicalUrlHash == canonicalUrlHash, cancellationToken);
 
         return candidate is null ? null : MapCandidate(candidate);
+    }
+
+    public async Task<NewsCandidate?> GetCandidateByContentHashAsync(string contentHash, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(contentHash))
+        {
+            return null;
+        }
+
+        var candidate = await dbContext.NewsCandidates
+            .AsNoTracking()
+            .Include(item => item.Source)
+            .SingleOrDefaultAsync(item => item.ContentHash == contentHash, cancellationToken);
+
+        return candidate is null ? null : MapCandidate(candidate);
+    }
+
+    public async Task<NewsCandidate?> FindEarlierDuplicateCandidateAsync(
+        int candidateId,
+        string sourceTitle,
+        string? contentHash,
+        CancellationToken cancellationToken = default)
+    {
+        if (!string.IsNullOrWhiteSpace(contentHash))
+        {
+            var byContent = await GetCandidateByContentHashAsync(contentHash, cancellationToken);
+            if (byContent is not null
+                && byContent.Id != candidateId
+                && NewsCandidateDuplicateRules.IsActiveDuplicateSource(byContent.Status))
+            {
+                return byContent;
+            }
+        }
+
+        var titleHash = NewsCandidateDedupe.ComputeContentHash(sourceTitle, null);
+        var candidates = await dbContext.NewsCandidates
+            .AsNoTracking()
+            .Include(item => item.Source)
+            .Where(candidate =>
+                candidate.Id != candidateId
+                && candidate.Status != NewsCandidateStatus.Rejected
+                && candidate.Status != NewsCandidateStatus.IgnoredDuplicate)
+            .ToListAsync(cancellationToken);
+
+        var duplicate = candidates
+            .Where(candidate => NewsCandidateDedupe.ComputeContentHash(candidate.SourceTitle, null) == titleHash)
+            .OrderBy(candidate => candidate.DiscoveredAt)
+            .ThenBy(candidate => candidate.Id)
+            .FirstOrDefault();
+
+        return duplicate is null ? null : MapCandidate(duplicate);
     }
 
     public async Task<NewsCandidate?> GetCandidateByIdAsync(int candidateId, CancellationToken cancellationToken = default)
@@ -308,6 +368,21 @@ public sealed class EfNewsDiscoveryRepository(QueenZoneDbContext dbContext) : IN
             .ThenByDescending(run => run.Id)
             .Select(run => MapAiRun(run))
             .ToListAsync(cancellationToken);
+
+    public async Task<decimal> GetEstimatedAiSpendUsdAsync(DateTime fromUtc, DateTime toUtc, CancellationToken cancellationToken = default)
+    {
+        var spend = await dbContext.NewsAiRuns
+            .AsNoTracking()
+            .Where(run =>
+                run.CompletedAt != null
+                && run.CompletedAt >= fromUtc
+                && run.CompletedAt < toUtc
+                && run.EstimatedCostUsd != null)
+            .Select(run => run.EstimatedCostUsd!.Value)
+            .SumAsync(cancellationToken);
+
+        return spend;
+    }
 
     public async Task<NewsAgentDraft?> GetDraftByCandidateIdAsync(int candidateId, CancellationToken cancellationToken = default)
     {

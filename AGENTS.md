@@ -61,7 +61,7 @@ For multi-session work, use `docs/agent-handoff-cheatsheet.md`.
 
 Follow `docs/architecture/testing-policy.md`.
 
-Default verification before a pull request:
+### Default verification before a pull request
 
 ```powershell
 dotnet restore QueenZone.sln
@@ -70,6 +70,40 @@ dotnet test QueenZone.sln --configuration Release --no-build
 ```
 
 Use deterministic sample or fake data for normal unit and web integration tests. Real legacy database tests must be opt-in and clearly reported.
+
+### Pull request CI gates (must pass before merge)
+
+GitHub Actions workflow `.github/workflows/ci.yml` blocks merge when these fail:
+
+| Check | Requirement | Blocks PR? |
+| --- | --- | --- |
+| **Build + test** | `dotnet restore`, `dotnet build`, `dotnet test` (Release) | Yes |
+| **Global line coverage** | At least **51%** across the deterministic test suite | Yes |
+| **Changed-line coverage** | At least **80%** of changed, coverable `.cs` lines in the PR diff vs `main` | Yes |
+| **Smoke test** | Published app responds on `/health`, `/`, `/news` | Yes |
+| **Playwright e2e** | Runs on self-hosted Windows runner when available | No (`continue-on-error`) |
+
+Coverage exclusions are configured in `coverlet.runsettings`. EF Core files under `**/Migrations/**/*.cs` are excluded from coverage metrics.
+
+The changed-line gate compares `git diff origin/main...HEAD` for `*.cs` files. Large new modules (services, repositories, workers) usually need targeted unit or integration tests, often with fakes or SQLite/in-memory EF, or the gate will fail.
+
+### Pre-PR verification (recommended before opening the PR)
+
+Run the same coverage gate locally so CI failures are caught early:
+
+```powershell
+git fetch origin main
+dotnet restore QueenZone.sln
+dotnet build QueenZone.sln --configuration Release --no-restore
+dotnet test QueenZone.sln --configuration Release --no-build --collect:"XPlat Code Coverage" --settings coverlet.runsettings --results-directory ./TestResults
+powershell -File ./scripts/Test-CoverageGate.ps1 -Reports ./TestResults -GlobalLineThreshold 51 -ChangedLineThreshold 80 -BaseRef origin/main
+```
+
+On Linux or GitHub Actions, use `pwsh` instead of `powershell` for the last command.
+
+If the gate reports uncovered changed lines, it prints up to 20 `path:line` entries. Add or extend tests until changed-line coverage is at least 80%.
+
+Full detail, test-layer guidance, and coverage troubleshooting: `docs/architecture/testing-policy.md` (sections **Continuous Integration** and **Pre-pull request checklist**).
 
 ## Local Secrets
 
@@ -100,3 +134,11 @@ For local SQL MCP access through Azure Data API Builder, see `docs/sql/data-api-
 - Treat the legacy database as an import source, not the permanent domain model.
 - Prefer clean, stable, search-friendly canonical URLs over preserving legacy URL shapes.
 - Never expose private, hidden, deleted, moderated, or credential-related data by default.
+
+## Cursor Cloud specific instructions
+
+Environment: .NET 10 SDK is preinstalled at `/usr/local/dotnet` and symlinked to `/usr/local/bin/dotnet` (already on `PATH`). The startup update script runs `dotnet restore QueenZone.sln` and `dotnet tool restore`; standard build/test/run commands live in `README.md` and above.
+
+No database is required for local development. When `ConnectionStrings:QueenZoneLegacy` is empty (the default), the app uses in-memory/sample data, so `dotnet run --project src/QueenZone.Web/QueenZone.Web.csproj` starts with zero external services (defaults to `Development` at `http://localhost:5146`). `dotnet run` builds `Debug` by default; do not pass `--no-build` unless you have already built the `Debug` configuration (the `--configuration Release` builds live under `bin/Release`).
+
+Exercising admin editorial routes locally without real Entra: admin routes require Microsoft Entra sign-in unless `AzureAd:ClientId` is blank, in which case a test-header auth fallback is active. `appsettings.json` ships a placeholder `ClientId`, so create a git-ignored `src/QueenZone.Web/appsettings.Local.json` that sets `AzureAd:ClientId` to `""` and lists an allowed admin email under `Admin:AllowedEmails`. Then authenticate admin requests by sending the `X-Test-User-Email: <allowed-email>` header. Admin POSTs need the `__RequestVerificationToken` antiforgery field, so fetch the form first and reuse its token plus cookie. The news article body is validated as plain text (HtmlSanitizer), so a body containing HTML tags is rejected with "Article body must be plain text."

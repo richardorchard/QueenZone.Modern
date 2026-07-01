@@ -115,16 +115,63 @@ dotnet build QueenZone.sln --configuration Release --no-restore
 dotnet test QueenZone.sln --configuration Release --no-build
 ```
 
-CI should also collect coverage from the deterministic test suite and publish an HTML/Cobertura report artifact. The coverage report is expected to help reviewers spot untested risk.
+CI also collects coverage from the deterministic test suite and publishes an HTML/Cobertura report artifact. The coverage report is expected to help reviewers spot untested risk.
 
-CI enforces two coverage gates:
+### Coverage gates (enforced on every pull request)
 
-- Global line coverage must stay at or above 51%. This is the initial ratchet baseline from the deterministic test suite and should be raised deliberately as coverage improves.
-- Changed coverable C# lines in pull requests must be at least 80% covered. If a pull request changes no coverable C# lines, the changed-line gate is skipped.
+Implemented in `scripts/Test-CoverageGate.ps1` and invoked from `.github/workflows/ci.yml` after tests complete.
+
+| Gate | Threshold | What it measures |
+| --- | --- | --- |
+| **Global line coverage** | **≥ 51%** | Line coverage across the full Cobertura report from `QueenZone.Web.Tests` |
+| **Changed-line coverage** | **≥ 80%** | Coverable `.cs` lines added or modified in the PR diff against the base branch (`main`) |
+
+Rules:
+
+- Changed-line coverage is computed from `git diff origin/main...HEAD` for `*.cs` files only.
+- Only lines that appear in the Cobertura report count as coverable. Non-executable lines, some boilerplate, and excluded files do not count.
+- If a pull request changes no coverable C# lines, the changed-line gate is skipped.
+- `coverlet.runsettings` excludes `**/obj/**/*.cs` and `**/Migrations/**/*.cs` from coverage collection.
 
 These gates are guardrails, not a replacement for useful assertions. New or changed pure logic should still normally include targeted unit coverage, especially for canonical routes, pagination, visibility rules, date formatting, and HTML sanitisation.
 
-For local coverage reports:
+### Other CI jobs
+
+| Job | Purpose | Blocks merge? |
+| --- | --- | --- |
+| `build` | Restore, build, test, coverage gates | Yes |
+| `smoke-test` | Publish app, curl `/health`, `/`, `/news` | Yes |
+| `e2e-test` | Playwright suite on self-hosted Windows runner | No (`continue-on-error` if runner offline) |
+
+Merges to `main` also trigger `.github/workflows/deploy-app-service.yml`, which re-runs tests, applies EF Core migrations, and deploys to the dev App Service. That is separate from pull request checks.
+
+## Pre-pull request checklist
+
+Before opening a pull request, run the full local gate—not only `dotnet test`:
+
+```powershell
+git fetch origin main
+dotnet restore QueenZone.sln
+dotnet build QueenZone.sln --configuration Release --no-restore
+dotnet test QueenZone.sln --configuration Release --no-build --collect:"XPlat Code Coverage" --settings coverlet.runsettings --results-directory ./TestResults
+powershell -File ./scripts/Test-CoverageGate.ps1 -Reports ./TestResults -GlobalLineThreshold 51 -ChangedLineThreshold 80 -BaseRef origin/main
+```
+
+Use `pwsh` instead of `powershell` on Linux or macOS.
+
+### When changed-line coverage fails
+
+1. Read the script output. It prints `Changed-line coverage: X%` and up to 20 uncovered `file:line` entries.
+2. Add tests that execute the uncovered paths. Prefer:
+   - Unit tests for pure logic (no I/O).
+   - Fake HTTP clients, in-memory repositories, or SQLite EF tests for data-access and service code.
+   - Web integration tests for Razor route behavior.
+3. Re-run the checklist until changed-line coverage is at least 80%.
+4. Do not rely on live network, OpenRouter, or legacy SQL for default tests.
+
+Common gaps: new repository implementations, console/worker entry points, DI registration-only code (cover via integration tests that resolve services), and error branches.
+
+For local HTML coverage inspection:
 
 ```powershell
 dotnet tool restore

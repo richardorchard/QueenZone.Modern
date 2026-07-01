@@ -11,6 +11,12 @@ public sealed class InMemoryNewsDiscoveryRepository(SharedNewsDiscoveryStore sto
         return Task.FromResult(source is null ? null : MapSource(source));
     }
 
+    public Task<NewsDiscoverySource?> GetSourceByIdAsync(int sourceId, CancellationToken cancellationToken = default)
+    {
+        var source = store.GetSourceById(sourceId);
+        return Task.FromResult(source is null ? null : MapSource(source));
+    }
+
     public Task<int> UpsertSourceAsync(NewsDiscoverySourceDraft source, CancellationToken cancellationToken = default) =>
         Task.FromResult(store.UpsertSource(source));
 
@@ -25,6 +31,21 @@ public sealed class InMemoryNewsDiscoveryRepository(SharedNewsDiscoveryStore sto
         var candidate = store.GetCandidateByCanonicalUrlHash(canonicalUrlHash);
         return Task.FromResult(candidate is null ? null : MapCandidate(candidate));
     }
+
+    public Task<NewsCandidate?> GetCandidateByContentHashAsync(string contentHash, CancellationToken cancellationToken = default)
+    {
+        var candidate = store.GetCandidateByContentHash(contentHash);
+        return Task.FromResult(candidate is null ? null : MapCandidate(candidate));
+    }
+
+    public Task<NewsCandidate?> FindEarlierDuplicateCandidateAsync(
+        int candidateId,
+        string sourceTitle,
+        string? contentHash,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(store.FindEarlierDuplicateCandidate(candidateId, sourceTitle, contentHash) is { } candidate
+            ? MapCandidate(candidate)
+            : null);
 
     public Task<NewsCandidate?> GetCandidateByIdAsync(int candidateId, CancellationToken cancellationToken = default)
     {
@@ -64,6 +85,9 @@ public sealed class InMemoryNewsDiscoveryRepository(SharedNewsDiscoveryStore sto
 
     public Task<IReadOnlyList<NewsAiRun>> GetAiRunsForCandidateAsync(int candidateId, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<NewsAiRun>>(store.GetAiRunsForCandidate(candidateId).Select(MapAiRun).ToList());
+
+    public Task<decimal> GetEstimatedAiSpendUsdAsync(DateTime fromUtc, DateTime toUtc, CancellationToken cancellationToken = default) =>
+        Task.FromResult(store.GetEstimatedAiSpendUsd(fromUtc, toUtc));
 
     public Task<NewsAgentDraft?> GetDraftByCandidateIdAsync(int candidateId, CancellationToken cancellationToken = default)
     {

@@ -105,6 +105,46 @@ public sealed class SharedNewsDiscoveryStore
         }
     }
 
+    public NewsCandidateEntity? GetCandidateByContentHash(string contentHash)
+    {
+        if (string.IsNullOrWhiteSpace(contentHash))
+        {
+            return null;
+        }
+
+        lock (sync)
+        {
+            return candidates.SingleOrDefault(candidate => candidate.ContentHash == contentHash);
+        }
+    }
+
+    public NewsCandidateEntity? FindEarlierDuplicateCandidate(int candidateId, string sourceTitle, string? contentHash)
+    {
+        lock (sync)
+        {
+            if (!string.IsNullOrWhiteSpace(contentHash))
+            {
+                var byContent = candidates.SingleOrDefault(candidate => candidate.ContentHash == contentHash);
+                if (byContent is not null
+                    && byContent.Id != candidateId
+                    && NewsCandidateDuplicateRules.IsActiveDuplicateSource(byContent.Status))
+                {
+                    return byContent;
+                }
+            }
+
+            var titleHash = NewsCandidateDedupe.ComputeContentHash(sourceTitle, null);
+            return candidates
+                .Where(candidate =>
+                    candidate.Id != candidateId
+                    && NewsCandidateDuplicateRules.IsActiveDuplicateSource(candidate.Status)
+                    && NewsCandidateDedupe.ComputeContentHash(candidate.SourceTitle, null) == titleHash)
+                .OrderBy(candidate => candidate.DiscoveredAt)
+                .ThenBy(candidate => candidate.Id)
+                .FirstOrDefault();
+        }
+    }
+
     public NewsCandidateEntity? GetCandidateById(int candidateId)
     {
         lock (sync)
@@ -309,6 +349,20 @@ public sealed class SharedNewsDiscoveryStore
                 .OrderByDescending(item => item.StartedAt)
                 .ThenByDescending(item => item.Id)
                 .ToList();
+        }
+    }
+
+    public decimal GetEstimatedAiSpendUsd(DateTime fromUtc, DateTime toUtc)
+    {
+        lock (sync)
+        {
+            return aiRuns
+                .Where(run =>
+                    run.CompletedAt is not null
+                    && run.CompletedAt >= fromUtc
+                    && run.CompletedAt < toUtc
+                    && run.EstimatedCostUsd is not null)
+                .Sum(run => run.EstimatedCostUsd!.Value);
         }
     }
 

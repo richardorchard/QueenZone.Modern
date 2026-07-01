@@ -22,7 +22,7 @@
 
 <section class="qz-section qz-section--warm">
   <div class="qz-container">
-    <partial name="_SectionHeader" model="@(("Boards", "Browse the community archive", false, (string?)null, (string?)null))" />
+    <partial name="_SectionHeader" model="@(("Boards", "Browse the community archive", false, "/search", "Search forum"))" />
     @if (Model.Categories.Count == 0)
     {
       <p>No forum boards are available yet.</p>

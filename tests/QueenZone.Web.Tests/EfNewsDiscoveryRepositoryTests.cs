@@ -287,6 +287,43 @@ public sealed class EfNewsDiscoveryRepositoryTests : IAsyncDisposable
                     "Missing",
                     DateTime.UtcNow)));
 
+    [Fact]
+    public async Task FindEarlierDuplicateCandidateAsync_returns_earlier_title_match()
+    {
+        var sourceId = await repository.UpsertSourceAsync(new NewsDiscoverySourceDraft(
+            "queen-online",
+            "Queen Online",
+            "https://www.queenonline.com/",
+            "https://www.queenonline.com/feed/",
+            NewsDiscoverySourceType.Rss,
+            NewsDiscoveryTrustTier.Primary,
+            60,
+            true,
+            null));
+        var firstId = await repository.CreateCandidateAsync(new NewsCandidateCreateRequest(
+            sourceId,
+            "https://www.queenonline.com/news/tour-2026",
+            "Queen announce 2026 tour",
+            DateTime.UtcNow,
+            "Official dates announced.",
+            DateTime.UtcNow));
+        var secondId = await repository.CreateCandidateAsync(new NewsCandidateCreateRequest(
+            sourceId,
+            "https://www.queenonline.com/news/tour-2026-copy",
+            "Queen announce 2026 tour",
+            DateTime.UtcNow,
+            "Different excerpt.",
+            DateTime.UtcNow));
+
+        var duplicate = await repository.FindEarlierDuplicateCandidateAsync(
+            secondId,
+            "Queen announce 2026 tour",
+            null);
+
+        Assert.NotNull(duplicate);
+        Assert.Equal(firstId, duplicate.Id);
+    }
+
     public async ValueTask DisposeAsync()
     {
         await dbContext.DisposeAsync();
