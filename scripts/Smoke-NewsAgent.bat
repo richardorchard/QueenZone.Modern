@@ -9,9 +9,8 @@ echo QueenZone News Agent — OpenRouter smoke test
 echo ============================================
 echo.
 echo This run will:
-echo   1. Seed discovery sources (if needed)
-echo   2. Fetch recent items from configured feeds
-echo   3. Triage candidates with OpenRouter (small budget limits apply)
+echo   1. Seed discovery sources (if needed) and fetch feeds
+echo   2. Triage candidates with OpenRouter (small budget limits apply)
 echo.
 echo One-time setup: copy
 echo   src\QueenZone.NewsAgent.Worker\appsettings.Local.json.example
@@ -28,6 +27,7 @@ if errorlevel 1 (
 
 set "LOCAL_SETTINGS=src\QueenZone.NewsAgent.Worker\appsettings.Local.json"
 set "EXAMPLE=src\QueenZone.NewsAgent.Worker\appsettings.Local.json.example"
+set "WORKER=dotnet run --project src\QueenZone.NewsAgent.Worker -- discover-news"
 
 if not exist "%LOCAL_SETTINGS%" (
     if "%OPENROUTER_API_KEY%"=="" (
@@ -48,18 +48,31 @@ if exist "%LOCAL_SETTINGS%" (
     )
 )
 
-echo Starting worker...
+echo Step 1/2: fetch discovery sources...
 echo.
-
-dotnet run --project src\QueenZone.NewsAgent.Worker -- discover-news --seed-sources --triage
-set EXITCODE=%ERRORLEVEL%
+%WORKER% --seed-sources
+set FETCH_EXIT=%ERRORLEVEL%
 
 echo.
-if %EXITCODE% equ 0 (
-    echo Smoke test finished. Check the log above for triage counts and any OpenRouter errors.
-    echo If you see "No discovered candidates require triage", feeds had nothing new to classify.
+echo Step 2/2: triage with OpenRouter...
+echo.
+%WORKER% --triage-only
+set TRIAGE_EXIT=%ERRORLEVEL%
+
+echo.
+if %TRIAGE_EXIT% equ 0 (
+    echo OpenRouter smoke test passed.
+    echo Look for "OpenRouter completed" and "Triage finished" lines above.
+    echo Rejecting all candidates as NotRelevant is normal for off-topic feed items.
+    if %FETCH_EXIT% neq 0 (
+        echo.
+        echo Note: discovery reported source fetch errors ^(exit %FETCH_EXIT%^).
+        echo Scroll up for "Discovery error" lines. Triage still ran successfully.
+    )
+    set EXITCODE=0
 ) else (
-    echo Smoke test failed with exit code %EXITCODE%.
+    echo OpenRouter smoke test failed with triage exit code %TRIAGE_EXIT%.
+    set EXITCODE=%TRIAGE_EXIT%
 )
 
 goto :end
