@@ -9,7 +9,9 @@ public sealed class DiscoverNewsWorker(
     NewsTriageService triageService,
     NewsDraftGenerationService draftGenerationService,
     NewsAiRunExecutor aiRunExecutor,
+    INewsAgentRunLeaseService runLeaseService,
     IOptions<OpenRouterOptions> openRouterOptions,
+    IOptions<NewsAgentSchedulerOptions> schedulerOptions,
     ILogger<DiscoverNewsWorker> logger)
 {
     public async Task<int> RunAsync(
@@ -17,6 +19,12 @@ public sealed class DiscoverNewsWorker(
         CancellationToken cancellationToken = default)
     {
         LogAiStatus();
+
+        await using var runLease = await TryAcquireRunLeaseAsync(options, cancellationToken);
+        if (runLease is null)
+        {
+            return 0;
+        }
 
         var exitCode = 0;
 
@@ -36,6 +44,30 @@ public sealed class DiscoverNewsWorker(
         }
 
         return exitCode;
+    }
+
+    private async Task<INewsAgentRunLease?> TryAcquireRunLeaseAsync(
+        DiscoverNewsCommandOptions options,
+        CancellationToken cancellationToken)
+    {
+        var scheduler = schedulerOptions.Value;
+        if (!scheduler.UseRunLease || options.Force)
+        {
+            return NoOpNewsAgentRunLease.Instance;
+        }
+
+        var lease = await runLeaseService.TryAcquireAsync(
+            scheduler.LeaseName,
+            TimeSpan.FromMinutes(scheduler.LeaseDurationMinutes),
+            cancellationToken);
+        if (lease is null)
+        {
+            logger.LogWarning(
+                "Skipping discover-news run because lease {LeaseName} is held by another instance.",
+                scheduler.LeaseName);
+        }
+
+        return lease;
     }
 
     private void LogAiStatus()
@@ -130,5 +162,16 @@ public sealed class DiscoverNewsWorker(
         }
 
         return draftResult.Failures > 0 ? 1 : 0;
+    }
+
+    private sealed class NoOpNewsAgentRunLease : INewsAgentRunLease
+    {
+        public static readonly NoOpNewsAgentRunLease Instance = new();
+
+        public string LeaseName => string.Empty;
+
+        public string HolderId => string.Empty;
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 }
