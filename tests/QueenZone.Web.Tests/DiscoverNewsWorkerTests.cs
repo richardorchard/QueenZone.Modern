@@ -204,6 +204,52 @@ public sealed class DiscoverNewsWorkerTests
     }
 
     [Fact]
+    public async Task RunAsync_force_bypasses_run_lease_when_another_holder_is_active()
+    {
+        var leaseStore = new SharedNewsAgentLeaseStore();
+        var leaseService = new InMemoryNewsAgentRunLeaseService(leaseStore);
+        await using var held = (await leaseService.TryAcquireAsync("discover-news", TimeSpan.FromMinutes(30)))!;
+
+        var repository = new InMemoryNewsDiscoveryRepository(new SharedNewsDiscoveryStore());
+        var feedUrl = "https://www.queenonline.com/feed/";
+        var discoveryService = NewsAgentTestSupport.CreateDiscoveryService(
+            repository,
+            new FakeNewsDiscoveryHttpClient(new Dictionary<string, string>
+            {
+                [feedUrl] = NewsAgentTestSupport.ReadFixture("sample-rss.xml")
+            }));
+        await repository.UpsertSourceAsync(new NewsDiscoverySourceDraft(
+            "queen-online",
+            "Queen Online",
+            "https://www.queenonline.com/",
+            feedUrl,
+            NewsDiscoverySourceType.Rss,
+            NewsDiscoveryTrustTier.Primary,
+            60,
+            true,
+            null));
+
+        var worker = CreateWorker(
+            repository,
+            discoveryService,
+            aiEnabled: false,
+            leaseService: leaseService,
+            useRunLease: true);
+
+        var exitCode = await worker.RunAsync(new DiscoverNewsCommandOptions(
+            SeedSources: false,
+            DryRun: false,
+            Force: true,
+            Triage: false,
+            TriageOnly: false,
+            Draft: false,
+            DraftOnly: false));
+
+        Assert.Equal(0, exitCode);
+        Assert.Equal(2, (await repository.GetCandidatesAsync()).Count);
+    }
+
+    [Fact]
     public void DiscoverNewsCommandOptions_Parse_scheduled_enables_full_pipeline_flags()
     {
         var options = DiscoverNewsCommandOptions.Parse(["discover-news", "--scheduled"]);

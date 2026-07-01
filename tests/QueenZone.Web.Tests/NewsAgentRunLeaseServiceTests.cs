@@ -38,4 +38,14 @@ public sealed class NewsAgentRunLeaseServiceTests
         Assert.NotNull(next);
         await next!.DisposeAsync();
     }
+
+    [Fact]
+    public void Release_returns_false_when_holder_does_not_match()
+    {
+        var store = new SharedNewsAgentLeaseStore();
+        store.TryAcquire("discover-news", "holder-a", DateTime.UtcNow.AddMinutes(30));
+
+        Assert.False(store.Release("discover-news", "holder-b"));
+        Assert.True(store.Release("discover-news", "holder-a"));
+    }
 }
