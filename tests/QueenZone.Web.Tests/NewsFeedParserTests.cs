@@ -42,4 +42,26 @@ public sealed class NewsFeedParserTests
         Assert.Equal(2, items.Count);
         Assert.All(items, item => Assert.Contains("rogertaylorofficial.com", item.SourceUrl));
     }
+
+    [Fact]
+    public void Parse_reads_atom_entries()
+    {
+        const string atom = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <feed xmlns="http://www.w3.org/2005/Atom">
+              <entry>
+                <title>Queen box set announced</title>
+                <link href="https://www.queenonline.com/news/box-set" rel="alternate" />
+                <summary>Collector edition announced.</summary>
+                <published>2026-07-01T10:00:00Z</published>
+              </entry>
+            </feed>
+            """;
+
+        var items = NewsFeedParser.Parse(atom);
+
+        Assert.Single(items);
+        Assert.Equal("Queen box set announced", items[0].Title);
+        Assert.Equal("https://www.queenonline.com/news/box-set", items[0].SourceUrl);
+    }
 }
