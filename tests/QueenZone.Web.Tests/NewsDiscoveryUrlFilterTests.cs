@@ -5,6 +5,15 @@ namespace QueenZone.Web.Tests;
 public sealed class NewsDiscoveryUrlFilterTests
 {
     [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("not-a-valid-url")]
+    public void IsLikelyArticleUrl_rejects_blank_and_invalid_urls(string url)
+    {
+        Assert.False(NewsDiscoveryUrlFilter.IsLikelyArticleUrl(url));
+    }
+
+    [Theory]
     [InlineData("https://www.rogertaylorofficial.com/wp-content/themes/rogertaylor/_/css/reset.css?ver=4.7.33")]
     [InlineData("https://www.rogertaylorofficial.com/wp-content/uploads/2013/10/copy-Strange-Frontier-front.jpg")]
     [InlineData("https://www.rogertaylorofficial.com/wp-includes/wlwmanifest.xml")]
