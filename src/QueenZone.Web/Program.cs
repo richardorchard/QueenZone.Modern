@@ -110,6 +110,21 @@ if (wellKnownPath is not null && Directory.Exists(wellKnownPath))
     });
 }
 
+if (!app.Environment.IsDevelopment() && !app.Environment.IsEnvironment("Testing"))
+{
+    app.UseHsts();
+}
+
+app.UseHttpsRedirection();
+
+app.Use(async (context, next) =>
+{
+    context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    context.Response.Headers["X-Frame-Options"] = "DENY";
+    context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+    await next();
+});
+
 app.UseStaticFiles();
 app.UseAuthentication();
 app.UseAuthorization();
@@ -176,12 +191,18 @@ static void ConfigureMemberAuthentication(WebApplicationBuilder builder, Authent
         options.LogoutPath = "/account/logout";
         options.ExpireTimeSpan = TimeSpan.FromDays(30);
         options.SlidingExpiration = true;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        // Lax (not Strict): the OAuth callback is a top-level GET redirected back from the
+        // external provider's domain, and Strict would drop the cookie on that navigation.
+        options.Cookie.SameSite = SameSiteMode.Lax;
     });
 
     authenticationBuilder.AddCookie(MemberAuthenticationSchemes.ExternalCookie, options =>
     {
         options.Cookie.Name = ".QueenZone.MembersExternal";
         options.ExpireTimeSpan = TimeSpan.FromMinutes(15);
+        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        options.Cookie.SameSite = SameSiteMode.Lax;
     });
 
     var memberAuth = builder.Configuration.GetSection(MemberAuthenticationOptions.SectionName).Get<MemberAuthenticationOptions>();
