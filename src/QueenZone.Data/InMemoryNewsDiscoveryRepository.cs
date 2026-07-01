@@ -71,6 +71,9 @@ public sealed class InMemoryNewsDiscoveryRepository(SharedNewsDiscoveryStore sto
     public Task<IReadOnlyList<NewsAiRun>> GetAiRunsForCandidateAsync(int candidateId, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<NewsAiRun>>(store.GetAiRunsForCandidate(candidateId).Select(MapAiRun).ToList());
 
+    public Task<decimal> GetEstimatedAiSpendUsdAsync(DateTime fromUtc, DateTime toUtc, CancellationToken cancellationToken = default) =>
+        Task.FromResult(store.GetEstimatedAiSpendUsd(fromUtc, toUtc));
+
     public Task<NewsAgentDraft?> GetDraftByCandidateIdAsync(int candidateId, CancellationToken cancellationToken = default)
     {
         var draft = store.GetDraftByCandidateId(candidateId);
