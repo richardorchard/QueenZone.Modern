@@ -27,9 +27,20 @@ public sealed class NewsAiStructuredDisplayTests
     }
 
     [Fact]
-    public void TryReadTriageSummary_returns_false_for_empty_json()
+    public void TryReadTriageSummary_returns_false_for_invalid_json()
     {
-        var parsed = NewsAiStructuredDisplay.TryReadTriageSummary(null, out var summary);
+        var parsed = NewsAiStructuredDisplay.TryReadTriageSummary("{not-json", out var summary);
+
+        Assert.False(parsed);
+        Assert.Null(summary);
+    }
+
+    [Fact]
+    public void TryReadTriageSummary_returns_false_when_rationale_missing()
+    {
+        const string json = """{"verdict":"relevant","entities":["Queen"]}""";
+
+        var parsed = NewsAiStructuredDisplay.TryReadTriageSummary(json, out var summary);
 
         Assert.False(parsed);
         Assert.Null(summary);

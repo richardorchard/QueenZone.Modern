@@ -97,6 +97,189 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
         Assert.Equal(NewsCandidateStatus.Rejected, candidate.Status);
     }
 
+    [Fact]
+    public async Task AuthorizedAdminCanIgnoreDuplicateCandidate()
+    {
+        var discoveryStore = new SharedNewsDiscoveryStore();
+        var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
+        var (firstId, secondId) = await SeedDuplicatePairAsync(discoveryRepository);
+        var client = CreateClient(AdminEmail, new SharedNewsStore(), discoveryStore);
+
+        var ignoreResponse = await PostActionAsync(client, $"/admin/news-discovery/{secondId}/ignoreduplicate", secondId);
+        Assert.Equal(HttpStatusCode.Redirect, ignoreResponse.StatusCode);
+
+        var ignored = await discoveryRepository.GetCandidateByIdAsync(secondId);
+        Assert.NotNull(ignored);
+        Assert.Equal(NewsCandidateStatus.IgnoredDuplicate, ignored.Status);
+        Assert.Equal(firstId, ignored.DuplicateOfCandidateId);
+    }
+
+    [Fact]
+    public async Task AuthorizedAdminCanPromoteNeedsReviewCandidateWithAttribution()
+    {
+        var newsStore = new SharedNewsStore();
+        var discoveryStore = new SharedNewsDiscoveryStore();
+        var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
+        var candidateId = await SeedNeedsReviewCandidateWithDraftAsync(discoveryRepository);
+        var client = CreateClient(AdminEmail, newsStore, discoveryStore);
+
+        var promoteResponse = await PostActionAsync(client, $"/admin/news-discovery/{candidateId}/promote", candidateId);
+        Assert.Equal(HttpStatusCode.Redirect, promoteResponse.StatusCode);
+
+        var editPath = promoteResponse.Headers.Location!.OriginalString;
+        var articleId = int.Parse(editPath.Split('/')[3], System.Globalization.CultureInfo.InvariantCulture);
+        var previewBody = await client.GetStringAsync($"/admin/news/{articleId}/preview");
+        Assert.Contains("Needs-review draft title", previewBody);
+        Assert.Contains("Source: Queen Online", previewBody);
+
+        var candidate = await discoveryRepository.GetCandidateByIdAsync(candidateId);
+        Assert.NotNull(candidate);
+        Assert.Equal(NewsCandidateStatus.PromotedToArticle, candidate.Status);
+    }
+
+    [Fact]
+    public async Task AuthorizedAdminCanEditDraftAndMoveCandidateToDrafted()
+    {
+        var discoveryStore = new SharedNewsDiscoveryStore();
+        var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
+        var candidateId = await SeedNeedsReviewCandidateWithDraftAsync(discoveryRepository);
+        var client = CreateClient(AdminEmail, new SharedNewsStore(), discoveryStore);
+
+        var editPage = await client.GetStringAsync($"/admin/news-discovery/{candidateId}/edit-draft");
+        Assert.Contains("Needs-review draft title", editPage);
+
+        var saveResponse = await PostDraftEditAsync(
+            client,
+            candidateId,
+            new Dictionary<string, string>
+            {
+                ["form.title"] = "Edited discovery draft",
+                ["form.slug"] = "edited-discovery-draft",
+                ["form.excerpt"] = "Edited excerpt.",
+                ["form.body"] = "Edited body text.",
+                ["form.attributionText"] = "Edited attribution.",
+                ["form.sourceNotes"] = "Edited source notes.",
+                ["form.confidenceNotes"] = "Edited confidence notes.",
+                ["form.suggestedPublishAt"] = "2026-07-15"
+            });
+        Assert.Equal(HttpStatusCode.Redirect, saveResponse.StatusCode);
+        Assert.Equal($"/admin/news-discovery/{candidateId}", saveResponse.Headers.Location!.OriginalString);
+
+        var draft = await discoveryRepository.GetDraftByCandidateIdAsync(candidateId);
+        Assert.NotNull(draft);
+        Assert.Equal("Edited discovery draft", draft.ProposedTitle);
+
+        var candidate = await discoveryRepository.GetCandidateByIdAsync(candidateId);
+        Assert.NotNull(candidate);
+        Assert.Equal(NewsCandidateStatus.Drafted, candidate.Status);
+    }
+
+    [Fact]
+    public async Task EditDraftValidationFailuresAreReturnedForInvalidForm()
+    {
+        var discoveryStore = new SharedNewsDiscoveryStore();
+        var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
+        var candidateId = await SeedNeedsReviewCandidateWithDraftAsync(discoveryRepository);
+        var client = CreateClient(AdminEmail, new SharedNewsStore(), discoveryStore);
+
+        var response = await PostDraftEditAsync(
+            client,
+            candidateId,
+            new Dictionary<string, string>
+            {
+                ["form.title"] = "",
+                ["form.excerpt"] = "",
+                ["form.body"] = ""
+            });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("Title is required.", body);
+        Assert.Contains("Excerpt is required.", body);
+        Assert.Contains("Body is required.", body);
+    }
+
+    [Fact]
+    public async Task ReviewAndEditDraftReturnNotFoundForMissingCandidate()
+    {
+        var client = CreateClient(AdminEmail);
+
+        var reviewResponse = await client.GetAsync("/admin/news-discovery/99999");
+        Assert.Equal(HttpStatusCode.NotFound, reviewResponse.StatusCode);
+
+        var editResponse = await client.GetAsync("/admin/news-discovery/99999/edit-draft");
+        Assert.Equal(HttpStatusCode.NotFound, editResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task RejectActionReturnsNotFoundForMissingCandidate()
+    {
+        var discoveryStore = new SharedNewsDiscoveryStore();
+        var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
+        var candidateId = await SeedNeedsReviewCandidateAsync(discoveryRepository);
+        var client = CreateClient(AdminEmail, new SharedNewsStore(), discoveryStore);
+        var reviewPage = await client.GetStringAsync($"/admin/news-discovery/{candidateId}");
+        var token = ExtractAntiforgeryToken(reviewPage);
+
+        var response = await client.PostAsync(
+            "/admin/news-discovery/99999/reject",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                [AdminNewsDiscoveryPageModel.AntiforgeryTokenFieldName] = token
+            }));
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task RejectActionRedirectsWhenCandidateCannotBeRejectedAgain()
+    {
+        var discoveryStore = new SharedNewsDiscoveryStore();
+        var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
+        var candidateId = await SeedNeedsReviewCandidateAsync(discoveryRepository);
+        var client = CreateClient(AdminEmail, new SharedNewsStore(), discoveryStore);
+
+        await PostActionAsync(client, $"/admin/news-discovery/{candidateId}/reject", candidateId);
+        var secondReject = await PostActionAsync(client, $"/admin/news-discovery/{candidateId}/reject", candidateId);
+
+        Assert.Equal(HttpStatusCode.Redirect, secondReject.StatusCode);
+        Assert.Equal($"/admin/news-discovery/{candidateId}", secondReject.Headers.Location!.OriginalString);
+    }
+
+    [Fact]
+    public async Task ReviewPageShowsDuplicateLinkWhenConfigured()
+    {
+        var discoveryStore = new SharedNewsDiscoveryStore();
+        var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
+        var (firstId, secondId) = await SeedDuplicatePairAsync(discoveryRepository);
+        await discoveryRepository.TryUpdateCandidateStatusAsync(
+            secondId,
+            new NewsCandidateStatusUpdate(
+                NewsCandidateStatus.IgnoredDuplicate,
+                DuplicateOfCandidateId: firstId));
+        var client = CreateClient(AdminEmail, new SharedNewsStore(), discoveryStore);
+
+        var body = await client.GetStringAsync($"/admin/news-discovery/{secondId}");
+        Assert.Contains($"Candidate #{firstId}", body);
+        Assert.Contains("Original Queen story", body);
+    }
+
+    [Fact]
+    public async Task IndexFiltersByTrustTierAndHasDraft()
+    {
+        var discoveryStore = new SharedNewsDiscoveryStore();
+        var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
+        var candidateId = await SeedDraftedCandidateAsync(discoveryRepository);
+        var client = CreateClient(AdminEmail, new SharedNewsStore(), discoveryStore);
+
+        var filteredBody = await client.GetStringAsync("/admin/news-discovery?trustTier=Primary&hasDraft=true");
+        Assert.Contains("Discovery review candidate", filteredBody);
+        Assert.Contains($"/admin/news-discovery/{candidateId}", filteredBody);
+
+        var emptyBody = await client.GetStringAsync("/admin/news-discovery?trustTier=Secondary&hasDraft=true");
+        Assert.Contains("No candidates match the current filters.", emptyBody);
+    }
+
     private static async Task<int> SeedNeedsReviewCandidateAsync(InMemoryNewsDiscoveryRepository repository)
     {
         var sourceId = await repository.UpsertSourceAsync(new NewsDiscoverySourceDraft(
@@ -180,6 +363,78 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
         return candidateId;
     }
 
+    private static async Task<int> SeedNeedsReviewCandidateWithDraftAsync(InMemoryNewsDiscoveryRepository repository)
+    {
+        var sourceId = await repository.UpsertSourceAsync(new NewsDiscoverySourceDraft(
+            "queen-online",
+            "Queen Online",
+            "https://www.queenonline.com/",
+            null,
+            NewsDiscoverySourceType.Rss,
+            NewsDiscoveryTrustTier.Primary,
+            60,
+            true,
+            null));
+        var discoveredAt = new DateTime(2026, 7, 1, 12, 0, 0, DateTimeKind.Utc);
+        var candidateId = await repository.CreateCandidateAsync(new NewsCandidateCreateRequest(
+            sourceId,
+            "https://www.queenonline.com/news/needs-review-draft",
+            "Needs review with draft",
+            discoveredAt,
+            "Excerpt",
+            discoveredAt));
+        await repository.TryUpdateCandidateStatusAsync(
+            candidateId,
+            new NewsCandidateStatusUpdate(NewsCandidateStatus.NeedsReview));
+        await repository.UpsertDraftAsync(candidateId, new NewsAgentDraftUpsert(
+            "Needs-review draft title",
+            "needs-review-draft-title",
+            "Needs-review excerpt.",
+            "Needs-review body.",
+            "Source: Queen Online",
+            null,
+            null,
+            discoveredAt.Date,
+            null));
+        return candidateId;
+    }
+
+    private static async Task<(int FirstId, int SecondId)> SeedDuplicatePairAsync(InMemoryNewsDiscoveryRepository repository)
+    {
+        var sourceId = await repository.UpsertSourceAsync(new NewsDiscoverySourceDraft(
+            "queen-online",
+            "Queen Online",
+            "https://www.queenonline.com/",
+            null,
+            NewsDiscoverySourceType.Rss,
+            NewsDiscoveryTrustTier.Primary,
+            60,
+            true,
+            null));
+        var discoveredAt = new DateTime(2026, 7, 1, 12, 0, 0, DateTimeKind.Utc);
+        var firstId = await repository.CreateCandidateAsync(new NewsCandidateCreateRequest(
+            sourceId,
+            "https://www.queenonline.com/news/original",
+            "Original Queen story",
+            discoveredAt,
+            "Excerpt",
+            discoveredAt));
+        await repository.TryUpdateCandidateStatusAsync(
+            firstId,
+            new NewsCandidateStatusUpdate(NewsCandidateStatus.NeedsReview));
+        var secondId = await repository.CreateCandidateAsync(new NewsCandidateCreateRequest(
+            sourceId,
+            "https://www.queenonline.com/news/duplicate-story",
+            "Original Queen story",
+            discoveredAt.AddMinutes(5),
+            "Duplicate excerpt.",
+            discoveredAt.AddMinutes(5)));
+        await repository.TryUpdateCandidateStatusAsync(
+            secondId,
+            new NewsCandidateStatusUpdate(NewsCandidateStatus.NeedsReview));
+        return (firstId, secondId);
+    }
+
     private WebApplicationFactory<Program> CreateFactory(SharedNewsStore newsStore, SharedNewsDiscoveryStore discoveryStore) =>
         factory.WithWebHostBuilder(builder =>
             builder.ConfigureServices(services =>
@@ -230,6 +485,16 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
         {
             [AdminNewsDiscoveryPageModel.AntiforgeryTokenFieldName] = token
         }));
+    }
+
+    private static async Task<HttpResponseMessage> PostDraftEditAsync(
+        HttpClient client,
+        int candidateId,
+        Dictionary<string, string> fields)
+    {
+        var formPage = await client.GetStringAsync($"/admin/news-discovery/{candidateId}/edit-draft");
+        fields[AdminNewsDiscoveryPageModel.AntiforgeryTokenFieldName] = ExtractAntiforgeryToken(formPage);
+        return await client.PostAsync($"/admin/news-discovery/{candidateId}/edit-draft", new FormUrlEncodedContent(fields));
     }
 
     private static string ExtractAntiforgeryToken(string html)
