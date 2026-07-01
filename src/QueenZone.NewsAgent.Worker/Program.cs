@@ -43,5 +43,5 @@ static void PrintUsage()
     Console.WriteLine("QueenZone news discovery worker");
     Console.WriteLine();
     Console.WriteLine("Usage:");
-    Console.WriteLine("  dotnet run --project src/QueenZone.NewsAgent.Worker -- discover-news [--fetch-only] [--seed-sources] [--dry-run] [--force] [--triage] [--triage-only]");
+    Console.WriteLine("  dotnet run --project src/QueenZone.NewsAgent.Worker -- discover-news [--fetch-only] [--seed-sources] [--dry-run] [--force] [--triage] [--triage-only] [--draft] [--draft-only]");
 }

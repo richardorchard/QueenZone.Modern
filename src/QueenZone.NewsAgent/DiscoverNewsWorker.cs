@@ -7,6 +7,7 @@ namespace QueenZone.NewsAgent;
 public sealed class DiscoverNewsWorker(
     NewsDiscoveryService discoveryService,
     NewsTriageService triageService,
+    NewsDraftGenerationService draftGenerationService,
     NewsAiRunExecutor aiRunExecutor,
     IOptions<OpenRouterOptions> openRouterOptions,
     ILogger<DiscoverNewsWorker> logger)
@@ -19,7 +20,7 @@ public sealed class DiscoverNewsWorker(
 
         var exitCode = 0;
 
-        if (!options.TriageOnly)
+        if (!options.TriageOnly && !options.DraftOnly)
         {
             exitCode = await RunDiscoveryAsync(options, cancellationToken);
         }
@@ -27,6 +28,11 @@ public sealed class DiscoverNewsWorker(
         if (options.Triage)
         {
             exitCode = Math.Max(exitCode, await RunTriageAsync(options, cancellationToken));
+        }
+
+        if (options.Draft)
+        {
+            exitCode = Math.Max(exitCode, await RunDraftGenerationAsync(options, cancellationToken));
         }
 
         return exitCode;
@@ -99,5 +105,30 @@ public sealed class DiscoverNewsWorker(
         }
 
         return triageResult.Failures > 0 ? 1 : 0;
+    }
+
+    private async Task<int> RunDraftGenerationAsync(
+        DiscoverNewsCommandOptions options,
+        CancellationToken cancellationToken)
+    {
+        var draftResult = await draftGenerationService.RunDraftGenerationAsync(
+            new NewsDraftRunOptions(
+                DryRun: options.DryRun,
+                ForceRegenerate: options.Force),
+            cancellationToken);
+
+        logger.LogInformation(
+            "Draft generation finished. Considered={CandidatesConsidered}, created={DraftsCreated}, skipped={Skipped}, failures={Failures}.",
+            draftResult.CandidatesConsidered,
+            draftResult.DraftsCreated,
+            draftResult.Skipped,
+            draftResult.Failures);
+
+        foreach (var error in draftResult.Errors)
+        {
+            logger.LogError("Draft generation error: {Error}", error);
+        }
+
+        return draftResult.Failures > 0 ? 1 : 0;
     }
 }

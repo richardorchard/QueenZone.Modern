@@ -43,15 +43,21 @@ public static class NewsAgentServiceCollectionExtensions
             services.AddOptions<NewsTriageOptions>()
                 .Bind(configuration.GetSection(NewsTriageOptions.SectionName))
                 .ValidateOnStart();
+
+            services.AddOptions<NewsDraftGenerationOptions>()
+                .Bind(configuration.GetSection(NewsDraftGenerationOptions.SectionName))
+                .ValidateOnStart();
         }
         else
         {
             services.AddOptions<OpenRouterOptions>();
             services.AddOptions<NewsTriageOptions>();
+            services.AddOptions<NewsDraftGenerationOptions>();
         }
 
         services.AddSingleton<IValidateOptions<OpenRouterOptions>, OpenRouterOptionsValidator>();
         services.AddSingleton<IValidateOptions<NewsTriageOptions>, NewsTriageOptionsValidator>();
+        services.AddSingleton<IValidateOptions<NewsDraftGenerationOptions>, NewsDraftGenerationOptionsValidator>();
         services.AddHttpClient<INewsAiClient, OpenRouterNewsAiClient>((serviceProvider, client) =>
         {
             var options = serviceProvider.GetRequiredService<IOptions<OpenRouterOptions>>().Value;
@@ -61,6 +67,7 @@ public static class NewsAgentServiceCollectionExtensions
         services.AddScoped<NewsAiRunExecutor>();
         services.AddScoped<NewsTriageDeterministicAnalyzer>();
         services.AddScoped<NewsTriageService>();
+        services.AddScoped<NewsDraftGenerationService>();
         services.AddScoped<DiscoverNewsWorker>();
 
         return services;
