@@ -78,7 +78,7 @@ public static class LegacyNewsSchema
     {
         var sourceUrlProjection = columns.HasSourceUrlColumn
             ? "SOURCE_URL"
-            : "CAST(NULL AS varchar(75)) AS SOURCE_URL";
+            : "CAST(NULL AS varchar(2000)) AS SOURCE_URL";
         var slugProjection = columns.HasSlugColumn
             ? "SLUG"
             : "CAST(NULL AS nvarchar(200)) AS SLUG";
