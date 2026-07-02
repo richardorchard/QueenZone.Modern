@@ -6,7 +6,8 @@ namespace QueenZone.Web.Pages.Admin.News;
 public sealed class EditPostModel(
     IAdminNewsRepository adminNewsRepository,
     INewsDiscoveryRepository discoveryRepository,
-    INewsAuditRepository auditRepository) : AdminNewsPageModel
+    INewsAuditRepository auditRepository,
+    ILogger<EditPostModel> logger) : AdminNewsPageModel
 {
     public ArticleFormViewModel? Form { get; private set; }
 
@@ -29,10 +30,19 @@ public sealed class EditPostModel(
         var errors = NewsValidation.ValidateDraft(draft, slugInUse);
         if (errors.Count > 0)
         {
-            var provenance = await NewsDiscoveryProvenanceBuilder.LoadForPromotedArticleAsync(
-                discoveryRepository,
-                id,
-                cancellationToken);
+            NewsDiscoveryProvenance? provenance = null;
+            try
+            {
+                provenance = await NewsDiscoveryProvenanceBuilder.LoadForPromotedArticleAsync(
+                    discoveryRepository,
+                    id,
+                    cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to load discovery provenance for admin news edit {NewsId}", id);
+            }
+
             ViewData["Title"] = "Edit article";
             Form = EditModel.BuildForm(existing, draft, errors, provenance);
             return Page();

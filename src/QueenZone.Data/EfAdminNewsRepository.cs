@@ -24,12 +24,14 @@ public sealed class EfAdminNewsRepository(QueenZoneDbContext dbContext) : IAdmin
     public async Task<AdminNewsArticle?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
 #pragma warning disable EF1003 // SQL is generated from fixed schema-detection branches, not user input.
-        var row = await dbContext.NewsRows
+        // Materialize on the client: EF cannot compose SingleOrDefault over this CTE-based SQL.
+        var rows = await dbContext.NewsRows
             .FromSqlRaw(latestNewsSql + " AND NEWS_ID = {0}", id)
             .AsNoTracking()
-            .SingleOrDefaultAsync(cancellationToken);
+            .ToListAsync(cancellationToken);
 #pragma warning restore EF1003
 
+        var row = rows.FirstOrDefault();
         return row is null ? null : NewsTableRowMapper.ToAdminArticle(row);
     }
 

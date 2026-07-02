@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using QueenZone.Data;
 
@@ -58,6 +59,13 @@ public sealed class ActionModel(
             await adminNewsRepository.DeleteAsync(id, EditorEmail, cancellationToken);
         }
         catch (DbUpdateException ex) when (AdminNewsDeleteError.IsForeignKeyViolation(ex))
+        {
+            TempData[AdminNewsMessages.MessageKey] =
+                "This article could not be deleted because other archive records still reference it. Unpublish it instead to hide it from the public site.";
+            TempData[AdminNewsMessages.MessageKindKey] = "error";
+            return Redirect("/admin/news");
+        }
+        catch (SqlException ex) when (ex.Number == 547)
         {
             TempData[AdminNewsMessages.MessageKey] =
                 "This article could not be deleted because other archive records still reference it. Unpublish it instead to hide it from the public site.";

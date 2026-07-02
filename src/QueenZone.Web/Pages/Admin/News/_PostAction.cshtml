@@ -2,6 +2,6 @@
 @inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
 
 <form method="post" action="@Model.Action" class="admin-inline-form" onsubmit="@(Model.Confirm ? "return confirm('Are you sure?');" : null)">
-  <input type="hidden" name="@AdminNewsPageModel.AntiforgeryTokenFieldName" value="@Antiforgery.GetAndStoreTokens(Context).RequestToken">
+  <input type="hidden" name="@AdminNewsPageModel.AntiforgeryTokenFieldName" value="@(Model.AntiforgeryToken ?? Antiforgery.GetAndStoreTokens(Context).RequestToken)">
   <button type="submit">@Model.Label</button>
 </form>
