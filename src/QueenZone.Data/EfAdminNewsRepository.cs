@@ -1,3 +1,5 @@
+using Dapper;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using QueenZone.Data.Entities;
 
@@ -7,6 +9,8 @@ public sealed class EfAdminNewsRepository : IAdminNewsRepository
 {
     private readonly QueenZoneDbContext dbContext;
     private readonly string latestNewsSql;
+    private readonly string latestNewsCountSql;
+    private readonly string connectionString;
 
     public EfAdminNewsRepository(QueenZoneDbContext dbContext)
         : this(dbContext, latestNewsSqlOverride: null)
@@ -16,9 +20,19 @@ public sealed class EfAdminNewsRepository : IAdminNewsRepository
     internal EfAdminNewsRepository(QueenZoneDbContext dbContext, string? latestNewsSqlOverride)
     {
         this.dbContext = dbContext;
-        latestNewsSql = latestNewsSqlOverride ?? LegacyNewsSchema.BuildAdminLatestNewsSql(
-            LegacyNewsSchema.GetNewsColumnAvailability(dbContext.Database.GetConnectionString()
-                ?? throw new InvalidOperationException("QueenZone legacy database connection string is not configured.")));
+        connectionString = dbContext.Database.GetConnectionString()
+            ?? throw new InvalidOperationException("QueenZone legacy database connection string is not configured.");
+        if (latestNewsSqlOverride is not null)
+        {
+            latestNewsSql = latestNewsSqlOverride;
+            latestNewsCountSql = "SELECT COUNT(*) AS [Value] FROM NEWS_T";
+        }
+        else
+        {
+            var columns = LegacyNewsSchema.GetNewsColumnAvailability(connectionString);
+            latestNewsSql = LegacyNewsSchema.BuildAdminLatestNewsSql(columns);
+            latestNewsCountSql = LegacyNewsSchema.BuildAdminLatestNewsCountSql(columns);
+        }
     }
 
     public async Task<IReadOnlyList<AdminNewsArticle>> GetAllAsync(CancellationToken cancellationToken = default)
@@ -31,6 +45,35 @@ public sealed class EfAdminNewsRepository : IAdminNewsRepository
 #pragma warning restore EF1003
 
         return rows.Select(NewsTableRowMapper.ToAdminArticle).ToList();
+    }
+
+    public async Task<AdminNewsArticlePage> GetPageAsync(int page, int pageSize, CancellationToken cancellationToken = default)
+    {
+        var normalizedPage = Math.Max(page, 1);
+        var normalizedPageSize = Math.Max(pageSize, 1);
+        var offset = (normalizedPage - 1) * normalizedPageSize;
+
+        var totalCount = await GetAdminNewsTotalCountAsync(cancellationToken);
+
+        var pagingSuffix = IsSqliteDatabase()
+            ? " ORDER BY PublishedAt DESC, NewsId DESC LIMIT {1} OFFSET {0}"
+            : " ORDER BY PublishedAt DESC, NewsId DESC OFFSET {0} ROWS FETCH NEXT {1} ROWS ONLY";
+
+#pragma warning disable EF1003 // SQL is generated from fixed schema-detection branches, not user input.
+        var rows = await dbContext.NewsRows
+            .FromSqlRaw(
+                latestNewsSql + pagingSuffix,
+                offset,
+                normalizedPageSize)
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
+#pragma warning restore EF1003
+
+        return new AdminNewsArticlePage(
+            rows.Select(NewsTableRowMapper.ToAdminArticle).ToList(),
+            totalCount,
+            normalizedPage,
+            normalizedPageSize);
     }
 
     public async Task<AdminNewsArticle?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
@@ -151,4 +194,24 @@ public sealed class EfAdminNewsRepository : IAdminNewsRepository
             article.Id != excludeNewsId
             && string.Equals(NewsSlug.ResolveForArticle(article), normalized, StringComparison.OrdinalIgnoreCase));
     }
+
+    private async Task<int> GetAdminNewsTotalCountAsync(CancellationToken cancellationToken)
+    {
+        if (IsSqliteDatabase())
+        {
+            return await dbContext.Database
+                .SqlQueryRaw<int>(latestNewsCountSql)
+                .FirstAsync(cancellationToken);
+        }
+
+        await using var connection = new SqlConnection(connectionString);
+        return await connection.ExecuteScalarAsync<int>(
+            new CommandDefinition(latestNewsCountSql, cancellationToken: cancellationToken));
+    }
+
+    private bool IsSqliteDatabase() =>
+        string.Equals(
+            dbContext.Database.ProviderName,
+            "Microsoft.EntityFrameworkCore.Sqlite",
+            StringComparison.Ordinal);
 }

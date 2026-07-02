@@ -6,27 +6,7 @@ namespace QueenZone.Web.Tests;
 
 public sealed class EfAdminNewsRepositoryTests : IAsyncDisposable
 {
-    private const string SqliteLatestNewsSql = """
-        SELECT
-            NEWS_ID,
-            TITLE,
-            EXCERPT,
-            ARTICLE,
-            "DATE",
-            "DATE" AS PublishedAt,
-            CAST(NULL AS TEXT) AS SOURCE_URL,
-            DISPLAY,
-            CAST(NULL AS TEXT) AS SLUG,
-            CAST(NULL AS TEXT) AS CREATED_AT,
-            CAST(NULL AS TEXT) AS UPDATED_AT,
-            CAST(NULL AS TEXT) AS EDITOR_EMAIL,
-            CAST(NULL AS INTEGER) AS USER_ID,
-            NEWS_ID AS NewsId,
-            TYPE,
-            QUEEN_ONLINE
-        FROM NEWS_T
-        WHERE 1 = 1
-        """;
+    internal const string SqliteLatestNewsSql = AdminNewsSqliteTestHarness.LatestNewsSql;
 
     private readonly SqliteConnection connection;
     private readonly QueenZoneDbContext dbContext;
@@ -40,23 +20,8 @@ public sealed class EfAdminNewsRepositoryTests : IAsyncDisposable
             .UseSqlite(connection)
             .Options;
         dbContext = new QueenZoneDbContext(options);
-        dbContext.Database.ExecuteSqlRaw("""
-            CREATE TABLE NEWS_T (
-                NEWS_ID INTEGER NOT NULL PRIMARY KEY,
-                TITLE TEXT NOT NULL,
-                EXCERPT TEXT NOT NULL,
-                ARTICLE TEXT NOT NULL,
-                "DATE" TEXT NOT NULL,
-                DISPLAY INTEGER NOT NULL,
-                USER_ID INTEGER NULL,
-                TYPE INTEGER NOT NULL DEFAULT 0,
-                QUEEN_ONLINE INTEGER NOT NULL DEFAULT 0
-            );
-            """);
-        dbContext.Database.ExecuteSqlRaw("""
-            INSERT INTO NEWS_T (NEWS_ID, TITLE, EXCERPT, ARTICLE, "DATE", DISPLAY, TYPE, QUEEN_ONLINE)
-            VALUES (4201, 'SQLite admin article', 'Excerpt', 'Body', '2026-06-01', 0, 0, 0);
-            """);
+        AdminNewsSqliteTestHarness.EnsureNewsTable(dbContext);
+        AdminNewsSqliteTestHarness.SeedArticle(dbContext, 4201, "SQLite admin article");
         repository = new EfAdminNewsRepository(dbContext, SqliteLatestNewsSql);
     }
 
@@ -86,6 +51,77 @@ public sealed class EfAdminNewsRepositoryTests : IAsyncDisposable
         var article = await repository.GetByIdAsync(9999);
 
         Assert.Null(article);
+    }
+
+    [Fact]
+    public async Task GetPageAsync_returns_requested_slice_and_total_count()
+    {
+        for (var id = 4202; id <= 4210; id++)
+        {
+            var title = $"Article {id}";
+            var publishedAt = $"2026-06-{id - 4200:D2}";
+            dbContext.Database.ExecuteSql($"""
+                INSERT INTO NEWS_T (NEWS_ID, TITLE, EXCERPT, ARTICLE, "DATE", DISPLAY, TYPE, QUEEN_ONLINE)
+                VALUES ({id}, {title}, 'Excerpt', 'Body', {publishedAt}, 0, 0, 0);
+                """);
+        }
+
+        var firstPage = await repository.GetPageAsync(1, 4);
+
+        Assert.Equal(10, firstPage.TotalCount);
+        Assert.Equal(1, firstPage.Page);
+        Assert.Equal(4, firstPage.PageSize);
+        Assert.Equal(4, firstPage.Items.Count);
+        Assert.Equal(4210, firstPage.Items[0].Id);
+        Assert.Equal(4207, firstPage.Items[^1].Id);
+
+        var secondPage = await repository.GetPageAsync(2, 4);
+
+        Assert.Equal(10, secondPage.TotalCount);
+        Assert.Equal(4, secondPage.Items.Count);
+        Assert.Equal(4206, secondPage.Items[0].Id);
+        Assert.Equal(4203, secondPage.Items[^1].Id);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_persists_changes_readable_via_GetByIdAsync()
+    {
+        var draft = new AdminNewsDraft(
+            "Updated sqlite title",
+            "updated-sqlite-title",
+            "Updated excerpt",
+            "Updated body",
+            new DateTime(2026, 6, 20, 0, 0, 0, DateTimeKind.Utc),
+            null);
+
+        await repository.UpdateAsync(4201, draft, "editor@test.local");
+
+        var article = await repository.GetByIdAsync(4201);
+        Assert.NotNull(article);
+        Assert.Equal("Updated sqlite title", article.Title);
+        Assert.Equal("Updated excerpt", article.Excerpt);
+        Assert.Equal("Updated body", article.Body);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_removes_article_from_GetByIdAsync()
+    {
+        await repository.DeleteAsync(4201, "editor@test.local");
+
+        var article = await repository.GetByIdAsync(4201);
+        Assert.Null(article);
+    }
+
+    [Fact]
+    public async Task GetById_then_DeleteAsync_matches_admin_delete_workflow()
+    {
+        var loaded = await repository.GetByIdAsync(4201);
+        Assert.NotNull(loaded);
+        Assert.Equal("SQLite admin article", loaded.Title);
+
+        await repository.DeleteAsync(4201, "editor@test.local");
+
+        Assert.Null(await repository.GetByIdAsync(4201));
     }
 
     public async ValueTask DisposeAsync()

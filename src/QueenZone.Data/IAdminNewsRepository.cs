@@ -4,6 +4,8 @@ public interface IAdminNewsRepository
 {
     Task<IReadOnlyList<AdminNewsArticle>> GetAllAsync(CancellationToken cancellationToken = default);
 
+    Task<AdminNewsArticlePage> GetPageAsync(int page, int pageSize, CancellationToken cancellationToken = default);
+
     Task<AdminNewsArticle?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
 
     Task<int> CreateDraftAsync(AdminNewsDraft draft, string editorEmail, CancellationToken cancellationToken = default);

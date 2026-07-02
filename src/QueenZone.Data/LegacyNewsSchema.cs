@@ -42,44 +42,9 @@ public static class LegacyNewsSchema
             """;
     }
 
-    public static string BuildAdminLatestNewsSql(NewsColumnAvailability columns)
-    {
-        var sourceUrlProjection = columns.HasSourceUrlColumn
-            ? "SOURCE_URL"
-            : "CAST(NULL AS varchar(75)) AS SOURCE_URL";
-        var slugProjection = columns.HasSlugColumn
-            ? "SLUG"
-            : "CAST(NULL AS nvarchar(200)) AS SLUG";
-        var createdAtProjection = columns.HasCreatedAtColumn
-            ? "CREATED_AT"
-            : "CAST(NULL AS datetime2) AS CREATED_AT";
-        var updatedAtProjection = columns.HasUpdatedAtColumn
-            ? "UPDATED_AT"
-            : "CAST(NULL AS datetime2) AS UPDATED_AT";
-        var editorEmailProjection = columns.HasEditorEmailColumn
-            ? "EDITOR_EMAIL"
-            : "CAST(NULL AS nvarchar(256)) AS EDITOR_EMAIL";
+    public static string BuildAdminLatestNewsSql(NewsColumnAvailability columns) =>
+        BuildAdminLatestNewsCte(columns) + """
 
-        return $"""
-            WITH LatestNews AS (
-                SELECT
-                    NEWS_ID,
-                    ISNULL(TITLE, '') AS TITLE,
-                    ISNULL(EXCERPT, '') AS EXCERPT,
-                    ISNULL(ARTICLE, '') AS ARTICLE,
-                    [DATE],
-                    {sourceUrlProjection},
-                    DISPLAY,
-                    {slugProjection},
-                    {createdAtProjection},
-                    {updatedAtProjection},
-                    {editorEmailProjection},
-                    USER_ID,
-                    CAST(ISNULL(TYPE, 0) AS int) AS TYPE,
-                    CAST(ISNULL(QUEEN_ONLINE, 0) AS int) AS QUEEN_ONLINE,
-                    ROW_NUMBER() OVER (PARTITION BY NEWS_ID ORDER BY [DATE] DESC, NEWS_ID DESC) AS RowNumber
-                FROM NEWS_T
-            )
             SELECT
                 NEWS_ID,
                 TITLE,
@@ -99,6 +64,55 @@ public static class LegacyNewsSchema
                 QUEEN_ONLINE
             FROM LatestNews
             WHERE RowNumber = 1
+            """;
+
+    public static string BuildAdminLatestNewsCountSql(NewsColumnAvailability columns) =>
+        BuildAdminLatestNewsCte(columns) + """
+
+            SELECT COUNT(*)
+            FROM LatestNews
+            WHERE RowNumber = 1
+            """;
+
+    private static string BuildAdminLatestNewsCte(NewsColumnAvailability columns)
+    {
+        var sourceUrlProjection = columns.HasSourceUrlColumn
+            ? "SOURCE_URL"
+            : "CAST(NULL AS varchar(75)) AS SOURCE_URL";
+        var slugProjection = columns.HasSlugColumn
+            ? "SLUG"
+            : "CAST(NULL AS nvarchar(200)) AS SLUG";
+        var createdAtProjection = columns.HasCreatedAtColumn
+            ? "CREATED_AT"
+            : "CAST(NULL AS datetime2) AS CREATED_AT";
+        var updatedAtProjection = columns.HasUpdatedAtColumn
+            ? "UPDATED_AT"
+            : "CAST(NULL AS datetime2) AS UPDATED_AT";
+        var editorEmailProjection = columns.HasEditorEmailColumn
+            ? "EDITOR_EMAIL"
+            : "CAST(NULL AS nvarchar(256)) AS EDITOR_EMAIL";
+
+        return $"""
+
+            WITH LatestNews AS (
+                SELECT
+                    NEWS_ID,
+                    ISNULL(TITLE, '') AS TITLE,
+                    ISNULL(EXCERPT, '') AS EXCERPT,
+                    ISNULL(ARTICLE, '') AS ARTICLE,
+                    [DATE],
+                    {sourceUrlProjection},
+                    DISPLAY,
+                    {slugProjection},
+                    {createdAtProjection},
+                    {updatedAtProjection},
+                    {editorEmailProjection},
+                    USER_ID,
+                    CAST(ISNULL(TYPE, 0) AS int) AS TYPE,
+                    CAST(ISNULL(QUEEN_ONLINE, 0) AS int) AS QUEEN_ONLINE,
+                    ROW_NUMBER() OVER (PARTITION BY NEWS_ID ORDER BY [DATE] DESC, NEWS_ID DESC) AS RowNumber
+                FROM NEWS_T
+            )
             """;
     }
 

@@ -1,0 +1,62 @@
+@model QueenZone.Web.Pages.Admin.News.AdminNewsListViewModel
+
+<h1>Admin news</h1>
+
+@if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+{
+  <p class="admin-status admin-status--@Model.StatusMessageKind">@Model.StatusMessage</p>
+}
+
+<p>
+  <a href="/admin/news/new">Create article</a>
+  <span aria-hidden="true"> · </span>
+  <a href="/admin/news-discovery">Review discovered candidates</a>
+</p>
+
+@if (Model.TotalCount > 0)
+{
+  <p class="admin-list-range">Showing @Model.RangeStart&ndash;@Model.RangeEnd of @Model.TotalCount articles</p>
+}
+
+@if (Model.Articles.Count == 0)
+{
+  <p>No news articles yet.</p>
+}
+else
+{
+  <table class="admin-table">
+    <thead>
+      <tr>
+        <th>Title</th>
+        <th>Status</th>
+        <th>Published</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      @foreach (var article in Model.Articles)
+      {
+        <tr>
+          <td class="admin-title-cell">@article.Title</td>
+          <td>@(article.IsPublished ? "Published" : "Draft")</td>
+          <td>@article.PublishedAt.ToString("dd MMM yyyy")</td>
+          <td class="admin-actions">
+            <a href="/admin/news/@article.Id/edit">Edit</a>
+            <a href="/admin/news/@article.Id/preview">Preview</a>
+            @if (article.IsPublished)
+            {
+              <partial name="_PostAction" model="@(new PostActionViewModel($"/admin/news/{article.Id}/unpublish", "Unpublish", AntiforgeryToken: Model.AntiforgeryToken))" />
+            }
+            else
+            {
+              <partial name="_PostAction" model="@(new PostActionViewModel($"/admin/news/{article.Id}/publish", "Publish", AntiforgeryToken: Model.AntiforgeryToken))" />
+            }
+            <partial name="_PostAction" model="@(new PostActionViewModel($"/admin/news/{article.Id}/delete", "Delete", Confirm: true, AntiforgeryToken: Model.AntiforgeryToken))" />
+          </td>
+        </tr>
+      }
+    </tbody>
+  </table>
+
+  <partial name="_ArchivePagination" model="Model.Pagination" />
+}
