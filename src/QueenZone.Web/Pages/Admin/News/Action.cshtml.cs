@@ -7,14 +7,18 @@ namespace QueenZone.Web.Pages.Admin.News;
 public sealed class ActionModel(
     IAdminNewsRepository adminNewsRepository,
     INewsAuditRepository auditRepository,
-    INewsDiscoveryRepository discoveryRepository) : AdminNewsPageModel
+    INewsDiscoveryRepository discoveryRepository,
+    ILogger<ActionModel> logger) : AdminNewsPageModel
 {
+    public IActionResult OnGet(int id, string handler) =>
+        Redirect("/admin/news");
+
     public async Task<IActionResult> OnPostPublishAsync(int id, CancellationToken cancellationToken)
     {
         var article = await adminNewsRepository.GetByIdAsync(id, cancellationToken);
         if (article is null)
         {
-            return NotFound();
+            return ArticleNotFound(id);
         }
 
         await adminNewsRepository.PublishAsync(id, EditorEmail, cancellationToken);
@@ -27,7 +31,7 @@ public sealed class ActionModel(
         var article = await adminNewsRepository.GetByIdAsync(id, cancellationToken);
         if (article is null)
         {
-            return NotFound();
+            return ArticleNotFound(id);
         }
 
         await adminNewsRepository.UnpublishAsync(id, EditorEmail, cancellationToken);
@@ -40,7 +44,7 @@ public sealed class ActionModel(
         var article = await adminNewsRepository.GetByIdAsync(id, cancellationToken);
         if (article is null)
         {
-            return NotFound();
+            return ArticleNotFound(id);
         }
 
         try
@@ -71,6 +75,14 @@ public sealed class ActionModel(
             return Redirect("/admin/news");
         }
 
+        return Redirect("/admin/news");
+    }
+
+    private IActionResult ArticleNotFound(int id)
+    {
+        logger.LogWarning("Admin news action requested for missing article {NewsId}", id);
+        TempData[AdminNewsMessages.MessageKey] = $"News article {id} was not found.";
+        TempData[AdminNewsMessages.MessageKindKey] = "error";
         return Redirect("/admin/news");
     }
 }

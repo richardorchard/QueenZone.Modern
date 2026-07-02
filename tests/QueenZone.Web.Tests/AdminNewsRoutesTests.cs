@@ -469,6 +469,46 @@ public sealed partial class AdminNewsRoutesTests : IClassFixture<WebApplicationF
     }
 
     [Fact]
+    public async Task GetDeleteUrl_redirectsToAdminList()
+    {
+        var client = CreateClient(AdminEmail, new SharedNewsStore());
+
+        var response = await client.GetAsync("/admin/news/3001/delete");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal("/admin/news", response.Headers.Location!.OriginalString);
+    }
+
+    [Fact]
+    public async Task Delete_missingArticle_redirectsWithMessage()
+    {
+        var store = new SharedNewsStore(
+        [
+            new AdminNewsArticle(
+                3002,
+                "Still here",
+                "still-here",
+                "Excerpt",
+                "Body",
+                new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc),
+                null,
+                false,
+                DateTime.UtcNow,
+                DateTime.UtcNow,
+                AdminEmail)
+        ]);
+        var client = CreateClient(AdminEmail, store);
+
+        var deleteResponse = await PostActionAsync(client, "/admin/news/6999/delete");
+        Assert.Equal(HttpStatusCode.Redirect, deleteResponse.StatusCode);
+
+        var listBody = await client.GetStringAsync(deleteResponse.Headers.Location!.OriginalString);
+        Assert.Contains("News article 6999 was not found.", listBody);
+        Assert.Contains("admin-status--error", listBody);
+        Assert.Contains("Still here", listBody);
+    }
+
+    [Fact]
     public async Task AuthorizedAdminCanDeleteArticle()
     {
         var store = new SharedNewsStore(
