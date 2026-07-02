@@ -130,6 +130,7 @@ app.Use(async (context, next) =>
     await next();
 });
 
+app.UseStatusCodePagesWithReExecute("/404");
 app.UseStaticFiles();
 app.UseAuthentication();
 app.UseAuthorization();
