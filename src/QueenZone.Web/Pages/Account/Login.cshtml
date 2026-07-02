@@ -1,7 +1,7 @@
 @page "/account/login"
 @model LoginModel
 
-<partial name="_PageHero" model='@(("Members", "Sign in", "Sign in to QueenZone with Google, Microsoft, or Facebook.", ""))' />
+<partial name="_PageHero" model='@(("Members", "Sign in", "Sign in to QueenZone with Google, Microsoft, Discord or GitHub.", ""))' />
 
 <section class="qz-section">
   <div class="qz-container qz-prose">
@@ -14,9 +14,13 @@
       {
         <a class="qz-button" href="/account/external-login?provider=Microsoft&returnUrl=@Uri.EscapeDataString(Model.ReturnUrl)">Continue with Microsoft</a>
       }
-      @if (Model.FacebookEnabled)
+      @if (Model.DiscordEnabled)
       {
-        <a class="qz-button" href="/account/external-login?provider=Facebook&returnUrl=@Uri.EscapeDataString(Model.ReturnUrl)">Continue with Facebook</a>
+        <a class="qz-button" href="/account/external-login?provider=Discord&returnUrl=@Uri.EscapeDataString(Model.ReturnUrl)">Continue with Discord</a>
+      }
+      @if (Model.GitHubEnabled)
+      {
+        <a class="qz-button" href="/account/external-login?provider=GitHub&returnUrl=@Uri.EscapeDataString(Model.ReturnUrl)">Continue with GitHub</a>
       }
     </div>
   </div>

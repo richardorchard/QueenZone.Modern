@@ -8,7 +8,9 @@ public sealed class MemberAuthenticationOptions
 
     public ProviderCredentials? Microsoft { get; init; }
 
-    public ProviderCredentials? Facebook { get; init; }
+    public ProviderCredentials? Discord { get; init; }
+
+    public ProviderCredentials? GitHub { get; init; }
 
     public sealed class ProviderCredentials
     {

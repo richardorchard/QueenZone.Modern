@@ -11,7 +11,9 @@ public static class MemberAuthenticationSchemes
 
     public const string Microsoft = "Microsoft";
 
-    public const string Facebook = "Facebook";
+    public const string Discord = "Discord";
+
+    public const string GitHub = "GitHub";
 
     public const string MemberPolicy = "Member";
 }
