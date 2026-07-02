@@ -1,5 +1,9 @@
 @model QueenZone.Web.Pages.Admin.News.ArticleFormViewModel
 @inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@{
+  var antiforgeryToken = (ViewData["AntiforgeryToken"] as string)
+    ?? Antiforgery.GetAndStoreTokens(Context).RequestToken;
+}
 
 <div class="admin-form-panel">
 <h1>@Model.Title</h1>
@@ -24,7 +28,7 @@
 }
 
 <form method="post" action="@Model.Action" class="admin-form">
-  <input type="hidden" name="@AdminNewsPageModel.AntiforgeryTokenFieldName" value="@Antiforgery.GetAndStoreTokens(Context).RequestToken">
+  <input type="hidden" name="@AdminNewsPageModel.AntiforgeryTokenFieldName" value="@antiforgeryToken">
   <label>
     Title
     <input type="text" name="title" value="@Model.Draft.Title" maxlength="@NewsValidation.MaxTitleLength" required>
@@ -58,15 +62,21 @@
     {
       <span>|</span>
       <a href="/admin/news/@Model.Article.Id/preview">Preview</a>
-      @if (Model.Article.IsPublished)
-      {
-        <partial name="_PostAction" model="@(new PostActionViewModel($"/admin/news/{Model.Article.Id}/unpublish", "Unpublish"))" />
-      }
-      else
-      {
-        <partial name="_PostAction" model="@(new PostActionViewModel($"/admin/news/{Model.Article.Id}/publish", "Publish"))" />
-      }
     }
   </div>
 </form>
+
+@if (Model.Article is not null)
+{
+  <div class="admin-form-actions admin-form-actions--secondary">
+    @if (Model.Article.IsPublished)
+    {
+      <partial name="_PostAction" model="@(new PostActionViewModel($"/admin/news/{Model.Article.Id}/unpublish", "Unpublish", AntiforgeryToken: antiforgeryToken))" />
+    }
+    else
+    {
+      <partial name="_PostAction" model="@(new PostActionViewModel($"/admin/news/{Model.Article.Id}/publish", "Publish", AntiforgeryToken: antiforgeryToken))" />
+    }
+  </div>
+}
 </div>
