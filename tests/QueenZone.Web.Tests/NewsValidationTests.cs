@@ -54,6 +54,22 @@ public sealed class NewsValidationTests
     }
 
     [Fact]
+    public void ValidateDraftRejectsOverlongSourceUrl()
+    {
+        var draft = new AdminNewsDraft(
+            "Title",
+            null,
+            "Excerpt",
+            "Body",
+            new DateTime(2026, 6, 10, 0, 0, 0, DateTimeKind.Utc),
+            "https://example.com/" + new string('a', NewsValidation.MaxSourceUrlLength));
+
+        var errors = NewsValidation.ValidateDraft(draft, slugInUse: false);
+
+        Assert.Contains($"Source URL must be {NewsValidation.MaxSourceUrlLength} characters or fewer.", errors);
+    }
+
+    [Fact]
     public void NewsSlugResolveUsesOverrideWhenProvided()
     {
         Assert.Equal("custom-slug", NewsSlug.Resolve("Any title", "Custom Slug!"));

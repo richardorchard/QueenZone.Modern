@@ -32,7 +32,7 @@ internal static class AdminNewsSqliteTestHarness
     {
         dbContext.Database.ExecuteSqlRaw("""
             CREATE TABLE IF NOT EXISTS NEWS_T (
-                NEWS_ID INTEGER NOT NULL PRIMARY KEY,
+                NEWS_ID INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
                 TITLE TEXT NOT NULL,
                 EXCERPT TEXT NOT NULL,
                 ARTICLE TEXT NOT NULL,

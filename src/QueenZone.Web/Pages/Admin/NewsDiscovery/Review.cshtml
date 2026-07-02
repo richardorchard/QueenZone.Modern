@@ -13,7 +13,7 @@ else
 
   @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
   {
-    <p class="admin-status admin-status-@(Model.StatusMessageKind ?? "info")">@Model.StatusMessage</p>
+    <p class="admin-status admin-status--@(Model.StatusMessageKind ?? "info")">@Model.StatusMessage</p>
   }
 
   <section class="admin-review-section">

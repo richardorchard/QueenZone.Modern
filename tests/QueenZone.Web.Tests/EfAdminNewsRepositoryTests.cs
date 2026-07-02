@@ -124,6 +124,25 @@ public sealed class EfAdminNewsRepositoryTests : IAsyncDisposable
         Assert.Null(await repository.GetByIdAsync(4201));
     }
 
+    [Fact]
+    public async Task CreateDraftAsync_uses_database_generated_identity()
+    {
+        var draft = new AdminNewsDraft(
+            "Created draft",
+            "created-draft",
+            "Created excerpt",
+            "Created body",
+            new DateTime(2026, 6, 21, 0, 0, 0, DateTimeKind.Utc),
+            null);
+
+        var newsId = await repository.CreateDraftAsync(draft, "editor@test.local");
+
+        Assert.True(newsId > 4201);
+        var article = await repository.GetByIdAsync(newsId);
+        Assert.NotNull(article);
+        Assert.Equal("Created draft", article.Title);
+    }
+
     public async ValueTask DisposeAsync()
     {
         await dbContext.DisposeAsync();
