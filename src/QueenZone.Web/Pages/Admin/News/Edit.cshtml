@@ -1,5 +1,9 @@
 @page "/admin/news/{id:int}/edit"
 @model EditModel
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@{
+  ViewData["AntiforgeryToken"] = Antiforgery.GetAndStoreTokens(HttpContext).RequestToken;
+}
 
 <div class="admin-shell">
   <partial name="_ArticleForm" model="Model.Form" />

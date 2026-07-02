@@ -8,6 +8,7 @@
 <div class="admin-shell">
 @if (Model.CreateForm is not null)
 {
+  ViewData["AntiforgeryToken"] = antiforgeryToken;
   <partial name="_ArticleForm" model="Model.CreateForm" />
 }
 else

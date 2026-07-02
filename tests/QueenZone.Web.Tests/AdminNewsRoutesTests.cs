@@ -538,6 +538,47 @@ public sealed partial class AdminNewsRoutesTests : IClassFixture<WebApplicationF
     }
 
     [Fact]
+    public async Task EditDraft_can_save_when_publish_action_is_on_page()
+    {
+        var store = new SharedNewsStore(
+        [
+            new AdminNewsArticle(
+                4205,
+                "Draft to edit",
+                "draft-to-edit",
+                "Draft excerpt",
+                "Draft body",
+                new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc),
+                null,
+                false,
+                DateTime.UtcNow,
+                DateTime.UtcNow,
+                AdminEmail)
+        ]);
+        var client = CreateClient(AdminEmail, store);
+
+        var saveResponse = await PostArticleAsync(
+            client,
+            "/admin/news/4205/edit",
+            "/admin/news/4205",
+            new Dictionary<string, string>
+            {
+                ["title"] = "Draft to edit updated",
+                ["excerpt"] = "Updated excerpt",
+                ["body"] = "Updated body",
+                ["publishedAt"] = "2026-06-15"
+            });
+
+        Assert.Equal(HttpStatusCode.Redirect, saveResponse.StatusCode);
+        Assert.Equal("/admin/news/4205/edit", saveResponse.Headers.Location!.OriginalString);
+
+        var editBody = await client.GetStringAsync("/admin/news/4205/edit");
+        Assert.Contains("Draft to edit updated", editBody);
+        Assert.Contains("Updated body", editBody);
+        Assert.Contains("Publish", editBody);
+    }
+
+    [Fact]
     public async Task PublishAndEditActionsAreAudited()
     {
         var store = new SharedNewsStore();
