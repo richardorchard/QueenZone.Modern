@@ -92,12 +92,10 @@ public sealed class EfAdminNewsRepository : IAdminNewsRepository
 
     public async Task<int> CreateDraftAsync(AdminNewsDraft draft, string editorEmail, CancellationToken cancellationToken = default)
     {
-        var nextId = (await dbContext.NewsRows.MaxAsync(row => (int?)row.NewsId, cancellationToken) ?? 0) + 1;
         var timestamp = DateTime.UtcNow;
 
         var row = new NewsTableRow
         {
-            NewsId = nextId,
             Title = draft.Title,
             Excerpt = draft.Excerpt,
             Body = draft.Body,
@@ -114,7 +112,7 @@ public sealed class EfAdminNewsRepository : IAdminNewsRepository
 
         dbContext.NewsRows.Add(row);
         await dbContext.SaveChangesAsync(cancellationToken);
-        return nextId;
+        return row.NewsId;
     }
 
     public async Task UpdateAsync(int id, AdminNewsDraft draft, string editorEmail, CancellationToken cancellationToken = default)

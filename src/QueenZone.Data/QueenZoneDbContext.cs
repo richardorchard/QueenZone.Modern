@@ -37,12 +37,14 @@ public sealed class QueenZoneDbContext : DbContext
             entity.ToTable("NEWS_T", table => table.ExcludeFromMigrations());
             entity.HasKey(row => row.NewsId);
 
-            entity.Property(row => row.NewsId).HasColumnName("NEWS_ID");
+            entity.Property(row => row.NewsId)
+                .HasColumnName("NEWS_ID")
+                .ValueGeneratedOnAdd();
             entity.Property(row => row.Title).HasColumnName("TITLE").HasMaxLength(150);
             entity.Property(row => row.Excerpt).HasColumnName("EXCERPT");
             entity.Property(row => row.Body).HasColumnName("ARTICLE");
             entity.Property(row => row.PublishedAt).HasColumnName("DATE");
-            entity.Property(row => row.SourceUrl).HasColumnName("SOURCE_URL");
+            entity.Property(row => row.SourceUrl).HasColumnName("SOURCE_URL").HasMaxLength(75);
             entity.Property(row => row.Slug).HasColumnName("SLUG").HasMaxLength(200);
             entity.Property(row => row.CreatedAt).HasColumnName("CREATED_AT");
             entity.Property(row => row.UpdatedAt).HasColumnName("UPDATED_AT");

@@ -8,7 +8,8 @@ public sealed class ActionModel(
     INewsDiscoveryRepository discoveryRepository,
     IAdminNewsRepository adminNewsRepository,
     INewsAuditRepository auditRepository,
-    NewsDraftGenerationService draftGenerationService) : AdminNewsDiscoveryPageModel
+    NewsDraftGenerationService draftGenerationService,
+    ILogger<ActionModel> logger) : AdminNewsDiscoveryPageModel
 {
     public async Task<IActionResult> OnPostRejectAsync(int id, CancellationToken cancellationToken)
     {
@@ -99,22 +100,31 @@ public sealed class ActionModel(
             return Redirect($"/admin/news-discovery/{id}");
         }
 
-        var body = agentDraft.ProposedBody;
-        if (!string.IsNullOrWhiteSpace(agentDraft.AttributionText))
+        var adminDraft = NewsDiscoveryPromoteDraft.Build(agentDraft, candidate);
+        var slugInUse = await adminNewsRepository.IsSlugInUseAsync(
+            NewsSlug.Resolve(adminDraft.Title, adminDraft.Slug),
+            cancellationToken: cancellationToken);
+        var validationErrors = NewsValidation.ValidateDraft(adminDraft, slugInUse);
+        if (validationErrors.Count > 0)
         {
-            body = $"{body.TrimEnd()}\n\n{agentDraft.AttributionText.Trim()}";
+            TempData["DiscoveryMessage"] = string.Join(" ", validationErrors);
+            TempData["DiscoveryMessageKind"] = "error";
+            return Redirect($"/admin/news-discovery/{id}");
         }
 
-        var newsId = await adminNewsRepository.CreateDraftAsync(
-            new AdminNewsDraft(
-                agentDraft.ProposedTitle,
-                agentDraft.ProposedSlug,
-                agentDraft.ProposedExcerpt,
-                body,
-                agentDraft.SuggestedPublishAt ?? DateTime.UtcNow.Date,
-                candidate.SourceUrl),
-            EditorEmail,
-            cancellationToken);
+        int newsId;
+        try
+        {
+            newsId = await adminNewsRepository.CreateDraftAsync(adminDraft, EditorEmail, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to promote discovery candidate {CandidateId} to admin news", id);
+            TempData["DiscoveryMessage"] =
+                "Promotion failed while creating the admin draft. Edit the AI draft to fix validation issues, then try again.";
+            TempData["DiscoveryMessageKind"] = "error";
+            return Redirect($"/admin/news-discovery/{id}");
+        }
 
         var promoted = await discoveryRepository.TryUpdateCandidateStatusAsync(
             id,

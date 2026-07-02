@@ -280,6 +280,94 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
     }
 
     [Fact]
+    public async Task Promote_with_overlong_title_shows_validation_error()
+    {
+        var newsStore = new SharedNewsStore();
+        var discoveryStore = new SharedNewsDiscoveryStore();
+        var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
+        var candidateId = await SeedDraftedCandidateAsync(discoveryRepository);
+        await discoveryRepository.UpsertDraftAsync(candidateId, new NewsAgentDraftUpsert(
+            new string('x', NewsValidation.MaxTitleLength + 1),
+            "overlong-title",
+            "Draft excerpt for review queue.",
+            "Draft body for review queue.",
+            null,
+            null,
+            null,
+            DateTime.UtcNow.Date,
+            null));
+        var client = CreateClient(AdminEmail, newsStore, discoveryStore);
+
+        var promoteResponse = await PostActionAsync(client, $"/admin/news-discovery/{candidateId}/promote", candidateId);
+        Assert.Equal(HttpStatusCode.Redirect, promoteResponse.StatusCode);
+        Assert.Equal($"/admin/news-discovery/{candidateId}", promoteResponse.Headers.Location!.OriginalString);
+
+        var reviewBody = await client.GetStringAsync($"/admin/news-discovery/{candidateId}");
+        Assert.Contains($"Title must be {NewsValidation.MaxTitleLength} characters or fewer.", reviewBody);
+        Assert.Contains("admin-status--error", reviewBody);
+
+        var candidate = await discoveryRepository.GetCandidateByIdAsync(candidateId);
+        Assert.NotNull(candidate);
+        Assert.Equal(NewsCandidateStatus.Drafted, candidate.Status);
+        Assert.Null(candidate.PromotedNewsId);
+    }
+
+    [Fact]
+    public async Task Promote_with_overlong_source_url_shows_validation_error()
+    {
+        var newsStore = new SharedNewsStore();
+        var discoveryStore = new SharedNewsDiscoveryStore();
+        var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
+        var longUrl = "https://www.queenonline.com/news/" + new string('a', NewsValidation.MaxSourceUrlLength);
+        var sourceId = await discoveryRepository.UpsertSourceAsync(new NewsDiscoverySourceDraft(
+            "long-url-source",
+            "Long URL Source",
+            "https://example.com/",
+            null,
+            NewsDiscoverySourceType.Rss,
+            NewsDiscoveryTrustTier.Primary,
+            60,
+            true,
+            null));
+        var discoveredAt = DateTime.UtcNow;
+        var candidateId = await discoveryRepository.CreateCandidateAsync(new NewsCandidateCreateRequest(
+            sourceId,
+            longUrl,
+            "Long URL candidate",
+            discoveredAt,
+            "Excerpt",
+            discoveredAt));
+        await discoveryRepository.TryUpdateCandidateStatusAsync(
+            candidateId,
+            new NewsCandidateStatusUpdate(
+                NewsCandidateStatus.NeedsReview,
+                RelevanceScore: 0.9m,
+                ConfidenceScore: 0.8m));
+        await discoveryRepository.TryUpdateCandidateStatusAsync(
+            candidateId,
+            new NewsCandidateStatusUpdate(NewsCandidateStatus.Drafted));
+        await discoveryRepository.UpsertDraftAsync(candidateId, new NewsAgentDraftUpsert(
+            "Valid title",
+            "valid-title",
+            "Draft excerpt",
+            "Draft body",
+            null,
+            null,
+            null,
+            discoveredAt.Date,
+            null));
+
+        var client = CreateClient(AdminEmail, newsStore, discoveryStore);
+        var promoteResponse = await PostActionAsync(client, $"/admin/news-discovery/{candidateId}/promote", candidateId);
+        Assert.Equal(HttpStatusCode.Redirect, promoteResponse.StatusCode);
+        Assert.Equal($"/admin/news-discovery/{candidateId}", promoteResponse.Headers.Location!.OriginalString);
+
+        var reviewBody = await client.GetStringAsync($"/admin/news-discovery/{candidateId}");
+        Assert.Contains($"Source URL must be {NewsValidation.MaxSourceUrlLength} characters or fewer.", reviewBody);
+        Assert.Contains("admin-status--error", reviewBody);
+    }
+
+    [Fact]
     public async Task AuthorizedAdminCanEditDraftAndMoveCandidateToDrafted()
     {
         var discoveryStore = new SharedNewsDiscoveryStore();
