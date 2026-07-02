@@ -1,5 +1,9 @@
 @page "/admin/news"
 @model IndexModel
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@{
+  var antiforgeryToken = Antiforgery.GetAndStoreTokens(HttpContext).RequestToken;
+}
 
 <div class="admin-shell">
 @if (Model.CreateForm is not null)
@@ -48,13 +52,13 @@ else
               <a href="/admin/news/@article.Id/preview">Preview</a>
               @if (article.IsPublished)
               {
-                <partial name="_PostAction" model="@(new PostActionViewModel($"/admin/news/{article.Id}/unpublish", "Unpublish"))" />
+                <partial name="_PostAction" model="@(new PostActionViewModel($"/admin/news/{article.Id}/unpublish", "Unpublish", AntiforgeryToken: antiforgeryToken))" />
               }
               else
               {
-                <partial name="_PostAction" model="@(new PostActionViewModel($"/admin/news/{article.Id}/publish", "Publish"))" />
+                <partial name="_PostAction" model="@(new PostActionViewModel($"/admin/news/{article.Id}/publish", "Publish", AntiforgeryToken: antiforgeryToken))" />
               }
-              <partial name="_PostAction" model="@(new PostActionViewModel($"/admin/news/{article.Id}/delete", "Delete", Confirm: true))" />
+              <partial name="_PostAction" model="@(new PostActionViewModel($"/admin/news/{article.Id}/delete", "Delete", Confirm: true, AntiforgeryToken: antiforgeryToken))" />
             </td>
           </tr>
         }

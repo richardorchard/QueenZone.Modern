@@ -6,6 +6,21 @@ namespace QueenZone.Web.Tests;
 public sealed class AdminNewsDeleteErrorTests
 {
     [Fact]
+    public void IsDeleteForeignKeyViolation_returns_true_for_wrapped_db_update_exception()
+    {
+        using var _ = AdminNewsDeleteError.UseForeignKeyViolationClassifier(_ => true);
+        var exception = new DbUpdateException("delete failed", new InvalidOperationException("fk"));
+
+        Assert.True(AdminNewsDeleteError.IsDeleteForeignKeyViolation(exception));
+    }
+
+    [Fact]
+    public void IsDeleteForeignKeyViolation_returns_false_for_unrelated_exception()
+    {
+        Assert.False(AdminNewsDeleteError.IsDeleteForeignKeyViolation(new InvalidOperationException("nope")));
+    }
+
+    [Fact]
     public void IsForeignKeyViolation_uses_configured_classifier()
     {
         using var _ = AdminNewsDeleteError.UseForeignKeyViolationClassifier(_ => true);
