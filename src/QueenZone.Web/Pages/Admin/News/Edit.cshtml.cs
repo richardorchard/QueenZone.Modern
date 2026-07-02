@@ -10,6 +10,10 @@ public sealed class EditModel(
 {
     public ArticleFormViewModel? Form { get; private set; }
 
+    public string? StatusMessage { get; private set; }
+
+    public string? StatusMessageKind { get; private set; }
+
     public async Task<IActionResult> OnGetAsync(int id, CancellationToken cancellationToken)
     {
         var article = await adminNewsRepository.GetByIdAsync(id, cancellationToken);
@@ -17,6 +21,9 @@ public sealed class EditModel(
         {
             return NotFound();
         }
+
+        StatusMessage = TempData[AdminNewsMessages.MessageKey] as string;
+        StatusMessageKind = TempData[AdminNewsMessages.MessageKindKey] as string;
 
         NewsDiscoveryProvenance? provenance = null;
         try

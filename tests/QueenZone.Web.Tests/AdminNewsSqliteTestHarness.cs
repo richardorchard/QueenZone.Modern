@@ -16,7 +16,7 @@ internal static class AdminNewsSqliteTestHarness
             "DATE" AS PublishedAt,
             CAST(NULL AS TEXT) AS SOURCE_URL,
             DISPLAY,
-            CAST(NULL AS TEXT) AS SLUG,
+            SLUG,
             CAST(NULL AS TEXT) AS CREATED_AT,
             CAST(NULL AS TEXT) AS UPDATED_AT,
             CAST(NULL AS TEXT) AS EDITOR_EMAIL,

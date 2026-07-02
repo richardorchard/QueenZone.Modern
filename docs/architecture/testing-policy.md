@@ -53,6 +53,10 @@ Good targets:
 
 These tests are the default place to cover user-visible route behavior.
 
+Admin editorial routes also have a second HTTP integration layer that wires `EfAdminNewsRepository` and `EfNewsDiscoveryRepository` through SQLite (`AdminNewsEfRoutesTests`, `AdminNewsDiscoveryEfRoutesTests`). Use that layer for create/edit/publish/promote persistence checks that in-memory fakes cannot catch.
+
+Negative antiforgery coverage belongs in the default HTTP integration suite: at least one admin news action and one discovery action should return `400` when `__RequestVerificationToken` is missing.
+
 ### Data Integration Tests
 
 Use data integration tests for the real restored legacy SQL Server database. These are opt-in unless a controlled test database is available in CI.
@@ -73,6 +77,8 @@ ConnectionStrings__QueenZoneLegacy=...
 ```
 
 Do not require these tests in normal CI until the project has a known, repeatable test database.
+
+For pre-release admin write checks against the configured legacy SQL Server database, run `scripts/Probe-AdminNewsLegacyWrites.ps1` with both `ConnectionStrings__QueenZoneLegacy` and `RUN_LEGACY_WRITE_PROBE=true` set. The probe creates, publishes, unpublishes, and deletes a uniquely named test article. Point the connection string at a database you are willing to mutate (often the same Azure SQL instance used locally or in production), not the in-memory sample data path.
 
 ### Migration And Content Validation
 
@@ -98,6 +104,7 @@ Good targets:
 
 - Homepage loads.
 - News archive navigation works.
+- Admin news list and create-draft flow with `X-Test-User-Email` test auth in the `Testing` environment.
 - News detail pages are crawlable.
 - News archive and detail pages are crawlable in a browser.
 - Mobile viewport smoke checks.
