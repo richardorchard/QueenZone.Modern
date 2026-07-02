@@ -11,6 +11,10 @@ internal static class AdminNewsDeleteError
     internal static bool IsForeignKeyViolation(DbUpdateException exception) =>
         foreignKeyViolationClassifier(exception.InnerException);
 
+    internal static bool IsDeleteForeignKeyViolation(Exception exception) =>
+        exception is SqlException { Number: 547 }
+        || exception is DbUpdateException db && IsForeignKeyViolation(db);
+
     internal static IDisposable UseForeignKeyViolationClassifier(Func<Exception?, bool> classifier)
     {
         var previous = foreignKeyViolationClassifier;

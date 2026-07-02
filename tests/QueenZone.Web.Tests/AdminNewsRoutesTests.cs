@@ -381,6 +381,56 @@ public sealed partial class AdminNewsRoutesTests : IClassFixture<WebApplicationF
     }
 
     [Fact]
+    public async Task EditPost_validation_rerenders_when_provenance_lookup_fails()
+    {
+        var store = new SharedNewsStore(
+        [
+            new AdminNewsArticle(
+                4103,
+                "Edit post provenance failure",
+                "edit-post-provenance-failure",
+                "Excerpt",
+                "Body",
+                new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc),
+                null,
+                false,
+                DateTime.UtcNow,
+                DateTime.UtcNow,
+                AdminEmail)
+        ]);
+        var discoveryStore = new SharedNewsDiscoveryStore();
+        var discoveryInner = new InMemoryNewsDiscoveryRepository(discoveryStore);
+        var client = CreateClient(
+            AdminEmail,
+            store,
+            _ => { },
+            new ConfigurableNewsDiscoveryRepository(discoveryInner)
+            {
+                GetCandidateByPromotedNewsIdHandler = (_, _) =>
+                    throw new InvalidOperationException("Discovery lookup failed.")
+            });
+
+        var response = await PostArticleAsync(
+            client,
+            "/admin/news/4103/edit",
+            "/admin/news/4103",
+            new Dictionary<string, string>
+            {
+                ["title"] = "",
+                ["excerpt"] = "Excerpt",
+                ["body"] = "Body",
+                ["publishedAt"] = "2026-06-14"
+            });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("Title is required.", body);
+        Assert.Contains("Edit post provenance failure", body);
+        Assert.DoesNotContain("Discovery provenance", body);
+    }
+
+    [Fact]
     public async Task PreviewPage_loads_when_provenance_lookup_fails()
     {
         var store = new SharedNewsStore(

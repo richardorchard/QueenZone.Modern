@@ -3,11 +3,23 @@ using QueenZone.Data.Entities;
 
 namespace QueenZone.Data;
 
-public sealed class EfAdminNewsRepository(QueenZoneDbContext dbContext) : IAdminNewsRepository
+public sealed class EfAdminNewsRepository : IAdminNewsRepository
 {
-    private readonly string latestNewsSql = LegacyNewsSchema.BuildAdminLatestNewsSql(
-        LegacyNewsSchema.GetNewsColumnAvailability(dbContext.Database.GetConnectionString()
-            ?? throw new InvalidOperationException("QueenZone legacy database connection string is not configured.")));
+    private readonly QueenZoneDbContext dbContext;
+    private readonly string latestNewsSql;
+
+    public EfAdminNewsRepository(QueenZoneDbContext dbContext)
+        : this(dbContext, latestNewsSqlOverride: null)
+    {
+    }
+
+    internal EfAdminNewsRepository(QueenZoneDbContext dbContext, string? latestNewsSqlOverride)
+    {
+        this.dbContext = dbContext;
+        latestNewsSql = latestNewsSqlOverride ?? LegacyNewsSchema.BuildAdminLatestNewsSql(
+            LegacyNewsSchema.GetNewsColumnAvailability(dbContext.Database.GetConnectionString()
+                ?? throw new InvalidOperationException("QueenZone legacy database connection string is not configured.")));
+    }
 
     public async Task<IReadOnlyList<AdminNewsArticle>> GetAllAsync(CancellationToken cancellationToken = default)
     {
