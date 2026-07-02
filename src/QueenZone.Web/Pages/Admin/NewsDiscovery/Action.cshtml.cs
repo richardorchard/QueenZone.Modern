@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using QueenZone.Data;
 using QueenZone.NewsAgent;
 
@@ -8,7 +9,9 @@ public sealed class ActionModel(
     INewsDiscoveryRepository discoveryRepository,
     IAdminNewsRepository adminNewsRepository,
     INewsAuditRepository auditRepository,
-    NewsDraftGenerationService draftGenerationService) : AdminNewsDiscoveryPageModel
+    NewsDraftGenerationService draftGenerationService,
+    IServiceProvider serviceProvider,
+    ILogger<ActionModel> logger) : AdminNewsDiscoveryPageModel
 {
     public async Task<IActionResult> OnPostRejectAsync(int id, CancellationToken cancellationToken)
     {
@@ -20,15 +23,23 @@ public sealed class ActionModel(
 
         if (!NewsCandidateWorkflow.CanTransition(candidate.Status, NewsCandidateStatus.Rejected))
         {
-            return Redirect($"/admin/news-discovery/{id}");
+            return RedirectToReview(
+                id,
+                candidate.Status == NewsCandidateStatus.Rejected
+                    ? "This candidate has already been rejected."
+                    : $"Cannot transition candidate status from {candidate.Status} to {NewsCandidateStatus.Rejected}.");
         }
 
-        await discoveryRepository.TryUpdateCandidateStatusAsync(
+        var updated = await discoveryRepository.TryUpdateCandidateStatusAsync(
             id,
             new NewsCandidateStatusUpdate(
                 NewsCandidateStatus.Rejected,
                 ReviewNotes: $"Marked not relevant by {EditorEmail}."),
             cancellationToken);
+        if (!updated)
+        {
+            return RedirectToReview(id, "The candidate could not be marked as rejected.");
+        }
 
         return Redirect("/admin/news-discovery");
     }
@@ -43,7 +54,11 @@ public sealed class ActionModel(
 
         if (!NewsCandidateWorkflow.CanTransition(candidate.Status, NewsCandidateStatus.IgnoredDuplicate))
         {
-            return Redirect($"/admin/news-discovery/{id}");
+            return RedirectToReview(
+                id,
+                candidate.Status == NewsCandidateStatus.IgnoredDuplicate
+                    ? "This candidate has already been ignored as a duplicate."
+                    : $"Cannot transition candidate status from {candidate.Status} to {NewsCandidateStatus.IgnoredDuplicate}.");
         }
 
         var duplicateOf = candidate.DuplicateOfCandidateId
@@ -53,13 +68,17 @@ public sealed class ActionModel(
                 candidate.ContentHash,
                 cancellationToken))?.Id;
 
-        await discoveryRepository.TryUpdateCandidateStatusAsync(
+        var updated = await discoveryRepository.TryUpdateCandidateStatusAsync(
             id,
             new NewsCandidateStatusUpdate(
                 NewsCandidateStatus.IgnoredDuplicate,
                 ReviewNotes: $"Ignored as duplicate by {EditorEmail}.",
                 DuplicateOfCandidateId: duplicateOf),
             cancellationToken);
+        if (!updated)
+        {
+            return RedirectToReview(id, "The candidate could not be marked as a duplicate.");
+        }
 
         return Redirect("/admin/news-discovery");
     }
@@ -75,11 +94,16 @@ public sealed class ActionModel(
         var agentDraft = await discoveryRepository.GetDraftByCandidateIdAsync(id, cancellationToken);
         if (agentDraft is null)
         {
-            return Redirect($"/admin/news-discovery/{id}");
+            return RedirectToReview(id, "Generate or save a draft before promoting this candidate.");
         }
 
         if (candidate.Status == NewsCandidateStatus.NeedsReview)
         {
+            if (!NewsCandidateWorkflow.TryTransition(candidate.Status, NewsCandidateStatus.Drafted, out var draftedError))
+            {
+                return RedirectToReview(id, draftedError);
+            }
+
             var drafted = await discoveryRepository.TryUpdateCandidateStatusAsync(
                 id,
                 new NewsCandidateStatusUpdate(
@@ -88,7 +112,7 @@ public sealed class ActionModel(
                 cancellationToken);
             if (!drafted)
             {
-                return Redirect($"/admin/news-discovery/{id}");
+                return RedirectToReview(id, "The candidate could not be marked as drafted before promotion.");
             }
 
             candidate = await discoveryRepository.GetCandidateByIdAsync(id, cancellationToken);
@@ -96,47 +120,85 @@ public sealed class ActionModel(
 
         if (candidate is null || candidate.Status != NewsCandidateStatus.Drafted)
         {
-            return Redirect($"/admin/news-discovery/{id}");
+            return RedirectToReview(
+                id,
+                candidate is null
+                    ? "The candidate is no longer available."
+                    : $"Only drafted candidates can be promoted. Current status: {candidate.Status}.");
         }
 
-        var body = agentDraft.ProposedBody;
-        if (!string.IsNullOrWhiteSpace(agentDraft.AttributionText))
+        var adminDraft = NewsDiscoveryPromoteDraft.Build(agentDraft, candidate);
+        var slugInUse = await adminNewsRepository.IsSlugInUseAsync(
+            NewsSlug.Resolve(adminDraft.Title, adminDraft.Slug),
+            cancellationToken: cancellationToken);
+        var validationErrors = NewsValidation.ValidateDraft(adminDraft, slugInUse);
+        if (validationErrors.Count > 0)
         {
-            body = $"{body.TrimEnd()}\n\n{agentDraft.AttributionText.Trim()}";
+            return RedirectToReview(id, string.Join(" ", validationErrors));
         }
 
-        var newsId = await adminNewsRepository.CreateDraftAsync(
-            new AdminNewsDraft(
-                agentDraft.ProposedTitle,
-                agentDraft.ProposedSlug,
-                agentDraft.ProposedExcerpt,
-                body,
-                agentDraft.SuggestedPublishAt ?? DateTime.UtcNow.Date,
-                candidate.SourceUrl),
-            EditorEmail,
-            cancellationToken);
-
-        var promoted = await discoveryRepository.TryUpdateCandidateStatusAsync(
-            id,
-            new NewsCandidateStatusUpdate(
-                NewsCandidateStatus.PromotedToArticle,
-                ReviewNotes: $"Promoted to admin news draft #{newsId} by {EditorEmail} at {DateTime.UtcNow:yyyy-MM-dd HH:mm} UTC.",
-                PromotedNewsId: newsId),
-            cancellationToken);
-        if (!promoted)
+        await using var transaction = serviceProvider.GetService<QueenZoneDbContext>() is { } dbContext
+            ? await dbContext.Database.BeginTransactionAsync(cancellationToken)
+            : null;
+        int newsId;
+        try
         {
-            return Redirect($"/admin/news-discovery/{id}");
+            newsId = await adminNewsRepository.CreateDraftAsync(adminDraft, EditorEmail, cancellationToken);
+
+            if (!NewsCandidateWorkflow.TryTransition(candidate.Status, NewsCandidateStatus.PromotedToArticle, out var promoteError))
+            {
+                if (transaction is not null)
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                }
+
+                return RedirectToReview(id, promoteError);
+            }
+
+            var promoted = await discoveryRepository.TryUpdateCandidateStatusAsync(
+                id,
+                new NewsCandidateStatusUpdate(
+                    NewsCandidateStatus.PromotedToArticle,
+                    ReviewNotes: $"Promoted to admin news draft #{newsId} by {EditorEmail} at {DateTime.UtcNow:yyyy-MM-dd HH:mm} UTC.",
+                    PromotedNewsId: newsId),
+                cancellationToken);
+            if (!promoted)
+            {
+                if (transaction is not null)
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                }
+
+                return RedirectToReview(id, "Promotion failed while updating the discovery candidate.");
+            }
+
+            var aiRuns = await discoveryRepository.GetAiRunsForCandidateAsync(id, cancellationToken);
+            var provenance = NewsDiscoveryProvenanceBuilder.Build(candidate, agentDraft, aiRuns);
+
+            await auditRepository.AppendAsync(
+                newsId,
+                "promote-from-discovery",
+                EditorEmail,
+                NewsDiscoveryPromoteAudit.Format(provenance),
+                cancellationToken);
+
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
         }
+        catch (Exception ex)
+        {
+            if (transaction is not null)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+            }
 
-        var aiRuns = await discoveryRepository.GetAiRunsForCandidateAsync(id, cancellationToken);
-        var provenance = NewsDiscoveryProvenanceBuilder.Build(candidate, agentDraft, aiRuns);
-
-        await auditRepository.AppendAsync(
-            newsId,
-            "promote-from-discovery",
-            EditorEmail,
-            NewsDiscoveryPromoteAudit.Format(provenance),
-            cancellationToken);
+            logger.LogError(ex, "Failed to promote discovery candidate {CandidateId} to admin news", id);
+            return RedirectToReview(
+                id,
+                "Promotion failed while creating the admin draft. Edit the AI draft to fix validation issues, then try again.");
+        }
 
         return Redirect($"/admin/news/{newsId}/edit");
     }
@@ -184,6 +246,17 @@ public sealed class ActionModel(
         catch (Exception ex)
         {
             TempData["DiscoveryMessage"] = $"Draft regeneration failed: {ex.Message}";
+            TempData["DiscoveryMessageKind"] = "error";
+        }
+
+        return Redirect($"/admin/news-discovery/{id}");
+    }
+
+    private IActionResult RedirectToReview(int id, string? message)
+    {
+        if (!string.IsNullOrWhiteSpace(message))
+        {
+            TempData["DiscoveryMessage"] = message;
             TempData["DiscoveryMessageKind"] = "error";
         }
 

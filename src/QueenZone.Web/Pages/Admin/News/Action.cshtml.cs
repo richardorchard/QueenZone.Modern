@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using QueenZone.Data;
 
 namespace QueenZone.Web.Pages.Admin.News;
@@ -19,6 +18,19 @@ public sealed class ActionModel(
         if (article is null)
         {
             return ArticleNotFound(id);
+        }
+
+        var draft = ToDraft(article);
+        var slugInUse = await adminNewsRepository.IsSlugInUseAsync(
+            NewsSlug.Resolve(draft.Title, draft.Slug),
+            excludeNewsId: id,
+            cancellationToken: cancellationToken);
+        var validationErrors = NewsValidation.ValidateDraft(draft, slugInUse);
+        if (validationErrors.Count > 0)
+        {
+            TempData[AdminNewsMessages.MessageKey] = string.Join(" ", validationErrors);
+            TempData[AdminNewsMessages.MessageKindKey] = "error";
+            return Redirect($"/admin/news/{id}/edit");
         }
 
         await adminNewsRepository.PublishAsync(id, EditorEmail, cancellationToken);

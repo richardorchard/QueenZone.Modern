@@ -124,6 +124,80 @@ public sealed class EfAdminNewsRepositoryTests : IAsyncDisposable
         Assert.Null(await repository.GetByIdAsync(4201));
     }
 
+    [Fact]
+    public async Task PublishAsync_sets_display_flag()
+    {
+        await repository.PublishAsync(4201, "editor@test.local");
+
+        var article = await repository.GetByIdAsync(4201);
+        Assert.NotNull(article);
+        Assert.True(article.IsPublished);
+    }
+
+    [Fact]
+    public async Task UnpublishAsync_clears_display_flag()
+    {
+        dbContext.Database.ExecuteSql($"""
+            UPDATE NEWS_T SET DISPLAY = 1 WHERE NEWS_ID = 4201;
+            """);
+
+        await repository.UnpublishAsync(4201, "editor@test.local");
+
+        var article = await repository.GetByIdAsync(4201);
+        Assert.NotNull(article);
+        Assert.False(article.IsPublished);
+    }
+
+    [Fact]
+    public async Task IsSlugInUseAsync_detects_existing_slug()
+    {
+        dbContext.Database.ExecuteSql($"""
+            UPDATE NEWS_T SET SLUG = 'shared-slug' WHERE NEWS_ID = 4201;
+            """);
+
+        Assert.True(await repository.IsSlugInUseAsync("shared-slug"));
+        Assert.False(await repository.IsSlugInUseAsync("shared-slug", excludeNewsId: 4201));
+        Assert.False(await repository.IsSlugInUseAsync("unused-slug"));
+    }
+
+    [Fact]
+    public async Task DeleteAsync_throws_when_foreign_key_blocks_delete()
+    {
+        dbContext.Database.ExecuteSqlRaw("PRAGMA foreign_keys = ON;");
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS NEWS_REF_TEST (
+                ID INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                NEWS_ID INTEGER NOT NULL,
+                FOREIGN KEY (NEWS_ID) REFERENCES NEWS_T(NEWS_ID)
+            );
+            """);
+        dbContext.Database.ExecuteSql($"""
+            INSERT INTO NEWS_REF_TEST (NEWS_ID) VALUES (4201);
+            """);
+
+        await Assert.ThrowsAnyAsync<Exception>(
+            async () => await repository.DeleteAsync(4201, "editor@test.local"));
+    }
+
+    [Fact]
+    public async Task CreateDraftAsync_uses_database_generated_identity()
+    {
+        var draft = new AdminNewsDraft(
+            "Created draft",
+            "created-draft",
+            "Created excerpt",
+            "Created body",
+            new DateTime(2026, 6, 21, 0, 0, 0, DateTimeKind.Utc),
+            null);
+
+        var newsId = await repository.CreateDraftAsync(draft, "editor@test.local");
+
+        Assert.True(newsId > 4201);
+        var article = await repository.GetByIdAsync(newsId);
+        Assert.NotNull(article);
+        Assert.Equal("Created draft", article.Title);
+    }
+
     public async ValueTask DisposeAsync()
     {
         await dbContext.DisposeAsync();

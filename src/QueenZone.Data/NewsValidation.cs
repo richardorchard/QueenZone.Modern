@@ -6,6 +6,8 @@ public static partial class NewsValidation
 {
     public const int MaxTitleLength = 150;
 
+    public const int MaxSourceUrlLength = 75;
+
     public static IReadOnlyList<string> ValidateDraft(AdminNewsDraft draft, bool slugInUse)
     {
         var errors = new List<string>();
@@ -48,6 +50,11 @@ public static partial class NewsValidation
         if (!string.IsNullOrEmpty(draft.Body) && LooksLikeHtml(draft.Body))
         {
             errors.Add("Article body must be plain text.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(draft.SourceUrl) && draft.SourceUrl.Length > MaxSourceUrlLength)
+        {
+            errors.Add($"Source URL must be {MaxSourceUrlLength} characters or fewer.");
         }
 
         if (!string.IsNullOrWhiteSpace(draft.SourceUrl) && !IsSafePublicUrl(draft.SourceUrl))

@@ -280,6 +280,94 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
     }
 
     [Fact]
+    public async Task Promote_with_overlong_title_shows_validation_error()
+    {
+        var newsStore = new SharedNewsStore();
+        var discoveryStore = new SharedNewsDiscoveryStore();
+        var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
+        var candidateId = await SeedDraftedCandidateAsync(discoveryRepository);
+        await discoveryRepository.UpsertDraftAsync(candidateId, new NewsAgentDraftUpsert(
+            new string('x', NewsValidation.MaxTitleLength + 1),
+            "overlong-title",
+            "Draft excerpt for review queue.",
+            "Draft body for review queue.",
+            null,
+            null,
+            null,
+            DateTime.UtcNow.Date,
+            null));
+        var client = CreateClient(AdminEmail, newsStore, discoveryStore);
+
+        var promoteResponse = await PostActionAsync(client, $"/admin/news-discovery/{candidateId}/promote", candidateId);
+        Assert.Equal(HttpStatusCode.Redirect, promoteResponse.StatusCode);
+        Assert.Equal($"/admin/news-discovery/{candidateId}", promoteResponse.Headers.Location!.OriginalString);
+
+        var reviewBody = await client.GetStringAsync($"/admin/news-discovery/{candidateId}");
+        Assert.Contains($"Title must be {NewsValidation.MaxTitleLength} characters or fewer.", reviewBody);
+        Assert.Contains("admin-status--error", reviewBody);
+
+        var candidate = await discoveryRepository.GetCandidateByIdAsync(candidateId);
+        Assert.NotNull(candidate);
+        Assert.Equal(NewsCandidateStatus.Drafted, candidate.Status);
+        Assert.Null(candidate.PromotedNewsId);
+    }
+
+    [Fact]
+    public async Task Promote_with_overlong_source_url_shows_validation_error()
+    {
+        var newsStore = new SharedNewsStore();
+        var discoveryStore = new SharedNewsDiscoveryStore();
+        var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
+        var longUrl = "https://www.queenonline.com/news/" + new string('a', NewsValidation.MaxSourceUrlLength);
+        var sourceId = await discoveryRepository.UpsertSourceAsync(new NewsDiscoverySourceDraft(
+            "long-url-source",
+            "Long URL Source",
+            "https://example.com/",
+            null,
+            NewsDiscoverySourceType.Rss,
+            NewsDiscoveryTrustTier.Primary,
+            60,
+            true,
+            null));
+        var discoveredAt = DateTime.UtcNow;
+        var candidateId = await discoveryRepository.CreateCandidateAsync(new NewsCandidateCreateRequest(
+            sourceId,
+            longUrl,
+            "Long URL candidate",
+            discoveredAt,
+            "Excerpt",
+            discoveredAt));
+        await discoveryRepository.TryUpdateCandidateStatusAsync(
+            candidateId,
+            new NewsCandidateStatusUpdate(
+                NewsCandidateStatus.NeedsReview,
+                RelevanceScore: 0.9m,
+                ConfidenceScore: 0.8m));
+        await discoveryRepository.TryUpdateCandidateStatusAsync(
+            candidateId,
+            new NewsCandidateStatusUpdate(NewsCandidateStatus.Drafted));
+        await discoveryRepository.UpsertDraftAsync(candidateId, new NewsAgentDraftUpsert(
+            "Valid title",
+            "valid-title",
+            "Draft excerpt",
+            "Draft body",
+            null,
+            null,
+            null,
+            discoveredAt.Date,
+            null));
+
+        var client = CreateClient(AdminEmail, newsStore, discoveryStore);
+        var promoteResponse = await PostActionAsync(client, $"/admin/news-discovery/{candidateId}/promote", candidateId);
+        Assert.Equal(HttpStatusCode.Redirect, promoteResponse.StatusCode);
+        Assert.Equal($"/admin/news-discovery/{candidateId}", promoteResponse.Headers.Location!.OriginalString);
+
+        var reviewBody = await client.GetStringAsync($"/admin/news-discovery/{candidateId}");
+        Assert.Contains($"Source URL must be {NewsValidation.MaxSourceUrlLength} characters or fewer.", reviewBody);
+        Assert.Contains("admin-status--error", reviewBody);
+    }
+
+    [Fact]
     public async Task AuthorizedAdminCanEditDraftAndMoveCandidateToDrafted()
     {
         var discoveryStore = new SharedNewsDiscoveryStore();
@@ -386,6 +474,172 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
 
         Assert.Equal(HttpStatusCode.Redirect, secondReject.StatusCode);
         Assert.Equal($"/admin/news-discovery/{candidateId}", secondReject.Headers.Location!.OriginalString);
+    }
+
+    [Fact]
+    public async Task RejectActionShowsErrorWhenStatusUpdateFails()
+    {
+        var discoveryStore = new SharedNewsDiscoveryStore();
+        var inner = new InMemoryNewsDiscoveryRepository(discoveryStore);
+        var candidateId = await SeedNeedsReviewCandidateAsync(inner);
+        var discoveryRepository = new ConfigurableNewsDiscoveryRepository(inner)
+        {
+            TryUpdateCandidateStatusHandler = (id, update, ct) =>
+                update.Status == NewsCandidateStatus.Rejected
+                    ? Task.FromResult(false)
+                    : inner.TryUpdateCandidateStatusAsync(id, update, ct)
+        };
+        var client = CreateClient(AdminEmail, new SharedNewsStore(), discoveryStore, discoveryRepository: discoveryRepository);
+
+        var response = await PostActionAsync(client, $"/admin/news-discovery/{candidateId}/reject", candidateId);
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+
+        var reviewBody = await client.GetStringAsync($"/admin/news-discovery/{candidateId}");
+        Assert.Contains("could not be marked as rejected", reviewBody);
+    }
+
+    [Fact]
+    public async Task IgnoreDuplicateActionShowsErrorWhenAlreadyIgnored()
+    {
+        var discoveryStore = new SharedNewsDiscoveryStore();
+        var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
+        var (_, secondId) = await SeedDuplicatePairAsync(discoveryRepository);
+        await discoveryRepository.TryUpdateCandidateStatusAsync(
+            secondId,
+            new NewsCandidateStatusUpdate(
+                NewsCandidateStatus.IgnoredDuplicate,
+                DuplicateOfCandidateId: 1));
+        var client = CreateClient(AdminEmail, new SharedNewsStore(), discoveryStore, discoveryRepository: discoveryRepository);
+
+        var response = await PostActionAsync(client, $"/admin/news-discovery/{secondId}/ignoreduplicate", secondId);
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+
+        var reviewBody = await client.GetStringAsync($"/admin/news-discovery/{secondId}");
+        Assert.Contains("already been ignored as a duplicate", reviewBody);
+    }
+
+    [Fact]
+    public async Task IgnoreDuplicateActionShowsErrorWhenStatusUpdateFails()
+    {
+        var discoveryStore = new SharedNewsDiscoveryStore();
+        var inner = new InMemoryNewsDiscoveryRepository(discoveryStore);
+        var candidateId = await SeedNeedsReviewCandidateAsync(inner);
+        var discoveryRepository = new ConfigurableNewsDiscoveryRepository(inner)
+        {
+            TryUpdateCandidateStatusHandler = (id, update, ct) =>
+                update.Status == NewsCandidateStatus.IgnoredDuplicate
+                    ? Task.FromResult(false)
+                    : inner.TryUpdateCandidateStatusAsync(id, update, ct)
+        };
+        var client = CreateClient(AdminEmail, new SharedNewsStore(), discoveryStore, discoveryRepository: discoveryRepository);
+
+        var response = await PostActionAsync(client, $"/admin/news-discovery/{candidateId}/ignoreduplicate", candidateId);
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+
+        var reviewBody = await client.GetStringAsync($"/admin/news-discovery/{candidateId}");
+        Assert.Contains("could not be marked as a duplicate", reviewBody);
+    }
+
+    [Fact]
+    public async Task PromoteActionShowsErrorWhenDraftIsMissing()
+    {
+        var discoveryStore = new SharedNewsDiscoveryStore();
+        var inner = new InMemoryNewsDiscoveryRepository(discoveryStore);
+        var candidateId = await SeedDraftedCandidateAsync(inner);
+        var discoveryRepository = new ConfigurableNewsDiscoveryRepository(inner)
+        {
+            GetDraftByCandidateIdHandler = (_, _) => Task.FromResult<NewsAgentDraft?>(null)
+        };
+        var client = CreateClient(AdminEmail, new SharedNewsStore(), discoveryStore, discoveryRepository: discoveryRepository);
+
+        var response = await PostActionAsync(client, $"/admin/news-discovery/{candidateId}/promote", candidateId);
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+
+        var reviewBody = await client.GetStringAsync($"/admin/news-discovery/{candidateId}");
+        Assert.Contains("Generate or save a draft before promoting", reviewBody);
+    }
+
+    [Fact]
+    public async Task PromoteActionShowsErrorWhenCandidateIsNotDrafted()
+    {
+        var discoveryStore = new SharedNewsDiscoveryStore();
+        var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
+        var candidateId = await SeedDiscoveredCandidateWithDraftAsync(discoveryRepository);
+        var client = CreateClient(AdminEmail, new SharedNewsStore(), discoveryStore, discoveryRepository: discoveryRepository);
+
+        var response = await PostActionAsync(client, $"/admin/news-discovery/{candidateId}/promote", candidateId);
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+
+        var reviewBody = await client.GetStringAsync($"/admin/news-discovery/{candidateId}");
+        Assert.Contains("Only drafted candidates can be promoted", reviewBody);
+    }
+
+    [Fact]
+    public async Task PromoteActionShowsErrorWhenDraftAcknowledgementFails()
+    {
+        var discoveryStore = new SharedNewsDiscoveryStore();
+        var inner = new InMemoryNewsDiscoveryRepository(discoveryStore);
+        var candidateId = await SeedNeedsReviewCandidateWithDraftAsync(inner);
+        var discoveryRepository = new ConfigurableNewsDiscoveryRepository(inner)
+        {
+            TryUpdateCandidateStatusHandler = (id, update, ct) =>
+                update.Status == NewsCandidateStatus.Drafted
+                    ? Task.FromResult(false)
+                    : inner.TryUpdateCandidateStatusAsync(id, update, ct)
+        };
+        var client = CreateClient(AdminEmail, new SharedNewsStore(), discoveryStore, discoveryRepository: discoveryRepository);
+
+        var response = await PostActionAsync(client, $"/admin/news-discovery/{candidateId}/promote", candidateId);
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+
+        var reviewBody = await client.GetStringAsync($"/admin/news-discovery/{candidateId}");
+        Assert.Contains("could not be marked as drafted before promotion", reviewBody);
+    }
+
+    [Fact]
+    public async Task PromoteActionShowsErrorWhenCandidateStatusUpdateFails()
+    {
+        var discoveryStore = new SharedNewsDiscoveryStore();
+        var inner = new InMemoryNewsDiscoveryRepository(discoveryStore);
+        var candidateId = await SeedDraftedCandidateAsync(inner);
+        var discoveryRepository = new ConfigurableNewsDiscoveryRepository(inner)
+        {
+            TryUpdateCandidateStatusHandler = (id, update, ct) =>
+                update.Status == NewsCandidateStatus.PromotedToArticle
+                    ? Task.FromResult(false)
+                    : inner.TryUpdateCandidateStatusAsync(id, update, ct)
+        };
+        var client = CreateClient(AdminEmail, new SharedNewsStore(), discoveryStore, discoveryRepository: discoveryRepository);
+
+        var response = await PostActionAsync(client, $"/admin/news-discovery/{candidateId}/promote", candidateId);
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+
+        var reviewBody = await client.GetStringAsync($"/admin/news-discovery/{candidateId}");
+        Assert.Contains("Promotion failed while updating the discovery candidate", reviewBody);
+    }
+
+    [Fact]
+    public async Task PromoteActionShowsErrorWhenCreateDraftFails()
+    {
+        var discoveryStore = new SharedNewsDiscoveryStore();
+        var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
+        var candidateId = await SeedDraftedCandidateAsync(discoveryRepository);
+        var newsStore = new SharedNewsStore();
+        var adminRepository = new FailingCreateAdminNewsRepository(
+            new InMemoryAdminNewsRepository(newsStore),
+            new InvalidOperationException("Simulated create failure."));
+        var client = CreateClient(
+            AdminEmail,
+            newsStore,
+            discoveryStore,
+            discoveryRepository: discoveryRepository,
+            adminNewsRepository: adminRepository);
+
+        var response = await PostActionAsync(client, $"/admin/news-discovery/{candidateId}/promote", candidateId);
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+
+        var reviewBody = await client.GetStringAsync($"/admin/news-discovery/{candidateId}");
+        Assert.Contains("Promotion failed while creating the admin draft", reviewBody);
     }
 
     [Fact]
@@ -577,12 +831,49 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
         return (firstId, secondId);
     }
 
+    private static async Task<int> SeedDiscoveredCandidateWithDraftAsync(InMemoryNewsDiscoveryRepository repository)
+    {
+        var sourceId = await repository.UpsertSourceAsync(new NewsDiscoverySourceDraft(
+            "discovered-draft-source",
+            "Discovered draft source",
+            "https://example.com/",
+            null,
+            NewsDiscoverySourceType.AllowlistedPage,
+            NewsDiscoveryTrustTier.Primary,
+            60,
+            true,
+            null));
+        var discoveredAt = new DateTime(2026, 7, 3, 12, 0, 0, DateTimeKind.Utc);
+        var candidateId = await repository.CreateCandidateAsync(new NewsCandidateCreateRequest(
+            sourceId,
+            "https://example.com/discovered-with-draft",
+            "Discovered with draft",
+            discoveredAt,
+            "Excerpt",
+            discoveredAt));
+        await repository.UpsertDraftAsync(
+            candidateId,
+            new NewsAgentDraftUpsert(
+                "Undrafted promote title",
+                "undrafted-promote-title",
+                "Excerpt",
+                "Body",
+                null,
+                null,
+                null,
+                discoveredAt.Date,
+                null));
+        return candidateId;
+    }
+
     private WebApplicationFactory<Program> CreateFactory(
         SharedNewsStore newsStore,
         SharedNewsDiscoveryStore discoveryStore,
         string? openRouterApiKey = "test-key",
         string? draftResponseJson = null,
-        bool aiClientEnabled = true) =>
+        bool aiClientEnabled = true,
+        INewsDiscoveryRepository? discoveryRepository = null,
+        IAdminNewsRepository? adminNewsRepository = null) =>
         factory.WithWebHostBuilder(builder =>
         {
             if (openRouterApiKey is not null)
@@ -609,9 +900,24 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
                 services.AddSingleton(newsStore);
                 services.AddSingleton(discoveryStore);
                 services.AddSingleton<INewsRepository>(_ => new QueenZone.Data.InMemoryNewsRepository(newsStore));
-                services.AddSingleton<IAdminNewsRepository>(_ => new InMemoryAdminNewsRepository(newsStore));
                 services.AddSingleton<INewsAuditRepository>(_ => new InMemoryNewsAuditRepository(newsStore));
-                services.AddSingleton<INewsDiscoveryRepository>(_ => new InMemoryNewsDiscoveryRepository(discoveryStore));
+                if (adminNewsRepository is not null)
+                {
+                    services.AddSingleton(adminNewsRepository);
+                }
+                else
+                {
+                    services.AddSingleton<IAdminNewsRepository>(_ => new InMemoryAdminNewsRepository(newsStore));
+                }
+
+                if (discoveryRepository is not null)
+                {
+                    services.AddSingleton(discoveryRepository);
+                }
+                else
+                {
+                    services.AddSingleton<INewsDiscoveryRepository>(_ => new InMemoryNewsDiscoveryRepository(discoveryStore));
+                }
                 services.AddSingleton<INewsAiClient>(_ => new RegenerateDraftFakeAiClient(draftJson, aiClientEnabled));
             });
         });
@@ -622,11 +928,20 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
         SharedNewsDiscoveryStore? discoveryStore = null,
         string? openRouterApiKey = "test-key",
         string? draftResponseJson = null,
-        bool aiClientEnabled = true)
+        bool aiClientEnabled = true,
+        INewsDiscoveryRepository? discoveryRepository = null,
+        IAdminNewsRepository? adminNewsRepository = null)
     {
         newsStore ??= new SharedNewsStore();
         discoveryStore ??= new SharedNewsDiscoveryStore();
-        var appFactory = CreateFactory(newsStore, discoveryStore, openRouterApiKey, draftResponseJson, aiClientEnabled);
+        var appFactory = CreateFactory(
+            newsStore,
+            discoveryStore,
+            openRouterApiKey,
+            draftResponseJson,
+            aiClientEnabled,
+            discoveryRepository,
+            adminNewsRepository);
         return CreateClientFromFactory(appFactory, email);
     }
 
