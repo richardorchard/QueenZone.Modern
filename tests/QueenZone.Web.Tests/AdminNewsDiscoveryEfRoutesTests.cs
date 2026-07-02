@@ -2,6 +2,7 @@ using System.Net;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using QueenZone.Data;
 using QueenZone.Web;
 
@@ -93,6 +94,44 @@ public sealed class AdminNewsDiscoveryEfRoutesTests : IClassFixture<WebApplicati
 
         var reviewBody = await client.GetStringAsync($"/admin/news-discovery/{candidateId}");
         Assert.Contains("Cannot transition candidate status", reviewBody);
+    }
+
+    [Fact]
+    public async Task Ef_backed_promote_rolls_back_when_candidate_update_fails()
+    {
+        var candidateId = await SeedDraftedCandidateAsync();
+
+        var failingFactory = harness.CreateFactory(baseFactory, services =>
+        {
+            services.RemoveAll<INewsDiscoveryRepository>();
+            services.AddScoped<INewsDiscoveryRepository>(sp =>
+            {
+                var inner = new EfNewsDiscoveryRepository(sp.GetRequiredService<QueenZoneDbContext>());
+                return new ConfigurableNewsDiscoveryRepository(inner)
+                {
+                    TryUpdateCandidateStatusHandler = (id, update, ct) =>
+                        update.Status == NewsCandidateStatus.PromotedToArticle
+                            ? Task.FromResult(false)
+                            : inner.TryUpdateCandidateStatusAsync(id, update, ct)
+                };
+            });
+        });
+        failingFactory.Services.GetRequiredService<QueenZoneDbContext>(); // ensure schema from InitializeAsync still valid - same connection
+
+        var client = AdminHttpTestHelpers.CreateClient(failingFactory, AdminHttpTestHelpers.AdminEmail);
+        var promoteResponse = await AdminHttpTestHelpers.PostDiscoveryActionAsync(
+            client,
+            $"/admin/news-discovery/{candidateId}/promote",
+            candidateId);
+        Assert.Equal(HttpStatusCode.Redirect, promoteResponse.StatusCode);
+
+        var reviewBody = await client.GetStringAsync($"/admin/news-discovery/{candidateId}");
+        Assert.Contains("Promotion failed while updating the discovery candidate", reviewBody);
+
+        await using var scope = failingFactory.Services.CreateAsyncScope();
+        var adminRepository = scope.ServiceProvider.GetRequiredService<IAdminNewsRepository>();
+        var articles = await adminRepository.GetAllAsync();
+        Assert.DoesNotContain(articles, article => article.Title == "Discovery draft title");
     }
 
     private async Task<int> SeedDraftedCandidateAsync()

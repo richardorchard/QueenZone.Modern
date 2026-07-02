@@ -22,7 +22,9 @@ internal sealed class AdminEfWebTestHarness : IAsyncDisposable
         connection.Open();
     }
 
-    internal WebApplicationFactory<Program> CreateFactory(WebApplicationFactory<Program> baseFactory) =>
+    internal WebApplicationFactory<Program> CreateFactory(
+        WebApplicationFactory<Program> baseFactory,
+        Action<IServiceCollection>? configureServices = null) =>
         baseFactory.WithWebHostBuilder(builder =>
         {
             builder.UseSetting("ConnectionStrings:QueenZoneLegacy", string.Empty);
@@ -45,6 +47,8 @@ internal sealed class AdminEfWebTestHarness : IAsyncDisposable
                 });
                 services.AddScoped<INewsAuditRepository, EfNewsAuditRepository>();
                 services.AddScoped<INewsDiscoveryRepository, EfNewsDiscoveryRepository>();
+
+                configureServices?.Invoke(services);
             });
         });
 

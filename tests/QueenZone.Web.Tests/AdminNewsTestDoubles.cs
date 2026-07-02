@@ -2,6 +2,36 @@ using QueenZone.Data;
 
 namespace QueenZone.Web.Tests;
 
+internal sealed class FailingCreateAdminNewsRepository(InMemoryAdminNewsRepository inner, Exception createException) : IAdminNewsRepository
+{
+    public Task<IReadOnlyList<AdminNewsArticle>> GetAllAsync(CancellationToken cancellationToken = default) =>
+        inner.GetAllAsync(cancellationToken);
+
+    public Task<AdminNewsArticlePage> GetPageAsync(int page, int pageSize, CancellationToken cancellationToken = default) =>
+        inner.GetPageAsync(page, pageSize, cancellationToken);
+
+    public Task<AdminNewsArticle?> GetByIdAsync(int id, CancellationToken cancellationToken = default) =>
+        inner.GetByIdAsync(id, cancellationToken);
+
+    public Task<int> CreateDraftAsync(AdminNewsDraft draft, string editorEmail, CancellationToken cancellationToken = default) =>
+        Task.FromException<int>(createException);
+
+    public Task UpdateAsync(int id, AdminNewsDraft draft, string editorEmail, CancellationToken cancellationToken = default) =>
+        inner.UpdateAsync(id, draft, editorEmail, cancellationToken);
+
+    public Task PublishAsync(int id, string editorEmail, CancellationToken cancellationToken = default) =>
+        inner.PublishAsync(id, editorEmail, cancellationToken);
+
+    public Task UnpublishAsync(int id, string editorEmail, CancellationToken cancellationToken = default) =>
+        inner.UnpublishAsync(id, editorEmail, cancellationToken);
+
+    public Task DeleteAsync(int id, string editorEmail, CancellationToken cancellationToken = default) =>
+        inner.DeleteAsync(id, editorEmail, cancellationToken);
+
+    public Task<bool> IsSlugInUseAsync(string slug, int? excludeNewsId = null, CancellationToken cancellationToken = default) =>
+        inner.IsSlugInUseAsync(slug, excludeNewsId, cancellationToken);
+}
+
 internal sealed class FailingDeleteAdminNewsRepository(InMemoryAdminNewsRepository inner, Exception deleteException) : IAdminNewsRepository
 {
     public Task<IReadOnlyList<AdminNewsArticle>> GetAllAsync(CancellationToken cancellationToken = default) =>
@@ -37,6 +67,10 @@ internal sealed class ConfigurableNewsDiscoveryRepository(INewsDiscoveryReposito
     public Func<int, CancellationToken, Task<NewsCandidate?>>? GetCandidateByPromotedNewsIdHandler { get; init; }
 
     public Func<int, CancellationToken, Task>? ClearPromotedNewsLinksHandler { get; init; }
+
+    public Func<int, NewsCandidateStatusUpdate, CancellationToken, Task<bool>>? TryUpdateCandidateStatusHandler { get; init; }
+
+    public Func<int, CancellationToken, Task<NewsAgentDraft?>>? GetDraftByCandidateIdHandler { get; init; }
 
     public Task<IReadOnlyList<NewsDiscoverySource>> GetSourcesAsync(bool enabledOnly = false, CancellationToken cancellationToken = default) =>
         inner.GetSourcesAsync(enabledOnly, cancellationToken);
@@ -95,7 +129,8 @@ internal sealed class ConfigurableNewsDiscoveryRepository(INewsDiscoveryReposito
         int candidateId,
         NewsCandidateStatusUpdate update,
         CancellationToken cancellationToken = default) =>
-        inner.TryUpdateCandidateStatusAsync(candidateId, update, cancellationToken);
+        TryUpdateCandidateStatusHandler?.Invoke(candidateId, update, cancellationToken)
+        ?? inner.TryUpdateCandidateStatusAsync(candidateId, update, cancellationToken);
 
     public Task<int> AddCandidateEvidenceAsync(int candidateId, NewsCandidateEvidenceDraft evidence, CancellationToken cancellationToken = default) =>
         inner.AddCandidateEvidenceAsync(candidateId, evidence, cancellationToken);
@@ -116,7 +151,8 @@ internal sealed class ConfigurableNewsDiscoveryRepository(INewsDiscoveryReposito
         inner.GetEstimatedAiSpendUsdAsync(fromUtc, toUtc, cancellationToken);
 
     public Task<NewsAgentDraft?> GetDraftByCandidateIdAsync(int candidateId, CancellationToken cancellationToken = default) =>
-        inner.GetDraftByCandidateIdAsync(candidateId, cancellationToken);
+        GetDraftByCandidateIdHandler?.Invoke(candidateId, cancellationToken)
+        ?? inner.GetDraftByCandidateIdAsync(candidateId, cancellationToken);
 
     public Task<int> UpsertDraftAsync(int candidateId, NewsAgentDraftUpsert draft, CancellationToken cancellationToken = default) =>
         inner.UpsertDraftAsync(candidateId, draft, cancellationToken);
