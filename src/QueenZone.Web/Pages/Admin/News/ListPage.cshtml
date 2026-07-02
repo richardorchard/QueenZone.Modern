@@ -1,17 +1,10 @@
-@page "/admin/news"
-@model IndexModel
+@page "/admin/news/page/{pageNumber:int}"
+@model ListPageModel
 @inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
 @{
   var antiforgeryToken = Antiforgery.GetAndStoreTokens(HttpContext).RequestToken;
 }
 
 <div class="admin-shell">
-@if (Model.CreateForm is not null)
-{
-  <partial name="_ArticleForm" model="Model.CreateForm" />
-}
-else
-{
   <partial name="_AdminNewsList" model="AdminNewsListViewModel.FromPageModel(Model, antiforgeryToken ?? string.Empty)" />
-}
 </div>

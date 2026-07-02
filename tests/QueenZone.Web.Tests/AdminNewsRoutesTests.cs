@@ -198,6 +198,48 @@ public sealed partial class AdminNewsRoutesTests : IClassFixture<WebApplicationF
     }
 
     [Fact]
+    public async Task AuthorizedAdminCanSaveEditedArticle()
+    {
+        var store = new SharedNewsStore(
+        [
+            new AdminNewsArticle(
+                4002,
+                "Before save",
+                "before-save",
+                "Original excerpt",
+                "Original body",
+                new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc),
+                null,
+                false,
+                DateTime.UtcNow,
+                DateTime.UtcNow,
+                AdminEmail)
+        ]);
+        var client = CreateClient(AdminEmail, store);
+
+        var saveResponse = await PostArticleAsync(
+            client,
+            "/admin/news/4002/edit",
+            "/admin/news/4002",
+            new Dictionary<string, string>
+            {
+                ["title"] = "After save",
+                ["slug"] = "after-save",
+                ["excerpt"] = "Saved excerpt",
+                ["body"] = "Saved body text",
+                ["publishedAt"] = "2026-06-15"
+            });
+
+        Assert.Equal(HttpStatusCode.Redirect, saveResponse.StatusCode);
+        Assert.Equal("/admin/news/4002/edit", saveResponse.Headers.Location!.OriginalString);
+
+        var editBody = await client.GetStringAsync("/admin/news/4002/edit");
+        Assert.Contains("After save", editBody);
+        Assert.Contains("Saved body text", editBody);
+        Assert.DoesNotContain("Original body", editBody);
+    }
+
+    [Fact]
     public async Task OverlongTitleIsRejected()
     {
         var store = new SharedNewsStore();
@@ -480,6 +522,35 @@ public sealed partial class AdminNewsRoutesTests : IClassFixture<WebApplicationF
     }
 
     [Fact]
+    public async Task AdminNewsList_is_paginated()
+    {
+        var store = new SharedNewsStore(CreateSeedArticles(55));
+        var client = CreateClient(AdminEmail, store);
+
+        var firstPage = await client.GetStringAsync("/admin/news");
+        Assert.Contains("Showing 1&ndash;50 of 55 articles", firstPage);
+        Assert.Contains("Article 055", firstPage);
+        Assert.Contains("Article 006", firstPage);
+        Assert.DoesNotContain("Article 005", firstPage);
+        Assert.Contains("href=\"/admin/news/page/2\"", firstPage);
+
+        var secondPage = await client.GetStringAsync("/admin/news/page/2");
+        Assert.Contains("Showing 51&ndash;55 of 55 articles", secondPage);
+        Assert.Contains("Article 005", secondPage);
+        Assert.Contains("Article 001", secondPage);
+        Assert.DoesNotContain("Article 006", secondPage);
+        Assert.Contains("href=\"/admin/news\"", secondPage);
+
+        var invalidPage = await client.GetAsync("/admin/news/page/99");
+        Assert.Equal(HttpStatusCode.Redirect, invalidPage.StatusCode);
+        Assert.Equal("/admin/news/page/2", invalidPage.Headers.Location!.OriginalString);
+
+        var zeroPage = await client.GetAsync("/admin/news/page/0");
+        Assert.Equal(HttpStatusCode.Redirect, zeroPage.StatusCode);
+        Assert.Equal("/admin/news", zeroPage.Headers.Location!.OriginalString);
+    }
+
+    [Fact]
     public async Task Delete_missingArticle_redirectsWithMessage()
     {
         var store = new SharedNewsStore(
@@ -663,4 +734,18 @@ public sealed partial class AdminNewsRoutesTests : IClassFixture<WebApplicationF
 
     [GeneratedRegex("""name="__RequestVerificationToken" value="(?<token>[^"]+)""", RegexOptions.IgnoreCase)]
     private static partial Regex AntiforgeryTokenRegex();
+
+    private static IEnumerable<AdminNewsArticle> CreateSeedArticles(int count) =>
+        Enumerable.Range(1, count).Select(index => new AdminNewsArticle(
+            index,
+            $"Article {index:D3}",
+            $"article-{index}",
+            "Excerpt",
+            "Body",
+            new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddDays(index),
+            null,
+            false,
+            null,
+            null,
+            null));
 }

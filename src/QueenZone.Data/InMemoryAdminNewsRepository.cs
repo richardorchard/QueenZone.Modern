@@ -5,6 +5,19 @@ public sealed class InMemoryAdminNewsRepository(SharedNewsStore store) : IAdminN
     public Task<IReadOnlyList<AdminNewsArticle>> GetAllAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(store.GetAllArticles());
 
+    public Task<AdminNewsArticlePage> GetPageAsync(int page, int pageSize, CancellationToken cancellationToken = default)
+    {
+        var normalizedPage = Math.Max(page, 1);
+        var normalizedPageSize = Math.Max(pageSize, 1);
+        var all = store.GetAllArticles();
+        var items = all
+            .Skip((normalizedPage - 1) * normalizedPageSize)
+            .Take(normalizedPageSize)
+            .ToList();
+
+        return Task.FromResult(new AdminNewsArticlePage(items, all.Count, normalizedPage, normalizedPageSize));
+    }
+
     public Task<AdminNewsArticle?> GetByIdAsync(int id, CancellationToken cancellationToken = default) =>
         Task.FromResult(store.GetArticle(id));
 

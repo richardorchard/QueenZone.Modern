@@ -5,28 +5,17 @@ namespace QueenZone.Web.Pages.Admin.News;
 
 public sealed class IndexModel(
     IAdminNewsRepository adminNewsRepository,
-    INewsAuditRepository auditRepository) : AdminNewsPageModel
+    INewsAuditRepository auditRepository) : AdminNewsListPageModel(adminNewsRepository)
 {
-    public IReadOnlyList<AdminNewsArticle> Articles { get; private set; } = [];
-
     public ArticleFormViewModel? CreateForm { get; private set; }
 
-    public string? StatusMessage { get; private set; }
-
-    public string? StatusMessageKind { get; private set; }
-
-    public async Task OnGetAsync(CancellationToken cancellationToken)
-    {
-        Articles = await adminNewsRepository.GetAllAsync(cancellationToken);
-        StatusMessage = TempData[AdminNewsMessages.MessageKey] as string;
-        StatusMessageKind = TempData[AdminNewsMessages.MessageKindKey] as string;
-        ViewData["Title"] = "Admin news";
-    }
+    public async Task<IActionResult> OnGetAsync(CancellationToken cancellationToken) =>
+        await LoadListPageAsync(1, cancellationToken);
 
     public async Task<IActionResult> OnPostAsync([FromForm] AdminNewsForm form, CancellationToken cancellationToken)
     {
         var draft = form.ToDraft();
-        var slugInUse = await adminNewsRepository.IsSlugInUseAsync(
+        var slugInUse = await AdminNewsRepository.IsSlugInUseAsync(
             NewsSlug.Resolve(draft.Title, draft.Slug),
             cancellationToken: cancellationToken);
         var errors = NewsValidation.ValidateDraft(draft, slugInUse);
@@ -37,7 +26,7 @@ public sealed class IndexModel(
             return Page();
         }
 
-        var id = await adminNewsRepository.CreateDraftAsync(draft, EditorEmail, cancellationToken);
+        var id = await AdminNewsRepository.CreateDraftAsync(draft, EditorEmail, cancellationToken);
         await auditRepository.AppendAsync(id, "create", EditorEmail, $"Created draft \"{draft.Title}\"", cancellationToken);
         return Redirect($"/admin/news/{id}/edit");
     }

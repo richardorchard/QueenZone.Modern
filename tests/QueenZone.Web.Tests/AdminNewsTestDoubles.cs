@@ -7,6 +7,9 @@ internal sealed class FailingDeleteAdminNewsRepository(InMemoryAdminNewsReposito
     public Task<IReadOnlyList<AdminNewsArticle>> GetAllAsync(CancellationToken cancellationToken = default) =>
         inner.GetAllAsync(cancellationToken);
 
+    public Task<AdminNewsArticlePage> GetPageAsync(int page, int pageSize, CancellationToken cancellationToken = default) =>
+        inner.GetPageAsync(page, pageSize, cancellationToken);
+
     public Task<AdminNewsArticle?> GetByIdAsync(int id, CancellationToken cancellationToken = default) =>
         inner.GetByIdAsync(id, cancellationToken);
 
