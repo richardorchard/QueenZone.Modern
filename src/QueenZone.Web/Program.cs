@@ -35,6 +35,7 @@ builder.Services.Configure<SitemapOptions>(builder.Configuration.GetSection(Site
 builder.Services.Configure<MemberAuthenticationOptions>(builder.Configuration.GetSection(MemberAuthenticationOptions.SectionName));
 builder.Services.Configure<ForumDataOptions>(builder.Configuration.GetSection(ForumDataOptions.SectionName));
 builder.Services.AddMemoryCache();
+builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<CoreSitemapBuilder>();
 builder.Services.AddSingleton<CoreSitemapService>();
 builder.Services.AddSingleton<ForumSitemapBuilder>();

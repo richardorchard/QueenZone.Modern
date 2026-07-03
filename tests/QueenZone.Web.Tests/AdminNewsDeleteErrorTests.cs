@@ -3,6 +3,7 @@ using QueenZone.Web.Pages.Admin.News;
 
 namespace QueenZone.Web.Tests;
 
+[Collection(AdminNewsDeleteErrorCollection.Name)]
 public sealed class AdminNewsDeleteErrorTests
 {
     [Fact]

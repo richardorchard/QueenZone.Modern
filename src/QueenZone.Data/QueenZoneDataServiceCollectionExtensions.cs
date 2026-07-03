@@ -30,6 +30,7 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddScoped<IMemberAccountRepository, EfMemberAccountRepository>();
         services.AddScoped<INewsDiscoveryRepository, EfNewsDiscoveryRepository>();
         services.AddScoped<INewsAgentRunLeaseService, EfNewsAgentRunLeaseService>();
+        services.AddScoped<IQueenHistoryRepository, EfQueenHistoryRepository>();
 
         return services;
     }
@@ -48,6 +49,7 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddSingleton<IFanPerformanceRepository>(_ => new InMemoryFanPerformanceRepository(SampleFanPerformanceData.CreateSeedPerformances()));
         services.AddSingleton<ILegacyMemberLookupRepository>(_ => new InMemoryLegacyMemberLookupRepository(SampleLegacyMemberData.CreateSeedMatches()));
         services.AddSingleton<IDiscographyRepository>(_ => new InMemoryDiscographyRepository(SampleDiscographyData.CreateSeedAlbums()));
+        services.AddSingleton<IQueenHistoryRepository>(_ => new InMemoryQueenHistoryRepository(SampleQueenHistoryData.CreateSeedEvents()));
         services.AddSingleton<IAdminNewsRepository, InMemoryAdminNewsRepository>();
         services.AddSingleton<INewsAuditRepository, InMemoryNewsAuditRepository>();
         services.AddSingleton<IMemberAccountRepository, InMemoryMemberAccountRepository>();
