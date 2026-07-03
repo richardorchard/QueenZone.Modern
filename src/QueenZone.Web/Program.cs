@@ -223,6 +223,7 @@ static void ConfigureAdminAuthenticationScheme(PolicySchemeOptions options, bool
         : TestAuthHandler.SchemeName;
 }
 
+[System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
 static void ConfigureMemberAuthentication(WebApplicationBuilder builder, AuthenticationBuilder authenticationBuilder)
 {
     authenticationBuilder.AddCookie(MemberAuthenticationSchemes.MembersCookie, options =>
@@ -274,6 +275,7 @@ static void ConfigureMemberAuthentication(WebApplicationBuilder builder, Authent
             options.ClientId = memberAuth.Discord.ClientId!;
             options.ClientSecret = memberAuth.Discord.ClientSecret!;
             options.SignInScheme = MemberAuthenticationSchemes.ExternalCookie;
+            options.Scope.Add("email");
         });
     }
 
@@ -284,6 +286,7 @@ static void ConfigureMemberAuthentication(WebApplicationBuilder builder, Authent
             options.ClientId = memberAuth.GitHub.ClientId!;
             options.ClientSecret = memberAuth.GitHub.ClientSecret!;
             options.SignInScheme = MemberAuthenticationSchemes.ExternalCookie;
+            options.Scope.Add("user:email");
         });
     }
 }

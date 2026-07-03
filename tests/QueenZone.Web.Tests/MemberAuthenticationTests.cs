@@ -51,4 +51,5 @@ public sealed class MemberAuthenticationTests : IClassFixture<WebApplicationFact
         Assert.Contains("Sign in", body);
         Assert.Contains("Sign in to QueenZone", body);
     }
+
 }
