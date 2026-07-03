@@ -6,7 +6,7 @@ public static partial class NewsValidation
 {
     public const int MaxTitleLength = 150;
 
-    public const int MaxSourceUrlLength = 75;
+    public const int MaxSourceUrlLength = 2000;
 
     public static IReadOnlyList<string> ValidateDraft(AdminNewsDraft draft, bool slugInUse)
     {

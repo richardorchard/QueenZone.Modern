@@ -52,7 +52,7 @@
   </label>
   <label>
     Source URL
-    <input type="text" name="sourceUrl" value="@Model.Draft.SourceUrl">
+    <input type="text" name="sourceUrl" value="@Model.Draft.SourceUrl" maxlength="@NewsValidation.MaxSourceUrlLength">
   </label>
 
   <div class="admin-form-actions">
