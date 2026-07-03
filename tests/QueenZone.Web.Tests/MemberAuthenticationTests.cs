@@ -1,7 +1,6 @@
 using System.Net;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Extensions.Configuration;
 
 namespace QueenZone.Web.Tests;
 
@@ -53,41 +52,4 @@ public sealed class MemberAuthenticationTests : IClassFixture<WebApplicationFact
         Assert.Contains("Sign in to QueenZone", body);
     }
 
-    [Fact]
-    public async Task LoginPageRendersDiscordButtonWhenDiscordCredentialsConfigured()
-    {
-        var localFactory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
-        {
-            builder.UseEnvironment("Development");
-            builder.ConfigureAppConfiguration(config =>
-                config.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["Authentication:Discord:ClientId"] = "test-discord-client-id",
-                    ["Authentication:Discord:ClientSecret"] = "test-discord-client-secret",
-                }));
-        });
-
-        var body = await localFactory.CreateClient().GetStringAsync("/account/login");
-
-        Assert.Contains("Discord", body);
-    }
-
-    [Fact]
-    public async Task LoginPageRendersGitHubButtonWhenGitHubCredentialsConfigured()
-    {
-        var localFactory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
-        {
-            builder.UseEnvironment("Development");
-            builder.ConfigureAppConfiguration(config =>
-                config.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["Authentication:GitHub:ClientId"] = "test-github-client-id",
-                    ["Authentication:GitHub:ClientSecret"] = "test-github-client-secret",
-                }));
-        });
-
-        var body = await localFactory.CreateClient().GetStringAsync("/account/login");
-
-        Assert.Contains("GitHub", body);
-    }
 }

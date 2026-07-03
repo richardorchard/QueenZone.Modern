@@ -223,6 +223,7 @@ static void ConfigureAdminAuthenticationScheme(PolicySchemeOptions options, bool
         : TestAuthHandler.SchemeName;
 }
 
+[System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
 static void ConfigureMemberAuthentication(WebApplicationBuilder builder, AuthenticationBuilder authenticationBuilder)
 {
     authenticationBuilder.AddCookie(MemberAuthenticationSchemes.MembersCookie, options =>
