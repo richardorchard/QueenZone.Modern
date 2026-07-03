@@ -274,6 +274,7 @@ static void ConfigureMemberAuthentication(WebApplicationBuilder builder, Authent
             options.ClientId = memberAuth.Discord.ClientId!;
             options.ClientSecret = memberAuth.Discord.ClientSecret!;
             options.SignInScheme = MemberAuthenticationSchemes.ExternalCookie;
+            options.Scope.Add("email");
         });
     }
 
