@@ -132,7 +132,16 @@ app.Use(async (context, next) =>
     await next();
 });
 
-app.UseStatusCodePagesWithReExecute("/404");
+app.UseStatusCodePages(async statusCodeContext =>
+{
+    if (statusCodeContext.HttpContext.Response.StatusCode == 404)
+    {
+        var originalPath = statusCodeContext.HttpContext.Request.Path;
+        statusCodeContext.HttpContext.Request.Path = "/404";
+        await statusCodeContext.Next(statusCodeContext.HttpContext);
+        statusCodeContext.HttpContext.Request.Path = originalPath;
+    }
+});
 app.UseStaticFiles();
 app.UseAuthentication();
 app.UseAuthorization();
