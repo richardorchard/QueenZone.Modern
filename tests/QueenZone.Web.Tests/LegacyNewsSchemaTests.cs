@@ -67,4 +67,19 @@ public sealed class LegacyNewsSchemaTests
         Assert.DoesNotContain("CAST(NULL AS nvarchar(200)) AS SLUG", sql);
         Assert.DoesNotContain("CAST(NULL AS datetime2) AS CREATED_AT", sql);
     }
+
+    [Fact]
+    public void BuildAdminLatestNewsSql_UsesSourceUrlFallbackMatchingValidationLimit()
+    {
+        var sql = LegacyNewsSchema.BuildAdminLatestNewsSql(new LegacyNewsSchema.NewsColumnAvailability
+        {
+            HasSourceUrlColumn = false,
+            HasSlugColumn = true,
+            HasCreatedAtColumn = true,
+            HasUpdatedAtColumn = true,
+            HasEditorEmailColumn = true
+        });
+
+        Assert.Contains($"CAST(NULL AS varchar({NewsValidation.MaxSourceUrlLength})) AS SOURCE_URL", sql);
+    }
 }
