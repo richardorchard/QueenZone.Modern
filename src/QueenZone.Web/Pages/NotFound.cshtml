@@ -1,0 +1,20 @@
+@page "/404"
+@{
+  ViewData["Title"] = "Page Not Found — Queenzone";
+  Response.StatusCode = 404;
+}
+
+<partial name="_PageHero" model='@(("404", "Page Not Found", "Sorry, we couldn't find what you were looking for.", ""))' />
+
+<section class="qz-section qz-section--warm">
+  <div class="qz-container" style="max-width: var(--container-text);">
+    <p>The page you requested doesn't exist or may have moved. Try one of the links below, or use the search to find what you need.</p>
+    <ul>
+      <li><a href="/">Home</a></li>
+      <li><a href="/news">News</a></li>
+      <li><a href="/articles">Articles</a></li>
+      <li><a href="/discography">Discography</a></li>
+      <li><a href="/search">Search</a></li>
+    </ul>
+  </div>
+</section>
