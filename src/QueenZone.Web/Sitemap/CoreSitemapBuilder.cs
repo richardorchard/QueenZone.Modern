@@ -13,7 +13,11 @@ public sealed class CoreSitemapBuilder(
 {
     public async Task<IReadOnlyList<SitemapEntry>> BuildAsync(CancellationToken cancellationToken = default)
     {
-        var entries = new List<SitemapEntry> { new("/") };
+        var entries = new List<SitemapEntry>
+        {
+            new("/"),
+            new("/about")
+        };
 
         await AddNewsEntriesAsync(entries, cancellationToken);
         await AddArticleEntriesAsync(entries, cancellationToken);

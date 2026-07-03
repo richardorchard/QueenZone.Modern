@@ -88,6 +88,7 @@ public sealed class SitemapEndpointsTests : IClassFixture<WebApplicationFactory<
             .ToList();
 
         Assert.Contains($"{BaseUrl}/", locations);
+        Assert.Contains($"{BaseUrl}/about", locations);
         Assert.Contains($"{BaseUrl}/news", locations);
         Assert.Contains($"{BaseUrl}/news/page/2", locations);
         Assert.Contains($"{BaseUrl}/news/1003/queenzone-modernisation-begins", locations);
