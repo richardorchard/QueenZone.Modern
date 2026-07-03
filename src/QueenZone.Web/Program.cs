@@ -285,6 +285,7 @@ static void ConfigureMemberAuthentication(WebApplicationBuilder builder, Authent
             options.ClientId = memberAuth.GitHub.ClientId!;
             options.ClientSecret = memberAuth.GitHub.ClientSecret!;
             options.SignInScheme = MemberAuthenticationSchemes.ExternalCookie;
+            options.Scope.Add("user:email");
         });
     }
 }
