@@ -10,7 +10,8 @@ public sealed class ExternalLoginModel : PageModel
     {
         MemberAuthenticationSchemes.Google,
         MemberAuthenticationSchemes.Microsoft,
-        MemberAuthenticationSchemes.Facebook,
+        MemberAuthenticationSchemes.Discord,
+        MemberAuthenticationSchemes.GitHub,
     };
 
     public IActionResult OnGet(string provider, string? returnUrl)

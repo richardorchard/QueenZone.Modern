@@ -9,7 +9,9 @@ public abstract class AccountPageModel(IOptions<MemberAuthenticationOptions> mem
 
     public bool MicrosoftEnabled => memberAuthenticationOptions.Value.Microsoft?.ClientId is { Length: > 0 };
 
-    public bool FacebookEnabled => memberAuthenticationOptions.Value.Facebook?.ClientId is { Length: > 0 };
+    public bool DiscordEnabled => memberAuthenticationOptions.Value.Discord?.ClientId is { Length: > 0 };
+
+    public bool GitHubEnabled => memberAuthenticationOptions.Value.GitHub?.ClientId is { Length: > 0 };
 
     protected static string ResolveReturnUrl(string? returnUrl) =>
         !string.IsNullOrWhiteSpace(returnUrl) && Uri.IsWellFormedUriString(returnUrl, UriKind.Relative)

@@ -11,7 +11,7 @@ public partial class ExpandNewsSourceUrlLength : Migration
         migrationBuilder.Sql("""
             IF COL_LENGTH('NEWS_T', 'SOURCE_URL') IS NOT NULL
             BEGIN
-                ALTER TABLE NEWS_T ALTER COLUMN SOURCE_URL VARCHAR(2000) NULL;
+                ALTER TABLE NEWS_T ALTER COLUMN SOURCE_URL VARCHAR(500) NULL;
             END;
             """);
     }

@@ -198,6 +198,28 @@ public sealed class EfAdminNewsRepositoryTests : IAsyncDisposable
         Assert.Equal("Created draft", article.Title);
     }
 
+    [Fact]
+    public async Task CreateDraftAsync_preserves_source_url_within_validation_limit()
+    {
+        var sourceUrl = "https://www.queenonline.com/news/" + new string('a', 400);
+        Assert.True(sourceUrl.Length <= NewsValidation.MaxSourceUrlLength);
+        var draft = new AdminNewsDraft(
+            "Created draft with source",
+            "created-draft-with-source",
+            "Created excerpt",
+            "Created body",
+            new DateTime(2026, 6, 21, 0, 0, 0, DateTimeKind.Utc),
+            sourceUrl);
+
+        var newsId = await repository.CreateDraftAsync(draft, "editor@test.local");
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT SOURCE_URL FROM NEWS_T WHERE NEWS_ID = $newsId";
+        command.Parameters.AddWithValue("$newsId", newsId);
+        var savedSourceUrl = Assert.IsType<string>(await command.ExecuteScalarAsync());
+        Assert.Equal(sourceUrl, savedSourceUrl);
+    }
+
     public async ValueTask DisposeAsync()
     {
         await dbContext.DisposeAsync();

@@ -49,6 +49,7 @@ public sealed class MemberAuthenticationTests : IClassFixture<WebApplicationFact
         var body = await client.GetStringAsync("/account/login");
 
         Assert.Contains("Sign in", body);
-        Assert.Contains("Google, Microsoft, or Facebook", body);
+        Assert.Contains("Sign in to QueenZone", body);
     }
+
 }

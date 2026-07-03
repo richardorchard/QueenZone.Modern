@@ -1,3 +1,5 @@
+using AspNet.Security.OAuth.Discord;
+using AspNet.Security.OAuth.GitHub;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -131,6 +133,16 @@ app.Use(async (context, next) =>
     await next();
 });
 
+app.UseStatusCodePages(async statusCodeContext =>
+{
+    if (statusCodeContext.HttpContext.Response.StatusCode == 404)
+    {
+        var originalPath = statusCodeContext.HttpContext.Request.Path;
+        statusCodeContext.HttpContext.Request.Path = "/404";
+        await statusCodeContext.Next(statusCodeContext.HttpContext);
+        statusCodeContext.HttpContext.Request.Path = originalPath;
+    }
+});
 app.UseStaticFiles();
 app.UseAuthentication();
 app.UseAuthorization();
@@ -212,6 +224,7 @@ static void ConfigureAdminAuthenticationScheme(PolicySchemeOptions options, bool
         : TestAuthHandler.SchemeName;
 }
 
+[System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
 static void ConfigureMemberAuthentication(WebApplicationBuilder builder, AuthenticationBuilder authenticationBuilder)
 {
     authenticationBuilder.AddCookie(MemberAuthenticationSchemes.MembersCookie, options =>
@@ -256,13 +269,25 @@ static void ConfigureMemberAuthentication(WebApplicationBuilder builder, Authent
         });
     }
 
-    if (!string.IsNullOrWhiteSpace(memberAuth?.Facebook?.ClientId))
+    if (!string.IsNullOrWhiteSpace(memberAuth?.Discord?.ClientId))
     {
-        authenticationBuilder.AddFacebook(MemberAuthenticationSchemes.Facebook, options =>
+        authenticationBuilder.AddDiscord(MemberAuthenticationSchemes.Discord, options =>
         {
-            options.AppId = memberAuth.Facebook.ClientId!;
-            options.AppSecret = memberAuth.Facebook.ClientSecret!;
+            options.ClientId = memberAuth.Discord.ClientId!;
+            options.ClientSecret = memberAuth.Discord.ClientSecret!;
             options.SignInScheme = MemberAuthenticationSchemes.ExternalCookie;
+            options.Scope.Add("email");
+        });
+    }
+
+    if (!string.IsNullOrWhiteSpace(memberAuth?.GitHub?.ClientId))
+    {
+        authenticationBuilder.AddGitHub(MemberAuthenticationSchemes.GitHub, options =>
+        {
+            options.ClientId = memberAuth.GitHub.ClientId!;
+            options.ClientSecret = memberAuth.GitHub.ClientSecret!;
+            options.SignInScheme = MemberAuthenticationSchemes.ExternalCookie;
+            options.Scope.Add("user:email");
         });
     }
 }

@@ -564,8 +564,8 @@ namespace QueenZone.Data.Migrations
                         .HasColumnName("SLUG");
 
                     b.Property<string>("SourceUrl")
-                        .HasMaxLength(2000)
-                        .HasColumnType("nvarchar(2000)")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)")
                         .HasColumnName("SOURCE_URL");
 
                     b.Property<string>("Title")
