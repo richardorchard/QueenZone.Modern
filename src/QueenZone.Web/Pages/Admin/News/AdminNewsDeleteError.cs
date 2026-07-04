@@ -5,11 +5,13 @@ namespace QueenZone.Web.Pages.Admin.News;
 
 internal static class AdminNewsDeleteError
 {
-    private static Func<Exception?, bool> foreignKeyViolationClassifier =
+    private static readonly Func<Exception?, bool> DefaultForeignKeyViolationClassifier =
         inner => inner is SqlException { Number: 547 };
+    private static readonly object ClassifierLock = new();
+    private static Func<Exception?, bool> foreignKeyViolationClassifier = DefaultForeignKeyViolationClassifier;
 
     internal static bool IsForeignKeyViolation(DbUpdateException exception) =>
-        foreignKeyViolationClassifier(exception.InnerException);
+        IsForeignKeyViolation(exception.InnerException);
 
     internal static bool IsDeleteForeignKeyViolation(Exception exception) =>
         exception is SqlException { Number: 547 }
@@ -17,13 +19,30 @@ internal static class AdminNewsDeleteError
 
     internal static IDisposable UseForeignKeyViolationClassifier(Func<Exception?, bool> classifier)
     {
-        var previous = foreignKeyViolationClassifier;
-        foreignKeyViolationClassifier = classifier;
-        return new ResetScope(previous);
+        lock (ClassifierLock)
+        {
+            var previous = foreignKeyViolationClassifier;
+            foreignKeyViolationClassifier = classifier;
+            return new ResetScope(previous);
+        }
+    }
+
+    private static bool IsForeignKeyViolation(Exception? innerException)
+    {
+        lock (ClassifierLock)
+        {
+            return foreignKeyViolationClassifier(innerException);
+        }
     }
 
     private sealed class ResetScope(Func<Exception?, bool> previous) : IDisposable
     {
-        public void Dispose() => foreignKeyViolationClassifier = previous;
+        public void Dispose()
+        {
+            lock (ClassifierLock)
+            {
+                foreignKeyViolationClassifier = previous;
+            }
+        }
     }
 }

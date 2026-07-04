@@ -30,6 +30,8 @@ public sealed class QueenZoneDbContext : DbContext
 
     public DbSet<NewsAgentRunLeaseEntity> NewsAgentRunLeases => Set<NewsAgentRunLeaseEntity>();
 
+    public DbSet<QueenHistoryEventEntity> QueenHistoryEvents => Set<QueenHistoryEventEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<NewsTableRow>(entity =>
@@ -264,6 +266,32 @@ public sealed class QueenZoneDbContext : DbContext
             entity.Property(lease => lease.HolderId).HasMaxLength(64).IsRequired();
             entity.Property(lease => lease.AcquiredAtUtc).IsRequired();
             entity.Property(lease => lease.ExpiresAtUtc).IsRequired();
+        });
+
+        modelBuilder.Entity<QueenHistoryEventEntity>(entity =>
+        {
+            entity.ToTable("QueenHistoryEvents");
+            entity.HasKey(historyEvent => historyEvent.Id);
+
+            entity.Property(historyEvent => historyEvent.Title).HasMaxLength(200).IsRequired();
+            entity.Property(historyEvent => historyEvent.Summary).HasMaxLength(1000).IsRequired();
+            entity.Property(historyEvent => historyEvent.EventDate).IsRequired();
+            entity.Property(historyEvent => historyEvent.DatePrecision).HasConversion<string>().HasMaxLength(50).IsRequired();
+            entity.Property(historyEvent => historyEvent.Category).HasConversion<string>().HasMaxLength(50).IsRequired();
+            entity.Property(historyEvent => historyEvent.Importance).IsRequired();
+            entity.Property(historyEvent => historyEvent.SourceType).HasConversion<string>().HasMaxLength(50).IsRequired();
+            entity.Property(historyEvent => historyEvent.SourceKey).HasMaxLength(200).IsRequired();
+            entity.Property(historyEvent => historyEvent.SourceUrl).HasMaxLength(2000);
+            entity.Property(historyEvent => historyEvent.IsPublished).IsRequired();
+            entity.Property(historyEvent => historyEvent.CreatedAt).IsRequired();
+            entity.Property(historyEvent => historyEvent.UpdatedAt).IsRequired();
+
+            entity.HasIndex(historyEvent => new { historyEvent.IsPublished, historyEvent.DatePrecision, historyEvent.EventDate })
+                .HasDatabaseName("IX_QueenHistoryEvents_Published_Date");
+
+            entity.HasIndex(historyEvent => new { historyEvent.SourceType, historyEvent.SourceKey })
+                .IsUnique()
+                .HasDatabaseName("IX_QueenHistoryEvents_Source");
         });
     }
 }

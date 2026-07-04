@@ -11,6 +11,7 @@ using QueenZone.Web.Pages.Admin.News;
 
 namespace QueenZone.Web.Tests;
 
+[Collection(AdminNewsDeleteErrorCollection.Name)]
 public sealed partial class AdminNewsRoutesTests : IClassFixture<WebApplicationFactory<Program>>
 {
     private const string AdminEmail = "admin@test.local";

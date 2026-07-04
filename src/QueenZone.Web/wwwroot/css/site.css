@@ -940,6 +940,32 @@ body.qz-menu-lock .qz-masthead {
   color: rgba(255, 255, 255, 0.66);
 }
 
+.qz-on-this-day-note {
+  margin-top: calc(-1 * var(--space-4));
+  margin-bottom: var(--space-5);
+}
+
+.qz-on-this-day-item {
+  min-height: 100%;
+}
+
+.qz-on-this-day-item h3 {
+  margin: 0 0 var(--space-2);
+  font-size: 1.35rem;
+  line-height: 1.18;
+}
+
+.qz-on-this-day-item p {
+  margin-bottom: var(--space-3);
+}
+
+.qz-on-this-day-item__category {
+  font: var(--type-meta);
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.46);
+}
+
 .qz-tag-row {
   display: flex;
   flex-wrap: wrap;
