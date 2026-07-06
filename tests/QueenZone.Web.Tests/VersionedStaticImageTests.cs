@@ -43,6 +43,8 @@ public sealed class VersionedStaticImageTests : IClassFixture<WebApplicationFact
         var body = await factory.CreateClient().GetStringAsync("/articles/101/inside-the-making-of-bohemian-rhapsody");
 
         Assert.Contains("/design-system/assets/img-hero.jpg?v=", body);
+        Assert.Contains("img-hero.webp?v=", body);
+        Assert.Contains("type=\"image/webp\"", body);
     }
 }
 
