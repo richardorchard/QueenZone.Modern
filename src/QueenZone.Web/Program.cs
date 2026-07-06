@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.OutputCaching;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.FileProviders.Physical;
@@ -37,6 +38,20 @@ builder.Services.Configure<SitemapOptions>(builder.Configuration.GetSection(Site
 builder.Services.Configure<MemberAuthenticationOptions>(builder.Configuration.GetSection(MemberAuthenticationOptions.SectionName));
 builder.Services.Configure<ForumDataOptions>(builder.Configuration.GetSection(ForumDataOptions.SectionName));
 builder.Services.AddMemoryCache();
+builder.Services.AddOutputCache(options =>
+{
+    options.AddPolicy(PublicOutputCachePolicies.PublicArchivePages, policy => policy
+        .With(context => PublicOutputCachePolicies.IsPublicReadOnlyRequest(context.HttpContext))
+        .Expire(PublicOutputCachePolicies.ArchivePageDuration)
+        .SetVaryByQuery("*")
+        .Tag("public-archive"));
+
+    options.AddPolicy(PublicOutputCachePolicies.PublicSitemaps, policy => policy
+        .With(context => PublicOutputCachePolicies.IsPublicReadOnlyRequest(context.HttpContext))
+        .Expire(PublicOutputCachePolicies.SitemapDuration)
+        .SetVaryByRouteValue("*")
+        .Tag("public-sitemap"));
+});
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<CoreSitemapBuilder>();
 builder.Services.AddSingleton<CoreSitemapService>();
@@ -159,6 +174,7 @@ app.UseStaticFiles(new StaticFileOptions
 });
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseOutputCache();
 app.UseAntiforgery();
 
 // Minimal liveness probe used by CI smoke/e2e checks and any future uptime monitoring.
@@ -171,7 +187,8 @@ app.MapGet("/account/member-probe", () => Results.Ok(new { authenticated = true 
     .RequireAuthorization(MemberAuthenticationSchemes.MemberPolicy);
 
 app.MapSitemapEndpoints();
-app.MapRazorPages();
+app.MapRazorPages()
+    .CacheOutput(PublicOutputCachePolicies.PublicArchivePages);
 
 app.Run();
 

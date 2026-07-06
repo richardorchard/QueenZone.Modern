@@ -20,7 +20,8 @@ public static class SitemapEndpoints
                 """;
 
             return Results.Text(body, "text/plain");
-        });
+        })
+        .CacheOutput(PublicOutputCachePolicies.PublicSitemaps);
 
         app.MapGet("/sitemap.xml", async (
             SitemapIndexBuilder indexBuilder,
@@ -30,7 +31,8 @@ public static class SitemapEndpoints
             var entries = await indexBuilder.BuildAsync(cancellationToken);
             var xml = SitemapXmlWriter.WriteSitemapIndex(entries, options.Value.PublicBaseUrl);
             return Results.Content(xml, "application/xml; charset=utf-8");
-        });
+        })
+        .CacheOutput(PublicOutputCachePolicies.PublicSitemaps);
 
         app.MapGet("/sitemap-forum-{fileNumber:int}.xml", async (
             int fileNumber,
@@ -46,7 +48,8 @@ public static class SitemapEndpoints
 
             var xml = SitemapXmlWriter.WriteUrlSet(entries, options.Value.PublicBaseUrl);
             return Results.Content(xml, "application/xml; charset=utf-8");
-        });
+        })
+        .CacheOutput(PublicOutputCachePolicies.PublicSitemaps);
 
         app.MapGet("/sitemap-core.xml", async (
             HttpContext httpContext,
@@ -60,6 +63,7 @@ public static class SitemapEndpoints
 
             var xml = await sitemapService.GetXmlAsync(options.Value.PublicBaseUrl, cancellationToken);
             return Results.Content(xml, "application/xml; charset=utf-8");
-        });
+        })
+        .CacheOutput(PublicOutputCachePolicies.PublicSitemaps);
     }
 }
