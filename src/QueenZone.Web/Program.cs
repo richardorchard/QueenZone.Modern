@@ -36,12 +36,14 @@ builder.Services.Configure<AnalyticsOptions>(builder.Configuration.GetSection(An
 builder.Services.Configure<SitemapOptions>(builder.Configuration.GetSection(SitemapOptions.SectionName));
 builder.Services.Configure<MemberAuthenticationOptions>(builder.Configuration.GetSection(MemberAuthenticationOptions.SectionName));
 builder.Services.Configure<ForumDataOptions>(builder.Configuration.GetSection(ForumDataOptions.SectionName));
+builder.Services.Configure<PublicQueryCacheOptions>(builder.Configuration.GetSection(PublicQueryCacheOptions.SectionName));
 builder.Services.AddMemoryCache();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<CoreSitemapBuilder>();
 builder.Services.AddSingleton<CoreSitemapService>();
 builder.Services.AddSingleton<ForumSitemapBuilder>();
 builder.Services.AddSingleton<SitemapIndexBuilder>();
+builder.Services.AddScoped<PublicQueryCacheService>();
 builder.Services.AddScoped<MemberAccountService>();
 builder.Services.AddAntiforgery();
 

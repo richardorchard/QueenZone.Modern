@@ -4,8 +4,7 @@ using QueenZone.Data;
 namespace QueenZone.Web.Pages;
 
 public sealed class IndexModel(
-    INewsRepository newsRepository,
-    IQueenHistoryRepository queenHistoryRepository,
+    PublicQueryCacheService publicQueryCache,
     TimeProvider timeProvider) : PageModel
 {
     public IReadOnlyList<NewsItem> Latest { get; private set; } = [];
@@ -17,13 +16,13 @@ public sealed class IndexModel(
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
         ViewData["Title"] = "QueenZone";
-        Latest = await newsRepository.GetLatestAsync(5, cancellationToken);
+        Latest = await publicQueryCache.GetLatestNewsAsync(5, cancellationToken);
         var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
-        OnThisDay = await queenHistoryRepository.GetOnThisDayAsync(today, 3, cancellationToken);
+        OnThisDay = await publicQueryCache.GetOnThisDayAsync(today, 3, cancellationToken);
 
         if (OnThisDay.Count == 0)
         {
-            OnThisDay = await queenHistoryRepository.GetAroundThisDayAsync(today, 7, 3, cancellationToken);
+            OnThisDay = await publicQueryCache.GetAroundThisDayAsync(today, 7, 3, cancellationToken);
             IsOnThisDayFallback = OnThisDay.Count > 0;
         }
     }

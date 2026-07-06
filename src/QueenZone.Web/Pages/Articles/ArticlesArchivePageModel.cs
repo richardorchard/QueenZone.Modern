@@ -4,7 +4,9 @@ using QueenZone.Data;
 
 namespace QueenZone.Web.Pages.Articles;
 
-public abstract class ArticlesArchivePageModel(IArticlesRepository articlesRepository) : PageModel
+public abstract class ArticlesArchivePageModel(
+    IArticlesRepository articlesRepository,
+    PublicQueryCacheService publicQueryCache) : PageModel
 {
     public IReadOnlyList<ArticleItem> Items { get; private set; } = [];
 
@@ -21,7 +23,7 @@ public abstract class ArticlesArchivePageModel(IArticlesRepository articlesRepos
             return NotFound();
         }
 
-        var publishedCount = await articlesRepository.GetPublishedCountAsync(cancellationToken);
+        var publishedCount = await publicQueryCache.GetArticlePublishedCountAsync(cancellationToken);
         var archive = await articlesRepository.GetArchivePageAsync(page, ArticlesRoutes.ArchivePageSize, cancellationToken);
         var totalPages = ArticlesRoutes.ResolveArchiveTotalPages(
             page,

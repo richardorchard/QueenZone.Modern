@@ -7,6 +7,7 @@ public sealed class ActionModel(
     IAdminNewsRepository adminNewsRepository,
     INewsAuditRepository auditRepository,
     INewsDiscoveryRepository discoveryRepository,
+    PublicQueryCacheService publicQueryCache,
     ILogger<ActionModel> logger) : AdminNewsPageModel
 {
     public IActionResult OnGet(int id, string handler) =>
@@ -34,6 +35,7 @@ public sealed class ActionModel(
         }
 
         await adminNewsRepository.PublishAsync(id, EditorEmail, cancellationToken);
+        publicQueryCache.InvalidateNewsCache();
         await auditRepository.AppendAsync(id, "publish", EditorEmail, $"Published \"{article.Title}\"", cancellationToken);
         return Redirect("/admin/news");
     }
@@ -47,6 +49,7 @@ public sealed class ActionModel(
         }
 
         await adminNewsRepository.UnpublishAsync(id, EditorEmail, cancellationToken);
+        publicQueryCache.InvalidateNewsCache();
         await auditRepository.AppendAsync(id, "unpublish", EditorEmail, $"Unpublished \"{article.Title}\"", cancellationToken);
         return Redirect("/admin/news");
     }
@@ -72,6 +75,10 @@ public sealed class ActionModel(
         {
             await auditRepository.AppendAsync(id, "delete", EditorEmail, $"Deleted \"{article.Title}\"", cancellationToken);
             await adminNewsRepository.DeleteAsync(id, EditorEmail, cancellationToken);
+            if (article.IsPublished)
+            {
+                publicQueryCache.InvalidateNewsCache();
+            }
         }
         catch (Exception ex) when (AdminNewsDeleteError.IsDeleteForeignKeyViolation(ex))
         {

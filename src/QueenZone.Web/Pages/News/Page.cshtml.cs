@@ -3,7 +3,9 @@ using QueenZone.Data;
 
 namespace QueenZone.Web.Pages.News;
 
-public sealed class ArchivePageModel(INewsRepository newsRepository) : NewsArchivePageModel(newsRepository)
+public sealed class ArchivePageModel(
+    INewsRepository newsRepository,
+    PublicQueryCacheService publicQueryCache) : NewsArchivePageModel(newsRepository, publicQueryCache)
 {
     [BindProperty(SupportsGet = true)]
     public int PageNumber { get; set; }

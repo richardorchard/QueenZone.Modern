@@ -7,6 +7,7 @@ public sealed class EditPostModel(
     IAdminNewsRepository adminNewsRepository,
     INewsDiscoveryRepository discoveryRepository,
     INewsAuditRepository auditRepository,
+    PublicQueryCacheService publicQueryCache,
     ILogger<EditPostModel> logger) : AdminNewsPageModel
 {
     public ArticleFormViewModel? Form { get; private set; }
@@ -49,6 +50,11 @@ public sealed class EditPostModel(
         }
 
         await adminNewsRepository.UpdateAsync(id, draft, EditorEmail, cancellationToken);
+        if (existing.IsPublished)
+        {
+            publicQueryCache.InvalidateNewsCache();
+        }
+
         await auditRepository.AppendAsync(id, "edit", EditorEmail, $"Updated \"{draft.Title}\"", cancellationToken);
         return Redirect($"/admin/news/{id}/edit");
     }
