@@ -164,12 +164,11 @@ app.UseAntiforgery();
 // Minimal liveness probe used by CI smoke/e2e checks and any future uptime monitoring.
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 
-// Proves the Member policy gate works end-to-end. No real content uses it yet — future
-// write-features (forum posting, attachment downloads, fan-performance submissions) will
-// apply [Authorize(Policy = "Member")] or this same RequireAuthorization call once built.
+// Member-gated fan-performance audio downloads use FanPerformanceEndpoints.
 app.MapGet("/account/member-probe", () => Results.Ok(new { authenticated = true }))
     .RequireAuthorization(MemberAuthenticationSchemes.MemberPolicy);
 
+app.MapFanPerformanceEndpoints();
 app.MapSitemapEndpoints();
 app.MapRazorPages();
 

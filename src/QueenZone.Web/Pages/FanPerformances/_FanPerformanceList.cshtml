@@ -1,22 +1,30 @@
-@using QueenZone.Data
-@model IReadOnlyList<FanPerformance>
+@model FanPerformanceListViewModel
 
-@if (Model.Count == 0)
+@if (Model.Items.Count == 0)
 {
   <p>No fan performances are available yet.</p>
 }
 else
 {
   <ol class="qz-stage-list">
-    @foreach (var performance in Model)
+    @foreach (var performance in Model.Items)
     {
       <li class="qz-stage-row">
         <div class="qz-card__kicker"><time datetime="@performance.DateAdded.ToString("yyyy-MM-dd")">@performance.DateAdded.ToString("dd MMMM yyyy")</time></div>
         <h2>@performance.Title</h2>
         <p class="qz-meta">Performed by @performance.PerformedBy</p>
-        <audio controls preload="none" src="@performance.AudioUrl">
-          <a href="@performance.AudioUrl">Download @performance.Title</a>
-        </audio>
+        @if (performance.AudioPlayPath is not null)
+        {
+          <audio controls preload="none" src="@performance.AudioPlayPath">
+            <a href="@performance.AudioPlayPath">Download @performance.Title</a>
+          </audio>
+        }
+        else
+        {
+          <p class="qz-meta">
+            <a href="@FanPerformanceRoutes.GetLoginPath(Model.LoginReturnUrl)">Sign in to play</a>
+          </p>
+        }
         @if (!string.IsNullOrWhiteSpace(performance.Description))
         {
           <p class="qz-stage-row__description">@performance.Description</p>

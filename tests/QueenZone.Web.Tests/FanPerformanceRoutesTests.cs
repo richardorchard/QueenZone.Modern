@@ -21,4 +21,14 @@ public sealed class FanPerformanceRoutesTests
     [InlineData(149, 8)]
     public void GetTotalPages_UsesTwentyItemPageSize(int visibleCount, int expectedPages) =>
         Assert.Equal(expectedPages, FanPerformanceRoutes.GetTotalPages(visibleCount));
+
+    [Fact]
+    public void GetAudioPath_UsesPerformanceId() =>
+        Assert.Equal("/fan-performances/187/audio", FanPerformanceRoutes.GetAudioPath(187));
+
+    [Fact]
+    public void GetLoginPath_EncodesReturnUrl() =>
+        Assert.Equal(
+            "/account/login?returnUrl=%2Ffan-performances%2Fpage%2F2",
+            FanPerformanceRoutes.GetLoginPath("/fan-performances/page/2"));
 }

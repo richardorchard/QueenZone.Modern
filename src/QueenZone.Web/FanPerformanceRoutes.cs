@@ -9,6 +9,11 @@ public static class FanPerformanceRoutes
     public static string GetPagePath(int page) =>
         page <= 1 ? GetIndexPath() : $"/fan-performances/page/{page}";
 
+    public static string GetAudioPath(int id) => $"/fan-performances/{id}/audio";
+
+    public static string GetLoginPath(string returnPath) =>
+        $"/account/login?returnUrl={Uri.EscapeDataString(returnPath)}";
+
     public static int GetTotalPages(int visibleCount, int pageSize = PageSize) =>
         ArchivePagination.GetTotalPages(visibleCount, pageSize);
 
