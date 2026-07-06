@@ -2,7 +2,7 @@
 
 <a class="qz-article-card @(Model.OnDark ? "qz-on-dark" : "")" href="@Model.Href">
   <div class="qz-article-card__media">
-    <img src="@Model.Image" alt="">
+    <partial name="_PictureImage" model="@(Model.Image, "", true)" />
   </div>
   <div class="qz-card__kicker">@Model.Category</div>
   <h3>@Model.Title</h3>

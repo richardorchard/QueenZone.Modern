@@ -1,0 +1,13 @@
+@model (string Src, string Alt, bool Lazy)
+@{
+    string? webpSrc = Model.Src.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase)
+        ? string.Concat(Model.Src.AsSpan(0, Model.Src.Length - 4), ".webp")
+        : null;
+}
+<picture>
+  @if (webpSrc is not null)
+  {
+    <source srcset="@webpSrc" type="image/webp">
+  }
+  <img src="@Model.Src" alt="@Model.Alt" loading="@(Model.Lazy ? "lazy" : "eager")" decoding="async">
+</picture>

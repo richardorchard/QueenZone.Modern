@@ -904,6 +904,13 @@ body.qz-menu-lock .qz-masthead {
   background: var(--qz-grey-200);
 }
 
+.qz-article-card__media picture,
+.qz-gallery-tile picture {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
 .qz-article-card__media img,
 .qz-gallery-tile img {
   width: 100%;
