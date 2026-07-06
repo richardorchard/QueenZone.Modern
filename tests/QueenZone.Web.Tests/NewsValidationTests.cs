@@ -54,6 +54,22 @@ public sealed class NewsValidationTests
     }
 
     [Fact]
+    public void ValidateDraftRejectsOverlongExcerpt()
+    {
+        var draft = new AdminNewsDraft(
+            "Title",
+            null,
+            new string('x', NewsValidation.MaxExcerptLength + 1),
+            "Body",
+            new DateTime(2026, 6, 10, 0, 0, 0, DateTimeKind.Utc),
+            null);
+
+        var errors = NewsValidation.ValidateDraft(draft, slugInUse: false);
+
+        Assert.Contains($"Excerpt must be {NewsValidation.MaxExcerptLength} characters or fewer.", errors);
+    }
+
+    [Fact]
     public void ValidateDraftRejectsOverlongSourceUrl()
     {
         var draft = new AdminNewsDraft(

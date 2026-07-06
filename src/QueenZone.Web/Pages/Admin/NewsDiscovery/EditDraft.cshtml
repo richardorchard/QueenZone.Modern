@@ -19,15 +19,15 @@
   <input type="hidden" name="@AdminNewsDiscoveryPageModel.AntiforgeryTokenFieldName" value="@Antiforgery.GetAndStoreTokens(HttpContext).RequestToken" />
   <label>
     Title
-    <input type="text" name="form.title" value="@Model.Form.Title" required />
+    <input type="text" name="form.title" value="@Model.Form.Title" maxlength="@NewsValidation.MaxTitleLength" required />
   </label>
   <label>
     Slug
-    <input type="text" name="form.slug" value="@Model.Form.Slug" />
+    <input type="text" name="form.slug" value="@Model.Form.Slug" maxlength="@NewsSlug.MaxLength" />
   </label>
   <label>
     Excerpt
-    <textarea name="form.excerpt" rows="3" required>@Model.Form.Excerpt</textarea>
+    <textarea name="form.excerpt" rows="3" maxlength="@NewsValidation.MaxExcerptLength" required>@Model.Form.Excerpt</textarea>
   </label>
   <label>
     Body

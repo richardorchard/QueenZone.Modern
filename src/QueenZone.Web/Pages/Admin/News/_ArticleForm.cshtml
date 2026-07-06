@@ -40,7 +40,7 @@
   <p class="admin-help">Leave blank to auto-generate from the title.</p>
   <label>
     Excerpt
-    <input type="text" name="excerpt" value="@Model.Draft.Excerpt" required>
+    <input type="text" name="excerpt" value="@Model.Draft.Excerpt" maxlength="@NewsValidation.MaxExcerptLength" required>
   </label>
   <label>
     Body

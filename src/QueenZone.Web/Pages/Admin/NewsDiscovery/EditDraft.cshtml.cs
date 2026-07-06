@@ -87,10 +87,18 @@ public sealed class EditDraftModel(INewsDiscoveryRepository discoveryRepository)
         {
             errors.Add("Title is required.");
         }
+        else if (form.Title.Length > NewsValidation.MaxTitleLength)
+        {
+            errors.Add($"Title must be {NewsValidation.MaxTitleLength} characters or fewer.");
+        }
 
         if (string.IsNullOrWhiteSpace(form.Excerpt))
         {
             errors.Add("Excerpt is required.");
+        }
+        else if (form.Excerpt.Length > NewsValidation.MaxExcerptLength)
+        {
+            errors.Add($"Excerpt must be {NewsValidation.MaxExcerptLength} characters or fewer.");
         }
 
         if (string.IsNullOrWhiteSpace(form.Body))

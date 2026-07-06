@@ -313,6 +313,39 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
     }
 
     [Fact]
+    public async Task Promote_with_overlong_excerpt_shows_validation_error()
+    {
+        var newsStore = new SharedNewsStore();
+        var discoveryStore = new SharedNewsDiscoveryStore();
+        var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
+        var candidateId = await SeedDraftedCandidateAsync(discoveryRepository);
+        await discoveryRepository.UpsertDraftAsync(candidateId, new NewsAgentDraftUpsert(
+            "Draft title",
+            "draft-title",
+            new string('x', NewsValidation.MaxExcerptLength + 1),
+            "Draft body for review queue.",
+            null,
+            null,
+            null,
+            DateTime.UtcNow.Date,
+            null));
+        var client = CreateClient(AdminEmail, newsStore, discoveryStore);
+
+        var promoteResponse = await PostActionAsync(client, $"/admin/news-discovery/{candidateId}/promote", candidateId);
+        Assert.Equal(HttpStatusCode.Redirect, promoteResponse.StatusCode);
+        Assert.Equal($"/admin/news-discovery/{candidateId}", promoteResponse.Headers.Location!.OriginalString);
+
+        var reviewBody = await client.GetStringAsync($"/admin/news-discovery/{candidateId}");
+        Assert.Contains($"Excerpt must be {NewsValidation.MaxExcerptLength} characters or fewer.", reviewBody);
+        Assert.Contains("admin-status--error", reviewBody);
+
+        var candidate = await discoveryRepository.GetCandidateByIdAsync(candidateId);
+        Assert.NotNull(candidate);
+        Assert.Equal(NewsCandidateStatus.Drafted, candidate.Status);
+        Assert.Null(candidate.PromotedNewsId);
+    }
+
+    [Fact]
     public async Task Promote_with_overlong_source_url_shows_validation_error()
     {
         var newsStore = new SharedNewsStore();
