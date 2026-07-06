@@ -112,7 +112,7 @@
       @if (memberDisplayName is not null)
       {
         <span class="qz-masthead__member-name" title="@memberDisplayName">@memberDisplayName</span>
-        <a class="qz-masthead__signin" href="/account/logout">Sign out</a>
+        <partial name="_MemberSignOut" />
       }
       else
       {
@@ -142,6 +142,17 @@
           </svg>
         </a>
       </div>
+      <div class="qz-mobile-account" aria-label="Member account">
+        @if (memberDisplayName is not null)
+        {
+          <span class="qz-masthead__member-name qz-masthead__member-name--mobile">@memberDisplayName</span>
+          <partial name="_MemberSignOut" view-data='@new ViewDataDictionary(ViewData) { { "SignOutExtraClass", "qz-masthead__signin--mobile" } }' />
+        }
+        else
+        {
+          <a class="qz-masthead__signin qz-masthead__signin--mobile" href="/account/login">Sign in</a>
+        }
+      </div>
       <nav class="qz-mobile-nav" aria-label="Mobile primary navigation">
         @foreach (var group in navGroups)
         {
@@ -163,15 +174,6 @@
               }
             </ul>
           </section>
-        }
-        @if (memberDisplayName is not null)
-        {
-          <span class="qz-masthead__member-name qz-masthead__member-name--mobile">@memberDisplayName</span>
-          <a class="qz-masthead__signin qz-masthead__signin--mobile" href="/account/logout">Sign out</a>
-        }
-        else
-        {
-          <a class="qz-masthead__signin qz-masthead__signin--mobile" href="/account/login">Sign in</a>
         }
       </nav>
     </div>

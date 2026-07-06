@@ -23,6 +23,7 @@ public sealed class ExternalLoginModel : PageModel
 
         var callbackUrl = Url.Page("/Account/ExternalLoginCallback", pageHandler: null, values: new { returnUrl })!;
         var properties = new AuthenticationProperties { RedirectUri = callbackUrl };
+        properties.SetParameter("prompt", "select_account");
         return Challenge(properties, provider);
     }
 }

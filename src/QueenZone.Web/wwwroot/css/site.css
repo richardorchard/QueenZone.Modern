@@ -304,6 +304,21 @@
   color: var(--qz-masthead-accent);
 }
 
+.qz-masthead__signout-form {
+  display: inline-flex;
+  margin: 0;
+}
+
+.qz-masthead__signout-form button {
+  cursor: pointer;
+}
+
+.qz-account-notice {
+  margin: 0 0 var(--space-5);
+  color: var(--qz-charcoal);
+  font: var(--fw-medium) 0.9375rem/1.5 var(--font-body);
+}
+
 .qz-menu-button {
   display: none;
   width: 2.75rem;
@@ -315,6 +330,9 @@
   position: fixed;
   inset: 0;
   z-index: 60;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
 }
 
 .qz-mobile-menu__scrim {
@@ -327,8 +345,14 @@
   position: absolute;
   inset: 0 0 0 auto;
   width: min(100%, 420px);
+  height: 100%;
+  max-height: 100vh;
+  max-height: 100dvh;
   padding: var(--space-4) var(--gutter) var(--space-6);
+  overflow-x: hidden;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   background: var(--qz-white);
   color: var(--qz-charcoal);
   box-shadow: -12px 0 40px rgba(17, 17, 17, 0.28);
@@ -345,6 +369,24 @@
 
 .qz-mobile-menu .qz-icon-button {
   color: var(--qz-charcoal);
+}
+
+.qz-mobile-account {
+  padding: var(--space-4) 0;
+  border-bottom: 1px solid var(--qz-grey-200);
+}
+
+.qz-mobile-account .qz-masthead__member-name--mobile {
+  margin-top: 0;
+}
+
+.qz-mobile-account .qz-masthead__signout-form {
+  display: block;
+  width: 100%;
+}
+
+.qz-mobile-account .qz-masthead__member-name--mobile + .qz-masthead__signout-form {
+  margin-top: var(--space-2);
 }
 
 .qz-mobile-nav__section {
@@ -397,7 +439,6 @@
 .qz-masthead__signin--mobile {
   width: 100%;
   min-height: 2.75rem;
-  margin-top: var(--space-5);
   border-color: var(--qz-grey-300);
   color: var(--qz-charcoal);
 }
@@ -2108,8 +2149,9 @@ body.qz-menu-lock .qz-masthead {
     font-size: 1rem;
   }
 
-  .qz-masthead__signin,
-  .qz-masthead__admin-link {
+  .qz-masthead__actions .qz-masthead__signin,
+  .qz-masthead__actions .qz-masthead__admin-link,
+  .qz-masthead__actions .qz-masthead__signout-form {
     display: none;
   }
 

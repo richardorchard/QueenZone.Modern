@@ -1,0 +1,10 @@
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@{
+  var extraClass = ViewData["SignOutExtraClass"] as string ?? string.Empty;
+  var token = Antiforgery.GetAndStoreTokens(Context).RequestToken;
+}
+
+<form method="post" action="/account/logout" class="qz-masthead__signout-form">
+  <input type="hidden" name="__RequestVerificationToken" value="@token" />
+  <button type="submit" class="qz-masthead__signin@(!string.IsNullOrEmpty(extraClass) ? " " + extraClass : "")">Sign out</button>
+</form>
