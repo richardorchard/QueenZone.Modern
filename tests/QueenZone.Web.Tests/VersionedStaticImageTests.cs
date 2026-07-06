@@ -25,6 +25,7 @@ public sealed class VersionedStaticImageTests : IClassFixture<WebApplicationFact
         Assert.Contains("img-crowd.webp?v=", body);
         Assert.Contains("img-stage.jpg?v=", body);
         Assert.Contains("img-studio.webp?v=", body);
+        Assert.Contains("crest-white.png?v=", body);
     }
 
     [Fact]

@@ -9,7 +9,7 @@
 
 <section class="qz-hero-archive" id="qz-hero-archive" aria-label="Homepage hero">
   <div class="qz-hero-archive__glow" id="qz-era-glow" aria-hidden="true"></div>
-  <img class="qz-hero-archive__crest" src="/design-system/assets/crest-white.png" alt="" aria-hidden="true">
+  <partial name="_PictureImage" model="@("/design-system/assets/crest-white.png", "", false, "qz-hero-archive__crest")" />
 
   <div class="qz-container qz-hero-archive__inner">
 
@@ -76,7 +76,7 @@
 </section>
 
 <section class="qz-section qz-band-dark">
-  <img class="qz-band-dark__crest" src="/design-system/assets/crest-white.png" alt="">
+  <partial name="_PictureImage" model="@("/design-system/assets/crest-white.png", "", false, "qz-band-dark__crest")" />
   <div class="qz-container">
     <partial name="_SectionHeader" model="@(("Featured", "Articles from the archive", true, "/articles", "View all"))" />
     <div class="qz-tag-row">
@@ -119,10 +119,10 @@
   <div class="qz-container">
     <partial name="_SectionHeader" model="@(("Featured Photography", "A visual archive in progress", false, "/photography", "Browse gallery"))" />
     <div class="qz-gallery-grid">
-      <figure class="qz-gallery-tile qz-gallery-tile--tall"><partial name="_PictureImage" model="@("/design-system/assets/img-stage.jpg", "", true)" /><figcaption><span>Wembley Stadium</span><span>1986</span></figcaption></figure>
-      <figure class="qz-gallery-tile"><partial name="_PictureImage" model="@("/design-system/assets/img-portrait.jpg", "", true)" /><figcaption><span>Studio portrait</span><span>1974</span></figcaption></figure>
-      <figure class="qz-gallery-tile qz-gallery-tile--wide"><partial name="_PictureImage" model="@("/design-system/assets/img-crowd.jpg", "", true)" /><figcaption><span>Hyde Park</span><span>1976</span></figcaption></figure>
-      <figure class="qz-gallery-tile"><partial name="_PictureImage" model="@("/design-system/assets/img-studio.jpg", "", true)" /><figcaption><span>Mountain Studios</span><span>1978</span></figcaption></figure>
+      <figure class="qz-gallery-tile qz-gallery-tile--tall"><partial name="_PictureImage" model="@("/design-system/assets/img-stage.jpg", "", true, (string?)null)" /><figcaption><span>Wembley Stadium</span><span>1986</span></figcaption></figure>
+      <figure class="qz-gallery-tile"><partial name="_PictureImage" model="@("/design-system/assets/img-portrait.jpg", "", true, (string?)null)" /><figcaption><span>Studio portrait</span><span>1974</span></figcaption></figure>
+      <figure class="qz-gallery-tile qz-gallery-tile--wide"><partial name="_PictureImage" model="@("/design-system/assets/img-crowd.jpg", "", true, (string?)null)" /><figcaption><span>Hyde Park</span><span>1976</span></figcaption></figure>
+      <figure class="qz-gallery-tile"><partial name="_PictureImage" model="@("/design-system/assets/img-studio.jpg", "", true, (string?)null)" /><figcaption><span>Mountain Studios</span><span>1978</span></figcaption></figure>
     </div>
   </div>
 </section>

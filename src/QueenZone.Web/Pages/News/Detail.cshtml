@@ -4,7 +4,7 @@
 @if (Model.Item is not null)
 {
   <section class="qz-article-hero">
-    <partial name="_PictureImage" model="@("/design-system/assets/img-hero.jpg", "", false)" />
+    <partial name="_PictureImage" model="@("/design-system/assets/img-hero.jpg", "", false, (string?)null)" />
     <div class="qz-container qz-article-hero__content qz-breadcrumbs-on-dark">
       <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
       <div class="qz-eyebrow" style="color: var(--qz-gold);">News archive</div>

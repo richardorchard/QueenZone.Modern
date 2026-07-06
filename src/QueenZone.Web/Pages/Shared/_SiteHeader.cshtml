@@ -59,7 +59,7 @@
 <header class="qz-masthead @(mastheadDark ? "qz-masthead--dark" : "qz-masthead--light")" data-masthead>
   <div class="qz-masthead__inner">
     <a class="qz-brand" href="/">
-      <img src="@(mastheadDark ? "/design-system/assets/crest-white.png" : "/design-system/assets/crest-black.png")" alt="Queen crest">
+      <partial name="_PictureImage" model="@(mastheadDark ? "/design-system/assets/crest-white.png" : "/design-system/assets/crest-black.png", "Queen crest", false, (string?)null)" />
       <span>Queenzone</span>
     </a>
 

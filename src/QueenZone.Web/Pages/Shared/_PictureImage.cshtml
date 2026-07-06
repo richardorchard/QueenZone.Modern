@@ -1,13 +1,12 @@
-@model (string Src, string Alt, bool Lazy)
+@model (string Src, string Alt, bool Lazy, string? CssClass)
 @inject IFileVersionProvider FileVersionProvider
+@inject IWebHostEnvironment HostEnv
 @{
     var pathBase = ViewContext.HttpContext.Request.PathBase;
     var versionedSrc = VersionedStaticPath.Apply(FileVersionProvider, pathBase, Model.Src);
-    string? webpSrc = Model.Src.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase)
-        ? VersionedStaticPath.Apply(FileVersionProvider, pathBase, string.Concat(Model.Src.AsSpan(0, Model.Src.Length - 4), ".webp"))
-        : null;
+    var webpSrc = VersionedStaticPath.TryGetVersionedWebpSrc(FileVersionProvider, HostEnv, pathBase, Model.Src);
 }
-<picture>
+<picture class="@Model.CssClass">
   @if (webpSrc is not null)
   {
     <source srcset="@webpSrc" type="image/webp">

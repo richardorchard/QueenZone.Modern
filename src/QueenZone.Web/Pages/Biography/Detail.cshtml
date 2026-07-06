@@ -7,7 +7,7 @@
   var nav = Model.Navigation;
 
   <section class="qz-bio-detail-hero">
-    <img class="qz-bio-detail-hero__crest" src="/design-system/assets/crest-white.png" alt="">
+    <partial name="_PictureImage" model="@("/design-system/assets/crest-white.png", "", false, "qz-bio-detail-hero__crest")" />
     <div class="qz-container qz-bio-detail-hero__content qz-breadcrumbs-on-dark">
       <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
       <div class="qz-eyebrow" style="color: var(--qz-gold);">
