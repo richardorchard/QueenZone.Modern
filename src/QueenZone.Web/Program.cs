@@ -45,6 +45,11 @@ builder.Services.AddSingleton<SitemapIndexBuilder>();
 builder.Services.AddScoped<MemberAccountService>();
 builder.Services.AddAntiforgery();
 
+if (ResponseCompressionBootstrap.IsEnabled(builder.Environment))
+{
+    ResponseCompressionBootstrap.ConfigureServices(builder.Services);
+}
+
 var legacyConnectionString = builder.Configuration.GetConnectionString("QueenZoneLegacy");
 var useLegacySql = !string.IsNullOrWhiteSpace(legacyConnectionString);
 
@@ -98,6 +103,11 @@ var forwardedHeadersOptions = new ForwardedHeadersOptions
 forwardedHeadersOptions.KnownIPNetworks.Clear();
 forwardedHeadersOptions.KnownProxies.Clear();
 app.UseForwardedHeaders(forwardedHeadersOptions);
+
+if (ResponseCompressionBootstrap.IsEnabled(app.Environment))
+{
+    app.UseResponseCompression();
+}
 
 // PhysicalFileProvider excludes dot-prefixed files/folders by default, so the generic
 // UseStaticFiles() below would 404 on /.well-known/* (used for Microsoft's domain
