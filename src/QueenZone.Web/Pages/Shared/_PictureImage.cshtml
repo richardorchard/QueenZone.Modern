@@ -1,16 +1,8 @@
 @model (string Src, string Alt, bool Lazy)
-@inject IWebHostEnvironment HostEnv
 @{
-    string? webpSrc = null;
-    if (Model.Src.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase))
-    {
-        var relative = Model.Src.TrimStart('/').Replace('/', System.IO.Path.DirectorySeparatorChar);
-        var webpRelative = System.IO.Path.ChangeExtension(relative, ".webp");
-        if (System.IO.File.Exists(System.IO.Path.Combine(HostEnv.WebRootPath, webpRelative)))
-        {
-            webpSrc = "/" + webpRelative.Replace(System.IO.Path.DirectorySeparatorChar, '/');
-        }
-    }
+    string? webpSrc = Model.Src.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase)
+        ? string.Concat(Model.Src.AsSpan(0, Model.Src.Length - 4), ".webp")
+        : null;
 }
 <picture>
   @if (webpSrc is not null)
