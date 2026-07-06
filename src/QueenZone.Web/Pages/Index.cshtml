@@ -1,5 +1,11 @@
 @page "/"
 @model IndexModel
+@using System.Text.Json
+@inject IFileVersionProvider FileVersionProvider
+@{
+    var eraSlides = HomeEraMontage.GetSlides(FileVersionProvider, HttpContext.Request.PathBase);
+    var eraConfigJson = JsonSerializer.Serialize(eraSlides, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+}
 
 <section class="qz-hero-archive" id="qz-hero-archive" aria-label="Homepage hero">
   <div class="qz-hero-archive__glow" id="qz-era-glow" aria-hidden="true"></div>
@@ -35,8 +41,8 @@
         </div>
         <div class="qz-hero-archive__viewport">
           <img class="qz-hero-archive__screenshot" id="qz-era-img"
-               src="/assets/eras/queenzone-1999.png"
-               alt="Queenzone.com in 1999"
+               src="@eraSlides[0].Img"
+               alt="Queenzone.com in @eraSlides[0].Year"
                loading="eager" fetchpriority="high" width="800" height="600">
           <div class="qz-hero-archive__overlay"></div>
         </div>
@@ -54,6 +60,7 @@
 
   </div>
 </section>
+<script type="application/json" id="qz-era-config">@Html.Raw(eraConfigJson)</script>
 
 <section class="qz-section qz-section--warm">
   <div class="qz-container">

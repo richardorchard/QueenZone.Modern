@@ -4,7 +4,7 @@
 @if (Model.Item is not null)
 {
   <section class="qz-article-hero">
-    <img src="/design-system/assets/img-hero.jpg" alt="">
+    <img src="/design-system/assets/img-hero.jpg" alt="" asp-append-version="true">
     <div class="qz-container qz-article-hero__content qz-breadcrumbs-on-dark">
       <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
       @if (!string.IsNullOrWhiteSpace(Model.Item.CategoryName))
