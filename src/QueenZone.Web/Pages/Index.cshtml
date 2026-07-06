@@ -37,7 +37,7 @@
           <img class="qz-hero-archive__screenshot" id="qz-era-img"
                src="/assets/eras/queenzone-1999.png"
                alt="Queenzone.com in 1999"
-               loading="eager" width="800" height="600">
+               loading="eager" fetchpriority="high" width="800" height="600">
           <div class="qz-hero-archive__overlay"></div>
         </div>
       </div>
@@ -112,10 +112,10 @@
   <div class="qz-container">
     <partial name="_SectionHeader" model="@(("Featured Photography", "A visual archive in progress", false, "/photography", "Browse gallery"))" />
     <div class="qz-gallery-grid">
-      <figure class="qz-gallery-tile qz-gallery-tile--tall"><img src="/design-system/assets/img-stage.jpg" alt=""><figcaption><span>Wembley Stadium</span><span>1986</span></figcaption></figure>
-      <figure class="qz-gallery-tile"><img src="/design-system/assets/img-portrait.jpg" alt=""><figcaption><span>Studio portrait</span><span>1974</span></figcaption></figure>
-      <figure class="qz-gallery-tile qz-gallery-tile--wide"><img src="/design-system/assets/img-crowd.jpg" alt=""><figcaption><span>Hyde Park</span><span>1976</span></figcaption></figure>
-      <figure class="qz-gallery-tile"><img src="/design-system/assets/img-studio.jpg" alt=""><figcaption><span>Mountain Studios</span><span>1978</span></figcaption></figure>
+      <figure class="qz-gallery-tile qz-gallery-tile--tall"><partial name="_PictureImage" model="@("/design-system/assets/img-stage.jpg", "", true)" /><figcaption><span>Wembley Stadium</span><span>1986</span></figcaption></figure>
+      <figure class="qz-gallery-tile"><partial name="_PictureImage" model="@("/design-system/assets/img-portrait.jpg", "", true)" /><figcaption><span>Studio portrait</span><span>1974</span></figcaption></figure>
+      <figure class="qz-gallery-tile qz-gallery-tile--wide"><partial name="_PictureImage" model="@("/design-system/assets/img-crowd.jpg", "", true)" /><figcaption><span>Hyde Park</span><span>1976</span></figcaption></figure>
+      <figure class="qz-gallery-tile"><partial name="_PictureImage" model="@("/design-system/assets/img-studio.jpg", "", true)" /><figcaption><span>Mountain Studios</span><span>1978</span></figcaption></figure>
     </div>
   </div>
 </section>
