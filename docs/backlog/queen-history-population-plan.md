@@ -58,6 +58,28 @@ powershell -File .\scripts\Import-QueenHistoryEvents.ps1 -CsvPath .\data\queen_h
 
 The importer upserts by `SourceType + SourceKey`, so it is safe to rerun after correcting titles, summaries, dates, importance, or source URLs.
 
+## Import Status
+
+Initial live import completed on 2026-07-06 using `data/queen_history_events.csv`.
+
+First run:
+
+```text
+Rows read: 252
+Created: 252
+Updated: 0
+Unchanged: 0
+```
+
+Idempotency check:
+
+```text
+Rows read: 252
+Created: 0
+Updated: 0
+Unchanged: 252
+```
+
 ## Validation
 
 - Count source rows, imported rows, published rows, and skipped rows.
