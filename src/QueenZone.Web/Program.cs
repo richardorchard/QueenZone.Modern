@@ -143,7 +143,10 @@ app.UseStatusCodePages(async statusCodeContext =>
         statusCodeContext.HttpContext.Request.Path = originalPath;
     }
 });
-app.UseStaticFiles();
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx => StaticFileCacheControl.Apply(ctx.Context, app.Environment),
+});
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseAntiforgery();
