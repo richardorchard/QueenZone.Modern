@@ -2,10 +2,8 @@ namespace QueenZone.Web;
 
 public static class PublicOutputCachePolicies
 {
-    public const string PublicArchivePages = "public-archive-pages";
     public const string PublicSitemaps = "public-sitemaps";
 
-    public static readonly TimeSpan ArchivePageDuration = TimeSpan.FromMinutes(5);
     public static readonly TimeSpan SitemapDuration = TimeSpan.FromHours(24);
 
     private static readonly string[] ExcludedPathPrefixes =

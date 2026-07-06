@@ -37,15 +37,10 @@ builder.Services.Configure<AnalyticsOptions>(builder.Configuration.GetSection(An
 builder.Services.Configure<SitemapOptions>(builder.Configuration.GetSection(SitemapOptions.SectionName));
 builder.Services.Configure<MemberAuthenticationOptions>(builder.Configuration.GetSection(MemberAuthenticationOptions.SectionName));
 builder.Services.Configure<ForumDataOptions>(builder.Configuration.GetSection(ForumDataOptions.SectionName));
+builder.Services.Configure<PublicQueryCacheOptions>(builder.Configuration.GetSection(PublicQueryCacheOptions.SectionName));
 builder.Services.AddMemoryCache();
 builder.Services.AddOutputCache(options =>
 {
-    options.AddPolicy(PublicOutputCachePolicies.PublicArchivePages, policy => policy
-        .With(context => PublicOutputCachePolicies.IsPublicReadOnlyRequest(context.HttpContext))
-        .Expire(PublicOutputCachePolicies.ArchivePageDuration)
-        .SetVaryByQuery("*")
-        .Tag("public-archive"));
-
     options.AddPolicy(PublicOutputCachePolicies.PublicSitemaps, policy => policy
         .With(context => PublicOutputCachePolicies.IsPublicReadOnlyRequest(context.HttpContext))
         .Expire(PublicOutputCachePolicies.SitemapDuration)
@@ -57,6 +52,7 @@ builder.Services.AddSingleton<CoreSitemapBuilder>();
 builder.Services.AddSingleton<CoreSitemapService>();
 builder.Services.AddSingleton<ForumSitemapBuilder>();
 builder.Services.AddSingleton<SitemapIndexBuilder>();
+builder.Services.AddScoped<PublicQueryCacheService>();
 builder.Services.AddScoped<MemberAccountService>();
 builder.Services.AddAntiforgery();
 
@@ -186,8 +182,7 @@ app.MapGet("/account/member-probe", () => Results.Ok(new { authenticated = true 
 
 app.MapFanPerformanceEndpoints();
 app.MapSitemapEndpoints();
-app.MapRazorPages()
-    .CacheOutput(PublicOutputCachePolicies.PublicArchivePages);
+app.MapRazorPages();
 
 app.Run();
 

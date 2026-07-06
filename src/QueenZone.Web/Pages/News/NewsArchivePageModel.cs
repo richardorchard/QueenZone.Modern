@@ -4,7 +4,9 @@ using QueenZone.Data;
 
 namespace QueenZone.Web.Pages.News;
 
-public abstract class NewsArchivePageModel(INewsRepository newsRepository) : PageModel
+public abstract class NewsArchivePageModel(
+    INewsRepository newsRepository,
+    PublicQueryCacheService publicQueryCache) : PageModel
 {
     public IReadOnlyList<NewsItem> Items { get; private set; } = [];
 
@@ -21,7 +23,7 @@ public abstract class NewsArchivePageModel(INewsRepository newsRepository) : Pag
             return NotFound();
         }
 
-        var publishedCount = await newsRepository.GetPublishedCountAsync(cancellationToken);
+        var publishedCount = await publicQueryCache.GetNewsPublishedCountAsync(cancellationToken);
         var archive = await newsRepository.GetArchivePageAsync(page, NewsRoutes.ArchivePageSize, cancellationToken);
         var totalPages = NewsRoutes.ResolveArchiveTotalPages(
             page,

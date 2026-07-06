@@ -3,7 +3,7 @@ using QueenZone.Data;
 
 namespace QueenZone.Web.Pages;
 
-public sealed class ForumModel(IForumRepository forumRepository) : PageModel
+public sealed class ForumModel(PublicQueryCacheService publicQueryCache) : PageModel
 {
     public ForumArchiveStats Stats { get; private set; } = new(0, 0, 0);
 
@@ -13,8 +13,8 @@ public sealed class ForumModel(IForumRepository forumRepository) : PageModel
 
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
-        Categories = await forumRepository.GetCategoriesAsync(cancellationToken);
-        var threadCount = await forumRepository.GetTotalThreadCountAsync(cancellationToken);
+        Categories = await publicQueryCache.GetForumCategoriesAsync(cancellationToken);
+        var threadCount = await publicQueryCache.GetForumThreadCountAsync(cancellationToken);
         Stats = ForumArchiveStats.FromCategories(Categories, threadCount);
     }
 }
