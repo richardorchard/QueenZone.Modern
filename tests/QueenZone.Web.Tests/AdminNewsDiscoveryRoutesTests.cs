@@ -368,6 +368,37 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
     }
 
     [Fact]
+    public async Task Promote_with_overlong_ai_slug_caps_slug_before_creating_draft()
+    {
+        var newsStore = new SharedNewsStore();
+        var discoveryStore = new SharedNewsDiscoveryStore();
+        var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
+        var candidateId = await SeedDraftedCandidateAsync(discoveryRepository);
+        await discoveryRepository.UpsertDraftAsync(candidateId, new NewsAgentDraftUpsert(
+            "Draft title with verbose generated slug",
+            new string('a', NewsSlug.MaxLength + 50),
+            "Draft excerpt for review queue.",
+            "Draft body for review queue.",
+            null,
+            null,
+            null,
+            DateTime.UtcNow.Date,
+            null));
+        var client = CreateClient(AdminEmail, newsStore, discoveryStore);
+
+        var promoteResponse = await PostActionAsync(client, $"/admin/news-discovery/{candidateId}/promote", candidateId);
+
+        Assert.Equal(HttpStatusCode.Redirect, promoteResponse.StatusCode);
+        var editPath = promoteResponse.Headers.Location!.OriginalString;
+        Assert.Matches("/admin/news/\\d+/edit", editPath);
+
+        var articleId = int.Parse(editPath.Split('/')[3], System.Globalization.CultureInfo.InvariantCulture);
+        var article = newsStore.GetArticle(articleId);
+        Assert.NotNull(article);
+        Assert.Equal(NewsSlug.MaxLength, article.Slug!.Length);
+    }
+
+    [Fact]
     public async Task AuthorizedAdminCanEditDraftAndMoveCandidateToDrafted()
     {
         var discoveryStore = new SharedNewsDiscoveryStore();

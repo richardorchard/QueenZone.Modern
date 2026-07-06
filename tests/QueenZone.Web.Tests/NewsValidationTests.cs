@@ -75,4 +75,13 @@ public sealed class NewsValidationTests
         Assert.Equal("custom-slug", NewsSlug.Resolve("Any title", "Custom Slug!"));
         Assert.Equal("generated-title", NewsSlug.Resolve("Generated Title", null));
     }
+
+    [Fact]
+    public void NewsSlugResolveCapsGeneratedSlugAtDatabaseLimit()
+    {
+        var slug = NewsSlug.Resolve("Generated title", new string('a', NewsSlug.MaxLength + 25));
+
+        Assert.Equal(NewsSlug.MaxLength, slug.Length);
+        Assert.All(slug, character => Assert.Equal('a', character));
+    }
 }

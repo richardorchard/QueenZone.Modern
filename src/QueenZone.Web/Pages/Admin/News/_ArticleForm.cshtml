@@ -35,7 +35,7 @@
   </label>
   <label>
     Slug
-    <input type="text" name="slug" value="@Model.Draft.Slug" placeholder="@NewsSlug.Resolve(Model.Draft.Title, null)">
+    <input type="text" name="slug" value="@Model.Draft.Slug" placeholder="@NewsSlug.Resolve(Model.Draft.Title, null)" maxlength="@NewsSlug.MaxLength">
   </label>
   <p class="admin-help">Leave blank to auto-generate from the title.</p>
   <label>
