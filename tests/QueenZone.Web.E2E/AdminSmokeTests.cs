@@ -29,7 +29,7 @@ public class AdminSmokeTests : PageTest
     [Test]
     public async Task AdminNews_ShowsEditorialList()
     {
-        await Page.GotoAsync("/admin/news");
+        await GotoAdminAsync("/admin/news");
 
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Admin news", Level = 1 })).ToBeVisibleAsync();
         await Expect(Page.GetByRole(AriaRole.Link, new() { Name = "Create article" })).ToBeVisibleAsync();
@@ -40,7 +40,7 @@ public class AdminSmokeTests : PageTest
     {
         var uniqueTitle = $"E2E admin draft {DateTime.UtcNow:yyyyMMddHHmmss}";
 
-        await Page.GotoAsync("/admin/news/new");
+        await GotoAdminAsync("/admin/news/new");
         await Page.GetByLabel("Title").FillAsync(uniqueTitle);
         await Page.GetByLabel("Excerpt").FillAsync("Playwright admin smoke excerpt.");
         await Page.GetByLabel("Body").FillAsync("Playwright admin smoke body.");
@@ -49,5 +49,11 @@ public class AdminSmokeTests : PageTest
 
         await Expect(Page).ToHaveURLAsync(new Regex("/admin/news/\\d+/edit"));
         await Expect(Page.GetByText(uniqueTitle)).ToBeVisibleAsync();
+    }
+
+    private async Task GotoAdminAsync(string path)
+    {
+        var response = await Page.GotoAsync(path);
+        Assert.That(response?.Status, Is.EqualTo(200), $"Expected {path} to load as admin user {AdminEmail}.");
     }
 }

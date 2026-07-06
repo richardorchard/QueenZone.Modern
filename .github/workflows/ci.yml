@@ -160,11 +160,12 @@ jobs:
           # Start-Process makes the app a child of this step's process, which is
           # tied to the runner's Windows Job Object and gets killed when this step
           # exits. Launch via WMI instead so it survives into later steps.
-          $exePath = (Resolve-Path ".\e2e-app\QueenZone.Web.exe").Path
+          $appDir = (Resolve-Path ".\e2e-app").Path
+          $exePath = Join-Path $appDir "QueenZone.Web.exe"
           $logPath = Join-Path (Get-Location).Path "e2e-app.log"
           $errPath = Join-Path (Get-Location).Path "e2e-app.err.log"
-          $cmdLine = "cmd.exe /c `"set ASPNETCORE_ENVIRONMENT=Testing&&set ASPNETCORE_URLS=http://127.0.0.1:5099&&`"$exePath`" > `"$logPath`" 2> `"$errPath`"`""
-          $result = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = $cmdLine }
+          $cmdLine = "cmd.exe /c `"set ASPNETCORE_ENVIRONMENT=Testing&&set ASPNETCORE_URLS=http://127.0.0.1:5099&&set ASPNETCORE_CONTENTROOT=$appDir&&`"$exePath`" > `"$logPath`" 2> `"$errPath`"`""
+          $result = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = $cmdLine; CurrentDirectory = $appDir }
           if ($result.ReturnValue -ne 0) {
             throw "Failed to start app via WMI, return code $($result.ReturnValue)"
           }
@@ -214,6 +215,7 @@ jobs:
       - name: Run Playwright e2e tests
         env:
           E2E_BASE_URL: http://127.0.0.1:5099
+          E2E_ADMIN_EMAIL: admin@test.local
         run: dotnet test tests/QueenZone.Web.E2E/QueenZone.Web.E2E.csproj --configuration Release --no-build
 
       - name: Stop app
