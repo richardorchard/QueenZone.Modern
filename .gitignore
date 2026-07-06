@@ -6,7 +6,7 @@ obj/
 .tools/
 *.user
 *.suo
-TestResults/
+TestResults*/
 coverage-report/
 *.trx
 *.coverage
@@ -16,8 +16,12 @@ appsettings.Local.json
 .cloudflare-token.txt
 *.db
 *.bak
+*.local-backup
 *.PublishSettings
 *.pubxml
+
+smoke-app-local/
+smoke-*.log
 
 appservice-logs.zip
 
