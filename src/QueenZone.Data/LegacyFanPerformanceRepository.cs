@@ -47,6 +47,21 @@ public sealed class LegacyFanPerformanceRepository : IFanPerformanceRepository
         return await connection.ExecuteScalarAsync<int>(command);
     }
 
+    public async Task<FanPerformance?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
+    {
+        await using var connection = new SqlConnection(connectionString);
+        var command = new CommandDefinition(
+            """
+            SELECT Q_STAGE_ID, TITLE, PERFORMED_BY, DESCRIPTION, URL, thesize, DATE_ADDED
+            FROM dbo.Q_STAGE_T
+            WHERE Q_STAGE_ID = @id AND DISPLAY = 1
+            """,
+            new { id },
+            cancellationToken: cancellationToken);
+        var row = await connection.QuerySingleOrDefaultAsync<StageRow>(command);
+        return row is null ? null : MapRow(row);
+    }
+
     private static FanPerformance MapRow(StageRow row) => new(
         Id: row.Q_STAGE_ID,
         Title: row.TITLE,

@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.OutputCaching;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.FileProviders.Physical;
@@ -38,6 +39,20 @@ builder.Services.Configure<MemberAuthenticationOptions>(builder.Configuration.Ge
 builder.Services.Configure<ForumDataOptions>(builder.Configuration.GetSection(ForumDataOptions.SectionName));
 builder.Services.Configure<PublicQueryCacheOptions>(builder.Configuration.GetSection(PublicQueryCacheOptions.SectionName));
 builder.Services.AddMemoryCache();
+builder.Services.AddOutputCache(options =>
+{
+    options.AddPolicy(PublicOutputCachePolicies.PublicArchivePages, policy => policy
+        .With(context => PublicOutputCachePolicies.IsPublicReadOnlyRequest(context.HttpContext))
+        .Expire(PublicOutputCachePolicies.ArchivePageDuration)
+        .SetVaryByQuery("*")
+        .Tag("public-archive"));
+
+    options.AddPolicy(PublicOutputCachePolicies.PublicSitemaps, policy => policy
+        .With(context => PublicOutputCachePolicies.IsPublicReadOnlyRequest(context.HttpContext))
+        .Expire(PublicOutputCachePolicies.SitemapDuration)
+        .SetVaryByRouteValue("*")
+        .Tag("public-sitemap"));
+});
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<CoreSitemapBuilder>();
 builder.Services.AddSingleton<CoreSitemapService>();
@@ -161,19 +176,20 @@ app.UseStaticFiles(new StaticFileOptions
 });
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseOutputCache();
 app.UseAntiforgery();
 
 // Minimal liveness probe used by CI smoke/e2e checks and any future uptime monitoring.
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 
-// Proves the Member policy gate works end-to-end. No real content uses it yet — future
-// write-features (forum posting, attachment downloads, fan-performance submissions) will
-// apply [Authorize(Policy = "Member")] or this same RequireAuthorization call once built.
+// Member-gated fan-performance audio downloads use FanPerformanceEndpoints.
 app.MapGet("/account/member-probe", () => Results.Ok(new { authenticated = true }))
     .RequireAuthorization(MemberAuthenticationSchemes.MemberPolicy);
 
+app.MapFanPerformanceEndpoints();
 app.MapSitemapEndpoints();
-app.MapRazorPages();
+app.MapRazorPages()
+    .CacheOutput(PublicOutputCachePolicies.PublicArchivePages);
 
 app.Run();
 

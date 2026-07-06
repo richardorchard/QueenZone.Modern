@@ -22,4 +22,7 @@ public sealed class InMemoryFanPerformanceRepository : IFanPerformanceRepository
 
     public Task<int> GetVisibleCountAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(performances.Count);
+
+    public Task<FanPerformance?> GetByIdAsync(int id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(performances.FirstOrDefault(performance => performance.Id == id));
 }
