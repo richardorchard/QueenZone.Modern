@@ -1,0 +1,261 @@
+@page "/timeline"
+@model IndexModel
+
+@* Hero *@
+<section class="qz-htl-hero">
+  <img class="qz-htl-hero__crest" src="/design-system/assets/crest-white.png" alt="" aria-hidden="true">
+  <div class="qz-container qz-htl-hero__inner">
+    <div class="qz-eyebrow qz-htl-hero__eyebrow">Five decades &middot; 1970 &ndash; today</div>
+    <h1 class="qz-htl-hero__title">Queen&nbsp;History</h1>
+    <p class="qz-htl-hero__lead">Every landmark moment &mdash; concerts, releases, milestones &mdash; gathered from the Queenzone archive and placed on one continuous line.</p>
+  </div>
+</section>
+
+@* Sticky filter bar *@
+<div class="qz-htl-filterbar" id="qz-htl-filterbar" role="toolbar" aria-label="Filter events by category">
+  <div class="qz-container qz-htl-filterbar__inner">
+    <div class="qz-htl-chips" role="group" aria-label="Category filter">
+      <button class="qz-htl-chip qz-htl-chip--active" data-filter="all" aria-pressed="true">All events</button>
+      <button class="qz-htl-chip" data-filter="music" aria-pressed="false">
+        <span class="qz-htl-chip__dot qz-htl-chip__dot--music"></span>Music
+      </button>
+      <button class="qz-htl-chip" data-filter="live" aria-pressed="false">
+        <span class="qz-htl-chip__dot qz-htl-chip__dot--live"></span>Live
+      </button>
+      <button class="qz-htl-chip" data-filter="milestone" aria-pressed="false">
+        <span class="qz-htl-chip__dot qz-htl-chip__dot--milestone"></span>Milestone
+      </button>
+      <button class="qz-htl-chip" data-filter="other" aria-pressed="false">
+        <span class="qz-htl-chip__dot qz-htl-chip__dot--other"></span>Other
+      </button>
+    </div>
+    <span class="qz-htl-count" id="qz-htl-count" aria-live="polite">@Model.TotalEventCount events</span>
+  </div>
+</div>
+
+@* Body grid *@
+<div class="qz-container">
+  <div class="qz-htl-body">
+
+    @* Decade rail *@
+    <nav class="qz-htl-rail" id="qz-htl-rail" aria-label="Jump to decade">
+      <div class="qz-htl-rail__label">Jump to</div>
+      @foreach (var decade in Model.Decades)
+      {
+        <div class="qz-htl-rail__decade-group" data-rail-decade="@decade.Decade">
+          <button class="qz-htl-rail__decade-btn" data-jump-decade="@decade.Decade" aria-current="false">
+            @decade.Decade
+            <span class="qz-htl-rail__decade-count">@decade.Events.Count</span>
+          </button>
+          <div class="qz-htl-rail__years" aria-hidden="true">
+            @foreach (var year in decade.Years)
+            {
+              <button class="qz-htl-rail__year-btn" data-jump-year="@year">@year</button>
+            }
+          </div>
+        </div>
+      }
+    </nav>
+
+    @* Decade sections *@
+    <div id="qz-htl-decades">
+      @if (Model.Decades.Count == 0)
+      {
+        <p>No history events have been published yet.</p>
+      }
+      else
+      {
+        @foreach (var decade in Model.Decades)
+        {
+          <section class="qz-htl-decade" data-decade="@decade.Decade" id="decade-@decade.Decade">
+            <div class="qz-htl-decade__heading">
+              <h2>@decade.Decade</h2>
+              <span class="qz-htl-decade__rule" aria-hidden="true"></span>
+              <span class="qz-htl-decade__count">@decade.Events.Count events</span>
+            </div>
+
+            <div class="qz-htl-events">
+              @for (int i = 0; i < decade.Events.Count; i++)
+              {
+                var row = decade.Events[i];
+                <article class="qz-htl-row@(i == 0 ? " qz-htl-row--first" : "")"
+                         data-year="@row.Year"
+                         data-cat="@row.DisplayCategory"
+                         id="event-@row.Event.Id">
+                  <span class="qz-htl-row__node" aria-hidden="true"></span>
+                  <button class="qz-htl-row__header" aria-expanded="false" aria-controls="detail-@row.Event.Id">
+                    <span class="qz-htl-row__year">@row.Year</span>
+                    <span class="qz-htl-row__title-block">
+                      <span class="qz-htl-tag qz-htl-tag--@row.DisplayCategory">
+                        <span class="qz-htl-tag__dot" aria-hidden="true"></span>
+                        <span class="qz-htl-tag__label">@row.DisplayLabel</span>
+                      </span>
+                      <span class="qz-htl-row__title">@row.Event.Title</span>
+                      <span class="qz-htl-row__lede">@row.Event.Summary</span>
+                    </span>
+                    <svg class="qz-htl-row__chevron" width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
+                      <path d="M3 5.5L7.5 10L12 5.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                  </button>
+                  <div class="qz-htl-row__detail" id="detail-@row.Event.Id" role="region" aria-label="@row.Event.Title details">
+                    <div class="qz-htl-row__detail-inner">
+                      <span class="qz-htl-row__detail-spacer" aria-hidden="true"></span>
+                      <div class="qz-htl-row__detail-content">
+                        <p class="qz-htl-row__standfirst">@row.Event.Summary</p>
+                        <div class="qz-htl-row__meta">
+                          <time class="qz-htl-row__date" datetime="@row.Event.EventDate.ToString("yyyy-MM-dd")">
+                            @row.Event.FormattedDate
+                          </time>
+                        </div>
+                        @if (!string.IsNullOrEmpty(row.Event.SourceUrl))
+                        {
+                          <a class="qz-htl-row__readmore" href="@row.Event.SourceUrl" target="_blank" rel="noopener noreferrer">
+                            Read more
+                            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+                              <path d="M2.5 6.5H10.5M10.5 6.5L7 3M10.5 6.5L7 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                          </a>
+                        }
+                      </div>
+                    </div>
+                  </div>
+                </article>
+              }
+            </div>
+          </section>
+        }
+      }
+    </div>
+
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ---- Filter ----
+  var filter = 'all';
+  var chips = document.querySelectorAll('.qz-htl-chip');
+  var countEl = document.getElementById('qz-htl-count');
+
+  function applyFilter(cat) {
+    filter = cat;
+
+    chips.forEach(function (chip) {
+      var active = chip.dataset.filter === cat;
+      chip.classList.toggle('qz-htl-chip--active', active);
+      chip.setAttribute('aria-pressed', String(active));
+    });
+
+    var rows = document.querySelectorAll('.qz-htl-row');
+    var visible = 0;
+    rows.forEach(function (row) {
+      var show = cat === 'all' || row.dataset.cat === cat;
+      row.hidden = !show;
+      if (show) visible++;
+    });
+
+    countEl.textContent = visible + ' event' + (visible === 1 ? '' : 's');
+
+    document.querySelectorAll('.qz-htl-decade').forEach(function (sec) {
+      var any = Array.from(sec.querySelectorAll('.qz-htl-row')).some(function (r) { return !r.hidden; });
+      sec.hidden = !any;
+    });
+
+    rebindObservers();
+  }
+
+  chips.forEach(function (chip) {
+    chip.addEventListener('click', function () { applyFilter(chip.dataset.filter); });
+  });
+
+  // ---- Expand / collapse ----
+  document.querySelectorAll('.qz-htl-row__header').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var row = btn.closest('.qz-htl-row');
+      var open = btn.getAttribute('aria-expanded') === 'true';
+      btn.setAttribute('aria-expanded', String(!open));
+      row.classList.toggle('qz-htl-row--open', !open);
+    });
+  });
+
+  // ---- Scroll tracking ----
+  var activeDecade = null;
+  var activeYear = null;
+  var decadeObserver = null;
+  var yearObserver = null;
+
+  function setActiveDecade(decade) {
+    if (decade === activeDecade) return;
+    activeDecade = decade;
+    document.querySelectorAll('.qz-htl-rail__decade-btn').forEach(function (btn) {
+      var active = btn.dataset.jumpDecade === decade;
+      btn.classList.toggle('qz-htl-rail__decade-btn--active', active);
+      btn.setAttribute('aria-current', String(active));
+    });
+    document.querySelectorAll('.qz-htl-rail__years').forEach(function (el) {
+      var group = el.closest('[data-rail-decade]');
+      el.classList.toggle('qz-htl-rail__years--open', group && group.dataset.railDecade === decade);
+    });
+  }
+
+  function setActiveYear(year) {
+    if (year === activeYear) return;
+    activeYear = year;
+    document.querySelectorAll('.qz-htl-rail__year-btn').forEach(function (btn) {
+      btn.classList.toggle('qz-htl-rail__year-btn--active', btn.dataset.jumpYear === year);
+    });
+  }
+
+  function rebindObservers() {
+    if (decadeObserver) decadeObserver.disconnect();
+    if (yearObserver) yearObserver.disconnect();
+
+    decadeObserver = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) setActiveDecade(entry.target.dataset.decade);
+      });
+    }, { rootMargin: '-25% 0px -70% 0px' });
+
+    document.querySelectorAll('.qz-htl-decade:not([hidden])').forEach(function (el) {
+      decadeObserver.observe(el);
+    });
+
+    yearObserver = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) setActiveYear(entry.target.dataset.year);
+      });
+    }, { rootMargin: '-30% 0px -65% 0px' });
+
+    document.querySelectorAll('.qz-htl-row:not([hidden])').forEach(function (el) {
+      yearObserver.observe(el);
+    });
+  }
+
+  rebindObservers();
+
+  // ---- Jump navigation ----
+  var DECADE_OFFSET = 84;
+  var YEAR_OFFSET = 96;
+
+  document.querySelectorAll('.qz-htl-rail__decade-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var sec = document.getElementById('decade-' + btn.dataset.jumpDecade);
+      if (!sec) return;
+      var top = sec.getBoundingClientRect().top + window.scrollY - DECADE_OFFSET;
+      window.scrollTo({ top: top, behavior: 'smooth' });
+    });
+  });
+
+  document.querySelectorAll('.qz-htl-rail__year-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var year = btn.dataset.jumpYear;
+      var row = document.querySelector('.qz-htl-row[data-year="' + year + '"]:not([hidden])');
+      if (!row) return;
+      var top = row.getBoundingClientRect().top + window.scrollY - YEAR_OFFSET;
+      window.scrollTo({ top: top, behavior: 'smooth' });
+    });
+  });
+}());
+</script>

@@ -12,4 +12,7 @@ public interface IQueenHistoryRepository
         int dayWindow,
         int count,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<QueenHistoryEvent>> GetAllPublishedAsync(
+        CancellationToken cancellationToken = default);
 }
