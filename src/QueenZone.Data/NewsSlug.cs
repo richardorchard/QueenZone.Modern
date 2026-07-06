@@ -4,6 +4,8 @@ namespace QueenZone.Data;
 
 public static partial class NewsSlug
 {
+    public const int MaxLength = 200;
+
     public static string Resolve(string title, string? slugOverride = null)
     {
         if (!string.IsNullOrWhiteSpace(slugOverride))
@@ -18,7 +20,13 @@ public static partial class NewsSlug
     {
         var lower = value.Trim().ToLowerInvariant();
         var replaced = NonAlphaNumericRegex().Replace(lower, "-");
-        return DuplicateDashRegex().Replace(replaced, "-").Trim('-');
+        var slug = DuplicateDashRegex().Replace(replaced, "-").Trim('-');
+        if (slug.Length <= MaxLength)
+        {
+            return slug;
+        }
+
+        return slug[..MaxLength].Trim('-');
     }
 
     public static string ResolveForArticle(NewsItem item) =>
