@@ -141,6 +141,7 @@ public sealed class ActionModel(
             ? await dbContext.Database.BeginTransactionAsync(cancellationToken)
             : null;
         int newsId;
+        var promotionStage = "creating the admin draft";
         try
         {
             newsId = await adminNewsRepository.CreateDraftAsync(adminDraft, EditorEmail, cancellationToken);
@@ -155,6 +156,7 @@ public sealed class ActionModel(
                 return RedirectToReview(id, promoteError);
             }
 
+            promotionStage = "updating the discovery candidate";
             var promoted = await discoveryRepository.TryUpdateCandidateStatusAsync(
                 id,
                 new NewsCandidateStatusUpdate(
@@ -172,9 +174,11 @@ public sealed class ActionModel(
                 return RedirectToReview(id, "Promotion failed while updating the discovery candidate.");
             }
 
+            promotionStage = "loading the discovery audit provenance";
             var aiRuns = await discoveryRepository.GetAiRunsForCandidateAsync(id, cancellationToken);
             var provenance = NewsDiscoveryProvenanceBuilder.Build(candidate, agentDraft, aiRuns);
 
+            promotionStage = "recording the promotion audit";
             await auditRepository.AppendAsync(
                 newsId,
                 "promote-from-discovery",
@@ -184,6 +188,7 @@ public sealed class ActionModel(
 
             if (transaction is not null)
             {
+                promotionStage = "committing the promotion";
                 await transaction.CommitAsync(cancellationToken);
             }
         }
@@ -194,10 +199,14 @@ public sealed class ActionModel(
                 await transaction.RollbackAsync(cancellationToken);
             }
 
-            logger.LogError(ex, "Failed to promote discovery candidate {CandidateId} to admin news", id);
+            logger.LogError(
+                ex,
+                "Failed while {PromotionStage} for discovery candidate {CandidateId}",
+                promotionStage,
+                id);
             return RedirectToReview(
                 id,
-                "Promotion failed while creating the admin draft. Edit the AI draft to fix validation issues, then try again.");
+                $"Promotion failed while {promotionStage}. Check the app logs for the exact validation or database error.");
         }
 
         return Redirect($"/admin/news/{newsId}/edit");
