@@ -41,12 +41,6 @@ builder.Services.Configure<PublicQueryCacheOptions>(builder.Configuration.GetSec
 builder.Services.AddMemoryCache();
 builder.Services.AddOutputCache(options =>
 {
-    options.AddPolicy(PublicOutputCachePolicies.PublicArchivePages, policy => policy
-        .With(context => PublicOutputCachePolicies.IsPublicReadOnlyRequest(context.HttpContext))
-        .Expire(PublicOutputCachePolicies.ArchivePageDuration)
-        .SetVaryByQuery("*")
-        .Tag("public-archive"));
-
     options.AddPolicy(PublicOutputCachePolicies.PublicSitemaps, policy => policy
         .With(context => PublicOutputCachePolicies.IsPublicReadOnlyRequest(context.HttpContext))
         .Expire(PublicOutputCachePolicies.SitemapDuration)
@@ -188,8 +182,7 @@ app.MapGet("/account/member-probe", () => Results.Ok(new { authenticated = true 
 
 app.MapFanPerformanceEndpoints();
 app.MapSitemapEndpoints();
-app.MapRazorPages()
-    .CacheOutput(PublicOutputCachePolicies.PublicArchivePages);
+app.MapRazorPages();
 
 app.Run();
 

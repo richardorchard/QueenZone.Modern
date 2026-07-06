@@ -17,7 +17,7 @@ public sealed class PublicOutputCacheTests : IClassFixture<WebApplicationFactory
     }
 
     [Fact]
-    public async Task PublicArchivePagesAreServedFromOutputCache()
+    public async Task RazorPagesAreNotServedFromOutputCache()
     {
         var repository = new CountingArticlesRepository();
         var client = factory.WithWebHostBuilder(builder =>
@@ -33,25 +33,7 @@ public sealed class PublicOutputCacheTests : IClassFixture<WebApplicationFactory
         Assert.Contains("Cached archive article", first);
         Assert.Equal(first, second);
         Assert.True(callsAfterFirstRequest > 0);
-        Assert.Equal(callsAfterFirstRequest, repository.ArchivePageCallCount + repository.PublishedCountCallCount);
-    }
-
-    [Fact]
-    public async Task PublicArchiveOutputCacheVariesByQueryString()
-    {
-        var repository = new CountingArticlesRepository();
-        var client = factory.WithWebHostBuilder(builder =>
-            builder.ConfigureServices(services =>
-            {
-                services.AddSingleton<IArticlesRepository>(repository);
-            })).CreateClient();
-
-        await client.GetStringAsync("/articles?probe=one");
-        var callsAfterFirstQuery = repository.ArchivePageCallCount + repository.PublishedCountCallCount;
-        await client.GetStringAsync("/articles?probe=two");
-
-        Assert.True(callsAfterFirstQuery > 0);
-        Assert.True(repository.ArchivePageCallCount + repository.PublishedCountCallCount > callsAfterFirstQuery);
+        Assert.True(repository.ArchivePageCallCount + repository.PublishedCountCallCount > callsAfterFirstRequest);
     }
 
     [Theory]
