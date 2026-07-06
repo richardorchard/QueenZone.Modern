@@ -39,4 +39,31 @@ public sealed class HomeImageDeliveryTests : IClassFixture<WebApplicationFactory
         Assert.Contains("img-stage.jpg?v=", body);
         Assert.Contains("img-studio.jpg?v=", body);
     }
+
+    [Fact]
+    public async Task HomePagePreloadsLocalFontsWithoutGoogleFontDependency()
+    {
+        var client = factory.CreateClient();
+        var body = await client.GetStringAsync("/");
+
+        Assert.Contains("/design-system/fonts/inter-latin-400-700.woff2", body);
+        Assert.Contains("/design-system/fonts/cormorant-garamond-latin-300-700.woff2", body);
+        Assert.DoesNotContain("fonts.googleapis.com", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("fonts.gstatic.com", body, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task FontTokensUseLocalWoff2Sources()
+    {
+        var client = factory.CreateClient();
+        var css = await client.GetStringAsync("/design-system/tokens/fonts.css");
+
+        Assert.Contains("@font-face", css);
+        Assert.Contains("font-display: swap", css);
+        Assert.Contains("/design-system/fonts/inter-latin-400-700.woff2", css);
+        Assert.Contains("/design-system/fonts/cinzel-latin-400-700.woff2", css);
+        Assert.DoesNotContain("@import", css, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("fonts.googleapis.com", css, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("fonts.gstatic.com", css, StringComparison.OrdinalIgnoreCase);
+    }
 }

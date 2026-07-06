@@ -62,7 +62,7 @@ Extended neutral ramp: `--qz-grey-50 #FBFBFA` · `-100 #F2F1ED` · `-200 #E8E8E8
 - **Body / UI — Inter** (`--font-body`): body copy, navigation, interface. Body 17px / 1.6; long-form 18px / 1.75.
 - **Titling — Cinzel** (`--font-titling`): uppercase eyebrows/kickers (tracking `0.22em`), timeline markers, anniversary titles. **Never body text.**
 
-Fonts load from Google Fonts via `@import` in `tokens/fonts.css` (Cormorant Garamond, Inter, Cinzel). Self-host in production if preferred.
+Fonts load from local Latin WOFF2 subsets in `tokens/fonts.css` (Cormorant Garamond, Inter, Cinzel) with `font-display: swap`.
 
 Type scale: display `--fs-display-1..4` = 80 / 56 / 40 / 30px; body `--fs-lead` 21 · `--fs-body` 17 · `--fs-sm` 15 · `--fs-xs` 13; `--fs-eyebrow` 12px.
 
