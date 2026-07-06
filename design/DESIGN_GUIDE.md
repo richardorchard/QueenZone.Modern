@@ -103,7 +103,7 @@ No bespoke icon set was provided in the brief. The system uses **[Lucide](https:
 
 **Root**
 - `styles.css` — global entry point (consumers link this); `@import`s only.
-- `tokens/` — `fonts.css` (Google Fonts), `colors.css`, `typography.css`, `spacing.css`, `base.css` (element + editorial primitives).
+- `tokens/` — `fonts.css` (local WOFF2 fonts), `colors.css`, `typography.css`, `spacing.css`, `base.css` (element + editorial primitives).
 - `readme.md` — this guide. · `SKILL.md` — Agent-Skill wrapper.
 - `assets/` — crest variants (`crest-black/white/silver/lineart.png`), `crest-evolution.png`, monochrome placeholder imagery (`img-*.jpg`).
 
@@ -116,4 +116,4 @@ No bespoke icon set was provided in the brief. The system uses **[Lucide](https:
 
 **UI kit** (`ui_kits/website/`) — the Queenzone site: multi-page desktop click-through (`index.html` — home, news, articles, photography gallery + lightbox, timeline, article view) and a mobile showcase (`mobile.html` — four iPhone screens). Distinct dark/light section rhythm. See its `README.md`.
 
-> Fonts ship via a Google Fonts `@import` (Cormorant Garamond, Inter, Cinzel) rather than self-hosted binaries — the compiler reports 0 self-hosted fonts, which is expected.
+> Fonts ship via local WOFF2 subsets (Cormorant Garamond, Inter, Cinzel) with `font-display: swap`.
