@@ -183,16 +183,11 @@
 
 // ── Homepage archive hero — era montage ──────────────────────────────────────
 (() => {
-  const ERAS = [
-    { year: "1999", img: "/assets/eras/queenzone-1999.png", label: "The Queen Internet Zone", glow: "#c81e2e" },
-    { year: "2000", img: "/assets/eras/queenzone-2000.png", label: "Queen Internet Zone",     glow: "#3c4a5a" },
-    { year: "2002", img: "/assets/eras/queenzone-2002.png", label: "www.queenzone.com",       glow: "#9c1414" },
-    { year: "2004", img: "/assets/eras/queenzone-2004.png", label: "Queenzone.com",           glow: "#1668ad" },
-    { year: "2020", img: "/assets/eras/queenzone-2020.png", label: "QUEENZONE.COM",           glow: "#8b95a1" },
-  ];
+  const configEl = document.getElementById("qz-era-config");
+  const ERAS = configEl ? JSON.parse(configEl.textContent) : [];
 
   const hero    = document.getElementById("qz-hero-archive");
-  if (!hero) return;
+  if (!hero || ERAS.length === 0) return;
 
   const glowEl  = document.getElementById("qz-era-glow");
   const labelEl = document.getElementById("qz-era-label");

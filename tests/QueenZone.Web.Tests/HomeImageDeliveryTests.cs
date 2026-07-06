@@ -20,10 +20,10 @@ public sealed class HomeImageDeliveryTests : IClassFixture<WebApplicationFactory
         var body = await client.GetStringAsync("/");
 
         Assert.Contains("type=\"image/webp\"", body);
-        Assert.Contains("/design-system/assets/img-portrait.webp", body);
-        Assert.Contains("/design-system/assets/img-crowd.webp", body);
-        Assert.Contains("/design-system/assets/img-stage.webp", body);
-        Assert.Contains("/design-system/assets/img-studio.webp", body);
+        Assert.Contains("img-portrait.webp?v=", body);
+        Assert.Contains("img-crowd.webp?v=", body);
+        Assert.Contains("img-stage.webp?v=", body);
+        Assert.Contains("img-studio.webp?v=", body);
         Assert.Contains("loading=\"lazy\"", body);
         Assert.Contains("fetchpriority=\"high\"", body);
     }
@@ -34,9 +34,9 @@ public sealed class HomeImageDeliveryTests : IClassFixture<WebApplicationFactory
         var client = factory.CreateClient();
         var body = await client.GetStringAsync("/");
 
-        Assert.Contains("/design-system/assets/img-portrait.jpg", body);
-        Assert.Contains("/design-system/assets/img-crowd.jpg", body);
-        Assert.Contains("/design-system/assets/img-stage.jpg", body);
-        Assert.Contains("/design-system/assets/img-studio.jpg", body);
+        Assert.Contains("img-portrait.jpg?v=", body);
+        Assert.Contains("img-crowd.jpg?v=", body);
+        Assert.Contains("img-stage.jpg?v=", body);
+        Assert.Contains("img-studio.jpg?v=", body);
     }
 }
