@@ -14,6 +14,13 @@ public sealed class InMemoryQueenHistoryRepository(IReadOnlyList<QueenHistoryEve
         return Task.FromResult(QueenHistoryEventOrdering.ForHomepage(matches, count));
     }
 
+    public Task<IReadOnlyList<QueenHistoryEvent>> GetAllPublishedAsync(
+        CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<QueenHistoryEvent> result = events.Where(e => e.IsPublished).ToList();
+        return Task.FromResult(result);
+    }
+
     public Task<IReadOnlyList<QueenHistoryEvent>> GetAroundThisDayAsync(
         DateOnly date,
         int dayWindow,

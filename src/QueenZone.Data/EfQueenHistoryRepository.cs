@@ -42,6 +42,25 @@ public sealed class EfQueenHistoryRepository(QueenZoneDbContext dbContext) : IQu
         return matches;
     }
 
+    public async Task<IReadOnlyList<QueenHistoryEvent>> GetAllPublishedAsync(
+        CancellationToken cancellationToken = default) =>
+        await dbContext.QueenHistoryEvents
+            .AsNoTracking()
+            .Where(item => item.IsPublished)
+            .Select(item => new QueenHistoryEvent(
+                item.Id,
+                item.Title,
+                item.Summary,
+                item.EventDate,
+                item.DatePrecision,
+                item.Category,
+                item.Importance,
+                item.SourceType,
+                item.SourceKey,
+                item.SourceUrl,
+                item.IsPublished))
+            .ToListAsync(cancellationToken);
+
     private async Task<IReadOnlyList<QueenHistoryEvent>> GetPublishedExactEventsAsync(CancellationToken cancellationToken) =>
         await dbContext.QueenHistoryEvents
             .AsNoTracking()
