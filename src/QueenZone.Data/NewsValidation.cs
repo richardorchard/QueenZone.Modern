@@ -6,6 +6,8 @@ public static partial class NewsValidation
 {
     public const int MaxTitleLength = 150;
 
+    public const int MaxExcerptLength = 800;
+
     public const int MaxSourceUrlLength = 500;
 
     public static IReadOnlyList<string> ValidateDraft(AdminNewsDraft draft, bool slugInUse)
@@ -24,6 +26,10 @@ public static partial class NewsValidation
         if (string.IsNullOrWhiteSpace(draft.Excerpt))
         {
             errors.Add("Excerpt is required.");
+        }
+        else if (draft.Excerpt.Length > MaxExcerptLength)
+        {
+            errors.Add($"Excerpt must be {MaxExcerptLength} characters or fewer.");
         }
 
         if (draft.PublishedAt == default)
