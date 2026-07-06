@@ -40,6 +40,24 @@ Only `ExactDate` and `IsPublished = true` rows are eligible for the homepage.
 6. Review uncertain records in batches before flipping `IsPublished`.
 7. Add source URLs or editorial notes for high-importance records.
 
+## Import Command
+
+The first curated batch lives at `data/queen_history_events.csv`.
+
+Validate the CSV without touching a database:
+
+```powershell
+powershell -File .\scripts\Import-QueenHistoryEvents.ps1 -CsvPath .\data\queen_history_events.csv -DryRun
+```
+
+Import or update rows in SQL Server:
+
+```powershell
+powershell -File .\scripts\Import-QueenHistoryEvents.ps1 -CsvPath .\data\queen_history_events.csv -ConnectionString "<connection string>"
+```
+
+The importer upserts by `SourceType + SourceKey`, so it is safe to rerun after correcting titles, summaries, dates, importance, or source URLs.
+
 ## Validation
 
 - Count source rows, imported rows, published rows, and skipped rows.

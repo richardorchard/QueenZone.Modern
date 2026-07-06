@@ -29,8 +29,8 @@ public sealed class HomeOnThisDayTests : IClassFixture<WebApplicationFactory<Pro
         var body = await client.GetStringAsync("/");
 
         Assert.Contains("This Day in Queen History", body);
-        Assert.Contains("Queen perform at Live Aid", body);
-        Assert.Contains("Queen release their debut album", body);
+        Assert.Contains("Queen&#x27;s Live Aid performance", body);
+        Assert.Contains("Queen released", body);
         Assert.Contains("<time datetime=\"1985-07-13\">13 Jul 1985</time>", body);
         Assert.DoesNotContain("nearby dates", body);
     }
@@ -49,7 +49,7 @@ public sealed class HomeOnThisDayTests : IClassFixture<WebApplicationFactory<Pro
         var body = await client.GetStringAsync("/");
 
         Assert.Contains("nearby dates from the archive", body);
-        Assert.Contains("Queen perform at Live Aid", body);
+        Assert.Contains("Queen&#x27;s Live Aid performance", body);
     }
 
     private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider

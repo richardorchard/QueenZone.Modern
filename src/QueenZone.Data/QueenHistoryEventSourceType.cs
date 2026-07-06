@@ -7,4 +7,5 @@ public enum QueenHistoryEventSourceType
     LegacyTourDate,
     Discography,
     Curated,
+    Wikipedia,
 }
