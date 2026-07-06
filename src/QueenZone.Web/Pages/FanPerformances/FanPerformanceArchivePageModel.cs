@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using QueenZone.Data;
@@ -6,7 +7,7 @@ namespace QueenZone.Web.Pages.FanPerformances;
 
 public abstract class FanPerformanceArchivePageModel(IFanPerformanceRepository fanPerformanceRepository) : PageModel
 {
-    public IReadOnlyList<FanPerformance> Items { get; private set; } = [];
+    public FanPerformanceListViewModel PerformanceList { get; private set; } = FanPerformanceListViewModel.Empty;
 
     public int CurrentPage { get; private set; }
 
@@ -41,7 +42,7 @@ public abstract class FanPerformanceArchivePageModel(IFanPerformanceRepository f
             return NotFound();
         }
 
-        Items = items;
+        PerformanceList = await BuildPerformanceListAsync(items, page, cancellationToken);
         CurrentPage = page;
         TotalPages = totalPages;
         Breadcrumbs = [BreadcrumbItem.Home, new BreadcrumbItem("Fan Performances", FanPerformanceRoutes.GetIndexPath())];
@@ -50,5 +51,27 @@ public abstract class FanPerformanceArchivePageModel(IFanPerformanceRepository f
         ViewData["CanonicalPath"] = FanPerformanceRoutes.GetPagePath(page);
 
         return Page();
+    }
+
+    private async Task<FanPerformanceListViewModel> BuildPerformanceListAsync(
+        IReadOnlyList<FanPerformance> items,
+        int page,
+        CancellationToken cancellationToken)
+    {
+        var memberAuth = await HttpContext.AuthenticateAsync(MemberAuthenticationSchemes.MembersCookie);
+        var isSignedIn = memberAuth.Succeeded;
+        var loginReturnUrl = FanPerformanceRoutes.GetPagePath(page);
+
+        var listItems = items
+            .Select(performance => new FanPerformanceListItem(
+                performance.Id,
+                performance.Title,
+                performance.PerformedBy,
+                performance.Description,
+                performance.DateAdded,
+                isSignedIn ? FanPerformanceRoutes.GetAudioPath(performance.Id) : null))
+            .ToList();
+
+        return new FanPerformanceListViewModel(listItems, loginReturnUrl);
     }
 }
