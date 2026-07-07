@@ -52,4 +52,15 @@ public sealed class MemberAuthenticationTests : IClassFixture<WebApplicationFact
         Assert.Contains("Sign in to QueenZone", body);
     }
 
+    [Fact]
+    public async Task AnonymousHeaderRendersMobileLoginAction()
+    {
+        var client = factory.CreateClient();
+
+        var body = await client.GetStringAsync("/");
+
+        Assert.Contains("class=\"qz-mobile-account\"", body);
+        Assert.Contains("class=\"qz-masthead__signin qz-masthead__signin--mobile\" href=\"/account/login\"", body);
+    }
+
 }

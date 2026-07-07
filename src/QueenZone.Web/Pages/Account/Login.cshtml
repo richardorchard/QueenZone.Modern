@@ -5,6 +5,10 @@
 
 <section class="qz-section">
   <div class="qz-container qz-prose">
+    @if (Model.ShowSignedOutMessage)
+    {
+      <p class="qz-account-notice">You have been signed out of QueenZone.</p>
+    }
     <div class="qz-account-providers">
       @if (Model.GoogleEnabled)
       {

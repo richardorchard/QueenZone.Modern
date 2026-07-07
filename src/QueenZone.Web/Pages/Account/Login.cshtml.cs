@@ -6,5 +6,12 @@ public sealed class LoginModel(IOptions<MemberAuthenticationOptions> memberAuthe
 {
     public string ReturnUrl { get; private set; } = "/";
 
-    public void OnGet(string? returnUrl) => ReturnUrl = ResolveReturnUrl(returnUrl);
+    public bool ShowSignedOutMessage { get; private set; }
+
+    public void OnGet(string? returnUrl, string? signedOut = null)
+    {
+        ReturnUrl = ResolveReturnUrl(returnUrl);
+        ShowSignedOutMessage = string.Equals(signedOut, "1", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(signedOut, "true", StringComparison.OrdinalIgnoreCase);
+    }
 }

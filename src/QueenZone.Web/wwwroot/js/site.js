@@ -12,6 +12,10 @@
   let closeTimer = 0;
   let lastFocus = null;
 
+  if (menu && menu.parentElement !== document.body) {
+    document.body.appendChild(menu);
+  }
+
   const setScrolled = () => {
     masthead.classList.toggle("is-scrolled", window.scrollY > 12);
   };
