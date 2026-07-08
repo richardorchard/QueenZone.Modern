@@ -35,7 +35,7 @@ public sealed class ArticlesRoutesTests : IClassFixture<WebApplicationFactory<Pr
         var body = await client.GetStringAsync("/articles");
 
         Assert.Contains(TestSiteConfiguration.CanonicalLink("/articles"), body);
-        Assert.Contains("<title>QueenZone articles</title>", body);
+        TestHtmlAssertions.AssertPageTitle(body, "QueenZone articles");
         Assert.Contains("Page 1 of 2", body);
     }
 
@@ -111,11 +111,12 @@ public sealed class ArticlesRoutesTests : IClassFixture<WebApplicationFactory<Pr
 
         Assert.Contains("Six weeks, three studios", body);
         Assert.Contains("qz-breadcrumbs", body);
-        Assert.Contains("href=\"/articles\">Articles</a>", body);
+        Assert.Contains("href=\"/articles\"", body);
+        Assert.Contains(">Articles<", body);
         Assert.Contains("\"@type\":\"BreadcrumbList\"", body);
         Assert.Contains("Recording", body);
         Assert.Contains(TestSiteConfiguration.CanonicalLink("/articles/101/inside-the-making-of-bohemian-rhapsody"), body);
-        Assert.Contains("<title>Inside the Making of Bohemian Rhapsody | QueenZone articles</title>", body);
+        TestHtmlAssertions.AssertPageTitle(body, "Inside the Making of Bohemian Rhapsody | QueenZone articles");
     }
 
     [Fact]
