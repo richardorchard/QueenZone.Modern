@@ -129,6 +129,24 @@ public sealed partial class AdminNewsRoutesTests : IClassFixture<WebApplicationF
     }
 
     [Fact]
+    public async Task CreatePostWithoutAntiforgeryTokenReturnsBadRequest()
+    {
+        var client = CreateClient(AdminEmail, new SharedNewsStore());
+
+        var response = await client.PostAsync(
+            "/admin/news",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["title"] = "Missing token article",
+                ["excerpt"] = "Missing token excerpt",
+                ["body"] = "Missing token body",
+                ["publishedAt"] = "2026-06-14"
+            }));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
     public async Task DuplicateSlugIsRejected()
     {
         var store = new SharedNewsStore(
