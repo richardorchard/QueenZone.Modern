@@ -116,7 +116,7 @@ public sealed class NewsDiscoveryServiceTests
     {
         var sources = NewsDiscoverySourceSeeder.LoadSeedSources();
 
-        Assert.True(sources.Count >= 15);
+        Assert.Equal(15, sources.Count);
         Assert.Contains(sources, source => source.Key == "queen-online" && source.SourceType == NewsDiscoverySourceType.AllowlistedPage);
         Assert.Contains(sources, source => source.Key == "roger-taylor" && source.SourceType == NewsDiscoverySourceType.Rss);
         Assert.Contains(sources, source => source.Key == "brian-may" && source.FeedOrSiteUrl == "https://brianmay.com/feed/");
@@ -131,10 +131,13 @@ public sealed class NewsDiscoveryServiceTests
     public async Task SeedAsync_upserts_embedded_registry_sources()
     {
         var repository = new InMemoryNewsDiscoveryRepository(new SharedNewsDiscoveryStore());
+        var expectedSourceCount = NewsDiscoverySourceSeeder.LoadSeedSources().Count;
 
         var seeded = await NewsDiscoverySourceSeeder.SeedAsync(repository);
+        var storedSources = await repository.GetSourcesAsync();
 
-        Assert.True(seeded >= 10);
+        Assert.Equal(expectedSourceCount, seeded);
+        Assert.Equal(expectedSourceCount, storedSources.Count);
         Assert.NotNull(await repository.GetSourceByKeyAsync("queen-online"));
     }
 
@@ -142,6 +145,7 @@ public sealed class NewsDiscoveryServiceTests
     public async Task RunFetchAsync_with_seed_sources_upserts_registry_before_fetch()
     {
         var repository = new InMemoryNewsDiscoveryRepository(new SharedNewsDiscoveryStore());
+        var expectedCheckedSources = NewsDiscoverySourceSeeder.LoadSeedSources().Count(source => source.Enabled);
         var service = NewsAgentTestSupport.CreateDiscoveryService(
             repository,
             new FakeNewsDiscoveryHttpClient(new Dictionary<string, string>()));
@@ -149,7 +153,9 @@ public sealed class NewsDiscoveryServiceTests
         var result = await service.RunFetchAsync(new NewsDiscoveryRunOptions(SeedSources: true, Force: true));
 
         Assert.NotNull(await repository.GetSourceByKeyAsync("queen-online"));
-        Assert.True(result.SourcesChecked >= 1);
+        Assert.Equal(expectedCheckedSources, result.SourcesChecked);
+        Assert.Equal(expectedCheckedSources, result.Failures);
+        Assert.Equal(expectedCheckedSources, result.Errors.Count);
     }
 
     [Fact]
