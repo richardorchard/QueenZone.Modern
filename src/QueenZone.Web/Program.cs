@@ -192,6 +192,7 @@ app.MapRazorPages();
 
 app.Run();
 
+[System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
 static void ConfigureApplicationInsights(WebApplicationBuilder builder)
 {
     if (builder.Environment.IsEnvironment("Testing"))
