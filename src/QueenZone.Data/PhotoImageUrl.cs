@@ -51,7 +51,8 @@ public static class PhotoImageUrl
     {
         container = string.Empty;
         blobName = string.Empty;
-        if (!Uri.TryCreate(publicUrl, UriKind.Absolute, out var uri))
+        if (!Uri.TryCreate(publicUrl, UriKind.Absolute, out var uri) ||
+            (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
         {
             return false;
         }

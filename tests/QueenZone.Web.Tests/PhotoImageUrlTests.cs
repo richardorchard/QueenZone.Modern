@@ -55,6 +55,7 @@ public sealed class PhotoImageUrlTests
     [Theory]
     [InlineData("")]
     [InlineData("not-a-url")]
+    [InlineData("/Multimedia/photo.jpg")]
     [InlineData("https://queenzone.blob.core.windows.net/only-container")]
     public void TryParseBlobLocation_RejectsInvalidUrls(string url)
     {
