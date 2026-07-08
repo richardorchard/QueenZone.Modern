@@ -1,5 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using QueenZone.Data;
+using QueenZone.Tools;
+
+if (args.Length > 0 && string.Equals(args[0], "check-photos", StringComparison.OrdinalIgnoreCase))
+{
+    return await CheckPhotosCommand.RunAsync(args[1..]);
+}
 
 var options = ImportOptions.Parse(args);
 if (!options.IsValid)
