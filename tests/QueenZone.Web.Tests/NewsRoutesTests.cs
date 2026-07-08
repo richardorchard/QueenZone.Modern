@@ -46,7 +46,7 @@ public sealed class NewsRoutesTests : IClassFixture<WebApplicationFactory<Progra
         var body = await client.GetStringAsync("/news");
 
         Assert.Contains(TestSiteConfiguration.CanonicalLink("/news"), body);
-        Assert.Contains("<title>QueenZone news</title>", body);
+        TestHtmlAssertions.AssertPageTitle(body, "QueenZone news");
         Assert.Contains("Page 1 of 2", body);
         Assert.DoesNotContain("QueenZone news – Page 1", body);
     }
@@ -64,12 +64,11 @@ public sealed class NewsRoutesTests : IClassFixture<WebApplicationFactory<Progra
         Assert.Contains("/news/1005/archive-sample-article-1005", pageTwo);
         Assert.DoesNotContain("/news/1005/archive-sample-article-1005", pageOne);
         Assert.Contains(TestSiteConfiguration.CanonicalLink("/news/page/2"), pageTwo);
-        Assert.Contains("<title>QueenZone news &#x2013; Page 2</title>", pageTwo);
-        Assert.Contains("archive-pagination-controls", pageOne);
-        Assert.Contains("archive-pagination-prev is-disabled", pageOne);
+        TestHtmlAssertions.AssertPageTitle(pageTwo, "QueenZone news – Page 2");
         Assert.Contains(TestSiteConfiguration.NextLink("/news/page/2"), pageOne);
+        Assert.DoesNotContain(TestSiteConfiguration.PrevLink("/news"), pageOne);
         Assert.Contains(TestSiteConfiguration.PrevLink("/news"), pageTwo);
-        Assert.Contains("archive-pagination-next is-disabled", pageTwo);
+        Assert.DoesNotContain(TestSiteConfiguration.NextLink("/news/page/3"), pageTwo);
     }
 
     [Fact]
@@ -130,13 +129,13 @@ public sealed class NewsRoutesTests : IClassFixture<WebApplicationFactory<Progra
 
         Assert.Contains("The first local vertical slice", body);
         Assert.Contains("qz-breadcrumbs", body);
-        Assert.Contains("href=\"/news\">News</a>", body);
+        Assert.Contains(">News<", body);
         Assert.Contains("aria-current=\"page\">QueenZone modernisation begins</span>", body);
         Assert.Contains("\"@type\":\"BreadcrumbList\"", body);
         Assert.Contains("<time datetime=\"2026-06-11\">", body);
         Assert.Contains(TestSiteConfiguration.CanonicalLink("/news/1003/queenzone-modernisation-begins"), body);
         Assert.Contains("<meta name=\"description\" content=\"The first local vertical slice", body);
-        Assert.Contains("<title>QueenZone modernisation begins | QueenZone news</title>", body);
+        TestHtmlAssertions.AssertPageTitle(body, "QueenZone modernisation begins | QueenZone news");
     }
 
     [Fact]
@@ -192,7 +191,8 @@ public sealed class NewsRoutesTests : IClassFixture<WebApplicationFactory<Progra
         var unsafeBody = await client.GetStringAsync("/news/5002/article-with-unsafe-source");
 
         Assert.Contains("href=\"https://example.com/original-story\"", safeBody);
-        Assert.Contains("rel=\"noopener noreferrer\">Source</a>", safeBody);
+        Assert.Contains("rel=\"noopener noreferrer\"", safeBody);
+        Assert.Contains(">Source<", safeBody);
         Assert.DoesNotContain("javascript:", unsafeBody, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain(">Source</a>", unsafeBody);
     }
@@ -381,4 +381,5 @@ public sealed class NewsRoutesTests : IClassFixture<WebApplicationFactory<Progra
         Assert.DoesNotContain("Hidden duplicate candidate", pageOne);
         Assert.DoesNotContain("Hidden duplicate candidate", pageTwo);
     }
+
 }

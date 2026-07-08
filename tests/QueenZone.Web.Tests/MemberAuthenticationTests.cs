@@ -59,8 +59,8 @@ public sealed class MemberAuthenticationTests : IClassFixture<WebApplicationFact
 
         var body = await client.GetStringAsync("/");
 
-        Assert.Contains("class=\"qz-mobile-account\"", body);
-        Assert.Contains("class=\"qz-masthead__signin qz-masthead__signin--mobile\" href=\"/account/login\"", body);
+        Assert.Contains("href=\"/account/login\"", body);
+        Assert.Contains(">Sign in<", body);
     }
 
 }

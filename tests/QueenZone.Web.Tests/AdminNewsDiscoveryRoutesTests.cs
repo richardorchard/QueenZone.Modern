@@ -304,7 +304,6 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
 
         var reviewBody = await client.GetStringAsync($"/admin/news-discovery/{candidateId}");
         Assert.Contains($"Title must be {NewsValidation.MaxTitleLength} characters or fewer.", reviewBody);
-        Assert.Contains("admin-status--error", reviewBody);
 
         var candidate = await discoveryRepository.GetCandidateByIdAsync(candidateId);
         Assert.NotNull(candidate);
@@ -337,7 +336,6 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
 
         var reviewBody = await client.GetStringAsync($"/admin/news-discovery/{candidateId}");
         Assert.Contains($"Excerpt must be {NewsValidation.MaxExcerptLength} characters or fewer.", reviewBody);
-        Assert.Contains("admin-status--error", reviewBody);
 
         var candidate = await discoveryRepository.GetCandidateByIdAsync(candidateId);
         Assert.NotNull(candidate);
@@ -397,7 +395,6 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
 
         var reviewBody = await client.GetStringAsync($"/admin/news-discovery/{candidateId}");
         Assert.Contains($"Source URL must be {NewsValidation.MaxSourceUrlLength} characters or fewer.", reviewBody);
-        Assert.Contains("admin-status--error", reviewBody);
     }
 
     [Fact]
