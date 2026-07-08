@@ -16,6 +16,7 @@
 - [ ] `dotnet build QueenZone.sln --configuration Release --no-restore`
 - [ ] `dotnet test QueenZone.sln --configuration Release --no-build`
 - [ ] Coverage gate passed locally (`scripts/Test-CoverageGate.ps1` with `-BaseRef origin/main`; see `AGENTS.md`)
+- [ ] Route/page tests avoid brittle CSS class or exact markup assertions unless markup shape is the contract
 
 ## Legacy database checks
 

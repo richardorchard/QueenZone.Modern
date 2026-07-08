@@ -57,6 +57,26 @@ Admin editorial routes also have a second HTTP integration layer that wires `EfA
 
 Negative antiforgery coverage belongs in the default HTTP integration suite: at least one admin news action and one discovery action should return `400` when `__RequestVerificationToken` is missing.
 
+#### Behavior-first HTML assertions
+
+For route/page integration tests, prefer assertions that change only when behavior changes.
+
+- Prefer status codes, redirect targets, canonical links, and user-visible domain text.
+- Prefer model/repository state checks after POST actions when possible.
+- Avoid assertions on CSS class names unless the class itself is a product contract.
+- Avoid exact raw markup snapshots for common tags (`<title>`, exact anchor shape, container `<div>` structures).
+- If structure matters, parse and assert semantically (or use a shared helper) instead of brittle raw string fragments.
+
+Examples:
+
+- Avoid: `Assert.Contains("archive-pagination-prev is-disabled", body);`
+- Prefer: `Assert.DoesNotContain(TestSiteConfiguration.PrevLink("/news"), pageOne);`
+
+- Avoid: `Assert.Contains("<title>QueenZone news &#x2013; Page 2</title>", body);`
+- Prefer: `TestHtmlAssertions.AssertPageTitle(body, "QueenZone news – Page 2");`
+
+Exception: exact markup assertions are still appropriate when markup sanitization or security output is the contract under test (for example, ensuring disallowed attributes are stripped).
+
 ### Data Integration Tests
 
 Use data integration tests for the real restored legacy SQL Server database. These are opt-in unless a controlled test database is available in CI.
