@@ -48,7 +48,7 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
         var newsStore = new SharedNewsStore();
         var discoveryStore = new SharedNewsDiscoveryStore();
         var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
-        var candidateId = await SeedDraftedCandidateAsync(discoveryRepository);
+        var candidateId = await NewsDiscoveryTestSeeder.SeedDraftedCandidateAsync(discoveryRepository);
         var client = CreateClient(AdminEmail, newsStore, discoveryStore);
 
         var queueBody = await client.GetStringAsync("/admin/news-discovery?status=Drafted");
@@ -93,7 +93,7 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
         var newsStore = new SharedNewsStore();
         var discoveryStore = new SharedNewsDiscoveryStore();
         var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
-        var candidateId = await SeedDraftedCandidateAsync(discoveryRepository);
+        var candidateId = await NewsDiscoveryTestSeeder.SeedDraftedCandidateAsync(discoveryRepository);
         var client = CreateClient(AdminEmail, newsStore, discoveryStore);
 
         var promoteResponse = await PostActionAsync(client, $"/admin/news-discovery/{candidateId}/promote", candidateId);
@@ -112,7 +112,7 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
     {
         var discoveryStore = new SharedNewsDiscoveryStore();
         var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
-        var candidateId = await SeedDraftedCandidateAsync(discoveryRepository);
+        var candidateId = await NewsDiscoveryTestSeeder.SeedDraftedCandidateAsync(discoveryRepository);
         var client = CreateClient(AdminEmail, new SharedNewsStore(), discoveryStore);
 
         var response = await PostActionAsync(client, $"/admin/news-discovery/{candidateId}/regeneratedraft", candidateId);
@@ -132,7 +132,7 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
     {
         var discoveryStore = new SharedNewsDiscoveryStore();
         var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
-        var candidateId = await SeedDraftedCandidateAsync(discoveryRepository);
+        var candidateId = await NewsDiscoveryTestSeeder.SeedDraftedCandidateAsync(discoveryRepository);
         var client = CreateClient(
             AdminEmail,
             new SharedNewsStore(),
@@ -152,7 +152,14 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
     {
         var discoveryStore = new SharedNewsDiscoveryStore();
         var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
-        var candidateId = await SeedNeedsReviewCandidateAsync(discoveryRepository);
+        var candidateId = await NewsDiscoveryTestSeeder.SeedNeedsReviewCandidateAsync(
+            discoveryRepository,
+            canonicalUrl: "https://www.queenonline.com/news/reject-candidate",
+            title: "Reject me",
+            excerpt: "Excerpt",
+            sourceFeedOrSiteUrl: null,
+            relevanceScore: null,
+            confidenceScore: null);
         await discoveryRepository.TryUpdateCandidateStatusAsync(
             candidateId,
             new NewsCandidateStatusUpdate(NewsCandidateStatus.Rejected));
@@ -170,7 +177,7 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
     {
         var discoveryStore = new SharedNewsDiscoveryStore();
         var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
-        var candidateId = await SeedDraftedCandidateAsync(discoveryRepository);
+        var candidateId = await NewsDiscoveryTestSeeder.SeedDraftedCandidateAsync(discoveryRepository);
         var client = CreateClient(
             AdminEmail,
             new SharedNewsStore(),
@@ -189,7 +196,7 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
     {
         var discoveryStore = new SharedNewsDiscoveryStore();
         var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
-        var candidateId = await SeedDraftedCandidateAsync(discoveryRepository);
+        var candidateId = await NewsDiscoveryTestSeeder.SeedDraftedCandidateAsync(discoveryRepository);
         var client = CreateClient(
             AdminEmail,
             new SharedNewsStore(),
@@ -208,7 +215,7 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
     {
         var discoveryStore = new SharedNewsDiscoveryStore();
         var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
-        var candidateId = await SeedDraftedCandidateAsync(discoveryRepository);
+        var candidateId = await NewsDiscoveryTestSeeder.SeedDraftedCandidateAsync(discoveryRepository);
         var client = CreateClient(AdminEmail, new SharedNewsStore(), discoveryStore);
         var reviewPage = await client.GetStringAsync($"/admin/news-discovery/{candidateId}");
         var token = ExtractAntiforgeryToken(reviewPage);
@@ -243,7 +250,14 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
     {
         var discoveryStore = new SharedNewsDiscoveryStore();
         var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
-        var candidateId = await SeedNeedsReviewCandidateAsync(discoveryRepository);
+        var candidateId = await NewsDiscoveryTestSeeder.SeedNeedsReviewCandidateAsync(
+            discoveryRepository,
+            canonicalUrl: "https://www.queenonline.com/news/reject-candidate",
+            title: "Reject me",
+            excerpt: "Excerpt",
+            sourceFeedOrSiteUrl: null,
+            relevanceScore: null,
+            confidenceScore: null);
         var client = CreateClient(AdminEmail, new SharedNewsStore(), discoveryStore);
 
         var rejectResponse = await PostActionAsync(client, $"/admin/news-discovery/{candidateId}/reject", candidateId);
@@ -259,7 +273,7 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
     {
         var discoveryStore = new SharedNewsDiscoveryStore();
         var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
-        var (firstId, secondId) = await SeedDuplicatePairAsync(discoveryRepository);
+        var (firstId, secondId) = await NewsDiscoveryTestSeeder.SeedDuplicatePairAsync(discoveryRepository);
         var client = CreateClient(AdminEmail, new SharedNewsStore(), discoveryStore);
 
         var ignoreResponse = await PostActionAsync(client, $"/admin/news-discovery/{secondId}/ignoreduplicate", secondId);
@@ -277,7 +291,7 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
         var newsStore = new SharedNewsStore();
         var discoveryStore = new SharedNewsDiscoveryStore();
         var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
-        var candidateId = await SeedNeedsReviewCandidateWithDraftAsync(discoveryRepository);
+        var candidateId = await NewsDiscoveryTestSeeder.SeedNeedsReviewCandidateWithDraftAsync(discoveryRepository);
         var client = CreateClient(AdminEmail, newsStore, discoveryStore);
 
         var promoteResponse = await PostActionAsync(client, $"/admin/news-discovery/{candidateId}/promote", candidateId);
@@ -300,7 +314,7 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
         var newsStore = new SharedNewsStore();
         var discoveryStore = new SharedNewsDiscoveryStore();
         var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
-        var candidateId = await SeedDraftedCandidateAsync(discoveryRepository);
+        var candidateId = await NewsDiscoveryTestSeeder.SeedDraftedCandidateAsync(discoveryRepository);
         await discoveryRepository.UpsertDraftAsync(candidateId, new NewsAgentDraftUpsert(
             new string('x', NewsValidation.MaxTitleLength + 1),
             "overlong-title",
@@ -332,7 +346,7 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
         var newsStore = new SharedNewsStore();
         var discoveryStore = new SharedNewsDiscoveryStore();
         var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
-        var candidateId = await SeedDraftedCandidateAsync(discoveryRepository);
+        var candidateId = await NewsDiscoveryTestSeeder.SeedDraftedCandidateAsync(discoveryRepository);
         await discoveryRepository.UpsertDraftAsync(candidateId, new NewsAgentDraftUpsert(
             "Draft title",
             "draft-title",
@@ -418,7 +432,7 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
         var newsStore = new SharedNewsStore();
         var discoveryStore = new SharedNewsDiscoveryStore();
         var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
-        var candidateId = await SeedDraftedCandidateAsync(discoveryRepository);
+        var candidateId = await NewsDiscoveryTestSeeder.SeedDraftedCandidateAsync(discoveryRepository);
         await discoveryRepository.UpsertDraftAsync(candidateId, new NewsAgentDraftUpsert(
             "Draft title with verbose generated slug",
             new string('a', NewsSlug.MaxLength + 50),
@@ -448,7 +462,7 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
     {
         var discoveryStore = new SharedNewsDiscoveryStore();
         var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
-        var candidateId = await SeedNeedsReviewCandidateWithDraftAsync(discoveryRepository);
+        var candidateId = await NewsDiscoveryTestSeeder.SeedNeedsReviewCandidateWithDraftAsync(discoveryRepository);
         var client = CreateClient(AdminEmail, new SharedNewsStore(), discoveryStore);
 
         var editPage = await client.GetStringAsync($"/admin/news-discovery/{candidateId}/edit-draft");
@@ -485,7 +499,7 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
     {
         var discoveryStore = new SharedNewsDiscoveryStore();
         var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
-        var candidateId = await SeedNeedsReviewCandidateWithDraftAsync(discoveryRepository);
+        var candidateId = await NewsDiscoveryTestSeeder.SeedNeedsReviewCandidateWithDraftAsync(discoveryRepository);
         var client = CreateClient(AdminEmail, new SharedNewsStore(), discoveryStore);
 
         var response = await PostDraftEditAsync(
@@ -522,7 +536,14 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
     {
         var discoveryStore = new SharedNewsDiscoveryStore();
         var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
-        var candidateId = await SeedNeedsReviewCandidateAsync(discoveryRepository);
+        var candidateId = await NewsDiscoveryTestSeeder.SeedNeedsReviewCandidateAsync(
+            discoveryRepository,
+            canonicalUrl: "https://www.queenonline.com/news/reject-candidate",
+            title: "Reject me",
+            excerpt: "Excerpt",
+            sourceFeedOrSiteUrl: null,
+            relevanceScore: null,
+            confidenceScore: null);
         var client = CreateClient(AdminEmail, new SharedNewsStore(), discoveryStore);
         var reviewPage = await client.GetStringAsync($"/admin/news-discovery/{candidateId}");
         var token = ExtractAntiforgeryToken(reviewPage);
@@ -542,7 +563,14 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
     {
         var discoveryStore = new SharedNewsDiscoveryStore();
         var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
-        var candidateId = await SeedNeedsReviewCandidateAsync(discoveryRepository);
+        var candidateId = await NewsDiscoveryTestSeeder.SeedNeedsReviewCandidateAsync(
+            discoveryRepository,
+            canonicalUrl: "https://www.queenonline.com/news/reject-candidate",
+            title: "Reject me",
+            excerpt: "Excerpt",
+            sourceFeedOrSiteUrl: null,
+            relevanceScore: null,
+            confidenceScore: null);
         var client = CreateClient(AdminEmail, new SharedNewsStore(), discoveryStore);
 
         await PostActionAsync(client, $"/admin/news-discovery/{candidateId}/reject", candidateId);
@@ -557,7 +585,14 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
     {
         var discoveryStore = new SharedNewsDiscoveryStore();
         var inner = new InMemoryNewsDiscoveryRepository(discoveryStore);
-        var candidateId = await SeedNeedsReviewCandidateAsync(inner);
+        var candidateId = await NewsDiscoveryTestSeeder.SeedNeedsReviewCandidateAsync(
+            inner,
+            canonicalUrl: "https://www.queenonline.com/news/reject-candidate",
+            title: "Reject me",
+            excerpt: "Excerpt",
+            sourceFeedOrSiteUrl: null,
+            relevanceScore: null,
+            confidenceScore: null);
         var discoveryRepository = new ConfigurableNewsDiscoveryRepository(inner)
         {
             TryUpdateCandidateStatusHandler = (id, update, ct) =>
@@ -579,7 +614,7 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
     {
         var discoveryStore = new SharedNewsDiscoveryStore();
         var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
-        var (_, secondId) = await SeedDuplicatePairAsync(discoveryRepository);
+        var (_, secondId) = await NewsDiscoveryTestSeeder.SeedDuplicatePairAsync(discoveryRepository);
         await discoveryRepository.TryUpdateCandidateStatusAsync(
             secondId,
             new NewsCandidateStatusUpdate(
@@ -599,7 +634,14 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
     {
         var discoveryStore = new SharedNewsDiscoveryStore();
         var inner = new InMemoryNewsDiscoveryRepository(discoveryStore);
-        var candidateId = await SeedNeedsReviewCandidateAsync(inner);
+        var candidateId = await NewsDiscoveryTestSeeder.SeedNeedsReviewCandidateAsync(
+            inner,
+            canonicalUrl: "https://www.queenonline.com/news/reject-candidate",
+            title: "Reject me",
+            excerpt: "Excerpt",
+            sourceFeedOrSiteUrl: null,
+            relevanceScore: null,
+            confidenceScore: null);
         var discoveryRepository = new ConfigurableNewsDiscoveryRepository(inner)
         {
             TryUpdateCandidateStatusHandler = (id, update, ct) =>
@@ -621,7 +663,7 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
     {
         var discoveryStore = new SharedNewsDiscoveryStore();
         var inner = new InMemoryNewsDiscoveryRepository(discoveryStore);
-        var candidateId = await SeedDraftedCandidateAsync(inner);
+        var candidateId = await NewsDiscoveryTestSeeder.SeedDraftedCandidateAsync(inner);
         var discoveryRepository = new ConfigurableNewsDiscoveryRepository(inner)
         {
             GetDraftByCandidateIdHandler = (_, _) => Task.FromResult<NewsAgentDraft?>(null)
@@ -640,7 +682,7 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
     {
         var discoveryStore = new SharedNewsDiscoveryStore();
         var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
-        var candidateId = await SeedDiscoveredCandidateWithDraftAsync(discoveryRepository);
+        var candidateId = await NewsDiscoveryTestSeeder.SeedDiscoveredCandidateWithDraftAsync(discoveryRepository);
         var client = CreateClient(AdminEmail, new SharedNewsStore(), discoveryStore, discoveryRepository: discoveryRepository);
 
         var response = await PostActionAsync(client, $"/admin/news-discovery/{candidateId}/promote", candidateId);
@@ -655,7 +697,7 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
     {
         var discoveryStore = new SharedNewsDiscoveryStore();
         var inner = new InMemoryNewsDiscoveryRepository(discoveryStore);
-        var candidateId = await SeedNeedsReviewCandidateWithDraftAsync(inner);
+        var candidateId = await NewsDiscoveryTestSeeder.SeedNeedsReviewCandidateWithDraftAsync(inner);
         var discoveryRepository = new ConfigurableNewsDiscoveryRepository(inner)
         {
             TryUpdateCandidateStatusHandler = (id, update, ct) =>
@@ -677,7 +719,7 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
     {
         var discoveryStore = new SharedNewsDiscoveryStore();
         var inner = new InMemoryNewsDiscoveryRepository(discoveryStore);
-        var candidateId = await SeedDraftedCandidateAsync(inner);
+        var candidateId = await NewsDiscoveryTestSeeder.SeedDraftedCandidateAsync(inner);
         var discoveryRepository = new ConfigurableNewsDiscoveryRepository(inner)
         {
             TryUpdateCandidateStatusHandler = (id, update, ct) =>
@@ -699,7 +741,7 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
     {
         var discoveryStore = new SharedNewsDiscoveryStore();
         var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
-        var candidateId = await SeedDraftedCandidateAsync(discoveryRepository);
+        var candidateId = await NewsDiscoveryTestSeeder.SeedDraftedCandidateAsync(discoveryRepository);
         var newsStore = new SharedNewsStore();
         var adminRepository = new FailingCreateAdminNewsRepository(
             new InMemoryAdminNewsRepository(newsStore),
@@ -723,7 +765,7 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
     {
         var discoveryStore = new SharedNewsDiscoveryStore();
         var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
-        var (firstId, secondId) = await SeedDuplicatePairAsync(discoveryRepository);
+        var (firstId, secondId) = await NewsDiscoveryTestSeeder.SeedDuplicatePairAsync(discoveryRepository);
         await discoveryRepository.TryUpdateCandidateStatusAsync(
             secondId,
             new NewsCandidateStatusUpdate(
@@ -741,7 +783,7 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
     {
         var discoveryStore = new SharedNewsDiscoveryStore();
         var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
-        var candidateId = await SeedDraftedCandidateAsync(discoveryRepository);
+        var candidateId = await NewsDiscoveryTestSeeder.SeedDraftedCandidateAsync(discoveryRepository);
         var client = CreateClient(AdminEmail, new SharedNewsStore(), discoveryStore);
 
         var filteredBody = await client.GetStringAsync("/admin/news-discovery?trustTier=Primary&hasDraft=true");
@@ -750,196 +792,6 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
 
         var emptyBody = await client.GetStringAsync("/admin/news-discovery?trustTier=Secondary&hasDraft=true");
         Assert.Contains("No candidates match the current filters.", emptyBody);
-    }
-
-    private static async Task<int> SeedNeedsReviewCandidateAsync(InMemoryNewsDiscoveryRepository repository)
-    {
-        var sourceId = await repository.UpsertSourceAsync(new NewsDiscoverySourceDraft(
-            "queen-online",
-            "Queen Online",
-            "https://www.queenonline.com/",
-            null,
-            NewsDiscoverySourceType.Rss,
-            NewsDiscoveryTrustTier.Primary,
-            60,
-            true,
-            null));
-        var discoveredAt = new DateTime(2026, 7, 1, 12, 0, 0, DateTimeKind.Utc);
-        var candidateId = await repository.CreateCandidateAsync(new NewsCandidateCreateRequest(
-            sourceId,
-            "https://www.queenonline.com/news/reject-candidate",
-            "Reject me",
-            discoveredAt,
-            "Excerpt",
-            discoveredAt));
-        await repository.TryUpdateCandidateStatusAsync(
-            candidateId,
-            new NewsCandidateStatusUpdate(NewsCandidateStatus.NeedsReview));
-        return candidateId;
-    }
-
-    private static async Task<int> SeedDraftedCandidateAsync(InMemoryNewsDiscoveryRepository repository)
-    {
-        var sourceId = await repository.UpsertSourceAsync(new NewsDiscoverySourceDraft(
-            "queen-online",
-            "Queen Online",
-            "https://www.queenonline.com/",
-            null,
-            NewsDiscoverySourceType.Rss,
-            NewsDiscoveryTrustTier.Primary,
-            60,
-            true,
-            null));
-        var discoveredAt = new DateTime(2026, 7, 1, 12, 0, 0, DateTimeKind.Utc);
-        var candidateId = await repository.CreateCandidateAsync(new NewsCandidateCreateRequest(
-            sourceId,
-            "https://www.queenonline.com/news/review-candidate",
-            "Discovery review candidate",
-            discoveredAt,
-            "Official dates announced for 2026.",
-            discoveredAt));
-        await repository.TryUpdateCandidateStatusAsync(
-            candidateId,
-            new NewsCandidateStatusUpdate(
-                NewsCandidateStatus.NeedsReview,
-                RelevanceScore: 0.9m,
-                ConfidenceScore: 0.88m));
-        await repository.TryUpdateCandidateStatusAsync(
-            candidateId,
-            new NewsCandidateStatusUpdate(NewsCandidateStatus.Drafted));
-        var aiRunId = await repository.CreateAiRunAsync(new NewsAiRunCreateRequest(
-            candidateId,
-            NewsAiRunKind.Triage,
-            "openrouter",
-            "openai/gpt-4.1-nano",
-            "triage-v1",
-            discoveredAt));
-        await repository.CompleteAiRunAsync(aiRunId, new NewsAiRunCompletion(
-            NewsAiRunStatus.Succeeded,
-            100,
-            50,
-            0.0001m,
-            """{"verdict":"relevant","rationale":"Mentions Queen tour dates.","entities":["Queen"]}""",
-            null,
-            discoveredAt));
-        await repository.UpsertDraftAsync(candidateId, new NewsAgentDraftUpsert(
-            "Discovery draft title",
-            "discovery-draft-title",
-            "Draft excerpt for review queue.",
-            "Draft body for review queue.",
-            "Source: Queen Online",
-            "Official announcement.",
-            "High confidence.",
-            discoveredAt.Date,
-            null));
-        return candidateId;
-    }
-
-    private static async Task<int> SeedNeedsReviewCandidateWithDraftAsync(InMemoryNewsDiscoveryRepository repository)
-    {
-        var sourceId = await repository.UpsertSourceAsync(new NewsDiscoverySourceDraft(
-            "queen-online",
-            "Queen Online",
-            "https://www.queenonline.com/",
-            null,
-            NewsDiscoverySourceType.Rss,
-            NewsDiscoveryTrustTier.Primary,
-            60,
-            true,
-            null));
-        var discoveredAt = new DateTime(2026, 7, 1, 12, 0, 0, DateTimeKind.Utc);
-        var candidateId = await repository.CreateCandidateAsync(new NewsCandidateCreateRequest(
-            sourceId,
-            "https://www.queenonline.com/news/needs-review-draft",
-            "Needs review with draft",
-            discoveredAt,
-            "Excerpt",
-            discoveredAt));
-        await repository.TryUpdateCandidateStatusAsync(
-            candidateId,
-            new NewsCandidateStatusUpdate(NewsCandidateStatus.NeedsReview));
-        await repository.UpsertDraftAsync(candidateId, new NewsAgentDraftUpsert(
-            "Needs-review draft title",
-            "needs-review-draft-title",
-            "Needs-review excerpt.",
-            "Needs-review body.",
-            "Source: Queen Online",
-            null,
-            null,
-            discoveredAt.Date,
-            null));
-        return candidateId;
-    }
-
-    private static async Task<(int FirstId, int SecondId)> SeedDuplicatePairAsync(InMemoryNewsDiscoveryRepository repository)
-    {
-        var sourceId = await repository.UpsertSourceAsync(new NewsDiscoverySourceDraft(
-            "queen-online",
-            "Queen Online",
-            "https://www.queenonline.com/",
-            null,
-            NewsDiscoverySourceType.Rss,
-            NewsDiscoveryTrustTier.Primary,
-            60,
-            true,
-            null));
-        var discoveredAt = new DateTime(2026, 7, 1, 12, 0, 0, DateTimeKind.Utc);
-        var firstId = await repository.CreateCandidateAsync(new NewsCandidateCreateRequest(
-            sourceId,
-            "https://www.queenonline.com/news/original",
-            "Original Queen story",
-            discoveredAt,
-            "Excerpt",
-            discoveredAt));
-        await repository.TryUpdateCandidateStatusAsync(
-            firstId,
-            new NewsCandidateStatusUpdate(NewsCandidateStatus.NeedsReview));
-        var secondId = await repository.CreateCandidateAsync(new NewsCandidateCreateRequest(
-            sourceId,
-            "https://www.queenonline.com/news/duplicate-story",
-            "Original Queen story",
-            discoveredAt.AddMinutes(5),
-            "Duplicate excerpt.",
-            discoveredAt.AddMinutes(5)));
-        await repository.TryUpdateCandidateStatusAsync(
-            secondId,
-            new NewsCandidateStatusUpdate(NewsCandidateStatus.NeedsReview));
-        return (firstId, secondId);
-    }
-
-    private static async Task<int> SeedDiscoveredCandidateWithDraftAsync(InMemoryNewsDiscoveryRepository repository)
-    {
-        var sourceId = await repository.UpsertSourceAsync(new NewsDiscoverySourceDraft(
-            "discovered-draft-source",
-            "Discovered draft source",
-            "https://example.com/",
-            null,
-            NewsDiscoverySourceType.AllowlistedPage,
-            NewsDiscoveryTrustTier.Primary,
-            60,
-            true,
-            null));
-        var discoveredAt = new DateTime(2026, 7, 3, 12, 0, 0, DateTimeKind.Utc);
-        var candidateId = await repository.CreateCandidateAsync(new NewsCandidateCreateRequest(
-            sourceId,
-            "https://example.com/discovered-with-draft",
-            "Discovered with draft",
-            discoveredAt,
-            "Excerpt",
-            discoveredAt));
-        await repository.UpsertDraftAsync(
-            candidateId,
-            new NewsAgentDraftUpsert(
-                "Undrafted promote title",
-                "undrafted-promote-title",
-                "Excerpt",
-                "Body",
-                null,
-                null,
-                null,
-                discoveredAt.Date,
-                null));
-        return candidateId;
     }
 
     private WebApplicationFactory<Program> CreateFactory(
