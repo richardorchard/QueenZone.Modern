@@ -224,6 +224,21 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
     }
 
     [Fact]
+    public async Task RejectActionWithoutAntiforgeryTokenReturnsBadRequest()
+    {
+        var discoveryStore = new SharedNewsDiscoveryStore();
+        var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
+        var candidateId = await SeedNeedsReviewCandidateAsync(discoveryRepository);
+        var client = CreateClient(AdminEmail, new SharedNewsStore(), discoveryStore);
+
+        var response = await client.PostAsync(
+            $"/admin/news-discovery/{candidateId}/reject",
+            new FormUrlEncodedContent(new Dictionary<string, string>()));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
     public async Task AuthorizedAdminCanRejectCandidate()
     {
         var discoveryStore = new SharedNewsDiscoveryStore();
