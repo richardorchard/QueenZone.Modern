@@ -14,18 +14,24 @@ public sealed class PublicQueryCacheServiceTests
         var newsRepository = new CountingNewsRepository();
         var service = CreateService(memoryCache, newsRepository: newsRepository);
 
-        await service.GetLatestNewsAsync(5);
-        await service.GetLatestNewsAsync(5);
-        await service.GetNewsPublishedCountAsync();
-        await service.GetNewsPublishedCountAsync();
+        var firstLatest = await service.GetLatestNewsAsync(5);
+        var secondLatest = await service.GetLatestNewsAsync(5);
+        var firstPublishedCount = await service.GetNewsPublishedCountAsync();
+        var secondPublishedCount = await service.GetNewsPublishedCountAsync();
 
+        Assert.Same(firstLatest, secondLatest);
+        Assert.Equal(firstLatest[0].Title, secondLatest[0].Title);
+        Assert.Equal(firstPublishedCount, secondPublishedCount);
         Assert.Equal(1, newsRepository.LatestCallCount);
         Assert.Equal(1, newsRepository.PublishedCountCallCount);
 
         service.InvalidateNewsCache();
-        await service.GetLatestNewsAsync(5);
-        await service.GetNewsPublishedCountAsync();
+        var thirdLatest = await service.GetLatestNewsAsync(5);
+        var thirdPublishedCount = await service.GetNewsPublishedCountAsync();
 
+        Assert.NotSame(firstLatest, thirdLatest);
+        Assert.NotEqual(firstLatest[0].Title, thirdLatest[0].Title);
+        Assert.NotEqual(firstPublishedCount, thirdPublishedCount);
         Assert.Equal(2, newsRepository.LatestCallCount);
         Assert.Equal(2, newsRepository.PublishedCountCallCount);
     }
@@ -100,15 +106,6 @@ public sealed class PublicQueryCacheServiceTests
 
     private sealed class CountingNewsRepository : INewsRepository
     {
-        private readonly NewsItem item = new(
-            1,
-            "Cached news",
-            "Cached news excerpt.",
-            "Cached news body.",
-            new DateTime(2026, 7, 6, 0, 0, 0, DateTimeKind.Utc),
-            null,
-            true);
-
         public int LatestCallCount { get; private set; }
 
         public int PublishedCountCallCount { get; private set; }
@@ -116,23 +113,31 @@ public sealed class PublicQueryCacheServiceTests
         public Task<IReadOnlyList<NewsItem>> GetLatestAsync(int count, CancellationToken cancellationToken = default)
         {
             LatestCallCount++;
+            var item = new NewsItem(
+                1,
+                $"Cached news {LatestCallCount}",
+                "Cached news excerpt.",
+                "Cached news body.",
+                new DateTime(2026, 7, 6, 0, 0, 0, DateTimeKind.Utc),
+                null,
+                true);
             return Task.FromResult<IReadOnlyList<NewsItem>>([item]);
         }
 
         public Task<int> GetPublishedCountAsync(CancellationToken cancellationToken = default)
         {
             PublishedCountCallCount++;
-            return Task.FromResult(1);
+            return Task.FromResult(PublishedCountCallCount);
         }
 
         public Task<IReadOnlyList<NewsItem>> GetArchivePageAsync(int page, int pageSize, CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<NewsItem>>([item]);
+            Task.FromResult<IReadOnlyList<NewsItem>>([]);
 
         public Task<NewsItem?> GetByIdAsync(int id, CancellationToken cancellationToken = default) =>
-            Task.FromResult<NewsItem?>(id == item.Id ? item : null);
+            Task.FromResult<NewsItem?>(null);
 
         public Task<IReadOnlyList<SitemapContentEntry>> GetPublishedSitemapEntriesAsync(CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<SitemapContentEntry>>([new SitemapContentEntry(item.Id, item.Title, item.PublishedAt)]);
+            Task.FromResult<IReadOnlyList<SitemapContentEntry>>([]);
     }
 
     private sealed class CountingArticlesRepository : IArticlesRepository
