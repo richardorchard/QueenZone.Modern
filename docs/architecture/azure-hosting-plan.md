@@ -53,6 +53,29 @@ Metrics disabled. In Azure, configure a small daily cap on both Application
 Insights and the backing Log Analytics workspace so unexpected telemetry volume
 is budget-contained.
 
+## Monitoring
+
+Preview monitoring resources in `Queenzone-RG`:
+
+- Log Analytics workspace: `queenzone-dev-law`, 30-day retention, 0.1 GB/day cap.
+- Application Insights: `queenzone-dev-ai`, workspace-backed.
+- Action group: `queenzone-alerts`, email receiver `richard@thinkingwebsites.com.au`.
+- Availability test: `queenzone-dev-health`, `https://queenzone-dev.azurewebsites.net/health`, every 15 minutes, five locations, retries enabled, SSL check enabled.
+
+Alerts:
+
+- `queenzone-dev-health-unavailable`: availability below 80% over 15 minutes.
+- `queenzone-dev-failed-requests`: more than 10 failed requests over 15 minutes.
+- `queenzone-dev-server-exceptions`: more than 5 server exceptions over 15 minutes.
+- `queenzone-dev-ingestion-warning`: billable workspace usage over 80 MB in 24 hours, ahead of the 0.1 GB/day cap.
+
+Operating rhythm:
+
+- After deployment, check `/health` and confirm request telemetry appears in Application Insights.
+- Weekly, review Failures, Performance, Dependencies, and workspace ingestion.
+- Monthly, tune alert thresholds and the daily cap based on observed traffic.
+- Keep alerting email-only unless the project becomes operationally critical.
+
 ## Public Media Delivery
 
 Public archive media is served from Azure Blob Storage through Cloudflare:
