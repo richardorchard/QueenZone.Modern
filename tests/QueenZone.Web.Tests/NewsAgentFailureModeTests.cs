@@ -11,7 +11,7 @@ public sealed class NewsAgentFailureModeTests
     public async Task RunTriageAsync_counts_malformed_ai_response_as_failure()
     {
         var repository = new InMemoryNewsDiscoveryRepository(new SharedNewsDiscoveryStore());
-        var candidateId = await SeedDiscoveredCandidateAsync(repository);
+        var candidateId = await NewsDiscoveryTestSeeder.SeedDiscoveredCandidateAsync(repository);
         var service = CreateTriageService(repository, new FailureModeFakeAiClient("{not-json"));
 
         var result = await service.RunTriageAsync(new NewsTriageRunOptions());
@@ -24,7 +24,7 @@ public sealed class NewsAgentFailureModeTests
     public async Task RunDraftGenerationAsync_counts_malformed_ai_response_as_failure()
     {
         var repository = new InMemoryNewsDiscoveryRepository(new SharedNewsDiscoveryStore());
-        var candidateId = await SeedNeedsReviewCandidateAsync(repository);
+        var candidateId = await NewsDiscoveryTestSeeder.SeedNeedsReviewCandidateAsync(repository);
         var service = NewsAgentTestSupport.CreateDraftGenerationService(
             repository,
             new FailureModeFakeAiClient("{not-json"));
@@ -39,7 +39,7 @@ public sealed class NewsAgentFailureModeTests
     public async Task RunTriageAsync_without_openrouter_uses_deterministic_checks_only()
     {
         var repository = new InMemoryNewsDiscoveryRepository(new SharedNewsDiscoveryStore());
-        await SeedDiscoveredCandidateAsync(repository);
+        await NewsDiscoveryTestSeeder.SeedDiscoveredCandidateAsync(repository);
         var service = CreateTriageService(repository, new FailureModeFakeAiClient("{}", enabled: false));
 
         var result = await service.RunTriageAsync(new NewsTriageRunOptions());
@@ -52,7 +52,7 @@ public sealed class NewsAgentFailureModeTests
     public async Task DiscoverNewsWorker_returns_error_exit_when_triage_ai_fails()
     {
         var repository = new InMemoryNewsDiscoveryRepository(new SharedNewsDiscoveryStore());
-        await SeedDiscoveredCandidateAsync(repository);
+        await NewsDiscoveryTestSeeder.SeedDiscoveredCandidateAsync(repository);
         var discoveryService = NewsAgentTestSupport.CreateDiscoveryService(
             repository,
             new FakeNewsDiscoveryHttpClient(new Dictionary<string, string>()));
@@ -119,39 +119,6 @@ public sealed class NewsAgentFailureModeTests
                 })),
             Options.Create(new OpenRouterOptions { ApiKey = aiClient.IsEnabled ? "test-key" : null }),
             NullLogger<NewsAiRunExecutor>.Instance);
-
-    private static async Task<int> SeedDiscoveredCandidateAsync(InMemoryNewsDiscoveryRepository repository)
-    {
-        var sourceId = await repository.UpsertSourceAsync(new NewsDiscoverySourceDraft(
-            "queen-online",
-            "Queen Online",
-            "https://www.queenonline.com/",
-            "https://www.queenonline.com/feed/",
-            NewsDiscoverySourceType.Rss,
-            NewsDiscoveryTrustTier.Primary,
-            60,
-            true,
-            null));
-        return await repository.CreateCandidateAsync(new NewsCandidateCreateRequest(
-            sourceId,
-            "https://www.queenonline.com/news/tour-2026",
-            "Queen announce 2026 tour",
-            DateTime.UtcNow,
-            "Official dates announced.",
-            DateTime.UtcNow));
-    }
-
-    private static async Task<int> SeedNeedsReviewCandidateAsync(InMemoryNewsDiscoveryRepository repository)
-    {
-        var candidateId = await SeedDiscoveredCandidateAsync(repository);
-        await repository.TryUpdateCandidateStatusAsync(
-            candidateId,
-            new NewsCandidateStatusUpdate(
-                NewsCandidateStatus.NeedsReview,
-                ConfidenceScore: 0.90m,
-                RelevanceScore: 0.92m));
-        return candidateId;
-    }
 
     private sealed class FailureModeFakeAiClient(string content, bool enabled = true) : INewsAiClient
     {

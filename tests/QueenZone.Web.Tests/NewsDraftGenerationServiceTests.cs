@@ -11,7 +11,7 @@ public sealed class NewsDraftGenerationServiceTests
   public async Task GenerateDraftAsync_creates_unpublished_draft_and_marks_candidate_drafted()
   {
     var repository = new InMemoryNewsDiscoveryRepository(new SharedNewsDiscoveryStore());
-    var candidateId = await SeedNeedsReviewCandidateAsync(repository);
+    var candidateId = await NewsDiscoveryTestSeeder.SeedNeedsReviewCandidateAsync(repository);
     var service = NewsAgentTestSupport.CreateDraftGenerationService(
       repository,
       new DraftGenerationFakeAiClient(NewsAgentTestSupport.SampleDraftJson));
@@ -36,7 +36,7 @@ public sealed class NewsDraftGenerationServiceTests
   public async Task GenerateDraftAsync_skips_when_draft_already_exists()
   {
     var repository = new InMemoryNewsDiscoveryRepository(new SharedNewsDiscoveryStore());
-    var candidateId = await SeedNeedsReviewCandidateAsync(repository);
+    var candidateId = await NewsDiscoveryTestSeeder.SeedNeedsReviewCandidateAsync(repository);
     await repository.UpsertDraftAsync(candidateId, new NewsAgentDraftUpsert(
       "Existing draft",
       "existing-draft",
@@ -63,7 +63,7 @@ public sealed class NewsDraftGenerationServiceTests
   public async Task GenerateDraftAsync_throws_when_drafted_without_force_regenerate()
   {
     var repository = new InMemoryNewsDiscoveryRepository(new SharedNewsDiscoveryStore());
-    var candidateId = await SeedNeedsReviewCandidateAsync(repository);
+    var candidateId = await NewsDiscoveryTestSeeder.SeedNeedsReviewCandidateAsync(repository);
     var service = NewsAgentTestSupport.CreateDraftGenerationService(
       repository,
       new DraftGenerationFakeAiClient(NewsAgentTestSupport.SampleDraftJson));
@@ -82,7 +82,7 @@ public sealed class NewsDraftGenerationServiceTests
   public async Task GenerateDraftAsync_regenerates_when_drafted_and_forced()
   {
     var repository = new InMemoryNewsDiscoveryRepository(new SharedNewsDiscoveryStore());
-    var candidateId = await SeedNeedsReviewCandidateAsync(repository);
+    var candidateId = await NewsDiscoveryTestSeeder.SeedNeedsReviewCandidateAsync(repository);
     var service = NewsAgentTestSupport.CreateDraftGenerationService(
       repository,
       new DraftGenerationFakeAiClient(NewsAgentTestSupport.SampleDraftJson));
@@ -104,7 +104,7 @@ public sealed class NewsDraftGenerationServiceTests
   public async Task RunDraftGenerationAsync_skips_when_openrouter_disabled()
   {
     var repository = new InMemoryNewsDiscoveryRepository(new SharedNewsDiscoveryStore());
-    await SeedNeedsReviewCandidateAsync(repository);
+    await NewsDiscoveryTestSeeder.SeedNeedsReviewCandidateAsync(repository);
     var service = NewsAgentTestSupport.CreateDraftGenerationService(
       repository,
       new DraftGenerationFakeAiClient(NewsAgentTestSupport.SampleDraftJson, enabled: false));
@@ -119,7 +119,7 @@ public sealed class NewsDraftGenerationServiceTests
   public async Task GenerateDraftAsync_dry_run_does_not_persist_draft_or_status()
   {
     var repository = new InMemoryNewsDiscoveryRepository(new SharedNewsDiscoveryStore());
-    var candidateId = await SeedNeedsReviewCandidateAsync(repository);
+    var candidateId = await NewsDiscoveryTestSeeder.SeedNeedsReviewCandidateAsync(repository);
     var service = NewsAgentTestSupport.CreateDraftGenerationService(
       repository,
       new DraftGenerationFakeAiClient(NewsAgentTestSupport.SampleDraftJson));
@@ -130,35 +130,6 @@ public sealed class NewsDraftGenerationServiceTests
 
     Assert.Null(await repository.GetDraftByCandidateIdAsync(candidateId));
     Assert.Equal(NewsCandidateStatus.NeedsReview, (await repository.GetCandidateByIdAsync(candidateId))!.Status);
-  }
-
-  private static async Task<int> SeedNeedsReviewCandidateAsync(INewsDiscoveryRepository repository)
-  {
-    var sourceId = await repository.UpsertSourceAsync(new NewsDiscoverySourceDraft(
-      "queen-online",
-      "Queen Online",
-      "https://www.queenonline.com/",
-      "https://www.queenonline.com/feed/",
-      NewsDiscoverySourceType.Rss,
-      NewsDiscoveryTrustTier.Primary,
-      60,
-      true,
-      null));
-    var candidateId = await repository.CreateCandidateAsync(new NewsCandidateCreateRequest(
-      sourceId,
-      "https://www.queenonline.com/news/tour-2026",
-      "Queen announce 2026 tour",
-      DateTime.UtcNow,
-      "Official dates announced.",
-      DateTime.UtcNow));
-    await repository.TryUpdateCandidateStatusAsync(
-      candidateId,
-      new NewsCandidateStatusUpdate(
-        NewsCandidateStatus.NeedsReview,
-        ConfidenceScore: 0.90m,
-        RelevanceScore: 0.92m));
-
-    return candidateId;
   }
 
   private sealed class DraftGenerationFakeAiClient(string content, bool enabled = true) : INewsAiClient
