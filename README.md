@@ -241,6 +241,9 @@ Repository secrets required:
 App Service configuration required:
 
 - `ConnectionStrings__QueenZoneLegacy`: the Azure SQL connection string for the copied legacy tables. The current runtime path uses SQL authentication against `queenzone-db` on `queenzone-sql-server.database.windows.net`.
+- `APPLICATIONINSIGHTS_CONNECTION_STRING`: the Application Insights connection string for production/preview telemetry. Leave unset in local development unless local telemetry is intentional.
+
+Application Insights is wired through Azure Monitor OpenTelemetry and is opt-in at runtime: no telemetry is exported unless `APPLICATIONINSIGHTS_CONNECTION_STRING` is present. The default `ApplicationInsights` settings in `src/QueenZone.Web/appsettings.json` are deliberately low-volume for a hobby project: at most 0.2 traces per second, warning-or-higher exported logs, trace-based log sampling enabled, and Live Metrics disabled. In Azure, also set a small daily cap on both the Application Insights resource and its Log Analytics workspace, for example 0.05-0.10 GB/day, so unexpected traffic or noisy logging cannot run up a large bill.
 
 The runtime App Service setting and the GitHub Actions migration secret are intentionally separate. Updating `QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING` in GitHub does not update the live App Service setting. If the database name, login, or password changes, update both places as needed and restart the App Service so the running container reloads the connection string.
 
