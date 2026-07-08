@@ -1,6 +1,7 @@
 using AspNet.Security.OAuth.Discord;
 using AspNet.Security.OAuth.GitHub;
 using System.Security.Claims;
+using Azure.Monitor.OpenTelemetry.AspNetCore;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
@@ -8,9 +9,12 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.OutputCaching;
 using Microsoft.AspNetCore.StaticFiles;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.FileProviders.Physical;
 using Microsoft.Identity.Web;
+using OpenTelemetry.Logs;
+using OpenTelemetry.Resources;
 using QueenZone.Data;
 using QueenZone.NewsAgent;
 using QueenZone.Web;
@@ -30,6 +34,8 @@ else
     // (and unnecessary for short-lived smoke test runs) on the self-hosted CI runner.
     builder.Services.AddDataProtection().UseEphemeralDataProtectionProvider();
 }
+
+ConfigureApplicationInsights(builder);
 
 builder.Services.Configure<AdminOptions>(builder.Configuration.GetSection(AdminOptions.SectionName));
 builder.Services.Configure<SiteOptions>(builder.Configuration.GetSection(SiteOptions.SectionName));
@@ -185,6 +191,41 @@ app.MapSitemapEndpoints();
 app.MapRazorPages();
 
 app.Run();
+
+[System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+static void ConfigureApplicationInsights(WebApplicationBuilder builder)
+{
+    if (builder.Environment.IsEnvironment("Testing"))
+    {
+        return;
+    }
+
+    var connectionString = builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"];
+    if (string.IsNullOrWhiteSpace(connectionString))
+    {
+        return;
+    }
+
+    var section = builder.Configuration.GetSection("ApplicationInsights");
+    var tracesPerSecond = section.GetValue<double?>("TracesPerSecond") ?? 0.2;
+    var enableLiveMetrics = section.GetValue<bool?>("EnableLiveMetrics") ?? false;
+    var enableTraceBasedLogsSampler = section.GetValue<bool?>("EnableTraceBasedLogsSampler") ?? true;
+    var exportedLogLevel = section.GetValue<LogLevel?>("ExportedLogLevel") ?? LogLevel.Warning;
+
+    builder.Logging.AddFilter<OpenTelemetryLoggerProvider>(null, exportedLogLevel);
+
+    builder.Services.AddOpenTelemetry()
+        .ConfigureResource(resource => resource.AddService(
+            serviceName: "QueenZone.Web",
+            serviceNamespace: "QueenZone"))
+        .UseAzureMonitor(options =>
+        {
+            options.ConnectionString = connectionString;
+            options.TracesPerSecond = tracesPerSecond;
+            options.EnableLiveMetrics = enableLiveMetrics;
+            options.EnableTraceBasedLogsSampler = enableTraceBasedLogsSampler;
+        });
+}
 
 static void ConfigureAuthentication(WebApplicationBuilder builder)
 {

@@ -18,7 +18,7 @@ flowchart LR
 | Web app | Azure App Service | Linux is fine for ASP.NET Core. Windows only needed for legacy Web Forms. |
 | Database | Azure SQL Database | Restore or import legacy DB, then connect read-only at first. |
 | Media | Azure Blob Storage | Pictures, thumbnails, downloadable public assets. |
-| Telemetry | Application Insights | Request tracking, exceptions, dependency timings. |
+| Telemetry | Application Insights | Request tracking, exceptions, dependency timings. Keep sampling and daily caps low for the hobby budget. |
 | Secrets | App Service settings or Key Vault | Start with App Service settings, move to Key Vault if needed. |
 | DNS/TLS | App Service custom domain or Azure Front Door | Front Door can wait. |
 | CI/CD | GitHub Actions | Build, test, deploy. |
@@ -40,9 +40,18 @@ Optional later:
 Use configuration keys like:
 
 - `ConnectionStrings:QueenZoneLegacy`
+- `APPLICATIONINSIGHTS_CONNECTION_STRING`
 - `Storage:PublicMediaBaseUrl`
 - `FeatureFlags:ForumArchiveEnabled`
 - `FeatureFlags:LegacyRedirectsEnabled`
+
+Application Insights telemetry is enabled in `QueenZone.Web` only when
+`APPLICATIONINSIGHTS_CONNECTION_STRING` is configured. The app uses Azure Monitor
+OpenTelemetry with conservative defaults in `ApplicationInsights`: 0.2 traces per
+second, warning-or-higher exported logs, trace-based log sampling, and Live
+Metrics disabled. In Azure, configure a small daily cap on both Application
+Insights and the backing Log Analytics workspace so unexpected telemetry volume
+is budget-contained.
 
 ## Public Media Delivery
 
