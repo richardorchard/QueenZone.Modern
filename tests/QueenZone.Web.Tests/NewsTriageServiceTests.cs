@@ -7,36 +7,56 @@ namespace QueenZone.Web.Tests;
 
 public sealed class NewsTriageServiceTests
 {
-    [Fact]
-    public async Task TriageCandidateAsync_promotes_relevant_candidate_to_needs_review()
+    [Theory]
+    [InlineData(
+        """
+        {
+          "verdict": "relevant",
+          "relevance_score": 0.93,
+          "confidence_score": 0.90,
+          "rationale": "Official Queen tour announcement.",
+          "suggested_category": "tour",
+          "entities": ["Queen", "tour"],
+          "review_notes": "Primary source."
+        }
+        """,
+        NewsCandidateStatus.NeedsReview,
+        0.93)]
+    [InlineData(
+        """
+        {
+          "verdict": "not_relevant",
+          "relevance_score": 0.12,
+          "confidence_score": 0.95,
+          "rationale": "Generic guitar pedal review.",
+          "suggested_category": "other",
+          "entities": [],
+          "review_notes": null
+        }
+        """,
+        NewsCandidateStatus.Rejected,
+        null)]
+    public async Task TriageCandidateAsync_maps_ai_verdict_to_expected_status(
+        string aiResponseJson,
+        NewsCandidateStatus expectedStatus,
+        double? expectedRelevanceScore)
     {
         var repository = new InMemoryNewsDiscoveryRepository(new SharedNewsDiscoveryStore());
         var candidateId = await NewsDiscoveryTestSeeder.SeedDiscoveredCandidateAsync(repository);
-        var service = CreateService(
-            repository,
-            new FakeNewsAiClient(
-                true,
-                """
-                {
-                  "verdict": "relevant",
-                  "relevance_score": 0.93,
-                  "confidence_score": 0.90,
-                  "rationale": "Official Queen tour announcement.",
-                  "suggested_category": "tour",
-                  "entities": ["Queen", "tour"],
-                  "review_notes": "Primary source."
-                }
-                """));
+        var service = CreateService(repository, new FakeNewsAiClient(true, aiResponseJson));
 
         var result = await service.TriageCandidateAsync(
             (await repository.GetCandidateByIdAsync(candidateId))!,
             new NewsTriageRunOptions());
 
-        Assert.Equal(NewsCandidateStatus.NeedsReview, result.Decision.TargetStatus);
+        Assert.Equal(expectedStatus, result.Decision.TargetStatus);
         var updated = await repository.GetCandidateByIdAsync(candidateId);
         Assert.NotNull(updated);
-        Assert.Equal(NewsCandidateStatus.NeedsReview, updated.Status);
-        Assert.Equal(0.93m, updated.RelevanceScore);
+        Assert.Equal(expectedStatus, updated.Status);
+        if (expectedRelevanceScore is not null)
+        {
+            Assert.Equal((decimal)expectedRelevanceScore.Value, updated.RelevanceScore);
+        }
     }
 
     [Fact]
@@ -107,34 +127,6 @@ public sealed class NewsTriageServiceTests
         var result = await service.RunTriageAsync(new NewsTriageRunOptions());
 
         Assert.Equal(0, result.CandidatesConsidered);
-    }
-
-    [Fact]
-    public async Task TriageCandidateAsync_rejects_not_relevant_ai_verdict()
-    {
-        var repository = new InMemoryNewsDiscoveryRepository(new SharedNewsDiscoveryStore());
-        var candidateId = await NewsDiscoveryTestSeeder.SeedDiscoveredCandidateAsync(repository);
-        var service = CreateService(
-            repository,
-            new FakeNewsAiClient(
-                true,
-                """
-                {
-                  "verdict": "not_relevant",
-                  "relevance_score": 0.12,
-                  "confidence_score": 0.95,
-                  "rationale": "Generic guitar pedal review.",
-                  "suggested_category": "other",
-                  "entities": [],
-                  "review_notes": null
-                }
-                """));
-
-        var result = await service.TriageCandidateAsync(
-            (await repository.GetCandidateByIdAsync(candidateId))!,
-            new NewsTriageRunOptions());
-
-        Assert.Equal(NewsCandidateStatus.Rejected, result.Decision.TargetStatus);
     }
 
     [Fact]

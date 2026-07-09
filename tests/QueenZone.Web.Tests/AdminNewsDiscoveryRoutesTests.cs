@@ -235,7 +235,14 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
     {
         var discoveryStore = new SharedNewsDiscoveryStore();
         var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
-        var candidateId = await SeedNeedsReviewCandidateAsync(discoveryRepository);
+        var candidateId = await NewsDiscoveryTestSeeder.SeedNeedsReviewCandidateAsync(
+            discoveryRepository,
+            canonicalUrl: "https://www.queenonline.com/news/reject-candidate",
+            title: "Reject me",
+            excerpt: "Excerpt",
+            sourceFeedOrSiteUrl: null,
+            relevanceScore: null,
+            confidenceScore: null);
         var client = CreateClient(AdminEmail, new SharedNewsStore(), discoveryStore);
 
         var response = await client.PostAsync(
