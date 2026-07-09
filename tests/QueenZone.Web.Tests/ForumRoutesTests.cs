@@ -1,4 +1,3 @@
-using QueenZone.Data;
 using QueenZone.Web;
 
 namespace QueenZone.Web.Tests;
@@ -8,14 +7,14 @@ public sealed class ForumRoutesTests
     [Fact]
     public void GetCategoryPath_BuildsSlugFromCategoryName()
     {
-        var category = new ForumCategoryItem(
+        var category = new ForumCategorySummary(
             1,
             "Queen - Serious Discussion",
             "SERIOUS discussion on the greatest band in the land",
             344_828,
             new DateTime(2017, 7, 15, 20, 30, 0, DateTimeKind.Utc),
             "In response to who likes Bowie",
-            10);
+            "/forum/1/queen-serious-discussion");
 
         Assert.Equal("/forum/1/queen-serious-discussion", ForumRoutes.GetCategoryPath(category));
     }
@@ -30,7 +29,7 @@ public sealed class ForumRoutesTests
     [Fact]
     public void GetCategoryCanonicalPath_UsesPageSegmentAfterFirstPage()
     {
-        var category = new ForumCategoryItem(1, "Queen - Serious Discussion", null, 0, null, null, 10);
+        var category = new ForumCategorySummary(1, "Queen - Serious Discussion", null, 0, null, null, "/forum/1/queen-serious-discussion");
 
         Assert.Equal("/forum/1/queen-serious-discussion", ForumRoutes.GetCategoryCanonicalPath(category));
         Assert.Equal("/forum/1/queen-serious-discussion/page/3", ForumRoutes.GetCategoryCanonicalPath(category, 3));

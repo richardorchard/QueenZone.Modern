@@ -87,7 +87,7 @@ public sealed class CoreSitemapBuilder(
         foreach (var category in categories)
         {
             entries.Add(new(
-                ForumRoutes.GetCategoryCanonicalPath(category),
+                ForumRoutes.GetCategoryCanonicalPath(category.Id, category.Name),
                 category.LastActivityAt));
         }
     }

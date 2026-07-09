@@ -23,6 +23,9 @@ public static partial class NewsRoutes
     public static int ResolveArchiveTotalPages(int currentPage, int itemCount, int publishedCount, int totalPages) =>
         ArchivePagination.ResolveTotalPages(currentPage, itemCount, publishedCount, totalPages, ArchivePageSize);
 
+    public static string GetNewsDetailPath(int id, string title, string? slug = null) =>
+        $"/news/{id}/{NewsSlug.Resolve(title, slug)}";
+
     public static string GetNewsDetailPath(NewsItem item) =>
-        $"/news/{item.Id}/{NewsSlug.ResolveForArticle(item)}";
+        GetNewsDetailPath(item.Id, item.Title, item.Slug);
 }

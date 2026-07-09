@@ -7,9 +7,9 @@ namespace QueenZone.Web.Pages.Forum;
 
 public abstract class ForumTopicPageModel(IForumRepository forumRepository) : PageModel
 {
-    public ForumTopicHeader? Header { get; private set; }
+    public ForumThreadHeader? Header { get; private set; }
 
-    public IReadOnlyList<ForumPostItem> Posts { get; private set; } = [];
+    public IReadOnlyList<ForumPostViewModel> Posts { get; private set; } = [];
 
     public int CurrentPage { get; private set; }
 
@@ -40,10 +40,11 @@ public abstract class ForumTopicPageModel(IForumRepository forumRepository) : Pa
             return NotFound();
         }
 
+        var header = PublicContentMapper.ToForumThreadHeader(topicPage.Header);
         var canonicalSlug = NewsSlug.Slugify(topicPage.Header.Title);
         if (!string.Equals(canonicalSlug, slug, StringComparison.OrdinalIgnoreCase))
         {
-            return RedirectPermanent(ForumRoutes.GetTopicCanonicalPath(topicPage.Header, page));
+            return RedirectPermanent(ForumRoutes.GetTopicCanonicalPath(header, page));
         }
 
         var totalPages = ForumRoutes.GetPostsTotalPages(topicPage.TotalCount, ForumRoutes.PostsPageSize);
@@ -59,8 +60,8 @@ public abstract class ForumTopicPageModel(IForumRepository forumRepository) : Pa
             return NotFound();
         }
 
-        Header = topicPage.Header;
-        Posts = topicPage.Posts;
+        Header = header;
+        Posts = PublicContentMapper.ToForumPostViewModels(topicPage.Posts);
         CurrentPage = page;
         TotalPages = totalPages;
         TotalPosts = topicPage.TotalCount;
@@ -68,22 +69,22 @@ public abstract class ForumTopicPageModel(IForumRepository forumRepository) : Pa
         [
             BreadcrumbItem.Home,
             new BreadcrumbItem("Forum", "/forum"),
-            new BreadcrumbItem(topicPage.Header.ForumName.Trim(), ForumRoutes.GetCategoryCanonicalPath(topicPage.Header.ForumId, topicPage.Header.ForumName)),
-            new BreadcrumbItem(topicPage.Header.Title.Trim(), ForumRoutes.GetTopicCanonicalPath(topicPage.Header)),
+            new BreadcrumbItem(header.ForumName, header.CategoryPath),
+            new BreadcrumbItem(header.Title, header.DetailPath),
         ];
 
-        ViewData["Title"] = ForumRoutes.GetTopicPageTitle(topicPage.Header, page);
-        ViewData["CanonicalPath"] = ForumRoutes.GetTopicCanonicalPath(topicPage.Header, page);
-        ViewData["Description"] = $"Read-only Queenzone forum archive thread in {topicPage.Header.ForumName.Trim()}.";
+        ViewData["Title"] = ForumRoutes.GetTopicPageTitle(header, page);
+        ViewData["CanonicalPath"] = ForumRoutes.GetTopicCanonicalPath(header, page);
+        ViewData["Description"] = $"Read-only Queenzone forum archive thread in {header.ForumName}.";
 
         if (page > 1)
         {
-            ViewData["PrevPath"] = ForumRoutes.GetTopicCanonicalPath(topicPage.Header, page - 1);
+            ViewData["PrevPath"] = ForumRoutes.GetTopicCanonicalPath(header, page - 1);
         }
 
         if (totalPages > 0 && page < totalPages)
         {
-            ViewData["NextPath"] = ForumRoutes.GetTopicCanonicalPath(topicPage.Header, page + 1);
+            ViewData["NextPath"] = ForumRoutes.GetTopicCanonicalPath(header, page + 1);
         }
 
         return Page();

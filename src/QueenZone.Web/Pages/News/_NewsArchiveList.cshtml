@@ -1,4 +1,4 @@
-@model IReadOnlyList<NewsItem>
+@model IReadOnlyList<NewsArchiveItem>
 
 @if (Model.Count == 0)
 {
@@ -15,7 +15,7 @@ else
           <div class="qz-meta">News</div>
         </div>
         <div>
-          <h2><a href="@NewsRoutes.GetNewsDetailPath(item)">@item.Title</a></h2>
+          <h2><a href="@item.DetailPath">@item.Title</a></h2>
           <p>@item.Excerpt</p>
         </div>
       </li>

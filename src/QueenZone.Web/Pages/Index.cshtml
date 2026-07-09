@@ -105,7 +105,7 @@
           <li class="qz-news-row">
             <div class="qz-meta"><time datetime="@item.PublishedAt.ToString("yyyy-MM-dd")">@item.PublishedAt.ToString("dd MMMM yyyy")</time></div>
             <div>
-              <h3><a href="@NewsRoutes.GetNewsDetailPath(item)">@item.Title</a></h3>
+              <h3><a href="@item.DetailPath">@item.Title</a></h3>
               <p>@item.Excerpt</p>
             </div>
           </li>

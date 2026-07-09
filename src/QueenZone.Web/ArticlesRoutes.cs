@@ -21,9 +21,9 @@ public static partial class ArticlesRoutes
     public static int ResolveArchiveTotalPages(int currentPage, int itemCount, int publishedCount, int totalPages) =>
         ArchivePagination.ResolveTotalPages(currentPage, itemCount, publishedCount, totalPages, ArchivePageSize);
 
-    public static string GetArticleDetailPath(ArticleItem item) =>
-        GetArticleDetailPath(item.Id, item.Title);
-
     public static string GetArticleDetailPath(int id, string title) =>
         $"/articles/{id}/{NewsSlug.Slugify(title)}";
+
+    public static string GetArticleDetailPath(ArticleItem item) =>
+        GetArticleDetailPath(item.Id, item.Title);
 }

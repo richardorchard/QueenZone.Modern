@@ -24,16 +24,8 @@ public abstract class AdminNewsPageModel : PageModel
             article.PublishedAt,
             article.SourceUrl);
 
-    protected static NewsItem ToNewsItem(AdminNewsArticle article) =>
-        new(
-            article.Id,
-            article.Title,
-            article.Excerpt,
-            article.Body,
-            article.PublishedAt,
-            article.SourceUrl,
-            article.IsPublished,
-            string.IsNullOrWhiteSpace(article.Slug) ? null : article.Slug);
+    protected static NewsDetailItem ToNewsDetailItem(AdminNewsArticle article) =>
+        PublicContentMapper.ToNewsDetailItem(article);
 
     protected string EditorEmail =>
         User.FindFirstValue(ClaimTypes.Email)
