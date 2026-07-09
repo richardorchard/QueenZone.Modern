@@ -232,6 +232,13 @@ public sealed class EfPublicReadRepositoryTests : IAsyncDisposable
 
         var all = await repository.GetCategoryAllAsync(3);
         Assert.Single(all);
+
+        var sitemap = await repository.GetPublishedSitemapCategoriesAsync();
+        Assert.Single(sitemap);
+        Assert.Equal(3, sitemap[0].CatId);
+        Assert.Equal("live-1986", sitemap[0].Slug);
+        Assert.Single(sitemap[0].Photos);
+        Assert.Equal(9, sitemap[0].Photos[0].PicId);
     }
 
     [Fact]

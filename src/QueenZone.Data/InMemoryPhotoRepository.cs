@@ -49,6 +49,24 @@ public sealed class InMemoryPhotoRepository : IPhotoRepository
         return Task.FromResult(items);
     }
 
+    public Task<IReadOnlyList<PhotoSitemapCategory>> GetPublishedSitemapCategoriesAsync(
+        CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<PhotoSitemapCategory> categories = seedCategories
+            .Where(seed => seed.Items.Count > 0)
+            .Select(seed =>
+            {
+                var slug = NewsSlug.Slugify(seed.Name);
+                IReadOnlyList<PhotoSitemapPhoto> photos = seed.Items
+                    .Select(item => new PhotoSitemapPhoto(item.PicId, item.DateTime))
+                    .ToList();
+                return new PhotoSitemapCategory(seed.CatId, seed.Name, slug, photos);
+            })
+            .ToList();
+
+        return Task.FromResult(categories);
+    }
+
     private static IEnumerable<PhotoItem> MapItems(PhotoCategorySeed seed)
     {
         var slug = NewsSlug.Slugify(seed.Name);

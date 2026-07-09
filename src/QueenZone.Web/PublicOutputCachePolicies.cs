@@ -4,6 +4,13 @@ public static class PublicOutputCachePolicies
 {
     public const string PublicSitemaps = "public-sitemaps";
 
+    /// <summary>
+    /// Output-cache tag applied to robots/sitemap routes. Evict with
+    /// <see cref="Microsoft.AspNetCore.OutputCaching.IOutputCacheStore.EvictByTagAsync"/> after
+    /// public URL sets change (for example admin news publish).
+    /// </summary>
+    public const string PublicSitemapTag = "public-sitemap";
+
     public static readonly TimeSpan SitemapDuration = TimeSpan.FromHours(24);
 
     private static readonly string[] ExcludedPathPrefixes =
