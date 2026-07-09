@@ -1,15 +1,14 @@
-using System.Data;
-using Dapper;
-using Microsoft.Data.SqlClient;
+using System.Diagnostics.CodeAnalysis;
+using Microsoft.EntityFrameworkCore;
 
 namespace QueenZone.Data;
 
 /// <summary>
-/// Reads forum categories from legacy <c>Q_FORUM_T</c>.
+/// Reads forum categories from legacy <c>Q_FORUM_T</c> via EF Core SQL / stored procedures.
 /// Column map and stored procedures are documented in <c>docs/legacy/db-schema.txt</c>
 /// and <c>docs/legacy/table-map.md</c> (equivalent to <c>Q_LIST_FORUM_SP</c> / <c>Q_FORUM_MAIN_SP</c>).
 /// </summary>
-public sealed class LegacyForumRepository(string connectionString) : IForumRepository
+public sealed class LegacyForumRepository(QueenZoneDbContext dbContext) : IForumRepository
 {
     private const int CommandTimeoutSeconds = 120;
 
@@ -43,16 +42,16 @@ public sealed class LegacyForumRepository(string connectionString) : IForumRepos
               AND t.TOPIC_STARTER = 1
             ORDER BY t.TOPIC_LAST_POST DESC
         ) latest
-        WHERE f.Q_FORUM_ID = @Id
+        WHERE f.Q_FORUM_ID = {0}
         """;
 
     private const string TotalThreadCountSelect = """
-        SELECT ISNULL(SUM(CAST(THREADCOUNT AS bigint)), 0)
+        SELECT ISNULL(SUM(CAST(THREADCOUNT AS bigint)), 0) AS Value
         FROM dbUser.Q_FORUM_TOPIC_THREAD_COUNT_V
         """;
 
     private const string TopicSitemapCountSelect = """
-        SELECT COUNT(*)
+        SELECT COUNT(*) AS Value
         FROM Q_FORUM_TOPIC_T
         WHERE Q_FORUM_TOPIC_PARENT_ID = 0
           AND LTRIM(RTRIM(ISNULL(TOPIC_SUBJECT, ''))) <> ''
@@ -67,89 +66,93 @@ public sealed class LegacyForumRepository(string connectionString) : IForumRepos
         WHERE t.Q_FORUM_TOPIC_PARENT_ID = 0
           AND LTRIM(RTRIM(ISNULL(t.TOPIC_SUBJECT, ''))) <> ''
         ORDER BY t.Q_FORUM_TOPIC_ID ASC
-        OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY
+        OFFSET {0} ROWS FETCH NEXT {1} ROWS ONLY
         """;
 
+    [ExcludeFromCodeCoverage] // SQL Server legacy schema; covered by opt-in legacy probes.
     public async Task<IReadOnlyList<ForumCategoryItem>> GetCategoriesAsync(CancellationToken cancellationToken = default)
     {
-        await using var connection = new SqlConnection(connectionString);
-        var command = new CommandDefinition(
-            CategoriesSelect,
-            cancellationToken: cancellationToken,
-            commandTimeout: CommandTimeoutSeconds);
-        var rows = await connection.QueryAsync<ForumCategoryRow>(command);
+        dbContext.Database.SetCommandTimeout(CommandTimeoutSeconds);
+        var rows = await dbContext.Database
+            .SqlQueryRaw<ForumCategoryRow>(CategoriesSelect)
+            .ToListAsync(cancellationToken);
         return rows.Select(Map).ToList();
     }
 
+    [ExcludeFromCodeCoverage]
     public async Task<ForumCategoryItem?> GetCategoryByIdAsync(int id, CancellationToken cancellationToken = default)
     {
-        await using var connection = new SqlConnection(connectionString);
-        var command = new CommandDefinition(
-            CategoryByIdSelect,
-            new { Id = id },
-            cancellationToken: cancellationToken,
-            commandTimeout: CommandTimeoutSeconds);
-        var row = await connection.QuerySingleOrDefaultAsync<ForumCategoryRow>(command);
+        dbContext.Database.SetCommandTimeout(CommandTimeoutSeconds);
+        var rows = await dbContext.Database
+            .SqlQueryRaw<ForumCategoryRow>(CategoryByIdSelect, id)
+            .ToListAsync(cancellationToken);
+        var row = rows.FirstOrDefault();
         return row is null ? null : Map(row);
     }
 
+    [ExcludeFromCodeCoverage]
     public async Task<ForumCategoryTopicsPage> GetCategoryTopicsPageAsync(
         int forumId,
         int page,
         int pageSize,
         CancellationToken cancellationToken = default)
     {
-        await using var connection = new SqlConnection(connectionString);
-        var parameters = new DynamicParameters();
-        parameters.Add("CurrentPage", page);
-        parameters.Add("PageSize", pageSize);
-        parameters.Add("Q_FORUM_ID", forumId);
-        parameters.Add("TotalRecords", dbType: DbType.Int32, direction: ParameterDirection.Output);
-
-        var command = new CommandDefinition(
+        var totalRecords = EfSql.OutputInt("@TotalRecords");
+        var rows = await EfSql.QueryProcAsync<ForumTopicRow>(
+            dbContext,
             "Q_FORUM_VIEW_PAGE_SP",
-            parameters,
-            commandType: CommandType.StoredProcedure,
-            cancellationToken: cancellationToken,
-            commandTimeout: CommandTimeoutSeconds);
+            command =>
+            {
+                command.Parameters.Add(EfSql.Input("@CurrentPage", page));
+                command.Parameters.Add(EfSql.Input("@PageSize", pageSize));
+                command.Parameters.Add(EfSql.Input("@Q_FORUM_ID", forumId));
+                command.Parameters.Add(totalRecords);
+            },
+            CommandTimeoutSeconds,
+            cancellationToken);
 
-        var rows = await connection.QueryAsync<ForumTopicRow>(command);
         return new ForumCategoryTopicsPage(
             rows.Select(MapTopic).ToList(),
-            parameters.Get<int>("TotalRecords"),
+            EfSql.GetNullableInt(totalRecords) ?? 0,
             page,
             pageSize);
     }
 
+    [ExcludeFromCodeCoverage]
     public async Task<ForumTopicPostsPage?> GetTopicPostsPageAsync(
         int topicId,
         int page,
         int pageSize,
         CancellationToken cancellationToken = default)
     {
-        await using var connection = new SqlConnection(connectionString);
-        var parameters = new DynamicParameters();
-        parameters.Add("CurrentPage", page);
-        parameters.Add("PageSize", pageSize);
-        parameters.Add("Q_FORUM_TOPIC_ID", topicId);
-        parameters.Add("USER_ID", 0);
-        parameters.Add("TotalRecords", dbType: DbType.Int32, direction: ParameterDirection.Output);
-        parameters.Add("SUBSCRIBED", dbType: DbType.Int32, direction: ParameterDirection.Output);
-        parameters.Add("forum_name", dbType: DbType.String, size: 30, direction: ParameterDirection.Output);
-        parameters.Add("SUBJECT", dbType: DbType.String, size: 75, direction: ParameterDirection.Output);
-        parameters.Add("Q_FORUM_ID", dbType: DbType.Int32, direction: ParameterDirection.Output);
-        parameters.Add("DISCO", dbType: DbType.Byte, direction: ParameterDirection.Output);
+        var totalRecords = EfSql.OutputInt("@TotalRecords");
+        var subscribed = EfSql.OutputInt("@SUBSCRIBED");
+        var forumName = EfSql.OutputString("@forum_name", 30);
+        var subject = EfSql.OutputString("@SUBJECT", 75);
+        var forumIdParam = EfSql.OutputInt("@Q_FORUM_ID");
+        var disco = EfSql.OutputByte("@DISCO");
 
-        var command = new CommandDefinition(
+        var rows = await EfSql.QueryProcAsync<ForumPostRow>(
+            dbContext,
             "Q_FORUM_TOPIC_NEW_SP",
-            parameters,
-            commandType: CommandType.StoredProcedure,
-            cancellationToken: cancellationToken,
-            commandTimeout: CommandTimeoutSeconds);
+            command =>
+            {
+                command.Parameters.Add(EfSql.Input("@CurrentPage", page));
+                command.Parameters.Add(EfSql.Input("@PageSize", pageSize));
+                command.Parameters.Add(EfSql.Input("@Q_FORUM_TOPIC_ID", topicId));
+                command.Parameters.Add(EfSql.Input("@USER_ID", 0));
+                command.Parameters.Add(totalRecords);
+                command.Parameters.Add(subscribed);
+                command.Parameters.Add(forumName);
+                command.Parameters.Add(subject);
+                command.Parameters.Add(forumIdParam);
+                command.Parameters.Add(disco);
+            },
+            CommandTimeoutSeconds,
+            cancellationToken);
 
-        var rows = await connection.QueryAsync<ForumPostRow>(command);
-        var forumId = parameters.Get<int?>("Q_FORUM_ID") ?? 0;
-        var title = parameters.Get<string>("SUBJECT")?.Trim();
+        var forumId = EfSql.GetNullableInt(forumIdParam) ?? 0;
+        var title = EfSql.GetNullableString(subject)?.Trim();
         if (forumId <= 0 || string.IsNullOrWhiteSpace(title))
         {
             return null;
@@ -159,26 +162,26 @@ public sealed class LegacyForumRepository(string connectionString) : IForumRepos
             topicId,
             title,
             forumId,
-            parameters.Get<string>("forum_name")?.Trim() ?? string.Empty);
+            EfSql.GetNullableString(forumName)?.Trim() ?? string.Empty);
 
         return new ForumTopicPostsPage(
             header,
             rows.Select(MapPost).ToList(),
-            parameters.Get<int>("TotalRecords"),
+            EfSql.GetNullableInt(totalRecords) ?? 0,
             page,
             pageSize);
     }
 
+    [ExcludeFromCodeCoverage]
     public async Task<int> GetTotalThreadCountAsync(CancellationToken cancellationToken = default)
     {
-        await using var connection = new SqlConnection(connectionString);
-        var command = new CommandDefinition(
-            TotalThreadCountSelect,
-            cancellationToken: cancellationToken,
-            commandTimeout: CommandTimeoutSeconds);
-        return await connection.ExecuteScalarAsync<int>(command);
+        dbContext.Database.SetCommandTimeout(CommandTimeoutSeconds);
+        return await dbContext.Database
+            .SqlQueryRaw<int>(TotalThreadCountSelect)
+            .FirstAsync(cancellationToken);
     }
 
+    [ExcludeFromCodeCoverage]
     public async Task<ForumArchiveStats> GetArchiveStatsAsync(CancellationToken cancellationToken = default)
     {
         var categories = await GetCategoriesAsync(cancellationToken);
@@ -186,28 +189,25 @@ public sealed class LegacyForumRepository(string connectionString) : IForumRepos
         return ForumArchiveStats.FromCategories(categories, threadCount);
     }
 
+    [ExcludeFromCodeCoverage]
     public async Task<int> GetTopicSitemapCountAsync(CancellationToken cancellationToken = default)
     {
-        await using var connection = new SqlConnection(connectionString);
-        var command = new CommandDefinition(
-            TopicSitemapCountSelect,
-            cancellationToken: cancellationToken,
-            commandTimeout: CommandTimeoutSeconds);
-        return await connection.ExecuteScalarAsync<int>(command);
+        dbContext.Database.SetCommandTimeout(CommandTimeoutSeconds);
+        return await dbContext.Database
+            .SqlQueryRaw<int>(TopicSitemapCountSelect)
+            .FirstAsync(cancellationToken);
     }
 
+    [ExcludeFromCodeCoverage]
     public async Task<IReadOnlyList<ForumTopicSitemapItem>> GetTopicSitemapPageAsync(
         int offset,
         int pageSize,
         CancellationToken cancellationToken = default)
     {
-        await using var connection = new SqlConnection(connectionString);
-        var command = new CommandDefinition(
-            TopicSitemapPageSelect,
-            new { Offset = Math.Max(offset, 0), PageSize = pageSize },
-            cancellationToken: cancellationToken,
-            commandTimeout: CommandTimeoutSeconds);
-        var rows = await connection.QueryAsync<ForumTopicSitemapRow>(command);
+        dbContext.Database.SetCommandTimeout(CommandTimeoutSeconds);
+        var rows = await dbContext.Database
+            .SqlQueryRaw<ForumTopicSitemapRow>(TopicSitemapPageSelect, Math.Max(offset, 0), pageSize)
+            .ToListAsync(cancellationToken);
         return rows
             .Select(row => new ForumTopicSitemapItem(
                 row.TopicId,
@@ -223,6 +223,7 @@ public sealed class LegacyForumRepository(string connectionString) : IForumRepos
         CancellationToken cancellationToken = default) =>
         throw new NotSupportedException("Forum search is not supported on the legacy forum path.");
 
+    [ExcludeFromCodeCoverage]
     private static ForumCategoryItem Map(ForumCategoryRow row) =>
         new(
             row.Id,
@@ -233,6 +234,7 @@ public sealed class LegacyForumRepository(string connectionString) : IForumRepos
             row.LatestThreadTitle,
             row.SortOrder);
 
+    [ExcludeFromCodeCoverage]
     private static ForumPostItem MapPost(ForumPostRow row) =>
         new(
             row.Q_FORUM_TOPIC_ID,
@@ -244,6 +246,7 @@ public sealed class LegacyForumRepository(string connectionString) : IForumRepos
             row.DATE_CREATED,
             ForumPostAttachment.Parse(row.ATTACHMENT, row.FILESIZE));
 
+    [ExcludeFromCodeCoverage]
     private static ForumTopicItem MapTopic(ForumTopicRow row) =>
         new(
             row.Q_FORUM_TOPIC_ID,
@@ -254,45 +257,83 @@ public sealed class LegacyForumRepository(string connectionString) : IForumRepos
             string.IsNullOrWhiteSpace(row.LAST_POST_USERNAME) ? null : row.LAST_POST_USERNAME.Trim(),
             row.STICKY == 1);
 
-    private sealed record ForumPostRow(
-        string? TOPIC_MESSAGE,
-        DateTime TOPIC_DATE,
-        int USER_ID,
-        string? USERNAME,
-        string? SIGNATURE,
-        short NUMBER_OF_POSTS,
-        DateTime? DATE_CREATED,
-        int Q_FORUM_TOPIC_ID,
-        string? ATTACHMENT,
-        string? FILESIZE,
-        short ATTACH_COUNT,
-        byte ONLINE,
-        string? AVATAR,
-        string? DISPLAY_MESSAGE,
-        byte DISCO);
+    internal sealed class ForumPostRow
+    {
+        public string? TOPIC_MESSAGE { get; set; }
 
-    private sealed record ForumTopicRow(
-        int Id,
-        int Q_FORUM_TOPIC_ID,
-        string TOPIC_SUBJECT,
-        DateTime TOPIC_LAST_POST,
-        int USER_ID,
-        string USERNAME,
-        short NUMBEROFREPLIES,
-        string? LAST_POST_USERNAME,
-        byte STICKY);
+        public DateTime TOPIC_DATE { get; set; }
 
-    private sealed record ForumCategoryRow(
-        int Id,
-        string? Name,
-        string? Description,
-        int PostCount,
-        DateTime? LastActivityAt,
-        string? LatestThreadTitle,
-        int SortOrder);
+        public int USER_ID { get; set; }
 
-    private sealed record ForumTopicSitemapRow(
-        int TopicId,
-        string? Title,
-        DateTime? LastActivityAt);
+        public string? USERNAME { get; set; }
+
+        public string? SIGNATURE { get; set; }
+
+        public short NUMBER_OF_POSTS { get; set; }
+
+        public DateTime? DATE_CREATED { get; set; }
+
+        public int Q_FORUM_TOPIC_ID { get; set; }
+
+        public string? ATTACHMENT { get; set; }
+
+        public string? FILESIZE { get; set; }
+
+        public short ATTACH_COUNT { get; set; }
+
+        public byte ONLINE { get; set; }
+
+        public string? AVATAR { get; set; }
+
+        public string? DISPLAY_MESSAGE { get; set; }
+
+        public byte DISCO { get; set; }
+    }
+
+    internal sealed class ForumTopicRow
+    {
+        public int Id { get; set; }
+
+        public int Q_FORUM_TOPIC_ID { get; set; }
+
+        public string TOPIC_SUBJECT { get; set; } = string.Empty;
+
+        public DateTime TOPIC_LAST_POST { get; set; }
+
+        public int USER_ID { get; set; }
+
+        public string USERNAME { get; set; } = string.Empty;
+
+        public short NUMBEROFREPLIES { get; set; }
+
+        public string? LAST_POST_USERNAME { get; set; }
+
+        public byte STICKY { get; set; }
+    }
+
+    internal sealed class ForumCategoryRow
+    {
+        public int Id { get; set; }
+
+        public string? Name { get; set; }
+
+        public string? Description { get; set; }
+
+        public int PostCount { get; set; }
+
+        public DateTime? LastActivityAt { get; set; }
+
+        public string? LatestThreadTitle { get; set; }
+
+        public int SortOrder { get; set; }
+    }
+
+    internal sealed class ForumTopicSitemapRow
+    {
+        public int TopicId { get; set; }
+
+        public string? Title { get; set; }
+
+        public DateTime? LastActivityAt { get; set; }
+    }
 }

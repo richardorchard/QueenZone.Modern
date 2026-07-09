@@ -1,11 +1,18 @@
+using Microsoft.EntityFrameworkCore;
 using QueenZone.Data;
 
 namespace QueenZone.Web.Tests;
 
 public sealed class ModernForumRepositorySearchTests
 {
-    private static ModernForumRepository CreateRepository() =>
-        new("Server=.;Database=QueenZone;Integrated Security=true;");
+    private static ModernForumRepository CreateRepository()
+    {
+        // Search short-circuits on blank queries before any database call.
+        var options = new DbContextOptionsBuilder<QueenZoneDbContext>()
+            .UseSqlServer("Server=.;Database=QueenZone;Integrated Security=true;Connect Timeout=1")
+            .Options;
+        return new ModernForumRepository(new QueenZoneDbContext(options));
+    }
 
     [Fact]
     public async Task SearchForumAsync_ReturnsEmptyPageForBlankQuery()

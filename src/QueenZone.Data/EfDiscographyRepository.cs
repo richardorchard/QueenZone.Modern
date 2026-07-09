@@ -1,30 +1,47 @@
-using System.Data;
-using Dapper;
-using Microsoft.Data.SqlClient;
+using System.Diagnostics.CodeAnalysis;
+using Microsoft.EntityFrameworkCore;
 
 namespace QueenZone.Data;
 
 /// <summary>
 /// Reads the legacy studio-album catalogue via its original stored procedures
-/// (Q_ALBUM_LIST_SP, Q_ALBUM_T_DISPLAY_SP, Q_ALBUM_SONG_T_LIST_SP).
+/// (<c>Q_ALBUM_LIST_SP</c>, <c>Q_ALBUM_T_DISPLAY_SP</c>, <c>Q_ALBUM_SONG_T_LIST_SP</c>),
+/// invoked through EF Core rather than Dapper.
 /// </summary>
-public sealed class LegacyDiscographyRepository : IDiscographyRepository
+public sealed class EfDiscographyRepository : IDiscographyRepository
 {
-    private readonly string connectionString;
+    private readonly QueenZoneDbContext dbContext;
+    private readonly string listSql;
+    private readonly Func<int, FormattableString> displaySql;
+    private readonly Func<int, FormattableString> songsSql;
 
-    public LegacyDiscographyRepository(string connectionString)
+    [ExcludeFromCodeCoverage]
+    public EfDiscographyRepository(QueenZoneDbContext dbContext)
+        : this(
+            dbContext,
+            listSql: EfProductionSql.CreateDiscographyQueries().ListSql,
+            displaySql: EfProductionSql.CreateDiscographyQueries().DisplaySql,
+            songsSql: EfProductionSql.CreateDiscographyQueries().SongsSql)
     {
-        this.connectionString = connectionString;
+    }
+
+    internal EfDiscographyRepository(
+        QueenZoneDbContext dbContext,
+        string listSql,
+        Func<int, FormattableString> displaySql,
+        Func<int, FormattableString> songsSql)
+    {
+        this.dbContext = dbContext;
+        this.listSql = listSql;
+        this.displaySql = displaySql;
+        this.songsSql = songsSql;
     }
 
     public async Task<IReadOnlyList<AlbumSummary>> GetAlbumsAsync(CancellationToken cancellationToken = default)
     {
-        await using var connection = new SqlConnection(connectionString);
-        var command = new CommandDefinition(
-            "Q_ALBUM_LIST_SP",
-            commandType: CommandType.StoredProcedure,
-            cancellationToken: cancellationToken);
-        var rows = await connection.QueryAsync<AlbumListRow>(command);
+        var rows = await dbContext.Database
+            .SqlQueryRaw<AlbumListRow>(listSql)
+            .ToListAsync(cancellationToken);
 
         return rows
             .Select(row => new AlbumSummary(
@@ -38,14 +55,11 @@ public sealed class LegacyDiscographyRepository : IDiscographyRepository
 
     public async Task<AlbumDetail?> GetAlbumByIdAsync(int albumId, CancellationToken cancellationToken = default)
     {
-        await using var connection = new SqlConnection(connectionString);
+        var albumRows = await dbContext.Database
+            .SqlQuery<AlbumDisplayRow>(displaySql(albumId))
+            .ToListAsync(cancellationToken);
 
-        var albumCommand = new CommandDefinition(
-            "Q_ALBUM_T_DISPLAY_SP",
-            new { Q_ALBUM_ID = albumId },
-            commandType: CommandType.StoredProcedure,
-            cancellationToken: cancellationToken);
-        var album = await connection.QuerySingleOrDefaultAsync<AlbumDisplayRow>(albumCommand);
+        var album = albumRows.FirstOrDefault();
 
         // Q_ALBUM_T_DISPLAY_SP does not filter on ACTIVE itself, so apply the visibility
         // gate here (mirrors the DISPLAY=1 pattern used for fan performances).
@@ -54,12 +68,9 @@ public sealed class LegacyDiscographyRepository : IDiscographyRepository
             return null;
         }
 
-        var songsCommand = new CommandDefinition(
-            "Q_ALBUM_SONG_T_LIST_SP",
-            new { Q_ALBUM_ID = albumId },
-            commandType: CommandType.StoredProcedure,
-            cancellationToken: cancellationToken);
-        var songRows = await connection.QueryAsync<AlbumSongRow>(songsCommand);
+        var songRows = await dbContext.Database
+            .SqlQuery<AlbumSongRow>(songsSql(albumId))
+            .ToListAsync(cancellationToken);
 
         var songs = songRows
             .Select(row => new AlbumSong(
@@ -81,7 +92,7 @@ public sealed class LegacyDiscographyRepository : IDiscographyRepository
             Songs: songs);
     }
 
-    private sealed class AlbumListRow
+    internal sealed class AlbumListRow
     {
         public int Q_ALBUM_ID { get; set; }
 
@@ -92,7 +103,7 @@ public sealed class LegacyDiscographyRepository : IDiscographyRepository
         public string? thumb_url { get; set; }
     }
 
-    private sealed class AlbumDisplayRow
+    internal sealed class AlbumDisplayRow
     {
         public int Q_ALBUM_ID { get; set; }
 
@@ -111,7 +122,7 @@ public sealed class LegacyDiscographyRepository : IDiscographyRepository
         public int ACTIVE { get; set; }
     }
 
-    private sealed class AlbumSongRow
+    internal sealed class AlbumSongRow
     {
         public int Q_ALBUM_SONG_ID { get; set; }
 

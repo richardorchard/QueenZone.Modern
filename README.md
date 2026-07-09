@@ -274,7 +274,7 @@ dotnet tool restore
 dotnet ef database update --project src/QueenZone.Data/QueenZone.Data.csproj --startup-project src/QueenZone.Web/QueenZone.Web.csproj
 ```
 
-Public news reads still use Dapper. Admin writes and audit logging use EF Core (`QueenZoneDbContext`).
+Public and admin SQL access uses EF Core (`QueenZoneDbContext`). Hot paths keep stored procedures, invoked via EF (`SqlQuery` / `SqlQueryRaw` / EF-managed proc calls). See ADR 0006.
 
 ### Admin authentication
 

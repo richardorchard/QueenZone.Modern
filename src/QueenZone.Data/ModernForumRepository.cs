@@ -1,103 +1,99 @@
-using System.Data;
 using System.Diagnostics.CodeAnalysis;
-using Dapper;
-using Microsoft.Data.SqlClient;
 
 namespace QueenZone.Data;
 
 /// <summary>
 /// Reads the public forum archive from the imported <c>ModernForum*</c> tables.
 /// Stored procedures and supporting indexes are documented in <c>docs/sql/006-modern-forum-read-path.sql</c>.
+/// Invoked through EF Core rather than Dapper.
 /// </summary>
-public sealed class ModernForumRepository(string connectionString) : IForumRepository
+public sealed class ModernForumRepository(QueenZoneDbContext dbContext) : IForumRepository
 {
     private const int CommandTimeoutSeconds = 120;
 
+    [ExcludeFromCodeCoverage] // SQL Server stored procedures; covered by opt-in legacy probes.
     public async Task<IReadOnlyList<ForumCategoryItem>> GetCategoriesAsync(CancellationToken cancellationToken = default)
     {
-        await using var connection = new SqlConnection(connectionString);
-        var command = new CommandDefinition(
+        var rows = await EfSql.QueryProcAsync<ForumCategoryRow>(
+            dbContext,
             "ModernForum_GetCategories",
-            commandType: CommandType.StoredProcedure,
-            cancellationToken: cancellationToken,
-            commandTimeout: CommandTimeoutSeconds);
-
-        var rows = await connection.QueryAsync<ForumCategoryRow>(command);
+            commandTimeoutSeconds: CommandTimeoutSeconds,
+            cancellationToken: cancellationToken);
         return rows.Select(Map).ToList();
     }
 
+    [ExcludeFromCodeCoverage]
     public async Task<ForumCategoryItem?> GetCategoryByIdAsync(int id, CancellationToken cancellationToken = default)
     {
-        await using var connection = new SqlConnection(connectionString);
-        var parameters = new DynamicParameters();
-        parameters.Add("Q_FORUM_ID", id);
-
-        var command = new CommandDefinition(
+        var row = await EfSql.QueryProcSingleOrDefaultAsync<ForumCategoryRow>(
+            dbContext,
             "ModernForum_GetCategoryByLegacyForumId",
-            parameters,
-            commandType: CommandType.StoredProcedure,
-            cancellationToken: cancellationToken,
-            commandTimeout: CommandTimeoutSeconds);
-
-        var row = await connection.QuerySingleOrDefaultAsync<ForumCategoryRow>(command);
+            command => command.Parameters.Add(EfSql.Input("@Q_FORUM_ID", id)),
+            CommandTimeoutSeconds,
+            cancellationToken);
         return row is null ? null : Map(row);
     }
 
+    [ExcludeFromCodeCoverage]
     public async Task<ForumCategoryTopicsPage> GetCategoryTopicsPageAsync(
         int forumId,
         int page,
         int pageSize,
         CancellationToken cancellationToken = default)
     {
-        await using var connection = new SqlConnection(connectionString);
-        var parameters = new DynamicParameters();
-        parameters.Add("CurrentPage", page);
-        parameters.Add("PageSize", pageSize);
-        parameters.Add("Q_FORUM_ID", forumId);
-        parameters.Add("TotalRecords", dbType: DbType.Int32, direction: ParameterDirection.Output);
-
-        var command = new CommandDefinition(
+        var totalRecords = EfSql.OutputInt("@TotalRecords");
+        var rows = await EfSql.QueryProcAsync<ForumTopicRow>(
+            dbContext,
             "ModernForum_GetCategoryThreadsPage",
-            parameters,
-            commandType: CommandType.StoredProcedure,
-            cancellationToken: cancellationToken,
-            commandTimeout: CommandTimeoutSeconds);
+            command =>
+            {
+                command.Parameters.Add(EfSql.Input("@CurrentPage", page));
+                command.Parameters.Add(EfSql.Input("@PageSize", pageSize));
+                command.Parameters.Add(EfSql.Input("@Q_FORUM_ID", forumId));
+                command.Parameters.Add(totalRecords);
+            },
+            CommandTimeoutSeconds,
+            cancellationToken);
 
-        var rows = await connection.QueryAsync<ForumTopicRow>(command);
         return new ForumCategoryTopicsPage(
             rows.Select(MapTopic).ToList(),
-            parameters.Get<int?>("TotalRecords") ?? 0,
+            EfSql.GetNullableInt(totalRecords) ?? 0,
             page,
             pageSize);
     }
 
+    [ExcludeFromCodeCoverage]
     public async Task<ForumTopicPostsPage?> GetTopicPostsPageAsync(
         int topicId,
         int page,
         int pageSize,
         CancellationToken cancellationToken = default)
     {
-        await using var connection = new SqlConnection(connectionString);
-        var parameters = new DynamicParameters();
-        parameters.Add("CurrentPage", page);
-        parameters.Add("PageSize", pageSize);
-        parameters.Add("Q_FORUM_TOPIC_ID", topicId);
-        parameters.Add("TotalRecords", dbType: DbType.Int32, direction: ParameterDirection.Output);
-        parameters.Add("forum_name", dbType: DbType.String, size: 100, direction: ParameterDirection.Output);
-        parameters.Add("SUBJECT", dbType: DbType.String, size: 200, direction: ParameterDirection.Output);
-        parameters.Add("Q_FORUM_ID", dbType: DbType.Int32, direction: ParameterDirection.Output);
-        parameters.Add("DISCO", dbType: DbType.Byte, direction: ParameterDirection.Output);
+        var totalRecords = EfSql.OutputInt("@TotalRecords");
+        var forumName = EfSql.OutputString("@forum_name", 100);
+        var subject = EfSql.OutputString("@SUBJECT", 200);
+        var forumIdParam = EfSql.OutputInt("@Q_FORUM_ID");
+        var disco = EfSql.OutputByte("@DISCO");
 
-        var command = new CommandDefinition(
+        var rows = await EfSql.QueryProcAsync<ForumPostRow>(
+            dbContext,
             "ModernForum_GetTopicPostsPage",
-            parameters,
-            commandType: CommandType.StoredProcedure,
-            cancellationToken: cancellationToken,
-            commandTimeout: CommandTimeoutSeconds);
+            command =>
+            {
+                command.Parameters.Add(EfSql.Input("@CurrentPage", page));
+                command.Parameters.Add(EfSql.Input("@PageSize", pageSize));
+                command.Parameters.Add(EfSql.Input("@Q_FORUM_TOPIC_ID", topicId));
+                command.Parameters.Add(totalRecords);
+                command.Parameters.Add(forumName);
+                command.Parameters.Add(subject);
+                command.Parameters.Add(forumIdParam);
+                command.Parameters.Add(disco);
+            },
+            CommandTimeoutSeconds,
+            cancellationToken);
 
-        var rows = await connection.QueryAsync<ForumPostRow>(command);
-        var forumId = parameters.Get<int?>("Q_FORUM_ID") ?? 0;
-        var title = parameters.Get<string>("SUBJECT")?.Trim();
+        var forumId = EfSql.GetNullableInt(forumIdParam) ?? 0;
+        var title = EfSql.GetNullableString(subject)?.Trim();
         if (forumId <= 0 || string.IsNullOrWhiteSpace(title))
         {
             return null;
@@ -107,28 +103,25 @@ public sealed class ModernForumRepository(string connectionString) : IForumRepos
             topicId,
             title,
             forumId,
-            parameters.Get<string>("forum_name")?.Trim() ?? string.Empty);
+            EfSql.GetNullableString(forumName)?.Trim() ?? string.Empty);
 
         return new ForumTopicPostsPage(
             header,
             rows.Select(MapPost).ToList(),
-            parameters.Get<int?>("TotalRecords") ?? 0,
+            EfSql.GetNullableInt(totalRecords) ?? 0,
             page,
             pageSize);
     }
 
-    public async Task<int> GetTotalThreadCountAsync(CancellationToken cancellationToken = default)
-    {
-        await using var connection = new SqlConnection(connectionString);
-        var command = new CommandDefinition(
+    [ExcludeFromCodeCoverage]
+    public Task<int> GetTotalThreadCountAsync(CancellationToken cancellationToken = default) =>
+        EfSql.ExecuteScalarProcAsync(
+            dbContext,
             "ModernForum_GetTotalThreadCount",
-            commandType: CommandType.StoredProcedure,
-            cancellationToken: cancellationToken,
-            commandTimeout: CommandTimeoutSeconds);
+            commandTimeoutSeconds: CommandTimeoutSeconds,
+            cancellationToken: cancellationToken);
 
-        return await connection.ExecuteScalarAsync<int>(command);
-    }
-
+    [ExcludeFromCodeCoverage]
     public async Task<ForumArchiveStats> GetArchiveStatsAsync(CancellationToken cancellationToken = default)
     {
         var categories = await GetCategoriesAsync(cancellationToken);
@@ -136,36 +129,31 @@ public sealed class ModernForumRepository(string connectionString) : IForumRepos
         return ForumArchiveStats.FromCategories(categories, threadCount);
     }
 
-    public async Task<int> GetTopicSitemapCountAsync(CancellationToken cancellationToken = default)
-    {
-        await using var connection = new SqlConnection(connectionString);
-        var command = new CommandDefinition(
+    [ExcludeFromCodeCoverage]
+    public Task<int> GetTopicSitemapCountAsync(CancellationToken cancellationToken = default) =>
+        EfSql.ExecuteScalarProcAsync(
+            dbContext,
             "ModernForum_GetTopicSitemapCount",
-            commandType: CommandType.StoredProcedure,
-            cancellationToken: cancellationToken,
-            commandTimeout: CommandTimeoutSeconds);
+            commandTimeoutSeconds: CommandTimeoutSeconds,
+            cancellationToken: cancellationToken);
 
-        return await connection.ExecuteScalarAsync<int>(command);
-    }
-
+    [ExcludeFromCodeCoverage]
     public async Task<IReadOnlyList<ForumTopicSitemapItem>> GetTopicSitemapPageAsync(
         int offset,
         int pageSize,
         CancellationToken cancellationToken = default)
     {
-        await using var connection = new SqlConnection(connectionString);
-        var parameters = new DynamicParameters();
-        parameters.Add("Offset", Math.Max(offset, 0));
-        parameters.Add("PageSize", pageSize);
-
-        var command = new CommandDefinition(
+        var rows = await EfSql.QueryProcAsync<ForumTopicSitemapRow>(
+            dbContext,
             "ModernForum_GetTopicSitemapPage",
-            parameters,
-            commandType: CommandType.StoredProcedure,
-            cancellationToken: cancellationToken,
-            commandTimeout: CommandTimeoutSeconds);
+            command =>
+            {
+                command.Parameters.Add(EfSql.Input("@Offset", Math.Max(offset, 0)));
+                command.Parameters.Add(EfSql.Input("@PageSize", pageSize));
+            },
+            CommandTimeoutSeconds,
+            cancellationToken);
 
-        var rows = await connection.QueryAsync<ForumTopicSitemapRow>(command);
         return rows
             .Select(row => new ForumTopicSitemapItem(
                 row.TopicId,
@@ -195,31 +183,29 @@ public sealed class ModernForumRepository(string connectionString) : IForumRepos
         int pageSize,
         CancellationToken cancellationToken)
     {
-        await using var connection = new SqlConnection(connectionString);
         var offset = Math.Max(page - 1, 0) * pageSize;
-        var parameters = new DynamicParameters();
-        parameters.Add("Query", query);
-        parameters.Add("Offset", offset);
-        parameters.Add("PageSize", pageSize);
-        parameters.Add("TotalRecords", dbType: DbType.Int32, direction: ParameterDirection.Output);
-
-        var command = new CommandDefinition(
+        var totalRecords = EfSql.OutputInt("@TotalRecords");
+        var rows = await EfSql.QueryProcAsync<ForumSearchRow>(
+            dbContext,
             "ModernForum_SearchThreads",
-            parameters,
-            commandType: CommandType.StoredProcedure,
-            cancellationToken: cancellationToken,
-            commandTimeout: CommandTimeoutSeconds);
-
-        var rows = await connection.QueryAsync<ForumSearchRow>(command);
-        var totalRecords = parameters.Get<int?>("TotalRecords") ?? 0;
+            command =>
+            {
+                command.Parameters.Add(EfSql.Input("@Query", query));
+                command.Parameters.Add(EfSql.Input("@Offset", offset));
+                command.Parameters.Add(EfSql.Input("@PageSize", pageSize));
+                command.Parameters.Add(totalRecords);
+            },
+            CommandTimeoutSeconds,
+            cancellationToken);
 
         return new ForumSearchPage(
             rows.Select(MapSearch).ToList(),
-            totalRecords,
+            EfSql.GetNullableInt(totalRecords) ?? 0,
             page,
             pageSize);
     }
 
+    [ExcludeFromCodeCoverage]
     private static ForumCategoryItem Map(ForumCategoryRow row) =>
         new(
             row.Id,
@@ -230,6 +216,7 @@ public sealed class ModernForumRepository(string connectionString) : IForumRepos
             string.IsNullOrWhiteSpace(row.LatestThreadTitle) ? null : row.LatestThreadTitle.Trim(),
             row.SortOrder);
 
+    [ExcludeFromCodeCoverage]
     private static ForumPostItem MapPost(ForumPostRow row) =>
         new(
             row.Q_FORUM_TOPIC_ID,
@@ -241,6 +228,7 @@ public sealed class ModernForumRepository(string connectionString) : IForumRepos
             row.DATE_CREATED,
             ForumPostAttachment.Parse(row.ATTACHMENT, row.FILESIZE));
 
+    [ExcludeFromCodeCoverage]
     private static ForumTopicItem MapTopic(ForumTopicRow row) =>
         new(
             row.Q_FORUM_TOPIC_ID,
@@ -250,43 +238,6 @@ public sealed class ModernForumRepository(string connectionString) : IForumRepos
             row.NUMBEROFREPLIES,
             string.IsNullOrWhiteSpace(row.LAST_POST_USERNAME) ? null : row.LAST_POST_USERNAME.Trim(),
             row.STICKY == 1);
-
-    private sealed record ForumPostRow(
-        string? TOPIC_MESSAGE,
-        DateTime? TOPIC_DATE,
-        int? USER_ID,
-        string? USERNAME,
-        string? SIGNATURE,
-        int? NUMBER_OF_POSTS,
-        DateTime? DATE_CREATED,
-        int Q_FORUM_TOPIC_ID,
-        string? ATTACHMENT,
-        string? FILESIZE,
-        int ATTACH_COUNT,
-        byte ONLINE,
-        string? AVATAR,
-        string? DISPLAY_MESSAGE,
-        byte DISCO);
-
-    private sealed record ForumTopicRow(
-        int Id,
-        int Q_FORUM_TOPIC_ID,
-        string? TOPIC_SUBJECT,
-        DateTime? TOPIC_LAST_POST,
-        int? USER_ID,
-        string? USERNAME,
-        int NUMBEROFREPLIES,
-        string? LAST_POST_USERNAME,
-        byte STICKY);
-
-    private sealed record ForumCategoryRow(
-        int Id,
-        string? Name,
-        string? Description,
-        int PostCount,
-        DateTime? LastActivityAt,
-        string? LatestThreadTitle,
-        int SortOrder);
 
     [ExcludeFromCodeCoverage]
     private static ForumSearchResult MapSearch(ForumSearchRow row) =>
@@ -299,18 +250,101 @@ public sealed class ModernForumRepository(string connectionString) : IForumRepos
             row.LastActivityAt,
             string.IsNullOrWhiteSpace(row.StartedByDisplayName) ? null : row.StartedByDisplayName.Trim());
 
-    [ExcludeFromCodeCoverage]
-    private sealed record ForumSearchRow(
-        int TopicId,
-        string? Title,
-        int CategoryId,
-        string? CategoryName,
-        int ReplyCount,
-        DateTime? LastActivityAt,
-        string? StartedByDisplayName);
+    internal sealed class ForumPostRow
+    {
+        public string? TOPIC_MESSAGE { get; set; }
 
-    private sealed record ForumTopicSitemapRow(
-        int TopicId,
-        string? Title,
-        DateTime? LastActivityAt);
+        public DateTime? TOPIC_DATE { get; set; }
+
+        public int? USER_ID { get; set; }
+
+        public string? USERNAME { get; set; }
+
+        public string? SIGNATURE { get; set; }
+
+        public int? NUMBER_OF_POSTS { get; set; }
+
+        public DateTime? DATE_CREATED { get; set; }
+
+        public int Q_FORUM_TOPIC_ID { get; set; }
+
+        public string? ATTACHMENT { get; set; }
+
+        public string? FILESIZE { get; set; }
+
+        public int ATTACH_COUNT { get; set; }
+
+        public byte ONLINE { get; set; }
+
+        public string? AVATAR { get; set; }
+
+        public string? DISPLAY_MESSAGE { get; set; }
+
+        public byte DISCO { get; set; }
+    }
+
+    internal sealed class ForumTopicRow
+    {
+        public int Id { get; set; }
+
+        public int Q_FORUM_TOPIC_ID { get; set; }
+
+        public string? TOPIC_SUBJECT { get; set; }
+
+        public DateTime? TOPIC_LAST_POST { get; set; }
+
+        public int? USER_ID { get; set; }
+
+        public string? USERNAME { get; set; }
+
+        public int NUMBEROFREPLIES { get; set; }
+
+        public string? LAST_POST_USERNAME { get; set; }
+
+        public byte STICKY { get; set; }
+    }
+
+    internal sealed class ForumCategoryRow
+    {
+        public int Id { get; set; }
+
+        public string? Name { get; set; }
+
+        public string? Description { get; set; }
+
+        public int PostCount { get; set; }
+
+        public DateTime? LastActivityAt { get; set; }
+
+        public string? LatestThreadTitle { get; set; }
+
+        public int SortOrder { get; set; }
+    }
+
+    [ExcludeFromCodeCoverage]
+    internal sealed class ForumSearchRow
+    {
+        public int TopicId { get; set; }
+
+        public string? Title { get; set; }
+
+        public int CategoryId { get; set; }
+
+        public string? CategoryName { get; set; }
+
+        public int ReplyCount { get; set; }
+
+        public DateTime? LastActivityAt { get; set; }
+
+        public string? StartedByDisplayName { get; set; }
+    }
+
+    internal sealed class ForumTopicSitemapRow
+    {
+        public int TopicId { get; set; }
+
+        public string? Title { get; set; }
+
+        public DateTime? LastActivityAt { get; set; }
+    }
 }

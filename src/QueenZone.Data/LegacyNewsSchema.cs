@@ -1,4 +1,4 @@
-using Dapper;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Data.SqlClient;
 
 namespace QueenZone.Data;
@@ -7,15 +7,15 @@ public static class LegacyNewsSchema
 {
     public sealed class NewsColumnAvailability
     {
-        public bool HasSourceUrlColumn { get; init; }
+        public bool HasSourceUrlColumn { get; set; }
 
-        public bool HasSlugColumn { get; init; }
+        public bool HasSlugColumn { get; set; }
 
-        public bool HasCreatedAtColumn { get; init; }
+        public bool HasCreatedAtColumn { get; set; }
 
-        public bool HasUpdatedAtColumn { get; init; }
+        public bool HasUpdatedAtColumn { get; set; }
 
-        public bool HasEditorEmailColumn { get; init; }
+        public bool HasEditorEmailColumn { get; set; }
     }
 
     public static string BuildPublishedNewsCte(bool includeSlugColumn)
@@ -69,7 +69,7 @@ public static class LegacyNewsSchema
     public static string BuildAdminLatestNewsCountSql(NewsColumnAvailability columns) =>
         BuildAdminLatestNewsCte(columns) + """
 
-            SELECT COUNT(*)
+            SELECT COUNT(*) AS Value
             FROM LatestNews
             WHERE RowNumber = 1
             """;
@@ -116,9 +116,9 @@ public static class LegacyNewsSchema
             """;
     }
 
+    [ExcludeFromCodeCoverage] // SQL Server COL_LENGTH probe.
     internal static bool HasSlugColumn(string connectionString)
     {
-        using var connection = new SqlConnection(connectionString);
         const string sql = """
             SELECT CASE
                 WHEN COL_LENGTH('NEWS_T', 'SLUG') IS NOT NULL THEN CAST(1 AS bit)
@@ -126,12 +126,12 @@ public static class LegacyNewsSchema
             END
             """;
 
-        return connection.ExecuteScalar<bool>(sql);
+        return EfSql.ExecuteScalarBoolSqlAsync(connectionString, sql).GetAwaiter().GetResult();
     }
 
+    [ExcludeFromCodeCoverage] // SQL Server COL_LENGTH probe.
     internal static NewsColumnAvailability GetNewsColumnAvailability(string connectionString)
     {
-        using var connection = new SqlConnection(connectionString);
         const string sql = """
             SELECT
                 CAST(CASE WHEN COL_LENGTH('NEWS_T', 'SOURCE_URL') IS NOT NULL THEN 1 ELSE 0 END AS bit) AS HasSourceUrlColumn,
@@ -141,6 +141,6 @@ public static class LegacyNewsSchema
                 CAST(CASE WHEN COL_LENGTH('NEWS_T', 'EDITOR_EMAIL') IS NOT NULL THEN 1 ELSE 0 END AS bit) AS HasEditorEmailColumn
             """;
 
-        return connection.QuerySingle<NewsColumnAvailability>(sql);
+        return EfSql.QuerySingleSqlAsync<NewsColumnAvailability>(connectionString, sql).GetAwaiter().GetResult();
     }
 }

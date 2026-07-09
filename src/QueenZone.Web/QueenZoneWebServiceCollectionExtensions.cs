@@ -61,10 +61,11 @@ public static class QueenZoneWebServiceCollectionExtensions
     public static IServiceCollection AddQueenZoneSitemaps(this IServiceCollection services)
     {
         services.AddSingleton(TimeProvider.System);
-        services.AddSingleton<CoreSitemapBuilder>();
-        services.AddSingleton<CoreSitemapService>();
-        services.AddSingleton<ForumSitemapBuilder>();
-        services.AddSingleton<SitemapIndexBuilder>();
+        // Scoped: sitemap builders depend on EF-backed content repositories (scoped DbContext).
+        services.AddScoped<CoreSitemapBuilder>();
+        services.AddScoped<CoreSitemapService>();
+        services.AddScoped<ForumSitemapBuilder>();
+        services.AddScoped<SitemapIndexBuilder>();
         return services;
     }
 
