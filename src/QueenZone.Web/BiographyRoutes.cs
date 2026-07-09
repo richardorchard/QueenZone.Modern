@@ -6,29 +6,31 @@ public static class BiographyRoutes
 {
     public const string IndexPath = "/biography";
 
+    public static string GetChapterDetailPath(int id, string title) =>
+        $"/biography/{id}/{NewsSlug.Slugify(title)}";
+
     public static string GetChapterDetailPath(BiographyChapterItem chapter) =>
-        $"/biography/{chapter.Id}/{NewsSlug.Slugify(chapter.Title)}";
+        GetChapterDetailPath(chapter.Id, chapter.Title);
+
+    public static string GetChapterDetailPath(BiographyChapterSummary chapter) =>
+        chapter.DetailPath;
+
+    public static string GetChapterDetailPath(BiographyChapterDetail chapter) =>
+        chapter.DetailPath;
 
     public static string GetChapterNumeral(int index, bool useRoman = true) =>
         useRoman ? ToRoman(index + 1) : (index + 1).ToString();
 
-    public static string GetChapterNumeral(
-        BiographyChapterItem chapter,
-        IEnumerable<BiographyChapterItem> chapters,
-        bool useRoman = true)
+    public static string GetChapterMarker(string title, byte displaySequence)
     {
-        var readingOrder = BiographyChapterOrdering.ByDisplaySequenceAscending(chapters);
-        var index = readingOrder.ToList().FindIndex(item => item.Id == chapter.Id);
-        return GetChapterNumeral(Math.Max(index, 0), useRoman);
-    }
-
-    public static string GetChapterMarker(BiographyChapterItem chapter)
-    {
-        var marker = BiographyTitle.GetYearMarker(chapter.Title);
+        var marker = BiographyTitle.GetYearMarker(title);
         return string.IsNullOrWhiteSpace(marker)
-            ? $"Chapter {chapter.DisplaySequence}"
+            ? $"Chapter {displaySequence}"
             : marker;
     }
+
+    public static string GetChapterMarker(BiographyChapterItem chapter) =>
+        GetChapterMarker(chapter.Title, chapter.DisplaySequence);
 
     public static string GetReadTimeLabel(string body)
     {

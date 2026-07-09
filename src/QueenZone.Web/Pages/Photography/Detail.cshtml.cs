@@ -6,9 +6,9 @@ namespace QueenZone.Web.Pages.Photography;
 
 public sealed class DetailModel(IPhotoRepository photoRepository) : PageModel
 {
-    public PhotoCategory Category { get; private set; } = null!;
+    public PhotoCategorySummary Category { get; private set; } = null!;
 
-    public PhotoItem Photo { get; private set; } = null!;
+    public PhotoDetailItem Photo { get; private set; } = null!;
 
     public int Index { get; private set; }
 
@@ -37,8 +37,10 @@ public sealed class DetailModel(IPhotoRepository photoRepository) : PageModel
             return NotFound();
         }
 
-        Category = category;
-        Photo = items[index];
+        var categoryView = PublicContentMapper.ToPhotoCategorySummary(category);
+        var photo = PublicContentMapper.ToPhotoDetailItem(items[index]);
+        Category = categoryView;
+        Photo = photo;
         Index = index;
         Count = items.Count;
 
@@ -52,11 +54,11 @@ public sealed class DetailModel(IPhotoRepository photoRepository) : PageModel
         [
             BreadcrumbItem.Home,
             new BreadcrumbItem("Photography", PhotoRoutes.GetCategoriesPath()),
-            new BreadcrumbItem(category.Name, PhotoRoutes.GetCategoryPath(category.Slug)),
-            new BreadcrumbItem(Photo.Title, PhotoRoutes.GetDetailPath(category.Slug, Photo.PicId)),
+            new BreadcrumbItem(categoryView.Name, categoryView.DetailPath),
+            new BreadcrumbItem(photo.Title, photo.DetailPath),
         ];
 
-        ViewData["Title"] = $"{Photo.Title} | {category.Name} | Photography | QueenZone";
+        ViewData["Title"] = $"{photo.Title} | {categoryView.Name} | Photography | QueenZone";
 
         return Page();
     }

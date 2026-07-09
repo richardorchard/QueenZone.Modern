@@ -1,23 +1,19 @@
-@model IReadOnlyList<BiographyChapterItem>
+@model IReadOnlyList<BiographyChapterSummary>
 
 <ol class="qz-bio-chapters">
-  @for (var index = 0; index < Model.Count; index++)
+  @foreach (var chapter in Model)
   {
-    var chapter = Model[index];
     <li>
-      <a class="qz-bio-chapter-row" href="@BiographyRoutes.GetChapterDetailPath(chapter)">
+      <a class="qz-bio-chapter-row" href="@chapter.DetailPath">
         <div class="qz-bio-chapter-row__marker">
-          <div class="qz-bio-chapter-row__numeral">Chapter @BiographyRoutes.GetChapterNumeral(chapter, Model)</div>
-          <div class="qz-bio-chapter-row__range">@BiographyRoutes.GetChapterMarker(chapter)</div>
+          <div class="qz-bio-chapter-row__numeral">Chapter @chapter.ChapterNumeral</div>
+          <div class="qz-bio-chapter-row__range">@chapter.Marker</div>
         </div>
         <div class="qz-bio-chapter-row__content">
           <h2>@chapter.Title</h2>
-          @{
-            var summary = BiographyContent.GetListSummary(chapter);
-          }
-          @if (!string.IsNullOrWhiteSpace(summary))
+          @if (!string.IsNullOrWhiteSpace(chapter.Summary))
           {
-            <p>@summary</p>
+            <p>@chapter.Summary</p>
           }
           <span class="qz-bio-chapter-row__cta">
             Read the chapter

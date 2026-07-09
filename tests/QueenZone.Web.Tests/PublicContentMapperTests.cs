@@ -121,4 +121,102 @@ public sealed class PublicContentMapperTests
         Assert.Equal(4, stats.ThreadCount);
         Assert.Equal(15, stats.PostCount);
     }
+
+    [Fact]
+    public void ToBiographyChapterSummaries_PreservesSourceOrderAndAssignsReadingNumerals()
+    {
+        // Repository presentation order is newest-first; numerals follow ascending reading order.
+        var chapters = new[]
+        {
+            new BiographyChapterItem(2, "1970", "Second summary", "Body two", 2, DateTime.UtcNow),
+            new BiographyChapterItem(1, "1946 - 1969", "First summary", "Body one", 1, DateTime.UtcNow)
+        };
+
+        var views = PublicContentMapper.ToBiographyChapterSummaries(chapters);
+
+        Assert.Equal(2, views.Count);
+        Assert.Equal(2, views[0].Id);
+        Assert.Equal("II", views[0].ChapterNumeral);
+        Assert.Equal("/biography/2/1970", views[0].DetailPath);
+        Assert.Equal(1, views[1].Id);
+        Assert.Equal("I", views[1].ChapterNumeral);
+        Assert.Equal("1946–1969", views[1].Marker);
+        Assert.Equal("/biography/1/1946-1969", views[1].DetailPath);
+    }
+
+    [Fact]
+    public void ToBiographyChapterNav_MapsAdjacentLinks()
+    {
+        var previous = new BiographyChapterItem(1, "Earlier", "s", "b", 1, DateTime.UtcNow);
+        var next = new BiographyChapterItem(3, "Later chapter", "s", "b", 3, DateTime.UtcNow);
+
+        var nav = PublicContentMapper.ToBiographyChapterNav(new BiographyChapterNav(previous, next));
+
+        Assert.NotNull(nav.Previous);
+        Assert.Equal("Earlier", nav.Previous!.Title);
+        Assert.Equal("/biography/1/earlier", nav.Previous.DetailPath);
+        Assert.NotNull(nav.Next);
+        Assert.Equal("/biography/3/later-chapter", nav.Next!.DetailPath);
+    }
+
+    [Fact]
+    public void ToPhotoCategorySummary_IncludesCoverAndDetailPath()
+    {
+        var category = new PhotoCategory(5, "Live Aid", "live-aid", 12);
+
+        var view = PublicContentMapper.ToPhotoCategorySummary(category, coverImageUrl: "https://cdn.example/cover.jpg");
+
+        Assert.Equal(5, view.CatId);
+        Assert.Equal("/photography/live-aid", view.DetailPath);
+        Assert.Equal("https://cdn.example/cover.jpg", view.CoverImageUrl);
+    }
+
+    [Fact]
+    public void ToPhotoThumbnailItem_BuildsDetailPath()
+    {
+        var photo = new PhotoItem(
+            99,
+            5,
+            "Live Aid",
+            "live-aid",
+            "Stage shot",
+            "https://cdn.example/full.jpg",
+            "https://cdn.example/thumb.jpg",
+            200,
+            150,
+            1985,
+            DateTime.UtcNow);
+
+        var view = PublicContentMapper.ToPhotoThumbnailItem(photo);
+
+        Assert.Equal("/photography/live-aid/99", view.DetailPath);
+        Assert.Equal("Stage shot", view.Title);
+        Assert.Equal(1985, view.Year);
+    }
+
+    [Fact]
+    public void ToAlbumCardItem_AndDetail_MapPathsAndTracks()
+    {
+        var summary = new AlbumSummary(7, "A Night at the Opera", "a-night-at-the-opera", 1975, "https://cdn.example/thumb.jpg");
+        var card = PublicContentMapper.ToAlbumCardItem(summary);
+        Assert.Equal("/discography/albums/7/a-night-at-the-opera", card.DetailPath);
+
+        var detail = new AlbumDetail(
+            7,
+            "A Night at the Opera",
+            "a-night-at-the-opera",
+            1975,
+            "Queen",
+            "Notes",
+            "https://cdn.example/cover.jpg",
+            [new AlbumSong(1, "Bohemian Rhapsody", true, "Is this the real life?", null)]);
+
+        var view = PublicContentMapper.ToAlbumDetailViewModel(detail);
+
+        Assert.Equal(card.DetailPath, view.DetailPath);
+        Assert.Equal("Queen", view.ArtistName);
+        Assert.Single(view.Songs);
+        Assert.True(view.Songs[0].IsSingle);
+        Assert.Equal("Bohemian Rhapsody", view.Songs[0].Title);
+    }
 }

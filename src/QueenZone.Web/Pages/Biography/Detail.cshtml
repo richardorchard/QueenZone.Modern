@@ -11,24 +11,21 @@
     <div class="qz-container qz-bio-detail-hero__content qz-breadcrumbs-on-dark">
       <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
       <div class="qz-eyebrow" style="color: var(--qz-gold);">
-        Chapter @BiographyRoutes.GetChapterNumeral(Math.Max(Model.ChapterIndex, 0)) · @BiographyRoutes.GetChapterMarker(chapter)
+        Chapter @chapter.ChapterNumeral · @chapter.Marker
       </div>
       <h1>@chapter.Title</h1>
-      @{
-        var summary = BiographyContent.GetListSummary(chapter);
-      }
-      @if (!string.IsNullOrWhiteSpace(summary))
+      @if (!string.IsNullOrWhiteSpace(chapter.Summary))
       {
-        <p class="lede">@summary</p>
+        <p class="lede">@chapter.Summary</p>
       }
     </div>
   </section>
 
   <div class="qz-reading">
     <div class="qz-bio-detail-meta">
-      <span>@BiographyRoutes.GetChapterMarker(chapter)</span>
+      <span>@chapter.Marker</span>
       <span class="qz-bio-detail-meta__dot" aria-hidden="true"></span>
-      <span>@BiographyRoutes.GetReadTimeLabel(chapter.Body)</span>
+      <span>@chapter.ReadTimeLabel</span>
     </div>
 
     <article class="article-body">@Html.Raw(BiographyContent.FormatBody(chapter.Body))</article>
@@ -40,7 +37,7 @@
       <div class="qz-bio-chapter-nav__grid">
         @if (nav.Previous is not null)
         {
-          <a class="qz-bio-chapter-nav__link" href="@BiographyRoutes.GetChapterDetailPath(nav.Previous)">
+          <a class="qz-bio-chapter-nav__link" href="@nav.Previous.DetailPath">
             <span class="qz-bio-chapter-nav__label">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
               Previous Chapter
@@ -55,7 +52,7 @@
 
         @if (nav.Next is not null)
         {
-          <a class="qz-bio-chapter-nav__link qz-bio-chapter-nav__link--next" href="@BiographyRoutes.GetChapterDetailPath(nav.Next)">
+          <a class="qz-bio-chapter-nav__link qz-bio-chapter-nav__link--next" href="@nav.Next.DetailPath">
             <span class="qz-bio-chapter-nav__label">
               Next Chapter
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>

@@ -74,7 +74,7 @@ public sealed class CoreSitemapBuilder(
         foreach (var chapter in chapters)
         {
             entries.Add(new(
-                BiographyRoutes.GetChapterDetailPath(chapter),
+                BiographyRoutes.GetChapterDetailPath(chapter.Id, chapter.Title),
                 chapter.CreatedAt == DateTime.MinValue ? null : chapter.CreatedAt));
         }
     }
@@ -144,7 +144,7 @@ public sealed class CoreSitemapBuilder(
         var albums = await discographyRepository.GetAlbumsAsync(cancellationToken);
         foreach (var album in albums)
         {
-            entries.Add(new(DiscographyRoutes.GetAlbumPath(album)));
+            entries.Add(new(DiscographyRoutes.GetAlbumPath(album.AlbumId, album.Slug)));
         }
     }
 }

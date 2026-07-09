@@ -6,9 +6,9 @@ namespace QueenZone.Web.Pages.Photography;
 
 public abstract class PhotoCategoryPageModel(IPhotoRepository photoRepository) : PageModel
 {
-    public PhotoCategory Category { get; private set; } = null!;
+    public PhotoCategorySummary Category { get; private set; } = null!;
 
-    public IReadOnlyList<PhotoItem> Items { get; private set; } = [];
+    public IReadOnlyList<PhotoThumbnailItem> Items { get; private set; } = [];
 
     public int CurrentPage { get; private set; }
 
@@ -43,17 +43,25 @@ public abstract class PhotoCategoryPageModel(IPhotoRepository photoRepository) :
             return NotFound();
         }
 
-        Category = category;
-        Items = result.Items;
+        var categoryView = PublicContentMapper.ToPhotoCategorySummary(category);
+        Category = categoryView;
+        Items = PublicContentMapper.ToPhotoThumbnailItems(result.Items);
         CurrentPage = page;
         TotalPages = totalPages;
         TotalCount = result.TotalCount;
         RangeStart = result.TotalCount == 0 ? 0 : ((page - 1) * PhotoRoutes.CategoryPageSize) + 1;
         RangeEnd = result.TotalCount == 0 ? 0 : RangeStart + result.Items.Count - 1;
-        Breadcrumbs = [BreadcrumbItem.Home, new BreadcrumbItem("Photography", PhotoRoutes.GetCategoriesPath()), new BreadcrumbItem(category.Name, PhotoRoutes.GetCategoryPath(category.Slug))];
+        Breadcrumbs =
+        [
+            BreadcrumbItem.Home,
+            new BreadcrumbItem("Photography", PhotoRoutes.GetCategoriesPath()),
+            new BreadcrumbItem(categoryView.Name, categoryView.DetailPath)
+        ];
 
-        ViewData["Title"] = page <= 1 ? $"{category.Name} | Photography | QueenZone" : $"{category.Name} | Photography – Page {page} | QueenZone";
-        ViewData["CanonicalPath"] = PhotoRoutes.GetCategoryPagePath(category.Slug, page);
+        ViewData["Title"] = page <= 1
+            ? $"{categoryView.Name} | Photography | QueenZone"
+            : $"{categoryView.Name} | Photography – Page {page} | QueenZone";
+        ViewData["CanonicalPath"] = PhotoRoutes.GetCategoryPagePath(categoryView.Slug, page);
 
         return Page();
     }

@@ -6,7 +6,7 @@ namespace QueenZone.Web.Pages.Discography;
 
 public sealed class AlbumModel(IDiscographyRepository discographyRepository) : PageModel
 {
-    public AlbumDetail Album { get; private set; } = null!;
+    public AlbumDetailViewModel Album { get; private set; } = null!;
 
     public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
 
@@ -18,18 +18,24 @@ public sealed class AlbumModel(IDiscographyRepository discographyRepository) : P
             return NotFound();
         }
 
+        var detail = PublicContentMapper.ToAlbumDetailViewModel(album);
         if (!string.Equals(album.Slug, slug, StringComparison.OrdinalIgnoreCase))
         {
-            return RedirectPermanent(DiscographyRoutes.GetAlbumPath(album.AlbumId, album.Slug));
+            return RedirectPermanent(detail.DetailPath);
         }
 
-        Album = album;
-        Breadcrumbs = [BreadcrumbItem.Home, new BreadcrumbItem("Discography", DiscographyRoutes.GetIndexPath()), new BreadcrumbItem(album.Name, DiscographyRoutes.GetAlbumPath(album.AlbumId, album.Slug))];
-        ViewData["Title"] = $"{album.Name} | Discography | QueenZone";
-        ViewData["CanonicalPath"] = DiscographyRoutes.GetAlbumPath(album.AlbumId, album.Slug);
-        if (album.GeneralNotes is not null)
+        Album = detail;
+        Breadcrumbs =
+        [
+            BreadcrumbItem.Home,
+            new BreadcrumbItem("Discography", DiscographyRoutes.GetIndexPath()),
+            new BreadcrumbItem(detail.Name, detail.DetailPath)
+        ];
+        ViewData["Title"] = $"{detail.Name} | Discography | QueenZone";
+        ViewData["CanonicalPath"] = detail.DetailPath;
+        if (detail.GeneralNotes is not null)
         {
-            ViewData["Description"] = NewsArticleContent.ToPlainText(album.GeneralNotes);
+            ViewData["Description"] = NewsArticleContent.ToPlainText(detail.GeneralNotes);
         }
 
         return Page();
