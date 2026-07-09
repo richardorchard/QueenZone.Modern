@@ -73,19 +73,83 @@ public sealed class PublicQueryCacheServiceTests
     }
 
     [Fact]
+    public async Task InvalidateNewsCache_does_not_evict_forum_or_history_cache()
+    {
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var newsRepository = new CountingNewsRepository();
+        var forumRepository = new CountingForumRepository();
+        var historyRepository = new CountingQueenHistoryRepository();
+        var service = CreateService(
+            memoryCache,
+            newsRepository: newsRepository,
+            forumRepository: forumRepository,
+            historyRepository: historyRepository);
+
+        await service.GetLatestNewsAsync(5);
+        await service.GetForumCategoriesAsync();
+        await service.GetForumThreadCountAsync();
+        await service.GetOnThisDayAsync(new DateOnly(2026, 7, 6), 3);
+        await service.GetAroundThisDayAsync(new DateOnly(2026, 7, 6), 7, 3);
+
+        service.InvalidateNewsCache();
+
+        await service.GetLatestNewsAsync(5);
+        await service.GetForumCategoriesAsync();
+        await service.GetForumThreadCountAsync();
+        await service.GetOnThisDayAsync(new DateOnly(2026, 7, 6), 3);
+        await service.GetAroundThisDayAsync(new DateOnly(2026, 7, 6), 7, 3);
+
+        Assert.Equal(2, newsRepository.LatestCallCount);
+        Assert.Equal(1, forumRepository.CategoriesCallCount);
+        Assert.Equal(1, forumRepository.ThreadCountCallCount);
+        Assert.Equal(1, historyRepository.OnThisDayCallCount);
+        Assert.Equal(1, historyRepository.AroundThisDayCallCount);
+    }
+
+    [Fact]
+    public async Task InvalidateNewsCache_does_not_evict_article_published_count_cache()
+    {
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var newsRepository = new CountingNewsRepository();
+        var articlesRepository = new CountingArticlesRepository();
+        var service = CreateService(
+            memoryCache,
+            newsRepository: newsRepository,
+            articlesRepository: articlesRepository);
+
+        await service.GetNewsPublishedCountAsync();
+        await service.GetArticlePublishedCountAsync();
+
+        service.InvalidateNewsCache();
+
+        await service.GetNewsPublishedCountAsync();
+        await service.GetArticlePublishedCountAsync();
+
+        Assert.Equal(2, newsRepository.PublishedCountCallCount);
+        Assert.Equal(1, articlesRepository.PublishedCountCallCount);
+    }
+
+    [Fact]
     public async Task OnThisDayCacheVariesByDateAndCount()
     {
         using var memoryCache = new MemoryCache(new MemoryCacheOptions());
         var historyRepository = new CountingQueenHistoryRepository();
         var service = CreateService(memoryCache, historyRepository: historyRepository);
 
-        await service.GetOnThisDayAsync(new DateOnly(2026, 7, 6), 3);
-        await service.GetOnThisDayAsync(new DateOnly(2026, 7, 6), 3);
-        await service.GetOnThisDayAsync(new DateOnly(2026, 7, 7), 3);
-        await service.GetOnThisDayAsync(new DateOnly(2026, 7, 6), 4);
-        await service.GetAroundThisDayAsync(new DateOnly(2026, 7, 6), 7, 3);
-        await service.GetAroundThisDayAsync(new DateOnly(2026, 7, 6), 7, 3);
+        var july6Count3First = await service.GetOnThisDayAsync(new DateOnly(2026, 7, 6), 3);
+        var july6Count3Second = await service.GetOnThisDayAsync(new DateOnly(2026, 7, 6), 3);
+        var july7Count3 = await service.GetOnThisDayAsync(new DateOnly(2026, 7, 7), 3);
+        var july6Count4 = await service.GetOnThisDayAsync(new DateOnly(2026, 7, 6), 4);
+        var aroundFirst = await service.GetAroundThisDayAsync(new DateOnly(2026, 7, 6), 7, 3);
+        var aroundSecond = await service.GetAroundThisDayAsync(new DateOnly(2026, 7, 6), 7, 3);
 
+        Assert.Same(july6Count3First, july6Count3Second);
+        Assert.Same(aroundFirst, aroundSecond);
+        Assert.NotSame(july6Count3First, july7Count3);
+        Assert.NotSame(july6Count3First, july6Count4);
+        Assert.Equal("on-this-day:2026-07-06:3", july6Count3First[0].Title);
+        Assert.Equal("on-this-day:2026-07-07:3", july7Count3[0].Title);
+        Assert.Equal("on-this-day:2026-07-06:4", july6Count4[0].Title);
         Assert.Equal(3, historyRepository.OnThisDayCallCount);
         Assert.Equal(1, historyRepository.AroundThisDayCallCount);
     }
@@ -224,19 +288,6 @@ public sealed class PublicQueryCacheServiceTests
 
     private sealed class CountingQueenHistoryRepository : IQueenHistoryRepository
     {
-        private readonly QueenHistoryEvent historyEvent = new(
-            1,
-            "Cached history",
-            "Cached history summary.",
-            new DateTime(1985, 7, 13, 0, 0, 0, DateTimeKind.Utc),
-            QueenHistoryDatePrecision.ExactDate,
-            QueenHistoryEventCategory.Concert,
-            100,
-            QueenHistoryEventSourceType.Curated,
-            "cached-history",
-            null,
-            true);
-
         public int OnThisDayCallCount { get; private set; }
 
         public int AroundThisDayCallCount { get; private set; }
@@ -244,7 +295,7 @@ public sealed class PublicQueryCacheServiceTests
         public Task<IReadOnlyList<QueenHistoryEvent>> GetOnThisDayAsync(DateOnly date, int count, CancellationToken cancellationToken = default)
         {
             OnThisDayCallCount++;
-            return Task.FromResult<IReadOnlyList<QueenHistoryEvent>>([historyEvent]);
+            return Task.FromResult<IReadOnlyList<QueenHistoryEvent>>([CreateEvent($"on-this-day:{date:yyyy-MM-dd}:{count}")]);
         }
 
         public Task<IReadOnlyList<QueenHistoryEvent>> GetAroundThisDayAsync(
@@ -254,10 +305,25 @@ public sealed class PublicQueryCacheServiceTests
             CancellationToken cancellationToken = default)
         {
             AroundThisDayCallCount++;
-            return Task.FromResult<IReadOnlyList<QueenHistoryEvent>>([historyEvent]);
+            return Task.FromResult<IReadOnlyList<QueenHistoryEvent>>(
+                [CreateEvent($"around-this-day:{date:yyyy-MM-dd}:{dayWindow}:{count}")]);
         }
 
         public Task<IReadOnlyList<QueenHistoryEvent>> GetAllPublishedAsync(CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<QueenHistoryEvent>>([historyEvent]);
+            Task.FromResult<IReadOnlyList<QueenHistoryEvent>>([CreateEvent("all-published")]);
+
+        private static QueenHistoryEvent CreateEvent(string title) =>
+            new(
+                1,
+                title,
+                "Cached history summary.",
+                new DateTime(1985, 7, 13, 0, 0, 0, DateTimeKind.Utc),
+                QueenHistoryDatePrecision.ExactDate,
+                QueenHistoryEventCategory.Concert,
+                100,
+                QueenHistoryEventSourceType.Curated,
+                "cached-history",
+                null,
+                true);
     }
 }
