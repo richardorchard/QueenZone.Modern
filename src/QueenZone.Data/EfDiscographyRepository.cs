@@ -39,9 +39,21 @@ public sealed class EfDiscographyRepository : IDiscographyRepository
 
     public async Task<IReadOnlyList<AlbumSummary>> GetAlbumsAsync(CancellationToken cancellationToken = default)
     {
-        var rows = await dbContext.Database
-            .SqlQueryRaw<AlbumListRow>(listSql)
-            .ToListAsync(cancellationToken);
+        // Use EfSql for EXEC (flexible ADO conversion for tinyint/smallint); SqlQuery for tests.
+        IReadOnlyList<AlbumListRow> rows;
+        if (IsExec(listSql))
+        {
+            rows = await EfSql.QueryProcAsync<AlbumListRow>(
+                dbContext,
+                ProcName(listSql),
+                cancellationToken: cancellationToken);
+        }
+        else
+        {
+            rows = await dbContext.Database
+                .SqlQueryRaw<AlbumListRow>(listSql)
+                .ToListAsync(cancellationToken);
+        }
 
         return rows
             .Select(row => new AlbumSummary(
@@ -55,9 +67,22 @@ public sealed class EfDiscographyRepository : IDiscographyRepository
 
     public async Task<AlbumDetail?> GetAlbumByIdAsync(int albumId, CancellationToken cancellationToken = default)
     {
-        var albumRows = await dbContext.Database
-            .SqlQuery<AlbumDisplayRow>(displaySql(albumId))
-            .ToListAsync(cancellationToken);
+        IReadOnlyList<AlbumDisplayRow> albumRows;
+        var display = displaySql(albumId);
+        if (IsExec(display.Format))
+        {
+            albumRows = await EfSql.QueryProcAsync<AlbumDisplayRow>(
+                dbContext,
+                ProcName(display.Format),
+                command => command.Parameters.Add(EfSql.Input("@Q_ALBUM_ID", albumId)),
+                cancellationToken: cancellationToken);
+        }
+        else
+        {
+            albumRows = await dbContext.Database
+                .SqlQuery<AlbumDisplayRow>(display)
+                .ToListAsync(cancellationToken);
+        }
 
         var album = albumRows.FirstOrDefault();
 
@@ -68,11 +93,24 @@ public sealed class EfDiscographyRepository : IDiscographyRepository
             return null;
         }
 
-        var songRows = await dbContext.Database
-            .SqlQuery<AlbumSongRow>(songsSql(albumId))
-            .ToListAsync(cancellationToken);
+        IReadOnlyList<AlbumSongRow> songRows;
+        var songs = songsSql(albumId);
+        if (IsExec(songs.Format))
+        {
+            songRows = await EfSql.QueryProcAsync<AlbumSongRow>(
+                dbContext,
+                ProcName(songs.Format),
+                command => command.Parameters.Add(EfSql.Input("@Q_ALBUM_ID", albumId)),
+                cancellationToken: cancellationToken);
+        }
+        else
+        {
+            songRows = await dbContext.Database
+                .SqlQuery<AlbumSongRow>(songs)
+                .ToListAsync(cancellationToken);
+        }
 
-        var songs = songRows
+        var songItems = songRows
             .Select(row => new AlbumSong(
                 row.Q_ALBUM_SONG_ID,
                 row.SONG_TITLE,
@@ -89,7 +127,22 @@ public sealed class EfDiscographyRepository : IDiscographyRepository
             ArtistName: album.ARTIST_NAME,
             GeneralNotes: string.IsNullOrWhiteSpace(album.GENERAL_NOTES) ? null : album.GENERAL_NOTES,
             CoverUrl: AlbumCoverUrl.Build(album.PICTURE_URL) ?? AlbumCoverUrl.Build(album.THUMB_URL),
-            Songs: songs);
+            Songs: songItems);
+    }
+
+    private static bool IsExec(string sql) =>
+        sql.TrimStart().StartsWith("EXEC", StringComparison.OrdinalIgnoreCase);
+
+    private static string ProcName(string execSql)
+    {
+        var text = execSql.Trim();
+        if (text.StartsWith("EXEC ", StringComparison.OrdinalIgnoreCase))
+        {
+            text = text["EXEC ".Length..].Trim();
+        }
+
+        var space = text.IndexOfAny([' ', '@', '\r', '\n']);
+        return space < 0 ? text : text[..space];
     }
 
     internal sealed class AlbumListRow
