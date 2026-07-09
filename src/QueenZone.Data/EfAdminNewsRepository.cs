@@ -191,10 +191,13 @@ public sealed class EfAdminNewsRepository : IAdminNewsRepository
             && string.Equals(NewsSlug.ResolveForArticle(article), normalized, StringComparison.OrdinalIgnoreCase));
     }
 
-    private async Task<int> GetAdminNewsTotalCountAsync(CancellationToken cancellationToken) =>
-        await dbContext.Database
+    private async Task<int> GetAdminNewsTotalCountAsync(CancellationToken cancellationToken)
+    {
+        var values = await dbContext.Database
             .SqlQueryRaw<int>(latestNewsCountSql)
-            .FirstAsync(cancellationToken);
+            .ToListAsync(cancellationToken);
+        return values.FirstOrDefault();
+    }
 
     private bool IsSqliteDatabase() =>
         string.Equals(
