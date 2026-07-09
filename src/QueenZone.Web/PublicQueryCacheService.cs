@@ -12,39 +12,44 @@ public sealed class PublicQueryCacheService(
     IForumRepository forumRepository,
     IQueenHistoryRepository queenHistoryRepository)
 {
-    private const string LatestNewsKeyPrefix = "public-query:news:latest";
-    private const string NewsPublishedCountKey = "public-query:news:published-count";
-    private const string ArticlePublishedCountKey = "public-query:articles:published-count";
-    private const string ForumCategoriesKey = "public-query:forum:categories";
-    private const string ForumThreadCountKey = "public-query:forum:thread-count";
+    private static readonly MemoryCacheEntryOptions NewsVersionEntryOptions = new()
+    {
+        Priority = CacheItemPriority.NeverRemove
+    };
 
-    public Task<IReadOnlyList<NewsItem>> GetLatestNewsAsync(int count, CancellationToken cancellationToken = default) =>
-        GetOrCreateAsync(
-            $"{LatestNewsKeyPrefix}:{count}",
+    public Task<IReadOnlyList<NewsItem>> GetLatestNewsAsync(int count, CancellationToken cancellationToken = default)
+    {
+        var version = GetNewsCacheVersion();
+        return GetOrCreateAsync(
+            PublicQueryCacheKeys.LatestNews(version, count),
             options.Value.NewsCacheDuration,
             () => newsRepository.GetLatestAsync(count, cancellationToken));
+    }
 
-    public Task<int> GetNewsPublishedCountAsync(CancellationToken cancellationToken = default) =>
-        GetOrCreateAsync(
-            NewsPublishedCountKey,
+    public Task<int> GetNewsPublishedCountAsync(CancellationToken cancellationToken = default)
+    {
+        var version = GetNewsCacheVersion();
+        return GetOrCreateAsync(
+            PublicQueryCacheKeys.NewsPublishedCount(version),
             options.Value.NewsCacheDuration,
             () => newsRepository.GetPublishedCountAsync(cancellationToken));
+    }
 
     public Task<int> GetArticlePublishedCountAsync(CancellationToken cancellationToken = default) =>
         GetOrCreateAsync(
-            ArticlePublishedCountKey,
+            PublicQueryCacheKeys.ArticlePublishedCount,
             options.Value.ArticleCountCacheDuration,
             () => articlesRepository.GetPublishedCountAsync(cancellationToken));
 
     public Task<IReadOnlyList<ForumCategoryItem>> GetForumCategoriesAsync(CancellationToken cancellationToken = default) =>
         GetOrCreateAsync(
-            ForumCategoriesKey,
+            PublicQueryCacheKeys.ForumCategories,
             options.Value.ForumStatsCacheDuration,
             () => forumRepository.GetCategoriesAsync(cancellationToken));
 
     public Task<int> GetForumThreadCountAsync(CancellationToken cancellationToken = default) =>
         GetOrCreateAsync(
-            ForumThreadCountKey,
+            PublicQueryCacheKeys.ForumThreadCount,
             options.Value.ForumStatsCacheDuration,
             () => forumRepository.GetTotalThreadCountAsync(cancellationToken));
 
@@ -53,7 +58,7 @@ public sealed class PublicQueryCacheService(
         int count,
         CancellationToken cancellationToken = default) =>
         GetOrCreateAsync(
-            $"public-query:history:on-this-day:{date:yyyyMMdd}:{count}",
+            PublicQueryCacheKeys.OnThisDay(date, count),
             options.Value.OnThisDayCacheDuration,
             () => queenHistoryRepository.GetOnThisDayAsync(date, count, cancellationToken));
 
@@ -63,17 +68,36 @@ public sealed class PublicQueryCacheService(
         int count,
         CancellationToken cancellationToken = default) =>
         GetOrCreateAsync(
-            $"public-query:history:around-this-day:{date:yyyyMMdd}:{dayWindow}:{count}",
+            PublicQueryCacheKeys.AroundThisDay(date, dayWindow, count),
             options.Value.OnThisDayCacheDuration,
             () => queenHistoryRepository.GetAroundThisDayAsync(date, dayWindow, count, cancellationToken));
 
+    /// <summary>
+    /// Invalidates all public news cache entries (latest lists for any count and published count)
+    /// by bumping the news cache version. Call after publish, unpublish, delete of published news,
+    /// or edit of published news.
+    /// </summary>
     public void InvalidateNewsCache()
     {
-        cache.Remove(NewsPublishedCountKey);
-        // Homepage currently asks for five latest news items. Keep the count in the key so
-        // future callers can add more variants without changing the invalidation shape.
-        cache.Remove($"{LatestNewsKeyPrefix}:5");
+        // Versioned keys mean callers can introduce new latest-count variants without updating
+        // invalidation. Previous version entries expire via their normal TTL.
+        cache.Set(PublicQueryCacheKeys.NewsVersion, CreateNewsCacheVersion(), NewsVersionEntryOptions);
     }
+
+    private string GetNewsCacheVersion()
+    {
+        if (cache.TryGetValue(PublicQueryCacheKeys.NewsVersion, out string? version)
+            && !string.IsNullOrEmpty(version))
+        {
+            return version;
+        }
+
+        var initial = "0";
+        cache.Set(PublicQueryCacheKeys.NewsVersion, initial, NewsVersionEntryOptions);
+        return initial;
+    }
+
+    private static string CreateNewsCacheVersion() => Guid.NewGuid().ToString("N");
 
     private async Task<T> GetOrCreateAsync<T>(
         string key,
