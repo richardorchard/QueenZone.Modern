@@ -98,6 +98,44 @@ public sealed class EfPhotoRepository : IPhotoRepository
         CancellationToken cancellationToken = default) =>
         await QueryCategoryCollectionAsync(catId, cancellationToken);
 
+    public async Task<IReadOnlyList<PhotoSitemapCategory>> GetPublishedSitemapCategoriesAsync(
+        CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<CategoryRow> rows;
+        if (useLegacyProcedures)
+        {
+            rows = await QueryCategoriesViaProcedureAsync(cancellationToken);
+        }
+        else
+        {
+            rows = await dbContext.Database
+                .SqlQueryRaw<CategoryRow>(categoriesSql)
+                .ToListAsync(cancellationToken);
+        }
+
+        var categories = new List<PhotoSitemapCategory>();
+        foreach (var row in rows)
+        {
+            var items = await QueryCategoryCollectionAsync(row.cat_id, cancellationToken);
+            if (items.Count == 0)
+            {
+                continue;
+            }
+
+            IReadOnlyList<PhotoSitemapPhoto> photos = items
+                .Select(item => new PhotoSitemapPhoto(item.PicId, item.DateTime))
+                .ToList();
+
+            categories.Add(new PhotoSitemapCategory(
+                row.cat_id,
+                items[0].CategoryName,
+                items[0].CategorySlug,
+                photos));
+        }
+
+        return categories;
+    }
+
     /// <summary>
     /// Fetches every visible image in a category in one call.
     /// <c>Q_PIC_CAT_PAGE4_SP</c>'s own <c>TotalRecords</c> output param counts raw

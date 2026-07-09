@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "advisory": true,
+  "description": "Practical frontend performance budgets for QueenZone public pages. Checks are advisory by default; do not fail CI on these until CI variance is understood.",
+  "notes": [
+    "LCP and CLS use Core Web Vitals 'good' thresholds as upper bounds.",
+    "Byte and request budgets target a lean archive shell after compression and static-asset caching work (#162-#165).",
+    "Local sample-data runs are typically well under these budgets; production and throttled mobile runs are the meaningful comparison.",
+    "Per-path overrides are optional. Missing keys inherit from the form-factor defaults."
+  ],
+  "defaults": {
+    "mobile": {
+      "lcpMs": 2500,
+      "cls": 0.1,
+      "totalByteWeight": 1500000,
+      "requestCount": 40,
+      "serverResponseTimeMs": 600
+    },
+    "desktop": {
+      "lcpMs": 2000,
+      "cls": 0.1,
+      "totalByteWeight": 2000000,
+      "requestCount": 45,
+      "serverResponseTimeMs": 400
+    }
+  },
+  "paths": {
+    "/": {
+      "label": "Homepage",
+      "notes": "Hero image may dominate transfer size; keep LCP-critical work small."
+    },
+    "/news": {
+      "label": "News archive"
+    },
+    "/news/1003/queenzone-modernisation-begins": {
+      "label": "News article detail (sample data)"
+    },
+    "/forum": {
+      "label": "Forum index"
+    },
+    "/forum/1/the-music": {
+      "label": "Forum category (sample data)"
+    },
+    "/forum/topic/1002/ranking-every-studio-album": {
+      "label": "Forum topic (sample data)"
+    }
+  }
+}

@@ -136,6 +136,24 @@ Keep end-to-end tests small. They should prove critical user journeys and browse
 
 On failure, tests write screenshots and Playwright traces under `test-results/e2e/` (gitignored). CI uploads that folder as an artifact when the e2e job fails.
 
+### Frontend performance checks (advisory)
+
+Use Lighthouse via `scripts/Measure-FrontendPerformance.ps1` when a change may affect end-user load cost on public pages (homepage, news, forum).
+
+**How often:** not every PR and not daily CI. Run **before/after** frontend or static-asset changes; optionally after deploys that touch the public shell; optionally about **quarterly** for drift. Skip pure backend/docs/test work. Full cadence table: `docs/performance/frontend-performance-checks.md` (section **When to run**).
+
+Good targets:
+
+- LCP, CLS, total transfer size, and request count on key public routes.
+- Before/after summaries attached to performance-related pull requests.
+- Optional repeat-load pass when validating cache headers or static asset changes.
+
+These checks are **opt-in and advisory**. They are not a merge-blocking CI gate. Documented budgets live in `docs/performance/frontend-performance-budgets.json`. Workflow detail: `docs/performance/frontend-performance-checks.md`.
+
+```powershell
+powershell -File .\scripts\Measure-FrontendPerformance.ps1 -StartLocalApp -FormFactor mobile
+```
+
 ## Continuous Integration
 
 Every pull request must run:
@@ -203,6 +221,7 @@ Use `pwsh` instead of `powershell` on Linux or macOS.
 Optional manual checks (report skipped in PRs when not run):
 
 - News agent OpenRouter smoke: `scripts/Smoke-NewsAgent.bat` (Windows). See `docs/architecture/news-agent.md`.
+- Frontend performance (Lighthouse): `scripts/Measure-FrontendPerformance.ps1`. See `docs/performance/frontend-performance-checks.md`.
 
 Common gaps: new repository implementations, console/worker entry points, DI registration-only code (cover via integration tests that resolve services), and error branches.
 
@@ -231,6 +250,7 @@ Playwright browser smoke tests live in `tests/QueenZone.Web.E2E` and run in CI o
 - SQL mapping belongs in opt-in data integration tests.
 - Migration confidence belongs in content validation reports.
 - Browser behavior belongs in a small Playwright end-to-end suite.
+- End-user load cost belongs in the advisory frontend performance workflow, not in every PR.
 
 ## Pull Request Expectations
 

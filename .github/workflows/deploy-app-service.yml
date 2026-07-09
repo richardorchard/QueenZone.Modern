@@ -62,3 +62,22 @@ jobs:
           app-name: queenzone-dev
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
           package: publish
+
+      - name: Wait for site to be healthy
+        run: |
+          SITE_URL="https://queenzone-dev.azurewebsites.net/health"
+          echo "Polling $SITE_URL — the App Service restarts after deployment and needs time to warm up."
+          echo "The applicationInitialization module (web.config) pre-warms the process before it takes traffic,"
+          echo "but this step waits until the site is confirmed healthy from outside Azure."
+          for i in $(seq 1 30); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$SITE_URL" || echo "000")
+            ELAPSED=$(( i * 10 ))
+            if [ "$STATUS" = "200" ]; then
+              echo "✓ Site healthy after ~${ELAPSED}s (HTTP $STATUS)"
+              exit 0
+            fi
+            echo "  [${ELAPSED}s] HTTP $STATUS — waiting 10s..."
+            sleep 10
+          done
+          echo "::warning::Site did not return HTTP 200 within 5 minutes. Check App Service logs."
+          exit 1

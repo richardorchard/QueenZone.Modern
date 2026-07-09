@@ -142,6 +142,71 @@ public sealed partial class AdminNewsCacheInvalidationTests : IClassFixture<WebA
         Assert.Contains("Updated cache edit title", homeUpdated);
     }
 
+    [Fact]
+    public async Task Publish_invalidates_core_sitemap_cache()
+    {
+        var store = new SharedNewsStore();
+        var client = CreateClient(AdminEmail, store);
+
+        // Warm memory + output cache for the core sitemap.
+        var sitemapBefore = await client.GetStringAsync("/sitemap-core.xml");
+        Assert.DoesNotContain("sitemap-cache-publish-title", sitemapBefore, StringComparison.OrdinalIgnoreCase);
+
+        var articleId = await CreateDraftAsync(client, "Sitemap cache publish title");
+        Assert.Equal(HttpStatusCode.Redirect, (await PostActionAsync(client, $"/admin/news/{articleId}/publish")).StatusCode);
+
+        var sitemapAfter = await client.GetStringAsync("/sitemap-core.xml");
+        Assert.Contains($"/news/{articleId}/sitemap-cache-publish-title", sitemapAfter);
+    }
+
+    [Fact]
+    public async Task Unpublish_invalidates_core_sitemap_cache()
+    {
+        var store = new SharedNewsStore();
+        var client = CreateClient(AdminEmail, store);
+
+        var articleId = await CreateDraftAsync(client, "Sitemap cache unpublish title");
+        Assert.Equal(HttpStatusCode.Redirect, (await PostActionAsync(client, $"/admin/news/{articleId}/publish")).StatusCode);
+
+        var sitemapPublished = await client.GetStringAsync("/sitemap-core.xml");
+        Assert.Contains($"/news/{articleId}/sitemap-cache-unpublish-title", sitemapPublished);
+
+        Assert.Equal(HttpStatusCode.Redirect, (await PostActionAsync(client, $"/admin/news/{articleId}/unpublish")).StatusCode);
+
+        var sitemapUnpublished = await client.GetStringAsync("/sitemap-core.xml");
+        Assert.DoesNotContain($"/news/{articleId}/sitemap-cache-unpublish-title", sitemapUnpublished);
+    }
+
+    [Fact]
+    public async Task Edit_published_article_invalidates_core_sitemap_cache()
+    {
+        var store = new SharedNewsStore();
+        var client = CreateClient(AdminEmail, store);
+
+        var articleId = await CreateDraftAsync(client, "Sitemap original edit title");
+        Assert.Equal(HttpStatusCode.Redirect, (await PostActionAsync(client, $"/admin/news/{articleId}/publish")).StatusCode);
+
+        var sitemapOriginal = await client.GetStringAsync("/sitemap-core.xml");
+        Assert.Contains($"/news/{articleId}/sitemap-original-edit-title", sitemapOriginal);
+
+        var editResponse = await PostArticleAsync(
+            client,
+            $"/admin/news/{articleId}/edit",
+            $"/admin/news/{articleId}",
+            new Dictionary<string, string>
+            {
+                ["title"] = "Sitemap updated edit title",
+                ["excerpt"] = "Updated excerpt for sitemap cache invalidation.",
+                ["body"] = "Updated plain text body.",
+                ["publishedAt"] = "2026-06-14"
+            });
+        Assert.Equal(HttpStatusCode.Redirect, editResponse.StatusCode);
+
+        var sitemapUpdated = await client.GetStringAsync("/sitemap-core.xml");
+        Assert.DoesNotContain($"/news/{articleId}/sitemap-original-edit-title", sitemapUpdated);
+        Assert.Contains($"/news/{articleId}/sitemap-updated-edit-title", sitemapUpdated);
+    }
+
     private async Task<int> CreateDraftAsync(HttpClient client, string title)
     {
         var createResponse = await PostArticleAsync(

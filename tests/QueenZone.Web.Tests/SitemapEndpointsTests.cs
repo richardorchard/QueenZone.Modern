@@ -133,4 +133,16 @@ public sealed class SitemapEndpointsTests : IClassFixture<WebApplicationFactory<
         response.EnsureSuccessStatusCode();
         Assert.Equal("public, max-age=86400", response.Headers.CacheControl?.ToString());
     }
+
+    [Fact]
+    public async Task CoreSitemap_IncludesPhotographyDetailUrlsFromBulkProjection()
+    {
+        var client = factory.CreateClient();
+
+        var xml = await client.GetStringAsync("/sitemap-core.xml");
+
+        Assert.Contains($"{BaseUrl}/photography/brian-may", xml);
+        Assert.Contains($"{BaseUrl}/photography/brian-may/101", xml);
+        Assert.Contains($"{BaseUrl}/photography/queen/201", xml);
+    }
 }

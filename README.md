@@ -205,6 +205,14 @@ CI also publishes a code coverage artifact for pull requests and pushes. Use it 
 
 A Playwright browser smoke suite (`tests/QueenZone.Web.E2E`) runs in CI on a self-hosted Windows runner so it does not consume GitHub Actions minutes. It covers public homepage/news/forum journeys, mobile nav, axe-core critical a11y checks, and admin/editorial smoke. See `docs/architecture/self-hosted-e2e-runner.md` for runner setup and local commands. On failure, screenshots and traces land in `test-results/e2e/` (uploaded as CI artifacts).
 
+For advisory frontend performance baselines (LCP, CLS, transfer size, request count on key public pages), use the Lighthouse workflow:
+
+```powershell
+powershell -File .\scripts\Measure-FrontendPerformance.ps1 -StartLocalApp -FormFactor mobile
+```
+
+Results land under `docs/performance/results/` (gitignored). Budgets and comparison guidance: `docs/performance/frontend-performance-checks.md`.
+
 Normal CI and pull request checks should not require the restored legacy database. Real legacy database checks are opt-in until a controlled test database exists.
 
 If you change admin news write behavior or discovery promotion behavior, you can run the opt-in legacy write probe against the configured `ConnectionStrings__QueenZoneLegacy` database:

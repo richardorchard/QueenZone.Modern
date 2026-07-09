@@ -39,6 +39,17 @@ public sealed class StaticAssetCacheHeadersTests : IClassFixture<WebApplicationF
     }
 
     [Fact]
+    public async Task VersionedHomeArchiveHeroJs_HasLongLivedImmutableCacheControlInProduction()
+    {
+        var client = productionFactory.CreateClient();
+
+        var response = await client.GetAsync("/js/home-archive-hero.js?v=test");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(StaticFileCacheControl.VersionedCacheHeader, response.Headers.CacheControl?.ToString());
+    }
+
+    [Fact]
     public async Task UnversionedImage_HasShortPublicCacheControlInProduction()
     {
         var client = productionFactory.CreateClient();

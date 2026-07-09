@@ -46,10 +46,14 @@ public sealed class EfArticlesRepository : IArticlesRepository
         return rows.Select(Map).ToList();
     }
 
-    public async Task<int> GetPublishedCountAsync(CancellationToken cancellationToken = default) =>
-        await dbContext.Database
+    public async Task<int> GetPublishedCountAsync(CancellationToken cancellationToken = default)
+    {
+        // Avoid FirstAsync composition over raw SQL (can fail for some SQL Server shapes).
+        var values = await dbContext.Database
             .SqlQueryRaw<int>(countSql)
-            .FirstAsync(cancellationToken);
+            .ToListAsync(cancellationToken);
+        return values.FirstOrDefault();
+    }
 
     public async Task<IReadOnlyList<ArticleItem>> GetArchivePageAsync(
         int page,
