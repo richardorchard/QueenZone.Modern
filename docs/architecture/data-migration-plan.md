@@ -12,12 +12,12 @@ The legacy schema remains a stable historical source for most public archive rea
 
 ### Stage 1: Read From Legacy Schema
 
-Use Dapper to call either:
+Today many public archive repositories still use Dapper to call either:
 
 - Existing stored procedures, when they already return the page shape needed.
 - Direct SQL queries, when the stored procedure is too page-specific or outdated.
 
-This keeps the first release quick and reduces assumptions.
+This kept the first release quick and reduces assumptions. New write paths already use EF Core. The longer-term client-library target is EF Core everywhere in `QueenZone.Data`, still calling stored procedures where they are the right read shape — see ADR 0006 for the current matrix and contributor rules.
 
 ### Stage 2: Create Modern Read Models When Needed
 

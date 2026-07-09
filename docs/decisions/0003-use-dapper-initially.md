@@ -4,6 +4,8 @@
 
 Accepted.
 
+Amended by ADR 0006 (2026-07-09): Dapper remains valid for existing public-read repositories, but new writes default to EF Core and the target client-library direction is EF Core while retaining stored procedures for hot paths.
+
 ## Context
 
 The legacy database uses many stored procedures and an older schema style. There is also old Telerik OpenAccess ORM code in the legacy solution, but that should not be brought forward as a dependency.

@@ -7,6 +7,7 @@ This repository is the modern QueenZone rebuild. The project is archive-first: i
 - `README.md` gives the project overview and local development commands.
 - `docs/architecture/testing-policy.md` defines the required testing layers.
 - `docs/decisions/` contains accepted architectural decisions.
+- `docs/decisions/0006-hybrid-ef-core-admin-writes.md` is the Dapper vs EF access matrix and contributor rules for SQL in `QueenZone.Data`.
 - `docs/backlog/migration-backlog.md` tracks migration work.
 - `docs/sql/data-api-builder-mcp.md` explains the local SQL MCP setup for read-only legacy database investigation.
 
@@ -142,7 +143,7 @@ News agent worker and admin review queue: see `docs/architecture/news-agent.md`.
 - Keep the public archive read-only for visitors.
 - Allow deliberately designed editorial workflows for new approved news articles.
 - Do not port Web Forms architecture.
-- Keep legacy SQL access inside `QueenZone.Data`.
+- Keep all SQL Server access inside `QueenZone.Data` (no ad-hoc SQL in page models/tools). See ADR 0006 for the Dapper/EF matrix: new writes default to EF; complex legacy/projected reads may keep SQL/procs; target direction is EF Core as the single client library while retaining stored procedures for hot paths.
 - Treat the legacy database as an import source and historical reference. Forum public reads use modern projected tables by default; other public content may keep reading legacy tables unless performance or safety problems appear.
 - Prefer clean, stable, search-friendly canonical URLs over preserving legacy URL shapes.
 - Never expose private, hidden, deleted, moderated, or credential-related data by default.
