@@ -136,6 +136,8 @@ Keep end-to-end tests small. They should prove critical user journeys and browse
 
 Use Lighthouse via `scripts/Measure-FrontendPerformance.ps1` when a change may affect end-user load cost on public pages (homepage, news, forum).
 
+**How often:** not every PR and not daily CI. Run **before/after** frontend or static-asset changes; optionally after deploys that touch the public shell; optionally about **quarterly** for drift. Skip pure backend/docs/test work. Full cadence table: `docs/performance/frontend-performance-checks.md` (section **When to run**).
+
 Good targets:
 
 - LCP, CLS, total transfer size, and request count on key public routes.

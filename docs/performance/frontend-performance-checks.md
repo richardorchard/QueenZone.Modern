@@ -6,6 +6,21 @@ Repeatable, documented workflow for measuring end-user performance on the public
 
 Checks are **advisory by default**. They are not a pull-request CI gate yet, because Lighthouse variance (CPU load, network, throttling) can make hard failures noisy.
 
+## When to run
+
+**Not on every PR, and not on a fixed daily schedule.** Treat this like the opt-in legacy DB probes: run it when the risk is frontend load cost, not as part of the default restore/build/test loop.
+
+| Cadence | When | What to do |
+| --- | --- | --- |
+| **Change-driven (primary)** | Before and after work that can change page weight or render path: images, CSS/JS bundling, fonts, third-party tags (GTM/analytics), layout shell, compression, cache headers, homepage hero, shared `_Layout` | Same `-BaseUrl`, form factor, and paths; attach both `summary.md` tables (or median of `-Runs 3`) in the PR |
+| **Release / deploy spot-check** | After a production or `queenzone-dev` deploy that includes frontend or hosting changes | Point `-BaseUrl` at the deployed host; sample a few real article/topic URLs if not on sample data |
+| **Quarterly drift check** | About every 3 months, or after a large UI kit / design-system pass, even if no single “perf” issue is open | Full default path list, mobile form factor; optionally commit a dated baseline note under `docs/performance/` if numbers moved a lot |
+| **Skip** | Pure backend/data/docs/tests with no public HTML/CSS/JS/static-asset impact | Default `dotnet test` is enough |
+
+**Do not** add this to required PR CI yet. Keep it local (or an optional workflow later) so Lighthouse noise does not block merges.
+
+**Practical default for most contributors:** run it only on performance-tagged work and on PRs that touch `wwwroot`, shared layout/partials, static caching, compression, or third-party script includes.
+
 ## What it measures
 
 | Metric | Why it matters |
