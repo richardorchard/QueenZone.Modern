@@ -65,9 +65,14 @@ Preview monitoring resources in `Queenzone-RG`:
 Alerts:
 
 - `queenzone-dev-health-unavailable`: availability below 80% over 15 minutes.
-- `queenzone-dev-failed-requests`: more than 10 failed requests over 15 minutes.
+- `queenzone-dev-server-5xx`: more than 5 HTTP 5xx responses over 15 minutes.
 - `queenzone-dev-server-exceptions`: more than 5 server exceptions over 15 minutes.
 - `queenzone-dev-ingestion-warning`: billable workspace usage over 80 MB in 24 hours, ahead of the 0.1 GB/day cap.
+
+The broad `queenzone-dev-failed-requests` metric alert is disabled. It fired on
+crawler and client-side noise such as 404/405/499 requests, so server error
+alerting now uses the `queenzone-dev-server-5xx` Log Analytics query alert
+instead.
 
 Operating rhythm:
 
