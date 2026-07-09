@@ -1,34 +1,63 @@
-using Dapper;
-using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
 
 namespace QueenZone.Data;
 
-public sealed class LegacyBiographyRepository(string connectionString) : IBiographyRepository
+/// <summary>
+/// Public biography reads via the legacy stored procedures, invoked through EF Core
+/// (<c>SqlQuery</c> / <c>SqlQueryRaw</c>) rather than Dapper.
+/// </summary>
+public sealed class EfBiographyRepository : IBiographyRepository
 {
-    public async Task<IReadOnlyList<BiographyChapterItem>> GetChaptersAsync(CancellationToken cancellationToken = default)
+    private readonly QueenZoneDbContext dbContext;
+    private readonly string listSql;
+    private readonly Func<short, FormattableString> detailSql;
+
+    public EfBiographyRepository(QueenZoneDbContext dbContext)
+        : this(
+            dbContext,
+            listSql: "EXEC Q_BIO_LIST_SP",
+            detailSql: static id => $"EXEC Q_BIO_DISPLAY_SP @Q_BIO_ID = {id}")
     {
-        await using var connection = new SqlConnection(connectionString);
-        var command = new CommandDefinition(
-            "Q_BIO_LIST_SP",
-            commandType: System.Data.CommandType.StoredProcedure,
-            cancellationToken: cancellationToken);
-        var rows = await connection.QueryAsync<ListRow>(command);
+    }
+
+    /// <summary>
+    /// Test hook: substitute SELECT statements (e.g. SQLite) for the production EXEC calls.
+    /// </summary>
+    internal EfBiographyRepository(
+        QueenZoneDbContext dbContext,
+        string listSql,
+        Func<short, FormattableString> detailSql)
+    {
+        this.dbContext = dbContext;
+        this.listSql = listSql;
+        this.detailSql = detailSql;
+    }
+
+    public async Task<IReadOnlyList<BiographyChapterItem>> GetChaptersAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var rows = await dbContext.Database
+            .SqlQueryRaw<ListRow>(listSql)
+            .ToListAsync(cancellationToken);
+
         return rows.Select(MapListRow).ToList();
     }
 
-    public async Task<BiographyChapterItem?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
+    public async Task<BiographyChapterItem?> GetByIdAsync(
+        int id,
+        CancellationToken cancellationToken = default)
     {
-        await using var connection = new SqlConnection(connectionString);
-        var command = new CommandDefinition(
-            "Q_BIO_DISPLAY_SP",
-            new { Q_BIO_ID = (short)id },
-            commandType: System.Data.CommandType.StoredProcedure,
-            cancellationToken: cancellationToken);
-        var row = await connection.QuerySingleOrDefaultAsync<DetailRow>(command);
+        var rows = await dbContext.Database
+            .SqlQuery<DetailRow>(detailSql((short)id))
+            .ToListAsync(cancellationToken);
+
+        var row = rows.FirstOrDefault();
         return row is null ? null : MapDetailRow(id, row);
     }
 
-    public async Task<BiographyChapterNav> GetAdjacentChaptersAsync(int id, CancellationToken cancellationToken = default)
+    public async Task<BiographyChapterNav> GetAdjacentChaptersAsync(
+        int id,
+        CancellationToken cancellationToken = default)
     {
         var chapters = BiographyChapterOrdering.ByDisplaySequenceAscending(
             await GetChaptersAsync(cancellationToken));
@@ -71,7 +100,7 @@ public sealed class LegacyBiographyRepository(string connectionString) : IBiogra
         return LegacyArticleText.GetExcerpt(body);
     }
 
-    private sealed class ListRow
+    internal sealed class ListRow
     {
         public string? BIOTITLE { get; init; }
 
@@ -86,7 +115,7 @@ public sealed class LegacyBiographyRepository(string connectionString) : IBiogra
         public string? SUMMARY { get; init; }
     }
 
-    private sealed class DetailRow
+    internal sealed class DetailRow
     {
         public string? TITLE { get; init; }
 

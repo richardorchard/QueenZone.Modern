@@ -32,13 +32,20 @@ public sealed class QueenZoneWebCompositionTests
         services.AddSingleton<IConfiguration>(configuration);
         services.AddQueenZoneWebComposition(configuration, new FakeHostEnvironment("Testing"));
 
-        using var provider = services.BuildServiceProvider();
+        using var provider = services.BuildServiceProvider(validateScopes: true);
 
         Assert.NotNull(provider.GetRequiredService<INewsRepository>());
-        Assert.NotNull(provider.GetRequiredService<INewsDiscoveryRepository>());
-        Assert.NotNull(provider.GetRequiredService<CoreSitemapService>());
-        Assert.NotNull(provider.GetRequiredService<PublicQueryCacheService>());
-        Assert.NotNull(provider.GetRequiredService<MemberAccountService>());
+        using (var scope = provider.CreateScope())
+        {
+            Assert.NotNull(scope.ServiceProvider.GetRequiredService<INewsDiscoveryRepository>());
+            Assert.NotNull(scope.ServiceProvider.GetRequiredService<IBiographyRepository>());
+            Assert.IsType<InMemoryBiographyRepository>(
+                scope.ServiceProvider.GetRequiredService<IBiographyRepository>());
+            Assert.NotNull(scope.ServiceProvider.GetRequiredService<CoreSitemapService>());
+            Assert.NotNull(scope.ServiceProvider.GetRequiredService<PublicQueryCacheService>());
+            Assert.NotNull(scope.ServiceProvider.GetRequiredService<MemberAccountService>());
+        }
+
         Assert.Equal(["admin@test.local"], provider.GetRequiredService<IOptions<AdminOptions>>().Value.AllowedEmails);
         Assert.Equal("https://www.queenzone.org", provider.GetRequiredService<IOptions<SiteOptions>>().Value.PublicBaseUrl);
     }

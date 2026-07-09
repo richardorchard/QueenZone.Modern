@@ -17,7 +17,7 @@ public static class QueenZoneDataServiceCollectionExtensions
 
         services.AddSingleton<INewsRepository>(_ => new LegacyNewsRepository(connectionString));
         services.AddSingleton<IArticlesRepository>(_ => new LegacyArticlesRepository(connectionString));
-        services.AddSingleton<IBiographyRepository>(_ => new LegacyBiographyRepository(connectionString));
+        services.AddScoped<IBiographyRepository, EfBiographyRepository>();
         services.AddSingleton<IForumRepository>(_ => forumDataOptions.UseModernForumReads
             ? new ModernForumRepository(connectionString)
             : new LegacyForumRepository(connectionString));

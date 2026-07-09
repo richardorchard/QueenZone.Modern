@@ -6,6 +6,8 @@ Accepted.
 
 Amended 2026-07-09: documented the full Dapper vs EF repository matrix, contributor rules, and a target direction to standardize on EF Core as the single data-access library while keeping stored procedures for hot read paths.
 
+Amended 2026-07-09: migrated biography public reads to EF Core (`EfBiographyRepository`) while retaining the same legacy stored procedures.
+
 ## Context
 
 ADR 0003 chose Dapper for initial legacy database access. Issue #5 added admin write workflows for `NEWS_T` and `NewsAuditLog` using hand-written SQL.
@@ -26,7 +28,7 @@ Use a hybrid data-access model in `QueenZone.Data` today, with a clear path towa
 - Manage modern tables (`NewsAuditLog`, discovery, members, queen history, and similar) through EF migrations plus any required SQL bootstrap scripts.
 - Keep **all** SQL Server access inside `QueenZone.Data`. Page models and tools must not open their own connections or invent a third SQL style.
 
-`QueenZoneDbContext` is registered scoped. Public Dapper repositories remain singleton. In-memory repositories are still used when no SQL connection string is configured.
+`QueenZoneDbContext` is registered scoped. EF-backed repositories (including migrated public reads such as biography) are scoped. Remaining public Dapper repositories stay singleton until migrated. In-memory repositories are still used when no SQL connection string is configured.
 
 ### Access matrix (SQL-backed registrations)
 
@@ -34,7 +36,7 @@ Use a hybrid data-access model in `QueenZone.Data` today, with a clear path towa
 | --- | --- | --- | --- | --- |
 | Public news archive | `INewsRepository` | `LegacyNewsRepository` | Dapper + SQL | Legacy `NEWS_T` latest-row projections |
 | Articles | `IArticlesRepository` | `LegacyArticlesRepository` | Dapper | Legacy reads |
-| Biography | `IBiographyRepository` | `LegacyBiographyRepository` | Dapper + stored procedures | Legacy procs |
+| Biography | `IBiographyRepository` | `EfBiographyRepository` | EF Core + stored procedures (`SqlQuery` / `SqlQueryRaw`) | Same legacy procs (`Q_BIO_LIST_SP`, `Q_BIO_DISPLAY_SP`); first public-read migration off Dapper |
 | Photography | `IPhotoRepository` | `LegacyPhotoRepository` | Dapper + stored procedures | Legacy procs |
 | Discography | `IDiscographyRepository` | `LegacyDiscographyRepository` | Dapper + stored procedures | Legacy procs |
 | Fan performances | `IFanPerformanceRepository` | `LegacyFanPerformanceRepository` | Dapper + stored procedures | Legacy procs |
