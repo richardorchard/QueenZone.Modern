@@ -8,7 +8,7 @@ public abstract class NewsArchivePageModel(
     INewsRepository newsRepository,
     PublicQueryCacheService publicQueryCache) : PageModel
 {
-    public IReadOnlyList<NewsItem> Items { get; private set; } = [];
+    public IReadOnlyList<NewsArchiveItem> Items { get; private set; } = [];
 
     public int CurrentPage { get; private set; }
 
@@ -43,7 +43,7 @@ public abstract class NewsArchivePageModel(
             return NotFound();
         }
 
-        Items = archive;
+        Items = PublicContentMapper.ToNewsArchiveItems(archive);
         CurrentPage = page;
         TotalPages = totalPages;
         Breadcrumbs = [BreadcrumbItem.Home, new BreadcrumbItem("News", "/news")];

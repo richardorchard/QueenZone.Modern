@@ -5,16 +5,17 @@ namespace QueenZone.Web.Pages;
 
 public sealed class ForumModel(PublicQueryCacheService publicQueryCache) : PageModel
 {
-    public ForumArchiveStats Stats { get; private set; } = new(0, 0, 0);
+    public ForumIndexStats Stats { get; private set; } = new(0, 0, 0);
 
-    public IReadOnlyList<ForumCategoryItem> Categories { get; private set; } = Array.Empty<ForumCategoryItem>();
+    public IReadOnlyList<ForumCategorySummary> Categories { get; private set; } = [];
 
     public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; } = [BreadcrumbItem.Home, new BreadcrumbItem("Forum", "/forum")];
 
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
-        Categories = await publicQueryCache.GetForumCategoriesAsync(cancellationToken);
+        var categories = await publicQueryCache.GetForumCategoriesAsync(cancellationToken);
         var threadCount = await publicQueryCache.GetForumThreadCountAsync(cancellationToken);
-        Stats = ForumArchiveStats.FromCategories(Categories, threadCount);
+        Categories = PublicContentMapper.ToForumCategorySummaries(categories);
+        Stats = PublicContentMapper.ToForumIndexStats(categories, threadCount);
     }
 }

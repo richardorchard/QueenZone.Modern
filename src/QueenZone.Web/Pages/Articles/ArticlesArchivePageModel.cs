@@ -8,7 +8,7 @@ public abstract class ArticlesArchivePageModel(
     IArticlesRepository articlesRepository,
     PublicQueryCacheService publicQueryCache) : PageModel
 {
-    public IReadOnlyList<ArticleItem> Items { get; private set; } = [];
+    public IReadOnlyList<ArticleArchiveItem> Items { get; private set; } = [];
 
     public int CurrentPage { get; private set; }
 
@@ -43,7 +43,7 @@ public abstract class ArticlesArchivePageModel(
             return NotFound();
         }
 
-        Items = archive;
+        Items = PublicContentMapper.ToArticleArchiveItems(archive);
         CurrentPage = page;
         TotalPages = totalPages;
         Breadcrumbs = [BreadcrumbItem.Home, new BreadcrumbItem("Articles", "/articles")];

@@ -10,7 +10,7 @@ public sealed class PreviewModel(
 {
     public AdminNewsArticle? Article { get; private set; }
 
-    public NewsItem? Item { get; private set; }
+    public NewsDetailItem? Item { get; private set; }
 
     public NewsDiscoveryProvenance? DiscoveryProvenance { get; private set; }
 
@@ -34,9 +34,12 @@ public sealed class PreviewModel(
             logger.LogWarning(ex, "Failed to load discovery provenance for admin news preview {NewsId}", id);
         }
 
-        Item = ToNewsItem(Article);
+        Item = ToNewsDetailItem(Article);
         ViewData["Title"] = $"Preview: {Article.Title}";
-        ViewData["CanonicalPath"] = NewsArticleContent.GetDetailCanonicalPath(Item.Id, Item.Title, Item.Slug);
+        ViewData["CanonicalPath"] = NewsArticleContent.GetDetailCanonicalPath(
+            Item.Id,
+            Item.Title,
+            string.IsNullOrWhiteSpace(Article.Slug) ? null : Article.Slug);
         ViewData["Description"] = Item.Excerpt;
         return Page();
     }

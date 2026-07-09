@@ -6,7 +6,7 @@ namespace QueenZone.Web.Pages.News;
 
 public sealed class DetailModel(INewsRepository newsRepository) : PageModel
 {
-    public NewsItem? Item { get; private set; }
+    public NewsDetailItem? Item { get; private set; }
 
     public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
 
@@ -18,17 +18,18 @@ public sealed class DetailModel(INewsRepository newsRepository) : PageModel
             return NotFound();
         }
 
+        var detail = PublicContentMapper.ToNewsDetailItem(item);
         var canonicalSlug = NewsSlug.ResolveForArticle(item);
         if (!string.Equals(canonicalSlug, slug, StringComparison.OrdinalIgnoreCase))
         {
-            return RedirectPermanent(NewsRoutes.GetNewsDetailPath(item));
+            return RedirectPermanent(detail.DetailPath);
         }
 
-        Item = item;
-        Breadcrumbs = [BreadcrumbItem.Home, new BreadcrumbItem("News", "/news"), new BreadcrumbItem(item.Title, NewsRoutes.GetNewsDetailPath(item))];
-        ViewData["Title"] = $"{item.Title} | QueenZone news";
-        ViewData["CanonicalPath"] = NewsArticleContent.GetDetailCanonicalPath(item.Id, item.Title, item.Slug);
-        ViewData["Description"] = item.Excerpt;
+        Item = detail;
+        Breadcrumbs = [BreadcrumbItem.Home, new BreadcrumbItem("News", "/news"), new BreadcrumbItem(detail.Title, detail.DetailPath)];
+        ViewData["Title"] = $"{detail.Title} | QueenZone news";
+        ViewData["CanonicalPath"] = NewsArticleContent.GetDetailCanonicalPath(detail.Id, detail.Title, item.Slug);
+        ViewData["Description"] = detail.Excerpt;
 
         return Page();
     }

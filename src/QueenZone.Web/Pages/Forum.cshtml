@@ -32,7 +32,7 @@
       <div class="qz-grid qz-grid--three">
         @foreach (var category in Model.Categories)
         {
-          <a class="qz-card" href="@ForumRoutes.GetCategoryPath(category)">
+          <a class="qz-card" href="@category.DetailPath">
             <div class="qz-card__kicker">@category.Name</div>
             <h3>@(string.IsNullOrWhiteSpace(category.Description) ? category.Name : category.Description)</h3>
             @if (!string.IsNullOrWhiteSpace(category.LatestThreadTitle))

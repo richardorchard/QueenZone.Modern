@@ -1,4 +1,4 @@
-@model (ForumCategoryItem Category, IReadOnlyList<ForumTopicItem> Topics)
+@model (ForumCategorySummary Category, IReadOnlyList<ForumThreadSummary> Topics)
 
 @if (Model.Topics.Count == 0)
 {
@@ -24,7 +24,7 @@ else
             {
               <span class="qz-meta">Pinned · </span>
             }
-            <a href="@ForumRoutes.GetTopicPath(topic)">@topic.Title</a>
+            <a href="@topic.DetailPath">@topic.Title</a>
           </td>
           <td>@topic.AuthorUsername</td>
           <td>@topic.ReplyCount.ToString("N0")</td>

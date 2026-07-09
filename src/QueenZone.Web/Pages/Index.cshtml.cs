@@ -7,7 +7,7 @@ public sealed class IndexModel(
     PublicQueryCacheService publicQueryCache,
     TimeProvider timeProvider) : PageModel
 {
-    public IReadOnlyList<NewsItem> Latest { get; private set; } = [];
+    public IReadOnlyList<NewsArchiveItem> Latest { get; private set; } = [];
 
     public IReadOnlyList<QueenHistoryEvent> OnThisDay { get; private set; } = [];
 
@@ -16,7 +16,8 @@ public sealed class IndexModel(
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
         ViewData["Title"] = "QueenZone";
-        Latest = await publicQueryCache.GetLatestNewsAsync(5, cancellationToken);
+        var latest = await publicQueryCache.GetLatestNewsAsync(5, cancellationToken);
+        Latest = PublicContentMapper.ToNewsArchiveItems(latest);
         var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
         OnThisDay = await publicQueryCache.GetOnThisDayAsync(today, 3, cancellationToken);
 
