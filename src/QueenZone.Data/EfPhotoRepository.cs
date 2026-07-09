@@ -20,6 +20,7 @@ public sealed class EfPhotoRepository : IPhotoRepository
     private readonly string categoriesSql;
     private readonly Func<int, string> categoryPageSql;
 
+    [ExcludeFromCodeCoverage] // Production stored-procedure wiring; methods covered via test SQL hooks.
     public EfPhotoRepository(QueenZoneDbContext dbContext)
         : this(
             dbContext,

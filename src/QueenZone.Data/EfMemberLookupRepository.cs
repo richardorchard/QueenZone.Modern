@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.EntityFrameworkCore;
 
 namespace QueenZone.Data;
@@ -11,6 +12,7 @@ public sealed class EfMemberLookupRepository : ILegacyMemberLookupRepository
     private readonly QueenZoneDbContext dbContext;
     private readonly Func<string, FormattableString> findByEmailSql;
 
+    [ExcludeFromCodeCoverage] // Production SQL wiring; methods covered via test SQL hooks.
     public EfMemberLookupRepository(QueenZoneDbContext dbContext)
         : this(
             dbContext,

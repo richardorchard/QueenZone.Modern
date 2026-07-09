@@ -17,6 +17,7 @@ public sealed class EfFanPerformanceRepository : IFanPerformanceRepository
     private readonly string countSql;
     private readonly Func<int, FormattableString> byIdSql;
 
+    [ExcludeFromCodeCoverage] // Production SQL Server wiring; methods covered via test SQL hooks.
     public EfFanPerformanceRepository(QueenZoneDbContext dbContext)
         : this(
             dbContext,

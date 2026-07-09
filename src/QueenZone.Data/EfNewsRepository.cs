@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.EntityFrameworkCore;
 
 namespace QueenZone.Data;
@@ -14,6 +15,7 @@ public sealed class EfNewsRepository : INewsRepository
     private readonly Func<int, string> byIdSql;
     private readonly string sitemapSql;
 
+    [ExcludeFromCodeCoverage] // SQL Server connection/schema probe + production SQL wiring.
     public EfNewsRepository(QueenZoneDbContext dbContext)
     {
         this.dbContext = dbContext;

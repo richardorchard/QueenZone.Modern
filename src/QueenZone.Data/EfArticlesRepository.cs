@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.EntityFrameworkCore;
 
 namespace QueenZone.Data;
@@ -29,6 +30,7 @@ public sealed class EfArticlesRepository : IArticlesRepository
     private readonly Func<int, string> byIdSql;
     private readonly string sitemapSql;
 
+    [ExcludeFromCodeCoverage] // Production SQL Server query wiring; methods covered via test SQL hooks.
     public EfArticlesRepository(QueenZoneDbContext dbContext)
         : this(
             dbContext,

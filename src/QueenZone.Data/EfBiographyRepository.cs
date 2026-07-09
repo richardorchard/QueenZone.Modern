@@ -12,6 +12,7 @@ public sealed class EfBiographyRepository : IBiographyRepository
     private readonly string listSql;
     private readonly Func<short, FormattableString> detailSql;
 
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage] // Production EXEC wiring; methods covered via test SQL hooks.
     public EfBiographyRepository(QueenZoneDbContext dbContext)
         : this(
             dbContext,
