@@ -55,6 +55,11 @@ if (ResponseCompressionBootstrap.IsEnabled(app.Environment))
     app.UseResponseCompression();
 }
 
+if (!app.Environment.IsDevelopment())
+{
+    app.UseExceptionHandler("/error");
+}
+
 // PhysicalFileProvider excludes dot-prefixed files/folders by default, so the generic
 // UseStaticFiles() below would 404 on /.well-known/* (used for Microsoft's domain
 // association file, and any future well-known files like ACME challenges). Map it
@@ -89,16 +94,7 @@ app.Use(async (context, next) =>
     await next();
 });
 
-app.UseStatusCodePages(async statusCodeContext =>
-{
-    if (statusCodeContext.HttpContext.Response.StatusCode == 404)
-    {
-        var originalPath = statusCodeContext.HttpContext.Request.Path;
-        statusCodeContext.HttpContext.Request.Path = "/404";
-        await statusCodeContext.Next(statusCodeContext.HttpContext);
-        statusCodeContext.HttpContext.Request.Path = originalPath;
-    }
-});
+app.UseStatusCodePagesWithReExecute("/error/{0}");
 app.UseStaticFiles(new StaticFileOptions
 {
     OnPrepareResponse = ctx => StaticFileCacheControl.Apply(ctx.Context, app.Environment),
@@ -118,6 +114,7 @@ app.MapGet("/account/member-probe", () => Results.Ok(new { authenticated = true 
 app.MapFanPerformanceEndpoints();
 app.MapSitemapEndpoints();
 app.MapRazorPages();
+app.MapFallbackToPage("/NotFound");
 
 app.Run();
 

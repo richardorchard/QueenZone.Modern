@@ -532,6 +532,92 @@ body.qz-menu-lock .qz-masthead {
   border-color: var(--border-strong);
 }
 
+.qz-error-page__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: clamp(1.5rem, 4vw, 4rem);
+  align-items: start;
+}
+
+.qz-error-page__panel {
+  padding: clamp(1.5rem, 3vw, 2.25rem);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  background: var(--qz-white);
+  box-shadow: var(--shadow-sm);
+}
+
+.qz-error-page__kicker {
+  margin: 0 0 var(--space-2);
+  color: var(--qz-gold-deep);
+  font: var(--fw-semibold) 0.6875rem/1 var(--font-titling);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.qz-error-page__panel h2 {
+  margin: 0 0 var(--space-3);
+  font: var(--fw-medium) clamp(1.75rem, 3vw, 2.5rem)/1.08 var(--font-display);
+  letter-spacing: -0.01em;
+}
+
+.qz-error-page__panel p {
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: 1.65;
+}
+
+.qz-error-page__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+}
+
+.qz-error-page__links {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.qz-error-page__links a {
+  display: block;
+  min-height: 100%;
+  padding: var(--space-4);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.68);
+  color: inherit;
+  text-decoration: none;
+  transition: background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+}
+
+.qz-error-page__links a:hover,
+.qz-error-page__links a:focus-visible {
+  border-color: var(--qz-gold);
+  background: var(--qz-white);
+}
+
+.qz-error-page__links span {
+  display: block;
+  margin-bottom: var(--space-1);
+  font: var(--fw-semibold) 1rem/1.2 var(--font-body);
+}
+
+.qz-error-page__links small {
+  display: block;
+  color: var(--text-secondary);
+  font: var(--fw-regular) 0.875rem/1.5 var(--font-body);
+}
+
+.qz-error-page__request {
+  margin: var(--space-5) 0 0;
+  color: var(--text-muted);
+  font: var(--type-meta);
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+}
+
 .qz-page-hero,
 .qz-hero,
 .qz-band-dark {
@@ -2162,7 +2248,9 @@ body.qz-menu-lock .qz-masthead {
   .qz-grid--five,
   .qz-grid--four,
   .qz-grid--three,
-  .qz-grid--two {
+  .qz-grid--two,
+  .qz-error-page__grid,
+  .qz-error-page__links {
     grid-template-columns: 1fr;
   }
 
