@@ -4,6 +4,8 @@
 
 Accepted.
 
+Amended 2026-07-09: forum public reads now use modern projected tables by default; other content areas may continue reading legacy tables unless performance or safety problems appear.
+
 ## Context
 
 The legacy database is valuable because it contains the historical QueenZone content. It is also old, highly procedural, and mixes public content with user accounts, private data, community features, tracking data, and administrative concerns.
@@ -12,24 +14,29 @@ Some areas, especially forums, are unlikely to be efficient or pleasant to query
 
 ## Decision
 
-The legacy schema is an import source, not the final schema.
+The legacy schema remains an import source and historical reference. It is not required that every public content area move onto modern tables before launch.
 
-The modern application may read directly from legacy tables and stored procedures during early migration, but it can introduce new modern read-model tables when that improves safety, performance, clarity, or maintainability.
+The modern application may read directly from legacy tables and stored procedures for public archive content. Introduce modern read-model tables when that improves safety, performance, clarity, or maintainability — especially for large or awkward areas such as forums.
 
-Forum archive work should strongly prefer modern projected tables over direct long-term reads from `Q_FORUM_TOPIC_T`.
+### Current policy
+
+- **Forum archive:** public reads use the imported `ModernForum*` tables by default (`ForumData:UseModernForumReads = true`, `ModernForumRepository`). Legacy forum SQL remains available as a fallback and historical source, not the primary production path.
+- **Other public content** (news, articles, biography, discography, photography, and similar): continue reading legacy tables/stored procedures unless we discover performance, privacy, or maintainability problems that justify a modern projection.
+- **New editorial workflows** (for example admin news writes and discovery tables): continue using deliberately designed modern tables rather than extending legacy write paths.
 
 ## Consequences
 
 Benefits:
 
 - We can launch quickly while still allowing a better long-term shape.
-- Forum archive pages can be optimized for modern browsing and search.
+- Forum archive pages are optimized for modern browsing and search via projected tables.
 - Private/sensitive fields can be excluded at import time.
 - Old IDs and URLs can still be preserved.
+- Non-forum content can stay on proven legacy reads without premature schema rewrites.
 
 Tradeoffs:
 
 - Requires import jobs and repeatable migration scripts.
 - Data correctness needs validation reports.
 - There may be a period where both legacy and modern tables exist.
-
+- Production must keep modern forum import/read-path scripts and indexes healthy (`docs/sql/006-modern-forum-read-path.sql` and related import tooling).

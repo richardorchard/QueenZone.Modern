@@ -6,7 +6,7 @@ For the archive-first launch, do not transform the whole database up front.
 
 Use the restored legacy SQL Server database as a read source, then introduce modern projection tables or import jobs only when the shape of each content area is understood.
 
-The legacy schema is not considered permanent for new product workflows, but preserved legacy tables should remain stable historical sources. News is the first slice that should combine archived legacy records from `NEWS_T` with newly approved articles stored in separate modern tables. Forum data is the clearest candidate for redesign because the legacy topic/reply model is old, large, and not optimized for modern archive browsing.
+The legacy schema remains a stable historical source for most public archive reads. News combines archived legacy records from `NEWS_T` with newly approved articles stored through modern admin/discovery tables. Forum data has already been projected into `ModernForum*` tables for public reads because the legacy topic/reply model was too large and awkward for modern archive browsing. Other content areas should stay on legacy reads unless performance or safety problems appear.
 
 ## Data Access Stages
 
@@ -19,9 +19,9 @@ Use Dapper to call either:
 
 This keeps the first release quick and reduces assumptions.
 
-### Stage 2: Create Modern Read Models
+### Stage 2: Create Modern Read Models When Needed
 
-For high-value content, create modern read models:
+Forum already uses modern read models for public archive pages. For other high-value content, create modern read models only when legacy reads become a performance, privacy, or maintainability problem:
 
 - `ContentPage`
 - `NewsItem`

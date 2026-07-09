@@ -211,6 +211,8 @@ Acceptance criteria:
 
 ### Forum archive feasibility review
 
+Status: **done** for public browse path.
+
 Acceptance criteria:
 
 - Public/private fields identified.
@@ -218,6 +220,8 @@ Acceptance criteria:
 - Sample forum topic renders read-only.
 
 ### Design modern forum archive schema
+
+Status: **done**.
 
 Acceptance criteria:
 
@@ -229,12 +233,19 @@ Acceptance criteria:
 
 ### Build forum import proof of concept
 
+Status: **done** and expanded to full public forum archive import/read path.
+
 Acceptance criteria:
 
 - One forum category imports into modern tables.
 - Thread and post counts match legacy source for that category.
 - Import report lists skipped or unsafe records.
 - Read-only pages render from modern tables, not directly from legacy forum tables.
+
+Notes:
+
+- Production defaults to `ModernForumRepository` (`ForumData:UseModernForumReads = true`).
+- Other non-forum archive content may continue reading legacy tables unless performance or safety problems appear.
 
 ### Blog archive feasibility review
 

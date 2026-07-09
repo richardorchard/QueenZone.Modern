@@ -34,9 +34,9 @@ The legacy schema contains 129 tables. This file focuses on the tables relevant 
 
 | Table | Purpose | Initial Treatment |
 | --- | --- | --- |
-| `Q_FORUM_T` | Forum categories. | Read-only archive (categories wired on `/forum`). |
-| `Q_FORUM_TOPIC_T` | Forum topics and replies. | Later read-only archive. |
-| `Q_FORUM_TOPIC_SUBJECT_T` | Forum subject metadata. | Later read-only archive. |
+| `Q_FORUM_T` | Forum categories. | Historical import source. Public `/forum` reads use `ModernForum*` by default. |
+| `Q_FORUM_TOPIC_T` | Forum topics and replies. | Historical import source. Public topic/post pages use `ModernForum*` by default. |
+| `Q_FORUM_TOPIC_SUBJECT_T` | Forum subject metadata. | Historical import source for modern forum projection. |
 | `Q_STAGE_T` | Fan-submitted song performances ("fan stage"). | Read-only archive, wired on `/fan-performances` (`DISPLAY = 1` rows only). |
 
 ### `Q_STAGE_T` columns
@@ -94,17 +94,32 @@ Related stored procedures: `Q_STAGE_T_LIST_SP` (unfiltered full list, unused by 
 | `dbUser.Q_FORUM_TOPIC_THREAD_COUNT_V` | Pre-aggregated thread count per forum. Sum for site-wide thread totals. |
 | `FORUM_VIEW_V` | Forum topics joined to users (used by `Q_FORUM_VIEW_SP`). |
 
-### Modern forum read patterns (`LegacyForumRepository`)
+### Legacy forum read patterns (`LegacyForumRepository`)
 
-Avoid ad-hoc `COUNT(*)` scans on `Q_FORUM_TOPIC_T` in production. The table is large and causes App Service timeouts.
+`LegacyForumRepository` remains available when `ForumData:UseModernForumReads` is `false`. Production defaults to `ModernForumRepository` against imported `ModernForum*` tables (`docs/sql/006-modern-forum-read-path.sql`).
 
-| Page need | Preferred source |
+If using the legacy path, avoid ad-hoc `COUNT(*)` scans on `Q_FORUM_TOPIC_T` in production. The table is large and causes App Service timeouts.
+
+| Page need | Preferred legacy source |
 | --- | --- |
 | Category index (`/forum`) | Direct read of `Q_FORUM_T` ordered by `FORUM_ORDER` (same shape as `Q_LIST_FORUM_SP`). |
 | Board/post hero stats | Derive board count and post total from the category read (`Q_FORUM_POST_COUNT` per row). Sum thread totals from `dbUser.Q_FORUM_TOPIC_THREAD_COUNT_V`. |
 | Category header (`/forum/{id}/{slug}`) | `Q_FORUM_T` for one board; optional `OUTER APPLY` for latest thread title on a single row only. |
 | Paged topic list | `Q_FORUM_VIEW_PAGE_SP` with `@TotalRecords` output. Do not add a separate manual `COUNT(*)` query. |
 | Thread detail (`/forum/topic/{id}/{slug}`) | `Q_FORUM_TOPIC_NEW_SP` for paged posts in chronological order. Pass `@USER_ID = 0` for anonymous archive reads. |
+
+### Modern forum read patterns (`ModernForumRepository`)
+
+Default production path (`ForumData:UseModernForumReads = true`):
+
+| Page need | Preferred modern source |
+| --- | --- |
+| Category index / stats | `ModernForum_GetCategories` and related read-stat procedures |
+| Category topics | Modern category topic page procedures with covering indexes |
+| Thread detail | Modern topic/post page procedures |
+| Forum sitemap | Modern topic sitemap page/count procedures |
+
+See `docs/performance/forum-read-benchmark-2026-06-29.md` for legacy vs modern timing comparisons.
 
 ## Private Or Sensitive
 
