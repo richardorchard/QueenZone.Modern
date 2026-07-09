@@ -99,6 +99,54 @@ public sealed class NewsCandidateWorkflowTests
         Assert.Equal("This candidate has already been ignored as a duplicate.", error);
     }
 
+    [Theory]
+    [InlineData(NewsCandidateStatus.PromotedToArticle, "This candidate has already been promoted to an article.")]
+    [InlineData(NewsCandidateStatus.Drafted, "This candidate is already drafted.")]
+    [InlineData(NewsCandidateStatus.NeedsReview, "This candidate is already in needs-review.")]
+    [InlineData(NewsCandidateStatus.Discovered, "This candidate is already discovered.")]
+    public void FormatAlreadyAtStatusError_covers_open_and_promoted_statuses(
+        NewsCandidateStatus status,
+        string expected) =>
+        Assert.Equal(expected, NewsCandidateWorkflow.FormatAlreadyAtStatusError(status));
+
+    [Fact]
+    public void GetRejectError_and_GetIgnoreDuplicateError_return_empty_for_valid_actions()
+    {
+        Assert.Equal(string.Empty, NewsCandidateWorkflow.GetRejectError(NewsCandidateStatus.Discovered));
+        Assert.Equal(string.Empty, NewsCandidateWorkflow.GetRejectError(NewsCandidateStatus.NeedsReview));
+        Assert.Equal(string.Empty, NewsCandidateWorkflow.GetIgnoreDuplicateError(NewsCandidateStatus.Drafted));
+    }
+
+    [Fact]
+    public void GetRejectError_and_GetIgnoreDuplicateError_return_messages_for_invalid_actions()
+    {
+        Assert.Equal(
+            "This candidate has already been rejected.",
+            NewsCandidateWorkflow.GetRejectError(NewsCandidateStatus.Rejected));
+        Assert.Equal(
+            "This candidate has already been ignored as a duplicate.",
+            NewsCandidateWorkflow.GetIgnoreDuplicateError(NewsCandidateStatus.IgnoredDuplicate));
+        Assert.Equal(
+            NewsCandidateWorkflow.FormatInvalidTransitionError(
+                NewsCandidateStatus.PromotedToArticle,
+                NewsCandidateStatus.Rejected),
+            NewsCandidateWorkflow.GetRejectError(NewsCandidateStatus.PromotedToArticle));
+    }
+
+    [Fact]
+    public void GetMarkDraftedError_returns_empty_when_allowed_and_message_when_blocked()
+    {
+        Assert.Equal(string.Empty, NewsCandidateWorkflow.GetMarkDraftedError(NewsCandidateStatus.NeedsReview));
+        Assert.Equal(
+            "This candidate is already drafted.",
+            NewsCandidateWorkflow.GetMarkDraftedError(NewsCandidateStatus.Drafted));
+        Assert.Equal(
+            NewsCandidateWorkflow.FormatInvalidTransitionError(
+                NewsCandidateStatus.Discovered,
+                NewsCandidateStatus.Drafted),
+            NewsCandidateWorkflow.GetMarkDraftedError(NewsCandidateStatus.Discovered));
+    }
+
     [Fact]
     public void TryValidateStatusChange_allows_valid_change_and_rejects_invalid()
     {
