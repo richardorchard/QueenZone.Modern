@@ -6,14 +6,11 @@ namespace QueenZone.Web.E2E;
 
 [Parallelizable(ParallelScope.Self)]
 [TestFixture]
-public class EditorWorkflowTests : PageTest
+public class EditorWorkflowTests : E2EPageTest
 {
     // Must match SampleNewsDiscoveryData seed titles used by AddQueenZoneInMemoryData.
     private const string SeededSourceTitle = "E2E editorial workflow source item";
     private const string SeededDraftTitle = "E2E editorial workflow draft";
-
-    private static string BaseUrl =>
-        Environment.GetEnvironmentVariable("E2E_BASE_URL") ?? "http://127.0.0.1:5099";
 
     private static string AdminEmail =>
         Environment.GetEnvironmentVariable("E2E_ADMIN_EMAIL") ?? "admin@test.local";

@@ -55,6 +55,30 @@ A self-hosted runner executes whatever code is in the triggered workflow run on 
 
 The workflow also accepts `workflow_dispatch`, so you can trigger `e2e-test` (along with the rest of CI) on demand from the **Actions** tab without waiting for a push, useful for checking the runner is online after machine restarts or service updates.
 
+### Local run (against a published Testing app)
+
+```powershell
+dotnet build tests/QueenZone.Web.E2E/QueenZone.Web.E2E.csproj --configuration Release
+.\tests\QueenZone.Web.E2E\bin\Release\net10.0\playwright.ps1 install chromium
+dotnet publish src/QueenZone.Web/QueenZone.Web.csproj --configuration Release --output ./e2e-app
+# Terminal A:
+$env:ASPNETCORE_ENVIRONMENT = "Testing"
+$env:ASPNETCORE_URLS = "http://127.0.0.1:5099"
+$env:ASPNETCORE_CONTENTROOT = (Resolve-Path .\e2e-app).Path
+.\e2e-app\QueenZone.Web.exe
+# Terminal B:
+$env:E2E_BASE_URL = "http://127.0.0.1:5099"
+$env:E2E_ADMIN_EMAIL = "admin@test.local"
+$env:E2E_ARTIFACT_DIR = "test-results/e2e"
+dotnet test tests/QueenZone.Web.E2E/QueenZone.Web.E2E.csproj --configuration Release --no-build
+```
+
+Failed tests write screenshots (`.png`) and Playwright traces (`.zip`) under `test-results/e2e/`. Open a trace with:
+
+```powershell
+npx playwright show-trace test-results/e2e\<name>.zip
+```
+
 ## Troubleshooting
 
 - **Job stuck in "Waiting for a runner to pick up this job"**: the service isn't running. Run `.\svc.cmd status` in the runner folder and `.\svc.cmd start` if needed.

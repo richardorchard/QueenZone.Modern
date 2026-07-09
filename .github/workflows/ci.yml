@@ -223,6 +223,7 @@ jobs:
         env:
           E2E_BASE_URL: http://127.0.0.1:5099
           E2E_ADMIN_EMAIL: admin@test.local
+          E2E_ARTIFACT_DIR: test-results/e2e
         run: dotnet test tests/QueenZone.Web.E2E/QueenZone.Web.E2E.csproj --configuration Release --no-build
 
       - name: Stop app
@@ -253,10 +254,14 @@ jobs:
             Start-Sleep -Milliseconds 500
           }
 
-      - name: Upload app log on failure
+      - name: Upload Playwright failure artifacts
         if: failure()
         uses: actions/upload-artifact@v5
         with:
-          name: e2e-app-log-${{ github.run_id }}
-          path: e2e-app.log
+          name: e2e-playwright-${{ github.run_id }}
+          path: |
+            test-results/e2e/
+            e2e-app.log
+            e2e-app.err.log
+          if-no-files-found: ignore
           retention-days: 7

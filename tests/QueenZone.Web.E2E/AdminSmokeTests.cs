@@ -1,16 +1,12 @@
 using System.Text.RegularExpressions;
 using Microsoft.Playwright;
-using Microsoft.Playwright.NUnit;
 
 namespace QueenZone.Web.E2E;
 
 [Parallelizable(ParallelScope.Self)]
 [TestFixture]
-public class AdminSmokeTests : PageTest
+public class AdminSmokeTests : E2EPageTest
 {
-    private static string BaseUrl =>
-        Environment.GetEnvironmentVariable("E2E_BASE_URL") ?? "http://127.0.0.1:5099";
-
     private static string AdminEmail =>
         Environment.GetEnvironmentVariable("E2E_ADMIN_EMAIL") ?? "admin@test.local";
 
