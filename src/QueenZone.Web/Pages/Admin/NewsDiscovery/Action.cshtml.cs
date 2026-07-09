@@ -21,13 +21,12 @@ public sealed class ActionModel(
             return NotFound();
         }
 
-        if (!NewsCandidateWorkflow.CanTransition(candidate.Status, NewsCandidateStatus.Rejected))
+        if (!NewsCandidateWorkflow.TryValidateStatusChange(
+                candidate.Status,
+                NewsCandidateStatus.Rejected,
+                out var transitionError))
         {
-            return RedirectToReview(
-                id,
-                candidate.Status == NewsCandidateStatus.Rejected
-                    ? "This candidate has already been rejected."
-                    : $"Cannot transition candidate status from {candidate.Status} to {NewsCandidateStatus.Rejected}.");
+            return RedirectToReview(id, transitionError);
         }
 
         var updated = await discoveryRepository.TryUpdateCandidateStatusAsync(
@@ -52,13 +51,12 @@ public sealed class ActionModel(
             return NotFound();
         }
 
-        if (!NewsCandidateWorkflow.CanTransition(candidate.Status, NewsCandidateStatus.IgnoredDuplicate))
+        if (!NewsCandidateWorkflow.TryValidateStatusChange(
+                candidate.Status,
+                NewsCandidateStatus.IgnoredDuplicate,
+                out var transitionError))
         {
-            return RedirectToReview(
-                id,
-                candidate.Status == NewsCandidateStatus.IgnoredDuplicate
-                    ? "This candidate has already been ignored as a duplicate."
-                    : $"Cannot transition candidate status from {candidate.Status} to {NewsCandidateStatus.IgnoredDuplicate}.");
+            return RedirectToReview(id, transitionError);
         }
 
         var duplicateOf = candidate.DuplicateOfCandidateId
@@ -97,9 +95,18 @@ public sealed class ActionModel(
             return RedirectToReview(id, "Generate or save a draft before promoting this candidate.");
         }
 
+        var promoteReadinessError = NewsCandidateWorkflow.GetPromoteReadinessError(candidate.Status);
+        if (!string.IsNullOrEmpty(promoteReadinessError))
+        {
+            return RedirectToReview(id, promoteReadinessError);
+        }
+
         if (candidate.Status == NewsCandidateStatus.NeedsReview)
         {
-            if (!NewsCandidateWorkflow.TryTransition(candidate.Status, NewsCandidateStatus.Drafted, out var draftedError))
+            if (!NewsCandidateWorkflow.TryValidateStatusChange(
+                    candidate.Status,
+                    NewsCandidateStatus.Drafted,
+                    out var draftedError))
             {
                 return RedirectToReview(id, draftedError);
             }
@@ -118,13 +125,13 @@ public sealed class ActionModel(
             candidate = await discoveryRepository.GetCandidateByIdAsync(id, cancellationToken);
         }
 
-        if (candidate is null || candidate.Status != NewsCandidateStatus.Drafted)
+        if (candidate is null || !NewsCandidateWorkflow.CanPromoteToArticle(candidate.Status))
         {
             return RedirectToReview(
                 id,
                 candidate is null
                     ? "The candidate is no longer available."
-                    : $"Only drafted candidates can be promoted. Current status: {candidate.Status}.");
+                    : NewsCandidateWorkflow.GetPromoteReadinessError(candidate.Status));
         }
 
         var adminDraft = NewsDiscoveryPromoteDraft.Build(agentDraft, candidate);
@@ -146,7 +153,10 @@ public sealed class ActionModel(
         {
             newsId = await adminNewsRepository.CreateDraftAsync(adminDraft, EditorEmail, cancellationToken);
 
-            if (!NewsCandidateWorkflow.TryTransition(candidate.Status, NewsCandidateStatus.PromotedToArticle, out var promoteError))
+            if (!NewsCandidateWorkflow.TryValidateStatusChange(
+                    candidate.Status,
+                    NewsCandidateStatus.PromotedToArticle,
+                    out var promoteError))
             {
                 if (transaction is not null)
                 {
@@ -227,9 +237,10 @@ public sealed class ActionModel(
             return Redirect($"/admin/news-discovery/{id}");
         }
 
-        if (candidate.Status is not NewsCandidateStatus.NeedsReview and not NewsCandidateStatus.Drafted)
+        var draftGenerationError = NewsCandidateWorkflow.GetDraftGenerationError(candidate.Status);
+        if (!string.IsNullOrEmpty(draftGenerationError))
         {
-            TempData["DiscoveryMessage"] = "Only needs-review or drafted candidates can regenerate a draft.";
+            TempData["DiscoveryMessage"] = draftGenerationError;
             TempData["DiscoveryMessageKind"] = "error";
             return Redirect($"/admin/news-discovery/{id}");
         }

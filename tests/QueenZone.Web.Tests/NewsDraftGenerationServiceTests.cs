@@ -107,6 +107,22 @@ public sealed class NewsDraftGenerationServiceTests
     Assert.Equal(0, result.DraftsCreated);
   }
 
+  [Fact]
+  public async Task GenerateDraftAsync_rejects_candidates_outside_draftable_statuses()
+  {
+    var repository = new InMemoryNewsDiscoveryRepository(new SharedNewsDiscoveryStore());
+    var candidateId = await NewsDiscoveryTestSeeder.SeedDiscoveredCandidateAsync(repository);
+    var candidate = (await repository.GetCandidateByIdAsync(candidateId))!;
+    var service = NewsAgentTestSupport.CreateDraftGenerationService(
+      repository,
+      new DraftGenerationFakeAiClient(NewsAgentTestSupport.SampleDraftJson));
+
+    var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+      service.GenerateDraftAsync(candidate, new NewsDraftRunOptions()));
+
+    Assert.Contains("needs-review or drafted", exception.Message, StringComparison.OrdinalIgnoreCase);
+  }
+
   [Theory]
   [InlineData(false)]
   [InlineData(true)]

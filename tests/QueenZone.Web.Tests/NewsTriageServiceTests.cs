@@ -60,6 +60,20 @@ public sealed class NewsTriageServiceTests
     }
 
     [Fact]
+    public async Task TriageCandidateAsync_rejects_candidates_outside_discovered_status()
+    {
+        var repository = new InMemoryNewsDiscoveryRepository(new SharedNewsDiscoveryStore());
+        var candidateId = await NewsDiscoveryTestSeeder.SeedNeedsReviewCandidateAsync(repository);
+        var candidate = (await repository.GetCandidateByIdAsync(candidateId))!;
+        var service = CreateService(repository, new FakeNewsAiClient(true, "{}"));
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.TriageCandidateAsync(candidate, new NewsTriageRunOptions()));
+
+        Assert.Contains("discovered", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task TriageCandidateAsync_marks_title_duplicate_without_calling_ai()
     {
         var repository = new InMemoryNewsDiscoveryRepository(new SharedNewsDiscoveryStore());

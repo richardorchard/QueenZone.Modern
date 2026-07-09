@@ -91,9 +91,10 @@ public sealed class NewsTriageService(
         NewsTriageRunOptions options,
         CancellationToken cancellationToken = default)
     {
-        if (candidate.Status != NewsCandidateStatus.Discovered)
+        var triageError = NewsCandidateWorkflow.GetTriageError(candidate.Status);
+        if (!string.IsNullOrEmpty(triageError))
         {
-            throw new InvalidOperationException($"Candidate {candidate.Id} is not in the discovered state.");
+            throw new InvalidOperationException($"Candidate {candidate.Id}: {triageError}");
         }
 
         var source = await repository.GetSourceByIdAsync(candidate.SourceId, cancellationToken)
@@ -135,6 +136,15 @@ public sealed class NewsTriageService(
 
         if (!options.DryRun && decision.TargetStatus != NewsCandidateStatus.Discovered)
         {
+            if (!NewsCandidateWorkflow.TryValidateStatusChange(
+                    candidate.Status,
+                    decision.TargetStatus,
+                    out var transitionError))
+            {
+                throw new InvalidOperationException(
+                    $"Candidate {candidate.Id}: {transitionError}");
+            }
+
             var updated = await repository.TryUpdateCandidateStatusAsync(
                 candidate.Id,
                 new NewsCandidateStatusUpdate(

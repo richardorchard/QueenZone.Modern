@@ -66,8 +66,7 @@ public sealed class EditDraftModel(INewsDiscoveryRepository discoveryRepository)
                 Form.SuggestedPublishAt,
                 existing.AiRunId));
 
-        if (Candidate.Status == NewsCandidateStatus.NeedsReview
-            && NewsCandidateWorkflow.CanTransition(Candidate.Status, NewsCandidateStatus.Drafted))
+        if (NewsCandidateWorkflow.CanMarkDrafted(Candidate.Status))
         {
             await discoveryRepository.TryUpdateCandidateStatusAsync(
                 id,

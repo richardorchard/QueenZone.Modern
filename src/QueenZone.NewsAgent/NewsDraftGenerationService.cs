@@ -76,9 +76,10 @@ public sealed class NewsDraftGenerationService(
         NewsDraftRunOptions options,
         CancellationToken cancellationToken = default)
     {
-        if (candidate.Status is not NewsCandidateStatus.NeedsReview and not NewsCandidateStatus.Drafted)
+        var draftStatusError = NewsCandidateWorkflow.GetDraftGenerationError(candidate.Status);
+        if (!string.IsNullOrEmpty(draftStatusError))
         {
-            throw new InvalidOperationException($"Candidate {candidate.Id} is not ready for draft generation.");
+            throw new InvalidOperationException($"Candidate {candidate.Id}: {draftStatusError}");
         }
 
         if (candidate.Status == NewsCandidateStatus.Drafted && !options.ForceRegenerate)
@@ -140,14 +141,27 @@ public sealed class NewsDraftGenerationService(
                     execution.AiRunId),
                 cancellationToken);
 
-            var updated = await repository.TryUpdateCandidateStatusAsync(
-                candidate.Id,
-                new NewsCandidateStatusUpdate(NewsCandidateStatus.Drafted),
-                cancellationToken);
-
-            if (!updated)
+            if (candidate.Status != NewsCandidateStatus.Drafted
+                && !NewsCandidateWorkflow.TryValidateStatusChange(
+                    candidate.Status,
+                    NewsCandidateStatus.Drafted,
+                    out var markDraftedError))
             {
-                throw new InvalidOperationException($"Failed to mark candidate {candidate.Id} as drafted.");
+                throw new InvalidOperationException(
+                    $"Candidate {candidate.Id}: {markDraftedError}");
+            }
+
+            if (candidate.Status != NewsCandidateStatus.Drafted)
+            {
+                var updated = await repository.TryUpdateCandidateStatusAsync(
+                    candidate.Id,
+                    new NewsCandidateStatusUpdate(NewsCandidateStatus.Drafted),
+                    cancellationToken);
+
+                if (!updated)
+                {
+                    throw new InvalidOperationException($"Failed to mark candidate {candidate.Id} as drafted.");
+                }
             }
 
             logger.LogInformation(
