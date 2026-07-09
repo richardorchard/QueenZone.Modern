@@ -12,12 +12,12 @@ public sealed class EfBiographyRepository : IBiographyRepository
     private readonly string listSql;
     private readonly Func<short, FormattableString> detailSql;
 
-    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage] // Production EXEC wiring; methods covered via test SQL hooks.
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public EfBiographyRepository(QueenZoneDbContext dbContext)
         : this(
             dbContext,
-            listSql: "EXEC Q_BIO_LIST_SP",
-            detailSql: static id => $"EXEC Q_BIO_DISPLAY_SP @Q_BIO_ID = {id}")
+            listSql: EfProductionSql.CreateBiographyQueries().ListSql,
+            detailSql: EfProductionSql.CreateBiographyQueries().DetailSql)
     {
     }
 

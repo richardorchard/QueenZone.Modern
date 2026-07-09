@@ -17,18 +17,14 @@ public sealed class EfFanPerformanceRepository : IFanPerformanceRepository
     private readonly string countSql;
     private readonly Func<int, FormattableString> byIdSql;
 
-    [ExcludeFromCodeCoverage] // Production SQL Server wiring; methods covered via test SQL hooks.
+    [ExcludeFromCodeCoverage]
     public EfFanPerformanceRepository(QueenZoneDbContext dbContext)
         : this(
             dbContext,
-            useLegacyProcedures: true,
-            pageSelectSql: string.Empty,
-            countSql: "SELECT COUNT(*) AS Value FROM dbo.Q_STAGE_T WHERE DISPLAY = 1",
-            byIdSql: static id => $"""
-                SELECT Q_STAGE_ID, TITLE, PERFORMED_BY, DESCRIPTION, URL, thesize, DATE_ADDED
-                FROM dbo.Q_STAGE_T
-                WHERE Q_STAGE_ID = {id} AND DISPLAY = 1
-                """)
+            useLegacyProcedures: EfProductionSql.CreateFanPerformanceQueries().UseProcs,
+            pageSelectSql: EfProductionSql.CreateFanPerformanceQueries().PageSelect,
+            countSql: EfProductionSql.CreateFanPerformanceQueries().CountSql,
+            byIdSql: EfProductionSql.CreateFanPerformanceQueries().ByIdSql)
     {
     }
 

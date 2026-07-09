@@ -12,15 +12,9 @@ public sealed class EfMemberLookupRepository : ILegacyMemberLookupRepository
     private readonly QueenZoneDbContext dbContext;
     private readonly Func<string, FormattableString> findByEmailSql;
 
-    [ExcludeFromCodeCoverage] // Production SQL wiring; methods covered via test SQL hooks.
+    [ExcludeFromCodeCoverage]
     public EfMemberLookupRepository(QueenZoneDbContext dbContext)
-        : this(
-            dbContext,
-            email => $"""
-                SELECT TOP 1 USER_ID, USERNAME
-                FROM dbo.USERS_T
-                WHERE EMAIL = {email}
-                """)
+        : this(dbContext, EfProductionSql.CreateMemberLookupSql())
     {
     }
 

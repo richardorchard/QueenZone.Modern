@@ -8,21 +8,6 @@ namespace QueenZone.Data;
 /// </summary>
 public sealed class EfArticlesRepository : IArticlesRepository
 {
-    private const string PublishedArticlesSelect = """
-        SELECT
-            CAST(a.Q_ARTICLE_ID AS int) AS Id,
-            a.ARTICLE_NAME AS Title,
-            ISNULL(a.ARTICLE_TEXT, '') AS Body,
-            a.DATE_CREATED AS PublishedAt,
-            NULLIF(LTRIM(RTRIM(a.SOURCE)), '') AS Source,
-            NULLIF(LTRIM(RTRIM(c.ARTICLE_CATEGORY)), '') AS CategoryName,
-            CAST(CASE WHEN a.DISPLAY = 1 THEN 1 ELSE 0 END AS bit) AS IsPublished
-        FROM Q_ARTICLE_T a
-        LEFT JOIN Q_ARTICLE_CATEGORY_T c
-            ON c.Q_ARTICLE_CAT_ID = a.Q_ARTICLE_CATEGORY_ID
-        WHERE a.DISPLAY = 1
-        """;
-
     private readonly QueenZoneDbContext dbContext;
     private readonly Func<int, string> latestSql;
     private readonly string countSql;
@@ -30,39 +15,11 @@ public sealed class EfArticlesRepository : IArticlesRepository
     private readonly Func<int, string> byIdSql;
     private readonly string sitemapSql;
 
-    [ExcludeFromCodeCoverage] // Production SQL Server query wiring; methods covered via test SQL hooks.
+    [ExcludeFromCodeCoverage]
     public EfArticlesRepository(QueenZoneDbContext dbContext)
-        : this(
-            dbContext,
-            latestSql: count => PublishedArticlesSelect + $"""
-
-                ORDER BY a.DATE_CREATED DESC, a.Q_ARTICLE_ID DESC
-                OFFSET 0 ROWS FETCH NEXT {count} ROWS ONLY
-                """,
-            countSql: """
-                SELECT COUNT(*) AS Value
-                FROM Q_ARTICLE_T
-                WHERE DISPLAY = 1
-                """,
-            archivePageSql: (offset, pageSize) => PublishedArticlesSelect + $"""
-
-                ORDER BY a.DATE_CREATED DESC, a.Q_ARTICLE_ID DESC
-                OFFSET {offset} ROWS FETCH NEXT {pageSize} ROWS ONLY
-                """,
-            byIdSql: id => PublishedArticlesSelect + $"""
-
-                  AND a.Q_ARTICLE_ID = {id}
-                """,
-            sitemapSql: """
-                SELECT
-                    CAST(a.Q_ARTICLE_ID AS int) AS Id,
-                    a.ARTICLE_NAME AS Title,
-                    a.DATE_CREATED AS PublishedAt
-                FROM Q_ARTICLE_T a
-                WHERE a.DISPLAY = 1
-                ORDER BY a.DATE_CREATED DESC, a.Q_ARTICLE_ID DESC
-                """)
     {
+        this.dbContext = dbContext;
+        (latestSql, countSql, archivePageSql, byIdSql, sitemapSql) = EfProductionSql.CreateArticlesQueries();
     }
 
     internal EfArticlesRepository(

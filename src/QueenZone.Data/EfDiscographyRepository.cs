@@ -15,13 +15,13 @@ public sealed class EfDiscographyRepository : IDiscographyRepository
     private readonly Func<int, FormattableString> displaySql;
     private readonly Func<int, FormattableString> songsSql;
 
-    [ExcludeFromCodeCoverage] // Production EXEC wiring; methods covered via test SQL hooks.
+    [ExcludeFromCodeCoverage]
     public EfDiscographyRepository(QueenZoneDbContext dbContext)
         : this(
             dbContext,
-            listSql: "EXEC Q_ALBUM_LIST_SP",
-            displaySql: static id => $"EXEC Q_ALBUM_T_DISPLAY_SP @Q_ALBUM_ID = {id}",
-            songsSql: static id => $"EXEC Q_ALBUM_SONG_T_LIST_SP @Q_ALBUM_ID = {id}")
+            listSql: EfProductionSql.CreateDiscographyQueries().ListSql,
+            displaySql: EfProductionSql.CreateDiscographyQueries().DisplaySql,
+            songsSql: EfProductionSql.CreateDiscographyQueries().SongsSql)
     {
     }
 

@@ -20,13 +20,13 @@ public sealed class EfPhotoRepository : IPhotoRepository
     private readonly string categoriesSql;
     private readonly Func<int, string> categoryPageSql;
 
-    [ExcludeFromCodeCoverage] // Production stored-procedure wiring; methods covered via test SQL hooks.
+    [ExcludeFromCodeCoverage]
     public EfPhotoRepository(QueenZoneDbContext dbContext)
         : this(
             dbContext,
-            useLegacyProcedures: true,
-            categoriesSql: string.Empty,
-            categoryPageSql: static _ => string.Empty)
+            useLegacyProcedures: EfProductionSql.CreatePhotoQueries().UseProcs,
+            categoriesSql: EfProductionSql.CreatePhotoQueries().CategoriesSql,
+            categoryPageSql: EfProductionSql.CreatePhotoQueries().CategoryPageSql)
     {
     }
 

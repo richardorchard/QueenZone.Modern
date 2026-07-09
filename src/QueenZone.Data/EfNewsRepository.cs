@@ -15,7 +15,7 @@ public sealed class EfNewsRepository : INewsRepository
     private readonly Func<int, string> byIdSql;
     private readonly string sitemapSql;
 
-    [ExcludeFromCodeCoverage] // SQL Server connection/schema probe + production SQL wiring.
+    [ExcludeFromCodeCoverage]
     public EfNewsRepository(QueenZoneDbContext dbContext)
     {
         this.dbContext = dbContext;
@@ -23,70 +23,8 @@ public sealed class EfNewsRepository : INewsRepository
             ?? throw new InvalidOperationException("QueenZone legacy database connection string is not configured.");
         var publishedNewsCte = LegacyNewsSchema.BuildPublishedNewsCte(
             LegacyNewsSchema.HasSlugColumn(connectionString));
-
-        latestSql = count => publishedNewsCte + $"""
-
-            SELECT TOP ({count})
-                Id,
-                Title,
-                Excerpt,
-                Body,
-                PublishedAt,
-                SourceUrl,
-                IsPublished,
-                Slug
-            FROM PublishedNews
-            WHERE RowNumber = 1
-            ORDER BY PublishedAt DESC, Id DESC
-            """;
-        countSql = publishedNewsCte + """
-
-            SELECT COUNT(*) AS Value
-            FROM PublishedNews
-            WHERE RowNumber = 1
-            """;
-        archivePageSql = (offset, pageSize) => publishedNewsCte + $"""
-
-            SELECT
-                Id,
-                Title,
-                Excerpt,
-                Body,
-                PublishedAt,
-                SourceUrl,
-                IsPublished,
-                Slug
-            FROM PublishedNews
-            WHERE RowNumber = 1
-            ORDER BY PublishedAt DESC, Id DESC
-            OFFSET {offset} ROWS FETCH NEXT {pageSize} ROWS ONLY
-            """;
-        byIdSql = id => publishedNewsCte + $"""
-
-            SELECT
-                Id,
-                Title,
-                Excerpt,
-                Body,
-                PublishedAt,
-                SourceUrl,
-                IsPublished,
-                Slug
-            FROM PublishedNews
-            WHERE RowNumber = 1
-              AND Id = {id}
-            """;
-        sitemapSql = publishedNewsCte + """
-
-            SELECT
-                Id,
-                Title,
-                PublishedAt,
-                Slug
-            FROM PublishedNews
-            WHERE RowNumber = 1
-            ORDER BY PublishedAt DESC, Id DESC
-            """;
+        (latestSql, countSql, archivePageSql, byIdSql, sitemapSql) =
+            EfProductionSql.CreateNewsQueries(publishedNewsCte);
     }
 
     internal EfNewsRepository(

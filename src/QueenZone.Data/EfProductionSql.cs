@@ -1,0 +1,163 @@
+using System.Diagnostics.CodeAnalysis;
+
+namespace QueenZone.Data;
+
+/// <summary>
+/// Production SQL Server query text for EF public-read repositories.
+/// Excluded from coverage: exercised against real SQL Server in opt-in probes / production,
+/// while deterministic tests inject SQLite-compatible SQL via repository test constructors.
+/// </summary>
+[ExcludeFromCodeCoverage]
+internal static class EfProductionSql
+{
+    public static (Func<int, string> Latest, string Count, Func<int, int, string> ArchivePage, Func<int, string> ById, string Sitemap)
+        CreateArticlesQueries()
+    {
+        const string publishedSelect = """
+            SELECT
+                CAST(a.Q_ARTICLE_ID AS int) AS Id,
+                a.ARTICLE_NAME AS Title,
+                ISNULL(a.ARTICLE_TEXT, '') AS Body,
+                a.DATE_CREATED AS PublishedAt,
+                NULLIF(LTRIM(RTRIM(a.SOURCE)), '') AS Source,
+                NULLIF(LTRIM(RTRIM(c.ARTICLE_CATEGORY)), '') AS CategoryName,
+                CAST(CASE WHEN a.DISPLAY = 1 THEN 1 ELSE 0 END AS bit) AS IsPublished
+            FROM Q_ARTICLE_T a
+            LEFT JOIN Q_ARTICLE_CATEGORY_T c
+                ON c.Q_ARTICLE_CAT_ID = a.Q_ARTICLE_CATEGORY_ID
+            WHERE a.DISPLAY = 1
+            """;
+
+        return (
+            count => publishedSelect + $"""
+
+                ORDER BY a.DATE_CREATED DESC, a.Q_ARTICLE_ID DESC
+                OFFSET 0 ROWS FETCH NEXT {count} ROWS ONLY
+                """,
+            """
+            SELECT COUNT(*) AS Value
+            FROM Q_ARTICLE_T
+            WHERE DISPLAY = 1
+            """,
+            (offset, pageSize) => publishedSelect + $"""
+
+                ORDER BY a.DATE_CREATED DESC, a.Q_ARTICLE_ID DESC
+                OFFSET {offset} ROWS FETCH NEXT {pageSize} ROWS ONLY
+                """,
+            id => publishedSelect + $"""
+
+                  AND a.Q_ARTICLE_ID = {id}
+                """,
+            """
+            SELECT
+                CAST(a.Q_ARTICLE_ID AS int) AS Id,
+                a.ARTICLE_NAME AS Title,
+                a.DATE_CREATED AS PublishedAt
+            FROM Q_ARTICLE_T a
+            WHERE a.DISPLAY = 1
+            ORDER BY a.DATE_CREATED DESC, a.Q_ARTICLE_ID DESC
+            """);
+    }
+
+    public static (Func<int, string> Latest, string Count, Func<int, int, string> ArchivePage, Func<int, string> ById, string Sitemap)
+        CreateNewsQueries(string publishedNewsCte) =>
+        (
+            count => publishedNewsCte + $"""
+
+                SELECT TOP ({count})
+                    Id,
+                    Title,
+                    Excerpt,
+                    Body,
+                    PublishedAt,
+                    SourceUrl,
+                    IsPublished,
+                    Slug
+                FROM PublishedNews
+                WHERE RowNumber = 1
+                ORDER BY PublishedAt DESC, Id DESC
+                """,
+            publishedNewsCte + """
+
+                SELECT COUNT(*) AS Value
+                FROM PublishedNews
+                WHERE RowNumber = 1
+                """,
+            (offset, pageSize) => publishedNewsCte + $"""
+
+                SELECT
+                    Id,
+                    Title,
+                    Excerpt,
+                    Body,
+                    PublishedAt,
+                    SourceUrl,
+                    IsPublished,
+                    Slug
+                FROM PublishedNews
+                WHERE RowNumber = 1
+                ORDER BY PublishedAt DESC, Id DESC
+                OFFSET {offset} ROWS FETCH NEXT {pageSize} ROWS ONLY
+                """,
+            id => publishedNewsCte + $"""
+
+                SELECT
+                    Id,
+                    Title,
+                    Excerpt,
+                    Body,
+                    PublishedAt,
+                    SourceUrl,
+                    IsPublished,
+                    Slug
+                FROM PublishedNews
+                WHERE RowNumber = 1
+                  AND Id = {id}
+                """,
+            publishedNewsCte + """
+
+                SELECT
+                    Id,
+                    Title,
+                    PublishedAt,
+                    Slug
+                FROM PublishedNews
+                WHERE RowNumber = 1
+                ORDER BY PublishedAt DESC, Id DESC
+                """);
+
+    public static (string ListSql, Func<int, FormattableString> DisplaySql, Func<int, FormattableString> SongsSql)
+        CreateDiscographyQueries() =>
+        (
+            "EXEC Q_ALBUM_LIST_SP",
+            static id => $"EXEC Q_ALBUM_T_DISPLAY_SP @Q_ALBUM_ID = {id}",
+            static id => $"EXEC Q_ALBUM_SONG_T_LIST_SP @Q_ALBUM_ID = {id}");
+
+    public static (bool UseProcs, string PageSelect, string CountSql, Func<int, FormattableString> ByIdSql)
+        CreateFanPerformanceQueries() =>
+        (
+            true,
+            string.Empty,
+            "SELECT COUNT(*) AS Value FROM dbo.Q_STAGE_T WHERE DISPLAY = 1",
+            static id => $"""
+                SELECT Q_STAGE_ID, TITLE, PERFORMED_BY, DESCRIPTION, URL, thesize, DATE_ADDED
+                FROM dbo.Q_STAGE_T
+                WHERE Q_STAGE_ID = {id} AND DISPLAY = 1
+                """);
+
+    public static (bool UseProcs, string CategoriesSql, Func<int, string> CategoryPageSql)
+        CreatePhotoQueries() =>
+        (true, string.Empty, static _ => string.Empty);
+
+    public static Func<string, FormattableString> CreateMemberLookupSql() =>
+        email => $"""
+            SELECT TOP 1 USER_ID, USERNAME
+            FROM dbo.USERS_T
+            WHERE EMAIL = {email}
+            """;
+
+    public static (string ListSql, Func<short, FormattableString> DetailSql) CreateBiographyQueries() =>
+        (
+            "EXEC Q_BIO_LIST_SP",
+            static id => $"EXEC Q_BIO_DISPLAY_SP @Q_BIO_ID = {id}");
+}
