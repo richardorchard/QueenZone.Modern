@@ -143,7 +143,7 @@ News agent worker and admin review queue: see `docs/architecture/news-agent.md`.
 - Allow deliberately designed editorial workflows for new approved news articles.
 - Do not port Web Forms architecture.
 - Keep legacy SQL access inside `QueenZone.Data`.
-- Treat the legacy database as an import source, not the permanent domain model.
+- Treat the legacy database as an import source and historical reference. Forum public reads use modern projected tables by default; other public content may keep reading legacy tables unless performance or safety problems appear.
 - Prefer clean, stable, search-friendly canonical URLs over preserving legacy URL shapes.
 - Never expose private, hidden, deleted, moderated, or credential-related data by default.
 

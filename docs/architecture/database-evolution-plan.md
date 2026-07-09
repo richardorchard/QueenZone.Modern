@@ -2,43 +2,41 @@
 
 ## Position
 
-The legacy `MAIN2_DB` schema is an import source and historical reference, not the final shape of QueenZone Modern.
+The legacy `MAIN2_DB` schema is an import source and historical reference.
 
-The new application can initially read from legacy tables and stored procedures, but it should be allowed to create modern tables where the legacy schema is inefficient, risky, or awkward.
+QueenZone Modern may keep reading most public archive content from legacy tables. Modern projected tables are introduced when a content area needs better performance, privacy boundaries, or maintainability — not as a blanket rewrite of every legacy read.
 
-## Why This Matters
+## Current State
 
-The forum database is likely the main pressure point:
+- **Forum archive:** migrated. Public `/forum` routes read `ModernForum*` tables by default via `ModernForumRepository` (`ForumData:UseModernForumReads = true`). See `docs/sql/006-modern-forum-read-path.sql` and `docs/performance/forum-read-benchmark-2026-06-29.md`.
+- **Other public content:** continue legacy table/stored-procedure reads unless we discover performance or safety problems.
+- **Editorial/admin workflows:** use deliberately designed modern tables (news admin columns, discovery, audit) rather than extending legacy write paths.
 
-- Topic and reply data appears to live in `Q_FORUM_TOPIC_T`.
-- Parent/child relationships are old-style and may be expensive to page.
-- Search and archive browsing will need indexes that suit modern routes.
-- User/account fields sit close to public post data.
-- Attachment, moderation, and tracker-adjacent data need careful separation.
+## Why Forum Needed Modern Tables
 
-For a public archive, we need a schema optimized for:
+Forum was the main pressure point:
 
-- Forum list pages.
-- Thread pages.
-- Post pagination.
-- Author display names without private fields.
-- Canonical route metadata.
-- Full-text search.
-- Content hiding or takedown.
+- Topic and reply data lived in large legacy `Q_FORUM_TOPIC_T` structures.
+- Parent/child relationships were expensive to page for modern archive routes.
+- Search and archive browsing needed indexes that suit modern URLs.
+- User/account fields sat close to public post data.
+- Attachment, moderation, and tracker-adjacent data needed careful separation.
 
 ## Recommended Pattern
 
-Use an import/project pattern:
+Use an import/project pattern when a content area needs it:
 
 ```mermaid
 flowchart LR
   Legacy["Legacy MAIN2_DB"] --> Importer["QueenZone.Import"]
   Importer --> Modern["Modern read model tables"]
   Modern --> Web["QueenZone.Web"]
+  Legacy --> DirectReads["Direct legacy reads for other content"]
+  DirectReads --> Web
   Legacy --> Audit["Migration reports"]
 ```
 
-The web app may read legacy tables directly during early phases, but long-lived public features should move to modern read models.
+Forum already follows the modern-table path. Other archive areas may stay on direct legacy reads until evidence says otherwise.
 
 ## Candidate Modern Tables
 
@@ -73,6 +71,8 @@ Fields:
 
 ### Forum Archive
 
+Shipped as imported `ModernForum*` tables (see `ModernForumRepository` and `docs/sql/006-modern-forum-read-path.sql`). Placeholder names below map to that family:
+
 - `ForumCategory`
 - `ForumThread`
 - `ForumPost`
@@ -105,15 +105,20 @@ Fields:
 - Generate reports for skipped, hidden, malformed, or unsafe records.
 - Do not import private messages, emails, password fields, IP addresses, or private profile fields into public read models.
 
-## Forum Archive Specific Plan
+## Forum Archive Status
 
-1. Count forums, threads, replies, hidden/deleted markers, and attachments.
-2. Identify all author fields used on public pages.
-3. Define privacy rules for usernames, signatures, avatars, profile links, and deleted users.
-4. Build a sample import for one forum category.
-5. Render read-only category, thread, and post pages from modern tables.
-6. Compare against legacy output.
-7. Add full-text search only after the browse model works.
+Completed for the public browse path:
+
+1. Forum/thread/post data imported into `ModernForum*` tables.
+2. Public category, topic, and post pages render from modern tables by default.
+3. Read-path procedures and covering indexes are documented and benchmarked.
+4. Legacy forum SQL remains available as fallback/historical source via `ForumData:UseModernForumReads`.
+
+Remaining forum follow-ups (not blockers for the modern-table decision):
+
+- Keep import/reconciliation and `ModernForum_RefreshReadStats` healthy after future imports.
+- Decide full-text search hosting (Azure SQL full-text vs Azure AI Search).
+- Confirm profile-link and takedown/moderation policy for archive authors.
 
 ## Open Questions
 
@@ -121,3 +126,4 @@ Fields:
 - Should forum archive content be indexed in Azure SQL full-text or Azure AI Search?
 - Should old user profile links be preserved, anonymized, or disabled?
 - How should takedown/moderation requests be handled after launch?
+- Which non-forum content areas, if any, show enough performance or privacy pressure to justify their own modern projections?
