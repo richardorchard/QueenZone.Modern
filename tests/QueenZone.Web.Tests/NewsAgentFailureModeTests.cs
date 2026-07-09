@@ -1,5 +1,3 @@
-using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using QueenZone.Data;
 using QueenZone.NewsAgent;
 
@@ -12,7 +10,9 @@ public sealed class NewsAgentFailureModeTests
     {
         var repository = new InMemoryNewsDiscoveryRepository(new SharedNewsDiscoveryStore());
         var candidateId = await NewsDiscoveryTestSeeder.SeedDiscoveredCandidateAsync(repository);
-        var service = CreateTriageService(repository, new FailureModeFakeAiClient("{not-json"));
+        var service = NewsAgentTestSupport.CreateTriageService(
+            repository,
+            new ConfigurableNewsAiClient(enabled: true, content: "{not-json"));
 
         var result = await service.RunTriageAsync(new NewsTriageRunOptions());
 
@@ -27,7 +27,7 @@ public sealed class NewsAgentFailureModeTests
         var candidateId = await NewsDiscoveryTestSeeder.SeedNeedsReviewCandidateAsync(repository);
         var service = NewsAgentTestSupport.CreateDraftGenerationService(
             repository,
-            new FailureModeFakeAiClient("{not-json"));
+            new ConfigurableNewsAiClient(enabled: true, content: "{not-json"));
 
         var result = await service.RunDraftGenerationAsync(new NewsDraftRunOptions());
 
@@ -40,7 +40,9 @@ public sealed class NewsAgentFailureModeTests
     {
         var repository = new InMemoryNewsDiscoveryRepository(new SharedNewsDiscoveryStore());
         await NewsDiscoveryTestSeeder.SeedDiscoveredCandidateAsync(repository);
-        var service = CreateTriageService(repository, new FailureModeFakeAiClient("{}", enabled: false));
+        var service = NewsAgentTestSupport.CreateTriageService(
+            repository,
+            new ConfigurableNewsAiClient(enabled: false, content: "{}"));
 
         var result = await service.RunTriageAsync(new NewsTriageRunOptions());
 
@@ -53,19 +55,11 @@ public sealed class NewsAgentFailureModeTests
     {
         var repository = new InMemoryNewsDiscoveryRepository(new SharedNewsDiscoveryStore());
         await NewsDiscoveryTestSeeder.SeedDiscoveredCandidateAsync(repository);
-        var discoveryService = NewsAgentTestSupport.CreateDiscoveryService(
+        var worker = NewsAgentTestSupport.CreateDiscoverNewsWorker(
             repository,
-            new FakeNewsDiscoveryHttpClient(new Dictionary<string, string>()));
-        var worker = new DiscoverNewsWorker(
-            discoveryService,
-            CreateTriageService(repository, new FailureModeFakeAiClient("{bad-json")),
-            NewsAgentTestSupport.CreateDraftGenerationService(repository, new FailureModeFakeAiClient("{}")),
-            CreateExecutor(repository, new FailureModeFakeAiClient("{}")),
-            repository,
-            new InMemoryNewsAgentRunLeaseService(new SharedNewsAgentLeaseStore()),
-            Options.Create(new OpenRouterOptions { ApiKey = "test-key" }),
-            Options.Create(new NewsAgentSchedulerOptions()),
-            NullLogger<DiscoverNewsWorker>.Instance);
+            triageClient: new ConfigurableNewsAiClient(enabled: true, content: "{bad-json"),
+            draftClient: new ConfigurableNewsAiClient(enabled: true, content: "{}"),
+            executorClient: new ConfigurableNewsAiClient(enabled: true, content: "{}"));
 
         var exitCode = await worker.RunAsync(new DiscoverNewsCommandOptions(
             SeedSources: false,
@@ -77,62 +71,5 @@ public sealed class NewsAgentFailureModeTests
             DraftOnly: false));
 
         Assert.Equal(1, exitCode);
-    }
-
-    private static NewsTriageService CreateTriageService(
-        INewsDiscoveryRepository repository,
-        INewsAiClient aiClient) =>
-        new(
-            repository,
-            new NewsAiRunExecutor(
-                aiClient,
-                repository,
-                new NewsAiBudgetGuard(
-                    repository,
-                    Options.Create(new OpenRouterOptions
-                    {
-                        ApiKey = aiClient.IsEnabled ? "test-key" : null,
-                        PerRunCandidateLimit = 5,
-                        PerRunBudgetUsd = 1m,
-                        DailyBudgetUsd = 5m
-                    })),
-                Options.Create(new OpenRouterOptions { ApiKey = aiClient.IsEnabled ? "test-key" : null }),
-                NullLogger<NewsAiRunExecutor>.Instance),
-            new NewsTriageDeterministicAnalyzer(repository),
-            Options.Create(new NewsTriageOptions()),
-            NullLogger<NewsTriageService>.Instance);
-
-    private static NewsAiRunExecutor CreateExecutor(
-        INewsDiscoveryRepository repository,
-        INewsAiClient aiClient) =>
-        new(
-            aiClient,
-            repository,
-            new NewsAiBudgetGuard(
-                repository,
-                Options.Create(new OpenRouterOptions
-                {
-                    ApiKey = aiClient.IsEnabled ? "test-key" : null,
-                    PerRunCandidateLimit = 5,
-                    PerRunBudgetUsd = 1m,
-                    DailyBudgetUsd = 5m
-                })),
-            Options.Create(new OpenRouterOptions { ApiKey = aiClient.IsEnabled ? "test-key" : null }),
-            NullLogger<NewsAiRunExecutor>.Instance);
-
-    private sealed class FailureModeFakeAiClient(string content, bool enabled = true) : INewsAiClient
-    {
-        public bool IsEnabled { get; } = enabled;
-
-        public Task<NewsAiChatCompletion> CompleteChatAsync(
-            NewsAiChatRequest request,
-            CancellationToken cancellationToken = default) =>
-            Task.FromResult(new NewsAiChatCompletion(
-                content,
-                request.ModelRole == NewsAiModelRole.Drafting ? "openai/gpt-4.1-mini" : "openai/gpt-4.1-nano",
-                1,
-                1,
-                0.0001m,
-                false));
     }
 }
