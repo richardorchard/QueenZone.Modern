@@ -78,7 +78,14 @@ jobs:
 
       - name: Start app in background
         run: |
-          ASPNETCORE_ENVIRONMENT=Testing ASPNETCORE_URLS=http://127.0.0.1:5099 ./smoke-app/QueenZone.Web > smoke-app.log 2>&1 &
+          # Content root must be the publish folder so appsettings*.json (including
+          # Admin:AllowedEmails in appsettings.Testing.json) are loaded. Without this,
+          # cwd is the repo root and ValidateOnStart fails with empty admin options.
+          APP_DIR="$(pwd)/smoke-app"
+          ASPNETCORE_ENVIRONMENT=Testing \
+          ASPNETCORE_URLS=http://127.0.0.1:5099 \
+          ASPNETCORE_CONTENTROOT="$APP_DIR" \
+          "$APP_DIR/QueenZone.Web" > smoke-app.log 2>&1 &
           echo $! > smoke-app.pid
 
       - name: Wait for app to be ready
