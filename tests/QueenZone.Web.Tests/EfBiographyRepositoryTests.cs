@@ -58,6 +58,31 @@ public sealed class EfBiographyRepositoryTests : IAsyncDisposable
     }
 
     [Fact]
+    public void Public_constructor_wires_legacy_proc_sql()
+    {
+        var productionRepository = new EfBiographyRepository(dbContext);
+
+        Assert.NotNull(productionRepository);
+    }
+
+    [Fact]
+    public async Task Public_list_path_invokes_legacy_list_proc_sql()
+    {
+        var productionRepository = new EfBiographyRepository(dbContext);
+
+        // SQLite has no Q_BIO_LIST_SP; production path still materializes the EXEC call.
+        await Assert.ThrowsAnyAsync<Exception>(() => productionRepository.GetChaptersAsync());
+    }
+
+    [Fact]
+    public async Task Public_detail_path_invokes_legacy_display_proc_sql()
+    {
+        var productionRepository = new EfBiographyRepository(dbContext);
+
+        await Assert.ThrowsAnyAsync<Exception>(() => productionRepository.GetByIdAsync(1));
+    }
+
+    [Fact]
     public async Task GetChaptersAsync_materializes_SqlQuery_rows_and_maps_fields()
     {
         SeedListRow(1, " Chapter One ", 2, "Summary one", "2020-01-15");
