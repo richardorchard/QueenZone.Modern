@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using QueenZone.Data;
 using QueenZone.NewsAgent;
@@ -31,7 +30,10 @@ public sealed class DiscoverNewsWorkerTests
             true,
             null));
 
-        var worker = CreateWorker(repository, discoveryService, aiEnabled: false);
+        var worker = NewsAgentTestSupport.CreateDiscoverNewsWorker(
+            repository,
+            discoveryService,
+            triageClient: new ConfigurableNewsAiClient(enabled: false));
 
         var exitCode = await worker.RunAsync(new DiscoverNewsCommandOptions(
             SeedSources: false,
@@ -65,7 +67,10 @@ public sealed class DiscoverNewsWorkerTests
             true,
             null));
 
-        var worker = CreateWorker(repository, discoveryService, aiEnabled: false);
+        var worker = NewsAgentTestSupport.CreateDiscoverNewsWorker(
+            repository,
+            discoveryService,
+            triageClient: new ConfigurableNewsAiClient(enabled: false));
 
         var exitCode = await worker.RunAsync(new DiscoverNewsCommandOptions(
             SeedSources: false,
@@ -86,7 +91,11 @@ public sealed class DiscoverNewsWorkerTests
         var discoveryService = NewsAgentTestSupport.CreateDiscoveryService(
             repository,
             new FakeNewsDiscoveryHttpClient(new Dictionary<string, string>()));
-        var worker = CreateWorker(repository, discoveryService, aiEnabled: true, dryRun: true);
+        var worker = NewsAgentTestSupport.CreateDiscoverNewsWorker(
+            repository,
+            discoveryService,
+            triageClient: new ConfigurableNewsAiClient(enabled: true),
+            dryRun: true);
 
         var exitCode = await worker.RunAsync(new DiscoverNewsCommandOptions(
             SeedSources: false,
@@ -131,11 +140,10 @@ public sealed class DiscoverNewsWorkerTests
         var discoveryService = NewsAgentTestSupport.CreateDiscoveryService(
             repository,
             new FakeNewsDiscoveryHttpClient(new Dictionary<string, string>()));
-        var worker = CreateWorker(
+        var worker = NewsAgentTestSupport.CreateDiscoverNewsWorker(
             repository,
             discoveryService,
-            aiEnabled: true,
-            draftJson: NewsAgentTestSupport.SampleDraftJson);
+            draftClient: new ConfigurableNewsAiClient(enabled: true, NewsAgentTestSupport.SampleDraftJson));
 
         var exitCode = await worker.RunAsync(new DiscoverNewsCommandOptions(
             SeedSources: false,
@@ -183,10 +191,10 @@ public sealed class DiscoverNewsWorkerTests
         var discoveryService = NewsAgentTestSupport.CreateDiscoveryService(
             repository,
             new FakeNewsDiscoveryHttpClient(new Dictionary<string, string>()));
-        var worker = CreateWorker(
+        var worker = NewsAgentTestSupport.CreateDiscoverNewsWorker(
             repository,
             discoveryService,
-            aiEnabled: false,
+            triageClient: new ConfigurableNewsAiClient(enabled: false),
             leaseService: leaseService,
             useRunLease: true);
 
@@ -229,10 +237,10 @@ public sealed class DiscoverNewsWorkerTests
             true,
             null));
 
-        var worker = CreateWorker(
+        var worker = NewsAgentTestSupport.CreateDiscoverNewsWorker(
             repository,
             discoveryService,
-            aiEnabled: false,
+            triageClient: new ConfigurableNewsAiClient(enabled: false),
             leaseService: leaseService,
             useRunLease: true);
 
@@ -260,74 +268,5 @@ public sealed class DiscoverNewsWorkerTests
         Assert.True(options.Draft);
         Assert.False(options.TriageOnly);
         Assert.False(options.DraftOnly);
-    }
-
-    private static DiscoverNewsWorker CreateWorker(
-        INewsDiscoveryRepository repository,
-        NewsDiscoveryService discoveryService,
-        bool aiEnabled,
-        bool dryRun = false,
-        string draftJson = "{}",
-        INewsAgentRunLeaseService? leaseService = null,
-        bool useRunLease = false) =>
-        new(
-            discoveryService,
-            CreateTriageService(repository, aiEnabled),
-            NewsAgentTestSupport.CreateDraftGenerationService(
-                repository,
-                new DiscoverNewsWorkerTestsFakeAiClient(aiEnabled, draftJson)),
-            CreateExecutor(repository, aiEnabled),
-            repository,
-            leaseService ?? new InMemoryNewsAgentRunLeaseService(new SharedNewsAgentLeaseStore()),
-            Options.Create(new OpenRouterOptions
-            {
-                ApiKey = aiEnabled ? "test-key" : null,
-                DryRun = dryRun
-            }),
-            Options.Create(new NewsAgentSchedulerOptions
-            {
-                UseRunLease = useRunLease,
-                LeaseName = "discover-news"
-            }),
-            NullLogger<DiscoverNewsWorker>.Instance);
-
-    private static NewsTriageService CreateTriageService(INewsDiscoveryRepository repository, bool enabled) =>
-        new(
-            repository,
-            CreateExecutor(repository, enabled),
-            new NewsTriageDeterministicAnalyzer(repository),
-            Options.Create(new NewsTriageOptions()),
-            NullLogger<NewsTriageService>.Instance);
-
-    private static NewsAiRunExecutor CreateExecutor(INewsDiscoveryRepository repository, bool enabled) =>
-        new(
-            new DiscoverNewsWorkerTestsFakeAiClient(enabled),
-            repository,
-            new NewsAiBudgetGuard(
-                repository,
-                Options.Create(new OpenRouterOptions
-                {
-                    ApiKey = enabled ? "test-key" : null,
-                    PerRunCandidateLimit = 5,
-                    PerRunBudgetUsd = 1m,
-                    DailyBudgetUsd = 5m
-                })),
-            Options.Create(new OpenRouterOptions { ApiKey = enabled ? "test-key" : null }),
-            NullLogger<NewsAiRunExecutor>.Instance);
-
-    private sealed class DiscoverNewsWorkerTestsFakeAiClient(bool enabled, string content = "{}") : INewsAiClient
-    {
-        public bool IsEnabled { get; } = enabled;
-
-        public Task<NewsAiChatCompletion> CompleteChatAsync(
-            NewsAiChatRequest request,
-            CancellationToken cancellationToken = default) =>
-            Task.FromResult(new NewsAiChatCompletion(
-                content,
-                request.ModelRole == NewsAiModelRole.Drafting ? "openai/gpt-4.1-mini" : "openai/gpt-4.1-nano",
-                1,
-                1,
-                0.0001m,
-                false));
     }
 }
