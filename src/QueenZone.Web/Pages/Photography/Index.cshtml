@@ -9,11 +9,11 @@
     <div class="qz-photo-cat-grid">
       @foreach (var category in Model.Categories)
       {
-        <a class="qz-photo-cat-card" href="@PhotoRoutes.GetCategoryPath(category.Slug)">
+        <a class="qz-photo-cat-card" href="@category.DetailPath">
           <div class="qz-photo-cat-card__media">
-            @if (Model.CoverImageUrls.TryGetValue(category.CatId, out var coverUrl))
+            @if (!string.IsNullOrWhiteSpace(category.CoverImageUrl))
             {
-              <img src="@coverUrl" alt="" loading="lazy">
+              <img src="@category.CoverImageUrl" alt="" loading="lazy">
             }
           </div>
           <div class="qz-photo-cat-card__overlay">

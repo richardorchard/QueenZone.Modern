@@ -6,11 +6,9 @@ namespace QueenZone.Web.Pages.Biography;
 
 public sealed class DetailModel(IBiographyRepository biographyRepository) : PageModel
 {
-    public BiographyChapterItem? Chapter { get; private set; }
+    public BiographyChapterDetail? Chapter { get; private set; }
 
-    public BiographyChapterNav Navigation { get; private set; } = new(null, null);
-
-    public int ChapterIndex { get; private set; }
+    public BiographyChapterNavViewModel Navigation { get; private set; } = new(null, null);
 
     public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
 
@@ -22,22 +20,29 @@ public sealed class DetailModel(IBiographyRepository biographyRepository) : Page
             return NotFound();
         }
 
+        var chapters = await biographyRepository.GetChaptersAsync(cancellationToken);
+        var readingOrder = BiographyChapterOrdering.ByDisplaySequenceAscending(chapters);
+        var chapterIndex = readingOrder.ToList().FindIndex(item => item.Id == id);
+        var detail = PublicContentMapper.ToBiographyChapterDetail(chapter, chapterIndex);
+
         var canonicalSlug = NewsSlug.Slugify(chapter.Title);
         if (!string.Equals(canonicalSlug, slug, StringComparison.OrdinalIgnoreCase))
         {
-            return RedirectPermanent(BiographyRoutes.GetChapterDetailPath(chapter));
+            return RedirectPermanent(detail.DetailPath);
         }
 
-        var chapters = await biographyRepository.GetChaptersAsync(cancellationToken);
-        var readingOrder = BiographyChapterOrdering.ByDisplaySequenceAscending(chapters);
-        ChapterIndex = readingOrder.ToList().FindIndex(item => item.Id == id);
-
-        Chapter = chapter;
-        Breadcrumbs = [BreadcrumbItem.Home, new BreadcrumbItem("Biography", "/biography"), new BreadcrumbItem(chapter.Title, BiographyRoutes.GetChapterDetailPath(chapter))];
-        Navigation = await biographyRepository.GetAdjacentChaptersAsync(id, cancellationToken);
-        ViewData["Title"] = $"{chapter.Title} | QueenZone biography";
-        ViewData["CanonicalPath"] = BiographyContent.GetDetailCanonicalPath(chapter);
-        ViewData["Description"] = BiographyContent.GetListSummary(chapter);
+        Chapter = detail;
+        Breadcrumbs =
+        [
+            BreadcrumbItem.Home,
+            new BreadcrumbItem("Biography", "/biography"),
+            new BreadcrumbItem(detail.Title, detail.DetailPath)
+        ];
+        var navigation = await biographyRepository.GetAdjacentChaptersAsync(id, cancellationToken);
+        Navigation = PublicContentMapper.ToBiographyChapterNav(navigation);
+        ViewData["Title"] = $"{detail.Title} | QueenZone biography";
+        ViewData["CanonicalPath"] = detail.DetailPath;
+        ViewData["Description"] = detail.Summary;
 
         return Page();
     }

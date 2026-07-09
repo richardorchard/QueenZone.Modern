@@ -5,18 +5,16 @@ namespace QueenZone.Web.Pages.Photography;
 
 public sealed class IndexModel(IPhotoRepository photoRepository) : PageModel
 {
-    public IReadOnlyList<PhotoCategory> Categories { get; private set; } = [];
-
-    public IReadOnlyDictionary<int, string> CoverImageUrls { get; private set; } = new Dictionary<int, string>();
+    public IReadOnlyList<PhotoCategorySummary> Categories { get; private set; } = [];
 
     public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; } = [BreadcrumbItem.Home, new BreadcrumbItem("Photography", PhotoRoutes.GetCategoriesPath())];
 
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
-        Categories = await photoRepository.GetCategoriesAsync(cancellationToken);
+        var categories = await photoRepository.GetCategoriesAsync(cancellationToken);
 
         var covers = new Dictionary<int, string>();
-        foreach (var category in Categories)
+        foreach (var category in categories)
         {
             var page = await photoRepository.GetCategoryPageAsync(category.CatId, 1, 1, cancellationToken);
             var cover = page.Items.FirstOrDefault();
@@ -26,6 +24,6 @@ public sealed class IndexModel(IPhotoRepository photoRepository) : PageModel
             }
         }
 
-        CoverImageUrls = covers;
+        Categories = PublicContentMapper.ToPhotoCategorySummaries(categories, covers);
     }
 }

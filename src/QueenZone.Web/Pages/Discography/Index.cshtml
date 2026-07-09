@@ -15,7 +15,7 @@
       <div class="qz-album-grid">
         @foreach (var album in Model.Albums)
         {
-          <a class="qz-album-card" href="@DiscographyRoutes.GetAlbumPath(album)">
+          <a class="qz-album-card" href="@album.DetailPath">
             <div class="qz-album-card__cover">
               @if (album.ThumbnailUrl is not null)
               {
