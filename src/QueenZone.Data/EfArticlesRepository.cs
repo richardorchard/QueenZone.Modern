@@ -5,7 +5,7 @@ namespace QueenZone.Data;
 /// <summary>
 /// Public article archive reads against legacy tables via EF Core SQL queries.
 /// </summary>
-public sealed class EfArticlesRepository(QueenZoneDbContext dbContext) : IArticlesRepository
+public sealed class EfArticlesRepository : IArticlesRepository
 {
     private const string PublishedArticlesSelect = """
         SELECT
@@ -22,32 +22,75 @@ public sealed class EfArticlesRepository(QueenZoneDbContext dbContext) : IArticl
         WHERE a.DISPLAY = 1
         """;
 
+    private readonly QueenZoneDbContext dbContext;
+    private readonly Func<int, string> latestSql;
+    private readonly string countSql;
+    private readonly Func<int, int, string> archivePageSql;
+    private readonly Func<int, string> byIdSql;
+    private readonly string sitemapSql;
+
+    public EfArticlesRepository(QueenZoneDbContext dbContext)
+        : this(
+            dbContext,
+            latestSql: count => PublishedArticlesSelect + $"""
+
+                ORDER BY a.DATE_CREATED DESC, a.Q_ARTICLE_ID DESC
+                OFFSET 0 ROWS FETCH NEXT {count} ROWS ONLY
+                """,
+            countSql: """
+                SELECT COUNT(*) AS Value
+                FROM Q_ARTICLE_T
+                WHERE DISPLAY = 1
+                """,
+            archivePageSql: (offset, pageSize) => PublishedArticlesSelect + $"""
+
+                ORDER BY a.DATE_CREATED DESC, a.Q_ARTICLE_ID DESC
+                OFFSET {offset} ROWS FETCH NEXT {pageSize} ROWS ONLY
+                """,
+            byIdSql: id => PublishedArticlesSelect + $"""
+
+                  AND a.Q_ARTICLE_ID = {id}
+                """,
+            sitemapSql: """
+                SELECT
+                    CAST(a.Q_ARTICLE_ID AS int) AS Id,
+                    a.ARTICLE_NAME AS Title,
+                    a.DATE_CREATED AS PublishedAt
+                FROM Q_ARTICLE_T a
+                WHERE a.DISPLAY = 1
+                ORDER BY a.DATE_CREATED DESC, a.Q_ARTICLE_ID DESC
+                """)
+    {
+    }
+
+    internal EfArticlesRepository(
+        QueenZoneDbContext dbContext,
+        Func<int, string> latestSql,
+        string countSql,
+        Func<int, int, string> archivePageSql,
+        Func<int, string> byIdSql,
+        string sitemapSql)
+    {
+        this.dbContext = dbContext;
+        this.latestSql = latestSql;
+        this.countSql = countSql;
+        this.archivePageSql = archivePageSql;
+        this.byIdSql = byIdSql;
+        this.sitemapSql = sitemapSql;
+    }
+
     public async Task<IReadOnlyList<ArticleItem>> GetLatestAsync(int count, CancellationToken cancellationToken = default)
     {
-        var sql = PublishedArticlesSelect + """
-
-            ORDER BY a.DATE_CREATED DESC, a.Q_ARTICLE_ID DESC
-            OFFSET 0 ROWS FETCH NEXT {0} ROWS ONLY
-            """;
-
         var rows = await dbContext.Database
-            .SqlQueryRaw<ArticleRow>(sql, count)
+            .SqlQueryRaw<ArticleRow>(latestSql(count))
             .ToListAsync(cancellationToken);
         return rows.Select(Map).ToList();
     }
 
-    public async Task<int> GetPublishedCountAsync(CancellationToken cancellationToken = default)
-    {
-        const string sql = """
-            SELECT COUNT(*) AS Value
-            FROM Q_ARTICLE_T
-            WHERE DISPLAY = 1
-            """;
-
-        return await dbContext.Database
-            .SqlQueryRaw<int>(sql)
+    public async Task<int> GetPublishedCountAsync(CancellationToken cancellationToken = default) =>
+        await dbContext.Database
+            .SqlQueryRaw<int>(countSql)
             .FirstAsync(cancellationToken);
-    }
 
     public async Task<IReadOnlyList<ArticleItem>> GetArchivePageAsync(
         int page,
@@ -55,49 +98,26 @@ public sealed class EfArticlesRepository(QueenZoneDbContext dbContext) : IArticl
         CancellationToken cancellationToken = default)
     {
         var offset = Math.Max(page - 1, 0) * pageSize;
-        var sql = PublishedArticlesSelect + """
-
-            ORDER BY a.DATE_CREATED DESC, a.Q_ARTICLE_ID DESC
-            OFFSET {0} ROWS FETCH NEXT {1} ROWS ONLY
-            """;
-
         var rows = await dbContext.Database
-            .SqlQueryRaw<ArticleRow>(sql, offset, pageSize)
+            .SqlQueryRaw<ArticleRow>(archivePageSql(offset, pageSize))
             .ToListAsync(cancellationToken);
         return rows.Select(Map).ToList();
     }
 
     public async Task<ArticleItem?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
-        var sql = PublishedArticlesSelect + """
-
-              AND a.Q_ARTICLE_ID = {0}
-            """;
-
         var rows = await dbContext.Database
-            .SqlQueryRaw<ArticleRow>(sql, id)
+            .SqlQueryRaw<ArticleRow>(byIdSql(id))
             .ToListAsync(cancellationToken);
         var row = rows.FirstOrDefault();
         return row is null ? null : Map(row);
     }
 
     public async Task<IReadOnlyList<SitemapContentEntry>> GetPublishedSitemapEntriesAsync(
-        CancellationToken cancellationToken = default)
-    {
-        const string sql = """
-            SELECT
-                CAST(a.Q_ARTICLE_ID AS int) AS Id,
-                a.ARTICLE_NAME AS Title,
-                a.DATE_CREATED AS PublishedAt
-            FROM Q_ARTICLE_T a
-            WHERE a.DISPLAY = 1
-            ORDER BY a.DATE_CREATED DESC, a.Q_ARTICLE_ID DESC
-            """;
-
-        return await dbContext.Database
-            .SqlQueryRaw<SitemapContentEntry>(sql)
+        CancellationToken cancellationToken = default) =>
+        await dbContext.Database
+            .SqlQueryRaw<SitemapContentEntry>(sitemapSql)
             .ToListAsync(cancellationToken);
-    }
 
     private static ArticleItem Map(ArticleRow row) =>
         new(

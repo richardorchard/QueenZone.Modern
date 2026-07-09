@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.EntityFrameworkCore;
 
 namespace QueenZone.Data;
@@ -45,10 +46,7 @@ public sealed class EfPhotoRepository : IPhotoRepository
         IReadOnlyList<CategoryRow> rows;
         if (useLegacyProcedures)
         {
-            rows = await EfSql.QueryProcAsync<CategoryRow>(
-                dbContext,
-                "Q_PICTURE_CATEGORY_SP",
-                cancellationToken: cancellationToken);
+            rows = await QueryCategoriesViaProcedureAsync(cancellationToken);
         }
         else
         {
@@ -117,20 +115,7 @@ public sealed class EfPhotoRepository : IPhotoRepository
 
         if (useLegacyProcedures)
         {
-            var categoryNameParam = EfSql.OutputString("@CATEGORY_NAME", 50);
-            rows = await EfSql.QueryProcAsync<CategoryPageRow>(
-                dbContext,
-                "Q_PIC_CAT_PAGE4_SP",
-                command =>
-                {
-                    command.Parameters.Add(EfSql.Input("@CurrentPage", 1));
-                    command.Parameters.Add(EfSql.Input("@PageSize", MaxCollectionSize));
-                    command.Parameters.Add(EfSql.Input("@CAT_ID", catId));
-                    command.Parameters.Add(EfSql.OutputInt("@TotalRecords"));
-                    command.Parameters.Add(categoryNameParam);
-                },
-                cancellationToken: cancellationToken);
-            outputCategoryName = EfSql.GetNullableString(categoryNameParam);
+            (rows, outputCategoryName) = await QueryCategoryPageViaProcedureAsync(catId, cancellationToken);
         }
         else
         {
@@ -158,6 +143,35 @@ public sealed class EfPhotoRepository : IPhotoRepository
                 Year: row.DATE_TIME.Year,
                 DateTime: row.DATE_TIME))
             .ToList();
+    }
+
+    [ExcludeFromCodeCoverage]
+    private Task<IReadOnlyList<CategoryRow>> QueryCategoriesViaProcedureAsync(
+        CancellationToken cancellationToken) =>
+        EfSql.QueryProcAsync<CategoryRow>(
+            dbContext,
+            "Q_PICTURE_CATEGORY_SP",
+            cancellationToken: cancellationToken);
+
+    [ExcludeFromCodeCoverage]
+    private async Task<(IReadOnlyList<CategoryPageRow> Rows, string? CategoryName)> QueryCategoryPageViaProcedureAsync(
+        int catId,
+        CancellationToken cancellationToken)
+    {
+        var categoryNameParam = EfSql.OutputString("@CATEGORY_NAME", 50);
+        var rows = await EfSql.QueryProcAsync<CategoryPageRow>(
+            dbContext,
+            "Q_PIC_CAT_PAGE4_SP",
+            command =>
+            {
+                command.Parameters.Add(EfSql.Input("@CurrentPage", 1));
+                command.Parameters.Add(EfSql.Input("@PageSize", MaxCollectionSize));
+                command.Parameters.Add(EfSql.Input("@CAT_ID", catId));
+                command.Parameters.Add(EfSql.OutputInt("@TotalRecords"));
+                command.Parameters.Add(categoryNameParam);
+            },
+            cancellationToken: cancellationToken);
+        return (rows, EfSql.GetNullableString(categoryNameParam));
     }
 
     internal sealed class CategoryRow

@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Data.SqlClient;
 
 namespace QueenZone.Data;
@@ -115,6 +116,7 @@ public static class LegacyNewsSchema
             """;
     }
 
+    [ExcludeFromCodeCoverage] // SQL Server COL_LENGTH probe.
     internal static bool HasSlugColumn(string connectionString)
     {
         const string sql = """
@@ -127,6 +129,7 @@ public static class LegacyNewsSchema
         return EfSql.ExecuteScalarBoolSqlAsync(connectionString, sql).GetAwaiter().GetResult();
     }
 
+    [ExcludeFromCodeCoverage] // SQL Server COL_LENGTH probe.
     internal static NewsColumnAvailability GetNewsColumnAvailability(string connectionString)
     {
         const string sql = """

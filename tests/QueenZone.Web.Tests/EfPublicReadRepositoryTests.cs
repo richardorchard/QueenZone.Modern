@@ -235,6 +235,115 @@ public sealed class EfPublicReadRepositoryTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task Articles_maps_latest_page_count_detail_and_sitemap()
+    {
+        dbContext.Database.ExecuteSqlRaw(
+            """
+            CREATE TABLE IF NOT EXISTS Articles (
+                Id INTEGER NOT NULL,
+                Title TEXT NOT NULL,
+                Body TEXT NOT NULL,
+                PublishedAt TEXT NOT NULL,
+                Source TEXT,
+                CategoryName TEXT,
+                IsPublished INTEGER NOT NULL
+            );
+            INSERT INTO Articles (Id, Title, Body, PublishedAt, Source, CategoryName, IsPublished)
+            VALUES
+                (1, 'First', 'Body one is long enough for an excerpt', '2020-01-01', 'BBC', 'News', 1),
+                (2, 'Second', 'Body two', '2020-02-01', NULL, NULL, 1);
+            """);
+
+        const string select = """
+            SELECT Id, Title, Body, PublishedAt, Source, CategoryName, IsPublished
+            FROM Articles
+            WHERE IsPublished = 1
+            """;
+
+        var repository = new EfArticlesRepository(
+            dbContext,
+            latestSql: count => select + $" ORDER BY PublishedAt DESC, Id DESC LIMIT {count}",
+            countSql: "SELECT COUNT(*) AS Value FROM Articles WHERE IsPublished = 1",
+            archivePageSql: (offset, pageSize) =>
+                select + $" ORDER BY PublishedAt DESC, Id DESC LIMIT {pageSize} OFFSET {offset}",
+            byIdSql: id => select + $" AND Id = {id}",
+            sitemapSql: """
+                SELECT Id, Title, PublishedAt, CAST(NULL AS TEXT) AS Slug
+                FROM Articles WHERE IsPublished = 1
+                ORDER BY PublishedAt DESC, Id DESC
+                """);
+
+        var latest = await repository.GetLatestAsync(10);
+        Assert.Equal(2, latest.Count);
+        Assert.Equal("Second", latest[0].Title);
+        Assert.False(string.IsNullOrWhiteSpace(latest[0].Excerpt));
+
+        Assert.Equal(2, await repository.GetPublishedCountAsync());
+
+        var page = await repository.GetArchivePageAsync(1, 1);
+        Assert.Single(page);
+        Assert.Equal(2, page[0].Id);
+
+        var detail = await repository.GetByIdAsync(1);
+        Assert.NotNull(detail);
+        Assert.Equal("First", detail.Title);
+        Assert.Null(await repository.GetByIdAsync(999));
+
+        var sitemap = await repository.GetPublishedSitemapEntriesAsync();
+        Assert.Equal(2, sitemap.Count);
+    }
+
+    [Fact]
+    public async Task News_maps_latest_page_count_detail_and_sitemap()
+    {
+        dbContext.Database.ExecuteSqlRaw(
+            """
+            CREATE TABLE IF NOT EXISTS NewsRows (
+                Id INTEGER NOT NULL,
+                Title TEXT NOT NULL,
+                Excerpt TEXT NOT NULL,
+                Body TEXT NOT NULL,
+                PublishedAt TEXT NOT NULL,
+                SourceUrl TEXT,
+                IsPublished INTEGER NOT NULL,
+                Slug TEXT
+            );
+            INSERT INTO NewsRows (Id, Title, Excerpt, Body, PublishedAt, SourceUrl, IsPublished, Slug)
+            VALUES
+                (10, 'Headline', 'Ex', 'Body', '2021-03-01', 'https://example.com', 1, 'headline'),
+                (11, 'Other', 'Ex2', 'Body2', '2021-04-01', NULL, 1, NULL);
+            """);
+
+        const string select = """
+            SELECT Id, Title, Excerpt, Body, PublishedAt, SourceUrl, IsPublished, Slug
+            FROM NewsRows
+            WHERE IsPublished = 1
+            """;
+
+        var repository = new EfNewsRepository(
+            dbContext,
+            latestSql: count => select + $" ORDER BY PublishedAt DESC, Id DESC LIMIT {count}",
+            countSql: "SELECT COUNT(*) AS Value FROM NewsRows WHERE IsPublished = 1",
+            archivePageSql: (offset, pageSize) =>
+                select + $" ORDER BY PublishedAt DESC, Id DESC LIMIT {pageSize} OFFSET {offset}",
+            byIdSql: id => select + $" AND Id = {id}",
+            sitemapSql: """
+                SELECT Id, Title, PublishedAt, Slug FROM NewsRows WHERE IsPublished = 1
+                ORDER BY PublishedAt DESC, Id DESC
+                """);
+
+        var latest = await repository.GetLatestAsync(5);
+        Assert.Equal(2, latest.Count);
+        Assert.Equal(11, latest[0].Id);
+
+        Assert.Equal(2, await repository.GetPublishedCountAsync());
+        Assert.Single(await repository.GetArchivePageAsync(1, 1));
+        Assert.Equal("Headline", (await repository.GetByIdAsync(10))!.Title);
+        Assert.Null(await repository.GetByIdAsync(404));
+        Assert.Equal(2, (await repository.GetPublishedSitemapEntriesAsync()).Count);
+    }
+
+    [Fact]
     public void Public_constructors_accept_dbContext()
     {
         Assert.NotNull(new EfDiscographyRepository(dbContext));
@@ -244,5 +353,15 @@ public sealed class EfPublicReadRepositoryTests : IAsyncDisposable
         Assert.NotNull(new EfArticlesRepository(dbContext));
         Assert.NotNull(new ModernForumRepository(dbContext));
         Assert.NotNull(new LegacyForumRepository(dbContext));
+    }
+
+    [Fact]
+    public void News_public_constructor_requires_connection_string()
+    {
+        var options = new DbContextOptionsBuilder<QueenZoneDbContext>()
+            .UseSqlite("Data Source=:memory:")
+            .Options;
+        using var bareContext = new QueenZoneDbContext(options);
+        Assert.ThrowsAny<Exception>(() => new EfNewsRepository(bareContext));
     }
 }

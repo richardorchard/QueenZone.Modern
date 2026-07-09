@@ -8,28 +8,23 @@ namespace QueenZone.Data;
 public sealed class EfNewsRepository : INewsRepository
 {
     private readonly QueenZoneDbContext dbContext;
-    private readonly string publishedNewsCte;
+    private readonly Func<int, string> latestSql;
+    private readonly string countSql;
+    private readonly Func<int, int, string> archivePageSql;
+    private readonly Func<int, string> byIdSql;
+    private readonly string sitemapSql;
 
     public EfNewsRepository(QueenZoneDbContext dbContext)
     {
         this.dbContext = dbContext;
         var connectionString = dbContext.Database.GetConnectionString()
             ?? throw new InvalidOperationException("QueenZone legacy database connection string is not configured.");
-        publishedNewsCte = LegacyNewsSchema.BuildPublishedNewsCte(
+        var publishedNewsCte = LegacyNewsSchema.BuildPublishedNewsCte(
             LegacyNewsSchema.HasSlugColumn(connectionString));
-    }
 
-    internal EfNewsRepository(QueenZoneDbContext dbContext, string publishedNewsCte)
-    {
-        this.dbContext = dbContext;
-        this.publishedNewsCte = publishedNewsCte;
-    }
+        latestSql = count => publishedNewsCte + $"""
 
-    public async Task<IReadOnlyList<NewsItem>> GetLatestAsync(int count, CancellationToken cancellationToken = default)
-    {
-        var sql = publishedNewsCte + """
-
-            SELECT TOP ({0})
+            SELECT TOP ({count})
                 Id,
                 Title,
                 Excerpt,
@@ -42,26 +37,84 @@ public sealed class EfNewsRepository : INewsRepository
             WHERE RowNumber = 1
             ORDER BY PublishedAt DESC, Id DESC
             """;
-
-        var rows = await dbContext.Database
-            .SqlQueryRaw<NewsRow>(sql, count)
-            .ToListAsync(cancellationToken);
-        return rows.Select(Map).ToList();
-    }
-
-    public async Task<int> GetPublishedCountAsync(CancellationToken cancellationToken = default)
-    {
-        var sql = publishedNewsCte + """
+        countSql = publishedNewsCte + """
 
             SELECT COUNT(*) AS Value
             FROM PublishedNews
             WHERE RowNumber = 1
             """;
+        archivePageSql = (offset, pageSize) => publishedNewsCte + $"""
 
-        return await dbContext.Database
-            .SqlQueryRaw<int>(sql)
-            .FirstAsync(cancellationToken);
+            SELECT
+                Id,
+                Title,
+                Excerpt,
+                Body,
+                PublishedAt,
+                SourceUrl,
+                IsPublished,
+                Slug
+            FROM PublishedNews
+            WHERE RowNumber = 1
+            ORDER BY PublishedAt DESC, Id DESC
+            OFFSET {offset} ROWS FETCH NEXT {pageSize} ROWS ONLY
+            """;
+        byIdSql = id => publishedNewsCte + $"""
+
+            SELECT
+                Id,
+                Title,
+                Excerpt,
+                Body,
+                PublishedAt,
+                SourceUrl,
+                IsPublished,
+                Slug
+            FROM PublishedNews
+            WHERE RowNumber = 1
+              AND Id = {id}
+            """;
+        sitemapSql = publishedNewsCte + """
+
+            SELECT
+                Id,
+                Title,
+                PublishedAt,
+                Slug
+            FROM PublishedNews
+            WHERE RowNumber = 1
+            ORDER BY PublishedAt DESC, Id DESC
+            """;
     }
+
+    internal EfNewsRepository(
+        QueenZoneDbContext dbContext,
+        Func<int, string> latestSql,
+        string countSql,
+        Func<int, int, string> archivePageSql,
+        Func<int, string> byIdSql,
+        string sitemapSql)
+    {
+        this.dbContext = dbContext;
+        this.latestSql = latestSql;
+        this.countSql = countSql;
+        this.archivePageSql = archivePageSql;
+        this.byIdSql = byIdSql;
+        this.sitemapSql = sitemapSql;
+    }
+
+    public async Task<IReadOnlyList<NewsItem>> GetLatestAsync(int count, CancellationToken cancellationToken = default)
+    {
+        var rows = await dbContext.Database
+            .SqlQueryRaw<NewsRow>(latestSql(count))
+            .ToListAsync(cancellationToken);
+        return rows.Select(Map).ToList();
+    }
+
+    public async Task<int> GetPublishedCountAsync(CancellationToken cancellationToken = default) =>
+        await dbContext.Database
+            .SqlQueryRaw<int>(countSql)
+            .FirstAsync(cancellationToken);
 
     public async Task<IReadOnlyList<NewsItem>> GetArchivePageAsync(
         int page,
@@ -69,73 +122,26 @@ public sealed class EfNewsRepository : INewsRepository
         CancellationToken cancellationToken = default)
     {
         var offset = Math.Max(page - 1, 0) * pageSize;
-        var sql = publishedNewsCte + """
-
-            SELECT
-                Id,
-                Title,
-                Excerpt,
-                Body,
-                PublishedAt,
-                SourceUrl,
-                IsPublished,
-                Slug
-            FROM PublishedNews
-            WHERE RowNumber = 1
-            ORDER BY PublishedAt DESC, Id DESC
-            OFFSET {0} ROWS FETCH NEXT {1} ROWS ONLY
-            """;
-
         var rows = await dbContext.Database
-            .SqlQueryRaw<NewsRow>(sql, offset, pageSize)
+            .SqlQueryRaw<NewsRow>(archivePageSql(offset, pageSize))
             .ToListAsync(cancellationToken);
         return rows.Select(Map).ToList();
     }
 
     public async Task<NewsItem?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
-        var sql = publishedNewsCte + """
-
-            SELECT
-                Id,
-                Title,
-                Excerpt,
-                Body,
-                PublishedAt,
-                SourceUrl,
-                IsPublished,
-               Slug
-            FROM PublishedNews
-            WHERE RowNumber = 1
-              AND Id = {0}
-            """;
-
         var rows = await dbContext.Database
-            .SqlQueryRaw<NewsRow>(sql, id)
+            .SqlQueryRaw<NewsRow>(byIdSql(id))
             .ToListAsync(cancellationToken);
         var row = rows.FirstOrDefault();
         return row is null ? null : Map(row);
     }
 
     public async Task<IReadOnlyList<SitemapContentEntry>> GetPublishedSitemapEntriesAsync(
-        CancellationToken cancellationToken = default)
-    {
-        var sql = publishedNewsCte + """
-
-            SELECT
-                Id,
-                Title,
-                PublishedAt,
-               Slug
-            FROM PublishedNews
-            WHERE RowNumber = 1
-            ORDER BY PublishedAt DESC, Id DESC
-            """;
-
-        return await dbContext.Database
-            .SqlQueryRaw<SitemapContentEntry>(sql)
+        CancellationToken cancellationToken = default) =>
+        await dbContext.Database
+            .SqlQueryRaw<SitemapContentEntry>(sitemapSql)
             .ToListAsync(cancellationToken);
-    }
 
     private static NewsItem Map(NewsRow row) =>
         new(

@@ -1,4 +1,4 @@
-using Microsoft.Data.SqlClient;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.EntityFrameworkCore;
 
 namespace QueenZone.Data;
@@ -52,25 +52,34 @@ public sealed class EfFanPerformanceRepository : IFanPerformanceRepository
     {
         if (useLegacyProcedures)
         {
-            var currentPage = Math.Max(page, 1);
-            var rows = await EfSql.QueryProcAsync<StageRow>(
-                dbContext,
-                "Q_STAGE_T_PAGE_SP",
-                command =>
-                {
-                    command.Parameters.Add(EfSql.Input("@PageSize", pageSize));
-                    command.Parameters.Add(EfSql.Input("@CurrentPage", currentPage));
-                    command.Parameters.Add(EfSql.OutputInt("@ItemCount"));
-                },
-                cancellationToken: cancellationToken);
-
-            return rows.Select(MapRow).ToList();
+            return await GetPageViaProcedureAsync(page, pageSize, cancellationToken);
         }
 
         var rowsFromSql = await dbContext.Database
             .SqlQueryRaw<StageRow>(pageSelectSql)
             .ToListAsync(cancellationToken);
         return rowsFromSql.Select(MapRow).ToList();
+    }
+
+    [ExcludeFromCodeCoverage] // SQL Server stored procedure path.
+    private async Task<IReadOnlyList<FanPerformance>> GetPageViaProcedureAsync(
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken)
+    {
+        var currentPage = Math.Max(page, 1);
+        var rows = await EfSql.QueryProcAsync<StageRow>(
+            dbContext,
+            "Q_STAGE_T_PAGE_SP",
+            command =>
+            {
+                command.Parameters.Add(EfSql.Input("@PageSize", pageSize));
+                command.Parameters.Add(EfSql.Input("@CurrentPage", currentPage));
+                command.Parameters.Add(EfSql.OutputInt("@ItemCount"));
+            },
+            cancellationToken: cancellationToken);
+
+        return rows.Select(MapRow).ToList();
     }
 
     public async Task<int> GetVisibleCountAsync(CancellationToken cancellationToken = default)
@@ -81,16 +90,20 @@ public sealed class EfFanPerformanceRepository : IFanPerformanceRepository
                 "Microsoft.EntityFrameworkCore.SqlServer",
                 StringComparison.Ordinal))
         {
-            return await EfSql.ExecuteScalarSqlAsync(
-                dbContext,
-                "SELECT COUNT(*) FROM dbo.Q_STAGE_T WHERE DISPLAY = 1",
-                cancellationToken: cancellationToken);
+            return await GetVisibleCountViaSqlServerAsync(cancellationToken);
         }
 
         return await dbContext.Database
             .SqlQueryRaw<int>(countSql)
             .FirstAsync(cancellationToken);
     }
+
+    [ExcludeFromCodeCoverage]
+    private Task<int> GetVisibleCountViaSqlServerAsync(CancellationToken cancellationToken) =>
+        EfSql.ExecuteScalarSqlAsync(
+            dbContext,
+            "SELECT COUNT(*) FROM dbo.Q_STAGE_T WHERE DISPLAY = 1",
+            cancellationToken: cancellationToken);
 
     public async Task<FanPerformance?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
