@@ -90,9 +90,10 @@ public sealed class EfFanPerformanceRepository : IFanPerformanceRepository
             return await GetVisibleCountViaSqlServerAsync(cancellationToken);
         }
 
-        return await dbContext.Database
+        var values = await dbContext.Database
             .SqlQueryRaw<int>(countSql)
-            .FirstAsync(cancellationToken);
+            .ToListAsync(cancellationToken);
+        return values.FirstOrDefault();
     }
 
     [ExcludeFromCodeCoverage]

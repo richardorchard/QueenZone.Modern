@@ -51,10 +51,14 @@ public sealed class EfNewsRepository : INewsRepository
         return rows.Select(Map).ToList();
     }
 
-    public async Task<int> GetPublishedCountAsync(CancellationToken cancellationToken = default) =>
-        await dbContext.Database
+    public async Task<int> GetPublishedCountAsync(CancellationToken cancellationToken = default)
+    {
+        // CTE SQL is non-composable; materialize fully instead of FirstAsync (which tries to compose).
+        var values = await dbContext.Database
             .SqlQueryRaw<int>(countSql)
-            .FirstAsync(cancellationToken);
+            .ToListAsync(cancellationToken);
+        return values.FirstOrDefault();
+    }
 
     public async Task<IReadOnlyList<NewsItem>> GetArchivePageAsync(
         int page,
