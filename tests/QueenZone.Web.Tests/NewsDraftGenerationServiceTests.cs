@@ -59,8 +59,10 @@ public sealed class NewsDraftGenerationServiceTests
     Assert.NotNull(result.DraftId);
   }
 
-  [Fact]
-  public async Task GenerateDraftAsync_throws_when_drafted_without_force_regenerate()
+  [Theory]
+  [InlineData(false)]
+  [InlineData(true)]
+  public async Task GenerateDraftAsync_force_regenerate_controls_redraft_of_drafted_candidate(bool forceRegenerate)
   {
     var repository = new InMemoryNewsDiscoveryRepository(new SharedNewsDiscoveryStore());
     var candidateId = await NewsDiscoveryTestSeeder.SeedNeedsReviewCandidateAsync(repository);
@@ -74,25 +76,15 @@ public sealed class NewsDraftGenerationServiceTests
 
     var candidate = await repository.GetCandidateByIdAsync(candidateId);
 
-    await Assert.ThrowsAsync<InvalidOperationException>(() =>
-      service.GenerateDraftAsync(candidate!, new NewsDraftRunOptions()));
-  }
-
-  [Fact]
-  public async Task GenerateDraftAsync_regenerates_when_drafted_and_forced()
-  {
-    var repository = new InMemoryNewsDiscoveryRepository(new SharedNewsDiscoveryStore());
-    var candidateId = await NewsDiscoveryTestSeeder.SeedNeedsReviewCandidateAsync(repository);
-    var service = NewsAgentTestSupport.CreateDraftGenerationService(
-      repository,
-      new DraftGenerationFakeAiClient(NewsAgentTestSupport.SampleDraftJson));
-
-    await service.GenerateDraftAsync(
-      (await repository.GetCandidateByIdAsync(candidateId))!,
-      new NewsDraftRunOptions());
+    if (!forceRegenerate)
+    {
+      await Assert.ThrowsAsync<InvalidOperationException>(() =>
+        service.GenerateDraftAsync(candidate!, new NewsDraftRunOptions()));
+      return;
+    }
 
     var result = await service.GenerateDraftAsync(
-      (await repository.GetCandidateByIdAsync(candidateId))!,
+      candidate!,
       new NewsDraftRunOptions(ForceRegenerate: true));
 
     Assert.True(result.Succeeded);
@@ -115,8 +107,10 @@ public sealed class NewsDraftGenerationServiceTests
     Assert.Equal(0, result.DraftsCreated);
   }
 
-  [Fact]
-  public async Task GenerateDraftAsync_dry_run_does_not_persist_draft_or_status()
+  [Theory]
+  [InlineData(false)]
+  [InlineData(true)]
+  public async Task GenerateDraftAsync_dry_run_controls_whether_draft_and_status_persist(bool dryRun)
   {
     var repository = new InMemoryNewsDiscoveryRepository(new SharedNewsDiscoveryStore());
     var candidateId = await NewsDiscoveryTestSeeder.SeedNeedsReviewCandidateAsync(repository);
@@ -124,12 +118,23 @@ public sealed class NewsDraftGenerationServiceTests
       repository,
       new DraftGenerationFakeAiClient(NewsAgentTestSupport.SampleDraftJson));
 
-    await service.GenerateDraftAsync(
+    var result = await service.GenerateDraftAsync(
       (await repository.GetCandidateByIdAsync(candidateId))!,
-      new NewsDraftRunOptions(DryRun: true));
+      new NewsDraftRunOptions(DryRun: dryRun));
 
-    Assert.Null(await repository.GetDraftByCandidateIdAsync(candidateId));
-    Assert.Equal(NewsCandidateStatus.NeedsReview, (await repository.GetCandidateByIdAsync(candidateId))!.Status);
+    var draft = await repository.GetDraftByCandidateIdAsync(candidateId);
+    var candidate = await repository.GetCandidateByIdAsync(candidateId);
+
+    if (dryRun)
+    {
+      Assert.Null(draft);
+      Assert.Equal(NewsCandidateStatus.NeedsReview, candidate!.Status);
+      return;
+    }
+
+    Assert.True(result.Succeeded);
+    Assert.NotNull(draft);
+    Assert.Equal(NewsCandidateStatus.Drafted, candidate!.Status);
   }
 
   private sealed class DraftGenerationFakeAiClient(string content, bool enabled = true) : INewsAiClient

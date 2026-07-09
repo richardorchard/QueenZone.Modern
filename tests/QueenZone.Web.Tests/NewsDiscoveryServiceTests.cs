@@ -270,35 +270,29 @@ public sealed class NewsDiscoveryServiceTests
         Assert.Equal(1, result.CandidatesCreated);
     }
 
-    [Fact]
-    public async Task RunFetchAsync_ingests_sitemap_and_allowlisted_page_sources()
+    [Theory]
+    [InlineData(NewsDiscoverySourceType.Rss, "https://www.queenonline.com/feed/", "sample-rss.xml", 2)]
+    [InlineData(NewsDiscoverySourceType.Sitemap, "https://www.queenonline.com/sitemap.xml", "sample-sitemap.xml", 2)]
+    [InlineData(NewsDiscoverySourceType.AllowlistedPage, "https://www.rogertaylorofficial.com/news", "sample-page.html", 2)]
+    public async Task RunFetchAsync_ingests_each_source_type(
+        NewsDiscoverySourceType sourceType,
+        string feedOrSiteUrl,
+        string fixtureName,
+        int expectedCandidates)
     {
         var repository = new InMemoryNewsDiscoveryRepository(new SharedNewsDiscoveryStore());
-        var sitemapUrl = "https://www.queenonline.com/sitemap.xml";
-        var pageUrl = "https://www.rogertaylorofficial.com/news";
         var service = NewsAgentTestSupport.CreateDiscoveryService(
             repository,
             new FakeNewsDiscoveryHttpClient(new Dictionary<string, string>
             {
-                [sitemapUrl] = NewsAgentTestSupport.ReadFixture("sample-sitemap.xml"),
-                [pageUrl] = NewsAgentTestSupport.ReadFixture("sample-page.html")
+                [feedOrSiteUrl] = NewsAgentTestSupport.ReadFixture(fixtureName)
             }));
         await repository.UpsertSourceAsync(new NewsDiscoverySourceDraft(
-            "queen-sitemap",
-            "Queen Sitemap",
-            "https://www.queenonline.com/",
-            sitemapUrl,
-            NewsDiscoverySourceType.Sitemap,
-            NewsDiscoveryTrustTier.Primary,
-            60,
-            true,
-            null));
-        await repository.UpsertSourceAsync(new NewsDiscoverySourceDraft(
-            "roger-taylor",
-            "Roger Taylor",
-            "https://www.rogertaylorofficial.com/",
-            pageUrl,
-            NewsDiscoverySourceType.AllowlistedPage,
+            "source-" + sourceType.ToString().ToLowerInvariant(),
+            sourceType.ToString(),
+            "https://example.com/",
+            feedOrSiteUrl,
+            sourceType,
             NewsDiscoveryTrustTier.Primary,
             60,
             true,
@@ -306,8 +300,8 @@ public sealed class NewsDiscoveryServiceTests
 
         var result = await service.RunFetchAsync(new NewsDiscoveryRunOptions(Force: true));
 
-        Assert.Equal(2, result.SourcesChecked);
-        Assert.Equal(4, result.CandidatesCreated);
+        Assert.Equal(1, result.SourcesChecked);
+        Assert.Equal(expectedCandidates, result.CandidatesCreated);
     }
 
     [Fact]
