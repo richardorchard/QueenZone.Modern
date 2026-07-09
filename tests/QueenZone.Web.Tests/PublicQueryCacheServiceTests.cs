@@ -130,6 +130,54 @@ public sealed class PublicQueryCacheServiceTests
     }
 
     [Fact]
+    public async Task InvalidateNewsCache_evicts_all_latest_count_variants_not_just_homepage_default()
+    {
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var newsRepository = new CountingNewsRepository();
+        var service = CreateService(memoryCache, newsRepository: newsRepository);
+
+        await service.GetLatestNewsAsync(3);
+        await service.GetLatestNewsAsync(5);
+        await service.GetLatestNewsAsync(10);
+        await service.GetNewsPublishedCountAsync();
+
+        Assert.Equal(3, newsRepository.LatestCallCount);
+        Assert.Equal(1, newsRepository.PublishedCountCallCount);
+
+        service.InvalidateNewsCache();
+
+        await service.GetLatestNewsAsync(3);
+        await service.GetLatestNewsAsync(5);
+        await service.GetLatestNewsAsync(10);
+        await service.GetNewsPublishedCountAsync();
+
+        Assert.Equal(6, newsRepository.LatestCallCount);
+        Assert.Equal(2, newsRepository.PublishedCountCallCount);
+    }
+
+    [Fact]
+    public async Task LatestNewsCacheKeys_are_isolated_by_count_until_version_bump()
+    {
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var newsRepository = new CountingNewsRepository();
+        var service = CreateService(memoryCache, newsRepository: newsRepository);
+
+        var latest3 = await service.GetLatestNewsAsync(3);
+        var latest5 = await service.GetLatestNewsAsync(5);
+        await service.GetLatestNewsAsync(3);
+        await service.GetLatestNewsAsync(5);
+
+        Assert.Equal(2, newsRepository.LatestCallCount);
+        Assert.NotSame(latest3, latest5);
+
+        service.InvalidateNewsCache();
+        var latest3After = await service.GetLatestNewsAsync(3);
+
+        Assert.Equal(3, newsRepository.LatestCallCount);
+        Assert.NotSame(latest3, latest3After);
+    }
+
+    [Fact]
     public async Task OnThisDayCacheVariesByDateAndCount()
     {
         using var memoryCache = new MemoryCache(new MemoryCacheOptions());
