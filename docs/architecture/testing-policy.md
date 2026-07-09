@@ -132,6 +132,22 @@ Good targets:
 
 Keep end-to-end tests small. They should prove critical user journeys and browser behavior, not duplicate all route integration tests.
 
+### Frontend performance checks (advisory)
+
+Use Lighthouse via `scripts/Measure-FrontendPerformance.ps1` when a change may affect end-user load cost on public pages (homepage, news, forum).
+
+Good targets:
+
+- LCP, CLS, total transfer size, and request count on key public routes.
+- Before/after summaries attached to performance-related pull requests.
+- Optional repeat-load pass when validating cache headers or static asset changes.
+
+These checks are **opt-in and advisory**. They are not a merge-blocking CI gate. Documented budgets live in `docs/performance/frontend-performance-budgets.json`. Workflow detail: `docs/performance/frontend-performance-checks.md`.
+
+```powershell
+powershell -File .\scripts\Measure-FrontendPerformance.ps1 -StartLocalApp -FormFactor mobile
+```
+
 ## Continuous Integration
 
 Every pull request must run:
@@ -199,6 +215,7 @@ Use `pwsh` instead of `powershell` on Linux or macOS.
 Optional manual checks (report skipped in PRs when not run):
 
 - News agent OpenRouter smoke: `scripts/Smoke-NewsAgent.bat` (Windows). See `docs/architecture/news-agent.md`.
+- Frontend performance (Lighthouse): `scripts/Measure-FrontendPerformance.ps1`. See `docs/performance/frontend-performance-checks.md`.
 
 Common gaps: new repository implementations, console/worker entry points, DI registration-only code (cover via integration tests that resolve services), and error branches.
 
@@ -227,6 +244,7 @@ Playwright browser smoke tests live in `tests/QueenZone.Web.E2E` and run in CI o
 - SQL mapping belongs in opt-in data integration tests.
 - Migration confidence belongs in content validation reports.
 - Browser behavior belongs in a small Playwright end-to-end suite.
+- End-user load cost belongs in the advisory frontend performance workflow, not in every PR.
 
 ## Pull Request Expectations
 
