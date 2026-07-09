@@ -23,6 +23,9 @@ appsettings.Local.json
 smoke-app-local/
 smoke-*.log
 
+perf-app/
+docs/performance/results/
+
 appservice-logs.zip
 
 appservice-logs/

@@ -96,23 +96,22 @@ public sealed class CoreSitemapBuilder(
     {
         entries.Add(new(PhotoRoutes.GetCategoriesPath()));
 
-        var categories = await photoRepository.GetCategoriesAsync(cancellationToken);
+        var categories = await photoRepository.GetPublishedSitemapCategoriesAsync(cancellationToken);
         foreach (var category in categories)
         {
-            var photos = await photoRepository.GetCategoryAllAsync(category.CatId, cancellationToken);
-            var latestPhotoAt = photos.Count > 0
-                ? photos.Max(photo => photo.DateTime)
+            var latestPhotoAt = category.Photos.Count > 0
+                ? category.Photos.Max(photo => photo.DateTime)
                 : (DateTime?)null;
 
             entries.Add(new(PhotoRoutes.GetCategoryPath(category.Slug), latestPhotoAt));
 
-            var totalPages = PhotoRoutes.GetCategoryTotalPages(category.ImageCount);
+            var totalPages = PhotoRoutes.GetCategoryTotalPages(category.Photos.Count);
             for (var page = 2; page <= totalPages; page++)
             {
                 entries.Add(new(PhotoRoutes.GetCategoryPagePath(category.Slug, page), latestPhotoAt));
             }
 
-            foreach (var photo in photos)
+            foreach (var photo in category.Photos)
             {
                 entries.Add(new(
                     PhotoRoutes.GetDetailPath(category.Slug, photo.PicId),

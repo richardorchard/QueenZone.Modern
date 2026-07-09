@@ -52,7 +52,7 @@ public static class QueenZoneWebServiceCollectionExtensions
                 .With(context => PublicOutputCachePolicies.IsPublicReadOnlyRequest(context.HttpContext))
                 .Expire(PublicOutputCachePolicies.SitemapDuration)
                 .SetVaryByRouteValue("*")
-                .Tag("public-sitemap"));
+                .Tag(PublicOutputCachePolicies.PublicSitemapTag));
         });
         services.AddScoped<PublicQueryCacheService>();
         return services;

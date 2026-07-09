@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using QueenZone.Data;
+using QueenZone.Web.Sitemap;
 
 namespace QueenZone.Web.Pages.Admin.News;
 
@@ -8,6 +9,7 @@ public sealed class EditPostModel(
     INewsDiscoveryRepository discoveryRepository,
     INewsAuditRepository auditRepository,
     PublicQueryCacheService publicQueryCache,
+    CoreSitemapService coreSitemapService,
     ILogger<EditPostModel> logger) : AdminNewsPageModel
 {
     public ArticleFormViewModel? Form { get; private set; }
@@ -53,6 +55,7 @@ public sealed class EditPostModel(
         if (existing.IsPublished)
         {
             publicQueryCache.InvalidateNewsCache();
+            await coreSitemapService.InvalidateAsync(cancellationToken);
         }
 
         await auditRepository.AppendAsync(id, "edit", EditorEmail, $"Updated \"{draft.Title}\"", cancellationToken);

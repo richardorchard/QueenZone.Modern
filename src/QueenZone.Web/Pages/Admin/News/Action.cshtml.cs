@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using QueenZone.Data;
+using QueenZone.Web.Sitemap;
 
 namespace QueenZone.Web.Pages.Admin.News;
 
@@ -8,6 +9,7 @@ public sealed class ActionModel(
     INewsAuditRepository auditRepository,
     INewsDiscoveryRepository discoveryRepository,
     PublicQueryCacheService publicQueryCache,
+    CoreSitemapService coreSitemapService,
     ILogger<ActionModel> logger) : AdminNewsPageModel
 {
     public IActionResult OnGet(int id, string handler) =>
@@ -35,7 +37,7 @@ public sealed class ActionModel(
         }
 
         await adminNewsRepository.PublishAsync(id, EditorEmail, cancellationToken);
-        publicQueryCache.InvalidateNewsCache();
+        await InvalidatePublicNewsCachesAsync(cancellationToken);
         await auditRepository.AppendAsync(id, "publish", EditorEmail, $"Published \"{article.Title}\"", cancellationToken);
         return Redirect("/admin/news");
     }
@@ -49,7 +51,7 @@ public sealed class ActionModel(
         }
 
         await adminNewsRepository.UnpublishAsync(id, EditorEmail, cancellationToken);
-        publicQueryCache.InvalidateNewsCache();
+        await InvalidatePublicNewsCachesAsync(cancellationToken);
         await auditRepository.AppendAsync(id, "unpublish", EditorEmail, $"Unpublished \"{article.Title}\"", cancellationToken);
         return Redirect("/admin/news");
     }
@@ -77,7 +79,7 @@ public sealed class ActionModel(
             await adminNewsRepository.DeleteAsync(id, EditorEmail, cancellationToken);
             if (article.IsPublished)
             {
-                publicQueryCache.InvalidateNewsCache();
+                await InvalidatePublicNewsCachesAsync(cancellationToken);
             }
         }
         catch (Exception ex) when (AdminNewsDeleteError.IsDeleteForeignKeyViolation(ex))
@@ -95,6 +97,12 @@ public sealed class ActionModel(
         }
 
         return Redirect("/admin/news");
+    }
+
+    private async Task InvalidatePublicNewsCachesAsync(CancellationToken cancellationToken)
+    {
+        publicQueryCache.InvalidateNewsCache();
+        await coreSitemapService.InvalidateAsync(cancellationToken);
     }
 
     private IActionResult ArticleNotFound(int id)
