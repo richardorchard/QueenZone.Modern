@@ -1,21 +1,23 @@
-@page "/404"
+@page "/error/{statusCode:int?}"
+@model QueenZone.Web.Pages.ErrorModel
 @{
-  ViewData["Title"] = "Page Not Found - Queenzone";
-  ViewData["Description"] = "The requested Queenzone page could not be found.";
-  Response.StatusCode = 404;
+  ViewData["Title"] = $"{Model.Heading} - Queenzone";
+  ViewData["Description"] = Model.Standfirst;
 }
 
-<partial name="_PageHero" model='@(("404", "Page Not Found", "Sorry, we couldn't find what you were looking for. It may have moved as the archive has been restored.", ""))' />
+<partial name="_PageHero" model='@((Model.Eyebrow, Model.Heading, Model.Standfirst, ""))' />
 
-<section class="qz-section qz-section--warm qz-error-page" aria-labelledby="not-found-actions-heading">
+<section class="qz-section qz-section--warm qz-error-page" aria-labelledby="error-actions-heading">
   <div class="qz-container qz-error-page__grid">
     <div class="qz-error-page__panel">
       <p class="qz-error-page__kicker">Where to go next</p>
-      <h2 id="not-found-actions-heading">Find it in the archive</h2>
-      <p>The page you requested doesn't exist or may have moved. Search the restored archive or jump to a main section.</p>
+      <h2 id="error-actions-heading">@Model.ActionHeading</h2>
+      <p>
+        The restored public archive is read-only and searchable. These entry points should get you back to the useful parts quickly.
+      </p>
       <div class="qz-error-page__actions" aria-label="Suggested destinations">
-        <a class="qz-button qz-button--cta" href="/search">Search</a>
-        <a class="qz-button qz-button--outline" href="/">Home</a>
+        <a class="qz-button qz-button--cta" href="/">Home</a>
+        <a class="qz-button qz-button--outline" href="/search">Search</a>
       </div>
     </div>
 
@@ -38,4 +40,11 @@
       </a>
     </nav>
   </div>
+
+  @if (Model.HttpStatusCodeValue >= 500)
+  {
+    <div class="qz-container">
+      <p class="qz-error-page__request">Error reference: @Model.RequestId</p>
+    </div>
+  }
 </section>

@@ -3,8 +3,14 @@
 @{
     var measurementId = Analytics.Value.MeasurementId?.Trim();
     var isAdmin = Context.Request.Path.StartsWithSegments("/Admin", StringComparison.OrdinalIgnoreCase);
+    var isAccount = Context.Request.Path.StartsWithSegments("/Account", StringComparison.OrdinalIgnoreCase);
+    var fallbackPath = Convert.ToString(Context.Request.RouteValues["path"]);
+    var isAdminFallbackPath = fallbackPath?.StartsWith("Admin/", StringComparison.OrdinalIgnoreCase) == true;
+    var isAdminReturnUrl = Context.Request.Query.TryGetValue("ReturnUrl", out var returnUrls)
+        && returnUrls.Any(returnUrl => returnUrl?.StartsWith("/Admin", StringComparison.OrdinalIgnoreCase) == true);
+    var isErrorResponse = Context.Response.StatusCode >= StatusCodes.Status400BadRequest;
 }
-@if (!string.IsNullOrWhiteSpace(measurementId) && !isAdmin)
+@if (!string.IsNullOrWhiteSpace(measurementId) && !isAdmin && !isAccount && !isAdminFallbackPath && !isAdminReturnUrl && !isErrorResponse)
 {
   <!-- Google tag (gtag.js) -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=@measurementId"></script>
