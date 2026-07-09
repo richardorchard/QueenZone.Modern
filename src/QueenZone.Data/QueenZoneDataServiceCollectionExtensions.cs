@@ -53,7 +53,9 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddSingleton<IAdminNewsRepository, InMemoryAdminNewsRepository>();
         services.AddSingleton<INewsAuditRepository, InMemoryNewsAuditRepository>();
         services.AddSingleton<IMemberAccountRepository, InMemoryMemberAccountRepository>();
-        services.AddSingleton<SharedNewsDiscoveryStore>();
+        var discoveryStore = new SharedNewsDiscoveryStore();
+        SampleNewsDiscoveryData.Seed(discoveryStore);
+        services.AddSingleton(discoveryStore);
         services.AddSingleton<INewsDiscoveryRepository, InMemoryNewsDiscoveryRepository>();
         services.AddSingleton<SharedNewsAgentLeaseStore>();
         services.AddSingleton<INewsAgentRunLeaseService, InMemoryNewsAgentRunLeaseService>();
