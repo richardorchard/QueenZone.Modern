@@ -212,6 +212,14 @@ dotnet publish src/QueenZone.Web/QueenZone.Web.csproj --configuration Release --
 dotnet test tests/QueenZone.Web.E2E/QueenZone.Web.E2E.csproj --configuration Release
 ```
 
+For advisory frontend performance baselines (LCP, CLS, transfer size, request count on key public pages), use the Lighthouse workflow:
+
+```powershell
+powershell -File .\scripts\Measure-FrontendPerformance.ps1 -StartLocalApp -FormFactor mobile
+```
+
+Results land under `docs/performance/results/` (gitignored). Budgets and comparison guidance: `docs/performance/frontend-performance-checks.md`.
+
 Normal CI and pull request checks should not require the restored legacy database. Real legacy database checks are opt-in until a controlled test database exists.
 
 If you change admin news write behavior or discovery promotion behavior, you can run the opt-in legacy write probe against the configured `ConnectionStrings__QueenZoneLegacy` database:
