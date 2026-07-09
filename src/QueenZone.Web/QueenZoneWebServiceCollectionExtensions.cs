@@ -61,12 +61,11 @@ public static class QueenZoneWebServiceCollectionExtensions
     public static IServiceCollection AddQueenZoneSitemaps(this IServiceCollection services)
     {
         services.AddSingleton(TimeProvider.System);
-        // Scoped: CoreSitemapBuilder depends on content repositories, some of which are EF-backed
-        // (scoped) once migrated off Dapper (e.g. IBiographyRepository → EfBiographyRepository).
+        // Scoped: sitemap builders depend on EF-backed content repositories (scoped DbContext).
         services.AddScoped<CoreSitemapBuilder>();
         services.AddScoped<CoreSitemapService>();
-        services.AddSingleton<ForumSitemapBuilder>();
-        services.AddSingleton<SitemapIndexBuilder>();
+        services.AddScoped<ForumSitemapBuilder>();
+        services.AddScoped<SitemapIndexBuilder>();
         return services;
     }
 

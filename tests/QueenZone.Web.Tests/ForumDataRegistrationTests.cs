@@ -12,9 +12,10 @@ public sealed class ForumDataRegistrationTests
 
         services.AddQueenZoneLegacyData("Server=(local);Database=QueenZone;Trusted_Connection=True;");
 
-        using var provider = services.BuildServiceProvider();
+        using var provider = services.BuildServiceProvider(validateScopes: true);
+        using var scope = provider.CreateScope();
 
-        Assert.IsType<ModernForumRepository>(provider.GetRequiredService<IForumRepository>());
+        Assert.IsType<ModernForumRepository>(scope.ServiceProvider.GetRequiredService<IForumRepository>());
     }
 
     [Fact]
@@ -26,8 +27,9 @@ public sealed class ForumDataRegistrationTests
             "Server=(local);Database=QueenZone;Trusted_Connection=True;",
             new ForumDataOptions { UseModernForumReads = false });
 
-        using var provider = services.BuildServiceProvider();
+        using var provider = services.BuildServiceProvider(validateScopes: true);
+        using var scope = provider.CreateScope();
 
-        Assert.IsType<LegacyForumRepository>(provider.GetRequiredService<IForumRepository>());
+        Assert.IsType<LegacyForumRepository>(scope.ServiceProvider.GetRequiredService<IForumRepository>());
     }
 }

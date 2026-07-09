@@ -8,6 +8,8 @@ Amended 2026-07-09: documented the full Dapper vs EF repository matrix, contribu
 
 Amended 2026-07-09: migrated biography public reads to EF Core (`EfBiographyRepository`) while retaining the same legacy stored procedures.
 
+Amended 2026-07-09: completed migration of remaining public-read repositories off Dapper onto EF Core (`SqlQuery` / `SqlQueryRaw` / EF-managed SQL Server proc calls). Removed the Dapper package reference from `QueenZone.Data`.
+
 ## Context
 
 ADR 0003 chose Dapper for initial legacy database access. Issue #5 added admin write workflows for `NEWS_T` and `NewsAuditLog` using hand-written SQL.
@@ -18,31 +20,32 @@ As more content areas landed, the hybrid split grew beyond news. Without a writt
 
 ## Decision
 
-Use a hybrid data-access model in `QueenZone.Data` today, with a clear path toward one library:
+Use **EF Core as the single data-access library** in `QueenZone.Data`, while keeping stored procedures for hot or proven read paths:
 
 ### Current split
 
-- **Dapper** for many public read repositories (legacy tables/procs and modern forum procs).
-- **EF Core** for admin/editorial writes, modern workflow tables, and some modern reads.
+- **EF Core** for all SQL-backed repositories (admin/editorial writes, modern workflow tables, and public reads).
+- Public and forum reads that already used stored procedures continue to invoke the **same** procs via EF (`Database.SqlQuery` / `SqlQueryRaw`) or the EF-managed SQL Server connection helper (`EfSql`) when output parameters are required.
+- Complex projected SQL (for example public news latest-row CTEs) stays as explicit SQL, executed through EF rather than Dapper.
 - Map legacy `NEWS_T` in EF as an existing table excluded from schema migrations where admin news needs it.
 - Manage modern tables (`NewsAuditLog`, discovery, members, queen history, and similar) through EF migrations plus any required SQL bootstrap scripts.
-- Keep **all** SQL Server access inside `QueenZone.Data`. Page models and tools must not open their own connections or invent a third SQL style.
+- Keep **all** SQL Server access inside `QueenZone.Data`. Page models and tools must not open their own connections or invent a third SQL style (tools may construct `QueenZoneDbContext` + repositories).
 
-`QueenZoneDbContext` is registered scoped. EF-backed repositories (including migrated public reads such as biography) are scoped. Remaining public Dapper repositories stay singleton until migrated. In-memory repositories are still used when no SQL connection string is configured.
+`QueenZoneDbContext` is registered scoped. All SQL-backed repositories are scoped. In-memory repositories are still used when no SQL connection string is configured.
 
 ### Access matrix (SQL-backed registrations)
 
 | Content / concern | Interface | SQL implementation | Access style | Notes |
 | --- | --- | --- | --- | --- |
-| Public news archive | `INewsRepository` | `LegacyNewsRepository` | Dapper + SQL | Legacy `NEWS_T` latest-row projections |
-| Articles | `IArticlesRepository` | `LegacyArticlesRepository` | Dapper | Legacy reads |
-| Biography | `IBiographyRepository` | `EfBiographyRepository` | EF Core + stored procedures (`SqlQuery` / `SqlQueryRaw`) | Same legacy procs (`Q_BIO_LIST_SP`, `Q_BIO_DISPLAY_SP`); first public-read migration off Dapper |
-| Photography | `IPhotoRepository` | `LegacyPhotoRepository` | Dapper + stored procedures | Legacy procs |
-| Discography | `IDiscographyRepository` | `LegacyDiscographyRepository` | Dapper + stored procedures | Legacy procs |
-| Fan performances | `IFanPerformanceRepository` | `LegacyFanPerformanceRepository` | Dapper + stored procedures | Legacy procs |
-| Legacy member lookup | `ILegacyMemberLookupRepository` | `LegacyMemberLookupRepository` | Dapper | Legacy reads |
-| Forum (default) | `IForumRepository` | `ModernForumRepository` | Dapper + stored procedures | Modern `ModernForum*` tables; procs in `docs/sql/006-modern-forum-read-path.sql` |
-| Forum (rollback) | `IForumRepository` | `LegacyForumRepository` | Dapper + stored procedures | Opt-out via `ForumData:UseModernForumReads = false` |
+| Public news archive | `INewsRepository` | `EfNewsRepository` | EF Core + SQL | Legacy `NEWS_T` latest-row projections |
+| Articles | `IArticlesRepository` | `EfArticlesRepository` | EF Core + SQL | Legacy reads |
+| Biography | `IBiographyRepository` | `EfBiographyRepository` | EF Core + stored procedures | `Q_BIO_LIST_SP`, `Q_BIO_DISPLAY_SP` |
+| Photography | `IPhotoRepository` | `EfPhotoRepository` | EF Core + stored procedures | `Q_PICTURE_CATEGORY_SP`, `Q_PIC_CAT_PAGE4_SP` (output params via `EfSql`) |
+| Discography | `IDiscographyRepository` | `EfDiscographyRepository` | EF Core + stored procedures | `Q_ALBUM_*` procs |
+| Fan performances | `IFanPerformanceRepository` | `EfFanPerformanceRepository` | EF Core + stored procedures / SQL | `Q_STAGE_T_PAGE_SP` + direct count/detail SQL |
+| Legacy member lookup | `ILegacyMemberLookupRepository` | `EfMemberLookupRepository` | EF Core + SQL | Legacy `USERS_T` read |
+| Forum (default) | `IForumRepository` | `ModernForumRepository` | EF Core + stored procedures | Modern `ModernForum*` tables; procs in `docs/sql/006-modern-forum-read-path.sql` |
+| Forum (rollback) | `IForumRepository` | `LegacyForumRepository` | EF Core + SQL / stored procedures | Opt-out via `ForumData:UseModernForumReads = false` |
 | Admin news writes | `IAdminNewsRepository` | `EfAdminNewsRepository` | EF Core (+ `FromSqlRaw` for legacy news projections) | Writes/migrations; hybrid SQL for `NEWS_T` reads used by admin |
 | News audit | `INewsAuditRepository` | `EfNewsAuditRepository` | EF Core | Modern audit table |
 | Member accounts | `IMemberAccountRepository` | `EfMemberAccountRepository` | EF Core | Modern tables |
@@ -55,9 +58,10 @@ When `ConnectionStrings:QueenZoneLegacy` is empty, the matching `InMemory*` impl
 ### Contributor rules
 
 1. **New write paths default to EF Core** against deliberately designed modern tables (or carefully mapped legacy tables when that is the accepted write target).
-2. **Complex legacy or projected read shapes may keep explicit SQL/stored procedures** until a modern table or EF mapping is justified.
+2. **Complex legacy or projected read shapes may keep explicit SQL/stored procedures** until a modern table or EF mapping is justified; invoke them through EF, not a second client library.
 3. **Do not add a third ad-hoc SQL style** in Razor page models, minimal endpoints, or tools. New SQL belongs in `QueenZone.Data` repositories.
 4. Prefer extending an existing repository over opening a one-off `SqlConnection` elsewhere.
+5. **Do not reintroduce Dapper** (or another micro-ORM) for new code without a new ADR.
 
 ### Target direction (standardize on EF Core)
 
@@ -65,16 +69,15 @@ It is desirable to standardize on **EF Core as the single data-access library** 
 
 Important distinction:
 
-- **Library choice** (Dapper vs EF) is mostly about C# mapping, DI, and migrations.
-- **Query performance** for an existing stored procedure is dominated by SQL Server plans and indexes. Calling the same proc through EF (`FromSqlRaw` / `Database.SqlQuery` / `ExecuteSql`) keeps that server-side work; it does not require rewriting procs as LINQ.
+- **Library choice** (client mapping vs previous Dapper usage) is mostly about C# mapping, DI, and migrations.
+- **Query performance** for an existing stored procedure is dominated by SQL Server plans and indexes. Calling the same proc through EF (`FromSqlRaw` / `Database.SqlQuery` / `ExecuteSql` / EF-managed `SqlCommand`) keeps that server-side work; it does not require rewriting procs as LINQ.
 
-Target end state:
+Target end state (achieved for client library):
 
 - One primary library: EF Core in `QueenZone.Data`.
 - Keep valuable stored procedures (especially `ModernForum_*` and proven legacy procs) and invoke them from EF-backed repositories.
 - Use EF entities/change tracking for writes and for simple modern-table reads.
-- Migrate existing `Legacy*` / Dapper repositories incrementally when those areas are touched, not as a big-bang rewrite.
-- Do not map the entire legacy schema into EF entities solely to call procs; keyless entities or SQL queries are enough for read models.
+- Do not map the entire legacy schema into EF entities solely to call procs; keyless entities, `SqlQuery` row types, or `EfSql` readers are enough for read models.
 
 This target does **not** require abandoning ADR 0004's "legacy as import source" policy. Table shape (legacy vs modern) remains independent of the client library.
 
@@ -84,13 +87,13 @@ Benefits:
 
 - Admin write code uses EF `ExecuteUpdate`, `ExecuteDelete`, and `SaveChanges` instead of manual SQL strings.
 - Modern schema is versioned through EF migrations.
-- Public read queries can stay explicit (SQL/procs) where that is the right tool.
+- Public read queries stay explicit (SQL/procs) where that is the right tool, but share one client library and DI lifetime model with writes.
 - Contributors have a single matrix and a clear default for new work.
-- A future EF-only client stack can still preserve proc performance.
+- One NuGet data-access dependency surface for SQL Server in `QueenZone.Data`.
 
 Tradeoffs:
 
-- Two data-access styles remain in `QueenZone.Data` until repositories are migrated.
 - `NEWS_T` is mapped with `NEWS_ID` as the EF key; duplicate legacy rows are read through a latest-row SQL projection.
 - Deployments must apply both bootstrap SQL scripts (where required) and `dotnet ef database update` for EF-managed tables.
-- Moving Dapper repositories to EF is follow-up engineering work, not part of the docs-only matrix pass.
+- Stored procedures that need output parameters use a small ADO.NET helper (`EfSql`) on the EF-managed connection rather than pure `SqlQuery` composition.
+- Public-read repositories are scoped (not singleton) because they depend on `QueenZoneDbContext`; sitemap builders are scoped to match.

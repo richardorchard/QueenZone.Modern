@@ -1,4 +1,5 @@
 using Azure.Storage.Blobs;
+using Microsoft.EntityFrameworkCore;
 using QueenZone.Data;
 
 namespace QueenZone.Tools;
@@ -62,7 +63,11 @@ internal static class CheckPhotosCommand
 
     private static async Task<IReadOnlyList<PhotoItem>> LoadPhotosAsync(CheckPhotosOptions options)
     {
-        var repository = new LegacyPhotoRepository(options.ConnectionString);
+        var dbOptions = new DbContextOptionsBuilder<QueenZoneDbContext>()
+            .UseSqlServer(options.ConnectionString)
+            .Options;
+        await using var dbContext = new QueenZoneDbContext(dbOptions);
+        var repository = new EfPhotoRepository(dbContext);
         return await LoadPhotosAsync(options, repository);
     }
 

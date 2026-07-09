@@ -1,5 +1,3 @@
-using Dapper;
-using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using QueenZone.Data.Entities;
 
@@ -193,19 +191,10 @@ public sealed class EfAdminNewsRepository : IAdminNewsRepository
             && string.Equals(NewsSlug.ResolveForArticle(article), normalized, StringComparison.OrdinalIgnoreCase));
     }
 
-    private async Task<int> GetAdminNewsTotalCountAsync(CancellationToken cancellationToken)
-    {
-        if (IsSqliteDatabase())
-        {
-            return await dbContext.Database
-                .SqlQueryRaw<int>(latestNewsCountSql)
-                .FirstAsync(cancellationToken);
-        }
-
-        await using var connection = new SqlConnection(connectionString);
-        return await connection.ExecuteScalarAsync<int>(
-            new CommandDefinition(latestNewsCountSql, cancellationToken: cancellationToken));
-    }
+    private async Task<int> GetAdminNewsTotalCountAsync(CancellationToken cancellationToken) =>
+        await dbContext.Database
+            .SqlQueryRaw<int>(latestNewsCountSql)
+            .FirstAsync(cancellationToken);
 
     private bool IsSqliteDatabase() =>
         string.Equals(

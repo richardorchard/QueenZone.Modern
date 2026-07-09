@@ -15,16 +15,22 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddDbContext<QueenZoneDbContext>(options =>
             options.UseSqlServer(connectionString));
 
-        services.AddSingleton<INewsRepository>(_ => new LegacyNewsRepository(connectionString));
-        services.AddSingleton<IArticlesRepository>(_ => new LegacyArticlesRepository(connectionString));
+        services.AddScoped<INewsRepository, EfNewsRepository>();
+        services.AddScoped<IArticlesRepository, EfArticlesRepository>();
         services.AddScoped<IBiographyRepository, EfBiographyRepository>();
-        services.AddSingleton<IForumRepository>(_ => forumDataOptions.UseModernForumReads
-            ? new ModernForumRepository(connectionString)
-            : new LegacyForumRepository(connectionString));
-        services.AddSingleton<IPhotoRepository>(_ => new LegacyPhotoRepository(connectionString));
-        services.AddSingleton<IFanPerformanceRepository>(_ => new LegacyFanPerformanceRepository(connectionString));
-        services.AddSingleton<ILegacyMemberLookupRepository>(_ => new LegacyMemberLookupRepository(connectionString));
-        services.AddSingleton<IDiscographyRepository>(_ => new LegacyDiscographyRepository(connectionString));
+        if (forumDataOptions.UseModernForumReads)
+        {
+            services.AddScoped<IForumRepository, ModernForumRepository>();
+        }
+        else
+        {
+            services.AddScoped<IForumRepository, LegacyForumRepository>();
+        }
+
+        services.AddScoped<IPhotoRepository, EfPhotoRepository>();
+        services.AddScoped<IFanPerformanceRepository, EfFanPerformanceRepository>();
+        services.AddScoped<ILegacyMemberLookupRepository, EfMemberLookupRepository>();
+        services.AddScoped<IDiscographyRepository, EfDiscographyRepository>();
         services.AddScoped<IAdminNewsRepository, EfAdminNewsRepository>();
         services.AddScoped<INewsAuditRepository, EfNewsAuditRepository>();
         services.AddScoped<IMemberAccountRepository, EfMemberAccountRepository>();

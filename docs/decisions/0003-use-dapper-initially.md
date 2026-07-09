@@ -4,7 +4,7 @@
 
 Accepted.
 
-Amended by ADR 0006 (2026-07-09): Dapper remains valid for existing public-read repositories, but new writes default to EF Core and the target client-library direction is EF Core while retaining stored procedures for hot paths.
+Amended by ADR 0006 (2026-07-09): target client-library direction is EF Core while retaining stored procedures for hot paths. Follow-up work completed the migration of public-read repositories off Dapper; the Dapper package is no longer referenced in `QueenZone.Data`.
 
 ## Context
 
