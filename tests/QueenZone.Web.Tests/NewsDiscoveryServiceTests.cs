@@ -112,11 +112,50 @@ public sealed class NewsDiscoveryServiceTests
     }
 
     [Fact]
-    public void SeedSources_loads_expected_primary_and_secondary_registry()
+    public void SeedSources_produces_structurally_valid_registry()
     {
         var sources = NewsDiscoverySourceSeeder.LoadSeedSources();
 
-        Assert.Equal(15, sources.Count);
+        Assert.NotEmpty(sources);
+        Assert.Equal(sources.Count, sources.Select(source => source.Key).Distinct(StringComparer.OrdinalIgnoreCase).Count());
+
+        foreach (var source in sources)
+        {
+            Assert.False(string.IsNullOrWhiteSpace(source.Key), "Source key must be non-empty.");
+            Assert.False(string.IsNullOrWhiteSpace(source.DisplayName), $"Display name for '{source.Key}' must be non-empty.");
+            Assert.True(
+                Uri.TryCreate(source.HomepageUrl, UriKind.Absolute, out var homepage) &&
+                (homepage.Scheme == Uri.UriSchemeHttp || homepage.Scheme == Uri.UriSchemeHttps),
+                $"HomepageUrl for '{source.Key}' must be an absolute http(s) URL.");
+            Assert.True(
+                Enum.IsDefined(source.SourceType),
+                $"SourceType for '{source.Key}' must be a defined enum value.");
+            Assert.True(
+                Enum.IsDefined(source.TrustTier),
+                $"TrustTier for '{source.Key}' must be a defined enum value.");
+            Assert.True(
+                source.PollIntervalMinutes > 0,
+                $"PollIntervalMinutes for '{source.Key}' must be positive.");
+
+            if (!string.IsNullOrWhiteSpace(source.FeedOrSiteUrl))
+            {
+                Assert.True(
+                    Uri.TryCreate(source.FeedOrSiteUrl, UriKind.Absolute, out var feedOrSite) &&
+                    (feedOrSite.Scheme == Uri.UriSchemeHttp || feedOrSite.Scheme == Uri.UriSchemeHttps),
+                    $"FeedOrSiteUrl for '{source.Key}' must be an absolute http(s) URL when present.");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Data-coupled regression guard for known registry entries.
+    /// Update deliberately when source keys, types, or URLs change in news-discovery-sources.json.
+    /// </summary>
+    [Fact]
+    public void SeedSources_data_regression_contains_expected_known_keys()
+    {
+        var sources = NewsDiscoverySourceSeeder.LoadSeedSources();
+
         Assert.Contains(sources, source => source.Key == "queen-online" && source.SourceType == NewsDiscoverySourceType.AllowlistedPage);
         Assert.Contains(sources, source => source.Key == "roger-taylor" && source.SourceType == NewsDiscoverySourceType.Rss);
         Assert.Contains(sources, source => source.Key == "brian-may" && source.FeedOrSiteUrl == "https://brianmay.com/feed/");
