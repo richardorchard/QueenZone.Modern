@@ -49,9 +49,12 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddSingleton<INewsRepository, InMemoryNewsRepository>();
         services.AddSingleton<IArticlesRepository>(_ => new InMemoryArticlesRepository(SampleArticlesData.CreateSeedArticles()));
         services.AddSingleton<IBiographyRepository>(_ => new InMemoryBiographyRepository(SampleBiographyData.CreateSeedChapters()));
+        var forumWriteRepository = new InMemoryForumWriteRepository();
+        services.AddSingleton<IForumWriteRepository>(forumWriteRepository);
         services.AddSingleton<IForumRepository>(_ => new InMemoryForumRepository(
             SampleForumData.CreateSeedCategories(),
-            SampleForumData.CreateSeedStats()));
+            SampleForumData.CreateSeedStats(),
+            forumWriteRepository));
         services.AddSingleton<IPhotoRepository>(_ => new InMemoryPhotoRepository(SamplePhotoData.CreateSeedCategories()));
         services.AddSingleton<IFanPerformanceRepository>(_ => new InMemoryFanPerformanceRepository(SampleFanPerformanceData.CreateSeedPerformances()));
         services.AddSingleton<ILegacyMemberLookupRepository>(_ => new InMemoryLegacyMemberLookupRepository(SampleLegacyMemberData.CreateSeedMatches()));
@@ -60,7 +63,6 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddSingleton<IAdminNewsRepository, InMemoryAdminNewsRepository>();
         services.AddSingleton<INewsAuditRepository, InMemoryNewsAuditRepository>();
         services.AddSingleton<IMemberAccountRepository, InMemoryMemberAccountRepository>();
-        services.AddSingleton<IForumWriteRepository, InMemoryForumWriteRepository>();
         var discoveryStore = new SharedNewsDiscoveryStore();
         SampleNewsDiscoveryData.Seed(discoveryStore);
         services.AddSingleton(discoveryStore);

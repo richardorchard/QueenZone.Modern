@@ -3,7 +3,7 @@ namespace QueenZone.Data;
 public sealed class InMemoryForumWriteRepository : IForumWriteRepository
 {
     private readonly List<ForumWriteThread> threads = [];
-    private readonly List<(int PostId, int TopicId, Guid MemberId, string DisplayName, DateTimeOffset CreatedAt)> posts = [];
+    private readonly List<InMemoryForumWritePost> posts = [];
     private readonly object sync = new();
     private int nextTopicId = 200_000;
     private int nextPostId = 2_000_000;
@@ -22,7 +22,13 @@ public sealed class InMemoryForumWriteRepository : IForumWriteRepository
                 thread.CreatedAt,
                 1,
                 IsLocked: false));
-            posts.Add((postId, topicId, thread.AuthorMemberId, thread.AuthorDisplayName, thread.CreatedAt));
+            posts.Add(new InMemoryForumWritePost(
+                postId,
+                topicId,
+                thread.AuthorMemberId,
+                thread.AuthorDisplayName,
+                thread.Body,
+                thread.CreatedAt));
             return Task.FromResult(topicId);
         }
     }
@@ -54,7 +60,13 @@ public sealed class InMemoryForumWriteRepository : IForumWriteRepository
             }
 
             var postId = nextPostId++;
-            posts.Add((postId, post.TopicId, post.AuthorMemberId, post.AuthorDisplayName, post.CreatedAt));
+            posts.Add(new InMemoryForumWritePost(
+                postId,
+                post.TopicId,
+                post.AuthorMemberId,
+                post.AuthorDisplayName,
+                post.Body,
+                post.CreatedAt));
             threads[index] = thread with
             {
                 LastPostAt = post.CreatedAt,
@@ -103,4 +115,28 @@ public sealed class InMemoryForumWriteRepository : IForumWriteRepository
             return Task.FromResult(posts.Count(post => post.MemberId == memberId));
         }
     }
+
+    public IReadOnlyList<ForumWriteThread> GetCreatedThreads()
+    {
+        lock (sync)
+        {
+            return threads.ToList();
+        }
+    }
+
+    public IReadOnlyList<InMemoryForumWritePost> GetPostsForTopic(int topicId)
+    {
+        lock (sync)
+        {
+            return posts.Where(post => post.TopicId == topicId).ToList();
+        }
+    }
 }
+
+public sealed record InMemoryForumWritePost(
+    int PostId,
+    int TopicId,
+    Guid MemberId,
+    string DisplayName,
+    string Body,
+    DateTimeOffset CreatedAt);
