@@ -46,15 +46,19 @@
       var label = progress.querySelector(".qz-rte-progress__label");
       if (label) {
         label.textContent =
-          count <= 1 ? "Uploading…" : "Uploading " + count + " files…";
+          count <= 1 ? "Uploading file…" : "Uploading " + count + " files…";
       }
     }
 
     var form = root.closest("form");
     if (form) {
+      form.classList.toggle("qz-form--uploading", busy);
       var buttons = form.querySelectorAll('button[type="submit"], input[type="submit"]');
       for (var i = 0; i < buttons.length; i++) {
-        buttons[i].disabled = busy;
+        // Don't re-enable if the form is already mid-submit (busy-submit).
+        if (busy || !form.classList.contains("is-submitting")) {
+          buttons[i].disabled = busy;
+        }
       }
     }
   }

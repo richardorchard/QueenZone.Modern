@@ -28,12 +28,18 @@
     <partial name="_ArchivePagination" model="ForumRoutes.GetTopicPaginationViewModel(header, Model.CurrentPage, Model.TotalPages)" />
     @if (Model.CanReply)
     {
-      <form method="post" class="qz-form">
+      <form method="post"
+            class="qz-form qz-forum-compose"
+            data-busy-submit
+            data-busy-label="Posting reply…">
         @Html.AntiForgeryToken()
         <div asp-validation-summary="ModelOnly" class="qz-form__validation"></div>
         <partial name="_RichTextEditor" />
         <span asp-validation-for="Body"></span>
-        <button class="qz-button" type="submit">Reply</button>
+        <div class="qz-form__actions">
+          <button class="qz-button" type="submit">Reply</button>
+          <p class="qz-form__busy-status" data-busy-status hidden role="status" aria-live="polite"></p>
+        </div>
       </form>
     }
     else
