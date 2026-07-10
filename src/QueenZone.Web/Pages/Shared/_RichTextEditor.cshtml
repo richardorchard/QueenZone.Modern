@@ -1,7 +1,9 @@
 @using Microsoft.AspNetCore.Antiforgery
+@using Microsoft.Extensions.Options
 @using QueenZone.Storage
 @using QueenZone.Web
 @inject IAntiforgery Antiforgery
+@inject IOptions<BlobUploadOptions> BlobUploadOptions
 @{
   var textareaId = ViewData["TextareaId"] as string ?? "body";
   var textareaName = ViewData["TextareaName"] as string ?? "body";
@@ -9,8 +11,12 @@
   var container = ViewData["UploadContainer"] as string ?? BlobUploadContainers.Forum;
   var label = ViewData["EditorLabel"] as string ?? "Body";
   var rows = ViewData["TextareaRows"] as int? ?? 12;
-  var token = Antiforgery.GetAndStoreTokens(Context).RequestToken ?? string.Empty;
+  // Ensures the antiforgery cookie is present for subsequent fetch() uploads.
+  var tokens = Antiforgery.GetAndStoreTokens(Context);
+  var token = tokens.RequestToken ?? string.Empty;
   var uploadUrl = EditorImageUploadEndpoints.Route;
+  var maxBytes = EditorImageUploadEndpoints.ResolveMaxBytes(BlobUploadOptions.Value, container);
+  var maxMb = Math.Max(1, (int)Math.Ceiling(maxBytes / (1024.0 * 1024.0)));
 }
 
 @* Load Quill only when this partial is used (authoring pages). *@
@@ -23,12 +29,13 @@
        data-textarea="@textareaId"
        data-upload-url="@uploadUrl"
        data-container="@container"
+       data-max-bytes="@maxBytes"
        data-uploads-inflight="0"
        data-af-token="@token">
     <div class="qz-rte-mount" aria-label="@label editor"></div>
     <div class="qz-rte-progress" hidden aria-live="polite" aria-busy="false">
       <span class="qz-rte-progress__spinner" aria-hidden="true"></span>
-      <span class="qz-rte-progress__label">Uploading image…</span>
+      <span class="qz-rte-progress__label">Uploading…</span>
     </div>
     <p class="qz-rte-error" hidden></p>
   </div>
@@ -37,7 +44,10 @@
             class="qz-rte-textarea"
             rows="@rows"
             hidden>@initialValue</textarea>
-  <p class="qz-rte-help">Paste or drop images to upload. Formatting is limited; content is sanitised on save.</p>
+  <p class="qz-rte-help">
+    Paste, drop, or attach images and files (PDF, Office, ZIP, text). Images are resized automatically.
+    Max @maxMb&nbsp;MB. Formatting is limited; content is sanitised on save.
+  </p>
 </div>
 
 <script src="~/js/editor/quill.js" asp-append-version="true"></script>

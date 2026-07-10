@@ -61,10 +61,11 @@ public sealed class EditorImageUploadEndpointsTests : IClassFixture<WebApplicati
     }
 
     [Fact]
-    public async Task UploadAsync_returns_bad_request_for_non_image()
+    public async Task UploadAsync_returns_bad_request_for_disallowed_content_type()
     {
         var (httpContext, antiforgery) = CreateAuthenticatedHttpContext();
-        var file = CreateFormFile("note.txt", "text/plain", "hello"u8.ToArray());
+        // Executable content is not in the forum allowlist.
+        var file = CreateFormFile("payload.exe", "application/octet-stream", [0x4D, 0x5A, 0x90, 0x00]);
         var result = await EditorImageUploadEndpoints.UploadAsync(
             httpContext,
             file,
@@ -74,6 +75,26 @@ public sealed class EditorImageUploadEndpointsTests : IClassFixture<WebApplicati
             CancellationToken.None);
 
         Assert.Equal(StatusCodes.Status400BadRequest, await GetStatusCodeAsync(result));
+    }
+
+    [Fact]
+    public async Task UploadAsync_accepts_plain_text_as_file_attachment()
+    {
+        var (httpContext, antiforgery) = CreateAuthenticatedHttpContext();
+        var stub = new StubBlobUploadService();
+        var file = CreateFormFile("note.txt", "text/plain", "hello forum"u8.ToArray());
+        var result = await EditorImageUploadEndpoints.UploadAsync(
+            httpContext,
+            file,
+            container: BlobUploadContainers.Forum,
+            stub,
+            antiforgery,
+            CancellationToken.None);
+
+        var (status, body) = await ExecuteAsync(result);
+        Assert.Equal(StatusCodes.Status200OK, status);
+        using var doc = JsonDocument.Parse(body);
+        Assert.Equal("file", doc.RootElement.GetProperty("kind").GetString());
     }
 
     [Fact]
@@ -176,6 +197,30 @@ public sealed class EditorImageUploadEndpointsTests : IClassFixture<WebApplicati
 
         using var doc = JsonDocument.Parse(body);
         Assert.StartsWith("/ugc/forum/", doc.RootElement.GetProperty("url").GetString());
+    }
+
+    [Fact]
+    public async Task UploadAsync_accepts_pdf_as_file_attachment()
+    {
+        var (httpContext, antiforgery) = CreateAuthenticatedHttpContext();
+        var stub = new StubBlobUploadService();
+        // %PDF-1.4 minimal header
+        var pdf = "%PDF-1.4\n%âãÏÓ\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF"u8.ToArray();
+        var file = CreateFormFile("notes.pdf", "application/pdf", pdf);
+        var result = await EditorImageUploadEndpoints.UploadAsync(
+            httpContext,
+            file,
+            container: BlobUploadContainers.Forum,
+            stub,
+            antiforgery,
+            CancellationToken.None);
+
+        var (status, body) = await ExecuteAsync(result);
+        Assert.Equal(StatusCodes.Status200OK, status);
+        using var doc = JsonDocument.Parse(body);
+        Assert.Equal("file", doc.RootElement.GetProperty("kind").GetString());
+        Assert.StartsWith("/ugc/forum/", doc.RootElement.GetProperty("url").GetString());
+        Assert.Equal(1, stub.UploadCount);
     }
 
     [Fact]
