@@ -61,6 +61,7 @@
       form.classList.toggle("qz-form--uploading", busy);
       var buttons = form.querySelectorAll('button[type="submit"], input[type="submit"]');
       for (var i = 0; i < buttons.length; i++) {
+        // Don't re-enable if the form is already mid-submit (busy-submit).
         if (busy || !form.classList.contains("is-submitting")) {
           buttons[i].disabled = busy;
         }
