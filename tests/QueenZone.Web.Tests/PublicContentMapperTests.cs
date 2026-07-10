@@ -101,7 +101,7 @@ public sealed class PublicContentMapperTests
         Assert.Equal("brian", view.AuthorUsername);
         Assert.Single(view.Attachments);
         Assert.Equal("scan.jpg", view.Attachments[0].FileName);
-        Assert.Equal("https://pictures.queenzone.org/attachments/scan.jpg", view.Attachments[0].Url);
+        Assert.Equal("https://cdn.queenzone.org/attachments/scan.jpg", view.Attachments[0].Url);
         Assert.Equal("JPG", view.Attachments[0].Extension);
         Assert.Equal("2.0 KB", view.Attachments[0].FormattedSize);
     }

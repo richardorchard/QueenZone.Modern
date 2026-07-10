@@ -7,7 +7,7 @@ public sealed class PhotoImageUrlTests
     [Fact]
     public void Build_UsesPublicPicturesBaseUrl() =>
         Assert.Equal(
-            "https://pictures.queenzone.org/brian-may/img-101.jpg",
+            "https://cdn.queenzone.org/brian-may/img-101.jpg",
             PhotoImageUrl.Build("/Brian_May/img-101.jpg"));
 
     [Fact]
@@ -26,7 +26,7 @@ public sealed class PhotoImageUrlTests
     public void ToBlobStorageUrl_ConvertsPublicUrlToBlobEndpoint() =>
         Assert.Equal(
             "https://queenzone.blob.core.windows.net/queen/img-201.jpg",
-            PhotoImageUrl.ToBlobStorageUrl("https://pictures.queenzone.org/queen/img-201.jpg"));
+            PhotoImageUrl.ToBlobStorageUrl("https://cdn.queenzone.org/queen/img-201.jpg"));
 
     [Fact]
     public void ToBlobStorageUrl_FallsBackToLegacyPathMapping() =>
@@ -41,7 +41,7 @@ public sealed class PhotoImageUrlTests
             PhotoImageUrl.BuildBlobStorageUrl("photo.jpg"));
 
     [Theory]
-    [InlineData("https://pictures.queenzone.org/queen/img.jpg", "queen", "img.jpg")]
+    [InlineData("https://cdn.queenzone.org/queen/img.jpg", "queen", "img.jpg")]
     [InlineData("https://queenzone.blob.core.windows.net/multimedia/t_123.jpg", "multimedia", "t_123.jpg")]
     public void TryParseBlobLocation_ParsesContainerAndBlobName(string url, string container, string blobName)
     {

@@ -21,7 +21,7 @@ public sealed class DiscographyPageTests : IClassFixture<WebApplicationFactory<P
 
         Assert.Contains("Discography", body);
         Assert.Contains("A Night at the Opera", body);
-        Assert.Contains("https://pictures.queenzone.org/images/discography/", body);
+        Assert.Contains("https://cdn.queenzone.org/images/discography/", body);
     }
 
     [Fact]

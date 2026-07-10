@@ -2,7 +2,7 @@ namespace QueenZone.Storage;
 
 /// <summary>
 /// Canonical UGC container names. Keep these separate from legacy photo-archive containers
-/// served via pictures.queenzone.org.
+/// served via cdn.queenzone.org.
 /// </summary>
 public static class BlobUploadContainers
 {

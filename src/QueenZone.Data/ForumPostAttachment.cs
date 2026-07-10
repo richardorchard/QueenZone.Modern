@@ -2,7 +2,7 @@ namespace QueenZone.Data;
 
 public sealed record ForumPostAttachment(string FileName, long? FileSizeBytes)
 {
-    public string Url => $"https://pictures.queenzone.org/attachments/{FileName}";
+    public string Url => $"https://cdn.queenzone.org/attachments/{FileName}";
 
     public string Extension => Path.GetExtension(FileName).TrimStart('.').ToUpperInvariant();
 
