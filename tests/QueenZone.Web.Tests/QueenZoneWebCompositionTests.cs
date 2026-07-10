@@ -4,6 +4,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using QueenZone.Data;
 using QueenZone.NewsAgent;
+using QueenZone.Storage;
 using QueenZone.Web.Sitemap;
 
 namespace QueenZone.Web.Tests;
@@ -35,6 +36,7 @@ public sealed class QueenZoneWebCompositionTests
         using var provider = services.BuildServiceProvider(validateScopes: true);
 
         Assert.NotNull(provider.GetRequiredService<INewsRepository>());
+        Assert.IsType<NullBlobUploadService>(provider.GetRequiredService<IBlobUploadService>());
         using (var scope = provider.CreateScope())
         {
             Assert.NotNull(scope.ServiceProvider.GetRequiredService<INewsDiscoveryRepository>());

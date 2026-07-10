@@ -180,10 +180,13 @@ The hosted App Service currently connects to Azure SQL with SQL authentication. 
 ```json
 {
   "ConnectionStrings": {
-    "QueenZoneLegacy": "Server=tcp:queenzone-sql-server.database.windows.net,1433;Database=queenzone-db;User ID=...;Password=...;Encrypt=True;TrustServerCertificate=False;"
+    "QueenZoneLegacy": "Server=tcp:queenzone-sql-server.database.windows.net,1433;Database=queenzone-db;User ID=...;Password=...;Encrypt=True;TrustServerCertificate=False;",
+    "BlobStorage": "DefaultEndpointsProtocol=https;AccountName=...;AccountKey=...;EndpointSuffix=core.windows.net"
   }
 }
 ```
+
+User-generated content uploads use `QueenZone.Storage` (`IBlobUploadService`). Leave `ConnectionStrings:BlobStorage` empty for local runs without Azure; see `docs/architecture/blob-storage-ugc.md`.
 
 Do not commit real usernames, passwords, publish profiles, or copied Azure setting values. If a SQL password contains semicolons or other connection-string delimiters, wrap it using the standard connection-string escaping rules before saving it in Azure or local settings.
 
