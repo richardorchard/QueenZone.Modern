@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 namespace QueenZone.Web;
 
 public static class FanPerformanceRoutes
@@ -10,6 +12,18 @@ public static class FanPerformanceRoutes
         page <= 1 ? GetIndexPath() : $"/fan-performances/page/{page}";
 
     public static string GetAudioPath(int id) => $"/fan-performances/{id}/audio";
+
+    public static string GetAudioPath(int id, string title) =>
+        $"/fan-performances/{id}/audio/{ToUrlSafeFilename(title)}.mp3";
+
+    private static readonly Regex NonAlphanumericRun = new(@"[^a-zA-Z0-9]+", RegexOptions.Compiled);
+
+    private static string ToUrlSafeFilename(string title)
+    {
+        var safe = NonAlphanumericRun.Replace(title.Trim(), "-").Trim('-');
+        if (safe.Length == 0) return "download";
+        return safe.Length > 100 ? safe[..100] : safe;
+    }
 
     public static string GetLoginPath(string returnPath) =>
         $"/account/login?returnUrl={Uri.EscapeDataString(returnPath)}";

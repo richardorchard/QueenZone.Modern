@@ -69,7 +69,7 @@ public abstract class FanPerformanceArchivePageModel(IFanPerformanceRepository f
                 performance.PerformedBy,
                 performance.Description,
                 performance.DateAdded,
-                isSignedIn ? FanPerformanceRoutes.GetAudioPath(performance.Id) : null))
+                isSignedIn ? FanPerformanceRoutes.GetAudioPath(performance.Id, performance.Title) : null))
             .ToList();
 
         return new FanPerformanceListViewModel(listItems, loginReturnUrl);
