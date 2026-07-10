@@ -9,6 +9,7 @@ This repository is the modern QueenZone rebuild. The project is archive-first: i
 - `docs/decisions/` contains accepted architectural decisions.
 - `docs/decisions/0006-hybrid-ef-core-admin-writes.md` is the Dapper vs EF access matrix and contributor rules for SQL in `QueenZone.Data`.
 - `docs/architecture/blob-storage-ugc.md` is the UGC blob upload foundation (`QueenZone.Storage` / `IBlobUploadService`).
+- `docs/decisions/0007-rich-text-editor-quill.md` is the shared Quill rich-text editor decision (partial + `/api/uploads/editor-image`).
 - `docs/backlog/migration-backlog.md` tracks migration work.
 - `docs/sql/data-api-builder-mcp.md` explains the local SQL MCP setup for read-only legacy database investigation.
 

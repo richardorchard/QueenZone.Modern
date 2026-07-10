@@ -73,6 +73,7 @@ public static class QueenZoneWebServiceCollectionExtensions
     public static IServiceCollection AddQueenZoneWebAppServices(this IServiceCollection services)
     {
         services.AddScoped<MemberAccountService>();
+        services.AddScoped<UgcHtml>();
         services.AddAntiforgery();
         return services;
     }

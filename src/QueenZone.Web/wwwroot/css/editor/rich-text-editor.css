@@ -1,0 +1,48 @@
+.qz-rte-field {
+  margin-bottom: 1rem;
+}
+
+.qz-rte-label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+}
+
+.qz-rte {
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.qz-rte .ql-toolbar.ql-snow {
+  border: none;
+  border-bottom: 1px solid #ccc;
+}
+
+.qz-rte .ql-container.ql-snow {
+  border: none;
+  min-height: 12rem;
+  font-size: 1rem;
+}
+
+.qz-rte .ql-editor img {
+  max-width: 100%;
+  height: auto;
+}
+
+.qz-rte-error {
+  color: #a40000;
+  margin: 0.5rem 0.75rem;
+  font-size: 0.9rem;
+}
+
+.qz-rte-help {
+  margin: 0.35rem 0 0;
+  font-size: 0.85rem;
+  color: #555;
+}
+
+.qz-rte-textarea {
+  /* Fallback if JS disabled: keep visible enough for progressive enhancement */
+  width: 100%;
+}
