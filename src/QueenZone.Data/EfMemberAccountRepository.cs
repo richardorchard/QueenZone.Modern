@@ -47,5 +47,29 @@ public sealed class EfMemberAccountRepository(QueenZoneDbContext dbContext) : IM
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<string>> ListExternalProvidersAsync(Guid memberAccountId, CancellationToken cancellationToken = default) =>
+        await dbContext.MemberExternalLogins
+            .AsNoTracking()
+            .Where(login => login.MemberAccountId == memberAccountId)
+            .Select(login => login.Provider)
+            .Distinct()
+            .OrderBy(provider => provider)
+            .ToListAsync(cancellationToken);
+
+    public async Task<MemberAccount?> UpdateDisplayNameAsync(Guid memberId, string displayName, CancellationToken cancellationToken = default)
+    {
+        // Load tracked so change detection persists the new name.
+        var account = await dbContext.MemberAccounts
+            .SingleOrDefaultAsync(a => a.Id == memberId, cancellationToken);
+        if (account is null)
+        {
+            return null;
+        }
+
+        account.DisplayName = displayName;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return account;
+    }
+
     private static string Normalize(string email) => email.Trim().ToUpperInvariant();
 }

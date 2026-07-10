@@ -10,7 +10,15 @@ public interface IMemberAccountRepository
 
     Task<MemberAccount?> FindByExternalLoginAsync(string provider, string providerKey, CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<string>> ListExternalProvidersAsync(Guid memberAccountId, CancellationToken cancellationToken = default);
+
     Task<MemberAccount> CreateAsync(MemberAccount account, CancellationToken cancellationToken = default);
 
     Task AddExternalLoginAsync(Guid memberAccountId, string provider, string providerKey, string email, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Updates <see cref="MemberAccount.DisplayName"/> for the given member.
+    /// Display names are not unique — multiple members may share the same name.
+    /// </summary>
+    Task<MemberAccount?> UpdateDisplayNameAsync(Guid memberId, string displayName, CancellationToken cancellationToken = default);
 }

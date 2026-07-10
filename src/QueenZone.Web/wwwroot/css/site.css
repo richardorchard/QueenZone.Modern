@@ -319,6 +319,91 @@
   font: var(--fw-medium) 0.9375rem/1.5 var(--font-body);
 }
 
+.qz-account-notice--success {
+  color: var(--qz-blue-deep, #1a3a6b);
+}
+
+.qz-account-settings {
+  max-width: 32rem;
+}
+
+.qz-account-settings__meta {
+  display: grid;
+  gap: var(--space-4);
+  margin: 0 0 var(--space-6);
+  padding: 0;
+}
+
+.qz-account-settings__meta dt {
+  margin: 0 0 var(--space-1);
+  color: var(--text-secondary);
+  font: var(--fw-semibold) 0.6875rem/1 var(--font-titling);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.qz-account-settings__meta dd {
+  margin: 0;
+  color: var(--qz-charcoal);
+  font: var(--fw-medium) 1rem/1.5 var(--font-body);
+}
+
+.qz-account-settings__providers {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.qz-account-form {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.qz-account-form__field {
+  display: grid;
+  gap: var(--space-2);
+  font: var(--fw-medium) 0.875rem/1.4 var(--font-body);
+  color: var(--qz-charcoal);
+}
+
+.qz-account-form__field input {
+  width: 100%;
+  max-width: 28rem;
+  min-height: 2.75rem;
+  padding: 0.625rem 0.875rem;
+  border: 1px solid var(--border-strong, #c8c8c8);
+  border-radius: var(--radius-sm);
+  background: var(--qz-white);
+  color: var(--qz-charcoal);
+  font: var(--fw-regular, 400) 1rem/1.4 var(--font-body);
+}
+
+.qz-account-form__field input:focus {
+  outline: 2px solid var(--qz-blue, #2b5ea7);
+  outline-offset: 1px;
+}
+
+.qz-account-form__help {
+  color: var(--text-secondary);
+  font: var(--fw-regular, 400) 0.8125rem/1.5 var(--font-body);
+}
+
+.qz-account-form__errors,
+.qz-account-form__field-error {
+  color: #8b1e1e;
+  font: var(--fw-medium) 0.875rem/1.4 var(--font-body);
+}
+
+.qz-account-form__errors:empty,
+.qz-account-form__field-error:empty {
+  display: none;
+}
+
+.qz-account-form__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
 .qz-menu-button {
   display: none;
   width: 2.75rem;
@@ -380,9 +465,11 @@
   margin-top: 0;
 }
 
+.qz-mobile-account .qz-masthead__signin--mobile,
 .qz-mobile-account .qz-masthead__signout-form {
   display: block;
   width: 100%;
+  margin-top: var(--space-2);
 }
 
 .qz-mobile-account .qz-masthead__member-name--mobile + .qz-masthead__signout-form {
