@@ -105,11 +105,35 @@ public sealed class EfFanPerformanceRepository : IFanPerformanceRepository
 
     public async Task<FanPerformance?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
+        if (useLegacyProcedures &&
+            string.Equals(
+                dbContext.Database.ProviderName,
+                "Microsoft.EntityFrameworkCore.SqlServer",
+                StringComparison.Ordinal))
+        {
+            return await GetByIdViaSqlServerAsync(id, cancellationToken);
+        }
+
         var rows = await dbContext.Database
             .SqlQuery<StageRow>(byIdSql(id))
             .ToListAsync(cancellationToken);
         var row = rows.FirstOrDefault();
         return row is null ? null : MapRow(row);
+    }
+
+    [ExcludeFromCodeCoverage] // SQL Server stored procedure path.
+    private async Task<FanPerformance?> GetByIdViaSqlServerAsync(int id, CancellationToken cancellationToken)
+    {
+        var rows = await EfSql.QuerySqlAsync<StageRow>(
+            dbContext,
+            """
+            SELECT Q_STAGE_ID, TITLE, PERFORMED_BY, DESCRIPTION, URL, thesize, DATE_ADDED
+            FROM dbo.Q_STAGE_T
+            WHERE Q_STAGE_ID = @id AND DISPLAY = 1
+            """,
+            command => command.Parameters.Add(EfSql.Input("@id", id)),
+            cancellationToken: cancellationToken);
+        return rows.FirstOrDefault() is { } row ? MapRow(row) : null;
     }
 
     private static FanPerformance MapRow(StageRow row) => new(

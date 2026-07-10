@@ -35,6 +35,35 @@ internal static class EfSql
         return rows;
     }
 
+    public static async Task<IReadOnlyList<T>> QuerySqlAsync<T>(
+        QueenZoneDbContext dbContext,
+        string sql,
+        Action<SqlCommand>? configure = null,
+        int? commandTimeoutSeconds = null,
+        CancellationToken cancellationToken = default)
+        where T : class, new()
+    {
+        var connection = await OpenSqlConnectionAsync(dbContext, cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        command.CommandType = CommandType.Text;
+        if (commandTimeoutSeconds is not null)
+        {
+            command.CommandTimeout = commandTimeoutSeconds.Value;
+        }
+
+        configure?.Invoke(command);
+
+        var rows = new List<T>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            rows.Add(MapRow<T>(reader));
+        }
+
+        return rows;
+    }
+
     public static async Task<T?> QueryProcSingleOrDefaultAsync<T>(
         QueenZoneDbContext dbContext,
         string procedureName,
