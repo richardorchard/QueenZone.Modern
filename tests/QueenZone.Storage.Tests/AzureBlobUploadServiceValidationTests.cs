@@ -1,21 +1,15 @@
-using Azure.Storage.Blobs;
 using Microsoft.Extensions.Options;
 using QueenZone.Storage;
 
 namespace QueenZone.Storage.Tests;
 
 /// <summary>
-/// Exercises validation that runs before any Azure network call.
+/// Exercises validation that runs before any storage backend write.
 /// </summary>
 public sealed class AzureBlobUploadServiceValidationTests
 {
-    private static AzureBlobUploadService CreateService()
-    {
-        // Client is only used after validation; invalid credentials are fine here.
-        var client = new BlobServiceClient(
-            "DefaultEndpointsProtocol=https;AccountName=queenzonetest;AccountKey=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=;EndpointSuffix=core.windows.net");
-        return new AzureBlobUploadService(client, Options.Create(new BlobUploadOptions()));
-    }
+    private static AzureBlobUploadService CreateService(BlobUploadOptions? options = null) =>
+        new(new InMemoryBlobStorageBackend(), Options.Create(options ?? new BlobUploadOptions()));
 
     [Fact]
     public async Task UploadAsync_rejects_empty_stream()
@@ -50,14 +44,21 @@ public sealed class AzureBlobUploadServiceValidationTests
                 },
             },
         };
-        var client = new BlobServiceClient(
-            "DefaultEndpointsProtocol=https;AccountName=queenzonetest;AccountKey=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=;EndpointSuffix=core.windows.net");
-        var service = new AzureBlobUploadService(client, Options.Create(options));
+        var service = CreateService(options);
 
         // 9 bytes of JPEG-like header padding
         await using var stream = new MemoryStream([0xFF, 0xD8, 0xFF, 0xE0, 1, 2, 3, 4, 5]);
         var ex = await Assert.ThrowsAsync<BlobUploadException>(() =>
             service.UploadAsync(stream, "big.jpg", BlobUploadContainers.Avatars));
         Assert.Contains("exceeds", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void BlobUploadException_supports_inner_exception()
+    {
+        var inner = new InvalidOperationException("inner");
+        var ex = new BlobUploadException("outer", inner);
+        Assert.Equal("outer", ex.Message);
+        Assert.Same(inner, ex.InnerException);
     }
 }

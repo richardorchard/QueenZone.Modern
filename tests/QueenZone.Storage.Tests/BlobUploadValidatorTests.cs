@@ -80,4 +80,30 @@ public sealed class BlobUploadValidatorTests
             BlobUploadContainers.Articles);
         Assert.Equal("image/jpeg", contentType);
     }
+
+    [Fact]
+    public void Rejects_blank_container_and_unknown_content()
+    {
+        Assert.Throws<BlobUploadException>(() => validator.EnsureKnownContainer(" "));
+        Assert.Throws<BlobUploadException>(() =>
+            validator.ResolveAndValidateContentType("file.bin", [0x00, 0x01], BlobUploadContainers.Forum));
+    }
+
+    [Fact]
+    public void Accepts_custom_container_from_options()
+    {
+        var custom = new BlobUploadValidator(new BlobUploadOptions
+        {
+            Containers =
+            {
+                ["custom-ugc"] = new BlobContainerPolicy
+                {
+                    MaxBytes = 100,
+                    AllowedContentTypes = ["image/png"],
+                },
+            },
+        });
+        custom.EnsureKnownContainer("custom-ugc");
+        Assert.Equal(100, custom.GetMaxBytes("custom-ugc"));
+    }
 }

@@ -1,20 +1,26 @@
-using Azure.Storage.Blobs;
-using Azure.Storage.Blobs.Models;
 using Microsoft.Extensions.Options;
 
 namespace QueenZone.Storage;
 
 public sealed class AzureBlobUploadService : IBlobUploadService
 {
-    private readonly BlobServiceClient blobServiceClient;
+    private readonly IBlobStorageBackend backend;
     private readonly BlobUploadOptions options;
     private readonly BlobUploadValidator validator;
 
-    public AzureBlobUploadService(BlobServiceClient blobServiceClient, IOptions<BlobUploadOptions> options)
+    internal AzureBlobUploadService(IBlobStorageBackend backend, IOptions<BlobUploadOptions> options)
     {
-        this.blobServiceClient = blobServiceClient;
+        this.backend = backend;
         this.options = options.Value;
         validator = new BlobUploadValidator(this.options);
+    }
+
+    /// <summary>
+    /// Production constructor used by DI (Azure backend).
+    /// </summary>
+    public AzureBlobUploadService(Azure.Storage.Blobs.BlobServiceClient blobServiceClient, IOptions<BlobUploadOptions> options)
+        : this(new AzureBlobStorageBackend(blobServiceClient), options)
+    {
     }
 
     public async Task<BlobUploadResult> UploadAsync(
@@ -49,24 +55,16 @@ public sealed class AzureBlobUploadService : IBlobUploadService
             containerName);
 
         var blobName = BlobNameGenerator.Create(originalFileName, context);
-        var container = blobServiceClient.GetBlobContainerClient(containerName);
-        await container.CreateIfNotExistsAsync(
-            PublicAccessType.None,
-            cancellationToken: cancellationToken);
+        await backend.UploadAsync(containerName, blobName, buffer, contentType, cancellationToken);
 
-        var blob = container.GetBlobClient(blobName);
-        await blob.UploadAsync(
-            buffer,
-            new BlobHttpHeaders { ContentType = contentType },
-            cancellationToken: cancellationToken);
-
+        var storageUri = backend.GetBlobUri(containerName, blobName);
         return new BlobUploadResult
         {
             Container = containerName,
             BlobName = blobName,
             ContentType = contentType,
             SizeBytes = sizeBytes,
-            PublicUrl = BuildPublicUrl(containerName, blobName, blob.Uri),
+            PublicUrl = BuildPublicUrl(containerName, blobName, storageUri),
         };
     }
 
@@ -85,9 +83,7 @@ public sealed class AzureBlobUploadService : IBlobUploadService
             throw new BlobUploadException("Blob name is required.");
         }
 
-        var container = blobServiceClient.GetBlobContainerClient(containerName);
-        var blob = container.GetBlobClient(blobName);
-        await blob.DeleteIfExistsAsync(cancellationToken: cancellationToken);
+        await backend.DeleteIfExistsAsync(containerName, blobName, cancellationToken);
     }
 
     private string BuildPublicUrl(string containerName, string blobName, Uri storageUri)

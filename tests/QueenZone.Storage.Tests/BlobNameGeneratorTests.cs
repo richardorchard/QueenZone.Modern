@@ -34,4 +34,23 @@ public sealed class BlobNameGeneratorTests
         Assert.StartsWith("anonymous/", name);
         Assert.EndsWith(".webp", name);
     }
+
+    [Fact]
+    public void Drops_missing_or_overlong_extension()
+    {
+        var noExt = BlobNameGenerator.Create("readme", context: null);
+        Assert.DoesNotContain(".", Path.GetFileName(noExt));
+
+        var longExt = BlobNameGenerator.Create("file." + new string('a', 20), context: null);
+        Assert.DoesNotContain("." + new string('a', 20), longExt);
+    }
+
+    [Fact]
+    public void Sanitize_unknown_when_email_has_no_safe_chars()
+    {
+        var name = BlobNameGenerator.Create(
+            "x.jpg",
+            new BlobUploadContext { ActorEmail = "@@++" });
+        Assert.StartsWith("editors/unknown/", name);
+    }
 }

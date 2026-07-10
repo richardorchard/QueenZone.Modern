@@ -21,6 +21,8 @@ public static class QueenZoneStorageServiceCollectionExtensions
         }
 
         services.AddSingleton(_ => new BlobServiceClient(connectionString));
+        services.AddSingleton<IBlobStorageBackend>(sp =>
+            new AzureBlobStorageBackend(sp.GetRequiredService<BlobServiceClient>()));
         services.AddSingleton<IBlobUploadService, AzureBlobUploadService>();
         return services;
     }
