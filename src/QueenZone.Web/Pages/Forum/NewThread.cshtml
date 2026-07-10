@@ -1,11 +1,13 @@
 @page "/forum/c/{categorySlug}/new-thread"
 @model NewThreadModel
+@using QueenZone.Storage
 @{
   var category = Model.Category!;
   ViewData["TextareaId"] = "Body";
   ViewData["TextareaName"] = "Body";
   ViewData["EditorValue"] = Model.Body;
   ViewData["EditorLabel"] = "Body";
+  ViewData["UploadContainer"] = BlobUploadContainers.Forum;
 }
 
 <section class="qz-page-hero">

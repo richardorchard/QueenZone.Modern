@@ -114,6 +114,7 @@ app.MapGet("/account/member-probe", () => Results.Ok(new { authenticated = true 
 app.MapFanPerformanceEndpoints();
 app.MapEditorImageUploadEndpoints();
 app.MapMemberAvatarEndpoints();
+app.MapUgcProxyEndpoints();
 app.MapSitemapEndpoints();
 app.MapRazorPages();
 app.MapFallbackToPage("/NotFound");

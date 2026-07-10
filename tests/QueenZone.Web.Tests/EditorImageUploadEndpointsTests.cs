@@ -7,6 +7,9 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.PixelFormats;
 using QueenZone.Storage;
 using QueenZone.Web;
 
@@ -97,7 +100,7 @@ public sealed class EditorImageUploadEndpointsTests : IClassFixture<WebApplicati
     public async Task UploadAsync_returns_bad_request_for_disallowed_container()
     {
         var (httpContext, antiforgery) = CreateAuthenticatedHttpContext();
-        var file = CreateFormFile("x.jpg", "image/jpeg", [0xFF, 0xD8, 0xFF, 0xD9]);
+        var file = CreateFormFile("x.png", "image/png", await CreatePngBytesAsync());
         var result = await EditorImageUploadEndpoints.UploadAsync(
             httpContext,
             file,
@@ -113,7 +116,7 @@ public sealed class EditorImageUploadEndpointsTests : IClassFixture<WebApplicati
     public async Task UploadAsync_returns_service_unavailable_when_storage_not_configured()
     {
         var (httpContext, antiforgery) = CreateAuthenticatedHttpContext();
-        var file = CreateFormFile("x.jpg", "image/jpeg", [0xFF, 0xD8, 0xFF, 0xD9]);
+        var file = CreateFormFile("x.png", "image/png", await CreatePngBytesAsync());
         var result = await EditorImageUploadEndpoints.UploadAsync(
             httpContext,
             file,
@@ -126,11 +129,11 @@ public sealed class EditorImageUploadEndpointsTests : IClassFixture<WebApplicati
     }
 
     [Fact]
-    public async Task UploadAsync_returns_ok_with_url_when_storage_succeeds()
+    public async Task UploadAsync_returns_ok_with_proxy_url_and_uploads_full_plus_thumb()
     {
         var (httpContext, antiforgery) = CreateAuthenticatedHttpContext();
         var stub = new StubBlobUploadService();
-        var file = CreateFormFile("x.jpg", "image/jpeg", [0xFF, 0xD8, 0xFF, 0xD9]);
+        var file = CreateFormFile("x.png", "image/png", await CreatePngBytesAsync());
         var result = await EditorImageUploadEndpoints.UploadAsync(
             httpContext,
             file,
@@ -139,15 +142,115 @@ public sealed class EditorImageUploadEndpointsTests : IClassFixture<WebApplicati
             antiforgery,
             CancellationToken.None);
 
-        Assert.Equal(StatusCodes.Status200OK, await GetStatusCodeAsync(result));
+        var (status, body) = await ExecuteAsync(result);
+        Assert.Equal(StatusCodes.Status200OK, status);
         Assert.Equal(BlobUploadContainers.Articles, stub.LastContainer);
+        Assert.Equal(2, stub.UploadCount);
+
+        using var doc = JsonDocument.Parse(body);
+        var url = doc.RootElement.GetProperty("url").GetString();
+        var thumbUrl = doc.RootElement.GetProperty("thumbUrl").GetString();
+        Assert.StartsWith("/ugc/articles/", url);
+        Assert.EndsWith(".webp", url);
+        Assert.StartsWith("/ugc/articles/", thumbUrl);
+        Assert.Contains("-thumb.webp", thumbUrl);
+    }
+
+    [Fact]
+    public async Task UploadAsync_defaults_to_forum_container()
+    {
+        var (httpContext, antiforgery) = CreateAuthenticatedHttpContext();
+        var stub = new StubBlobUploadService();
+        var file = CreateFormFile("paste.png", "image/png", await CreatePngBytesAsync());
+        var result = await EditorImageUploadEndpoints.UploadAsync(
+            httpContext,
+            file,
+            container: null,
+            stub,
+            antiforgery,
+            CancellationToken.None);
+
+        var (status, body) = await ExecuteAsync(result);
+        Assert.Equal(StatusCodes.Status200OK, status);
+        Assert.Equal(BlobUploadContainers.Forum, stub.LastContainer);
+
+        using var doc = JsonDocument.Parse(body);
+        Assert.StartsWith("/ugc/forum/", doc.RootElement.GetProperty("url").GetString());
+    }
+
+    [Fact]
+    public async Task UploadAsync_returns_bad_request_when_image_bytes_invalid()
+    {
+        var (httpContext, antiforgery) = CreateAuthenticatedHttpContext();
+        // JPEG magic bytes but not a decodable image — processor rejects.
+        var file = CreateFormFile("bad.jpg", "image/jpeg", [0xFF, 0xD8, 0xFF, 0xD9]);
+        var result = await EditorImageUploadEndpoints.UploadAsync(
+            httpContext,
+            file,
+            container: null,
+            new StubBlobUploadService(),
+            antiforgery,
+            CancellationToken.None);
+
+        Assert.Equal(StatusCodes.Status400BadRequest, await GetStatusCodeAsync(result));
+    }
+
+    [Fact]
+    public async Task UploadAsync_cleans_up_when_blob_upload_throws()
+    {
+        var (httpContext, antiforgery) = CreateAuthenticatedHttpContext();
+        var stub = new StubBlobUploadService { FailOnUploadNumber = 2 };
+        var file = CreateFormFile("x.png", "image/png", await CreatePngBytesAsync());
+        var result = await EditorImageUploadEndpoints.UploadAsync(
+            httpContext,
+            file,
+            container: null,
+            stub,
+            antiforgery,
+            CancellationToken.None);
+
+        Assert.Equal(StatusCodes.Status400BadRequest, await GetStatusCodeAsync(result));
+        Assert.True(stub.DeleteCount >= 1);
+    }
+
+    [Fact]
+    public async Task UploadAsync_uses_member_account_blob_prefix_when_nameidentifier_is_guid()
+    {
+        var memberId = Guid.NewGuid();
+        var httpContext = new DefaultHttpContext
+        {
+            User = new ClaimsPrincipal(
+                new ClaimsIdentity(
+                [
+                    new Claim(ClaimTypes.NameIdentifier, memberId.ToString("D")),
+                    new Claim(ClaimTypes.Email, "member@example.com"),
+                ],
+                authenticationType: "Test")),
+            RequestServices = factory.Services,
+            Request = { Method = "POST" },
+        };
+        var stub = new StubBlobUploadService();
+        var file = CreateFormFile("x.png", "image/png", await CreatePngBytesAsync());
+        var result = await EditorImageUploadEndpoints.UploadAsync(
+            httpContext,
+            file,
+            container: BlobUploadContainers.Forum,
+            stub,
+            new NoopAntiforgery(),
+            CancellationToken.None);
+
+        var (status, body) = await ExecuteAsync(result);
+        Assert.Equal(StatusCodes.Status200OK, status);
+        using var doc = JsonDocument.Parse(body);
+        var url = doc.RootElement.GetProperty("url").GetString();
+        Assert.Contains($"/ugc/forum/members/{memberId:N}/", url);
     }
 
     [Fact]
     public async Task Http_route_rejects_anonymous_caller()
     {
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-        using var content = CreateJpegForm();
+        using var content = await CreatePngFormAsync();
         var response = await client.PostAsync(EditorImageUploadEndpoints.Route, content);
         Assert.NotEqual(HttpStatusCode.OK, response.StatusCode);
     }
@@ -170,13 +273,15 @@ public sealed class EditorImageUploadEndpointsTests : IClassFixture<WebApplicati
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserEmailHeader, AdminHttpTestHelpers.AdminEmail);
 
         var token = await GetAntiforgeryTokenAsync(client);
-        using var form = CreateJpegForm(token);
+        using var form = await CreatePngFormAsync(token);
         var response = await client.PostAsync(EditorImageUploadEndpoints.Route, form);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        Assert.Equal("https://cdn.test/ugc-forum/editors/x.jpg", doc.RootElement.GetProperty("url").GetString());
+        var url = doc.RootElement.GetProperty("url").GetString();
+        Assert.StartsWith("/ugc/forum/", url);
         Assert.Equal(BlobUploadContainers.Forum, stub.LastContainer);
+        Assert.Equal(2, stub.UploadCount);
     }
 
     private (HttpContext HttpContext, IAntiforgery Antiforgery) CreateAuthenticatedHttpContext()
@@ -220,18 +325,26 @@ public sealed class EditorImageUploadEndpointsTests : IClassFixture<WebApplicati
         return AdminHttpTestHelpers.ExtractAntiforgeryToken(html);
     }
 
-    private static MultipartFormDataContent CreateJpegForm(string? token = null)
+    private static async Task<MultipartFormDataContent> CreatePngFormAsync(string? token = null)
     {
         var content = new MultipartFormDataContent();
-        var file = new ByteArrayContent([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0xFF, 0xD9]);
-        file.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
-        content.Add(file, "file", "paste.jpg");
+        var file = new ByteArrayContent(await CreatePngBytesAsync());
+        file.Headers.ContentType = new MediaTypeHeaderValue("image/png");
+        content.Add(file, "file", "paste.png");
         if (!string.IsNullOrEmpty(token))
         {
             content.Add(new StringContent(token), "__RequestVerificationToken");
         }
 
         return content;
+    }
+
+    private static async Task<byte[]> CreatePngBytesAsync()
+    {
+        using var image = new Image<Rgba32>(32, 24);
+        await using var stream = new MemoryStream();
+        await image.SaveAsync(stream, new PngEncoder());
+        return stream.ToArray();
     }
 
     private static IFormFile CreateFormFile(string name, string contentType, byte[] bytes)
@@ -246,14 +359,30 @@ public sealed class EditorImageUploadEndpointsTests : IClassFixture<WebApplicati
 
     private async Task<int> GetStatusCodeAsync(IResult result)
     {
+        var (status, _) = await ExecuteAsync(result);
+        return status;
+    }
+
+    private async Task<(int StatusCode, string Body)> ExecuteAsync(IResult result)
+    {
         var httpContext = new DefaultHttpContext { RequestServices = factory.Services };
+        httpContext.Response.Body = new MemoryStream();
         await result.ExecuteAsync(httpContext);
-        return httpContext.Response.StatusCode;
+        httpContext.Response.Body.Position = 0;
+        using var reader = new StreamReader(httpContext.Response.Body);
+        var body = await reader.ReadToEndAsync();
+        return (httpContext.Response.StatusCode, body);
     }
 
     private sealed class StubBlobUploadService : IBlobUploadService
     {
         public string? LastContainer { get; private set; }
+
+        public int UploadCount { get; private set; }
+
+        public int DeleteCount { get; private set; }
+
+        public int? FailOnUploadNumber { get; init; }
 
         public Task<BlobUploadResult> UploadAsync(
             Stream content,
@@ -263,21 +392,31 @@ public sealed class EditorImageUploadEndpointsTests : IClassFixture<WebApplicati
             CancellationToken cancellationToken = default)
         {
             LastContainer = containerName;
+            UploadCount++;
+            if (FailOnUploadNumber is int failAt && UploadCount == failAt)
+            {
+                throw new BlobUploadException("Simulated upload failure.");
+            }
+
+            var blobName = context?.PreferredBlobName ?? originalFileName;
             return Task.FromResult(new BlobUploadResult
             {
                 Container = containerName,
-                BlobName = "editors/x.jpg",
-                ContentType = "image/jpeg",
-                SizeBytes = 8,
-                PublicUrl = "https://cdn.test/ugc-forum/editors/x.jpg",
+                BlobName = blobName,
+                ContentType = UgcProxyPaths.WebpContentType,
+                SizeBytes = content.CanSeek ? content.Length : 8,
+                PublicUrl = $"https://cdn.test/{containerName}/{blobName}",
             });
         }
 
         public Task DeleteAsync(
             string containerName,
             string blobName,
-            CancellationToken cancellationToken = default) =>
-            Task.CompletedTask;
+            CancellationToken cancellationToken = default)
+        {
+            DeleteCount++;
+            return Task.CompletedTask;
+        }
 
         public Task<BlobContent?> OpenReadAsync(
             string containerName,

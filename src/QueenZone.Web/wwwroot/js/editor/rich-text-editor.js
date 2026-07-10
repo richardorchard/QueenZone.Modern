@@ -18,6 +18,44 @@
     el.hidden = !message;
   }
 
+  function getInflight(root) {
+    var n = parseInt(root.getAttribute("data-uploads-inflight") || "0", 10);
+    return isNaN(n) ? 0 : n;
+  }
+
+  function setInflight(root, count) {
+    root.setAttribute("data-uploads-inflight", String(Math.max(0, count)));
+    var busy = count > 0;
+    root.classList.toggle("qz-rte--uploading", busy);
+
+    var progress = root.querySelector(".qz-rte-progress");
+    if (progress) {
+      progress.hidden = !busy;
+      progress.setAttribute("aria-busy", busy ? "true" : "false");
+      var label = progress.querySelector(".qz-rte-progress__label");
+      if (label) {
+        label.textContent =
+          count === 1 ? "Uploading image…" : "Uploading " + count + " images…";
+      }
+    }
+
+    var form = root.closest("form");
+    if (form) {
+      var buttons = form.querySelectorAll('button[type="submit"], input[type="submit"]');
+      for (var i = 0; i < buttons.length; i++) {
+        buttons[i].disabled = busy;
+      }
+    }
+  }
+
+  function beginUpload(root) {
+    setInflight(root, getInflight(root) + 1);
+  }
+
+  function endUpload(root) {
+    setInflight(root, getInflight(root) - 1);
+  }
+
   function uploadImage(root, file) {
     var uploadUrl = root.getAttribute("data-upload-url");
     var container = root.getAttribute("data-container") || "ugc-forum";
@@ -28,6 +66,8 @@
     form.append("container", container);
     form.append("__RequestVerificationToken", token);
 
+    beginUpload(root);
+
     return fetch(uploadUrl, {
       method: "POST",
       body: form,
@@ -35,18 +75,43 @@
       headers: {
         RequestVerificationToken: token,
       },
-    }).then(function (response) {
-      return response.json().then(function (body) {
-        if (!response.ok) {
-          var msg = (body && body.error) || "Image upload failed.";
-          throw new Error(msg);
-        }
-        if (!body || !body.url) {
-          throw new Error("Image upload returned no URL.");
-        }
-        return body.url;
+    })
+      .then(function (response) {
+        return response.json().then(function (body) {
+          if (!response.ok) {
+            var msg = (body && body.error) || "Image upload failed.";
+            throw new Error(msg);
+          }
+          if (!body || !body.url) {
+            throw new Error("Image upload returned no URL.");
+          }
+          // Prefer full proxy URL in the document; display layer rewrites to thumb + link.
+          return body.url;
+        });
+      })
+      .finally(function () {
+        endUpload(root);
       });
-    });
+  }
+
+  function insertImage(quill, url) {
+    var range = quill.getSelection(true) || { index: quill.getLength(), length: 0 };
+    quill.insertEmbed(range.index, "image", url, "user");
+    quill.setSelection(range.index + 1, 0, "silent");
+  }
+
+  function handleImageFile(quill, root, file) {
+    if (!file) {
+      return;
+    }
+    showError(root, "");
+    uploadImage(root, file)
+      .then(function (url) {
+        insertImage(quill, url);
+      })
+      .catch(function (err) {
+        showError(root, err.message || "Image upload failed.");
+      });
   }
 
   function bindImageHandler(quill, root) {
@@ -59,19 +124,7 @@
         input.click();
         input.onchange = function () {
           var file = input.files && input.files[0];
-          if (!file) {
-            return;
-          }
-          showError(root, "");
-          uploadImage(root, file)
-            .then(function (url) {
-              var range = quill.getSelection(true) || { index: quill.getLength(), length: 0 };
-              quill.insertEmbed(range.index, "image", url, "user");
-              quill.setSelection(range.index + 1, 0, "silent");
-            })
-            .catch(function (err) {
-              showError(root, err.message || "Image upload failed.");
-            });
+          handleImageFile(quill, root, file);
         };
       });
     }
@@ -85,19 +138,7 @@
         if (items[i].type && items[i].type.indexOf("image") === 0) {
           e.preventDefault();
           var file = items[i].getAsFile();
-          if (!file) {
-            return;
-          }
-          showError(root, "");
-          uploadImage(root, file)
-            .then(function (url) {
-              var range = quill.getSelection(true) || { index: quill.getLength(), length: 0 };
-              quill.insertEmbed(range.index, "image", url, "user");
-              quill.setSelection(range.index + 1, 0, "silent");
-            })
-            .catch(function (err) {
-              showError(root, err.message || "Image upload failed.");
-            });
+          handleImageFile(quill, root, file);
           return;
         }
       }
@@ -113,16 +154,7 @@
         return;
       }
       e.preventDefault();
-      showError(root, "");
-      uploadImage(root, file)
-        .then(function (url) {
-          var range = quill.getSelection(true) || { index: quill.getLength(), length: 0 };
-          quill.insertEmbed(range.index, "image", url, "user");
-          quill.setSelection(range.index + 1, 0, "silent");
-        })
-        .catch(function (err) {
-          showError(root, err.message || "Image upload failed.");
-        });
+      handleImageFile(quill, root, file);
     });
   }
 
@@ -179,11 +211,18 @@
     quill.on("text-change", sync);
     var form = textarea.closest("form");
     if (form) {
-      form.addEventListener("submit", sync);
+      form.addEventListener("submit", function (e) {
+        sync();
+        if (getInflight(root) > 0) {
+          e.preventDefault();
+          showError(root, "Please wait for image uploads to finish.");
+        }
+      });
     }
 
     bindImageHandler(quill, root);
     root.setAttribute("data-qz-rte-ready", "1");
+    setInflight(root, 0);
   }
 
   function initAll() {

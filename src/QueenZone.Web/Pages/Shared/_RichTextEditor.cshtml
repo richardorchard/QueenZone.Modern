@@ -23,8 +23,13 @@
        data-textarea="@textareaId"
        data-upload-url="@uploadUrl"
        data-container="@container"
+       data-uploads-inflight="0"
        data-af-token="@token">
     <div class="qz-rte-mount" aria-label="@label editor"></div>
+    <div class="qz-rte-progress" hidden aria-live="polite" aria-busy="false">
+      <span class="qz-rte-progress__spinner" aria-hidden="true"></span>
+      <span class="qz-rte-progress__label">Uploading image…</span>
+    </div>
     <p class="qz-rte-error" hidden></p>
   </div>
   <textarea id="@textareaId"
