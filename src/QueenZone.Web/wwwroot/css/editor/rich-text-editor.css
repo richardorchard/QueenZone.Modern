@@ -9,9 +9,12 @@
 }
 
 .qz-rte {
+  position: relative;
   background: #fff;
   border: 1px solid #ccc;
   border-radius: 4px;
+  /* Larger hit target so drops don't have to land on the caret line. */
+  min-height: 14rem;
 }
 
 .qz-rte .ql-toolbar.ql-snow {
@@ -23,6 +26,46 @@
   border: none;
   min-height: 12rem;
   font-size: 1rem;
+}
+
+/* Full-editor drop target highlight (toolbar + body, not just the active line). */
+.qz-rte--dragover,
+.qz-rte-field--dragover .qz-rte {
+  border-color: #c4a35a;
+  box-shadow: 0 0 0 2px rgba(196, 163, 90, 0.45);
+  background: #fbf8f0;
+}
+
+.qz-rte-drop-hint {
+  display: none;
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  background: rgba(251, 248, 240, 0.92);
+  border-radius: inherit;
+}
+
+.qz-rte--dragover .qz-rte-drop-hint {
+  display: flex;
+}
+
+.qz-rte-drop-hint__label {
+  padding: 0.65rem 1rem;
+  border: 2px dashed #c4a35a;
+  border-radius: 4px;
+  background: #fff;
+  color: #1a1a1a;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.qz-form--dragover {
+  outline: 2px dashed rgba(196, 163, 90, 0.55);
+  outline-offset: 4px;
+  border-radius: 4px;
 }
 
 .qz-rte .ql-editor img {
