@@ -63,5 +63,34 @@ public sealed class InMemoryMemberAccountRepository : IMemberAccountRepository
         }
     }
 
+    public Task<IReadOnlyList<string>> ListExternalProvidersAsync(Guid memberAccountId, CancellationToken cancellationToken = default)
+    {
+        lock (gate)
+        {
+            IReadOnlyList<string> providers = externalLogins
+                .Where(login => login.MemberAccountId == memberAccountId)
+                .Select(login => login.Provider)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(provider => provider, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            return Task.FromResult(providers);
+        }
+    }
+
+    public Task<MemberAccount?> UpdateDisplayNameAsync(Guid memberId, string displayName, CancellationToken cancellationToken = default)
+    {
+        lock (gate)
+        {
+            var account = accounts.FirstOrDefault(a => a.Id == memberId);
+            if (account is null)
+            {
+                return Task.FromResult<MemberAccount?>(null);
+            }
+
+            account.DisplayName = displayName;
+            return Task.FromResult<MemberAccount?>(account);
+        }
+    }
+
     private static string Normalize(string email) => email.Trim().ToUpperInvariant();
 }

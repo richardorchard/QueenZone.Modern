@@ -112,6 +112,7 @@
       @if (memberDisplayName is not null)
       {
         <span class="qz-masthead__member-name" title="@memberDisplayName">@memberDisplayName</span>
+        <a class="qz-masthead__signin" href="/account/settings" aria-current="@(IsActive("/account/settings") ? "page" : null)">Settings</a>
         <partial name="_MemberSignOut" />
       }
       else
@@ -146,6 +147,7 @@
         @if (memberDisplayName is not null)
         {
           <span class="qz-masthead__member-name qz-masthead__member-name--mobile">@memberDisplayName</span>
+          <a class="qz-masthead__signin qz-masthead__signin--mobile" href="/account/settings" aria-current="@(IsActive("/account/settings") ? "page" : null)">Settings</a>
           <partial name="_MemberSignOut" view-data='@new ViewDataDictionary(ViewData) { { "SignOutExtraClass", "qz-masthead__signin--mobile" } }' />
         }
         else

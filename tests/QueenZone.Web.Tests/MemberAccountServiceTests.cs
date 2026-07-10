@@ -119,4 +119,113 @@ public sealed class MemberAccountServiceTests
 
         Assert.Equal(registered.Account!.Id, externalAccount.Id);
     }
+
+    [Fact]
+    public async Task UpdateDisplayNameAsync_PersistsNewName()
+    {
+        var service = CreateService();
+        var registered = await service.RegisterAsync("fan@queenzone.org", "S3curePass!", "Original Name");
+
+        var result = await service.UpdateDisplayNameAsync(registered.Account!.Id, "  New Name  ");
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("New Name", result.Account!.DisplayName);
+
+        var reloaded = await service.FindByIdAsync(registered.Account.Id);
+        Assert.Equal("New Name", reloaded!.DisplayName);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task UpdateDisplayNameAsync_RejectsEmptyOrWhitespace(string? displayName)
+    {
+        var service = CreateService();
+        var registered = await service.RegisterAsync("fan@queenzone.org", "S3curePass!", "Original Name");
+
+        var result = await service.UpdateDisplayNameAsync(registered.Account!.Id, displayName!);
+
+        Assert.False(result.Succeeded);
+        Assert.NotNull(result.Error);
+        Assert.Null(result.Account);
+
+        var reloaded = await service.FindByIdAsync(registered.Account.Id);
+        Assert.Equal("Original Name", reloaded!.DisplayName);
+    }
+
+    [Fact]
+    public async Task UpdateDisplayNameAsync_RejectsTooShortName()
+    {
+        var service = CreateService();
+        var registered = await service.RegisterAsync("fan@queenzone.org", "S3curePass!", "Original Name");
+
+        var result = await service.UpdateDisplayNameAsync(registered.Account!.Id, "A");
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("at least", result.Error, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task UpdateDisplayNameAsync_RejectsTooLongName()
+    {
+        var service = CreateService();
+        var registered = await service.RegisterAsync("fan@queenzone.org", "S3curePass!", "Original Name");
+        var tooLong = new string('x', MemberAccountService.MaxDisplayNameLength + 1);
+
+        var result = await service.UpdateDisplayNameAsync(registered.Account!.Id, tooLong);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("at most", result.Error, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task UpdateDisplayNameAsync_AllowsDuplicateDisplayNames()
+    {
+        var service = CreateService();
+        await service.RegisterAsync("fan1@queenzone.org", "S3curePass!", "Shared Name");
+        var second = await service.RegisterAsync("fan2@queenzone.org", "S3curePass!", "Other Name");
+
+        var result = await service.UpdateDisplayNameAsync(second.Account!.Id, "Shared Name");
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("Shared Name", result.Account!.DisplayName);
+    }
+
+    [Fact]
+    public async Task UpdateDisplayNameAsync_Fails_WhenAccountDoesNotExist()
+    {
+        var service = CreateService();
+
+        var result = await service.UpdateDisplayNameAsync(Guid.NewGuid(), "Nobody");
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("Account not found.", result.Error);
+        Assert.Null(result.Account);
+    }
+
+    [Fact]
+    public async Task ListExternalProvidersAsync_ReturnsLinkedProviders()
+    {
+        var service = CreateService();
+        var account = await service.FindOrCreateFromExternalLoginAsync(
+            "Google", "google-providers-1", "providers@example.com", "Provider Fan");
+        await service.FindOrCreateFromExternalLoginAsync(
+            "GitHub", "github-providers-1", "providers@example.com", "Provider Fan");
+
+        var providers = await service.ListExternalProvidersAsync(account.Id);
+
+        Assert.Equal(["GitHub", "Google"], providers);
+    }
+
+    [Fact]
+    public async Task ListExternalProvidersAsync_ReturnsEmpty_WhenNoneLinked()
+    {
+        var service = CreateService();
+        var registered = await service.RegisterAsync("native@example.com", "S3curePass!", "Native Fan");
+
+        var providers = await service.ListExternalProvidersAsync(registered.Account!.Id);
+
+        Assert.Empty(providers);
+    }
 }

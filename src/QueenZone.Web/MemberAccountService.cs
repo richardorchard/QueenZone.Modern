@@ -87,6 +87,47 @@ public sealed class MemberAccountService(
         await memberAccountRepository.AddExternalLoginAsync(created.Id, provider, providerKey, email, cancellationToken);
         return created;
     }
+
+    public async Task<MemberAccount?> FindByIdAsync(Guid memberId, CancellationToken cancellationToken = default) =>
+        await memberAccountRepository.FindByIdAsync(memberId, cancellationToken);
+
+    public async Task<IReadOnlyList<string>> ListExternalProvidersAsync(Guid memberId, CancellationToken cancellationToken = default) =>
+        await memberAccountRepository.ListExternalProvidersAsync(memberId, cancellationToken);
+
+    /// <summary>
+    /// Updates the member's display name. Names are not unique — multiple members may share
+    /// the same display name (common on forums). Leading/trailing whitespace is stripped.
+    /// </summary>
+    public async Task<MemberAccountResult> UpdateDisplayNameAsync(Guid memberId, string displayName, CancellationToken cancellationToken = default)
+    {
+        var trimmed = displayName?.Trim() ?? string.Empty;
+        if (trimmed.Length == 0)
+        {
+            return MemberAccountResult.Failure("Display name is required.");
+        }
+
+        if (trimmed.Length < MinDisplayNameLength)
+        {
+            return MemberAccountResult.Failure($"Display name must be at least {MinDisplayNameLength} characters.");
+        }
+
+        if (trimmed.Length > MaxDisplayNameLength)
+        {
+            return MemberAccountResult.Failure($"Display name must be at most {MaxDisplayNameLength} characters.");
+        }
+
+        var updated = await memberAccountRepository.UpdateDisplayNameAsync(memberId, trimmed, cancellationToken);
+        if (updated is null)
+        {
+            return MemberAccountResult.Failure("Account not found.");
+        }
+
+        return MemberAccountResult.Success(updated);
+    }
+
+    public const int MinDisplayNameLength = 2;
+
+    public const int MaxDisplayNameLength = 100;
 }
 
 public sealed record MemberAccountResult(bool Succeeded, MemberAccount? Account, string? Error)

@@ -1,0 +1,65 @@
+@page "/account/settings"
+@model SettingsModel
+
+<partial name="_PageHero" model='@(("Members", "Account settings", "Update the name shown on your posts and contributions.", ""))' />
+
+<section class="qz-section">
+  <div class="qz-container qz-prose">
+    @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+    {
+      <p class="qz-account-notice qz-account-notice--success" role="status">@Model.StatusMessage</p>
+    }
+
+    <div class="qz-account-settings">
+      <dl class="qz-account-settings__meta">
+        <div>
+          <dt>Email</dt>
+          <dd>@Model.Email</dd>
+        </div>
+        <div>
+          <dt>Linked sign-in providers</dt>
+          <dd>
+            @if (Model.LinkedProviders.Count == 0)
+            {
+              <span>None linked</span>
+            }
+            else
+            {
+              <ul class="qz-account-settings__providers">
+                @foreach (var provider in Model.LinkedProviders)
+                {
+                  <li>@provider</li>
+                }
+              </ul>
+            }
+          </dd>
+        </div>
+      </dl>
+
+      <form method="post" class="qz-account-form" novalidate>
+        @Html.AntiForgeryToken()
+
+        <div asp-validation-summary="ModelOnly" class="qz-account-form__errors" role="alert"></div>
+
+        <label class="qz-account-form__field">
+          <span>Display name</span>
+          <input asp-for="DisplayName"
+                 type="text"
+                 maxlength="@MemberAccountService.MaxDisplayNameLength"
+                 minlength="@MemberAccountService.MinDisplayNameLength"
+                 required
+                 autocomplete="nickname"
+                 aria-describedby="display-name-help" />
+          <span asp-validation-for="DisplayName" class="qz-account-form__field-error"></span>
+          <span id="display-name-help" class="qz-account-form__help">
+            2–100 characters. This name appears on forum posts, photo attributions, and other contributions. Display names do not need to be unique.
+          </span>
+        </label>
+
+        <div class="qz-account-form__actions">
+          <button type="submit" class="qz-button">Save display name</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
