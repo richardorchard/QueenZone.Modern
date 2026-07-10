@@ -54,7 +54,7 @@ public sealed class EditorImageProcessorTests
         await using var source = new MemoryStream(bytes);
 
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            EditorImageProcessor.ProcessAsync(source, "huge.jpg"));
+            EditorImageProcessor.ProcessAsync(source, "huge.jpg", EditorImageUploadEndpoints.MaxImageBytes));
 
         Assert.Contains("bytes", ex.Message, StringComparison.OrdinalIgnoreCase);
     }

@@ -65,13 +65,20 @@ internal sealed class BlobUploadValidator(BlobUploadOptions options)
         var fromExtension = BlobContentSniffer.GuessContentTypeFromExtension(extension);
 
         // Prefer sniff when available; require agreement with extension when both present.
+        // Office Open XML (docx/xlsx) files are ZIP containers — allow extension to win.
         string? contentType = fromSniff ?? fromExtension;
         if (fromSniff is not null
             && fromExtension is not null
-            && !string.Equals(fromSniff, fromExtension, StringComparison.OrdinalIgnoreCase))
+            && !string.Equals(fromSniff, fromExtension, StringComparison.OrdinalIgnoreCase)
+            && !IsZipBasedOfficePackage(fromSniff, fromExtension))
         {
             throw new BlobUploadException(
                 $"File content type '{fromSniff}' does not match extension '{extension}' ({fromExtension}).");
+        }
+
+        if (IsZipBasedOfficePackage(fromSniff, fromExtension) && fromExtension is not null)
+        {
+            contentType = fromExtension;
         }
 
         if (contentType is null)
@@ -90,4 +97,10 @@ internal sealed class BlobUploadValidator(BlobUploadOptions options)
 
         return contentType;
     }
+
+    private static bool IsZipBasedOfficePackage(string? sniffed, string? fromExtension) =>
+        string.Equals(sniffed, "application/zip", StringComparison.OrdinalIgnoreCase)
+        && fromExtension is not null
+        && (string.Equals(fromExtension, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(fromExtension, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", StringComparison.OrdinalIgnoreCase));
 }

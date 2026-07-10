@@ -8,6 +8,7 @@ Shared upload infrastructure lives in `QueenZone.Storage`. Web (and future worke
 | --- | --- |
 | `ConnectionStrings:BlobStorage` | Azure Storage connection string. Empty = app boots with `NullBlobUploadService` (uploads throw). |
 | `BlobUpload:DefaultMaxBytes` | Default size limit (10 MB). |
+| `BlobUpload:EditorMaxBytes` | Max size for rich-text editor uploads (default 10 MB). Effective limit is `min(EditorMaxBytes, container MaxBytes)`. |
 | `BlobUpload:DefaultAllowedContentTypes` | Default MIME allowlist. |
 | `BlobUpload:Containers` | Per-container max size / MIME overrides. |
 | `BlobUpload:PublicBaseUrl` | Optional CDN/worker base for display URLs. |

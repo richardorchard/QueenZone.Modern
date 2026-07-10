@@ -60,6 +60,16 @@ internal static class BlobContentSniffer
             return "application/pdf";
         }
 
+        // ZIP local file header (also used by docx/xlsx/odt packages).
+        if (header.Length >= 4
+            && header[0] == 0x50
+            && header[1] == 0x4B
+            && (header[2] == 0x03 || header[2] == 0x05 || header[2] == 0x07)
+            && (header[3] == 0x04 || header[3] == 0x06 || header[3] == 0x08))
+        {
+            return "application/zip";
+        }
+
         return null;
     }
 
@@ -73,6 +83,11 @@ internal static class BlobContentSniffer
             ".webp" => "image/webp",
             ".pdf" => "application/pdf",
             ".txt" => "text/plain",
+            ".zip" => "application/zip",
+            ".doc" => "application/msword",
+            ".docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            ".xls" => "application/vnd.ms-excel",
+            ".xlsx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             _ => null,
         };
     }
