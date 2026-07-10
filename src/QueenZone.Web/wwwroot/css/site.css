@@ -747,18 +747,29 @@ body.qz-menu-lock .qz-masthead {
   }
 }
 
-.qz-account-form.is-submitting {
+.qz-account-form.is-submitting,
+.qz-form.is-submitting {
   opacity: 0.92;
 }
 
-.qz-account-form__status {
+.qz-account-form__status,
+.qz-form__busy-status {
   margin: 0;
   color: var(--text-secondary);
   font: var(--fw-medium) 0.875rem/1.4 var(--font-body);
 }
 
-.qz-account-form__status[hidden] {
+.qz-account-form__status[hidden],
+.qz-form__busy-status[hidden] {
   display: none;
+}
+
+.qz-form__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  margin-top: 0.75rem;
 }
 
 .qz-error-page__grid {

@@ -39,10 +39,14 @@
 .qz-rte-progress {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  margin: 0.5rem 0.75rem;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0.55rem 0.75rem;
   font-size: 0.9rem;
-  color: #444;
+  font-weight: 500;
+  color: #1a1a1a;
+  background: #f5f0e6;
+  border-top: 1px solid #e0d8c8;
 }
 
 .qz-rte-progress[hidden] {
@@ -56,6 +60,7 @@
   border-top-color: #333;
   border-radius: 50%;
   animation: qz-rte-spin 0.7s linear infinite;
+  flex-shrink: 0;
 }
 
 @keyframes qz-rte-spin {
@@ -64,8 +69,14 @@
   }
 }
 
+.qz-rte--uploading {
+  outline: 2px solid #c4a35a;
+  outline-offset: -1px;
+}
+
 .qz-rte--uploading .ql-editor {
-  opacity: 0.85;
+  opacity: 0.75;
+  pointer-events: none;
 }
 
 .qz-ugc-img {
