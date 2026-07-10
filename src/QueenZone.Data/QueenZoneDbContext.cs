@@ -87,6 +87,7 @@ public sealed class QueenZoneDbContext : DbContext
             entity.Property(account => account.Email).HasMaxLength(256).IsRequired();
             entity.Property(account => account.NormalizedEmail).HasMaxLength(256).IsRequired();
             entity.Property(account => account.DisplayName).HasMaxLength(100).IsRequired();
+            entity.Property(account => account.AvatarUrl).HasMaxLength(512);
             entity.Property(account => account.PasswordHash).HasMaxLength(512);
             entity.Property(account => account.CreatedAt).IsRequired();
 

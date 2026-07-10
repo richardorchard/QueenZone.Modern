@@ -10,6 +10,12 @@ public sealed class MemberAccount
 
     public string DisplayName { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Blob path within the ugc-avatars container (not a full URL), e.g.
+    /// <c>members/{guid}/avatar-{id}.webp</c>. Null when the member has no custom avatar.
+    /// </summary>
+    public string? AvatarUrl { get; set; }
+
     public string? PasswordHash { get; set; }
 
     public DateTime CreatedAt { get; set; }

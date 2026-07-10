@@ -71,5 +71,19 @@ public sealed class EfMemberAccountRepository(QueenZoneDbContext dbContext) : IM
         return account;
     }
 
+    public async Task<MemberAccount?> UpdateAvatarUrlAsync(Guid memberId, string? avatarBlobPath, CancellationToken cancellationToken = default)
+    {
+        var account = await dbContext.MemberAccounts
+            .SingleOrDefaultAsync(a => a.Id == memberId, cancellationToken);
+        if (account is null)
+        {
+            return null;
+        }
+
+        account.AvatarUrl = avatarBlobPath;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return account;
+    }
+
     private static string Normalize(string email) => email.Trim().ToUpperInvariant();
 }

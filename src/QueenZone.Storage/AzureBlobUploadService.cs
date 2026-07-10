@@ -86,6 +86,19 @@ public sealed class AzureBlobUploadService : IBlobUploadService
         await backend.DeleteIfExistsAsync(containerName, blobName, cancellationToken);
     }
 
+    public async Task<BlobContent?> OpenReadAsync(
+        string containerName,
+        string blobName,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(containerName) || string.IsNullOrWhiteSpace(blobName))
+        {
+            return null;
+        }
+
+        return await backend.OpenReadAsync(containerName, blobName, cancellationToken);
+    }
+
     private string BuildPublicUrl(string containerName, string blobName, Uri storageUri)
     {
         if (!string.IsNullOrWhiteSpace(options.PublicBaseUrl))

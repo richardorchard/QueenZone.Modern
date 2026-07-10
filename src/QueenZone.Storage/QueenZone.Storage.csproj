@@ -16,6 +16,8 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="QueenZone.Storage.Tests" />
+    <InternalsVisibleTo Include="QueenZone.Web" />
+    <InternalsVisibleTo Include="QueenZone.Web.Tests" />
   </ItemGroup>
 
 </Project>

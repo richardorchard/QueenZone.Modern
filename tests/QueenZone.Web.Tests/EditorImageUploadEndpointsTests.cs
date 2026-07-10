@@ -278,5 +278,11 @@ public sealed class EditorImageUploadEndpointsTests : IClassFixture<WebApplicati
             string blobName,
             CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
+
+        public Task<BlobContent?> OpenReadAsync(
+            string containerName,
+            string blobName,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<BlobContent?>(null);
     }
 }

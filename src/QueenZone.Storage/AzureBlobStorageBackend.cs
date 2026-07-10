@@ -39,6 +39,26 @@ internal sealed class AzureBlobStorageBackend(BlobServiceClient blobServiceClien
         await blob.DeleteIfExistsAsync(cancellationToken: cancellationToken);
     }
 
+    public async Task<BlobContent?> OpenReadAsync(
+        string containerName,
+        string blobName,
+        CancellationToken cancellationToken = default)
+    {
+        var container = blobServiceClient.GetBlobContainerClient(containerName);
+        var blob = container.GetBlobClient(blobName);
+        if (!await blob.ExistsAsync(cancellationToken))
+        {
+            return null;
+        }
+
+        var response = await blob.DownloadStreamingAsync(cancellationToken: cancellationToken);
+        return new BlobContent
+        {
+            Stream = response.Value.Content,
+            ContentType = response.Value.Details.ContentType ?? "application/octet-stream",
+        };
+    }
+
     public Uri GetBlobUri(string containerName, string blobName) =>
         blobServiceClient.GetBlobContainerClient(containerName).GetBlobClient(blobName).Uri;
 }

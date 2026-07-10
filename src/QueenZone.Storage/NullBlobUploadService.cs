@@ -22,4 +22,10 @@ public sealed class NullBlobUploadService : IBlobUploadService
         string blobName,
         CancellationToken cancellationToken = default) =>
         throw new NotSupportedException(NotConfiguredMessage);
+
+    public Task<BlobContent?> OpenReadAsync(
+        string containerName,
+        string blobName,
+        CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException(NotConfiguredMessage);
 }

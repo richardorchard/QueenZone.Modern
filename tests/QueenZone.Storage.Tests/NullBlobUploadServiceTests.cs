@@ -22,4 +22,12 @@ public sealed class NullBlobUploadServiceTests
             service.DeleteAsync(BlobUploadContainers.Avatars, "members/1/x.jpg"));
         Assert.Contains("Blob storage is not configured", ex.Message);
     }
+
+    [Fact]
+    public async Task OpenReadAsync_throws_not_supported()
+    {
+        var ex = await Assert.ThrowsAsync<NotSupportedException>(() =>
+            service.OpenReadAsync(BlobUploadContainers.Avatars, "members/1/x.jpg"));
+        Assert.Contains("Blob storage is not configured", ex.Message);
+    }
 }

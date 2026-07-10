@@ -36,6 +36,41 @@
         </div>
       </dl>
 
+      <section class="qz-account-settings__avatar" aria-labelledby="avatar-heading">
+        <h2 id="avatar-heading" class="qz-account-settings__section-title">Profile avatar</h2>
+        <div class="qz-account-settings__avatar-row">
+          <partial name="_MemberAvatar" model="@(new MemberAvatarViewModel { DisplayName = Model.DisplayName, MemberId = Model.MemberId, HasAvatar = Model.HasAvatar, Size = "md" })" />
+          <div class="qz-account-settings__avatar-forms">
+            <form method="post" asp-page-handler="UploadAvatar" enctype="multipart/form-data" class="qz-account-form">
+              @Html.AntiForgeryToken()
+              <label class="qz-account-form__field">
+                <span>Upload image</span>
+                <input asp-for="AvatarFile"
+                       type="file"
+                       accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+                       required />
+                <span asp-validation-for="AvatarFile" class="qz-account-form__field-error"></span>
+                <span class="qz-account-form__help">
+                  JPEG, PNG, or WebP. Max 2&nbsp;MB. Cropped to a square and stored as WebP.
+                </span>
+              </label>
+              <div class="qz-account-form__actions">
+                <button type="submit" class="qz-button">Upload avatar</button>
+              </div>
+            </form>
+            @if (Model.HasAvatar)
+            {
+              <form method="post" asp-page-handler="RemoveAvatar" class="qz-account-form">
+                @Html.AntiForgeryToken()
+                <div class="qz-account-form__actions">
+                  <button type="submit" class="qz-button qz-button--outline">Remove avatar</button>
+                </div>
+              </form>
+            }
+          </div>
+        </div>
+      </section>
+
       <form method="post" class="qz-account-form" novalidate>
         @Html.AntiForgeryToken()
 

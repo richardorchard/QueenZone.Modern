@@ -21,7 +21,14 @@ public sealed class SettingsModel(MemberAccountService memberAccountService) : P
     [Display(Name = "Display name")]
     public string DisplayName { get; set; } = string.Empty;
 
+    [BindProperty]
+    public IFormFile? AvatarFile { get; set; }
+
     public string Email { get; private set; } = string.Empty;
+
+    public Guid MemberId { get; private set; }
+
+    public bool HasAvatar { get; private set; }
 
     public IReadOnlyList<string> LinkedProviders { get; private set; } = [];
 
@@ -35,8 +42,7 @@ public sealed class SettingsModel(MemberAccountService memberAccountService) : P
             return Redirect("/account/login");
         }
 
-        DisplayName = account.DisplayName;
-        Email = account.Email;
+        PopulateFromAccount(account);
         LinkedProviders = await memberAccountService.ListExternalProvidersAsync(account.Id, cancellationToken);
         StatusMessage = TempData[SuccessMessageKey] as string;
         ViewData["Title"] = "Account settings";
@@ -51,19 +57,18 @@ public sealed class SettingsModel(MemberAccountService memberAccountService) : P
             return Redirect("/account/login");
         }
 
-        // Always repopulate read-only fields so validation failures keep the page usable.
         var account = await memberAccountService.FindByIdAsync(memberId.Value, cancellationToken);
         if (account is null)
         {
             return Redirect("/account/login");
         }
 
-        Email = account.Email;
+        // Preserve form-bound DisplayName; only repopulate read-only fields.
+        var submittedDisplayName = DisplayName?.Trim() ?? string.Empty;
+        PopulateFromAccount(account);
+        DisplayName = submittedDisplayName;
         LinkedProviders = await memberAccountService.ListExternalProvidersAsync(account.Id, cancellationToken);
         ViewData["Title"] = "Account settings";
-
-        // Strip whitespace before model validation so min/max lengths apply to the trimmed value.
-        DisplayName = DisplayName?.Trim() ?? string.Empty;
 
         if (!ModelState.IsValid)
         {
@@ -81,6 +86,83 @@ public sealed class SettingsModel(MemberAccountService memberAccountService) : P
 
         TempData[SuccessMessageKey] = "Display name updated.";
         return RedirectToPage();
+    }
+
+    public async Task<IActionResult> OnPostUploadAvatarAsync(CancellationToken cancellationToken)
+    {
+        var memberId = await GetCurrentMemberIdAsync();
+        if (memberId is null)
+        {
+            return Redirect("/account/login");
+        }
+
+        var account = await memberAccountService.FindByIdAsync(memberId.Value, cancellationToken);
+        if (account is null)
+        {
+            return Redirect("/account/login");
+        }
+
+        PopulateFromAccount(account);
+        LinkedProviders = await memberAccountService.ListExternalProvidersAsync(account.Id, cancellationToken);
+        ViewData["Title"] = "Account settings";
+
+        if (AvatarFile is null || AvatarFile.Length <= 0)
+        {
+            ModelState.AddModelError(nameof(AvatarFile), "Choose an image file to upload.");
+            return Page();
+        }
+
+        await using var stream = AvatarFile.OpenReadStream();
+        var result = await memberAccountService.UpdateAvatarAsync(
+            memberId.Value,
+            stream,
+            AvatarFile.FileName,
+            cancellationToken);
+
+        if (!result.Succeeded || result.Account is null)
+        {
+            ModelState.AddModelError(nameof(AvatarFile), result.Error ?? "Could not update avatar.");
+            return Page();
+        }
+
+        TempData[SuccessMessageKey] = "Avatar updated.";
+        return RedirectToPage();
+    }
+
+    public async Task<IActionResult> OnPostRemoveAvatarAsync(CancellationToken cancellationToken)
+    {
+        var memberId = await GetCurrentMemberIdAsync();
+        if (memberId is null)
+        {
+            return Redirect("/account/login");
+        }
+
+        var result = await memberAccountService.RemoveAvatarAsync(memberId.Value, cancellationToken);
+        if (!result.Succeeded)
+        {
+            var account = await memberAccountService.FindByIdAsync(memberId.Value, cancellationToken);
+            if (account is null)
+            {
+                return Redirect("/account/login");
+            }
+
+            PopulateFromAccount(account);
+            LinkedProviders = await memberAccountService.ListExternalProvidersAsync(account.Id, cancellationToken);
+            ModelState.AddModelError(string.Empty, result.Error ?? "Could not remove avatar.");
+            ViewData["Title"] = "Account settings";
+            return Page();
+        }
+
+        TempData[SuccessMessageKey] = "Avatar removed.";
+        return RedirectToPage();
+    }
+
+    private void PopulateFromAccount(Data.Entities.MemberAccount account)
+    {
+        MemberId = account.Id;
+        DisplayName = account.DisplayName;
+        Email = account.Email;
+        HasAvatar = !string.IsNullOrWhiteSpace(account.AvatarUrl);
     }
 
     private async Task<Data.Entities.MemberAccount?> LoadCurrentAccountAsync(CancellationToken cancellationToken)

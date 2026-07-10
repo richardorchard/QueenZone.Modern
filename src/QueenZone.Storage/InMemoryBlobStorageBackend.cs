@@ -44,6 +44,24 @@ internal sealed class InMemoryBlobStorageBackend : IBlobStorageBackend
     public Uri GetBlobUri(string containerName, string blobName) =>
         new($"{BaseUri.AbsoluteUri.TrimEnd('/')}/{containerName}/{blobName}");
 
+    public Task<BlobContent?> OpenReadAsync(
+        string containerName,
+        string blobName,
+        CancellationToken cancellationToken = default)
+    {
+        var value = TryGet(containerName, blobName);
+        if (value is null)
+        {
+            return Task.FromResult<BlobContent?>(null);
+        }
+
+        return Task.FromResult<BlobContent?>(new BlobContent
+        {
+            Stream = new MemoryStream(value.Value.Bytes, writable: false),
+            ContentType = value.Value.ContentType,
+        });
+    }
+
     public bool Exists(string containerName, string blobName) =>
         store.TryGetValue(containerName, out var container) && container.ContainsKey(blobName);
 

@@ -68,6 +68,18 @@ public sealed class EfMemberAccountRepositoryTests : IAsyncDisposable
         Assert.Null(updated);
     }
 
+    [Fact]
+    public async Task UpdateAvatarUrlAsync_PersistsAndClearsPath()
+    {
+        var account = await SeedAccountAsync("avatar-ef@example.com", "EF Avatar");
+
+        var updated = await repository.UpdateAvatarUrlAsync(account.Id, "members/x/avatar.webp");
+        Assert.Equal("members/x/avatar.webp", updated!.AvatarUrl);
+
+        var cleared = await repository.UpdateAvatarUrlAsync(account.Id, null);
+        Assert.Null(cleared!.AvatarUrl);
+    }
+
     private async Task<MemberAccount> SeedAccountAsync(string email, string displayName)
     {
         return await repository.CreateAsync(new MemberAccount

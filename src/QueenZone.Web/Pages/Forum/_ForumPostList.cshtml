@@ -11,12 +11,16 @@ else
     {
       <article class="qz-forum-post" id="post-@post.Id">
         <header class="qz-forum-post__header">
-          <div>
-            <strong class="qz-forum-post__author">@post.AuthorUsername</strong>
-            @if (post.AuthorMemberSince is not null)
-            {
-              <span class="qz-meta"> · Member since <time datetime="@post.AuthorMemberSince.Value.ToString("yyyy-MM-dd")">@post.AuthorMemberSince.Value.ToString("MMMM yyyy")</time></span>
-            }
+          <div class="qz-forum-post__author-row">
+            @* Legacy archive posts are not linked to modern MemberAccounts; show initials fallback. *@
+            <partial name="_MemberAvatar" model="@(new MemberAvatarViewModel { DisplayName = post.AuthorUsername, Size = "sm" })" />
+            <div>
+              <strong class="qz-forum-post__author">@post.AuthorUsername</strong>
+              @if (post.AuthorMemberSince is not null)
+              {
+                <span class="qz-meta"> · Member since <time datetime="@post.AuthorMemberSince.Value.ToString("yyyy-MM-dd")">@post.AuthorMemberSince.Value.ToString("MMMM yyyy")</time></span>
+              }
+            </div>
           </div>
           <time class="qz-meta" datetime="@post.PostedAt.ToString("yyyy-MM-ddTHH:mm:ss")">@post.PostedAt.ToString("dd MMMM yyyy HH:mm")</time>
         </header>

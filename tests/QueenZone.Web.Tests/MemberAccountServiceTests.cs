@@ -1,5 +1,10 @@
+using Microsoft.Extensions.Options;
 using QueenZone.Data;
+using QueenZone.Data.Entities;
+using QueenZone.Storage;
 using QueenZone.Web;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
 
 namespace QueenZone.Web.Tests;
 
@@ -7,11 +12,28 @@ public sealed class MemberAccountServiceTests
 {
     private static MemberAccountService CreateService(
         IMemberAccountRepository? memberAccountRepository = null,
-        ILegacyMemberLookupRepository? legacyMemberLookupRepository = null) =>
-        new(
+        ILegacyMemberLookupRepository? legacyMemberLookupRepository = null,
+        IBlobUploadService? blobUploadService = null,
+        InMemoryBlobStorageBackend? blobBackend = null)
+    {
+        var backend = blobBackend ?? new InMemoryBlobStorageBackend();
+        var blobs = blobUploadService
+            ?? new AzureBlobUploadService(backend, Options.Create(new BlobUploadOptions()));
+        return new(
             memberAccountRepository ?? new InMemoryMemberAccountRepository(),
             legacyMemberLookupRepository ?? new InMemoryLegacyMemberLookupRepository(
-                new Dictionary<string, LegacyMemberMatch>()));
+                new Dictionary<string, LegacyMemberMatch>()),
+            blobs);
+    }
+
+    private static async Task<MemoryStream> CreatePngAsync(int width = 32, int height = 32)
+    {
+        using var image = new Image<Rgba32>(width, height, new Rgba32(40, 120, 200));
+        var stream = new MemoryStream();
+        await image.SaveAsPngAsync(stream);
+        stream.Position = 0;
+        return stream;
+    }
 
     [Fact]
     public async Task RegisterAsync_CreatesAccount_AndAutoLinksMatchingLegacyEmail()
@@ -227,5 +249,116 @@ public sealed class MemberAccountServiceTests
         var providers = await service.ListExternalProvidersAsync(registered.Account!.Id);
 
         Assert.Empty(providers);
+    }
+
+    [Fact]
+    public async Task UpdateAvatarAsync_PersistsBlobPath_AndStoresFullAndThumb()
+    {
+        var backend = new InMemoryBlobStorageBackend();
+        var service = CreateService(blobBackend: backend);
+        var registered = await service.RegisterAsync("avatar@example.com", "S3curePass!", "Avatar Fan");
+        await using var png = await CreatePngAsync(120, 80);
+
+        var result = await service.UpdateAvatarAsync(registered.Account!.Id, png, "photo.png");
+
+        Assert.True(result.Succeeded);
+        Assert.False(string.IsNullOrWhiteSpace(result.Account!.AvatarUrl));
+        Assert.StartsWith($"members/{registered.Account.Id:N}/avatar-", result.Account.AvatarUrl);
+        Assert.EndsWith(".webp", result.Account.AvatarUrl);
+        Assert.True(backend.Exists(MemberAvatarPaths.Container, result.Account.AvatarUrl!));
+        Assert.True(backend.Exists(
+            MemberAvatarPaths.Container,
+            MemberAvatarPaths.ToThumbBlobName(result.Account.AvatarUrl!)));
+    }
+
+    [Fact]
+    public async Task UpdateAvatarAsync_RejectsOversizedFile_BeforeUpload()
+    {
+        var backend = new InMemoryBlobStorageBackend();
+        var service = CreateService(blobBackend: backend);
+        var registered = await service.RegisterAsync("big@example.com", "S3curePass!", "Big Fan");
+        // Oversized payload that is not a valid image — rejected on size before blob upload.
+        await using var oversized = new MemoryStream(new byte[MemberAvatarPaths.MaxUploadBytes + 1]);
+
+        var result = await service.UpdateAvatarAsync(registered.Account!.Id, oversized, "huge.png");
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("MB", result.Error, StringComparison.OrdinalIgnoreCase);
+        Assert.Null(result.Account);
+        var reloaded = await service.FindByIdAsync(registered.Account.Id);
+        Assert.Null(reloaded!.AvatarUrl);
+        Assert.Null(backend.TryGet(MemberAvatarPaths.Container, "members/any"));
+    }
+
+    [Fact]
+    public async Task UpdateAvatarAsync_RejectsNonImageFile_BeforeUpload()
+    {
+        var backend = new InMemoryBlobStorageBackend();
+        var service = CreateService(blobBackend: backend);
+        var registered = await service.RegisterAsync("txt@example.com", "S3curePass!", "Text Fan");
+        await using var notImage = new MemoryStream("not-an-image"u8.ToArray());
+
+        var result = await service.UpdateAvatarAsync(registered.Account!.Id, notImage, "notes.txt");
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("JPEG", result.Error, StringComparison.OrdinalIgnoreCase);
+        var reloaded = await service.FindByIdAsync(registered.Account.Id);
+        Assert.Null(reloaded!.AvatarUrl);
+    }
+
+    [Fact]
+    public async Task UpdateAvatarAsync_CleansUpNewBlobs_WhenDbSaveFails_AndKeepsOldAvatar()
+    {
+        var backend = new InMemoryBlobStorageBackend();
+        var realRepo = new InMemoryMemberAccountRepository();
+        var service = CreateService(memberAccountRepository: realRepo, blobBackend: backend);
+        var registered = await service.RegisterAsync("keep@example.com", "S3curePass!", "Keep Fan");
+        await using var first = await CreatePngAsync();
+        var firstResult = await service.UpdateAvatarAsync(registered.Account!.Id, first, "one.png");
+        Assert.True(firstResult.Succeeded);
+        var oldPath = firstResult.Account!.AvatarUrl!;
+        var oldThumb = MemberAvatarPaths.ToThumbBlobName(oldPath);
+        Assert.True(backend.Exists(MemberAvatarPaths.Container, oldPath));
+
+        var failingRepo = new FailingUpdateAvatarRepository(realRepo);
+        var failingService = CreateService(memberAccountRepository: failingRepo, blobBackend: backend);
+        await using var second = await CreatePngAsync(64, 64);
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            failingService.UpdateAvatarAsync(registered.Account.Id, second, "two.png"));
+
+        Assert.True(backend.Exists(MemberAvatarPaths.Container, oldPath));
+        Assert.True(backend.Exists(MemberAvatarPaths.Container, oldThumb));
+        var reloaded = await realRepo.FindByIdAsync(registered.Account.Id);
+        Assert.Equal(oldPath, reloaded!.AvatarUrl);
+    }
+
+    /// <summary>
+    /// Delegates reads to the inner repo but throws on avatar URL writes to simulate DB failure.
+    /// </summary>
+    private sealed class FailingUpdateAvatarRepository(IMemberAccountRepository inner) : IMemberAccountRepository
+    {
+        public Task<MemberAccount?> FindByEmailAsync(string email, CancellationToken cancellationToken = default) =>
+            inner.FindByEmailAsync(email, cancellationToken);
+
+        public Task<MemberAccount?> FindByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+            inner.FindByIdAsync(id, cancellationToken);
+
+        public Task<MemberAccount?> FindByExternalLoginAsync(string provider, string providerKey, CancellationToken cancellationToken = default) =>
+            inner.FindByExternalLoginAsync(provider, providerKey, cancellationToken);
+
+        public Task<IReadOnlyList<string>> ListExternalProvidersAsync(Guid memberAccountId, CancellationToken cancellationToken = default) =>
+            inner.ListExternalProvidersAsync(memberAccountId, cancellationToken);
+
+        public Task<MemberAccount> CreateAsync(MemberAccount account, CancellationToken cancellationToken = default) =>
+            inner.CreateAsync(account, cancellationToken);
+
+        public Task AddExternalLoginAsync(Guid memberAccountId, string provider, string providerKey, string email, CancellationToken cancellationToken = default) =>
+            inner.AddExternalLoginAsync(memberAccountId, provider, providerKey, email, cancellationToken);
+
+        public Task<MemberAccount?> UpdateDisplayNameAsync(Guid memberId, string displayName, CancellationToken cancellationToken = default) =>
+            inner.UpdateDisplayNameAsync(memberId, displayName, cancellationToken);
+
+        public Task<MemberAccount?> UpdateAvatarUrlAsync(Guid memberId, string? avatarBlobPath, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("Simulated database failure.");
     }
 }
