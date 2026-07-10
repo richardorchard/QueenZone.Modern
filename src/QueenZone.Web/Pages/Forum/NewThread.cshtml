@@ -21,7 +21,10 @@
 
 <section class="qz-section">
   <div class="qz-container qz-prose">
-    <form method="post" class="qz-form">
+    <form method="post"
+          class="qz-form qz-forum-compose"
+          data-busy-submit
+          data-busy-label="Creating thread…">
       @Html.AntiForgeryToken()
       <div asp-validation-summary="ModelOnly" class="qz-form__validation"></div>
       <div class="qz-form__field">
@@ -31,7 +34,10 @@
       </div>
       <partial name="_RichTextEditor" />
       <span asp-validation-for="Body"></span>
-      <button class="qz-button" type="submit">Create thread</button>
+      <div class="qz-form__actions">
+        <button class="qz-button" type="submit">Create thread</button>
+        <p class="qz-form__busy-status" data-busy-status hidden role="status" aria-live="polite"></p>
+      </div>
     </form>
   </div>
 </section>
