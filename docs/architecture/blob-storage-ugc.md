@@ -43,7 +43,7 @@ Store **container + blob name** in the database. Treat any public/display URL as
 
 - Storage is not anonymously listable.
 - Do not use permanent raw `*.blob.core.windows.net` URLs as the product contract.
-- Prefer short-lived SAS and/or a Cloudflare Worker/CDN with controlled origin—same idea as `cdn.queenzone.org` for legacy media, but on separate UGC containers/routes.
+- Prefer short-lived SAS and/or a Cloudflare CDN with controlled origin—same idea as `cdn.queenzone.org` for legacy media (straight Cloudflare proxy to Azure Blob), but on separate UGC containers/routes.
 - App-proxy every byte only when auth truly requires it.
 
 ## Security baseline

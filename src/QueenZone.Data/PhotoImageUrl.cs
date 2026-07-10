@@ -2,8 +2,8 @@ namespace QueenZone.Data;
 
 /// <summary>
 /// Builds public image URLs from legacy PIC_FILES_T paths (e.g. "/Brian_May/3120008212.jpg").
-/// The CDN/Worker at cdn.queenzone.org maps the first path segment, lower-cased
-/// with underscores converted to hyphens, to the matching Azure Blob Storage folder.
+/// cdn.queenzone.org is a straight Cloudflare CDN proxy to Azure Blob Storage, so the first
+/// path segment must match the Azure container name exactly (lowercased, underscores as hyphens).
 /// </summary>
 public static class PhotoImageUrl
 {
@@ -44,8 +44,7 @@ public static class PhotoImageUrl
     }
 
     /// <summary>
-    /// Parses a public pictures URL into the Azure Blob container and blob name
-    /// used by the Cloudflare Worker mapping.
+    /// Parses a public CDN URL into the Azure Blob container and blob name.
     /// </summary>
     public static bool TryParseBlobLocation(string publicUrl, out string container, out string blobName)
     {

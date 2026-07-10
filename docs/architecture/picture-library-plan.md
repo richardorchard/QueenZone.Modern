@@ -53,13 +53,13 @@ Current public media delivery configuration:
 
 ```text
 Public base URL: https://cdn.queenzone.org
-Cloudflare Worker: pictures-queenzone-org
+CDN: Cloudflare (straight CDN proxy, no Worker)
 Azure storage account: queenzone
 Azure blob endpoint: https://queenzone.blob.core.windows.net
 URL shape: https://cdn.queenzone.org/{container}/{blob}
 ```
 
-Use `https://cdn.queenzone.org` for new public image references instead of direct `*.blob.core.windows.net` URLs. The Cloudflare Worker maps public URLs to the Azure Blob endpoint and caches successful non-range `GET` responses at the edge.
+Use `https://cdn.queenzone.org` for new public image references instead of direct `*.blob.core.windows.net` URLs. Cloudflare proxies requests directly to the Azure Blob endpoint — the URL path is passed through as-is, so `{container}` must match the Azure container name exactly and the container must have public read access.
 
 Suggested containers:
 
