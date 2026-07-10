@@ -11,6 +11,7 @@ public sealed class TopicModel : ForumTopicPageModel
     private readonly IForumRepository forumRepository;
     private readonly IForumWriteRepository forumWriteRepository;
     private readonly MemberAccountService memberAccountService;
+    private readonly PublicQueryCacheService publicQueryCache;
     private readonly UgcHtml ugcHtml;
     private readonly ForumPostRateLimiter rateLimiter;
     private readonly TimeProvider timeProvider;
@@ -19,6 +20,7 @@ public sealed class TopicModel : ForumTopicPageModel
         IForumRepository forumRepository,
         IForumWriteRepository forumWriteRepository,
         MemberAccountService memberAccountService,
+        PublicQueryCacheService publicQueryCache,
         UgcHtml ugcHtml,
         ForumPostRateLimiter rateLimiter,
         TimeProvider timeProvider)
@@ -27,6 +29,7 @@ public sealed class TopicModel : ForumTopicPageModel
         this.forumRepository = forumRepository;
         this.forumWriteRepository = forumWriteRepository;
         this.memberAccountService = memberAccountService;
+        this.publicQueryCache = publicQueryCache;
         this.ugcHtml = ugcHtml;
         this.rateLimiter = rateLimiter;
         this.timeProvider = timeProvider;
@@ -98,6 +101,7 @@ public sealed class TopicModel : ForumTopicPageModel
                 timeProvider.GetUtcNow()),
             cancellationToken);
 
+        publicQueryCache.InvalidateForumStatsCache();
         var updatedPage = await forumRepository.GetTopicPostsPageAsync(topicId, 1, 1, cancellationToken);
         var lastPage = updatedPage is null
             ? 1

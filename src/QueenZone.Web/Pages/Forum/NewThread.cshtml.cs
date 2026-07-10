@@ -11,6 +11,7 @@ public sealed class NewThreadModel(
     IForumRepository forumRepository,
     IForumWriteRepository forumWriteRepository,
     MemberAccountService memberAccountService,
+    PublicQueryCacheService publicQueryCache,
     UgcHtml ugcHtml,
     ForumPostRateLimiter rateLimiter,
     TimeProvider timeProvider) : PageModel
@@ -84,6 +85,7 @@ public sealed class NewThreadModel(
                 timeProvider.GetUtcNow()),
             cancellationToken);
 
+        publicQueryCache.InvalidateForumStatsCache();
         return Redirect(ForumRoutes.GetTopicCanonicalPath(threadId, Subject));
     }
 

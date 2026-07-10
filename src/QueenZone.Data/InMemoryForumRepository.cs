@@ -6,7 +6,7 @@ public sealed class InMemoryForumRepository(
     InMemoryForumWriteRepository? writeRepository = null) : IForumRepository
 {
     public Task<IReadOnlyList<ForumCategoryItem>> GetCategoriesAsync(CancellationToken cancellationToken = default) =>
-        Task.FromResult(seedCategories);
+        Task.FromResult<IReadOnlyList<ForumCategoryItem>>(GetCategories());
 
     public Task<ForumCategoryItem?> GetCategoryByIdAsync(int id, CancellationToken cancellationToken = default) =>
         Task.FromResult(seedCategories.SingleOrDefault(category => category.Id == id));
@@ -52,10 +52,12 @@ public sealed class InMemoryForumRepository(
     }
 
     public Task<int> GetTotalThreadCountAsync(CancellationToken cancellationToken = default) =>
-        Task.FromResult(seedStats.ThreadCount);
+        Task.FromResult(seedStats.ThreadCount + (writeRepository?.GetCreatedThreads().Count ?? 0));
 
-    public Task<ForumArchiveStats> GetArchiveStatsAsync(CancellationToken cancellationToken = default) =>
-        Task.FromResult(seedStats);
+    public async Task<ForumArchiveStats> GetArchiveStatsAsync(CancellationToken cancellationToken = default) =>
+        ForumArchiveStats.FromCategories(
+            await GetCategoriesAsync(cancellationToken),
+            await GetTotalThreadCountAsync(cancellationToken));
 
     public Task<int> GetTopicSitemapCountAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(SampleForumData.CreateSeedTopicSitemapItems().Count);
@@ -115,6 +117,49 @@ public sealed class InMemoryForumRepository(
                 null,
                 IsSticky: false))
             .ToList() ?? [];
+
+    private IReadOnlyList<ForumCategoryItem> GetCategories()
+    {
+        var createdThreads = writeRepository?.GetCreatedThreads() ?? [];
+        if (createdThreads.Count == 0)
+        {
+            return seedCategories;
+        }
+
+        return seedCategories
+            .Select(category => OverlayCreatedThreadStats(category, createdThreads))
+            .ToList();
+    }
+
+    private static ForumCategoryItem OverlayCreatedThreadStats(
+        ForumCategoryItem category,
+        IReadOnlyList<ForumWriteThread> createdThreads)
+    {
+        var categoryThreads = createdThreads
+            .Where(thread => thread.CategoryId == category.Id)
+            .OrderByDescending(thread => thread.LastPostAt)
+            .ToList();
+        if (categoryThreads.Count == 0)
+        {
+            return category;
+        }
+
+        var latestCreatedThread = categoryThreads[0];
+        var latestCreatedActivity = latestCreatedThread.LastPostAt.UtcDateTime;
+        var latestThreadTitle = category.LastActivityAt.HasValue && category.LastActivityAt.Value > latestCreatedActivity
+            ? category.LatestThreadTitle
+            : latestCreatedThread.Subject;
+
+        return category with
+        {
+            PostCount = category.PostCount + categoryThreads.Sum(thread => thread.PostCount),
+            LastActivityAt = Max(category.LastActivityAt, latestCreatedActivity),
+            LatestThreadTitle = latestThreadTitle,
+        };
+    }
+
+    private static DateTime? Max(DateTime? left, DateTime right) =>
+        !left.HasValue || right > left.Value ? right : left;
 
     private ForumTopicHeader? TryGetCreatedTopicHeader(int topicId)
     {

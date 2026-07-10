@@ -55,4 +55,44 @@ public sealed class InMemoryForumWriteRepositoryTests
         Assert.Equal(0, await repository.CountPostsByMemberSinceAsync(memberId, createdAt.AddSeconds(1)));
         Assert.Equal(1, await repository.CountApprovedPostsByMemberAsync(memberId));
     }
+
+    [Fact]
+    public async Task InMemoryForumRepository_ReflectsCreatedThreadsInCategoryStats()
+    {
+        var writeRepository = new InMemoryForumWriteRepository();
+        var repository = new InMemoryForumRepository(
+            [
+                new ForumCategoryItem(
+                    1,
+                    "The Music",
+                    "Albums and songs.",
+                    10,
+                    new DateTime(2020, 10, 6, 0, 0, 0, DateTimeKind.Utc),
+                    "Older topic",
+                    1),
+            ],
+            new ForumArchiveStats(1, 3, 10),
+            writeRepository);
+        var createdAt = DateTimeOffset.Parse("2026-07-10T04:00:00Z");
+
+        await writeRepository.CreateThreadAsync(new NewForumThread(
+            1,
+            Guid.NewGuid(),
+            "Forum Fan",
+            "Fresh activity",
+            "<p>Body</p>",
+            createdAt));
+
+        var categories = await repository.GetCategoriesAsync();
+        var threadCount = await repository.GetTotalThreadCountAsync();
+        var stats = await repository.GetArchiveStatsAsync();
+
+        var category = Assert.Single(categories);
+        Assert.Equal(11, category.PostCount);
+        Assert.Equal(createdAt.UtcDateTime, category.LastActivityAt);
+        Assert.Equal("Fresh activity", category.LatestThreadTitle);
+        Assert.Equal(4, threadCount);
+        Assert.Equal(11, stats.PostCount);
+        Assert.Equal(4, stats.ThreadCount);
+    }
 }
