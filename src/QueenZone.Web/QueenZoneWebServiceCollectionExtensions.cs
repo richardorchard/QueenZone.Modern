@@ -74,6 +74,7 @@ public static class QueenZoneWebServiceCollectionExtensions
     {
         services.AddScoped<MemberAccountService>();
         services.AddScoped<UgcHtml>();
+        services.AddScoped<ForumPostRateLimiter>();
         services.AddAntiforgery();
         return services;
     }
@@ -118,7 +119,7 @@ public static class QueenZoneWebServiceCollectionExtensions
         services.AddQueenZoneStorage(configuration);
         services.AddQueenZoneNewsAgent(configuration);
         services.AddQueenZoneAuth(configuration, environment);
-        services.AddQueenZoneAuthorization(configuration);
+        services.AddQueenZoneAuthorization(configuration, environment);
 
         return services;
     }

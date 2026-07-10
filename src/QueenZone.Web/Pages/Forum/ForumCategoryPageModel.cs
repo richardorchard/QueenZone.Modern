@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.AspNetCore.Authentication;
 using QueenZone.Data;
 using QueenZone.Web;
 
@@ -18,6 +19,8 @@ public abstract class ForumCategoryPageModel(IForumRepository forumRepository) :
     public int TotalTopics { get; private set; }
 
     public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
+    public bool CanCreateThread { get; private set; }
 
     protected async Task<IActionResult> LoadCategoryPageAsync(
         int id,
@@ -68,6 +71,7 @@ public abstract class ForumCategoryPageModel(IForumRepository forumRepository) :
         TotalPages = totalPages;
         TotalTopics = topicsPage.TotalCount;
         Breadcrumbs = [BreadcrumbItem.Home, new BreadcrumbItem("Forum", "/forum"), new BreadcrumbItem(categoryView.Name, categoryView.DetailPath)];
+        CanCreateThread = await IsMemberAuthenticatedAsync();
 
         ViewData["Title"] = ForumRoutes.GetCategoryPageTitle(categoryView, page);
         ViewData["CanonicalPath"] = ForumRoutes.GetCategoryCanonicalPath(categoryView, page);
@@ -86,5 +90,22 @@ public abstract class ForumCategoryPageModel(IForumRepository forumRepository) :
         }
 
         return Page();
+    }
+
+    private async Task<bool> IsMemberAuthenticatedAsync()
+    {
+        var memberCookie = await HttpContext.AuthenticateAsync(MemberAuthenticationSchemes.MembersCookie);
+        if (memberCookie.Succeeded)
+        {
+            return true;
+        }
+
+        if (HttpContext.RequestServices.GetService<IHostEnvironment>()?.IsEnvironment("Testing") == true)
+        {
+            var testMember = await HttpContext.AuthenticateAsync(TestMemberAuthHandler.SchemeName);
+            return testMember.Succeeded;
+        }
+
+        return false;
     }
 }

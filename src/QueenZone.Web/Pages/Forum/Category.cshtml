@@ -22,7 +22,7 @@
 
 <section class="qz-section">
   <div class="qz-container">
-    <partial name="_SectionHeader" model="@(("Topics", "Threads in this board", false, "/search", "Search forum"))" />
+    <partial name="_SectionHeader" model="@(("Topics", "Threads in this board", false, Model.CanCreateThread ? ForumRoutes.GetNewThreadPath(category) : "/search", Model.CanCreateThread ? "New thread" : "Search forum"))" />
     <partial name="_ForumTopicList" model="@(category, Model.Topics)" />
     <partial name="_ArchivePagination" model="ForumRoutes.GetCategoryPaginationViewModel(category, Model.CurrentPage, Model.TotalPages)" />
   </div>

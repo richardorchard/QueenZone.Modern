@@ -25,6 +25,7 @@ public static class QueenZoneAuthServiceCollectionExtensions
                 .AddPolicyScheme(AdminAuthenticationSchemes.CompositeScheme, null, options =>
                     ConfigureAdminAuthenticationScheme(options, useAzureAd: false))
                 .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestAuthHandler.SchemeName, null)
+                .AddScheme<AuthenticationSchemeOptions, TestMemberAuthHandler>(TestMemberAuthHandler.SchemeName, null)
                 // A real (not test-shortcut) cookie scheme: native register/sign-in pages call
                 // SignInAsync, which requires a handler that actually implements sign-in, and a
                 // local cookie has no external dependency that would make it unsuitable for tests.
@@ -64,7 +65,8 @@ public static class QueenZoneAuthServiceCollectionExtensions
 
     public static IServiceCollection AddQueenZoneAuthorization(
         this IServiceCollection services,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IHostEnvironment environment)
     {
         services.AddAuthorization(options =>
         {
@@ -74,8 +76,15 @@ public static class QueenZoneAuthServiceCollectionExtensions
                     .RequireAssertion(context => IsAdminEmail(context.User, configuration)));
 
             options.AddPolicy(MemberAuthenticationSchemes.MemberPolicy, policy =>
-                policy.AddAuthenticationSchemes(MemberAuthenticationSchemes.MembersCookie)
-                    .RequireAuthenticatedUser());
+            {
+                policy.AddAuthenticationSchemes(MemberAuthenticationSchemes.MembersCookie);
+                if (environment.IsEnvironment("Testing"))
+                {
+                    policy.AddAuthenticationSchemes(TestMemberAuthHandler.SchemeName);
+                }
+
+                policy.RequireAuthenticatedUser();
+            });
 
             // Shared authoring (rich text image upload). Composite scheme selects member cookie
             // when present, otherwise Entra/test admin auth (same as admin pages).

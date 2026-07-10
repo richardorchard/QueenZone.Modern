@@ -34,6 +34,7 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddScoped<IAdminNewsRepository, EfAdminNewsRepository>();
         services.AddScoped<INewsAuditRepository, EfNewsAuditRepository>();
         services.AddScoped<IMemberAccountRepository, EfMemberAccountRepository>();
+        services.AddScoped<IForumWriteRepository, EfForumWriteRepository>();
         services.AddScoped<INewsDiscoveryRepository, EfNewsDiscoveryRepository>();
         services.AddScoped<INewsAgentRunLeaseService, EfNewsAgentRunLeaseService>();
         services.AddScoped<IQueenHistoryRepository, EfQueenHistoryRepository>();
@@ -48,9 +49,12 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddSingleton<INewsRepository, InMemoryNewsRepository>();
         services.AddSingleton<IArticlesRepository>(_ => new InMemoryArticlesRepository(SampleArticlesData.CreateSeedArticles()));
         services.AddSingleton<IBiographyRepository>(_ => new InMemoryBiographyRepository(SampleBiographyData.CreateSeedChapters()));
+        var forumWriteRepository = new InMemoryForumWriteRepository();
+        services.AddSingleton<IForumWriteRepository>(forumWriteRepository);
         services.AddSingleton<IForumRepository>(_ => new InMemoryForumRepository(
             SampleForumData.CreateSeedCategories(),
-            SampleForumData.CreateSeedStats()));
+            SampleForumData.CreateSeedStats(),
+            forumWriteRepository));
         services.AddSingleton<IPhotoRepository>(_ => new InMemoryPhotoRepository(SamplePhotoData.CreateSeedCategories()));
         services.AddSingleton<IFanPerformanceRepository>(_ => new InMemoryFanPerformanceRepository(SampleFanPerformanceData.CreateSeedPerformances()));
         services.AddSingleton<ILegacyMemberLookupRepository>(_ => new InMemoryLegacyMemberLookupRepository(SampleLegacyMemberData.CreateSeedMatches()));
