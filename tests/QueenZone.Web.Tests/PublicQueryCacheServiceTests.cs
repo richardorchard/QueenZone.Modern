@@ -73,6 +73,25 @@ public sealed class PublicQueryCacheServiceTests
     }
 
     [Fact]
+    public async Task InvalidateForumStatsCache_evicts_categories_and_thread_count()
+    {
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var forumRepository = new CountingForumRepository();
+        var service = CreateService(memoryCache, forumRepository: forumRepository);
+
+        await service.GetForumCategoriesAsync();
+        await service.GetForumThreadCountAsync();
+
+        service.InvalidateForumStatsCache();
+
+        await service.GetForumCategoriesAsync();
+        await service.GetForumThreadCountAsync();
+
+        Assert.Equal(2, forumRepository.CategoriesCallCount);
+        Assert.Equal(2, forumRepository.ThreadCountCallCount);
+    }
+
+    [Fact]
     public async Task InvalidateNewsCache_does_not_evict_forum_or_history_cache()
     {
         using var memoryCache = new MemoryCache(new MemoryCacheOptions());

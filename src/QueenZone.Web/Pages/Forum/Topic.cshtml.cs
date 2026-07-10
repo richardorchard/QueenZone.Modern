@@ -10,6 +10,8 @@ public sealed class TopicModel : ForumTopicPageModel
 {
     private readonly IForumRepository forumRepository;
     private readonly IForumWriteRepository forumWriteRepository;
+    private readonly MemberAccountService memberAccountService;
+    private readonly PublicQueryCacheService publicQueryCache;
     private readonly UgcHtml ugcHtml;
     private readonly ForumPostRateLimiter rateLimiter;
     private readonly TimeProvider timeProvider;
@@ -17,6 +19,8 @@ public sealed class TopicModel : ForumTopicPageModel
     public TopicModel(
         IForumRepository forumRepository,
         IForumWriteRepository forumWriteRepository,
+        MemberAccountService memberAccountService,
+        PublicQueryCacheService publicQueryCache,
         UgcHtml ugcHtml,
         ForumPostRateLimiter rateLimiter,
         TimeProvider timeProvider)
@@ -24,6 +28,8 @@ public sealed class TopicModel : ForumTopicPageModel
     {
         this.forumRepository = forumRepository;
         this.forumWriteRepository = forumWriteRepository;
+        this.memberAccountService = memberAccountService;
+        this.publicQueryCache = publicQueryCache;
         this.ugcHtml = ugcHtml;
         this.rateLimiter = rateLimiter;
         this.timeProvider = timeProvider;
@@ -85,15 +91,17 @@ public sealed class TopicModel : ForumTopicPageModel
             return StatusCode(StatusCodes.Status429TooManyRequests);
         }
 
+        var authorDisplayName = await ResolveAuthorDisplayNameAsync(memberId.Value, cancellationToken);
         var postId = await forumWriteRepository.CreatePostAsync(
             new NewForumPost(
                 topicId,
                 memberId.Value,
-                User.Identity?.Name ?? "Member",
+                authorDisplayName,
                 sanitizedBody,
                 timeProvider.GetUtcNow()),
             cancellationToken);
 
+        publicQueryCache.InvalidateForumStatsCache();
         var updatedPage = await forumRepository.GetTopicPostsPageAsync(topicId, 1, 1, cancellationToken);
         var lastPage = updatedPage is null
             ? 1
@@ -129,6 +137,17 @@ public sealed class TopicModel : ForumTopicPageModel
         }
 
         return null;
+    }
+
+    private async Task<string> ResolveAuthorDisplayNameAsync(Guid memberId, CancellationToken cancellationToken)
+    {
+        var account = await memberAccountService.FindByIdAsync(memberId, cancellationToken);
+        if (!string.IsNullOrWhiteSpace(account?.DisplayName))
+        {
+            return account.DisplayName;
+        }
+
+        return string.IsNullOrWhiteSpace(User.Identity?.Name) ? "Member" : User.Identity.Name;
     }
 
     private async Task<bool> IsMemberAuthenticatedAsync() =>

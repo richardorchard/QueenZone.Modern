@@ -39,11 +39,14 @@ public sealed class EfForumWriteRepositoryTests : IAsyncDisposable
 
         var thread = await dbContext.ModernForumThreads.SingleAsync(thread => thread.LegacyTopicId == topicId);
         var post = await dbContext.ModernForumPosts.SingleAsync(post => post.ThreadId == thread.Id);
+        var category = await dbContext.ModernForumCategories.SingleAsync(category => category.LegacyForumId == 1);
         Assert.Equal("A brand new topic", thread.Title);
         Assert.Equal(0, thread.ReplyCount);
         Assert.True(thread.IsLegacyTopicStarter);
         Assert.Equal("<p>Hello forum</p>", post.BodyHtml);
         Assert.Equal(topicId, post.LegacyThreadTopicId);
+        Assert.Equal(1, category.LegacyPostCount);
+        Assert.Equal(new DateTime(2026, 7, 10, 4, 0, 0, DateTimeKind.Utc), category.LastActivityAt);
     }
 
     [Fact]
@@ -85,7 +88,11 @@ public sealed class EfForumWriteRepositoryTests : IAsyncDisposable
             DateTimeOffset.Parse("2026-07-10T04:05:00Z")));
 
         var thread = await dbContext.ModernForumThreads.SingleAsync(thread => thread.LegacyTopicId == topicId);
+        var category = await dbContext.ModernForumCategories.SingleAsync(category => category.LegacyForumId == 1);
         Assert.Equal(1, thread.ReplyCount);
+        Assert.Equal(new DateTime(2026, 7, 10, 4, 5, 0, DateTimeKind.Utc), thread.LastActivityAt);
+        Assert.Equal(2, category.LegacyPostCount);
+        Assert.Equal(new DateTime(2026, 7, 10, 4, 5, 0, DateTimeKind.Utc), category.LastActivityAt);
         Assert.Equal("<p>Reply</p>", (await dbContext.ModernForumPosts.SingleAsync(post => post.LegacyPostId == postId)).BodyHtml);
     }
 

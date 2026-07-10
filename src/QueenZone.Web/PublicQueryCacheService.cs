@@ -84,6 +84,12 @@ public sealed class PublicQueryCacheService(
         cache.Set(PublicQueryCacheKeys.NewsVersion, CreateNewsCacheVersion(), NewsVersionEntryOptions);
     }
 
+    public void InvalidateForumStatsCache()
+    {
+        cache.Remove(PublicQueryCacheKeys.ForumCategories);
+        cache.Remove(PublicQueryCacheKeys.ForumThreadCount);
+    }
+
     private string GetNewsCacheVersion()
     {
         if (cache.TryGetValue(PublicQueryCacheKeys.NewsVersion, out string? version)
