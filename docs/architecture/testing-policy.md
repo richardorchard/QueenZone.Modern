@@ -120,17 +120,21 @@ These checks may live as test projects, import-tool reports, or validation scrip
 
 Use Playwright for a small browser-level smoke suite once the UI has stable pages.
 
-Good targets:
+The suite lives in `tests/QueenZone.Web.E2E` (not part of `QueenZone.sln`, so default `dotnet test QueenZone.sln` stays DB-free and server-free).
 
-- Homepage loads.
-- News archive navigation works.
+Good targets (covered or expanding):
+
+- Homepage, news archive (including pagination), and news detail (canonical + body).
+- Forum index, category, and topic (posts + breadcrumbs).
+- Articles, biography, photography, and search surface loads.
+- Mobile viewport + open mobile nav menu.
+- axe-core accessibility smoke: **critical** violations fail the run (serious findings are logged).
 - Admin news list and create-draft flow with `X-Test-User-Email` test auth in the `Testing` environment.
-- News detail pages are crawlable.
-- News archive and detail pages are crawlable in a browser.
-- Mobile viewport smoke checks.
-- Basic accessibility smoke checks.
+- Editorial discovery promote → publish → public visibility journey.
 
 Keep end-to-end tests small. They should prove critical user journeys and browser behavior, not duplicate all route integration tests.
+
+On failure, tests write screenshots and Playwright traces under `test-results/e2e/` (gitignored). CI uploads that folder as an artifact when the e2e job fails.
 
 ### Frontend performance checks (advisory)
 
