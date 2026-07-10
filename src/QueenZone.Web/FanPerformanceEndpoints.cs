@@ -6,7 +6,7 @@ public static class FanPerformanceEndpoints
 {
     public static void MapFanPerformanceEndpoints(this WebApplication app)
     {
-        app.MapGet("/fan-performances/{id:int}/audio", async (
+        app.MapGet("/fan-performances/{id:int}/audio/{filename?}", async (
             int id,
             IFanPerformanceRepository fanPerformanceRepository,
             CancellationToken cancellationToken) =>
