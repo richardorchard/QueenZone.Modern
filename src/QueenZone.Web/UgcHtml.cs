@@ -1,4 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Net;
+using System.Text.RegularExpressions;
 using AngleSharp.Dom;
 using Ganss.Xss;
 using Microsoft.Extensions.Options;
@@ -10,7 +12,14 @@ namespace QueenZone.Web;
 /// Server-side sanitization for user-generated rich HTML (forum, future UGC articles).
 /// Separate from <see cref="NewsArticleContent"/> so public news allowlists do not expand by accident.
 /// </summary>
-public sealed class UgcHtml(IOptions<BlobUploadOptions> blobUploadOptions)
+/// <remarks>
+/// <para><b>Image src policy (forum / UGC):</b> only app-proxy UGC paths
+/// (<c>/ugc/forum/...</c>, etc.) and configured UGC hosts (CDN base or Azure blob paths under known
+/// <c>ugc-*</c> containers) are kept. Arbitrary external hosts such as
+/// <c>https://evil.example.com/...</c> are stripped. Prefer proxy paths so private containers are not
+/// exposed via direct blob URLs.</para>
+/// </remarks>
+public sealed partial class UgcHtml(IOptions<BlobUploadOptions> blobUploadOptions)
 {
     private readonly BlobUploadOptions blobOptions = blobUploadOptions.Value;
 
@@ -21,7 +30,27 @@ public sealed class UgcHtml(IOptions<BlobUploadOptions> blobUploadOptions)
             return string.Empty;
         }
 
-        return CreateSanitizer().Sanitize(html);
+        return CreateSanitizer(forDisplay: false).Sanitize(html);
+    }
+
+    /// <summary>
+    /// Sanitizes UGC HTML for public rendering. Images use the stored thumbnail proxy path
+    /// (or <c>?size=thumb</c>) and wrap a link to the full-size image.
+    /// Plain-text legacy bodies keep auto-linked URLs via <see cref="NewsArticleContent.FormatBody"/>.
+    /// </summary>
+    public string FormatForDisplay(string? body)
+    {
+        if (string.IsNullOrEmpty(body))
+        {
+            return string.Empty;
+        }
+
+        if (!LooksLikeHtml(body))
+        {
+            return NewsArticleContent.FormatBody(body);
+        }
+
+        return CreateSanitizer(forDisplay: true).Sanitize(body);
     }
 
     public bool IsAllowedImageSrc(string? src)
@@ -31,7 +60,16 @@ public sealed class UgcHtml(IOptions<BlobUploadOptions> blobUploadOptions)
             return false;
         }
 
-        if (!Uri.TryCreate(src.Trim(), UriKind.Absolute, out var uri)
+        var trimmed = src.Trim();
+
+        // App-relative UGC proxy paths — preferred product contract (served by this web app).
+        if (trimmed.StartsWith("/ugc/", StringComparison.OrdinalIgnoreCase)
+            && UgcProxyPaths.IsProxyImageSrc(trimmed))
+        {
+            return true;
+        }
+
+        if (!Uri.TryCreate(trimmed, UriKind.Absolute, out var uri)
             || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
         {
             return false;
@@ -73,8 +111,10 @@ public sealed class UgcHtml(IOptions<BlobUploadOptions> blobUploadOptions)
         return false;
     }
 
+    private static bool LooksLikeHtml(string value) => HtmlTagRegex().IsMatch(value);
+
     [ExcludeFromCodeCoverage(Justification = "HtmlSanitizer wiring; covered via Sanitize tests.")]
-    private HtmlSanitizer CreateSanitizer()
+    private HtmlSanitizer CreateSanitizer(bool forDisplay)
     {
         var sanitizer = new HtmlSanitizer();
 
@@ -93,6 +133,8 @@ public sealed class UgcHtml(IOptions<BlobUploadOptions> blobUploadOptions)
         sanitizer.AllowedAttributes.Add("src");
         sanitizer.AllowedAttributes.Add("alt");
         sanitizer.AllowedAttributes.Add("title");
+        sanitizer.AllowedAttributes.Add("class");
+        sanitizer.AllowedAttributes.Add("loading");
 
         sanitizer.AllowedSchemes.Clear();
         sanitizer.AllowedSchemes.Add(Uri.UriSchemeHttp);
@@ -120,10 +162,101 @@ public sealed class UgcHtml(IOptions<BlobUploadOptions> blobUploadOptions)
                 if (!IsAllowedImageSrc(src))
                 {
                     element.Remove();
+                    return;
+                }
+
+                if (forDisplay)
+                {
+                    RewriteImageForDisplay(element, src!);
                 }
             }
         };
 
         return sanitizer;
     }
+
+    private static void RewriteImageForDisplay(IElement img, string src)
+    {
+        // Prefer stored -thumb.webp sibling; fall back to ?size=thumb on the proxy.
+        string fullHref;
+        string thumbSrc;
+
+        if (UgcProxyPaths.TryParseProxySrc(src, out var container, out var blobName))
+        {
+            // If the src already points at a thumb blob, link full to the non-thumb sibling.
+            var isThumbBlob = blobName.EndsWith("-thumb.webp", StringComparison.OrdinalIgnoreCase)
+                || blobName.EndsWith("-thumb", StringComparison.OrdinalIgnoreCase);
+
+            if (isThumbBlob)
+            {
+                var fullBlob = blobName
+                    .Replace("-thumb.webp", ".webp", StringComparison.OrdinalIgnoreCase)
+                    .Replace("-thumb", string.Empty, StringComparison.OrdinalIgnoreCase);
+                fullHref = UgcProxyPaths.GetPath(container, fullBlob);
+                thumbSrc = UgcProxyPaths.GetPath(container, blobName);
+            }
+            else
+            {
+                fullHref = UgcProxyPaths.GetPath(container, blobName);
+                thumbSrc = UgcProxyPaths.GetPath(container, UgcProxyPaths.ToThumbBlobName(blobName));
+            }
+        }
+        else
+        {
+            fullHref = src;
+            thumbSrc = src.Contains('?', StringComparison.Ordinal)
+                ? src + "&size=thumb"
+                : src + "?size=thumb";
+        }
+
+        img.SetAttribute("src", thumbSrc);
+        if (!img.HasAttribute("alt"))
+        {
+            img.SetAttribute("alt", string.Empty);
+        }
+
+        img.SetAttribute("class", MergeClass(img.GetAttribute("class"), "qz-ugc-img"));
+        img.SetAttribute("loading", "lazy");
+
+        // Skip wrapping if already inside a link.
+        if (img.ParentElement is { } parent
+            && string.Equals(parent.TagName, "A", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        var owner = img.Owner;
+        if (owner is null)
+        {
+            return;
+        }
+
+        var anchor = owner.CreateElement("a");
+        anchor.SetAttribute("href", fullHref);
+        anchor.SetAttribute("target", "_blank");
+        anchor.SetAttribute("rel", "noopener noreferrer");
+        anchor.SetAttribute("class", "qz-ugc-img-link");
+
+        img.ReplaceWith(anchor);
+        anchor.AppendChild(img);
+    }
+
+    private static string MergeClass(string? existing, string add)
+    {
+        if (string.IsNullOrWhiteSpace(existing))
+        {
+            return add;
+        }
+
+        if (existing.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Contains(add, StringComparer.Ordinal))
+        {
+            return existing;
+        }
+
+        return existing + " " + add;
+    }
+
+    [GeneratedRegex("<[^>]+>", RegexOptions.IgnoreCase)]
+    private static partial Regex HtmlTagRegex();
 }

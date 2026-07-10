@@ -41,6 +41,22 @@ public sealed class UgcHtmlTests
     }
 
     [Fact]
+    public void Sanitize_preserves_ugc_proxy_img_and_strips_external()
+    {
+        // Policy: only UGC proxy paths (and configured UGC hosts) — not arbitrary external images.
+        var input = """
+            <p>Hello</p>
+            <img src="/ugc/forum/members/abc/photo.webp" alt="ok">
+            <img src="https://evil.example.com/phish.jpg" alt="bad">
+            """;
+
+        var html = Create(publicBaseUrl: null).Sanitize(input);
+
+        Assert.Contains("/ugc/forum/members/abc/photo.webp", html);
+        Assert.DoesNotContain("evil.example.com", html);
+    }
+
+    [Fact]
     public void Sanitize_allows_azure_blob_ugc_container_urls()
     {
         var html = Create(publicBaseUrl: null).Sanitize(
@@ -56,6 +72,43 @@ public sealed class UgcHtmlTests
             """<img src="https://acct.blob.core.windows.net/legacy-photos/a.jpg" alt="no">""");
 
         Assert.DoesNotContain("legacy-photos", html);
+    }
+
+    [Fact]
+    public void FormatForDisplay_wraps_proxy_image_with_thumb_and_full_link()
+    {
+        var html = Create(publicBaseUrl: null).FormatForDisplay(
+            """<p><img src="/ugc/forum/editors/me/abc.webp" alt="scan"></p>""");
+
+        Assert.Contains("href=\"/ugc/forum/editors/me/abc.webp\"", html);
+        Assert.Contains("src=\"/ugc/forum/editors/me/abc-thumb.webp\"", html);
+        Assert.Contains("qz-ugc-img", html);
+        Assert.DoesNotContain("evil", html);
+    }
+
+    [Fact]
+    public void FormatForDisplay_does_not_double_wrap_linked_thumb()
+    {
+        var html = Create(publicBaseUrl: null).FormatForDisplay(
+            """<a href="/ugc/forum/a/full.webp"><img src="/ugc/forum/a/full-thumb.webp" alt="x" class="qz-ugc-img"></a>""");
+
+        Assert.Contains("full-thumb.webp", html);
+        // One anchor only (no nested re-wrap).
+        Assert.Equal(1, html.Split("<a ", StringSplitOptions.None).Length - 1);
+    }
+
+    [Fact]
+    public void FormatForDisplay_plain_text_auto_links()
+    {
+        var html = Create().FormatForDisplay("See https://example.com/page for details.");
+        Assert.Contains("<a href=\"https://example.com/page\"", html);
+    }
+
+    [Fact]
+    public void IsAllowedImageSrc_rejects_foreign_host_even_with_ugc_path()
+    {
+        Assert.True(Create().IsAllowedImageSrc("/ugc/forum/x.webp"));
+        Assert.False(Create().IsAllowedImageSrc("https://evil.example.com/ugc/forum/x.webp"));
     }
 
     [Theory]

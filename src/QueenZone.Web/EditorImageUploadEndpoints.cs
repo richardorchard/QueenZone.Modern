@@ -84,27 +84,65 @@ public static class EditorImageUploadEndpoints
             ? BlobUploadContainers.Forum
             : container.Trim();
 
-        if (!AllowedContainers.Contains(containerName))
+        if (!AllowedContainers.Contains(containerName)
+            || UgcProxyPaths.TryMapContainerToArea(containerName) is null)
         {
             return Results.BadRequest(new { error = "Container is not allowed for editor uploads." });
         }
 
         var context = BuildUploadContext(httpContext.User);
+        string? fullBlobName = null;
+        string? thumbBlobName = null;
 
         try
         {
-            await using var stream = file.OpenReadStream();
-            var result = await blobUploadService.UploadAsync(
-                stream,
+            await using var source = file.OpenReadStream();
+            var processed = await EditorImageProcessor.ProcessAsync(
+                source,
                 file.FileName,
-                containerName,
-                context,
                 cancellationToken);
 
-            var url = result.PublicUrl
-                ?? $"/{result.Container}/{result.BlobName}";
+            await using (processed.FullImage)
+            await using (processed.Thumbnail)
+            {
+                // Stable WebP names so full + thumb stay paired under the same prefix.
+                fullBlobName = BuildWebpBlobName(context);
+                thumbBlobName = UgcProxyPaths.ToThumbBlobName(fullBlobName);
 
-            return Results.Json(new { url, container = result.Container, blobName = result.BlobName });
+                var fullResult = await blobUploadService.UploadAsync(
+                    processed.FullImage,
+                    fullBlobName,
+                    containerName,
+                    CloneContext(context, fullBlobName),
+                    cancellationToken);
+
+                fullBlobName = fullResult.BlobName;
+                thumbBlobName = UgcProxyPaths.ToThumbBlobName(fullBlobName);
+
+                processed.Thumbnail.Position = 0;
+                await blobUploadService.UploadAsync(
+                    processed.Thumbnail,
+                    thumbBlobName,
+                    containerName,
+                    CloneContext(context, thumbBlobName),
+                    cancellationToken);
+
+                // Product contract: app proxy paths only (not Azure blob / CDN raw URLs).
+                var url = UgcProxyPaths.GetPath(fullResult.Container, fullBlobName);
+                var thumbUrl = UgcProxyPaths.GetPath(fullResult.Container, thumbBlobName);
+
+                return Results.Json(new
+                {
+                    url,
+                    thumbUrl,
+                    container = fullResult.Container,
+                    blobName = fullBlobName,
+                });
+            }
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.BadRequest(new { error = ex.Message });
         }
         catch (NotSupportedException ex)
         {
@@ -112,7 +150,69 @@ public static class EditorImageUploadEndpoints
         }
         catch (BlobUploadException ex)
         {
+            // Best-effort cleanup if thumb failed after full succeeded.
+            await TryDeleteQuietlyAsync(blobUploadService, containerName, fullBlobName, cancellationToken);
+            await TryDeleteQuietlyAsync(blobUploadService, containerName, thumbBlobName, cancellationToken);
             return Results.BadRequest(new { error = ex.Message });
+        }
+    }
+
+    private static string BuildWebpBlobName(BlobUploadContext context)
+    {
+        // Mirror BlobNameGenerator layout with a .webp extension.
+        var id = Guid.NewGuid().ToString("N");
+        if (context.MemberAccountId is Guid accountId && accountId != Guid.Empty)
+        {
+            return $"members/{accountId:N}/{id}.webp";
+        }
+
+        if (!string.IsNullOrWhiteSpace(context.ActorEmail))
+        {
+            var slug = SanitizeEmailSegment(context.ActorEmail);
+            return $"editors/{slug}/{id}.webp";
+        }
+
+        return $"anonymous/{id}.webp";
+    }
+
+    private static string SanitizeEmailSegment(string value)
+    {
+        var trimmed = value.Trim().ToLowerInvariant();
+        var chars = trimmed
+            .Select(ch =>
+            {
+                if (char.IsAsciiLetterOrDigit(ch) || ch is '-' or '_' or '.')
+                {
+                    return ch;
+                }
+
+                return ch is '@' or '+' ? '-' : '\0';
+            })
+            .Where(ch => ch != '\0')
+            .ToArray();
+
+        var result = new string(chars).Trim('-', '.');
+        return string.IsNullOrEmpty(result) ? "unknown" : result;
+    }
+
+    private static async Task TryDeleteQuietlyAsync(
+        IBlobUploadService blobUploadService,
+        string containerName,
+        string? blobName,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(blobName))
+        {
+            return;
+        }
+
+        try
+        {
+            await blobUploadService.DeleteAsync(containerName, blobName, cancellationToken);
+        }
+        catch
+        {
+            // Cleanup is best-effort.
         }
     }
 
@@ -122,9 +222,26 @@ public static class EditorImageUploadEndpoints
             ?? user.FindFirstValue("preferred_username")
             ?? user.Identity?.Name;
 
+        Guid? memberAccountId = null;
+        var memberIdValue = user.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (Guid.TryParse(memberIdValue, out var parsed) && parsed != Guid.Empty)
+        {
+            memberAccountId = parsed;
+        }
+
         return new BlobUploadContext
         {
             ActorEmail = email,
+            MemberAccountId = memberAccountId,
         };
     }
+
+    private static BlobUploadContext CloneContext(BlobUploadContext source, string preferredBlobName) =>
+        new()
+        {
+            MemberAccountId = source.MemberAccountId,
+            MemberId = source.MemberId,
+            ActorEmail = source.ActorEmail,
+            PreferredBlobName = preferredBlobName,
+        };
 }

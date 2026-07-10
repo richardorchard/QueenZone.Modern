@@ -1,4 +1,5 @@
 @model IReadOnlyList<ForumPostViewModel>
+@inject UgcHtml UgcHtml
 
 @if (Model.Count == 0)
 {
@@ -24,7 +25,7 @@ else
           </div>
           <time class="qz-meta" datetime="@post.PostedAt.ToString("yyyy-MM-ddTHH:mm:ss")">@post.PostedAt.ToString("dd MMMM yyyy HH:mm")</time>
         </header>
-        <div class="qz-forum-post__body article-body">@Html.Raw(NewsArticleContent.FormatBody(post.Body))</div>
+        <div class="qz-forum-post__body article-body">@Html.Raw(UgcHtml.FormatForDisplay(post.Body))</div>
         @if (post.Attachments is { Count: > 0 })
         {
           <div class="qz-forum-post__attachments">

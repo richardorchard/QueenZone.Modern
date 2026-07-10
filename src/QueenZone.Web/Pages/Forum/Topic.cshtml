@@ -1,11 +1,13 @@
 @page "/forum/topic/{topicId:int}/{slug}"
 @model TopicModel
+@using QueenZone.Storage
 @{
   var header = Model.Header!;
   ViewData["TextareaId"] = "Body";
   ViewData["TextareaName"] = "Body";
   ViewData["EditorValue"] = Model.Body;
   ViewData["EditorLabel"] = "Reply";
+  ViewData["UploadContainer"] = BlobUploadContainers.Forum;
 }
 
 <section class="qz-page-hero">
