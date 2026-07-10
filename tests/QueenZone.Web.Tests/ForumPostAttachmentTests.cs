@@ -8,7 +8,7 @@ public sealed class ForumPostAttachmentTests
     public void Url_IsCorrectBlobStoragePath()
     {
         var attachment = new ForumPostAttachment("setlist-scan.jpg", 100_000);
-        Assert.Equal("https://pictures.queenzone.org/attachments/setlist-scan.jpg", attachment.Url);
+        Assert.Equal("https://cdn.queenzone.org/attachments/setlist-scan.jpg", attachment.Url);
     }
 
     [Theory]

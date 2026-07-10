@@ -2,12 +2,12 @@ namespace QueenZone.Data;
 
 /// <summary>
 /// Builds public image URLs from legacy PIC_FILES_T paths (e.g. "/Brian_May/3120008212.jpg").
-/// The Cloudflare Worker at pictures.queenzone.org maps the first path segment, lower-cased
+/// The CDN/Worker at cdn.queenzone.org maps the first path segment, lower-cased
 /// with underscores converted to hyphens, to the matching Azure Blob Storage folder.
 /// </summary>
 public static class PhotoImageUrl
 {
-    private const string PublicBaseUrl = "https://pictures.queenzone.org";
+    private const string PublicBaseUrl = "https://cdn.queenzone.org";
     private const string BlobStorageBaseUrl = "https://queenzone.blob.core.windows.net";
 
     public static string Build(string legacyPath)

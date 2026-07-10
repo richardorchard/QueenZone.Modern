@@ -58,20 +58,20 @@ is budget-contained.
 Public archive media is served from Azure Blob Storage through Cloudflare:
 
 ```text
-Visitor URL: https://pictures.queenzone.org/{container}/{blob}
+Visitor URL: https://cdn.queenzone.org/{container}/{blob}
 Cloudflare Worker: pictures-queenzone-org
-Worker route: pictures.queenzone.org/*
+Worker route: cdn.queenzone.org/*
 Azure origin: https://queenzone.blob.core.windows.net
 Storage account: queenzone
 ```
 
-The Worker is used because Cloudflare Free supports proxied DNS and Workers, but Host header, SNI, and DNS origin overrides in Origin Rules are Enterprise-only. Azure Blob Storage rejects direct proxied requests to `pictures.queenzone.org` unless the request to Azure uses the storage account host. The Worker fetches the equivalent Azure Blob URL directly, avoiding the need for Enterprise Origin Rules.
+The Worker is used because Cloudflare Free supports proxied DNS and Workers, but Host header, SNI, and DNS origin overrides in Origin Rules are Enterprise-only. Azure Blob Storage rejects direct proxied requests to `cdn.queenzone.org` unless the request to Azure uses the storage account host. The Worker fetches the equivalent Azure Blob URL directly, avoiding the need for Enterprise Origin Rules.
 
 The Cloudflare DNS record should remain:
 
 ```text
 Type: CNAME
-Name: pictures
+Name: cdn
 Target: queenzone.blob.core.windows.net
 Proxy status: Proxied
 TTL: Auto
@@ -92,7 +92,7 @@ Azure requirements:
 - Public archive containers must remain public where visitor access is expected.
 - Private containers such as `databasebackup` and `songfiles` should remain private.
 
-Do not configure Azure CDN, Azure Front Door, or an Azure Storage custom domain for `pictures.queenzone.org` unless the architecture is deliberately changed.
+Do not configure Azure CDN, Azure Front Door, or an Azure Storage custom domain for `cdn.queenzone.org` unless the architecture is deliberately changed.
 
 ## Database Access
 
