@@ -20,16 +20,24 @@
     memberId = parsedMemberId;
   }
   // Look up avatar presence once per request so the header can show the image without
-  // baking blob URLs into the cookie.
+  // baking blob URLs into the cookie. Fail soft (initials fallback) if the DB is mid-migration
+  // or unavailable — never break sign-in or page render for avatar lookup alone.
   var memberHasAvatar = false;
   if (memberId is Guid mid)
   {
-    var memberAccounts = Context.RequestServices.GetService(typeof(QueenZone.Data.IMemberAccountRepository))
-      as QueenZone.Data.IMemberAccountRepository;
-    if (memberAccounts is not null)
+    try
     {
-      var memberAccount = await memberAccounts.FindByIdAsync(mid);
-      memberHasAvatar = !string.IsNullOrWhiteSpace(memberAccount?.AvatarUrl);
+      var memberAccounts = Context.RequestServices.GetService(typeof(QueenZone.Data.IMemberAccountRepository))
+        as QueenZone.Data.IMemberAccountRepository;
+      if (memberAccounts is not null)
+      {
+        var memberAccount = await memberAccounts.FindByIdAsync(mid);
+        memberHasAvatar = !string.IsNullOrWhiteSpace(memberAccount?.AvatarUrl);
+      }
+    }
+    catch
+    {
+      memberHasAvatar = false;
     }
   }
   var navGroups = new[]
