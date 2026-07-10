@@ -41,7 +41,12 @@
         <div class="qz-account-settings__avatar-row">
           <partial name="_MemberAvatar" model="@(new MemberAvatarViewModel { DisplayName = Model.DisplayName, MemberId = Model.MemberId, HasAvatar = Model.HasAvatar, Size = "md" })" />
           <div class="qz-account-settings__avatar-forms">
-            <form method="post" asp-page-handler="UploadAvatar" enctype="multipart/form-data" class="qz-account-form">
+            <form method="post"
+                  asp-page-handler="UploadAvatar"
+                  enctype="multipart/form-data"
+                  class="qz-account-form"
+                  data-busy-submit
+                  data-busy-label="Uploading…">
               @Html.AntiForgeryToken()
               <label class="qz-account-form__field">
                 <span>Upload image</span>
@@ -57,21 +62,31 @@
               <div class="qz-account-form__actions">
                 <button type="submit" class="qz-button">Upload avatar</button>
               </div>
+              <p class="qz-account-form__status" data-busy-status hidden role="status" aria-live="polite"></p>
             </form>
             @if (Model.HasAvatar)
             {
-              <form method="post" asp-page-handler="RemoveAvatar" class="qz-account-form">
+              <form method="post"
+                    asp-page-handler="RemoveAvatar"
+                    class="qz-account-form"
+                    data-busy-submit
+                    data-busy-label="Removing…">
                 @Html.AntiForgeryToken()
                 <div class="qz-account-form__actions">
                   <button type="submit" class="qz-button qz-button--outline">Remove avatar</button>
                 </div>
+                <p class="qz-account-form__status" data-busy-status hidden role="status" aria-live="polite"></p>
               </form>
             }
           </div>
         </div>
       </section>
 
-      <form method="post" class="qz-account-form" novalidate>
+      <form method="post"
+            class="qz-account-form"
+            novalidate
+            data-busy-submit
+            data-busy-label="Saving…">
         @Html.AntiForgeryToken()
 
         <div asp-validation-summary="ModelOnly" class="qz-account-form__errors" role="alert"></div>
@@ -94,6 +109,7 @@
         <div class="qz-account-form__actions">
           <button type="submit" class="qz-button">Save display name</button>
         </div>
+        <p class="qz-account-form__status" data-busy-status hidden role="status" aria-live="polite"></p>
       </form>
     </div>
   </div>

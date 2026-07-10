@@ -184,3 +184,58 @@
   window.addEventListener("scroll", setScrolled, { passive: true });
   setScrolled();
 })();
+
+// Progressive submit feedback for forms that can take a noticeable time
+// (e.g. avatar upload with server-side image processing).
+(() => {
+  const forms = document.querySelectorAll("form[data-busy-submit]");
+  if (forms.length === 0) {
+    return;
+  }
+
+  forms.forEach((form) => {
+    form.addEventListener("submit", (event) => {
+      if (form.classList.contains("is-submitting")) {
+        // Already submitted once; block double-posts.
+        event.preventDefault();
+        return;
+      }
+
+      // Honour HTML constraint validation even when the form has novalidate
+      // (novalidate only disables the browser's automatic pre-submit check).
+      if (typeof form.reportValidity === "function" && !form.reportValidity()) {
+        event.preventDefault();
+        return;
+      }
+
+      form.classList.add("is-submitting");
+
+      const busyLabel = form.getAttribute("data-busy-label") || "Working…";
+      const status = form.querySelector("[data-busy-status]");
+      if (status) {
+        status.hidden = false;
+        status.textContent = busyLabel;
+      }
+
+      const submitters = form.querySelectorAll('button[type="submit"], input[type="submit"]');
+      submitters.forEach((control) => {
+        if (control instanceof HTMLButtonElement) {
+          control.classList.add("is-busy");
+          control.setAttribute("aria-busy", "true");
+          control.textContent = busyLabel;
+          // Disable after the current event so the browser still completes this submit.
+          window.setTimeout(() => {
+            control.disabled = true;
+          }, 0);
+        } else if (control instanceof HTMLInputElement) {
+          control.classList.add("is-busy");
+          control.setAttribute("aria-busy", "true");
+          control.value = busyLabel;
+          window.setTimeout(() => {
+            control.disabled = true;
+          }, 0);
+        }
+      });
+    });
+  });
+})();
