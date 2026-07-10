@@ -693,6 +693,7 @@ body.qz-menu-lock .qz-masthead {
   letter-spacing: 0.04em;
   text-transform: uppercase;
   text-decoration: none;
+  cursor: pointer;
 }
 
 .qz-button:hover {
@@ -715,6 +716,49 @@ body.qz-menu-lock .qz-masthead {
   background: transparent;
   color: var(--qz-charcoal);
   border-color: var(--border-strong);
+}
+
+.qz-button--outline:hover {
+  color: var(--qz-charcoal);
+  background: var(--qz-grey-100, #f3f3f3);
+}
+
+.qz-button:disabled,
+.qz-button.is-busy {
+  cursor: progress;
+  opacity: 0.78;
+  pointer-events: none;
+}
+
+.qz-button.is-busy::before {
+  content: "";
+  width: 0.9em;
+  height: 0.9em;
+  flex-shrink: 0;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: qz-button-spin 0.7s linear infinite;
+}
+
+@keyframes qz-button-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.qz-account-form.is-submitting {
+  opacity: 0.92;
+}
+
+.qz-account-form__status {
+  margin: 0;
+  color: var(--text-secondary);
+  font: var(--fw-medium) 0.875rem/1.4 var(--font-body);
+}
+
+.qz-account-form__status[hidden] {
+  display: none;
 }
 
 .qz-error-page__grid {
