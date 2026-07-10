@@ -191,4 +191,41 @@ public sealed class MemberAccountServiceTests
         Assert.True(result.Succeeded);
         Assert.Equal("Shared Name", result.Account!.DisplayName);
     }
+
+    [Fact]
+    public async Task UpdateDisplayNameAsync_Fails_WhenAccountDoesNotExist()
+    {
+        var service = CreateService();
+
+        var result = await service.UpdateDisplayNameAsync(Guid.NewGuid(), "Nobody");
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("Account not found.", result.Error);
+        Assert.Null(result.Account);
+    }
+
+    [Fact]
+    public async Task ListExternalProvidersAsync_ReturnsLinkedProviders()
+    {
+        var service = CreateService();
+        var account = await service.FindOrCreateFromExternalLoginAsync(
+            "Google", "google-providers-1", "providers@example.com", "Provider Fan");
+        await service.FindOrCreateFromExternalLoginAsync(
+            "GitHub", "github-providers-1", "providers@example.com", "Provider Fan");
+
+        var providers = await service.ListExternalProvidersAsync(account.Id);
+
+        Assert.Equal(["GitHub", "Google"], providers);
+    }
+
+    [Fact]
+    public async Task ListExternalProvidersAsync_ReturnsEmpty_WhenNoneLinked()
+    {
+        var service = CreateService();
+        var registered = await service.RegisterAsync("native@example.com", "S3curePass!", "Native Fan");
+
+        var providers = await service.ListExternalProvidersAsync(registered.Account!.Id);
+
+        Assert.Empty(providers);
+    }
 }

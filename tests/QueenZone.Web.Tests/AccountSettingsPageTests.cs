@@ -121,6 +121,35 @@ public sealed partial class AccountSettingsPageTests : IClassFixture<WebApplicat
     }
 
     [Fact]
+    public async Task Post_TooShortName_ReturnsValidationErrors()
+    {
+        var client = await CreateSignedInMemberClientAsync(
+            email: "settings-short@example.com",
+            displayName: "Valid Name",
+            subject: "google-settings-short",
+            options: new WebApplicationFactoryClientOptions
+            {
+                HandleCookies = true,
+                AllowAutoRedirect = false,
+            });
+
+        var formPage = await client.GetStringAsync("/account/settings");
+        var response = await client.PostAsync(
+            "/account/settings",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(formPage),
+                ["DisplayName"] = "A",
+            }));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("between", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Display name updated.", body);
+        Assert.Contains("value=\"A\"", body);
+    }
+
+    [Fact]
     public async Task SignedInHeader_IncludesSettingsLink()
     {
         var client = await CreateSignedInMemberClientAsync(
