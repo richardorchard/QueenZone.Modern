@@ -43,9 +43,18 @@ Store **container + blob name** in the database. Treat any public/display URL as
 
 - Storage is not anonymously listable.
 - Do not use permanent raw `*.blob.core.windows.net` URLs as the product contract.
-- Prefer short-lived SAS and/or a Cloudflare CDN with controlled origin—same idea as `cdn.queenzone.org` for legacy media (straight Cloudflare proxy to Azure Blob), but on separate UGC containers/routes.
+- Prefer short-lived SAS and/or a Cloudflare proxy with controlled origin, on separate UGC containers/routes.
 - **Editor / forum pasted images** are served through the web app proxy: `/ugc/{area}/{blobName}` (e.g. `/ugc/forum/editors/…/id.webp`). Optional `?size=thumb` loads the paired `-thumb.webp` blob (thumb max 600 px longest side; full max 1200 px).
 - App-proxy every byte only when auth truly requires it; private UGC containers use the proxy by default for HTML embeds.
+
+### Legacy media CDN hostnames
+
+Two Cloudflare hostnames proxy the legacy Azure Blob containers. They behave differently and are not interchangeable:
+
+- **`cdn.queenzone.org`** — straight CDN proxy, no Worker. Cannot set response headers. Used by `PhotoImageUrl` for photos and images.
+- **`pictures.queenzone.org`** — Cloudflare Worker proxy. Can set `Content-Disposition` and other response headers. Used by `SongFileUrl` for fan performance audio so the browser download filename is consistent.
+
+Do not route audio through `cdn.queenzone.org`; it silently breaks the download filename without any test failure.
 
 ## Security baseline
 

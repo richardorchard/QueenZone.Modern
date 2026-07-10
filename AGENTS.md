@@ -139,6 +139,19 @@ For local SQL MCP access through Azure Data API Builder, see `docs/sql/data-api-
 
 News agent worker and admin review queue: see `docs/architecture/news-agent.md`. OpenRouter key goes in `src/QueenZone.NewsAgent.Worker/appsettings.Local.json`. Manual OpenRouter smoke test: `scripts/Smoke-NewsAgent.bat`. Admin review UI: `/admin/news-discovery` (requires `Admin:AllowedEmails`; member OAuth at `/account/login` is unrelated).
 
+## Media Serving
+
+Two Cloudflare hostnames serve Azure Blob Storage content. They are **not interchangeable** — pick the right one for the content type.
+
+| Hostname | Type | Can set response headers? | Use for |
+| --- | --- | --- | --- |
+| `cdn.queenzone.org` | Straight CDN proxy | No | Photos and images (`PhotoImageUrl`) |
+| `pictures.queenzone.org` | Cloudflare Worker proxy | Yes | Fan performance audio (`SongFileUrl`) |
+
+`pictures.queenzone.org` goes through a Worker, which allows `Content-Disposition` headers to be set on responses. This is required for fan performance audio so that the browser's native download button shows a consistent filename instead of "audio" (the last segment of the auth-gated endpoint path).
+
+Do not switch `SongFileUrl` back to `cdn.queenzone.org`. Doing so silently breaks the download filename without causing any test failure.
+
 ## Migration Principles
 
 - Preserve public content first.
