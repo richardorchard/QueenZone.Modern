@@ -1,16 +1,24 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
+using QueenZone.Storage;
+using QueenZone.Web;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
 
 namespace QueenZone.Web.Tests;
 
 public sealed partial class AccountSettingsPageTests : IClassFixture<WebApplicationFactory<Program>>
 {
     private readonly WebApplicationFactory<Program> factory;
+    private readonly InMemoryBlobStorageBackend blobBackend = new();
 
     public AccountSettingsPageTests(WebApplicationFactory<Program> factory)
     {
@@ -23,6 +31,11 @@ public sealed partial class AccountSettingsPageTests : IClassFixture<WebApplicat
                     .AddAuthentication()
                     .AddScheme<AuthenticationSchemeOptions, ExternalCookieTestHandler>(
                         MemberAuthenticationSchemes.ExternalCookie, _ => { });
+
+                // Avatar upload requires a real blob service (default Testing uses NullBlobUploadService).
+                services.RemoveAll<IBlobUploadService>();
+                services.AddSingleton<IBlobUploadService>(_ =>
+                    new AzureBlobUploadService(blobBackend, Options.Create(new BlobUploadOptions())));
             });
         });
     }
@@ -86,9 +99,9 @@ public sealed partial class AccountSettingsPageTests : IClassFixture<WebApplicat
         // Follow redirect; header should show the new display name from the re-issued cookie.
         var updatedPage = await client.GetStringAsync("/account/settings");
         Assert.Contains("Display name updated.", updatedPage);
-        Assert.Contains("value=\"After Name\"", updatedPage);
-        Assert.Contains("After Name", updatedPage);
-        Assert.DoesNotContain("Before Name", updatedPage);
+        Assert.Contains("After Name", updatedPage, StringComparison.Ordinal);
+        Assert.DoesNotContain("Before Name", updatedPage, StringComparison.Ordinal);
+        Assert.Contains("name=\"DisplayName\"", updatedPage, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -161,6 +174,87 @@ public sealed partial class AccountSettingsPageTests : IClassFixture<WebApplicat
 
         Assert.Contains("href=\"/account/settings\"", body);
         Assert.Contains(">Settings</a>", body);
+        Assert.Contains("qz-avatar", body);
+    }
+
+    [Fact]
+    public async Task PostUploadAvatar_StoresAvatar_AndShowsImageOnSettings()
+    {
+        var client = await CreateSignedInMemberClientAsync(
+            email: "settings-avatar@example.com",
+            displayName: "Avatar Uploader",
+            subject: "google-settings-avatar",
+            options: new WebApplicationFactoryClientOptions
+            {
+                HandleCookies = true,
+                AllowAutoRedirect = false,
+            });
+
+        var formPage = await client.GetStringAsync("/account/settings");
+        var token = ExtractAntiforgeryToken(formPage);
+        await using var png = await CreatePngAsync();
+        using var content = new MultipartFormDataContent();
+        content.Add(new StringContent(token), "__RequestVerificationToken");
+        var fileContent = new StreamContent(png);
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue("image/png");
+        content.Add(fileContent, "AvatarFile", "face.png");
+
+        var response = await client.PostAsync("/account/settings?handler=UploadAvatar", content);
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+
+        var updated = await client.GetStringAsync("/account/settings");
+        Assert.Contains("Avatar updated.", updated);
+        Assert.Contains("/account/avatar/", updated);
+        Assert.Contains("Remove avatar", updated);
+    }
+
+    [Fact]
+    public async Task PostRemoveAvatar_ClearsAvatar()
+    {
+        var client = await CreateSignedInMemberClientAsync(
+            email: "settings-remove-avatar@example.com",
+            displayName: "Remove Avatar Fan",
+            subject: "google-settings-remove-avatar",
+            options: new WebApplicationFactoryClientOptions
+            {
+                HandleCookies = true,
+                AllowAutoRedirect = false,
+            });
+
+        // Upload first.
+        var formPage = await client.GetStringAsync("/account/settings");
+        await using var png = await CreatePngAsync();
+        using (var content = new MultipartFormDataContent())
+        {
+            content.Add(new StringContent(ExtractAntiforgeryToken(formPage)), "__RequestVerificationToken");
+            var fileContent = new StreamContent(png);
+            fileContent.Headers.ContentType = new MediaTypeHeaderValue("image/png");
+            content.Add(fileContent, "AvatarFile", "face.png");
+            var upload = await client.PostAsync("/account/settings?handler=UploadAvatar", content);
+            Assert.Equal(HttpStatusCode.Redirect, upload.StatusCode);
+        }
+
+        var afterUpload = await client.GetStringAsync("/account/settings");
+        Assert.Contains("Remove avatar", afterUpload);
+        using var remove = new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = ExtractAntiforgeryToken(afterUpload),
+        });
+        var removeResponse = await client.PostAsync("/account/settings?handler=RemoveAvatar", remove);
+        Assert.Equal(HttpStatusCode.Redirect, removeResponse.StatusCode);
+
+        var afterRemove = await client.GetStringAsync("/account/settings");
+        Assert.Contains("Avatar removed.", afterRemove);
+        Assert.DoesNotContain("Remove avatar", afterRemove);
+    }
+
+    private static async Task<MemoryStream> CreatePngAsync()
+    {
+        using var image = new Image<Rgba32>(40, 40, new Rgba32(10, 180, 90));
+        var stream = new MemoryStream();
+        await image.SaveAsPngAsync(stream);
+        stream.Position = 0;
+        return stream;
     }
 
     private async Task<HttpClient> CreateSignedInMemberClientAsync(

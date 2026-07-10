@@ -16,7 +16,17 @@ internal static class BlobNameGenerator
             extension = extension.ToLowerInvariant();
         }
 
+        if (!string.IsNullOrWhiteSpace(context?.PreferredBlobName))
+        {
+            return context.PreferredBlobName.Trim().TrimStart('/');
+        }
+
         var id = Guid.NewGuid().ToString("N");
+        if (context?.MemberAccountId is Guid accountId && accountId != Guid.Empty)
+        {
+            return $"members/{accountId:N}/{id}{extension}";
+        }
+
         if (context?.MemberId is int memberId and > 0)
         {
             return $"members/{memberId}/{id}{extension}";

@@ -13,6 +13,25 @@
   var memberDisplayName = memberAuthResult.Succeeded
     ? memberAuthResult.Principal?.FindFirstValue(ClaimTypes.Name)
     : null;
+  Guid? memberId = null;
+  if (memberAuthResult.Succeeded
+      && Guid.TryParse(memberAuthResult.Principal?.FindFirstValue(ClaimTypes.NameIdentifier), out var parsedMemberId))
+  {
+    memberId = parsedMemberId;
+  }
+  // Look up avatar presence once per request so the header can show the image without
+  // baking blob URLs into the cookie.
+  var memberHasAvatar = false;
+  if (memberId is Guid mid)
+  {
+    var memberAccounts = Context.RequestServices.GetService(typeof(QueenZone.Data.IMemberAccountRepository))
+      as QueenZone.Data.IMemberAccountRepository;
+    if (memberAccounts is not null)
+    {
+      var memberAccount = await memberAccounts.FindByIdAsync(mid);
+      memberHasAvatar = !string.IsNullOrWhiteSpace(memberAccount?.AvatarUrl);
+    }
+  }
   var navGroups = new[]
   {
     new
@@ -111,7 +130,10 @@
       }
       @if (memberDisplayName is not null)
       {
-        <span class="qz-masthead__member-name" title="@memberDisplayName">@memberDisplayName</span>
+        <a class="qz-masthead__member" href="/account/settings" title="Account settings">
+          <partial name="_MemberAvatar" model="@(new MemberAvatarViewModel { DisplayName = memberDisplayName, MemberId = memberId, HasAvatar = memberHasAvatar, UseThumbnail = true, Size = "sm" })" />
+          <span class="qz-masthead__member-name" title="@memberDisplayName">@memberDisplayName</span>
+        </a>
         <a class="qz-masthead__signin" href="/account/settings" aria-current="@(IsActive("/account/settings") ? "page" : null)">Settings</a>
         <partial name="_MemberSignOut" />
       }
@@ -146,7 +168,10 @@
       <div class="qz-mobile-account" aria-label="Member account">
         @if (memberDisplayName is not null)
         {
-          <span class="qz-masthead__member-name qz-masthead__member-name--mobile">@memberDisplayName</span>
+          <a class="qz-masthead__member qz-masthead__member--mobile" href="/account/settings" title="Account settings">
+            <partial name="_MemberAvatar" model="@(new MemberAvatarViewModel { DisplayName = memberDisplayName, MemberId = memberId, HasAvatar = memberHasAvatar, UseThumbnail = true, Size = "sm" })" />
+            <span class="qz-masthead__member-name qz-masthead__member-name--mobile">@memberDisplayName</span>
+          </a>
           <a class="qz-masthead__signin qz-masthead__signin--mobile" href="/account/settings" aria-current="@(IsActive("/account/settings") ? "page" : null)">Settings</a>
           <partial name="_MemberSignOut" view-data='@new ViewDataDictionary(ViewData) { { "SignOutExtraClass", "qz-masthead__signin--mobile" } }' />
         }

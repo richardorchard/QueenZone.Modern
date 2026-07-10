@@ -92,5 +92,20 @@ public sealed class InMemoryMemberAccountRepository : IMemberAccountRepository
         }
     }
 
+    public Task<MemberAccount?> UpdateAvatarUrlAsync(Guid memberId, string? avatarBlobPath, CancellationToken cancellationToken = default)
+    {
+        lock (gate)
+        {
+            var account = accounts.FirstOrDefault(a => a.Id == memberId);
+            if (account is null)
+            {
+                return Task.FromResult<MemberAccount?>(null);
+            }
+
+            account.AvatarUrl = avatarBlobPath;
+            return Task.FromResult<MemberAccount?>(account);
+        }
+    }
+
     private static string Normalize(string email) => email.Trim().ToUpperInvariant();
 }

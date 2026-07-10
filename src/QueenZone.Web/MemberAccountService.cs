@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using QueenZone.Data;
 using QueenZone.Data.Entities;
+using QueenZone.Storage;
 
 namespace QueenZone.Web;
 
@@ -11,7 +12,8 @@ namespace QueenZone.Web;
 /// </summary>
 public sealed class MemberAccountService(
     IMemberAccountRepository memberAccountRepository,
-    ILegacyMemberLookupRepository legacyMemberLookupRepository)
+    ILegacyMemberLookupRepository legacyMemberLookupRepository,
+    IBlobUploadService blobUploadService)
 {
     private readonly PasswordHasher<MemberAccount> passwordHasher = new();
 
@@ -123,6 +125,174 @@ public sealed class MemberAccountService(
         }
 
         return MemberAccountResult.Success(updated);
+    }
+
+    /// <summary>
+    /// Validates and processes an avatar upload, stores full + thumbnail WebP blobs, and
+    /// updates <see cref="MemberAccount.AvatarUrl"/>. On DB failure the new blobs are deleted
+    /// and the previous avatar is left in place.
+    /// </summary>
+    public async Task<MemberAccountResult> UpdateAvatarAsync(
+        Guid memberId,
+        Stream image,
+        string originalFileName,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(image);
+
+        var account = await memberAccountRepository.FindByIdAsync(memberId, cancellationToken);
+        if (account is null)
+        {
+            return MemberAccountResult.Failure("Account not found.");
+        }
+
+        MemberAvatarImageProcessor.ProcessedAvatar processed;
+        try
+        {
+            processed = await MemberAvatarImageProcessor.ProcessAsync(image, originalFileName, cancellationToken);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return MemberAccountResult.Failure(ex.Message);
+        }
+
+        await using (processed.FullImage)
+        await using (processed.Thumbnail)
+        {
+            var avatarBlobName = MemberAvatarPaths.CreateAvatarBlobName(memberId);
+            var thumbBlobName = MemberAvatarPaths.ToThumbBlobName(avatarBlobName);
+            var uploadContext = new BlobUploadContext
+            {
+                MemberAccountId = memberId,
+                PreferredBlobName = avatarBlobName,
+            };
+            var thumbContext = new BlobUploadContext
+            {
+                MemberAccountId = memberId,
+                PreferredBlobName = thumbBlobName,
+            };
+
+            string? uploadedAvatar = null;
+            string? uploadedThumb = null;
+            try
+            {
+                processed.FullImage.Position = 0;
+                var fullResult = await blobUploadService.UploadAsync(
+                    processed.FullImage,
+                    "avatar.webp",
+                    MemberAvatarPaths.Container,
+                    uploadContext,
+                    cancellationToken);
+                uploadedAvatar = fullResult.BlobName;
+
+                processed.Thumbnail.Position = 0;
+                var thumbResult = await blobUploadService.UploadAsync(
+                    processed.Thumbnail,
+                    "avatar-thumb.webp",
+                    MemberAvatarPaths.Container,
+                    thumbContext,
+                    cancellationToken);
+                uploadedThumb = thumbResult.BlobName;
+
+                var previousAvatar = account.AvatarUrl;
+                var updated = await memberAccountRepository.UpdateAvatarUrlAsync(
+                    memberId,
+                    uploadedAvatar,
+                    cancellationToken);
+                if (updated is null)
+                {
+                    await SafeDeleteAsync(uploadedAvatar, uploadedThumb, cancellationToken);
+                    return MemberAccountResult.Failure("Account not found.");
+                }
+
+                // Delete previous blobs only after the DB write succeeds.
+                if (!string.IsNullOrWhiteSpace(previousAvatar)
+                    && !string.Equals(previousAvatar, uploadedAvatar, StringComparison.Ordinal))
+                {
+                    await SafeDeleteAsync(
+                        previousAvatar,
+                        MemberAvatarPaths.ToThumbBlobName(previousAvatar),
+                        cancellationToken);
+                }
+
+                return MemberAccountResult.Success(updated);
+            }
+            catch (NotSupportedException ex)
+            {
+                await SafeDeleteAsync(uploadedAvatar, uploadedThumb, cancellationToken);
+                return MemberAccountResult.Failure(ex.Message);
+            }
+            catch (BlobUploadException ex)
+            {
+                await SafeDeleteAsync(uploadedAvatar, uploadedThumb, cancellationToken);
+                return MemberAccountResult.Failure(ex.Message);
+            }
+            catch (Exception)
+            {
+                await SafeDeleteAsync(uploadedAvatar, uploadedThumb, cancellationToken);
+                throw;
+            }
+        }
+    }
+
+    public async Task<MemberAccountResult> RemoveAvatarAsync(
+        Guid memberId,
+        CancellationToken cancellationToken = default)
+    {
+        var account = await memberAccountRepository.FindByIdAsync(memberId, cancellationToken);
+        if (account is null)
+        {
+            return MemberAccountResult.Failure("Account not found.");
+        }
+
+        if (string.IsNullOrWhiteSpace(account.AvatarUrl))
+        {
+            return MemberAccountResult.Success(account);
+        }
+
+        var previousAvatar = account.AvatarUrl;
+        var updated = await memberAccountRepository.UpdateAvatarUrlAsync(memberId, null, cancellationToken);
+        if (updated is null)
+        {
+            return MemberAccountResult.Failure("Account not found.");
+        }
+
+        await SafeDeleteAsync(
+            previousAvatar,
+            MemberAvatarPaths.ToThumbBlobName(previousAvatar),
+            cancellationToken);
+
+        return MemberAccountResult.Success(updated);
+    }
+
+    private async Task SafeDeleteAsync(
+        string? avatarBlobName,
+        string? thumbBlobName,
+        CancellationToken cancellationToken)
+    {
+        if (!string.IsNullOrWhiteSpace(avatarBlobName))
+        {
+            try
+            {
+                await blobUploadService.DeleteAsync(MemberAvatarPaths.Container, avatarBlobName, cancellationToken);
+            }
+            catch
+            {
+                // Best-effort cleanup; do not mask the original failure.
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(thumbBlobName))
+        {
+            try
+            {
+                await blobUploadService.DeleteAsync(MemberAvatarPaths.Container, thumbBlobName, cancellationToken);
+            }
+            catch
+            {
+                // Best-effort cleanup.
+            }
+        }
     }
 
     public const int MinDisplayNameLength = 2;

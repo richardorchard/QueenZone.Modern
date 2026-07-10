@@ -1,0 +1,27 @@
+@model QueenZone.Web.MemberAvatarViewModel
+@{
+  var sizeClass = Model.Size switch
+  {
+    "md" => "qz-avatar--md",
+    "lg" => "qz-avatar--lg",
+    _ => "qz-avatar--sm",
+  };
+}
+
+@if (Model.ImageUrl is not null)
+{
+  <img class="qz-avatar qz-avatar--image @sizeClass"
+       src="@Model.ImageUrl"
+       alt="@Model.AltText"
+       width="@(Model.UseThumbnail || Model.Size == "sm" ? 32 : 64)"
+       height="@(Model.UseThumbnail || Model.Size == "sm" ? 32 : 64)"
+       loading="lazy"
+       decoding="async" />
+}
+else
+{
+  <span class="qz-avatar qz-avatar--initials @sizeClass"
+        style="--qz-avatar-bg: @Model.InitialsBackgroundCss"
+        role="img"
+        aria-label="@Model.AltText">@Model.Initials</span>
+}

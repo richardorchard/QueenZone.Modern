@@ -21,4 +21,10 @@ public interface IMemberAccountRepository
     /// Display names are not unique — multiple members may share the same name.
     /// </summary>
     Task<MemberAccount?> UpdateDisplayNameAsync(Guid memberId, string displayName, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Sets or clears <see cref="MemberAccount.AvatarUrl"/> (blob path within ugc-avatars).
+    /// Pass null to remove the avatar.
+    /// </summary>
+    Task<MemberAccount?> UpdateAvatarUrlAsync(Guid memberId, string? avatarBlobPath, CancellationToken cancellationToken = default);
 }
