@@ -76,6 +76,12 @@ public static class QueenZoneAuthServiceCollectionExtensions
             options.AddPolicy(MemberAuthenticationSchemes.MemberPolicy, policy =>
                 policy.AddAuthenticationSchemes(MemberAuthenticationSchemes.MembersCookie)
                     .RequireAuthenticatedUser());
+
+            // Shared authoring (rich text image upload). Composite scheme selects member cookie
+            // when present, otherwise Entra/test admin auth (same as admin pages).
+            options.AddPolicy("Authoring", policy =>
+                policy.AddAuthenticationSchemes(AdminAuthenticationSchemes.CompositeScheme)
+                    .RequireAuthenticatedUser());
         });
 
         return services;

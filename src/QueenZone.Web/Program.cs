@@ -112,6 +112,7 @@ app.MapGet("/account/member-probe", () => Results.Ok(new { authenticated = true 
     .RequireAuthorization(MemberAuthenticationSchemes.MemberPolicy);
 
 app.MapFanPerformanceEndpoints();
+app.MapEditorImageUploadEndpoints();
 app.MapSitemapEndpoints();
 app.MapRazorPages();
 app.MapFallbackToPage("/NotFound");

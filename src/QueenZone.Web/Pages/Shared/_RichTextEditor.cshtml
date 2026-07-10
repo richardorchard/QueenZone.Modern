@@ -1,0 +1,39 @@
+@using Microsoft.AspNetCore.Antiforgery
+@using QueenZone.Storage
+@using QueenZone.Web
+@inject IAntiforgery Antiforgery
+@{
+  var textareaId = ViewData["TextareaId"] as string ?? "body";
+  var textareaName = ViewData["TextareaName"] as string ?? "body";
+  var initialValue = ViewData["EditorValue"] as string ?? string.Empty;
+  var container = ViewData["UploadContainer"] as string ?? BlobUploadContainers.Forum;
+  var label = ViewData["EditorLabel"] as string ?? "Body";
+  var rows = ViewData["TextareaRows"] as int? ?? 12;
+  var token = Antiforgery.GetAndStoreTokens(Context).RequestToken ?? string.Empty;
+  var uploadUrl = EditorImageUploadEndpoints.Route;
+}
+
+@* Load Quill only when this partial is used (authoring pages). *@
+<link rel="stylesheet" href="~/css/editor/quill.snow.css" asp-append-version="true" />
+<link rel="stylesheet" href="~/css/editor/rich-text-editor.css" asp-append-version="true" />
+
+<div class="qz-rte-field">
+  <label class="qz-rte-label" for="@textareaId">@label</label>
+  <div class="qz-rte"
+       data-textarea="@textareaId"
+       data-upload-url="@uploadUrl"
+       data-container="@container"
+       data-af-token="@token">
+    <div class="qz-rte-mount" aria-label="@label editor"></div>
+    <p class="qz-rte-error" hidden></p>
+  </div>
+  <textarea id="@textareaId"
+            name="@textareaName"
+            class="qz-rte-textarea"
+            rows="@rows"
+            hidden>@initialValue</textarea>
+  <p class="qz-rte-help">Paste or drop images to upload. Formatting is limited; content is sanitised on save.</p>
+</div>
+
+<script src="~/js/editor/quill.js" asp-append-version="true"></script>
+<script src="~/js/editor/rich-text-editor.js" asp-append-version="true"></script>
