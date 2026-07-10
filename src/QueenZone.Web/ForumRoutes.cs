@@ -20,6 +20,9 @@ public static class ForumRoutes
         return page <= 1 ? $"/forum/{id}/{slug}" : $"/forum/{id}/{slug}/page/{page}";
     }
 
+    public static string GetNewThreadPath(ForumCategorySummary category) =>
+        $"/forum/c/{NewsSlug.Slugify(category.Name)}/new-thread";
+
     public static string GetCategoryPageTitle(ForumCategorySummary category, int page) =>
         page <= 1 ? $"{category.Name} | QueenZone forum" : $"{category.Name} – Page {page} | QueenZone forum";
 

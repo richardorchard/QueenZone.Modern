@@ -1,0 +1,35 @@
+@page "/forum/c/{categorySlug}/new-thread"
+@model NewThreadModel
+@{
+  var category = Model.Category!;
+  ViewData["TextareaId"] = "Body";
+  ViewData["TextareaName"] = "Body";
+  ViewData["EditorValue"] = Model.Body;
+  ViewData["EditorLabel"] = "Body";
+}
+
+<section class="qz-page-hero">
+  <partial name="_PictureImage" model="@("/design-system/assets/crest-white.png", "", false, "qz-page-hero__crest")" />
+  <div class="qz-container qz-breadcrumbs-on-dark">
+    <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
+    <h1>New thread</h1>
+    <p class="lede" style="max-width: var(--container-text);">@category.Name</p>
+  </div>
+</section>
+
+<section class="qz-section">
+  <div class="qz-container qz-prose">
+    <form method="post" class="qz-form">
+      @Html.AntiForgeryToken()
+      <div asp-validation-summary="ModelOnly" class="qz-form__validation"></div>
+      <div class="qz-form__field">
+        <label asp-for="Subject">Subject</label>
+        <input asp-for="Subject" maxlength="200" minlength="5" required />
+        <span asp-validation-for="Subject"></span>
+      </div>
+      <partial name="_RichTextEditor" />
+      <span asp-validation-for="Body"></span>
+      <button class="qz-button" type="submit">Create thread</button>
+    </form>
+  </div>
+</section>

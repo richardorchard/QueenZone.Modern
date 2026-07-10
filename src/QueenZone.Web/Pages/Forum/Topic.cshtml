@@ -2,6 +2,10 @@
 @model TopicModel
 @{
   var header = Model.Header!;
+  ViewData["TextareaId"] = "Body";
+  ViewData["TextareaName"] = "Body";
+  ViewData["EditorValue"] = Model.Body;
+  ViewData["EditorLabel"] = "Reply";
 }
 
 <section class="qz-page-hero">
@@ -20,5 +24,19 @@
     <partial name="_SectionHeader" model="@(("Thread", "Posts in chronological order", false, "/search", "Search forum"))" />
     <partial name="_ForumPostList" model="Model.Posts" />
     <partial name="_ArchivePagination" model="ForumRoutes.GetTopicPaginationViewModel(header, Model.CurrentPage, Model.TotalPages)" />
+    @if (Model.CanReply)
+    {
+      <form method="post" class="qz-form">
+        @Html.AntiForgeryToken()
+        <div asp-validation-summary="ModelOnly" class="qz-form__validation"></div>
+        <partial name="_RichTextEditor" />
+        <span asp-validation-for="Body"></span>
+        <button class="qz-button" type="submit">Reply</button>
+      </form>
+    }
+    else
+    {
+      <p><a class="qz-button" href="/account/login?returnUrl=@Uri.EscapeDataString(HttpContext.Request.Path)">Sign in to reply</a></p>
+    }
   </div>
 </section>

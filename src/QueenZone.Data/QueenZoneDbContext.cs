@@ -18,6 +18,12 @@ public sealed class QueenZoneDbContext : DbContext
 
     public DbSet<MemberExternalLogin> MemberExternalLogins => Set<MemberExternalLogin>();
 
+    public DbSet<ModernForumCategoryEntity> ModernForumCategories => Set<ModernForumCategoryEntity>();
+
+    public DbSet<ModernForumThreadEntity> ModernForumThreads => Set<ModernForumThreadEntity>();
+
+    public DbSet<ModernForumPostEntity> ModernForumPosts => Set<ModernForumPostEntity>();
+
     public DbSet<NewsDiscoverySourceEntity> NewsDiscoverySources => Set<NewsDiscoverySourceEntity>();
 
     public DbSet<NewsCandidateEntity> NewsCandidates => Set<NewsCandidateEntity>();
@@ -113,6 +119,52 @@ public sealed class QueenZoneDbContext : DbContext
             entity.HasOne<MemberAccount>()
                 .WithMany()
                 .HasForeignKey(login => login.MemberAccountId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ModernForumCategoryEntity>(entity =>
+        {
+            entity.ToTable("ModernForumCategory", table => table.ExcludeFromMigrations());
+            entity.HasKey(category => category.Id);
+            entity.Property(category => category.Name).HasMaxLength(100).IsRequired();
+            entity.Property(category => category.Description).HasMaxLength(400);
+            entity.HasIndex(category => category.LegacyForumId)
+                .IsUnique()
+                .HasDatabaseName("UQ_ModernForumCategory_LegacyForumId");
+        });
+
+        modelBuilder.Entity<ModernForumThreadEntity>(entity =>
+        {
+            entity.ToTable("ModernForumThread", table => table.ExcludeFromMigrations());
+            entity.HasKey(thread => thread.Id);
+            entity.Property(thread => thread.Title).HasMaxLength(200).IsRequired();
+            entity.Property(thread => thread.StartedByDisplayName).HasMaxLength(100).IsRequired();
+            entity.Property(thread => thread.StarterAttachment).HasMaxLength(120);
+            entity.Property(thread => thread.StarterFileSize).HasMaxLength(12);
+            entity.HasIndex(thread => thread.LegacyTopicId)
+                .IsUnique()
+                .HasDatabaseName("UQ_ModernForumThread_LegacyTopicId");
+            entity.HasOne(thread => thread.Category)
+                .WithMany()
+                .HasForeignKey(thread => thread.CategoryId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ModernForumPostEntity>(entity =>
+        {
+            entity.ToTable("ModernForumPost", table => table.ExcludeFromMigrations());
+            entity.HasKey(post => post.Id);
+            entity.Property(post => post.AuthorDisplayName).HasMaxLength(100).IsRequired();
+            entity.Property(post => post.BodyHtml).HasMaxLength(8000).IsUnicode(false).IsRequired();
+            entity.Property(post => post.SignatureHtml).HasMaxLength(8000).IsUnicode(false);
+            entity.Property(post => post.Attachment).HasMaxLength(120).IsUnicode(false);
+            entity.Property(post => post.FileSize).HasMaxLength(12).IsUnicode(false);
+            entity.HasIndex(post => post.LegacyPostId)
+                .IsUnique()
+                .HasDatabaseName("UQ_ModernForumPost_LegacyPostId");
+            entity.HasOne(post => post.Thread)
+                .WithMany()
+                .HasForeignKey(post => post.ThreadId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
