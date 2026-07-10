@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using QueenZone.Data;
+using QueenZone.Data.Entities;
 using QueenZone.Web;
 
 namespace QueenZone.Web.Tests;
@@ -63,6 +64,27 @@ public sealed class ForumWriteRoutesTests : IClassFixture<WebApplicationFactory<
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
         Assert.Contains("/forum/topic/1002/ranking-every-studio-album", response.Headers.Location!.OriginalString);
         Assert.Contains("#post-", response.Headers.Location!.OriginalString);
+    }
+
+    [Fact]
+    public async Task ExistingTopicPost_UsesPersistedMemberDisplayName()
+    {
+        var memberId = Guid.NewGuid();
+        await SeedMemberAccountAsync(memberId, "Richard Orchard");
+        var client = CreateMemberClient(factory, memberId, "Member");
+        var page = await client.GetStringAsync("/forum/topic/1002/ranking-every-studio-album");
+        var token = ExtractAntiforgeryToken(page);
+
+        var response = await client.PostAsync("/forum/topic/1002/ranking-every-studio-album", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = token,
+            ["Body"] = "Display name regression reply",
+        }));
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        var redirected = await client.GetStringAsync(response.Headers.Location);
+        Assert.Contains("Richard Orchard", redirected);
+        Assert.Contains("Display name regression reply", redirected);
     }
 
     [Fact]
@@ -176,7 +198,23 @@ public sealed class ForumWriteRoutesTests : IClassFixture<WebApplicationFactory<
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    private static HttpClient CreateMemberClient(WebApplicationFactory<Program> sourceFactory, Guid memberId)
+    private async Task SeedMemberAccountAsync(Guid memberId, string displayName)
+    {
+        using var scope = factory.Services.CreateScope();
+        var repository = scope.ServiceProvider.GetRequiredService<IMemberAccountRepository>();
+        await repository.CreateAsync(new MemberAccount
+        {
+            Id = memberId,
+            Email = $"{memberId:N}@example.test",
+            DisplayName = displayName,
+            CreatedAt = DateTime.UtcNow,
+        });
+    }
+
+    private static HttpClient CreateMemberClient(
+        WebApplicationFactory<Program> sourceFactory,
+        Guid memberId,
+        string displayName = "Forum Fan")
     {
         var client = sourceFactory.CreateClient(new WebApplicationFactoryClientOptions
         {
@@ -184,7 +222,7 @@ public sealed class ForumWriteRoutesTests : IClassFixture<WebApplicationFactory<
             AllowAutoRedirect = false,
         });
         client.DefaultRequestHeaders.Add(TestMemberAuthHandler.MemberIdHeader, memberId.ToString());
-        client.DefaultRequestHeaders.Add(TestMemberAuthHandler.DisplayNameHeader, "Forum Fan");
+        client.DefaultRequestHeaders.Add(TestMemberAuthHandler.DisplayNameHeader, displayName);
         return client;
     }
 
