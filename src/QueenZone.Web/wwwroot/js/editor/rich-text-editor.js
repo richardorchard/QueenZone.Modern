@@ -1,13 +1,19 @@
 /**
  * Initializes Quill rich-text editors bound to hidden textareas.
  * Expected markup: .qz-rte[data-textarea][data-upload-url][data-container][data-af-token]
+ *
+ * File drops are handled on the whole editor chrome (not only the caret line) and the
+ * document-level default is suppressed on compose pages so Chrome does not open the
+ * image in a new tab when the drop misses the contenteditable line.
  */
 (function () {
   "use strict";
 
+  /** @type {WeakMap<Element, {quill: object, root: Element}>} */
+  var editorsByRoot = new WeakMap();
+
   /**
    * Prefer the form's antiforgery field (same token used for POST) over the data attribute.
-   * Generating a second token in the partial can desync from the form token on some hosts.
    */
   function getToken(root) {
     var form = root.closest("form");
@@ -46,15 +52,18 @@
       var label = progress.querySelector(".qz-rte-progress__label");
       if (label) {
         label.textContent =
-          count <= 1 ? "Uploading…" : "Uploading " + count + " files…";
+          count <= 1 ? "Uploading file…" : "Uploading " + count + " files…";
       }
     }
 
     var form = root.closest("form");
     if (form) {
+      form.classList.toggle("qz-form--uploading", busy);
       var buttons = form.querySelectorAll('button[type="submit"], input[type="submit"]');
       for (var i = 0; i < buttons.length; i++) {
-        buttons[i].disabled = busy;
+        if (busy || !form.classList.contains("is-submitting")) {
+          buttons[i].disabled = busy;
+        }
       }
     }
   }
@@ -87,6 +96,20 @@
       name.endsWith(".gif") ||
       name.endsWith(".webp")
     );
+  }
+
+  function transferHasFiles(dataTransfer) {
+    if (!dataTransfer || !dataTransfer.types) {
+      return false;
+    }
+    var types = dataTransfer.types;
+    // types can be a DOMStringList or array-like
+    for (var i = 0; i < types.length; i++) {
+      if (types[i] === "Files" || types[i] === "application/x-moz-file") {
+        return true;
+      }
+    }
+    return false;
   }
 
   function uploadFile(root, file) {
@@ -168,7 +191,6 @@
     if (sel) {
       return sel.index;
     }
-    // Insert before the trailing newline Quill keeps at end of document.
     return Math.max(0, quill.getLength() - 1);
   }
 
@@ -185,7 +207,6 @@
       return;
     }
 
-    // Image: embed then ensure a paragraph break so further typing works.
     quill.insertEmbed(safeIndex, "image", url, "user");
     quill.insertText(safeIndex + 1, "\n", "user");
     quill.setSelection(safeIndex + 2, 0, "silent");
@@ -213,6 +234,17 @@
       });
   }
 
+  function acceptDroppedFiles(quill, root, files, clientX, clientY) {
+    if (!files || !files.length) {
+      return false;
+    }
+    var index = indexFromPoint(quill, clientX, clientY);
+    for (var i = 0; i < files.length; i++) {
+      handleFile(quill, root, files[i], index + i);
+    }
+    return true;
+  }
+
   function pickFiles(accept, multiple, onFiles) {
     var input = document.createElement("input");
     input.setAttribute("type", "file");
@@ -232,6 +264,98 @@
     };
   }
 
+  /**
+   * Find the editor under a point, else the nearest compose editor on the page.
+   */
+  function resolveEditorAtPoint(x, y) {
+    var el = document.elementFromPoint(x, y);
+    while (el && el !== document.documentElement) {
+      if (el.classList && el.classList.contains("qz-rte") && editorsByRoot.has(el)) {
+        return editorsByRoot.get(el);
+      }
+      // Walk up from field/form chrome into the editor root.
+      if (el.classList && el.classList.contains("qz-rte-field")) {
+        var nested = el.querySelector(".qz-rte");
+        if (nested && editorsByRoot.has(nested)) {
+          return editorsByRoot.get(nested);
+        }
+      }
+      el = el.parentElement;
+    }
+
+    // Fallback: first initialized editor (compose pages usually have one).
+    var all = document.querySelectorAll(".qz-rte[data-qz-rte-ready='1']");
+    for (var i = 0; i < all.length; i++) {
+      if (editorsByRoot.has(all[i])) {
+        return editorsByRoot.get(all[i]);
+      }
+    }
+    return null;
+  }
+
+  function setDragActive(root, active) {
+    root.classList.toggle("qz-rte--dragover", active);
+    var field = root.closest(".qz-rte-field");
+    if (field) {
+      field.classList.toggle("qz-rte-field--dragover", active);
+    }
+    var form = root.closest("form");
+    if (form) {
+      form.classList.toggle("qz-form--dragover", active);
+    }
+  }
+
+  function bindDropZone(zone, quill, root) {
+    // Nested dragenter/leave: only clear highlight when the pointer fully leaves the zone.
+    var depth = 0;
+
+    zone.addEventListener("dragenter", function (e) {
+      if (!transferHasFiles(e.dataTransfer)) {
+        return;
+      }
+      e.preventDefault();
+      depth += 1;
+      setDragActive(root, true);
+    });
+
+    zone.addEventListener("dragover", function (e) {
+      if (!transferHasFiles(e.dataTransfer)) {
+        return;
+      }
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.dataTransfer) {
+        e.dataTransfer.dropEffect = "copy";
+      }
+      setDragActive(root, true);
+    });
+
+    zone.addEventListener("dragleave", function (e) {
+      if (!transferHasFiles(e.dataTransfer)) {
+        return;
+      }
+      depth = Math.max(0, depth - 1);
+      // relatedTarget outside the zone → clear
+      var related = e.relatedTarget;
+      if (depth === 0 || (related && !zone.contains(related))) {
+        depth = 0;
+        setDragActive(root, false);
+      }
+    });
+
+    zone.addEventListener("drop", function (e) {
+      var files = e.dataTransfer && e.dataTransfer.files;
+      if (!files || !files.length) {
+        return;
+      }
+      e.preventDefault();
+      e.stopPropagation();
+      depth = 0;
+      setDragActive(root, false);
+      acceptDroppedFiles(quill, root, files, e.clientX, e.clientY);
+    });
+  }
+
   function bindHandlers(quill, root) {
     var toolbar = quill.getModule("toolbar");
     if (toolbar) {
@@ -241,7 +365,6 @@
         });
       });
 
-      // Attach non-image (and image) files via a paperclip control if present.
       var attachBtn = root.parentElement && root.parentElement.querySelector("[data-qz-rte-attach]");
       if (attachBtn) {
         attachBtn.addEventListener("click", function (e) {
@@ -268,7 +391,6 @@
           if (!file) {
             continue;
           }
-          // Prefer images from clipboard; skip non-files.
           if (isImageFile(file) || (file.type && file.type.length > 0)) {
             e.preventDefault();
             handleFile(quill, root, file);
@@ -278,38 +400,76 @@
       }
     });
 
-    // Required so the browser allows drop into the editor (empty paragraphs included).
-    quill.root.addEventListener("dragover", function (e) {
-      if (e.dataTransfer && e.dataTransfer.types) {
-        var types = e.dataTransfer.types;
-        var hasFiles = false;
-        for (var i = 0; i < types.length; i++) {
-          if (types[i] === "Files") {
-            hasFiles = true;
-            break;
-          }
+    // Whole editor chrome (toolbar + content + progress), not just the caret line.
+    bindDropZone(root, quill, root);
+
+    var field = root.closest(".qz-rte-field");
+    if (field) {
+      bindDropZone(field, quill, root);
+    }
+
+    // Compose form: catch drops on help text, buttons, empty padding.
+    var form = root.closest("form");
+    if (form && form.getAttribute("data-qz-rte-drop-bound") !== "1") {
+      form.setAttribute("data-qz-rte-drop-bound", "1");
+      bindDropZone(form, quill, root);
+    }
+  }
+
+  /**
+   * Page-level guard: stop the browser navigating to a dropped file (Chrome opens a tab).
+   * Drops that land outside the editor still cancel navigation; if we can resolve an
+   * editor, the file is accepted into it.
+   */
+  function installDocumentDropGuard() {
+    if (document.documentElement.getAttribute("data-qz-rte-doc-drop") === "1") {
+      return;
+    }
+    document.documentElement.setAttribute("data-qz-rte-doc-drop", "1");
+
+    document.addEventListener(
+      "dragover",
+      function (e) {
+        if (!document.querySelector(".qz-rte[data-qz-rte-ready='1']")) {
+          return;
         }
-        if (hasFiles) {
-          e.preventDefault();
+        if (!transferHasFiles(e.dataTransfer)) {
+          return;
+        }
+        // Required so drop fires and the browser does not use its navigate default.
+        e.preventDefault();
+        if (e.dataTransfer) {
           e.dataTransfer.dropEffect = "copy";
         }
-      }
-    });
+      },
+      false
+    );
 
-    quill.root.addEventListener("drop", function (e) {
-      var files = e.dataTransfer && e.dataTransfer.files;
-      if (!files || !files.length) {
-        return;
-      }
-      e.preventDefault();
-      e.stopPropagation();
+    document.addEventListener(
+      "drop",
+      function (e) {
+        if (!document.querySelector(".qz-rte[data-qz-rte-ready='1']")) {
+          return;
+        }
+        if (!transferHasFiles(e.dataTransfer)) {
+          return;
+        }
+        e.preventDefault();
 
-      var index = indexFromPoint(quill, e.clientX, e.clientY);
-      // Process first file only to keep placement predictable; extra files append after.
-      for (var i = 0; i < files.length; i++) {
-        handleFile(quill, root, files[i], index + i);
-      }
-    });
+        var files = e.dataTransfer && e.dataTransfer.files;
+        if (!files || !files.length) {
+          return;
+        }
+
+        var target = resolveEditorAtPoint(e.clientX, e.clientY);
+        if (!target) {
+          return;
+        }
+        setDragActive(target.root, false);
+        acceptDroppedFiles(target.quill, target.root, files, e.clientX, e.clientY);
+      },
+      false
+    );
   }
 
   function initOne(root) {
@@ -327,7 +487,6 @@
       return;
     }
 
-    // Sync data-af-token from form if the form token is the canonical one.
     var formToken = getToken(root);
     if (formToken) {
       root.setAttribute("data-af-token", formToken);
@@ -380,7 +539,6 @@
       });
     }
 
-    // Attach button lives next to the editor field.
     var field = root.closest(".qz-rte-field");
     if (field && !field.querySelector("[data-qz-rte-attach]")) {
       var actions = document.createElement("div");
@@ -394,7 +552,19 @@
       field.appendChild(actions);
     }
 
+    // Drop hint overlay (shown while dragging files over the zone).
+    if (!root.querySelector(".qz-rte-drop-hint")) {
+      var hint = document.createElement("div");
+      hint.className = "qz-rte-drop-hint";
+      hint.setAttribute("aria-hidden", "true");
+      hint.innerHTML =
+        '<span class="qz-rte-drop-hint__label">Drop image or file to attach</span>';
+      root.appendChild(hint);
+    }
+
+    editorsByRoot.set(root, { quill: quill, root: root });
     bindHandlers(quill, root);
+    installDocumentDropGuard();
     root.setAttribute("data-qz-rte-ready", "1");
     setInflight(root, 0);
   }
