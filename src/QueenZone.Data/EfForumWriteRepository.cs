@@ -1,4 +1,5 @@
 using System.Data;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.EntityFrameworkCore;
 using QueenZone.Data.Entities;
 
@@ -179,6 +180,7 @@ public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForu
             .Select(member => member.DisplayName)
             .SingleOrDefaultAsync(cancellationToken);
 
+    [ExcludeFromCodeCoverage(Justification = "SQL Server read-stat maintenance is covered by manual/production smoke checks; SQLite tests exercise the write flow.")]
     private async Task RefreshStatsForThreadAsync(
         long threadId,
         int legacyTopicId,

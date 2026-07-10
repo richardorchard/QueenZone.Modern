@@ -1,5 +1,8 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace QueenZone.Data.Entities;
 
+[ExcludeFromCodeCoverage]
 public sealed class ModernForumPostEntity
 {
     public long Id { get; set; }

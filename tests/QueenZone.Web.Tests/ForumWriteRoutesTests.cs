@@ -66,6 +66,81 @@ public sealed class ForumWriteRoutesTests : IClassFixture<WebApplicationFactory<
     }
 
     [Fact]
+    public async Task ExistingTopicPost_RedirectsAnonymousMemberToLogin()
+    {
+        var client = CreateMemberClient(factory, Guid.NewGuid());
+        var page = await client.GetStringAsync("/forum/topic/1002/ranking-every-studio-album");
+        var token = ExtractAntiforgeryToken(page);
+        client.DefaultRequestHeaders.Remove(TestMemberAuthHandler.MemberIdHeader);
+        client.DefaultRequestHeaders.Remove(TestMemberAuthHandler.DisplayNameHeader);
+
+        var response = await client.PostAsync("/forum/topic/1002/ranking-every-studio-album", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = token,
+            ["Body"] = "<p>New reply</p>",
+        }));
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Contains("/account/login", response.Headers.Location!.OriginalString);
+    }
+
+    [Fact]
+    public async Task ExistingTopicPost_ReturnsNotFoundForMissingTopic()
+    {
+        var client = CreateMemberClient(factory, Guid.NewGuid());
+        var page = await client.GetStringAsync("/forum/topic/1002/ranking-every-studio-album");
+        var token = ExtractAntiforgeryToken(page);
+
+        var response = await client.PostAsync("/forum/topic/9999/missing-topic", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = token,
+            ["Body"] = "<p>New reply</p>",
+        }));
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ExistingTopicPost_RerendersWhenBodySanitizesToEmpty()
+    {
+        var client = CreateMemberClient(factory, Guid.NewGuid());
+        var page = await client.GetStringAsync("/forum/topic/1002/ranking-every-studio-album");
+        var token = ExtractAntiforgeryToken(page);
+
+        var response = await client.PostAsync("/forum/topic/1002/ranking-every-studio-album", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = token,
+            ["Body"] = "<script>alert(1)</script>",
+        }));
+
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("Body is required.", body);
+    }
+
+    [Fact]
+    public async Task ExistingTopicPost_ReturnsTooManyRequestsAfterRateLimit()
+    {
+        var memberId = Guid.NewGuid();
+        var client = CreateMemberClient(factory, memberId);
+
+        HttpResponseMessage? response = null;
+        for (var i = 0; i < ForumPostRateLimiter.MaxPostsPerMinute + 1; i++)
+        {
+            var page = await client.GetStringAsync("/forum/topic/1002/ranking-every-studio-album");
+            var token = ExtractAntiforgeryToken(page);
+            response = await client.PostAsync("/forum/topic/1002/ranking-every-studio-album", new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = token,
+                ["Body"] = $"<p>Reply {i}</p>",
+            }));
+        }
+
+        Assert.NotNull(response);
+        Assert.Equal((HttpStatusCode)429, response!.StatusCode);
+    }
+
+    [Fact]
     public async Task NewThreadButton_IsVisibleOnCategoryPageForAuthenticatedMember()
     {
         var client = CreateMemberClient(factory, Guid.NewGuid());

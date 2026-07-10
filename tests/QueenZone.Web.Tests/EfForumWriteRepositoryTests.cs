@@ -89,6 +89,90 @@ public sealed class EfForumWriteRepositoryTests : IAsyncDisposable
         Assert.Equal("<p>Reply</p>", (await dbContext.ModernForumPosts.SingleAsync(post => post.LegacyPostId == postId)).BodyHtml);
     }
 
+    [Fact]
+    public async Task CreateThreadAsync_ThrowsWhenCategoryMissing()
+    {
+        var member = await SeedMemberAsync();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => repository.CreateThreadAsync(new NewForumThread(
+            999,
+            member.Id,
+            member.DisplayName,
+            "Missing category",
+            "<p>Body</p>",
+            DateTimeOffset.UtcNow)));
+    }
+
+    [Fact]
+    public async Task CreatePostAsync_ThrowsWhenThreadMissing()
+    {
+        var member = await SeedMemberAsync();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => repository.CreatePostAsync(new NewForumPost(
+            999,
+            member.Id,
+            member.DisplayName,
+            "<p>Reply</p>",
+            DateTimeOffset.UtcNow)));
+    }
+
+    [Fact]
+    public async Task CountMethods_ReturnZeroWhenMemberMissing()
+    {
+        var memberId = Guid.NewGuid();
+
+        Assert.Equal(0, await repository.CountPostsByMemberSinceAsync(memberId, DateTimeOffset.UtcNow.AddMinutes(-1)));
+        Assert.Equal(0, await repository.CountApprovedPostsByMemberAsync(memberId));
+    }
+
+    [Fact]
+    public async Task CreateThreadAsync_TruncatesBodyToLegacyColumnLimit()
+    {
+        var member = await SeedMemberAsync();
+        await SeedCategoryAsync();
+        var longBody = new string('x', 8_100);
+
+        var topicId = await repository.CreateThreadAsync(new NewForumThread(
+            1,
+            member.Id,
+            member.DisplayName,
+            "Long body",
+            longBody,
+            DateTimeOffset.UtcNow));
+
+        var thread = await dbContext.ModernForumThreads.SingleAsync(thread => thread.LegacyTopicId == topicId);
+        var post = await dbContext.ModernForumPosts.SingleAsync(post => post.ThreadId == thread.Id);
+        Assert.Equal(8_000, post.BodyHtml.Length);
+    }
+
+    [Fact]
+    public async Task GetThreadAsync_MapsMissingDatesToMinimum()
+    {
+        await SeedCategoryAsync();
+        dbContext.ModernForumThreads.Add(new ModernForumThreadEntity
+        {
+            LegacyTopicId = 12345,
+            LegacyForumId = 1,
+            CategoryId = 1,
+            Title = "No dates",
+            StartedByDisplayName = "Forum Fan",
+            ReplyCount = 0,
+            IsSticky = false,
+            IsLegacyTopicStarter = true,
+            LegacyDiscography = 0,
+            StarterAttachCount = 0,
+            ImportedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+        });
+        await dbContext.SaveChangesAsync();
+
+        var thread = await repository.GetThreadAsync(12345);
+
+        Assert.NotNull(thread);
+        Assert.Equal(DateTimeOffset.MinValue, thread.CreatedAt);
+        Assert.Equal(DateTimeOffset.MinValue, thread.LastPostAt);
+    }
+
     public async ValueTask DisposeAsync()
     {
         await dbContext.DisposeAsync();
