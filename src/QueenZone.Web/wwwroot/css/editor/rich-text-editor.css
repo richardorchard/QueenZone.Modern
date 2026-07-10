@@ -84,6 +84,14 @@
   color: #555;
 }
 
+.qz-rte-actions {
+  margin-top: 0.5rem;
+}
+
+.qz-rte-attach {
+  font-size: 0.9rem;
+}
+
 .qz-rte-textarea {
   /* Fallback if JS disabled: keep visible enough for progressive enhancement */
   width: 100%;

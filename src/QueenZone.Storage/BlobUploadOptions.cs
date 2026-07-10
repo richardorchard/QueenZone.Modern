@@ -12,6 +12,12 @@ public sealed class BlobUploadOptions
     public long DefaultMaxBytes { get; set; } = 10 * 1024 * 1024;
 
     /// <summary>
+    /// Max size for rich-text editor uploads (paste / toolbar / drag-drop). Defaults to 10 MB.
+    /// The effective limit is the minimum of this value and the target container's max.
+    /// </summary>
+    public long EditorMaxBytes { get; set; } = 10 * 1024 * 1024;
+
+    /// <summary>
     /// Default allowed MIME types (images). Containers may override.
     /// </summary>
     public List<string> DefaultAllowedContentTypes { get; set; } =
@@ -44,6 +50,11 @@ public sealed class BlobUploadOptions
                     "image/webp",
                     "application/pdf",
                     "text/plain",
+                    "application/zip",
+                    "application/msword",
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    "application/vnd.ms-excel",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 ],
             },
             [BlobUploadContainers.Photos] = new()

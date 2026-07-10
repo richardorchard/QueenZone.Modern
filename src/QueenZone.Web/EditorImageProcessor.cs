@@ -17,12 +17,23 @@ public static class EditorImageProcessor
         string FullFileName,
         string ThumbFileName);
 
+    public static Task<ProcessedEditorImage> ProcessAsync(
+        Stream source,
+        string originalFileName,
+        CancellationToken cancellationToken = default) =>
+        ProcessAsync(source, originalFileName, EditorImageUploadEndpoints.MaxImageBytes, cancellationToken);
+
     public static async Task<ProcessedEditorImage> ProcessAsync(
         Stream source,
         string originalFileName,
+        long maxBytes,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(source);
+        if (maxBytes <= 0)
+        {
+            maxBytes = EditorImageUploadEndpoints.MaxImageBytes;
+        }
 
         await using var buffer = new MemoryStream();
         await source.CopyToAsync(buffer, cancellationToken);
@@ -31,10 +42,10 @@ public static class EditorImageProcessor
             throw new InvalidOperationException("An image file is required.");
         }
 
-        if (buffer.Length > EditorImageUploadEndpoints.MaxImageBytes)
+        if (buffer.Length > maxBytes)
         {
             throw new InvalidOperationException(
-                $"Image must be {EditorImageUploadEndpoints.MaxImageBytes} bytes or smaller.");
+                $"Image must be {maxBytes} bytes or smaller.");
         }
 
         buffer.Position = 0;

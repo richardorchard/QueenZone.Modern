@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.StaticFiles;
@@ -100,6 +101,22 @@ app.UseStaticFiles(new StaticFileOptions
     OnPrepareResponse = ctx => StaticFileCacheControl.Apply(ctx.Context, app.Environment),
 });
 app.UseAuthentication();
+// Public pages use a non-member default scheme; without this, HttpContext.User stays
+// anonymous while the MembersCookie is present. Antiforgery tokens then fail on member-only
+// APIs (e.g. editor image upload) because generation and validation see different identities.
+app.Use(async (context, next) =>
+{
+    if (context.User.Identity?.IsAuthenticated != true)
+    {
+        var member = await context.AuthenticateAsync(MemberAuthenticationSchemes.MembersCookie);
+        if (member.Succeeded && member.Principal?.Identity?.IsAuthenticated == true)
+        {
+            context.User = member.Principal;
+        }
+    }
+
+    await next();
+});
 app.UseAuthorization();
 app.UseOutputCache();
 app.UseAntiforgery();

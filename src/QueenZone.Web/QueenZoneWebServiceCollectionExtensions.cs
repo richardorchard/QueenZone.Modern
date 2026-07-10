@@ -75,7 +75,11 @@ public static class QueenZoneWebServiceCollectionExtensions
         services.AddScoped<MemberAccountService>();
         services.AddScoped<UgcHtml>();
         services.AddScoped<ForumPostRateLimiter>();
-        services.AddAntiforgery();
+        // Header name used by the rich-text editor fetch() upload helper.
+        services.AddAntiforgery(options =>
+        {
+            options.HeaderName = EditorImageUploadEndpoints.AntiforgeryHeaderName;
+        });
         return services;
     }
 
