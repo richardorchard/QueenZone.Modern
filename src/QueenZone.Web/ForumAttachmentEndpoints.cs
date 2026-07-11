@@ -49,12 +49,19 @@ public static class ForumAttachmentEndpoints
             return Results.NotFound();
         }
 
-        // Sanitize path segments — legacy filenames are bare blob names, not paths.
-        var fileName = Path.GetFileName(legacy.FileName.Trim());
-        if (string.IsNullOrWhiteSpace(fileName)
-            || fileName.Contains("..", StringComparison.Ordinal)
-            || fileName.Contains('/', StringComparison.Ordinal)
-            || fileName.Contains('\\', StringComparison.Ordinal))
+        // Legacy filenames must be bare blob names, not paths (check raw value before GetFileName,
+        // which would strip directory segments including ".." on some platforms).
+        var rawName = legacy.FileName.Trim();
+        if (string.IsNullOrWhiteSpace(rawName)
+            || rawName.Contains("..", StringComparison.Ordinal)
+            || rawName.Contains('/', StringComparison.Ordinal)
+            || rawName.Contains('\\', StringComparison.Ordinal))
+        {
+            return Results.NotFound();
+        }
+
+        var fileName = Path.GetFileName(rawName);
+        if (string.IsNullOrWhiteSpace(fileName))
         {
             return Results.NotFound();
         }

@@ -95,6 +95,94 @@ public sealed class EfForumAttachmentRepositoryTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task AddAttachmentsAsync_NoOpsWhenEmpty()
+    {
+        await attachmentRepository.AddAttachmentsAsync(1, []);
+        Assert.Empty(await attachmentRepository.GetByLegacyPostIdsAsync([1]));
+    }
+
+    [Fact]
+    public async Task GetByLegacyPostIdsAsync_ReturnsEmptyForEmptyInput()
+    {
+        Assert.Empty(await attachmentRepository.GetByLegacyPostIdsAsync([]));
+    }
+
+    [Fact]
+    public async Task AddAttachmentsAsync_ThrowsWhenPostMissing()
+    {
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            attachmentRepository.AddAttachmentsAsync(
+                404,
+                [new NewForumAttachment("a.txt", "p/a.txt", "ugc-forum", 1, "text/plain", DateTimeOffset.UtcNow)]));
+    }
+
+    [Fact]
+    public async Task GetAsync_ReturnsNullWhenMissing()
+    {
+        Assert.Null(await attachmentRepository.GetAsync(1, Guid.NewGuid()));
+    }
+
+    [Fact]
+    public async Task GetLegacyAsync_ReturnsNullWhenPostMissingOrNoAttachment()
+    {
+        Assert.Null(await attachmentRepository.GetLegacyAsync(404));
+
+        var member = await SeedMemberAsync();
+        await SeedCategoryAsync();
+        var created = await writeRepository.CreateThreadAsync(new NewForumThread(
+            1,
+            member.Id,
+            member.DisplayName,
+            "No attach",
+            "<p>Body</p>",
+            DateTimeOffset.UtcNow));
+
+        Assert.Null(await attachmentRepository.GetLegacyAsync(created.StarterPostId));
+    }
+
+    [Fact]
+    public async Task IncrementDownloadCountAsync_NoOpsWhenMissing()
+    {
+        await attachmentRepository.IncrementDownloadCountAsync(Guid.NewGuid());
+    }
+
+    [Fact]
+    public async Task AddAttachmentsAsync_TruncatesLongMetadata()
+    {
+        var member = await SeedMemberAsync();
+        await SeedCategoryAsync();
+        var created = await writeRepository.CreateThreadAsync(new NewForumThread(
+            1,
+            member.Id,
+            member.DisplayName,
+            "Long names",
+            "<p>Body</p>",
+            DateTimeOffset.UtcNow));
+
+        var longName = new string('n', 300) + ".pdf";
+        var longPath = new string('p', 600);
+        var longMime = new string('m', 150);
+
+        await attachmentRepository.AddAttachmentsAsync(
+            created.StarterPostId,
+            [
+                new NewForumAttachment(
+                    longName,
+                    longPath,
+                    new string('c', 80),
+                    10,
+                    longMime,
+                    DateTimeOffset.UtcNow),
+            ]);
+
+        var stored = (await attachmentRepository.GetByLegacyPostIdsAsync([created.StarterPostId])).Single();
+        Assert.Equal(255, stored.OriginalFileName.Length);
+        Assert.Equal(512, stored.BlobPath.Length);
+        Assert.Equal(64, stored.ContainerName.Length);
+        Assert.Equal(100, stored.MimeType.Length);
+    }
+
+    [Fact]
     public async Task GetLegacyAsync_ReturnsImportedFilename()
     {
         await SeedCategoryAsync();
