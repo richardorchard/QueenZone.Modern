@@ -67,9 +67,10 @@ public sealed class ForumTopicPageTests : IClassFixture<WebApplicationFactory<Pr
 
         var body = await client.GetStringAsync("/forum/topic/1002/ranking-every-studio-album");
 
-        Assert.Contains("cdn.queenzone.org/attachments/anoto-setlist-scan.jpg", body);
+        Assert.Contains("/forum/attachment/legacy/1002", body);
         Assert.Contains("anoto-setlist-scan.jpg", body);
         Assert.Contains("JPG", body);
         Assert.Contains("278.0 KB", body);
+        Assert.DoesNotContain("cdn.queenzone.org/attachments/", body);
     }
 }

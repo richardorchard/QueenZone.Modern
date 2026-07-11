@@ -23,3 +23,5 @@ public sealed record ForumWriteThread(
     DateTimeOffset LastPostAt,
     int PostCount,
     bool IsLocked);
+
+public sealed record ForumThreadCreateResult(int TopicId, int StarterPostId);

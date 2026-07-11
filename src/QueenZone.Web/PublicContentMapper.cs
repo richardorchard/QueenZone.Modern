@@ -138,7 +138,9 @@ public static class PublicContentMapper
                 attachment.FileName,
                 attachment.Url,
                 attachment.Extension,
-                attachment.FormattedSize))
+                attachment.FormattedSize,
+                attachment.IsImage,
+                attachment.ThumbnailUrl))
             .ToList();
     }
 }

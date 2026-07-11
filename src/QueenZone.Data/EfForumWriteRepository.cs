@@ -9,7 +9,7 @@ public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForu
 {
     private const int BodyHtmlMaxLength = 8000;
 
-    public async Task<int> CreateThreadAsync(NewForumThread thread, CancellationToken cancellationToken = default)
+    public async Task<ForumThreadCreateResult> CreateThreadAsync(NewForumThread thread, CancellationToken cancellationToken = default)
     {
         var now = ToUtcDateTime(thread.CreatedAt);
         await using var transaction = await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
@@ -70,7 +70,7 @@ public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForu
         await RefreshStatsForThreadAsync(forumThread.Id, topicId, category.Id, now, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
-        return topicId;
+        return new ForumThreadCreateResult(topicId, postId);
     }
 
     public async Task<int> CreatePostAsync(NewForumPost post, CancellationToken cancellationToken = default)

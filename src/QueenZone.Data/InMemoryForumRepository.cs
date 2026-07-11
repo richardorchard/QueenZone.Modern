@@ -3,7 +3,8 @@ namespace QueenZone.Data;
 public sealed class InMemoryForumRepository(
     IReadOnlyList<ForumCategoryItem> seedCategories,
     ForumArchiveStats seedStats,
-    InMemoryForumWriteRepository? writeRepository = null) : IForumRepository
+    InMemoryForumWriteRepository? writeRepository = null,
+    IForumAttachmentRepository? attachmentRepository = null) : IForumRepository
 {
     public Task<IReadOnlyList<ForumCategoryItem>> GetCategoriesAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<ForumCategoryItem>>(GetCategories());
@@ -28,7 +29,7 @@ public sealed class InMemoryForumRepository(
         return Task.FromResult(new ForumCategoryTopicsPage(pageItems, topics.Count, page, pageSize));
     }
 
-    public Task<ForumTopicPostsPage?> GetTopicPostsPageAsync(
+    public async Task<ForumTopicPostsPage?> GetTopicPostsPageAsync(
         int topicId,
         int page,
         int pageSize,
@@ -38,17 +39,25 @@ public sealed class InMemoryForumRepository(
             ?? TryGetCreatedTopicHeader(topicId);
         if (header is null)
         {
-            return Task.FromResult<ForumTopicPostsPage?>(null);
+            return null;
         }
 
         var posts = SampleForumData.CreateSeedPosts(topicId)
             .Concat(GetCreatedPosts(topicId))
             .OrderBy(post => post.PostedAt)
             .ToList();
+
+        if (attachmentRepository is not null)
+        {
+            posts = await ForumAttachmentMerge.MergeViaRepositoryAsync(
+                attachmentRepository,
+                posts,
+                cancellationToken);
+        }
+
         var skip = Math.Max(page - 1, 0) * pageSize;
         var pageItems = posts.Skip(skip).Take(pageSize).ToList();
-        return Task.FromResult<ForumTopicPostsPage?>(
-            new ForumTopicPostsPage(header, pageItems, posts.Count, page, pageSize));
+        return new ForumTopicPostsPage(header, pageItems, posts.Count, page, pageSize);
     }
 
     public Task<int> GetTotalThreadCountAsync(CancellationToken cancellationToken = default) =>

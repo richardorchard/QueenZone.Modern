@@ -2,7 +2,7 @@ namespace QueenZone.Data;
 
 public interface IForumWriteRepository
 {
-    Task<int> CreateThreadAsync(NewForumThread thread, CancellationToken cancellationToken = default);
+    Task<ForumThreadCreateResult> CreateThreadAsync(NewForumThread thread, CancellationToken cancellationToken = default);
 
     Task<int> CreatePostAsync(NewForumPost post, CancellationToken cancellationToken = default);
 

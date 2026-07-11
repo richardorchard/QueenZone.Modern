@@ -3,10 +3,13 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using QueenZone.Data;
+using QueenZone.Storage;
 
 namespace QueenZone.Web.Pages.Forum;
 
 [Authorize(Policy = MemberAuthenticationSchemes.MemberPolicy)]
+[RequestFormLimits(MultipartBodyLengthLimit = 55 * 1024 * 1024)]
+[RequestSizeLimit(55 * 1024 * 1024)]
 public sealed class NewThreadModel(
     IForumRepository forumRepository,
     IForumWriteRepository forumWriteRepository,
@@ -14,6 +17,8 @@ public sealed class NewThreadModel(
     PublicQueryCacheService publicQueryCache,
     UgcHtml ugcHtml,
     ForumPostRateLimiter rateLimiter,
+    ForumAttachmentValidator attachmentValidator,
+    ForumAttachmentUploadService attachmentUploadService,
     TimeProvider timeProvider) : PageModel
 {
     [BindProperty]
@@ -24,6 +29,9 @@ public sealed class NewThreadModel(
     [BindProperty]
     [Required]
     public string Body { get; set; } = string.Empty;
+
+    [BindProperty]
+    public List<IFormFile> Attachments { get; set; } = [];
 
     public ForumCategorySummary? Category { get; private set; }
 
@@ -63,6 +71,13 @@ public sealed class NewThreadModel(
             ModelState.AddModelError(nameof(Body), "Body is required.");
         }
 
+        var selectedFiles = Attachments?.Where(file => file is { Length: > 0 }).ToList() ?? [];
+        var attachmentValidation = attachmentValidator.Validate(selectedFiles);
+        foreach (var error in attachmentValidation.Errors)
+        {
+            ModelState.AddModelError(nameof(Attachments), error);
+        }
+
         if (!ModelState.IsValid)
         {
             Body = sanitizedBody;
@@ -75,18 +90,43 @@ public sealed class NewThreadModel(
         }
 
         var authorDisplayName = await ResolveAuthorDisplayNameAsync(memberId.Value, cancellationToken);
-        var threadId = await forumWriteRepository.CreateThreadAsync(
-            new NewForumThread(
-                category.Id,
-                memberId.Value,
-                authorDisplayName,
-                Subject,
-                sanitizedBody,
-                timeProvider.GetUtcNow()),
-            cancellationToken);
+        ForumThreadCreateResult created;
+        try
+        {
+            created = await forumWriteRepository.CreateThreadAsync(
+                new NewForumThread(
+                    category.Id,
+                    memberId.Value,
+                    authorDisplayName,
+                    Subject,
+                    sanitizedBody,
+                    timeProvider.GetUtcNow()),
+                cancellationToken);
+
+            if (attachmentValidation.AcceptedFiles.Count > 0)
+            {
+                await attachmentUploadService.UploadAndSaveAsync(
+                    created.StarterPostId,
+                    memberId.Value,
+                    attachmentValidation.AcceptedFiles,
+                    cancellationToken);
+            }
+        }
+        catch (NotSupportedException ex)
+        {
+            ModelState.AddModelError(nameof(Attachments), ex.Message);
+            Body = sanitizedBody;
+            return Page();
+        }
+        catch (BlobUploadException ex)
+        {
+            ModelState.AddModelError(nameof(Attachments), ex.Message);
+            Body = sanitizedBody;
+            return Page();
+        }
 
         publicQueryCache.InvalidateForumStatsCache();
-        return Redirect(ForumRoutes.GetTopicCanonicalPath(threadId, Subject));
+        return Redirect(ForumRoutes.GetTopicCanonicalPath(created.TopicId, Subject));
     }
 
     private async Task<ForumCategorySummary?> ResolveCategoryAsync(string categorySlug, CancellationToken cancellationToken)

@@ -41,7 +41,7 @@ public sealed class BlobUploadOptions
             },
             [BlobUploadContainers.Forum] = new()
             {
-                MaxBytes = 10 * 1024 * 1024,
+                MaxBytes = 20 * 1024 * 1024,
                 AllowedContentTypes =
                 [
                     "image/jpeg",
@@ -51,10 +51,17 @@ public sealed class BlobUploadOptions
                     "application/pdf",
                     "text/plain",
                     "application/zip",
+                    "application/x-zip-compressed",
+                    "audio/mpeg",
+                    "audio/mp3",
+                    "audio/flac",
+                    "audio/x-flac",
                     "application/msword",
                     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                     "application/vnd.ms-excel",
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    "application/vnd.ms-powerpoint",
+                    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
                 ],
             },
             [BlobUploadContainers.Photos] = new()

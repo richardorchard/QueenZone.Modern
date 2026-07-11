@@ -94,14 +94,14 @@ public sealed class PublicContentMapperTests
             "sig",
             12,
             new DateTime(2001, 1, 1, 0, 0, 0, DateTimeKind.Utc),
-            [new ForumPostAttachment("scan.jpg", 2048)]);
+            [new ForumPostAttachment("scan.jpg", 2048, ForumAttachmentPaths.LegacyDownloadPath(9))]);
 
         var view = PublicContentMapper.ToForumPostViewModel(post);
 
         Assert.Equal("brian", view.AuthorUsername);
         Assert.Single(view.Attachments);
         Assert.Equal("scan.jpg", view.Attachments[0].FileName);
-        Assert.Equal("https://cdn.queenzone.org/attachments/scan.jpg", view.Attachments[0].Url);
+        Assert.Equal("/forum/attachment/legacy/9", view.Attachments[0].Url);
         Assert.Equal("JPG", view.Attachments[0].Extension);
         Assert.Equal("2.0 KB", view.Attachments[0].FormattedSize);
     }

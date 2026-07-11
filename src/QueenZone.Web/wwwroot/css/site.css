@@ -1590,6 +1590,31 @@ body.qz-menu-lock .qz-masthead {
   white-space: nowrap;
 }
 
+.qz-forum-post__attachment-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.qz-forum-post__attachment-thumb-link {
+  display: inline-block;
+  max-width: 8rem;
+}
+
+.qz-forum-post__attachment-thumb {
+  display: block;
+  width: 7.5rem;
+  height: 7.5rem;
+  object-fit: cover;
+  border-radius: 0.35rem;
+  border: 1px solid color-mix(in srgb, var(--color-border, #ccc) 80%, transparent);
+}
+
+.qz-forum-compose__attachments input[type="file"] {
+  display: block;
+  max-width: 100%;
+}
+
 .qz-forum-post__attachment-meta span + span::before {
   content: "·";
   margin-right: var(--space-2);

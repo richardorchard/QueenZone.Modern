@@ -8,7 +8,7 @@ public sealed class InMemoryForumWriteRepository : IForumWriteRepository
     private int nextTopicId = 200_000;
     private int nextPostId = 2_000_000;
 
-    public Task<int> CreateThreadAsync(NewForumThread thread, CancellationToken cancellationToken = default)
+    public Task<ForumThreadCreateResult> CreateThreadAsync(NewForumThread thread, CancellationToken cancellationToken = default)
     {
         lock (sync)
         {
@@ -29,7 +29,7 @@ public sealed class InMemoryForumWriteRepository : IForumWriteRepository
                 thread.AuthorDisplayName,
                 thread.Body,
                 thread.CreatedAt));
-            return Task.FromResult(topicId);
+            return Task.FromResult(new ForumThreadCreateResult(topicId, postId));
         }
     }
 

@@ -244,7 +244,7 @@ public sealed class LegacyForumRepository(QueenZoneDbContext dbContext) : IForum
             string.IsNullOrWhiteSpace(row.SIGNATURE) ? null : row.SIGNATURE.Trim(),
             row.NUMBER_OF_POSTS,
             row.DATE_CREATED,
-            ForumPostAttachment.Parse(row.ATTACHMENT, row.FILESIZE));
+            ForumPostAttachment.Parse(row.ATTACHMENT, row.FILESIZE, row.Q_FORUM_TOPIC_ID));
 
     [ExcludeFromCodeCoverage]
     private static ForumTopicItem MapTopic(ForumTopicRow row) =>
