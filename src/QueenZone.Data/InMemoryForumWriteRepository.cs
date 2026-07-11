@@ -7,13 +7,19 @@ public sealed class InMemoryForumWriteRepository : IForumWriteRepository
     private readonly object sync = new();
     private int nextTopicId = 200_000;
     private int nextPostId = 2_000_000;
+    private InMemoryForumPollRepository? pollRepository;
 
-    public Task<ForumThreadCreateResult> CreateThreadAsync(NewForumThread thread, CancellationToken cancellationToken = default)
+    public void AttachPollRepository(InMemoryForumPollRepository repository) =>
+        pollRepository = repository;
+
+    public async Task<ForumThreadCreateResult> CreateThreadAsync(NewForumThread thread, CancellationToken cancellationToken = default)
     {
+        int topicId;
+        int postId;
         lock (sync)
         {
-            var topicId = nextTopicId++;
-            var postId = nextPostId++;
+            topicId = nextTopicId++;
+            postId = nextPostId++;
             threads.Add(new ForumWriteThread(
                 topicId,
                 thread.CategoryId,
@@ -29,8 +35,18 @@ public sealed class InMemoryForumWriteRepository : IForumWriteRepository
                 thread.AuthorDisplayName,
                 thread.Body,
                 thread.CreatedAt));
-            return Task.FromResult(new ForumThreadCreateResult(topicId, postId));
         }
+
+        if (thread.Poll is not null && pollRepository is not null)
+        {
+            pollRepository.RegisterTopic(topicId);
+            await pollRepository.CreatePollAsync(
+                topicId,
+                thread.Poll with { CreatedByMemberId = thread.AuthorMemberId },
+                cancellationToken);
+        }
+
+        return new ForumThreadCreateResult(topicId, postId);
     }
 
     public Task<int> CreatePostAsync(NewForumPost post, CancellationToken cancellationToken = default)

@@ -1,0 +1,93 @@
+@model QueenZone.Data.ForumPollResults
+@{
+  var poll = Model;
+  var returnUrl = Context.Request.Path + Context.Request.QueryString;
+}
+
+<section class="qz-forum-poll" id="poll">
+  <header class="qz-forum-poll__header">
+    <p class="qz-forum-poll__eyebrow qz-meta">POLL</p>
+    <h2 class="qz-forum-poll__question">@poll.Question</h2>
+    <p class="qz-meta">
+      @if (poll.IsClosed)
+      {
+        <span>Closed</span>
+      }
+      else if (poll.ClosesAt is not null)
+      {
+        <span>Closes <time datetime="@poll.ClosesAt.Value.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ssZ")">@poll.ClosesAt.Value.UtcDateTime.ToString("dd MMM yyyy HH:mm") UTC</time></span>
+      }
+      else
+      {
+        <span>Open</span>
+      }
+      <span>· @poll.DistinctVoters.ToString("N0") voter@(poll.DistinctVoters == 1 ? "" : "s")</span>
+      @if (poll.IsMultiChoice)
+      {
+        <span>· Multi-choice@(poll.MaxChoices is int max ? $" (max {max})" : "")</span>
+      }
+    </p>
+  </header>
+
+  @if (poll.CanViewerVote)
+  {
+    <form method="post" action="/forum/poll/@poll.PollId/vote" class="qz-forum-poll__vote-form">
+      @Html.AntiForgeryToken()
+      <input type="hidden" name="returnUrl" value="@returnUrl" />
+      <ul class="qz-forum-poll__options">
+        @foreach (var option in poll.Options)
+        {
+          <li>
+            <label class="qz-forum-poll__option-label">
+              @if (poll.IsMultiChoice)
+              {
+                <input type="checkbox" name="optionIds" value="@option.OptionId" />
+              }
+              else
+              {
+                <input type="radio" name="optionId" value="@option.OptionId" required />
+              }
+              <span>@option.OptionText</span>
+            </label>
+          </li>
+        }
+      </ul>
+      <p class="qz-meta">Votes are final and cannot be changed.</p>
+      <button class="qz-button" type="submit">Vote</button>
+    </form>
+  }
+  else
+  {
+    <ul class="qz-forum-poll__results">
+      @foreach (var option in poll.Options)
+      {
+        <li class="qz-forum-poll__result">
+          <div class="qz-forum-poll__result-head">
+            <span class="qz-forum-poll__result-text">@option.OptionText</span>
+            <span class="qz-meta">@option.VoteCount · @option.Percentage.ToString("0.#")%</span>
+          </div>
+          <div class="qz-forum-poll__bar" role="img" aria-label="@option.Percentage.ToString("0.#") percent">
+            <span class="qz-forum-poll__bar-fill" style="width: @(option.Percentage.ToString(System.Globalization.CultureInfo.InvariantCulture))%"></span>
+          </div>
+          @if (option.SelectedByViewer)
+          {
+            <p class="qz-meta">Your vote</p>
+          }
+        </li>
+      }
+    </ul>
+    @if (!poll.ViewerHasVoted && !poll.IsClosed)
+    {
+      <p class="qz-meta"><a href="/account/login?returnUrl=@Uri.EscapeDataString(returnUrl)">Sign in to vote</a></p>
+    }
+  }
+
+  @if (poll.CanViewerClose)
+  {
+    <form method="post" action="/forum/poll/@poll.PollId/close" class="qz-forum-poll__close-form">
+      @Html.AntiForgeryToken()
+      <input type="hidden" name="returnUrl" value="@returnUrl" />
+      <button class="qz-button qz-button--ghost" type="submit">Close poll</button>
+    </form>
+  }
+</section>

@@ -33,6 +33,9 @@ public sealed class NewThreadModel(
     [BindProperty]
     public List<IFormFile> Attachments { get; set; } = [];
 
+    [BindProperty]
+    public ForumPollForm Poll { get; set; } = new();
+
     public ForumCategorySummary? Category { get; private set; }
 
     public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
@@ -78,6 +81,13 @@ public sealed class NewThreadModel(
             ModelState.AddModelError(nameof(Attachments), error);
         }
 
+        var pollErrors = new List<string>();
+        var newPoll = (Poll ?? new ForumPollForm()).ToNewPoll(memberId.Value, pollErrors);
+        foreach (var error in pollErrors)
+        {
+            ModelState.AddModelError(nameof(Poll), error);
+        }
+
         if (!ModelState.IsValid)
         {
             Body = sanitizedBody;
@@ -100,7 +110,8 @@ public sealed class NewThreadModel(
                     authorDisplayName,
                     Subject,
                     sanitizedBody,
-                    timeProvider.GetUtcNow()),
+                    timeProvider.GetUtcNow(),
+                    newPoll),
                 cancellationToken);
 
             if (attachmentValidation.AcceptedFiles.Count > 0)

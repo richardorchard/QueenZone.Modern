@@ -130,6 +130,7 @@ app.MapGet("/account/member-probe", () => Results.Ok(new { authenticated = true 
 
 app.MapFanPerformanceEndpoints();
 app.MapForumAttachmentEndpoints();
+app.MapForumPollEndpoints();
 app.MapEditorImageUploadEndpoints();
 app.MapMemberAvatarEndpoints();
 app.MapUgcProxyEndpoints();
