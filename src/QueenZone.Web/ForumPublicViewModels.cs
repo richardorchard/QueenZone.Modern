@@ -55,7 +55,9 @@ public sealed record ForumAttachmentViewModel(
     string FileName,
     string Url,
     string Extension,
-    string FormattedSize);
+    string FormattedSize,
+    bool IsImage = false,
+    string? ThumbnailUrl = null);
 
 /// <summary>
 /// Stable aggregate counts for the public forum index.

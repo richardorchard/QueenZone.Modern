@@ -22,6 +22,60 @@ namespace QueenZone.Data.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("QueenZone.Data.Entities.ForumPostAttachmentEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("BlobPath")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
+                    b.Property<string>("ContainerName")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<int>("DownloadCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
+                    b.Property<long>("FileSizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("LegacyPostId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("MimeType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("OriginalFileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<long>("PostId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("UploadedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LegacyPostId")
+                        .HasDatabaseName("IX_ForumPostAttachments_LegacyPostId");
+
+                    b.HasIndex("PostId")
+                        .HasDatabaseName("IX_ForumPostAttachments_PostId");
+
+                    b.ToTable("ForumPostAttachments", (string)null);
+                });
+
             modelBuilder.Entity("QueenZone.Data.Entities.MemberAccount", b =>
                 {
                     b.Property<Guid>("Id")
@@ -668,6 +722,16 @@ namespace QueenZone.Data.Migrations
                         .HasDatabaseName("IX_QueenHistoryEvents_Published_Date");
 
                     b.ToTable("QueenHistoryEvents", (string)null);
+                });
+
+            modelBuilder.Entity("QueenZone.Data.Entities.ForumPostAttachmentEntity", b =>
+                {
+                    b.HasOne("QueenZone.Data.Entities.ModernForumPostEntity", "Post")
+                        .WithMany()
+                        .HasForeignKey("PostId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("Post");
                 });
 
             modelBuilder.Entity("QueenZone.Data.Entities.MemberExternalLogin", b =>

@@ -35,6 +35,7 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddScoped<INewsAuditRepository, EfNewsAuditRepository>();
         services.AddScoped<IMemberAccountRepository, EfMemberAccountRepository>();
         services.AddScoped<IForumWriteRepository, EfForumWriteRepository>();
+        services.AddScoped<IForumAttachmentRepository, EfForumAttachmentRepository>();
         services.AddScoped<INewsDiscoveryRepository, EfNewsDiscoveryRepository>();
         services.AddScoped<INewsAgentRunLeaseService, EfNewsAgentRunLeaseService>();
         services.AddScoped<IQueenHistoryRepository, EfQueenHistoryRepository>();
@@ -50,11 +51,14 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddSingleton<IArticlesRepository>(_ => new InMemoryArticlesRepository(SampleArticlesData.CreateSeedArticles()));
         services.AddSingleton<IBiographyRepository>(_ => new InMemoryBiographyRepository(SampleBiographyData.CreateSeedChapters()));
         var forumWriteRepository = new InMemoryForumWriteRepository();
+        var forumAttachmentRepository = new InMemoryForumAttachmentRepository();
         services.AddSingleton<IForumWriteRepository>(forumWriteRepository);
+        services.AddSingleton<IForumAttachmentRepository>(forumAttachmentRepository);
         services.AddSingleton<IForumRepository>(_ => new InMemoryForumRepository(
             SampleForumData.CreateSeedCategories(),
             SampleForumData.CreateSeedStats(),
-            forumWriteRepository));
+            forumWriteRepository,
+            forumAttachmentRepository));
         services.AddSingleton<IPhotoRepository>(_ => new InMemoryPhotoRepository(SamplePhotoData.CreateSeedCategories()));
         services.AddSingleton<IFanPerformanceRepository>(_ => new InMemoryFanPerformanceRepository(SampleFanPerformanceData.CreateSeedPerformances()));
         services.AddSingleton<ILegacyMemberLookupRepository>(_ => new InMemoryLegacyMemberLookupRepository(SampleLegacyMemberData.CreateSeedMatches()));

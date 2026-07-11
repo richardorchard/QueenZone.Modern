@@ -105,9 +105,12 @@ public sealed class ModernForumRepository(QueenZoneDbContext dbContext) : IForum
             forumId,
             EfSql.GetNullableString(forumName)?.Trim() ?? string.Empty);
 
+        var posts = rows.Select(MapPost).ToList();
+        posts = await ForumAttachmentMerge.MergeModernAsync(dbContext, posts, cancellationToken);
+
         return new ForumTopicPostsPage(
             header,
-            rows.Select(MapPost).ToList(),
+            posts,
             EfSql.GetNullableInt(totalRecords) ?? 0,
             page,
             pageSize);
@@ -226,7 +229,7 @@ public sealed class ModernForumRepository(QueenZoneDbContext dbContext) : IForum
             string.IsNullOrWhiteSpace(row.SIGNATURE) ? null : row.SIGNATURE.Trim(),
             row.NUMBER_OF_POSTS ?? 0,
             row.DATE_CREATED,
-            ForumPostAttachment.Parse(row.ATTACHMENT, row.FILESIZE));
+            ForumPostAttachment.Parse(row.ATTACHMENT, row.FILESIZE, row.Q_FORUM_TOPIC_ID));
 
     [ExcludeFromCodeCoverage]
     private static ForumTopicItem MapTopic(ForumTopicRow row) =>

@@ -241,8 +241,8 @@ public sealed class ForumWriteRoutesTests : IClassFixture<WebApplicationFactory<
 
     private sealed class LockedForumWriteRepository : IForumWriteRepository
     {
-        public Task<int> CreateThreadAsync(NewForumThread thread, CancellationToken cancellationToken = default) =>
-            Task.FromResult(200_001);
+        public Task<ForumThreadCreateResult> CreateThreadAsync(NewForumThread thread, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new ForumThreadCreateResult(200_001, 2_000_001));
 
         public Task<int> CreatePostAsync(NewForumPost post, CancellationToken cancellationToken = default) =>
             throw new InvalidOperationException("Locked.");

@@ -3,9 +3,12 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using QueenZone.Data;
+using QueenZone.Storage;
 
 namespace QueenZone.Web.Pages.Forum;
 
+[RequestFormLimits(MultipartBodyLengthLimit = 55 * 1024 * 1024)]
+[RequestSizeLimit(55 * 1024 * 1024)]
 public sealed class TopicModel : ForumTopicPageModel
 {
     private readonly IForumRepository forumRepository;
@@ -14,6 +17,8 @@ public sealed class TopicModel : ForumTopicPageModel
     private readonly PublicQueryCacheService publicQueryCache;
     private readonly UgcHtml ugcHtml;
     private readonly ForumPostRateLimiter rateLimiter;
+    private readonly ForumAttachmentValidator attachmentValidator;
+    private readonly ForumAttachmentUploadService attachmentUploadService;
     private readonly TimeProvider timeProvider;
 
     public TopicModel(
@@ -23,6 +28,8 @@ public sealed class TopicModel : ForumTopicPageModel
         PublicQueryCacheService publicQueryCache,
         UgcHtml ugcHtml,
         ForumPostRateLimiter rateLimiter,
+        ForumAttachmentValidator attachmentValidator,
+        ForumAttachmentUploadService attachmentUploadService,
         TimeProvider timeProvider)
         : base(forumRepository)
     {
@@ -32,12 +39,17 @@ public sealed class TopicModel : ForumTopicPageModel
         this.publicQueryCache = publicQueryCache;
         this.ugcHtml = ugcHtml;
         this.rateLimiter = rateLimiter;
+        this.attachmentValidator = attachmentValidator;
+        this.attachmentUploadService = attachmentUploadService;
         this.timeProvider = timeProvider;
     }
 
     [BindProperty]
     [Required]
     public string Body { get; set; } = string.Empty;
+
+    [BindProperty]
+    public List<IFormFile> Attachments { get; set; } = [];
 
     public bool CanReply { get; private set; }
 
@@ -80,6 +92,13 @@ public sealed class TopicModel : ForumTopicPageModel
             ModelState.AddModelError(nameof(Body), "Body is required.");
         }
 
+        var selectedFiles = Attachments?.Where(file => file is { Length: > 0 }).ToList() ?? [];
+        var attachmentValidation = attachmentValidator.Validate(selectedFiles);
+        foreach (var error in attachmentValidation.Errors)
+        {
+            ModelState.AddModelError(nameof(Attachments), error);
+        }
+
         if (!ModelState.IsValid)
         {
             Body = sanitizedBody;
@@ -92,14 +111,39 @@ public sealed class TopicModel : ForumTopicPageModel
         }
 
         var authorDisplayName = await ResolveAuthorDisplayNameAsync(memberId.Value, cancellationToken);
-        var postId = await forumWriteRepository.CreatePostAsync(
-            new NewForumPost(
-                topicId,
-                memberId.Value,
-                authorDisplayName,
-                sanitizedBody,
-                timeProvider.GetUtcNow()),
-            cancellationToken);
+        int postId;
+        try
+        {
+            postId = await forumWriteRepository.CreatePostAsync(
+                new NewForumPost(
+                    topicId,
+                    memberId.Value,
+                    authorDisplayName,
+                    sanitizedBody,
+                    timeProvider.GetUtcNow()),
+                cancellationToken);
+
+            if (attachmentValidation.AcceptedFiles.Count > 0)
+            {
+                await attachmentUploadService.UploadAndSaveAsync(
+                    postId,
+                    memberId.Value,
+                    attachmentValidation.AcceptedFiles,
+                    cancellationToken);
+            }
+        }
+        catch (NotSupportedException ex)
+        {
+            ModelState.AddModelError(nameof(Attachments), ex.Message);
+            Body = sanitizedBody;
+            return Page();
+        }
+        catch (BlobUploadException ex)
+        {
+            ModelState.AddModelError(nameof(Attachments), ex.Message);
+            Body = sanitizedBody;
+            return Page();
+        }
 
         publicQueryCache.InvalidateForumStatsCache();
         var updatedPage = await forumRepository.GetTopicPostsPageAsync(topicId, 1, 1, cancellationToken);

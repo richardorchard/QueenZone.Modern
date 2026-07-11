@@ -24,6 +24,8 @@ public sealed class QueenZoneDbContext : DbContext
 
     public DbSet<ModernForumPostEntity> ModernForumPosts => Set<ModernForumPostEntity>();
 
+    public DbSet<ForumPostAttachmentEntity> ForumPostAttachments => Set<ForumPostAttachmentEntity>();
+
     public DbSet<NewsDiscoverySourceEntity> NewsDiscoverySources => Set<NewsDiscoverySourceEntity>();
 
     public DbSet<NewsCandidateEntity> NewsCandidates => Set<NewsCandidateEntity>();
@@ -165,6 +167,30 @@ public sealed class QueenZoneDbContext : DbContext
             entity.HasOne(post => post.Thread)
                 .WithMany()
                 .HasForeignKey(post => post.ThreadId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ForumPostAttachmentEntity>(entity =>
+        {
+            entity.ToTable("ForumPostAttachments");
+            entity.HasKey(attachment => attachment.Id);
+
+            entity.Property(attachment => attachment.OriginalFileName).HasMaxLength(255).IsRequired();
+            entity.Property(attachment => attachment.BlobPath).HasMaxLength(512).IsRequired();
+            entity.Property(attachment => attachment.ContainerName).HasMaxLength(64).IsRequired();
+            entity.Property(attachment => attachment.MimeType).HasMaxLength(100).IsRequired();
+            entity.Property(attachment => attachment.UploadedAt).IsRequired();
+            entity.Property(attachment => attachment.DownloadCount).HasDefaultValue(0);
+
+            entity.HasIndex(attachment => attachment.LegacyPostId)
+                .HasDatabaseName("IX_ForumPostAttachments_LegacyPostId");
+            entity.HasIndex(attachment => attachment.PostId)
+                .HasDatabaseName("IX_ForumPostAttachments_PostId");
+
+            // ModernForumPost is excluded from EF migrations; SQL Server migration adds the FK in SQL.
+            entity.HasOne(attachment => attachment.Post)
+                .WithMany()
+                .HasForeignKey(attachment => attachment.PostId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

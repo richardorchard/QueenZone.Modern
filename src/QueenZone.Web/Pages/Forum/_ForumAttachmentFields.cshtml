@@ -1,0 +1,41 @@
+@using Microsoft.Extensions.Options
+@inject IOptions<ForumAttachmentOptions> AttachmentOptions
+@{
+  var options = AttachmentOptions.Value;
+  var maxMb = Math.Max(1, (int)Math.Ceiling(options.MaxBytesPerFile / (1024.0 * 1024.0)));
+  var totalMb = Math.Max(1, (int)Math.Ceiling(options.MaxTotalBytesPerPost / (1024.0 * 1024.0)));
+  var accept = string.Join(",", options.AllowedContentTypes.Select(type => type switch
+  {
+    "image/jpeg" => ".jpg,.jpeg",
+    "image/png" => ".png",
+    "image/gif" => ".gif",
+    "image/webp" => ".webp",
+    "application/pdf" => ".pdf",
+    "application/zip" or "application/x-zip-compressed" => ".zip",
+    "audio/mpeg" or "audio/mp3" => ".mp3",
+    "audio/flac" or "audio/x-flac" => ".flac",
+    "text/plain" => ".txt",
+    "application/msword" => ".doc",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document" => ".docx",
+    "application/vnd.ms-excel" => ".xls",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" => ".xlsx",
+    "application/vnd.ms-powerpoint" => ".ppt",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation" => ".pptx",
+    _ => string.Empty,
+  }).Where(ext => ext.Length > 0).Distinct());
+}
+
+<div class="qz-form__field qz-forum-compose__attachments">
+  <label for="Attachments">Attachments <span class="qz-meta">(optional)</span></label>
+  <input id="Attachments"
+         name="Attachments"
+         type="file"
+         multiple
+         accept="@accept" />
+  <p class="qz-meta">
+    Up to @options.MaxFilesPerPost files, @maxMb MB each, @totalMb MB total.
+    Images, PDF, ZIP, audio, and common office documents. Download requires sign-in.
+  </p>
+  <span class="field-validation-error" data-valmsg-for="Attachments" data-valmsg-replace="true"></span>
+  <div asp-validation-for="Attachments"></div>
+</div>

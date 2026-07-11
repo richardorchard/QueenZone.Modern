@@ -41,6 +41,9 @@ public static class QueenZoneWebServiceCollectionExtensions
             .ValidateOnStart();
         services.AddSingleton<IValidateOptions<PublicQueryCacheOptions>, PublicQueryCacheOptionsValidator>();
 
+        services.AddOptions<ForumAttachmentOptions>()
+            .Bind(configuration.GetSection(ForumAttachmentOptions.SectionName));
+
         return services;
     }
 
@@ -75,6 +78,8 @@ public static class QueenZoneWebServiceCollectionExtensions
         services.AddScoped<MemberAccountService>();
         services.AddScoped<UgcHtml>();
         services.AddScoped<ForumPostRateLimiter>();
+        services.AddScoped<ForumAttachmentValidator>();
+        services.AddScoped<ForumAttachmentUploadService>();
         // Header name used by the rich-text editor fetch() upload helper.
         services.AddAntiforgery(options =>
         {
