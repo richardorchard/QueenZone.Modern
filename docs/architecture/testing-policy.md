@@ -194,6 +194,18 @@ These gates are guardrails, not a replacement for useful assertions. New or chan
 
 Merges to `main` also trigger `.github/workflows/deploy-app-service.yml`, which re-runs tests, applies EF Core migrations, and deploys to the dev App Service. That is separate from pull request checks.
 
+### EF migration consistency
+
+When a change adds, removes, or changes an EF-mapped entity in `QueenZoneDbContext`, verify the model snapshot is current before opening the pull request:
+
+```powershell
+dotnet ef migrations has-pending-model-changes --project src/QueenZone.Data/QueenZone.Data.csproj --startup-project src/QueenZone.Web/QueenZone.Web.csproj
+```
+
+This check is required even when the migration itself is hand-written SQL. EF still compares the runtime model to `QueenZoneDbContextModelSnapshot` during `dotnet ef database update`; if the snapshot does not include the model change, deployment fails with `PendingModelChangesWarning`.
+
+For hand-written idempotent SQL migrations, add the normal EF migration designer/snapshot metadata as well. If the SQL migration already performs the real DDL, the follow-up sync migration should be a deliberate no-op in `Up`/`Down` whose purpose is only to advance EF's model snapshot.
+
 ## Pre-pull request checklist
 
 Before opening a pull request, run the full local gate—not only `dotnet test`:
@@ -204,6 +216,12 @@ dotnet restore QueenZone.sln
 dotnet build QueenZone.sln --configuration Release --no-restore
 dotnet test QueenZone.sln --configuration Release --no-build --collect:"XPlat Code Coverage" --settings coverlet.runsettings --results-directory ./TestResults
 powershell -File ./scripts/Test-CoverageGate.ps1 -Reports ./TestResults -GlobalLineThreshold 51 -ChangedLineThreshold 80 -BaseRef origin/main
+```
+
+If the pull request touches `QueenZoneDbContext`, entity mappings, or files under `src/QueenZone.Data/Migrations/`, also run:
+
+```powershell
+dotnet ef migrations has-pending-model-changes --project src/QueenZone.Data/QueenZone.Data.csproj --startup-project src/QueenZone.Web/QueenZone.Web.csproj
 ```
 
 Use `pwsh` instead of `powershell` on Linux or macOS.

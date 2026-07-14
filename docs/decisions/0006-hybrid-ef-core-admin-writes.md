@@ -62,6 +62,7 @@ When `ConnectionStrings:QueenZoneLegacy` is empty, the matching `InMemory*` impl
 3. **Do not add a third ad-hoc SQL style** in Razor page models, minimal endpoints, or tools. New SQL belongs in `QueenZone.Data` repositories.
 4. Prefer extending an existing repository over opening a one-off `SqlConnection` elsewhere.
 5. **Do not reintroduce Dapper** (or another micro-ORM) for new code without a new ADR.
+6. **Keep EF migrations and the model snapshot in sync.** Hand-written SQL migrations are allowed for careful idempotent DDL, but EF still requires migration designer metadata and `QueenZoneDbContextModelSnapshot` to match the runtime model. Run `dotnet ef migrations has-pending-model-changes --project src/QueenZone.Data/QueenZone.Data.csproj --startup-project src/QueenZone.Web/QueenZone.Web.csproj` before PRs that change `QueenZoneDbContext`, mapped entities, or migrations.
 
 ### Target direction (standardize on EF Core)
 
