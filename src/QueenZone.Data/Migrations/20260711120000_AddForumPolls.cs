@@ -74,6 +74,9 @@ public partial class AddForumPolls : Migration
 
                 CREATE UNIQUE INDEX UQ_ForumPollVotes_Poll_Member_Option
                     ON dbo.ForumPollVotes (PollId, MemberAccountId, OptionId);
+
+                CREATE INDEX IX_ForumPollVotes_OptionId
+                    ON dbo.ForumPollVotes (OptionId);
             END
 
             IF OBJECT_ID(N'dbo.ModernForumThread', N'U') IS NOT NULL
