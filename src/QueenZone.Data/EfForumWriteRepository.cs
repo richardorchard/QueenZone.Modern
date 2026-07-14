@@ -62,6 +62,16 @@ public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForu
             UpdatedAt = now,
         });
 
+        if (thread.Poll is not null)
+        {
+            var poll = EfForumPollRepository.BuildPollEntity(
+                forumThread.Id,
+                topicId,
+                thread.Poll with { CreatedByMemberId = thread.AuthorMemberId },
+                thread.CreatedAt);
+            dbContext.ForumPolls.Add(poll);
+        }
+
         category.LegacyPostCount += 1;
         category.LastActivityAt = now;
         category.UpdatedAt = now;

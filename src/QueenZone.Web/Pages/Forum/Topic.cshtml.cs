@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.Extensions.Options;
 using QueenZone.Data;
 using QueenZone.Storage;
 
@@ -13,34 +14,40 @@ public sealed class TopicModel : ForumTopicPageModel
 {
     private readonly IForumRepository forumRepository;
     private readonly IForumWriteRepository forumWriteRepository;
+    private readonly IForumPollRepository forumPollRepository;
     private readonly MemberAccountService memberAccountService;
     private readonly PublicQueryCacheService publicQueryCache;
     private readonly UgcHtml ugcHtml;
     private readonly ForumPostRateLimiter rateLimiter;
     private readonly ForumAttachmentValidator attachmentValidator;
     private readonly ForumAttachmentUploadService attachmentUploadService;
+    private readonly AdminOptions adminOptions;
     private readonly TimeProvider timeProvider;
 
     public TopicModel(
         IForumRepository forumRepository,
         IForumWriteRepository forumWriteRepository,
+        IForumPollRepository forumPollRepository,
         MemberAccountService memberAccountService,
         PublicQueryCacheService publicQueryCache,
         UgcHtml ugcHtml,
         ForumPostRateLimiter rateLimiter,
         ForumAttachmentValidator attachmentValidator,
         ForumAttachmentUploadService attachmentUploadService,
+        IOptions<AdminOptions> adminOptions,
         TimeProvider timeProvider)
         : base(forumRepository)
     {
         this.forumRepository = forumRepository;
         this.forumWriteRepository = forumWriteRepository;
+        this.forumPollRepository = forumPollRepository;
         this.memberAccountService = memberAccountService;
         this.publicQueryCache = publicQueryCache;
         this.ugcHtml = ugcHtml;
         this.rateLimiter = rateLimiter;
         this.attachmentValidator = attachmentValidator;
         this.attachmentUploadService = attachmentUploadService;
+        this.adminOptions = adminOptions.Value;
         this.timeProvider = timeProvider;
     }
 
@@ -53,10 +60,17 @@ public sealed class TopicModel : ForumTopicPageModel
 
     public bool CanReply { get; private set; }
 
+    public ForumPollResults? Poll { get; private set; }
+
     public async Task<IActionResult> OnGetAsync(int topicId, string slug, CancellationToken cancellationToken)
     {
         var result = await LoadTopicPageAsync(topicId, slug, 1, cancellationToken);
         CanReply = await IsMemberAuthenticatedAsync();
+        if (result is PageResult)
+        {
+            await LoadPollAsync(topicId, cancellationToken);
+        }
+
         return result;
     }
 
@@ -74,6 +88,7 @@ public sealed class TopicModel : ForumTopicPageModel
             return loadResult;
         }
         CanReply = true;
+        await LoadPollAsync(topicId, cancellationToken);
 
         var thread = await forumWriteRepository.GetThreadAsync(topicId, cancellationToken);
         if (thread is null)
@@ -196,4 +211,15 @@ public sealed class TopicModel : ForumTopicPageModel
 
     private async Task<bool> IsMemberAuthenticatedAsync() =>
         await GetCurrentMemberIdAsync() is not null;
+
+    private async Task LoadPollAsync(int topicId, CancellationToken cancellationToken)
+    {
+        var memberId = await GetCurrentMemberIdAsync();
+        var isAdmin = memberId is not null && ForumPollEndpoints.IsAdmin(User, adminOptions);
+        Poll = await forumPollRepository.GetPollWithResultsAsync(
+            topicId,
+            memberId,
+            isAdmin,
+            cancellationToken);
+    }
 }

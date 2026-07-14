@@ -26,6 +26,12 @@ public sealed class QueenZoneDbContext : DbContext
 
     public DbSet<ForumPostAttachmentEntity> ForumPostAttachments => Set<ForumPostAttachmentEntity>();
 
+    public DbSet<ForumPollEntity> ForumPolls => Set<ForumPollEntity>();
+
+    public DbSet<ForumPollOptionEntity> ForumPollOptions => Set<ForumPollOptionEntity>();
+
+    public DbSet<ForumPollVoteEntity> ForumPollVotes => Set<ForumPollVoteEntity>();
+
     public DbSet<NewsDiscoverySourceEntity> NewsDiscoverySources => Set<NewsDiscoverySourceEntity>();
 
     public DbSet<NewsCandidateEntity> NewsCandidates => Set<NewsCandidateEntity>();
@@ -192,6 +198,55 @@ public sealed class QueenZoneDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(attachment => attachment.PostId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ForumPollEntity>(entity =>
+        {
+            entity.ToTable("ForumPolls");
+            entity.HasKey(poll => poll.Id);
+            entity.Property(poll => poll.Question).HasMaxLength(300).IsRequired();
+            entity.Property(poll => poll.CreatedAt).IsRequired();
+            entity.HasIndex(poll => poll.LegacyTopicId)
+                .IsUnique()
+                .HasDatabaseName("UQ_ForumPolls_LegacyTopicId");
+            entity.HasIndex(poll => poll.ThreadId)
+                .IsUnique()
+                .HasDatabaseName("UQ_ForumPolls_ThreadId");
+            entity.HasOne(poll => poll.Thread)
+                .WithMany()
+                .HasForeignKey(poll => poll.ThreadId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasMany(poll => poll.Options)
+                .WithOne(option => option.Poll)
+                .HasForeignKey(option => option.PollId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasMany(poll => poll.Votes)
+                .WithOne(vote => vote.Poll)
+                .HasForeignKey(vote => vote.PollId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ForumPollOptionEntity>(entity =>
+        {
+            entity.ToTable("ForumPollOptions");
+            entity.HasKey(option => option.Id);
+            entity.Property(option => option.OptionText).HasMaxLength(200).IsRequired();
+            entity.HasIndex(option => new { option.PollId, option.DisplayOrder })
+                .HasDatabaseName("IX_ForumPollOptions_PollId_DisplayOrder");
+        });
+
+        modelBuilder.Entity<ForumPollVoteEntity>(entity =>
+        {
+            entity.ToTable("ForumPollVotes");
+            entity.HasKey(vote => vote.Id);
+            entity.Property(vote => vote.VotedAt).IsRequired();
+            entity.HasIndex(vote => new { vote.PollId, vote.MemberAccountId, vote.OptionId })
+                .IsUnique()
+                .HasDatabaseName("UQ_ForumPollVotes_Poll_Member_Option");
+            entity.HasOne(vote => vote.Option)
+                .WithMany(option => option.Votes)
+                .HasForeignKey(vote => vote.OptionId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<NewsDiscoverySourceEntity>(entity =>

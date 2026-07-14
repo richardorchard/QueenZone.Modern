@@ -6,7 +6,8 @@ public sealed record NewForumThread(
     string AuthorDisplayName,
     string Subject,
     string Body,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    NewForumPoll? Poll = null);
 
 public sealed record NewForumPost(
     int TopicId,

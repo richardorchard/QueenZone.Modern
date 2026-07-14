@@ -36,6 +36,7 @@
       <partial name="_RichTextEditor" />
       <span asp-validation-for="Body"></span>
       <partial name="_ForumAttachmentFields" />
+      <partial name="_ForumPollFields" model="Model.Poll" />
       <div class="qz-form__actions">
         <button class="qz-button" type="submit">Create thread</button>
         <p class="qz-form__busy-status" data-busy-status hidden role="status" aria-live="polite"></p>
