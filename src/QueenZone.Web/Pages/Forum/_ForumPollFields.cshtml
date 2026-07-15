@@ -5,12 +5,12 @@
 
 <div class="qz-form__field qz-forum-poll-compose" data-forum-poll-compose>
   <label class="qz-forum-poll-compose__toggle">
-    <input type="hidden" name="Poll.Enabled" value="false" />
     <input type="checkbox"
            name="Poll.Enabled"
            value="true"
            data-poll-toggle
            @(poll.Enabled ? "checked" : null) />
+    <input type="hidden" name="Poll.Enabled" value="false" />
     Add a poll
   </label>
 

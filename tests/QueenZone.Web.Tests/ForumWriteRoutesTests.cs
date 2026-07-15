@@ -49,6 +49,35 @@ public sealed class ForumWriteRoutesTests : IClassFixture<WebApplicationFactory<
     }
 
     [Fact]
+    public async Task ValidNewThreadPost_WithPoll_CreatesThreadAndRedirectedTopicRendersPoll()
+    {
+        var client = CreateMemberClient(factory, Guid.NewGuid());
+        var form = await client.GetStringAsync("/forum/c/the-music/new-thread");
+        var token = ExtractAntiforgeryToken(form);
+
+        var response = await client.PostAsync("/forum/c/the-music/new-thread", new FormUrlEncodedContent(
+        [
+            new KeyValuePair<string, string>("__RequestVerificationToken", token),
+            new KeyValuePair<string, string>("Subject", "Fresh poll thread"),
+            new KeyValuePair<string, string>("Body", "<p>Vote on this</p>"),
+            new KeyValuePair<string, string>("Poll.Enabled", "true"),
+            new KeyValuePair<string, string>("Poll.Enabled", "false"),
+            new KeyValuePair<string, string>("Poll.Question", "Which Queen era?"),
+            new KeyValuePair<string, string>("Poll.Options[0]", "Seventies"),
+            new KeyValuePair<string, string>("Poll.Options[1]", "Eighties"),
+        ]));
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.StartsWith("/forum/topic/", response.Headers.Location!.OriginalString, StringComparison.Ordinal);
+
+        var redirected = await client.GetStringAsync(response.Headers.Location);
+        Assert.Contains("Which Queen era?", redirected);
+        Assert.Contains("Seventies", redirected);
+        Assert.Contains("Eighties", redirected);
+        Assert.Contains("qz-forum-poll", redirected);
+    }
+
+    [Fact]
     public async Task ExistingTopicPost_CreatesReplyAndRedirectsToPostAnchor()
     {
         var client = CreateMemberClient(factory, Guid.NewGuid());
