@@ -10,7 +10,8 @@ public sealed class QueenZoneDbContextFactory : IDesignTimeDbContextFactory<Quee
         var optionsBuilder = new DbContextOptionsBuilder<QueenZoneDbContext>();
         optionsBuilder.UseSqlServer(
             Environment.GetEnvironmentVariable("ConnectionStrings__QueenZoneLegacy")
-            ?? "Server=(localdb)\\mssqllocaldb;Database=QueenZone;Trusted_Connection=True;TrustServerCertificate=True");
+            ?? "Server=(localdb)\\mssqllocaldb;Database=QueenZone;Trusted_Connection=True;TrustServerCertificate=True",
+            sql => sql.CommandTimeout(300));
 
         return new QueenZoneDbContext(optionsBuilder.Options);
     }
