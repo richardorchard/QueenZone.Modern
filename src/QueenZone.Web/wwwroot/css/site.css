@@ -1537,19 +1537,26 @@ body.qz-menu-lock .qz-masthead {
 .qz-forum-poll {
   margin: 0 0 var(--space-6);
   padding: var(--space-4);
-  border: 1px solid var(--hairline);
+  border: 1px solid var(--border-on-dark);
   border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--surface, #111) 92%, transparent);
+  color: var(--text-on-dark);
+  background: var(--surface-inverse);
 }
 
 .qz-forum-poll__eyebrow {
   margin: 0 0 var(--space-2);
+  color: var(--qz-gold);
   letter-spacing: 0.12em;
 }
 
 .qz-forum-poll__question {
   margin: 0 0 var(--space-2);
+  color: var(--text-on-dark);
   font-size: 1.15rem;
+}
+
+.qz-forum-poll .qz-meta {
+  color: var(--text-on-dark-muted);
 }
 
 .qz-forum-poll__options,
@@ -1566,6 +1573,7 @@ body.qz-menu-lock .qz-masthead {
   display: flex;
   gap: var(--space-2);
   align-items: flex-start;
+  color: var(--text-on-dark);
 }
 
 .qz-forum-poll__result-head {
@@ -1578,19 +1586,30 @@ body.qz-menu-lock .qz-masthead {
 .qz-forum-poll__bar {
   height: 0.55rem;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--hairline, #444) 70%, transparent);
+  background: rgba(255, 255, 255, 0.16);
   overflow: hidden;
 }
 
 .qz-forum-poll__bar-fill {
   display: block;
   height: 100%;
-  background: var(--link, #c9a227);
+  background: var(--qz-gold);
   border-radius: inherit;
 }
 
 .qz-forum-poll__close-form {
   margin-top: var(--space-3);
+}
+
+.qz-forum-poll__close-form .qz-button--ghost {
+  color: var(--text-on-dark);
+  border-color: var(--border-on-dark);
+}
+
+.qz-forum-poll__close-form .qz-button--ghost:hover {
+  color: var(--qz-black);
+  background: var(--qz-gold);
+  border-color: var(--qz-gold);
 }
 
 .qz-forum-poll-compose {
