@@ -26,7 +26,7 @@ public partial class AddModernForumPostAuthorPostedIndex : Migration
                 CREATE INDEX IX_ModernForumPost_AuthorDisplayName_PostedAt
                     ON dbo.ModernForumPost (AuthorDisplayName, PostedAt);
             END
-            """);
+            """, suppressTransaction: true);
     }
 
     /// <inheritdoc />
@@ -43,6 +43,6 @@ public partial class AddModernForumPostAuthorPostedIndex : Migration
                 DROP INDEX IX_ModernForumPost_AuthorDisplayName_PostedAt
                     ON dbo.ModernForumPost;
             END
-            """);
+            """, suppressTransaction: true);
     }
 }

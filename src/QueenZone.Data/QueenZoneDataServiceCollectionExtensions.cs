@@ -13,7 +13,9 @@ public static class QueenZoneDataServiceCollectionExtensions
         forumDataOptions ??= new ForumDataOptions();
 
         services.AddDbContext<QueenZoneDbContext>(options =>
-            options.UseSqlServer(connectionString));
+            options.UseSqlServer(
+                connectionString,
+                sql => sql.CommandTimeout(300)));
 
         services.AddScoped<INewsRepository, EfNewsRepository>();
         services.AddScoped<IArticlesRepository, EfArticlesRepository>();
