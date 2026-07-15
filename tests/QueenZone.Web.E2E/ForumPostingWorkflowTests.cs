@@ -69,6 +69,10 @@ public class ForumPostingWorkflowTests : E2EPageTest
         await Page.GetByLabel("Poll question").FillAsync(question);
         await Page.GetByPlaceholder("Option 1").FillAsync("Seventies");
         await Page.GetByPlaceholder("Option 2").FillAsync("Eighties");
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Add option" }).ClickAsync();
+        await Page.GetByPlaceholder("Option").Last.FillAsync("Nineties");
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Add option" }).ClickAsync();
+        await Page.GetByPlaceholder("Option").Last.FillAsync("Now");
 
         await Page.GetByRole(AriaRole.Button, new() { Name = "Create thread" }).ClickAsync();
 
@@ -77,6 +81,8 @@ public class ForumPostingWorkflowTests : E2EPageTest
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = question, Level = 2 })).ToBeVisibleAsync();
         await Expect(Page.GetByText("Seventies")).ToBeVisibleAsync();
         await Expect(Page.GetByText("Eighties")).ToBeVisibleAsync();
+        await Expect(Page.GetByText("Nineties")).ToBeVisibleAsync();
+        await Expect(Page.GetByText("Now")).ToBeVisibleAsync();
     }
 
     private async Task FillRichTextEditorAsync(string text)

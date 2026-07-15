@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Logging;
 using QueenZone.Data;
 
 namespace QueenZone.Web;
@@ -6,7 +7,8 @@ namespace QueenZone.Web;
 public sealed class ForumPostRateLimiter(
     IForumWriteRepository forumWriteRepository,
     IMemoryCache cache,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    ILogger<ForumPostRateLimiter> logger)
 {
     public const int MaxPostsPerMinute = 5;
     private static readonly TimeSpan Window = TimeSpan.FromMinutes(1);
@@ -20,7 +22,21 @@ public sealed class ForumPostRateLimiter(
             return false;
         }
 
-        var count = await forumWriteRepository.CountPostsByMemberSinceAsync(memberId, now - Window, cancellationToken);
+        int count;
+        try
+        {
+            count = await forumWriteRepository.CountPostsByMemberSinceAsync(memberId, now - Window, cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException && !cancellationToken.IsCancellationRequested)
+        {
+            logger.LogWarning(
+                ex,
+                "Forum post rate-limit probe failed for member {MemberId}; allowing this post attempt.",
+                memberId);
+            cache.Set(key, 1, Window);
+            return true;
+        }
+
         if (count >= MaxPostsPerMinute)
         {
             cache.Set(key, count, Window);
