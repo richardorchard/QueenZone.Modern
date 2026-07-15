@@ -65,6 +65,8 @@ public sealed class ForumWriteRoutesTests : IClassFixture<WebApplicationFactory<
             new KeyValuePair<string, string>("Poll.Question", "Which Queen era?"),
             new KeyValuePair<string, string>("Poll.Options[0]", "Seventies"),
             new KeyValuePair<string, string>("Poll.Options[1]", "Eighties"),
+            new KeyValuePair<string, string>("Poll.Options[2]", "Nineties"),
+            new KeyValuePair<string, string>("Poll.Options[3]", "Now"),
         ]));
 
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
@@ -74,6 +76,8 @@ public sealed class ForumWriteRoutesTests : IClassFixture<WebApplicationFactory<
         Assert.Contains("Which Queen era?", redirected);
         Assert.Contains("Seventies", redirected);
         Assert.Contains("Eighties", redirected);
+        Assert.Contains("Nineties", redirected);
+        Assert.Contains("Now", redirected);
         Assert.Contains("qz-forum-poll", redirected);
     }
 
