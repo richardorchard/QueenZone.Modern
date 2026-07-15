@@ -53,6 +53,32 @@ public class ForumPostingWorkflowTests : E2EPageTest
         await Expect(Page.Locator(".qz-forum-post").Filter(new() { HasText = replyBody })).ToBeVisibleAsync();
     }
 
+    [Test]
+    public async Task MemberCanCreateTopicWithPoll()
+    {
+        var stamp = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
+        var subject = $"Playwright forum poll topic {stamp}";
+        var question = $"Best Queen poll option {stamp}?";
+
+        await Page.GotoAsync("/forum/c/the-music/new-thread");
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "New thread", Level = 1 })).ToBeVisibleAsync();
+
+        await Page.GetByLabel("Subject").FillAsync(subject);
+        await FillRichTextEditorAsync($"Playwright poll first post {stamp}");
+        await Page.GetByLabel("Add a poll").CheckAsync();
+        await Page.GetByLabel("Poll question").FillAsync(question);
+        await Page.GetByPlaceholder("Option 1").FillAsync("Seventies");
+        await Page.GetByPlaceholder("Option 2").FillAsync("Eighties");
+
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Create thread" }).ClickAsync();
+
+        await Expect(Page).ToHaveURLAsync(new Regex(".*/forum/topic/\\d+/playwright-forum-poll-topic-.*", RegexOptions.IgnoreCase));
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = subject, Level = 1 })).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = question, Level = 2 })).ToBeVisibleAsync();
+        await Expect(Page.GetByText("Seventies")).ToBeVisibleAsync();
+        await Expect(Page.GetByText("Eighties")).ToBeVisibleAsync();
+    }
+
     private async Task FillRichTextEditorAsync(string text)
     {
         var editor = Page.Locator(".ql-editor").Last;
