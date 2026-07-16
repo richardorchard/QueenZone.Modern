@@ -189,10 +189,11 @@ These gates are guardrails, not a replacement for useful assertions. New or chan
 | Job | Purpose | Blocks merge? |
 | --- | --- | --- |
 | `build` | Restore, build, test, coverage gates | Yes |
+| `ef-migrations` | When migration-related paths change: snapshot check + `database update` on Azure SQL | Yes (same-repo PRs only; skipped otherwise) |
 | `smoke-test` | Publish app, curl `/health`, `/`, `/news` | Yes |
 | `e2e-test` | Playwright suite on self-hosted Windows runner | No (`continue-on-error` if runner offline) |
 
-Merges to `main` also trigger `.github/workflows/deploy-app-service.yml`, which re-runs tests, applies EF Core migrations, and deploys to the dev App Service. That is separate from pull request checks.
+Merges to `main` also trigger `.github/workflows/deploy-app-service.yml`, which re-runs tests, applies EF Core migrations, and deploys to the dev App Service. That is separate from pull request checks. The PR `ef-migrations` job uses the same migration connection string so SQL Server failures are caught before merge.
 
 ### EF migration consistency
 
@@ -224,7 +225,12 @@ If the pull request touches `QueenZoneDbContext`, entity mappings, or files unde
 
 ```powershell
 dotnet ef migrations has-pending-model-changes --project src/QueenZone.Data/QueenZone.Data.csproj --startup-project src/QueenZone.Web/QueenZone.Web.csproj
+
+$env:ConnectionStrings__QueenZoneLegacy = "<migration connection string>"
+dotnet ef database update --project src/QueenZone.Data/QueenZone.Data.csproj --startup-project src/QueenZone.Web/QueenZone.Web.csproj
 ```
+
+CI will re-run both steps on Azure SQL for same-repo PRs. Prefer fixing failures there before merge rather than discovering them on deploy-to-`main`.
 
 Use `pwsh` instead of `powershell` on Linux or macOS.
 
