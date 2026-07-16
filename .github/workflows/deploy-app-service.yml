@@ -36,14 +36,11 @@ jobs:
             echo "Docs-only push — skipping deploy."
           fi
 
-  deploy:
-    name: Build, test, and deploy
+  build:
+    name: Build and test
     runs-on: ubuntu-latest
     needs: changes
     if: needs.changes.outputs.code == 'true'
-    environment:
-      name: dev
-      url: https://queenzone-dev.azurewebsites.net
 
     steps:
       - name: Checkout
@@ -63,6 +60,37 @@ jobs:
       - name: Test
         run: dotnet test QueenZone.sln --configuration Release --no-build
 
+      - name: Publish
+        run: dotnet publish src/QueenZone.Web/QueenZone.Web.csproj --configuration Release --no-build --output publish
+
+      - name: Upload publish artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: web-publish-${{ github.run_id }}
+          path: publish
+          retention-days: 7
+
+  migrate:
+    name: Apply database migrations
+    runs-on: ubuntu-latest
+    needs: [changes, build]
+    if: needs.changes.outputs.code == 'true'
+    environment: dev
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: |
+          dotnet tool restore
+          dotnet restore QueenZone.sln
+
       - name: Apply database migrations
         env:
           ConnectionStrings__QueenZoneLegacy: ${{ secrets.QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING }}
@@ -72,13 +100,25 @@ jobs:
             exit 1
           fi
 
-          dotnet tool restore
           dotnet ef database update \
             --project src/QueenZone.Data/QueenZone.Data.csproj \
             --startup-project src/QueenZone.Web/QueenZone.Web.csproj
 
-      - name: Publish
-        run: dotnet publish src/QueenZone.Web/QueenZone.Web.csproj --configuration Release --no-build --output publish
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: [changes, build, migrate]
+    if: needs.changes.outputs.code == 'true'
+    environment:
+      name: dev
+      url: https://queenzone-dev.azurewebsites.net
+
+    steps:
+      - name: Download publish artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: web-publish-${{ github.run_id }}
+          path: publish
 
       - name: Deploy
         uses: azure/webapps-deploy@v3
@@ -87,21 +127,75 @@ jobs:
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
           package: publish
 
-      - name: Wait for site to be healthy
+  smoke:
+    name: Post-deploy smoke
+    runs-on: ubuntu-latest
+    needs: [changes, deploy]
+    if: needs.changes.outputs.code == 'true'
+    timeout-minutes: 10
+
+    steps:
+      # Smoke the public custom domain (Site:PublicBaseUrl), not only the App Service hostname.
+      # A failed smoke fails this job so GitHub Actions can email watchers.
+      - name: Wait for custom domain to be healthy
         run: |
-          SITE_URL="https://queenzone-dev.azurewebsites.net/health"
+          SITE_URL="https://www.queenzone.org/health"
           echo "Polling $SITE_URL — the App Service restarts after deployment and needs time to warm up."
           echo "The applicationInitialization module (web.config) pre-warms the process before it takes traffic,"
-          echo "but this step waits until the site is confirmed healthy from outside Azure."
-          for i in $(seq 1 30); do
+          echo "but this step waits until the custom domain is confirmed healthy from outside Azure."
+          for i in $(seq 1 36); do
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$SITE_URL" || echo "000")
             ELAPSED=$(( i * 10 ))
             if [ "$STATUS" = "200" ]; then
-              echo "✓ Site healthy after ~${ELAPSED}s (HTTP $STATUS)"
-              exit 0
+              BODY=$(curl -s --max-time 10 "$SITE_URL" || true)
+              if echo "$BODY" | grep -q '"status":"ok"'; then
+                echo "✓ Site healthy after ~${ELAPSED}s (HTTP $STATUS, status=ok)"
+                exit 0
+              fi
+              echo "  [${ELAPSED}s] HTTP $STATUS but health body missing status=ok — waiting 10s..."
+            else
+              echo "  [${ELAPSED}s] HTTP $STATUS — waiting 10s..."
             fi
-            echo "  [${ELAPSED}s] HTTP $STATUS — waiting 10s..."
             sleep 10
           done
-          echo "::warning::Site did not return HTTP 200 within 5 minutes. Check App Service logs."
+          echo "::error::Custom domain did not return healthy /health within 6 minutes. Check App Service logs."
           exit 1
+
+      - name: Post-deploy smoke (custom domain)
+        run: |
+          BASE_URL="https://www.queenzone.org"
+          FAILED=0
+          check() {
+            local path="$1"
+            local url="${BASE_URL}${path}"
+            local status
+            status=$(curl -s -o /tmp/smoke-body -w "%{http_code}" --max-time 30 -L "$url" || echo "000")
+            if [ "$status" != "200" ]; then
+              echo "✗ $url → HTTP $status"
+              FAILED=1
+              return
+            fi
+            if [ "$path" = "/health" ]; then
+              if ! grep -q '"status":"ok"' /tmp/smoke-body; then
+                echo "✗ $url → 200 but body missing \"status\":\"ok\""
+                FAILED=1
+                return
+              fi
+            fi
+            echo "✓ $url → HTTP $status"
+          }
+
+          check "/health"
+          check "/"
+          check "/news"
+          check "/forum"
+          check "/articles"
+          check "/biography"
+          check "/photography"
+          check "/search"
+
+          if [ "$FAILED" -ne 0 ]; then
+            echo "::error::Post-deploy smoke failed against $BASE_URL"
+            exit 1
+          fi
+          echo "All post-deploy smoke checks passed."

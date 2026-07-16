@@ -28,6 +28,7 @@ The goal is to restart QueenZone as a clean, modern public site that fully expos
     backlog/
   scripts/
     Smoke-NewsAgent.bat
+    Smoke-LiveSite.ps1
 ```
 
 ## Local Development
@@ -172,6 +173,8 @@ dotnet run --project src/QueenZone.NewsAgent.Worker -- discover-news --seed-sour
 ```
 
 OpenRouter smoke test (Windows): double-click `scripts/Smoke-NewsAgent.bat`.
+
+Post-deploy live site smoke (custom domain): separate job at the end of the App Service deploy workflow (`build` → `migrate` → `deploy` → `smoke`) against `https://www.queenzone.org`. Re-run locally with `powershell -File .\scripts\Smoke-LiveSite.ps1`.
 
 Admin review queue (after signing in as an allowed admin): `/admin/news-discovery`. Promoted drafts are edited and published through the existing `/admin/news` workflow.
 
