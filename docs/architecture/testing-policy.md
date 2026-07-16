@@ -206,6 +206,8 @@ This check is required even when the migration itself is hand-written SQL. EF st
 
 For hand-written idempotent SQL migrations, add the normal EF migration designer/snapshot metadata as well. If the SQL migration already performs the real DDL, the follow-up sync migration should be a deliberate no-op in `Up`/`Down` whose purpose is only to advance EF's model snapshot.
 
+**SQL Server batch binding:** do not put `ALTER TABLE ... ADD column` and a later `CREATE INDEX` / `UPDATE` / DML that references that new column in the same `migrationBuilder.Sql(...)` string. SQL Server compiles the whole batch before execution and fails with error 207 (`Invalid column name`). Use a separate `migrationBuilder.Sql` call (separate batch) for each dependent step. Filtered indexes and `CREATE OR ALTER PROCEDURE` that need to avoid ambient transactions may still use `suppressTransaction: true` on their own call.
+
 ## Pre-pull request checklist
 
 Before opening a pull request, run the full local gate—not only `dotnet test`:

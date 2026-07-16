@@ -9,6 +9,11 @@ namespace QueenZone.Data.Migrations;
 /// Adds author ownership and edit metadata columns for member post editing,
 /// and updates ModernForum_GetTopicPostsPage to return them.
 /// </summary>
+/// <remarks>
+/// SQL Server binds an entire batch before execution. ALTER TABLE ... ADD and a later
+/// CREATE INDEX that references the new column must not share one Sql() batch, or you get
+/// error 207 Invalid column name. Keep each dependent step in its own migrationBuilder.Sql call.
+/// </remarks>
 [DbContext(typeof(QueenZoneDbContext))]
 [Migration("20260716090000_AddForumPostEditColumns")]
 public partial class AddForumPostEditColumns : Migration
@@ -37,17 +42,22 @@ public partial class AddForumPostEditColumns : Migration
                         ADD EditCount int NOT NULL
                             CONSTRAINT DF_ModernForumPost_EditCount DEFAULT (0);
                 END;
+            END
+            """);
 
-                IF NOT EXISTS (
+        // Separate batch: CREATE INDEX must see AuthorMemberId after ALTER has committed.
+        migrationBuilder.Sql("""
+            IF OBJECT_ID(N'dbo.ModernForumPost', N'U') IS NOT NULL
+               AND COL_LENGTH(N'dbo.ModernForumPost', N'AuthorMemberId') IS NOT NULL
+               AND NOT EXISTS (
                     SELECT 1
                     FROM sys.indexes
                     WHERE object_id = OBJECT_ID(N'dbo.ModernForumPost', N'U')
                       AND name = N'IX_ModernForumPost_AuthorMemberId')
-                BEGIN
-                    CREATE INDEX IX_ModernForumPost_AuthorMemberId
-                        ON dbo.ModernForumPost (AuthorMemberId)
-                        WHERE AuthorMemberId IS NOT NULL;
-                END;
+            BEGIN
+                CREATE INDEX IX_ModernForumPost_AuthorMemberId
+                    ON dbo.ModernForumPost (AuthorMemberId)
+                    WHERE AuthorMemberId IS NOT NULL;
             END
             """, suppressTransaction: true);
 
@@ -137,7 +147,12 @@ public partial class AddForumPostEditColumns : Migration
                     DROP INDEX IX_ModernForumPost_AuthorMemberId
                         ON dbo.ModernForumPost;
                 END;
+            END
+            """, suppressTransaction: true);
 
+        migrationBuilder.Sql("""
+            IF OBJECT_ID(N'dbo.ModernForumPost', N'U') IS NOT NULL
+            BEGIN
                 IF COL_LENGTH(N'dbo.ModernForumPost', N'EditCount') IS NOT NULL
                 BEGIN
                     DECLARE @df sysname =
@@ -162,6 +177,6 @@ public partial class AddForumPostEditColumns : Migration
                 IF COL_LENGTH(N'dbo.ModernForumPost', N'AuthorMemberId') IS NOT NULL
                     ALTER TABLE dbo.ModernForumPost DROP COLUMN AuthorMemberId;
             END
-            """, suppressTransaction: true);
+            """);
     }
 }
