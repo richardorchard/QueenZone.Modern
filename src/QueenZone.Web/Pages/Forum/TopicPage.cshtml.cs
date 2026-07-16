@@ -1,10 +1,15 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using QueenZone.Data;
 using QueenZone.Web;
 
 namespace QueenZone.Web.Pages.Forum;
 
-public sealed class TopicPageModel(IForumRepository forumRepository) : ForumTopicPageModel(forumRepository)
+public sealed class TopicPageModel(
+    IForumRepository forumRepository,
+    IOptions<ForumOptions> forumOptions,
+    IOptions<AdminOptions> adminOptions,
+    TimeProvider timeProvider) : ForumTopicPageModel(forumRepository, forumOptions, adminOptions, timeProvider)
 {
     [BindProperty(SupportsGet = true)]
     public int PageNumber { get; set; }

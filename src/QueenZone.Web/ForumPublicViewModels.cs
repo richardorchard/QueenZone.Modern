@@ -46,7 +46,12 @@ public sealed record ForumPostViewModel(
     string AuthorUsername,
     string? Signature,
     DateTime? AuthorMemberSince,
-    IReadOnlyList<ForumAttachmentViewModel> Attachments);
+    IReadOnlyList<ForumAttachmentViewModel> Attachments,
+    Guid? AuthorMemberId = null,
+    DateTimeOffset? EditedAt = null,
+    int EditCount = 0,
+    bool CanEdit = false,
+    string? EditedLabel = null);
 
 /// <summary>
 /// Stable attachment presentation for forum posts.

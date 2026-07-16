@@ -33,6 +33,20 @@ public sealed class ForumPostRateLimiterTests
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
+        public Task<ForumEditablePost?> GetPostAsync(
+            int postId,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<ForumPostUpdateResult> UpdatePostAsync(
+            int postId,
+            Guid editorMemberId,
+            string sanitisedBody,
+            bool isAdmin,
+            int editWindowMinutes,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public Task<ForumWriteThread?> GetThreadAsync(
             int topicId,
             CancellationToken cancellationToken = default) =>

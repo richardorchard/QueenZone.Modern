@@ -36,6 +36,9 @@ public static class QueenZoneWebServiceCollectionExtensions
         services.AddOptions<ForumDataOptions>()
             .Bind(configuration.GetSection(ForumDataOptions.SectionName));
 
+        services.AddOptions<ForumOptions>()
+            .Bind(configuration.GetSection(ForumOptions.SectionName));
+
         services.AddOptions<PublicQueryCacheOptions>()
             .Bind(configuration.GetSection(PublicQueryCacheOptions.SectionName))
             .ValidateOnStart();

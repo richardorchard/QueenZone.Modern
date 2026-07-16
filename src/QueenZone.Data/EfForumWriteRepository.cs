@@ -52,12 +52,14 @@ public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForu
             LegacyThreadTopicId = topicId,
             ThreadId = forumThread.Id,
             LegacyForumId = category.LegacyForumId,
+            AuthorMemberId = thread.AuthorMemberId,
             AuthorDisplayName = thread.AuthorDisplayName.Trim(),
             BodyHtml = TruncateBody(thread.Body),
             PostedAt = now,
             LegacyDiscography = 0,
             AuthorUserValidated = true,
             AttachCount = 0,
+            EditCount = 0,
             ImportedAt = now,
             UpdatedAt = now,
         });
@@ -103,12 +105,14 @@ public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForu
             LegacyThreadTopicId = thread.LegacyTopicId,
             ThreadId = thread.Id,
             LegacyForumId = thread.LegacyForumId,
+            AuthorMemberId = post.AuthorMemberId,
             AuthorDisplayName = post.AuthorDisplayName.Trim(),
             BodyHtml = TruncateBody(post.Body),
             PostedAt = now,
             LegacyDiscography = thread.LegacyDiscography,
             AuthorUserValidated = true,
             AttachCount = 0,
+            EditCount = 0,
             ImportedAt = now,
             UpdatedAt = now,
         });
@@ -128,6 +132,102 @@ public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForu
         await transaction.CommitAsync(cancellationToken);
 
         return postId;
+    }
+
+    public async Task<ForumEditablePost?> GetPostAsync(int postId, CancellationToken cancellationToken = default)
+    {
+        var row = await dbContext.ModernForumPosts
+            .AsNoTracking()
+            .Where(post => post.LegacyPostId == postId)
+            .Select(post => new
+            {
+                post.LegacyPostId,
+                post.LegacyThreadTopicId,
+                TopicSubject = post.Thread!.Title,
+                post.BodyHtml,
+                post.AuthorMemberId,
+                post.PostedAt,
+                post.EditedAt,
+                post.EditCount,
+            })
+            .SingleOrDefaultAsync(cancellationToken);
+
+        if (row is null)
+        {
+            return null;
+        }
+
+        var position = await dbContext.ModernForumPosts
+            .AsNoTracking()
+            .CountAsync(
+                post => post.LegacyThreadTopicId == row.LegacyThreadTopicId && post.LegacyPostId <= postId,
+                cancellationToken);
+
+        return new ForumEditablePost(
+            row.LegacyPostId,
+            row.LegacyThreadTopicId,
+            row.TopicSubject,
+            row.BodyHtml,
+            row.AuthorMemberId,
+            ToOffset(row.PostedAt),
+            row.EditedAt.HasValue ? ToOffset(row.EditedAt) : null,
+            row.EditCount,
+            Math.Max(1, position));
+    }
+
+    public async Task<ForumPostUpdateResult> UpdatePostAsync(
+        int postId,
+        Guid editorMemberId,
+        string sanitisedBody,
+        bool isAdmin,
+        int editWindowMinutes,
+        CancellationToken cancellationToken = default)
+    {
+        var post = await dbContext.ModernForumPosts
+            .Include(item => item.Thread)
+            .SingleOrDefaultAsync(item => item.LegacyPostId == postId, cancellationToken);
+        if (post?.Thread is null)
+        {
+            return new ForumPostUpdateResult(ForumPostUpdateStatus.NotFound);
+        }
+
+        var postedAt = ToOffset(post.PostedAt);
+        var canEdit = ForumPostEditRules.CanEdit(
+            post.AuthorMemberId,
+            editorMemberId,
+            isAdmin,
+            postedAt,
+            editWindowMinutes,
+            DateTimeOffset.UtcNow);
+
+        if (!canEdit)
+        {
+            if (!isAdmin
+                && post.AuthorMemberId == editorMemberId
+                && editWindowMinutes == 0)
+            {
+                return new ForumPostUpdateResult(ForumPostUpdateStatus.EditingDisabled, post.LegacyThreadTopicId, post.Thread.Title);
+            }
+
+            if (!isAdmin
+                && post.AuthorMemberId == editorMemberId
+                && editWindowMinutes > 0
+                && DateTimeOffset.UtcNow > postedAt.AddMinutes(editWindowMinutes))
+            {
+                return new ForumPostUpdateResult(ForumPostUpdateStatus.EditWindowExpired, post.LegacyThreadTopicId, post.Thread.Title);
+            }
+
+            return new ForumPostUpdateResult(ForumPostUpdateStatus.Forbidden, post.LegacyThreadTopicId, post.Thread.Title);
+        }
+
+        var now = DateTime.UtcNow;
+        post.BodyHtml = TruncateBody(sanitisedBody);
+        post.EditedAt = now;
+        post.EditCount += 1;
+        post.UpdatedAt = now;
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return new ForumPostUpdateResult(ForumPostUpdateStatus.Success, post.LegacyThreadTopicId, post.Thread.Title);
     }
 
     public async Task<ForumWriteThread?> GetThreadAsync(int topicId, CancellationToken cancellationToken = default) =>
@@ -274,6 +374,11 @@ public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForu
 
     private static DateTime ToUtcDateTime(DateTimeOffset value) =>
         value.UtcDateTime;
+
+    private static DateTimeOffset ToOffset(DateTime? value) =>
+        value.HasValue
+            ? new DateTimeOffset(DateTime.SpecifyKind(value.Value, DateTimeKind.Utc))
+            : DateTimeOffset.MinValue;
 
     private static string TruncateBody(string body) =>
         body.Length <= BodyHtmlMaxLength ? body : body[..BodyHtmlMaxLength];

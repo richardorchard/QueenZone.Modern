@@ -6,6 +6,16 @@ public interface IForumWriteRepository
 
     Task<int> CreatePostAsync(NewForumPost post, CancellationToken cancellationToken = default);
 
+    Task<ForumEditablePost?> GetPostAsync(int postId, CancellationToken cancellationToken = default);
+
+    Task<ForumPostUpdateResult> UpdatePostAsync(
+        int postId,
+        Guid editorMemberId,
+        string sanitisedBody,
+        bool isAdmin,
+        int editWindowMinutes,
+        CancellationToken cancellationToken = default);
+
     Task<ForumWriteThread?> GetThreadAsync(int topicId, CancellationToken cancellationToken = default);
 
     Task<int> CountPostsByMemberSinceAsync(Guid memberId, DateTimeOffset since, CancellationToken cancellationToken = default);

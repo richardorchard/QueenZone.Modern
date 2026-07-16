@@ -13,6 +13,7 @@ public sealed class TestMemberAuthHandler(
     public const string SchemeName = "TestMember";
     public const string MemberIdHeader = "X-Test-Member-Id";
     public const string DisplayNameHeader = "X-Test-Member-Name";
+    public const string EmailHeader = "X-Test-Member-Email";
 
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
@@ -31,6 +32,13 @@ public sealed class TestMemberAuthHandler(
             new(ClaimTypes.NameIdentifier, memberId.ToString()),
             new(ClaimTypes.Name, string.IsNullOrWhiteSpace(displayName) ? "Test Member" : displayName),
         };
+
+        if (Request.Headers.TryGetValue(EmailHeader, out var emailValues)
+            && !string.IsNullOrWhiteSpace(emailValues.FirstOrDefault()))
+        {
+            claims.Add(new Claim(ClaimTypes.Email, emailValues.FirstOrDefault()!));
+        }
+
         var identity = new ClaimsIdentity(claims, SchemeName);
         return Task.FromResult(AuthenticateResult.Success(new AuthenticationTicket(new ClaimsPrincipal(identity), SchemeName)));
     }

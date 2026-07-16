@@ -111,7 +111,33 @@ public static class PublicContentMapper
             post.AuthorUsername,
             post.Signature,
             post.AuthorMemberSince,
-            ToForumAttachments(post.Attachments));
+            ToForumAttachments(post.Attachments),
+            post.AuthorMemberId,
+            post.EditedAt,
+            post.EditCount);
+
+    public static ForumPostViewModel WithEditState(
+        ForumPostViewModel post,
+        Guid? currentMemberId,
+        bool isAdmin,
+        int editWindowMinutes,
+        DateTimeOffset utcNow)
+    {
+        var postedAt = new DateTimeOffset(DateTime.SpecifyKind(post.PostedAt, DateTimeKind.Utc));
+        var canEdit = ForumPostEditRules.CanEdit(
+            post.AuthorMemberId,
+            currentMemberId,
+            isAdmin,
+            postedAt,
+            editWindowMinutes,
+            utcNow);
+        var showEdited = ForumPostEditRules.ShowEditedIndicator(post.EditCount, post.EditedAt, postedAt);
+        var editedLabel = showEdited && post.EditedAt is not null
+            ? ForumPostEditRules.FormatEditedLabel(post.EditCount, post.EditedAt.Value, utcNow)
+            : null;
+
+        return post with { CanEdit = canEdit, EditedLabel = editedLabel };
+    }
 
     public static IReadOnlyList<ForumPostViewModel> ToForumPostViewModels(
         IEnumerable<ForumPostItem> posts) =>

@@ -275,6 +275,9 @@ public sealed class EfForumPollRepositoryTests : IAsyncDisposable
                 Attachment TEXT NULL,
                 FileSize TEXT NULL,
                 AttachCount INTEGER NOT NULL,
+                AuthorMemberId TEXT NULL,
+                EditedAt TEXT NULL,
+                EditCount INTEGER NOT NULL DEFAULT 0,
                 ImportedAt TEXT NOT NULL,
                 UpdatedAt TEXT NOT NULL,
                 FOREIGN KEY (ThreadId) REFERENCES ModernForumThread (Id)

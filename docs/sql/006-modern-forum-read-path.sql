@@ -350,7 +350,10 @@ BEGIN
         CAST(0 AS tinyint) AS ONLINE,
         CAST(NULL AS varchar(50)) AS AVATAR,
         CAST(NULL AS varchar(30)) AS DISPLAY_MESSAGE,
-        p.LegacyDiscography AS DISCO
+        p.LegacyDiscography AS DISCO,
+        p.AuthorMemberId,
+        p.EditedAt,
+        p.EditCount
     FROM dbo.ModernForumPost p WITH (INDEX(IX_ModernForumPost_Thread_Posted))
     WHERE p.ThreadId = @ThreadId
     ORDER BY p.LegacyPostId ASC
