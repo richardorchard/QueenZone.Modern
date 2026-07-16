@@ -26,3 +26,28 @@ public sealed record ForumWriteThread(
     bool IsLocked);
 
 public sealed record ForumThreadCreateResult(int TopicId, int StarterPostId);
+
+public sealed record ForumEditablePost(
+    int PostId,
+    int TopicId,
+    string TopicSubject,
+    string Body,
+    Guid? AuthorMemberId,
+    DateTimeOffset PostedAt,
+    DateTimeOffset? EditedAt,
+    int EditCount,
+    int PositionInThread = 1);
+
+public enum ForumPostUpdateStatus
+{
+    Success,
+    NotFound,
+    Forbidden,
+    EditWindowExpired,
+    EditingDisabled,
+}
+
+public sealed record ForumPostUpdateResult(
+    ForumPostUpdateStatus Status,
+    int TopicId = 0,
+    string TopicSubject = "");

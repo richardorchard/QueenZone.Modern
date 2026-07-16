@@ -194,6 +194,9 @@ public sealed class InMemoryForumRepository(
                 post.DisplayName,
                 Signature: null,
                 AuthorPostCount: 0,
-                AuthorMemberSince: null))
+                AuthorMemberSince: null,
+                AuthorMemberId: post.MemberId,
+                EditedAt: post.EditedAt,
+                EditCount: post.EditCount))
             .ToList() ?? [];
 }

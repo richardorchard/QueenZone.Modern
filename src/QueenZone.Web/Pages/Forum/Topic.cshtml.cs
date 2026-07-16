@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Extensions.Options;
@@ -35,8 +34,9 @@ public sealed class TopicModel : ForumTopicPageModel
         ForumAttachmentValidator attachmentValidator,
         ForumAttachmentUploadService attachmentUploadService,
         IOptions<AdminOptions> adminOptions,
+        IOptions<ForumOptions> forumOptions,
         TimeProvider timeProvider)
-        : base(forumRepository)
+        : base(forumRepository, forumOptions, adminOptions, timeProvider)
     {
         this.forumRepository = forumRepository;
         this.forumWriteRepository = forumWriteRepository;
@@ -65,7 +65,7 @@ public sealed class TopicModel : ForumTopicPageModel
     public async Task<IActionResult> OnGetAsync(int topicId, string slug, CancellationToken cancellationToken)
     {
         var result = await LoadTopicPageAsync(topicId, slug, 1, cancellationToken);
-        CanReply = await IsMemberAuthenticatedAsync();
+        CanReply = await GetCurrentMemberIdAsync() is not null;
         if (result is PageResult)
         {
             await LoadPollAsync(topicId, cancellationToken);
@@ -172,32 +172,6 @@ public sealed class TopicModel : ForumTopicPageModel
         return Redirect(redirectPath + $"#post-{postId}");
     }
 
-    private async Task<Guid?> GetCurrentMemberIdAsync()
-    {
-        var direct = ForumMember.GetMemberId(User);
-        if (direct is not null)
-        {
-            return direct;
-        }
-
-        var memberCookie = await HttpContext.AuthenticateAsync(MemberAuthenticationSchemes.MembersCookie);
-        if (memberCookie.Succeeded)
-        {
-            return ForumMember.GetMemberId(memberCookie.Principal!);
-        }
-
-        if (HttpContext.RequestServices.GetService<IHostEnvironment>()?.IsEnvironment("Testing") == true)
-        {
-            var testMember = await HttpContext.AuthenticateAsync(TestMemberAuthHandler.SchemeName);
-            if (testMember.Succeeded)
-            {
-                return ForumMember.GetMemberId(testMember.Principal!);
-            }
-        }
-
-        return null;
-    }
-
     private async Task<string> ResolveAuthorDisplayNameAsync(Guid memberId, CancellationToken cancellationToken)
     {
         var account = await memberAccountService.FindByIdAsync(memberId, cancellationToken);
@@ -209,13 +183,12 @@ public sealed class TopicModel : ForumTopicPageModel
         return string.IsNullOrWhiteSpace(User.Identity?.Name) ? "Member" : User.Identity.Name;
     }
 
-    private async Task<bool> IsMemberAuthenticatedAsync() =>
-        await GetCurrentMemberIdAsync() is not null;
-
     private async Task LoadPollAsync(int topicId, CancellationToken cancellationToken)
     {
-        var memberId = await GetCurrentMemberIdAsync();
-        var isAdmin = memberId is not null && ForumPollEndpoints.IsAdmin(User, adminOptions);
+        var memberAuth = await ResolveMemberAuthAsync();
+        var memberId = ForumMember.GetMemberId(memberAuth?.Principal);
+        var isAdmin = memberAuth?.Principal is not null
+            && ForumPollEndpoints.IsAdmin(memberAuth.Principal, adminOptions);
         Poll = await forumPollRepository.GetPollWithResultsAsync(
             topicId,
             memberId,

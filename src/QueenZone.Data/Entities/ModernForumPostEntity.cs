@@ -17,6 +17,8 @@ public sealed class ModernForumPostEntity
 
     public int? AuthorLegacyUserId { get; set; }
 
+    public Guid? AuthorMemberId { get; set; }
+
     public string AuthorDisplayName { get; set; } = string.Empty;
 
     public int? AuthorPostCount { get; set; }
@@ -28,6 +30,10 @@ public sealed class ModernForumPostEntity
     public string? SignatureHtml { get; set; }
 
     public DateTime? PostedAt { get; set; }
+
+    public DateTime? EditedAt { get; set; }
+
+    public int EditCount { get; set; }
 
     public byte LegacyDiscography { get; set; }
 

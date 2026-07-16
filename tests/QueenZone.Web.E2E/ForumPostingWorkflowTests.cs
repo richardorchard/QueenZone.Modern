@@ -85,6 +85,37 @@ public class ForumPostingWorkflowTests : E2EPageTest
         await Expect(Page.GetByText("Now")).ToBeVisibleAsync();
     }
 
+    [Test]
+    public async Task MemberCanEditOwnPost()
+    {
+        var stamp = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
+        var subject = $"Playwright forum edit topic {stamp}";
+        var originalBody = $"Playwright original post {stamp}";
+        var editedBody = $"Playwright edited post {stamp}";
+
+        await Page.GotoAsync("/forum/c/the-music/new-thread");
+        await Page.GetByLabel("Subject").FillAsync(subject);
+        await FillRichTextEditorAsync(originalBody);
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Create thread" }).ClickAsync();
+        await Expect(Page).ToHaveURLAsync(new Regex(".*/forum/topic/\\d+/playwright-forum-edit-topic-.*", RegexOptions.IgnoreCase));
+
+        var post = Page.Locator(".qz-forum-post").Filter(new() { HasText = originalBody });
+        await Expect(post).ToBeVisibleAsync();
+        await post.GetByRole(AriaRole.Link, new() { Name = "Edit" }).ClickAsync();
+
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Edit post", Level = 1 })).ToBeVisibleAsync();
+        var editor = Page.Locator(".ql-editor").Last;
+        await Expect(editor).ToContainTextAsync(originalBody);
+        await editor.ClickAsync();
+        await Page.Keyboard.PressAsync("Control+A");
+        await Page.Keyboard.InsertTextAsync(editedBody);
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Save changes" }).ClickAsync();
+
+        await Expect(Page).ToHaveURLAsync(new Regex(".*/forum/topic/\\d+/playwright-forum-edit-topic-.*#post-\\d+", RegexOptions.IgnoreCase));
+        await Expect(Page.Locator(".qz-forum-post").Filter(new() { HasText = editedBody })).ToBeVisibleAsync();
+        await Expect(Page.GetByText(originalBody)).ToHaveCountAsync(0);
+    }
+
     private async Task FillRichTextEditorAsync(string text)
     {
         var editor = Page.Locator(".ql-editor").Last;

@@ -229,7 +229,12 @@ public sealed class ModernForumRepository(QueenZoneDbContext dbContext) : IForum
             string.IsNullOrWhiteSpace(row.SIGNATURE) ? null : row.SIGNATURE.Trim(),
             row.NUMBER_OF_POSTS ?? 0,
             row.DATE_CREATED,
-            ForumPostAttachment.Parse(row.ATTACHMENT, row.FILESIZE, row.Q_FORUM_TOPIC_ID));
+            ForumPostAttachment.Parse(row.ATTACHMENT, row.FILESIZE, row.Q_FORUM_TOPIC_ID),
+            row.AuthorMemberId,
+            row.EditedAt.HasValue
+                ? new DateTimeOffset(DateTime.SpecifyKind(row.EditedAt.Value, DateTimeKind.Utc))
+                : null,
+            row.EditCount);
 
     [ExcludeFromCodeCoverage]
     private static ForumTopicItem MapTopic(ForumTopicRow row) =>
@@ -284,6 +289,12 @@ public sealed class ModernForumRepository(QueenZoneDbContext dbContext) : IForum
         public string? DISPLAY_MESSAGE { get; set; }
 
         public byte DISCO { get; set; }
+
+        public Guid? AuthorMemberId { get; set; }
+
+        public DateTime? EditedAt { get; set; }
+
+        public int EditCount { get; set; }
     }
 
     internal sealed class ForumTopicRow

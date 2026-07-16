@@ -1,12 +1,31 @@
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.Extensions.Options;
 using QueenZone.Data;
 using QueenZone.Web;
 
 namespace QueenZone.Web.Pages.Forum;
 
-public abstract class ForumTopicPageModel(IForumRepository forumRepository) : PageModel
+public abstract class ForumTopicPageModel : PageModel
 {
+    private readonly IForumRepository forumRepository;
+    private readonly ForumOptions forumOptions;
+    private readonly AdminOptions adminOptions;
+    private readonly TimeProvider timeProvider;
+
+    protected ForumTopicPageModel(
+        IForumRepository forumRepository,
+        IOptions<ForumOptions> forumOptions,
+        IOptions<AdminOptions> adminOptions,
+        TimeProvider timeProvider)
+    {
+        this.forumRepository = forumRepository;
+        this.forumOptions = forumOptions.Value;
+        this.adminOptions = adminOptions.Value;
+        this.timeProvider = timeProvider;
+    }
+
     public ForumThreadHeader? Header { get; private set; }
 
     public IReadOnlyList<ForumPostViewModel> Posts { get; private set; } = [];
@@ -60,8 +79,22 @@ public abstract class ForumTopicPageModel(IForumRepository forumRepository) : Pa
             return NotFound();
         }
 
+        var memberAuth = await ResolveMemberAuthAsync();
+        var memberId = ForumMember.GetMemberId(memberAuth?.Principal);
+        var isAdmin = memberAuth?.Principal is not null
+            && ForumPollEndpoints.IsAdmin(memberAuth.Principal, adminOptions);
+        var utcNow = timeProvider.GetUtcNow();
+
         Header = header;
-        Posts = PublicContentMapper.ToForumPostViewModels(topicPage.Posts);
+        Posts = topicPage.Posts
+            .Select(PublicContentMapper.ToForumPostViewModel)
+            .Select(post => PublicContentMapper.WithEditState(
+                post,
+                memberId,
+                isAdmin,
+                forumOptions.PostEditWindowMinutes,
+                utcNow))
+            .ToList();
         CurrentPage = page;
         TotalPages = totalPages;
         TotalPosts = topicPage.TotalCount;
@@ -88,5 +121,37 @@ public abstract class ForumTopicPageModel(IForumRepository forumRepository) : Pa
         }
 
         return Page();
+    }
+
+    protected async Task<Guid?> GetCurrentMemberIdAsync()
+    {
+        var auth = await ResolveMemberAuthAsync();
+        return ForumMember.GetMemberId(auth?.Principal);
+    }
+
+    protected async Task<AuthenticateResult?> ResolveMemberAuthAsync()
+    {
+        var directId = ForumMember.GetMemberId(User);
+        if (directId is not null)
+        {
+            return AuthenticateResult.Success(new AuthenticationTicket(User, MemberAuthenticationSchemes.MembersCookie));
+        }
+
+        var memberCookie = await HttpContext.AuthenticateAsync(MemberAuthenticationSchemes.MembersCookie);
+        if (memberCookie.Succeeded)
+        {
+            return memberCookie;
+        }
+
+        if (HttpContext.RequestServices.GetService<IHostEnvironment>()?.IsEnvironment("Testing") == true)
+        {
+            var testMember = await HttpContext.AuthenticateAsync(TestMemberAuthHandler.SchemeName);
+            if (testMember.Succeeded)
+            {
+                return testMember;
+            }
+        }
+
+        return null;
     }
 }

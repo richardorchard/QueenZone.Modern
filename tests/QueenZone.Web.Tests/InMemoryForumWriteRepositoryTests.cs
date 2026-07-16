@@ -95,4 +95,80 @@ public sealed class InMemoryForumWriteRepositoryTests
         Assert.Equal(11, stats.PostCount);
         Assert.Equal(4, stats.ThreadCount);
     }
+
+    [Fact]
+    public async Task UpdatePostAsync_RejectsEditsAfterWindowExpires()
+    {
+        var repository = new InMemoryForumWriteRepository();
+        var memberId = Guid.NewGuid();
+        var created = await repository.CreateThreadAsync(new NewForumThread(
+            1,
+            memberId,
+            "Forum Fan",
+            "Editable topic",
+            "<p>Original</p>",
+            DateTimeOffset.UtcNow.AddHours(-2)));
+
+        var result = await repository.UpdatePostAsync(
+            created.StarterPostId,
+            memberId,
+            "<p>Too late</p>",
+            isAdmin: false,
+            editWindowMinutes: 60);
+
+        Assert.Equal(ForumPostUpdateStatus.EditWindowExpired, result.Status);
+        var post = await repository.GetPostAsync(created.StarterPostId);
+        Assert.Equal("<p>Original</p>", post!.Body);
+        Assert.Equal(0, post.EditCount);
+    }
+
+    [Fact]
+    public async Task UpdatePostAsync_RejectsNonOwnerWhoIsNotAdmin()
+    {
+        var repository = new InMemoryForumWriteRepository();
+        var ownerId = Guid.NewGuid();
+        var created = await repository.CreateThreadAsync(new NewForumThread(
+            1,
+            ownerId,
+            "Owner",
+            "Owned topic",
+            "<p>Original</p>",
+            DateTimeOffset.UtcNow));
+
+        var result = await repository.UpdatePostAsync(
+            created.StarterPostId,
+            Guid.NewGuid(),
+            "<p>Hijack</p>",
+            isAdmin: false,
+            editWindowMinutes: 60);
+
+        Assert.Equal(ForumPostUpdateStatus.Forbidden, result.Status);
+    }
+
+    [Fact]
+    public async Task UpdatePostAsync_AllowsAdminRegardlessOfAgeOrOwner()
+    {
+        var repository = new InMemoryForumWriteRepository();
+        var ownerId = Guid.NewGuid();
+        var created = await repository.CreateThreadAsync(new NewForumThread(
+            1,
+            ownerId,
+            "Owner",
+            "Old topic",
+            "<p>Original</p>",
+            DateTimeOffset.UtcNow.AddDays(-30)));
+
+        var result = await repository.UpdatePostAsync(
+            created.StarterPostId,
+            Guid.NewGuid(),
+            "<p>Admin edit</p>",
+            isAdmin: true,
+            editWindowMinutes: 60);
+
+        Assert.Equal(ForumPostUpdateStatus.Success, result.Status);
+        var post = await repository.GetPostAsync(created.StarterPostId);
+        Assert.Equal("<p>Admin edit</p>", post!.Body);
+        Assert.Equal(1, post.EditCount);
+        Assert.NotNull(post.EditedAt);
+    }
 }

@@ -26,6 +26,16 @@ else
           <time class="qz-meta" datetime="@post.PostedAt.ToString("yyyy-MM-ddTHH:mm:ss")">@post.PostedAt.ToString("dd MMMM yyyy HH:mm")</time>
         </header>
         <div class="qz-forum-post__body article-body">@Html.Raw(UgcHtml.FormatForDisplay(post.Body))</div>
+        @if (!string.IsNullOrWhiteSpace(post.EditedLabel))
+        {
+          <p class="qz-forum-post__edited qz-meta">@post.EditedLabel</p>
+        }
+        @if (post.CanEdit)
+        {
+          <p class="qz-forum-post__actions">
+            <a class="qz-forum-post__edit-link" href="/forum/post/@post.Id/edit">Edit</a>
+          </p>
+        }
         @if (post.Attachments is { Count: > 0 })
         {
           <div class="qz-forum-post__attachments">

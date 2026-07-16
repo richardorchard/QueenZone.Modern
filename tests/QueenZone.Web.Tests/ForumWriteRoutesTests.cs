@@ -280,6 +280,18 @@ public sealed class ForumWriteRoutesTests : IClassFixture<WebApplicationFactory<
         public Task<int> CreatePostAsync(NewForumPost post, CancellationToken cancellationToken = default) =>
             throw new InvalidOperationException("Locked.");
 
+        public Task<ForumEditablePost?> GetPostAsync(int postId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<ForumEditablePost?>(null);
+
+        public Task<ForumPostUpdateResult> UpdatePostAsync(
+            int postId,
+            Guid editorMemberId,
+            string sanitisedBody,
+            bool isAdmin,
+            int editWindowMinutes,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new ForumPostUpdateResult(ForumPostUpdateStatus.Forbidden));
+
         public Task<ForumWriteThread?> GetThreadAsync(int topicId, CancellationToken cancellationToken = default) =>
             Task.FromResult<ForumWriteThread?>(new ForumWriteThread(
                 topicId,

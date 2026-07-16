@@ -1,0 +1,54 @@
+@page "/forum/post/{postId:int}/edit"
+@model EditPostModel
+@using QueenZone.Storage
+@{
+  ViewData["TextareaId"] = "Body";
+  ViewData["TextareaName"] = "Body";
+  ViewData["EditorValue"] = Model.Body;
+  ViewData["EditorLabel"] = "Post";
+  ViewData["UploadContainer"] = BlobUploadContainers.Forum;
+}
+
+<section class="qz-page-hero">
+  <partial name="_PictureImage" model="@("/design-system/assets/crest-white.png", "", false, "qz-page-hero__crest")" />
+  <div class="qz-container qz-breadcrumbs-on-dark">
+    <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
+    <h1>Edit post</h1>
+    @if (Model.Post is not null)
+    {
+      <p class="qz-lede">Update your post in <a href="@ForumRoutes.GetTopicCanonicalPath(Model.Post.TopicId, Model.Post.TopicSubject)">@Model.Post.TopicSubject</a>.</p>
+    }
+  </div>
+</section>
+
+<section class="qz-section">
+  <div class="qz-container">
+    @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+    {
+      <div class="qz-form__validation" role="alert">@Model.ErrorMessage</div>
+      @if (Model.Post is not null)
+      {
+        <p><a class="qz-button qz-button--ghost" href="@ForumRoutes.GetTopicCanonicalPath(Model.Post.TopicId, Model.Post.TopicSubject)">Back to thread</a></p>
+      }
+    }
+    else
+    {
+      <form method="post"
+            class="qz-form qz-forum-compose"
+            data-busy-submit
+            data-busy-label="Saving…">
+        @Html.AntiForgeryToken()
+        <div asp-validation-summary="ModelOnly" class="qz-form__validation"></div>
+        <partial name="_RichTextEditor" />
+        <span asp-validation-for="Body" class="text-danger"></span>
+        <div class="qz-form-actions">
+          <button type="submit" class="qz-button">Save changes</button>
+          @if (Model.Post is not null)
+          {
+            <a class="qz-button qz-button--ghost" href="@ForumRoutes.GetTopicCanonicalPath(Model.Post.TopicId, Model.Post.TopicSubject)#post-@Model.Post.PostId">Cancel</a>
+          }
+        </div>
+      </form>
+    }
+  </div>
+</section>

@@ -181,6 +181,86 @@ public sealed class EfForumWriteRepositoryTests : IAsyncDisposable
         Assert.Equal(DateTimeOffset.MinValue, thread.LastPostAt);
     }
 
+    [Fact]
+    public async Task UpdatePostAsync_RejectsEditsAfterWindowExpires()
+    {
+        var member = await SeedMemberAsync();
+        await SeedCategoryAsync();
+        var created = await repository.CreateThreadAsync(new NewForumThread(
+            1,
+            member.Id,
+            member.DisplayName,
+            "Old post",
+            "<p>Original</p>",
+            DateTimeOffset.UtcNow.AddHours(-3)));
+
+        var result = await repository.UpdatePostAsync(
+            created.StarterPostId,
+            member.Id,
+            "<p>Too late</p>",
+            isAdmin: false,
+            editWindowMinutes: 60);
+
+        Assert.Equal(ForumPostUpdateStatus.EditWindowExpired, result.Status);
+        var post = await dbContext.ModernForumPosts.SingleAsync(item => item.LegacyPostId == created.StarterPostId);
+        Assert.Equal("<p>Original</p>", post.BodyHtml);
+        Assert.Equal(0, post.EditCount);
+        Assert.Null(post.EditedAt);
+    }
+
+    [Fact]
+    public async Task UpdatePostAsync_RejectsNonOwnerWhoIsNotAdmin()
+    {
+        var member = await SeedMemberAsync();
+        await SeedCategoryAsync();
+        var created = await repository.CreateThreadAsync(new NewForumThread(
+            1,
+            member.Id,
+            member.DisplayName,
+            "Owned",
+            "<p>Original</p>",
+            DateTimeOffset.UtcNow));
+
+        var result = await repository.UpdatePostAsync(
+            created.StarterPostId,
+            Guid.NewGuid(),
+            "<p>Nope</p>",
+            isAdmin: false,
+            editWindowMinutes: 60);
+
+        Assert.Equal(ForumPostUpdateStatus.Forbidden, result.Status);
+    }
+
+    [Fact]
+    public async Task UpdatePostAsync_AllowsAdminAndPersistsAuthorMemberId()
+    {
+        var member = await SeedMemberAsync();
+        await SeedCategoryAsync();
+        var created = await repository.CreateThreadAsync(new NewForumThread(
+            1,
+            member.Id,
+            member.DisplayName,
+            "Admin target",
+            "<p>Original</p>",
+            DateTimeOffset.UtcNow.AddDays(-10)));
+
+        var stored = await dbContext.ModernForumPosts.SingleAsync(item => item.LegacyPostId == created.StarterPostId);
+        Assert.Equal(member.Id, stored.AuthorMemberId);
+
+        var result = await repository.UpdatePostAsync(
+            created.StarterPostId,
+            Guid.NewGuid(),
+            "<p>Admin rewrite</p>",
+            isAdmin: true,
+            editWindowMinutes: 60);
+
+        Assert.Equal(ForumPostUpdateStatus.Success, result.Status);
+        await dbContext.Entry(stored).ReloadAsync();
+        Assert.Equal("<p>Admin rewrite</p>", stored.BodyHtml);
+        Assert.Equal(1, stored.EditCount);
+        Assert.NotNull(stored.EditedAt);
+    }
+
     public async ValueTask DisposeAsync()
     {
         await dbContext.DisposeAsync();
@@ -276,6 +356,9 @@ public sealed class EfForumWriteRepositoryTests : IAsyncDisposable
                 Attachment TEXT NULL,
                 FileSize TEXT NULL,
                 AttachCount INTEGER NOT NULL,
+                AuthorMemberId TEXT NULL,
+                EditedAt TEXT NULL,
+                EditCount INTEGER NOT NULL DEFAULT 0,
                 ImportedAt TEXT NOT NULL,
                 UpdatedAt TEXT NOT NULL,
                 FOREIGN KEY (ThreadId) REFERENCES ModernForumThread (Id)

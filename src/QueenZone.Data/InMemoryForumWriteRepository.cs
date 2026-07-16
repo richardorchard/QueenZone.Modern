@@ -92,6 +92,98 @@ public sealed class InMemoryForumWriteRepository : IForumWriteRepository
         }
     }
 
+    public Task<ForumEditablePost?> GetPostAsync(int postId, CancellationToken cancellationToken = default)
+    {
+        lock (sync)
+        {
+            var post = posts.SingleOrDefault(item => item.PostId == postId);
+            if (post is null)
+            {
+                return Task.FromResult<ForumEditablePost?>(null);
+            }
+
+            var subject = threads.SingleOrDefault(thread => thread.TopicId == post.TopicId)?.Subject
+                ?? SampleForumData.TryGetSeedTopicHeader(post.TopicId)?.Title
+                ?? string.Empty;
+
+            var seedCount = SampleForumData.CreateSeedPosts(post.TopicId).Count;
+            var createdBefore = posts.Count(item => item.TopicId == post.TopicId && item.PostId <= postId);
+            // Created posts append after seed posts for topics that started from sample data.
+            var position = seedCount > 0 && threads.Any(thread => thread.TopicId == post.TopicId)
+                ? seedCount + createdBefore
+                : createdBefore;
+
+            return Task.FromResult<ForumEditablePost?>(new ForumEditablePost(
+                post.PostId,
+                post.TopicId,
+                subject,
+                post.Body,
+                post.MemberId,
+                post.CreatedAt,
+                post.EditedAt,
+                post.EditCount,
+                Math.Max(1, position)));
+        }
+    }
+
+    public Task<ForumPostUpdateResult> UpdatePostAsync(
+        int postId,
+        Guid editorMemberId,
+        string sanitisedBody,
+        bool isAdmin,
+        int editWindowMinutes,
+        CancellationToken cancellationToken = default)
+    {
+        lock (sync)
+        {
+            var index = posts.FindIndex(item => item.PostId == postId);
+            if (index < 0)
+            {
+                return Task.FromResult(new ForumPostUpdateResult(ForumPostUpdateStatus.NotFound));
+            }
+
+            var post = posts[index];
+            var subject = threads.SingleOrDefault(thread => thread.TopicId == post.TopicId)?.Subject
+                ?? SampleForumData.TryGetSeedTopicHeader(post.TopicId)?.Title
+                ?? string.Empty;
+            var utcNow = DateTimeOffset.UtcNow;
+            var canEdit = ForumPostEditRules.CanEdit(
+                post.MemberId,
+                editorMemberId,
+                isAdmin,
+                post.CreatedAt,
+                editWindowMinutes,
+                utcNow);
+
+            if (!canEdit)
+            {
+                if (!isAdmin && post.MemberId == editorMemberId && editWindowMinutes == 0)
+                {
+                    return Task.FromResult(new ForumPostUpdateResult(ForumPostUpdateStatus.EditingDisabled, post.TopicId, subject));
+                }
+
+                if (!isAdmin
+                    && post.MemberId == editorMemberId
+                    && editWindowMinutes > 0
+                    && utcNow > post.CreatedAt.AddMinutes(editWindowMinutes))
+                {
+                    return Task.FromResult(new ForumPostUpdateResult(ForumPostUpdateStatus.EditWindowExpired, post.TopicId, subject));
+                }
+
+                return Task.FromResult(new ForumPostUpdateResult(ForumPostUpdateStatus.Forbidden, post.TopicId, subject));
+            }
+
+            posts[index] = post with
+            {
+                Body = sanitisedBody,
+                EditedAt = utcNow,
+                EditCount = post.EditCount + 1,
+            };
+
+            return Task.FromResult(new ForumPostUpdateResult(ForumPostUpdateStatus.Success, post.TopicId, subject));
+        }
+    }
+
     public Task<ForumWriteThread?> GetThreadAsync(int topicId, CancellationToken cancellationToken = default)
     {
         lock (sync)
@@ -155,4 +247,6 @@ public sealed record InMemoryForumWritePost(
     Guid MemberId,
     string DisplayName,
     string Body,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? EditedAt = null,
+    int EditCount = 0);

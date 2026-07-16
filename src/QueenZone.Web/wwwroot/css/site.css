@@ -1528,6 +1528,21 @@ body.qz-menu-lock .qz-masthead {
   margin: 0;
 }
 
+.qz-forum-post__edited {
+  margin: 0.35rem 0 0;
+  font-style: italic;
+}
+
+.qz-forum-post__actions {
+  margin: 0.5rem 0 0;
+}
+
+.qz-forum-post__edit-link {
+  font-size: 0.875rem;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
 .qz-forum-post__signature {
   margin-top: var(--space-4);
   padding-top: var(--space-3);
