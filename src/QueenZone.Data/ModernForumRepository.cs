@@ -74,6 +74,7 @@ public sealed class ModernForumRepository(QueenZoneDbContext dbContext) : IForum
         var subject = EfSql.OutputString("@SUBJECT", 200);
         var forumIdParam = EfSql.OutputInt("@Q_FORUM_ID");
         var disco = EfSql.OutputByte("@DISCO");
+        var hasPoll = EfSql.OutputBool("@HasPoll");
 
         var rows = await EfSql.QueryProcAsync<ForumPostRow>(
             dbContext,
@@ -88,6 +89,7 @@ public sealed class ModernForumRepository(QueenZoneDbContext dbContext) : IForum
                 command.Parameters.Add(subject);
                 command.Parameters.Add(forumIdParam);
                 command.Parameters.Add(disco);
+                command.Parameters.Add(hasPoll);
             },
             CommandTimeoutSeconds,
             cancellationToken);
@@ -103,7 +105,8 @@ public sealed class ModernForumRepository(QueenZoneDbContext dbContext) : IForum
             topicId,
             title,
             forumId,
-            EfSql.GetNullableString(forumName)?.Trim() ?? string.Empty);
+            EfSql.GetNullableString(forumName)?.Trim() ?? string.Empty,
+            EfSql.GetNullableBool(hasPoll));
 
         var posts = rows.Select(MapPost).ToList();
         posts = await ForumAttachmentMerge.MergeModernAsync(dbContext, posts, cancellationToken);

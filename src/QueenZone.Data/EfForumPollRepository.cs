@@ -50,13 +50,109 @@ public sealed class EfForumPollRepository(QueenZoneDbContext dbContext, TimeProv
             return null;
         }
 
-        var votes = await dbContext.ForumPollVotes
+        var utcNow = timeProvider.GetUtcNow();
+        var closed = IsClosed(poll, utcNow);
+        var canClose = !closed
+            && viewerMemberId is Guid closer
+            && (viewerIsAdmin || poll.CreatedByMemberId == closer);
+
+        HashSet<Guid> viewerSelected = [];
+        var viewerHasVoted = false;
+        if (viewerMemberId is Guid memberId)
+        {
+            viewerSelected = (await dbContext.ForumPollVotes
+                .AsNoTracking()
+                .Where(vote => vote.PollId == poll.Id && vote.MemberAccountId == memberId)
+                .Select(vote => vote.OptionId)
+                .ToListAsync(cancellationToken))
+                .ToHashSet();
+            viewerHasVoted = viewerSelected.Count > 0;
+        }
+
+        var canVote = viewerMemberId is not null && !viewerHasVoted && !closed;
+        var distinctVoters = await dbContext.ForumPollVotes
             .AsNoTracking()
             .Where(vote => vote.PollId == poll.Id)
-            .Select(vote => new { vote.OptionId, vote.MemberAccountId })
-            .ToListAsync(cancellationToken);
+            .Select(vote => vote.MemberAccountId)
+            .Distinct()
+            .CountAsync(cancellationToken);
 
-        return BuildResults(poll, votes.Select(v => (v.OptionId, v.MemberAccountId)).ToList(), viewerMemberId, viewerIsAdmin, timeProvider.GetUtcNow());
+        if (canVote)
+        {
+            // Vote form does not need per-option tallies — skip loading the full ballot set.
+            var options = poll.Options
+                .OrderBy(option => option.DisplayOrder)
+                .ThenBy(option => option.OptionText)
+                .Select(option => new ForumPollOptionResult(
+                    option.Id,
+                    option.OptionText,
+                    option.DisplayOrder,
+                    VoteCount: 0,
+                    Percentage: 0,
+                    SelectedByViewer: false))
+                .ToList();
+
+            return new ForumPollResults(
+                poll.Id,
+                poll.LegacyTopicId,
+                poll.Question,
+                poll.IsMultiChoice,
+                poll.MaxChoices,
+                poll.ClosesAt,
+                poll.ClosedAt,
+                poll.CreatedAt,
+                poll.CreatedByMemberId,
+                TotalVotes: 0,
+                distinctVoters,
+                viewerHasVoted,
+                closed,
+                canVote,
+                canClose,
+                options);
+        }
+
+        var optionCounts = await dbContext.ForumPollVotes
+            .AsNoTracking()
+            .Where(vote => vote.PollId == poll.Id)
+            .GroupBy(vote => vote.OptionId)
+            .Select(group => new { OptionId = group.Key, Count = group.Count() })
+            .ToDictionaryAsync(row => row.OptionId, row => row.Count, cancellationToken);
+
+        var totalVotes = optionCounts.Values.Sum();
+        var resultOptions = poll.Options
+            .OrderBy(option => option.DisplayOrder)
+            .ThenBy(option => option.OptionText)
+            .Select(option =>
+            {
+                var count = optionCounts.GetValueOrDefault(option.Id);
+                var percentage = totalVotes == 0 ? 0d : Math.Round(100d * count / totalVotes, 1);
+                return new ForumPollOptionResult(
+                    option.Id,
+                    option.OptionText,
+                    option.DisplayOrder,
+                    count,
+                    percentage,
+                    viewerSelected.Contains(option.Id));
+            })
+            .ToList();
+
+        return new ForumPollResults(
+            poll.Id,
+            poll.LegacyTopicId,
+            poll.Question,
+            poll.IsMultiChoice,
+            poll.MaxChoices,
+            poll.ClosesAt,
+            poll.ClosedAt,
+            poll.CreatedAt,
+            poll.CreatedByMemberId,
+            totalVotes,
+            distinctVoters,
+            viewerHasVoted,
+            closed,
+            canVote,
+            canClose,
+            resultOptions);
     }
 
     public async Task CastVoteAsync(
@@ -180,6 +276,16 @@ public sealed class EfForumPollRepository(QueenZoneDbContext dbContext, TimeProv
         {
             throw new ArgumentException("MaxChoices must be at least 1 for multi-choice polls.", nameof(poll));
         }
+    }
+
+    internal static ForumPollEntity BuildPollEntity(
+        ModernForumThreadEntity thread,
+        NewForumPoll poll,
+        DateTimeOffset createdAt)
+    {
+        var entity = BuildPollEntity(thread.Id, thread.LegacyTopicId, poll, createdAt);
+        entity.Thread = thread;
+        return entity;
     }
 
     internal static ForumPollEntity BuildPollEntity(

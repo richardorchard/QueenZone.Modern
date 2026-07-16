@@ -38,6 +38,8 @@ public abstract class ForumTopicPageModel : PageModel
 
     public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
 
+    protected AuthenticateResult? MemberAuth { get; set; }
+
     protected async Task<IActionResult> LoadTopicPageAsync(
         int topicId,
         string slug,
@@ -79,10 +81,10 @@ public abstract class ForumTopicPageModel : PageModel
             return NotFound();
         }
 
-        var memberAuth = await ResolveMemberAuthAsync();
-        var memberId = ForumMember.GetMemberId(memberAuth?.Principal);
-        var isAdmin = memberAuth?.Principal is not null
-            && ForumPollEndpoints.IsAdmin(memberAuth.Principal, adminOptions);
+        MemberAuth = await ResolveMemberAuthAsync();
+        var memberId = ForumMember.GetMemberId(MemberAuth?.Principal);
+        var isAdmin = MemberAuth?.Principal is not null
+            && ForumPollEndpoints.IsAdmin(MemberAuth.Principal, adminOptions);
         var utcNow = timeProvider.GetUtcNow();
 
         Header = header;
@@ -125,8 +127,8 @@ public abstract class ForumTopicPageModel : PageModel
 
     protected async Task<Guid?> GetCurrentMemberIdAsync()
     {
-        var auth = await ResolveMemberAuthAsync();
-        return ForumMember.GetMemberId(auth?.Principal);
+        MemberAuth ??= await ResolveMemberAuthAsync();
+        return ForumMember.GetMemberId(MemberAuth?.Principal);
     }
 
     protected async Task<AuthenticateResult?> ResolveMemberAuthAsync()

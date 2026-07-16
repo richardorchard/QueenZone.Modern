@@ -182,7 +182,7 @@ public sealed class InMemoryForumRepository(
         var category = seedCategories.SingleOrDefault(category => category.Id == thread.CategoryId);
         return category is null
             ? null
-            : new ForumTopicHeader(thread.TopicId, thread.Subject, category.Id, category.Name);
+            : new ForumTopicHeader(thread.TopicId, thread.Subject, category.Id, category.Name, thread.HasPoll);
     }
 
     private IReadOnlyList<ForumPostItem> GetCreatedPosts(int topicId) =>

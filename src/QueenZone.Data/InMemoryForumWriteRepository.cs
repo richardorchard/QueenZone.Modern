@@ -27,7 +27,8 @@ public sealed class InMemoryForumWriteRepository : IForumWriteRepository
                 thread.CreatedAt,
                 thread.CreatedAt,
                 1,
-                IsLocked: false));
+                IsLocked: false,
+                HasPoll: thread.Poll is not null));
             posts.Add(new InMemoryForumWritePost(
                 postId,
                 topicId,

@@ -185,10 +185,17 @@ public sealed class TopicModel : ForumTopicPageModel
 
     private async Task LoadPollAsync(int topicId, CancellationToken cancellationToken)
     {
-        var memberAuth = await ResolveMemberAuthAsync();
-        var memberId = ForumMember.GetMemberId(memberAuth?.Principal);
-        var isAdmin = memberAuth?.Principal is not null
-            && ForumPollEndpoints.IsAdmin(memberAuth.Principal, adminOptions);
+        // HasPoll == false: skip the poll round-trip. null means unknown (legacy/sample) — load defensively.
+        if (Header?.HasPoll == false)
+        {
+            Poll = null;
+            return;
+        }
+
+        MemberAuth ??= await ResolveMemberAuthAsync();
+        var memberId = ForumMember.GetMemberId(MemberAuth?.Principal);
+        var isAdmin = MemberAuth?.Principal is not null
+            && ForumPollEndpoints.IsAdmin(MemberAuth.Principal, adminOptions);
         Poll = await forumPollRepository.GetPollWithResultsAsync(
             topicId,
             memberId,

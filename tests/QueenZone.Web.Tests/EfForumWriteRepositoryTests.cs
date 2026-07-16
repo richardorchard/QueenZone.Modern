@@ -51,6 +51,25 @@ public sealed class EfForumWriteRepositoryTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task CreateThreadAsync_AllocatesMonotonicLegacyIdsAcrossCreates()
+    {
+        var member = await SeedMemberAsync();
+        await SeedCategoryAsync();
+
+        var first = await repository.CreateThreadAsync(new NewForumThread(
+            1, member.Id, member.DisplayName, "First", "<p>One</p>", DateTimeOffset.UtcNow));
+        var second = await repository.CreateThreadAsync(new NewForumThread(
+            1, member.Id, member.DisplayName, "Second", "<p>Two</p>", DateTimeOffset.UtcNow));
+
+        Assert.True(second.TopicId > first.TopicId);
+        Assert.True(second.StarterPostId > first.StarterPostId);
+
+        var replyId = await repository.CreatePostAsync(new NewForumPost(
+            first.TopicId, member.Id, member.DisplayName, "<p>Reply</p>", DateTimeOffset.UtcNow));
+        Assert.True(replyId > second.StarterPostId);
+    }
+
+    [Fact]
     public async Task CreateThreadAsync_RollsBack_WhenFirstPostCannotBeInserted()
     {
         var member = await SeedMemberAsync();

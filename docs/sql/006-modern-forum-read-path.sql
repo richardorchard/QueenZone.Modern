@@ -300,13 +300,16 @@ CREATE OR ALTER PROCEDURE dbo.ModernForum_GetTopicPostsPage
     @forum_name nvarchar(100) OUTPUT,
     @SUBJECT nvarchar(200) OUTPUT,
     @Q_FORUM_ID int OUTPUT,
-    @DISCO tinyint OUTPUT
+    @DISCO tinyint OUTPUT,
+    @HasPoll bit OUTPUT
 AS
 BEGIN
     SET NOCOUNT ON;
 
     DECLARE @Offset int = (CASE WHEN @CurrentPage > 1 THEN @CurrentPage - 1 ELSE 0 END) * @PageSize;
     DECLARE @ThreadId bigint;
+
+    SET @HasPoll = 0;
 
     SELECT
         @ThreadId = t.Id,
@@ -322,6 +325,12 @@ BEGIN
     BEGIN
         SET @TotalRecords = 0;
         RETURN;
+    END;
+
+    IF OBJECT_ID(N'dbo.ForumPolls', N'U') IS NOT NULL
+       AND EXISTS (SELECT 1 FROM dbo.ForumPolls WHERE LegacyTopicId = @Q_FORUM_TOPIC_ID)
+    BEGIN
+        SET @HasPoll = 1;
     END;
 
     SELECT @TotalRecords = PostCount
