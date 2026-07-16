@@ -157,11 +157,17 @@ internal static class EfSql
     public static SqlParameter OutputByte(string name) =>
         new(name, SqlDbType.TinyInt) { Direction = ParameterDirection.Output };
 
+    public static SqlParameter OutputBool(string name) =>
+        new(name, SqlDbType.Bit) { Direction = ParameterDirection.Output };
+
     public static SqlParameter OutputString(string name, int size) =>
         new(name, SqlDbType.NVarChar, size) { Direction = ParameterDirection.Output };
 
     public static int? GetNullableInt(SqlParameter parameter) =>
         parameter.Value is null or DBNull ? null : Convert.ToInt32(parameter.Value);
+
+    public static bool? GetNullableBool(SqlParameter parameter) =>
+        parameter.Value is null or DBNull ? null : Convert.ToBoolean(parameter.Value);
 
     public static string? GetNullableString(SqlParameter parameter) =>
         parameter.Value is null or DBNull ? null : Convert.ToString(parameter.Value);

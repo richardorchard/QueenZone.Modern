@@ -84,12 +84,36 @@ public sealed class EfForumPollRepositoryTests : IAsyncDisposable
             new NewForumPoll("Q", false, null, null, ["A", "B"], member.Id)));
 
         var before = await pollRepository.GetPollWithResultsAsync(created.TopicId, voter.Id);
-        await pollRepository.CastVoteAsync(before!.PollId, voter.Id, [before.Options[0].OptionId]);
+        Assert.True(before!.CanViewerVote);
+        Assert.Equal(0, before.Options[0].VoteCount);
+        await pollRepository.CastVoteAsync(before.PollId, voter.Id, [before.Options[0].OptionId]);
 
         var after = await pollRepository.GetPollWithResultsAsync(created.TopicId, voter.Id);
         Assert.True(after!.ViewerHasVoted);
         Assert.Equal(1, after.TotalVotes);
         Assert.Equal(100, after.Options[0].Percentage);
+    }
+
+    [Fact]
+    public async Task GetPollWithResultsAsync_WhenViewerCanVote_OmitsOptionTalliesButReportsDistinctVoters()
+    {
+        var author = await SeedMemberAsync();
+        var firstVoter = await SeedMemberAsync("first@example.com", "First");
+        var secondVoter = await SeedMemberAsync("second@example.com", "Second");
+        await SeedCategoryAsync();
+        var created = await writeRepository.CreateThreadAsync(new NewForumThread(
+            1, author.Id, author.DisplayName, "T", "<p>B</p>", Now,
+            new NewForumPoll("Q", false, null, null, ["A", "B"], author.Id)));
+        var poll = await pollRepository.GetPollWithResultsAsync(created.TopicId, firstVoter.Id);
+        await pollRepository.CastVoteAsync(poll!.PollId, firstVoter.Id, [poll.Options[0].OptionId]);
+
+        var openBallot = await pollRepository.GetPollWithResultsAsync(created.TopicId, secondVoter.Id);
+
+        Assert.NotNull(openBallot);
+        Assert.True(openBallot!.CanViewerVote);
+        Assert.Equal(1, openBallot.DistinctVoters);
+        Assert.Equal(0, openBallot.TotalVotes);
+        Assert.All(openBallot.Options, option => Assert.Equal(0, option.VoteCount));
     }
 
     [Fact]

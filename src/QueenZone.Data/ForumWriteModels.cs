@@ -23,7 +23,8 @@ public sealed record ForumWriteThread(
     DateTimeOffset CreatedAt,
     DateTimeOffset LastPostAt,
     int PostCount,
-    bool IsLocked);
+    bool IsLocked,
+    bool HasPoll = false);
 
 public sealed record ForumThreadCreateResult(int TopicId, int StarterPostId);
 

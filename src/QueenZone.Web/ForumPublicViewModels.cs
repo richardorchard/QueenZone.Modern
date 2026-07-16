@@ -34,7 +34,8 @@ public sealed record ForumThreadHeader(
     int ForumId,
     string ForumName,
     string CategoryPath,
-    string DetailPath);
+    string DetailPath,
+    bool? HasPoll = null);
 
 /// <summary>
 /// Stable post shape for public topic pages.

@@ -101,7 +101,8 @@ public static class PublicContentMapper
             header.ForumId,
             header.ForumName.Trim(),
             ForumRoutes.GetCategoryCanonicalPath(header.ForumId, header.ForumName),
-            ForumRoutes.GetTopicCanonicalPath(header.TopicId, header.Title));
+            ForumRoutes.GetTopicCanonicalPath(header.TopicId, header.Title),
+            header.HasPoll);
 
     public static ForumPostViewModel ToForumPostViewModel(ForumPostItem post) =>
         new(

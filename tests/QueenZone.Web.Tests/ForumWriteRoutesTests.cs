@@ -46,6 +46,9 @@ public sealed class ForumWriteRoutesTests : IClassFixture<WebApplicationFactory<
 
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
         Assert.StartsWith("/forum/topic/", response.Headers.Location!.OriginalString, StringComparison.Ordinal);
+
+        var redirected = await client.GetStringAsync(response.Headers.Location);
+        Assert.DoesNotContain("qz-forum-poll", redirected);
     }
 
     [Fact]

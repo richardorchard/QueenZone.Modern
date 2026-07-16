@@ -1,6 +1,7 @@
 using System.Data;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using QueenZone.Data.Entities;
 
 namespace QueenZone.Data;
@@ -8,11 +9,13 @@ namespace QueenZone.Data;
 public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForumWriteRepository
 {
     private const int BodyHtmlMaxLength = 8000;
+    internal const string TopicIdSequence = "ForumLegacyTopicIdSeq";
+    internal const string PostIdSequence = "ForumLegacyPostIdSeq";
 
     public async Task<ForumThreadCreateResult> CreateThreadAsync(NewForumThread thread, CancellationToken cancellationToken = default)
     {
         var now = ToUtcDateTime(thread.CreatedAt);
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
 
         var category = await dbContext.ModernForumCategories
             .SingleOrDefaultAsync(item => item.LegacyForumId == thread.CategoryId && !item.IsSynthetic, cancellationToken);
@@ -21,8 +24,8 @@ public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForu
             throw new InvalidOperationException("Forum category not found.");
         }
 
-        var topicId = await GetNextTopicIdAsync(cancellationToken);
-        var postId = await GetNextPostIdAsync(cancellationToken);
+        var topicId = await AllocateNextTopicIdAsync(cancellationToken);
+        var postId = await AllocateNextPostIdAsync(cancellationToken);
 
         var forumThread = new ModernForumThreadEntity
         {
@@ -43,14 +46,11 @@ public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForu
             UpdatedAt = now,
         };
 
-        dbContext.ModernForumThreads.Add(forumThread);
-        await dbContext.SaveChangesAsync(cancellationToken);
-
-        dbContext.ModernForumPosts.Add(new ModernForumPostEntity
+        var firstPost = new ModernForumPostEntity
         {
             LegacyPostId = postId,
             LegacyThreadTopicId = topicId,
-            ThreadId = forumThread.Id,
+            Thread = forumThread,
             LegacyForumId = category.LegacyForumId,
             AuthorMemberId = thread.AuthorMemberId,
             AuthorDisplayName = thread.AuthorDisplayName.Trim(),
@@ -62,13 +62,15 @@ public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForu
             EditCount = 0,
             ImportedAt = now,
             UpdatedAt = now,
-        });
+        };
+
+        dbContext.ModernForumThreads.Add(forumThread);
+        dbContext.ModernForumPosts.Add(firstPost);
 
         if (thread.Poll is not null)
         {
             var poll = EfForumPollRepository.BuildPollEntity(
-                forumThread.Id,
-                topicId,
+                forumThread,
                 thread.Poll with { CreatedByMemberId = thread.AuthorMemberId },
                 thread.CreatedAt);
             dbContext.ForumPolls.Add(poll);
@@ -79,7 +81,14 @@ public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForu
         category.UpdatedAt = now;
 
         await dbContext.SaveChangesAsync(cancellationToken);
-        await RefreshStatsForThreadAsync(forumThread.Id, topicId, category.Id, now, cancellationToken);
+
+        await ApplyCreateThreadStatsAsync(
+            forumThread.Id,
+            topicId,
+            category.Id,
+            now,
+            titleCountsForSitemap: !string.IsNullOrWhiteSpace(forumThread.Title),
+            cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
         return new ForumThreadCreateResult(topicId, postId);
@@ -88,7 +97,7 @@ public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForu
     public async Task<int> CreatePostAsync(NewForumPost post, CancellationToken cancellationToken = default)
     {
         var now = ToUtcDateTime(post.CreatedAt);
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
 
         var thread = await dbContext.ModernForumThreads
             .Include(item => item.Category)
@@ -98,7 +107,7 @@ public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForu
             throw new InvalidOperationException("Forum thread not found.");
         }
 
-        var postId = await GetNextPostIdAsync(cancellationToken);
+        var postId = await AllocateNextPostIdAsync(cancellationToken);
         dbContext.ModernForumPosts.Add(new ModernForumPostEntity
         {
             LegacyPostId = postId,
@@ -128,7 +137,7 @@ public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForu
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
-        await RefreshStatsForThreadAsync(thread.Id, thread.LegacyTopicId, thread.CategoryId, now, cancellationToken);
+        await ApplyCreatePostStatsAsync(thread.Id, thread.LegacyTopicId, now, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
         return postId;
@@ -271,16 +280,50 @@ public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForu
             .CountAsync(post => post.AuthorDisplayName == displayName, cancellationToken);
     }
 
-    private async Task<int> GetNextTopicIdAsync(CancellationToken cancellationToken)
-    {
-        var maxTopicId = await dbContext.ModernForumThreads.MaxAsync(thread => (int?)thread.LegacyTopicId, cancellationToken) ?? 0;
-        return maxTopicId + 1;
-    }
+    private async Task<int> AllocateNextTopicIdAsync(CancellationToken cancellationToken) =>
+        await AllocateNextLegacyIdAsync(
+            TopicIdSequence,
+            static async (db, ct) =>
+                (await db.ModernForumThreads.MaxAsync(thread => (int?)thread.LegacyTopicId, ct) ?? 0) + 1,
+            cancellationToken);
 
-    private async Task<int> GetNextPostIdAsync(CancellationToken cancellationToken)
+    private async Task<int> AllocateNextPostIdAsync(CancellationToken cancellationToken) =>
+        await AllocateNextLegacyIdAsync(
+            PostIdSequence,
+            static async (db, ct) =>
+                (await db.ModernForumPosts.MaxAsync(post => (int?)post.LegacyPostId, ct) ?? 0) + 1,
+            cancellationToken);
+
+    private async Task<int> AllocateNextLegacyIdAsync(
+        string sequenceName,
+        Func<QueenZoneDbContext, CancellationToken, Task<int>> fallback,
+        CancellationToken cancellationToken)
     {
-        var maxPostId = await dbContext.ModernForumPosts.MaxAsync(post => (int?)post.LegacyPostId, cancellationToken) ?? 0;
-        return maxPostId + 1;
+        if (!IsSqlServer())
+        {
+            return await fallback(dbContext, cancellationToken);
+        }
+
+        var connection = dbContext.Database.GetDbConnection();
+        if (connection.State != ConnectionState.Open)
+        {
+            await connection.OpenAsync(cancellationToken);
+        }
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = $"SELECT NEXT VALUE FOR dbo.[{sequenceName}]";
+        if (dbContext.Database.CurrentTransaction is { } transaction)
+        {
+            command.Transaction = transaction.GetDbTransaction();
+        }
+
+        var result = await command.ExecuteScalarAsync(cancellationToken);
+        if (result is null or DBNull)
+        {
+            return await fallback(dbContext, cancellationToken);
+        }
+
+        return Convert.ToInt32(result);
     }
 
     private async Task<string?> GetDisplayNameAsync(Guid memberId, CancellationToken cancellationToken) =>
@@ -291,14 +334,55 @@ public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForu
             .SingleOrDefaultAsync(cancellationToken);
 
     [ExcludeFromCodeCoverage(Justification = "SQL Server read-stat maintenance is covered by manual/production smoke checks; SQLite tests exercise the write flow.")]
-    private async Task RefreshStatsForThreadAsync(
+    private async Task ApplyCreateThreadStatsAsync(
         long threadId,
         int legacyTopicId,
         int categoryId,
         DateTime updatedAt,
+        bool titleCountsForSitemap,
         CancellationToken cancellationToken)
     {
-        if (!string.Equals(dbContext.Database.ProviderName, "Microsoft.EntityFrameworkCore.SqlServer", StringComparison.Ordinal))
+        if (!IsSqlServer())
+        {
+            return;
+        }
+
+        var sitemapDelta = titleCountsForSitemap ? 1 : 0;
+        await dbContext.Database.ExecuteSqlInterpolatedAsync($"""
+            IF OBJECT_ID(N'dbo.ModernForumThreadReadStats', N'U') IS NOT NULL
+            BEGIN
+                INSERT INTO dbo.ModernForumThreadReadStats (ThreadId, LegacyTopicId, PostCount, UpdatedAt)
+                VALUES ({threadId}, {legacyTopicId}, 1, {updatedAt});
+            END;
+
+            IF OBJECT_ID(N'dbo.ModernForumCategoryReadStats', N'U') IS NOT NULL
+            BEGIN
+                UPDATE dbo.ModernForumCategoryReadStats
+                SET TotalThreads = TotalThreads + 1,
+                    ValidatedDisplayThreads = ValidatedDisplayThreads + 1,
+                    UpdatedAt = {updatedAt}
+                WHERE CategoryId = {categoryId};
+            END;
+
+            IF OBJECT_ID(N'dbo.ModernForumArchiveReadStats', N'U') IS NOT NULL
+            BEGIN
+                UPDATE dbo.ModernForumArchiveReadStats
+                SET TotalThreads = TotalThreads + 1,
+                    SitemapTopicCount = SitemapTopicCount + {sitemapDelta},
+                    UpdatedAt = {updatedAt}
+                WHERE Id = 1;
+            END;
+            """, cancellationToken);
+    }
+
+    [ExcludeFromCodeCoverage(Justification = "SQL Server read-stat maintenance is covered by manual/production smoke checks; SQLite tests exercise the write flow.")]
+    private async Task ApplyCreatePostStatsAsync(
+        long threadId,
+        int legacyTopicId,
+        DateTime updatedAt,
+        CancellationToken cancellationToken)
+    {
+        if (!IsSqlServer())
         {
             return;
         }
@@ -306,71 +390,28 @@ public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForu
         await dbContext.Database.ExecuteSqlInterpolatedAsync($"""
             IF OBJECT_ID(N'dbo.ModernForumThreadReadStats', N'U') IS NOT NULL
             BEGIN
-                MERGE dbo.ModernForumThreadReadStats AS target
-                USING
-                (
+                UPDATE dbo.ModernForumThreadReadStats
+                SET PostCount = PostCount + 1,
+                    UpdatedAt = {updatedAt}
+                WHERE ThreadId = {threadId};
+
+                IF @@ROWCOUNT = 0
+                BEGIN
+                    INSERT INTO dbo.ModernForumThreadReadStats (ThreadId, LegacyTopicId, PostCount, UpdatedAt)
                     SELECT
-                        {threadId} AS ThreadId,
-                        {legacyTopicId} AS LegacyTopicId,
-                        CONVERT(int, COUNT_BIG(*)) AS PostCount
+                        {threadId},
+                        {legacyTopicId},
+                        CONVERT(int, COUNT_BIG(*)),
+                        {updatedAt}
                     FROM dbo.ModernForumPost
-                    WHERE ThreadId = {threadId}
-                ) AS source
-                ON target.ThreadId = source.ThreadId
-                WHEN MATCHED THEN
-                    UPDATE SET PostCount = source.PostCount, UpdatedAt = {updatedAt}
-                WHEN NOT MATCHED BY TARGET THEN
-                    INSERT (ThreadId, LegacyTopicId, PostCount, UpdatedAt)
-                    VALUES (source.ThreadId, source.LegacyTopicId, source.PostCount, {updatedAt});
-            END;
-
-            IF OBJECT_ID(N'dbo.ModernForumCategoryReadStats', N'U') IS NOT NULL
-            BEGIN
-                MERGE dbo.ModernForumCategoryReadStats AS target
-                USING
-                (
-                    SELECT
-                        {categoryId} AS CategoryId,
-                        CONVERT(int, COUNT_BIG(*)) AS TotalThreads,
-                        CONVERT(int, COUNT_BIG(CASE WHEN StartedByUserValidated = 1 THEN 1 END)) AS ValidatedDisplayThreads
-                    FROM dbo.ModernForumThread
-                    WHERE CategoryId = {categoryId}
-                      AND IsLegacyTopicStarter = 1
-                ) AS source
-                ON target.CategoryId = source.CategoryId
-                WHEN MATCHED THEN
-                    UPDATE SET
-                        TotalThreads = source.TotalThreads,
-                        ValidatedDisplayThreads = source.ValidatedDisplayThreads,
-                        UpdatedAt = {updatedAt}
-                WHEN NOT MATCHED BY TARGET THEN
-                    INSERT (CategoryId, TotalThreads, ValidatedDisplayThreads, UpdatedAt)
-                    VALUES (source.CategoryId, source.TotalThreads, source.ValidatedDisplayThreads, {updatedAt});
-            END;
-
-            IF OBJECT_ID(N'dbo.ModernForumArchiveReadStats', N'U') IS NOT NULL
-            BEGIN
-                MERGE dbo.ModernForumArchiveReadStats AS target
-                USING
-                (
-                    SELECT
-                        CONVERT(tinyint, 1) AS Id,
-                        CONVERT(int, COUNT_BIG(*)) AS TotalThreads,
-                        CONVERT(int, COUNT_BIG(CASE WHEN NULLIF(LTRIM(RTRIM(Title)), '') IS NOT NULL THEN 1 END)) AS SitemapTopicCount
-                    FROM dbo.ModernForumThread
-                ) AS source
-                ON target.Id = source.Id
-                WHEN MATCHED THEN
-                    UPDATE SET
-                        TotalThreads = source.TotalThreads,
-                        SitemapTopicCount = source.SitemapTopicCount,
-                        UpdatedAt = {updatedAt}
-                WHEN NOT MATCHED BY TARGET THEN
-                    INSERT (Id, TotalThreads, SitemapTopicCount, UpdatedAt)
-                    VALUES (source.Id, source.TotalThreads, source.SitemapTopicCount, {updatedAt});
+                    WHERE ThreadId = {threadId};
+                END;
             END;
             """, cancellationToken);
     }
+
+    private bool IsSqlServer() =>
+        string.Equals(dbContext.Database.ProviderName, "Microsoft.EntityFrameworkCore.SqlServer", StringComparison.Ordinal);
 
     private static DateTime ToUtcDateTime(DateTimeOffset value) =>
         value.UtcDateTime;
