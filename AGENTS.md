@@ -93,11 +93,39 @@ GitHub Actions workflow `.github/workflows/ci.yml` blocks merge when these fail:
 | **Global line coverage** | At least **51%** across the deterministic test suite | Yes |
 | **Changed-line coverage** | At least **80%** of changed, coverable `.cs` lines in the PR diff vs `main` | Yes |
 | **Smoke test** | Published app responds on `/health`, `/`, `/news` | Yes |
+| **EF migrations (Azure SQL)** | When migration-related paths change: `has-pending-model-changes` + `database update` against the deploy SQL Server | Yes (job runs only for those PRs) |
 | **Playwright e2e** | Runs on self-hosted Windows runner when available | No (`continue-on-error`) |
 
 Coverage exclusions are configured in `coverlet.runsettings`. EF Core files under `**/Migrations/**/*.cs` are excluded from coverage metrics.
 
 The changed-line gate compares `git diff origin/main...HEAD` for `*.cs` files. Large new modules (services, repositories, workers) usually need targeted unit or integration tests, often with fakes or SQLite/in-memory EF, or the gate will fail.
+
+### EF migration PRs (required before merge)
+
+If the PR touches any of:
+
+- `src/QueenZone.Data/Migrations/`
+- `src/QueenZone.Data/QueenZoneDbContext.cs`
+- `src/QueenZone.Data/QueenZoneDbContextFactory.cs`
+- `src/QueenZone.Data/Entities/`
+
+then CI runs **EF migrations (Azure SQL)** against the same database as deploy (`QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING`). Unit/SQLite tests do **not** catch SQL Server batch-binding errors or Azure SQL timeouts.
+
+Locally, before opening such a PR:
+
+```powershell
+dotnet tool restore
+dotnet ef migrations has-pending-model-changes --project src/QueenZone.Data/QueenZone.Data.csproj --startup-project src/QueenZone.Web/QueenZone.Web.csproj
+
+$env:ConnectionStrings__QueenZoneLegacy = "<migration connection string>"
+dotnet ef database update --project src/QueenZone.Data/QueenZone.Data.csproj --startup-project src/QueenZone.Web/QueenZone.Web.csproj
+```
+
+Rules of thumb for hand-written SQL migrations:
+
+- Separate dependent DDL into separate `migrationBuilder.Sql(...)` calls (SQL Server batch binding).
+- Prefer idempotent SQL; large indexes may need `suppressTransaction: true` and a higher command timeout.
+- Keep the EF model snapshot in sync (or add a no-op sync migration).
 
 ### Pre-PR verification (recommended before opening the PR)
 
