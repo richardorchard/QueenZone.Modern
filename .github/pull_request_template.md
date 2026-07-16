@@ -17,6 +17,7 @@
 - [ ] `dotnet test QueenZone.sln --configuration Release --no-build`
 - [ ] Coverage gate passed locally (`scripts/Test-CoverageGate.ps1` with `-BaseRef origin/main`; see `AGENTS.md`)
 - [ ] Route/page tests avoid brittle CSS class or exact markup assertions unless markup shape is the contract
+- [ ] If this PR touches EF migrations / `QueenZoneDbContext` / `Entities/`: `dotnet ef migrations has-pending-model-changes` passed, and CI **EF migrations (Azure SQL)** is green (or you ran `dotnet ef database update` against the migration SQL Server locally)
 
 ## Legacy database checks
 
