@@ -90,7 +90,13 @@ Quick health checks:
 
 ```powershell
 az webapp show --name queenzone-dev --resource-group Queenzone-RG --query "{hostNames:hostNames, state:state}"
-Invoke-WebRequest -Uri https://queenzone.org/health -UseBasicParsing | Select-Object StatusCode
+Invoke-WebRequest -Uri https://www.queenzone.org/health -UseBasicParsing | Select-Object StatusCode
+```
+
+Post-deploy smoke (custom domain) is a separate job at the end of `.github/workflows/deploy-app-service.yml` (`changes` → `build` → `migrate` → `deploy` → `smoke`) against `https://www.queenzone.org` (`/health` plus key public routes). A failure fails the smoke job so GitHub Actions can notify watchers. Re-run the same checks locally:
+
+```powershell
+powershell -File .\scripts\Smoke-LiveSite.ps1
 ```
 
 Application logging should be enabled at Information level on the filesystem. If the stream is quiet, hit the failing route to generate entries.
@@ -191,8 +197,8 @@ When MCP auth fails, fall back to Azure CLI commands above.
 
 After a forum deploy, verify:
 
-- `GET https://queenzone.org/forum` → 200
-- `GET https://queenzone.org/forum/1/queen-serious-discussion` → 200
+- `GET https://www.queenzone.org/forum` → 200
+- `GET https://www.queenzone.org/forum/1/queen-serious-discussion` → 200
 
 In the log stream, `SqlException: Execution Timeout` in `LegacyForumRepository` usually means a full-table `COUNT(*)` on `Q_FORUM_TOPIC_T` or other heavy ad-hoc SQL. The modern read path should use denormalised `Q_FORUM_T.Q_FORUM_POST_COUNT`, `dbUser.Q_FORUM_TOPIC_THREAD_COUNT_V`, and `Q_FORUM_VIEW_PAGE_SP` instead. See `docs/legacy/table-map.md`.
 
