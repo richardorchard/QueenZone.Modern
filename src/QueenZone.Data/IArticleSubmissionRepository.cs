@@ -33,4 +33,13 @@ public interface IArticleSubmissionRepository
         CancellationToken ct = default);
 
     Task<IReadOnlyList<PublishedArticleSubmission>> GetPublishedAsync(CancellationToken ct = default);
+
+    Task<SubmissionTypeCounts> GetDashboardCountsAsync(
+        DateTimeOffset utcNow,
+        CancellationToken ct = default);
+
+    Task<IReadOnlyList<SubmissionContributor>> GetTopContributorsThisMonthAsync(
+        DateTimeOffset monthStart,
+        int maxCount,
+        CancellationToken ct = default);
 }

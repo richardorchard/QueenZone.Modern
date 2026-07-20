@@ -102,6 +102,79 @@
       <a class="admin-dashboard__content-link" href="/admin/news-discovery">AI discovery queue</a>
     </div>
   </section>
+
+  <section class="admin-dashboard__section">
+    <h2 class="admin-dashboard__section-title">Submission queue</h2>
+    <div class="admin-dashboard__queue-tiles">
+
+      <a class="admin-dashboard__queue-tile" href="/admin/photo-submissions">
+        <span class="admin-dashboard__queue-tile-label">Photos</span>
+        <span class="admin-dashboard__queue-tile-count">@Model.SubmissionQueue.Photos.Pending</span>
+        <span class="admin-dashboard__queue-tile-sub">pending review</span>
+        <span class="admin-dashboard__queue-tile-meta">Today: @Model.SubmissionQueue.Photos.ReceivedToday &nbsp;&middot;&nbsp; This week: @Model.SubmissionQueue.Photos.ReceivedThisWeek</span>
+      </a>
+
+      <a class="admin-dashboard__queue-tile" href="/admin/news-suggestions">
+        <span class="admin-dashboard__queue-tile-label">News suggestions</span>
+        <span class="admin-dashboard__queue-tile-count">@Model.SubmissionQueue.NewsSuggestions.Pending</span>
+        <span class="admin-dashboard__queue-tile-sub">pending review</span>
+        <span class="admin-dashboard__queue-tile-meta">Today: @Model.SubmissionQueue.NewsSuggestions.ReceivedToday &nbsp;&middot;&nbsp; This week: @Model.SubmissionQueue.NewsSuggestions.ReceivedThisWeek</span>
+      </a>
+
+      <a class="admin-dashboard__queue-tile" href="/admin/articles">
+        <span class="admin-dashboard__queue-tile-label">Articles</span>
+        <span class="admin-dashboard__queue-tile-count">@Model.SubmissionQueue.Articles.Pending</span>
+        <span class="admin-dashboard__queue-tile-sub">pending review</span>
+        <span class="admin-dashboard__queue-tile-meta">Today: @Model.SubmissionQueue.Articles.ReceivedToday &nbsp;&middot;&nbsp; This week: @Model.SubmissionQueue.Articles.ReceivedThisWeek</span>
+      </a>
+
+    </div>
+
+    @{
+      var total30 = Model.SubmissionQueue.TotalLast30Days;
+      var approved30 = Model.SubmissionQueue.TotalApprovedLast30Days;
+      var rejected30 = Model.SubmissionQueue.TotalRejectedLast30Days;
+      var pending30 = Model.SubmissionQueue.TotalStillPendingLast30Days;
+    }
+    <div class="admin-dashboard__approval-rate">
+      <span class="admin-dashboard__approval-rate-label">Last 30 days:</span>
+      @if (total30 > 0)
+      {
+        <span class="admin-dashboard__approval-rate-stat admin-dashboard__approval-rate-stat--approved">
+          Approved @((approved30 * 100 / total30))%
+        </span>
+        <span class="admin-dashboard__approval-rate-sep">&middot;</span>
+        <span class="admin-dashboard__approval-rate-stat admin-dashboard__approval-rate-stat--rejected">
+          Rejected @((rejected30 * 100 / total30))%
+        </span>
+        <span class="admin-dashboard__approval-rate-sep">&middot;</span>
+        <span class="admin-dashboard__approval-rate-stat admin-dashboard__approval-rate-stat--pending">
+          Pending @((pending30 * 100 / total30))%
+        </span>
+        <span class="admin-dashboard__approval-rate-total">(@total30 total)</span>
+      }
+      else
+      {
+        <span class="admin-dashboard__approval-rate-empty">No submissions in the last 30 days.</span>
+      }
+    </div>
+
+    @if (Model.SubmissionQueue.TopContributors.Count > 0)
+    {
+      <div class="admin-dashboard__contributors">
+        <h3 class="admin-dashboard__contributors-title">Top contributors this month</h3>
+        <ol class="admin-dashboard__contributors-list">
+          @foreach (var contributor in Model.SubmissionQueue.TopContributors)
+          {
+            <li class="admin-dashboard__contributors-item">
+              <span class="admin-dashboard__contributors-name">@contributor.DisplayName</span>
+              <span class="admin-dashboard__contributors-count">@contributor.Count</span>
+            </li>
+          }
+        </ol>
+      </div>
+    }
+  </section>
 </div>
 
 @functions {

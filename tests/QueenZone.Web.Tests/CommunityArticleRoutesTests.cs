@@ -490,6 +490,11 @@ public sealed class CommunityArticleRoutesTests : IClassFixture<WebApplicationFa
         public Task<ArticleSubmission?> UpdateStatusAsync(Guid id, string status, string? re,
             string? n, string? rr, string? sl = null, string? ex = null, string? t = null, CancellationToken ct = default) =>
             throw new NotSupportedException();
+        public Task<SubmissionTypeCounts> GetDashboardCountsAsync(DateTimeOffset utcNow, CancellationToken ct = default) =>
+            Task.FromResult(SubmissionTypeCounts.Empty);
+        public Task<IReadOnlyList<SubmissionContributor>> GetTopContributorsThisMonthAsync(
+            DateTimeOffset monthStart, int maxCount, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<SubmissionContributor>>([]);
     }
 
     // Minimal IArticleRepository stub for web integration tests

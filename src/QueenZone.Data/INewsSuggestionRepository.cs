@@ -47,4 +47,13 @@ public interface INewsSuggestionRepository
         string reviewerEmail,
         string? reviewNotes,
         CancellationToken cancellationToken = default);
+
+    Task<SubmissionTypeCounts> GetDashboardCountsAsync(
+        DateTimeOffset utcNow,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<SubmissionContributor>> GetTopContributorsThisMonthAsync(
+        DateTimeOffset monthStart,
+        int maxCount,
+        CancellationToken cancellationToken = default);
 }

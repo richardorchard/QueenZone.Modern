@@ -1,0 +1,274 @@
+using System.Net;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
+using QueenZone.Data;
+using QueenZone.Data.Entities;
+using QueenZone.Web;
+using QueenZone.Web.Pages.Admin;
+
+namespace QueenZone.Web.Tests;
+
+/// <summary>
+/// Tests for the submission queue tiles on the admin dashboard (issue #291).
+/// </summary>
+public sealed class AdminDashboardSubmissionQueueTests : IClassFixture<WebApplicationFactory<Program>>
+{
+    private const string AdminEmail = "admin@test.local";
+    private readonly WebApplicationFactory<Program> factory;
+
+    public AdminDashboardSubmissionQueueTests(WebApplicationFactory<Program> factory)
+    {
+        this.factory = factory.WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
+    }
+
+    // ── In-memory repo: photos ──────────────────────────────────────────────
+
+    [Fact]
+    public async Task PhotoRepo_GetDashboardCounts_ReturnsZerosWhenEmpty()
+    {
+        var repo = new InMemoryPhotoSubmissionRepository();
+        var counts = await repo.GetDashboardCountsAsync(DateTimeOffset.UtcNow);
+
+        Assert.Equal(SubmissionTypeCounts.Empty, counts);
+    }
+
+    [Fact]
+    public async Task PhotoRepo_GetDashboardCounts_CountsPendingCorrectly()
+    {
+        var member = SampleMember();
+        var repo = new InMemoryPhotoSubmissionRepository(id => id == member.Id ? member : null);
+        var utcNow = DateTimeOffset.UtcNow;
+
+        await repo.CreateAsync(SamplePhotoSubmission(member.Id), default);
+        await repo.CreateAsync(SamplePhotoSubmission(member.Id), default);
+
+        var counts = await repo.GetDashboardCountsAsync(utcNow);
+
+        Assert.Equal(2, counts.Pending);
+        Assert.Equal(2, counts.ReceivedToday);
+        Assert.Equal(2, counts.ReceivedThisWeek);
+    }
+
+    [Fact]
+    public async Task PhotoRepo_GetTopContributors_ReturnsEmpty_WhenNoSubmissions()
+    {
+        var repo = new InMemoryPhotoSubmissionRepository();
+        var monthStart = new DateTimeOffset(DateTimeOffset.UtcNow.Year, DateTimeOffset.UtcNow.Month, 1, 0, 0, 0, TimeSpan.Zero);
+
+        var contributors = await repo.GetTopContributorsThisMonthAsync(monthStart, 5);
+
+        Assert.Empty(contributors);
+    }
+
+    [Fact]
+    public async Task PhotoRepo_GetTopContributors_GroupsByMember()
+    {
+        var member = SampleMember();
+        var repo = new InMemoryPhotoSubmissionRepository(id => id == member.Id ? member : null);
+        var monthStart = new DateTimeOffset(DateTimeOffset.UtcNow.Year, DateTimeOffset.UtcNow.Month, 1, 0, 0, 0, TimeSpan.Zero);
+
+        await repo.CreateAsync(SamplePhotoSubmission(member.Id), default);
+        await repo.CreateAsync(SamplePhotoSubmission(member.Id), default);
+
+        var contributors = await repo.GetTopContributorsThisMonthAsync(monthStart, 5);
+
+        Assert.Single(contributors);
+        Assert.Equal(member.DisplayName, contributors[0].DisplayName);
+        Assert.Equal(2, contributors[0].Count);
+    }
+
+    // ── In-memory repo: news suggestions ───────────────────────────────────
+
+    [Fact]
+    public async Task NewsRepo_GetDashboardCounts_ReturnsZerosWhenEmpty()
+    {
+        var repo = new InMemoryNewsSuggestionRepository();
+        var counts = await repo.GetDashboardCountsAsync(DateTimeOffset.UtcNow);
+
+        Assert.Equal(SubmissionTypeCounts.Empty, counts);
+    }
+
+    [Fact]
+    public async Task NewsRepo_GetDashboardCounts_CountsPendingCorrectly()
+    {
+        var member = SampleMember();
+        var repo = new InMemoryNewsSuggestionRepository(id => id == member.Id ? member : null);
+        var utcNow = DateTimeOffset.UtcNow;
+
+        await repo.CreateAsync(SampleNewsSuggestion(member.Id), default);
+
+        var counts = await repo.GetDashboardCountsAsync(utcNow);
+
+        Assert.Equal(1, counts.Pending);
+        Assert.Equal(1, counts.ReceivedToday);
+    }
+
+    [Fact]
+    public async Task NewsRepo_GetTopContributors_GroupsByMember()
+    {
+        var member = SampleMember();
+        var repo = new InMemoryNewsSuggestionRepository(id => id == member.Id ? member : null);
+        var monthStart = new DateTimeOffset(DateTimeOffset.UtcNow.Year, DateTimeOffset.UtcNow.Month, 1, 0, 0, 0, TimeSpan.Zero);
+
+        await repo.CreateAsync(SampleNewsSuggestion(member.Id), default);
+        await repo.CreateAsync(SampleNewsSuggestion(member.Id, "https://example.com/2"), default);
+
+        var contributors = await repo.GetTopContributorsThisMonthAsync(monthStart, 5);
+
+        Assert.Single(contributors);
+        Assert.Equal(2, contributors[0].Count);
+    }
+
+    // ── In-memory repo: articles ────────────────────────────────────────────
+
+    [Fact]
+    public async Task ArticleRepo_GetDashboardCounts_ReturnsZerosWhenEmpty()
+    {
+        var repo = new InMemoryArticleSubmissionRepository();
+        var counts = await repo.GetDashboardCountsAsync(DateTimeOffset.UtcNow);
+
+        Assert.Equal(SubmissionTypeCounts.Empty, counts);
+    }
+
+    [Fact]
+    public async Task ArticleRepo_GetDashboardCounts_CountsSubmittedAsPending()
+    {
+        var member = SampleMember();
+        var repo = new InMemoryArticleSubmissionRepository(id => id == member.Id ? member : null);
+        var utcNow = DateTimeOffset.UtcNow;
+
+        var draft = await repo.UpsertDraftAsync(SampleArticleDraft(member.Id), default);
+        await repo.SubmitForReviewAsync(draft.Id, member.Id, default);
+
+        var counts = await repo.GetDashboardCountsAsync(utcNow);
+
+        Assert.Equal(1, counts.Pending);
+        Assert.Equal(1, counts.ReceivedToday);
+    }
+
+    [Fact]
+    public async Task ArticleRepo_GetTopContributors_GroupsByMember()
+    {
+        var member = SampleMember();
+        var repo = new InMemoryArticleSubmissionRepository(id => id == member.Id ? member : null);
+        var monthStart = new DateTimeOffset(DateTimeOffset.UtcNow.Year, DateTimeOffset.UtcNow.Month, 1, 0, 0, 0, TimeSpan.Zero);
+
+        var draft1 = await repo.UpsertDraftAsync(SampleArticleDraft(member.Id, "Title One"), default);
+        await repo.SubmitForReviewAsync(draft1.Id, member.Id, default);
+
+        var draft2 = await repo.UpsertDraftAsync(SampleArticleDraft(member.Id, "Title Two"), default);
+        await repo.SubmitForReviewAsync(draft2.Id, member.Id, default);
+
+        var contributors = await repo.GetTopContributorsThisMonthAsync(monthStart, 5);
+
+        Assert.Single(contributors);
+        Assert.Equal(2, contributors[0].Count);
+    }
+
+    // ── SubmissionQueueStats helper ─────────────────────────────────────────
+
+    [Fact]
+    public void SubmissionQueueStats_Totals_AggregateAcrossTypes()
+    {
+        var counts = new SubmissionTypeCounts(
+            Pending: 3, ReceivedToday: 1, ReceivedThisWeek: 2,
+            ApprovedLast30Days: 4, RejectedLast30Days: 2, StillPendingFromLast30Days: 1);
+
+        var stats = new SubmissionQueueStats(counts, counts, counts, []);
+
+        Assert.Equal(12, stats.TotalApprovedLast30Days);
+        Assert.Equal(6, stats.TotalRejectedLast30Days);
+        Assert.Equal(3, stats.TotalStillPendingLast30Days);
+        Assert.Equal(21, stats.TotalLast30Days);
+    }
+
+    // ── Dashboard page integration ──────────────────────────────────────────
+
+    [Fact]
+    public async Task AdminDashboard_RendersSubmissionQueueSection_WithEmptyData()
+    {
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Test-User-Email", AdminEmail);
+
+        var response = await client.GetAsync("/admin");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("Submission queue", body);
+        Assert.Contains("Photos", body);
+        Assert.Contains("News suggestions", body);
+        Assert.Contains("Articles", body);
+        Assert.Contains("/admin/photo-submissions", body);
+        Assert.Contains("/admin/news-suggestions", body);
+        Assert.Contains("/admin/articles", body);
+    }
+
+    [Fact]
+    public async Task AdminDashboard_ShowsApprovalRateEmpty_WhenNoSubmissions()
+    {
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Test-User-Email", AdminEmail);
+
+        var response = await client.GetAsync("/admin");
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Contains("No submissions in the last 30 days", body);
+    }
+
+    // ── Helpers ─────────────────────────────────────────────────────────────
+
+    private static MemberAccount SampleMember() =>
+        new()
+        {
+            Id = Guid.NewGuid(),
+            Email = "contributor@example.com",
+            DisplayName = "Sample Contributor",
+        };
+
+    private static NewPhotoSubmission SamplePhotoSubmission(Guid memberId) =>
+        new(
+            Id: Guid.NewGuid(),
+            SubmitterMemberId: memberId,
+            Title: "Test Photo",
+            Description: null,
+            SuggestedCategory: "Queen",
+            ApproximateYear: null,
+            ApproximateDate: null,
+            BlobPath: "originals/test.jpg",
+            WebOptimizedBlobPath: "web/test.webp",
+            ThumbnailBlobPath: "thumbs/test.webp",
+            OriginalFileName: "test.jpg",
+            FileSizeBytes: 1024,
+            MimeType: "image/jpeg",
+            ImageWidthPx: 800,
+            ImageHeightPx: 600);
+
+    private static NewsSuggestion SampleNewsSuggestion(Guid memberId, string url = "https://example.com/queen-news") =>
+        new(
+            Id: Guid.Empty,
+            SubmitterMemberId: memberId,
+            Url: url,
+            UrlHash: Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(url))),
+            Title: "Sample News",
+            Notes: null,
+            Status: NewsSuggestionStatus.Pending,
+            SubmittedAt: DateTimeOffset.UtcNow,
+            ReviewedAt: null,
+            ReviewerEmail: null,
+            ReviewNotes: null,
+            PromotedNewsId: null,
+            DuplicateCandidateId: null,
+            SubmitterDisplayName: null,
+            SubmitterEmail: null);
+
+    private static ArticleSubmissionDraft SampleArticleDraft(Guid memberId, string title = "Test Article") =>
+        new(
+            Id: null,
+            AuthorMemberId: memberId,
+            Title: title,
+            Excerpt: "A test excerpt.",
+            Body: new string('x', 350),
+            CoverImageBlobPath: null,
+            Tags: null);
+}

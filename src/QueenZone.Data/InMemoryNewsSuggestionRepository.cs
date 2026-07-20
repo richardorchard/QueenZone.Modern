@@ -206,6 +206,57 @@ public sealed class InMemoryNewsSuggestionRepository : INewsSuggestionRepository
         }
     }
 
+    public Task<SubmissionTypeCounts> GetDashboardCountsAsync(
+        DateTimeOffset utcNow,
+        CancellationToken cancellationToken = default)
+    {
+        var today = utcNow.UtcDateTime.Date;
+        var weekAgo = today.AddDays(-6);
+        var monthAgo = utcNow.AddDays(-30);
+
+        lock (sync)
+        {
+            var pending = suggestions.Count(r =>
+                r.Status is NewsSuggestionStatus.Pending or NewsSuggestionStatus.UnderReview);
+
+            var receivedToday = suggestions.Count(r => r.SubmittedAt.UtcDateTime.Date >= today);
+            var receivedThisWeek = suggestions.Count(r => r.SubmittedAt.UtcDateTime.Date >= weekAgo);
+
+            var last30 = suggestions.Where(r => r.SubmittedAt >= monthAgo).ToList();
+            var approvedLast30 = last30.Count(r => r.Status == NewsSuggestionStatus.Promoted);
+            var rejectedLast30 = last30.Count(r =>
+                r.Status is NewsSuggestionStatus.Rejected or NewsSuggestionStatus.Duplicate);
+            var pendingLast30 = last30.Count(r =>
+                r.Status is NewsSuggestionStatus.Pending or NewsSuggestionStatus.UnderReview);
+
+            return Task.FromResult(new SubmissionTypeCounts(
+                pending, receivedToday, receivedThisWeek, approvedLast30, rejectedLast30, pendingLast30));
+        }
+    }
+
+    public Task<IReadOnlyList<SubmissionContributor>> GetTopContributorsThisMonthAsync(
+        DateTimeOffset monthStart,
+        int maxCount,
+        CancellationToken cancellationToken = default)
+    {
+        lock (sync)
+        {
+            IReadOnlyList<SubmissionContributor> result = suggestions
+                .Where(r => r.SubmittedAt >= monthStart)
+                .GroupBy(r => r.SubmitterMemberId)
+                .Select(g =>
+                {
+                    var member = resolveMember?.Invoke(g.Key);
+                    return new SubmissionContributor(g.Key, member?.DisplayName ?? "Unknown member", g.Count());
+                })
+                .OrderByDescending(c => c.Count)
+                .Take(maxCount)
+                .ToList();
+
+            return Task.FromResult(result);
+        }
+    }
+
     private NewsSuggestion Map(NewsSuggestionEntity entity)
     {
         var member = resolveMember?.Invoke(entity.SubmitterMemberId);

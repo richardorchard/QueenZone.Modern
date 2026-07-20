@@ -201,6 +201,63 @@ public sealed class EfNewsSuggestionRepository(QueenZoneDbContext dbContext) : I
         return Map(entity);
     }
 
+    public async Task<SubmissionTypeCounts> GetDashboardCountsAsync(
+        DateTimeOffset utcNow,
+        CancellationToken cancellationToken = default)
+    {
+        var monthAgo = utcNow.AddDays(-30);
+
+        var rows = await dbContext.NewsSuggestions
+            .AsNoTracking()
+            .Select(r => new { r.Status, r.SubmittedAt })
+            .ToListAsync(cancellationToken);
+
+        var today = utcNow.UtcDateTime.Date;
+        var weekAgo = today.AddDays(-6);
+
+        var pending = rows.Count(r =>
+            r.Status is NewsSuggestionStatus.Pending or NewsSuggestionStatus.UnderReview);
+
+        var receivedToday = rows.Count(r => r.SubmittedAt.UtcDateTime.Date >= today);
+        var receivedThisWeek = rows.Count(r => r.SubmittedAt.UtcDateTime.Date >= weekAgo);
+
+        var last30 = rows.Where(r => r.SubmittedAt >= monthAgo).ToList();
+        var approvedLast30 = last30.Count(r => r.Status == NewsSuggestionStatus.Promoted);
+        var rejectedLast30 = last30.Count(r =>
+            r.Status is NewsSuggestionStatus.Rejected or NewsSuggestionStatus.Duplicate);
+        var pendingLast30 = last30.Count(r =>
+            r.Status is NewsSuggestionStatus.Pending or NewsSuggestionStatus.UnderReview);
+
+        return new SubmissionTypeCounts(
+            pending, receivedToday, receivedThisWeek, approvedLast30, rejectedLast30, pendingLast30);
+    }
+
+    public async Task<IReadOnlyList<SubmissionContributor>> GetTopContributorsThisMonthAsync(
+        DateTimeOffset monthStart,
+        int maxCount,
+        CancellationToken cancellationToken = default)
+    {
+        var rows = await dbContext.NewsSuggestions
+            .AsNoTracking()
+            .Where(r => r.SubmittedAt >= monthStart)
+            .Select(r => new
+            {
+                r.SubmitterMemberId,
+                DisplayName = r.Submitter != null ? r.Submitter.DisplayName : string.Empty,
+            })
+            .ToListAsync(cancellationToken);
+
+        return rows
+            .GroupBy(r => r.SubmitterMemberId)
+            .Select(g => new SubmissionContributor(
+                g.Key,
+                g.FirstOrDefault(r => !string.IsNullOrWhiteSpace(r.DisplayName))?.DisplayName ?? "Unknown member",
+                g.Count()))
+            .OrderByDescending(c => c.Count)
+            .Take(maxCount)
+            .ToList();
+    }
+
     private static string? NormalizeOptional(string? value, int maxLength)
     {
         if (string.IsNullOrWhiteSpace(value))
