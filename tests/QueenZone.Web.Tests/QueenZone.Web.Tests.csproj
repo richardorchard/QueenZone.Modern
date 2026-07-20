@@ -21,6 +21,18 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!--
+      SQLitePCLRaw.lib.e_sqlite3 2.1.11 — GHSA-2m69-gcr7-jv3q (high: arbitrary code via crafted SQLite db).
+      Transitive via Microsoft.EntityFrameworkCore.Sqlite → SQLitePCLRaw.bundle_e_sqlite3 2.1.11.
+      SQLitePCLRaw 3.x (patched) is API-incompatible with EF Core's 2.x dependency; no safe forced upgrade.
+      Test-only: SQLite is used only for in-process EF Core integration tests with fixture data.
+      No untrusted .db files are opened; code paths that would trigger the vulnerability are not exercised.
+      Owner: EF Core team — revisit when EF Core ships a version that targets SQLitePCLRaw 3.x.
+    -->
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-2m69-gcr7-jv3q" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\QueenZone.Web\QueenZone.Web.csproj" />
     <ProjectReference Include="..\..\src\QueenZone.NewsAgent\QueenZone.NewsAgent.csproj" />
   </ItemGroup>
