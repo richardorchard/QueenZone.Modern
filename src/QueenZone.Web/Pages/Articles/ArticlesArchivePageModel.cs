@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.Data.SqlClient;
 using QueenZone.Data;
 
 namespace QueenZone.Web.Pages.Articles;
@@ -65,16 +66,27 @@ public abstract class ArticlesArchivePageModel(
 
         if (articleRepository is not null)
         {
-            communityPage = Math.Max(1, communityPage);
-            var communityCount = await articleRepository.GetCountAsync(tag, cancellationToken);
-            CommunityTotalPages = (int)Math.Ceiling(communityCount / (double)CommunityPageSize);
-            if (CommunityTotalPages > 0 && communityPage > CommunityTotalPages)
+            try
             {
-                return NotFound();
-            }
+                communityPage = Math.Max(1, communityPage);
+                var communityCount = await articleRepository.GetCountAsync(tag, cancellationToken);
+                CommunityTotalPages = (int)Math.Ceiling(communityCount / (double)CommunityPageSize);
+                if (CommunityTotalPages > 0 && communityPage > CommunityTotalPages)
+                {
+                    return NotFound();
+                }
 
-            CommunityItems = await articleRepository.GetPageAsync(communityPage, CommunityPageSize, tag, cancellationToken);
-            CommunityCurrentPage = communityPage;
+                CommunityItems = await articleRepository.GetPageAsync(communityPage, CommunityPageSize, tag, cancellationToken);
+                CommunityCurrentPage = communityPage;
+            }
+            catch (SqlException)
+            {
+                // Community articles are additive; archive pages must still render when the
+                // modern submission table is unavailable (e.g. migration not yet applied).
+                CommunityItems = [];
+                CommunityCurrentPage = 1;
+                CommunityTotalPages = 0;
+            }
         }
 
         Breadcrumbs = [BreadcrumbItem.Home, new BreadcrumbItem("Articles", "/articles")];
