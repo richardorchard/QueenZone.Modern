@@ -1,4 +1,4 @@
-using QueenZone.Data.Entities;
+﻿using QueenZone.Data.Entities;
 
 namespace QueenZone.Data;
 
@@ -232,9 +232,11 @@ public sealed class InMemoryArticleSubmissionRepository : IArticleSubmissionRepo
                     a.Slug,
                     a.Excerpt,
                     a.Body,
+                    a.CoverImageBlobPath,
                     a.Tags,
                     a.PublishedAt!.Value,
-                    a.Author?.DisplayName))
+                    a.Author?.DisplayName,
+                    EfArticleSubmissionRepository.EstimateWordCount(a.Body)))
                 .ToList();
 
             return Task.FromResult<IReadOnlyList<PublishedArticleSubmission>>(result);
