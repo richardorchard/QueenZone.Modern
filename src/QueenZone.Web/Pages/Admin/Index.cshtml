@@ -1,2 +1,118 @@
 @page "/admin"
 @model QueenZone.Web.Pages.Admin.IndexModel
+@{
+    ViewData["Title"] = "Admin Dashboard";
+
+    // Build a 30-day registration lookup for the sparkline.
+    var utcToday = DateOnly.FromDateTime(DateTime.UtcNow);
+    var regsByDate = Model.DailyRegistrations.ToDictionary(r => r.Date, r => r.Count);
+    var sparkDays = Enumerable.Range(0, 30)
+        .Select(i => utcToday.AddDays(i - 29))
+        .Select(d => regsByDate.TryGetValue(d, out var c) ? c : 0)
+        .ToList();
+
+    const int svgW = 300;
+    const int svgH = 48;
+    const int padX = 2;
+    var maxVal = sparkDays.Max() is > 0 ? sparkDays.Max() : 1;
+    var stepX = (svgW - padX * 2.0) / (sparkDays.Count - 1);
+
+    string SparkPoint(int i, int val)
+    {
+        var x = padX + i * stepX;
+        var y = svgH - 4 - (val / (double)maxVal) * (svgH - 8);
+        return $"{x:F1},{y:F1}";
+    }
+    var polyline = string.Join(" ", sparkDays.Select((v, i) => SparkPoint(i, v)));
+}
+
+<div class="admin-shell">
+  <h1 class="admin-dashboard__title">Dashboard</h1>
+
+  <section class="admin-dashboard__section">
+    <h2 class="admin-dashboard__section-title">Members</h2>
+    <div class="admin-dashboard__stats-row">
+      <div class="admin-dashboard__stat">
+        <span class="admin-dashboard__stat-value">@Model.MemberStats.Total.ToString("N0")</span>
+        <span class="admin-dashboard__stat-label">Total members</span>
+      </div>
+      <div class="admin-dashboard__stat">
+        <span class="admin-dashboard__stat-value">@Model.MemberStats.NewToday</span>
+        <span class="admin-dashboard__stat-label">Joined today</span>
+      </div>
+      <div class="admin-dashboard__stat">
+        <span class="admin-dashboard__stat-value">@Model.MemberStats.NewLast7Days</span>
+        <span class="admin-dashboard__stat-label">Last 7 days</span>
+      </div>
+      <div class="admin-dashboard__stat">
+        <span class="admin-dashboard__stat-value">@Model.MemberStats.NewLast30Days</span>
+        <span class="admin-dashboard__stat-label">Last 30 days</span>
+      </div>
+    </div>
+
+    <div class="admin-dashboard__sparkline-wrap">
+      <span class="admin-dashboard__sparkline-label">New registrations — last 30 days</span>
+      <svg class="admin-dashboard__sparkline"
+           viewBox="0 0 @svgW @svgH"
+           width="@svgW"
+           height="@svgH"
+           aria-hidden="true"
+           xmlns="http://www.w3.org/2000/svg">
+        <polyline fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linejoin="round"
+                  stroke-linecap="round"
+                  points="@polyline" />
+      </svg>
+    </div>
+  </section>
+
+  @if (Model.RecentLogins.Count > 0)
+  {
+    <section class="admin-dashboard__section">
+      <h2 class="admin-dashboard__section-title">Recent logins</h2>
+      <ul class="admin-dashboard__login-list">
+        @foreach (var login in Model.RecentLogins)
+        {
+          <li class="admin-dashboard__login-item">
+            <partial name="_MemberAvatar" model='@(new MemberAvatarViewModel { DisplayName = login.DisplayName, MemberId = login.MemberId, HasAvatar = login.HasAvatar, UseThumbnail = true })' />
+            <span class="admin-dashboard__login-name">@login.DisplayName</span>
+            <time class="admin-dashboard__login-time"
+                  datetime="@login.LastLoginAt.ToString("O")">
+              @FormatRelative(login.LastLoginAt)
+            </time>
+          </li>
+        }
+      </ul>
+    </section>
+  }
+  else
+  {
+    <section class="admin-dashboard__section">
+      <h2 class="admin-dashboard__section-title">Recent logins</h2>
+      <p class="admin-dashboard__empty">No logins recorded yet — login timestamps are tracked from this release onwards.</p>
+    </section>
+  }
+
+  <section class="admin-dashboard__section">
+    <h2 class="admin-dashboard__section-title">Content</h2>
+    <div class="admin-dashboard__link-list">
+      <a class="admin-dashboard__content-link" href="/admin/news">Manage news articles</a>
+      <a class="admin-dashboard__content-link" href="/admin/news-discovery">AI discovery queue</a>
+    </div>
+  </section>
+</div>
+
+@functions {
+    private static string FormatRelative(DateTime utc)
+    {
+        var diff = DateTime.UtcNow - utc;
+        if (diff.TotalMinutes < 2) return "just now";
+        if (diff.TotalMinutes < 60) return $"{(int)diff.TotalMinutes} mins ago";
+        if (diff.TotalHours < 2) return "1 hour ago";
+        if (diff.TotalHours < 24) return $"{(int)diff.TotalHours} hours ago";
+        if (diff.TotalDays < 2) return "yesterday";
+        return $"{(int)diff.TotalDays} days ago";
+    }
+}

@@ -85,5 +85,55 @@ public sealed class EfMemberAccountRepository(QueenZoneDbContext dbContext) : IM
         return account;
     }
 
+    public async Task RecordLoginAsync(Guid memberId, DateTime loginAt, CancellationToken cancellationToken = default)
+    {
+        var account = await dbContext.MemberAccounts
+            .SingleOrDefaultAsync(a => a.Id == memberId, cancellationToken);
+        if (account is not null)
+        {
+            account.LastLoginAt = loginAt;
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    public async Task<MemberStats> GetStatsAsync(DateTime utcNow, CancellationToken cancellationToken = default)
+    {
+        var today = utcNow.Date;
+        var sevenDaysAgo = today.AddDays(-7);
+        var thirtyDaysAgo = today.AddDays(-30);
+
+        var total = await dbContext.MemberAccounts.CountAsync(cancellationToken);
+        var newToday = await dbContext.MemberAccounts.CountAsync(a => a.CreatedAt >= today, cancellationToken);
+        var newLast7 = await dbContext.MemberAccounts.CountAsync(a => a.CreatedAt >= sevenDaysAgo, cancellationToken);
+        var newLast30 = await dbContext.MemberAccounts.CountAsync(a => a.CreatedAt >= thirtyDaysAgo, cancellationToken);
+
+        return new MemberStats(total, newToday, newLast7, newLast30);
+    }
+
+    public async Task<IReadOnlyList<RecentLogin>> GetRecentLoginsAsync(int count, CancellationToken cancellationToken = default) =>
+        await dbContext.MemberAccounts
+            .AsNoTracking()
+            .Where(a => a.LastLoginAt != null)
+            .OrderByDescending(a => a.LastLoginAt)
+            .Take(count)
+            .Select(a => new RecentLogin(a.Id, a.DisplayName, a.AvatarUrl != null, a.LastLoginAt!.Value))
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<DailyRegistration>> GetDailyRegistrationsAsync(DateOnly fromDate, CancellationToken cancellationToken = default)
+    {
+        var from = fromDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        var rawDates = await dbContext.MemberAccounts
+            .AsNoTracking()
+            .Where(a => a.CreatedAt >= from)
+            .Select(a => a.CreatedAt)
+            .ToListAsync(cancellationToken);
+
+        return rawDates
+            .GroupBy(d => DateOnly.FromDateTime(d))
+            .Select(g => new DailyRegistration(g.Key, g.Count()))
+            .OrderBy(r => r.Date)
+            .ToList();
+    }
+
     private static string Normalize(string email) => email.Trim().ToUpperInvariant();
 }

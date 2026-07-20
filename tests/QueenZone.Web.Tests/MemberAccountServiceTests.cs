@@ -360,5 +360,17 @@ public sealed class MemberAccountServiceTests
 
         public Task<MemberAccount?> UpdateAvatarUrlAsync(Guid memberId, string? avatarBlobPath, CancellationToken cancellationToken = default) =>
             throw new InvalidOperationException("Simulated database failure.");
+
+        public Task RecordLoginAsync(Guid memberId, DateTime loginAt, CancellationToken cancellationToken = default) =>
+            inner.RecordLoginAsync(memberId, loginAt, cancellationToken);
+
+        public Task<MemberStats> GetStatsAsync(DateTime utcNow, CancellationToken cancellationToken = default) =>
+            inner.GetStatsAsync(utcNow, cancellationToken);
+
+        public Task<IReadOnlyList<RecentLogin>> GetRecentLoginsAsync(int count, CancellationToken cancellationToken = default) =>
+            inner.GetRecentLoginsAsync(count, cancellationToken);
+
+        public Task<IReadOnlyList<DailyRegistration>> GetDailyRegistrationsAsync(DateOnly fromDate, CancellationToken cancellationToken = default) =>
+            inner.GetDailyRegistrationsAsync(fromDate, cancellationToken);
     }
 }

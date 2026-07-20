@@ -27,4 +27,12 @@ public interface IMemberAccountRepository
     /// Pass null to remove the avatar.
     /// </summary>
     Task<MemberAccount?> UpdateAvatarUrlAsync(Guid memberId, string? avatarBlobPath, CancellationToken cancellationToken = default);
+
+    Task RecordLoginAsync(Guid memberId, DateTime loginAt, CancellationToken cancellationToken = default);
+
+    Task<MemberStats> GetStatsAsync(DateTime utcNow, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<RecentLogin>> GetRecentLoginsAsync(int count, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<DailyRegistration>> GetDailyRegistrationsAsync(DateOnly fromDate, CancellationToken cancellationToken = default);
 }

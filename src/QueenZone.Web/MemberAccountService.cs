@@ -53,6 +53,7 @@ public sealed class MemberAccountService(
             return MemberAccountResult.Failure("Incorrect email or password.");
         }
 
+        await memberAccountRepository.RecordLoginAsync(account.Id, DateTime.UtcNow, cancellationToken);
         return MemberAccountResult.Success(account);
     }
 
@@ -63,31 +64,40 @@ public sealed class MemberAccountService(
         string displayName,
         CancellationToken cancellationToken = default)
     {
+        MemberAccount result;
+
         var existingByLogin = await memberAccountRepository.FindByExternalLoginAsync(provider, providerKey, cancellationToken);
         if (existingByLogin is not null)
         {
-            return existingByLogin;
+            result = existingByLogin;
+        }
+        else
+        {
+            var existingByEmail = await memberAccountRepository.FindByEmailAsync(email, cancellationToken);
+            if (existingByEmail is not null)
+            {
+                await memberAccountRepository.AddExternalLoginAsync(existingByEmail.Id, provider, providerKey, email, cancellationToken);
+                result = existingByEmail;
+            }
+            else
+            {
+                var account = new MemberAccount
+                {
+                    Id = Guid.NewGuid(),
+                    Email = email,
+                    DisplayName = displayName,
+                    CreatedAt = DateTime.UtcNow,
+                    LinkedLegacyUserId = (await legacyMemberLookupRepository.FindByEmailAsync(email, cancellationToken))?.UserId,
+                };
+
+                var created = await memberAccountRepository.CreateAsync(account, cancellationToken);
+                await memberAccountRepository.AddExternalLoginAsync(created.Id, provider, providerKey, email, cancellationToken);
+                result = created;
+            }
         }
 
-        var existingByEmail = await memberAccountRepository.FindByEmailAsync(email, cancellationToken);
-        if (existingByEmail is not null)
-        {
-            await memberAccountRepository.AddExternalLoginAsync(existingByEmail.Id, provider, providerKey, email, cancellationToken);
-            return existingByEmail;
-        }
-
-        var account = new MemberAccount
-        {
-            Id = Guid.NewGuid(),
-            Email = email,
-            DisplayName = displayName,
-            CreatedAt = DateTime.UtcNow,
-            LinkedLegacyUserId = (await legacyMemberLookupRepository.FindByEmailAsync(email, cancellationToken))?.UserId,
-        };
-
-        var created = await memberAccountRepository.CreateAsync(account, cancellationToken);
-        await memberAccountRepository.AddExternalLoginAsync(created.Id, provider, providerKey, email, cancellationToken);
-        return created;
+        await memberAccountRepository.RecordLoginAsync(result.Id, DateTime.UtcNow, cancellationToken);
+        return result;
     }
 
     public async Task<MemberAccount?> FindByIdAsync(Guid memberId, CancellationToken cancellationToken = default) =>

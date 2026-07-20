@@ -107,5 +107,62 @@ public sealed class InMemoryMemberAccountRepository : IMemberAccountRepository
         }
     }
 
+    public Task RecordLoginAsync(Guid memberId, DateTime loginAt, CancellationToken cancellationToken = default)
+    {
+        lock (gate)
+        {
+            var account = accounts.FirstOrDefault(a => a.Id == memberId);
+            if (account is not null)
+            {
+                account.LastLoginAt = loginAt;
+            }
+
+            return Task.CompletedTask;
+        }
+    }
+
+    public Task<MemberStats> GetStatsAsync(DateTime utcNow, CancellationToken cancellationToken = default)
+    {
+        lock (gate)
+        {
+            var today = utcNow.Date;
+            var stats = new MemberStats(
+                Total: accounts.Count,
+                NewToday: accounts.Count(a => a.CreatedAt >= today),
+                NewLast7Days: accounts.Count(a => a.CreatedAt >= today.AddDays(-7)),
+                NewLast30Days: accounts.Count(a => a.CreatedAt >= today.AddDays(-30)));
+            return Task.FromResult(stats);
+        }
+    }
+
+    public Task<IReadOnlyList<RecentLogin>> GetRecentLoginsAsync(int count, CancellationToken cancellationToken = default)
+    {
+        lock (gate)
+        {
+            IReadOnlyList<RecentLogin> logins = accounts
+                .Where(a => a.LastLoginAt != null)
+                .OrderByDescending(a => a.LastLoginAt)
+                .Take(count)
+                .Select(a => new RecentLogin(a.Id, a.DisplayName, a.AvatarUrl != null, a.LastLoginAt!.Value))
+                .ToList();
+            return Task.FromResult(logins);
+        }
+    }
+
+    public Task<IReadOnlyList<DailyRegistration>> GetDailyRegistrationsAsync(DateOnly fromDate, CancellationToken cancellationToken = default)
+    {
+        lock (gate)
+        {
+            var from = fromDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+            IReadOnlyList<DailyRegistration> regs = accounts
+                .Where(a => a.CreatedAt >= from)
+                .GroupBy(a => DateOnly.FromDateTime(a.CreatedAt))
+                .Select(g => new DailyRegistration(g.Key, g.Count()))
+                .OrderBy(r => r.Date)
+                .ToList();
+            return Task.FromResult(regs);
+        }
+    }
+
     private static string Normalize(string email) => email.Trim().ToUpperInvariant();
 }

@@ -20,5 +20,7 @@ public sealed class MemberAccount
 
     public DateTime CreatedAt { get; set; }
 
+    public DateTime? LastLoginAt { get; set; }
+
     public int? LinkedLegacyUserId { get; set; }
 }
