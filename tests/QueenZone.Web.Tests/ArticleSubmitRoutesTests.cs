@@ -136,7 +136,7 @@ public sealed partial class ArticleSubmitRoutesTests : IClassFixture<WebApplicat
         Assert.Contains("Wembley retrospective", confirmation);
         Assert.Contains(ArticleSubmissionStatus.Submitted, confirmation);
 
-        var mySubmissions = await client.GetStringAsync("/account/my-submissions");
+        var mySubmissions = await client.GetStringAsync("/account/my-submissions?tab=articles");
         Assert.Contains("Wembley retrospective", mySubmissions);
         Assert.Contains(ArticleSubmissionStatus.Submitted, mySubmissions);
     }

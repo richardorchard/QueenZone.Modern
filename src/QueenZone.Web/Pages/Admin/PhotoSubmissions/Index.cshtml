@@ -37,7 +37,7 @@ else
           <td>@item.SubmitterDisplayName</td>
           <td>@item.SubmittedAt.ToString("u")</td>
           <td>@(item.SuggestedCategory ?? "—")</td>
-          <td>@item.Status</td>
+          <td><partial name="_SubmissionStatusBadge" model="item.Status" /></td>
           <td><a href="/admin/photo-submissions/@item.Id">Review</a></td>
         </tr>
       }

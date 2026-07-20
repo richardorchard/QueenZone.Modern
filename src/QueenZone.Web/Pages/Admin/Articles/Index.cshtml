@@ -30,7 +30,7 @@ else
           <td>@item.AuthorDisplayName</td>
           <td>~@item.WordCountEstimate</td>
           <td>@(item.SubmittedAt?.ToString("yyyy-MM-dd HH:mm") ?? "—")</td>
-          <td>@item.Status</td>
+          <td><partial name="_SubmissionStatusBadge" model="item.Status" /></td>
           <td><a href="/admin/articles/@item.Id">Review</a></td>
         </tr>
       }

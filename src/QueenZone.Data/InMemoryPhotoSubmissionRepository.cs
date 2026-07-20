@@ -107,18 +107,29 @@ public sealed class InMemoryPhotoSubmissionRepository : IPhotoSubmissionReposito
         }
     }
 
-    public Task<IReadOnlyList<PhotoSubmission>> GetBySubmitterAsync(
+    public Task<SubmissionListPage<PhotoSubmission>> GetBySubmitterAsync(
         Guid submitterMemberId,
+        int page = 1,
+        int pageSize = 10,
         CancellationToken cancellationToken = default)
     {
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 100);
+
         lock (sync)
         {
-            IReadOnlyList<PhotoSubmission> result = submissions
+            var owned = submissions
                 .Where(row => row.SubmitterMemberId == submitterMemberId)
                 .OrderByDescending(row => row.SubmittedAt)
+                .ToList();
+
+            IReadOnlyList<PhotoSubmission> items = owned
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
                 .Select(Map)
                 .ToList();
-            return Task.FromResult(result);
+
+            return Task.FromResult(new SubmissionListPage<PhotoSubmission>(items, owned.Count));
         }
     }
 

@@ -83,18 +83,32 @@ public sealed class EfArticleSubmissionRepository(QueenZoneDbContext dbContext) 
         return Map(entity);
     }
 
-    public async Task<IReadOnlyList<ArticleSubmission>> GetDraftsForMemberAsync(Guid memberId, CancellationToken ct = default)
+    public async Task<SubmissionListPage<ArticleSubmission>> GetDraftsForMemberAsync(
+        Guid memberId,
+        int page = 1,
+        int pageSize = 10,
+        CancellationToken ct = default)
     {
-        var rows = await dbContext.ArticleSubmissions
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 100);
+
+        var query = dbContext.ArticleSubmissions
             .AsNoTracking()
-            .Where(a => a.AuthorMemberId == memberId)
+            .Where(a => a.AuthorMemberId == memberId);
+
+        var totalCount = await query.CountAsync(ct);
+        var rows = await query
             .Include(a => a.Author)
             .ToListAsync(ct);
 
-        return rows
+        var items = rows
             .OrderByDescending(a => a.SubmittedAt ?? DateTimeOffset.MinValue)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Select(Map)
             .ToList();
+
+        return new SubmissionListPage<ArticleSubmission>(items, totalCount);
     }
 
     public async Task<IReadOnlyList<ArticleSubmissionListItem>> GetPendingAsync(

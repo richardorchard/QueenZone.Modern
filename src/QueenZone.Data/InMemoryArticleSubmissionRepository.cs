@@ -92,17 +92,33 @@ public sealed class InMemoryArticleSubmissionRepository : IArticleSubmissionRepo
         }
     }
 
-    public Task<IReadOnlyList<ArticleSubmission>> GetDraftsForMemberAsync(Guid memberId, CancellationToken ct = default)
+    public Task<SubmissionListPage<ArticleSubmission>> GetDraftsForMemberAsync(
+        Guid memberId,
+        int page = 1,
+        int pageSize = 10,
+        CancellationToken ct = default)
     {
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 100);
+
         lock (sync)
         {
-            var result = submissions
+            var owned = submissions
                 .Where(a => a.AuthorMemberId == memberId)
                 .OrderByDescending(a => a.SubmittedAt ?? DateTimeOffset.MinValue)
-                .Select(a => { a.Author = resolveMember?.Invoke(a.AuthorMemberId); return Map(a); })
                 .ToList();
 
-            return Task.FromResult<IReadOnlyList<ArticleSubmission>>(result);
+            var items = owned
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(a =>
+                {
+                    a.Author = resolveMember?.Invoke(a.AuthorMemberId);
+                    return Map(a);
+                })
+                .ToList();
+
+            return Task.FromResult(new SubmissionListPage<ArticleSubmission>(items, owned.Count));
         }
     }
 

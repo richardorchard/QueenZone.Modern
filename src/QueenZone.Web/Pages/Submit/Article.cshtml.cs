@@ -36,8 +36,13 @@ public sealed class ArticleModel(
 
     public string StatusMessageKind { get; private set; } = "success";
 
-    public async Task<IActionResult> OnGetAsync(CancellationToken cancellationToken)
+    public async Task<IActionResult> OnGetAsync(Guid? id, CancellationToken cancellationToken)
     {
+        if (id is Guid editId)
+        {
+            return await LoadEditableDraftAsync(editId, cancellationToken);
+        }
+
         if (await GetCurrentMemberIdAsync() is null)
         {
             return Redirect("/account/login");
@@ -47,7 +52,11 @@ public sealed class ArticleModel(
         return Page();
     }
 
-    public async Task<IActionResult> OnGetEditAsync(Guid id, CancellationToken cancellationToken)
+    /// <summary>Legacy edit URL: <c>/submit/article?handler=Edit&amp;id={guid}</c>.</summary>
+    public Task<IActionResult> OnGetEditAsync(Guid id, CancellationToken cancellationToken) =>
+        LoadEditableDraftAsync(id, cancellationToken);
+
+    private async Task<IActionResult> LoadEditableDraftAsync(Guid id, CancellationToken cancellationToken)
     {
         var memberId = await GetCurrentMemberIdAsync();
         if (memberId is null)
@@ -61,13 +70,20 @@ public sealed class ArticleModel(
             return NotFound();
         }
 
+        if (submission.Status is not (ArticleSubmissionStatus.Draft or ArticleSubmissionStatus.RequiresRevision))
+        {
+            return Redirect("/account/my-submissions?tab=articles");
+        }
+
         DraftId = submission.Id;
         Title = submission.Title;
         Excerpt = submission.Excerpt;
         Body = submission.Body;
         Tags = submission.Tags;
 
-        ViewData["Title"] = "Edit draft";
+        ViewData["Title"] = submission.Status == ArticleSubmissionStatus.RequiresRevision
+            ? "Revise article"
+            : "Edit draft";
         return Page();
     }
 

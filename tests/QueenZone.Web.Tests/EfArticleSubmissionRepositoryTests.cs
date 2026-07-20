@@ -160,7 +160,7 @@ public sealed class EfArticleSubmissionRepositoryTests : IAsyncDisposable
 
         var all = await repository.GetDraftsForMemberAsync(memberId);
 
-        Assert.Equal(2, all.Count);
+        Assert.Equal(2, all.TotalCount);
     }
 
     [Fact]

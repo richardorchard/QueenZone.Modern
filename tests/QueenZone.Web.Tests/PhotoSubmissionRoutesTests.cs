@@ -92,7 +92,7 @@ public sealed partial class PhotoSubmissionRoutesTests : IClassFixture<WebApplic
         var repository = factory.Services.GetRequiredService<IPhotoSubmissionRepository>();
         var submissions = await repository.GetBySubmitterAsync(
             await GetMemberIdForEmailAsync("photo-submit@example.com"));
-        var submission = Assert.Single(submissions);
+        var submission = Assert.Single(submissions.Items);
         Assert.Equal(PhotoSubmissionStatus.Pending, submission.Status);
         Assert.Equal("Wembley crowd shot", submission.Title);
     }

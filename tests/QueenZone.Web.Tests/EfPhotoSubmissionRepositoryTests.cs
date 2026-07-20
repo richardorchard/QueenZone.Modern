@@ -126,8 +126,23 @@ public sealed class EfPhotoSubmissionRepositoryTests : IAsyncDisposable
         });
 
         var mine = await repository.GetBySubmitterAsync(memberId);
-        Assert.Single(mine);
-        Assert.Equal("Mine", mine[0].Title);
+        Assert.Single(mine.Items);
+        Assert.Equal("Mine", mine.Items[0].Title);
+        Assert.Equal(1, mine.TotalCount);
+    }
+
+    [Fact]
+    public async Task GetBySubmitterAsync_PaginatesNewestFirst()
+    {
+        for (var i = 0; i < 3; i++)
+        {
+            await repository.CreateAsync(NewSubmission(Guid.NewGuid(), $"Shot {i}", null));
+        }
+
+        var page = await repository.GetBySubmitterAsync(memberId, page: 1, pageSize: 2);
+        Assert.Equal(3, page.TotalCount);
+        Assert.Equal(2, page.Items.Count);
+        Assert.Equal("Shot 2", page.Items[0].Title);
     }
 
     [Fact]

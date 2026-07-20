@@ -77,6 +77,34 @@ public sealed class EfNewsSuggestionRepository(QueenZoneDbContext dbContext) : I
         return entity is null ? null : Map(entity);
     }
 
+    public async Task<SubmissionListPage<NewsSuggestion>> GetBySubmitterAsync(
+        Guid submitterMemberId,
+        int page = 1,
+        int pageSize = 10,
+        CancellationToken cancellationToken = default)
+    {
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 100);
+
+        var query = dbContext.NewsSuggestions
+            .AsNoTracking()
+            .Where(row => row.SubmitterMemberId == submitterMemberId);
+
+        var totalCount = await query.CountAsync(cancellationToken);
+        var rows = await query
+            .Include(row => row.Submitter)
+            .ToListAsync(cancellationToken);
+
+        var items = rows
+            .OrderByDescending(row => row.SubmittedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(Map)
+            .ToList();
+
+        return new SubmissionListPage<NewsSuggestion>(items, totalCount);
+    }
+
     public async Task<NewsSuggestion?> UpdateStatusAsync(
         Guid id,
         string status,

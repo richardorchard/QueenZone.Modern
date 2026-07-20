@@ -153,6 +153,51 @@ public sealed class EfNewsSuggestionRepositoryTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task GetBySubmitterAsync_ReturnsOwnedRowsNewestFirst()
+    {
+        await repository.CreateAsync(NewSuggestion(
+            NewsCandidateDedupe.ComputeUrlHash("https://example.com/older"),
+            "https://example.com/older"));
+        await repository.CreateAsync(NewSuggestion(
+            NewsCandidateDedupe.ComputeUrlHash("https://example.com/newer"),
+            "https://example.com/newer"));
+
+        var otherMember = Guid.NewGuid();
+        dbContext.MemberAccounts.Add(new MemberAccount
+        {
+            Id = otherMember,
+            Email = "other-news@example.com",
+            NormalizedEmail = "OTHER-NEWS@EXAMPLE.COM",
+            DisplayName = "Other",
+            CreatedAt = DateTime.UtcNow,
+        });
+        await dbContext.SaveChangesAsync();
+        await repository.CreateAsync(new NewsSuggestion(
+            Guid.NewGuid(),
+            otherMember,
+            "https://example.com/theirs",
+            NewsCandidateDedupe.ComputeUrlHash("https://example.com/theirs"),
+            "Theirs",
+            null,
+            NewsSuggestionStatus.Pending,
+            DateTimeOffset.UtcNow,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null));
+
+        var page = await repository.GetBySubmitterAsync(memberId, page: 1, pageSize: 10);
+
+        Assert.Equal(2, page.TotalCount);
+        Assert.Equal(2, page.Items.Count);
+        Assert.DoesNotContain(page.Items, item => item.Url.Contains("theirs", StringComparison.Ordinal));
+        Assert.Contains("newer", page.Items[0].Url, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task GetByIdAsync_ReturnsNull_WhenMissing()
     {
         Assert.Null(await repository.GetByIdAsync(Guid.NewGuid()));

@@ -81,6 +81,32 @@ public sealed class InMemoryNewsSuggestionRepository : INewsSuggestionRepository
         }
     }
 
+    public Task<SubmissionListPage<NewsSuggestion>> GetBySubmitterAsync(
+        Guid submitterMemberId,
+        int page = 1,
+        int pageSize = 10,
+        CancellationToken cancellationToken = default)
+    {
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 100);
+
+        lock (sync)
+        {
+            var owned = suggestions
+                .Where(row => row.SubmitterMemberId == submitterMemberId)
+                .OrderByDescending(row => row.SubmittedAt)
+                .ToList();
+
+            IReadOnlyList<NewsSuggestion> items = owned
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(Map)
+                .ToList();
+
+            return Task.FromResult(new SubmissionListPage<NewsSuggestion>(items, owned.Count));
+        }
+    }
+
     public Task<NewsSuggestion?> UpdateStatusAsync(
         Guid id,
         string status,

@@ -323,6 +323,109 @@
   color: var(--qz-blue-deep, #1a3a6b);
 }
 
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.qz-submissions-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+  margin: 1.5rem 0 1.25rem;
+  border-bottom: 1px solid var(--hairline);
+  padding-bottom: 0.75rem;
+}
+
+.qz-submissions-tabs__tab {
+  color: var(--qz-charcoal);
+  text-decoration: none;
+  font-weight: 600;
+  padding-bottom: 0.35rem;
+  border-bottom: 2px solid transparent;
+}
+
+.qz-submissions-tabs__tab:hover {
+  color: var(--qz-blue-deep, #1a3a6b);
+}
+
+.qz-submissions-tabs__tab.is-active {
+  color: var(--qz-blue-deep, #1a3a6b);
+  border-bottom-color: var(--qz-blue, #2f6fed);
+}
+
+.qz-submissions-thumb {
+  object-fit: cover;
+  display: block;
+  border-radius: var(--radius-xs);
+}
+
+.qz-submissions-secondary {
+  margin-top: 0.25rem;
+  color: var(--qz-grey-500);
+  font-size: 0.9em;
+}
+
+.qz-submissions-revision-note {
+  margin: 0;
+  padding: 0.5rem 0.65rem;
+  border-left: 3px solid var(--qz-gold, #c9a227);
+  background: var(--surface-muted, #f6f6f6);
+}
+
+.qz-status-badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border-strong);
+  font-size: 0.85em;
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.qz-status-badge--pending {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+  color: #374151;
+}
+
+.qz-status-badge--review {
+  background: #eff6ff;
+  border-color: #93c5fd;
+  color: #1e40af;
+}
+
+.qz-status-badge--attention {
+  background: #fffbeb;
+  border-color: #fcd34d;
+  color: #92400e;
+}
+
+.qz-status-badge--success {
+  background: #ecfdf5;
+  border-color: #6ee7b7;
+  color: #065f46;
+}
+
+.qz-status-badge--danger {
+  background: var(--qz-burgundy-tint, #f8e8ec);
+  border-color: var(--qz-burgundy, #7a1f3d);
+  color: var(--qz-burgundy, #7a1f3d);
+}
+
+.qz-status-badge--neutral {
+  background: var(--surface-muted, #f6f6f6);
+  color: var(--qz-charcoal);
+}
+
 .qz-account-settings {
   max-width: 32rem;
 }

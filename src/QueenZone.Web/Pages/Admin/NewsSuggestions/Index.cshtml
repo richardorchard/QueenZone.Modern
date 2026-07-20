@@ -33,7 +33,7 @@ else
           <td>@(item.Title ?? "—")</td>
           <td>@item.SubmitterDisplayName</td>
           <td>@item.SubmittedAt.ToString("u")</td>
-          <td>@item.Status</td>
+          <td><partial name="_SubmissionStatusBadge" model="item.Status" /></td>
           <td><a href="/admin/news-suggestions/@item.Id">Review</a></td>
         </tr>
       }
