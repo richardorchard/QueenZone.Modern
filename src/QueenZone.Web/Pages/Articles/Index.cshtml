@@ -6,6 +6,14 @@
 <section class="qz-section">
   <div class="qz-container">
     <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
+
+    @if (Model.CommunityItems.Count > 0)
+    {
+      <h2 class="qz-section-heading">Community articles</h2>
+      <partial name="_ArticlesArchiveList" model="Model.CommunityItems" />
+      <h2 class="qz-section-heading">Archive</h2>
+    }
+
     <partial name="_ArticlesArchiveList" model="Model.Items" />
 
     <partial name="_ArchivePagination" model="ArticlesRoutes.GetArchivePaginationViewModel(Model.CurrentPage, Model.TotalPages)" />

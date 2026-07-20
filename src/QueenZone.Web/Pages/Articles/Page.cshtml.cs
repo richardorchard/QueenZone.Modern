@@ -5,7 +5,8 @@ namespace QueenZone.Web.Pages.Articles;
 
 public sealed class ArchivePageModel(
     IArticlesRepository articlesRepository,
-    PublicQueryCacheService publicQueryCache) : ArticlesArchivePageModel(articlesRepository, publicQueryCache)
+    IArticleSubmissionRepository articleSubmissionRepository,
+    PublicQueryCacheService publicQueryCache) : ArticlesArchivePageModel(articlesRepository, articleSubmissionRepository, publicQueryCache)
 {
     [BindProperty(SupportsGet = true)]
     public int PageNumber { get; set; }

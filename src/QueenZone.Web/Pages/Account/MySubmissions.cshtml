@@ -9,10 +9,64 @@
     <p>
       <a href="/submit/photo">Submit a photo</a>
       ·
+      <a href="/submit/article">Write an article</a>
+      ·
       <a href="/account/settings">Account settings</a>
     </p>
 
-    @if (Model.Submissions.Count == 0)
+    <h2>Articles</h2>
+    @if (Model.ArticleSubmissions.Count == 0)
+    {
+      <p>You have not submitted any articles yet. <a href="/submit/article">Write your first article</a></p>
+    }
+    else
+    {
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Title</th>
+            <th>Status</th>
+            <th>Submitted</th>
+            <th>Notes</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @foreach (var item in Model.ArticleSubmissions)
+          {
+            <tr>
+              <td>@item.Title</td>
+              <td>@item.Status</td>
+              <td>@(item.SubmittedAt?.ToString("u") ?? "Draft")</td>
+              <td>
+                @if (!string.IsNullOrWhiteSpace(item.RejectionReason))
+                {
+                  <span>@item.RejectionReason</span>
+                }
+                else if (!string.IsNullOrWhiteSpace(item.ReviewNotes))
+                {
+                  <span>@item.ReviewNotes</span>
+                }
+              </td>
+              <td>
+                @if (item.Status == QueenZone.Data.ArticleSubmissionStatus.Draft
+                     || item.Status == QueenZone.Data.ArticleSubmissionStatus.RequiresRevision)
+                {
+                  <a href="/submit/article?edit=@item.Id">Edit</a>
+                }
+                else if (item.Status == QueenZone.Data.ArticleSubmissionStatus.Published)
+                {
+                  <a href="/articles/@item.Slug">Read</a>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+
+    <h2>Photos</h2>
+    @if (Model.PhotoSubmissions.Count == 0)
     {
       <p>You have not submitted any photos yet.</p>
     }
@@ -29,7 +83,7 @@
           </tr>
         </thead>
         <tbody>
-          @foreach (var item in Model.Submissions)
+          @foreach (var item in Model.PhotoSubmissions)
           {
             var thumbUrl = UgcProxyPaths.GetPath(BlobUploadContainers.Photos, item.ThumbnailBlobPath);
             <tr>

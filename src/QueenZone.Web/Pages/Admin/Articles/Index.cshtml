@@ -1,0 +1,39 @@
+@page "/admin/articles"
+@model IndexModel
+@using QueenZone.Data
+
+<h1>Article submissions</h1>
+<p><a href="/admin">Admin home</a></p>
+
+@if (Model.Submissions.Count == 0)
+{
+  <p>No articles pending review.</p>
+}
+else
+{
+  <table class="admin-table">
+    <thead>
+      <tr>
+        <th>Title</th>
+        <th>Author</th>
+        <th>Words</th>
+        <th>Submitted</th>
+        <th>Status</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      @foreach (var item in Model.Submissions)
+      {
+        <tr>
+          <td><a href="/admin/articles/@item.Id">@item.Title</a></td>
+          <td>@item.AuthorDisplayName</td>
+          <td>~@item.WordCountEstimate</td>
+          <td>@(item.SubmittedAt?.ToString("yyyy-MM-dd HH:mm") ?? "—")</td>
+          <td>@item.Status</td>
+          <td><a href="/admin/articles/@item.Id">Review</a></td>
+        </tr>
+      }
+    </tbody>
+  </table>
+}

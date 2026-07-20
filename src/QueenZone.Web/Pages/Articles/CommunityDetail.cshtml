@@ -1,0 +1,28 @@
+@page "/articles/{slug}"
+@model CommunityDetailModel
+@using QueenZone.Data
+
+@if (Model.Item is not null)
+{
+  <section class="qz-article-hero">
+    <div class="qz-container qz-article-hero__content qz-breadcrumbs-on-dark">
+      <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
+      <div class="qz-eyebrow" style="color: var(--qz-gold);">Community article</div>
+      <h1>@Model.Item.Title</h1>
+      <div class="qz-meta" style="color: rgba(255,255,255,0.52);">
+        @if (!string.IsNullOrWhiteSpace(Model.Item.AuthorDisplayName))
+        {
+          <span>By @Model.Item.AuthorDisplayName · </span>
+        }
+        <time datetime="@Model.Item.PublishedAt.ToString("yyyy-MM-dd")">@Model.Item.PublishedAt.ToString("dd MMMM yyyy")</time>
+      </div>
+    </div>
+  </section>
+  <div class="qz-reading">
+    @if (!string.IsNullOrWhiteSpace(Model.Item.Excerpt))
+    {
+      <p class="lede">@Model.Item.Excerpt</p>
+    }
+    <article class="article-body">@Html.Raw(Model.FormattedBody)</article>
+  </div>
+}

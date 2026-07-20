@@ -5,18 +5,14 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using QueenZone.Data;
 
-namespace QueenZone.Web.Pages.Account;
+namespace QueenZone.Web.Pages.Submit;
 
 [Authorize(Policy = MemberAuthenticationSchemes.MemberPolicy, AuthenticationSchemes = MemberAuthenticationSchemes.MembersCookie)]
-public sealed class MySubmissionsModel(
-    IPhotoSubmissionRepository photoSubmissionRepository,
-    IArticleSubmissionRepository articleSubmissionRepository) : PageModel
+public sealed class ArticleConfirmationModel(IArticleSubmissionRepository articleSubmissionRepository) : PageModel
 {
-    public IReadOnlyList<PhotoSubmission> PhotoSubmissions { get; private set; } = [];
+    public ArticleSubmission? Submission { get; private set; }
 
-    public IReadOnlyList<ArticleSubmission> ArticleSubmissions { get; private set; } = [];
-
-    public async Task<IActionResult> OnGetAsync(CancellationToken cancellationToken)
+    public async Task<IActionResult> OnGetAsync(Guid id, CancellationToken cancellationToken)
     {
         var memberId = await GetCurrentMemberIdAsync();
         if (memberId is null)
@@ -24,9 +20,14 @@ public sealed class MySubmissionsModel(
             return Redirect("/account/login");
         }
 
-        PhotoSubmissions = await photoSubmissionRepository.GetBySubmitterAsync(memberId.Value, cancellationToken);
-        ArticleSubmissions = await articleSubmissionRepository.GetDraftsForMemberAsync(memberId.Value, cancellationToken);
-        ViewData["Title"] = "My submissions";
+        var submission = await articleSubmissionRepository.GetByIdAsync(id, cancellationToken);
+        if (submission is null || submission.AuthorMemberId != memberId.Value)
+        {
+            return NotFound();
+        }
+
+        Submission = submission;
+        ViewData["Title"] = "Article submitted";
         return Page();
     }
 

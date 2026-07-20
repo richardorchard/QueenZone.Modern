@@ -1,0 +1,93 @@
+@page "/submit/article"
+@model ArticleModel
+@using QueenZone.Storage
+
+<partial name="_PageHero" model='@(("Community", "Write an article", "Share a retrospective, concert review, or deep dive for the QueenZone community.", ""))' />
+
+<section class="qz-section">
+  <div class="qz-container qz-prose">
+    <p>
+      Submissions are reviewed by editors before they appear on the public articles section.
+      <a href="/account/my-submissions">View your submissions</a>
+    </p>
+
+    @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+    {
+      <p class="qz-account-notice @(Model.StatusMessageKind == "error" ? "qz-account-notice--error" : "qz-account-notice--success")" role="status">
+        @Model.StatusMessage
+      </p>
+    }
+
+    <div asp-validation-summary="ModelOnly" class="qz-account-notice qz-account-notice--error"></div>
+
+    <form method="post" id="article-form" class="qz-account-form">
+      @Html.AntiForgeryToken()
+      <input type="hidden" asp-for="DraftId" />
+
+      <label class="qz-account-form__field">
+        <span>Title</span>
+        <input asp-for="Title" maxlength="300" required />
+        <span asp-validation-for="Title" class="qz-account-form__field-error"></span>
+      </label>
+
+      <label class="qz-account-form__field">
+        <span>Excerpt <span class="qz-account-form__optional">(optional)</span></span>
+        <textarea asp-for="Excerpt" rows="3" maxlength="500" placeholder="A short summary shown in listings and link previews"></textarea>
+        <span asp-validation-for="Excerpt" class="qz-account-form__field-error"></span>
+      </label>
+
+      @{
+        ViewData["TextareaId"] = "Body";
+        ViewData["TextareaName"] = "Body";
+        ViewData["EditorValue"] = Model.Body ?? string.Empty;
+        ViewData["UploadContainer"] = BlobUploadContainers.Articles;
+        ViewData["EditorLabel"] = "Article body";
+        ViewData["TextareaRows"] = 20;
+      }
+      <partial name="_RichTextEditor" />
+      <span asp-validation-for="Body" class="qz-account-form__field-error"></span>
+
+      <label class="qz-account-form__field">
+        <span>Tags <span class="qz-account-form__optional">(optional)</span></span>
+        <input asp-for="Tags" maxlength="500" placeholder="e.g. Concert review, Freddie Mercury, 1985" />
+        <span class="qz-account-form__help">Comma-separated, up to 5 tags.</span>
+        <span asp-validation-for="Tags" class="qz-account-form__field-error"></span>
+      </label>
+
+      <div class="qz-account-form__actions">
+        <button type="submit" name="action" value="save" class="qz-button qz-button--secondary">Save draft</button>
+        <button type="submit" name="action" value="submit" class="qz-button">Submit for review</button>
+      </div>
+    </form>
+  </div>
+</section>
+
+<script>
+  (function () {
+    var form = document.getElementById('article-form');
+    if (!form) return;
+    var autosaveTimer;
+    var lastSaved = null;
+    function autosave() {
+      var data = new FormData(form);
+      data.set('action', 'autosave');
+      fetch('/submit/article/autosave', {
+        method: 'POST',
+        headers: { 'RequestVerificationToken': data.get('__RequestVerificationToken') },
+        body: data,
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (j) {
+          if (j && j.draftId) {
+            var inp = form.querySelector('[name="DraftId"]');
+            if (inp && !inp.value) inp.value = j.draftId;
+          }
+        })
+        .catch(function () { /* silent */ });
+    }
+    form.addEventListener('input', function () {
+      clearTimeout(autosaveTimer);
+      autosaveTimer = setTimeout(autosave, 60000);
+    });
+  }());
+</script>
