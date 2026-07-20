@@ -26,4 +26,6 @@ public static partial class ArticlesRoutes
 
     public static string GetArticleDetailPath(ArticleItem item) =>
         GetArticleDetailPath(item.Id, item.Title);
+
+    public static string GetCommunityArticleDetailPath(string slug) => $"/articles/{slug}";
 }

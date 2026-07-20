@@ -5,7 +5,8 @@ namespace QueenZone.Web.Pages.Articles;
 
 public sealed class IndexModel(
     IArticlesRepository articlesRepository,
-    PublicQueryCacheService publicQueryCache) : ArticlesArchivePageModel(articlesRepository, publicQueryCache)
+    IArticleSubmissionRepository articleSubmissionRepository,
+    PublicQueryCacheService publicQueryCache) : ArticlesArchivePageModel(articlesRepository, articleSubmissionRepository, publicQueryCache)
 {
     public async Task<IActionResult> OnGetAsync(CancellationToken cancellationToken) =>
         await LoadArchivePageAsync(1, cancellationToken);

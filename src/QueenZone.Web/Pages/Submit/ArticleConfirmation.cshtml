@@ -1,0 +1,35 @@
+@page "/submit/article/confirmation/{id:guid}"
+@model ArticleConfirmationModel
+
+<partial name="_PageHero" model='@(("Community", "Article submitted", "Your article is now under review.", ""))' />
+
+<section class="qz-section">
+  <div class="qz-container qz-prose">
+    @if (Model.Submission is not null)
+    {
+      <h2>@Model.Submission.Title</h2>
+      <p>
+        Your article has been submitted for editorial review. The editorial team will review it
+        and let you know the outcome via the <a href="/account/my-submissions">my submissions</a> page.
+      </p>
+      <p>
+        <strong>Status:</strong> @Model.Submission.Status
+      </p>
+      @if (Model.Submission.SubmittedAt.HasValue)
+      {
+        <p>
+          <strong>Submitted:</strong> @Model.Submission.SubmittedAt.Value.ToString("dd MMMM yyyy HH:mm") UTC
+        </p>
+      }
+      <p>
+        <a href="/account/my-submissions">View all my submissions</a>
+        ·
+        <a href="/submit/article">Write another article</a>
+      </p>
+    }
+    else
+    {
+      <p>Submission not found. <a href="/submit/article">Write a new article</a></p>
+    }
+  </div>
+</section>

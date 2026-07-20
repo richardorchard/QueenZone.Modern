@@ -50,6 +50,8 @@ public sealed class QueenZoneDbContext : DbContext
 
     public DbSet<PhotoSubmissionAuditLogEntity> PhotoSubmissionAuditLogs => Set<PhotoSubmissionAuditLogEntity>();
 
+    public DbSet<ArticleSubmissionEntity> ArticleSubmissions => Set<ArticleSubmissionEntity>();
+
     public DbSet<NewsSuggestionEntity> NewsSuggestions => Set<NewsSuggestionEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -469,6 +471,39 @@ public sealed class QueenZoneDbContext : DbContext
             entity.HasOne(submission => submission.Submitter)
                 .WithMany()
                 .HasForeignKey(submission => submission.SubmitterMemberId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ArticleSubmissionEntity>(entity =>
+        {
+            entity.ToTable("ArticleSubmissions");
+            entity.HasKey(a => a.Id);
+
+            entity.Property(a => a.Title).HasMaxLength(300).IsRequired();
+            entity.Property(a => a.Slug).HasMaxLength(300).IsRequired();
+            entity.Property(a => a.Excerpt).HasMaxLength(500);
+            entity.Property(a => a.Body).IsRequired();
+            entity.Property(a => a.CoverImageBlobPath).HasMaxLength(512);
+            entity.Property(a => a.Tags).HasMaxLength(500);
+            entity.Property(a => a.Status).HasMaxLength(50).IsRequired();
+            entity.Property(a => a.ReviewerEmail).HasMaxLength(256);
+            entity.Property(a => a.ReviewNotes).HasMaxLength(1000);
+            entity.Property(a => a.RejectionReason).HasMaxLength(1000);
+
+            entity.HasIndex(a => a.Slug)
+                .HasDatabaseName("IX_ArticleSubmissions_Slug");
+
+            entity.HasIndex(a => new { a.Status, a.SubmittedAt })
+                .IsDescending(false, true)
+                .HasDatabaseName("IX_ArticleSubmissions_Status_SubmittedAt");
+
+            entity.HasIndex(a => new { a.AuthorMemberId, a.SubmittedAt })
+                .IsDescending(false, true)
+                .HasDatabaseName("IX_ArticleSubmissions_Author_SubmittedAt");
+
+            entity.HasOne(a => a.Author)
+                .WithMany()
+                .HasForeignKey(a => a.AuthorMemberId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 

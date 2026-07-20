@@ -136,6 +136,7 @@ app.MapEditorImageUploadEndpoints();
 app.MapMemberAvatarEndpoints();
 app.MapUgcProxyEndpoints();
 app.MapSitemapEndpoints();
+app.MapArticleAutosaveEndpoint();
 app.MapRazorPages();
 app.MapFallbackToPage("/NotFound");
 

@@ -1,0 +1,32 @@
+namespace QueenZone.Data;
+
+public interface IArticleSubmissionRepository
+{
+    /// <summary>Creates or updates a draft. Returns the saved submission.</summary>
+    Task<ArticleSubmission> UpsertDraftAsync(ArticleSubmissionDraft draft, CancellationToken ct = default);
+
+    /// <summary>
+    /// Transitions Draft → Submitted atomically. Returns null when not found or already submitted.
+    /// Throws <see cref="InvalidOperationException"/> when the body is too short.
+    /// </summary>
+    Task<ArticleSubmission?> SubmitForReviewAsync(Guid id, Guid authorMemberId, CancellationToken ct = default);
+
+    Task<IReadOnlyList<ArticleSubmission>> GetDraftsForMemberAsync(Guid memberId, CancellationToken ct = default);
+
+    Task<IReadOnlyList<ArticleSubmissionListItem>> GetPendingAsync(int page, int pageSize, CancellationToken ct = default);
+
+    Task<ArticleSubmission?> GetByIdAsync(Guid id, CancellationToken ct = default);
+
+    Task<ArticleSubmission?> UpdateStatusAsync(
+        Guid id,
+        string status,
+        string? reviewerEmail,
+        string? notes,
+        string? rejectionReason,
+        string? slug = null,
+        string? excerpt = null,
+        string? tags = null,
+        CancellationToken ct = default);
+
+    Task<IReadOnlyList<PublishedArticleSubmission>> GetPublishedAsync(CancellationToken ct = default);
+}

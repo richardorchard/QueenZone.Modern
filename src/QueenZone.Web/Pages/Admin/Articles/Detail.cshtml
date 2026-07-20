@@ -1,0 +1,122 @@
+@page "/admin/articles/{id:guid}"
+@model DetailModel
+@using QueenZone.Data
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+
+@{
+  var submission = Model.Submission;
+  var token = Antiforgery.GetAndStoreTokens(ViewContext.HttpContext).RequestToken;
+  var canAct = submission is not null && ArticleSubmissionStatus.CanBeActedOnByAdmin(submission.Status);
+}
+
+<h1>Review article submission</h1>
+<p><a href="/admin/articles">Back to queue</a></p>
+
+@if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+{
+  <p class="qz-account-notice @(Model.StatusMessageKind == "error" ? "qz-account-notice--error" : "qz-account-notice--success")" role="status">
+    @Model.StatusMessage
+  </p>
+}
+
+@if (submission is not null)
+{
+  <dl>
+    <dt>Title</dt>
+    <dd>@submission.Title</dd>
+    <dt>Author</dt>
+    <dd>@(submission.AuthorDisplayName ?? "Unknown") @(string.IsNullOrWhiteSpace(submission.AuthorEmail) ? "" : $"({submission.AuthorEmail})")</dd>
+    <dt>Status</dt>
+    <dd>@submission.Status</dd>
+    <dt>Submitted</dt>
+    <dd>@(submission.SubmittedAt?.ToString("u") ?? "—")</dd>
+    <dt>Slug</dt>
+    <dd>@submission.Slug</dd>
+    <dt>Excerpt</dt>
+    <dd>@(submission.Excerpt ?? "—")</dd>
+    <dt>Tags</dt>
+    <dd>@(submission.Tags ?? "—")</dd>
+    @if (!string.IsNullOrWhiteSpace(submission.ReviewNotes))
+    {
+      <dt>Reviewer notes</dt>
+      <dd>@submission.ReviewNotes</dd>
+    }
+    @if (!string.IsNullOrWhiteSpace(submission.RejectionReason))
+    {
+      <dt>Rejection reason</dt>
+      <dd>@submission.RejectionReason</dd>
+    }
+  </dl>
+
+  <h2>Article preview</h2>
+  <div class="qz-reading" style="max-height: 600px; overflow-y: auto; border: 1px solid var(--qz-border); padding: 1rem; margin-bottom: 2rem;">
+    <article class="article-body">@Html.Raw(Model.FormattedBody)</article>
+  </div>
+
+  @if (canAct)
+  {
+    <h2>Actions</h2>
+
+    <form method="post" action="/admin/articles/@submission.Id/action" style="display:contents;">
+      <input type="hidden" name="__RequestVerificationToken" value="@token" />
+
+      <fieldset style="margin-bottom: 1.5rem; border: 1px solid var(--qz-border); padding: 1rem;">
+        <legend>Approve &amp; publish</legend>
+        <label class="qz-account-form__field">
+          <span>Final slug</span>
+          <input type="text" name="Slug" value="@submission.Slug" maxlength="300" required />
+        </label>
+        <label class="qz-account-form__field">
+          <span>Excerpt (optional)</span>
+          <textarea name="Excerpt" rows="3" maxlength="500">@submission.Excerpt</textarea>
+        </label>
+        <label class="qz-account-form__field">
+          <span>Tags (optional)</span>
+          <input type="text" name="Tags" value="@submission.Tags" maxlength="500" />
+        </label>
+        <label class="qz-account-form__field">
+          <span>Reviewer notes (optional)</span>
+          <textarea name="ReviewNotes" rows="2" maxlength="1000"></textarea>
+        </label>
+        <div style="display:flex; gap: 0.5rem; flex-wrap: wrap;">
+          @if (submission.Status == ArticleSubmissionStatus.Submitted || submission.Status == ArticleSubmissionStatus.UnderReview)
+          {
+            <button type="submit" name="submitAction" value="approve" class="qz-button qz-button--secondary">Approve for publishing</button>
+          }
+          @if (submission.Status == ArticleSubmissionStatus.ApprovedForPublishing)
+          {
+            <button type="submit" name="submitAction" value="publish" class="qz-button">Publish now</button>
+          }
+        </div>
+      </fieldset>
+
+      <fieldset style="margin-bottom: 1.5rem; border: 1px solid var(--qz-border); padding: 1rem;">
+        <legend>Request revision / Reject</legend>
+        <label class="qz-account-form__field">
+          <span>Reason (required for rejection; optional for revision)</span>
+          <textarea name="RejectionReason" rows="3" maxlength="1000"></textarea>
+        </label>
+        <label class="qz-account-form__field">
+          <span>Reviewer notes (optional)</span>
+          <textarea name="ReviewNotes" rows="2" maxlength="1000"></textarea>
+        </label>
+        <div style="display:flex; gap: 0.5rem; flex-wrap: wrap;">
+          <button type="submit" name="submitAction" value="revise" class="qz-button qz-button--secondary">Request revision</button>
+          <button type="submit" name="submitAction" value="reject" class="qz-button" style="background: var(--qz-error, #c0392b);">Reject</button>
+        </div>
+      </fieldset>
+
+      @if (submission.Status == ArticleSubmissionStatus.Submitted)
+      {
+        <fieldset style="border: 1px solid var(--qz-border); padding: 1rem;">
+          <legend>Mark under review</legend>
+          <button type="submit" name="submitAction" value="underreview" class="qz-button qz-button--secondary">Mark under review</button>
+        </fieldset>
+      }
+    </form>
+  }
+}
+else
+{
+  <p>Submission not found.</p>
+}
