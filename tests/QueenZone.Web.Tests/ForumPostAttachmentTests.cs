@@ -99,10 +99,10 @@ public sealed class ForumPostAttachmentTests
     }
 
     [Fact]
-    public void BuildLegacyCdnUrl_UsesPicturesWorkerHost()
+    public void BuildLegacyCdnUrl_UsesCdn2WorkerHost()
     {
         Assert.Equal(
-            "https://pictures.queenzone.org/attachments/scan.jpg",
+            "https://cdn2.queenzone.org/attachments/scan.jpg",
             ForumAttachmentPaths.BuildLegacyCdnUrl("scan.jpg"));
     }
 }

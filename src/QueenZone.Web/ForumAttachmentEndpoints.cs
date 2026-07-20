@@ -8,7 +8,7 @@ namespace QueenZone.Web;
 /// <summary>
 /// Member-gated forum attachment downloads.
 /// Modern attachments stream from private UGC storage; legacy import files redirect
-/// through the pictures.queenzone.org Worker (Content-Disposition capable).
+/// through the cdn2.queenzone.org Worker (Content-Disposition capable).
 /// </summary>
 public static class ForumAttachmentEndpoints
 {

@@ -6,7 +6,7 @@ namespace QueenZone.Data;
 /// </summary>
 public static class ForumAttachmentPaths
 {
-    public const string LegacyAttachmentsCdnBaseUrl = "https://pictures.queenzone.org/attachments";
+    public const string LegacyAttachmentsCdnBaseUrl = "https://cdn2.queenzone.org/attachments";
 
     public static string LegacyDownloadPath(int legacyPostId) =>
         $"/forum/attachment/legacy/{legacyPostId}";

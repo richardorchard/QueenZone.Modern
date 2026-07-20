@@ -7,12 +7,12 @@ public sealed class SongFileUrlTests
     [Fact]
     public void Build_PrependsSongfilesContainerBaseUrl() =>
         Assert.Equal(
-            "https://pictures.queenzone.org/songfiles/2014417798057369.mp3",
+            "https://cdn2.queenzone.org/songfiles/2014417798057369.mp3",
             SongFileUrl.Build("2014417798057369.mp3"));
 
     [Fact]
     public void Build_TrimsLeadingSlash() =>
         Assert.Equal(
-            "https://pictures.queenzone.org/songfiles/2014417798057369.mp3",
+            "https://cdn2.queenzone.org/songfiles/2014417798057369.mp3",
             SongFileUrl.Build("/2014417798057369.mp3"));
 }

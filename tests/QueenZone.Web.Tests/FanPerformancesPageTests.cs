@@ -84,7 +84,7 @@ public sealed class FanPerformancesPageTests : IClassFixture<WebApplicationFacto
 
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
         Assert.Equal(
-            "https://pictures.queenzone.org/songfiles/2014417798057369.mp3",
+            "https://cdn2.queenzone.org/songfiles/2014417798057369.mp3",
             response.Headers.Location!.OriginalString);
     }
 
