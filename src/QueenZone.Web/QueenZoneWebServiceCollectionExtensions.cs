@@ -50,6 +50,9 @@ public static class QueenZoneWebServiceCollectionExtensions
         services.AddOptions<ForumAttachmentOptions>()
             .Bind(configuration.GetSection(ForumAttachmentOptions.SectionName));
 
+        services.AddOptions<NewsSuggestionOptions>()
+            .Bind(configuration.GetSection(NewsSuggestionOptions.SectionName));
+
         return services;
     }
 
@@ -127,6 +130,7 @@ public static class QueenZoneWebServiceCollectionExtensions
     {
         services.AddScoped<MemberAccountService>();
         services.AddScoped<PhotoSubmissionService>();
+        services.AddScoped<NewsSuggestionService>();
         services.AddScoped<UgcHtml>();
         services.AddScoped<ForumPostRateLimiter>();
         services.AddScoped<ForumAttachmentValidator>();

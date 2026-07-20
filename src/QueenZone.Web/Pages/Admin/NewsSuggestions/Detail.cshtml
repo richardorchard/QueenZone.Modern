@@ -1,0 +1,114 @@
+@page "/admin/news-suggestions/{id:guid}"
+@model DetailModel
+@using QueenZone.Data
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+
+@{
+  var suggestion = Model.Suggestion!;
+  var token = Antiforgery.GetAndStoreTokens(ViewContext.HttpContext).RequestToken;
+  var canAct = suggestion.Status is NewsSuggestionStatus.Pending or NewsSuggestionStatus.UnderReview;
+}
+
+<h1>Review news suggestion</h1>
+<p><a href="/admin/news-suggestions">Back to queue</a></p>
+
+@if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+{
+  <p class="qz-account-notice @(Model.StatusMessageKind == "error" ? "qz-account-notice--error" : "qz-account-notice--success")" role="status">
+    @Model.StatusMessage
+  </p>
+}
+
+<dl>
+  <dt>URL</dt>
+  <dd><a href="@suggestion.Url" rel="noopener noreferrer" target="_blank">@suggestion.Url</a></dd>
+  <dt>Suggested title</dt>
+  <dd>@(suggestion.Title ?? "—")</dd>
+  <dt>Submitter</dt>
+  <dd>@(suggestion.SubmitterDisplayName ?? "Unknown") @(string.IsNullOrWhiteSpace(suggestion.SubmitterEmail) ? "" : $"({suggestion.SubmitterEmail})")</dd>
+  <dt>Status</dt>
+  <dd>@suggestion.Status</dd>
+  <dt>Submitted</dt>
+  <dd>@suggestion.SubmittedAt.ToString("u")</dd>
+  <dt>Member notes</dt>
+  <dd>@(string.IsNullOrWhiteSpace(suggestion.Notes) ? "—" : suggestion.Notes)</dd>
+  <dt>Review notes</dt>
+  <dd>@(suggestion.ReviewNotes ?? "—")</dd>
+  @if (suggestion.PromotedNewsId is int newsId)
+  {
+    <dt>Promoted article</dt>
+    <dd><a href="/admin/news/@newsId/edit">Draft #@newsId</a></dd>
+  }
+  @if (suggestion.DuplicateCandidateId is int candidateId)
+  {
+    <dt>Duplicate candidate</dt>
+    <dd><a href="/admin/news-discovery/@candidateId">Candidate #@candidateId</a></dd>
+  }
+</dl>
+
+@if (Model.MatchingCandidate is not null && canAct)
+{
+  <p class="admin-muted">
+    The AI discovery pipeline already has
+    <a href="/admin/news-discovery/@Model.MatchingCandidate.Id">candidate #@Model.MatchingCandidate.Id</a>
+    for this URL.
+  </p>
+}
+
+@if (canAct)
+{
+  <section>
+    <h2>Promote to draft</h2>
+    <form method="post" action="/admin/news-suggestions/@suggestion.Id/promote" class="admin-inline-form">
+      <input type="hidden" name="@AdminNewsSuggestionsPageModel.AntiforgeryTokenFieldName" value="@token" />
+      <label>
+        Internal review notes
+        <input name="reviewNotes" maxlength="500" />
+      </label>
+      <button type="submit">Promote to admin news draft</button>
+    </form>
+  </section>
+
+  <section>
+    <h2>Reject</h2>
+    <form method="post" action="/admin/news-suggestions/@suggestion.Id/reject" class="admin-inline-form" onsubmit="return confirm('Reject this suggestion?');">
+      <input type="hidden" name="@AdminNewsSuggestionsPageModel.AntiforgeryTokenFieldName" value="@token" />
+      <label>
+        Internal review notes
+        <input name="reviewNotes" maxlength="500" />
+      </label>
+      <button type="submit">Reject</button>
+    </form>
+  </section>
+
+  <section>
+    <h2>Mark as duplicate</h2>
+    <form method="post" action="/admin/news-suggestions/@suggestion.Id/markduplicate" class="admin-inline-form" onsubmit="return confirm('Mark as duplicate of an AI candidate?');">
+      <input type="hidden" name="@AdminNewsSuggestionsPageModel.AntiforgeryTokenFieldName" value="@token" />
+      <label>
+        Discovery candidate ID
+        <input name="duplicateCandidateId" type="number" min="1" value="@(Model.MatchingCandidate?.Id)" required />
+      </label>
+      <label>
+        Internal review notes
+        <input name="reviewNotes" maxlength="500" />
+      </label>
+      <button type="submit">Mark duplicate</button>
+    </form>
+  </section>
+
+  @if (suggestion.Status == NewsSuggestionStatus.Pending)
+  {
+    <section>
+      <h2>Start review</h2>
+      <form method="post" action="/admin/news-suggestions/@suggestion.Id/underreview" class="admin-inline-form">
+        <input type="hidden" name="@AdminNewsSuggestionsPageModel.AntiforgeryTokenFieldName" value="@token" />
+        <label>
+          Internal review notes
+          <input name="reviewNotes" maxlength="500" />
+        </label>
+        <button type="submit">Mark under review</button>
+      </form>
+    </section>
+  }
+}
