@@ -16,6 +16,7 @@ public static class FanPerformanceEndpoints
                 ? Results.NotFound()
                 : Results.Redirect(performance.AudioUrl);
         })
-        .RequireAuthorization(MemberAuthenticationSchemes.MemberPolicy);
+        .RequireAuthorization(MemberAuthenticationSchemes.MemberPolicy)
+        .RequireRateLimiting(FanPerformanceRateLimitingOptions.AudioPolicy);
     }
 }
