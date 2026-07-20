@@ -195,12 +195,19 @@ When MCP auth fails, fall back to Azure CLI commands above.
 
 ### Forum production smoke checks
 
-After a forum deploy, verify:
+Post-deploy smoke (`.github/workflows/deploy-app-service.yml`) already hits these public URLs. After a forum deploy, you can also verify manually:
 
 - `GET https://www.queenzone.org/forum` → 200
 - `GET https://www.queenzone.org/forum/1/queen-serious-discussion` → 200
+- `GET https://www.queenzone.org/forum/topic/455095/forum-guidelines` → 200
 
 In the log stream, `SqlException: Execution Timeout` in `LegacyForumRepository` usually means a full-table `COUNT(*)` on `Q_FORUM_TOPIC_T` or other heavy ad-hoc SQL. The modern read path should use denormalised `Q_FORUM_T.Q_FORUM_POST_COUNT`, `dbUser.Q_FORUM_TOPIC_THREAD_COUNT_V`, and `Q_FORUM_VIEW_PAGE_SP` instead. See `docs/legacy/table-map.md`.
+
+### Modern forum read path configuration
+
+`ForumData:UseModernForumReads` defaults to `true` in code and in published `appsettings.json`. **Absent App Service setting = modern default** — production does not need `ForumData__UseModernForumReads=true` unless you want an explicit override for ops visibility. Set `ForumData__UseModernForumReads=false` in App Service configuration only for an emergency rollback to `LegacyForumRepository`.
+
+Registration coverage: `tests/QueenZone.Web.Tests/ForumDataRegistrationTests.cs` asserts the modern repository is registered by default and that the legacy repository can be selected for rollback.
 
 ### Modern forum import status
 
@@ -217,7 +224,7 @@ The corrected live run first hit Azure SQL error `40544` at 570,000 imported pos
 
 After the database max size was increased to 5 GB, the corrected import completed successfully: 18 categories, 89,070 threads, and 1,164,816 posts. Reconciliation reported 0 legacy rows unmapped to a source thread. Attachment fields are present in the modern tables: 4,754 thread rows with starter attachments and 11,690 post rows with attachments. After import, the data file was about 2.5 GB allocated of 5 GB max.
 
-The public site can read forum pages through `ModernForumRepository` when `ForumData:UseModernForumReads` is enabled. This is the default for SQL-backed runtime configuration after PR #86. Set `ForumData__UseModernForumReads=false` in App Service configuration for an emergency rollback to `LegacyForumRepository`.
+The public site reads forum pages through `ModernForumRepository` by default (see **Modern forum read path configuration** above).
 
 ## Quick Links
 

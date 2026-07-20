@@ -189,6 +189,9 @@ jobs:
           check "/"
           check "/news"
           check "/forum"
+          # Representative modern-forum category/topic pages (guards accidental LegacyForumRepository fallback).
+          check "/forum/1/queen-serious-discussion"
+          check "/forum/topic/455095/forum-guidelines"
           check "/articles"
           check "/biography"
           check "/photography"
