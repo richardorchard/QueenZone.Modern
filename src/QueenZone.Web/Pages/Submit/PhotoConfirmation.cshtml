@@ -1,0 +1,54 @@
+@page "/submit/photo/confirmation/{id:guid}"
+@model PhotoConfirmationModel
+@using QueenZone.Storage
+
+@{
+  var submission = Model.Submission!;
+  var thumbUrl = UgcProxyPaths.GetPath(BlobUploadContainers.Photos, submission.ThumbnailBlobPath);
+}
+
+<partial name="_PageHero" model='@(("Community", "Photo submitted", "Your photo is under review.", ""))' />
+
+<section class="qz-section">
+  <div class="qz-container qz-prose">
+    <p class="qz-account-notice qz-account-notice--success" role="status">Your photo is under review.</p>
+
+    <div class="qz-account-settings">
+      <img src="@thumbUrl" alt="" width="200" height="200" style="object-fit: cover;" />
+      <dl class="qz-account-settings__meta">
+        <div>
+          <dt>Title</dt>
+          <dd>@submission.Title</dd>
+        </div>
+        @if (!string.IsNullOrWhiteSpace(submission.Description))
+        {
+          <div>
+            <dt>Description</dt>
+            <dd>@submission.Description</dd>
+          </div>
+        }
+        @if (!string.IsNullOrWhiteSpace(submission.SuggestedCategory))
+        {
+          <div>
+            <dt>Suggested category</dt>
+            <dd>@submission.SuggestedCategory</dd>
+          </div>
+        }
+        <div>
+          <dt>Status</dt>
+          <dd>@submission.Status</dd>
+        </div>
+        <div>
+          <dt>Submitted</dt>
+          <dd>@submission.SubmittedAt.ToString("u")</dd>
+        </div>
+      </dl>
+    </div>
+
+    <p>
+      <a href="/account/my-submissions">View your submissions</a>
+      ·
+      <a href="/submit/photo">Submit another photo</a>
+    </p>
+  </div>
+</section>

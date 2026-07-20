@@ -1,0 +1,128 @@
+@page "/admin/photo-submissions/{id:guid}"
+@model DetailModel
+@using QueenZone.Data
+@using QueenZone.Storage
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+
+@{
+  var submission = Model.Submission!;
+  var previewUrl = UgcProxyPaths.GetPath(BlobUploadContainers.Photos, submission.WebOptimizedBlobPath);
+  var token = Antiforgery.GetAndStoreTokens(ViewContext.HttpContext).RequestToken;
+  var canAct = submission.Status is PhotoSubmissionStatus.Pending
+      or PhotoSubmissionStatus.UnderReview
+      or PhotoSubmissionStatus.NeedsInfo;
+}
+
+<h1>Review photo submission</h1>
+<p><a href="/admin/photo-submissions">Back to queue</a></p>
+
+@if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+{
+  <p class="qz-account-notice @(Model.StatusMessageKind == "error" ? "qz-account-notice--error" : "qz-account-notice--success")" role="status">
+    @Model.StatusMessage
+  </p>
+}
+
+<div class="admin-review-layout" style="display:grid; gap:1.5rem; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);">
+  <div>
+    <img src="@previewUrl" alt="@submission.Title" style="max-width:100%; height:auto;" />
+  </div>
+  <div>
+    <dl>
+      <dt>Title</dt>
+      <dd>@submission.Title</dd>
+      <dt>Submitter</dt>
+      <dd>@(submission.SubmitterDisplayName ?? "Unknown") @(string.IsNullOrWhiteSpace(submission.SubmitterEmail) ? "" : $"({submission.SubmitterEmail})")</dd>
+      <dt>Status</dt>
+      <dd>@submission.Status</dd>
+      <dt>Submitted</dt>
+      <dd>@submission.SubmittedAt.ToString("u")</dd>
+      <dt>Suggested category</dt>
+      <dd>@(submission.SuggestedCategory ?? "—")</dd>
+      <dt>Approved category</dt>
+      <dd>@(submission.ApprovedCategory ?? "—")</dd>
+      <dt>Approximate year</dt>
+      <dd>@(submission.ApproximateYear?.ToString() ?? "—")</dd>
+      <dt>Approximate date</dt>
+      <dd>@(submission.ApproximateDate?.ToString("yyyy-MM-dd") ?? "—")</dd>
+      <dt>Original file</dt>
+      <dd>@submission.OriginalFileName (@submission.FileSizeBytes bytes)</dd>
+      <dt>Dimensions</dt>
+      <dd>@(submission.ImageWidthPx is int w && submission.ImageHeightPx is int h ? $"{w} × {h}" : "—")</dd>
+      <dt>Description</dt>
+      <dd>@(submission.Description ?? "—")</dd>
+      <dt>Review notes</dt>
+      <dd>@(submission.ReviewNotes ?? "—")</dd>
+      <dt>Rejection reason</dt>
+      <dd>@(submission.RejectionReason ?? "—")</dd>
+    </dl>
+
+    @if (canAct)
+    {
+      <section>
+        <h2>Approve</h2>
+        <form method="post" action="/admin/photo-submissions/@submission.Id/approve" class="admin-inline-form">
+          <input type="hidden" name="@AdminPhotoSubmissionsPageModel.AntiforgeryTokenFieldName" value="@token" />
+          <label>
+            Gallery category
+            <input name="approvedCategory" list="approve-categories" value="@(submission.SuggestedCategory ?? "")" required maxlength="100" />
+            <datalist id="approve-categories">
+              @foreach (var category in Model.Categories)
+              {
+                <option value="@category.Name"></option>
+              }
+            </datalist>
+          </label>
+          <label>
+            Internal review notes
+            <input name="reviewNotes" maxlength="500" />
+          </label>
+          <button type="submit">Approve</button>
+        </form>
+      </section>
+
+      <section>
+        <h2>Reject</h2>
+        <form method="post" action="/admin/photo-submissions/@submission.Id/reject" class="admin-inline-form" onsubmit="return confirm('Reject this submission?');">
+          <input type="hidden" name="@AdminPhotoSubmissionsPageModel.AntiforgeryTokenFieldName" value="@token" />
+          <label>
+            Rejection reason (shown to submitter)
+            <input name="rejectionReason" required maxlength="500" />
+          </label>
+          <label>
+            Internal review notes
+            <input name="reviewNotes" maxlength="500" />
+          </label>
+          <button type="submit">Reject</button>
+        </form>
+      </section>
+
+      <section>
+        <h2>Request changes</h2>
+        <form method="post" action="/admin/photo-submissions/@submission.Id/needsinfo" class="admin-inline-form">
+          <input type="hidden" name="@AdminPhotoSubmissionsPageModel.AntiforgeryTokenFieldName" value="@token" />
+          <label>
+            Note for submitter / review notes
+            <input name="reviewNotes" required maxlength="500" />
+          </label>
+          <button type="submit">Mark needs info</button>
+        </form>
+      </section>
+
+      @if (submission.Status == PhotoSubmissionStatus.Pending)
+      {
+        <section>
+          <h2>Start review</h2>
+          <form method="post" action="/admin/photo-submissions/@submission.Id/underreview" class="admin-inline-form">
+            <input type="hidden" name="@AdminPhotoSubmissionsPageModel.AntiforgeryTokenFieldName" value="@token" />
+            <label>
+              Internal review notes
+              <input name="reviewNotes" maxlength="500" />
+            </label>
+            <button type="submit">Mark under review</button>
+          </form>
+        </section>
+      }
+    }
+  </div>
+</div>

@@ -46,6 +46,10 @@ public sealed class QueenZoneDbContext : DbContext
 
     public DbSet<QueenHistoryEventEntity> QueenHistoryEvents => Set<QueenHistoryEventEntity>();
 
+    public DbSet<PhotoSubmissionEntity> PhotoSubmissions => Set<PhotoSubmissionEntity>();
+
+    public DbSet<PhotoSubmissionAuditLogEntity> PhotoSubmissionAuditLogs => Set<PhotoSubmissionAuditLogEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<NewsTableRow>(entity =>
@@ -429,6 +433,60 @@ public sealed class QueenZoneDbContext : DbContext
             entity.HasIndex(historyEvent => new { historyEvent.SourceType, historyEvent.SourceKey })
                 .IsUnique()
                 .HasDatabaseName("IX_QueenHistoryEvents_Source");
+        });
+
+        modelBuilder.Entity<PhotoSubmissionEntity>(entity =>
+        {
+            entity.ToTable("PhotoSubmissions");
+            entity.HasKey(submission => submission.Id);
+
+            entity.Property(submission => submission.Title).HasMaxLength(200).IsRequired();
+            entity.Property(submission => submission.Description).HasMaxLength(1000);
+            entity.Property(submission => submission.SuggestedCategory).HasMaxLength(100);
+            entity.Property(submission => submission.ApprovedCategory).HasMaxLength(100);
+            entity.Property(submission => submission.BlobPath).HasMaxLength(512).IsRequired();
+            entity.Property(submission => submission.WebOptimizedBlobPath).HasMaxLength(512).IsRequired();
+            entity.Property(submission => submission.ThumbnailBlobPath).HasMaxLength(512).IsRequired();
+            entity.Property(submission => submission.OriginalFileName).HasMaxLength(255).IsRequired();
+            entity.Property(submission => submission.MimeType).HasMaxLength(100).IsRequired();
+            entity.Property(submission => submission.Status).HasMaxLength(50).IsRequired();
+            entity.Property(submission => submission.SubmittedAt).IsRequired();
+            entity.Property(submission => submission.ReviewerEmail).HasMaxLength(256);
+            entity.Property(submission => submission.ReviewNotes).HasMaxLength(500);
+            entity.Property(submission => submission.RejectionReason).HasMaxLength(500);
+
+            entity.HasIndex(submission => new { submission.Status, submission.SubmittedAt })
+                .IsDescending(false, true)
+                .HasDatabaseName("IX_PhotoSubmissions_Status_SubmittedAt");
+
+            entity.HasIndex(submission => new { submission.SubmitterMemberId, submission.SubmittedAt })
+                .IsDescending(false, true)
+                .HasDatabaseName("IX_PhotoSubmissions_Submitter_SubmittedAt");
+
+            entity.HasOne(submission => submission.Submitter)
+                .WithMany()
+                .HasForeignKey(submission => submission.SubmitterMemberId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<PhotoSubmissionAuditLogEntity>(entity =>
+        {
+            entity.ToTable("PhotoSubmissionAuditLog");
+            entity.HasKey(log => log.Id);
+
+            entity.Property(log => log.Action).HasMaxLength(50).IsRequired();
+            entity.Property(log => log.ActorEmail).HasMaxLength(256).IsRequired();
+            entity.Property(log => log.OccurredAt).IsRequired();
+            entity.Property(log => log.Details).HasMaxLength(2000);
+
+            entity.HasIndex(log => new { log.PhotoSubmissionId, log.OccurredAt })
+                .IsDescending(false, true)
+                .HasDatabaseName("IX_PhotoSubmissionAuditLog_Submission_OccurredAt");
+
+            entity.HasOne(log => log.Submission)
+                .WithMany(submission => submission.AuditLogs)
+                .HasForeignKey(log => log.PhotoSubmissionId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }
