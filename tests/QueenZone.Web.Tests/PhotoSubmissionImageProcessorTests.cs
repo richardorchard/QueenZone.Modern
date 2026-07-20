@@ -33,6 +33,25 @@ public sealed class PhotoSubmissionImageProcessorTests
     }
 
     [Fact]
+    public async Task ProcessAsync_rejects_empty_stream_and_extension_mismatch()
+    {
+        await using var empty = new MemoryStream();
+        var emptyEx = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            PhotoSubmissionImageProcessor.ProcessAsync(empty, "empty.png"));
+        Assert.Contains("required", emptyEx.Message);
+
+        await using var png = await CreatePngAsync(40, 40);
+        var mismatch = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            PhotoSubmissionImageProcessor.ProcessAsync(png, "photo.jpg"));
+        Assert.Contains("extension", mismatch.Message);
+
+        png.Position = 0;
+        var nonImageExt = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            PhotoSubmissionImageProcessor.ProcessAsync(png, "photo.pdf"));
+        Assert.Contains("extension", nonImageExt.Message);
+    }
+
+    [Fact]
     public async Task ProcessAsync_produces_web_and_square_thumb()
     {
         await using var source = await CreatePngAsync(2400, 1200);

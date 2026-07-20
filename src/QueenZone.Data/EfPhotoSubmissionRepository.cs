@@ -56,17 +56,13 @@ public sealed class EfPhotoSubmissionRepository(QueenZoneDbContext dbContext) : 
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 100);
 
-        var query = dbContext.PhotoSubmissions
+        // Materialize first so ordering works on SQLite (no DateTimeOffset ORDER BY) and SQL Server.
+        var rows = await dbContext.PhotoSubmissions
             .AsNoTracking()
             .Where(row =>
                 row.Status == PhotoSubmissionStatus.Pending
                 || row.Status == PhotoSubmissionStatus.UnderReview
                 || row.Status == PhotoSubmissionStatus.NeedsInfo)
-            .OrderByDescending(row => row.SubmittedAt);
-
-        var rows = await query
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
             .Select(row => new
             {
                 row.Id,
@@ -81,6 +77,9 @@ public sealed class EfPhotoSubmissionRepository(QueenZoneDbContext dbContext) : 
             .ToListAsync(cancellationToken);
 
         return rows
+            .OrderByDescending(row => row.SubmittedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Select(row => new PhotoSubmissionListItem(
                 row.Id,
                 row.Title,
@@ -110,10 +109,12 @@ public sealed class EfPhotoSubmissionRepository(QueenZoneDbContext dbContext) : 
         var rows = await dbContext.PhotoSubmissions
             .AsNoTracking()
             .Where(row => row.SubmitterMemberId == submitterMemberId)
-            .OrderByDescending(row => row.SubmittedAt)
             .ToListAsync(cancellationToken);
 
-        return rows.Select(Map).ToList();
+        return rows
+            .OrderByDescending(row => row.SubmittedAt)
+            .Select(Map)
+            .ToList();
     }
 
     public async Task<PhotoSubmission?> UpdateStatusAsync(

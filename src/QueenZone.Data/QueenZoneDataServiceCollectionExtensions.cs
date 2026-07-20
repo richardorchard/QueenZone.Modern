@@ -80,7 +80,12 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddSingleton<INewsDiscoveryRepository, InMemoryNewsDiscoveryRepository>();
         services.AddSingleton<SharedNewsAgentLeaseStore>();
         services.AddSingleton<INewsAgentRunLeaseService, InMemoryNewsAgentRunLeaseService>();
-        services.AddSingleton<IPhotoSubmissionRepository, InMemoryPhotoSubmissionRepository>();
+        services.AddSingleton<IPhotoSubmissionRepository>(sp =>
+        {
+            var members = sp.GetRequiredService<IMemberAccountRepository>();
+            return new InMemoryPhotoSubmissionRepository(id =>
+                members.FindByIdAsync(id).GetAwaiter().GetResult());
+        });
 
         return services;
     }
