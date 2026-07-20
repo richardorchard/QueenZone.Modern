@@ -1,0 +1,41 @@
+@page "/submit/news"
+@model NewsModel
+
+<partial name="_PageHero" model='@(("Community", "Suggest news", "Spot a Queen-related story the editors should know about? Send us the link.", ""))' />
+
+<section class="qz-section">
+  <div class="qz-container qz-prose">
+    <p>
+      Suggestions are reviewed by editors before any article is drafted.
+      Please share a direct link to the original news story.
+    </p>
+
+    <div asp-validation-summary="All" class="qz-account-notice qz-account-notice--error"></div>
+
+    <form method="post" class="qz-account-form">
+      @Html.AntiForgeryToken()
+
+      <label class="qz-account-form__field">
+        <span>News story URL</span>
+        <input asp-for="StoryUrl" type="url" inputmode="url" maxlength="2000" placeholder="https://example.com/story" required />
+        <span asp-validation-for="StoryUrl" class="qz-account-form__field-error"></span>
+        <span class="qz-account-form__help">Must be a secure https:// link to the original article.</span>
+      </label>
+
+      <label class="qz-account-form__field">
+        <span>Suggested headline <span class="qz-account-form__optional">(optional)</span></span>
+        <input asp-for="Title" maxlength="300" />
+        <span asp-validation-for="Title" class="qz-account-form__field-error"></span>
+      </label>
+
+      <label class="qz-account-form__field">
+        <span>Notes for the editor <span class="qz-account-form__optional">(optional)</span></span>
+        <textarea asp-for="Notes" rows="5" maxlength="1000"></textarea>
+        <span asp-validation-for="Notes" class="qz-account-form__field-error"></span>
+        <span class="qz-account-form__help">Plain text only — explain why you think this is newsworthy.</span>
+      </label>
+
+      <button type="submit" class="qz-button">Submit suggestion</button>
+    </form>
+  </div>
+</section>
