@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using QueenZone.Data.Entities;
 
 namespace QueenZone.Data;
@@ -212,6 +212,7 @@ public sealed class EfArticleSubmissionRepository(QueenZoneDbContext dbContext) 
                 a.Slug,
                 a.Excerpt,
                 a.Body,
+                a.CoverImageBlobPath,
                 a.Tags,
                 a.PublishedAt,
                 DisplayName = a.Author != null ? a.Author.DisplayName : string.Empty,
@@ -226,9 +227,11 @@ public sealed class EfArticleSubmissionRepository(QueenZoneDbContext dbContext) 
                 a.Slug,
                 a.Excerpt,
                 a.Body,
+                a.CoverImageBlobPath,
                 a.Tags,
                 a.PublishedAt!.Value,
-                string.IsNullOrWhiteSpace(a.DisplayName) ? null : a.DisplayName))
+                string.IsNullOrWhiteSpace(a.DisplayName) ? null : a.DisplayName,
+                EstimateWordCount(a.Body)))
             .ToList();
     }
 
@@ -246,7 +249,7 @@ public sealed class EfArticleSubmissionRepository(QueenZoneDbContext dbContext) 
         return collapsed.Length;
     }
 
-    private static int EstimateWordCount(string? body) =>
+    internal static int EstimateWordCount(string? body) =>
         string.IsNullOrWhiteSpace(body)
             ? 0
             : System.Text.RegularExpressions.Regex.Replace(body, "<[^>]+>", " ")

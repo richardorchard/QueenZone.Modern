@@ -1,4 +1,4 @@
-@using Microsoft.AspNetCore.Authentication
+﻿@using Microsoft.AspNetCore.Authentication
 @using System.Security.Claims
 @{
   var path = Context.Request.Path.Value ?? "/";
@@ -7,7 +7,7 @@
 
   // Authenticates against the member cookie explicitly rather than relying on the ambient
   // User/HttpContext.User, since the site's default authentication scheme is the Admin one.
-  // This is just an in-process cookie validation — no DB or network call — so it's cheap to
+  // This is just an in-process cookie validation â€” no DB or network call â€” so it's cheap to
   // do on every request even though _SiteHeader renders on every page.
   var memberAuthResult = await Context.AuthenticateAsync(MemberAuthenticationSchemes.MembersCookie);
   var memberDisplayName = memberAuthResult.Succeeded
@@ -21,7 +21,7 @@
   }
   // Look up avatar presence once per request so the header can show the image without
   // baking blob URLs into the cookie. Fail soft (initials fallback) if the DB is mid-migration
-  // or unavailable — never break sign-in or page render for avatar lookup alone.
+  // or unavailable â€” never break sign-in or page render for avatar lookup alone.
   var memberHasAvatar = false;
   if (memberId is Guid mid)
   {
@@ -64,7 +64,7 @@
       Items = new[]
       {
         new { Title = "News", Href = "/news", Description = "4,000+ articles from the original archive", Tag = "" },
-        new { Title = "Stories", Href = "/articles", Description = "Long-form features and editorial", Tag = "" },
+        new { Title = "Articles", Href = "/articles", Description = "Community articles and long-form features from the archive", Tag = "New" },
         new { Title = "Photography", Href = "/photography", Description = "Tens of thousands of restored images", Tag = "" }
       }
     },
@@ -214,3 +214,4 @@
     </div>
   </div>
 </header>
+

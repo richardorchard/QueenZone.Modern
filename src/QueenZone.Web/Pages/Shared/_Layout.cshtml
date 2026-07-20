@@ -1,4 +1,4 @@
-@using Microsoft.Extensions.Options
+﻿@using Microsoft.Extensions.Options
 @using QueenZone.Web.Sitemap
 @inject IOptions<SiteOptions> SiteOptionsAccessor
 <!doctype html>
@@ -36,6 +36,7 @@
   <link rel="stylesheet" href="/design-system/tokens/spacing.css" asp-append-version="true">
   <link rel="stylesheet" href="/design-system/tokens/base.css" asp-append-version="true">
   <link rel="stylesheet" href="/css/site.css" asp-append-version="true">
+@await RenderSectionAsync("Head", required: false)
 </head>
 <body>
   <partial name="_SiteHeader" />
@@ -48,3 +49,5 @@
   @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>
+
+

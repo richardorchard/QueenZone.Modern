@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authentication;
+﻿using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.StaticFiles;
@@ -39,7 +39,7 @@ var app = builder.Build();
 // Azure App Service (and any CDN/proxy in front of it, e.g. Cloudflare) terminates TLS and
 // forwards plain HTTP internally. Without this, Request.Scheme/Host reflect the internal
 // hop, so OAuth providers (Google/Microsoft/Facebook) get built redirect_uri values like
-// http://<internal-host> instead of https://queenzone.org — which then fail to match the
+// http://<internal-host> instead of https://queenzone.org â€” which then fail to match the
 // redirect URI registered with each provider. KnownIPNetworks/KnownProxies are cleared because
 // the edge proxy IP isn't a fixed, known address; the app already trusts App Service/Cloudflare
 // as its only ingress.
@@ -67,7 +67,7 @@ if (!app.Environment.IsDevelopment())
 // explicitly with exclusion filtering turned off before the catch-all static handler.
 // WebRootPath can be null if no physical wwwroot folder is found relative to whatever
 // the process's working directory happens to be at startup (e.g. a misconfigured launch
-// script) — guard rather than crash the whole app over an optional route.
+// script) â€” guard rather than crash the whole app over an optional route.
 var wellKnownPath = string.IsNullOrEmpty(app.Environment.WebRootPath)
     ? null
     : Path.Combine(app.Environment.WebRootPath, ".well-known");
@@ -137,9 +137,11 @@ app.MapMemberAvatarEndpoints();
 app.MapUgcProxyEndpoints();
 app.MapSitemapEndpoints();
 app.MapArticleAutosaveEndpoint();
+app.MapArticlesFeedEndpoint();
 app.MapRazorPages();
 app.MapFallbackToPage("/NotFound");
 
 app.Run();
 
 public partial class Program;
+

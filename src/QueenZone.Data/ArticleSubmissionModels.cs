@@ -1,4 +1,4 @@
-namespace QueenZone.Data;
+﻿namespace QueenZone.Data;
 
 /// <summary>Input model for creating or updating a draft.</summary>
 public sealed record ArticleSubmissionDraft(
@@ -46,6 +46,11 @@ public sealed record PublishedArticleSubmission(
     string Slug,
     string? Excerpt,
     string Body,
+    string? CoverImageBlobPath,
     string? Tags,
     DateTimeOffset PublishedAt,
-    string? AuthorDisplayName);
+    string? AuthorDisplayName,
+    int WordCount)
+{
+    public int ReadTimeMinutes => Math.Max(1, WordCount / 200);
+}
