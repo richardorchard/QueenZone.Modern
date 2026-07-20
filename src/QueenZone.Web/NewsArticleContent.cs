@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using AngleSharp.Dom;
 using Ganss.Xss;
 using QueenZone.Data;
+using QueenZone.Storage;
 
 namespace QueenZone.Web;
 
@@ -76,18 +77,57 @@ public static partial class NewsArticleContent
         return sb.ToString();
     }
 
+    internal static bool IsAllowedNewsImageSrc(string? src)
+    {
+        if (string.IsNullOrWhiteSpace(src))
+        {
+            return false;
+        }
+
+        var trimmed = src.Trim();
+
+        if (trimmed.StartsWith("/ugc/", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (!Uri.TryCreate(trimmed, UriKind.Absolute, out var uri)
+            || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+        {
+            return false;
+        }
+
+        if (uri.Host.EndsWith(".blob.core.windows.net", StringComparison.OrdinalIgnoreCase))
+        {
+            var path = uri.AbsolutePath;
+            foreach (var container in BlobUploadContainers.All)
+            {
+                if (path.Contains("/" + container + "/", StringComparison.OrdinalIgnoreCase)
+                    || path.StartsWith("/" + container + "/", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     private static HtmlSanitizer CreateSanitizer()
     {
         var sanitizer = new HtmlSanitizer();
 
         sanitizer.AllowedTags.Clear();
-        foreach (var tag in new[] { "p", "br", "div", "span", "strong", "b", "em", "i", "u", "ul", "ol", "li", "a", "h2", "h3", "h4", "blockquote" })
+        foreach (var tag in new[] { "p", "br", "div", "span", "strong", "b", "em", "i", "u", "ul", "ol", "li", "a", "h2", "h3", "h4", "blockquote", "img" })
         {
             sanitizer.AllowedTags.Add(tag);
         }
 
         sanitizer.AllowedAttributes.Clear();
         sanitizer.AllowedAttributes.Add("href");
+        sanitizer.AllowedAttributes.Add("src");
+        sanitizer.AllowedAttributes.Add("alt");
+        sanitizer.AllowedAttributes.Add("loading");
 
         sanitizer.AllowedSchemes.Clear();
         sanitizer.AllowedSchemes.Add(Uri.UriSchemeHttp);
@@ -95,12 +135,25 @@ public static partial class NewsArticleContent
 
         sanitizer.PostProcessNode += (_, args) =>
         {
-            if (args.Node is IElement element
-                && string.Equals(element.TagName, "A", StringComparison.OrdinalIgnoreCase)
+            if (args.Node is not IElement element)
+            {
+                return;
+            }
+
+            if (string.Equals(element.TagName, "A", StringComparison.OrdinalIgnoreCase)
                 && element.HasAttribute("href"))
             {
                 element.SetAttribute("rel", "noopener noreferrer");
                 element.SetAttribute("target", "_blank");
+            }
+
+            if (string.Equals(element.TagName, "IMG", StringComparison.OrdinalIgnoreCase))
+            {
+                var src = element.GetAttribute("src");
+                if (!IsAllowedNewsImageSrc(src))
+                {
+                    element.Remove();
+                }
             }
         };
 

@@ -1,4 +1,5 @@
 @model QueenZone.Web.Pages.Admin.News.ArticleFormViewModel
+@using QueenZone.Storage
 @inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
 @{
   var antiforgeryToken = (ViewData["AntiforgeryToken"] as string)
@@ -42,10 +43,14 @@
     Excerpt
     <input type="text" name="excerpt" value="@Model.Draft.Excerpt" maxlength="@NewsValidation.MaxExcerptLength" required>
   </label>
-  <label>
-    Body
-    <textarea name="body" rows="16">@Model.Draft.Body</textarea>
-  </label>
+  @{
+    ViewData["TextareaId"] = "body";
+    ViewData["TextareaName"] = "body";
+    ViewData["EditorValue"] = Model.Draft.Body;
+    ViewData["UploadContainer"] = BlobUploadContainers.News;
+    ViewData["EditorLabel"] = "Body";
+  }
+  <partial name="_RichTextEditor" />
   <label>
     Publication date
     <input type="date" name="publishedAt" value="@Model.Draft.PublishedAt.ToString("yyyy-MM-dd")" required>

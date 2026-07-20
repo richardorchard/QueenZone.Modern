@@ -21,19 +21,35 @@ public sealed class NewsValidationTests
     }
 
     [Fact]
-    public void ValidateDraftRejectsHtmlBodyAndUnsafeSourceUrl()
+    public void ValidateDraftAcceptsHtmlBody()
     {
         var draft = new AdminNewsDraft(
             "Title",
             null,
             "Excerpt",
-            "<p>Not plain text</p>",
+            "<p>Rich <strong>text</strong> body</p>",
+            new DateTime(2026, 6, 10, 0, 0, 0, DateTimeKind.Utc),
+            null);
+
+        var errors = NewsValidation.ValidateDraft(draft, slugInUse: false);
+
+        Assert.Empty(errors);
+    }
+
+    [Fact]
+    public void ValidateDraftRejectsUnsafeSourceUrl()
+    {
+        var draft = new AdminNewsDraft(
+            "Title",
+            null,
+            "Excerpt",
+            "<p>Body with HTML</p>",
             new DateTime(2026, 6, 10, 0, 0, 0, DateTimeKind.Utc),
             "javascript:alert(1)");
 
         var errors = NewsValidation.ValidateDraft(draft, slugInUse: false);
 
-        Assert.Contains("Article body must be plain text.", errors);
+        Assert.DoesNotContain("Article body must be plain text.", errors);
         Assert.Contains("Source URL must be a safe http or https link.", errors);
     }
 
