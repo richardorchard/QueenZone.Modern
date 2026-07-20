@@ -163,6 +163,80 @@ public sealed class EfArticleSubmissionRepositoryTests : IAsyncDisposable
         Assert.Equal(2, all.Count);
     }
 
+    [Fact]
+    public async Task GetByIdAsync_ReturnsSubmissionWithAuthor()
+    {
+        var saved = await repository.UpsertDraftAsync(Draft(null, "Lookup article", "Body text."));
+
+        var loaded = await repository.GetByIdAsync(saved.Id);
+
+        Assert.NotNull(loaded);
+        Assert.Equal("Test Author", loaded!.AuthorDisplayName);
+        Assert.Equal("article-author@example.com", loaded.AuthorEmail);
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_ReturnsNull_WhenMissing()
+    {
+        Assert.Null(await repository.GetByIdAsync(Guid.NewGuid()));
+    }
+
+    [Fact]
+    public async Task UpsertDraftAsync_ThrowsWhenStatusIsNotEditable()
+    {
+        var body = new string('a', EfArticleSubmissionRepository.MinBodyVisibleChars);
+        var draft = await repository.UpsertDraftAsync(Draft(null, "Locked article", body));
+        await repository.SubmitForReviewAsync(draft.Id, memberId);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => repository.UpsertDraftAsync(Draft(draft.Id, "Changed", body)));
+    }
+
+    [Fact]
+    public async Task UpdateStatusAsync_UpdatesSlugExcerptTagsAndRejectionReason()
+    {
+        var body = new string('a', EfArticleSubmissionRepository.MinBodyVisibleChars);
+        var draft = await repository.UpsertDraftAsync(Draft(null, "Metadata article", body));
+        await repository.SubmitForReviewAsync(draft.Id, memberId);
+
+        var updated = await repository.UpdateStatusAsync(
+            draft.Id,
+            ArticleSubmissionStatus.Rejected,
+            "editor@test.local",
+            "Not suitable",
+            "Off topic",
+            slug: "custom-slug",
+            excerpt: "Short summary",
+            tags: "Queen");
+
+        Assert.NotNull(updated);
+        Assert.Equal(ArticleSubmissionStatus.Rejected, updated!.Status);
+        Assert.Equal("custom-slug", updated.Slug);
+        Assert.Equal("Short summary", updated.Excerpt);
+        Assert.Equal("Queen", updated.Tags);
+        Assert.Equal("Off topic", updated.RejectionReason);
+    }
+
+    [Fact]
+    public async Task SubmitForReviewAsync_AllowsResubmitAfterRevisionRequested()
+    {
+        var body = new string('a', EfArticleSubmissionRepository.MinBodyVisibleChars);
+        var draft = await repository.UpsertDraftAsync(Draft(null, "Revise me", body));
+        await repository.SubmitForReviewAsync(draft.Id, memberId);
+        await repository.UpdateStatusAsync(
+            draft.Id,
+            ArticleSubmissionStatus.RequiresRevision,
+            "editor@test.local",
+            "Fix intro",
+            "Too short");
+
+        var revised = await repository.UpsertDraftAsync(Draft(draft.Id, "Revised article", body + " extra"));
+        var resubmitted = await repository.SubmitForReviewAsync(revised.Id, memberId);
+
+        Assert.NotNull(resubmitted);
+        Assert.Equal(ArticleSubmissionStatus.Submitted, resubmitted!.Status);
+    }
+
     public async ValueTask DisposeAsync()
     {
         await dbContext.DisposeAsync();
