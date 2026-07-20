@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using QueenZone.Data;
 
@@ -11,9 +12,11 @@ using QueenZone.Data;
 namespace QueenZone.Data.Migrations
 {
     [DbContext(typeof(QueenZoneDbContext))]
-    partial class QueenZoneDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260720064141_AddNewsSuggestions")]
+    partial class AddNewsSuggestions
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -195,9 +198,6 @@ namespace QueenZone.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
-
-                    b.Property<DateTime?>("LastLoginAt")
-                        .HasColumnType("datetime2");
 
                     b.Property<string>("Email")
                         .IsRequired()
@@ -1274,80 +1274,6 @@ namespace QueenZone.Data.Migrations
                     b.ToTable("QueenHistoryEvents", (string)null);
                 });
 
-            modelBuilder.Entity("QueenZone.Data.Entities.ArticleSubmissionEntity", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("AuthorMemberId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(300)
-                        .HasColumnType("nvarchar(300)");
-
-                    b.Property<string>("Slug")
-                        .IsRequired()
-                        .HasMaxLength(300)
-                        .HasColumnType("nvarchar(300)");
-
-                    b.Property<string>("Excerpt")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<string>("Body")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("CoverImageBlobPath")
-                        .HasMaxLength(512)
-                        .HasColumnType("nvarchar(512)");
-
-                    b.Property<string>("Tags")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<DateTimeOffset?>("SubmittedAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<DateTimeOffset?>("PublishedAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<string>("ReviewerEmail")
-                        .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)");
-
-                    b.Property<string>("ReviewNotes")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.Property<string>("RejectionReason")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Slug")
-                        .HasDatabaseName("IX_ArticleSubmissions_Slug");
-
-                    b.HasIndex("Status", "SubmittedAt")
-                        .IsDescending(false, true)
-                        .HasDatabaseName("IX_ArticleSubmissions_Status_SubmittedAt");
-
-                    b.HasIndex("AuthorMemberId", "SubmittedAt")
-                        .IsDescending(false, true)
-                        .HasDatabaseName("IX_ArticleSubmissions_Author_SubmittedAt");
-
-                    b.ToTable("ArticleSubmissions", (string)null);
-                });
-
             modelBuilder.Entity("QueenZone.Data.Entities.ForumPollEntity", b =>
                 {
                     b.HasOne("QueenZone.Data.Entities.ModernForumThreadEntity", "Thread")
@@ -1487,17 +1413,6 @@ namespace QueenZone.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Candidate");
-                });
-
-            modelBuilder.Entity("QueenZone.Data.Entities.ArticleSubmissionEntity", b =>
-                {
-                    b.HasOne("QueenZone.Data.Entities.MemberAccount", "Author")
-                        .WithMany()
-                        .HasForeignKey("AuthorMemberId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Author");
                 });
 
             modelBuilder.Entity("QueenZone.Data.Entities.NewsSuggestionEntity", b =>

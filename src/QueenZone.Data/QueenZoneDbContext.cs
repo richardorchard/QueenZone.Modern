@@ -52,6 +52,8 @@ public sealed class QueenZoneDbContext : DbContext
 
     public DbSet<ArticleSubmissionEntity> ArticleSubmissions => Set<ArticleSubmissionEntity>();
 
+    public DbSet<NewsSuggestionEntity> NewsSuggestions => Set<NewsSuggestionEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<NewsTableRow>(entity =>
@@ -523,6 +525,44 @@ public sealed class QueenZoneDbContext : DbContext
                 .WithMany(submission => submission.AuditLogs)
                 .HasForeignKey(log => log.PhotoSubmissionId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<NewsSuggestionEntity>(entity =>
+        {
+            entity.ToTable("NewsSuggestions");
+            entity.HasKey(suggestion => suggestion.Id);
+
+            entity.Property(suggestion => suggestion.Url).HasMaxLength(2000).IsRequired();
+            entity.Property(suggestion => suggestion.UrlHash).HasMaxLength(64).IsRequired();
+            entity.Property(suggestion => suggestion.Title).HasMaxLength(300);
+            entity.Property(suggestion => suggestion.Notes).HasMaxLength(1000);
+            entity.Property(suggestion => suggestion.Status).HasMaxLength(50).IsRequired();
+            entity.Property(suggestion => suggestion.SubmittedAt).IsRequired();
+            entity.Property(suggestion => suggestion.ReviewerEmail).HasMaxLength(256);
+            entity.Property(suggestion => suggestion.ReviewNotes).HasMaxLength(500);
+
+            entity.HasIndex(suggestion => suggestion.UrlHash)
+                .IsUnique()
+                .HasFilter("[Status] IN ('Pending', 'UnderReview')")
+                .HasDatabaseName("IX_NewsSuggestions_UrlHash_Active");
+
+            entity.HasIndex(suggestion => new { suggestion.Status, suggestion.SubmittedAt })
+                .IsDescending(false, true)
+                .HasDatabaseName("IX_NewsSuggestions_Status_SubmittedAt");
+
+            entity.HasIndex(suggestion => new { suggestion.SubmitterMemberId, suggestion.SubmittedAt })
+                .IsDescending(false, true)
+                .HasDatabaseName("IX_NewsSuggestions_Submitter_SubmittedAt");
+
+            entity.HasOne(suggestion => suggestion.Submitter)
+                .WithMany()
+                .HasForeignKey(suggestion => suggestion.SubmitterMemberId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(suggestion => suggestion.DuplicateCandidate)
+                .WithMany()
+                .HasForeignKey(suggestion => suggestion.DuplicateCandidateId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
     }
 }

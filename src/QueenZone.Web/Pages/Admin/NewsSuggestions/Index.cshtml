@@ -1,0 +1,42 @@
+@page "/admin/news-suggestions"
+@model IndexModel
+
+<h1>Member news suggestions</h1>
+<p>
+  <a href="/admin/news">Back to admin news</a>
+  ·
+  <a href="/admin/news-discovery">AI discovery queue</a>
+</p>
+
+@if (Model.Suggestions.Count == 0)
+{
+  <p>No member suggestions awaiting review.</p>
+}
+else
+{
+  <table class="admin-table">
+    <thead>
+      <tr>
+        <th>URL</th>
+        <th>Suggested title</th>
+        <th>Submitter</th>
+        <th>Submitted</th>
+        <th>Status</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      @foreach (var item in Model.Suggestions)
+      {
+        <tr>
+          <td><a href="@item.Url" rel="noopener noreferrer" target="_blank">@item.Url</a></td>
+          <td>@(item.Title ?? "—")</td>
+          <td>@item.SubmitterDisplayName</td>
+          <td>@item.SubmittedAt.ToString("u")</td>
+          <td>@item.Status</td>
+          <td><a href="/admin/news-suggestions/@item.Id">Review</a></td>
+        </tr>
+      }
+    </tbody>
+  </table>
+}
