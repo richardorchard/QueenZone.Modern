@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc.Testing;
+﻿using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -38,6 +38,14 @@ internal sealed class AdminEfWebTestHarness : IAsyncDisposable
                 services.RemoveAll<INewsAgentRunLeaseService>();
                 services.RemoveAll<IMemberAccountRepository>();
                 services.RemoveAll<SharedNewsDiscoveryStore>();
+
+                // IArticleSubmissionRepository depends on IMemberAccountRepository (removed above).
+                // IArticleRepository depends on IArticleSubmissionRepository.
+                // Neither is used by admin news tests, so replace both with no-op stubs so that
+                // CoreSitemapBuilder (injected into ActionModel) can still be constructed.
+                services.RemoveAll<IArticleSubmissionRepository>();
+                services.RemoveAll<IArticleRepository>();
+                services.AddSingleton<IArticleRepository, EmptyArticleRepository>();
 
                 services.AddDbContext<QueenZoneDbContext>(options => options.UseSqlite(connection));
                 services.AddScoped<IAdminNewsRepository>(sp =>
