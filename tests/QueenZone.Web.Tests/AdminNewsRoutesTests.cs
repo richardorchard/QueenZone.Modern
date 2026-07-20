@@ -43,14 +43,15 @@ public sealed partial class AdminNewsRoutesTests : IClassFixture<WebApplicationF
     }
 
     [Fact]
-    public async Task AdminRootRedirectsToNewsAdmin()
+    public async Task AdminRootRendersDashboard()
     {
         var client = CreateClient(AdminEmail);
 
         var response = await client.GetAsync("/admin");
 
-        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
-        Assert.Equal("/admin/news", response.Headers.Location!.OriginalString);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("Dashboard", body);
     }
 
     [Fact]

@@ -104,6 +104,7 @@ public sealed class QueenZoneDbContext : DbContext
             entity.Property(account => account.AvatarUrl).HasMaxLength(512);
             entity.Property(account => account.PasswordHash).HasMaxLength(512);
             entity.Property(account => account.CreatedAt).IsRequired();
+            entity.Property(account => account.LastLoginAt);
 
             entity.HasIndex(account => account.NormalizedEmail)
                 .IsUnique()
