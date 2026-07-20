@@ -12,7 +12,16 @@ public static class ArticlesFeedEndpointExtensions
             IOptions<SiteOptions> siteOptions,
             CancellationToken cancellationToken) =>
         {
-            var articles = await articleRepository.GetSitemapEntriesAsync(cancellationToken);
+            IReadOnlyList<PublishedArticleSubmission> articles;
+            try
+            {
+                articles = await articleRepository.GetSitemapEntriesAsync(cancellationToken);
+            }
+            catch (Microsoft.Data.SqlClient.SqlException)
+            {
+                articles = [];
+            }
+
             var baseUrl = siteOptions.Value.PublicBaseUrl.TrimEnd('/');
             var xml = BuildRss(articles, baseUrl);
             return Results.Content(xml, "application/rss+xml; charset=utf-8");
