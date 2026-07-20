@@ -10,6 +10,8 @@ public static class BlobUploadContainers
 
     public const string Forum = "ugc-forum";
 
+    public const string News = "ugc-news";
+
     public const string Photos = "ugc-photos";
 
     public const string Articles = "ugc-articles";
@@ -18,6 +20,7 @@ public static class BlobUploadContainers
     [
         Avatars,
         Forum,
+        News,
         Photos,
         Articles,
     ];

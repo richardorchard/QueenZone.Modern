@@ -10,6 +10,7 @@ public sealed class EditPostModel(
     INewsAuditRepository auditRepository,
     PublicQueryCacheService publicQueryCache,
     CoreSitemapService coreSitemapService,
+    UgcHtml ugcHtml,
     ILogger<EditPostModel> logger) : AdminNewsPageModel
 {
     public ArticleFormViewModel? Form { get; private set; }
@@ -25,7 +26,8 @@ public sealed class EditPostModel(
             return NotFound();
         }
 
-        var draft = form.ToDraft();
+        var rawDraft = form.ToDraft();
+        var draft = rawDraft with { Body = ugcHtml.Sanitize(rawDraft.Body) };
         var slugInUse = await adminNewsRepository.IsSlugInUseAsync(
             NewsSlug.Resolve(draft.Title, draft.Slug),
             excludeNewsId: id,

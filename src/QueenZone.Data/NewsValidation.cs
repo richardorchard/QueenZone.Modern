@@ -1,8 +1,6 @@
-using System.Text.RegularExpressions;
-
 namespace QueenZone.Data;
 
-public static partial class NewsValidation
+public static class NewsValidation
 {
     public const int MaxTitleLength = 150;
 
@@ -53,11 +51,6 @@ public static partial class NewsValidation
             errors.Add("Slug is already in use by another article.");
         }
 
-        if (!string.IsNullOrEmpty(draft.Body) && LooksLikeHtml(draft.Body))
-        {
-            errors.Add("Article body must be plain text.");
-        }
-
         if (!string.IsNullOrWhiteSpace(draft.SourceUrl) && draft.SourceUrl.Length > MaxSourceUrlLength)
         {
             errors.Add($"Source URL must be {MaxSourceUrlLength} characters or fewer.");
@@ -82,8 +75,4 @@ public static partial class NewsValidation
             && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
     }
 
-    private static bool LooksLikeHtml(string value) => HtmlTagRegex().IsMatch(value);
-
-    [GeneratedRegex("<[^>]+>", RegexOptions.IgnoreCase)]
-    private static partial Regex HtmlTagRegex();
 }

@@ -5,7 +5,8 @@ namespace QueenZone.Web.Pages.Admin.News;
 
 public sealed class IndexModel(
     IAdminNewsRepository adminNewsRepository,
-    INewsAuditRepository auditRepository) : AdminNewsListPageModel(adminNewsRepository)
+    INewsAuditRepository auditRepository,
+    UgcHtml ugcHtml) : AdminNewsListPageModel(adminNewsRepository)
 {
     public ArticleFormViewModel? CreateForm { get; private set; }
 
@@ -14,7 +15,8 @@ public sealed class IndexModel(
 
     public async Task<IActionResult> OnPostAsync([FromForm] AdminNewsForm form, CancellationToken cancellationToken)
     {
-        var draft = form.ToDraft();
+        var rawDraft = form.ToDraft();
+        var draft = rawDraft with { Body = ugcHtml.Sanitize(rawDraft.Body) };
         var slugInUse = await AdminNewsRepository.IsSlugInUseAsync(
             NewsSlug.Resolve(draft.Title, draft.Slug),
             cancellationToken: cancellationToken);

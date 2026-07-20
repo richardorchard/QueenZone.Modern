@@ -108,4 +108,91 @@ public sealed class NewsArticleContentSanitizationTests
         Assert.DoesNotContain("<10", result, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("&amp;lt;", result, StringComparison.OrdinalIgnoreCase);
     }
+
+    [Fact]
+    public void FormatBody_PreservesAllowedFormattingTags()
+    {
+        var html = "<p><strong>bold</strong> and <em>italic</em></p>" +
+                   "<ul><li>item</li></ul>" +
+                   "<a href=\"https://example.com\">link</a>";
+
+        var result = NewsArticleContent.FormatBody(html);
+
+        Assert.Contains("<strong>bold</strong>", result);
+        Assert.Contains("<em>italic</em>", result);
+        Assert.Contains("<ul>", result);
+        Assert.Contains("<li>item</li>", result);
+        Assert.Contains("href=\"https://example.com\"", result);
+    }
+
+    [Fact]
+    public void FormatBody_PreservesUgcBlobImageAndStripsExternalImage()
+    {
+        var ugcSrc = "https://mystorage.blob.core.windows.net/ugc-news/photo.jpg";
+        var externalSrc = "https://evil.example.com/tracker.png";
+        var html = $"<p><img src=\"{ugcSrc}\" alt=\"queen\"> and <img src=\"{externalSrc}\" alt=\"bad\"></p>";
+
+        var result = NewsArticleContent.FormatBody(html);
+
+        Assert.Contains(ugcSrc, result);
+        Assert.DoesNotContain(externalSrc, result);
+    }
+
+    [Fact]
+    public void FormatBody_PreservesUgcProxyImagePath()
+    {
+        var proxySrc = "/ugc/news/abc123.jpg";
+        var html = $"<img src=\"{proxySrc}\" alt=\"queen\">";
+
+        var result = NewsArticleContent.FormatBody(html);
+
+        Assert.Contains(proxySrc, result);
+    }
+
+    [Fact]
+    public void FormatBody_StripsScriptOnclickAndIframeFromRichHtml()
+    {
+        var html = "<p onclick=\"alert(1)\">text</p>" +
+                   "<script>evil()</script>" +
+                   "<iframe src=\"https://evil.example.com\"></iframe>";
+
+        var result = NewsArticleContent.FormatBody(html);
+
+        Assert.DoesNotContain("onclick", result, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("<script", result, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("<iframe", result, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("text", result);
+    }
+
+    [Fact]
+    public void FormatBody_ReturnsPlainTextBodyUnchangedAsAutoLinked()
+    {
+        var plainText = "Queen released a new album.";
+
+        var result = NewsArticleContent.FormatBody(plainText);
+
+        Assert.Contains("Queen released a new album.", result);
+        Assert.DoesNotContain("<p>", result, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData("/ugc/news/img.jpg")]
+    [InlineData("/ugc/forum/img.jpg")]
+    [InlineData("https://storage.blob.core.windows.net/ugc-news/img.jpg")]
+    [InlineData("https://storage.blob.core.windows.net/ugc-forum/img.jpg")]
+    public void IsAllowedNewsImageSrc_AllowsUgcPaths(string src)
+    {
+        Assert.True(NewsArticleContent.IsAllowedNewsImageSrc(src));
+    }
+
+    [Theory]
+    [InlineData("https://evil.example.com/img.jpg")]
+    [InlineData("https://storage.blob.core.windows.net/public-photos/img.jpg")]
+    [InlineData("javascript:alert(1)")]
+    [InlineData("")]
+    [InlineData(null)]
+    public void IsAllowedNewsImageSrc_BlocksNonUgcPaths(string? src)
+    {
+        Assert.False(NewsArticleContent.IsAllowedNewsImageSrc(src));
+    }
 }

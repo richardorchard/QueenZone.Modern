@@ -115,7 +115,7 @@ public sealed partial class AdminNewsRoutesTests : IClassFixture<WebApplicationF
             {
                 ["title"] = "",
                 ["excerpt"] = "",
-                ["body"] = "<script>alert(1)</script>",
+                ["body"] = "<p>Rich text body is now allowed</p>",
                 ["publishedAt"] = "",
                 ["sourceUrl"] = "javascript:alert(1)"
             });
@@ -124,9 +124,45 @@ public sealed partial class AdminNewsRoutesTests : IClassFixture<WebApplicationF
         var body = await response.Content.ReadAsStringAsync();
         Assert.Contains("Title is required.", body);
         Assert.Contains("Excerpt is required.", body);
-        Assert.Contains("Article body must be plain text.", body);
+        Assert.DoesNotContain("Article body must be plain text.", body);
         Assert.Contains("Publication date is required.", body);
         Assert.Contains("Source URL must be a safe http or https link.", body);
+    }
+
+    [Fact]
+    public async Task HtmlBodyIsSavedAndRenderedAsHtml()
+    {
+        var store = new SharedNewsStore();
+        var client = CreateClient(AdminEmail, store);
+
+        var createResponse = await PostArticleAsync(
+            client,
+            "/admin/news/new",
+            "/admin/news",
+            new Dictionary<string, string>
+            {
+                ["title"] = "Rich text article",
+                ["excerpt"] = "Article with bold text.",
+                ["body"] = "<p><strong>bold content</strong></p>",
+                ["publishedAt"] = "2026-06-14"
+            });
+
+        Assert.Equal(HttpStatusCode.Redirect, createResponse.StatusCode);
+        Assert.DoesNotContain("Article body must be plain text.", createResponse.Headers.Location?.OriginalString ?? string.Empty);
+
+        var editPath = createResponse.Headers.Location!.OriginalString;
+        var articleId = int.Parse(editPath.Split('/')[3], System.Globalization.CultureInfo.InvariantCulture);
+
+        var editBody = await client.GetStringAsync($"/admin/news/{articleId}/edit");
+        Assert.DoesNotContain("Article body must be plain text.", editBody);
+
+        var publishResponse = await PostActionAsync(client, $"/admin/news/{articleId}/publish");
+        Assert.Equal(HttpStatusCode.Redirect, publishResponse.StatusCode);
+
+        var detailSlug = "rich-text-article";
+        var detailBody = await client.GetStringAsync($"/news/{articleId}/{detailSlug}");
+        Assert.Contains("<strong>bold content</strong>", detailBody);
+        Assert.DoesNotContain("&lt;strong&gt;", detailBody);
     }
 
     [Fact]
