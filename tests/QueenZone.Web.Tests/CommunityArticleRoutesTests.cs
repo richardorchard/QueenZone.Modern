@@ -305,13 +305,53 @@ public sealed class CommunityArticleRoutesTests : IClassFixture<WebApplicationFa
         Assert.DoesNotContain("Other Article", body);
     }
 
+    [Fact]
+    public async Task Get_Articles_WhenCommunityPageOutOfRange_Returns404()
+    {
+        var client = WithRepo([Published("only-one", "Only One", DateTimeOffset.UtcNow)]).CreateClient();
+
+        var response = await client.GetAsync("/articles?cp=99");
+
+        Assert.Equal(System.Net.HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Get_Articles_WhenCommunityRepoThrowsSqlException_StillReturnsArchive()
+    {
+        var client = WithArticleRepository(new SqlFailingArticleRepo()).CreateClient();
+
+        var response = await client.GetAsync("/articles");
+
+        Assert.Equal(System.Net.HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("Articles", body);
+        Assert.DoesNotContain("qz-community-articles-header", body);
+    }
+
+    [Fact]
+    public async Task Get_ArticlesFeed_WhenRepoThrowsSqlException_ReturnsEmptyRss()
+    {
+        var client = WithArticleRepository(new SqlFailingArticleRepo()).CreateClient();
+
+        var response = await client.GetAsync("/articles/feed.rss");
+
+        Assert.Equal(System.Net.HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("<rss", body);
+        Assert.Contains("<channel>", body);
+        Assert.DoesNotContain("<item>", body);
+    }
+
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
 
     private WebApplicationFactory<Program> WithRepo(IEnumerable<PublishedArticleSubmission> seed) =>
+        WithArticleRepository(new StubArticleRepo(seed));
+
+    private WebApplicationFactory<Program> WithArticleRepository(IArticleRepository repository) =>
         factory.WithWebHostBuilder(b => b.ConfigureServices(s =>
-            s.AddSingleton<IArticleRepository>(new StubArticleRepo(seed))));
+            s.AddSingleton<IArticleRepository>(repository)));
 
     private static PublishedArticleSubmission Published(
         string slug, string title, DateTimeOffset publishedAt,
@@ -327,6 +367,106 @@ public sealed class CommunityArticleRoutesTests : IClassFixture<WebApplicationFa
             publishedAt,
             "Test Author",
             100);
+
+    private sealed class SqlFailingArticleRepo : IArticleRepository
+    {
+        public Task<int> GetCountAsync(string? tag = null, CancellationToken ct = default) =>
+            throw SqlExceptionFactory.Create();
+
+        public Task<IReadOnlyList<PublishedArticleSubmission>> GetPageAsync(
+            int page, int pageSize, string? tag = null, CancellationToken ct = default) =>
+            throw SqlExceptionFactory.Create();
+
+        public Task<PublishedArticleSubmission?> GetBySlugAsync(string slug, CancellationToken ct = default) =>
+            throw SqlExceptionFactory.Create();
+
+        public Task<(PublishedArticleSubmission? Previous, PublishedArticleSubmission? Next)> GetAdjacentAsync(
+            DateTimeOffset publishedAt, CancellationToken ct = default) =>
+            throw SqlExceptionFactory.Create();
+
+        public Task<IReadOnlyList<PublishedArticleSubmission>> GetSitemapEntriesAsync(CancellationToken ct = default) =>
+            throw SqlExceptionFactory.Create();
+    }
+
+    private static class SqlExceptionFactory
+    {
+        public static Microsoft.Data.SqlClient.SqlException Create()
+        {
+            var sqlClient = typeof(Microsoft.Data.SqlClient.SqlException).Assembly;
+            var errorCollectionType = sqlClient.GetType("Microsoft.Data.SqlClient.SqlErrorCollection")
+                ?? throw new InvalidOperationException("SqlErrorCollection type not found.");
+            var errorType = sqlClient.GetType("Microsoft.Data.SqlClient.SqlError")
+                ?? throw new InvalidOperationException("SqlError type not found.");
+
+            var collection = Activator.CreateInstance(errorCollectionType, nonPublic: true)
+                ?? throw new InvalidOperationException("Unable to create SqlErrorCollection.");
+
+            var errorCtor = errorType.GetConstructors(System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
+                .OrderByDescending(c => c.GetParameters().Length)
+                .First();
+            var errorArgs = errorCtor.GetParameters().Select(p =>
+            {
+                if (p.ParameterType == typeof(int))
+                {
+                    return (object)208;
+                }
+
+                if (p.ParameterType == typeof(byte))
+                {
+                    return (byte)16;
+                }
+
+                if (p.ParameterType == typeof(string))
+                {
+                    return "Invalid object name 'ArticleSubmissions'.";
+                }
+
+                if (p.ParameterType == typeof(uint))
+                {
+                    return 0u;
+                }
+
+                if (typeof(Exception).IsAssignableFrom(p.ParameterType))
+                {
+                    return null!;
+                }
+
+                return p.ParameterType.IsValueType ? Activator.CreateInstance(p.ParameterType)! : null!;
+            }).ToArray();
+            var error = errorCtor.Invoke(errorArgs);
+
+            errorCollectionType
+                .GetMethod("Add", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
+                .Invoke(collection, [error]);
+
+            var createException = typeof(Microsoft.Data.SqlClient.SqlException)
+                .GetMethods(System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)
+                .Where(m => m.Name == "CreateException")
+                .OrderBy(m => m.GetParameters().Length)
+                .First();
+            var createArgs = createException.GetParameters().Select(p =>
+            {
+                if (p.ParameterType == errorCollectionType)
+                {
+                    return collection;
+                }
+
+                if (p.ParameterType == typeof(string))
+                {
+                    return "12.0.0";
+                }
+
+                if (p.ParameterType == typeof(Guid))
+                {
+                    return Guid.Empty;
+                }
+
+                return null!;
+            }).ToArray();
+
+            return (Microsoft.Data.SqlClient.SqlException)createException.Invoke(null, createArgs)!;
+        }
+    }
 
     // Stub IArticleSubmissionRepository — only GetPublishedAsync is used by InMemoryArticleRepository
     private sealed class StubSubmissionRepo(IEnumerable<PublishedArticleSubmission> published) : IArticleSubmissionRepository
