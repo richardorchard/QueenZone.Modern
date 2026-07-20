@@ -26,129 +26,71 @@ public sealed class EfArticleRepository(QueenZoneDbContext dbContext) : IArticle
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 100);
 
-        if (!string.IsNullOrWhiteSpace(tag))
-        {
-            var roughRows = await Published()
-                .OrderByDescending(a => a.PublishedAt)
-                .Where(a => a.Tags != null && a.Tags.Contains(tag))
-                .Select(a => new
-                {
-                    a.Id, a.Title, a.Slug, a.Excerpt, a.Body, a.CoverImageBlobPath,
-                    a.Tags, a.PublishedAt,
-                    DisplayName = a.Author != null ? a.Author.DisplayName : string.Empty,
-                })
-                .ToListAsync(ct);
+        var rows = await SelectProjection(Published()).ToListAsync(ct);
 
-            return roughRows
-                .Where(a => HasTag(a.Tags, tag))
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .Select(a => Map(a.Id, a.Title, a.Slug, a.Excerpt, a.Body, a.CoverImageBlobPath, a.Tags, a.PublishedAt!.Value, a.DisplayName))
-                .ToList();
-        }
+        var filtered = string.IsNullOrWhiteSpace(tag)
+            ? rows
+            : rows.Where(a => HasTag(a.Tags, tag)).ToList();
 
-        var rows = await Published()
+        return filtered
             .OrderByDescending(a => a.PublishedAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .Select(a => new
-            {
-                a.Id, a.Title, a.Slug, a.Excerpt, a.Body, a.CoverImageBlobPath,
-                a.Tags, a.PublishedAt,
-                DisplayName = a.Author != null ? a.Author.DisplayName : string.Empty,
-            })
-            .ToListAsync(ct);
-
-        return rows
-            .Select(a => Map(a.Id, a.Title, a.Slug, a.Excerpt, a.Body, a.CoverImageBlobPath, a.Tags, a.PublishedAt!.Value, a.DisplayName))
             .ToList();
     }
 
     public async Task<PublishedArticleSubmission?> GetBySlugAsync(string slug, CancellationToken ct = default)
     {
-        var a = await Published()
-            .Where(x => x.Slug == slug)
-            .Select(x => new
-            {
-                x.Id, x.Title, x.Slug, x.Excerpt, x.Body, x.CoverImageBlobPath,
-                x.Tags, x.PublishedAt,
-                DisplayName = x.Author != null ? x.Author.DisplayName : string.Empty,
-            })
-            .FirstOrDefaultAsync(ct);
-
-        return a is null
-            ? null
-            : Map(a.Id, a.Title, a.Slug, a.Excerpt, a.Body, a.CoverImageBlobPath, a.Tags, a.PublishedAt!.Value, a.DisplayName);
+        var rows = await SelectProjection(Published().Where(x => x.Slug == slug)).ToListAsync(ct);
+        return rows.FirstOrDefault();
     }
 
     public async Task<(PublishedArticleSubmission? Previous, PublishedArticleSubmission? Next)> GetAdjacentAsync(
         DateTimeOffset publishedAt, CancellationToken ct = default)
     {
-        var prevTask = Published()
+        var all = await SelectProjection(Published()).ToListAsync(ct);
+
+        var prev = all
             .Where(a => a.PublishedAt < publishedAt)
             .OrderByDescending(a => a.PublishedAt)
-            .Select(a => new
-            {
-                a.Id, a.Title, a.Slug, a.Excerpt, a.Body, a.CoverImageBlobPath,
-                a.Tags, a.PublishedAt,
-                DisplayName = a.Author != null ? a.Author.DisplayName : string.Empty,
-            })
-            .FirstOrDefaultAsync(ct);
-
-        var nextTask = Published()
+            .FirstOrDefault();
+        var next = all
             .Where(a => a.PublishedAt > publishedAt)
             .OrderBy(a => a.PublishedAt)
-            .Select(a => new
-            {
-                a.Id, a.Title, a.Slug, a.Excerpt, a.Body, a.CoverImageBlobPath,
-                a.Tags, a.PublishedAt,
-                DisplayName = a.Author != null ? a.Author.DisplayName : string.Empty,
-            })
-            .FirstOrDefaultAsync(ct);
+            .FirstOrDefault();
 
-        await Task.WhenAll(prevTask, nextTask);
-
-        var prev = prevTask.Result;
-        var next = nextTask.Result;
-
-        return (
-            prev is null ? null : Map(prev.Id, prev.Title, prev.Slug, prev.Excerpt, prev.Body, prev.CoverImageBlobPath, prev.Tags, prev.PublishedAt!.Value, prev.DisplayName),
-            next is null ? null : Map(next.Id, next.Title, next.Slug, next.Excerpt, next.Body, next.CoverImageBlobPath, next.Tags, next.PublishedAt!.Value, next.DisplayName)
-        );
+        return (prev, next);
     }
 
     public async Task<IReadOnlyList<PublishedArticleSubmission>> GetSitemapEntriesAsync(CancellationToken ct = default)
     {
-        var rows = await Published()
-            .OrderByDescending(a => a.PublishedAt)
-            .Select(a => new
-            {
-                a.Id, a.Title, a.Slug, a.Excerpt, a.Body, a.CoverImageBlobPath,
-                a.Tags, a.PublishedAt,
-                DisplayName = a.Author != null ? a.Author.DisplayName : string.Empty,
-            })
-            .ToListAsync(ct);
-
-        return rows
-            .Select(a => Map(a.Id, a.Title, a.Slug, a.Excerpt, a.Body, a.CoverImageBlobPath, a.Tags, a.PublishedAt!.Value, a.DisplayName))
-            .ToList();
+        var rows = await SelectProjection(Published()).ToListAsync(ct);
+        return rows.OrderByDescending(a => a.PublishedAt).ToList();
     }
 
     private IQueryable<ArticleSubmissionEntity> Published() =>
         dbContext.ArticleSubmissions
             .AsNoTracking()
-            .Include(a => a.Author)
             .Where(a => a.Status == ArticleSubmissionStatus.Published && a.PublishedAt != null);
+
+    // Anonymous-type projection lets EF Core generate a simple JOIN without implicit ORDER BY.
+    // The OrderBy is applied client-side after materialisation to avoid SQLite's DateTimeOffset
+    // ORDER BY limitation.
+    private static IQueryable<PublishedArticleSubmission> SelectProjection(
+        IQueryable<ArticleSubmissionEntity> query) =>
+        query.Select(a => new PublishedArticleSubmission(
+            a.Id,
+            a.Title,
+            a.Slug,
+            a.Excerpt,
+            a.Body,
+            a.CoverImageBlobPath,
+            a.Tags,
+            a.PublishedAt!.Value,
+            string.IsNullOrWhiteSpace(a.Author != null ? a.Author.DisplayName : null) ? null : a.Author!.DisplayName,
+            EfArticleSubmissionRepository.EstimateWordCount(a.Body)));
 
     private static bool HasTag(string? tags, string tag) =>
         !string.IsNullOrWhiteSpace(tags) &&
         ("," + tags + ",").Contains("," + tag + ",", StringComparison.OrdinalIgnoreCase);
-
-    private static PublishedArticleSubmission Map(
-        Guid id, string title, string slug, string? excerpt, string body,
-        string? coverImageBlobPath, string? tags, DateTimeOffset publishedAt, string displayName) =>
-        new(
-            id, title, slug, excerpt, body, coverImageBlobPath, tags, publishedAt,
-            string.IsNullOrWhiteSpace(displayName) ? null : displayName,
-            EfArticleSubmissionRepository.EstimateWordCount(body));
 }
