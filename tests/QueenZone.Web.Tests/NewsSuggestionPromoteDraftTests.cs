@@ -57,4 +57,29 @@ public sealed class NewsSuggestionPromoteDraftTests
         Assert.Equal("queen reunion tour", draft.Title);
         Assert.Contains("Community-suggested", draft.Excerpt);
     }
+
+    [Fact]
+    public void Build_TruncatesLongNotesForExcerpt()
+    {
+        var suggestion = new NewsSuggestion(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            "https://example.com/long-notes",
+            "hash",
+            "Title",
+            new string('n', NewsValidation.MaxExcerptLength + 50),
+            NewsSuggestionStatus.Pending,
+            DateTimeOffset.UtcNow,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
+
+        var draft = NewsSuggestionPromoteDraft.Build(suggestion);
+
+        Assert.Equal(NewsValidation.MaxExcerptLength, draft.Excerpt.Length);
+    }
 }

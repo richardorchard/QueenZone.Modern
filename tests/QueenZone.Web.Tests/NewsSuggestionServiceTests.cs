@@ -81,4 +81,63 @@ public sealed class NewsSuggestionServiceTests
         Assert.Contains("5 news stories per day", blocked.Error, StringComparison.Ordinal);
         Assert.Equal(5, await repository.CountBySubmitterSinceAsync(memberId, DateTimeOffset.UtcNow.AddDays(-1)));
     }
+
+    [Fact]
+    public async Task SubmitAsync_RejectsEmptyMemberId()
+    {
+        var service = new NewsSuggestionService(
+            new InMemoryNewsSuggestionRepository(),
+            Options.Create(new NewsSuggestionOptions()));
+
+        var result = await service.SubmitAsync(Guid.Empty, "https://example.com/story", null, null);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("Sign in is required", result.Error, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(null, "URL is required.")]
+    [InlineData("", "URL is required.")]
+    [InlineData("http://example.com/story", "https://")]
+    [InlineData("not-a-url", "https://")]
+    public async Task SubmitAsync_RejectsInvalidUrls(string? url, string expectedFragment)
+    {
+        var service = new NewsSuggestionService(
+            new InMemoryNewsSuggestionRepository(),
+            Options.Create(new NewsSuggestionOptions()));
+
+        var result = await service.SubmitAsync(Guid.NewGuid(), url!, null, null);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(expectedFragment, result.Error, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task SubmitAsync_RejectsOverlongTitleAndNotes()
+    {
+        var service = new NewsSuggestionService(
+            new InMemoryNewsSuggestionRepository(),
+            Options.Create(new NewsSuggestionOptions()));
+
+        var titleResult = await service.SubmitAsync(
+            Guid.NewGuid(),
+            "https://example.com/story",
+            new string('t', 301),
+            null);
+        Assert.Contains("300 characters", titleResult.Error, StringComparison.Ordinal);
+
+        var notesResult = await service.SubmitAsync(
+            Guid.NewGuid(),
+            "https://example.com/story",
+            null,
+            new string('n', 1001));
+        Assert.Contains("1000 characters", notesResult.Error, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ValidateUrl_RejectsOverlongUrl()
+    {
+        var error = NewsSuggestionService.ValidateUrl("https://example.com/" + new string('a', 2000));
+        Assert.Contains("2000 characters", error, StringComparison.Ordinal);
+    }
 }

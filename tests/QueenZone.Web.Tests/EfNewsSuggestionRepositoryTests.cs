@@ -152,6 +152,33 @@ public sealed class EfNewsSuggestionRepositoryTests : IAsyncDisposable
         Assert.Equal(3, count);
     }
 
+    [Fact]
+    public async Task GetByIdAsync_ReturnsNull_WhenMissing()
+    {
+        Assert.Null(await repository.GetByIdAsync(Guid.NewGuid()));
+    }
+
+    [Fact]
+    public async Task UpdateStatusAsync_ReturnsNull_WhenMissing()
+    {
+        Assert.Null(await repository.UpdateStatusAsync(
+            Guid.NewGuid(),
+            NewsSuggestionStatus.Rejected,
+            "admin@test.local",
+            null));
+    }
+
+    [Fact]
+    public async Task GetPendingAsync_ClampsPageAndPageSize()
+    {
+        await repository.CreateAsync(NewSuggestion(
+            NewsCandidateDedupe.ComputeUrlHash("https://example.com/only"),
+            "https://example.com/only"));
+
+        var page = await repository.GetPendingAsync(0, 1000);
+        Assert.Single(page);
+    }
+
     private NewsSuggestion NewSuggestion(string urlHash, string url) =>
         new(
             Guid.NewGuid(),

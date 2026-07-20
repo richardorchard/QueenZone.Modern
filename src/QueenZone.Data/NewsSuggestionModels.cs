@@ -24,10 +24,3 @@ public sealed record NewsSuggestionListItem(
     string SubmitterDisplayName,
     DateTimeOffset SubmittedAt,
     string Status);
-
-public sealed record NewsSuggestionStatusUpdate(
-    string Status,
-    string? ReviewerEmail = null,
-    string? ReviewNotes = null,
-    int? PromotedNewsId = null,
-    int? DuplicateCandidateId = null);

@@ -136,6 +136,166 @@ public sealed partial class NewsSuggestionRoutesTests : IClassFixture<WebApplica
         Assert.Contains("Member news suggestions", body);
     }
 
+    [Fact]
+    public async Task Admin_CanReviewPromoteRejectAndMarkDuplicate()
+    {
+        var memberClient = await CreateSignedInMemberClientAsync(
+            email: "news-admin-flow@example.com",
+            displayName: "Admin Flow Fan",
+            subject: "google-news-admin-flow",
+            options: new WebApplicationFactoryClientOptions
+            {
+                HandleCookies = true,
+                AllowAutoRedirect = false,
+            });
+
+        var underReviewId = await SubmitSuggestionAsync(
+            memberClient,
+            "https://example.com/under-review-story",
+            "Under review story");
+        var promoteId = await SubmitSuggestionAsync(
+            memberClient,
+            "https://example.com/promote-story",
+            "Promote story",
+            "Member notes for editors");
+        var rejectId = await SubmitSuggestionAsync(
+            memberClient,
+            "https://example.com/reject-story",
+            "Reject story");
+
+        var discoveryRepository = factory.Services.GetRequiredService<INewsDiscoveryRepository>();
+        var candidateId = await NewsDiscoveryTestSeeder.SeedDiscoveredCandidateAsync(
+            discoveryRepository,
+            canonicalUrl: "https://example.com/duplicate-story",
+            title: "Already discovered");
+        var duplicateId = await SubmitSuggestionAsync(
+            memberClient,
+            "https://example.com/duplicate-story",
+            "Duplicate story");
+
+        var admin = CreateAdminClient(AdminEmail);
+
+        var queue = await admin.GetStringAsync("/admin/news-suggestions");
+        Assert.Contains("Promote story", queue);
+        Assert.Contains("Admin Flow Fan", queue);
+
+        var detail = await admin.GetStringAsync($"/admin/news-suggestions/{promoteId}");
+        Assert.Contains("Promote story", detail);
+        Assert.Contains("Member notes for editors", detail);
+
+        await PostAdminActionAsync(admin, $"/admin/news-suggestions/{underReviewId}/underreview", new Dictionary<string, string>
+        {
+            ["reviewNotes"] = "Starting review",
+        });
+
+        var promoteResponse = await PostAdminActionAsync(
+            admin,
+            $"/admin/news-suggestions/{promoteId}/promote",
+            new Dictionary<string, string> { ["reviewNotes"] = "Looks good" });
+        Assert.Equal(HttpStatusCode.Redirect, promoteResponse.StatusCode);
+        Assert.Matches("/admin/news/\\d+/edit", promoteResponse.Headers.Location!.OriginalString);
+
+        await PostAdminActionAsync(admin, $"/admin/news-suggestions/{rejectId}/reject", new Dictionary<string, string>
+        {
+            ["reviewNotes"] = "Not relevant",
+        });
+
+        await PostAdminActionAsync(
+            admin,
+            $"/admin/news-suggestions/{duplicateId}/markduplicate",
+            new Dictionary<string, string>
+            {
+                ["duplicateCandidateId"] = candidateId.ToString(),
+                ["reviewNotes"] = "Already in discovery queue",
+            });
+
+        var invalidDupId = await SubmitSuggestionAsync(
+            memberClient,
+            "https://example.com/invalid-duplicate-story",
+            "Invalid duplicate");
+        var invalidDuplicate = await PostAdminActionAsync(
+            admin,
+            $"/admin/news-suggestions/{invalidDupId}/markduplicate",
+            new Dictionary<string, string>());
+        Assert.Equal(HttpStatusCode.Redirect, invalidDuplicate.StatusCode);
+
+        var repository = factory.Services.GetRequiredService<INewsSuggestionRepository>();
+        Assert.Equal(NewsSuggestionStatus.UnderReview, (await repository.GetByIdAsync(underReviewId))!.Status);
+        Assert.Equal(NewsSuggestionStatus.Promoted, (await repository.GetByIdAsync(promoteId))!.Status);
+        Assert.NotNull((await repository.GetByIdAsync(promoteId))!.PromotedNewsId);
+        Assert.Equal(NewsSuggestionStatus.Rejected, (await repository.GetByIdAsync(rejectId))!.Status);
+        Assert.Equal(NewsSuggestionStatus.Duplicate, (await repository.GetByIdAsync(duplicateId))!.Status);
+        Assert.Equal(candidateId, (await repository.GetByIdAsync(duplicateId))!.DuplicateCandidateId);
+    }
+
+    [Fact]
+    public async Task Post_InvalidHttpsUrl_ShowsValidationError()
+    {
+        var client = await CreateSignedInMemberClientAsync(
+            email: "news-invalid@example.com",
+            displayName: "Invalid URL",
+            subject: "google-news-invalid",
+            options: new WebApplicationFactoryClientOptions
+            {
+                HandleCookies = true,
+                AllowAutoRedirect = false,
+            });
+
+        var formPage = await client.GetStringAsync("/submit/news");
+        using var content = new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = ExtractAntiforgeryToken(formPage),
+            ["StoryUrl"] = "http://example.com/not-secure",
+            ["Title"] = "Bad scheme",
+        });
+
+        var response = await client.PostAsync("/submit/news", content);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("https://", body, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task<Guid> SubmitSuggestionAsync(
+        HttpClient client,
+        string url,
+        string title,
+        string? notes = null)
+    {
+        var formPage = await client.GetStringAsync("/submit/news");
+        var fields = new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = ExtractAntiforgeryToken(formPage),
+            ["StoryUrl"] = url,
+            ["Title"] = title,
+        };
+        if (notes is not null)
+        {
+            fields["Notes"] = notes;
+        }
+
+        using var content = new FormUrlEncodedContent(fields);
+        var response = await client.PostAsync("/submit/news", content);
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+
+        var repository = factory.Services.GetRequiredService<INewsSuggestionRepository>();
+        var pending = await repository.GetPendingAsync(1, 50);
+        return pending.Single(item => item.Url.Contains(url.Split('/').Last(), StringComparison.Ordinal)).Id;
+    }
+
+    private async Task<HttpResponseMessage> PostAdminActionAsync(
+        HttpClient client,
+        string actionPath,
+        Dictionary<string, string> fields)
+    {
+        var id = Guid.Parse(actionPath.Split('/')[3]);
+        var detail = await client.GetStringAsync($"/admin/news-suggestions/{id}");
+        var form = new Dictionary<string, string>(fields)
+        {
+            ["__RequestVerificationToken"] = ExtractAntiforgeryToken(detail),
+        };
+        return await client.PostAsync(actionPath, new FormUrlEncodedContent(form));
+    }
+
     private HttpClient CreateAdminClient(string? email = null)
     {
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
@@ -186,6 +346,6 @@ public sealed partial class NewsSuggestionRoutesTests : IClassFixture<WebApplica
         return match.Groups["token"].Value;
     }
 
-    [GeneratedRegex("""name="__RequestVerificationToken" value="(?<token>[^"]+)""", RegexOptions.IgnoreCase)]
+    [GeneratedRegex("""name="__RequestVerificationToken"[^>]*value="(?<token>[^"]+)""", RegexOptions.IgnoreCase)]
     private static partial Regex AntiforgeryTokenRegex();
 }
