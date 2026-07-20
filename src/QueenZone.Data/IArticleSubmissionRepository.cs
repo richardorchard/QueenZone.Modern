@@ -11,7 +11,11 @@ public interface IArticleSubmissionRepository
     /// </summary>
     Task<ArticleSubmission?> SubmitForReviewAsync(Guid id, Guid authorMemberId, CancellationToken ct = default);
 
-    Task<IReadOnlyList<ArticleSubmission>> GetDraftsForMemberAsync(Guid memberId, CancellationToken ct = default);
+    Task<SubmissionListPage<ArticleSubmission>> GetDraftsForMemberAsync(
+        Guid memberId,
+        int page = 1,
+        int pageSize = 10,
+        CancellationToken ct = default);
 
     Task<IReadOnlyList<ArticleSubmissionListItem>> GetPendingAsync(int page, int pageSize, CancellationToken ct = default);
 

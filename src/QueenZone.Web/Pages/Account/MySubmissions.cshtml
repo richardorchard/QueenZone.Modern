@@ -1,113 +1,191 @@
 @page "/account/my-submissions"
 @model MySubmissionsModel
+@using QueenZone.Data
 @using QueenZone.Storage
 
-<partial name="_PageHero" model='@(("Members", "My submissions", "Track the status of photos you have submitted for the gallery.", ""))' />
+<partial name="_PageHero" model='@(("Members", "My submissions", "Track photos, news suggestions, and articles you have submitted.", ""))' />
 
 <section class="qz-section">
   <div class="qz-container qz-prose">
     <p>
       <a href="/submit/photo">Submit a photo</a>
       ·
+      <a href="/submit/news">Suggest news</a>
+      ·
       <a href="/submit/article">Write an article</a>
       ·
       <a href="/account/settings">Account settings</a>
     </p>
 
-    <h2>Articles</h2>
-    @if (Model.ArticleSubmissions.Count == 0)
+    <nav class="qz-submissions-tabs" aria-label="Submission types">
+      <a class="qz-submissions-tabs__tab @(Model.ActiveTab == MySubmissionsModel.TabPhotos ? "is-active" : null)"
+         href="@Model.GetTabHref(MySubmissionsModel.TabPhotos)"
+         aria-current="@(Model.ActiveTab == MySubmissionsModel.TabPhotos ? "page" : null)">Photos</a>
+      <a class="qz-submissions-tabs__tab @(Model.ActiveTab == MySubmissionsModel.TabNews ? "is-active" : null)"
+         href="@Model.GetTabHref(MySubmissionsModel.TabNews)"
+         aria-current="@(Model.ActiveTab == MySubmissionsModel.TabNews ? "page" : null)">News suggestions</a>
+      <a class="qz-submissions-tabs__tab @(Model.ActiveTab == MySubmissionsModel.TabArticles ? "is-active" : null)"
+         href="@Model.GetTabHref(MySubmissionsModel.TabArticles)"
+         aria-current="@(Model.ActiveTab == MySubmissionsModel.TabArticles ? "page" : null)">Articles</a>
+    </nav>
+
+    @if (Model.ActiveTab == MySubmissionsModel.TabPhotos)
     {
-      <p>You have not submitted any articles yet. <a href="/submit/article">Write your first article</a></p>
+      <h2 class="visually-hidden">Photos</h2>
+      @if (Model.PhotoSubmissions.Count == 0)
+      {
+        <p>You have not submitted any photos yet. <a href="/submit/photo">Submit a photo</a></p>
+      }
+      else
+      {
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th></th>
+              <th>Title</th>
+              <th>Status</th>
+              <th>Submitted</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            @foreach (var item in Model.PhotoSubmissions)
+            {
+              var thumbUrl = UgcProxyPaths.GetPath(BlobUploadContainers.Photos, item.ThumbnailBlobPath);
+              <tr>
+                <td>
+                  <img class="qz-submissions-thumb" src="@thumbUrl" alt="" width="64" height="64" />
+                </td>
+                <td>@item.Title</td>
+                <td><partial name="_SubmissionStatusBadge" model="item.Status" /></td>
+                <td>@item.SubmittedAt.ToString("u")</td>
+                <td>
+                  @if (item.Status == PhotoSubmissionStatus.Rejected
+                       && !string.IsNullOrWhiteSpace(item.RejectionReason))
+                  {
+                    <span>@item.RejectionReason</span>
+                  }
+                  else if (!string.IsNullOrWhiteSpace(item.ReviewNotes))
+                  {
+                    <span>@item.ReviewNotes</span>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    }
+    else if (Model.ActiveTab == MySubmissionsModel.TabNews)
+    {
+      <h2 class="visually-hidden">News suggestions</h2>
+      @if (Model.NewsSuggestions.Count == 0)
+      {
+        <p>You have not suggested any news yet. <a href="/submit/news">Suggest a news link</a></p>
+      }
+      else
+      {
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>URL</th>
+              <th>Status</th>
+              <th>Submitted</th>
+              <th>Notes</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @foreach (var row in Model.NewsSuggestions)
+            {
+              var item = row.Suggestion;
+              <tr>
+                <td>
+                  <a href="@item.Url" rel="noopener noreferrer" title="@item.Url">
+                    @SubmissionStatusPresentation.TruncateUrl(item.Url)
+                  </a>
+                  @if (!string.IsNullOrWhiteSpace(item.Title))
+                  {
+                    <div class="qz-submissions-secondary">@item.Title</div>
+                  }
+                </td>
+                <td><partial name="_SubmissionStatusBadge" model="item.Status" /></td>
+                <td>@item.SubmittedAt.ToString("u")</td>
+                <td>@item.ReviewNotes</td>
+                <td>
+                  @if (!string.IsNullOrWhiteSpace(row.PublishedArticlePath))
+                  {
+                    <a href="@row.PublishedArticlePath">View article</a>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
     }
     else
     {
-      <table class="admin-table">
-        <thead>
-          <tr>
-            <th>Title</th>
-            <th>Status</th>
-            <th>Submitted</th>
-            <th>Notes</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          @foreach (var item in Model.ArticleSubmissions)
-          {
+      <h2 class="visually-hidden">Articles</h2>
+      @if (Model.ArticleSubmissions.Count == 0)
+      {
+        <p>You have not submitted any articles yet. <a href="/submit/article">Write your first article</a></p>
+      }
+      else
+      {
+        <table class="admin-table">
+          <thead>
             <tr>
-              <td>@item.Title</td>
-              <td>@item.Status</td>
-              <td>@(item.SubmittedAt?.ToString("u") ?? "Draft")</td>
-              <td>
-                @if (!string.IsNullOrWhiteSpace(item.RejectionReason))
-                {
-                  <span>@item.RejectionReason</span>
-                }
-                else if (!string.IsNullOrWhiteSpace(item.ReviewNotes))
-                {
-                  <span>@item.ReviewNotes</span>
-                }
-              </td>
-              <td>
-                @if (item.Status == QueenZone.Data.ArticleSubmissionStatus.Draft
-                     || item.Status == QueenZone.Data.ArticleSubmissionStatus.RequiresRevision)
-                {
-                  <a href="/submit/article?edit=@item.Id">Edit</a>
-                }
-                else if (item.Status == QueenZone.Data.ArticleSubmissionStatus.Published)
-                {
-                  <a href="/articles/@item.Slug">Read</a>
-                }
-              </td>
+              <th>Title</th>
+              <th>Status</th>
+              <th>Submitted</th>
+              <th>Notes</th>
+              <th></th>
             </tr>
-          }
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            @foreach (var item in Model.ArticleSubmissions)
+            {
+              <tr>
+                <td>@item.Title</td>
+                <td><partial name="_SubmissionStatusBadge" model="item.Status" /></td>
+                <td>@(item.SubmittedAt?.ToString("u") ?? "Draft")</td>
+                <td>
+                  @if (item.Status == ArticleSubmissionStatus.RequiresRevision
+                       && !string.IsNullOrWhiteSpace(item.ReviewNotes))
+                  {
+                    <p class="qz-submissions-revision-note">@item.ReviewNotes</p>
+                  }
+                  else if (!string.IsNullOrWhiteSpace(item.RejectionReason))
+                  {
+                    <span>@item.RejectionReason</span>
+                  }
+                  else if (!string.IsNullOrWhiteSpace(item.ReviewNotes))
+                  {
+                    <span>@item.ReviewNotes</span>
+                  }
+                </td>
+                <td>
+                  @if (item.Status == ArticleSubmissionStatus.Draft)
+                  {
+                    <a href="@Model.GetArticleEditPath(item.Id)">Continue editing</a>
+                  }
+                  else if (item.Status == ArticleSubmissionStatus.RequiresRevision)
+                  {
+                    <a href="@Model.GetArticleEditPath(item.Id)">Revise and resubmit</a>
+                  }
+                  else if (item.Status == ArticleSubmissionStatus.Published)
+                  {
+                    <a href="@ArticlesRoutes.GetCommunityArticleDetailPath(item.Slug)">View published article</a>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
     }
 
-    <h2>Photos</h2>
-    @if (Model.PhotoSubmissions.Count == 0)
-    {
-      <p>You have not submitted any photos yet.</p>
-    }
-    else
-    {
-      <table class="admin-table">
-        <thead>
-          <tr>
-            <th></th>
-            <th>Title</th>
-            <th>Status</th>
-            <th>Submitted</th>
-            <th>Notes</th>
-          </tr>
-        </thead>
-        <tbody>
-          @foreach (var item in Model.PhotoSubmissions)
-          {
-            var thumbUrl = UgcProxyPaths.GetPath(BlobUploadContainers.Photos, item.ThumbnailBlobPath);
-            <tr>
-              <td>
-                <img src="@thumbUrl" alt="" width="64" height="64" style="object-fit: cover;" />
-              </td>
-              <td>@item.Title</td>
-              <td>@item.Status</td>
-              <td>@item.SubmittedAt.ToString("u")</td>
-              <td>
-                @if (!string.IsNullOrWhiteSpace(item.RejectionReason))
-                {
-                  <span>@item.RejectionReason</span>
-                }
-                else if (string.Equals(item.Status, QueenZone.Data.PhotoSubmissionStatus.NeedsInfo, StringComparison.OrdinalIgnoreCase)
-                         && !string.IsNullOrWhiteSpace(item.ReviewNotes))
-                {
-                  <span>@item.ReviewNotes</span>
-                }
-              </td>
-            </tr>
-          }
-        </tbody>
-      </table>
-    }
+    <partial name="_ArchivePagination" model="Model.Pagination" />
   </div>
 </section>

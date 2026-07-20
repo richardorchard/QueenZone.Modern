@@ -102,19 +102,30 @@ public sealed class EfPhotoSubmissionRepository(QueenZoneDbContext dbContext) : 
         return entity is null ? null : Map(entity);
     }
 
-    public async Task<IReadOnlyList<PhotoSubmission>> GetBySubmitterAsync(
+    public async Task<SubmissionListPage<PhotoSubmission>> GetBySubmitterAsync(
         Guid submitterMemberId,
+        int page = 1,
+        int pageSize = 10,
         CancellationToken cancellationToken = default)
     {
-        var rows = await dbContext.PhotoSubmissions
-            .AsNoTracking()
-            .Where(row => row.SubmitterMemberId == submitterMemberId)
-            .ToListAsync(cancellationToken);
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 100);
 
-        return rows
+        var query = dbContext.PhotoSubmissions
+            .AsNoTracking()
+            .Where(row => row.SubmitterMemberId == submitterMemberId);
+
+        var totalCount = await query.CountAsync(cancellationToken);
+        var rows = await query.ToListAsync(cancellationToken);
+
+        var items = rows
             .OrderByDescending(row => row.SubmittedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Select(Map)
             .ToList();
+
+        return new SubmissionListPage<PhotoSubmission>(items, totalCount);
     }
 
     public async Task<PhotoSubmission?> UpdateStatusAsync(

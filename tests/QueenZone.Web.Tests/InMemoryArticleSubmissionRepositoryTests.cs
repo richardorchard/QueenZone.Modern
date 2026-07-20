@@ -207,8 +207,8 @@ public sealed class InMemoryArticleSubmissionRepositoryTests
 
         var rows = await repository.GetDraftsForMemberAsync(memberId);
 
-        Assert.Equal(2, rows.Count);
-        Assert.Equal("Submitted one", rows[0].Title);
+        Assert.Equal(2, rows.TotalCount);
+        Assert.Equal("Submitted one", rows.Items[0].Title);
     }
 
     [Fact]

@@ -49,16 +49,41 @@ public sealed class InMemoryNewsSuggestionRepositoryTests
         Assert.Single(page);
     }
 
+    [Fact]
+    public async Task GetBySubmitterAsync_ReturnsOnlyOwnedRows_NewestFirst_Paginated()
+    {
+        var repository = new InMemoryNewsSuggestionRepository();
+        var memberId = Guid.NewGuid();
+        var otherId = Guid.NewGuid();
+
+        await repository.CreateAsync(NewSuggestion(Guid.NewGuid(), memberId, "https://example.com/a", DateTimeOffset.UtcNow.AddMinutes(-2)));
+        await repository.CreateAsync(NewSuggestion(Guid.NewGuid(), memberId, "https://example.com/b", DateTimeOffset.UtcNow.AddMinutes(-1)));
+        await repository.CreateAsync(NewSuggestion(Guid.NewGuid(), otherId, "https://example.com/other", DateTimeOffset.UtcNow));
+
+        var page = await repository.GetBySubmitterAsync(memberId, page: 1, pageSize: 1);
+
+        Assert.Equal(2, page.TotalCount);
+        Assert.Single(page.Items);
+        Assert.Contains("example.com/b", page.Items[0].Url, StringComparison.Ordinal);
+    }
+
     private static NewsSuggestion NewSuggestion(Guid id) =>
+        NewSuggestion(id, Guid.NewGuid(), "https://example.com/story", DateTimeOffset.UtcNow);
+
+    private static NewsSuggestion NewSuggestion(
+        Guid id,
+        Guid submitterMemberId,
+        string url,
+        DateTimeOffset submittedAt) =>
         new(
             id,
-            Guid.NewGuid(),
-            "https://example.com/story",
-            NewsCandidateDedupe.ComputeUrlHash("https://example.com/story"),
+            submitterMemberId,
+            url,
+            NewsCandidateDedupe.ComputeUrlHash(url),
             "Title",
             "Notes",
             NewsSuggestionStatus.Pending,
-            DateTimeOffset.UtcNow,
+            submittedAt,
             null,
             null,
             null,

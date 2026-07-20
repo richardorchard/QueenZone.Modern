@@ -132,7 +132,7 @@ public sealed class PhotoSubmissionWorkflowTests
         Assert.Equal("Unknown member", pending[0].SubmitterDisplayName);
 
         var bySubmitter = await repository.GetBySubmitterAsync(created.SubmitterMemberId);
-        Assert.Single(bySubmitter);
+        Assert.Single(bySubmitter.Items);
 
         await repository.UpdateStatusAsync(
             created.Id,

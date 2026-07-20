@@ -1,0 +1,7 @@
+@model string
+@{
+  var status = Model ?? string.Empty;
+  var modifier = SubmissionStatusPresentation.GetModifier(status);
+  var label = SubmissionStatusPresentation.GetLabel(status);
+}
+<span class="qz-status-badge qz-status-badge--@modifier">@label</span>

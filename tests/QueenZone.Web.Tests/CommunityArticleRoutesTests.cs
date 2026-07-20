@@ -340,7 +340,8 @@ public sealed class CommunityArticleRoutesTests : IClassFixture<WebApplicationFa
             throw new NotSupportedException();
         public Task<ArticleSubmission?> SubmitForReviewAsync(Guid id, Guid m, CancellationToken ct = default) =>
             throw new NotSupportedException();
-        public Task<IReadOnlyList<ArticleSubmission>> GetDraftsForMemberAsync(Guid m, CancellationToken ct = default) =>
+        public Task<SubmissionListPage<ArticleSubmission>> GetDraftsForMemberAsync(
+            Guid m, int page = 1, int pageSize = 10, CancellationToken ct = default) =>
             throw new NotSupportedException();
         public Task<IReadOnlyList<ArticleSubmissionListItem>> GetPendingAsync(int p, int s, CancellationToken ct = default) =>
             throw new NotSupportedException();

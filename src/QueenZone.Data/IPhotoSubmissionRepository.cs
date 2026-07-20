@@ -11,8 +11,10 @@ public interface IPhotoSubmissionRepository
 
     Task<PhotoSubmission?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<PhotoSubmission>> GetBySubmitterAsync(
+    Task<SubmissionListPage<PhotoSubmission>> GetBySubmitterAsync(
         Guid submitterMemberId,
+        int page = 1,
+        int pageSize = 10,
         CancellationToken cancellationToken = default);
 
     /// <summary>
