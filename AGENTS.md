@@ -174,9 +174,9 @@ Two Cloudflare hostnames serve Azure Blob Storage content. They are **not interc
 | Hostname | Type | Can set response headers? | Use for |
 | --- | --- | --- | --- |
 | `cdn.queenzone.org` | Straight CDN proxy | No | Photos and images (`PhotoImageUrl`) |
-| `pictures.queenzone.org` | Cloudflare Worker proxy | Yes | Fan performance audio (`SongFileUrl`); legacy forum attachment redirect target |
+| `cdn2.queenzone.org` | Cloudflare Worker proxy | Yes | Fan performance audio (`SongFileUrl`); legacy forum attachment redirect target |
 
-`pictures.queenzone.org` goes through a Worker, which allows `Content-Disposition` headers to be set on responses. This is required for fan performance audio so that the browser's native download button shows a consistent filename instead of "audio" (the last segment of the auth-gated endpoint path). Legacy forum attachments use the same Worker host after a member-auth gate (`/forum/attachment/legacy/{postId}`).
+`cdn2.queenzone.org` goes through a Worker, which allows `Content-Disposition` headers to be set on responses. This is required for fan performance audio so that the browser's native download button shows a consistent filename instead of "audio" (the last segment of the auth-gated endpoint path). Legacy forum attachments use the same Worker host after a member-auth gate (`/forum/attachment/legacy/{postId}`).
 
 Do not switch `SongFileUrl` back to `cdn.queenzone.org`. Doing so silently breaks the download filename without causing any test failure. New forum uploads live in private `ugc-forum` and download via `/forum/attachment/{postId}/{attachmentId}` (member-only, app-streamed).
 

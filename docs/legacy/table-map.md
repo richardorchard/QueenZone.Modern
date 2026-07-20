@@ -47,7 +47,7 @@ The legacy schema contains 129 tables. This file focuses on the tables relevant 
 | `TITLE` | `varchar(100)` | Track title. |
 | `PERFORMED_BY` | `varchar(100)` | Performer/band name. |
 | `DESCRIPTION` | `varchar(1000)` | Free-text notes from the submitter. |
-| `URL` | `varchar(200)` | Bare audio filename (e.g. `2014417798057369.mp3`), not a path — served from the `songfiles` Azure Blob Storage container behind `cdn.queenzone.org`. |
+| `URL` | `varchar(200)` | Bare audio filename (e.g. `2014417798057369.mp3`), not a path — served from the `songfiles` Azure Blob Storage container behind `cdn2.queenzone.org`. |
 | `THESIZE` | varies | File size in bytes, stored as text by `Q_STAGE_T_PAGE_SP`. |
 | `DATE_ADDED` | `smalldatetime` | Submission date; archive sort key (`DESC`). |
 | `DISPLAY` | `tinyint` | Public visibility gate; only `1` is shown. |

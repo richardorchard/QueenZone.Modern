@@ -34,7 +34,7 @@ public sealed class ForumAttachmentUnitTests
 
         var result = await ForumAttachmentEndpoints.ServeLegacyAsync(42, repo, CancellationToken.None);
         var redirect = Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.RedirectHttpResult>(result);
-        Assert.Equal("https://pictures.queenzone.org/attachments/scan.jpg", redirect.Url);
+        Assert.Equal("https://cdn2.queenzone.org/attachments/scan.jpg", redirect.Url);
     }
 
     [Fact]

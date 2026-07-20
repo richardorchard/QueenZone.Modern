@@ -53,7 +53,7 @@ Store **container + blob name** in the database. Treat any public/display URL as
 Two Cloudflare hostnames proxy the legacy Azure Blob containers. They behave differently and are not interchangeable:
 
 - **`cdn.queenzone.org`** — straight CDN proxy, no Worker. Cannot set response headers. Used by `PhotoImageUrl` for photos and images.
-- **`pictures.queenzone.org`** — Cloudflare Worker proxy. Can set `Content-Disposition` and other response headers. Used by `SongFileUrl` for fan performance audio so the browser download filename is consistent. Also used as the redirect target for **legacy forum attachments** after a member-auth check (`/forum/attachment/legacy/{postId}` → `https://pictures.queenzone.org/attachments/{fileName}`).
+- **`cdn2.queenzone.org`** — Cloudflare Worker proxy. Can set `Content-Disposition` and other response headers. Used by `SongFileUrl` for fan performance audio so the browser download filename is consistent. Also used as the redirect target for **legacy forum attachments** after a member-auth check (`/forum/attachment/legacy/{postId}` → `https://cdn2.queenzone.org/attachments/{fileName}`).
 
 Do not route audio through `cdn.queenzone.org`; it silently breaks the download filename without any test failure.
 
@@ -61,7 +61,7 @@ Do not route audio through `cdn.queenzone.org`; it silently breaks the download 
 
 | Kind | Storage | Public HTML link | Download behaviour |
 | --- | --- | --- | --- |
-| Legacy import (`ModernForumPost.Attachment`) | Historical `attachments` blob container | `/forum/attachment/legacy/{legacyPostId}` | Member policy required; redirect to `pictures.queenzone.org/attachments/…` |
+| Legacy import (`ModernForumPost.Attachment`) | Historical `attachments` blob container | `/forum/attachment/legacy/{legacyPostId}` | Member policy required; redirect to `cdn2.queenzone.org/attachments/…` |
 | New uploads (`ForumPostAttachments`) | Private `ugc-forum` container | `/forum/attachment/{legacyPostId}/{attachmentId}` | Member policy required; stream via app with `Content-Disposition: attachment` and increment `DownloadCount` |
 
 Do not link forum attachments straight to `cdn.queenzone.org` or raw Azure blob URLs in HTML. Inline editor images remain on `/ugc/forum/…` (see serve strategy above).

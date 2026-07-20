@@ -39,7 +39,7 @@ public sealed class ForumAttachmentEndpointsTests : IClassFixture<WebApplication
 
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
         Assert.Equal(
-            "https://pictures.queenzone.org/attachments/anoto-setlist-scan.jpg",
+            "https://cdn2.queenzone.org/attachments/anoto-setlist-scan.jpg",
             response.Headers.Location!.OriginalString);
     }
 
