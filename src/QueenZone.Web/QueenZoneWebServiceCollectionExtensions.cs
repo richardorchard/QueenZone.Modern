@@ -1,3 +1,6 @@
+using System.Security.Claims;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
 using QueenZone.Data;
 using QueenZone.NewsAgent;
@@ -46,6 +49,50 @@ public static class QueenZoneWebServiceCollectionExtensions
 
         services.AddOptions<ForumAttachmentOptions>()
             .Bind(configuration.GetSection(ForumAttachmentOptions.SectionName));
+
+        return services;
+    }
+
+    public static IServiceCollection AddQueenZoneRateLimiting(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        services.AddOptions<FanPerformanceRateLimitingOptions>()
+            .Bind(configuration.GetSection(FanPerformanceRateLimitingOptions.SectionName));
+
+        services.AddRateLimiter(limiter =>
+        {
+            limiter.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+            limiter.AddPolicy(FanPerformanceRateLimitingOptions.AudioPolicy, context =>
+            {
+                var opts = context.RequestServices
+                    .GetRequiredService<IOptions<FanPerformanceRateLimitingOptions>>().Value;
+                return RateLimitPartition.GetSlidingWindowLimiter(
+                    context.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "anonymous",
+                    _ => new SlidingWindowRateLimiterOptions
+                    {
+                        PermitLimit = opts.AudioPermitLimit,
+                        Window = TimeSpan.FromSeconds(opts.AudioSlidingWindowSeconds),
+                        SegmentsPerWindow = Math.Max(1, opts.AudioSlidingWindowSeconds / 60),
+                        QueueLimit = 0,
+                    });
+            });
+
+            limiter.AddPolicy(FanPerformanceRateLimitingOptions.BrowsePolicy, context =>
+            {
+                var opts = context.RequestServices
+                    .GetRequiredService<IOptions<FanPerformanceRateLimitingOptions>>().Value;
+                return RateLimitPartition.GetFixedWindowLimiter(
+                    context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = opts.BrowsePermitLimit,
+                        Window = TimeSpan.FromSeconds(opts.BrowseWindowSeconds),
+                        QueueLimit = 0,
+                    });
+            });
+        });
 
         return services;
     }
@@ -119,6 +166,7 @@ public static class QueenZoneWebServiceCollectionExtensions
     {
         services.AddQueenZoneWebOptions(configuration);
         services.AddQueenZoneCaching();
+        services.AddQueenZoneRateLimiting(configuration);
         services.AddQueenZoneSitemaps();
         services.AddQueenZoneWebAppServices();
 

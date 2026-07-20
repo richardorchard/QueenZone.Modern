@@ -118,6 +118,7 @@ app.Use(async (context, next) =>
     await next();
 });
 app.UseAuthorization();
+app.UseRateLimiter();
 app.UseOutputCache();
 app.UseAntiforgery();
 
