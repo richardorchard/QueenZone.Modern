@@ -1,10 +1,11 @@
-using QueenZone.Data;
+﻿using QueenZone.Data;
 
 namespace QueenZone.Web.Sitemap;
 
 public sealed class CoreSitemapBuilder(
     INewsRepository newsRepository,
     IArticlesRepository articlesRepository,
+    IArticleRepository communityArticleRepository,
     IBiographyRepository biographyRepository,
     IForumRepository forumRepository,
     IPhotoRepository photoRepository,
@@ -21,6 +22,7 @@ public sealed class CoreSitemapBuilder(
 
         await AddNewsEntriesAsync(entries, cancellationToken);
         await AddArticleEntriesAsync(entries, cancellationToken);
+        await AddCommunityArticleEntriesAsync(entries, cancellationToken);
         await AddBiographyEntriesAsync(entries, cancellationToken);
         await AddForumEntriesAsync(entries, cancellationToken);
         await AddPhotographyEntriesAsync(entries, cancellationToken);
@@ -63,6 +65,15 @@ public sealed class CoreSitemapBuilder(
             entries.Add(new(
                 ArticlesRoutes.GetArticleDetailPath(item.Id, item.Title),
                 item.PublishedAt));
+        }
+    }
+
+    private async Task AddCommunityArticleEntriesAsync(List<SitemapEntry> entries, CancellationToken cancellationToken)
+    {
+        var articles = await communityArticleRepository.GetSitemapEntriesAsync(cancellationToken);
+        foreach (var article in articles)
+        {
+            entries.Add(new(ArticlesRoutes.GetCommunityArticleDetailPath(article.Slug), article.PublishedAt.UtcDateTime));
         }
     }
 
@@ -147,3 +158,4 @@ public sealed class CoreSitemapBuilder(
         }
     }
 }
+

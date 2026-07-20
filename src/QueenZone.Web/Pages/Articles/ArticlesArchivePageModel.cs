@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using QueenZone.Data;
 
@@ -6,20 +6,32 @@ namespace QueenZone.Web.Pages.Articles;
 
 public abstract class ArticlesArchivePageModel(
     IArticlesRepository articlesRepository,
-    IArticleSubmissionRepository articleSubmissionRepository,
     PublicQueryCacheService publicQueryCache) : PageModel
 {
+    public const int CommunityPageSize = 12;
+
     public IReadOnlyList<ArticleArchiveItem> Items { get; private set; } = [];
 
-    public IReadOnlyList<ArticleArchiveItem> CommunityItems { get; private set; } = [];
+    public IReadOnlyList<PublishedArticleSubmission> CommunityItems { get; private set; } = [];
 
     public int CurrentPage { get; private set; }
 
     public int TotalPages { get; private set; }
 
+    public int CommunityCurrentPage { get; private set; }
+
+    public int CommunityTotalPages { get; private set; }
+
+    public string? ActiveTag { get; private set; }
+
     public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
 
-    protected async Task<IActionResult> LoadArchivePageAsync(int page, CancellationToken cancellationToken)
+    protected async Task<IActionResult> LoadArchivePageAsync(
+        int page,
+        CancellationToken cancellationToken,
+        IArticleRepository? articleRepository = null,
+        int communityPage = 1,
+        string? tag = null)
     {
         if (page < 1)
         {
@@ -27,7 +39,6 @@ public abstract class ArticlesArchivePageModel(
         }
 
         var publishedCount = await publicQueryCache.GetArticlePublishedCountAsync(cancellationToken);
-        var publishedSubmissions = await articleSubmissionRepository.GetPublishedAsync(cancellationToken);
         var archive = await articlesRepository.GetArchivePageAsync(page, ArticlesRoutes.ArchivePageSize, cancellationToken);
         var totalPages = ArticlesRoutes.ResolveArchiveTotalPages(
             page,
@@ -48,17 +59,24 @@ public abstract class ArticlesArchivePageModel(
         }
 
         Items = PublicContentMapper.ToArticleArchiveItems(archive);
-        CommunityItems = publishedSubmissions
-            .Select(s => new ArticleArchiveItem(
-                0,
-                s.Title,
-                s.Excerpt ?? string.Empty,
-                s.PublishedAt.UtcDateTime,
-                "Community article",
-                ArticlesRoutes.GetCommunityArticleDetailPath(s.Slug)))
-            .ToList();
         CurrentPage = page;
         TotalPages = totalPages;
+        ActiveTag = tag;
+
+        if (articleRepository is not null)
+        {
+            communityPage = Math.Max(1, communityPage);
+            var communityCount = await articleRepository.GetCountAsync(tag, cancellationToken);
+            CommunityTotalPages = (int)Math.Ceiling(communityCount / (double)CommunityPageSize);
+            if (CommunityTotalPages > 0 && communityPage > CommunityTotalPages)
+            {
+                return NotFound();
+            }
+
+            CommunityItems = await articleRepository.GetPageAsync(communityPage, CommunityPageSize, tag, cancellationToken);
+            CommunityCurrentPage = communityPage;
+        }
+
         Breadcrumbs = [BreadcrumbItem.Home, new BreadcrumbItem("Articles", "/articles")];
 
         ViewData["Title"] = ArticlesRoutes.GetArchivePageTitle(page);

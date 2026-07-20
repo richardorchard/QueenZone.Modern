@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace QueenZone.Data;
@@ -44,6 +44,7 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddScoped<IQueenHistoryRepository, EfQueenHistoryRepository>();
         services.AddScoped<IPhotoSubmissionRepository, EfPhotoSubmissionRepository>();
         services.AddScoped<IArticleSubmissionRepository, EfArticleSubmissionRepository>();
+        services.AddScoped<IArticleRepository, EfArticleRepository>();
         services.AddScoped<INewsSuggestionRepository, EfNewsSuggestionRepository>();
 
         return services;
@@ -101,7 +102,10 @@ public static class QueenZoneDataServiceCollectionExtensions
             return new InMemoryArticleSubmissionRepository(id =>
                 members.FindByIdAsync(id).GetAwaiter().GetResult());
         });
+        services.AddSingleton<IArticleRepository>(sp =>
+            new InMemoryArticleRepository(sp.GetRequiredService<IArticleSubmissionRepository>()));
 
         return services;
     }
 }
+

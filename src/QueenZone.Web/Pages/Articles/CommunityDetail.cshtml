@@ -1,6 +1,13 @@
-@page "/articles/{slug}"
+﻿@page "/articles/{slug}"
 @model CommunityDetailModel
 @using QueenZone.Data
+
+@section Head {
+  @if (!string.IsNullOrWhiteSpace(Model.StructuredDataJson))
+  {
+    <script type="application/ld+json">@Html.Raw(Model.StructuredDataJson)</script>
+  }
+}
 
 @if (Model.Item is not null)
 {
@@ -12,12 +19,23 @@
       <div class="qz-meta" style="color: rgba(255,255,255,0.52);">
         @if (!string.IsNullOrWhiteSpace(Model.Item.AuthorDisplayName))
         {
-          <span>By @Model.Item.AuthorDisplayName · </span>
+          <span>By @Model.Item.AuthorDisplayName &middot; </span>
         }
         <time datetime="@Model.Item.PublishedAt.ToString("yyyy-MM-dd")">@Model.Item.PublishedAt.ToString("dd MMMM yyyy")</time>
+        <span> &middot; @Model.Item.ReadTimeMinutes min read</span>
       </div>
     </div>
   </section>
+
+  @if (Model.CoverImageUrl is not null)
+  {
+    <div class="qz-article-cover">
+      <div class="qz-container">
+        <img src="@Model.CoverImageUrl" alt="@Model.Item.Title cover image" class="qz-article-cover__img" loading="lazy" />
+      </div>
+    </div>
+  }
+
   <div class="qz-reading">
     @if (!string.IsNullOrWhiteSpace(Model.Item.Excerpt))
     {
@@ -25,4 +43,36 @@
     }
     <article class="article-body">@Html.Raw(Model.FormattedBody)</article>
   </div>
+
+  @if (!string.IsNullOrWhiteSpace(Model.Item.Tags))
+  {
+    <div class="qz-container">
+      <div class="qz-article-tags">
+        @foreach (var tag in Model.Item.Tags.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+          <a href="/articles?tag=@Uri.EscapeDataString(tag)" class="qz-tag">@tag</a>
+        }
+      </div>
+    </div>
+  }
+
+  @if (Model.PreviousArticle is not null || Model.NextArticle is not null)
+  {
+    <nav class="qz-article-adjacent qz-container" aria-label="More articles">
+      @if (Model.PreviousArticle is not null)
+      {
+        <div class="qz-article-adjacent__prev">
+          <div class="qz-article-adjacent__label">&lsaquo; Previous article</div>
+          <a href="@ArticlesRoutes.GetCommunityArticleDetailPath(Model.PreviousArticle.Slug)">@Model.PreviousArticle.Title</a>
+        </div>
+      }
+      @if (Model.NextArticle is not null)
+      {
+        <div class="qz-article-adjacent__next">
+          <div class="qz-article-adjacent__label">Next article &rsaquo;</div>
+          <a href="@ArticlesRoutes.GetCommunityArticleDetailPath(Model.NextArticle.Slug)">@Model.NextArticle.Title</a>
+        </div>
+      }
+    </nav>
+  }
 }
