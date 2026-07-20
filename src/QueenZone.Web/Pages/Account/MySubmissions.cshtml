@@ -1,0 +1,59 @@
+@page "/account/my-submissions"
+@model MySubmissionsModel
+@using QueenZone.Storage
+
+<partial name="_PageHero" model='@(("Members", "My submissions", "Track the status of photos you have submitted for the gallery.", ""))' />
+
+<section class="qz-section">
+  <div class="qz-container qz-prose">
+    <p>
+      <a href="/submit/photo">Submit a photo</a>
+      ·
+      <a href="/account/settings">Account settings</a>
+    </p>
+
+    @if (Model.Submissions.Count == 0)
+    {
+      <p>You have not submitted any photos yet.</p>
+    }
+    else
+    {
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th>Title</th>
+            <th>Status</th>
+            <th>Submitted</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          @foreach (var item in Model.Submissions)
+          {
+            var thumbUrl = UgcProxyPaths.GetPath(BlobUploadContainers.Photos, item.ThumbnailBlobPath);
+            <tr>
+              <td>
+                <img src="@thumbUrl" alt="" width="64" height="64" style="object-fit: cover;" />
+              </td>
+              <td>@item.Title</td>
+              <td>@item.Status</td>
+              <td>@item.SubmittedAt.ToString("u")</td>
+              <td>
+                @if (!string.IsNullOrWhiteSpace(item.RejectionReason))
+                {
+                  <span>@item.RejectionReason</span>
+                }
+                else if (string.Equals(item.Status, QueenZone.Data.PhotoSubmissionStatus.NeedsInfo, StringComparison.OrdinalIgnoreCase)
+                         && !string.IsNullOrWhiteSpace(item.ReviewNotes))
+                {
+                  <span>@item.ReviewNotes</span>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+  </div>
+</section>

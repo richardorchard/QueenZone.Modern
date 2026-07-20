@@ -79,6 +79,7 @@ public static class QueenZoneWebServiceCollectionExtensions
     public static IServiceCollection AddQueenZoneWebAppServices(this IServiceCollection services)
     {
         services.AddScoped<MemberAccountService>();
+        services.AddScoped<PhotoSubmissionService>();
         services.AddScoped<UgcHtml>();
         services.AddScoped<ForumPostRateLimiter>();
         services.AddScoped<ForumAttachmentValidator>();

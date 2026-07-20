@@ -42,6 +42,7 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddScoped<INewsDiscoveryRepository, EfNewsDiscoveryRepository>();
         services.AddScoped<INewsAgentRunLeaseService, EfNewsAgentRunLeaseService>();
         services.AddScoped<IQueenHistoryRepository, EfQueenHistoryRepository>();
+        services.AddScoped<IPhotoSubmissionRepository, EfPhotoSubmissionRepository>();
 
         return services;
     }
@@ -79,6 +80,12 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddSingleton<INewsDiscoveryRepository, InMemoryNewsDiscoveryRepository>();
         services.AddSingleton<SharedNewsAgentLeaseStore>();
         services.AddSingleton<INewsAgentRunLeaseService, InMemoryNewsAgentRunLeaseService>();
+        services.AddSingleton<IPhotoSubmissionRepository>(sp =>
+        {
+            var members = sp.GetRequiredService<IMemberAccountRepository>();
+            return new InMemoryPhotoSubmissionRepository(id =>
+                members.FindByIdAsync(id).GetAwaiter().GetResult());
+        });
 
         return services;
     }

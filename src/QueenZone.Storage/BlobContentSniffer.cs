@@ -50,6 +50,14 @@ internal static class BlobContentSniffer
             return "image/webp";
         }
 
+        // TIFF little-endian (II*\0) or big-endian (MM\0*)
+        if (header.Length >= 4
+            && ((header[0] == 0x49 && header[1] == 0x49 && header[2] == 0x2A && header[3] == 0x00)
+                || (header[0] == 0x4D && header[1] == 0x4D && header[2] == 0x00 && header[3] == 0x2A)))
+        {
+            return "image/tiff";
+        }
+
         // %PDF
         if (header.Length >= 4
             && header[0] == 0x25
@@ -81,6 +89,7 @@ internal static class BlobContentSniffer
             ".png" => "image/png",
             ".gif" => "image/gif",
             ".webp" => "image/webp",
+            ".tif" or ".tiff" => "image/tiff",
             ".pdf" => "application/pdf",
             ".txt" => "text/plain",
             ".zip" => "application/zip",

@@ -1,0 +1,74 @@
+@page "/submit/photo"
+@model PhotoModel
+
+<partial name="_PageHero" model='@(("Community", "Submit a photo", "Share concert shots, memorabilia, or archive finds for the QueenZone gallery.", ""))' />
+
+<section class="qz-section">
+  <div class="qz-container qz-prose">
+    <p>
+      Submissions are reviewed by editors before they appear in the public gallery.
+      One photo per submission — you can submit again for additional photos.
+      <a href="/account/my-submissions">View your submissions</a>
+    </p>
+
+    <div asp-validation-summary="ModelOnly" class="qz-account-notice qz-account-notice--error"></div>
+
+    <form method="post"
+          enctype="multipart/form-data"
+          class="qz-account-form"
+          data-busy-submit
+          data-busy-label="Uploading…">
+      @Html.AntiForgeryToken()
+
+      <label class="qz-account-form__field">
+        <span>Title</span>
+        <input asp-for="Title" maxlength="200" required />
+        <span asp-validation-for="Title" class="qz-account-form__field-error"></span>
+      </label>
+
+      <label class="qz-account-form__field">
+        <span>Description <span class="qz-account-form__optional">(optional)</span></span>
+        <textarea asp-for="Description" rows="4" maxlength="1000"></textarea>
+        <span asp-validation-for="Description" class="qz-account-form__field-error"></span>
+      </label>
+
+      <label class="qz-account-form__field">
+        <span>Suggested category <span class="qz-account-form__optional">(optional)</span></span>
+        <input asp-for="SuggestedCategory" list="photo-categories" maxlength="100" />
+        <datalist id="photo-categories">
+          @foreach (var category in Model.Categories)
+          {
+            <option value="@category.Name"></option>
+          }
+        </datalist>
+        <span asp-validation-for="SuggestedCategory" class="qz-account-form__field-error"></span>
+      </label>
+
+      <label class="qz-account-form__field">
+        <span>Approximate year <span class="qz-account-form__optional">(optional)</span></span>
+        <input asp-for="ApproximateYear" type="number" min="1900" max="2100" />
+        <span asp-validation-for="ApproximateYear" class="qz-account-form__field-error"></span>
+      </label>
+
+      <label class="qz-account-form__field">
+        <span>Approximate date <span class="qz-account-form__optional">(optional)</span></span>
+        <input asp-for="ApproximateDate" type="date" />
+        <span asp-validation-for="ApproximateDate" class="qz-account-form__field-error"></span>
+      </label>
+
+      <label class="qz-account-form__field">
+        <span>Photo</span>
+        <input asp-for="PhotoFile"
+               type="file"
+               accept="image/jpeg,image/png,image/webp,image/tiff,.jpg,.jpeg,.png,.webp,.tif,.tiff"
+               required />
+        <span asp-validation-for="PhotoFile" class="qz-account-form__field-error"></span>
+        <span class="qz-account-form__help">
+          JPEG, PNG, WebP, or TIFF. Max 20&nbsp;MB. The original is kept for the archive; a web copy and thumbnail are generated automatically.
+        </span>
+      </label>
+
+      <button type="submit" class="qz-button">Submit for review</button>
+    </form>
+  </div>
+</section>

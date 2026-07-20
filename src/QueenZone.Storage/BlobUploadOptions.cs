@@ -66,8 +66,14 @@ public sealed class BlobUploadOptions
             },
             [BlobUploadContainers.Photos] = new()
             {
-                MaxBytes = 15 * 1024 * 1024,
-                AllowedContentTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"],
+                MaxBytes = 20 * 1024 * 1024,
+                AllowedContentTypes =
+                [
+                    "image/jpeg",
+                    "image/png",
+                    "image/webp",
+                    "image/tiff",
+                ],
             },
             [BlobUploadContainers.Articles] = new()
             {
