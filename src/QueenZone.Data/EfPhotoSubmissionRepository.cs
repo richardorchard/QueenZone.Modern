@@ -229,17 +229,19 @@ public sealed class EfPhotoSubmissionRepository(QueenZoneDbContext dbContext) : 
         int maxCount,
         CancellationToken cancellationToken = default)
     {
+        // Materialize first: SQLite EF provider can't translate DateTimeOffset comparisons.
         var rows = await dbContext.PhotoSubmissions
             .AsNoTracking()
-            .Where(r => r.SubmittedAt >= monthStart)
             .Select(r => new
             {
                 r.SubmitterMemberId,
                 DisplayName = r.Submitter != null ? r.Submitter.DisplayName : string.Empty,
+                r.SubmittedAt,
             })
             .ToListAsync(cancellationToken);
 
         return rows
+            .Where(r => r.SubmittedAt >= monthStart)
             .GroupBy(r => r.SubmitterMemberId)
             .Select(g => new SubmissionContributor(
                 g.Key,

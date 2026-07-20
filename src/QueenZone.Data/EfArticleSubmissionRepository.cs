@@ -289,17 +289,19 @@ public sealed class EfArticleSubmissionRepository(QueenZoneDbContext dbContext) 
         int maxCount,
         CancellationToken ct = default)
     {
+        // Materialize first: SQLite EF provider can't translate DateTimeOffset? comparisons.
         var rows = await dbContext.ArticleSubmissions
             .AsNoTracking()
-            .Where(a => a.SubmittedAt.HasValue && a.SubmittedAt!.Value >= monthStart)
             .Select(a => new
             {
                 MemberId = a.AuthorMemberId,
                 DisplayName = a.Author != null ? a.Author.DisplayName : string.Empty,
+                a.SubmittedAt,
             })
             .ToListAsync(ct);
 
         return rows
+            .Where(a => a.SubmittedAt.HasValue && a.SubmittedAt.Value >= monthStart)
             .GroupBy(a => a.MemberId)
             .Select(g => new SubmissionContributor(
                 g.Key,
