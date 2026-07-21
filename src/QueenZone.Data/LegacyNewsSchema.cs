@@ -1,8 +1,11 @@
 using System.Diagnostics.CodeAnalysis;
-using Microsoft.Data.SqlClient;
 
 namespace QueenZone.Data;
 
+/// <summary>
+/// Legacy <c>NEWS_T</c> column-availability probes. Latest-row / published projection
+/// SQL lives in <see cref="PublishedNewsQuery"/>.
+/// </summary>
 public static class LegacyNewsSchema
 {
     public sealed class NewsColumnAvailability
@@ -18,103 +21,17 @@ public static class LegacyNewsSchema
         public bool HasEditorEmailColumn { get; set; }
     }
 
-    public static string BuildPublishedNewsCte(bool includeSlugColumn)
-    {
-        var slugProjection = includeSlugColumn
-            ? "SLUG AS Slug"
-            : "CAST(NULL AS nvarchar(200)) AS Slug";
+    /// <inheritdoc cref="PublishedNewsQuery.BuildPublishedNewsCte"/>
+    public static string BuildPublishedNewsCte(bool includeSlugColumn) =>
+        PublishedNewsQuery.BuildPublishedNewsCte(includeSlugColumn);
 
-        return $"""
-            WITH PublishedNews AS (
-                SELECT
-                    NEWS_ID AS Id,
-                    TITLE AS Title,
-                    {slugProjection},
-                    ISNULL(EXCERPT, '') AS Excerpt,
-                    ISNULL(ARTICLE, '') AS Body,
-                    [DATE] AS PublishedAt,
-                    SOURCE_URL AS SourceUrl,
-                    CAST(CASE WHEN DISPLAY = 1 THEN 1 ELSE 0 END AS bit) AS IsPublished,
-                    ROW_NUMBER() OVER (PARTITION BY NEWS_ID ORDER BY [DATE] DESC, NEWS_ID DESC) AS RowNumber
-                FROM NEWS_T
-                WHERE DISPLAY = 1
-            )
-            """;
-    }
-
+    /// <inheritdoc cref="PublishedNewsQuery.BuildAdminLatestNewsSql"/>
     public static string BuildAdminLatestNewsSql(NewsColumnAvailability columns) =>
-        BuildAdminLatestNewsCte(columns) + """
+        PublishedNewsQuery.BuildAdminLatestNewsSql(columns);
 
-            SELECT
-                NEWS_ID,
-                TITLE,
-                EXCERPT,
-                ARTICLE,
-                [DATE],
-                [DATE] AS PublishedAt,
-                SOURCE_URL,
-                CASE WHEN DISPLAY = 1 THEN 1 ELSE 0 END AS DISPLAY,
-                SLUG,
-                CREATED_AT,
-                UPDATED_AT,
-                EDITOR_EMAIL,
-                USER_ID,
-                NEWS_ID AS NewsId,
-                TYPE,
-                QUEEN_ONLINE
-            FROM LatestNews
-            WHERE RowNumber = 1
-            """;
-
+    /// <inheritdoc cref="PublishedNewsQuery.BuildAdminLatestNewsCountSql"/>
     public static string BuildAdminLatestNewsCountSql(NewsColumnAvailability columns) =>
-        BuildAdminLatestNewsCte(columns) + """
-
-            SELECT COUNT(*) AS Value
-            FROM LatestNews
-            WHERE RowNumber = 1
-            """;
-
-    private static string BuildAdminLatestNewsCte(NewsColumnAvailability columns)
-    {
-        var sourceUrlProjection = columns.HasSourceUrlColumn
-            ? "SOURCE_URL"
-            : "CAST(NULL AS varchar(500)) AS SOURCE_URL";
-        var slugProjection = columns.HasSlugColumn
-            ? "SLUG"
-            : "CAST(NULL AS nvarchar(200)) AS SLUG";
-        var createdAtProjection = columns.HasCreatedAtColumn
-            ? "CREATED_AT"
-            : "CAST(NULL AS datetime2) AS CREATED_AT";
-        var updatedAtProjection = columns.HasUpdatedAtColumn
-            ? "UPDATED_AT"
-            : "CAST(NULL AS datetime2) AS UPDATED_AT";
-        var editorEmailProjection = columns.HasEditorEmailColumn
-            ? "EDITOR_EMAIL"
-            : "CAST(NULL AS nvarchar(256)) AS EDITOR_EMAIL";
-
-        return $"""
-
-            WITH LatestNews AS (
-                SELECT
-                    NEWS_ID,
-                    ISNULL(TITLE, '') AS TITLE,
-                    ISNULL(EXCERPT, '') AS EXCERPT,
-                    ISNULL(ARTICLE, '') AS ARTICLE,
-                    [DATE],
-                    {sourceUrlProjection},
-                    DISPLAY,
-                    {slugProjection},
-                    {createdAtProjection},
-                    {updatedAtProjection},
-                    {editorEmailProjection},
-                    USER_ID,
-                    CAST(ISNULL(TYPE, 0) AS int) AS TYPE,
-                    CAST(ISNULL(QUEEN_ONLINE, 0) AS int) AS QUEEN_ONLINE,
-                    ROW_NUMBER() OVER (PARTITION BY NEWS_ID ORDER BY [DATE] DESC, NEWS_ID DESC) AS RowNumber
-                FROM NEWS_T
-            )
-            """;
-    }
+        PublishedNewsQuery.BuildAdminLatestNewsCountSql(columns);
 
     [ExcludeFromCodeCoverage] // SQL Server COL_LENGTH probe.
     internal static bool HasSlugColumn(string connectionString)

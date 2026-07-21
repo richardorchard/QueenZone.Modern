@@ -28,8 +28,8 @@ public sealed class EfAdminNewsRepository : IAdminNewsRepository
         else
         {
             var columns = LegacyNewsSchema.GetNewsColumnAvailability(connectionString);
-            latestNewsSql = LegacyNewsSchema.BuildAdminLatestNewsSql(columns);
-            latestNewsCountSql = LegacyNewsSchema.BuildAdminLatestNewsCountSql(columns);
+            latestNewsSql = PublishedNewsQuery.BuildAdminLatestNewsSql(columns);
+            latestNewsCountSql = PublishedNewsQuery.BuildAdminLatestNewsCountSql(columns);
         }
     }
 

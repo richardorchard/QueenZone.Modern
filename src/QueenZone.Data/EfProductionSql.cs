@@ -74,14 +74,14 @@ internal static class EfProductionSql
                     IsPublished,
                     Slug
                 FROM PublishedNews
-                WHERE RowNumber = 1
+                WHERE {PublishedNewsQuery.LatestRowFilter}
                 ORDER BY PublishedAt DESC, Id DESC
                 """,
-            publishedNewsCte + """
+            publishedNewsCte + $"""
 
                 SELECT COUNT(*) AS Value
                 FROM PublishedNews
-                WHERE RowNumber = 1
+                WHERE {PublishedNewsQuery.LatestRowFilter}
                 """,
             (offset, pageSize) => publishedNewsCte + $"""
 
@@ -95,7 +95,7 @@ internal static class EfProductionSql
                     IsPublished,
                     Slug
                 FROM PublishedNews
-                WHERE RowNumber = 1
+                WHERE {PublishedNewsQuery.LatestRowFilter}
                 ORDER BY PublishedAt DESC, Id DESC
                 OFFSET {offset} ROWS FETCH NEXT {pageSize} ROWS ONLY
                 """,
@@ -111,10 +111,10 @@ internal static class EfProductionSql
                     IsPublished,
                     Slug
                 FROM PublishedNews
-                WHERE RowNumber = 1
+                WHERE {PublishedNewsQuery.LatestRowFilter}
                   AND Id = {id}
                 """,
-            publishedNewsCte + """
+            publishedNewsCte + $"""
 
                 SELECT
                     Id,
@@ -122,7 +122,7 @@ internal static class EfProductionSql
                     PublishedAt,
                     Slug
                 FROM PublishedNews
-                WHERE RowNumber = 1
+                WHERE {PublishedNewsQuery.LatestRowFilter}
                 ORDER BY PublishedAt DESC, Id DESC
                 """);
 
