@@ -29,6 +29,32 @@
 <div class="admin-shell">
   <h1 class="admin-dashboard__title">Dashboard</h1>
 
+  <section class="admin-dashboard__section" aria-labelledby="admin-sections-heading">
+    <h2 id="admin-sections-heading" class="admin-dashboard__section-title">Admin sections</h2>
+    <nav class="admin-dashboard__nav" aria-label="Admin sections">
+      <a class="admin-dashboard__nav-link" href="/admin/news">
+        <span class="admin-dashboard__nav-link-title">News articles</span>
+        <span class="admin-dashboard__nav-link-desc">Create, edit, and publish editorial news</span>
+      </a>
+      <a class="admin-dashboard__nav-link" href="/admin/news-discovery">
+        <span class="admin-dashboard__nav-link-title">AI discovery</span>
+        <span class="admin-dashboard__nav-link-desc">Review AI-discovered news candidates</span>
+      </a>
+      <a class="admin-dashboard__nav-link" href="/admin/photo-submissions">
+        <span class="admin-dashboard__nav-link-title">Photo submissions</span>
+        <span class="admin-dashboard__nav-link-desc">Review member photo uploads</span>
+      </a>
+      <a class="admin-dashboard__nav-link" href="/admin/news-suggestions">
+        <span class="admin-dashboard__nav-link-title">News suggestions</span>
+        <span class="admin-dashboard__nav-link-desc">Review member news tips</span>
+      </a>
+      <a class="admin-dashboard__nav-link" href="/admin/articles">
+        <span class="admin-dashboard__nav-link-title">Article submissions</span>
+        <span class="admin-dashboard__nav-link-desc">Review member article drafts</span>
+      </a>
+    </nav>
+  </section>
+
   <section class="admin-dashboard__section">
     <h2 class="admin-dashboard__section-title">Members</h2>
     <div class="admin-dashboard__stats-row">
@@ -94,14 +120,6 @@
       <p class="admin-dashboard__empty">No logins recorded yet — login timestamps are tracked from this release onwards.</p>
     </section>
   }
-
-  <section class="admin-dashboard__section">
-    <h2 class="admin-dashboard__section-title">Content</h2>
-    <div class="admin-dashboard__link-list">
-      <a class="admin-dashboard__content-link" href="/admin/news">Manage news articles</a>
-      <a class="admin-dashboard__content-link" href="/admin/news-discovery">AI discovery queue</a>
-    </div>
-  </section>
 
   <section class="admin-dashboard__section">
     <h2 class="admin-dashboard__section-title">Submission queue</h2>
