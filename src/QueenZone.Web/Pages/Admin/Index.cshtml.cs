@@ -9,12 +9,16 @@ public sealed class IndexModel(
     IMemberAccountRepository memberAccountRepository,
     IPhotoSubmissionRepository photoSubmissionRepository,
     INewsSuggestionRepository newsSuggestionRepository,
-    IArticleSubmissionRepository articleSubmissionRepository) : PageModel
+    IArticleSubmissionRepository articleSubmissionRepository,
+    INewsDiscoveryRepository newsDiscoveryRepository,
+    INewsRepository newsRepository,
+    IArticlesRepository articlesRepository) : PageModel
 {
     public MemberStats MemberStats { get; private set; } = null!;
     public IReadOnlyList<RecentLogin> RecentLogins { get; private set; } = [];
     public IReadOnlyList<DailyRegistration> DailyRegistrations { get; private set; } = [];
     public SubmissionQueueStats SubmissionQueue { get; private set; } = SubmissionQueueStats.Empty;
+    public ContentPipelineStats ContentPipeline { get; private set; } = ContentPipelineStats.Empty;
 
     public override void OnPageHandlerExecuting(PageHandlerExecutingContext context)
     {
@@ -41,10 +45,17 @@ public sealed class IndexModel(
         var newsContributorsTask = newsSuggestionRepository.GetTopContributorsThisMonthAsync(monthStart, 10, cancellationToken);
         var articleContributorsTask = articleSubmissionRepository.GetTopContributorsThisMonthAsync(monthStart, 10, cancellationToken);
 
+        var pendingCandidatesTask = newsDiscoveryRepository.CountCandidatesAsync(
+            NewsCandidateStatus.NeedsReview, cancellationToken);
+        var aiPipelineTask = newsDiscoveryRepository.GetAiPipelineHealthAsync(utcNow, cancellationToken);
+        var latestNewsTask = newsRepository.GetLatestAsync(10, cancellationToken);
+        var latestArticlesTask = articlesRepository.GetLatestAsync(10, cancellationToken);
+
         await Task.WhenAll(
             memberStatsTask, recentLoginsTask, dailyRegistrationsTask,
             photoCountsTask, newsCountsTask, articleCountsTask,
-            photoContributorsTask, newsContributorsTask, articleContributorsTask);
+            photoContributorsTask, newsContributorsTask, articleContributorsTask,
+            pendingCandidatesTask, aiPipelineTask, latestNewsTask, latestArticlesTask);
 
         MemberStats = await memberStatsTask;
         RecentLogins = await recentLoginsTask;
@@ -61,6 +72,11 @@ public sealed class IndexModel(
             await newsCountsTask,
             await articleCountsTask,
             topContributors);
+
+        ContentPipeline = new ContentPipelineStats(
+            await pendingCandidatesTask,
+            await aiPipelineTask,
+            MergeRecentlyPublished(await latestNewsTask, await latestArticlesTask, maxCount: 10));
 
         return Page();
     }
@@ -79,6 +95,27 @@ public sealed class IndexModel(
                     is { } name ? name : "Unknown member",
                 g.Sum(c => c.Count)))
             .OrderByDescending(c => c.Count)
+            .Take(maxCount)
+            .ToList();
+    }
+
+    internal static IReadOnlyList<RecentlyPublishedDashboardItem> MergeRecentlyPublished(
+        IReadOnlyList<NewsItem> news,
+        IReadOnlyList<ArticleItem> articles,
+        int maxCount)
+    {
+        return news
+            .Select(item => new RecentlyPublishedDashboardItem(
+                item.Title,
+                item.PublishedAt,
+                "News",
+                NewsRoutes.GetNewsDetailPath(item)))
+            .Concat(articles.Select(item => new RecentlyPublishedDashboardItem(
+                item.Title,
+                item.PublishedAt,
+                "Article",
+                ArticlesRoutes.GetArticleDetailPath(item))))
+            .OrderByDescending(item => item.PublishedAt)
             .Take(maxCount)
             .ToList();
     }

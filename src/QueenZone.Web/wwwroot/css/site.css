@@ -2074,6 +2074,17 @@ body.qz-menu-lock .qz-masthead {
   border-color: var(--border-strong);
 }
 
+.admin-dashboard__queue-tile--amber {
+  border-color: #c9852a;
+  background: #fff8ef;
+}
+
+.admin-dashboard__queue-tile-warn {
+  margin-top: 0.35rem;
+  font-size: 0.8125rem;
+  color: #8a5a12;
+}
+
 .admin-dashboard__queue-tile-label {
   font-size: 0.875rem;
   color: var(--text-muted);
@@ -2131,6 +2142,45 @@ body.qz-menu-lock .qz-masthead {
 .admin-dashboard__contributors-count {
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
+}
+
+.admin-dashboard__published-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.admin-dashboard__published-item {
+  display: grid;
+  grid-template-columns: 4.5rem 1fr auto;
+  gap: var(--space-3);
+  align-items: baseline;
+}
+
+.admin-dashboard__published-kind {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.admin-dashboard__published-title {
+  color: inherit;
+  text-decoration: none;
+}
+
+.admin-dashboard__published-title:hover,
+.admin-dashboard__published-title:focus-visible {
+  text-decoration: underline;
+}
+
+.admin-dashboard__published-time {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  white-space: nowrap;
 }
 
 .admin-form-panel {

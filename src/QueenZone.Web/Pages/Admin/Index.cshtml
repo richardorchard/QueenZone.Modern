@@ -122,6 +122,68 @@
   }
 
   <section class="admin-dashboard__section">
+    <h2 class="admin-dashboard__section-title">Content pipeline</h2>
+    <div class="admin-dashboard__queue-tiles">
+      <a class="admin-dashboard__queue-tile" href="/admin/news-discovery?status=NeedsReview">
+        <span class="admin-dashboard__queue-tile-label">AI discovery</span>
+        <span class="admin-dashboard__queue-tile-count">@Model.ContentPipeline.PendingCandidates</span>
+        <span class="admin-dashboard__queue-tile-sub">awaiting review</span>
+      </a>
+
+      @{
+        var ai = Model.ContentPipeline.AiPipeline;
+        var aiStale = ai.IsStale(DateTime.UtcNow);
+        var aiTileClass = aiStale
+            ? "admin-dashboard__queue-tile admin-dashboard__queue-tile--amber"
+            : "admin-dashboard__queue-tile";
+      }
+      <div class="@aiTileClass" role="group" aria-label="AI pipeline health">
+        <span class="admin-dashboard__queue-tile-label">AI pipeline</span>
+        <span class="admin-dashboard__queue-tile-count">@ai.RunsLast24Hours</span>
+        <span class="admin-dashboard__queue-tile-sub">runs in last 24 h</span>
+        <span class="admin-dashboard__queue-tile-meta">
+          Errors: @ai.ErrorCountLast24Hours
+          &nbsp;&middot;&nbsp;
+          @if (ai.LastSuccessfulRunAtUtc is { } lastSuccess)
+          {
+            <text>Last success: @FormatRelative(lastSuccess)</text>
+          }
+          else
+          {
+            <text>Last success: never</text>
+          }
+        </span>
+        @if (aiStale)
+        {
+          <span class="admin-dashboard__queue-tile-warn">No successful run in over 25 hours</span>
+        }
+      </div>
+    </div>
+
+    <h3 class="admin-dashboard__contributors-title">Recently published</h3>
+    @if (Model.ContentPipeline.RecentlyPublished.Count > 0)
+    {
+      <ul class="admin-dashboard__published-list">
+        @foreach (var item in Model.ContentPipeline.RecentlyPublished)
+        {
+          <li class="admin-dashboard__published-item">
+            <span class="admin-dashboard__published-kind">@item.Kind</span>
+            <a class="admin-dashboard__published-title" href="@item.Href">@item.Title</a>
+            <time class="admin-dashboard__published-time"
+                  datetime="@item.PublishedAt.ToString("O")">
+              @FormatRelative(item.PublishedAt)
+            </time>
+          </li>
+        }
+      </ul>
+    }
+    else
+    {
+      <p class="admin-dashboard__empty">No published news or articles yet.</p>
+    }
+  </section>
+
+  <section class="admin-dashboard__section">
     <h2 class="admin-dashboard__section-title">Submission queue</h2>
     <div class="admin-dashboard__queue-tiles">
 

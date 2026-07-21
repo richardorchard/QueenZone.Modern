@@ -488,6 +488,32 @@ public sealed class EfNewsDiscoveryRepository(QueenZoneDbContext dbContext) : IN
         return spend;
     }
 
+    public Task<int> CountCandidatesAsync(NewsCandidateStatus status, CancellationToken cancellationToken = default) =>
+        dbContext.NewsCandidates
+            .AsNoTracking()
+            .CountAsync(candidate => candidate.Status == status, cancellationToken);
+
+    public async Task<NewsAiPipelineHealth> GetAiPipelineHealthAsync(DateTime utcNow, CancellationToken cancellationToken = default)
+    {
+        var windowStart = utcNow.AddHours(-24);
+        var runs = await dbContext.NewsAiRuns
+            .AsNoTracking()
+            .Select(run => new { run.Status, run.StartedAt, run.CompletedAt })
+            .ToListAsync(cancellationToken);
+
+        var runsLast24Hours = runs.Count(run => run.StartedAt >= windowStart);
+        var errorCountLast24Hours = runs.Count(run =>
+            run.Status == NewsAiRunStatus.Failed
+            && (run.CompletedAt ?? run.StartedAt) >= windowStart);
+        var lastSuccessfulRunAtUtc = runs
+            .Where(run => run.Status == NewsAiRunStatus.Succeeded && run.CompletedAt is not null)
+            .Select(run => run.CompletedAt)
+            .DefaultIfEmpty()
+            .Max();
+
+        return new NewsAiPipelineHealth(runsLast24Hours, lastSuccessfulRunAtUtc, errorCountLast24Hours);
+    }
+
     public async Task<NewsAgentDraft?> GetDraftByCandidateIdAsync(int candidateId, CancellationToken cancellationToken = default)
     {
         var draft = await dbContext.NewsAgentDrafts
