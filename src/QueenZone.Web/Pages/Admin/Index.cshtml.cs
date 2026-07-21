@@ -28,39 +28,29 @@ public sealed class IndexModel(
         var utcNowOffset = DateTimeOffset.UtcNow;
         var monthStart = new DateTimeOffset(utcNow.Year, utcNow.Month, 1, 0, 0, 0, TimeSpan.Zero);
 
-        var memberStatsTask = memberAccountRepository.GetStatsAsync(utcNow, cancellationToken);
-        var recentLoginsTask = memberAccountRepository.GetRecentLoginsAsync(5, cancellationToken);
-        var dailyRegistrationsTask = memberAccountRepository.GetDailyRegistrationsAsync(
+        // Await sequentially: all EF repositories share one scoped QueenZoneDbContext,
+        // and DbContext is not safe for concurrent operations.
+        MemberStats = await memberAccountRepository.GetStatsAsync(utcNow, cancellationToken);
+        RecentLogins = await memberAccountRepository.GetRecentLoginsAsync(5, cancellationToken);
+        DailyRegistrations = await memberAccountRepository.GetDailyRegistrationsAsync(
             DateOnly.FromDateTime(utcNow).AddDays(-29), cancellationToken);
 
-        var photoCountsTask = photoSubmissionRepository.GetDashboardCountsAsync(utcNowOffset, cancellationToken);
-        var newsCountsTask = newsSuggestionRepository.GetDashboardCountsAsync(utcNowOffset, cancellationToken);
-        var articleCountsTask = articleSubmissionRepository.GetDashboardCountsAsync(utcNowOffset, cancellationToken);
+        var photoCounts = await photoSubmissionRepository.GetDashboardCountsAsync(utcNowOffset, cancellationToken);
+        var newsCounts = await newsSuggestionRepository.GetDashboardCountsAsync(utcNowOffset, cancellationToken);
+        var articleCounts = await articleSubmissionRepository.GetDashboardCountsAsync(utcNowOffset, cancellationToken);
 
-        var photoContributorsTask = photoSubmissionRepository.GetTopContributorsThisMonthAsync(monthStart, 10, cancellationToken);
-        var newsContributorsTask = newsSuggestionRepository.GetTopContributorsThisMonthAsync(monthStart, 10, cancellationToken);
-        var articleContributorsTask = articleSubmissionRepository.GetTopContributorsThisMonthAsync(monthStart, 10, cancellationToken);
-
-        await Task.WhenAll(
-            memberStatsTask, recentLoginsTask, dailyRegistrationsTask,
-            photoCountsTask, newsCountsTask, articleCountsTask,
-            photoContributorsTask, newsContributorsTask, articleContributorsTask);
-
-        MemberStats = await memberStatsTask;
-        RecentLogins = await recentLoginsTask;
-        DailyRegistrations = await dailyRegistrationsTask;
-
-        var topContributors = CombineTopContributors(
-            await photoContributorsTask,
-            await newsContributorsTask,
-            await articleContributorsTask,
-            maxCount: 5);
+        var photoContributors = await photoSubmissionRepository.GetTopContributorsThisMonthAsync(
+            monthStart, 10, cancellationToken);
+        var newsContributors = await newsSuggestionRepository.GetTopContributorsThisMonthAsync(
+            monthStart, 10, cancellationToken);
+        var articleContributors = await articleSubmissionRepository.GetTopContributorsThisMonthAsync(
+            monthStart, 10, cancellationToken);
 
         SubmissionQueue = new SubmissionQueueStats(
-            await photoCountsTask,
-            await newsCountsTask,
-            await articleCountsTask,
-            topContributors);
+            photoCounts,
+            newsCounts,
+            articleCounts,
+            CombineTopContributors(photoContributors, newsContributors, articleContributors, maxCount: 5));
 
         return Page();
     }
@@ -75,8 +65,8 @@ public sealed class IndexModel(
             .GroupBy(c => c.MemberId)
             .Select(g => new SubmissionContributor(
                 g.Key,
-                g.First(c => !string.IsNullOrWhiteSpace(c.DisplayName)).DisplayName
-                    is { } name ? name : "Unknown member",
+                g.Select(c => c.DisplayName).FirstOrDefault(name => !string.IsNullOrWhiteSpace(name))
+                    ?? "Unknown member",
                 g.Sum(c => c.Count)))
             .OrderByDescending(c => c.Count)
             .Take(maxCount)
