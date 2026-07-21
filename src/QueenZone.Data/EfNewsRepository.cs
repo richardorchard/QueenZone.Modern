@@ -21,7 +21,7 @@ public sealed class EfNewsRepository : INewsRepository
         this.dbContext = dbContext;
         var connectionString = dbContext.Database.GetConnectionString()
             ?? throw new InvalidOperationException("QueenZone legacy database connection string is not configured.");
-        var publishedNewsCte = LegacyNewsSchema.BuildPublishedNewsCte(
+        var publishedNewsCte = PublishedNewsQuery.BuildPublishedNewsCte(
             LegacyNewsSchema.HasSlugColumn(connectionString));
         (latestSql, countSql, archivePageSql, byIdSql, sitemapSql) =
             EfProductionSql.CreateNewsQueries(publishedNewsCte);

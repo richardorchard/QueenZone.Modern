@@ -37,7 +37,7 @@ Use **EF Core as the single data-access library** in `QueenZone.Data`, while kee
 
 | Content / concern | Interface | SQL implementation | Access style | Notes |
 | --- | --- | --- | --- | --- |
-| Public news archive | `INewsRepository` | `EfNewsRepository` | EF Core + SQL | Legacy `NEWS_T` latest-row projections |
+| Public news archive | `INewsRepository` | `EfNewsRepository` | EF Core + SQL | Legacy `NEWS_T` latest-row projections via `PublishedNewsQuery` (extension point for future modern approved-news tables, issue #7) |
 | Articles | `IArticlesRepository` | `EfArticlesRepository` | EF Core + SQL | Legacy reads |
 | Biography | `IBiographyRepository` | `EfBiographyRepository` | EF Core + stored procedures | `Q_BIO_LIST_SP`, `Q_BIO_DISPLAY_SP` |
 | Photography | `IPhotoRepository` | `EfPhotoRepository` | EF Core + stored procedures | `Q_PICTURE_CATEGORY_SP`, `Q_PIC_CAT_PAGE4_SP` (output params via `EfSql`) |
@@ -46,7 +46,7 @@ Use **EF Core as the single data-access library** in `QueenZone.Data`, while kee
 | Legacy member lookup | `ILegacyMemberLookupRepository` | `EfMemberLookupRepository` | EF Core + SQL | Legacy `USERS_T` read |
 | Forum (default) | `IForumRepository` | `ModernForumRepository` | EF Core + stored procedures | Modern `ModernForum*` tables; procs in `docs/sql/006-modern-forum-read-path.sql` |
 | Forum (rollback) | `IForumRepository` | `LegacyForumRepository` | EF Core + SQL / stored procedures | Opt-out via `ForumData:UseModernForumReads = false` |
-| Admin news writes | `IAdminNewsRepository` | `EfAdminNewsRepository` | EF Core (+ `FromSqlRaw` for legacy news projections) | Writes/migrations; hybrid SQL for `NEWS_T` reads used by admin |
+| Admin news writes | `IAdminNewsRepository` | `EfAdminNewsRepository` | EF Core (+ `FromSqlRaw` for legacy news projections) | Writes/migrations; hybrid SQL for `NEWS_T` reads; latest-row CTE from `PublishedNewsQuery` (same dedup expression as public, without published filter) |
 | News audit | `INewsAuditRepository` | `EfNewsAuditRepository` | EF Core | Modern audit table |
 | Member accounts | `IMemberAccountRepository` | `EfMemberAccountRepository` | EF Core | Modern tables |
 | News discovery / agent drafts | `INewsDiscoveryRepository` | `EfNewsDiscoveryRepository` | EF Core | Modern workflow tables |
