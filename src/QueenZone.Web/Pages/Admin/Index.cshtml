@@ -24,6 +24,21 @@
         return $"{x:F1},{y:F1}";
     }
     var polyline = string.Join(" ", sparkDays.Select((v, i) => SparkPoint(i, v)));
+
+    var trafficDaysByDate = Model.Traffic.DailySessionsLast30Days
+        .Where(d => d.Date != DateOnly.MinValue)
+        .ToDictionary(d => d.Date, d => d.Sessions);
+    var trafficDays = Enumerable.Range(0, 30)
+        .Select(i => utcToday.AddDays(i - 29))
+        .Select(d => trafficDaysByDate.TryGetValue(d, out var c) ? c : 0)
+        .ToList();
+    var trafficMax = trafficDays.Max() is > 0 ? trafficDays.Max() : 1;
+
+    string TrafficBarHeight(int val)
+    {
+        var height = Math.Max(2, (int)Math.Round((val / (double)trafficMax) * 42));
+        return $"{height}px";
+    }
 }
 
 <div class="admin-shell">
@@ -92,6 +107,66 @@
                   points="@polyline" />
       </svg>
     </div>
+  </section>
+
+  <section class="admin-dashboard__section">
+    <h2 class="admin-dashboard__section-title">Traffic</h2>
+
+    <div class="admin-dashboard__stats-row">
+      <div class="admin-dashboard__stat">
+        <span class="admin-dashboard__stat-value">@(Model.Traffic.IsAvailable ? Model.Traffic.SessionsLast7Days.ToString("N0") : "Unavailable")</span>
+        <span class="admin-dashboard__stat-label">Sessions, last 7 days</span>
+      </div>
+      <div class="admin-dashboard__stat">
+        <span class="admin-dashboard__stat-value">@(Model.Traffic.IsAvailable ? Model.Traffic.PageViewsLast7Days.ToString("N0") : "Unavailable")</span>
+        <span class="admin-dashboard__stat-label">Page views, last 7 days</span>
+      </div>
+      <div class="admin-dashboard__stat">
+        <span class="admin-dashboard__stat-value">@(Model.Traffic.IsAvailable ? Model.Traffic.ActiveUsersLast7Days.ToString("N0") : "Unavailable")</span>
+        <span class="admin-dashboard__stat-label">Active users, last 7 days</span>
+      </div>
+    </div>
+
+    @if (Model.Traffic.IsAvailable)
+    {
+      <div class="admin-dashboard__traffic-grid">
+        <div class="admin-dashboard__traffic-chart">
+          <span class="admin-dashboard__sparkline-label">Daily sessions, last 30 days</span>
+          <div class="admin-dashboard__traffic-bars" aria-label="Daily sessions for the last 30 days">
+            @foreach (var sessions in trafficDays)
+            {
+              <span class="admin-dashboard__traffic-bar"
+                    style="height: @TrafficBarHeight(sessions)"
+                    title="@sessions.ToString("N0") sessions"></span>
+            }
+          </div>
+        </div>
+
+        <div class="admin-dashboard__top-pages">
+          <h3 class="admin-dashboard__contributors-title">Top pages this week</h3>
+          @if (Model.Traffic.TopPagesThisWeek.Count > 0)
+          {
+            <ol class="admin-dashboard__top-pages-list">
+              @foreach (var page in Model.Traffic.TopPagesThisWeek)
+              {
+                <li class="admin-dashboard__top-pages-item">
+                  <span class="admin-dashboard__top-pages-path">@(page.Path)</span>
+                  <span class="admin-dashboard__top-pages-count">@(page.Views.ToString("N0"))</span>
+                </li>
+              }
+            </ol>
+          }
+          else
+          {
+            <p class="admin-dashboard__empty">No page views recorded for this week.</p>
+          }
+        </div>
+      </div>
+    }
+    else
+    {
+      <p class="admin-dashboard__empty">@Model.Traffic.UnavailableReason</p>
+    }
   </section>
 
   @if (Model.RecentLogins.Count > 0)

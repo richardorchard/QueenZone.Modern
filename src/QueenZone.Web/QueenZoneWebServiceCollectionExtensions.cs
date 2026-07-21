@@ -135,6 +135,8 @@ public static class QueenZoneWebServiceCollectionExtensions
         services.AddScoped<ForumPostRateLimiter>();
         services.AddScoped<ForumAttachmentValidator>();
         services.AddScoped<ForumAttachmentUploadService>();
+        services.AddSingleton<IGoogleAnalyticsDataClient, GoogleAnalyticsDataClient>();
+        services.AddScoped<IGoogleAnalyticsTrafficService, GoogleAnalyticsTrafficService>();
         // Header name used by the rich-text editor fetch() upload helper.
         services.AddAntiforgery(options =>
         {
