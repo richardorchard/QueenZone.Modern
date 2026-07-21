@@ -475,6 +475,33 @@ public sealed class SharedNewsDiscoveryStore
         }
     }
 
+    public int CountCandidates(NewsCandidateStatus status)
+    {
+        lock (sync)
+        {
+            return candidates.Count(candidate => candidate.Status == status);
+        }
+    }
+
+    public NewsAiPipelineHealth GetAiPipelineHealth(DateTime utcNow)
+    {
+        lock (sync)
+        {
+            var windowStart = utcNow.AddHours(-24);
+            var runsLast24Hours = aiRuns.Count(run => run.StartedAt >= windowStart);
+            var errorCountLast24Hours = aiRuns.Count(run =>
+                run.Status == NewsAiRunStatus.Failed
+                && (run.CompletedAt ?? run.StartedAt) >= windowStart);
+            var lastSuccessfulRunAtUtc = aiRuns
+                .Where(run => run.Status == NewsAiRunStatus.Succeeded && run.CompletedAt is not null)
+                .Select(run => (DateTime?)run.CompletedAt)
+                .DefaultIfEmpty()
+                .Max();
+
+            return new NewsAiPipelineHealth(runsLast24Hours, lastSuccessfulRunAtUtc, errorCountLast24Hours);
+        }
+    }
+
     public NewsAgentDraftEntity? GetDraftByCandidateId(int candidateId)
     {
         lock (sync)

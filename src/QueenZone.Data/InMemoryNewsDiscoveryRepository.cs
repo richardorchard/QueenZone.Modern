@@ -106,6 +106,12 @@ public sealed class InMemoryNewsDiscoveryRepository(SharedNewsDiscoveryStore sto
     public Task<decimal> GetEstimatedAiSpendUsdAsync(DateTime fromUtc, DateTime toUtc, CancellationToken cancellationToken = default) =>
         Task.FromResult(store.GetEstimatedAiSpendUsd(fromUtc, toUtc));
 
+    public Task<int> CountCandidatesAsync(NewsCandidateStatus status, CancellationToken cancellationToken = default) =>
+        Task.FromResult(store.CountCandidates(status));
+
+    public Task<NewsAiPipelineHealth> GetAiPipelineHealthAsync(DateTime utcNow, CancellationToken cancellationToken = default) =>
+        Task.FromResult(store.GetAiPipelineHealth(utcNow));
+
     public Task<NewsAgentDraft?> GetDraftByCandidateIdAsync(int candidateId, CancellationToken cancellationToken = default)
     {
         var draft = store.GetDraftByCandidateId(candidateId);

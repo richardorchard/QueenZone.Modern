@@ -150,6 +150,12 @@ internal sealed class ConfigurableNewsDiscoveryRepository(INewsDiscoveryReposito
     public Task<decimal> GetEstimatedAiSpendUsdAsync(DateTime fromUtc, DateTime toUtc, CancellationToken cancellationToken = default) =>
         inner.GetEstimatedAiSpendUsdAsync(fromUtc, toUtc, cancellationToken);
 
+    public Task<int> CountCandidatesAsync(NewsCandidateStatus status, CancellationToken cancellationToken = default) =>
+        inner.CountCandidatesAsync(status, cancellationToken);
+
+    public Task<NewsAiPipelineHealth> GetAiPipelineHealthAsync(DateTime utcNow, CancellationToken cancellationToken = default) =>
+        inner.GetAiPipelineHealthAsync(utcNow, cancellationToken);
+
     public Task<NewsAgentDraft?> GetDraftByCandidateIdAsync(int candidateId, CancellationToken cancellationToken = default) =>
         GetDraftByCandidateIdHandler?.Invoke(candidateId, cancellationToken)
         ?? inner.GetDraftByCandidateIdAsync(candidateId, cancellationToken);
