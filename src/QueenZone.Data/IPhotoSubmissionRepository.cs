@@ -30,4 +30,13 @@ public interface IPhotoSubmissionRepository
         string? rejectionReason,
         string? approvedCategory = null,
         CancellationToken cancellationToken = default);
+
+    Task<SubmissionTypeCounts> GetDashboardCountsAsync(
+        DateTimeOffset utcNow,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<SubmissionContributor>> GetTopContributorsThisMonthAsync(
+        DateTimeOffset monthStart,
+        int maxCount,
+        CancellationToken cancellationToken = default);
 }

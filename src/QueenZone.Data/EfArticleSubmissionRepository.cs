@@ -249,6 +249,69 @@ public sealed class EfArticleSubmissionRepository(QueenZoneDbContext dbContext) 
             .ToList();
     }
 
+    public async Task<SubmissionTypeCounts> GetDashboardCountsAsync(
+        DateTimeOffset utcNow,
+        CancellationToken ct = default)
+    {
+        var monthAgo = utcNow.AddDays(-30);
+
+        var rows = await dbContext.ArticleSubmissions
+            .AsNoTracking()
+            .Select(a => new { a.Status, a.SubmittedAt })
+            .ToListAsync(ct);
+
+        var today = utcNow.UtcDateTime.Date;
+        var weekAgo = today.AddDays(-6);
+
+        var pending = rows.Count(a =>
+            a.Status is ArticleSubmissionStatus.Submitted
+                or ArticleSubmissionStatus.UnderReview
+                or ArticleSubmissionStatus.ApprovedForPublishing);
+
+        var submitted = rows.Where(a => a.SubmittedAt.HasValue).ToList();
+        var receivedToday = submitted.Count(a => a.SubmittedAt!.Value.UtcDateTime.Date >= today);
+        var receivedThisWeek = submitted.Count(a => a.SubmittedAt!.Value.UtcDateTime.Date >= weekAgo);
+
+        var last30 = submitted.Where(a => a.SubmittedAt!.Value >= monthAgo).ToList();
+        var approvedLast30 = last30.Count(a =>
+            a.Status is ArticleSubmissionStatus.Published or ArticleSubmissionStatus.ApprovedForPublishing);
+        var rejectedLast30 = last30.Count(a =>
+            a.Status is ArticleSubmissionStatus.Rejected or ArticleSubmissionStatus.RequiresRevision);
+        var pendingLast30 = last30.Count(a =>
+            a.Status is ArticleSubmissionStatus.Submitted or ArticleSubmissionStatus.UnderReview);
+
+        return new SubmissionTypeCounts(
+            pending, receivedToday, receivedThisWeek, approvedLast30, rejectedLast30, pendingLast30);
+    }
+
+    public async Task<IReadOnlyList<SubmissionContributor>> GetTopContributorsThisMonthAsync(
+        DateTimeOffset monthStart,
+        int maxCount,
+        CancellationToken ct = default)
+    {
+        // Materialize first: SQLite EF provider can't translate DateTimeOffset? comparisons.
+        var rows = await dbContext.ArticleSubmissions
+            .AsNoTracking()
+            .Select(a => new
+            {
+                MemberId = a.AuthorMemberId,
+                DisplayName = a.Author != null ? a.Author.DisplayName : string.Empty,
+                a.SubmittedAt,
+            })
+            .ToListAsync(ct);
+
+        return rows
+            .Where(a => a.SubmittedAt.HasValue && a.SubmittedAt.Value >= monthStart)
+            .GroupBy(a => a.MemberId)
+            .Select(g => new SubmissionContributor(
+                g.Key,
+                g.FirstOrDefault(a => !string.IsNullOrWhiteSpace(a.DisplayName))?.DisplayName ?? "Unknown member",
+                g.Count()))
+            .OrderByDescending(c => c.Count)
+            .Take(maxCount)
+            .ToList();
+    }
+
     internal static int CountVisibleChars(string? html)
     {
         if (string.IsNullOrEmpty(html))

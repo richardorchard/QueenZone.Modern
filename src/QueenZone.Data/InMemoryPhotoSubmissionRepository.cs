@@ -206,6 +206,60 @@ public sealed class InMemoryPhotoSubmissionRepository : IPhotoSubmissionReposito
         }
     }
 
+    public Task<SubmissionTypeCounts> GetDashboardCountsAsync(
+        DateTimeOffset utcNow,
+        CancellationToken cancellationToken = default)
+    {
+        var today = utcNow.UtcDateTime.Date;
+        var weekAgo = today.AddDays(-6);
+        var monthAgo = utcNow.AddDays(-30);
+
+        lock (sync)
+        {
+            var pending = submissions.Count(r =>
+                r.Status is PhotoSubmissionStatus.Pending
+                    or PhotoSubmissionStatus.UnderReview
+                    or PhotoSubmissionStatus.NeedsInfo);
+
+            var receivedToday = submissions.Count(r => r.SubmittedAt.UtcDateTime.Date >= today);
+            var receivedThisWeek = submissions.Count(r => r.SubmittedAt.UtcDateTime.Date >= weekAgo);
+
+            var last30 = submissions.Where(r => r.SubmittedAt >= monthAgo).ToList();
+            var approvedLast30 = last30.Count(r => r.Status == PhotoSubmissionStatus.Approved);
+            var rejectedLast30 = last30.Count(r => r.Status == PhotoSubmissionStatus.Rejected);
+            var pendingLast30 = last30.Count(r =>
+                r.Status is PhotoSubmissionStatus.Pending
+                    or PhotoSubmissionStatus.UnderReview
+                    or PhotoSubmissionStatus.NeedsInfo);
+
+            return Task.FromResult(new SubmissionTypeCounts(
+                pending, receivedToday, receivedThisWeek, approvedLast30, rejectedLast30, pendingLast30));
+        }
+    }
+
+    public Task<IReadOnlyList<SubmissionContributor>> GetTopContributorsThisMonthAsync(
+        DateTimeOffset monthStart,
+        int maxCount,
+        CancellationToken cancellationToken = default)
+    {
+        lock (sync)
+        {
+            IReadOnlyList<SubmissionContributor> result = submissions
+                .Where(r => r.SubmittedAt >= monthStart)
+                .GroupBy(r => r.SubmitterMemberId)
+                .Select(g =>
+                {
+                    var member = resolveMember?.Invoke(g.Key);
+                    return new SubmissionContributor(g.Key, member?.DisplayName ?? "Unknown member", g.Count());
+                })
+                .OrderByDescending(c => c.Count)
+                .Take(maxCount)
+                .ToList();
+
+            return Task.FromResult(result);
+        }
+    }
+
     /// <summary>Test helper: audit entries written for a submission.</summary>
     public IReadOnlyList<PhotoSubmissionAuditLogEntity> GetAuditLogs(Guid submissionId)
     {
