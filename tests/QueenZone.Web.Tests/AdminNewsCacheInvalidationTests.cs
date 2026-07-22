@@ -216,8 +216,8 @@ public sealed partial class AdminNewsCacheInvalidationTests : IClassFixture<WebA
             new Dictionary<string, string>
             {
                 ["title"] = title,
-                ["excerpt"] = "Created for cache invalidation coverage.",
-                ["body"] = "Plain text body for cache invalidation coverage.",
+                ["excerpt"] = "Created to exercise cache invalidation.",
+                ["body"] = "Plain text body for cache invalidation.",
                 ["publishedAt"] = "2026-06-14"
             });
 

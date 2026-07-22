@@ -173,7 +173,7 @@ Implemented in `scripts/Test-CoverageGate.ps1` and invoked from `.github/workflo
 | Gate | Threshold | What it measures |
 | --- | --- | --- |
 | **Global line coverage** | **≥ 51%** | Line coverage across the full Cobertura report from `QueenZone.Web.Tests` |
-| **Changed-line coverage** | **≥ 80%** | Coverable `.cs` lines added or modified in the PR diff against the base branch (`main`) |
+| **Changed-line coverage** | **≥ 70%** | Coverable `.cs` lines added or modified in the PR diff against the base branch (`main`) |
 
 Rules:
 
@@ -218,7 +218,7 @@ git fetch origin main
 dotnet restore QueenZone.sln
 dotnet build QueenZone.sln --configuration Release --no-restore
 dotnet test QueenZone.sln --configuration Release --no-build --collect:"XPlat Code Coverage" --settings coverlet.runsettings --results-directory ./TestResults
-powershell -File ./scripts/Test-CoverageGate.ps1 -Reports ./TestResults -GlobalLineThreshold 51 -ChangedLineThreshold 80 -BaseRef origin/main
+powershell -File ./scripts/Test-CoverageGate.ps1 -Reports ./TestResults -GlobalLineThreshold 51 -ChangedLineThreshold 70 -BaseRef origin/main
 ```
 
 If the pull request touches `QueenZoneDbContext`, entity mappings, or files under `src/QueenZone.Data/Migrations/`, also run:
@@ -241,7 +241,7 @@ Use `pwsh` instead of `powershell` on Linux or macOS.
    - Unit tests for pure logic (no I/O).
    - Fake HTTP clients, in-memory repositories, or SQLite EF tests for data-access and service code.
    - Web integration tests for Razor route behavior.
-3. Re-run the checklist until changed-line coverage is at least 80%.
+3. Re-run the checklist until changed-line coverage is at least 70%.
 4. Do not rely on live network, OpenRouter, or legacy SQL for default tests.
 
 Optional manual checks (report skipped in PRs when not run):

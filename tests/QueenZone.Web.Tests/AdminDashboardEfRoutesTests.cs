@@ -9,7 +9,7 @@ using QueenZone.Web;
 namespace QueenZone.Web.Tests;
 
 /// <summary>
-/// EF/SQLite HTTP coverage for /admin. Guarantees the dashboard does not parallelize
+/// EF/SQLite HTTP regression test for /admin. Guarantees the dashboard does not parallelize
 /// queries on the shared scoped DbContext (which 500s in production).
 /// </summary>
 public sealed class AdminDashboardEfRoutesTests : IClassFixture<WebApplicationFactory<Program>>, IAsyncLifetime
