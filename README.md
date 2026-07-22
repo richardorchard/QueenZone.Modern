@@ -54,6 +54,19 @@ Open `coverage-report/index.html` to inspect the report. Coverage reports and ra
 
 Local secrets belong in `src/QueenZone.Web/appsettings.Local.json`, which is ignored by git. You can also set `ConnectionStrings__QueenZoneLegacy` in your shell or a local `.env` file for tooling that loads dotenv values. If no `ConnectionStrings:QueenZoneLegacy` value is present, the site uses sample news data so the first slice can still run locally.
 
+### Google Analytics dashboard traffic
+
+The admin dashboard can show GA4 traffic data when server-side credentials are configured. Local development works without these values; the dashboard shows an unavailable state instead of calling Google Analytics.
+
+Configure these as local secrets or app settings, never in committed files:
+
+```text
+Analytics__GoogleAnalyticsPropertyId=<GA4 property id>
+Analytics__GoogleAnalyticsServiceAccountJson=<service account JSON key>
+```
+
+Grant the service account Viewer access to the GA4 property. The dashboard caches GA4 responses for at least 60 minutes.
+
 ### Using live legacy data locally
 
 Live-data development is opt-in. Use it when you need to reproduce a production-only data mapping, SQL, or admin editorial issue. Prefer a local SQL Server copy for repeat debugging so normal local work does not depend on Azure SQL latency, firewall rules, or live database load.

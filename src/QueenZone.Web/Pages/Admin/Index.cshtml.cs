@@ -9,12 +9,15 @@ public sealed class IndexModel(
     IMemberAccountRepository memberAccountRepository,
     IPhotoSubmissionRepository photoSubmissionRepository,
     INewsSuggestionRepository newsSuggestionRepository,
-    IArticleSubmissionRepository articleSubmissionRepository) : PageModel
+    IArticleSubmissionRepository articleSubmissionRepository,
+    IGoogleAnalyticsTrafficService googleAnalyticsTrafficService) : PageModel
 {
     public MemberStats MemberStats { get; private set; } = null!;
     public IReadOnlyList<RecentLogin> RecentLogins { get; private set; } = [];
     public IReadOnlyList<DailyRegistration> DailyRegistrations { get; private set; } = [];
     public SubmissionQueueStats SubmissionQueue { get; private set; } = SubmissionQueueStats.Empty;
+    public GoogleAnalyticsTrafficSnapshot Traffic { get; private set; } =
+        GoogleAnalyticsTrafficSnapshot.Unavailable("Google Analytics traffic has not loaded.");
 
     public override void OnPageHandlerExecuting(PageHandlerExecutingContext context)
     {
@@ -51,6 +54,7 @@ public sealed class IndexModel(
             newsCounts,
             articleCounts,
             CombineTopContributors(photoContributors, newsContributors, articleContributors, maxCount: 5));
+        Traffic = await googleAnalyticsTrafficService.GetDashboardTrafficAsync(cancellationToken);
 
         return Page();
     }

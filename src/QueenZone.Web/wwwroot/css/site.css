@@ -2021,6 +2021,57 @@ body.qz-menu-lock .qz-masthead {
   color: var(--qz-charcoal);
 }
 
+.admin-dashboard__traffic-grid {
+  display: grid;
+  gap: var(--space-5);
+  grid-template-columns: minmax(0, 1.4fr) minmax(16rem, 0.8fr);
+  align-items: start;
+}
+
+.admin-dashboard__traffic-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.admin-dashboard__traffic-bars {
+  display: grid;
+  grid-template-columns: repeat(30, minmax(0, 1fr));
+  align-items: end;
+  gap: 3px;
+  min-height: 48px;
+  max-width: 30rem;
+  color: var(--qz-charcoal);
+}
+
+.admin-dashboard__traffic-bar {
+  display: block;
+  min-height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: currentColor;
+}
+
+.admin-dashboard__top-pages-list {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.admin-dashboard__top-pages-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  padding: 0.25rem 0;
+}
+
+.admin-dashboard__top-pages-path {
+  overflow-wrap: anywhere;
+}
+
+.admin-dashboard__top-pages-count {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
 .admin-dashboard__login-list {
   list-style: none;
   margin: 0;
@@ -2131,6 +2182,12 @@ body.qz-menu-lock .qz-masthead {
 .admin-dashboard__contributors-count {
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 640px) {
+  .admin-dashboard__traffic-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .admin-form-panel {
