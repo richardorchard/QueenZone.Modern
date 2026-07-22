@@ -1,10 +1,12 @@
 using System.Globalization;
+using System.Diagnostics.CodeAnalysis;
 using Google.Analytics.Data.V1Beta;
 using Google.Apis.Auth.OAuth2;
 using Microsoft.Extensions.Options;
 
 namespace QueenZone.Web;
 
+[ExcludeFromCodeCoverage(Justification = "Thin Google SDK adapter; dashboard behavior and caching are covered with an injectable client.")]
 internal sealed class GoogleAnalyticsDataClient(IOptions<AnalyticsOptions> options) : IGoogleAnalyticsDataClient
 {
     public async Task<GoogleAnalyticsTrafficSnapshot> GetDashboardTrafficAsync(
