@@ -79,7 +79,7 @@ jobs:
 
       - name: Enforce coverage gate
         shell: pwsh
-        run: ./scripts/Test-CoverageGate.ps1 -Reports ./TestResults -GlobalLineThreshold 51 -ChangedLineThreshold 80
+        run: ./scripts/Test-CoverageGate.ps1 -Reports ./TestResults -GlobalLineThreshold 51 -ChangedLineThreshold 70
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v5

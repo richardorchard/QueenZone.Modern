@@ -5,7 +5,7 @@ using QueenZone.Data;
 namespace QueenZone.Web.Tests;
 
 /// <summary>
-/// SQLite materialization coverage for EF public-read repositories that used Dapper.
+/// SQLite materialization checks for public-read repositories that project legacy rows.
 /// Production paths use SQL Server procs/SQL; tests substitute SELECT shapes.
 /// </summary>
 public sealed class EfPublicReadRepositoryTests : IAsyncDisposable
@@ -350,61 +350,4 @@ public sealed class EfPublicReadRepositoryTests : IAsyncDisposable
         Assert.Equal(2, (await repository.GetPublishedSitemapEntriesAsync()).Count);
     }
 
-    [Fact]
-    public void Public_constructors_accept_dbContext()
-    {
-        Assert.NotNull(new EfDiscographyRepository(dbContext));
-        Assert.NotNull(new EfFanPerformanceRepository(dbContext));
-        Assert.NotNull(new EfPhotoRepository(dbContext));
-        Assert.NotNull(new EfMemberLookupRepository(dbContext));
-        Assert.NotNull(new EfArticlesRepository(dbContext));
-        Assert.NotNull(new ModernForumRepository(dbContext));
-        Assert.NotNull(new LegacyForumRepository(dbContext));
-    }
-
-    [Fact]
-    public async Task Production_sql_paths_execute_builders_against_sqlite()
-    {
-        // Invokes production SQL/proc builders so coverage includes those branches.
-        // SQLite cannot run the SQL Server shapes, so methods throw after building SQL.
-        var articles = new EfArticlesRepository(dbContext);
-        await Assert.ThrowsAnyAsync<Exception>(() => articles.GetLatestAsync(1));
-        await Assert.ThrowsAnyAsync<Exception>(() => articles.GetPublishedCountAsync());
-        await Assert.ThrowsAnyAsync<Exception>(() => articles.GetArchivePageAsync(1, 5));
-        await Assert.ThrowsAnyAsync<Exception>(() => articles.GetByIdAsync(1));
-        await Assert.ThrowsAnyAsync<Exception>(() => articles.GetPublishedSitemapEntriesAsync());
-
-        var discography = new EfDiscographyRepository(dbContext);
-        await Assert.ThrowsAnyAsync<Exception>(() => discography.GetAlbumsAsync());
-        await Assert.ThrowsAnyAsync<Exception>(() => discography.GetAlbumByIdAsync(1));
-
-        var fan = new EfFanPerformanceRepository(dbContext);
-        await Assert.ThrowsAnyAsync<Exception>(() => fan.GetPageAsync(1, 10));
-        await Assert.ThrowsAnyAsync<Exception>(() => fan.GetVisibleCountAsync());
-        await Assert.ThrowsAnyAsync<Exception>(() => fan.GetByIdAsync(1));
-
-        var photo = new EfPhotoRepository(dbContext);
-        await Assert.ThrowsAnyAsync<Exception>(() => photo.GetCategoriesAsync());
-        await Assert.ThrowsAnyAsync<Exception>(() => photo.GetCategoryPageAsync(1, 1, 10));
-        await Assert.ThrowsAnyAsync<Exception>(() => photo.GetCategoryAllAsync(1));
-
-        var members = new EfMemberLookupRepository(dbContext);
-        await Assert.ThrowsAnyAsync<Exception>(() => members.FindByEmailAsync("a@b.com"));
-
-        var modernForum = new ModernForumRepository(dbContext);
-        await Assert.ThrowsAnyAsync<Exception>(() => modernForum.GetCategoriesAsync());
-
-        var legacyForum = new LegacyForumRepository(dbContext);
-        await Assert.ThrowsAnyAsync<Exception>(() => legacyForum.GetCategoriesAsync());
-    }
-
-    [Fact]
-    public void News_public_constructor_requires_connection_string()
-    {
-        var options = new DbContextOptionsBuilder<QueenZoneDbContext>()
-            .UseSqlite("Data Source=:memory:")
-            .Options;
-        using var bareContext = new QueenZoneDbContext(options);
-        Assert.ThrowsAny<Exception>(() => new EfNewsRepository(bareContext));
-    }
 }

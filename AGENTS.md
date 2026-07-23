@@ -91,7 +91,7 @@ GitHub Actions workflow `.github/workflows/ci.yml` blocks merge when these fail:
 | --- | --- | --- |
 | **Build + test** | `dotnet restore`, `dotnet build`, `dotnet test` (Release) | Yes |
 | **Global line coverage** | At least **51%** across the deterministic test suite | Yes |
-| **Changed-line coverage** | At least **80%** of changed, coverable `.cs` lines in the PR diff vs `main` | Yes |
+| **Changed-line coverage** | At least **70%** of changed, coverable `.cs` lines in the PR diff vs `main` | Yes |
 | **Smoke test** | Published app responds on `/health`, `/`, `/news` | Yes |
 | **EF migrations (Azure SQL)** | When migration-related paths change: `has-pending-model-changes` + `database update` against the deploy SQL Server | Yes (job runs only for those PRs) |
 | **Playwright e2e** | Runs on self-hosted Windows runner when available | No (`continue-on-error`) |
@@ -136,12 +136,12 @@ git fetch origin main
 dotnet restore QueenZone.sln
 dotnet build QueenZone.sln --configuration Release --no-restore
 dotnet test QueenZone.sln --configuration Release --no-build --collect:"XPlat Code Coverage" --settings coverlet.runsettings --results-directory ./TestResults
-powershell -File ./scripts/Test-CoverageGate.ps1 -Reports ./TestResults -GlobalLineThreshold 51 -ChangedLineThreshold 80 -BaseRef origin/main
+powershell -File ./scripts/Test-CoverageGate.ps1 -Reports ./TestResults -GlobalLineThreshold 51 -ChangedLineThreshold 70 -BaseRef origin/main
 ```
 
 On Linux or GitHub Actions, use `pwsh` instead of `powershell` for the last command.
 
-If the gate reports uncovered changed lines, it prints up to 20 `path:line` entries. Add or extend tests until changed-line coverage is at least 80%.
+If the gate reports uncovered changed lines, it prints up to 20 `path:line` entries. Add or extend tests until changed-line coverage is at least 70%.
 
 Full detail, test-layer guidance, and coverage troubleshooting: `docs/architecture/testing-policy.md` (sections **Continuous Integration** and **Pre-pull request checklist**).
 

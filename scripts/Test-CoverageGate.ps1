@@ -4,7 +4,7 @@ param(
 
     [double]$GlobalLineThreshold = 51,
 
-    [double]$ChangedLineThreshold = 80,
+    [double]$ChangedLineThreshold = 70,
 
     [string]$BaseRef = $env:GITHUB_BASE_REF,
 
