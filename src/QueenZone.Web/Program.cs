@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.FileProviders.Physical;
 using QueenZone.Web;
+using QueenZone.Web.Health;
 using QueenZone.Web.Sitemap;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -125,8 +126,8 @@ app.UseRateLimiter();
 app.UseOutputCache();
 app.UseAntiforgery();
 
-// Minimal liveness probe used by CI smoke/e2e checks and any future uptime monitoring.
-app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+// Liveness (/health) + readiness (/health/ready) — see QueenZoneHealthEndpoints.
+app.MapQueenZoneHealthEndpoints();
 
 // Member-gated fan-performance audio downloads use FanPerformanceEndpoints.
 app.MapGet("/account/member-probe", () => Results.Ok(new { authenticated = true }))

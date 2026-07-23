@@ -64,6 +64,22 @@ Summary of what is live on App Service `queenzone-dev` (as of 2026-07-23):
 | Secret renewal | Client secret created 2026-07-23 for 2 years — **renew by 2028-07-01** (procedure in entra-admin-auth.md) |
 | Member OAuth | Separate app **queenzone member login** and `Authentication__*` settings — not the admin OIDC app |
 
+### Health probes
+
+| Path | Purpose | Dependencies |
+| --- | --- | --- |
+| `/health` | **Liveness** — process is up | None (always cheap JSON `{ "status": "ok" }`) |
+| `/health/ready` | **Readiness** — can serve traffic that needs SQL/blob | SQL when `ConnectionStrings:QueenZoneLegacy` is set; blob when `ConnectionStrings:BlobStorage` is set. Unconfigured dependencies report **Healthy** with a "not configured" description (sample-data local mode). Failures return **503** without secrets or exception text. |
+
+Use `/health` for App Service / CI pings. Point deeper monitors at `/health/ready` when you want SQL/blob failure to page.
+
+### SQL Server EF options (runtime)
+
+- Default command timeout: **30s** (was 300s) so runaway public queries release connections sooner.
+- `EnableRetryOnFailure` for Azure SQL transient faults (5 retries, max delay 20s).
+- Design-time migrations / long tools still use a **300s** timeout via `QueenZoneDbContextFactory`.
+- Hot forum paths that need longer still raise timeout per command in those repositories.
+
 Application Insights telemetry is enabled in `QueenZone.Web` only when
 `APPLICATIONINSIGHTS_CONNECTION_STRING` is configured. The app uses Azure Monitor
 OpenTelemetry with conservative defaults in `ApplicationInsights`: 0.2 traces per
