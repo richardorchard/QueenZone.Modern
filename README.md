@@ -166,6 +166,20 @@ Invoke-WebRequest `
   -UseBasicParsing
 ```
 
+**Admin auth environments**
+
+| Environment | `AzureAd:ClientId` | Admin sign-in |
+| --- | --- | --- |
+| Development | Empty / placeholder | `X-Test-User-Email` test header (allowlisted emails only) |
+| Testing | Any | Test auth handlers for automated tests |
+| Staging / Production | **Required real Entra client ID** | Microsoft Entra (OIDC). App **fails to start** if ClientId is missing or still `YOUR_CLIENT_ID`. |
+
+`TestAuthHandler` is never registered outside Development/Testing. Do not set `ASPNETCORE_ENVIRONMENT=Production` locally without a real Entra app registration.
+
+**Allowed hosts**
+
+Committed `appsettings.json` sets production hosts (`www.queenzone.org;queenzone.org;*.azurewebsites.net`). Development and Testing override with `AllowedHosts: "*"`. Override further in App Service configuration if you add custom domains.
+
 If you already have `src/QueenZone.NewsAgent.Worker/appsettings.Local.json` configured with `ConnectionStrings:QueenZoneLegacy`, you can copy that value into the web app's local settings. Keep both files local-only.
 
 The local SQL copy may contain production user, mail, IP, moderation, and private-message data. Treat local BACPAC and MDF/LDF files as sensitive data: store them outside the repository, do not attach them to issues or pull requests, and delete or refresh them deliberately when they are no longer needed.

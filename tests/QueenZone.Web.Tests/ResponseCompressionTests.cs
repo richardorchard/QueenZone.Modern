@@ -18,15 +18,35 @@ public sealed class ResponseCompressionTests : IClassFixture<WebApplicationFacto
         productionFactory = factory.WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Production");
-            builder.ConfigureAppConfiguration((_, config) =>
-            {
-                config.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["ConnectionStrings:QueenZoneLegacy"] = string.Empty,
-                });
-            });
+            // Host settings + in-memory config: production hosts fail-closed without a real Entra client id.
+            ApplyProductionEntraTestSettings(builder);
         });
         testingFactory = factory.WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
+    }
+
+    internal static void ApplyProductionEntraTestSettings(IWebHostBuilder builder)
+    {
+        // Host filtering uses AllowedHosts; WebApplicationFactory hits localhost.
+        builder.UseSetting("AllowedHosts", "localhost;127.0.0.1");
+        builder.UseSetting("ConnectionStrings:QueenZoneLegacy", string.Empty);
+        builder.UseSetting("AzureAd:Instance", "https://login.microsoftonline.com/");
+        builder.UseSetting("AzureAd:TenantId", "22222222-3333-4444-5555-666666666666");
+        builder.UseSetting("AzureAd:ClientId", "11111111-2222-3333-4444-555555555555");
+        builder.UseSetting("AzureAd:ClientSecret", "test-secret-not-used");
+        builder.UseSetting("AzureAd:CallbackPath", "/signin-oidc");
+        builder.ConfigureAppConfiguration((_, config) =>
+        {
+            config.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["AllowedHosts"] = "localhost;127.0.0.1",
+                ["ConnectionStrings:QueenZoneLegacy"] = string.Empty,
+                ["AzureAd:Instance"] = "https://login.microsoftonline.com/",
+                ["AzureAd:TenantId"] = "22222222-3333-4444-5555-666666666666",
+                ["AzureAd:ClientId"] = "11111111-2222-3333-4444-555555555555",
+                ["AzureAd:ClientSecret"] = "test-secret-not-used",
+                ["AzureAd:CallbackPath"] = "/signin-oidc",
+            });
+        });
     }
 
     [Fact]
@@ -73,6 +93,10 @@ public sealed class ResponseCompressionTests : IClassFixture<WebApplicationFacto
         Assert.Equal("nosniff", response.Headers.GetValues("X-Content-Type-Options").First());
         Assert.Equal("DENY", response.Headers.GetValues("X-Frame-Options").First());
         Assert.Equal("strict-origin-when-cross-origin", response.Headers.GetValues("Referrer-Policy").First());
+        Assert.Equal(SecurityHeaders.PermissionsPolicy, response.Headers.GetValues("Permissions-Policy").First());
+        Assert.Equal(
+            SecurityHeaders.ContentSecurityPolicyReportOnly,
+            response.Headers.GetValues("Content-Security-Policy-Report-Only").First());
     }
 
     [Fact]

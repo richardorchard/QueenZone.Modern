@@ -42,8 +42,16 @@ Use configuration keys like:
 - `ConnectionStrings:QueenZoneLegacy`
 - `APPLICATIONINSIGHTS_CONNECTION_STRING`
 - `Storage:PublicMediaBaseUrl`
+- `AzureAd:ClientId` / `AzureAd:TenantId` / related Entra settings (required outside Development)
+- `AllowedHosts` (production default: `www.queenzone.org;queenzone.org;*.azurewebsites.net`)
 - `FeatureFlags:ForumArchiveEnabled`
 - `FeatureFlags:LegacyRedirectsEnabled`
+
+### Production auth and host hardening
+
+- **Entra admin auth is mandatory** when `ASPNETCORE_ENVIRONMENT` is not `Development` or `Testing`. Placeholder values such as `YOUR_CLIENT_ID` do not count. The process throws at startup if admin Entra is not configured.
+- **Do not** enable header-based `X-Test-User-Email` admin auth on App Service. That path only exists for local Development and the automated Testing environment.
+- **AllowedHosts** is locked down in committed `appsettings.json`. Prefer App Service application settings to extend the host list when adding domains rather than shipping `AllowedHosts=*`.
 
 Application Insights telemetry is enabled in `QueenZone.Web` only when
 `APPLICATIONINSIGHTS_CONNECTION_STRING` is configured. The app uses Azure Monitor

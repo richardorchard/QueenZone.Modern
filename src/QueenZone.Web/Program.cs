@@ -11,11 +11,16 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 
-if (!builder.Environment.IsEnvironment("Testing"))
+// Local secrets only in Development. Loading them for Production/Staging would let a
+// developer machine's empty AzureAd:ClientId override App Service settings when
+// ASPNETCORE_ENVIRONMENT is mis-set, and would break production-shaped integration tests.
+if (builder.Environment.IsDevelopment())
 {
     builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
+    // Keep environment variables above Local.json so CI/shell overrides still win.
+    builder.Configuration.AddEnvironmentVariables();
 }
-else
+else if (builder.Environment.IsEnvironment("Testing"))
 {
     // Avoid DPAPI-backed key persistence under the service profile, which is slow
     // (and unnecessary for short-lived smoke test runs) on the self-hosted CI runner.
@@ -89,9 +94,7 @@ app.UseHttpsRedirection();
 
 app.Use(async (context, next) =>
 {
-    context.Response.Headers["X-Content-Type-Options"] = "nosniff";
-    context.Response.Headers["X-Frame-Options"] = "DENY";
-    context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+    SecurityHeaders.Apply(context);
     await next();
 });
 
