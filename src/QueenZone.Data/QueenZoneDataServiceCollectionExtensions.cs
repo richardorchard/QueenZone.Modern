@@ -15,7 +15,14 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddDbContext<QueenZoneDbContext>(options =>
             options.UseSqlServer(
                 connectionString,
-                sql => sql.CommandTimeout(300)));
+                sql =>
+                {
+                    sql.CommandTimeout(QueenZoneSqlServerOptions.DefaultCommandTimeoutSeconds);
+                    sql.EnableRetryOnFailure(
+                        maxRetryCount: QueenZoneSqlServerOptions.MaxRetryCount,
+                        maxRetryDelay: QueenZoneSqlServerOptions.MaxRetryDelay,
+                        errorNumbersToAdd: null);
+                }));
 
         services.AddScoped<INewsRepository, EfNewsRepository>();
         services.AddScoped<IArticlesRepository, EfArticlesRepository>();

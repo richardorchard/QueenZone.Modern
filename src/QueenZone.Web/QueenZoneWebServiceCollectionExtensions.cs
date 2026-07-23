@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using QueenZone.Data;
 using QueenZone.NewsAgent;
 using QueenZone.Storage;
+using QueenZone.Web.Health;
 using QueenZone.Web.Sitemap;
 
 namespace QueenZone.Web;
@@ -192,6 +193,7 @@ public static class QueenZoneWebServiceCollectionExtensions
 
         services.AddQueenZoneData(configuration);
         services.AddQueenZoneStorage(configuration);
+        services.AddQueenZoneHealthChecks();
         services.AddQueenZoneNewsAgent(configuration);
         services.AddQueenZoneAuth(configuration, environment);
         services.AddQueenZoneAuthorization(configuration, environment);

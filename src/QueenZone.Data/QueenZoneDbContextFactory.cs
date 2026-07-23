@@ -11,7 +11,14 @@ public sealed class QueenZoneDbContextFactory : IDesignTimeDbContextFactory<Quee
         optionsBuilder.UseSqlServer(
             Environment.GetEnvironmentVariable("ConnectionStrings__QueenZoneLegacy")
             ?? "Server=(localdb)\\mssqllocaldb;Database=QueenZone;Trusted_Connection=True;TrustServerCertificate=True",
-            sql => sql.CommandTimeout(300));
+            sql =>
+            {
+                sql.CommandTimeout(QueenZoneSqlServerOptions.LongRunningCommandTimeoutSeconds);
+                sql.EnableRetryOnFailure(
+                    maxRetryCount: QueenZoneSqlServerOptions.MaxRetryCount,
+                    maxRetryDelay: QueenZoneSqlServerOptions.MaxRetryDelay,
+                    errorNumbersToAdd: null);
+            });
 
         return new QueenZoneDbContext(optionsBuilder.Options);
     }
