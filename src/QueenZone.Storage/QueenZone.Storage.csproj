@@ -12,10 +12,13 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0" />
     <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.0" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.0" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
   </ItemGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="QueenZone.Storage.Tests" />
+    <InternalsVisibleTo Include="QueenZone.Tools" />
+    <InternalsVisibleTo Include="QueenZone.Tools.Tests" />
     <InternalsVisibleTo Include="QueenZone.Web" />
     <InternalsVisibleTo Include="QueenZone.Web.Tests" />
   </ItemGroup>

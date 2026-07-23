@@ -1,20 +1,19 @@
 using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats.Webp;
-using SixLabors.ImageSharp.Processing;
 using QueenZone.Storage;
 
 namespace QueenZone.Web;
 
 /// <summary>
 /// Validates member photo submissions and produces original + web + thumbnail payloads.
+/// Public derivatives default to WebP via <see cref="PhotoWebpDerivatives"/>.
 /// </summary>
 public static class PhotoSubmissionImageProcessor
 {
     public const long MaxUploadBytes = 20 * 1024 * 1024;
 
-    public const int WebMaxLongestSide = 2000;
+    public const int WebMaxLongestSide = PhotoWebpDerivatives.DefaultWebMaxLongestSide;
 
-    public const int ThumbSizePixels = 400;
+    public const int ThumbSizePixels = PhotoWebpDerivatives.DefaultThumbSizePixels;
 
     public static readonly HashSet<string> AllowedContentTypes = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -93,8 +92,14 @@ public static class PhotoSubmissionImageProcessor
             var width = image.Width;
             var height = image.Height;
 
-            var web = await EncodeMaxSideAsync(image, WebMaxLongestSide, cancellationToken);
-            var thumb = await EncodeSquareAsync(image, ThumbSizePixels, cancellationToken);
+            var web = await PhotoWebpDerivatives.CreateMaxSideAsync(
+                image,
+                WebMaxLongestSide,
+                cancellationToken: cancellationToken);
+            var thumb = await PhotoWebpDerivatives.CreateSquareThumbnailAsync(
+                image,
+                ThumbSizePixels,
+                cancellationToken: cancellationToken);
 
             var original = new MemoryStream();
             buffer.Position = 0;
@@ -103,8 +108,8 @@ public static class PhotoSubmissionImageProcessor
 
             return new ProcessedPhotoSubmission(
                 original,
-                web,
-                thumb,
+                web.Stream,
+                thumb.Stream,
                 sniffed,
                 width,
                 height,
@@ -123,48 +128,4 @@ public static class PhotoSubmissionImageProcessor
     private static bool IsJpegFamily(string contentType) =>
         string.Equals(contentType, "image/jpeg", StringComparison.OrdinalIgnoreCase)
         || string.Equals(contentType, "image/jpg", StringComparison.OrdinalIgnoreCase);
-
-    private static async Task<MemoryStream> EncodeMaxSideAsync(
-        Image image,
-        int maxLongestSide,
-        CancellationToken cancellationToken)
-    {
-        using var clone = image.Clone(ctx =>
-        {
-            if (image.Width > maxLongestSide || image.Height > maxLongestSide)
-            {
-                ctx.Resize(new ResizeOptions
-                {
-                    Size = new Size(maxLongestSide, maxLongestSide),
-                    Mode = ResizeMode.Max,
-                });
-            }
-        });
-
-        var output = new MemoryStream();
-        await clone.SaveAsync(output, new WebpEncoder { Quality = 85 }, cancellationToken);
-        output.Position = 0;
-        return output;
-    }
-
-    private static async Task<MemoryStream> EncodeSquareAsync(
-        Image image,
-        int size,
-        CancellationToken cancellationToken)
-    {
-        using var clone = image.Clone(ctx =>
-        {
-            ctx.Resize(new ResizeOptions
-            {
-                Size = new Size(size, size),
-                Mode = ResizeMode.Crop,
-                Position = AnchorPositionMode.Center,
-            });
-        });
-
-        var output = new MemoryStream();
-        await clone.SaveAsync(output, new WebpEncoder { Quality = 85 }, cancellationToken);
-        output.Position = 0;
-        return output;
-    }
 }

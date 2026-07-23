@@ -2,51 +2,71 @@ using Microsoft.EntityFrameworkCore;
 using QueenZone.Data;
 using QueenZone.Tools;
 
-if (args.Length > 0 && string.Equals(args[0], "check-photos", StringComparison.OrdinalIgnoreCase))
+return await ToolsApp.RunAsync(args);
+
+internal static class ToolsApp
 {
-    return await CheckPhotosCommand.RunAsync(args[1..]);
+    public static async Task<int> RunAsync(string[] args)
+    {
+        if (args.Length > 0 && string.Equals(args[0], "check-photos", StringComparison.OrdinalIgnoreCase))
+        {
+            return await CheckPhotosCommand.RunAsync(args[1..]);
+        }
+
+        if (args.Length > 0 && string.Equals(args[0], "generate-photo-thumbs", StringComparison.OrdinalIgnoreCase))
+        {
+            return await GeneratePhotoThumbsCommand.RunAsync(args[1..]);
+        }
+
+        return await RunImportHistoryAsync(args);
+    }
+
+    private static async Task<int> RunImportHistoryAsync(string[] args)
+    {
+        var options = ImportOptions.Parse(args);
+        if (!options.IsValid)
+        {
+            Console.Error.WriteLine(options.ErrorMessage);
+            Console.Error.WriteLine();
+            Console.Error.WriteLine("Usage:");
+            Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- import-history --csv <path> --connection-string <connection-string>");
+            Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- import-history --csv <path> --dry-run");
+            Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- check-photos [options]");
+            Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- generate-photo-thumbs [options]");
+            Console.Error.WriteLine();
+            Console.Error.WriteLine("Connection string can also be supplied with ConnectionStrings__QueenZoneLegacy.");
+            return 2;
+        }
+
+        if (!File.Exists(options.CsvPath))
+        {
+            Console.Error.WriteLine($"CSV file was not found: {options.CsvPath}");
+            return 2;
+        }
+
+        if (options.DryRun)
+        {
+            var rows = QueenHistoryCsvImporter.ReadRows(options.CsvPath);
+            Console.WriteLine($"Rows read: {rows.Count}");
+            Console.WriteLine("Dry run only. No database changes were made.");
+            return 0;
+        }
+
+        var dbOptions = new DbContextOptionsBuilder<QueenZoneDbContext>()
+            .UseSqlServer(options.ConnectionString)
+            .Options;
+
+        await using var dbContext = new QueenZoneDbContext(dbOptions);
+        var importer = new QueenHistoryCsvImporter(dbContext);
+        var result = await importer.ImportAsync(options.CsvPath, DateTime.UtcNow);
+
+        Console.WriteLine($"Rows read: {result.RowsRead}");
+        Console.WriteLine($"Created: {result.Created}");
+        Console.WriteLine($"Updated: {result.Updated}");
+        Console.WriteLine($"Unchanged: {result.Unchanged}");
+        return 0;
+    }
 }
-
-var options = ImportOptions.Parse(args);
-if (!options.IsValid)
-{
-    Console.Error.WriteLine(options.ErrorMessage);
-    Console.Error.WriteLine();
-    Console.Error.WriteLine("Usage:");
-    Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- import-history --csv <path> --connection-string <connection-string>");
-    Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- import-history --csv <path> --dry-run");
-    Console.Error.WriteLine();
-    Console.Error.WriteLine("Connection string can also be supplied with ConnectionStrings__QueenZoneLegacy.");
-    return 2;
-}
-
-if (!File.Exists(options.CsvPath))
-{
-    Console.Error.WriteLine($"CSV file was not found: {options.CsvPath}");
-    return 2;
-}
-
-if (options.DryRun)
-{
-    var rows = QueenHistoryCsvImporter.ReadRows(options.CsvPath);
-    Console.WriteLine($"Rows read: {rows.Count}");
-    Console.WriteLine("Dry run only. No database changes were made.");
-    return 0;
-}
-
-var dbOptions = new DbContextOptionsBuilder<QueenZoneDbContext>()
-    .UseSqlServer(options.ConnectionString)
-    .Options;
-
-await using var dbContext = new QueenZoneDbContext(dbOptions);
-var importer = new QueenHistoryCsvImporter(dbContext);
-var result = await importer.ImportAsync(options.CsvPath, DateTime.UtcNow);
-
-Console.WriteLine($"Rows read: {result.RowsRead}");
-Console.WriteLine($"Created: {result.Created}");
-Console.WriteLine($"Updated: {result.Updated}");
-Console.WriteLine($"Unchanged: {result.Unchanged}");
-return 0;
 
 internal sealed class ImportOptions
 {

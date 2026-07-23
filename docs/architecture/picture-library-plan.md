@@ -79,10 +79,18 @@ pictures/{category-slug}/{pic-id}/medium.webp
 
 Generate modern variants:
 
-- Thumbnail.
-- Medium web image.
-- Large web image.
+- Thumbnail (default **WebP**, square crop — see `PhotoWebpDerivatives` / `generate-photo-thumbs`).
+- Medium web image (WebP).
+- Large web image (WebP).
 - Original retained but not always linked directly.
+
+**Default public derivative format going forward is WebP.** Keep originals available; legacy JPG thumbs remain valid where already stored.
+
+Tooling:
+
+```powershell
+powershell -File .\scripts\Generate-PhotoThumbs.ps1 -PicIds "17816,17817" -SettingsFile .\path\to\appsettings.Local.json
+```
 
 Prefer modern formats where practical, while keeping originals available.
 
