@@ -68,7 +68,7 @@ public static class SitemapEndpoints
                 ApplyPublicCacheHeader(httpContext, sitemapOptions.Value);
 
                 var entries = await builder.BuildSectionAsync(capturedSection, cancellationToken);
-                if (entries is null || entries.Count == 0)
+                if (entries is null)
                 {
                     return Results.NotFound();
                 }
