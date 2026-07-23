@@ -96,10 +96,62 @@ public static class QueenZoneWebServiceCollectionExtensions
                         QueueLimit = 0,
                     });
             });
+
+            // Auth challenges (OAuth start) — IP only; soft trust in X-Forwarded-For behind Cloudflare.
+            limiter.AddPolicy(QueenZoneRateLimitPolicies.Auth, context =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    GetClientIpPartition(context),
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 30,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0,
+                    }));
+
+            // Member submissions — prefer member id, fall back to IP.
+            limiter.AddPolicy(QueenZoneRateLimitPolicies.MemberWrite, context =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    GetMemberOrIpPartition(context),
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 20,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0,
+                    }));
+
+            // Uploads (editor image, avatar) — member-centric.
+            limiter.AddPolicy(QueenZoneRateLimitPolicies.Upload, context =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    GetMemberOrIpPartition(context),
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 30,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0,
+                    }));
+
+            // Public search — IP partition (soft).
+            limiter.AddPolicy(QueenZoneRateLimitPolicies.Search, context =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    GetClientIpPartition(context),
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 60,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0,
+                    }));
         });
 
         return services;
     }
+
+    private static string GetClientIpPartition(HttpContext context) =>
+        context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+    private static string GetMemberOrIpPartition(HttpContext context) =>
+        context.User.FindFirstValue(ClaimTypes.NameIdentifier)
+        ?? context.User.FindFirstValue(ClaimTypes.Name)
+        ?? GetClientIpPartition(context);
 
     public static IServiceCollection AddQueenZoneCaching(this IServiceCollection services)
     {

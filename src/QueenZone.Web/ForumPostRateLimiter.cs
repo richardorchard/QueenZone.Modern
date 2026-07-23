@@ -4,6 +4,10 @@ using QueenZone.Data;
 
 namespace QueenZone.Web;
 
+/// <summary>
+/// Limits forum posts per member. When the DB rate-limit probe fails, requests are
+/// <b>denied</b> (fail-closed) so a database outage cannot become an open spam window.
+/// </summary>
 public sealed class ForumPostRateLimiter(
     IForumWriteRepository forumWriteRepository,
     IMemoryCache cache,
@@ -29,12 +33,12 @@ public sealed class ForumPostRateLimiter(
         }
         catch (Exception ex) when (ex is not OperationCanceledException && !cancellationToken.IsCancellationRequested)
         {
+            // Fail-closed: do not allow posts when we cannot verify the rate limit.
             logger.LogWarning(
                 ex,
-                "Forum post rate-limit probe failed for member {MemberId}; allowing this post attempt.",
+                "Forum post rate-limit probe failed for member {MemberId}; denying this post attempt.",
                 memberId);
-            cache.Set(key, 1, Window);
-            return true;
+            return false;
         }
 
         if (count >= MaxPostsPerMinute)
