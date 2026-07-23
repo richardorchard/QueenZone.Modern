@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 using QueenZone.Data;
@@ -16,6 +17,12 @@ public sealed class PublicQueryCacheService(
     {
         Priority = CacheItemPriority.NeverRemove
     };
+
+    /// <summary>
+    /// Per-key gates so concurrent cold-cache hits share a single factory execution (no stampede).
+    /// Key set is small (news version variants, forum stats, on-this-day dates).
+    /// </summary>
+    private readonly ConcurrentDictionary<string, SemaphoreSlim> loadGates = new(StringComparer.Ordinal);
 
     public Task<IReadOnlyList<NewsItem>> GetLatestNewsAsync(int count, CancellationToken cancellationToken = default)
     {
@@ -115,8 +122,22 @@ public sealed class PublicQueryCacheService(
             return cached;
         }
 
-        var value = await factory();
-        cache.Set(key, value, duration);
-        return value;
+        var gate = loadGates.GetOrAdd(key, static _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            if (cache.TryGetValue(key, out cached) && cached is not null)
+            {
+                return cached;
+            }
+
+            var value = await factory().ConfigureAwait(false);
+            cache.Set(key, value, duration);
+            return value;
+        }
+        finally
+        {
+            gate.Release();
+        }
     }
 }

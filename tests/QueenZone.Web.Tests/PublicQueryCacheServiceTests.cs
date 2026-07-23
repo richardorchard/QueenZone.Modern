@@ -197,6 +197,22 @@ public sealed class PublicQueryCacheServiceTests
     }
 
     [Fact]
+    public async Task Concurrent_cold_cache_hits_invoke_factory_once()
+    {
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var newsRepository = new SlowCountingNewsRepository(TimeSpan.FromMilliseconds(100));
+        var service = CreateService(memoryCache, newsRepository: newsRepository);
+
+        var tasks = Enumerable.Range(0, 12)
+            .Select(_ => service.GetLatestNewsAsync(5))
+            .ToArray();
+        await Task.WhenAll(tasks);
+
+        Assert.Equal(1, newsRepository.LatestCallCount);
+        Assert.All(tasks, t => Assert.Same(tasks[0].Result, t.Result));
+    }
+
+    [Fact]
     public async Task OnThisDayCacheVariesByDateAndCount()
     {
         using var memoryCache = new MemoryCache(new MemoryCacheOptions());
@@ -235,13 +251,24 @@ public sealed class PublicQueryCacheServiceTests
             forumRepository ?? new CountingForumRepository(),
             historyRepository ?? new CountingQueenHistoryRepository());
 
-    private sealed class CountingNewsRepository : INewsRepository
+    private sealed class SlowCountingNewsRepository(TimeSpan delay) : CountingNewsRepository
+    {
+        public override async Task<IReadOnlyList<NewsItem>> GetLatestAsync(
+            int count,
+            CancellationToken cancellationToken = default)
+        {
+            await Task.Delay(delay, cancellationToken);
+            return await base.GetLatestAsync(count, cancellationToken);
+        }
+    }
+
+    private class CountingNewsRepository : INewsRepository
     {
         public int LatestCallCount { get; private set; }
 
         public int PublishedCountCallCount { get; private set; }
 
-        public Task<IReadOnlyList<NewsItem>> GetLatestAsync(int count, CancellationToken cancellationToken = default)
+        public virtual Task<IReadOnlyList<NewsItem>> GetLatestAsync(int count, CancellationToken cancellationToken = default)
         {
             LatestCallCount++;
             var item = new NewsItem(

@@ -8,11 +8,14 @@ namespace QueenZone.Data;
 /// </summary>
 public sealed class EfArticlesRepository : IArticlesRepository
 {
+    private const int MaxPageSize = 100;
+    private const int MaxLatestCount = 100;
+
     private readonly QueenZoneDbContext dbContext;
-    private readonly Func<int, string> latestSql;
+    private readonly string latestSql;
     private readonly string countSql;
-    private readonly Func<int, int, string> archivePageSql;
-    private readonly Func<int, string> byIdSql;
+    private readonly string archivePageSql;
+    private readonly string byIdSql;
     private readonly string sitemapSql;
 
     [ExcludeFromCodeCoverage]
@@ -22,12 +25,16 @@ public sealed class EfArticlesRepository : IArticlesRepository
         (latestSql, countSql, archivePageSql, byIdSql, sitemapSql) = EfProductionSql.CreateArticlesQueries();
     }
 
+    /// <summary>
+    /// Test constructor: SQL templates must use EF <c>{0}</c>/<c>{1}</c> placeholders for
+    /// dynamic ints (same as production <see cref="EfProductionSql"/>).
+    /// </summary>
     internal EfArticlesRepository(
         QueenZoneDbContext dbContext,
-        Func<int, string> latestSql,
+        string latestSql,
         string countSql,
-        Func<int, int, string> archivePageSql,
-        Func<int, string> byIdSql,
+        string archivePageSql,
+        string byIdSql,
         string sitemapSql)
     {
         this.dbContext = dbContext;
@@ -40,8 +47,9 @@ public sealed class EfArticlesRepository : IArticlesRepository
 
     public async Task<IReadOnlyList<ArticleItem>> GetLatestAsync(int count, CancellationToken cancellationToken = default)
     {
+        var take = Math.Clamp(count, 1, MaxLatestCount);
         var rows = await dbContext.Database
-            .SqlQueryRaw<ArticleRow>(latestSql(count))
+            .SqlQueryRaw<ArticleRow>(latestSql, take)
             .ToListAsync(cancellationToken);
         return rows.Select(Map).ToList();
     }
@@ -60,9 +68,11 @@ public sealed class EfArticlesRepository : IArticlesRepository
         int pageSize,
         CancellationToken cancellationToken = default)
     {
-        var offset = Math.Max(page - 1, 0) * pageSize;
+        var normalizedPage = Math.Max(page, 1);
+        var take = Math.Clamp(pageSize, 1, MaxPageSize);
+        var offset = (normalizedPage - 1) * take;
         var rows = await dbContext.Database
-            .SqlQueryRaw<ArticleRow>(archivePageSql(offset, pageSize))
+            .SqlQueryRaw<ArticleRow>(archivePageSql, offset, take)
             .ToListAsync(cancellationToken);
         return rows.Select(Map).ToList();
     }
@@ -70,7 +80,7 @@ public sealed class EfArticlesRepository : IArticlesRepository
     public async Task<ArticleItem?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         var rows = await dbContext.Database
-            .SqlQueryRaw<ArticleRow>(byIdSql(id))
+            .SqlQueryRaw<ArticleRow>(byIdSql, id)
             .ToListAsync(cancellationToken);
         var row = rows.FirstOrDefault();
         return row is null ? null : Map(row);

@@ -8,6 +8,11 @@ namespace QueenZone.Web;
 /// </summary>
 public static class UgcProxyEndpoints
 {
+    /// <summary>
+    /// Blob names are unique/immutable (GUID-based). Safe for long-lived public caches.
+    /// </summary>
+    public const string CacheControlHeaderValue = "public, max-age=604800, immutable";
+
     public static void MapUgcProxyEndpoints(this WebApplication app)
     {
         app.MapGet(UgcProxyPaths.RouteTemplate, async (
@@ -69,14 +74,31 @@ public static class UgcProxyEndpoints
                 return Results.NotFound();
             }
 
-            return Results.Stream(
-                content.Stream,
-                content.ContentType,
-                enableRangeProcessing: false);
+            return new CachedBlobStreamResult(content.Stream, content.ContentType);
         }
         catch (NotSupportedException)
         {
             return Results.NotFound();
+        }
+    }
+
+    /// <summary>Streams a UGC blob with long-lived Cache-Control for anonymous CDN/browser reuse.</summary>
+    internal sealed class CachedBlobStreamResult(Stream stream, string contentType) : IResult
+    {
+        public async Task ExecuteAsync(HttpContext httpContext)
+        {
+            httpContext.Response.StatusCode = StatusCodes.Status200OK;
+            httpContext.Response.ContentType = contentType;
+            httpContext.Response.Headers.CacheControl = CacheControlHeaderValue;
+
+            try
+            {
+                await stream.CopyToAsync(httpContext.Response.Body, httpContext.RequestAborted);
+            }
+            finally
+            {
+                await stream.DisposeAsync();
+            }
         }
     }
 }

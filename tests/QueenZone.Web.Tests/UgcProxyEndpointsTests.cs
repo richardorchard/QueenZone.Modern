@@ -48,7 +48,10 @@ public sealed class UgcProxyEndpointsTests : IClassFixture<WebApplicationFactory
             stub,
             CancellationToken.None);
 
-        Assert.Equal(StatusCodes.Status200OK, await GetStatusCodeAsync(result));
+        var httpContext = new DefaultHttpContext { RequestServices = factory.Services };
+        await result.ExecuteAsync(httpContext);
+        Assert.Equal(StatusCodes.Status200OK, httpContext.Response.StatusCode);
+        Assert.Equal(UgcProxyEndpoints.CacheControlHeaderValue, httpContext.Response.Headers.CacheControl.ToString());
         Assert.Equal(BlobUploadContainers.Forum, stub.LastContainer);
         Assert.Equal("editors/x.webp", stub.LastBlobName);
     }

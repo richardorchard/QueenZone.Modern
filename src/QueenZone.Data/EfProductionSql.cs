@@ -6,11 +6,17 @@ namespace QueenZone.Data;
 /// Production SQL Server query text for EF public-read repositories.
 /// Excluded from coverage: exercised against real SQL Server in opt-in probes / production,
 /// while deterministic tests inject SQLite-compatible SQL via repository test constructors.
+/// Dynamic ints use EF <c>{0}</c> placeholders (passed to <c>SqlQueryRaw</c>), not string interpolation.
 /// </summary>
 [ExcludeFromCodeCoverage]
 internal static class EfProductionSql
 {
-    public static (Func<int, string> Latest, string Count, Func<int, int, string> ArchivePage, Func<int, string> ById, string Sitemap)
+    public static (
+        string Latest,
+        string Count,
+        string ArchivePage,
+        string ById,
+        string Sitemap)
         CreateArticlesQueries()
     {
         const string publishedSelect = """
@@ -29,24 +35,24 @@ internal static class EfProductionSql
             """;
 
         return (
-            count => publishedSelect + $"""
+            publishedSelect + """
 
                 ORDER BY a.DATE_CREATED DESC, a.Q_ARTICLE_ID DESC
-                OFFSET 0 ROWS FETCH NEXT {count} ROWS ONLY
+                OFFSET 0 ROWS FETCH NEXT {0} ROWS ONLY
                 """,
             """
             SELECT COUNT(*) AS Value
             FROM Q_ARTICLE_T
             WHERE DISPLAY = 1
             """,
-            (offset, pageSize) => publishedSelect + $"""
+            publishedSelect + """
 
                 ORDER BY a.DATE_CREATED DESC, a.Q_ARTICLE_ID DESC
-                OFFSET {offset} ROWS FETCH NEXT {pageSize} ROWS ONLY
+                OFFSET {0} ROWS FETCH NEXT {1} ROWS ONLY
                 """,
-            id => publishedSelect + $"""
+            publishedSelect + """
 
-                  AND a.Q_ARTICLE_ID = {id}
+                  AND a.Q_ARTICLE_ID = {0}
                 """,
             """
             SELECT
@@ -60,12 +66,18 @@ internal static class EfProductionSql
             """);
     }
 
-    public static (Func<int, string> Latest, string Count, Func<int, int, string> ArchivePage, Func<int, string> ById, string Sitemap)
+    public static (
+        string Latest,
+        string Count,
+        string ArchivePage,
+        string ById,
+        string Sitemap)
         CreateNewsQueries(string publishedNewsCte) =>
         (
-            count => publishedNewsCte + $"""
+            // $$ raw strings: {{expr}} interpolates; single {0} stays a literal EF parameter placeholder.
+            publishedNewsCte + $$"""
 
-                SELECT TOP ({count})
+                SELECT TOP ({0})
                     Id,
                     Title,
                     Excerpt,
@@ -75,16 +87,16 @@ internal static class EfProductionSql
                     IsPublished,
                     Slug
                 FROM PublishedNews
-                WHERE {PublishedNewsQuery.LatestRowFilter}
+                WHERE {{PublishedNewsQuery.LatestRowFilter}}
                 ORDER BY PublishedAt DESC, Id DESC
                 """,
-            publishedNewsCte + $"""
+            publishedNewsCte + $$"""
 
                 SELECT COUNT(*) AS Value
                 FROM PublishedNews
-                WHERE {PublishedNewsQuery.LatestRowFilter}
+                WHERE {{PublishedNewsQuery.LatestRowFilter}}
                 """,
-            (offset, pageSize) => publishedNewsCte + $"""
+            publishedNewsCte + $$"""
 
                 SELECT
                     Id,
@@ -96,11 +108,11 @@ internal static class EfProductionSql
                     IsPublished,
                     Slug
                 FROM PublishedNews
-                WHERE {PublishedNewsQuery.LatestRowFilter}
+                WHERE {{PublishedNewsQuery.LatestRowFilter}}
                 ORDER BY PublishedAt DESC, Id DESC
-                OFFSET {offset} ROWS FETCH NEXT {pageSize} ROWS ONLY
+                OFFSET {0} ROWS FETCH NEXT {1} ROWS ONLY
                 """,
-            id => publishedNewsCte + $"""
+            publishedNewsCte + $$"""
 
                 SELECT
                     Id,
@@ -112,10 +124,10 @@ internal static class EfProductionSql
                     IsPublished,
                     Slug
                 FROM PublishedNews
-                WHERE {PublishedNewsQuery.LatestRowFilter}
-                  AND Id = {id}
+                WHERE {{PublishedNewsQuery.LatestRowFilter}}
+                  AND Id = {0}
                 """,
-            publishedNewsCte + $"""
+            publishedNewsCte + $$"""
 
                 SELECT
                     Id,
@@ -123,7 +135,7 @@ internal static class EfProductionSql
                     PublishedAt,
                     Slug
                 FROM PublishedNews
-                WHERE {PublishedNewsQuery.LatestRowFilter}
+                WHERE {{PublishedNewsQuery.LatestRowFilter}}
                 ORDER BY PublishedAt DESC, Id DESC
                 """);
 
