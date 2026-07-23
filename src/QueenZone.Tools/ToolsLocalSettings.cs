@@ -16,23 +16,31 @@ internal sealed class ToolsLocalSettings
             return null;
         }
 
-        using var stream = File.OpenRead(path);
-        var readerOptions = new JsonDocumentOptions
+        try
         {
-            AllowTrailingCommas = true,
-            CommentHandling = JsonCommentHandling.Skip,
-        };
-        using var document = JsonDocument.Parse(stream, readerOptions);
-        if (!document.RootElement.TryGetProperty("ConnectionStrings", out var connectionStrings))
+            using var stream = File.OpenRead(path);
+            var readerOptions = new JsonDocumentOptions
+            {
+                AllowTrailingCommas = true,
+                CommentHandling = JsonCommentHandling.Skip,
+            };
+            using var document = JsonDocument.Parse(stream, readerOptions);
+            if (!document.RootElement.TryGetProperty("ConnectionStrings", out var connectionStrings))
+            {
+                return null;
+            }
+
+            return new ToolsLocalSettings
+            {
+                QueenZoneLegacyLive = TryGetString(connectionStrings, "QueenZoneLegacyLive"),
+                BlobStorage = TryGetString(connectionStrings, "BlobStorage"),
+            };
+        }
+        catch (JsonException)
         {
+            // Local developer settings are often JSONC / hand-edited; ignore invalid files.
             return null;
         }
-
-        return new ToolsLocalSettings
-        {
-            QueenZoneLegacyLive = TryGetString(connectionStrings, "QueenZoneLegacyLive"),
-            BlobStorage = TryGetString(connectionStrings, "BlobStorage"),
-        };
     }
 
     private static string? TryGetString(JsonElement element, string propertyName) =>

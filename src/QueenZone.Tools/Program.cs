@@ -7,6 +7,11 @@ if (args.Length > 0 && string.Equals(args[0], "check-photos", StringComparison.O
     return await CheckPhotosCommand.RunAsync(args[1..]);
 }
 
+if (args.Length > 0 && string.Equals(args[0], "generate-photo-thumbs", StringComparison.OrdinalIgnoreCase))
+{
+    return await GeneratePhotoThumbsCommand.RunAsync(args[1..]);
+}
+
 var options = ImportOptions.Parse(args);
 if (!options.IsValid)
 {

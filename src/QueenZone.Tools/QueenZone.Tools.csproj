@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\QueenZone.Data\QueenZone.Data.csproj" />
+    <ProjectReference Include="..\QueenZone.Storage\QueenZone.Storage.csproj" />
   </ItemGroup>
 
   <ItemGroup>

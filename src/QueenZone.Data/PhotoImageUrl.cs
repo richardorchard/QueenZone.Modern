@@ -63,8 +63,8 @@ public static class PhotoImageUrl
             return false;
         }
 
-        container = path[..slashIndex];
-        blobName = path[(slashIndex + 1)..];
+        container = Uri.UnescapeDataString(path[..slashIndex]);
+        blobName = Uri.UnescapeDataString(path[(slashIndex + 1)..]);
         return container.Length > 0 && blobName.Length > 0;
     }
 }

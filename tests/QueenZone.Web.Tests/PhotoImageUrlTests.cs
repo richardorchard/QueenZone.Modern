@@ -43,6 +43,7 @@ public sealed class PhotoImageUrlTests
     [Theory]
     [InlineData("https://cdn.queenzone.org/queen/img.jpg", "queen", "img.jpg")]
     [InlineData("https://queenzone.blob.core.windows.net/multimedia/t_123.jpg", "multimedia", "t_123.jpg")]
+    [InlineData("https://cdn.queenzone.org/freddie-mercury/claching%20colors%20(urk).jpg", "freddie-mercury", "claching colors (urk).jpg")]
     public void TryParseBlobLocation_ParsesContainerAndBlobName(string url, string container, string blobName)
     {
         var parsed = PhotoImageUrl.TryParseBlobLocation(url, out var actualContainer, out var actualBlobName);
