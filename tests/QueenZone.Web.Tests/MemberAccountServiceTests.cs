@@ -14,7 +14,8 @@ public sealed class MemberAccountServiceTests
         IMemberAccountRepository? memberAccountRepository = null,
         ILegacyMemberLookupRepository? legacyMemberLookupRepository = null,
         IBlobUploadService? blobUploadService = null,
-        InMemoryBlobStorageBackend? blobBackend = null)
+        InMemoryBlobStorageBackend? blobBackend = null,
+        MemberUploadQuotaService? uploadQuota = null)
     {
         var backend = blobBackend ?? new InMemoryBlobStorageBackend();
         var blobs = blobUploadService
@@ -23,8 +24,16 @@ public sealed class MemberAccountServiceTests
             memberAccountRepository ?? new InMemoryMemberAccountRepository(),
             legacyMemberLookupRepository ?? new InMemoryLegacyMemberLookupRepository(
                 new Dictionary<string, LegacyMemberMatch>()),
-            blobs);
+            blobs,
+            uploadQuota ?? CreateDisabledUploadQuota());
     }
+
+    private static MemberUploadQuotaService CreateDisabledUploadQuota() =>
+        new(
+            new Microsoft.Extensions.Caching.Memory.MemoryCache(
+                new Microsoft.Extensions.Caching.Memory.MemoryCacheOptions()),
+            TimeProvider.System,
+            Options.Create(new UploadQuotaOptions { Enabled = false }));
 
     private static async Task<MemoryStream> CreatePngAsync(int width = 32, int height = 32)
     {

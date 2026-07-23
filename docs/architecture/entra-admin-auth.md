@@ -23,6 +23,21 @@ App Service must therefore carry real Entra settings. Committed `appsettings.jso
 | ID token issuance | Enabled on the web platform |
 | Access control | Entra signs the user in; **admin rights** still require the signed-in email to match `Admin:AllowedEmails` |
 
+### Admin allowlist (not secrets, still not committed)
+
+Committed `appsettings.json` ships **`Admin:AllowedEmails` as an empty array**. Production must supply the allowlist via App Service (or Key Vault references), not git:
+
+```text
+Admin__AllowedEmails__0=you@example.com
+Admin__AllowedEmails__1=other@example.com
+```
+
+- **Production / Staging / Preview:** startup fails (`ValidateOnStart`) if the allowlist is empty.
+- **Development:** empty is allowed so the site boots; put real emails in git-ignored `appsettings.Local.json` for local admin work.
+- **Testing:** `appsettings.Testing.json` includes `admin@test.local` for automated tests only.
+
+Do not treat the allowlist as a secret, but also do not treat committed appsettings as the sole production source of admin access.
+
 ### Redirect URIs (web)
 
 - `https://www.queenzone.org/signin-oidc`
@@ -43,9 +58,19 @@ Use double-underscore names (ASP.NET Core nested config):
 | `AzureAd__ClientSecret` | Client secret value (never commit) |
 | `AzureAd__CallbackPath` | `/signin-oidc` |
 
-Optional: override allowlist without redeploying:
+**Required in production** (not optional once the committed allowlist is empty):
 
 - `Admin__AllowedEmails__0`, `Admin__AllowedEmails__1`, …
+
+### Secrets and logging hygiene
+
+Never put connection strings, client secrets, storage keys, or OpenRouter keys in committed config. When debugging:
+
+- Prefer `az webapp config appsettings list` queries that return **name + length**, not values (see below).
+- Do not paste secret values into GitHub issues, PR descriptions, App Insights custom events, or log messages.
+- Health endpoints (`/health`, `/health/ready`) must not return exception text or connection strings (they already redact).
+- Application Insights may capture request URLs and dependency names — avoid putting secrets in query strings or custom dimensions.
+- Log scopes and structured properties should use identifiers (member id, article id), never passwords, tokens, or full connection strings.
 
 ### Related but different app
 

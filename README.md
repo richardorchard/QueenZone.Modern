@@ -318,6 +318,8 @@ Admin routes require a signed-in user whose email address is listed in `Admin:Al
 The signed-in identity may come from the site OAuth member login (Google, Microsoft, or Facebook)
 or from the dedicated Microsoft Entra ID admin sign-in when Entra is configured.
 
+Committed `appsettings.json` ships an **empty** allowlist on purpose. Production must set the list on App Service (or Key Vault); Development uses git-ignored `appsettings.Local.json`. See `docs/architecture/entra-admin-auth.md`.
+
 1. Create an Entra app registration for `QueenZone.Web`.
 2. Add a web redirect URI such as `https://queenzone-dev.azurewebsites.net/signin-oidc`.
 3. Create a client secret for the app registration.
@@ -331,7 +333,9 @@ Admin__AllowedEmails__0
 Admin__AllowedEmails__1
 ```
 
-Use `src/QueenZone.Web/appsettings.Local.json` for local Entra values. If `AzureAd:ClientId` is empty locally, the app falls back to test-header authentication for development only.
+Use `src/QueenZone.Web/appsettings.Local.json` for local Entra values and local admin emails. If `AzureAd:ClientId` is empty locally, the app falls back to test-header authentication for development only.
+
+Do not log secrets (connection strings, client secrets, storage keys, API keys) to App Insights, issues, or PR text. When auditing App Service settings, prefer name + value length over printing values.
 
 For automated tests, send `X-Test-User-Email` with an allowed admin email address, or sign in through the OAuth callback test double with an allowlisted email.
 

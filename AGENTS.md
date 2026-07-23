@@ -169,7 +169,9 @@ Hosting scale/cost: production is **single-instance B1** with **no Redis**; see 
 
 For local SQL MCP access through Azure Data API Builder, see `docs/sql/data-api-builder-mcp.md`. Keep the MCP surface narrow and read-oriented by default.
 
-News agent worker and admin review queue: see `docs/architecture/news-agent.md`. OpenRouter key goes in `src/QueenZone.NewsAgent.Worker/appsettings.Local.json`. Manual OpenRouter smoke test: `scripts/Smoke-NewsAgent.bat`. Admin review UI: `/admin/news-discovery` (requires `Admin:AllowedEmails`; member OAuth at `/account/login` is unrelated).
+News agent worker and admin review queue: see `docs/architecture/news-agent.md`. OpenRouter key goes in `src/QueenZone.NewsAgent.Worker/appsettings.Local.json`. Manual OpenRouter smoke test: `scripts/Smoke-NewsAgent.bat`. Admin review UI: `/admin/news-discovery` (requires `Admin:AllowedEmails` from App Service or `appsettings.Local.json` — committed `appsettings.json` ships an empty allowlist; member OAuth at `/account/login` is unrelated).
+
+Never log secrets (connection strings, client secrets, storage keys, OpenRouter keys) into issues, PR text, or application telemetry properties.
 
 ## Media Serving
 

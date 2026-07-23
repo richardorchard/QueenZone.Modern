@@ -51,6 +51,9 @@ public static class QueenZoneWebServiceCollectionExtensions
         services.AddOptions<ForumAttachmentOptions>()
             .Bind(configuration.GetSection(ForumAttachmentOptions.SectionName));
 
+        services.AddOptions<UploadQuotaOptions>()
+            .Bind(configuration.GetSection(UploadQuotaOptions.SectionName));
+
         services.AddOptions<NewsSuggestionOptions>()
             .Bind(configuration.GetSection(NewsSuggestionOptions.SectionName));
 
@@ -141,6 +144,7 @@ public static class QueenZoneWebServiceCollectionExtensions
         services.AddScoped<NewsSuggestionService>();
         services.AddScoped<UgcHtml>();
         services.AddScoped<ForumPostRateLimiter>();
+        services.AddSingleton<MemberUploadQuotaService>();
         services.AddScoped<ForumAttachmentValidator>();
         services.AddScoped<ForumAttachmentUploadService>();
         services.AddSingleton<IGoogleAnalyticsDataClient, GoogleAnalyticsDataClient>();

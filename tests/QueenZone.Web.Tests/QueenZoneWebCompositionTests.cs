@@ -31,6 +31,7 @@ public sealed class QueenZoneWebCompositionTests
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddSingleton<IConfiguration>(configuration);
+        services.AddSingleton<IHostEnvironment>(new FakeHostEnvironment("Testing"));
         services.AddQueenZoneWebComposition(configuration, new FakeHostEnvironment("Testing"));
 
         using var provider = services.BuildServiceProvider(validateScopes: true);
@@ -53,10 +54,58 @@ public sealed class QueenZoneWebCompositionTests
     }
 
     [Fact]
-    public void AdminOptionsValidator_rejects_empty_allowed_emails()
+    public void AdminOptionsValidator_rejects_empty_allowed_emails_in_production()
     {
-        var result = new AdminOptionsValidator().Validate(null, new AdminOptions { AllowedEmails = [] });
+        var result = new AdminOptionsValidator(new FakeHostEnvironment("Production"))
+            .Validate(null, new AdminOptions { AllowedEmails = [] });
         Assert.True(result.Failed);
+        Assert.Contains("Admin__AllowedEmails", result.FailureMessage);
+    }
+
+    [Fact]
+    public void AdminOptionsValidator_allows_empty_allowed_emails_in_development()
+    {
+        var result = new AdminOptionsValidator(new FakeHostEnvironment("Development"))
+            .Validate(null, new AdminOptions { AllowedEmails = [] });
+        Assert.False(result.Failed);
+    }
+
+    [Fact]
+    public void AdminOptionsValidator_rejects_blank_entries()
+    {
+        var result = new AdminOptionsValidator(new FakeHostEnvironment("Development"))
+            .Validate(null, new AdminOptions { AllowedEmails = ["admin@test.local", "  "] });
+        Assert.True(result.Failed);
+    }
+
+    [Fact]
+    public void AddQueenZoneWebComposition_registers_upload_quota_service()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Admin:AllowedEmails:0"] = "admin@test.local",
+                ["Site:PublicBaseUrl"] = "https://www.queenzone.org",
+                ["Sitemap:CacheHours"] = "24",
+                ["PublicQueryCache:NewsCacheDuration"] = "00:05:00",
+                ["PublicQueryCache:ArticleCountCacheDuration"] = "00:30:00",
+                ["PublicQueryCache:ForumStatsCacheDuration"] = "00:30:00",
+                ["PublicQueryCache:OnThisDayCacheDuration"] = "12:00:00",
+                ["OpenRouter:DryRun"] = "true",
+                ["UploadQuotas:MaxUploadsPerDay"] = "25",
+            })
+            .Build();
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSingleton<IConfiguration>(configuration);
+        services.AddSingleton<IHostEnvironment>(new FakeHostEnvironment("Testing"));
+        services.AddQueenZoneWebComposition(configuration, new FakeHostEnvironment("Testing"));
+
+        using var provider = services.BuildServiceProvider(validateScopes: true);
+        var quota = provider.GetRequiredService<MemberUploadQuotaService>();
+        Assert.NotNull(quota);
+        Assert.Equal(25, provider.GetRequiredService<IOptions<UploadQuotaOptions>>().Value.MaxUploadsPerDay);
     }
 
     [Fact]

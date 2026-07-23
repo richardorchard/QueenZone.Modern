@@ -13,7 +13,8 @@ namespace QueenZone.Web;
 public sealed class MemberAccountService(
     IMemberAccountRepository memberAccountRepository,
     ILegacyMemberLookupRepository legacyMemberLookupRepository,
-    IBlobUploadService blobUploadService)
+    IBlobUploadService blobUploadService,
+    MemberUploadQuotaService uploadQuota)
 {
     private readonly PasswordHasher<MemberAccount> passwordHasher = new();
 
@@ -164,6 +165,13 @@ public sealed class MemberAccountService(
         catch (InvalidOperationException ex)
         {
             return MemberAccountResult.Failure(ex.Message);
+        }
+
+        var principalKey = MemberUploadQuotaService.PrincipalKeyFromMemberId(memberId);
+        var quotaBytes = Math.Max(processed.FullImage.Length, 1);
+        if (!uploadQuota.TryConsume(principalKey, quotaBytes, out var quotaError))
+        {
+            return MemberAccountResult.Failure(quotaError ?? "Daily upload limit reached.");
         }
 
         await using (processed.FullImage)
