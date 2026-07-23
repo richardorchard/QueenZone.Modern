@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OutputCaching;
 using QueenZone.Data;
 using QueenZone.Web.Sitemap;
 
@@ -10,6 +11,7 @@ public sealed class EditPostModel(
     INewsAuditRepository auditRepository,
     PublicQueryCacheService publicQueryCache,
     CoreSitemapService coreSitemapService,
+    IOutputCacheStore outputCacheStore,
     UgcHtml ugcHtml,
     ILogger<EditPostModel> logger) : AdminNewsPageModel
 {
@@ -58,6 +60,7 @@ public sealed class EditPostModel(
         {
             publicQueryCache.InvalidateNewsCache();
             await coreSitemapService.InvalidateAsync(cancellationToken);
+            await outputCacheStore.EvictByTagAsync(PublicOutputCachePolicies.PublicHtmlTag, cancellationToken);
         }
 
         await auditRepository.AppendAsync(id, "edit", EditorEmail, $"Updated \"{draft.Title}\"", cancellationToken);
