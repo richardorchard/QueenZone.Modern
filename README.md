@@ -176,6 +176,8 @@ Invoke-WebRequest `
 
 `TestAuthHandler` is never registered outside Development/Testing. Do not set `ASPNETCORE_ENVIRONMENT=Production` locally without a real Entra app registration.
 
+Production App Service Entra app, settings, and **client secret renewal** (renew by **2028-07-01**): [`docs/architecture/entra-admin-auth.md`](docs/architecture/entra-admin-auth.md).
+
 **Allowed hosts**
 
 Committed `appsettings.json` sets production hosts (`www.queenzone.org;queenzone.org;*.azurewebsites.net`). Development and Testing override with `AllowedHosts: "*"`. Override further in App Service configuration if you add custom domains.

@@ -70,6 +70,25 @@ App Service: `queenzone-dev` in resource group `Queenzone-RG` (Australia East).
 
 Public hostnames: `queenzone.org`, `www.queenzone.org`, `queenzone-dev.azurewebsites.net`.
 
+### Admin Entra auth (required for Production)
+
+Full runbook: [`docs/architecture/entra-admin-auth.md`](architecture/entra-admin-auth.md).
+
+- Entra app: **QueenZone Admin** (`f6d32f3b-7a4e-4517-a4d1-0995caad8feb`).
+- App Service must define `AzureAd__ClientId` / `AzureAd__ClientSecret` / related keys (not the committed placeholders).
+- **Client secret:** created 2026-07-23 (2 years) — **renew by 2028-07-01** (see runbook).
+- Admin access is still gated by `Admin:AllowedEmails` after Entra sign-in.
+- Member Microsoft login uses a **different** app (`Authentication__Microsoft__*`); do not confuse the two.
+
+```powershell
+# Confirm AzureAd settings exist (lengths only — do not dump secrets)
+az webapp config appsettings list `
+  --name queenzone-dev `
+  --resource-group Queenzone-RG `
+  --query "[?starts_with(name, 'AzureAd')].{name:name, length:length(value)}" `
+  -o table
+```
+
 ### Azure CLI (preferred for agents)
 
 Requires `az login` as a user with access to subscription **Base Thinking**.
