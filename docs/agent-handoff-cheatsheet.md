@@ -70,6 +70,13 @@ App Service: `queenzone-dev` in resource group `Queenzone-RG` (Australia East).
 
 Public hostnames: `queenzone.org`, `www.queenzone.org`, `queenzone-dev.azurewebsites.net`.
 
+### Scale / cache (single instance — no Redis)
+
+- Plan **ASP-Queenzone**: **B1 Basic**, **1 worker**. Do not assume scale-out.
+- Process-local memory/output cache and invalidation are intentional.
+- **No Azure Cache for Redis** while this cost model holds.
+- Decision + archived issues: [`docs/architecture/hosting-scale-and-cache.md`](architecture/hosting-scale-and-cache.md).
+
 ### Admin Entra auth (required for Production)
 
 Full runbook: [`docs/architecture/entra-admin-auth.md`](architecture/entra-admin-auth.md).
