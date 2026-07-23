@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OutputCaching;
 using QueenZone.Data;
 using QueenZone.Web.Sitemap;
 
@@ -10,6 +11,7 @@ public sealed class ActionModel(
     INewsDiscoveryRepository discoveryRepository,
     PublicQueryCacheService publicQueryCache,
     CoreSitemapService coreSitemapService,
+    IOutputCacheStore outputCacheStore,
     ILogger<ActionModel> logger) : AdminNewsPageModel
 {
     public IActionResult OnGet(int id, string handler) =>
@@ -103,6 +105,8 @@ public sealed class ActionModel(
     {
         publicQueryCache.InvalidateNewsCache();
         await coreSitemapService.InvalidateAsync(cancellationToken);
+        // Drop anonymous HTML output-cache entries so / and /news reflect publish actions immediately.
+        await outputCacheStore.EvictByTagAsync(PublicOutputCachePolicies.PublicHtmlTag, cancellationToken);
     }
 
     private IActionResult ArticleNotFound(int id)

@@ -4,6 +4,9 @@ public static class PublicOutputCachePolicies
 {
     public const string PublicSitemaps = "public-sitemaps";
 
+    /// <summary>Anonymous public HTML (Razor Pages) short TTL cache.</summary>
+    public const string PublicHtml = "public-html";
+
     /// <summary>
     /// Output-cache tag applied to robots/sitemap routes. Evict with
     /// <see cref="Microsoft.AspNetCore.OutputCaching.IOutputCacheStore.EvictByTagAsync"/> after
@@ -11,13 +14,27 @@ public static class PublicOutputCachePolicies
     /// </summary>
     public const string PublicSitemapTag = "public-sitemap";
 
+    /// <summary>
+    /// Output-cache tag for anonymous public HTML. Evict after editorial changes that affect
+    /// visitor-facing pages (publish/unpublish/delete/edit of published news).
+    /// </summary>
+    public const string PublicHtmlTag = "public-html";
+
     public static readonly TimeSpan SitemapDuration = TimeSpan.FromHours(24);
+
+    /// <summary>Short TTL so editorial changes without eviction still expire quickly.</summary>
+    public static readonly TimeSpan HtmlDuration = TimeSpan.FromSeconds(90);
 
     private static readonly string[] ExcludedPathPrefixes =
     [
         "/account",
         "/admin",
-        "/health"
+        "/health",
+        "/api",
+        "/ugc",
+        "/error",
+        "/submit",
+        "/forum/attachment",
     ];
 
     public static bool IsPublicReadOnlyRequest(HttpContext httpContext)
@@ -36,5 +53,20 @@ public static class PublicOutputCachePolicies
         var path = httpContext.Request.Path;
         return !ExcludedPathPrefixes.Any(prefix =>
             path.StartsWithSegments(prefix, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// True when the request may use the public HTML output-cache policy.
+    /// Disabled in Testing so WebApplicationFactory suites do not share stale HTML across cases.
+    /// </summary>
+    public static bool IsCacheablePublicHtmlRequest(HttpContext httpContext)
+    {
+        var environment = httpContext.RequestServices.GetService<IHostEnvironment>();
+        if (environment is not null && environment.IsEnvironment("Testing"))
+        {
+            return false;
+        }
+
+        return IsPublicReadOnlyRequest(httpContext);
     }
 }

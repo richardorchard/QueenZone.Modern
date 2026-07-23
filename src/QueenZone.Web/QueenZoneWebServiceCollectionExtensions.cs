@@ -110,6 +110,13 @@ public static class QueenZoneWebServiceCollectionExtensions
                 .Expire(PublicOutputCachePolicies.SitemapDuration)
                 .SetVaryByRouteValue("*")
                 .Tag(PublicOutputCachePolicies.PublicSitemapTag));
+
+            options.AddPolicy(PublicOutputCachePolicies.PublicHtml, policy => policy
+                .With(context => PublicOutputCachePolicies.IsCacheablePublicHtmlRequest(context.HttpContext))
+                .Expire(PublicOutputCachePolicies.HtmlDuration)
+                .SetVaryByRouteValue("*")
+                .SetVaryByQuery("*")
+                .Tag(PublicOutputCachePolicies.PublicHtmlTag));
         });
         services.AddScoped<PublicQueryCacheService>();
         return services;
@@ -137,6 +144,7 @@ public static class QueenZoneWebServiceCollectionExtensions
         services.AddScoped<ForumAttachmentUploadService>();
         services.AddSingleton<IGoogleAnalyticsDataClient, GoogleAnalyticsDataClient>();
         services.AddScoped<IGoogleAnalyticsTrafficService, GoogleAnalyticsTrafficService>();
+        services.AddScoped<AdminDashboardService>();
         // Header name used by the rich-text editor fetch() upload helper.
         services.AddAntiforgery(options =>
         {
