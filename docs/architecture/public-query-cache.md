@@ -2,6 +2,8 @@
 
 The public site caches a small set of stable, anonymous query results in ASP.NET Core `IMemoryCache` through `PublicQueryCacheService`.
 
+This is a **process-local** cache. Production runs a **single** App Service worker (B1); multi-instance Redis-backed cache is intentionally **not** used for cost reasons. See [`hosting-scale-and-cache.md`](hosting-scale-and-cache.md).
+
 This cache is intentionally limited to shared public data:
 
 - homepage latest published news
