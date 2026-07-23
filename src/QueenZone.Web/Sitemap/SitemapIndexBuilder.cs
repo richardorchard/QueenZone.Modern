@@ -10,6 +10,11 @@ public sealed class SitemapIndexBuilder(ForumSitemapBuilder forumSitemapBuilder)
             new("/sitemap-core.xml", lastModified)
         };
 
+        foreach (var section in SitemapSections.All)
+        {
+            entries.Add(new(SitemapSections.GetPath(section), lastModified));
+        }
+
         var forumFileCount = await forumSitemapBuilder.GetFileCountAsync(cancellationToken);
         for (var fileNumber = 1; fileNumber <= forumFileCount; fileNumber++)
         {
