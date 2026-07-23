@@ -12,22 +12,59 @@ public sealed class CoreSitemapBuilder(
     IFanPerformanceRepository fanPerformanceRepository,
     IDiscographyRepository discographyRepository)
 {
-    public async Task<IReadOnlyList<SitemapEntry>> BuildAsync(CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<SitemapEntry>> BuildAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<SitemapEntry>>(
+            [
+                new("/"),
+                new("/about")
+            ]);
+
+    public async Task<IReadOnlyList<SitemapEntry>?> BuildSectionAsync(
+        string section,
+        CancellationToken cancellationToken = default)
     {
-        var entries = new List<SitemapEntry>
+        var entries = section switch
         {
-            new("/"),
-            new("/about")
+            SitemapSections.News => new List<SitemapEntry>(),
+            SitemapSections.Articles => [],
+            SitemapSections.Biography => [],
+            SitemapSections.ForumCategories => [],
+            SitemapSections.Photography => [],
+            SitemapSections.FanPerformances => [],
+            SitemapSections.Discography => [],
+            _ => null
         };
 
-        await AddNewsEntriesAsync(entries, cancellationToken);
-        await AddArticleEntriesAsync(entries, cancellationToken);
-        await AddCommunityArticleEntriesAsync(entries, cancellationToken);
-        await AddBiographyEntriesAsync(entries, cancellationToken);
-        await AddForumEntriesAsync(entries, cancellationToken);
-        await AddPhotographyEntriesAsync(entries, cancellationToken);
-        await AddFanPerformanceEntriesAsync(entries, cancellationToken);
-        await AddDiscographyEntriesAsync(entries, cancellationToken);
+        if (entries is null)
+        {
+            return null;
+        }
+
+        switch (section)
+        {
+            case SitemapSections.News:
+                await AddNewsEntriesAsync(entries, cancellationToken);
+                break;
+            case SitemapSections.Articles:
+                await AddArticleEntriesAsync(entries, cancellationToken);
+                await AddCommunityArticleEntriesAsync(entries, cancellationToken);
+                break;
+            case SitemapSections.Biography:
+                await AddBiographyEntriesAsync(entries, cancellationToken);
+                break;
+            case SitemapSections.ForumCategories:
+                await AddForumEntriesAsync(entries, cancellationToken);
+                break;
+            case SitemapSections.Photography:
+                await AddPhotographyEntriesAsync(entries, cancellationToken);
+                break;
+            case SitemapSections.FanPerformances:
+                await AddFanPerformanceEntriesAsync(entries, cancellationToken);
+                break;
+            case SitemapSections.Discography:
+                await AddDiscographyEntriesAsync(entries, cancellationToken);
+                break;
+        }
 
         return entries;
     }
