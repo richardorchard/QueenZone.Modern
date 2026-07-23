@@ -32,12 +32,14 @@ public static class EditorImageUploadEndpoints
                 IBlobUploadService blobUploadService,
                 IAntiforgery antiforgery,
                 IOptions<BlobUploadOptions> blobUploadOptions,
+                MemberUploadQuotaService uploadQuota,
                 CancellationToken cancellationToken) =>
             await UploadAsync(
                 httpContext,
                 blobUploadService,
                 antiforgery,
                 blobUploadOptions.Value,
+                uploadQuota,
                 cancellationToken))
             .RequireAuthorization("Authoring")
             .RequireRateLimiting(QueenZoneRateLimitPolicies.Upload)
@@ -56,22 +58,28 @@ public static class EditorImageUploadEndpoints
         string? container,
         IBlobUploadService blobUploadService,
         IAntiforgery antiforgery,
-        CancellationToken cancellationToken) =>
-        UploadCoreAsync(
+        CancellationToken cancellationToken)
+    {
+        var uploadQuota = httpContext.RequestServices.GetService<MemberUploadQuotaService>()
+            ?? CreatePassthroughQuota();
+        return UploadCoreAsync(
             httpContext,
             file,
             container,
             blobUploadService,
             antiforgery,
             new BlobUploadOptions { EditorMaxBytes = MaxImageBytes },
+            uploadQuota,
             skipAntiforgery: false,
             cancellationToken);
+    }
 
     internal static async Task<IResult> UploadAsync(
         HttpContext httpContext,
         IBlobUploadService blobUploadService,
         IAntiforgery antiforgery,
         BlobUploadOptions blobUploadOptions,
+        MemberUploadQuotaService uploadQuota,
         CancellationToken cancellationToken)
     {
         if (httpContext.User.Identity?.IsAuthenticated != true)
@@ -107,6 +115,7 @@ public static class EditorImageUploadEndpoints
             blobUploadService,
             antiforgery,
             blobUploadOptions,
+            uploadQuota,
             skipAntiforgery: true,
             cancellationToken);
     }
@@ -118,6 +127,7 @@ public static class EditorImageUploadEndpoints
         IBlobUploadService blobUploadService,
         IAntiforgery antiforgery,
         BlobUploadOptions blobUploadOptions,
+        MemberUploadQuotaService uploadQuota,
         bool skipAntiforgery,
         CancellationToken cancellationToken)
     {
@@ -159,6 +169,12 @@ public static class EditorImageUploadEndpoints
             return Results.BadRequest(new { error = $"File must be {maxBytes} bytes or smaller." });
         }
 
+        var principalKey = MemberUploadQuotaService.PrincipalKeyFromUser(httpContext.User);
+        if (!uploadQuota.TryConsume(principalKey, file.Length, out var quotaError))
+        {
+            return Results.Json(new { error = quotaError }, statusCode: StatusCodes.Status429TooManyRequests);
+        }
+
         var context = BuildUploadContext(httpContext.User);
         var contentTypeHeader = file.ContentType ?? string.Empty;
         var isImage = contentTypeHeader.StartsWith("image/", StringComparison.OrdinalIgnoreCase)
@@ -198,6 +214,13 @@ public static class EditorImageUploadEndpoints
             return Results.BadRequest(new { error = ex.Message });
         }
     }
+
+    private static MemberUploadQuotaService CreatePassthroughQuota() =>
+        new(
+            new Microsoft.Extensions.Caching.Memory.MemoryCache(
+                new Microsoft.Extensions.Caching.Memory.MemoryCacheOptions()),
+            TimeProvider.System,
+            Microsoft.Extensions.Options.Options.Create(new UploadQuotaOptions { Enabled = false }));
 
     private static async Task<IResult> UploadImageAsync(
         IFormFile file,

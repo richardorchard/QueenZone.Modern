@@ -12,6 +12,11 @@ Shared upload infrastructure lives in `QueenZone.Storage`. Web (and future worke
 | `BlobUpload:DefaultAllowedContentTypes` | Default MIME allowlist. |
 | `BlobUpload:Containers` | Per-container max size / MIME overrides. |
 | `BlobUpload:PublicBaseUrl` | Optional CDN/worker base for display URLs. |
+| `UploadQuotas:Enabled` | Process-local daily quotas (default true). |
+| `UploadQuotas:MaxUploadsPerDay` | Max upload operations per principal per UTC day (default 50). |
+| `UploadQuotas:MaxBytesPerDay` | Max total bytes per principal per UTC day (default 100 MiB). |
+
+Per-member quotas (`MemberUploadQuotaService`) apply to editor images, forum attachments, avatars, and photo submissions. They are **process-local** (`IMemoryCache`) and fit single-instance B1 hosting; container MIME/size allowlists remain enforced separately. Antivirus scanning of uploads is **not planned**.
 
 Register in DI:
 

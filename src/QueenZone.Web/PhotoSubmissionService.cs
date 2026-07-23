@@ -5,7 +5,8 @@ namespace QueenZone.Web;
 
 public sealed class PhotoSubmissionService(
     IPhotoSubmissionRepository photoSubmissionRepository,
-    IBlobUploadService blobUploadService)
+    IBlobUploadService blobUploadService,
+    MemberUploadQuotaService uploadQuota)
 {
     public sealed record SubmitResult(bool Succeeded, PhotoSubmission? Submission, string? Error);
 
@@ -46,6 +47,12 @@ public sealed class PhotoSubmissionService(
         catch (InvalidOperationException ex)
         {
             return new SubmitResult(false, null, ex.Message);
+        }
+
+        var principalKey = MemberUploadQuotaService.PrincipalKeyFromMemberId(memberAccountId);
+        if (!uploadQuota.TryConsume(principalKey, processed.OriginalSizeBytes, out var quotaError))
+        {
+            return new SubmitResult(false, null, quotaError ?? "Daily upload limit reached.");
         }
 
         await using (processed.Original)

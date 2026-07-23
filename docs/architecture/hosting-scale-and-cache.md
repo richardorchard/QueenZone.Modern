@@ -25,6 +25,7 @@ Public performance work already relies on **process-local** mechanisms that are 
 | ASP.NET Core output cache (sitemaps + anonymous HTML) | In-process store on the one worker |
 | News / sitemap / HTML cache invalidation after admin publish | Bumps local version + evicts local output-cache tags |
 | Forum post rate limiter (memory + DB probe) | Counts are consistent for the single process |
+| Per-member daily upload quotas (`MemberUploadQuotaService` / `IMemoryCache`) | Count + byte caps per principal per UTC day on the one worker |
 
 Those designs become **incorrect or leaky** only if instance count &gt; 1 (stale HTML/news on another worker, rate-limit bypass, invalidation that does not reach every node).
 
@@ -47,6 +48,7 @@ These improve reliability on the current B1 single worker and do **not** require
 | --- | --- | --- |
 | [#324](https://github.com/richardorchard/QueenZone.Modern/issues/324) | Azure SQL retry + sane command timeouts | Transient fault handling; no new Azure SKU |
 | [#325](https://github.com/richardorchard/QueenZone.Modern/issues/325) | Readiness health checks (SQL/blob) | Ops signal only; keep `/health` cheap for liveness |
+| [#330](https://github.com/richardorchard/QueenZone.Modern/issues/330) | Per-member daily upload quotas | Process-local; container/size caps still enforced; AV scanning not planned |
 
 ## If scale-out is reconsidered later
 

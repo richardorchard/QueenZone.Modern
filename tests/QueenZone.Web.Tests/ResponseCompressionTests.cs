@@ -34,6 +34,8 @@ public sealed class ResponseCompressionTests : IClassFixture<WebApplicationFacto
         builder.UseSetting("AzureAd:ClientId", "11111111-2222-3333-4444-555555555555");
         builder.UseSetting("AzureAd:ClientSecret", "test-secret-not-used");
         builder.UseSetting("AzureAd:CallbackPath", "/signin-oidc");
+        // Production-like hosts require a non-empty allowlist (from App Service in real deploys).
+        builder.UseSetting("Admin:AllowedEmails:0", "admin@test.local");
         builder.ConfigureAppConfiguration((_, config) =>
         {
             config.AddInMemoryCollection(new Dictionary<string, string?>
@@ -45,6 +47,7 @@ public sealed class ResponseCompressionTests : IClassFixture<WebApplicationFacto
                 ["AzureAd:ClientId"] = "11111111-2222-3333-4444-555555555555",
                 ["AzureAd:ClientSecret"] = "test-secret-not-used",
                 ["AzureAd:CallbackPath"] = "/signin-oidc",
+                ["Admin:AllowedEmails:0"] = "admin@test.local",
             });
         });
     }

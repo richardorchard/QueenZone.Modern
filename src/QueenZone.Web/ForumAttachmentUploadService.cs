@@ -10,7 +10,8 @@ namespace QueenZone.Web;
 public sealed class ForumAttachmentUploadService(
     IBlobUploadService blobUploadService,
     IForumAttachmentRepository attachmentRepository,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    MemberUploadQuotaService uploadQuota)
 {
     public async Task UploadAndSaveAsync(
         int legacyPostId,
@@ -21,6 +22,13 @@ public sealed class ForumAttachmentUploadService(
         if (files.Count == 0)
         {
             return;
+        }
+
+        var totalBytes = files.Sum(file => Math.Max(0, file.Length));
+        var principalKey = MemberUploadQuotaService.PrincipalKeyFromMemberId(memberAccountId);
+        if (!uploadQuota.TryConsume(principalKey, totalBytes, out var quotaError, uploadCount: files.Count))
+        {
+            throw new BlobUploadException(quotaError ?? "Daily upload limit reached.");
         }
 
         var uploaded = new List<(string Container, string BlobName, NewForumAttachment Meta)>();

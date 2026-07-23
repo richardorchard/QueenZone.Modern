@@ -58,7 +58,10 @@ public sealed class PhotoSubmissionServiceTests
     public async Task SubmitAsync_surfaces_blob_upload_errors()
     {
         var repository = new InMemoryPhotoSubmissionRepository();
-        var service = new PhotoSubmissionService(repository, new ThrowingBlobUploadService());
+        var service = new PhotoSubmissionService(
+            repository,
+            new ThrowingBlobUploadService(),
+            CreateDisabledUploadQuota());
         await using var png = await CreatePngAsync();
         var result = await service.SubmitAsync(
             Guid.NewGuid(), "Upload fail", null, null, null, null, png, "a.png");
@@ -66,12 +69,50 @@ public sealed class PhotoSubmissionServiceTests
         Assert.Contains("upload failed", result.Error);
     }
 
+    [Fact]
+    public async Task SubmitAsync_rejects_when_daily_quota_exceeded()
+    {
+        var quota = new MemberUploadQuotaService(
+            new Microsoft.Extensions.Caching.Memory.MemoryCache(
+                new Microsoft.Extensions.Caching.Memory.MemoryCacheOptions()),
+            TimeProvider.System,
+            Microsoft.Extensions.Options.Options.Create(new UploadQuotaOptions
+            {
+                Enabled = true,
+                MaxUploadsPerDay = 1,
+                MaxBytesPerDay = 100L * 1024 * 1024,
+            }));
+        var service = new PhotoSubmissionService(
+            new InMemoryPhotoSubmissionRepository(),
+            new AzureBlobUploadService(
+                new InMemoryBlobStorageBackend(),
+                Microsoft.Extensions.Options.Options.Create(new BlobUploadOptions())),
+            quota);
+
+        var memberId = Guid.NewGuid();
+        await using var first = await CreatePngAsync();
+        var ok = await service.SubmitAsync(memberId, "One", null, null, null, null, first, "a.png");
+        Assert.True(ok.Succeeded);
+
+        await using var second = await CreatePngAsync();
+        var blocked = await service.SubmitAsync(memberId, "Two", null, null, null, null, second, "b.png");
+        Assert.False(blocked.Succeeded);
+        Assert.Contains("Daily upload", blocked.Error);
+    }
+
     private static PhotoSubmissionService CreateService(out InMemoryBlobStorageBackend backend)
     {
         backend = new InMemoryBlobStorageBackend();
         var blobs = new AzureBlobUploadService(backend, Microsoft.Extensions.Options.Options.Create(new BlobUploadOptions()));
-        return new PhotoSubmissionService(new InMemoryPhotoSubmissionRepository(), blobs);
+        return new PhotoSubmissionService(new InMemoryPhotoSubmissionRepository(), blobs, CreateDisabledUploadQuota());
     }
+
+    private static MemberUploadQuotaService CreateDisabledUploadQuota() =>
+        new(
+            new Microsoft.Extensions.Caching.Memory.MemoryCache(
+                new Microsoft.Extensions.Caching.Memory.MemoryCacheOptions()),
+            TimeProvider.System,
+            Microsoft.Extensions.Options.Options.Create(new UploadQuotaOptions { Enabled = false }));
 
     private static async Task<MemoryStream> CreatePngAsync()
     {

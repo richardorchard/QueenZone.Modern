@@ -162,7 +162,7 @@ public sealed class ForumAttachmentUnitTests
     {
         var blob = new MemoryBlobUploadService();
         var repo = new InMemoryForumAttachmentRepository();
-        var service = new ForumAttachmentUploadService(blob, repo, TimeProvider.System);
+        var service = new ForumAttachmentUploadService(blob, repo, TimeProvider.System, CreateDisabledUploadQuota());
 
         await service.UploadAndSaveAsync(1, Guid.NewGuid(), []);
         Assert.Empty(repo.GetAll());
@@ -174,7 +174,7 @@ public sealed class ForumAttachmentUnitTests
         var blob = new MemoryBlobUploadService();
         var repo = new InMemoryForumAttachmentRepository();
         var clock = new FixedTimeProvider(DateTimeOffset.Parse("2026-07-11T12:00:00Z"));
-        var service = new ForumAttachmentUploadService(blob, repo, clock);
+        var service = new ForumAttachmentUploadService(blob, repo, clock, CreateDisabledUploadQuota());
 
         var file = CreateFormFile("setlist.pdf", "%PDF-1.4", "application/pdf");
         await service.UploadAndSaveAsync(55, Guid.NewGuid(), [file]);
@@ -191,7 +191,7 @@ public sealed class ForumAttachmentUnitTests
     {
         var blob = new TrackingBlobUploadService();
         var repo = new FailingAttachmentRepository();
-        var service = new ForumAttachmentUploadService(blob, repo, TimeProvider.System);
+        var service = new ForumAttachmentUploadService(blob, repo, TimeProvider.System, CreateDisabledUploadQuota());
         var file = CreateFormFile("x.pdf", "%PDF", "application/pdf");
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
@@ -207,13 +207,44 @@ public sealed class ForumAttachmentUnitTests
     {
         var blob = new TrackingBlobUploadService { ThrowOnDelete = true };
         var repo = new FailingAttachmentRepository();
-        var service = new ForumAttachmentUploadService(blob, repo, TimeProvider.System);
+        var service = new ForumAttachmentUploadService(blob, repo, TimeProvider.System, CreateDisabledUploadQuota());
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             service.UploadAndSaveAsync(1, Guid.NewGuid(), [CreateFormFile("x.pdf", "%PDF", "application/pdf")]));
 
         Assert.Single(blob.Uploaded);
     }
+
+    [Fact]
+    public async Task UploadService_RejectsWhenDailyQuotaExceeded()
+    {
+        var blob = new MemoryBlobUploadService();
+        var repo = new InMemoryForumAttachmentRepository();
+        var quota = new MemberUploadQuotaService(
+            new Microsoft.Extensions.Caching.Memory.MemoryCache(
+                new Microsoft.Extensions.Caching.Memory.MemoryCacheOptions()),
+            TimeProvider.System,
+            Microsoft.Extensions.Options.Options.Create(new UploadQuotaOptions
+            {
+                Enabled = true,
+                MaxUploadsPerDay = 1,
+                MaxBytesPerDay = 100L * 1024 * 1024,
+            }));
+        var service = new ForumAttachmentUploadService(blob, repo, TimeProvider.System, quota);
+        var memberId = Guid.NewGuid();
+
+        await service.UploadAndSaveAsync(1, memberId, [CreateFormFile("a.pdf", "%PDF", "application/pdf")]);
+        var ex = await Assert.ThrowsAsync<BlobUploadException>(() =>
+            service.UploadAndSaveAsync(2, memberId, [CreateFormFile("b.pdf", "%PDF", "application/pdf")]));
+        Assert.Contains("Daily upload", ex.Message);
+    }
+
+    private static MemberUploadQuotaService CreateDisabledUploadQuota() =>
+        new(
+            new Microsoft.Extensions.Caching.Memory.MemoryCache(
+                new Microsoft.Extensions.Caching.Memory.MemoryCacheOptions()),
+            TimeProvider.System,
+            Microsoft.Extensions.Options.Options.Create(new UploadQuotaOptions { Enabled = false }));
 
     [Fact]
     public void ForumAttachmentMerge_CombinesLegacyAndModern()
