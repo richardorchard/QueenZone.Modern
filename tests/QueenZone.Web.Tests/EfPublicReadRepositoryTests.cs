@@ -269,11 +269,10 @@ public sealed class EfPublicReadRepositoryTests : IAsyncDisposable
 
         var repository = new EfArticlesRepository(
             dbContext,
-            latestSql: count => select + $" ORDER BY PublishedAt DESC, Id DESC LIMIT {count}",
+            latestSql: select + " ORDER BY PublishedAt DESC, Id DESC LIMIT {0}",
             countSql: "SELECT COUNT(*) AS Value FROM Articles WHERE IsPublished = 1",
-            archivePageSql: (offset, pageSize) =>
-                select + $" ORDER BY PublishedAt DESC, Id DESC LIMIT {pageSize} OFFSET {offset}",
-            byIdSql: id => select + $" AND Id = {id}",
+            archivePageSql: select + " ORDER BY PublishedAt DESC, Id DESC LIMIT {1} OFFSET {0}",
+            byIdSql: select + " AND Id = {0}",
             sitemapSql: """
                 SELECT Id, Title, PublishedAt, CAST(NULL AS TEXT) AS Slug
                 FROM Articles WHERE IsPublished = 1
@@ -309,6 +308,22 @@ public sealed class EfPublicReadRepositoryTests : IAsyncDisposable
     }
 
     [Fact]
+    public void News_and_article_production_sql_use_parameter_placeholders()
+    {
+        var news = EfProductionSql.CreateNewsQueries("/*cte*/");
+        Assert.Contains("{0}", news.Latest, StringComparison.Ordinal);
+        Assert.Contains("{0}", news.ArchivePage, StringComparison.Ordinal);
+        Assert.Contains("{1}", news.ArchivePage, StringComparison.Ordinal);
+        Assert.Contains("{0}", news.ById, StringComparison.Ordinal);
+
+        var articles = EfProductionSql.CreateArticlesQueries();
+        Assert.Contains("{0}", articles.Latest, StringComparison.Ordinal);
+        Assert.Contains("{0}", articles.ArchivePage, StringComparison.Ordinal);
+        Assert.Contains("{1}", articles.ArchivePage, StringComparison.Ordinal);
+        Assert.Contains("{0}", articles.ById, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task News_maps_latest_page_count_detail_and_sitemap()
     {
         dbContext.Database.ExecuteSqlRaw(
@@ -337,11 +352,10 @@ public sealed class EfPublicReadRepositoryTests : IAsyncDisposable
 
         var repository = new EfNewsRepository(
             dbContext,
-            latestSql: count => select + $" ORDER BY PublishedAt DESC, Id DESC LIMIT {count}",
+            latestSql: select + " ORDER BY PublishedAt DESC, Id DESC LIMIT {0}",
             countSql: "SELECT COUNT(*) AS Value FROM NewsRows WHERE IsPublished = 1",
-            archivePageSql: (offset, pageSize) =>
-                select + $" ORDER BY PublishedAt DESC, Id DESC LIMIT {pageSize} OFFSET {offset}",
-            byIdSql: id => select + $" AND Id = {id}",
+            archivePageSql: select + " ORDER BY PublishedAt DESC, Id DESC LIMIT {1} OFFSET {0}",
+            byIdSql: select + " AND Id = {0}",
             sitemapSql: """
                 SELECT Id, Title, PublishedAt, Slug FROM NewsRows WHERE IsPublished = 1
                 ORDER BY PublishedAt DESC, Id DESC

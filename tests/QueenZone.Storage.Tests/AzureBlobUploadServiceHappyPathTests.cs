@@ -98,4 +98,70 @@ public sealed class AzureBlobUploadServiceHappyPathTests
         // Sanitized email collapses to something non-empty or "unknown"
         Assert.DoesNotContain("!", result.BlobName);
     }
+
+    [Fact]
+    public async Task BufferForUploadAsync_non_seekable_stream_uses_temp_file_and_enforces_max()
+    {
+        var payload = new byte[32];
+        Random.Shared.NextBytes(payload);
+        await using var nonSeekable = new NonSeekableStream(payload);
+
+        await using var buffered = await AzureBlobUploadService.BufferForUploadAsync(
+            nonSeekable,
+            maxBytes: 1024,
+            CancellationToken.None);
+
+        Assert.True(buffered.CanSeek);
+        Assert.Equal(payload.Length, buffered.Length);
+        var copy = new byte[payload.Length];
+        Assert.Equal(payload.Length, await buffered.ReadAsync(copy));
+        Assert.Equal(payload, copy);
+    }
+
+    [Fact]
+    public async Task BufferForUploadAsync_rejects_oversize_non_seekable_stream()
+    {
+        var payload = new byte[100];
+        await using var nonSeekable = new NonSeekableStream(payload);
+
+        var ex = await Assert.ThrowsAsync<BlobUploadException>(() =>
+            AzureBlobUploadService.BufferForUploadAsync(nonSeekable, maxBytes: 50, CancellationToken.None));
+        Assert.Contains("50", ex.Message, StringComparison.Ordinal);
+    }
+
+    private sealed class NonSeekableStream(byte[] data) : Stream
+    {
+        private int position;
+
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position
+        {
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+
+        public override void Flush()
+        {
+        }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            if (position >= data.Length)
+            {
+                return 0;
+            }
+
+            var n = Math.Min(count, data.Length - position);
+            Array.Copy(data, position, buffer, offset, n);
+            position += n;
+            return n;
+        }
+
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    }
 }
