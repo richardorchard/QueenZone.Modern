@@ -42,6 +42,28 @@ public sealed class PhotoWebpDerivativesTests
         Assert.Equal(expected, PhotoWebpDerivatives.ToThumbnailBlobName(input));
 
     [Fact]
+    public async Task CreateSquareThumbnailAsync_rejects_invalid_size()
+    {
+        using var image = new Image<Rgba32>(10, 10);
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+            PhotoWebpDerivatives.CreateSquareThumbnailAsync(image, sizePixels: 0));
+    }
+
+    [Fact]
+    public async Task CreateMaxSideAsync_rejects_invalid_size()
+    {
+        using var image = new Image<Rgba32>(10, 10);
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+            PhotoWebpDerivatives.CreateMaxSideAsync(image, maxLongestSide: 0));
+    }
+
+    [Fact]
+    public void ToThumbnailBlobName_uses_fallback_stem_for_extension_only()
+    {
+        Assert.Equal("thumb_t.webp", PhotoWebpDerivatives.ToThumbnailBlobName(".jpg"));
+    }
+
+    [Fact]
     public void ToLegacyThumbnailPath_keeps_folder_segment()
     {
         var path = PhotoWebpDerivatives.ToLegacyThumbnailPath(
@@ -49,5 +71,21 @@ public sealed class PhotoWebpDerivativesTests
             "celeb2_t.webp");
 
         Assert.Equal("/Freddie_Mercury/celeb2_t.webp", path);
+    }
+
+    [Fact]
+    public void ToLegacyThumbnailPath_handles_single_segment()
+    {
+        Assert.Equal("/celeb2_t.webp", PhotoWebpDerivatives.ToLegacyThumbnailPath("celeb2.jpg", "celeb2_t.webp"));
+    }
+
+    [Fact]
+    public async Task CreateMaxSideAsync_keeps_small_images()
+    {
+        using var image = new Image<Rgba32>(200, 100, new Rgba32(1, 2, 3));
+        await using var encoded = await PhotoWebpDerivatives.CreateMaxSideAsync(image, maxLongestSide: 1000);
+        using var loaded = await Image.LoadAsync(encoded.Stream);
+        Assert.Equal(200, loaded.Width);
+        Assert.Equal(100, loaded.Height);
     }
 }

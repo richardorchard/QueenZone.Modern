@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Microsoft.Data.SqlClient;
@@ -19,6 +20,14 @@ internal static class GeneratePhotoThumbsCommand
         }
 
         var photos = await LoadPhotosAsync(options);
+        return await RunCoreAsync(options, photos);
+    }
+
+    internal static async Task<int> RunCoreAsync(
+        GeneratePhotoThumbsOptions options,
+        IReadOnlyList<GalleryPhotoRow> photos,
+        IGalleryThumbGenerator? generatorOverride = null)
+    {
         if (photos.Count == 0)
         {
             Console.WriteLine("No PIC_FILES_T rows matched the requested pic ids.");
@@ -46,7 +55,7 @@ internal static class GeneratePhotoThumbsCommand
             return 0;
         }
 
-        var blobService = new BlobServiceClient(options.StorageConnectionString);
+        var generator = generatorOverride ?? new AzureGalleryThumbGenerator(options.StorageConnectionString);
         var succeeded = 0;
         var failed = 0;
 
@@ -54,7 +63,7 @@ internal static class GeneratePhotoThumbsCommand
         {
             try
             {
-                var result = await GenerateAndSaveAsync(photo, options, blobService);
+                var result = await generator.GenerateAsync(photo, options);
                 succeeded++;
                 Console.WriteLine(
                     $"  OK pic_id={photo.PicId} thumb={result.LegacyThumbPath} ({result.WidthPx}x{result.HeightPx})");
@@ -85,12 +94,77 @@ internal static class GeneratePhotoThumbsCommand
         return new ThumbnailPlan(container, blobName, thumbBlobName, legacyThumbPath, thumbSizePixels);
     }
 
-    private static async Task<GeneratedThumbResult> GenerateAndSaveAsync(
-        GalleryPhotoRow photo,
-        GeneratePhotoThumbsOptions options,
-        BlobServiceClient blobService)
+    [ExcludeFromCodeCoverage]
+    private static async Task<IReadOnlyList<GalleryPhotoRow>> LoadPhotosAsync(GeneratePhotoThumbsOptions options)
     {
-        var plan = PlanThumbnail(photo, options.ThumbSizePixels);
+        var ids = options.PicIds;
+        await using var connection = new SqlConnection(options.ConnectionString);
+        await connection.OpenAsync(options.CancellationToken);
+        await using var command = connection.CreateCommand();
+        var parameterNames = new List<string>();
+        for (var index = 0; index < ids.Count; index++)
+        {
+            var name = "@p" + index;
+            parameterNames.Add(name);
+            command.Parameters.AddWithValue(name, ids[index]);
+        }
+
+        command.CommandText = $"""
+            SELECT PIC_ID, Url, Thumb_URL, DISPLAY
+            FROM dbo.PIC_FILES_T
+            WHERE PIC_ID IN ({string.Join(", ", parameterNames)})
+            ORDER BY PIC_ID
+            """;
+
+        var rows = new List<GalleryPhotoRow>();
+        await using var reader = await command.ExecuteReaderAsync(options.CancellationToken);
+        while (await reader.ReadAsync(options.CancellationToken))
+        {
+            rows.Add(new GalleryPhotoRow(
+                reader.GetInt32(0),
+                reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
+                reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
+                reader.IsDBNull(3) ? null : reader.GetInt32(3)));
+        }
+
+        return rows;
+    }
+
+    private static void WriteUsage(string errorMessage)
+    {
+        Console.Error.WriteLine(errorMessage);
+        Console.Error.WriteLine();
+        Console.Error.WriteLine("Usage:");
+        Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- generate-photo-thumbs [options]");
+        Console.Error.WriteLine();
+        Console.Error.WriteLine("Options:");
+        Console.Error.WriteLine("  --pic-ids <id,id,...>         PIC_FILES_T ids to process");
+        Console.Error.WriteLine("  --pic-ids-file <path>         File with one pic id per line");
+        Console.Error.WriteLine("  --connection-string <value>   Legacy SQL connection string");
+        Console.Error.WriteLine("  --storage-connection-string <value>  Azure Storage connection string");
+        Console.Error.WriteLine("  --settings-file <path>        appsettings.Local.json path");
+        Console.Error.WriteLine("  --thumb-size <px>             Square thumb size (default: 400)");
+        Console.Error.WriteLine("  --dry-run                     Plan uploads/updates without writing");
+        Console.Error.WriteLine();
+        Console.Error.WriteLine("Writes {stem}_t.webp into the same gallery container and updates Thumb_URL / t_width / t_height.");
+    }
+}
+
+internal interface IGalleryThumbGenerator
+{
+    Task<GeneratedThumbResult> GenerateAsync(GalleryPhotoRow photo, GeneratePhotoThumbsOptions options);
+}
+
+[ExcludeFromCodeCoverage]
+internal sealed class AzureGalleryThumbGenerator(string storageConnectionString) : IGalleryThumbGenerator
+{
+    private readonly BlobServiceClient blobService = new(storageConnectionString);
+
+    public async Task<GeneratedThumbResult> GenerateAsync(
+        GalleryPhotoRow photo,
+        GeneratePhotoThumbsOptions options)
+    {
+        var plan = GeneratePhotoThumbsCommand.PlanThumbnail(photo, options.ThumbSizePixels);
         var sourceBlob = blobService.GetBlobContainerClient(plan.Container).GetBlobClient(plan.SourceBlobName);
         if (!await sourceBlob.ExistsAsync(options.CancellationToken))
         {
@@ -148,60 +222,6 @@ internal static class GeneratePhotoThumbsCommand
         {
             throw new InvalidOperationException($"Expected to update 1 PIC_FILES_T row for PIC_ID={picId}, updated {rows}.");
         }
-    }
-
-    private static async Task<IReadOnlyList<GalleryPhotoRow>> LoadPhotosAsync(GeneratePhotoThumbsOptions options)
-    {
-        var ids = options.PicIds;
-        await using var connection = new SqlConnection(options.ConnectionString);
-        await connection.OpenAsync(options.CancellationToken);
-        await using var command = connection.CreateCommand();
-        var parameterNames = new List<string>();
-        for (var index = 0; index < ids.Count; index++)
-        {
-            var name = "@p" + index;
-            parameterNames.Add(name);
-            command.Parameters.AddWithValue(name, ids[index]);
-        }
-
-        command.CommandText = $"""
-            SELECT PIC_ID, Url, Thumb_URL, DISPLAY
-            FROM dbo.PIC_FILES_T
-            WHERE PIC_ID IN ({string.Join(", ", parameterNames)})
-            ORDER BY PIC_ID
-            """;
-
-        var rows = new List<GalleryPhotoRow>();
-        await using var reader = await command.ExecuteReaderAsync(options.CancellationToken);
-        while (await reader.ReadAsync(options.CancellationToken))
-        {
-            rows.Add(new GalleryPhotoRow(
-                reader.GetInt32(0),
-                reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
-                reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
-                reader.IsDBNull(3) ? null : reader.GetInt32(3)));
-        }
-
-        return rows;
-    }
-
-    private static void WriteUsage(string errorMessage)
-    {
-        Console.Error.WriteLine(errorMessage);
-        Console.Error.WriteLine();
-        Console.Error.WriteLine("Usage:");
-        Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- generate-photo-thumbs [options]");
-        Console.Error.WriteLine();
-        Console.Error.WriteLine("Options:");
-        Console.Error.WriteLine("  --pic-ids <id,id,...>         PIC_FILES_T ids to process");
-        Console.Error.WriteLine("  --pic-ids-file <path>         File with one pic id per line");
-        Console.Error.WriteLine("  --connection-string <value>   Legacy SQL connection string");
-        Console.Error.WriteLine("  --storage-connection-string <value>  Azure Storage connection string");
-        Console.Error.WriteLine("  --settings-file <path>        appsettings.Local.json path");
-        Console.Error.WriteLine("  --thumb-size <px>             Square thumb size (default: 400)");
-        Console.Error.WriteLine("  --dry-run                     Plan uploads/updates without writing");
-        Console.Error.WriteLine();
-        Console.Error.WriteLine("Writes {stem}_t.webp into the same gallery container and updates Thumb_URL / t_width / t_height.");
     }
 }
 
