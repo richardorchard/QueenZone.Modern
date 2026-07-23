@@ -1,6 +1,7 @@
 using System.Net;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Configuration;
 using QueenZone.Web;
 
 namespace QueenZone.Web.Tests;
@@ -12,7 +13,11 @@ public sealed class StaticAssetCacheHeadersTests : IClassFixture<WebApplicationF
 
     public StaticAssetCacheHeadersTests(WebApplicationFactory<Program> factory)
     {
-        productionFactory = factory.WithWebHostBuilder(builder => builder.UseEnvironment("Production"));
+        productionFactory = factory.WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Production");
+            ResponseCompressionTests.ApplyProductionEntraTestSettings(builder);
+        });
         developmentFactory = factory.WithWebHostBuilder(builder => builder.UseEnvironment("Development"));
     }
 

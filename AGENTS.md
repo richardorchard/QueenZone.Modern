@@ -163,6 +163,8 @@ The GitHub environment secret `QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING` is 
 
 For production debugging (log stream, Azure CLI, Azure MCP tenant setup, and forum smoke checks), see `docs/agent-handoff-cheatsheet.md`.
 
+Admin Entra app registration, App Service `AzureAd__*` settings, and **client secret rotation** (renew by 2028-07-01): `docs/architecture/entra-admin-auth.md`.
+
 For local SQL MCP access through Azure Data API Builder, see `docs/sql/data-api-builder-mcp.md`. Keep the MCP surface narrow and read-oriented by default.
 
 News agent worker and admin review queue: see `docs/architecture/news-agent.md`. OpenRouter key goes in `src/QueenZone.NewsAgent.Worker/appsettings.Local.json`. Manual OpenRouter smoke test: `scripts/Smoke-NewsAgent.bat`. Admin review UI: `/admin/news-discovery` (requires `Admin:AllowedEmails`; member OAuth at `/account/login` is unrelated).

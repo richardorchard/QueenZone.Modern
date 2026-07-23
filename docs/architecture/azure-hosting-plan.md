@@ -42,8 +42,27 @@ Use configuration keys like:
 - `ConnectionStrings:QueenZoneLegacy`
 - `APPLICATIONINSIGHTS_CONNECTION_STRING`
 - `Storage:PublicMediaBaseUrl`
+- `AzureAd:ClientId` / `AzureAd:TenantId` / related Entra settings (required outside Development)
+- `AllowedHosts` (production default: `www.queenzone.org;queenzone.org;*.azurewebsites.net`)
 - `FeatureFlags:ForumArchiveEnabled`
 - `FeatureFlags:LegacyRedirectsEnabled`
+
+### Production auth and host hardening
+
+- **Entra admin auth is mandatory** when `ASPNETCORE_ENVIRONMENT` is not `Development` or `Testing`. Placeholder values such as `YOUR_CLIENT_ID` do not count. The process throws at startup if admin Entra is not configured.
+- **Do not** enable header-based `X-Test-User-Email` admin auth on App Service. That path only exists for local Development and the automated Testing environment.
+- **AllowedHosts** is locked down in committed `appsettings.json`. Prefer App Service application settings to extend the host list when adding domains rather than shipping `AllowedHosts=*`.
+
+**Runbook (live Entra app, App Service keys, secret rotation):** see [`docs/architecture/entra-admin-auth.md`](entra-admin-auth.md).
+
+Summary of what is live on App Service `queenzone-dev` (as of 2026-07-23):
+
+| Item | Note |
+| --- | --- |
+| Entra app | **QueenZone Admin** — client ID `f6d32f3b-7a4e-4517-a4d1-0995caad8feb` |
+| Settings | `AzureAd__Instance`, `TenantId` (`common`), `ClientId`, `ClientSecret`, `CallbackPath` |
+| Secret renewal | Client secret created 2026-07-23 for 2 years — **renew by 2028-07-01** (procedure in entra-admin-auth.md) |
+| Member OAuth | Separate app **queenzone member login** and `Authentication__*` settings — not the admin OIDC app |
 
 Application Insights telemetry is enabled in `QueenZone.Web` only when
 `APPLICATIONINSIGHTS_CONNECTION_STRING` is configured. The app uses Azure Monitor

@@ -17,7 +17,9 @@ public static class QueenZoneAuthServiceCollectionExtensions
     {
         var azureAdSection = configuration.GetSection("AzureAd");
         var clientId = azureAdSection["ClientId"];
-        var useAzureAd = !environment.IsEnvironment("Testing") && !string.IsNullOrWhiteSpace(clientId);
+        // Fail closed outside Development/Testing when Entra is missing or still a placeholder.
+        AzureAdClientId.EnsureConfiguredForEnvironment(environment, clientId);
+        var useAzureAd = !environment.IsEnvironment("Testing") && AzureAdClientId.IsConfigured(clientId);
 
         if (environment.IsEnvironment("Testing"))
         {
@@ -37,7 +39,9 @@ public static class QueenZoneAuthServiceCollectionExtensions
             return services;
         }
 
-        if (string.IsNullOrWhiteSpace(clientId))
+        // Development-only fallback: empty/placeholder ClientId enables X-Test-User-Email admin auth.
+        // Staging and Production must never reach this branch (guarded above).
+        if (!useAzureAd)
         {
             services
                 .AddAuthentication(TestAuthHandler.SchemeName)
