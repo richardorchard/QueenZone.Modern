@@ -52,7 +52,8 @@ internal static class EfProductionSql
             SELECT
                 CAST(a.Q_ARTICLE_ID AS int) AS Id,
                 a.ARTICLE_NAME AS Title,
-                a.DATE_CREATED AS PublishedAt
+                a.DATE_CREATED AS PublishedAt,
+                CAST(NULL AS nvarchar(200)) AS Slug
             FROM Q_ARTICLE_T a
             WHERE a.DISPLAY = 1
             ORDER BY a.DATE_CREATED DESC, a.Q_ARTICLE_ID DESC
