@@ -15,11 +15,8 @@ public static class NewsAgentServiceCollectionExtensions
             client.Timeout = TimeSpan.FromSeconds(30);
             client.DefaultRequestHeaders.UserAgent.ParseAdd("QueenZoneNewsDiscovery/1.0");
         })
-        .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
-        {
-            AllowAutoRedirect = true,
-            MaxAutomaticRedirections = 10
-        });
+        // SSRF: block private/link-local/metadata destinations after DNS (and on redirects).
+        .ConfigurePrimaryHttpMessageHandler(() => SsrfSafeSocketsHttpHandler.Create(maxAutomaticRedirections: 5));
 
         services.AddSingleton<NewsSourceFetcherRegistry>();
         services.AddSingleton<INewsSourceFetcher, RssAtomSourceFetcher>();

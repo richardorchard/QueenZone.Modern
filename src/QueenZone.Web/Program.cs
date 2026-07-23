@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.StaticFiles;
@@ -38,17 +38,37 @@ builder.Services.AddQueenZoneWebComposition(builder.Configuration, builder.Envir
 builder.Services.AddRazorPages(options =>
 {
     options.Conventions.AuthorizeFolder("/Admin", "Admin");
+    // Abuse-sensitive public/member surfaces (process-local rate limits; single B1 instance).
+    // EnableRateLimitingAttribute is endpoint metadata, not an MVC filter.
+    options.Conventions.AddFolderApplicationModelConvention(
+        "/Submit",
+        model => model.EndpointMetadata.Add(new Microsoft.AspNetCore.RateLimiting.EnableRateLimitingAttribute(
+            QueenZoneRateLimitPolicies.MemberWrite)));
+    options.Conventions.AddPageApplicationModelConvention(
+        "/Account/ExternalLogin",
+        model => model.EndpointMetadata.Add(new Microsoft.AspNetCore.RateLimiting.EnableRateLimitingAttribute(
+            QueenZoneRateLimitPolicies.Auth)));
+    options.Conventions.AddPageApplicationModelConvention(
+        "/Account/Login",
+        model => model.EndpointMetadata.Add(new Microsoft.AspNetCore.RateLimiting.EnableRateLimitingAttribute(
+            QueenZoneRateLimitPolicies.Auth)));
+    options.Conventions.AddPageApplicationModelConvention(
+        "/Account/Settings",
+        model => model.EndpointMetadata.Add(new Microsoft.AspNetCore.RateLimiting.EnableRateLimitingAttribute(
+            QueenZoneRateLimitPolicies.Upload)));
+    options.Conventions.AddPageApplicationModelConvention(
+        "/Search",
+        model => model.EndpointMetadata.Add(new Microsoft.AspNetCore.RateLimiting.EnableRateLimitingAttribute(
+            QueenZoneRateLimitPolicies.Search)));
 });
 
 var app = builder.Build();
 
-// Azure App Service (and any CDN/proxy in front of it, e.g. Cloudflare) terminates TLS and
-// forwards plain HTTP internally. Without this, Request.Scheme/Host reflect the internal
-// hop, so OAuth providers (Google/Microsoft/Facebook) get built redirect_uri values like
-// http://<internal-host> instead of https://queenzone.org â€” which then fail to match the
-// redirect URI registered with each provider. KnownIPNetworks/KnownProxies are cleared because
-// the edge proxy IP isn't a fixed, known address; the app already trusts App Service/Cloudflare
-// as its only ingress.
+// Azure App Service (and CDN/proxy, e.g. Cloudflare) terminates TLS and forwards plain HTTP.
+// Without forwarded headers, OAuth redirect_uri values use the internal host/scheme.
+// KnownIPNetworks/Proxies are cleared (edge IP is not fixed). Trust boundary: App Service/
+// Cloudflare as only public ingress. IP-based rate limits are soft if the edge is bypassed.
+// See docs/architecture/azure-hosting-plan.md (forwarded-headers trust).
 var forwardedHeadersOptions = new ForwardedHeadersOptions
 {
     ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost,

@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
 using QueenZone.Storage;
 
@@ -39,6 +40,7 @@ public static class EditorImageUploadEndpoints
                 blobUploadOptions.Value,
                 cancellationToken))
             .RequireAuthorization("Authoring")
+            .RequireRateLimiting(QueenZoneRateLimitPolicies.Upload)
             .DisableAntiforgery()
             .WithName("UploadEditorImage")
             .Accepts<IFormFile>("multipart/form-data");

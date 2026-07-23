@@ -22,4 +22,8 @@
     <EmbeddedResource Include="news-discovery-sources.json" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="QueenZone.Web.Tests" />
+  </ItemGroup>
+
 </Project>

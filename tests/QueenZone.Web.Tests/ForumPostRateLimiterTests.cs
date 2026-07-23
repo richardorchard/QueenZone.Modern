@@ -7,7 +7,7 @@ namespace QueenZone.Web.Tests;
 public sealed class ForumPostRateLimiterTests
 {
     [Fact]
-    public async Task IsAllowedAsync_AllowsAttempt_WhenRateLimitProbeFails()
+    public async Task IsAllowedAsync_DeniesAttempt_WhenRateLimitProbeFails()
     {
         using var cache = new MemoryCache(new MemoryCacheOptions());
         var limiter = new ForumPostRateLimiter(
@@ -18,7 +18,8 @@ public sealed class ForumPostRateLimiterTests
 
         var allowed = await limiter.IsAllowedAsync(Guid.NewGuid());
 
-        Assert.True(allowed);
+        // Fail-closed: database outage must not open a spam window.
+        Assert.False(allowed);
     }
 
     private sealed class ThrowingForumWriteRepository : IForumWriteRepository

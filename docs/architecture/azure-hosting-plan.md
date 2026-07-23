@@ -61,6 +61,39 @@ Use configuration keys like:
 - **Do not** enable header-based `X-Test-User-Email` admin auth on App Service. That path only exists for local Development and the automated Testing environment.
 - **AllowedHosts** is locked down in committed `appsettings.json`. Prefer App Service application settings to extend the host list when adding domains rather than shipping `AllowedHosts=*`.
 
+### Forwarded headers trust boundary
+
+The app clears `KnownIPNetworks` / `KnownProxies` so `X-Forwarded-For`, `X-Forwarded-Proto`, and `X-Forwarded-Host` from **App Service / Cloudflare** are accepted (required for correct OAuth redirect URIs and scheme).
+
+| Trust | Implication |
+| --- | --- |
+| Edge is the only public ingress | Normal production path — forwarded headers are trusted |
+| Client reaches Kestrel without the edge | Client can spoof `X-Forwarded-For` (and thus IP-based rate-limit partitions) |
+
+**Policy:**
+
+- Treat **IP-based rate limits as soft** (auth start, search, anonymous partitions).
+- Prefer **authenticated member id** for write/upload rate partitions when a principal is present.
+- Forum post limits use **member id + DB count**, not IP.
+- Do not put private admin actions behind IP allowlists derived from `X-Forwarded-For` alone.
+
+If a second public path to the app is ever opened (direct App Service hostname without Cloudflare, extra VNet ingress), re-evaluate this model or terminate TLS only at a single trusted reverse proxy.
+
+### Rate limiting (process-local, single B1)
+
+Named policies (429 when exceeded):
+
+| Policy | Surfaces | Partition | Default |
+| --- | --- | --- | --- |
+| `qz-auth` | `/account/login`, `/account/externallogin` | Client IP | 30 / minute |
+| `qz-member-write` | `/submit/*` | Member id, else IP | 20 / minute |
+| `qz-upload` | editor image API, account settings (avatar) | Member id, else IP | 30 / minute |
+| `qz-search` | `/search` | Client IP | 60 / minute |
+| Fan performance | audio / browse | Member or IP | Config section `RateLimiting:FanPerformances` |
+| Forum posts | new thread / reply | Member + DB probe | 5 / minute; **fail-closed** if probe errors |
+
+No Redis: limits are per process. Correct on single-instance B1; see [`hosting-scale-and-cache.md`](hosting-scale-and-cache.md).
+
 **Runbook (live Entra app, App Service keys, secret rotation):** see [`docs/architecture/entra-admin-auth.md`](entra-admin-auth.md).
 
 Summary of what is live on App Service `queenzone-dev` (as of 2026-07-23):
@@ -87,6 +120,17 @@ Use `/health` for App Service / CI pings. Point deeper monitors at `/health/read
 - `EnableRetryOnFailure` for Azure SQL transient faults (5 retries, max delay 20s).
 - Design-time migrations / long tools still use a **300s** timeout via `QueenZoneDbContextFactory`.
 - Hot forum paths that need longer still raise timeout per command in those repositories.
+
+### News discovery outbound HTTP (SSRF)
+
+The news agent worker fetches admin-configured feed/page URLs. Guards:
+
+- Absolute **http/https** URLs only (no `file:`, `gopher:`, etc.).
+- Hostnames such as `localhost`, `*.local`, `*.internal`, cloud metadata names blocked.
+- After DNS, connections to private/link-local/CGNAT/metadata address ranges are refused (including redirect hops via `SocketsHttpHandler.ConnectCallback`).
+- Response body capped (default 5 MB).
+
+See `QueenZone.NewsAgent.OutboundUrlSafety` and `SsrfSafeSocketsHttpHandler`.
 
 Application Insights telemetry is enabled in `QueenZone.Web` only when
 `APPLICATIONINSIGHTS_CONNECTION_STRING` is configured. The app uses Azure Monitor
