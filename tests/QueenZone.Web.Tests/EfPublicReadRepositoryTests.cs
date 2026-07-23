@@ -301,6 +301,14 @@ public sealed class EfPublicReadRepositoryTests : IAsyncDisposable
     }
 
     [Fact]
+    public void Article_production_sitemap_sql_returns_slug_projection()
+    {
+        var sitemapSql = EfProductionSql.CreateArticlesQueries().Sitemap;
+
+        Assert.Contains(" AS Slug", sitemapSql, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task News_maps_latest_page_count_detail_and_sitemap()
     {
         dbContext.Database.ExecuteSqlRaw(
