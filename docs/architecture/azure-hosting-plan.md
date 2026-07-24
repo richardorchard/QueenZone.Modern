@@ -114,8 +114,18 @@ Summary of what is live on App Service `queenzone-dev` (as of 2026-07-23):
 | --- | --- | --- |
 | `/health` | **Liveness** — process is up | None (always cheap JSON `{ "status": "ok" }`) |
 | `/health/ready` | **Readiness** — can serve traffic that needs SQL/blob | SQL when `ConnectionStrings:QueenZoneLegacy` is set; blob when `ConnectionStrings:BlobStorage` is set. Unconfigured dependencies report **Healthy** with a "not configured" description (sample-data local mode). Failures return **503** without secrets or exception text. |
+| `/warmup` | **Warmup** — deployment/startup gate for public traffic | Runs readiness checks, then primes process-local public query caches for hot public routes. Failures return **503** with a minimal body and no dependency or exception details. |
 
 Use `/health` for App Service / CI pings. Point deeper monitors at `/health/ready` when you want SQL/blob failure to page.
+
+For the B1 App Service plan, keep deployment slots out of the critical path and configure App Service startup warmup instead:
+
+```text
+WEBSITE_WARMUP_PATH=/warmup
+WEBSITE_WARMUP_STATUSES=200
+```
+
+Enable **Always On** for the App Service when available on the active SKU so the single B1 worker is not unloaded after idle periods. Always On prevents idle cold starts; `WEBSITE_WARMUP_PATH` controls the platform startup ping when the app process/container starts. Keep the GitHub Actions post-deploy smoke route suite in place after `/warmup` passes, because real public pages still prove routing, Razor rendering, and output-cache behavior on the custom domain.
 
 ### SQL Server EF options (runtime)
 

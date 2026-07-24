@@ -117,13 +117,23 @@ Quick health checks:
 ```powershell
 az webapp show --name queenzone-dev --resource-group Queenzone-RG --query "{hostNames:hostNames, state:state}"
 Invoke-WebRequest -Uri https://www.queenzone.org/health -UseBasicParsing | Select-Object StatusCode
+Invoke-WebRequest -Uri https://www.queenzone.org/warmup -UseBasicParsing | Select-Object StatusCode
 ```
 
-Post-deploy smoke (custom domain) is a separate job at the end of `.github/workflows/deploy-app-service.yml` (`changes` → `build` → `migrate` → `deploy` → `smoke`) against `https://www.queenzone.org` (`/health` plus key public routes). A failure fails the smoke job so GitHub Actions can notify watchers. Re-run the same checks locally:
+Post-deploy smoke (custom domain) is a separate job at the end of `.github/workflows/deploy-app-service.yml` (`changes` → `build` → `migrate` → `deploy` → `smoke`) against `https://www.queenzone.org` (`/warmup`, then `/health` plus key public routes). A failure fails the smoke job so GitHub Actions can notify watchers. Re-run the same checks locally:
 
 ```powershell
 powershell -File .\scripts\Smoke-LiveSite.ps1
 ```
+
+B1 App Service warmup settings:
+
+```text
+WEBSITE_WARMUP_PATH=/warmup
+WEBSITE_WARMUP_STATUSES=200
+```
+
+Enable Always On on the App Service when the active SKU supports it; it reduces idle cold starts, while `/warmup` handles deployment/startup dependency checks and public query cache priming.
 
 Application logging should be enabled at Information level on the filesystem. If the stream is quiet, hit the failing route to generate entries.
 

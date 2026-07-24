@@ -4,7 +4,7 @@
   Post-deploy HTTP smoke against the live custom domain (or another base URL).
 
 .DESCRIPTION
-  Waits for /health to return 200 with status=ok, then checks key public routes.
+  Waits for /warmup to return 200 with status=ok, then checks key public routes.
   Matches the post-deploy smoke in .github/workflows/deploy-app-service.yml so you
   can re-run the same checks locally after a deploy or when debugging a failure.
 
@@ -28,22 +28,22 @@ if ($BaseUrl -notmatch '^https?://') {
 }
 
 $BaseUrl = $BaseUrl.TrimEnd("/")
-$healthUrl = "$BaseUrl/health"
+$warmupUrl = "$BaseUrl/warmup"
 $maxAttempts = [Math]::Max(1, [int][Math]::Ceiling(($TimeoutMinutes * 60) / $PollSeconds))
 
-Write-Host "Waiting for healthy $healthUrl (up to ~$TimeoutMinutes min)..."
+Write-Host "Waiting for warmup $warmupUrl (up to ~$TimeoutMinutes min)..."
 
-$healthy = $false
+$warmed = $false
 for ($i = 1; $i -le $maxAttempts; $i++) {
     $elapsed = $i * $PollSeconds
     try {
-        $response = Invoke-WebRequest -Uri $healthUrl -UseBasicParsing -TimeoutSec 10
+        $response = Invoke-WebRequest -Uri $warmupUrl -UseBasicParsing -TimeoutSec 30
         if ($response.StatusCode -eq 200 -and $response.Content -match '"status"\s*:\s*"ok"') {
-            Write-Host "Healthy after ~${elapsed}s (HTTP $($response.StatusCode), status=ok)"
-            $healthy = $true
+            Write-Host "Warmup complete after ~${elapsed}s (HTTP $($response.StatusCode), status=ok)"
+            $warmed = $true
             break
         }
-        Write-Host "  [${elapsed}s] HTTP $($response.StatusCode) but health body incomplete - waiting ${PollSeconds}s..."
+        Write-Host "  [${elapsed}s] HTTP $($response.StatusCode) but warmup body incomplete - waiting ${PollSeconds}s..."
     }
     catch {
         Write-Host "  [${elapsed}s] unreachable - waiting ${PollSeconds}s..."
@@ -51,8 +51,8 @@ for ($i = 1; $i -le $maxAttempts; $i++) {
     Start-Sleep -Seconds $PollSeconds
 }
 
-if (-not $healthy) {
-    throw "Custom domain did not return healthy /health within $TimeoutMinutes minutes: $healthUrl"
+if (-not $warmed) {
+    throw "Custom domain did not return warmed /warmup within $TimeoutMinutes minutes: $warmupUrl"
 }
 
 $paths = @(
