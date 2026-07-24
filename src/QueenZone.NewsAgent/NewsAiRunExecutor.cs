@@ -46,33 +46,12 @@ public sealed class NewsAiRunExecutor(
                 utcNow),
             cancellationToken);
 
+        NewsAiChatCompletion completion;
         try
         {
-            var completion = await aiClient.CompleteChatAsync(
+            completion = await aiClient.CompleteChatAsync(
                 new NewsAiChatRequest(modelRole, promptVersion, messages),
                 cancellationToken);
-
-            budgetGuard.RegisterSpend(completion.EstimatedCostUsd);
-
-            await repository.CompleteAiRunAsync(
-                aiRunId,
-                new NewsAiRunCompletion(
-                    NewsAiRunStatus.Succeeded,
-                    completion.InputTokens,
-                    completion.OutputTokens,
-                    completion.EstimatedCostUsd,
-                    completion.DryRun ? null : completion.Content,
-                    null,
-                    DateTime.UtcNow),
-                cancellationToken);
-
-            logger.LogInformation(
-                "AI run {AiRunId} completed for candidate {CandidateId} using model {ModelId}.",
-                aiRunId,
-                candidateId,
-                completion.ModelId);
-
-            return new NewsAiRunExecutionResult(aiRunId, completion);
         }
         catch (Exception ex)
         {
@@ -97,5 +76,27 @@ public sealed class NewsAiRunExecutor(
 
             throw;
         }
+
+        await repository.CompleteAiRunAsync(
+            aiRunId,
+            new NewsAiRunCompletion(
+                NewsAiRunStatus.Succeeded,
+                completion.InputTokens,
+                completion.OutputTokens,
+                completion.EstimatedCostUsd,
+                completion.DryRun ? null : completion.Content,
+                null,
+                DateTime.UtcNow),
+            cancellationToken);
+
+        budgetGuard.RegisterSpend(completion.EstimatedCostUsd);
+
+        logger.LogInformation(
+            "AI run {AiRunId} completed for candidate {CandidateId} using model {ModelId}.",
+            aiRunId,
+            candidateId,
+            completion.ModelId);
+
+        return new NewsAiRunExecutionResult(aiRunId, completion);
     }
 }
