@@ -10,6 +10,17 @@ public static class PhotoImageUrl
     private const string PublicBaseUrl = "https://cdn.queenzone.org";
     private const string BlobStorageBaseUrl = "https://queenzone.blob.core.windows.net";
 
+    /// <summary>
+    /// Legacy PIC_FILES_T folders that do not match the Azure container after the usual
+    /// underscore→hyphen lowercasing. Keys are already normalized container candidates.
+    /// </summary>
+    private static readonly Dictionary<string, string> ContainerAliases =
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            // Category "US Queen Convention 2001" → folder US_Queen_Convention_2001, but blobs live in us-convention-2001.
+            ["us-queen-convention-2001"] = "us-convention-2001",
+        };
+
     public static string Build(string legacyPath)
     {
         return BuildFromBase(PublicBaseUrl, legacyPath);
@@ -23,7 +34,7 @@ public static class PhotoImageUrl
         var endpoint = (blobEndpoint ?? BlobStorageBaseUrl).TrimEnd('/');
         if (TryParseBlobLocation(url, out var container, out var blobName))
         {
-            return $"{endpoint}/{container}/{blobName}";
+            return $"{endpoint}/{NormalizeContainer(container)}/{blobName}";
         }
 
         return BuildBlobStorageUrl(url, endpoint);
@@ -38,7 +49,7 @@ public static class PhotoImageUrl
             return $"{baseUrl.TrimEnd('/')}/{trimmed}";
         }
 
-        var folder = segments[0].ToLowerInvariant().Replace('_', '-');
+        var folder = NormalizeContainer(segments[0]);
         var fileName = segments[^1];
         return $"{baseUrl.TrimEnd('/')}/{folder}/{fileName}";
     }
@@ -63,8 +74,14 @@ public static class PhotoImageUrl
             return false;
         }
 
-        container = Uri.UnescapeDataString(path[..slashIndex]);
+        container = NormalizeContainer(Uri.UnescapeDataString(path[..slashIndex]));
         blobName = Uri.UnescapeDataString(path[(slashIndex + 1)..]);
         return container.Length > 0 && blobName.Length > 0;
+    }
+
+    internal static string NormalizeContainer(string folderOrContainer)
+    {
+        var normalized = folderOrContainer.Trim().ToLowerInvariant().Replace('_', '-');
+        return ContainerAliases.TryGetValue(normalized, out var alias) ? alias : normalized;
     }
 }

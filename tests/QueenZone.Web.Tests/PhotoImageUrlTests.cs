@@ -64,4 +64,26 @@ public sealed class PhotoImageUrlTests
 
         Assert.False(parsed);
     }
+
+    [Fact]
+    public void Build_AliasesUsQueenConventionFolder_ToActualContainer()
+    {
+        Assert.Equal(
+            "https://cdn.queenzone.org/us-convention-2001/121120014455.jpg",
+            PhotoImageUrl.Build("/US_Queen_Convention_2001/121120014455.jpg"));
+        Assert.Equal(
+            "https://cdn.queenzone.org/us-convention-2001/121120014455.jpg",
+            PhotoImageUrl.Build("/US_queen_Convention_2001/121120014455.jpg"));
+    }
+
+    [Fact]
+    public void TryParseBlobLocation_NormalizesAliasedContainer()
+    {
+        Assert.True(PhotoImageUrl.TryParseBlobLocation(
+            "https://cdn.queenzone.org/us-queen-convention-2001/121120014455.jpg",
+            out var container,
+            out var blobName));
+        Assert.Equal("us-convention-2001", container);
+        Assert.Equal("121120014455.jpg", blobName);
+    }
 }
