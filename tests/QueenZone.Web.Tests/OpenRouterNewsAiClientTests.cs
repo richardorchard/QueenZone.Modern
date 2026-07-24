@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using QueenZone.NewsAgent;
@@ -39,6 +40,7 @@ public sealed class OpenRouterNewsAiClientTests
     [Fact]
     public async Task CompleteChatAsync_parses_successful_provider_response()
     {
+        string? requestBody = null;
         const string responseBody = """
             {
               "model": "openai/gpt-4.1-nano",
@@ -58,9 +60,13 @@ public sealed class OpenRouterNewsAiClientTests
             """;
 
         var client = CreateClient(
-            (_, _) => new HttpResponseMessage(HttpStatusCode.OK)
+            (request, _) =>
             {
-                Content = new StringContent(responseBody, Encoding.UTF8, "application/json")
+                requestBody = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(responseBody, Encoding.UTF8, "application/json")
+                };
             },
             new OpenRouterOptions
             {
@@ -75,6 +81,56 @@ public sealed class OpenRouterNewsAiClientTests
         Assert.Equal(120, completion.InputTokens);
         Assert.Equal(30, completion.OutputTokens);
         Assert.Equal(0.0004m, completion.EstimatedCostUsd);
+
+        using var document = JsonDocument.Parse(requestBody!);
+        var root = document.RootElement;
+        Assert.True(root.TryGetProperty("usage", out var usage));
+        Assert.True(usage.GetProperty("include").GetBoolean());
+        Assert.False(root.TryGetProperty("max_input_tokens", out _));
+    }
+
+    [Fact]
+    public async Task CompleteChatAsync_trims_messages_to_configured_input_budget()
+    {
+        string? requestBody = null;
+        const string responseBody = """
+            {
+              "model": "openai/gpt-4.1-nano",
+              "choices": [{ "message": { "content": "ok" } }],
+              "usage": { "prompt_tokens": 1, "completion_tokens": 1, "cost": 0.0001 }
+            }
+            """;
+
+        var client = CreateClient(
+            (request, _) =>
+            {
+                requestBody = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(responseBody, Encoding.UTF8, "application/json")
+                };
+            },
+            new OpenRouterOptions
+            {
+                ApiKey = "test-key",
+                MaxInputTokens = 20,
+                MaxRetryAttempts = 1
+            });
+
+        await client.CompleteChatAsync(new NewsAiChatRequest(
+            NewsAiModelRole.Triage,
+            "triage-v1",
+            [
+                new NewsAiChatMessage("system", "Respond with JSON."),
+                new NewsAiChatMessage("user", new string('x', 300))
+            ]));
+
+        using var document = JsonDocument.Parse(requestBody!);
+        var messages = document.RootElement.GetProperty("messages");
+        var userContent = messages[1].GetProperty("content").GetString();
+        Assert.NotNull(userContent);
+        Assert.True(userContent!.Length < 300);
+        Assert.Contains("Content truncated", userContent, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -79,7 +79,48 @@ public sealed class NewsAiRunExecutorTests
             [new NewsAiChatMessage("user", "Classify headline.")]));
     }
 
-    private static NewsAiRunExecutor CreateExecutor(INewsDiscoveryRepository repository, INewsAiClient aiClient) =>
+    [Fact]
+    public async Task ExecuteAsync_records_cost_before_stopping_future_calls_over_budget()
+    {
+        var repository = new InMemoryNewsDiscoveryRepository(new SharedNewsDiscoveryStore());
+        var candidateId = await CreateCandidateAsync(repository);
+        var aiClient = new FakeNewsAiClient(enabled: true, completion: new NewsAiChatCompletion(
+            """{"relevant":true}""",
+            "openai/gpt-4.1-nano",
+            100,
+            20,
+            0.02m,
+            DryRun: false));
+        var executor = CreateExecutor(repository, aiClient, perRunBudget: 0.01m);
+
+        executor.BeginRun();
+
+        await Assert.ThrowsAsync<NewsAiBudgetExceededException>(() => executor.ExecuteAsync(
+            candidateId,
+            NewsAiRunKind.Triage,
+            NewsAiModelRole.Triage,
+            "triage-v1",
+            [new NewsAiChatMessage("user", "Classify headline.")]));
+
+        var runs = await repository.GetAiRunsForCandidateAsync(candidateId);
+        Assert.Single(runs);
+        Assert.Equal(NewsAiRunStatus.Succeeded, runs[0].Status);
+        Assert.Equal(0.02m, runs[0].EstimatedCostUsd);
+
+        await Assert.ThrowsAsync<NewsAiBudgetExceededException>(() => executor.ExecuteAsync(
+            candidateId,
+            NewsAiRunKind.Triage,
+            NewsAiModelRole.Triage,
+            "triage-v1",
+            [new NewsAiChatMessage("user", "Classify headline again.")]));
+        Assert.Equal(1, aiClient.CallCount);
+    }
+
+    private static NewsAiRunExecutor CreateExecutor(
+        INewsDiscoveryRepository repository,
+        INewsAiClient aiClient,
+        decimal perRunBudget = 1m,
+        decimal dailyBudget = 5m) =>
         new(
             aiClient,
             repository,
@@ -87,8 +128,8 @@ public sealed class NewsAiRunExecutorTests
             {
                 ApiKey = aiClient.IsEnabled ? "test-key" : null,
                 PerRunCandidateLimit = 5,
-                PerRunBudgetUsd = 1m,
-                DailyBudgetUsd = 5m
+                PerRunBudgetUsd = perRunBudget,
+                DailyBudgetUsd = dailyBudget
             })),
             Options.Create(new OpenRouterOptions
             {
@@ -125,10 +166,13 @@ public sealed class NewsAiRunExecutorTests
     {
         public bool IsEnabled { get; } = enabled;
 
+        public int CallCount { get; private set; }
+
         public Task<NewsAiChatCompletion> CompleteChatAsync(
             NewsAiChatRequest request,
             CancellationToken cancellationToken = default)
         {
+            CallCount++;
             if (exception is not null)
             {
                 throw exception;

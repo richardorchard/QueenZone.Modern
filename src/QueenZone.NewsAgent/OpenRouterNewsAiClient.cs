@@ -35,13 +35,16 @@ public sealed class OpenRouterNewsAiClient(
 
         var modelId = settings.ResolveModel(request.ModelRole);
         var maxOutputTokens = request.MaxOutputTokens ?? settings.MaxOutputTokens;
+        var messages = NewsAiPromptBudgeter.TrimToApproximateTokenBudget(
+            request.Messages,
+            settings.MaxInputTokens);
         var payload = new OpenRouterChatCompletionRequest(
             modelId,
-            request.Messages
+            messages
                 .Select(message => new OpenRouterChatMessage(message.Role, message.Content))
                 .ToList(),
             Math.Min(maxOutputTokens, settings.MaxOutputTokens),
-            settings.MaxInputTokens);
+            new OpenRouterUsageRequest(true));
 
         if (settings.DryRun)
         {
@@ -145,7 +148,9 @@ public sealed class OpenRouterNewsAiClient(
         string Model,
         IReadOnlyList<OpenRouterChatMessage> Messages,
         int MaxTokens,
-        int MaxInputTokens);
+        OpenRouterUsageRequest Usage);
+
+    private sealed record OpenRouterUsageRequest(bool Include);
 
     private sealed record OpenRouterChatMessage(string Role, string Content);
 }
