@@ -195,6 +195,7 @@ public static class QueenZoneWebServiceCollectionExtensions
         services.AddScoped<PhotoSubmissionService>();
         services.AddScoped<AdminPhotoService>();
         services.AddScoped<NewsSuggestionService>();
+        services.AddScoped<PublicWarmupService>();
         services.AddScoped<UgcHtml>();
         services.AddScoped<ForumPostRateLimiter>();
         services.AddSingleton<MemberUploadQuotaService>();

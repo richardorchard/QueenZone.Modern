@@ -46,6 +46,7 @@ public sealed class QueenZoneWebCompositionTests
                 scope.ServiceProvider.GetRequiredService<IBiographyRepository>());
             Assert.NotNull(scope.ServiceProvider.GetRequiredService<CoreSitemapService>());
             Assert.NotNull(scope.ServiceProvider.GetRequiredService<PublicQueryCacheService>());
+            Assert.NotNull(scope.ServiceProvider.GetRequiredService<PublicWarmupService>());
             Assert.NotNull(scope.ServiceProvider.GetRequiredService<MemberAccountService>());
         }
 

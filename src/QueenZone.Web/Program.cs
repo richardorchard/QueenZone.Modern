@@ -111,7 +111,9 @@ if (!app.Environment.IsDevelopment() && !app.Environment.IsEnvironment("Testing"
     app.UseHsts();
 }
 
-app.UseHttpsRedirection();
+app.UseWhen(
+    context => !QueenZoneHealthEndpoints.IsProbePath(context.Request.Path),
+    branch => branch.UseHttpsRedirection());
 
 app.Use(async (context, next) =>
 {

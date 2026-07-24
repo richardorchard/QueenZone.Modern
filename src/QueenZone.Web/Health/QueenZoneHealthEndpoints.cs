@@ -8,6 +8,12 @@ public static class QueenZoneHealthEndpoints
 {
     public const string ReadyTag = "ready";
     public const string ReadyPath = "/health/ready";
+    public const string WarmupPath = "/warmup";
+
+    public static bool IsProbePath(PathString path) =>
+        string.Equals(path.Value, "/health", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(path.Value, ReadyPath, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(path.Value, WarmupPath, StringComparison.OrdinalIgnoreCase);
 
     public static IServiceCollection AddQueenZoneHealthChecks(this IServiceCollection services)
     {
@@ -42,7 +48,38 @@ public static class QueenZoneHealthEndpoints
             },
         });
 
+        // Warmup: dependency readiness plus representative public query cache priming.
+        endpoints.MapGet(WarmupPath, RunWarmupAsync);
+
         return endpoints;
+    }
+
+    internal static async Task<IResult> RunWarmupAsync(
+        HealthCheckService healthCheckService,
+        PublicWarmupService publicWarmup,
+        CancellationToken cancellationToken)
+    {
+        var report = await healthCheckService.CheckHealthAsync(
+            registration => registration.Tags.Contains(ReadyTag),
+            cancellationToken);
+        if (report.Status is HealthStatus.Unhealthy)
+        {
+            return Results.Json(new { status = "unhealthy" }, statusCode: StatusCodes.Status503ServiceUnavailable);
+        }
+
+        try
+        {
+            await publicWarmup.WarmPublicCachesAsync(cancellationToken);
+            return Results.Ok(new { status = "ok" });
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch
+        {
+            return Results.Json(new { status = "unhealthy" }, statusCode: StatusCodes.Status503ServiceUnavailable);
+        }
     }
 
     internal static async Task WriteReadyResponseAsync(HttpContext httpContext, HealthReport report)

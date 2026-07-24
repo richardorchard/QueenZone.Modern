@@ -143,6 +143,7 @@ jobs:
       - name: Post-deploy smoke (custom domain)
         run: |
           BASE_URL="https://www.queenzone.org"
+          WARMUP_PATH="/warmup"
           PATHS=(
             "/health"
             "/"
@@ -159,7 +160,7 @@ jobs:
           MAX_ATTEMPTS=32
           SLEEP_SECONDS=15
 
-          echo "Polling content routes on $BASE_URL after deploy (up to ~$(( MAX_ATTEMPTS * SLEEP_SECONDS / 60 )) minutes)."
+          echo "Waiting for warmup on ${BASE_URL}${WARMUP_PATH} after deploy (up to ~$(( MAX_ATTEMPTS * SLEEP_SECONDS / 60 )) minutes)."
           echo "/health is not sufficient readiness — App Service can answer liveness while pages still 500."
 
           check_path() {
@@ -186,6 +187,23 @@ jobs:
             return 0
           }
 
+          for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
+            echo "Warmup attempt ${attempt}/${MAX_ATTEMPTS}..."
+            if check_path "$WARMUP_PATH"; then
+              echo "Warmup passed on attempt ${attempt}."
+              break
+            fi
+
+            if [ "$attempt" -eq "$MAX_ATTEMPTS" ]; then
+              echo "::error::Warmup failed against ${BASE_URL}${WARMUP_PATH} after ${MAX_ATTEMPTS} attempts. Check App Service logs."
+              exit 1
+            fi
+
+            echo "Warmup not ready yet. Retrying in ${SLEEP_SECONDS}s..."
+            sleep "$SLEEP_SECONDS"
+          done
+
+          echo "Polling content routes on $BASE_URL after warmup."
           for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
             echo "Attempt ${attempt}/${MAX_ATTEMPTS}..."
             failed=0
