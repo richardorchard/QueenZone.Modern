@@ -30,7 +30,7 @@ internal static class EfProductionSql
             SELECT
                 CAST(a.Q_ARTICLE_ID AS int) AS Id,
                 a.ARTICLE_NAME AS Title,
-                LEFT(ISNULL(a.ARTICLE_TEXT, N''), {ArticlesListBodyPreviewChars}) AS Body,
+                LEFT(ISNULL(CAST(a.ARTICLE_TEXT AS nvarchar(max)), N''), {ArticlesListBodyPreviewChars}) AS Body,
                 a.DATE_CREATED AS PublishedAt,
                 NULLIF(LTRIM(RTRIM(a.SOURCE)), '') AS Source,
                 NULLIF(LTRIM(RTRIM(c.ARTICLE_CATEGORY)), '') AS CategoryName,
@@ -45,7 +45,7 @@ internal static class EfProductionSql
             SELECT
                 CAST(a.Q_ARTICLE_ID AS int) AS Id,
                 a.ARTICLE_NAME AS Title,
-                ISNULL(a.ARTICLE_TEXT, '') AS Body,
+                ISNULL(CAST(a.ARTICLE_TEXT AS nvarchar(max)), N'') AS Body,
                 a.DATE_CREATED AS PublishedAt,
                 NULLIF(LTRIM(RTRIM(a.SOURCE)), '') AS Source,
                 NULLIF(LTRIM(RTRIM(c.ARTICLE_CATEGORY)), '') AS CategoryName,
