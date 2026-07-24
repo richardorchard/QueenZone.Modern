@@ -7,7 +7,7 @@ public sealed class InMemoryPhotoRepositorySitemapTests
     [Fact]
     public async Task GetPublishedSitemapCategoriesAsync_returns_only_non_empty_categories_with_light_photos()
     {
-        var repository = new InMemoryPhotoRepository(SamplePhotoData.CreateSeedCategories());
+        var repository = new InMemoryPhotoRepository(new SharedPhotoStore(SamplePhotoData.CreateSeedCategories()));
 
         var categories = await repository.GetPublishedSitemapCategoriesAsync();
 

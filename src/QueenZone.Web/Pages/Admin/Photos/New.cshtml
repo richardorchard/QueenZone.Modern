@@ -1,0 +1,59 @@
+@page "/admin/photos/new"
+@model NewModel
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@{
+  var antiforgeryToken = Antiforgery.GetAndStoreTokens(HttpContext).RequestToken;
+}
+
+<div class="admin-shell">
+  <div class="admin-form-panel">
+    <h1>Add photo</h1>
+    <p><a href="/admin/photos">Back to photos</a></p>
+
+    <form class="admin-form" method="post" action="/admin/photos/create" enctype="multipart/form-data">
+      <input type="hidden" name="@AdminPhotosPageModel.AntiforgeryTokenFieldName" value="@antiforgeryToken" />
+
+      <label>
+        Image file
+        <input type="file" name="file" accept="image/jpeg,image/png,image/webp,image/tiff" required />
+      </label>
+
+      <label>
+        Title
+        <input type="text" name="title" required maxlength="200" />
+      </label>
+
+      <label>
+        Category
+        <select name="catId" required>
+          @foreach (var category in Model.Categories)
+          {
+            <option value="@category.CatId">@category.Name</option>
+          }
+        </select>
+      </label>
+
+      <label>
+        Year
+        <input type="number" name="year" value="@DateTime.UtcNow.Year" />
+      </label>
+
+      <label>
+        Date
+        <input type="datetime-local" name="dateTime" value="@DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm")" />
+      </label>
+
+      <label>
+        Keywords
+        <input type="text" name="keywords" maxlength="500" />
+      </label>
+
+      <label>
+        <input type="checkbox" name="isVisible" value="true" checked />
+        Visible on public gallery
+      </label>
+
+      <button type="submit">Upload and create</button>
+    </form>
+  </div>
+</div>

@@ -1,0 +1,98 @@
+@page "/admin/photos/{id:int}"
+@model EditModel
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@{
+  var antiforgeryToken = Antiforgery.GetAndStoreTokens(HttpContext).RequestToken;
+  var photo = Model.Photo!;
+}
+
+<div class="admin-shell">
+  <div class="admin-form-panel">
+    <h1>Edit photo #@photo.PicId</h1>
+    <p>
+      <a href="/admin/photos">Back to photos</a>
+      @if (photo.IsVisible)
+      {
+        <text> · </text>
+        <a href="/photography/@photo.CategorySlug/@photo.PicId" target="_blank" rel="noopener">View public page</a>
+      }
+    </p>
+
+    @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+    {
+      <p class="qz-account-notice qz-account-notice--@(Model.StatusMessageKind == "error" ? "error" : "success")" role="status">
+        @Model.StatusMessage
+      </p>
+    }
+
+    <p>
+      <img src="@photo.ThumbnailUrl" alt="" width="160" height="160" style="object-fit: cover;" />
+    </p>
+
+    <form class="admin-form" method="post" action="/admin/photos/@photo.PicId/save" enctype="multipart/form-data">
+      <input type="hidden" name="@AdminPhotosPageModel.AntiforgeryTokenFieldName" value="@antiforgeryToken" />
+
+      <label>
+        Title
+        <input type="text" name="title" value="@photo.Title" required maxlength="200" />
+      </label>
+
+      <label>
+        Category
+        <select name="catId" required>
+          @foreach (var category in Model.Categories)
+          {
+            if (category.CatId == photo.CatId)
+            {
+              <option value="@category.CatId" selected>@category.Name</option>
+            }
+            else
+            {
+              <option value="@category.CatId">@category.Name</option>
+            }
+          }
+        </select>
+      </label>
+
+      <label>
+        Year
+        <input type="number" name="year" value="@photo.Year" />
+      </label>
+
+      <label>
+        Date
+        <input type="datetime-local" name="dateTime" value="@photo.DateTime.ToString("yyyy-MM-ddTHH:mm")" />
+      </label>
+
+      <label>
+        Keywords
+        <input type="text" name="keywords" value="@photo.Keywords" maxlength="500" />
+      </label>
+
+      <label>
+        Replace image file (optional)
+        <input type="file" name="replaceFile" accept="image/jpeg,image/png,image/webp,image/tiff" />
+      </label>
+
+      <button type="submit">Save changes</button>
+    </form>
+
+    <hr />
+
+    <form method="post" action="/admin/photos/@photo.PicId/@(photo.IsVisible ? "hide" : "show")" style="display:inline;">
+      <input type="hidden" name="@AdminPhotosPageModel.AntiforgeryTokenFieldName" value="@antiforgeryToken" />
+      <button type="submit">@(photo.IsVisible ? "Hide from gallery" : "Show in gallery")</button>
+    </form>
+
+    <form method="post" action="/admin/photos/@photo.PicId/regeneratethumb" style="display:inline; margin-left: .5rem;">
+      <input type="hidden" name="@AdminPhotosPageModel.AntiforgeryTokenFieldName" value="@antiforgeryToken" />
+      <button type="submit">Regenerate WebP thumbnail</button>
+    </form>
+
+    <form method="post" action="/admin/photos/@photo.PicId/delete" style="display:inline; margin-left: .5rem;"
+          onsubmit="return confirm('Hard-delete this photo row from the database? Blobs will be left in place. Prefer Hide for soft removal.');">
+      <input type="hidden" name="@AdminPhotosPageModel.AntiforgeryTokenFieldName" value="@antiforgeryToken" />
+      <button type="submit">Hard delete</button>
+    </form>
+  </div>
+</div>

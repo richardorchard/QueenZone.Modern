@@ -160,7 +160,7 @@ public sealed class CheckPhotosCommandTests
     [Fact]
     public async Task LoadPhotosAsync_FiltersByCategorySlugAndLimit()
     {
-        var repository = new InMemoryPhotoRepository(SamplePhotoData.CreateSeedCategories());
+        var repository = new InMemoryPhotoRepository(new SharedPhotoStore(SamplePhotoData.CreateSeedCategories()));
         var options = CheckPhotosOptions.Parse(
         [
             "--connection-string", "Server=.;Database=test;",

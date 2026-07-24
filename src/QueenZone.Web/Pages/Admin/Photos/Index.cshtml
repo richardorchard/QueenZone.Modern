@@ -1,0 +1,132 @@
+@page "/admin/photos"
+@model IndexModel
+@{
+  var photos = Model.Photos;
+}
+
+<div class="admin-shell">
+  <h1>Photos</h1>
+  <p>
+    <a href="/admin">Back to admin</a>
+    ·
+    <a href="/admin/photos/new">Add photo</a>
+  </p>
+
+  @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+  {
+    <p class="qz-account-notice qz-account-notice--@(Model.StatusMessageKind == "error" ? "error" : "success")" role="status">
+      @Model.StatusMessage
+    </p>
+  }
+
+  <form method="get" class="admin-form" style="margin-bottom: 1.5rem;">
+    <label>
+      Category
+        <select name="catId">
+        <option value="">All</option>
+        @foreach (var category in Model.Categories)
+        {
+          if (Model.CatId == category.CatId)
+          {
+            <option value="@category.CatId" selected>@category.Name</option>
+          }
+          else
+          {
+            <option value="@category.CatId">@category.Name</option>
+          }
+        }
+      </select>
+    </label>
+    <label>
+      Visibility
+      <select name="visibility">
+        <option value="">All</option>
+        @if (Model.Visibility == "visible")
+        {
+          <option value="visible" selected>Visible</option>
+        }
+        else
+        {
+          <option value="visible">Visible</option>
+        }
+        @if (Model.Visibility == "hidden")
+        {
+          <option value="hidden" selected>Hidden</option>
+        }
+        else
+        {
+          <option value="hidden">Hidden</option>
+        }
+      </select>
+    </label>
+    <label>
+      Year
+      <input type="number" name="year" value="@Model.Year" />
+    </label>
+    <label>
+      Search
+      <input type="search" name="q" value="@Model.Q" />
+    </label>
+    <button type="submit">Filter</button>
+  </form>
+
+  @if (photos is null || photos.Items.Count == 0)
+  {
+    <p>No photos matched the current filters.</p>
+  }
+  else
+  {
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th></th>
+          <th>Title</th>
+          <th>Category</th>
+          <th>Year</th>
+          <th>Visibility</th>
+          <th>Id</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @foreach (var item in photos.Items)
+        {
+          <tr>
+            <td>
+              <img src="@item.ThumbnailUrl" alt="" width="72" height="72" style="object-fit: cover;" />
+            </td>
+            <td>@item.Title</td>
+            <td>@item.CategoryName</td>
+            <td>@item.Year</td>
+            <td>@(item.IsVisible ? "Visible" : "Hidden")</td>
+            <td>@item.PicId</td>
+            <td>
+              <a href="/admin/photos/@item.PicId">Edit</a>
+              @if (item.IsVisible)
+              {
+                <text> · </text>
+                <a href="/photography/@item.CategorySlug/@item.PicId" target="_blank" rel="noopener">View</a>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+
+    var totalPages = (int)Math.Ceiling(photos.TotalCount / (double)photos.PageSize);
+    if (totalPages > 1)
+    {
+      <p>
+        Page @photos.Page of @totalPages
+        @if (photos.Page > 1)
+        {
+          <a href="?pageNumber=@(photos.Page - 1)&catId=@Model.CatId&visibility=@Model.Visibility&year=@Model.Year&q=@Model.Q">Previous</a>
+        }
+        @if (photos.Page < totalPages)
+        {
+          <a href="?pageNumber=@(photos.Page + 1)&catId=@Model.CatId&visibility=@Model.Visibility&year=@Model.Year&q=@Model.Q">Next</a>
+        }
+      </p>
+    }
+  }
+</div>

@@ -28,6 +28,7 @@ public sealed class AdminDashboardSectionLinksTests : IClassFixture<WebApplicati
         Assert.Contains("Admin sections", body);
         Assert.Contains("href=\"/admin/news\"", body);
         Assert.Contains("href=\"/admin/news-discovery\"", body);
+        Assert.Contains("href=\"/admin/photos\"", body);
         Assert.Contains("href=\"/admin/photo-submissions\"", body);
         Assert.Contains("href=\"/admin/news-suggestions\"", body);
         Assert.Contains("href=\"/admin/articles\"", body);

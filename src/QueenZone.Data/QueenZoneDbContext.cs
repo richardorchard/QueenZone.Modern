@@ -50,6 +50,8 @@ public sealed class QueenZoneDbContext : DbContext
 
     public DbSet<PhotoSubmissionAuditLogEntity> PhotoSubmissionAuditLogs => Set<PhotoSubmissionAuditLogEntity>();
 
+    public DbSet<PhotoAdminAuditLogEntity> PhotoAdminAuditLogs => Set<PhotoAdminAuditLogEntity>();
+
     public DbSet<ArticleSubmissionEntity> ArticleSubmissions => Set<ArticleSubmissionEntity>();
 
     public DbSet<NewsSuggestionEntity> NewsSuggestions => Set<NewsSuggestionEntity>();
@@ -525,6 +527,21 @@ public sealed class QueenZoneDbContext : DbContext
                 .WithMany(submission => submission.AuditLogs)
                 .HasForeignKey(log => log.PhotoSubmissionId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<PhotoAdminAuditLogEntity>(entity =>
+        {
+            entity.ToTable("PhotoAdminAuditLog");
+            entity.HasKey(log => log.Id);
+
+            entity.Property(log => log.Action).HasMaxLength(50).IsRequired();
+            entity.Property(log => log.ActorEmail).HasMaxLength(256).IsRequired();
+            entity.Property(log => log.OccurredAt).IsRequired();
+            entity.Property(log => log.Details).HasMaxLength(2000);
+
+            entity.HasIndex(log => new { log.PicId, log.OccurredAt })
+                .IsDescending(false, true)
+                .HasDatabaseName("IX_PhotoAdminAuditLog_PicId_OccurredAt");
         });
 
         modelBuilder.Entity<NewsSuggestionEntity>(entity =>
