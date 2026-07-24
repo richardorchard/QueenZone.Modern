@@ -373,18 +373,20 @@ public sealed class EfPublicReadRepositoryTests : IAsyncDisposable
 
         // List/archive: truncated preview only (not full body LOB).
         Assert.Contains(
-            $"LEFT(ISNULL(a.ARTICLE_TEXT, N''), {EfProductionSql.ArticlesListBodyPreviewChars})",
+            $"LEFT(ISNULL(CAST(a.ARTICLE_TEXT AS nvarchar(max)), N''), {EfProductionSql.ArticlesListBodyPreviewChars})",
             queries.Latest,
             StringComparison.Ordinal);
         Assert.Contains(
-            $"LEFT(ISNULL(a.ARTICLE_TEXT, N''), {EfProductionSql.ArticlesListBodyPreviewChars})",
+            $"LEFT(ISNULL(CAST(a.ARTICLE_TEXT AS nvarchar(max)), N''), {EfProductionSql.ArticlesListBodyPreviewChars})",
             queries.ArchivePage,
             StringComparison.Ordinal);
+        Assert.DoesNotContain("LEFT(ISNULL(a.ARTICLE_TEXT", queries.Latest, StringComparison.Ordinal);
+        Assert.DoesNotContain("LEFT(ISNULL(a.ARTICLE_TEXT", queries.ArchivePage, StringComparison.Ordinal);
         Assert.DoesNotContain("ISNULL(a.ARTICLE_TEXT, '') AS Body", queries.Latest, StringComparison.Ordinal);
         Assert.DoesNotContain("ISNULL(a.ARTICLE_TEXT, '') AS Body", queries.ArchivePage, StringComparison.Ordinal);
 
         // Detail still loads full body.
-        Assert.Contains("ISNULL(a.ARTICLE_TEXT, '') AS Body", queries.ById, StringComparison.Ordinal);
+        Assert.Contains("ISNULL(CAST(a.ARTICLE_TEXT AS nvarchar(max)), N'') AS Body", queries.ById, StringComparison.Ordinal);
         Assert.DoesNotContain("LEFT(ISNULL(a.ARTICLE_TEXT", queries.ById, StringComparison.Ordinal);
     }
 
