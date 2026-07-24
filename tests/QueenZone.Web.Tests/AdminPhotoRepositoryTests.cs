@@ -174,4 +174,14 @@ public sealed class PhotoLegacyPathTests
         Assert.Equal("brian-may", PhotoLegacyPath.BlobContainerName("Brian May"));
         Assert.Equal("/Brian_May/abc.jpg", PhotoLegacyPath.BuildLegacyPath("Brian May", "abc.jpg"));
     }
+
+    [Fact]
+    public void UsQueenConvention_UsesShortenedBlobContainer()
+    {
+        Assert.Equal("US_Queen_Convention_2001", PhotoLegacyPath.CategoryFolder("US Queen Convention 2001"));
+        Assert.Equal("us-convention-2001", PhotoLegacyPath.BlobContainerName("US Queen Convention 2001"));
+        Assert.Equal(
+            "/US_Queen_Convention_2001/121120014455.jpg",
+            PhotoLegacyPath.BuildLegacyPath("US Queen Convention 2001", "121120014455.jpg"));
+    }
 }
