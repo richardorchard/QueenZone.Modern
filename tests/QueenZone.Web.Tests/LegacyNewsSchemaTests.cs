@@ -11,6 +11,7 @@ public sealed class LegacyNewsSchemaTests
 
         Assert.Contains("SLUG AS Slug", cte);
         Assert.DoesNotContain("CAST(NULL AS nvarchar(200)) AS Slug", cte);
+        Assert.Contains("ISNULL(ARTICLE, '') AS Body", cte);
     }
 
     [Fact]
@@ -20,6 +21,17 @@ public sealed class LegacyNewsSchemaTests
 
         Assert.Contains("CAST(NULL AS nvarchar(200)) AS Slug", cte);
         Assert.DoesNotContain("SLUG AS Slug", cte);
+    }
+
+    [Fact]
+    public void BuildPublishedNewsCte_OmitsArticleLobWhenBodyNotRequested()
+    {
+        var cte = PublishedNewsQuery.BuildPublishedNewsCte(includeSlugColumn: true, includeBody: false);
+
+        // Empty constant for EF materialization — ARTICLE LOB is not read.
+        Assert.DoesNotContain("ARTICLE", cte, StringComparison.Ordinal);
+        Assert.Contains("CAST(N'' AS nvarchar(max)) AS Body", cte, StringComparison.Ordinal);
+        Assert.Contains("ISNULL(EXCERPT, '') AS Excerpt", cte, StringComparison.Ordinal);
     }
 
     [Fact]

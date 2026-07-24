@@ -24,10 +24,12 @@ public sealed class EfNewsRepository : INewsRepository
         this.dbContext = dbContext;
         var connectionString = dbContext.Database.GetConnectionString()
             ?? throw new InvalidOperationException("QueenZone legacy database connection string is not configured.");
-        var publishedNewsCte = PublishedNewsQuery.BuildPublishedNewsCte(
-            LegacyNewsSchema.HasSlugColumn(connectionString));
+        var includeSlug = LegacyNewsSchema.HasSlugColumn(connectionString);
+        // List/count/sitemap omit ARTICLE; detail still projects full body.
+        var listCte = PublishedNewsQuery.BuildPublishedNewsCte(includeSlug, includeBody: false);
+        var detailCte = PublishedNewsQuery.BuildPublishedNewsCte(includeSlug, includeBody: true);
         (latestSql, countSql, archivePageSql, byIdSql, sitemapSql) =
-            EfProductionSql.CreateNewsQueries(publishedNewsCte);
+            EfProductionSql.CreateNewsQueries(listCte, detailCte);
     }
 
     /// <summary>

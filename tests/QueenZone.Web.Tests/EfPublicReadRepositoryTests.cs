@@ -271,7 +271,13 @@ public sealed class EfPublicReadRepositoryTests : IAsyncDisposable
                 (2, 'Second', 'Body two', '2020-02-01', NULL, NULL, 1);
             """);
 
-        const string select = """
+        // List SQL projects empty Body (no ARTICLE_TEXT LOB) — mapping must still work.
+        const string listSelect = """
+            SELECT Id, Title, CAST('' AS TEXT) AS Body, PublishedAt, Source, CategoryName, IsPublished
+            FROM Articles
+            WHERE IsPublished = 1
+            """;
+        const string detailSelect = """
             SELECT Id, Title, Body, PublishedAt, Source, CategoryName, IsPublished
             FROM Articles
             WHERE IsPublished = 1
@@ -279,10 +285,10 @@ public sealed class EfPublicReadRepositoryTests : IAsyncDisposable
 
         var repository = new EfArticlesRepository(
             dbContext,
-            latestSql: select + " ORDER BY PublishedAt DESC, Id DESC LIMIT {0}",
+            latestSql: listSelect + " ORDER BY PublishedAt DESC, Id DESC LIMIT {0}",
             countSql: "SELECT COUNT(*) AS Value FROM Articles WHERE IsPublished = 1",
-            archivePageSql: select + " ORDER BY PublishedAt DESC, Id DESC LIMIT {1} OFFSET {0}",
-            byIdSql: select + " AND Id = {0}",
+            archivePageSql: listSelect + " ORDER BY PublishedAt DESC, Id DESC LIMIT {1} OFFSET {0}",
+            byIdSql: detailSelect + " AND Id = {0}",
             sitemapSql: """
                 SELECT Id, Title, PublishedAt, CAST(NULL AS TEXT) AS Slug
                 FROM Articles WHERE IsPublished = 1
@@ -292,17 +298,22 @@ public sealed class EfPublicReadRepositoryTests : IAsyncDisposable
         var latest = await repository.GetLatestAsync(10);
         Assert.Equal(2, latest.Count);
         Assert.Equal("Second", latest[0].Title);
-        Assert.False(string.IsNullOrWhiteSpace(latest[0].Excerpt));
+        // List mapping does not require body; Body is always empty on list items.
+        Assert.Equal(string.Empty, latest[0].Body);
+        Assert.Equal(string.Empty, latest[1].Body);
 
         Assert.Equal(2, await repository.GetPublishedCountAsync());
 
         var page = await repository.GetArchivePageAsync(1, 1);
         Assert.Single(page);
         Assert.Equal(2, page[0].Id);
+        Assert.Equal(string.Empty, page[0].Body);
 
         var detail = await repository.GetByIdAsync(1);
         Assert.NotNull(detail);
         Assert.Equal("First", detail.Title);
+        Assert.Equal("Body one is long enough for an excerpt", detail.Body);
+        Assert.False(string.IsNullOrWhiteSpace(detail.Excerpt));
         Assert.Null(await repository.GetByIdAsync(999));
 
         var sitemap = await repository.GetPublishedSitemapEntriesAsync();
@@ -310,27 +321,112 @@ public sealed class EfPublicReadRepositoryTests : IAsyncDisposable
     }
 
     [Fact]
-    public void Article_production_sitemap_sql_returns_slug_projection()
+    public async Task Articles_list_with_body_preview_derives_excerpt_but_clears_body()
     {
-        var sitemapSql = EfProductionSql.CreateArticlesQueries().Sitemap;
+        dbContext.Database.ExecuteSqlRaw(
+            """
+            CREATE TABLE IF NOT EXISTS ArticlesPreview (
+                Id INTEGER NOT NULL,
+                Title TEXT NOT NULL,
+                Body TEXT NOT NULL,
+                PublishedAt TEXT NOT NULL,
+                Source TEXT,
+                CategoryName TEXT,
+                IsPublished INTEGER NOT NULL
+            );
+            INSERT INTO ArticlesPreview (Id, Title, Body, PublishedAt, Source, CategoryName, IsPublished)
+            VALUES
+                (1, 'Previewed', 'Body one is long enough for an excerpt', '2020-01-01', 'BBC', 'News', 1);
+            """);
 
-        Assert.Contains(" AS Slug", sitemapSql, StringComparison.OrdinalIgnoreCase);
+        // Mirrors production list: truncated Body used only for excerpt, then discarded.
+        const string listSelect = """
+            SELECT Id, Title, substr(Body, 1, 2000) AS Body, PublishedAt, Source, CategoryName, IsPublished
+            FROM ArticlesPreview
+            WHERE IsPublished = 1
+            """;
+
+        var repository = new EfArticlesRepository(
+            dbContext,
+            latestSql: listSelect + " ORDER BY PublishedAt DESC, Id DESC LIMIT {0}",
+            countSql: "SELECT COUNT(*) AS Value FROM ArticlesPreview WHERE IsPublished = 1",
+            archivePageSql: listSelect + " ORDER BY PublishedAt DESC, Id DESC LIMIT {1} OFFSET {0}",
+            byIdSql: listSelect + " AND Id = {0}",
+            sitemapSql: """
+                SELECT Id, Title, PublishedAt, CAST(NULL AS TEXT) AS Slug
+                FROM ArticlesPreview WHERE IsPublished = 1
+                """);
+
+        var latest = await repository.GetLatestAsync(1);
+        Assert.Single(latest);
+        Assert.False(string.IsNullOrWhiteSpace(latest[0].Excerpt));
+        Assert.Equal(string.Empty, latest[0].Body);
+    }
+
+    [Fact]
+    public void Article_production_sql_splits_list_and_detail_body_projections()
+    {
+        var queries = EfProductionSql.CreateArticlesQueries();
+
+        Assert.Contains(" AS Slug", queries.Sitemap, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("ARTICLE_TEXT", queries.Sitemap, StringComparison.OrdinalIgnoreCase);
+
+        // List/archive: truncated preview only (not full body LOB).
+        Assert.Contains(
+            $"LEFT(ISNULL(a.ARTICLE_TEXT, N''), {EfProductionSql.ArticlesListBodyPreviewChars})",
+            queries.Latest,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            $"LEFT(ISNULL(a.ARTICLE_TEXT, N''), {EfProductionSql.ArticlesListBodyPreviewChars})",
+            queries.ArchivePage,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("ISNULL(a.ARTICLE_TEXT, '') AS Body", queries.Latest, StringComparison.Ordinal);
+        Assert.DoesNotContain("ISNULL(a.ARTICLE_TEXT, '') AS Body", queries.ArchivePage, StringComparison.Ordinal);
+
+        // Detail still loads full body.
+        Assert.Contains("ISNULL(a.ARTICLE_TEXT, '') AS Body", queries.ById, StringComparison.Ordinal);
+        Assert.DoesNotContain("LEFT(ISNULL(a.ARTICLE_TEXT", queries.ById, StringComparison.Ordinal);
     }
 
     [Fact]
     public void News_and_article_production_sql_use_parameter_placeholders()
     {
-        var news = EfProductionSql.CreateNewsQueries("/*cte*/");
+        var news = EfProductionSql.CreateNewsQueries("/*list*/", "/*detail*/");
         Assert.Contains("{0}", news.Latest, StringComparison.Ordinal);
         Assert.Contains("{0}", news.ArchivePage, StringComparison.Ordinal);
         Assert.Contains("{1}", news.ArchivePage, StringComparison.Ordinal);
         Assert.Contains("{0}", news.ById, StringComparison.Ordinal);
+        Assert.Contains("/*list*/", news.Latest, StringComparison.Ordinal);
+        Assert.Contains("/*detail*/", news.ById, StringComparison.Ordinal);
+        Assert.DoesNotContain("/*detail*/", news.Latest, StringComparison.Ordinal);
+        Assert.DoesNotContain("/*list*/", news.ById, StringComparison.Ordinal);
 
         var articles = EfProductionSql.CreateArticlesQueries();
         Assert.Contains("{0}", articles.Latest, StringComparison.Ordinal);
         Assert.Contains("{0}", articles.ArchivePage, StringComparison.Ordinal);
         Assert.Contains("{1}", articles.ArchivePage, StringComparison.Ordinal);
         Assert.Contains("{0}", articles.ById, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void News_production_sql_omits_article_lob_from_list_and_sitemap()
+    {
+        var listCte = PublishedNewsQuery.BuildPublishedNewsCte(includeSlugColumn: true, includeBody: false);
+        var detailCte = PublishedNewsQuery.BuildPublishedNewsCte(includeSlugColumn: true, includeBody: true);
+        var news = EfProductionSql.CreateNewsQueries(listCte, detailCte);
+
+        // List CTE never touches ARTICLE; empty Body constant for EF materialization only.
+        Assert.DoesNotContain("ARTICLE", listCte, StringComparison.Ordinal);
+        Assert.Contains("CAST(N'' AS nvarchar(max)) AS Body", listCte, StringComparison.Ordinal);
+        Assert.Contains("ISNULL(ARTICLE, '') AS Body", detailCte, StringComparison.Ordinal);
+
+        Assert.DoesNotContain("ARTICLE", news.Latest, StringComparison.Ordinal);
+        Assert.DoesNotContain("ARTICLE", news.ArchivePage, StringComparison.Ordinal);
+        Assert.DoesNotContain("ARTICLE", news.Sitemap, StringComparison.Ordinal);
+        Assert.DoesNotContain("ARTICLE", news.Count, StringComparison.Ordinal);
+
+        // Detail still projects the real ARTICLE body.
+        Assert.Contains("ISNULL(ARTICLE, '') AS Body", news.ById, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -350,11 +446,17 @@ public sealed class EfPublicReadRepositoryTests : IAsyncDisposable
             );
             INSERT INTO NewsRows (Id, Title, Excerpt, Body, PublishedAt, SourceUrl, IsPublished, Slug)
             VALUES
-                (10, 'Headline', 'Ex', 'Body', '2021-03-01', 'https://example.com', 1, 'headline'),
+                (10, 'Headline', 'Ex', 'Full body text for detail', '2021-03-01', 'https://example.com', 1, 'headline'),
                 (11, 'Other', 'Ex2', 'Body2', '2021-04-01', NULL, 1, NULL);
             """);
 
-        const string select = """
+        // List SQL projects empty Body (no ARTICLE LOB) — mapping must not require real body text.
+        const string listSelect = """
+            SELECT Id, Title, Excerpt, CAST('' AS TEXT) AS Body, PublishedAt, SourceUrl, IsPublished, Slug
+            FROM NewsRows
+            WHERE IsPublished = 1
+            """;
+        const string detailSelect = """
             SELECT Id, Title, Excerpt, Body, PublishedAt, SourceUrl, IsPublished, Slug
             FROM NewsRows
             WHERE IsPublished = 1
@@ -362,10 +464,10 @@ public sealed class EfPublicReadRepositoryTests : IAsyncDisposable
 
         var repository = new EfNewsRepository(
             dbContext,
-            latestSql: select + " ORDER BY PublishedAt DESC, Id DESC LIMIT {0}",
+            latestSql: listSelect + " ORDER BY PublishedAt DESC, Id DESC LIMIT {0}",
             countSql: "SELECT COUNT(*) AS Value FROM NewsRows WHERE IsPublished = 1",
-            archivePageSql: select + " ORDER BY PublishedAt DESC, Id DESC LIMIT {1} OFFSET {0}",
-            byIdSql: select + " AND Id = {0}",
+            archivePageSql: listSelect + " ORDER BY PublishedAt DESC, Id DESC LIMIT {1} OFFSET {0}",
+            byIdSql: detailSelect + " AND Id = {0}",
             sitemapSql: """
                 SELECT Id, Title, PublishedAt, Slug FROM NewsRows WHERE IsPublished = 1
                 ORDER BY PublishedAt DESC, Id DESC
@@ -374,10 +476,19 @@ public sealed class EfPublicReadRepositoryTests : IAsyncDisposable
         var latest = await repository.GetLatestAsync(5);
         Assert.Equal(2, latest.Count);
         Assert.Equal(11, latest[0].Id);
+        Assert.Equal("Ex2", latest[0].Excerpt);
+        Assert.Equal(string.Empty, latest[0].Body);
+        Assert.Equal(string.Empty, latest[1].Body);
 
         Assert.Equal(2, await repository.GetPublishedCountAsync());
-        Assert.Single(await repository.GetArchivePageAsync(1, 1));
-        Assert.Equal("Headline", (await repository.GetByIdAsync(10))!.Title);
+        var page = await repository.GetArchivePageAsync(1, 1);
+        Assert.Single(page);
+        Assert.Equal(string.Empty, page[0].Body);
+
+        var detail = await repository.GetByIdAsync(10);
+        Assert.NotNull(detail);
+        Assert.Equal("Headline", detail.Title);
+        Assert.Equal("Full body text for detail", detail.Body);
         Assert.Null(await repository.GetByIdAsync(404));
         Assert.Equal(2, (await repository.GetPublishedSitemapEntriesAsync()).Count);
     }

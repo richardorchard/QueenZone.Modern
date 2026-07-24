@@ -28,11 +28,22 @@ public static class PublishedNewsQuery
     /// <summary>
     /// Builds the public <c>PublishedNews</c> CTE (published rows only, latest-row numbered).
     /// </summary>
-    public static string BuildPublishedNewsCte(bool includeSlugColumn)
+    /// <param name="includeSlugColumn">When true, project <c>SLUG</c>; otherwise a null slug placeholder.</param>
+    /// <param name="includeBody">
+    /// When true, project full <c>ARTICLE</c> text as <c>Body</c> (detail queries).
+    /// When false, project an empty constant <c>Body</c> so EF materialization still works
+    /// without reading the <c>ARTICLE</c> LOB (list/archive/count/sitemap).
+    /// </param>
+    public static string BuildPublishedNewsCte(bool includeSlugColumn, bool includeBody = true)
     {
         var slugProjection = includeSlugColumn
             ? "SLUG AS Slug"
             : "CAST(NULL AS nvarchar(200)) AS Slug";
+        // Always project Body for EF SqlQueryRaw materialization. List paths use a constant
+        // empty string so the ARTICLE LOB is never read; detail paths project the real column.
+        var bodyProjection = includeBody
+            ? "ISNULL(ARTICLE, '') AS Body,"
+            : "CAST(N'' AS nvarchar(max)) AS Body,";
 
         return $"""
             WITH PublishedNews AS (
@@ -41,7 +52,7 @@ public static class PublishedNewsQuery
                     TITLE AS Title,
                     {slugProjection},
                     ISNULL(EXCERPT, '') AS Excerpt,
-                    ISNULL(ARTICLE, '') AS Body,
+                    {bodyProjection}
                     [DATE] AS PublishedAt,
                     SOURCE_URL AS SourceUrl,
                     CAST(CASE WHEN {PublishedFilter} THEN 1 ELSE 0 END AS bit) AS IsPublished,

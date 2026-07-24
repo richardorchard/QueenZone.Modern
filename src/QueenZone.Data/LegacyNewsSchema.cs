@@ -30,8 +30,8 @@ public static class LegacyNewsSchema
     }
 
     /// <inheritdoc cref="PublishedNewsQuery.BuildPublishedNewsCte"/>
-    public static string BuildPublishedNewsCte(bool includeSlugColumn) =>
-        PublishedNewsQuery.BuildPublishedNewsCte(includeSlugColumn);
+    public static string BuildPublishedNewsCte(bool includeSlugColumn, bool includeBody = true) =>
+        PublishedNewsQuery.BuildPublishedNewsCte(includeSlugColumn, includeBody);
 
     /// <inheritdoc cref="PublishedNewsQuery.BuildAdminLatestNewsSql"/>
     public static string BuildAdminLatestNewsSql(NewsColumnAvailability columns) =>

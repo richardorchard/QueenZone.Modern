@@ -11,6 +11,12 @@ namespace QueenZone.Data;
 [ExcludeFromCodeCoverage]
 internal static class EfProductionSql
 {
+    /// <summary>
+    /// Characters of <c>ARTICLE_TEXT</c> pulled for list/archive excerpt derivation only.
+    /// Full body remains detail-only so archive pages do not stream entire LOBs.
+    /// </summary>
+    internal const int ArticlesListBodyPreviewChars = 2000;
+
     public static (
         string Latest,
         string Count,
@@ -19,7 +25,23 @@ internal static class EfProductionSql
         string Sitemap)
         CreateArticlesQueries()
     {
-        const string publishedSelect = """
+        // List/archive: truncated ARTICLE_TEXT only (enough for GetExcerpt). Detail: full body.
+        var listSelect = $"""
+            SELECT
+                CAST(a.Q_ARTICLE_ID AS int) AS Id,
+                a.ARTICLE_NAME AS Title,
+                LEFT(ISNULL(a.ARTICLE_TEXT, N''), {ArticlesListBodyPreviewChars}) AS Body,
+                a.DATE_CREATED AS PublishedAt,
+                NULLIF(LTRIM(RTRIM(a.SOURCE)), '') AS Source,
+                NULLIF(LTRIM(RTRIM(c.ARTICLE_CATEGORY)), '') AS CategoryName,
+                CAST(CASE WHEN a.DISPLAY = 1 THEN 1 ELSE 0 END AS bit) AS IsPublished
+            FROM Q_ARTICLE_T a
+            LEFT JOIN Q_ARTICLE_CATEGORY_T c
+                ON c.Q_ARTICLE_CAT_ID = a.Q_ARTICLE_CATEGORY_ID
+            WHERE a.DISPLAY = 1
+            """;
+
+        const string detailSelect = """
             SELECT
                 CAST(a.Q_ARTICLE_ID AS int) AS Id,
                 a.ARTICLE_NAME AS Title,
@@ -35,7 +57,7 @@ internal static class EfProductionSql
             """;
 
         return (
-            publishedSelect + """
+            listSelect + """
 
                 ORDER BY a.DATE_CREATED DESC, a.Q_ARTICLE_ID DESC
                 OFFSET 0 ROWS FETCH NEXT {0} ROWS ONLY
@@ -45,12 +67,12 @@ internal static class EfProductionSql
             FROM Q_ARTICLE_T
             WHERE DISPLAY = 1
             """,
-            publishedSelect + """
+            listSelect + """
 
                 ORDER BY a.DATE_CREATED DESC, a.Q_ARTICLE_ID DESC
                 OFFSET {0} ROWS FETCH NEXT {1} ROWS ONLY
                 """,
-            publishedSelect + """
+            detailSelect + """
 
                   AND a.Q_ARTICLE_ID = {0}
                 """,
@@ -66,16 +88,21 @@ internal static class EfProductionSql
             """);
     }
 
+    /// <summary>
+    /// Builds public news SQL. List/count/sitemap use a body-free CTE; detail uses a CTE with body.
+    /// </summary>
+    /// <param name="listCte">CTE without <c>Body</c>/<c>ARTICLE</c> (from <see cref="PublishedNewsQuery.BuildPublishedNewsCte"/> with <c>includeBody: false</c>).</param>
+    /// <param name="detailCte">CTE with full body ( <c>includeBody: true</c> ).</param>
     public static (
         string Latest,
         string Count,
         string ArchivePage,
         string ById,
         string Sitemap)
-        CreateNewsQueries(string publishedNewsCte) =>
+        CreateNewsQueries(string listCte, string detailCte) =>
         (
             // $$ raw strings: {{expr}} interpolates; single {0} stays a literal EF parameter placeholder.
-            publishedNewsCte + $$"""
+            listCte + $$"""
 
                 SELECT TOP ({0})
                     Id,
@@ -90,13 +117,13 @@ internal static class EfProductionSql
                 WHERE {{PublishedNewsQuery.LatestRowFilter}}
                 ORDER BY PublishedAt DESC, Id DESC
                 """,
-            publishedNewsCte + $$"""
+            listCte + $$"""
 
                 SELECT COUNT(*) AS Value
                 FROM PublishedNews
                 WHERE {{PublishedNewsQuery.LatestRowFilter}}
                 """,
-            publishedNewsCte + $$"""
+            listCte + $$"""
 
                 SELECT
                     Id,
@@ -112,7 +139,7 @@ internal static class EfProductionSql
                 ORDER BY PublishedAt DESC, Id DESC
                 OFFSET {0} ROWS FETCH NEXT {1} ROWS ONLY
                 """,
-            publishedNewsCte + $$"""
+            detailCte + $$"""
 
                 SELECT
                     Id,
@@ -127,7 +154,7 @@ internal static class EfProductionSql
                 WHERE {{PublishedNewsQuery.LatestRowFilter}}
                   AND Id = {0}
                 """,
-            publishedNewsCte + $$"""
+            listCte + $$"""
 
                 SELECT
                     Id,
