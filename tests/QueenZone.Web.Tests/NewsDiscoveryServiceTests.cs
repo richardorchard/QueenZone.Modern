@@ -159,11 +159,20 @@ public sealed class NewsDiscoveryServiceTests
         Assert.Contains(sources, source => source.Key == "queen-online" && source.SourceType == NewsDiscoverySourceType.AllowlistedPage);
         Assert.Contains(sources, source => source.Key == "roger-taylor" && source.SourceType == NewsDiscoverySourceType.Rss);
         Assert.Contains(sources, source => source.Key == "brian-may" && source.FeedOrSiteUrl == "https://brianmay.com/feed/");
+        Assert.Contains(sources, source => source.Key == "freddie-mercury-official" && source.SourceType == NewsDiscoverySourceType.AllowlistedPage && source.TrustTier == NewsDiscoveryTrustTier.Primary);
+        Assert.Contains(sources, source => source.Key == "mercury-phoenix-trust" && source.FeedOrSiteUrl == "https://www.mercuryphoenixtrust.org/site/news");
+        Assert.Contains(sources, source => source.Key == "queen-extravaganza" && source.SourceType == NewsDiscoverySourceType.AllowlistedPage);
         Assert.Contains(sources, source => source.Key == "queen-fan-club" && source.SourceType == NewsDiscoverySourceType.AllowlistedPage);
         Assert.Contains(sources, source => source.Key == "google-news-freddie-mercury" && source.SourceType == NewsDiscoverySourceType.Rss);
+        Assert.Contains(sources, source => source.Key == "google-news-queen-adam-lambert" && source.SourceType == NewsDiscoverySourceType.Rss);
+        Assert.Contains(sources, source => source.Key == "bbc-entertainment" && source.FeedOrSiteUrl == "https://feeds.bbci.co.uk/news/entertainment_and_arts/rss.xml");
+        Assert.Contains(sources, source => source.Key == "nme-queen" && source.SourceType == NewsDiscoverySourceType.AllowlistedPage);
+        Assert.Contains(sources, source => source.Key == "udiscover-music" && source.TrustTier == NewsDiscoveryTrustTier.Secondary);
         Assert.Contains(sources, source => source.Key == "official-charts" && source.FeedOrSiteUrl == "https://www.officialcharts.com/chart-news/");
         Assert.Contains(sources, source => source.Key == "nme-music" && source.TrustTier == NewsDiscoveryTrustTier.Secondary);
         Assert.Contains(sources, source => source.Key == "gold-radio" && !source.Enabled);
+        Assert.Contains(sources, source => source.Key == "music-news" && !source.Enabled);
+        Assert.Contains(sources, source => source.Key == "youtube-queen-official" && !source.Enabled);
     }
 
     [Fact]

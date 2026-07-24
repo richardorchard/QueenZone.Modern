@@ -45,6 +45,10 @@ Each entry defines:
 | `brian-may` | https://brianmay.com/ |
 | `roger-taylor` | https://www.rogertaylorofficial.com/ |
 | `adam-lambert` | https://adamlambert.net/ |
+| `freddie-mercury-official` | https://www.freddiemercury.com/ |
+| `mercury-phoenix-trust` | https://www.mercuryphoenixtrust.org/ |
+| `queen-extravaganza` | https://www.queenonline.com/quex/about |
+| `queen-fan-club` | https://queenworld.com/ |
 
 Also in scope for future registry entries: official YouTube/community posts when attributable, tour promoters, venues, and record-label pages linked from official announcements.
 
@@ -55,11 +59,32 @@ Also in scope for future registry entries: official YouTube/community posts when
 | `rolling-stone-music` | https://www.rollingstone.com/music/ |
 | `billboard-music` | https://www.billboard.com/music/ |
 | `nme-music` | https://www.nme.com/music |
+| `nme-queen` | https://www.nme.com/artists/queen/ |
 | `louder` | https://www.loudersound.com/ |
 | `ultimate-classic-rock` | https://ultimateclassicrock.com/ |
 | `music-news` | https://www.music-news.com/ |
-| `gold-radio-uk` | https://www.goldradiouk.com/ |
+| `gold-radio` | https://www.goldradiouk.com/ |
 | `bbc-entertainment` | https://www.bbc.co.uk/news/entertainment_and_arts |
+| `udiscover-music` | https://www.udiscovermusic.com/news/ |
+| `official-charts` | https://www.officialcharts.com/news/ |
+| `google-news-freddie-mercury` | https://news.google.com/ |
+| `google-news-brian-may` | https://news.google.com/ |
+| `google-news-roger-taylor` | https://news.google.com/ |
+| `google-news-queen-adam-lambert` | https://news.google.com/ |
+| `google-news-queen-reissues` | https://news.google.com/ |
+| `google-news-freddie-auctions` | https://news.google.com/ |
+| `google-news-wwry-musical` | https://news.google.com/ |
+| `google-news-john-deacon` | https://news.google.com/ |
+
+### Seeded but disabled by default
+
+These entries stay in the seed registry as editor-visible watchlist candidates, but the worker will not poll them until an editor enables them in the database or the seed file.
+
+| Key | Site | Why disabled |
+|-----|------|--------------|
+| `gold-radio` | https://www.goldradiouk.com/ | useful UK entertainment lead source, but noisier than the core music press |
+| `music-news` | https://www.music-news.com/ | useful music press source; review feed reuse terms before enabling automated polling |
+| `youtube-queen-official` | https://www.youtube.com/@Queen | official channel, but video/short uploads are not always article-like news items |
 
 ### Out of registry (manual review only)
 

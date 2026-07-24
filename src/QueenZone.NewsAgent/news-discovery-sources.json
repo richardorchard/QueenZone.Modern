@@ -44,6 +44,39 @@
     "relevanceKeywords": "adam lambert,queen"
   },
   {
+    "key": "freddie-mercury-official",
+    "displayName": "Freddie Mercury Official",
+    "homepageUrl": "https://www.freddiemercury.com/",
+    "feedOrSiteUrl": "https://www.freddiemercury.com/en/news",
+    "sourceType": "AllowlistedPage",
+    "trustTier": "Primary",
+    "pollIntervalMinutes": 120,
+    "enabled": true,
+    "relevanceKeywords": "freddie mercury,queen,mercury phoenix trust"
+  },
+  {
+    "key": "mercury-phoenix-trust",
+    "displayName": "Mercury Phoenix Trust",
+    "homepageUrl": "https://www.mercuryphoenixtrust.org/",
+    "feedOrSiteUrl": "https://www.mercuryphoenixtrust.org/site/news",
+    "sourceType": "AllowlistedPage",
+    "trustTier": "Primary",
+    "pollIntervalMinutes": 120,
+    "enabled": true,
+    "relevanceKeywords": "freddie mercury,queen,mercury phoenix trust,mpt"
+  },
+  {
+    "key": "queen-extravaganza",
+    "displayName": "Queen Extravaganza",
+    "homepageUrl": "https://www.queenonline.com/quex/about",
+    "feedOrSiteUrl": "https://www.queenonline.com/quex/upcoming_shows",
+    "sourceType": "AllowlistedPage",
+    "trustTier": "Primary",
+    "pollIntervalMinutes": 240,
+    "enabled": true,
+    "relevanceKeywords": "queen extravaganza,queen,brian may,roger taylor"
+  },
+  {
     "key": "queen-fan-club",
     "displayName": "Queen Fan Club (QueenWorld)",
     "homepageUrl": "https://queenworld.com/",
@@ -88,6 +121,17 @@
     "relevanceKeywords": "queen,freddie mercury,brian may,roger taylor,adam lambert"
   },
   {
+    "key": "nme-queen",
+    "displayName": "NME Queen",
+    "homepageUrl": "https://www.nme.com/artists/queen/",
+    "feedOrSiteUrl": "https://www.nme.com/artists/queen/",
+    "sourceType": "AllowlistedPage",
+    "trustTier": "Secondary",
+    "pollIntervalMinutes": 120,
+    "enabled": true,
+    "relevanceKeywords": "queen,freddie mercury,brian may,roger taylor,adam lambert"
+  },
+  {
     "key": "louder",
     "displayName": "Louder / Classic Rock",
     "homepageUrl": "https://www.loudersound.com/",
@@ -119,6 +163,39 @@
     "pollIntervalMinutes": 120,
     "enabled": false,
     "relevanceKeywords": "queen,freddie mercury,brian may,roger taylor"
+  },
+  {
+    "key": "bbc-entertainment",
+    "displayName": "BBC Entertainment & Arts",
+    "homepageUrl": "https://www.bbc.co.uk/news/entertainment_and_arts",
+    "feedOrSiteUrl": "https://feeds.bbci.co.uk/news/entertainment_and_arts/rss.xml",
+    "sourceType": "Rss",
+    "trustTier": "Secondary",
+    "pollIntervalMinutes": 120,
+    "enabled": true,
+    "relevanceKeywords": "queen,freddie mercury,brian may,roger taylor,john deacon,adam lambert"
+  },
+  {
+    "key": "music-news",
+    "displayName": "Music-News.com",
+    "homepageUrl": "https://www.music-news.com/",
+    "feedOrSiteUrl": "https://www.music-news.com/news",
+    "sourceType": "AllowlistedPage",
+    "trustTier": "Secondary",
+    "pollIntervalMinutes": 120,
+    "enabled": false,
+    "relevanceKeywords": "queen,freddie mercury,brian may,roger taylor,john deacon,adam lambert"
+  },
+  {
+    "key": "udiscover-music",
+    "displayName": "uDiscover Music",
+    "homepageUrl": "https://www.udiscovermusic.com/",
+    "feedOrSiteUrl": "https://www.udiscovermusic.com/news/",
+    "sourceType": "AllowlistedPage",
+    "trustTier": "Secondary",
+    "pollIntervalMinutes": 180,
+    "enabled": true,
+    "relevanceKeywords": "queen,freddie mercury,brian may,roger taylor,john deacon,bohemian rhapsody"
   },
   {
     "key": "google-news-freddie-mercury",
@@ -154,6 +231,61 @@
     "relevanceKeywords": "queen,freddie mercury,brian may,roger taylor,adam lambert"
   },
   {
+    "key": "google-news-queen-adam-lambert",
+    "displayName": "Google News (Queen + Adam Lambert)",
+    "homepageUrl": "https://news.google.com/",
+    "feedOrSiteUrl": "https://news.google.com/rss/search?q=%22Queen%22+%22Adam+Lambert%22&hl=en-GB&gl=GB&ceid=GB:en",
+    "sourceType": "Rss",
+    "trustTier": "Secondary",
+    "pollIntervalMinutes": 120,
+    "enabled": true,
+    "relevanceKeywords": "queen,adam lambert,brian may,roger taylor"
+  },
+  {
+    "key": "google-news-queen-reissues",
+    "displayName": "Google News (Queen Reissues)",
+    "homepageUrl": "https://news.google.com/",
+    "feedOrSiteUrl": "https://news.google.com/rss/search?q=%22Queen%22+%28reissue+OR+remaster+OR+%22box+set%22+OR+%22new+album%22%29&hl=en-GB&gl=GB&ceid=GB:en",
+    "sourceType": "Rss",
+    "trustTier": "Secondary",
+    "pollIntervalMinutes": 180,
+    "enabled": true,
+    "relevanceKeywords": "queen,freddie mercury,brian may,roger taylor,john deacon,reissue,remaster,box set"
+  },
+  {
+    "key": "google-news-freddie-auctions",
+    "displayName": "Google News (Freddie Mercury Auctions)",
+    "homepageUrl": "https://news.google.com/",
+    "feedOrSiteUrl": "https://news.google.com/rss/search?q=%22Freddie+Mercury%22+%28auction+OR+memorabilia%29&hl=en-GB&gl=GB&ceid=GB:en",
+    "sourceType": "Rss",
+    "trustTier": "Secondary",
+    "pollIntervalMinutes": 180,
+    "enabled": true,
+    "relevanceKeywords": "freddie mercury,queen,auction,memorabilia"
+  },
+  {
+    "key": "google-news-wwry-musical",
+    "displayName": "Google News (We Will Rock You Musical)",
+    "homepageUrl": "https://news.google.com/",
+    "feedOrSiteUrl": "https://news.google.com/rss/search?q=%22We+Will+Rock+You%22+%22Queen%22+musical&hl=en-GB&gl=GB&ceid=GB:en",
+    "sourceType": "Rss",
+    "trustTier": "Secondary",
+    "pollIntervalMinutes": 180,
+    "enabled": true,
+    "relevanceKeywords": "we will rock you,queen,musical,brian may,roger taylor"
+  },
+  {
+    "key": "google-news-john-deacon",
+    "displayName": "Google News (John Deacon)",
+    "homepageUrl": "https://news.google.com/",
+    "feedOrSiteUrl": "https://news.google.com/rss/search?q=%22John+Deacon%22+%22Queen%22&hl=en-GB&gl=GB&ceid=GB:en",
+    "sourceType": "Rss",
+    "trustTier": "Secondary",
+    "pollIntervalMinutes": 240,
+    "enabled": true,
+    "relevanceKeywords": "john deacon,queen"
+  },
+  {
     "key": "official-charts",
     "displayName": "Official Charts Company",
     "homepageUrl": "https://www.officialcharts.com/news/",
@@ -163,5 +295,16 @@
     "pollIntervalMinutes": 120,
     "enabled": true,
     "relevanceKeywords": "queen,freddie mercury,brian may,roger taylor,john deacon,bohemian rhapsody,adam lambert"
+  },
+  {
+    "key": "youtube-queen-official",
+    "displayName": "YouTube Queen Official",
+    "homepageUrl": "https://www.youtube.com/@Queen",
+    "feedOrSiteUrl": "https://www.youtube.com/feeds/videos.xml?channel_id=UCiMhD4jzUqG-IgPzUmmytRQ",
+    "sourceType": "Rss",
+    "trustTier": "Secondary",
+    "pollIntervalMinutes": 360,
+    "enabled": false,
+    "relevanceKeywords": "queen,freddie mercury,brian may,roger taylor,john deacon,bohemian rhapsody"
   }
 ]

@@ -82,6 +82,9 @@ Primary / highest confidence:
 - Brian May official site: https://brianmay.com/
 - Roger Taylor official site: https://www.rogertaylorofficial.com/
 - Adam Lambert official site: https://adamlambert.net/
+- Freddie Mercury official site: https://www.freddiemercury.com/
+- Mercury Phoenix Trust: https://www.mercuryphoenixtrust.org/
+- Queen Extravaganza: https://www.queenonline.com/quex/about
 - Official public artist social/news surfaces where attributable.
 - Tour promoters, venues, record labels, or release pages linked from official announcements.
 
@@ -90,11 +93,19 @@ Secondary / reputable music press:
 - Rolling Stone Music: https://www.rollingstone.com/music/
 - Billboard Music: https://www.billboard.com/music/
 - NME Music: https://www.nme.com/music
+- NME Queen artist page: https://www.nme.com/artists/queen/
 - Louder / Classic Rock: https://www.loudersound.com/
 - Ultimate Classic Rock: https://ultimateclassicrock.com/
 - Music-News: https://www.music-news.com/
 - Gold Radio: https://www.goldradiouk.com/
 - BBC Entertainment & Arts: https://www.bbc.co.uk/news/entertainment_and_arts
+- uDiscover Music: https://www.udiscovermusic.com/news/
+- Official Charts: https://www.officialcharts.com/news/
+- Targeted Google News feeds for Freddie Mercury, Brian May, Roger Taylor, Queen + Adam Lambert, Queen reissues, Freddie Mercury auctions, We Will Rock You musical, and John Deacon.
+
+Seeded but disabled by default:
+
+- Gold Radio, Music-News.com, and YouTube Queen Official should be treated as watchlist entries until an editor decides the signal-to-noise ratio and reuse terms are acceptable for automated polling.
 
 Lower-confidence leads:
 
