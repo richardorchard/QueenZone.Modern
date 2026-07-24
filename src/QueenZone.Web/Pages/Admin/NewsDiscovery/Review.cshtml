@@ -1,6 +1,7 @@
 @page "/admin/news-discovery/{id:int}"
 @model ReviewModel
 
+<div class="admin-shell">
 @if (Model.Candidate is null)
 {
   <p>Candidate not found.</p>
@@ -165,3 +166,4 @@ else
     </div>
   </section>
 }
+</div>
