@@ -1,119 +1,121 @@
 @page "/admin/news-discovery"
 @model IndexModel
 
-<h1>News discovery review</h1>
-<p>
-  <a href="/admin">Back to admin</a>
-</p>
+<div class="admin-shell">
+  <h1>News discovery review</h1>
+  <p>
+    <a href="/admin">Back to admin</a>
+  </p>
 
-<form method="get" class="admin-filter-form">
-  <div class="admin-filter-grid">
-    <label>
-      Status
-      <select name="status">
-        <option value="">All</option>
-        @foreach (var status in Enum.GetValues<QueenZone.Data.NewsCandidateStatus>())
-        {
-          <option value="@status" selected="@(Model.Status == status)">@NewsDiscoveryStatusLabels.Format(status)</option>
-        }
-      </select>
-    </label>
-    <label>
-      Source
-      <select name="sourceId">
-        <option value="">All</option>
-        @foreach (var source in Model.Sources)
-        {
-          <option value="@source.Id" selected="@(Model.SourceId == source.Id)">@source.DisplayName</option>
-        }
-      </select>
-    </label>
-    <label>
-      Trust tier
-      <select name="trustTier">
-        <option value="">All</option>
-        @foreach (var tier in Enum.GetValues<QueenZone.Data.NewsDiscoveryTrustTier>())
-        {
-          <option value="@tier" selected="@(Model.TrustTier == tier)">@NewsDiscoveryStatusLabels.FormatTrustTier(tier)</option>
-        }
-      </select>
-    </label>
-    <label>
-      Min confidence
-      <input type="number" name="minConfidence" min="0" max="1" step="0.05" value="@Model.MinConfidence" />
-    </label>
-    <label>
-      Entity
-      <input type="text" name="entity" value="@Model.Entity" placeholder="e.g. Brian May" />
-    </label>
-    <label>
-      Discovered from
-      <input type="date" name="discoveredFrom" value="@(Model.DiscoveredFrom?.ToString("yyyy-MM-dd"))" />
-    </label>
-    <label>
-      Discovered to
-      <input type="date" name="discoveredTo" value="@(Model.DiscoveredTo?.ToString("yyyy-MM-dd"))" />
-    </label>
-    <label>
-      Has draft
-      <select name="hasDraft">
-        <option value="">Any</option>
-        <option value="true" selected="@(Model.HasDraft == true)">Yes</option>
-        <option value="false" selected="@(Model.HasDraft == false)">No</option>
-      </select>
-    </label>
-  </div>
-  <button type="submit">Apply filters</button>
-</form>
+  <form method="get" class="admin-filter-form">
+    <div class="admin-filter-grid">
+      <label>
+        Status
+        <select name="status">
+          <option value="">All</option>
+          @foreach (var status in Enum.GetValues<QueenZone.Data.NewsCandidateStatus>())
+          {
+            <option value="@status" selected="@(Model.Status == status)">@NewsDiscoveryStatusLabels.Format(status)</option>
+          }
+        </select>
+      </label>
+      <label>
+        Source
+        <select name="sourceId">
+          <option value="">All</option>
+          @foreach (var source in Model.Sources)
+          {
+            <option value="@source.Id" selected="@(Model.SourceId == source.Id)">@source.DisplayName</option>
+          }
+        </select>
+      </label>
+      <label>
+        Trust tier
+        <select name="trustTier">
+          <option value="">All</option>
+          @foreach (var tier in Enum.GetValues<QueenZone.Data.NewsDiscoveryTrustTier>())
+          {
+            <option value="@tier" selected="@(Model.TrustTier == tier)">@NewsDiscoveryStatusLabels.FormatTrustTier(tier)</option>
+          }
+        </select>
+      </label>
+      <label>
+        Min confidence
+        <input type="number" name="minConfidence" min="0" max="1" step="0.05" value="@Model.MinConfidence" />
+      </label>
+      <label>
+        Entity
+        <input type="text" name="entity" value="@Model.Entity" placeholder="e.g. Brian May" />
+      </label>
+      <label>
+        Discovered from
+        <input type="date" name="discoveredFrom" value="@(Model.DiscoveredFrom?.ToString("yyyy-MM-dd"))" />
+      </label>
+      <label>
+        Discovered to
+        <input type="date" name="discoveredTo" value="@(Model.DiscoveredTo?.ToString("yyyy-MM-dd"))" />
+      </label>
+      <label>
+        Has draft
+        <select name="hasDraft">
+          <option value="">Any</option>
+          <option value="true" selected="@(Model.HasDraft == true)">Yes</option>
+          <option value="false" selected="@(Model.HasDraft == false)">No</option>
+        </select>
+      </label>
+    </div>
+    <button type="submit">Apply filters</button>
+  </form>
 
-@if (Model.Candidates.Count == 0)
-{
-  <p>No candidates match the current filters.</p>
-}
-else
-{
-  <table class="admin-table">
-    <thead>
-      <tr>
-        <th>Title</th>
-        <th>Source</th>
-        <th>Status</th>
-        <th>Scores</th>
-        <th>Discovered</th>
-        <th>Draft</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      @foreach (var candidate in Model.Candidates)
-      {
+  @if (Model.Candidates.Count == 0)
+  {
+    <p>No candidates match the current filters.</p>
+  }
+  else
+  {
+    <table class="admin-table">
+      <thead>
         <tr>
-          <td>
-            <a href="@candidate.SourceUrl" rel="noopener noreferrer" target="_blank">@candidate.SourceTitle</a>
-          </td>
-          <td>
-            @candidate.SourceDisplayName
-            <span class="admin-muted">(@NewsDiscoveryStatusLabels.FormatTrustTier(candidate.SourceTrustTier))</span>
-          </td>
-          <td>@NewsDiscoveryStatusLabels.Format(candidate.Status)</td>
-          <td>
-            @if (candidate.RelevanceScore is not null || candidate.ConfidenceScore is not null)
-            {
-              <span>R @(candidate.RelevanceScore?.ToString("0.00") ?? "—")</span>
-              <span>C @(candidate.ConfidenceScore?.ToString("0.00") ?? "—")</span>
-            }
-            else
-            {
-              <span>—</span>
-            }
-          </td>
-          <td>@candidate.DiscoveredAt.ToString("dd MMM yyyy HH:mm") UTC</td>
-          <td>@(candidate.DraftTitle ?? "—")</td>
-          <td class="admin-actions">
-            <a href="/admin/news-discovery/@candidate.Id">Review</a>
-          </td>
+          <th>Title</th>
+          <th>Source</th>
+          <th>Status</th>
+          <th>Scores</th>
+          <th>Discovered</th>
+          <th>Draft</th>
+          <th>Actions</th>
         </tr>
-      }
-    </tbody>
-  </table>
-}
+      </thead>
+      <tbody>
+        @foreach (var candidate in Model.Candidates)
+        {
+          <tr>
+            <td>
+              <a href="@candidate.SourceUrl" rel="noopener noreferrer" target="_blank">@candidate.SourceTitle</a>
+            </td>
+            <td>
+              @candidate.SourceDisplayName
+              <span class="admin-muted">(@NewsDiscoveryStatusLabels.FormatTrustTier(candidate.SourceTrustTier))</span>
+            </td>
+            <td>@NewsDiscoveryStatusLabels.Format(candidate.Status)</td>
+            <td>
+              @if (candidate.RelevanceScore is not null || candidate.ConfidenceScore is not null)
+              {
+                <span>R @(candidate.RelevanceScore?.ToString("0.00") ?? "—")</span>
+                <span>C @(candidate.ConfidenceScore?.ToString("0.00") ?? "—")</span>
+              }
+              else
+              {
+                <span>—</span>
+              }
+            </td>
+            <td>@candidate.DiscoveredAt.ToString("dd MMM yyyy HH:mm") UTC</td>
+            <td>@(candidate.DraftTitle ?? "—")</td>
+            <td class="admin-actions">
+              <a href="/admin/news-discovery/@candidate.Id">Review</a>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+</div>
