@@ -11,16 +11,17 @@ public sealed class PublicQueryCacheService(
     INewsRepository newsRepository,
     IArticlesRepository articlesRepository,
     IForumRepository forumRepository,
-    IQueenHistoryRepository queenHistoryRepository)
+    IQueenHistoryRepository queenHistoryRepository,
+    IPhotoRepository photoRepository)
 {
-    private static readonly MemoryCacheEntryOptions NewsVersionEntryOptions = new()
+    private static readonly MemoryCacheEntryOptions VersionEntryOptions = new()
     {
         Priority = CacheItemPriority.NeverRemove
     };
 
     /// <summary>
     /// Per-key gates so concurrent cold-cache hits share a single factory execution (no stampede).
-    /// Key set is small (news version variants, forum stats, on-this-day dates).
+    /// Key set is small (news version variants, forum stats, on-this-day dates, photo pages).
     /// </summary>
     private readonly ConcurrentDictionary<string, SemaphoreSlim> loadGates = new(StringComparer.Ordinal);
 
@@ -79,6 +80,37 @@ public sealed class PublicQueryCacheService(
             options.Value.OnThisDayCacheDuration,
             () => queenHistoryRepository.GetAroundThisDayAsync(date, dayWindow, count, cancellationToken));
 
+    public Task<IReadOnlyList<PhotoCategory>> GetPhotoCategoriesAsync(CancellationToken cancellationToken = default)
+    {
+        var version = GetPhotoCacheVersion();
+        return GetOrCreateAsync(
+            PublicQueryCacheKeys.PhotoCategories(version),
+            options.Value.PhotoCacheDuration,
+            () => photoRepository.GetCategoriesAsync(cancellationToken));
+    }
+
+    public async Task<PhotoCategory?> GetPhotoCategoryBySlugAsync(
+        string slug,
+        CancellationToken cancellationToken = default)
+    {
+        var categories = await GetPhotoCategoriesAsync(cancellationToken);
+        return categories.FirstOrDefault(category =>
+            string.Equals(category.Slug, slug, StringComparison.OrdinalIgnoreCase));
+    }
+
+    public Task<PhotoCategoryPage> GetPhotoCategoryPageAsync(
+        int catId,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        var version = GetPhotoCacheVersion();
+        return GetOrCreateAsync(
+            PublicQueryCacheKeys.PhotoCategoryPage(version, catId, page, pageSize),
+            options.Value.PhotoCacheDuration,
+            () => photoRepository.GetCategoryPageAsync(catId, page, pageSize, cancellationToken));
+    }
+
     /// <summary>
     /// Invalidates all public news cache entries (latest lists for any count and published count)
     /// by bumping the news cache version. Call after publish, unpublish, delete of published news,
@@ -88,7 +120,7 @@ public sealed class PublicQueryCacheService(
     {
         // Versioned keys mean callers can introduce new latest-count variants without updating
         // invalidation. Previous version entries expire via their normal TTL.
-        cache.Set(PublicQueryCacheKeys.NewsVersion, CreateNewsCacheVersion(), NewsVersionEntryOptions);
+        cache.Set(PublicQueryCacheKeys.NewsVersion, CreateCacheVersion(), VersionEntryOptions);
     }
 
     public void InvalidateForumStatsCache()
@@ -97,20 +129,31 @@ public sealed class PublicQueryCacheService(
         cache.Remove(PublicQueryCacheKeys.ForumThreadCount);
     }
 
-    private string GetNewsCacheVersion()
+    /// <summary>
+    /// Bumps the photo cache version so category lists and paged grids refresh after admin writes.
+    /// </summary>
+    public void InvalidatePhotoCache()
     {
-        if (cache.TryGetValue(PublicQueryCacheKeys.NewsVersion, out string? version)
-            && !string.IsNullOrEmpty(version))
+        cache.Set(PublicQueryCacheKeys.PhotoVersion, CreateCacheVersion(), VersionEntryOptions);
+    }
+
+    private string GetNewsCacheVersion() => GetOrInitVersion(PublicQueryCacheKeys.NewsVersion);
+
+    private string GetPhotoCacheVersion() => GetOrInitVersion(PublicQueryCacheKeys.PhotoVersion);
+
+    private string GetOrInitVersion(string key)
+    {
+        if (cache.TryGetValue(key, out string? version) && !string.IsNullOrEmpty(version))
         {
             return version;
         }
 
         var initial = "0";
-        cache.Set(PublicQueryCacheKeys.NewsVersion, initial, NewsVersionEntryOptions);
+        cache.Set(key, initial, VersionEntryOptions);
         return initial;
     }
 
-    private static string CreateNewsCacheVersion() => Guid.NewGuid().ToString("N");
+    private static string CreateCacheVersion() => Guid.NewGuid().ToString("N");
 
     private async Task<T> GetOrCreateAsync<T>(
         string key,

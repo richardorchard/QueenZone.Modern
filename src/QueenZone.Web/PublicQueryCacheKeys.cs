@@ -20,11 +20,23 @@ public static class PublicQueryCacheKeys
 
     public const string ForumThreadCount = Prefix + ":forum:thread-count";
 
+    public const string PhotoVersion = Prefix + ":photo:version";
+
+    public const string PhotoCategoriesSegment = Prefix + ":photo:categories";
+
+    public const string PhotoCategoryPageSegment = Prefix + ":photo:category-page";
+
     public static string LatestNews(string version, int count) =>
         $"{LatestNewsSegment}:v{version}:{count}";
 
     public static string NewsPublishedCount(string version) =>
         $"{NewsPublishedCountSegment}:v{version}";
+
+    public static string PhotoCategories(string version) =>
+        $"{PhotoCategoriesSegment}:v{version}";
+
+    public static string PhotoCategoryPage(string version, int catId, int page, int pageSize) =>
+        $"{PhotoCategoryPageSegment}:v{version}:{catId}:{page}:{pageSize}";
 
     public static string OnThisDay(DateOnly date, int count) =>
         $"{Prefix}:history:on-this-day:{date:yyyyMMdd}:{count}";

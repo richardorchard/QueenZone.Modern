@@ -11,4 +11,7 @@ public sealed class PublicQueryCacheOptions
     public TimeSpan ForumStatsCacheDuration { get; init; } = TimeSpan.FromMinutes(30);
 
     public TimeSpan OnThisDayCacheDuration { get; init; } = TimeSpan.FromHours(12);
+
+    /// <summary>Photography archive changes rarely; default is generous.</summary>
+    public TimeSpan PhotoCacheDuration { get; init; } = TimeSpan.FromMinutes(30);
 }

@@ -237,19 +237,47 @@ public sealed class PublicQueryCacheServiceTests
         Assert.Equal(1, historyRepository.AroundThisDayCallCount);
     }
 
+    [Fact]
+    public async Task PhotoCategoriesAndPagesAreCachedUntilInvalidated()
+    {
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var photoRepository = new CountingPhotoRepository();
+        var service = CreateService(memoryCache, photoRepository: photoRepository);
+
+        var firstCategories = await service.GetPhotoCategoriesAsync();
+        var secondCategories = await service.GetPhotoCategoriesAsync();
+        var firstPage = await service.GetPhotoCategoryPageAsync(9, 1, 24);
+        var secondPage = await service.GetPhotoCategoryPageAsync(9, 1, 24);
+
+        Assert.Same(firstCategories, secondCategories);
+        Assert.Same(firstPage, secondPage);
+        Assert.Equal(1, photoRepository.CategoriesCallCount);
+        Assert.Equal(1, photoRepository.PageCallCount);
+
+        service.InvalidatePhotoCache();
+
+        _ = await service.GetPhotoCategoriesAsync();
+        _ = await service.GetPhotoCategoryPageAsync(9, 1, 24);
+
+        Assert.Equal(2, photoRepository.CategoriesCallCount);
+        Assert.Equal(2, photoRepository.PageCallCount);
+    }
+
     private static PublicQueryCacheService CreateService(
         IMemoryCache memoryCache,
         INewsRepository? newsRepository = null,
         IArticlesRepository? articlesRepository = null,
         IForumRepository? forumRepository = null,
-        IQueenHistoryRepository? historyRepository = null) =>
+        IQueenHistoryRepository? historyRepository = null,
+        IPhotoRepository? photoRepository = null) =>
         new(
             memoryCache,
             Options.Create(new PublicQueryCacheOptions()),
             newsRepository ?? new CountingNewsRepository(),
             articlesRepository ?? new CountingArticlesRepository(),
             forumRepository ?? new CountingForumRepository(),
-            historyRepository ?? new CountingQueenHistoryRepository());
+            historyRepository ?? new CountingQueenHistoryRepository(),
+            photoRepository ?? new CountingPhotoRepository());
 
     private sealed class SlowCountingNewsRepository(TimeSpan delay) : CountingNewsRepository
     {
@@ -419,5 +447,63 @@ public sealed class PublicQueryCacheServiceTests
                 "cached-history",
                 null,
                 true);
+    }
+
+    private sealed class CountingPhotoRepository : IPhotoRepository
+    {
+        public int CategoriesCallCount { get; private set; }
+
+        public int PageCallCount { get; private set; }
+
+        public Task<IReadOnlyList<PhotoCategory>> GetCategoriesAsync(CancellationToken cancellationToken = default)
+        {
+            CategoriesCallCount++;
+            return Task.FromResult<IReadOnlyList<PhotoCategory>>(
+            [
+                new PhotoCategory(9, "Brian May", "brian-may", 3, "https://cdn.queenzone.org/brian-may/cover.jpg"),
+            ]);
+        }
+
+        public Task<PhotoCategory?> GetCategoryBySlugAsync(string slug, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<PhotoCategoryPage> GetCategoryPageAsync(
+            int catId,
+            int page,
+            int pageSize,
+            CancellationToken cancellationToken = default)
+        {
+            PageCallCount++;
+            return Task.FromResult(new PhotoCategoryPage(
+                "Brian May",
+                [
+                    new PhotoItem(
+                        101,
+                        catId,
+                        "Brian May",
+                        "brian-may",
+                        $"page-{page}",
+                        "https://cdn.queenzone.org/brian-may/a.jpg",
+                        "https://cdn.queenzone.org/brian-may/a-t.jpg",
+                        150,
+                        150,
+                        1986,
+                        new DateTime(1986, 7, 12)),
+                ],
+                3));
+        }
+
+        public Task<PhotoDetailNavigation?> GetDetailNavigationAsync(
+            int catId,
+            int picId,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<PhotoItem>> GetCategoryAllAsync(int catId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<PhotoSitemapCategory>> GetPublishedSitemapCategoriesAsync(
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 }

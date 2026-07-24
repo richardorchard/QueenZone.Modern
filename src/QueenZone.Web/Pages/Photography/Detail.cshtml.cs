@@ -4,7 +4,9 @@ using QueenZone.Data;
 
 namespace QueenZone.Web.Pages.Photography;
 
-public sealed class DetailModel(IPhotoRepository photoRepository) : PageModel
+public sealed class DetailModel(
+    PublicQueryCacheService publicQueryCache,
+    IPhotoRepository photoRepository) : PageModel
 {
     public PhotoCategory Category { get; private set; } = null!;
 
@@ -24,28 +26,31 @@ public sealed class DetailModel(IPhotoRepository photoRepository) : PageModel
 
     public async Task<IActionResult> OnGetAsync(string slug, int picId, CancellationToken cancellationToken)
     {
-        var category = await photoRepository.GetCategoryBySlugAsync(slug, cancellationToken);
+        var category = await publicQueryCache.GetPhotoCategoryBySlugAsync(slug, cancellationToken);
         if (category is null)
         {
             return NotFound();
         }
 
-        var items = await photoRepository.GetCategoryAllAsync(category.CatId, cancellationToken);
-        var index = items.ToList().FindIndex(item => item.PicId == picId);
-        if (index < 0)
+        var navigation = await photoRepository.GetDetailNavigationAsync(category.CatId, picId, cancellationToken);
+        if (navigation is null)
         {
             return NotFound();
         }
 
         Category = category;
-        Photo = items[index];
-        Index = index;
-        Count = items.Count;
+        Photo = navigation.Photo;
+        Index = navigation.Index;
+        Count = navigation.Count;
 
-        PreviousHref = index > 0 ? PhotoRoutes.GetDetailPath(category.Slug, items[index - 1].PicId) : null;
-        NextHref = index < items.Count - 1 ? PhotoRoutes.GetDetailPath(category.Slug, items[index + 1].PicId) : null;
+        PreviousHref = navigation.PreviousPicId is int previousId
+            ? PhotoRoutes.GetDetailPath(category.Slug, previousId)
+            : null;
+        NextHref = navigation.NextPicId is int nextId
+            ? PhotoRoutes.GetDetailPath(category.Slug, nextId)
+            : null;
 
-        var page = (index / PhotoRoutes.CategoryPageSize) + 1;
+        var page = (navigation.Index / PhotoRoutes.CategoryPageSize) + 1;
         BackToGridHref = PhotoRoutes.GetCategoryPagePath(category.Slug, page);
 
         Breadcrumbs =

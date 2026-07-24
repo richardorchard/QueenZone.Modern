@@ -67,6 +67,7 @@ public sealed class NewModel(IAdminPhotoRepository adminPhotoRepository) : Admin
 
 public sealed class CreateModel(
     AdminPhotoService adminPhotoService,
+    PublicQueryCacheService publicQueryCache,
     CoreSitemapService coreSitemapService,
     IOutputCacheStore outputCacheStore) : AdminPhotosPageModel
 {
@@ -109,7 +110,11 @@ public sealed class CreateModel(
 
             if (isVisible)
             {
-                await InvalidatePublicCachesAsync(coreSitemapService, outputCacheStore, cancellationToken);
+                await ActionModel.InvalidatePublicPhotoCachesAsync(
+                    publicQueryCache,
+                    coreSitemapService,
+                    outputCacheStore,
+                    cancellationToken);
             }
 
             TempData[MessageKey] = $"Created photo #{picId}.";
@@ -123,12 +128,6 @@ public sealed class CreateModel(
             return Redirect("/admin/photos/new");
         }
     }
-
-    internal static Task InvalidatePublicCachesAsync(
-        CoreSitemapService coreSitemapService,
-        IOutputCacheStore outputCacheStore,
-        CancellationToken cancellationToken) =>
-        ActionModel.InvalidatePublicPhotoCachesAsync(coreSitemapService, outputCacheStore, cancellationToken);
 }
 
 public sealed class EditModel(IAdminPhotoRepository adminPhotoRepository) : AdminPhotosPageModel
@@ -160,6 +159,7 @@ public sealed class EditModel(IAdminPhotoRepository adminPhotoRepository) : Admi
 public sealed class EditPostModel(
     IAdminPhotoRepository adminPhotoRepository,
     AdminPhotoService adminPhotoService,
+    PublicQueryCacheService publicQueryCache,
     CoreSitemapService coreSitemapService,
     IOutputCacheStore outputCacheStore) : AdminPhotosPageModel
 {
@@ -199,7 +199,11 @@ public sealed class EditPostModel(
                 await adminPhotoService.ReplaceAsync(id, replaceFile, EditorEmail, cancellationToken);
             }
 
-            await ActionModel.InvalidatePublicPhotoCachesAsync(coreSitemapService, outputCacheStore, cancellationToken);
+            await ActionModel.InvalidatePublicPhotoCachesAsync(
+                publicQueryCache,
+                coreSitemapService,
+                outputCacheStore,
+                cancellationToken);
             TempData[MessageKey] = "Photo updated.";
             TempData[MessageKindKey] = "success";
             return Redirect($"/admin/photos/{id}");
@@ -216,6 +220,7 @@ public sealed class EditPostModel(
 public sealed class ActionModel(
     IAdminPhotoRepository adminPhotoRepository,
     AdminPhotoService adminPhotoService,
+    PublicQueryCacheService publicQueryCache,
     CoreSitemapService coreSitemapService,
     IOutputCacheStore outputCacheStore) : AdminPhotosPageModel
 {
@@ -224,7 +229,7 @@ public sealed class ActionModel(
     public async Task<IActionResult> OnPostHideAsync(int id, CancellationToken cancellationToken)
     {
         await adminPhotoRepository.SetVisibilityAsync(id, false, EditorEmail, cancellationToken);
-        await InvalidatePublicPhotoCachesAsync(coreSitemapService, outputCacheStore, cancellationToken);
+        await InvalidatePublicPhotoCachesAsync(publicQueryCache, coreSitemapService, outputCacheStore, cancellationToken);
         TempData[MessageKey] = "Photo hidden from public gallery.";
         TempData[MessageKindKey] = "success";
         return Redirect($"/admin/photos/{id}");
@@ -233,7 +238,7 @@ public sealed class ActionModel(
     public async Task<IActionResult> OnPostShowAsync(int id, CancellationToken cancellationToken)
     {
         await adminPhotoRepository.SetVisibilityAsync(id, true, EditorEmail, cancellationToken);
-        await InvalidatePublicPhotoCachesAsync(coreSitemapService, outputCacheStore, cancellationToken);
+        await InvalidatePublicPhotoCachesAsync(publicQueryCache, coreSitemapService, outputCacheStore, cancellationToken);
         TempData[MessageKey] = "Photo is now visible.";
         TempData[MessageKindKey] = "success";
         return Redirect($"/admin/photos/{id}");
@@ -244,7 +249,7 @@ public sealed class ActionModel(
         try
         {
             await adminPhotoService.RegenerateThumbnailAsync(id, EditorEmail, cancellationToken);
-            await InvalidatePublicPhotoCachesAsync(coreSitemapService, outputCacheStore, cancellationToken);
+            await InvalidatePublicPhotoCachesAsync(publicQueryCache, coreSitemapService, outputCacheStore, cancellationToken);
             TempData[MessageKey] = "Thumbnail regenerated.";
             TempData[MessageKindKey] = "success";
         }
@@ -260,17 +265,19 @@ public sealed class ActionModel(
     public async Task<IActionResult> OnPostDeleteAsync(int id, CancellationToken cancellationToken)
     {
         await adminPhotoRepository.DeleteAsync(id, EditorEmail, cancellationToken);
-        await InvalidatePublicPhotoCachesAsync(coreSitemapService, outputCacheStore, cancellationToken);
+        await InvalidatePublicPhotoCachesAsync(publicQueryCache, coreSitemapService, outputCacheStore, cancellationToken);
         TempData[MessageKey] = $"Deleted photo #{id} (database row only; blobs left in place).";
         TempData[MessageKindKey] = "success";
         return Redirect("/admin/photos");
     }
 
     internal static async Task InvalidatePublicPhotoCachesAsync(
+        PublicQueryCacheService publicQueryCache,
         CoreSitemapService coreSitemapService,
         IOutputCacheStore outputCacheStore,
         CancellationToken cancellationToken)
     {
+        publicQueryCache.InvalidatePhotoCache();
         await coreSitemapService.InvalidateAsync(cancellationToken);
         await outputCacheStore.EvictByTagAsync(PublicOutputCachePolicies.PublicHtmlTag, cancellationToken);
     }

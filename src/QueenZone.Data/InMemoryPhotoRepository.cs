@@ -7,11 +7,17 @@ public sealed class InMemoryPhotoRepository(SharedPhotoStore store) : IPhotoRepo
         IReadOnlyList<PhotoCategory> categories = store.GetCategories()
             .Select(category =>
             {
-                var count = store.GetVisiblePhotosByCategory(category.CatId).Count;
-                return new { category, count };
+                var photos = store.GetVisiblePhotosByCategory(category.CatId);
+                var cover = photos.FirstOrDefault()?.ThumbnailUrl;
+                return new { category, count = photos.Count, cover };
             })
             .Where(item => item.count > 0)
-            .Select(item => new PhotoCategory(item.category.CatId, item.category.Name, item.category.Slug, item.count))
+            .Select(item => new PhotoCategory(
+                item.category.CatId,
+                item.category.Name,
+                item.category.Slug,
+                item.count,
+                item.cover))
             .ToList();
 
         return Task.FromResult(categories);
@@ -43,6 +49,26 @@ public sealed class InMemoryPhotoRepository(SharedPhotoStore store) : IPhotoRepo
             .ToList();
 
         return Task.FromResult(new PhotoCategoryPage(category.Name, paged, items.Count));
+    }
+
+    public Task<PhotoDetailNavigation?> GetDetailNavigationAsync(
+        int catId,
+        int picId,
+        CancellationToken cancellationToken = default)
+    {
+        var items = store.GetVisiblePhotosByCategory(catId).Select(ToPhotoItem).ToList();
+        var index = items.FindIndex(item => item.PicId == picId);
+        if (index < 0)
+        {
+            return Task.FromResult<PhotoDetailNavigation?>(null);
+        }
+
+        return Task.FromResult<PhotoDetailNavigation?>(new PhotoDetailNavigation(
+            items[index],
+            index,
+            items.Count,
+            index > 0 ? items[index - 1].PicId : null,
+            index < items.Count - 1 ? items[index + 1].PicId : null));
     }
 
     public Task<IReadOnlyList<PhotoItem>> GetCategoryAllAsync(int catId, CancellationToken cancellationToken = default)
