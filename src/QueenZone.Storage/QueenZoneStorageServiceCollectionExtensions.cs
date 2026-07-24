@@ -17,6 +17,7 @@ public static class QueenZoneStorageServiceCollectionExtensions
         if (string.IsNullOrWhiteSpace(connectionString))
         {
             services.AddSingleton<IBlobUploadService, NullBlobUploadService>();
+            services.AddGalleryPhotoBlobService();
             return services;
         }
 
@@ -24,6 +25,7 @@ public static class QueenZoneStorageServiceCollectionExtensions
         services.AddSingleton<IBlobStorageBackend>(sp =>
             new AzureBlobStorageBackend(sp.GetRequiredService<BlobServiceClient>()));
         services.AddSingleton<IBlobUploadService, AzureBlobUploadService>();
+        services.AddGalleryPhotoBlobService();
         return services;
     }
 }

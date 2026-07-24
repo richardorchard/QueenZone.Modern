@@ -207,6 +207,16 @@ Acceptance criteria:
 - Thumbnails are present or regenerated.
 - New app uses Blob URLs.
 
+### Admin photography gallery management
+
+Tracked in [#349](https://github.com/richardorchard/QueenZone.Modern/issues/349).
+
+Acceptance criteria:
+
+- Admin can list/filter gallery photos and add/edit/hide/move/delete them.
+- Admin can regenerate WebP thumbnails and replace image files while keeping `PicId`.
+- Writes target legacy `PIC_FILES_T` / `PIC_CAT_T` (promote-from-submissions is a separate follow-up).
+
 ## Epic: Archive
 
 ### Forum archive feasibility review

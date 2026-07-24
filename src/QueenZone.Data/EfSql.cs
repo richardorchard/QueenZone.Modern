@@ -116,6 +116,26 @@ internal static class EfSql
         return result is null or DBNull ? 0 : Convert.ToInt32(result);
     }
 
+    public static async Task<int> ExecuteNonQuerySqlAsync(
+        QueenZoneDbContext dbContext,
+        string sql,
+        Action<SqlCommand>? configure = null,
+        int? commandTimeoutSeconds = null,
+        CancellationToken cancellationToken = default)
+    {
+        var connection = await OpenSqlConnectionAsync(dbContext, cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        command.CommandType = CommandType.Text;
+        if (commandTimeoutSeconds is not null)
+        {
+            command.CommandTimeout = commandTimeoutSeconds.Value;
+        }
+
+        configure?.Invoke(command);
+        return await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
     public static async Task<bool> ExecuteScalarBoolSqlAsync(
         string connectionString,
         string sql,
