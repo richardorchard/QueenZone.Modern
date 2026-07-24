@@ -31,7 +31,8 @@ public sealed class PublicQueryCacheService(
         return GetOrCreateAsync(
             PublicQueryCacheKeys.LatestNews(version, count),
             options.Value.NewsCacheDuration,
-            () => newsRepository.GetLatestAsync(count, cancellationToken));
+            () => newsRepository.GetLatestAsync(count, cancellationToken),
+            cancellationToken);
     }
 
     public Task<int> GetNewsPublishedCountAsync(CancellationToken cancellationToken = default)
@@ -40,26 +41,30 @@ public sealed class PublicQueryCacheService(
         return GetOrCreateAsync(
             PublicQueryCacheKeys.NewsPublishedCount(version),
             options.Value.NewsCacheDuration,
-            () => newsRepository.GetPublishedCountAsync(cancellationToken));
+            () => newsRepository.GetPublishedCountAsync(cancellationToken),
+            cancellationToken);
     }
 
     public Task<int> GetArticlePublishedCountAsync(CancellationToken cancellationToken = default) =>
         GetOrCreateAsync(
             PublicQueryCacheKeys.ArticlePublishedCount,
             options.Value.ArticleCountCacheDuration,
-            () => articlesRepository.GetPublishedCountAsync(cancellationToken));
+            () => articlesRepository.GetPublishedCountAsync(cancellationToken),
+            cancellationToken);
 
     public Task<IReadOnlyList<ForumCategoryItem>> GetForumCategoriesAsync(CancellationToken cancellationToken = default) =>
         GetOrCreateAsync(
             PublicQueryCacheKeys.ForumCategories,
             options.Value.ForumStatsCacheDuration,
-            () => forumRepository.GetCategoriesAsync(cancellationToken));
+            () => forumRepository.GetCategoriesAsync(cancellationToken),
+            cancellationToken);
 
     public Task<int> GetForumThreadCountAsync(CancellationToken cancellationToken = default) =>
         GetOrCreateAsync(
             PublicQueryCacheKeys.ForumThreadCount,
             options.Value.ForumStatsCacheDuration,
-            () => forumRepository.GetTotalThreadCountAsync(cancellationToken));
+            () => forumRepository.GetTotalThreadCountAsync(cancellationToken),
+            cancellationToken);
 
     public Task<IReadOnlyList<QueenHistoryEvent>> GetOnThisDayAsync(
         DateOnly date,
@@ -68,7 +73,8 @@ public sealed class PublicQueryCacheService(
         GetOrCreateAsync(
             PublicQueryCacheKeys.OnThisDay(date, count),
             options.Value.OnThisDayCacheDuration,
-            () => queenHistoryRepository.GetOnThisDayAsync(date, count, cancellationToken));
+            () => queenHistoryRepository.GetOnThisDayAsync(date, count, cancellationToken),
+            cancellationToken);
 
     public Task<IReadOnlyList<QueenHistoryEvent>> GetAroundThisDayAsync(
         DateOnly date,
@@ -78,7 +84,8 @@ public sealed class PublicQueryCacheService(
         GetOrCreateAsync(
             PublicQueryCacheKeys.AroundThisDay(date, dayWindow, count),
             options.Value.OnThisDayCacheDuration,
-            () => queenHistoryRepository.GetAroundThisDayAsync(date, dayWindow, count, cancellationToken));
+            () => queenHistoryRepository.GetAroundThisDayAsync(date, dayWindow, count, cancellationToken),
+            cancellationToken);
 
     public Task<IReadOnlyList<PhotoCategory>> GetPhotoCategoriesAsync(CancellationToken cancellationToken = default)
     {
@@ -86,7 +93,8 @@ public sealed class PublicQueryCacheService(
         return GetOrCreateAsync(
             PublicQueryCacheKeys.PhotoCategories(version),
             options.Value.PhotoCacheDuration,
-            () => photoRepository.GetCategoriesAsync(cancellationToken));
+            () => photoRepository.GetCategoriesAsync(cancellationToken),
+            cancellationToken);
     }
 
     public async Task<PhotoCategory?> GetPhotoCategoryBySlugAsync(
@@ -108,7 +116,8 @@ public sealed class PublicQueryCacheService(
         return GetOrCreateAsync(
             PublicQueryCacheKeys.PhotoCategoryPage(version, catId, page, pageSize),
             options.Value.PhotoCacheDuration,
-            () => photoRepository.GetCategoryPageAsync(catId, page, pageSize, cancellationToken));
+            () => photoRepository.GetCategoryPageAsync(catId, page, pageSize, cancellationToken),
+            cancellationToken);
     }
 
     /// <summary>
@@ -158,7 +167,8 @@ public sealed class PublicQueryCacheService(
     private async Task<T> GetOrCreateAsync<T>(
         string key,
         TimeSpan duration,
-        Func<Task<T>> factory)
+        Func<Task<T>> factory,
+        CancellationToken cancellationToken)
     {
         if (cache.TryGetValue(key, out T? cached) && cached is not null)
         {
@@ -166,7 +176,7 @@ public sealed class PublicQueryCacheService(
         }
 
         var gate = loadGates.GetOrAdd(key, static _ => new SemaphoreSlim(1, 1));
-        await gate.WaitAsync().ConfigureAwait(false);
+        await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             if (cache.TryGetValue(key, out cached) && cached is not null)

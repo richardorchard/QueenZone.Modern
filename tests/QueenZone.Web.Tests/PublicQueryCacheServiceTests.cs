@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using QueenZone.Data;
 using QueenZone.Web;
@@ -213,6 +214,42 @@ public sealed class PublicQueryCacheServiceTests
     }
 
     [Fact]
+    public async Task Waiting_for_busy_cache_key_observes_cancellation()
+    {
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var newsRepository = new BlockingNewsRepository();
+        var service = CreateService(memoryCache, newsRepository: newsRepository);
+
+        var first = service.GetLatestNewsAsync(5);
+        await newsRepository.WaitUntilEnteredAsync();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromMilliseconds(50));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            service.GetLatestNewsAsync(5, timeout.Token));
+
+        newsRepository.Release();
+        _ = await first;
+    }
+
+    [Fact]
+    public async Task PublicWarmupService_times_out_slow_cache_prime()
+    {
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var newsRepository = new CancellationBlockingNewsRepository();
+        var cache = CreateService(memoryCache, newsRepository: newsRepository);
+        var warmup = new PublicWarmupService(
+            cache,
+            TimeProvider.System,
+            NullLogger<PublicWarmupService>.Instance,
+            TimeSpan.FromMilliseconds(50));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            warmup.WarmPublicCachesAsync());
+
+        await newsRepository.WaitUntilEnteredAsync();
+    }
+
+    [Fact]
     public async Task OnThisDayCacheVariesByDateAndCount()
     {
         using var memoryCache = new MemoryCache(new MemoryCacheOptions());
@@ -286,6 +323,41 @@ public sealed class PublicQueryCacheServiceTests
             CancellationToken cancellationToken = default)
         {
             await Task.Delay(delay, cancellationToken);
+            return await base.GetLatestAsync(count, cancellationToken);
+        }
+    }
+
+    private sealed class BlockingNewsRepository : CountingNewsRepository
+    {
+        private readonly TaskCompletionSource entered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task WaitUntilEnteredAsync() => entered.Task;
+
+        public void Release() => release.TrySetResult();
+
+        public override async Task<IReadOnlyList<NewsItem>> GetLatestAsync(
+            int count,
+            CancellationToken cancellationToken = default)
+        {
+            entered.TrySetResult();
+            await release.Task;
+            return await base.GetLatestAsync(count, cancellationToken);
+        }
+    }
+
+    private sealed class CancellationBlockingNewsRepository : CountingNewsRepository
+    {
+        private readonly TaskCompletionSource entered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task WaitUntilEnteredAsync() => entered.Task;
+
+        public override async Task<IReadOnlyList<NewsItem>> GetLatestAsync(
+            int count,
+            CancellationToken cancellationToken = default)
+        {
+            entered.TrySetResult();
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
             return await base.GetLatestAsync(count, cancellationToken);
         }
     }
