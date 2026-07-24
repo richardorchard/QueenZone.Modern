@@ -237,6 +237,9 @@ public sealed class EfPublicReadRepositoryTests : IAsyncDisposable
         Assert.Null(newest.PreviousPicId);
         Assert.Equal(10, newest.NextPicId);
 
+        Assert.Null(await repository.GetDetailNavigationAsync(3, 9999));
+        Assert.Null(await repository.GetDetailNavigationAsync(99, 11));
+
         var all = await repository.GetCategoryAllAsync(3);
         Assert.Equal(3, all.Count);
 
