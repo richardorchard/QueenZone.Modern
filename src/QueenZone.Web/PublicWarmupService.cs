@@ -1,47 +1,90 @@
 namespace QueenZone.Web;
 
-public sealed class PublicWarmupService(
-    PublicQueryCacheService publicQueryCache,
-    TimeProvider timeProvider,
-    ILogger<PublicWarmupService> logger)
+public sealed class PublicWarmupService
 {
+    internal static readonly TimeSpan DefaultStepTimeout = TimeSpan.FromSeconds(8);
+
+    private readonly PublicQueryCacheService publicQueryCache;
+    private readonly TimeProvider timeProvider;
+    private readonly ILogger<PublicWarmupService> logger;
+    private readonly TimeSpan stepTimeout;
+
+    public PublicWarmupService(
+        PublicQueryCacheService publicQueryCache,
+        TimeProvider timeProvider,
+        ILogger<PublicWarmupService> logger)
+        : this(publicQueryCache, timeProvider, logger, DefaultStepTimeout)
+    {
+    }
+
+    internal PublicWarmupService(
+        PublicQueryCacheService publicQueryCache,
+        TimeProvider timeProvider,
+        ILogger<PublicWarmupService> logger,
+        TimeSpan stepTimeout)
+    {
+        this.publicQueryCache = publicQueryCache;
+        this.timeProvider = timeProvider;
+        this.logger = logger;
+        this.stepTimeout = stepTimeout;
+    }
+
     public async Task WarmPublicCachesAsync(CancellationToken cancellationToken = default)
     {
         var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
 
         await WarmStepAsync(
             "latest-news",
-            () => publicQueryCache.GetLatestNewsAsync(5, cancellationToken));
+            stepToken => publicQueryCache.GetLatestNewsAsync(5, stepToken),
+            cancellationToken);
         await WarmStepAsync(
             "news-count",
-            () => publicQueryCache.GetNewsPublishedCountAsync(cancellationToken));
+            publicQueryCache.GetNewsPublishedCountAsync,
+            cancellationToken);
         await WarmStepAsync(
             "article-count",
-            () => publicQueryCache.GetArticlePublishedCountAsync(cancellationToken));
+            publicQueryCache.GetArticlePublishedCountAsync,
+            cancellationToken);
         await WarmStepAsync(
             "forum-categories",
-            () => publicQueryCache.GetForumCategoriesAsync(cancellationToken));
+            publicQueryCache.GetForumCategoriesAsync,
+            cancellationToken);
         await WarmStepAsync(
             "forum-thread-count",
-            () => publicQueryCache.GetForumThreadCountAsync(cancellationToken));
+            publicQueryCache.GetForumThreadCountAsync,
+            cancellationToken);
         await WarmStepAsync(
             "on-this-day",
-            () => publicQueryCache.GetOnThisDayAsync(today, 3, cancellationToken));
+            stepToken => publicQueryCache.GetOnThisDayAsync(today, 3, stepToken),
+            cancellationToken);
         await WarmStepAsync(
             "around-this-day",
-            () => publicQueryCache.GetAroundThisDayAsync(today, 7, 3, cancellationToken));
+            stepToken => publicQueryCache.GetAroundThisDayAsync(today, 7, 3, stepToken),
+            cancellationToken);
         await WarmStepAsync(
             "photo-categories",
-            () => publicQueryCache.GetPhotoCategoriesAsync(cancellationToken));
+            publicQueryCache.GetPhotoCategoriesAsync,
+            cancellationToken);
     }
 
-    private async Task WarmStepAsync<T>(string stepName, Func<Task<T>> warmStep)
+    private async Task WarmStepAsync<T>(
+        string stepName,
+        Func<CancellationToken, Task<T>> warmStep,
+        CancellationToken cancellationToken)
     {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(stepTimeout);
+
         try
         {
-            _ = await warmStep();
+            _ = await warmStep(timeout.Token);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            logger.LogWarning("Public warmup timed out while priming {WarmupStep}.", stepName);
+            throw;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             throw;
         }
