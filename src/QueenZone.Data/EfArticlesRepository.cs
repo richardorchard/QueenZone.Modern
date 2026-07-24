@@ -51,7 +51,7 @@ public sealed class EfArticlesRepository : IArticlesRepository
         var rows = await dbContext.Database
             .SqlQueryRaw<ArticleRow>(latestSql, take)
             .ToListAsync(cancellationToken);
-        return rows.Select(Map).ToList();
+        return rows.Select(MapList).ToList();
     }
 
     public async Task<int> GetPublishedCountAsync(CancellationToken cancellationToken = default)
@@ -74,7 +74,7 @@ public sealed class EfArticlesRepository : IArticlesRepository
         var rows = await dbContext.Database
             .SqlQueryRaw<ArticleRow>(archivePageSql, offset, take)
             .ToListAsync(cancellationToken);
-        return rows.Select(Map).ToList();
+        return rows.Select(MapList).ToList();
     }
 
     public async Task<ArticleItem?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
@@ -83,7 +83,7 @@ public sealed class EfArticlesRepository : IArticlesRepository
             .SqlQueryRaw<ArticleRow>(byIdSql, id)
             .ToListAsync(cancellationToken);
         var row = rows.FirstOrDefault();
-        return row is null ? null : Map(row);
+        return row is null ? null : MapDetail(row);
     }
 
     public async Task<IReadOnlyList<SitemapContentEntry>> GetPublishedSitemapEntriesAsync(
@@ -92,7 +92,22 @@ public sealed class EfArticlesRepository : IArticlesRepository
             .SqlQueryRaw<SitemapContentEntry>(sitemapSql)
             .ToListAsync(cancellationToken);
 
-    private static ArticleItem Map(ArticleRow row) =>
+    /// <summary>
+    /// List/archive mapping: derive excerpt from optional body preview; never keep full body on list items.
+    /// Body may be empty when the list SQL omits it entirely.
+    /// </summary>
+    private static ArticleItem MapList(ArticleRow row) =>
+        new(
+            row.Id,
+            row.Title,
+            LegacyArticleText.GetExcerpt(row.Body),
+            string.Empty,
+            row.PublishedAt,
+            row.Source,
+            row.CategoryName,
+            row.IsPublished);
+
+    private static ArticleItem MapDetail(ArticleRow row) =>
         new(
             row.Id,
             row.Title,
