@@ -96,28 +96,60 @@ public sealed class PhotoSqlQueries
                 INNER JOIN dbo.PIC_CAT_T c ON c.cat_id = p.Cat_ID
                 WHERE p.Cat_ID = {0} AND p.PIC_ID = {1} AND p.DISPLAY = 1
                 """,
+            // Seek-friendly UNION ALL (avoids OR residual predicates that scan the whole category).
+            // Relies on IX_PIC_FILES_T_Cat_Display_Date (Cat_ID, DISPLAY, Date_time DESC, PIC_ID DESC).
             PreviousPicIdSql = """
                 SELECT TOP (1) PIC_ID AS Value
-                FROM dbo.PIC_FILES_T
-                WHERE Cat_ID = {0}
-                  AND DISPLAY = 1
-                  AND (Date_time > {1} OR (Date_time = {1} AND PIC_ID > {2}))
+                FROM (
+                    SELECT PIC_ID, Date_time
+                    FROM (
+                        SELECT TOP (1) PIC_ID, Date_time
+                        FROM dbo.PIC_FILES_T
+                        WHERE Cat_ID = {0} AND DISPLAY = 1 AND Date_time = {1} AND PIC_ID > {2}
+                        ORDER BY PIC_ID ASC
+                    ) same_ts
+                    UNION ALL
+                    SELECT PIC_ID, Date_time
+                    FROM (
+                        SELECT TOP (1) PIC_ID, Date_time
+                        FROM dbo.PIC_FILES_T
+                        WHERE Cat_ID = {0} AND DISPLAY = 1 AND Date_time > {1}
+                        ORDER BY Date_time ASC, PIC_ID ASC
+                    ) newer
+                ) neighbors
                 ORDER BY Date_time ASC, PIC_ID ASC
                 """,
             NextPicIdSql = """
                 SELECT TOP (1) PIC_ID AS Value
-                FROM dbo.PIC_FILES_T
-                WHERE Cat_ID = {0}
-                  AND DISPLAY = 1
-                  AND (Date_time < {1} OR (Date_time = {1} AND PIC_ID < {2}))
+                FROM (
+                    SELECT PIC_ID, Date_time
+                    FROM (
+                        SELECT TOP (1) PIC_ID, Date_time
+                        FROM dbo.PIC_FILES_T
+                        WHERE Cat_ID = {0} AND DISPLAY = 1 AND Date_time = {1} AND PIC_ID < {2}
+                        ORDER BY PIC_ID DESC
+                    ) same_ts
+                    UNION ALL
+                    SELECT PIC_ID, Date_time
+                    FROM (
+                        SELECT TOP (1) PIC_ID, Date_time
+                        FROM dbo.PIC_FILES_T
+                        WHERE Cat_ID = {0} AND DISPLAY = 1 AND Date_time < {1}
+                        ORDER BY Date_time DESC, PIC_ID DESC
+                    ) older
+                ) neighbors
                 ORDER BY Date_time DESC, PIC_ID DESC
                 """,
             IndexBeforeSql = """
-                SELECT COUNT(*) AS Value
-                FROM dbo.PIC_FILES_T
-                WHERE Cat_ID = {0}
-                  AND DISPLAY = 1
-                  AND (Date_time > {1} OR (Date_time = {1} AND PIC_ID > {2}))
+                SELECT
+                    (SELECT COUNT(*)
+                     FROM dbo.PIC_FILES_T
+                     WHERE Cat_ID = {0} AND DISPLAY = 1 AND Date_time > {1})
+                    +
+                    (SELECT COUNT(*)
+                     FROM dbo.PIC_FILES_T
+                     WHERE Cat_ID = {0} AND DISPLAY = 1 AND Date_time = {1} AND PIC_ID > {2})
+                    AS Value
                 """,
             SitemapSql = """
                 SELECT
@@ -192,25 +224,58 @@ public sealed class PhotoSqlQueries
                 """,
             PreviousPicIdSql = """
                 SELECT pic_id AS Value
-                FROM PhotoItems
-                WHERE cat_id = {0}
-                  AND (DATE_TIME > {1} OR (DATE_TIME = {1} AND pic_id > {2}))
+                FROM (
+                    SELECT pic_id, DATE_TIME
+                    FROM (
+                        SELECT pic_id, DATE_TIME
+                        FROM PhotoItems
+                        WHERE cat_id = {0} AND DATE_TIME = {1} AND pic_id > {2}
+                        ORDER BY pic_id ASC
+                        LIMIT 1
+                    ) same_ts
+                    UNION ALL
+                    SELECT pic_id, DATE_TIME
+                    FROM (
+                        SELECT pic_id, DATE_TIME
+                        FROM PhotoItems
+                        WHERE cat_id = {0} AND DATE_TIME > {1}
+                        ORDER BY DATE_TIME ASC, pic_id ASC
+                        LIMIT 1
+                    ) newer
+                ) neighbors
                 ORDER BY DATE_TIME ASC, pic_id ASC
                 LIMIT 1
                 """,
             NextPicIdSql = """
                 SELECT pic_id AS Value
-                FROM PhotoItems
-                WHERE cat_id = {0}
-                  AND (DATE_TIME < {1} OR (DATE_TIME = {1} AND pic_id < {2}))
+                FROM (
+                    SELECT pic_id, DATE_TIME
+                    FROM (
+                        SELECT pic_id, DATE_TIME
+                        FROM PhotoItems
+                        WHERE cat_id = {0} AND DATE_TIME = {1} AND pic_id < {2}
+                        ORDER BY pic_id DESC
+                        LIMIT 1
+                    ) same_ts
+                    UNION ALL
+                    SELECT pic_id, DATE_TIME
+                    FROM (
+                        SELECT pic_id, DATE_TIME
+                        FROM PhotoItems
+                        WHERE cat_id = {0} AND DATE_TIME < {1}
+                        ORDER BY DATE_TIME DESC, pic_id DESC
+                        LIMIT 1
+                    ) older
+                ) neighbors
                 ORDER BY DATE_TIME DESC, pic_id DESC
                 LIMIT 1
                 """,
             IndexBeforeSql = """
-                SELECT COUNT(*) AS Value
-                FROM PhotoItems
-                WHERE cat_id = {0}
-                  AND (DATE_TIME > {1} OR (DATE_TIME = {1} AND pic_id > {2}))
+                SELECT
+                    (SELECT COUNT(*) FROM PhotoItems WHERE cat_id = {0} AND DATE_TIME > {1})
+                    +
+                    (SELECT COUNT(*) FROM PhotoItems WHERE cat_id = {0} AND DATE_TIME = {1} AND pic_id > {2})
+                    AS Value
                 """,
             SitemapSql = """
                 SELECT
