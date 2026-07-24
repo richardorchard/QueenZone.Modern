@@ -183,12 +183,30 @@ public sealed class EfAdminNewsRepository : IAdminNewsRepository
 
     public async Task<bool> IsSlugInUseAsync(string slug, int? excludeNewsId = null, CancellationToken cancellationToken = default)
     {
-        var articles = await GetAllAsync(cancellationToken);
         var normalized = NewsSlug.Slugify(slug);
+        var rows = dbContext.NewsRows.AsNoTracking();
+        if (excludeNewsId is int excludeId)
+        {
+            rows = rows.Where(row => row.NewsId != excludeId);
+        }
 
-        return articles.Any(article =>
-            article.Id != excludeNewsId
-            && string.Equals(NewsSlug.ResolveForArticle(article), normalized, StringComparison.OrdinalIgnoreCase));
+        // Parameterized existence check against stored SLUG — never loads ARTICLE bodies.
+        var slugExists = await rows
+            .Where(row => row.Slug != null && row.Slug.Trim() != string.Empty)
+            .AnyAsync(row => row.Slug!.ToLower() == normalized, cancellationToken);
+        if (slugExists)
+        {
+            return true;
+        }
+
+        // Legacy rows without a stored slug still resolve from TITLE in the app.
+        var sluglessTitles = await rows
+            .Where(row => row.Slug == null || row.Slug.Trim() == string.Empty)
+            .Select(row => row.Title)
+            .ToListAsync(cancellationToken);
+
+        return sluglessTitles.Any(title =>
+            string.Equals(NewsSlug.Slugify(title), normalized, StringComparison.OrdinalIgnoreCase));
     }
 
     private async Task<int> GetAdminNewsTotalCountAsync(CancellationToken cancellationToken)
