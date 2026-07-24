@@ -117,10 +117,13 @@ END;
 /*
 Candidate 3: Picture category pages.
 
-Supports Q_PIC_CAT_PAGE4_SP:
+Supports category grids and neighbor navigation:
   WHERE PIC_FILES_T.Cat_ID = @CAT_ID
     AND PIC_FILES_T.DISPLAY = 1
-  ORDER BY PIC_FILES_T.Date_time DESC
+  ORDER BY PIC_FILES_T.Date_time DESC, PIC_FILES_T.PIC_ID DESC
+
+Date_time DESC + PIC_ID DESC match the public sort so OFFSET/FETCH and TOP (1)
+neighbor seeks avoid TopN sorts.
 */
 IF NOT EXISTS (
     SELECT 1
@@ -137,7 +140,7 @@ BEGIN
         Cat_ID ASC,
         DISPLAY ASC,
         Date_time DESC,
-        PIC_ID ASC
+        PIC_ID DESC
     )
     INCLUDE
     (

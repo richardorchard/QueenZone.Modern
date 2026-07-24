@@ -1,9 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
-using QueenZone.Data;
 
 namespace QueenZone.Web.Pages.Photography;
 
-public sealed class CategoryPageModel(IPhotoRepository photoRepository) : PhotoCategoryPageModel(photoRepository)
+public sealed class CategoryPageModel(PublicQueryCacheService publicQueryCache) : PhotoCategoryPageModel(publicQueryCache)
 {
     [BindProperty(SupportsGet = true)]
     public int PageNumber { get; set; }

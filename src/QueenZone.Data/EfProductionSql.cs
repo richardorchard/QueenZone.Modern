@@ -158,9 +158,7 @@ internal static class EfProductionSql
                 WHERE Q_STAGE_ID = {id} AND DISPLAY = 1
                 """);
 
-    public static (bool UseProcs, string CategoriesSql, Func<int, string> CategoryPageSql)
-        CreatePhotoQueries() =>
-        (true, string.Empty, static _ => string.Empty);
+    public static PhotoSqlQueries CreatePhotoQueries() => PhotoSqlQueries.CreateProduction();
 
     public static Func<string, FormattableString> CreateMemberLookupSql() =>
         email => $"""

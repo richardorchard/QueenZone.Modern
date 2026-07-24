@@ -191,54 +191,64 @@ public sealed class EfPublicReadRepositoryTests : IAsyncDisposable
     }
 
     [Fact]
-    public async Task Photo_maps_categories_and_collection_without_procs()
+    public async Task Photo_maps_categories_paging_navigation_and_sitemap_without_full_collection()
     {
         dbContext.Database.ExecuteSqlRaw(
             """
             INSERT INTO PhotoCategories (cat_id, name) VALUES (3, 'Live 1986');
             INSERT INTO PhotoItems (NAME, DATE_TIME, URL, THUMB_URL, T_HEIGHT, T_WIDTH, pic_id, category_name, cat_id)
-            VALUES ('Crowd', '1986-07-12', 'crowd.jpg', 'crowd-t.jpg', 100, 150, 9, 'Live 1986', 3);
+            VALUES
+                ('Newest', '1986-07-12 00:00:00', 'n.jpg', 'n-t.jpg', 100, 150, 11, 'Live 1986', 3),
+                ('Middle', '1986-07-11 00:00:00', 'm.jpg', 'm-t.jpg', 100, 150, 10, 'Live 1986', 3),
+                ('Oldest', '1986-07-10 00:00:00', 'o.jpg', 'o-t.jpg', 100, 150, 9, 'Live 1986', 3);
             """);
 
-        var repository = new EfPhotoRepository(
-            dbContext,
-            useLegacyProcedures: false,
-            categoriesSql: "SELECT cat_id, name FROM PhotoCategories",
-            categoryPageSql: catId => $"""
-                SELECT NAME, DATE_TIME, URL, THUMB_URL, T_HEIGHT, T_WIDTH, pic_id, category_name
-                FROM PhotoItems WHERE cat_id = {catId}
-                """.ToString());
-
-        // FormattableString.ToString() expands params - use raw format with literal id for SQLite test:
-        repository = new EfPhotoRepository(
-            dbContext,
-            useLegacyProcedures: false,
-            categoriesSql: "SELECT cat_id, name FROM PhotoCategories",
-            categoryPageSql: catId =>
-                "SELECT NAME, DATE_TIME, URL, THUMB_URL, T_HEIGHT, T_WIDTH, pic_id, category_name " +
-                $"FROM PhotoItems WHERE cat_id = {catId}");
+        var repository = new EfPhotoRepository(dbContext, PhotoSqlQueries.CreateSqliteFixture());
 
         var categories = await repository.GetCategoriesAsync();
         Assert.Single(categories);
         Assert.Equal(3, categories[0].CatId);
-        Assert.Equal(1, categories[0].ImageCount);
+        Assert.Equal(3, categories[0].ImageCount);
+        Assert.NotNull(categories[0].CoverThumbnailUrl);
 
         var bySlug = await repository.GetCategoryBySlugAsync("live-1986");
         Assert.NotNull(bySlug);
 
-        var page = await repository.GetCategoryPageAsync(3, 1, 10);
-        Assert.Single(page.Items);
-        Assert.Equal(9, page.Items[0].PicId);
+        var page = await repository.GetCategoryPageAsync(3, 1, 2);
+        Assert.Equal(3, page.TotalCount);
+        Assert.Equal(2, page.Items.Count);
+        Assert.Equal(11, page.Items[0].PicId);
+        Assert.Equal(10, page.Items[1].PicId);
+
+        var page2 = await repository.GetCategoryPageAsync(3, 2, 2);
+        Assert.Single(page2.Items);
+        Assert.Equal(9, page2.Items[0].PicId);
+
+        var middle = await repository.GetDetailNavigationAsync(3, 10);
+        Assert.NotNull(middle);
+        Assert.Equal(1, middle.Index);
+        Assert.Equal(3, middle.Count);
+        Assert.Equal(11, middle.PreviousPicId);
+        Assert.Equal(9, middle.NextPicId);
+
+        var newest = await repository.GetDetailNavigationAsync(3, 11);
+        Assert.NotNull(newest);
+        Assert.Equal(0, newest.Index);
+        Assert.Null(newest.PreviousPicId);
+        Assert.Equal(10, newest.NextPicId);
+
+        Assert.Null(await repository.GetDetailNavigationAsync(3, 9999));
+        Assert.Null(await repository.GetDetailNavigationAsync(99, 11));
 
         var all = await repository.GetCategoryAllAsync(3);
-        Assert.Single(all);
+        Assert.Equal(3, all.Count);
 
         var sitemap = await repository.GetPublishedSitemapCategoriesAsync();
         Assert.Single(sitemap);
         Assert.Equal(3, sitemap[0].CatId);
         Assert.Equal("live-1986", sitemap[0].Slug);
-        Assert.Single(sitemap[0].Photos);
-        Assert.Equal(9, sitemap[0].Photos[0].PicId);
+        Assert.Equal(3, sitemap[0].Photos.Count);
+        Assert.Equal(11, sitemap[0].Photos[0].PicId);
     }
 
     [Fact]
