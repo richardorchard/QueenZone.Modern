@@ -223,6 +223,99 @@ public sealed partial class AdminNewsRoutesTests : IClassFixture<WebApplicationF
     }
 
     [Fact]
+    public async Task DuplicateSlugOnEditIsRejected()
+    {
+        var store = new SharedNewsStore(
+        [
+            new AdminNewsArticle(
+                2002,
+                "Existing article",
+                "shared-edit-slug",
+                "Existing excerpt",
+                "Existing body",
+                new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc),
+                null,
+                false,
+                DateTime.UtcNow,
+                DateTime.UtcNow,
+                AdminEmail),
+            new AdminNewsArticle(
+                2003,
+                "Editable article",
+                "editable-slug",
+                "Editable excerpt",
+                "Editable body",
+                new DateTime(2026, 6, 2, 0, 0, 0, DateTimeKind.Utc),
+                null,
+                false,
+                DateTime.UtcNow,
+                DateTime.UtcNow,
+                AdminEmail)
+        ]);
+
+        var client = CreateClient(AdminEmail, store);
+
+        var response = await PostArticleAsync(
+            client,
+            "/admin/news/2003/edit",
+            "/admin/news/2003",
+            new Dictionary<string, string>
+            {
+                ["title"] = "Editable article",
+                ["slug"] = "shared-edit-slug",
+                ["excerpt"] = "Editable excerpt",
+                ["body"] = "Editable body",
+                ["publishedAt"] = "2026-06-02"
+            });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("Slug is already in use by another article.", body);
+    }
+
+    [Fact]
+    public async Task DuplicateSlugOnPublishIsRejected()
+    {
+        var store = new SharedNewsStore(
+        [
+            new AdminNewsArticle(
+                2004,
+                "Published collision owner",
+                "publish-collision-slug",
+                "Owner excerpt",
+                "Owner body",
+                new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc),
+                null,
+                true,
+                DateTime.UtcNow,
+                DateTime.UtcNow,
+                AdminEmail),
+            new AdminNewsArticle(
+                2005,
+                "Draft with colliding slug",
+                "publish-collision-slug",
+                "Draft excerpt",
+                "Draft body",
+                new DateTime(2026, 6, 2, 0, 0, 0, DateTimeKind.Utc),
+                null,
+                false,
+                DateTime.UtcNow,
+                DateTime.UtcNow,
+                AdminEmail)
+        ]);
+
+        var client = CreateClient(AdminEmail, store);
+
+        var publishResponse = await PostActionAsync(client, "/admin/news/2005/publish");
+        Assert.Equal(HttpStatusCode.Redirect, publishResponse.StatusCode);
+        Assert.Equal("/admin/news/2005/edit", publishResponse.Headers.Location!.OriginalString);
+
+        var editBody = await client.GetStringAsync("/admin/news/2005/edit");
+        Assert.Contains("Slug is already in use by another article.", editBody);
+        Assert.Contains("admin-status--error", editBody);
+    }
+
+    [Fact]
     public async Task AuthorizedAdminCanOpenEditPage()
     {
         var store = new SharedNewsStore(

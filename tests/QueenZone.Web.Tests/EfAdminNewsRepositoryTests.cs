@@ -161,6 +161,63 @@ public sealed class EfAdminNewsRepositoryTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task IsSlugInUseAsync_detects_slugless_legacy_row_via_title()
+    {
+        dbContext.Database.ExecuteSql($"""
+            UPDATE NEWS_T SET SLUG = NULL, TITLE = 'Legacy Title Slug' WHERE NEWS_ID = 4201;
+            """);
+
+        Assert.True(await repository.IsSlugInUseAsync("legacy-title-slug"));
+        Assert.False(await repository.IsSlugInUseAsync("legacy-title-slug", excludeNewsId: 4201));
+    }
+
+    [Fact]
+    public async Task IsSlugInUseAsync_create_conflict_when_another_draft_owns_slug()
+    {
+        await repository.CreateDraftAsync(
+            new AdminNewsDraft(
+                "First draft",
+                "create-conflict-slug",
+                "Excerpt",
+                "Body",
+                new DateTime(2026, 6, 21, 0, 0, 0, DateTimeKind.Utc),
+                null),
+            "editor@test.local");
+
+        Assert.True(await repository.IsSlugInUseAsync("create-conflict-slug"));
+    }
+
+    [Fact]
+    public async Task IsSlugInUseAsync_edit_allows_same_slug_on_current_article_only()
+    {
+        dbContext.Database.ExecuteSql($"""
+            UPDATE NEWS_T SET SLUG = 'edit-own-slug' WHERE NEWS_ID = 4201;
+            """);
+        AdminNewsSqliteTestHarness.SeedArticle(dbContext, 4202, "Other article");
+        dbContext.Database.ExecuteSql($"""
+            UPDATE NEWS_T SET SLUG = 'other-slug' WHERE NEWS_ID = 4202;
+            """);
+
+        Assert.False(await repository.IsSlugInUseAsync("edit-own-slug", excludeNewsId: 4201));
+        Assert.True(await repository.IsSlugInUseAsync("other-slug", excludeNewsId: 4201));
+    }
+
+    [Fact]
+    public async Task IsSlugInUseAsync_publish_conflict_when_resolved_slug_collides()
+    {
+        dbContext.Database.ExecuteSql($"""
+            UPDATE NEWS_T SET SLUG = 'publish-collision' WHERE NEWS_ID = 4201;
+            """);
+        AdminNewsSqliteTestHarness.SeedArticle(dbContext, 4202, "Draft waiting publish");
+        dbContext.Database.ExecuteSql($"""
+            UPDATE NEWS_T SET SLUG = 'publish-collision' WHERE NEWS_ID = 4202;
+            """);
+
+        // Publishing 4202 must see 4201's colliding slug.
+        Assert.True(await repository.IsSlugInUseAsync("publish-collision", excludeNewsId: 4202));
+    }
+
+    [Fact]
     public async Task DeleteAsync_throws_when_foreign_key_blocks_delete()
     {
         dbContext.Database.ExecuteSqlRaw("PRAGMA foreign_keys = ON;");
