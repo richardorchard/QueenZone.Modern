@@ -2,45 +2,47 @@
 @model IndexModel
 @using QueenZone.Storage
 
-<h1>Photo submissions</h1>
-<p>
-  <a href="/admin">Back to admin</a>
-</p>
+<div class="admin-shell">
+  <h1>Photo submissions</h1>
+  <p>
+    <a href="/admin">Back to admin</a>
+  </p>
 
-@if (Model.Submissions.Count == 0)
-{
-  <p>No photo submissions awaiting review.</p>
-}
-else
-{
-  <table class="admin-table">
-    <thead>
-      <tr>
-        <th></th>
-        <th>Title</th>
-        <th>Submitter</th>
-        <th>Submitted</th>
-        <th>Suggested category</th>
-        <th>Status</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody>
-      @foreach (var item in Model.Submissions)
-      {
-        var thumbUrl = UgcProxyPaths.GetPath(BlobUploadContainers.Photos, item.ThumbnailBlobPath);
+  @if (Model.Submissions.Count == 0)
+  {
+    <p>No photo submissions awaiting review.</p>
+  }
+  else
+  {
+    <table class="admin-table">
+      <thead>
         <tr>
-          <td>
-            <img src="@thumbUrl" alt="" width="72" height="72" style="object-fit: cover;" />
-          </td>
-          <td>@item.Title</td>
-          <td>@item.SubmitterDisplayName</td>
-          <td>@item.SubmittedAt.ToString("u")</td>
-          <td>@(item.SuggestedCategory ?? "—")</td>
-          <td><partial name="_SubmissionStatusBadge" model="item.Status" /></td>
-          <td><a href="/admin/photo-submissions/@item.Id">Review</a></td>
+          <th></th>
+          <th>Title</th>
+          <th>Submitter</th>
+          <th>Submitted</th>
+          <th>Suggested category</th>
+          <th>Status</th>
+          <th></th>
         </tr>
-      }
-    </tbody>
-  </table>
-}
+      </thead>
+      <tbody>
+        @foreach (var item in Model.Submissions)
+        {
+          var thumbUrl = UgcProxyPaths.GetPath(BlobUploadContainers.Photos, item.ThumbnailBlobPath);
+          <tr>
+            <td>
+              <img src="@thumbUrl" alt="" width="72" height="72" style="object-fit: cover;" />
+            </td>
+            <td>@item.Title</td>
+            <td>@item.SubmitterDisplayName</td>
+            <td>@item.SubmittedAt.ToString("u")</td>
+            <td>@(item.SuggestedCategory ?? "—")</td>
+            <td><partial name="_SubmissionStatusBadge" model="item.Status" /></td>
+            <td><a href="/admin/photo-submissions/@item.Id">Review</a></td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+</div>

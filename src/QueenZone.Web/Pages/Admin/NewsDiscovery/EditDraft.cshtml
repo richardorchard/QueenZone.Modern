@@ -2,52 +2,54 @@
 @model EditDraftModel
 @inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
 
-<h1>Edit generated draft</h1>
-<p><a href="/admin/news-discovery/@Model.Id">Back to candidate review</a></p>
+<div class="admin-shell">
+  <h1>Edit generated draft</h1>
+  <p><a href="/admin/news-discovery/@Model.Id">Back to candidate review</a></p>
 
-@if (Model.Errors.Count > 0)
-{
-  <ul class="admin-errors">
-    @foreach (var error in Model.Errors)
-    {
-      <li>@error</li>
-    }
-  </ul>
-}
+  @if (Model.Errors.Count > 0)
+  {
+    <ul class="admin-errors">
+      @foreach (var error in Model.Errors)
+      {
+        <li>@error</li>
+      }
+    </ul>
+  }
 
-<form method="post" class="admin-form">
-  <input type="hidden" name="@AdminNewsDiscoveryPageModel.AntiforgeryTokenFieldName" value="@Antiforgery.GetAndStoreTokens(HttpContext).RequestToken" />
-  <label>
-    Title
-    <input type="text" name="form.title" value="@Model.Form.Title" maxlength="@NewsValidation.MaxTitleLength" required />
-  </label>
-  <label>
-    Slug
-    <input type="text" name="form.slug" value="@Model.Form.Slug" maxlength="@NewsSlug.MaxLength" />
-  </label>
-  <label>
-    Excerpt
-    <textarea name="form.excerpt" rows="3" maxlength="@NewsValidation.MaxExcerptLength" required>@Model.Form.Excerpt</textarea>
-  </label>
-  <label>
-    Body
-    <textarea name="form.body" rows="12" required>@Model.Form.Body</textarea>
-  </label>
-  <label>
-    Attribution
-    <textarea name="form.attributionText" rows="2">@Model.Form.AttributionText</textarea>
-  </label>
-  <label>
-    Source notes
-    <textarea name="form.sourceNotes" rows="2">@Model.Form.SourceNotes</textarea>
-  </label>
-  <label>
-    Confidence notes
-    <textarea name="form.confidenceNotes" rows="2">@Model.Form.ConfidenceNotes</textarea>
-  </label>
-  <label>
-    Suggested publish date
-    <input type="date" name="form.suggestedPublishAt" value="@(Model.Form.SuggestedPublishAt?.ToString("yyyy-MM-dd"))" />
-  </label>
-  <button type="submit">Save draft</button>
-</form>
+  <form method="post" class="admin-form">
+    <input type="hidden" name="@AdminNewsDiscoveryPageModel.AntiforgeryTokenFieldName" value="@Antiforgery.GetAndStoreTokens(HttpContext).RequestToken" />
+    <label>
+      Title
+      <input type="text" name="form.title" value="@Model.Form.Title" maxlength="@NewsValidation.MaxTitleLength" required />
+    </label>
+    <label>
+      Slug
+      <input type="text" name="form.slug" value="@Model.Form.Slug" maxlength="@NewsSlug.MaxLength" />
+    </label>
+    <label>
+      Excerpt
+      <textarea name="form.excerpt" rows="3" maxlength="@NewsValidation.MaxExcerptLength" required>@Model.Form.Excerpt</textarea>
+    </label>
+    <label>
+      Body
+      <textarea name="form.body" rows="12" required>@Model.Form.Body</textarea>
+    </label>
+    <label>
+      Attribution
+      <textarea name="form.attributionText" rows="2">@Model.Form.AttributionText</textarea>
+    </label>
+    <label>
+      Source notes
+      <textarea name="form.sourceNotes" rows="2">@Model.Form.SourceNotes</textarea>
+    </label>
+    <label>
+      Confidence notes
+      <textarea name="form.confidenceNotes" rows="2">@Model.Form.ConfidenceNotes</textarea>
+    </label>
+    <label>
+      Suggested publish date
+      <input type="date" name="form.suggestedPublishAt" value="@(Model.Form.SuggestedPublishAt?.ToString("yyyy-MM-dd"))" />
+    </label>
+    <button type="submit">Save draft</button>
+  </form>
+</div>
