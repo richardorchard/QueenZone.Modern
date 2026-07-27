@@ -38,6 +38,8 @@ flowchart LR
 
 Forum already follows the modern-table path. Other archive areas may stay on direct legacy reads until evidence says otherwise.
 
+**2026-07-27 evaluation (issue #334):** live timings for `NEWS_T` latest-row CTE and other public legacy reads are in `docs/performance/legacy-to-modern-eval-2026-07-27.md`. Conclusion: do **not** forum-style modernize news for performance (server page SQL ~4–33 ms; zero duplicate `NEWS_ID` groups today). Revisit only for product dual-source live news or if measurements regress.
+
 ## Candidate Modern Tables
 
 Names are placeholders.
