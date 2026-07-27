@@ -4,8 +4,11 @@ using QueenZone.Web.Pages.Admin;
 namespace QueenZone.Web;
 
 /// <summary>
-/// Loads admin dashboard tiles with independent DI scopes so EF work can run in parallel
-/// without sharing one non-thread-safe <see cref="QueenZone.Data.QueenZoneDbContext"/>.
+/// Loads admin dashboard tiles in parallel without concurrent use of one
+/// <see cref="QueenZone.Data.QueenZoneDbContext"/> (issues #322, #335).
+/// Uses independent DI scopes so each tile resolves its own scoped repositories
+/// and DbContext. For code that works with <c>QueenZoneDbContext</c> directly,
+/// prefer <c>IDbContextFactory&lt;QueenZoneDbContext&gt;</c> (registered when SQL-backed).
 /// </summary>
 public sealed class AdminDashboardService(IServiceScopeFactory scopeFactory)
 {

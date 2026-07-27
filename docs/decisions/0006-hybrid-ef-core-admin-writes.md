@@ -10,6 +10,8 @@ Amended 2026-07-09: migrated biography public reads to EF Core (`EfBiographyRepo
 
 Amended 2026-07-09: completed migration of remaining public-read repositories off Dapper onto EF Core (`SqlQuery` / `SqlQueryRaw` / EF-managed SQL Server proc calls). Removed the Dapper package reference from `QueenZone.Data`.
 
+Amended 2026-07-27: register `IDbContextFactory<QueenZoneDbContext>` alongside scoped `QueenZoneDbContext` for SQL-backed mode so parallel admin/reporting reads can use independent contexts (issue #335).
+
 ## Context
 
 ADR 0003 chose Dapper for initial legacy database access. Issue #5 added admin write workflows for `NEWS_T` and `NewsAuditLog` using hand-written SQL.
@@ -31,7 +33,7 @@ Use **EF Core as the single data-access library** in `QueenZone.Data`, while kee
 - Manage modern tables (`NewsAuditLog`, discovery, members, queen history, and similar) through EF migrations plus any required SQL bootstrap scripts.
 - Keep **all** SQL Server access inside `QueenZone.Data`. Page models and tools must not open their own connections or invent a third SQL style (tools may construct `QueenZoneDbContext` + repositories).
 
-`QueenZoneDbContext` is registered scoped. All SQL-backed repositories are scoped. In-memory repositories are still used when no SQL connection string is configured.
+`QueenZoneDbContext` is registered scoped. When SQL-backed, `IDbContextFactory<QueenZoneDbContext>` is also registered so admin/reporting code can create independent short-lived contexts for parallel reads (issue #335). Prefer the factory for direct EF work that must run concurrently; prefer independent DI scopes (as on the admin dashboard) when the work goes through scoped repositories. All SQL-backed repositories remain scoped. In-memory repositories are still used when no SQL connection string is configured.
 
 ### Access matrix (SQL-backed registrations)
 
