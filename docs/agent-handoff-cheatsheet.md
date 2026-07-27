@@ -43,7 +43,7 @@ Also fill in the **Agent** line when opening the pull request (see `.github/pull
 | **Public rendering** | Never expose hidden, deleted, moderated, draft, or private records in public output |
 | **SEO / crawlability** | Unique page titles, canonical links, and crawlable HTML matter; avoid duplicate canonical pages |
 | **Testing** | Pure logic in unit tests; route behavior in web integration tests with sample/fake data by default; report whether legacy DB checks ran |
-| **Secrets / deploy** | No secrets in git; App Service runtime uses `ConnectionStrings__QueenZoneLegacy` with SQL authentication; GitHub migrations use the separate `QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING` secret; say what was tested before merge |
+| **Secrets / deploy** | No secrets in git; Bitwarden Secrets Manager project `Queenzone Development` mirrors local/App Service development secrets for agents; App Service runtime uses `ConnectionStrings__QueenZoneLegacy`; GitHub migrations use the separate `QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING` secret; say what was tested before merge |
 | **News agent** | Worker: `QueenZone.NewsAgent.Worker` + `discover-news` flags; secrets in `appsettings.Local.json`; smoke: `scripts/Smoke-NewsAgent.bat`; review: `/admin/news-discovery`; never auto-publish to public `/news` |
 
 ## Most-Used Minimal Template
@@ -69,6 +69,17 @@ Read the TODO in [specific file] and the GitHub issue first.
 App Service: `queenzone-dev` in resource group `Queenzone-RG` (Australia East).
 
 Public hostnames: `queenzone.org`, `www.queenzone.org`, `queenzone-dev.azurewebsites.net`.
+
+### Bitwarden Secrets Manager
+
+Development agents on Richard's machines should use Bitwarden Secrets Manager for local secret access. Use the machine account that matches the host platform: `windows-codex` on Windows machines, or `mac-codex` on Macs. The project is `Queenzone Development` (`1c16fd2d-4bfb-4eb7-8357-b49400233490`).
+
+```powershell
+$env:BWS_ACCESS_TOKEN = [Environment]::GetEnvironmentVariable("BWS_ACCESS_TOKEN", "User")
+bws secret list "1c16fd2d-4bfb-4eb7-8357-b49400233490"
+```
+
+Keep App Service setting names canonical in Bitwarden (`ConnectionStrings__QueenZoneLegacy`, `AzureAd__ClientSecret`, `OPENROUTER_API_KEY`, etc.). Do not print secret values. Bitwarden is a local/recovery mirror; Azure App Service settings and GitHub environment secrets still need explicit updates when credentials rotate.
 
 ### Scale / cache (single instance — no Redis)
 
