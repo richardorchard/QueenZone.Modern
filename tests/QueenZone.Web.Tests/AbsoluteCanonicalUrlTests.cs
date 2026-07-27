@@ -24,6 +24,18 @@ public sealed class AbsoluteCanonicalUrlTests : IClassFixture<WebApplicationFact
     }
 
     [Fact]
+    public async Task HomePageUsesConfiguredPublicBaseUrlForCanonical()
+    {
+        var client = factory.CreateClient();
+
+        var home = await client.GetStringAsync("/");
+
+        Assert.Contains(
+            """<link rel="canonical" href="https://preview.queenzone.test/">""",
+            home);
+    }
+
+    [Fact]
     public async Task NewsArchiveUsesConfiguredPublicBaseUrlForCanonicalAndPaginationLinks()
     {
         var client = factory.CreateClient();

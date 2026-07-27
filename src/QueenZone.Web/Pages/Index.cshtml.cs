@@ -16,6 +16,7 @@ public sealed class IndexModel(
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
         ViewData["Title"] = "QueenZone";
+        ViewData["CanonicalPath"] = "/";
         var latest = await publicQueryCache.GetLatestNewsAsync(5, cancellationToken);
         Latest = PublicContentMapper.ToNewsArchiveItems(latest);
         var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
