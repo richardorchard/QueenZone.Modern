@@ -1,0 +1,75 @@
+@model QueenZone.Web.Pages.FreddieTribute.FreddieTributeArchivePageModel
+
+<section class="qz-section qz-freddie-tribute">
+  <div class="qz-container">
+    <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
+
+    <div class="qz-freddie-tribute__intro">
+      @if (Model.FeaturedTribute is not null)
+      {
+        <aside class="qz-freddie-feature" aria-labelledby="freddie-feature-heading">
+          <div class="qz-card__kicker">Featured tribute</div>
+          <h2 id="freddie-feature-heading">@Model.FeaturedTribute.Name</h2>
+          <blockquote>@Model.FeaturedTribute.Thought</blockquote>
+          <p class="qz-meta">
+            @Model.FeaturedTribute.DateText
+            @if (!string.IsNullOrWhiteSpace(Model.FeaturedTribute.Country))
+            {
+              <span> - @Model.FeaturedTribute.Country</span>
+            }
+          </p>
+        </aside>
+      }
+
+      @if (Model.FreddiePhotos.Count > 0)
+      {
+        <div class="qz-freddie-photos" aria-label="Selected Freddie Mercury photographs">
+          @foreach (var photo in Model.FreddiePhotos)
+          {
+            <a class="qz-freddie-photo" href="@PhotoRoutes.GetDetailPath(photo.CategorySlug, photo.PicId)">
+              <img
+                src="@photo.ThumbnailUrl"
+                alt="@photo.Title"
+                width="@photo.ThumbWidth"
+                height="@photo.ThumbHeight"
+                loading="lazy">
+            </a>
+          }
+        </div>
+      }
+    </div>
+
+    @if (Model.Tributes.Count == 0)
+    {
+      <p>No Freddie Mercury tributes are available yet.</p>
+    }
+    else
+    {
+      <p class="qz-photo-range">Showing @(((Model.CurrentPage - 1) * FreddieTributeRoutes.PageSize) + 1)&ndash;@(((Model.CurrentPage - 1) * FreddieTributeRoutes.PageSize) + Model.Tributes.Count) of @Model.TotalCount</p>
+      <ol class="qz-tribute-list">
+        @foreach (var tribute in Model.Tributes)
+        {
+          <li class="qz-tribute-row" id="tribute-@tribute.Id">
+            <div class="qz-card__kicker">@tribute.DateText</div>
+            <h2>@tribute.Name</h2>
+            <p class="qz-tribute-row__thought">@tribute.Thought</p>
+            @if (!string.IsNullOrWhiteSpace(tribute.Country) || !string.IsNullOrWhiteSpace(tribute.TimeText))
+            {
+              <p class="qz-meta">
+                @if (!string.IsNullOrWhiteSpace(tribute.Country))
+                {
+                  <span>@tribute.Country</span>
+                }
+                @if (!string.IsNullOrWhiteSpace(tribute.TimeText))
+                {
+                  <span> @tribute.TimeText</span>
+                }
+              </p>
+            }
+          </li>
+        }
+      </ol>
+      <partial name="_ArchivePagination" model="FreddieTributeRoutes.GetPaginationViewModel(Model.CurrentPage, Model.TotalPages)" />
+    }
+  </div>
+</section>

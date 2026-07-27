@@ -1,0 +1,7 @@
+@page "/freddie-mercury-tribute"
+@model IndexModel
+
+<partial name="_PageHero" model='@(("In Memoriam", "Freddie Mercury Tribute", "Messages from QueenZone visitors remembering Freddie Mercury, preserved from the legacy tribute archive.", $"{Model.TotalCount:N0} tributes"))' />
+
+<partial name="_FreddieTributeArchive" model="Model" />
+
