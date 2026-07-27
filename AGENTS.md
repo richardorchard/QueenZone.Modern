@@ -157,6 +157,17 @@ Local secrets belong in ignored files such as:
 
 Commit only examples such as `.env.example`.
 
+Bitwarden Secrets Manager is the shared local secret store for development agents on Richard's machines. Use the `bws` CLI with the user-scoped `BWS_ACCESS_TOKEN` environment variable; do not ask the user to paste the token into chat and never print it. Use the Bitwarden machine account that matches the host platform: `windows-codex` on Windows machines, or `mac-codex` on Macs. The project for this repository is `Queenzone Development` (`1c16fd2d-4bfb-4eb7-8357-b49400233490`).
+
+For local agent work, prefer reading secrets from Bitwarden instead of copying values into chat:
+
+```powershell
+$env:BWS_ACCESS_TOKEN = [Environment]::GetEnvironmentVariable("BWS_ACCESS_TOKEN", "User")
+bws secret list "1c16fd2d-4bfb-4eb7-8357-b49400233490"
+```
+
+App Service setting names are the canonical secret keys in Bitwarden, including `ConnectionStrings__QueenZoneLegacy`, `ConnectionStrings__BlobStorage`, `AzureAd__*`, `Authentication__*`, `Admin__AllowedEmails__*`, `APPLICATIONINSIGHTS_CONNECTION_STRING`, and `OPENROUTER_API_KEY`. Azure App Service settings and GitHub environment secrets remain separate stores: updating Bitwarden does not update Azure App Service or GitHub Actions secrets. When credentials rotate, update every authoritative target deliberately and verify by name plus value length, not by printing values.
+
 The deployed App Service runtime database setting is `ConnectionStrings__QueenZoneLegacy`. The current production route uses SQL authentication, stored in Azure App Service configuration, not in the repository.
 
 The GitHub environment secret `QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING` is separate and is used by the deploy workflow for EF Core migrations. Updating the GitHub secret does not update the live App Service runtime connection string. When database credentials rotate, update both places as needed and restart the App Service before verifying production.

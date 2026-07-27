@@ -54,6 +54,18 @@ Open `coverage-report/index.html` to inspect the report. Coverage reports and ra
 
 Local secrets belong in `src/QueenZone.Web/appsettings.Local.json`, which is ignored by git. You can also set `ConnectionStrings__QueenZoneLegacy` in your shell or a local `.env` file for tooling that loads dotenv values. If no `ConnectionStrings:QueenZoneLegacy` value is present, the site uses sample news data so the first slice can still run locally.
 
+Bitwarden Secrets Manager is the shared local secret store for development agents on Richard's machines. Use the Bitwarden machine account that matches the host platform: `windows-codex` on Windows machines, or `mac-codex` on Macs. The Secrets Manager project is `Queenzone Development`. The `bws` CLI should authenticate from the user-scoped `BWS_ACCESS_TOKEN` environment variable. Do not commit or print that token.
+
+Useful local commands:
+
+```powershell
+$env:BWS_ACCESS_TOKEN = [Environment]::GetEnvironmentVariable("BWS_ACCESS_TOKEN", "User")
+bws project list
+bws secret list "1c16fd2d-4bfb-4eb7-8357-b49400233490"
+```
+
+When copying settings from Bitwarden to local app settings, keep App Service setting names as canonical (`ConnectionStrings__QueenZoneLegacy`, `AzureAd__ClientSecret`, `OPENROUTER_API_KEY`, etc.) and translate to JSON sections only in ignored local files. Azure App Service settings and GitHub environment secrets remain separate runtime/deploy stores; Bitwarden mirrors them for local development and recovery, but changing Bitwarden alone does not update Azure or GitHub.
+
 ### Google Analytics dashboard traffic
 
 The admin dashboard can show GA4 traffic data when server-side credentials are configured. Local development works without these values; the dashboard shows an unavailable state instead of calling Google Analytics.
