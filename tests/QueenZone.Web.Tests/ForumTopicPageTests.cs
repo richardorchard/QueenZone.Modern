@@ -26,6 +26,7 @@ public sealed class ForumTopicPageTests : IClassFixture<WebApplicationFactory<Pr
         Assert.Contains("brightonrock", body);
         Assert.Contains("A Night at the Opera", body);
         Assert.Contains("<strong>26</strong> posts", body);
+        Assert.Contains(TestSiteConfiguration.CanonicalLink("/forum/topic/1002/ranking-every-studio-album"), body);
     }
 
     [Fact]
@@ -37,6 +38,7 @@ public sealed class ForumTopicPageTests : IClassFixture<WebApplicationFactory<Pr
 
         Assert.Contains("Page 2 of 2", body);
         Assert.Contains("Archive reply 1125", body);
+        Assert.Contains(TestSiteConfiguration.CanonicalLink("/forum/topic/1002/ranking-every-studio-album/page/2"), body);
     }
 
     [Fact]

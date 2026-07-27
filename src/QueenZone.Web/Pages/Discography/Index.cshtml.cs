@@ -12,5 +12,7 @@ public sealed class IndexModel(IDiscographyRepository discographyRepository) : P
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
         Albums = await discographyRepository.GetAlbumsAsync(cancellationToken);
+        ViewData["Title"] = "Discography | QueenZone";
+        ViewData["CanonicalPath"] = DiscographyRoutes.GetIndexPath();
     }
 }

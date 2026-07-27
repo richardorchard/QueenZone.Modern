@@ -68,6 +68,7 @@ public sealed class BreadcrumbTests : IClassFixture<WebApplicationFactory<Progra
         Assert.Contains(">Photography<", body);
         Assert.Contains("aria-current=\"page\">Brian May</span>", body);
         Assert.Contains("\"@type\":\"BreadcrumbList\"", body);
+        Assert.Contains(TestSiteConfiguration.CanonicalLink("/photography/brian-may"), body);
     }
 
     [Fact]
@@ -84,6 +85,7 @@ public sealed class BreadcrumbTests : IClassFixture<WebApplicationFactory<Progra
         Assert.Contains(">Brian May<", body);
         Assert.Contains("aria-current=\"page\">Brian in action with his guitar</span>", body);
         Assert.Contains("\"@type\":\"BreadcrumbList\"", body);
+        Assert.Contains(TestSiteConfiguration.CanonicalLink("/photography/brian-may/101"), body);
     }
 
     [Fact]
