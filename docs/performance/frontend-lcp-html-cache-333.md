@@ -19,26 +19,47 @@ powershell -File .\scripts\Measure-FrontendPerformance.ps1 -StartLocalApp -FormF
 
 Compare medians for `/`, `/news`, a news/article detail path, and `/forum` against `frontend-performance-budgets.json`. Paste before/after tables in the PR.
 
-## Post-change lab capture (local sample data)
+## Before / after lab capture (local sample data, `-Runs 3`)
 
-Command (after change on this branch):
+Same machine, same command, consecutive runs:
 
 ```powershell
-powershell -File .\scripts\Measure-FrontendPerformance.ps1 -StartLocalApp -FormFactor mobile -Paths "/,/news,/forum" -Runs 1
+powershell -File .\scripts\Measure-FrontendPerformance.ps1 -StartLocalApp -FormFactor mobile -Paths "/,/news,/forum" -Runs 3
 ```
 
-| Path | Factor | LCP (ms) | CLS | Transfer | Requests | TTFB (ms) | Budget |
-| --- | --- | ---: | ---: | ---: | ---: | ---: | --- |
-| `/` | mobile | 3092 | 0.00 | 707.7 KB | 18 | 393 | LCP OVER (others ok) |
-| `/news` | mobile | 2559 | 0.00 | 261.2 KB | 13 | 58 | LCP OVER (~2%) |
-| `/forum` | mobile | 2556 | 0.00 | 256.0 KB | 13 | 29 | LCP OVER (~2%) |
+| Ref | Commit |
+| --- | --- |
+| **Before** | `origin/main` @ `4002d97` |
+| **After** | `grok/frontend-lcp-cache-headers` @ `998d5dd` |
 
-Notes:
+### Median of 3 mobile first-load runs
 
-- Single local run with simulated mobile throttling; Lighthouse chrome-launcher `EPERM` cleanup noise on Windows (reports still usable). Prefer `-Runs 3` median for PR comparison vs `main`.
-- CLS is **0** on all three paths after width/height emission.
-- Transfer and request counts sit well under budgets; homepage weight remains hero-dominated as expected.
-- LCP slightly over the advisory 2500 ms mobile budget on cold local publish — document, do not treat as a merge gate. Re-check on `queenzone-dev` / production if needed.
+| Path | Metric | Before (main) | After (branch) | Δ |
+| --- | --- | ---: | ---: | ---: |
+| `/` | LCP (ms) | 3082 | 3082 | 0 |
+| `/` | CLS | 0.00 | 0.00 | 0 |
+| `/` | Transfer | 707.3 KB | 707.7 KB | ~+0.4 KB |
+| `/` | Requests | 18 | 18 | 0 |
+| `/` | Perf score | 92 | 92 | 0 |
+| `/news` | LCP (ms) | 2556 | 2555 | −1 |
+| `/news` | CLS | 0.00 | 0.00 | 0 |
+| `/news` | Transfer | 261.1 KB | 261.2 KB | ~+0.1 KB |
+| `/news` | Requests | 13 | 13 | 0 |
+| `/news` | Perf score | 95 | 96 | +1 |
+| `/forum` | LCP (ms) | 2557 | 2555 | −2 |
+| `/forum` | CLS | 0.00 | 0.00 | 0 |
+| `/forum` | Transfer | 255.8 KB | 256.0 KB | ~+0.2 KB |
+| `/forum` | Requests | 13 | 13 | 0 |
+| `/forum` | Perf score | 95 | 96 | +1 |
+
+Raw run folders (gitignored): `docs/performance/results/2026-07-27-161716` (before), `docs/performance/results/2026-07-27-161914` (after).
+
+### Interpretation
+
+- **No core-budget regression.** LCP/CLS/transfer/requests are effectively flat within Lighthouse noise.
+- Lab LCP remains slightly over the advisory mobile **2500 ms** cap on all three paths on both main and the branch (simulated throttling); scores 92–96. Not a merge gate.
+- This change is mostly **correctness/infra for CWV** (intrinsic dimensions, hero `fetchpriority`, short HTML `Cache-Control`, deferred analytics). Simulated Lighthouse on already-WebP design assets will not show a large LCP drop; expect more benefit in real browsers for CLS/caching/analytics contention.
+- Windows chrome-launcher still logs `EPERM` on temp cleanup; reports remain usable (documented in `frontend-performance-checks.md`).
 
 ## Expected direction
 
