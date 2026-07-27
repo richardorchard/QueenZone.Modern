@@ -76,6 +76,7 @@ var forwardedHeadersOptions = new ForwardedHeadersOptions
 forwardedHeadersOptions.KnownIPNetworks.Clear();
 forwardedHeadersOptions.KnownProxies.Clear();
 app.UseForwardedHeaders(forwardedHeadersOptions);
+app.UseCanonicalHostRedirect();
 
 if (ResponseCompressionBootstrap.IsEnabled(app.Environment))
 {
