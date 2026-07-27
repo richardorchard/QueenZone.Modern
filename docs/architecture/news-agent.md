@@ -33,6 +33,17 @@ src/
     NewsDiscovery/               # discovery candidate + draft review queue
 ```
 
+### DI split (issue #336)
+
+| Host | Registration | What it includes |
+| --- | --- | --- |
+| `QueenZone.Web` | `AddQueenZoneNewsAgentWeb` | OpenRouter client, budget guard, draft generation (admin “regenerate draft” only) |
+| `QueenZone.NewsAgent.Worker` | `AddQueenZoneNewsAgentWorker` | Full pipeline: discovery HTTP + source fetchers, triage, draft, `DiscoverNewsWorker` |
+
+The public web host does **not** register outbound feed fetchers, SSRF-gated discovery HTTP, triage, or the discover-news worker. Review queue pages use `QueenZone.Data` repositories; only draft regeneration needs the editorial AI surface.
+
+`AddQueenZoneNewsAgent` remains as an alias of the worker registration for tests and tooling.
+
 Source registry: `src/QueenZone.NewsAgent/news-discovery-sources.json` (seeded into the database with `--seed-sources`).
 
 ## Local setup

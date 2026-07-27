@@ -52,6 +52,15 @@ public sealed class QueenZoneWebCompositionTests
 
         Assert.Equal(["admin@test.local"], provider.GetRequiredService<IOptions<AdminOptions>>().Value.AllowedEmails);
         Assert.Equal("https://www.queenzone.org", provider.GetRequiredService<IOptions<SiteOptions>>().Value.PublicBaseUrl);
+
+        // #336: web composition uses editorial AI surface only (not discovery worker pipeline).
+        using (var newsScope = provider.CreateScope())
+        {
+            Assert.NotNull(newsScope.ServiceProvider.GetRequiredService<NewsDraftGenerationService>());
+            Assert.Null(newsScope.ServiceProvider.GetService<DiscoverNewsWorker>());
+            Assert.Null(newsScope.ServiceProvider.GetService<NewsDiscoveryService>());
+            Assert.Empty(newsScope.ServiceProvider.GetServices<INewsSourceFetcher>());
+        }
     }
 
     [Fact]
