@@ -32,6 +32,7 @@ internal sealed class AdminEfWebTestHarness : IAsyncDisposable
             {
                 services.RemoveAll<QueenZoneDbContext>();
                 services.RemoveAll<DbContextOptions<QueenZoneDbContext>>();
+                services.RemoveAll<IDbContextFactory<QueenZoneDbContext>>();
                 services.RemoveAll<IAdminNewsRepository>();
                 services.RemoveAll<INewsAuditRepository>();
                 services.RemoveAll<INewsDiscoveryRepository>();
@@ -47,7 +48,9 @@ internal sealed class AdminEfWebTestHarness : IAsyncDisposable
                 services.RemoveAll<IArticleRepository>();
                 services.AddSingleton<IArticleRepository, EmptyArticleRepository>();
 
-                services.AddDbContext<QueenZoneDbContext>(options => options.UseSqlite(connection));
+                services.AddDbContextFactory<QueenZoneDbContext>(options => options.UseSqlite(connection));
+                services.AddScoped(sp =>
+                    sp.GetRequiredService<IDbContextFactory<QueenZoneDbContext>>().CreateDbContext());
                 services.AddScoped<IAdminNewsRepository>(sp =>
                 {
                     var dbContext = sp.GetRequiredService<QueenZoneDbContext>();
