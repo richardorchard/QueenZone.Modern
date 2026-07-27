@@ -5,11 +5,24 @@
     var pathBase = ViewContext.HttpContext.Request.PathBase;
     var versionedSrc = VersionedStaticPath.Apply(FileVersionProvider, pathBase, Model.Src);
     var webpSrc = VersionedStaticPath.TryGetVersionedWebpSrc(FileVersionProvider, HostEnv, pathBase, Model.Src);
+    var dimensions = DesignSystemImageDimensions.TryGet(Model.Src);
+    var fetchPriority = PictureImageAttributes.ResolveFetchPriority(Model.Src, Model.Lazy);
+    var loading = Model.Lazy ? "lazy" : "eager";
+    var extraAttributes = new System.Text.StringBuilder();
+    if (dimensions is (int width, int height))
+    {
+        extraAttributes.Append(System.Globalization.CultureInfo.InvariantCulture, $" width=\"{width}\" height=\"{height}\"");
+    }
+
+    if (!string.IsNullOrEmpty(fetchPriority))
+    {
+        extraAttributes.Append(System.Globalization.CultureInfo.InvariantCulture, $" fetchpriority=\"{fetchPriority}\"");
+    }
 }
 <picture class="@Model.CssClass">
   @if (webpSrc is not null)
   {
     <source srcset="@webpSrc" type="image/webp">
   }
-  <img src="@versionedSrc" alt="@Model.Alt" loading="@(Model.Lazy ? "lazy" : "eager")" decoding="async">
+  <img src="@versionedSrc" alt="@Model.Alt" loading="@loading" decoding="async"@Html.Raw(extraAttributes) />
 </picture>
