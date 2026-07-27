@@ -17,6 +17,7 @@ public sealed class SitemapXmlWriterTests
             BaseUrl);
 
         Assert.Contains("<loc>https://www.queenzone.org/news</loc>", xml);
+        Assert.StartsWith("<?xml version=\"1.0\" encoding=\"utf-8\"?>", xml);
         Assert.Contains("<loc>https://www.queenzone.org/news/1003/queenzone-modernisation-begins</loc>", xml);
         Assert.Contains("<lastmod>2026-06-11</lastmod>", xml);
         Assert.Contains("xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\"", xml);
@@ -30,6 +31,7 @@ public sealed class SitemapXmlWriterTests
             BaseUrl);
 
         Assert.Contains("<sitemapindex", xml);
+        Assert.StartsWith("<?xml version=\"1.0\" encoding=\"utf-8\"?>", xml);
         Assert.Contains("<loc>https://www.queenzone.org/sitemap-core.xml</loc>", xml);
         Assert.Contains("<lastmod>2026-06-24</lastmod>", xml);
     }

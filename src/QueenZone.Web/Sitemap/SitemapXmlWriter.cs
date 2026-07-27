@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.IO;
 using System.Text;
 using System.Xml;
 
@@ -12,7 +13,8 @@ public static class SitemapXmlWriter
     {
         var settings = CreateWriterSettings();
         var builder = new StringBuilder();
-        using (var writer = XmlWriter.Create(builder, settings))
+        using (var stringWriter = new Utf8StringWriter(builder))
+        using (var writer = XmlWriter.Create(stringWriter, settings))
         {
             writer.WriteStartDocument();
             writer.WriteStartElement("urlset", SitemapNamespace);
@@ -39,7 +41,8 @@ public static class SitemapXmlWriter
     {
         var settings = CreateWriterSettings();
         var builder = new StringBuilder();
-        using (var writer = XmlWriter.Create(builder, settings))
+        using (var stringWriter = new Utf8StringWriter(builder))
+        using (var writer = XmlWriter.Create(stringWriter, settings))
         {
             writer.WriteStartDocument();
             writer.WriteStartElement("sitemapindex", SitemapNamespace);
@@ -73,4 +76,9 @@ public static class SitemapXmlWriter
 
     internal static string FormatLastModified(DateTime value) =>
         value.ToUniversalTime().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+    private sealed class Utf8StringWriter(StringBuilder builder) : StringWriter(builder, CultureInfo.InvariantCulture)
+    {
+        public override Encoding Encoding => Encoding.UTF8;
+    }
 }
