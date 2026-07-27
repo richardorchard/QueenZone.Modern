@@ -33,8 +33,15 @@ public sealed class GoogleAnalyticsTests : IClassFixture<WebApplicationFactory<P
 
         var body = await client.GetStringAsync("/forum");
 
-        Assert.Contains($"https://www.googletagmanager.com/gtag/js?id={MeasurementId}", body);
-        Assert.Contains($"gtag('config', '{MeasurementId}');", body);
+        // Deferred idle/load loader (not a blocking head script) still embeds the tag URL + config.
+        Assert.Contains($"https://www.googletagmanager.com/gtag/js?id=", body);
+        Assert.Contains(MeasurementId, body);
+        Assert.Contains("requestIdleCallback", body);
+        Assert.Contains("gtag('config', measurementId);", body);
+        // Must not sit in <head> ahead of critical CSS/fonts.
+        var headEnd = body.IndexOf("</head>", StringComparison.OrdinalIgnoreCase);
+        var analyticsMarker = body.IndexOf("requestIdleCallback", StringComparison.Ordinal);
+        Assert.True(headEnd > 0 && analyticsMarker > headEnd, "Analytics loader should appear after </head>.");
     }
 
     [Fact]
