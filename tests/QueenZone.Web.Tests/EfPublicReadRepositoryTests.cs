@@ -437,6 +437,92 @@ public sealed class EfPublicReadRepositoryTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task AdminFreddieTributes_maps_filters_duplicate_counts_and_detail()
+    {
+        dbContext.Database.ExecuteSqlRaw(
+            """
+            INSERT INTO FreddieTributes (Id, Name, Thought, Email, DateText, TimeText, Country, Display)
+            VALUES
+                (20, 'Visible', 'Repeated', 'visible@example.test', '24 November 2001', '08:00', 'UK', 1),
+                (21, 'Visible', 'Repeated', 'visible2@example.test', '24 November 2001', '08:01', 'UK', 1),
+                (22, 'Hidden', 'Filtered', 'hidden@example.test', '24 November 2001', NULL, 'US', 0);
+            """);
+
+        const string pageSql = """
+            WITH Filtered AS
+            (
+                SELECT
+                    Id,
+                    COALESCE(TRIM(Name), 'Anonymous') AS Name,
+                    TRIM(Thought) AS Thought,
+                    NULLIF(TRIM(COALESCE(Country, '')), '') AS Country,
+                    TRIM(DateText) AS DateText,
+                    NULLIF(TRIM(COALESCE(TimeText, '')), '') AS TimeText,
+                    Display = 1 AS IsVisible,
+                    COUNT(*) OVER (
+                        PARTITION BY UPPER(TRIM(COALESCE(Name, ''))), UPPER(TRIM(COALESCE(Thought, '')))
+                    ) AS DuplicateCount
+                FROM FreddieTributes
+                WHERE ({2} IS NULL OR Display = {2})
+                  AND ({3} IS NULL OR Name LIKE '%' || {3} || '%' OR Thought LIKE '%' || {3} || '%' OR Country LIKE '%' || {3} || '%')
+            )
+            SELECT Id, Name, Thought, Country, DateText, TimeText, IsVisible, DuplicateCount
+            FROM Filtered
+            WHERE ({4} = 0 OR DuplicateCount > 1)
+            ORDER BY Id DESC
+            LIMIT {1} OFFSET {0}
+            """;
+        const string countSql = """
+            WITH Filtered AS
+            (
+                SELECT
+                    Id,
+                    COUNT(*) OVER (
+                        PARTITION BY UPPER(TRIM(COALESCE(Name, ''))), UPPER(TRIM(COALESCE(Thought, '')))
+                    ) AS DuplicateCount
+                FROM FreddieTributes
+                WHERE ({0} IS NULL OR Display = {0})
+                  AND ({1} IS NULL OR Name LIKE '%' || {1} || '%' OR Thought LIKE '%' || {1} || '%' OR Country LIKE '%' || {1} || '%')
+            )
+            SELECT COUNT(*) AS Value
+            FROM Filtered
+            WHERE ({2} = 0 OR DuplicateCount > 1)
+            """;
+        const string byIdSql = """
+            SELECT
+                Id,
+                COALESCE(TRIM(Name), 'Anonymous') AS Name,
+                TRIM(Thought) AS Thought,
+                NULLIF(TRIM(COALESCE(Country, '')), '') AS Country,
+                TRIM(DateText) AS DateText,
+                NULLIF(TRIM(COALESCE(TimeText, '')), '') AS TimeText,
+                Display = 1 AS IsVisible,
+                COUNT(*) OVER (
+                    PARTITION BY UPPER(TRIM(COALESCE(Name, ''))), UPPER(TRIM(COALESCE(Thought, '')))
+                ) AS DuplicateCount
+            FROM FreddieTributes
+            WHERE Id = {0}
+            """;
+
+        var repository = new EfAdminFreddieTributeRepository(dbContext, pageSql, countSql, byIdSql);
+
+        var duplicates = await repository.GetPageAsync(
+            new AdminFreddieTributeListFilter(true, "Repeated", DuplicatesOnly: true),
+            1,
+            10);
+
+        Assert.Equal(2, duplicates.TotalCount);
+        Assert.Equal(21, duplicates.Items[0].Id);
+        Assert.True(duplicates.Items[0].IsVisible);
+        Assert.Equal(2, duplicates.Items[0].DuplicateCount);
+
+        var hidden = await repository.GetByIdAsync(22);
+        Assert.NotNull(hidden);
+        Assert.False(hidden.IsVisible);
+        Assert.Null(hidden.TimeText);
+    }
+
+    [Fact]
     public void Article_production_sql_splits_list_and_detail_body_projections()
     {
         var queries = EfProductionSql.CreateArticlesQueries();

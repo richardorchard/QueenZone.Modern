@@ -2324,6 +2324,30 @@ body.qz-menu-lock .qz-masthead {
   padding-left: 1.25rem;
 }
 
+.admin-inline-form {
+  display: inline;
+}
+
+.admin-danger-action {
+  color: var(--qz-burgundy);
+}
+
+.admin-checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.admin-checkbox-label input {
+  width: auto;
+  margin: 0;
+}
+
+.admin-freddie-tributes-table__thought {
+  max-width: 34rem;
+  white-space: normal;
+}
+
 .admin-review-pre {
   white-space: pre-wrap;
   font-family: Consolas, monospace;

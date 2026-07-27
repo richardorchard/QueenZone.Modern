@@ -5,6 +5,7 @@ public static class SampleFreddieTributeData
     public static IReadOnlyList<FreddieTribute> CreateSeedTributes() =>
     [
         new(1012, "Maya", "Freddie, your voice still finds the exact place where joy and sorrow meet. Thank you for teaching us to be fearless.", "India", "24 November 2001", "21:18"),
+        new(1013, "Maya", "Freddie, your voice still finds the exact place where joy and sorrow meet. Thank you for teaching us to be fearless.", "India", "24 November 2001", "21:19"),
         new(1011, "Chris", "You made every outsider feel like there was a spotlight waiting somewhere. We still hear you.", "United Kingdom", "24 November 2001", "20:02"),
         new(1010, "Lucia", "No singer has ever made a stadium feel so intimate. I grew up with your songs and still turn to them when I need courage.", "Argentina", "24 November 2001", "19:44"),
         new(1009, "Daniel", "The music never became old. It became part of the furniture of my life, always there, always shining.", "Canada", "24 November 2001", "18:35"),
@@ -19,4 +20,3 @@ public static class SampleFreddieTributeData
         new(1000, "Ana", "A beautiful voice, a brilliant writer, and a spirit that still refuses to sit quietly in the past.", "Brazil", "23 November 2001", "22:50"),
     ];
 }
-
