@@ -23,6 +23,31 @@
   {
     <meta name="description" content="@description">
   }
+  @if (ViewData["CanonicalPath"] is string ogCanonicalPath)
+  {
+    var ogType = ViewData["OgType"] is string ot ? ot : "website";
+    <meta property="og:site_name" content="QueenZone">
+    <meta property="og:type" content="@ogType">
+    <meta property="og:url" content="@SiteUrl.ToAbsolute(SiteOptionsAccessor.Value.PublicBaseUrl, ogCanonicalPath)">
+    if (ViewData["Title"] is string ogTitle)
+    {
+      <meta property="og:title" content="@ogTitle">
+    }
+    if (ViewData["Description"] is string ogDesc)
+    {
+      <meta property="og:description" content="@ogDesc">
+    }
+    if (ViewData["OgImage"] is string ogImage)
+    {
+      <meta property="og:image" content="@ogImage">
+      <meta name="twitter:card" content="summary_large_image">
+      <meta name="twitter:image" content="@ogImage">
+    }
+    else
+    {
+      <meta name="twitter:card" content="summary">
+    }
+  }
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
