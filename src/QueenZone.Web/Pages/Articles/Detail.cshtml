@@ -1,6 +1,13 @@
 @page "/articles/{id:int}/{slug}"
 @model DetailModel
 
+@section Head {
+  @if (!string.IsNullOrWhiteSpace(Model.StructuredDataJson))
+  {
+    <script type="application/ld+json">@Html.Raw(Model.StructuredDataJson)</script>
+  }
+}
+
 @if (Model.Item is not null)
 {
   <section class="qz-article-hero">

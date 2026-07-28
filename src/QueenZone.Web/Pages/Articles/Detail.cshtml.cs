@@ -1,12 +1,17 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.Extensions.Options;
 using QueenZone.Data;
 
 namespace QueenZone.Web.Pages.Articles;
 
-public sealed class DetailModel(IArticlesRepository articlesRepository) : PageModel
+public sealed class DetailModel(
+    IArticlesRepository articlesRepository,
+    IOptions<SiteOptions> siteOptions) : PageModel
 {
     public ArticleDetailItem? Item { get; private set; }
+
+    public string StructuredDataJson { get; private set; } = string.Empty;
 
     public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
 
@@ -25,11 +30,20 @@ public sealed class DetailModel(IArticlesRepository articlesRepository) : PageMo
             return RedirectPermanent(detail.DetailPath);
         }
 
+        var canonicalPath = ArticleContent.GetDetailCanonicalPath(detail.Id, detail.Title);
+
         Item = detail;
         Breadcrumbs = [BreadcrumbItem.Home, new BreadcrumbItem("Articles", "/articles"), new BreadcrumbItem(detail.Title, detail.DetailPath)];
         ViewData["Title"] = $"{detail.Title} | QueenZone articles";
-        ViewData["CanonicalPath"] = ArticleContent.GetDetailCanonicalPath(detail.Id, detail.Title);
+        ViewData["CanonicalPath"] = canonicalPath;
         ViewData["Description"] = detail.Excerpt;
+
+        StructuredDataJson = EditorialJsonLd.BuildArticle(
+            detail.Title,
+            canonicalPath,
+            detail.PublishedAt,
+            detail.Excerpt,
+            siteOptions.Value.PublicBaseUrl);
 
         return Page();
     }
