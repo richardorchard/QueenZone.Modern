@@ -1,0 +1,136 @@
+@page "/admin/freddie-tributes"
+@model IndexModel
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@{
+  var antiforgeryToken = Antiforgery.GetAndStoreTokens(HttpContext).RequestToken ?? string.Empty;
+  var tributes = Model.Tributes;
+}
+
+<div class="admin-shell">
+  <h1>Freddie tributes</h1>
+  <p>
+    <a href="/admin">Back to admin</a>
+    &middot;
+    <a href="/freddie-mercury-tribute" target="_blank" rel="noopener">View public archive</a>
+  </p>
+
+  @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+  {
+    <p class="qz-account-notice qz-account-notice--@(Model.StatusMessageKind == "error" ? "error" : "success")" role="status">
+      @Model.StatusMessage
+    </p>
+  }
+
+  <form method="get" class="admin-form" style="margin-bottom: 1.5rem;">
+    <label>
+      Visibility
+      <select name="visibility">
+        <option value="">All</option>
+        @if (Model.Visibility == "visible")
+        {
+          <option value="visible" selected>Visible</option>
+        }
+        else
+        {
+          <option value="visible">Visible</option>
+        }
+        @if (Model.Visibility == "hidden")
+        {
+          <option value="hidden" selected>Hidden</option>
+        }
+        else
+        {
+          <option value="hidden">Hidden</option>
+        }
+      </select>
+    </label>
+    <label>
+      Search
+      <input type="search" name="q" value="@Model.Q" />
+    </label>
+    <label class="admin-checkbox-label">
+      <input type="checkbox" name="duplicatesOnly" value="true" checked="@Model.DuplicatesOnly" />
+      Possible duplicates only
+    </label>
+    <button type="submit">Filter</button>
+  </form>
+
+  @if (tributes is null || tributes.Items.Count == 0)
+  {
+    <p>No Freddie tributes matched the current filters.</p>
+  }
+  else
+  {
+    <table class="admin-table admin-freddie-tributes-table">
+      <thead>
+        <tr>
+          <th>Id</th>
+          <th>Name</th>
+          <th>Tribute</th>
+          <th>Country</th>
+          <th>Date</th>
+          <th>Visibility</th>
+          <th>Duplicate</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @foreach (var item in tributes.Items)
+        {
+          <tr>
+            <td>@item.Id</td>
+            <td>@item.Name</td>
+            <td class="admin-freddie-tributes-table__thought">@item.Thought</td>
+            <td>@item.Country</td>
+            <td>
+              @item.DateText
+              @if (!string.IsNullOrWhiteSpace(item.TimeText))
+              {
+                <span>@item.TimeText</span>
+              }
+            </td>
+            <td>@(item.IsVisible ? "Visible" : "Hidden")</td>
+            <td>@(item.DuplicateCount > 1 ? $"{item.DuplicateCount} matches" : "")</td>
+            <td>
+              @if (item.IsVisible)
+              {
+                <form method="post" action="/admin/freddie-tributes/@item.Id/hide" class="admin-inline-form">
+                  <input type="hidden" name="@AdminFreddieTributesPageModel.AntiforgeryTokenFieldName" value="@antiforgeryToken" />
+                  <button type="submit">Hide</button>
+                </form>
+              }
+              else
+              {
+                <form method="post" action="/admin/freddie-tributes/@item.Id/show" class="admin-inline-form">
+                  <input type="hidden" name="@AdminFreddieTributesPageModel.AntiforgeryTokenFieldName" value="@antiforgeryToken" />
+                  <button type="submit">Restore</button>
+                </form>
+              }
+              <form method="post" action="/admin/freddie-tributes/@item.Id/delete" class="admin-inline-form">
+                <input type="hidden" name="@AdminFreddieTributesPageModel.AntiforgeryTokenFieldName" value="@antiforgeryToken" />
+                <button type="submit" class="admin-danger-action">Delete</button>
+              </form>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+
+    var totalPages = (int)Math.Ceiling(tributes.TotalCount / (double)tributes.PageSize);
+    if (totalPages > 1)
+    {
+      <p>
+        Page @tributes.Page of @totalPages
+        @if (tributes.Page > 1)
+        {
+          <a href="?@Model.BuildPageQuery(tributes.Page - 1)">Previous</a>
+        }
+        @if (tributes.Page < totalPages)
+        {
+          <a href="?@Model.BuildPageQuery(tributes.Page + 1)">Next</a>
+        }
+      </p>
+    }
+  }
+</div>
+

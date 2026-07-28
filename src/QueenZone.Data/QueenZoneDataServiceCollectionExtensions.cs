@@ -61,6 +61,8 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddScoped<IArticleSubmissionRepository, EfArticleSubmissionRepository>();
         services.AddScoped<IArticleRepository, EfArticleRepository>();
         services.AddScoped<INewsSuggestionRepository, EfNewsSuggestionRepository>();
+        services.AddScoped<IFreddieTributeRepository, EfFreddieTributeRepository>();
+        services.AddScoped<IAdminFreddieTributeRepository, EfAdminFreddieTributeRepository>();
 
         return services;
     }
@@ -122,6 +124,9 @@ public static class QueenZoneDataServiceCollectionExtensions
         });
         services.AddSingleton<IArticleRepository>(sp =>
             new InMemoryArticleRepository(sp.GetRequiredService<IArticleSubmissionRepository>()));
+        services.AddSingleton(_ => new SharedFreddieTributeStore(SampleFreddieTributeData.CreateSeedTributes()));
+        services.AddSingleton<IFreddieTributeRepository, InMemoryFreddieTributeRepository>();
+        services.AddSingleton<IAdminFreddieTributeRepository, InMemoryAdminFreddieTributeRepository>();
 
         return services;
     }
