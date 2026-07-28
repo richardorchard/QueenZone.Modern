@@ -24,6 +24,7 @@ public sealed class ForumCategoryPageTests : IClassFixture<WebApplicationFactory
         Assert.Contains("/forum/topic/1002/ranking-every-studio-album", body);
         Assert.Contains("Forum Guidelines", body);
         Assert.Contains("<strong>30</strong> threads", body);
+        Assert.Contains(TestSiteConfiguration.CanonicalLink("/forum/1/the-music"), body);
     }
 
     [Fact]
@@ -35,6 +36,7 @@ public sealed class ForumCategoryPageTests : IClassFixture<WebApplicationFactory
 
         Assert.Contains("Page 2 of 2", body);
         Assert.Contains("Archive sample thread 1030", body);
+        Assert.Contains(TestSiteConfiguration.CanonicalLink("/forum/1/the-music/page/2"), body);
     }
 
     [Fact]

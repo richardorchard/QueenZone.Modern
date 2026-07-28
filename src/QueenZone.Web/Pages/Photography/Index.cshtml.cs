@@ -19,5 +19,8 @@ public sealed class IndexModel(PublicQueryCacheService publicQueryCache) : PageM
         CoverImageUrls = Categories
             .Where(category => !string.IsNullOrWhiteSpace(category.CoverThumbnailUrl))
             .ToDictionary(category => category.CatId, category => category.CoverThumbnailUrl!);
+
+        ViewData["Title"] = "Photography | QueenZone";
+        ViewData["CanonicalPath"] = PhotoRoutes.GetCategoriesPath();
     }
 }

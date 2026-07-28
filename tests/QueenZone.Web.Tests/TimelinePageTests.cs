@@ -31,6 +31,7 @@ public sealed class TimelinePageTests : IClassFixture<WebApplicationFactory<Prog
         Assert.Contains("1940s", body);
         Assert.Contains("1970s", body);
         Assert.Contains("1980s", body);
+        Assert.Contains(TestSiteConfiguration.CanonicalLink("/timeline"), body);
     }
 
     [Fact]

@@ -40,6 +40,7 @@ public sealed class FanPerformancesPageTests : IClassFixture<WebApplicationFacto
         Assert.Contains("returnUrl=%2Ffan-performances", body);
         Assert.DoesNotContain("songfiles", body, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("/fan-performances/187/audio", body);
+        Assert.Contains(TestSiteConfiguration.CanonicalLink("/fan-performances"), body);
     }
 
     [Fact]

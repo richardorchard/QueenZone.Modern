@@ -62,6 +62,7 @@ public sealed class DetailModel(
         ];
 
         ViewData["Title"] = $"{Photo.Title} | {category.Name} | Photography | QueenZone";
+        ViewData["CanonicalPath"] = PhotoRoutes.GetDetailPath(category.Slug, Photo.PicId);
 
         return Page();
     }
