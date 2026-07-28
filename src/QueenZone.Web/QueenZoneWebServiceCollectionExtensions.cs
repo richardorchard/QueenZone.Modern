@@ -252,7 +252,8 @@ public static class QueenZoneWebServiceCollectionExtensions
         services.AddQueenZoneData(configuration);
         services.AddQueenZoneStorage(configuration);
         services.AddQueenZoneHealthChecks();
-        services.AddQueenZoneNewsAgent(configuration);
+        // Admin draft regenerate only — discovery fetchers/worker stay on NewsAgent.Worker (#336).
+        services.AddQueenZoneNewsAgentWeb(configuration);
         services.AddQueenZoneAuth(configuration, environment);
         services.AddQueenZoneAuthorization(configuration, environment);
 
