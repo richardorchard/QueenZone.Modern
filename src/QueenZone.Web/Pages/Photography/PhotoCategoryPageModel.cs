@@ -64,6 +64,11 @@ public abstract class PhotoCategoryPageModel(PublicQueryCacheService publicQuery
         ViewData["Title"] = page <= 1
             ? $"{category.Name} | Photography | QueenZone"
             : $"{category.Name} | Photography – Page {page} | QueenZone";
+        if (page <= 1)
+        {
+            ViewData["Description"] = $"Queen {category.Name} photographs from the Queenzone.com archive.";
+        }
+
         ViewData["CanonicalPath"] = PhotoRoutes.GetCategoryPagePath(category.Slug, page);
 
         return Page();

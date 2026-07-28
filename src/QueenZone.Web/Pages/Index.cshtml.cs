@@ -16,6 +16,7 @@ public sealed class IndexModel(
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
         ViewData["Title"] = "QueenZone";
+        ViewData["Description"] = "The complete fan resource for Queen – music, news, history, photography and more, from the Queenzone.com archive.";
         ViewData["CanonicalPath"] = "/";
         var latest = await publicQueryCache.GetLatestNewsAsync(5, cancellationToken);
         Latest = PublicContentMapper.ToNewsArchiveItems(latest);

@@ -49,6 +49,11 @@ public abstract class NewsArchivePageModel(
         Breadcrumbs = [BreadcrumbItem.Home, new BreadcrumbItem("News", "/news")];
 
         ViewData["Title"] = NewsRoutes.GetArchivePageTitle(page);
+        if (page <= 1)
+        {
+            ViewData["Description"] = "The latest Queen news and stories from QueenZone.";
+        }
+
         ViewData["CanonicalPath"] = NewsRoutes.GetArchiveCanonicalPath(page);
         if (page > 1)
         {

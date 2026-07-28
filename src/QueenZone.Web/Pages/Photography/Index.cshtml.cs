@@ -21,6 +21,7 @@ public sealed class IndexModel(PublicQueryCacheService publicQueryCache) : PageM
             .ToDictionary(category => category.CatId, category => category.CoverThumbnailUrl!);
 
         ViewData["Title"] = "Photography | QueenZone";
+        ViewData["Description"] = "Browse Queen photograph collections – concerts, studio sessions, and rare imagery from the Queenzone archive.";
         ViewData["CanonicalPath"] = PhotoRoutes.GetCategoriesPath();
     }
 }
