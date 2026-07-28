@@ -48,6 +48,11 @@ public abstract class FanPerformanceArchivePageModel(IFanPerformanceRepository f
         Breadcrumbs = [BreadcrumbItem.Home, new BreadcrumbItem("Fan Performances", FanPerformanceRoutes.GetIndexPath())];
 
         ViewData["Title"] = page <= 1 ? "Fan Performances | QueenZone" : $"Fan Performances – Page {page} | QueenZone";
+        if (page <= 1)
+        {
+            ViewData["Description"] = "Fan recordings of Queen songs, submitted by performers from the Queenzone community.";
+        }
+
         ViewData["CanonicalPath"] = FanPerformanceRoutes.GetPagePath(page);
 
         return Page();

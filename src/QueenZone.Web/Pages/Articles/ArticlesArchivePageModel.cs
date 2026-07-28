@@ -92,6 +92,11 @@ public abstract class ArticlesArchivePageModel(
         Breadcrumbs = [BreadcrumbItem.Home, new BreadcrumbItem("Articles", "/articles")];
 
         ViewData["Title"] = ArticlesRoutes.GetArchivePageTitle(page);
+        if (page <= 1)
+        {
+            ViewData["Description"] = "In-depth Queen articles and interviews from the Queenzone.com archive.";
+        }
+
         ViewData["CanonicalPath"] = ArticlesRoutes.GetArchiveCanonicalPath(page);
         if (page > 1)
         {
