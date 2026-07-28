@@ -76,6 +76,7 @@ var forwardedHeadersOptions = new ForwardedHeadersOptions
 forwardedHeadersOptions.KnownIPNetworks.Clear();
 forwardedHeadersOptions.KnownProxies.Clear();
 app.UseForwardedHeaders(forwardedHeadersOptions);
+app.UseCanonicalHostRedirect();
 
 if (ResponseCompressionBootstrap.IsEnabled(app.Environment))
 {
@@ -144,6 +145,17 @@ app.Use(async (context, next) =>
     await next();
 });
 app.UseAuthorization();
+// Short browser/CDN Cache-Control for anonymous public HTML (after auth so User is known).
+// OnStarting runs when the response starts so Content-Type and status are available.
+app.Use(async (context, next) =>
+{
+    context.Response.OnStarting(static state =>
+    {
+        PublicHtmlCacheControl.TryApply((HttpContext)state!);
+        return Task.CompletedTask;
+    }, context);
+    await next();
+});
 app.UseRateLimiter();
 app.UseOutputCache();
 app.UseAntiforgery();

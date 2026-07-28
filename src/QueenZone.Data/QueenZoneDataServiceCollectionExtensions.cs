@@ -12,7 +12,12 @@ public static class QueenZoneDataServiceCollectionExtensions
     {
         forumDataOptions ??= new ForumDataOptions();
 
-        services.AddDbContext<QueenZoneDbContext>(options =>
+        // IDbContextFactory first (singleton) for independent short-lived contexts used by
+        // parallel admin/reporting reads (issue #335). Scoped QueenZoneDbContext is created
+        // from the factory so request-scoped repositories still receive one context per scope.
+        // Do not also call AddDbContext with the same options: that re-registers options
+        // configuration as scoped and breaks singleton factory resolution.
+        services.AddDbContextFactory<QueenZoneDbContext>(options =>
             options.UseSqlServer(
                 connectionString,
                 sql =>
@@ -23,6 +28,8 @@ public static class QueenZoneDataServiceCollectionExtensions
                         maxRetryDelay: QueenZoneSqlServerOptions.MaxRetryDelay,
                         errorNumbersToAdd: null);
                 }));
+        services.AddScoped(sp =>
+            sp.GetRequiredService<IDbContextFactory<QueenZoneDbContext>>().CreateDbContext());
 
         services.AddScoped<INewsRepository, EfNewsRepository>();
         services.AddScoped<IArticlesRepository, EfArticlesRepository>();
@@ -54,6 +61,8 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddScoped<IArticleSubmissionRepository, EfArticleSubmissionRepository>();
         services.AddScoped<IArticleRepository, EfArticleRepository>();
         services.AddScoped<INewsSuggestionRepository, EfNewsSuggestionRepository>();
+        services.AddScoped<IFreddieTributeRepository, EfFreddieTributeRepository>();
+        services.AddScoped<IAdminFreddieTributeRepository, EfAdminFreddieTributeRepository>();
 
         return services;
     }
@@ -115,6 +124,9 @@ public static class QueenZoneDataServiceCollectionExtensions
         });
         services.AddSingleton<IArticleRepository>(sp =>
             new InMemoryArticleRepository(sp.GetRequiredService<IArticleSubmissionRepository>()));
+        services.AddSingleton(_ => new SharedFreddieTributeStore(SampleFreddieTributeData.CreateSeedTributes()));
+        services.AddSingleton<IFreddieTributeRepository, InMemoryFreddieTributeRepository>();
+        services.AddSingleton<IAdminFreddieTributeRepository, InMemoryAdminFreddieTributeRepository>();
 
         return services;
     }

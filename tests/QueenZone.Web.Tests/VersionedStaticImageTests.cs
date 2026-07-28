@@ -47,6 +47,23 @@ public sealed class VersionedStaticImageTests : IClassFixture<WebApplicationFact
         Assert.Contains("/design-system/assets/img-hero.jpg?v=", body);
         Assert.Contains("img-hero.webp?v=", body);
         Assert.Contains("type=\"image/webp\"", body);
+        Assert.Contains("width=\"2000\"", body);
+        Assert.Contains("height=\"1100\"", body);
+        Assert.Contains("fetchpriority=\"high\"", body);
+    }
+
+    [Fact]
+    public async Task HomePageEmitsDimensionsOnDesignSystemImages()
+    {
+        var body = await factory.CreateClient().GetStringAsync("/");
+
+        Assert.Contains("width=\"447\"", body);
+        Assert.Contains("height=\"447\"", body);
+        Assert.Contains("width=\"1200\"", body);
+        Assert.Contains("height=\"800\"", body);
+        Assert.Contains("width=\"787\"", body);
+        Assert.Contains("height=\"518\"", body);
+        Assert.Contains("fetchpriority=\"high\"", body);
     }
 }
 
