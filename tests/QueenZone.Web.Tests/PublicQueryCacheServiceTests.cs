@@ -150,6 +150,31 @@ public sealed class PublicQueryCacheServiceTests
     }
 
     [Fact]
+    public async Task InvalidateArticleCountCache_evicts_article_published_count_only()
+    {
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var newsRepository = new CountingNewsRepository();
+        var articlesRepository = new CountingArticlesRepository();
+        var service = CreateService(
+            memoryCache,
+            newsRepository: newsRepository,
+            articlesRepository: articlesRepository);
+
+        await service.GetNewsPublishedCountAsync();
+        await service.GetArticlePublishedCountAsync();
+        await service.GetArticlePublishedCountAsync();
+        Assert.Equal(1, articlesRepository.PublishedCountCallCount);
+
+        service.InvalidateArticleCountCache();
+
+        await service.GetArticlePublishedCountAsync();
+        await service.GetNewsPublishedCountAsync();
+
+        Assert.Equal(2, articlesRepository.PublishedCountCallCount);
+        Assert.Equal(1, newsRepository.PublishedCountCallCount);
+    }
+
+    [Fact]
     public async Task InvalidateNewsCache_evicts_all_latest_count_variants_not_just_homepage_default()
     {
         using var memoryCache = new MemoryCache(new MemoryCacheOptions());

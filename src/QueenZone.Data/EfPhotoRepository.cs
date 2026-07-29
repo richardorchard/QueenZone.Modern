@@ -82,8 +82,9 @@ public sealed class EfPhotoRepository : IPhotoRepository
         int picId,
         CancellationToken cancellationToken = default)
     {
+        // Single SQL round-trip: photo fields + total + index + prev/next (see DetailNavigationSql).
         var rows = await dbContext.Database
-            .SqlQueryRaw<CategoryPageRow>(sql.PhotoByIdSql, catId, picId)
+            .SqlQueryRaw<DetailNavigationRow>(sql.DetailNavigationSql, catId, picId)
             .ToListAsync(cancellationToken);
         var row = rows.FirstOrDefault();
         if (row is null)
@@ -95,27 +96,12 @@ public sealed class EfPhotoRepository : IPhotoRepository
         var categorySlug = NewsSlug.Slugify(categoryName);
         var photo = MapItem(row, catId, categoryName, categorySlug);
 
-        var total = await dbContext.Database
-            .SqlQueryRaw<IntValueRow>(sql.CategoryCountSql, catId)
-            .SingleAsync(cancellationToken);
-
-        var index = await dbContext.Database
-            .SqlQueryRaw<IntValueRow>(sql.IndexBeforeSql, catId, row.DATE_TIME, picId)
-            .SingleAsync(cancellationToken);
-
-        var previousRows = await dbContext.Database
-            .SqlQueryRaw<IntValueRow>(sql.PreviousPicIdSql, catId, row.DATE_TIME, picId)
-            .ToListAsync(cancellationToken);
-        var nextRows = await dbContext.Database
-            .SqlQueryRaw<IntValueRow>(sql.NextPicIdSql, catId, row.DATE_TIME, picId)
-            .ToListAsync(cancellationToken);
-
         return new PhotoDetailNavigation(
             photo,
-            index.Value,
-            total.Value,
-            previousRows.FirstOrDefault()?.Value,
-            nextRows.FirstOrDefault()?.Value);
+            row.IndexBefore,
+            row.TotalCount,
+            row.PreviousPicId,
+            row.NextPicId);
     }
 
     public async Task<IReadOnlyList<PhotoItem>> GetCategoryAllAsync(
@@ -161,7 +147,7 @@ public sealed class EfPhotoRepository : IPhotoRepository
         return categories;
     }
 
-    private static PhotoItem MapItem(CategoryPageRow row, int catId, string categoryName, string categorySlug) =>
+    private static PhotoItem MapItem(IPhotoRow row, int catId, string categoryName, string categorySlug) =>
         new(
             PicId: row.pic_id,
             CatId: catId,
@@ -175,6 +161,25 @@ public sealed class EfPhotoRepository : IPhotoRepository
             Year: row.DATE_TIME.Year,
             DateTime: row.DATE_TIME);
 
+    private interface IPhotoRow
+    {
+        string NAME { get; }
+
+        DateTime DATE_TIME { get; }
+
+        string URL { get; }
+
+        string THUMB_URL { get; }
+
+        int T_HEIGHT { get; }
+
+        int T_WIDTH { get; }
+
+        int pic_id { get; }
+
+        string? category_name { get; }
+    }
+
     private sealed class CategoryWithCountRow
     {
         public int cat_id { get; set; }
@@ -186,7 +191,7 @@ public sealed class EfPhotoRepository : IPhotoRepository
         public string? CoverThumbUrl { get; set; }
     }
 
-    private sealed class CategoryPageRow
+    private sealed class CategoryPageRow : IPhotoRow
     {
         public string NAME { get; set; } = string.Empty;
 
@@ -203,6 +208,33 @@ public sealed class EfPhotoRepository : IPhotoRepository
         public int pic_id { get; set; }
 
         public string? category_name { get; set; }
+    }
+
+    private sealed class DetailNavigationRow : IPhotoRow
+    {
+        public string NAME { get; set; } = string.Empty;
+
+        public DateTime DATE_TIME { get; set; }
+
+        public string URL { get; set; } = string.Empty;
+
+        public string THUMB_URL { get; set; } = string.Empty;
+
+        public int T_HEIGHT { get; set; }
+
+        public int T_WIDTH { get; set; }
+
+        public int pic_id { get; set; }
+
+        public string? category_name { get; set; }
+
+        public int TotalCount { get; set; }
+
+        public int IndexBefore { get; set; }
+
+        public int? PreviousPicId { get; set; }
+
+        public int? NextPicId { get; set; }
     }
 
     private sealed class NameRow
