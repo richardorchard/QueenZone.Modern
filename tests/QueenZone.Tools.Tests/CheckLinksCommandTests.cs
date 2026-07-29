@@ -6,6 +6,43 @@ namespace QueenZone.Tools.Tests;
 public sealed class CheckLinksCommandTests
 {
     [Fact]
+    public async Task ToolsApp_routes_check_links_command_to_usage_error()
+    {
+        var exitCode = await WithNoLegacyConnectionStringAsync(() =>
+            ToolsApp.RunAsync(["check-links", "--settings-file", MissingSettingsPath()]));
+
+        Assert.Equal(2, exitCode);
+    }
+
+    [Fact]
+    public async Task ToolsApp_default_usage_includes_check_links_command()
+    {
+        using var error = new StringWriter();
+        var originalError = Console.Error;
+        Console.SetError(error);
+        try
+        {
+            var exitCode = await ToolsApp.RunAsync([]);
+
+            Assert.Equal(2, exitCode);
+            Assert.Contains("check-links", error.ToString());
+        }
+        finally
+        {
+            Console.SetError(originalError);
+        }
+    }
+
+    [Fact]
+    public async Task RunAsync_public_entrypoint_returns_usage_error_when_options_are_invalid()
+    {
+        var exitCode = await WithNoLegacyConnectionStringAsync(() =>
+            CheckLinksCommand.RunAsync(["--settings-file", MissingSettingsPath()]));
+
+        Assert.Equal(2, exitCode);
+    }
+
+    [Fact]
     public void Parse_accepts_scheduled_options()
     {
         var options = CheckLinksOptions.Parse(
@@ -81,6 +118,28 @@ public sealed class CheckLinksCommandTests
     }
 
     [Fact]
+    public async Task RunAsync_returns_zero_when_no_links_match()
+    {
+        var repository = new InMemoryLinksRepository([]);
+
+        var exitCode = await CheckLinksCommand.RunAsync(ValidOptions(), repository);
+
+        Assert.Equal(0, exitCode);
+    }
+
+    [Fact]
+    public async Task RunAsync_returns_zero_for_dry_run()
+    {
+        var repository = RepositoryWithLinks();
+        var options = CheckLinksOptions.Parse(["--connection-string", "Server=.;Database=test;", "--dry-run"]);
+        Assert.True(options.IsValid);
+
+        var exitCode = await CheckLinksCommand.RunAsync(options, repository);
+
+        Assert.Equal(0, exitCode);
+    }
+
+    [Fact]
     public async Task RunAsync_hides_link_after_repeated_hard_failures()
     {
         var repository = RepositoryWithLinks();
@@ -123,6 +182,23 @@ public sealed class CheckLinksCommandTests
         var options = CheckLinksOptions.Parse(["--connection-string", "Server=.;Database=test;"]);
         Assert.True(options.IsValid);
         return options;
+    }
+
+    private static string MissingSettingsPath() =>
+        Path.Combine(Path.GetTempPath(), $"qz-missing-settings-{Guid.NewGuid():N}.json");
+
+    private static async Task<T> WithNoLegacyConnectionStringAsync<T>(Func<Task<T>> action)
+    {
+        var previous = Environment.GetEnvironmentVariable("ConnectionStrings__QueenZoneLegacy");
+        Environment.SetEnvironmentVariable("ConnectionStrings__QueenZoneLegacy", null);
+        try
+        {
+            return await action();
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("ConnectionStrings__QueenZoneLegacy", previous);
+        }
     }
 
     private static InMemoryLinksRepository RepositoryWithLinks() =>
