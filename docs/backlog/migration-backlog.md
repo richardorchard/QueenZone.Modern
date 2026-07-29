@@ -1,268 +1,137 @@
 # Migration Backlog
 
-## Epic: Repository Foundation
+Living index of migration work. **Prefer open GitHub epics and issues for active tracking**; this file separates completed foundation work from remaining product/archive gaps so planning docs stay truthful.
 
-### Create solution skeleton
+## Status index
 
-Acceptance criteria:
+| Track | Link | Notes |
+| --- | --- | --- |
+| Architecture / performance (2026-07-23) | [#312](https://github.com/richardorchard/QueenZone.Modern/issues/312) | Earlier review; many Phase A–E children done |
+| Architecture / performance (2026-07) | [#391](https://github.com/richardorchard/QueenZone.Modern/issues/391) | Latest review; P0–P3 children |
+| Data access (EF Core + SQL/procs) | [ADR 0006](../decisions/0006-hybrid-ef-core-admin-writes.md) | Dapper package removed; EF is the client library |
+| Hosting scale & cache | [`hosting-scale-and-cache.md`](../architecture/hosting-scale-and-cache.md) | Single B1; no Redis |
+| Public query cache | [`public-query-cache.md`](../architecture/public-query-cache.md) | TTLs + invalidation matrix |
+| News agent / discovery | [`news-agent.md`](../architecture/news-agent.md) | Worker + admin review queue |
+| Modernization plan (phases) | [`modernization-plan.md`](../architecture/modernization-plan.md) | Historical phases + current status |
+| Testing policy | [`testing-policy.md`](../architecture/testing-policy.md) | CI gates, layers, coverage |
 
-- `QueenZone.sln` exists.
-- `src/QueenZone.Web` exists.
-- `src/QueenZone.Data` exists.
-- `tests` folder exists.
-- App runs locally.
+Do not invent new product scope in drive-by doc edits. Open a GitHub issue when accepting new work.
 
-### Add CI
+---
 
-Acceptance criteria:
+## Open work (high level)
 
-- GitHub Actions builds the solution.
-- Tests run.
-- Failed build blocks deployment.
+Items below are still useful product/archive gaps or ongoing hardening. Detailed acceptance criteria live in linked issues where present.
 
-### Add basic observability
+### News and editorial
 
-Acceptance criteria:
+- **Automated discovery hardening** — worker, OpenRouter triage/drafting, and admin review queue are shipped; continue reliability, budget, and editorial-rule work under `docs/architecture/news-agent*.md` and related issues.
+- **Modern approved-news tables** — long-term model for non-legacy news rows (historical issue #7 theme); public reads still project from legacy `NEWS_T` shapes via EF SQL.
 
-- Application Insights configured in Azure preview.
-- App logs startup and request failures.
-- Health endpoint exists.
+### Content / archive still thin or unfinished
 
-## Epic: Hosting Exploration
-
-### Prototype prerendered Static Web Apps deployment
-
-Acceptance criteria:
-
-- Static HTML generated for homepage and at least one content type.
-- Sitemap generated at build time.
-- Preview deploy works in Azure Static Web Apps.
-- A short decision note compares Static Web Apps with App Service based on the prototype.
-
-### Prototype Function-backed search endpoint
-
-Acceptance criteria:
-
-- A Function accepts a simple search or lookup request.
-- Function returns crawl-safe structured results or metadata.
-- Static Web Apps can route or proxy to the Function.
-- Timeout and API constraints are documented.
-
-## Epic: SEO And Monetisation
-
-### Add SEO foundation
-
-Status: **partly done** — unique titles/descriptions, canonical links, robots.txt, sitemap endpoints, Open Graph/Twitter cards, and editorial JSON-LD for news/articles have shipped. Structured data for albums/images is still future work.
-
-Acceptance criteria:
-
-- Unique title and meta description per page.
-- Canonical URL support.
-- XML sitemap.
-- Robots.txt.
-- Open Graph metadata.
-- Structured data plan for articles/albums/images.
-
-### Explore monetisation options
-
-Acceptance criteria:
-
-- Display ads, affiliate links, and donation/support options compared.
-- Page-speed impact documented.
-- Initial no-ads/ad-light policy decided before production launch.
-
-## Epic: News Vertical Slice
-
-### Implement legacy DB connection
-
-Acceptance criteria:
-
-- Connection string loaded from configuration.
-- No secrets committed.
-- Local dev can connect to restored DB.
-- Azure preview can connect to Azure SQL.
-
-### Render latest news on homepage
-
-Acceptance criteria:
-
-- Homepage shows latest published news.
-- Only `DISPLAY = 1` records appear.
-- Empty state is handled.
-
-### Render news archive
-
-Acceptance criteria:
-
-- `/news` lists published news.
-- Pagination works.
-- Dates render consistently.
-
-### Render news detail
-
-Acceptance criteria:
-
-- `/news/{id}/{slug}` renders title, date, excerpt/body, and source if approved.
-- Missing IDs return 404.
-- Hidden items do not render publicly.
-
-### Confirm canonical news URLs
-
-Acceptance criteria:
-
-- `/news` is the canonical archive URL.
-- `/news/{id}/{slug}` is the canonical detail URL.
-- Wrong slugs redirect to the canonical slug.
-- Canonical route behavior is covered by tests.
-
-### Design automated news discovery and draft ingestion
-
-Status: **in progress** — worker, OpenRouter triage/drafting, and admin review queue shipped. See `docs/architecture/news-agent.md`.
-
-Acceptance criteria:
-
-- Architecture plan documents the discovery, dedupe, AI assistance, review, and explicit publish workflow.
-- Candidate and draft data model is defined outside the legacy `NEWS_T` table.
-- First source strategy starts with curated official/RSS-style sources.
-- AI output is stored only as editor-review draft material.
-- No candidate can publish publicly without an explicit admin action.
-- Tests are planned for source fetching, dedupe, draft creation, rejection handling, and no-auto-publish safeguards.
-
-## Epic: Articles And Biography
-
-### Render articles archive and detail
-
-Acceptance criteria:
-
-- `/articles` lists published articles.
-- Category pages work.
-- Detail pages render old rich text safely.
-
-### Render biography pages
-
-Acceptance criteria:
-
-- `/biography` lists biography sections.
-- `/biography/{id}/{slug}` renders detail.
-- Ordering matches legacy intent.
-
-### Treat biography as core archive content
-
-Acceptance criteria:
-
-- Biography pages are included in sitemap.
-- Biography pages use stable canonical URLs.
-- Metadata is tuned for search.
-- Rendering preserves old content while improving readability.
-
-## Epic: Discography
-
-### Render album list and detail
-
-Acceptance criteria:
-
-- `/discography` lists active albums.
-- Album detail includes notes, artwork if available, and songs.
-- Album pages use stable canonical URLs.
-
-### Treat album information as core archive content
-
-Acceptance criteria:
-
-- Album pages include release date, notes, artwork, and track listing where available.
-- Song pages exist if content policy allows.
-- Lyrics policy is applied consistently.
-- Album pages include structured metadata where appropriate.
-
-### Decide lyric policy
-
-Acceptance criteria:
-
-- A written decision exists for whether to publish `SONG_LYRICS`.
-- Implementation follows that decision.
-
-## Epic: Pictures
-
-### Audit picture paths
-
-Acceptance criteria:
-
-- Count of `PIC_FILES_T` records.
-- Count of referenced files found.
-- Count of missing files.
-- Path normalization rules documented.
-
-### Treat picture library as core archive content
-
-Acceptance criteria:
-
-- Picture category pages are planned for first public archive release.
-- Picture detail pages have canonical URLs.
-- Image sitemap plan exists.
-- Blob Storage source and backup source are reconciled.
-
-### Migrate public pictures to Blob Storage
-
-Acceptance criteria:
-
-- Public images copied to Blob Storage.
-- Thumbnails are present or regenerated.
-- New app uses Blob URLs.
-
-### Admin photography gallery management
-
-Tracked in [#349](https://github.com/richardorchard/QueenZone.Modern/issues/349).
-
-Acceptance criteria:
-
-- Admin can list/filter gallery photos and add/edit/hide/move/delete them.
-- Admin can regenerate WebP thumbnails and replace image files while keeping `PicId`.
-- Writes target legacy `PIC_FILES_T` / `PIC_CAT_T` (promote-from-submissions is a separate follow-up).
-
-## Epic: Archive
-
-### Forum archive feasibility review
-
-Status: **done** for public browse path.
-
-Acceptance criteria:
-
-- Public/private fields identified.
-- Deleted/hidden/moderated content rules documented.
-- Sample forum topic renders read-only.
-
-### Design modern forum archive schema
-
-Status: **done**.
-
-Acceptance criteria:
-
-- Proposed tables documented.
-- Required indexes documented.
-- Legacy `Q_FORUM_TOPIC_T` mapping documented.
-- Private fields excluded by design.
-- Canonical URL strategy documented.
-
-### Build forum import proof of concept
-
-Status: **done** and expanded to full public forum archive import/read path.
-
-Acceptance criteria:
-
-- One forum category imports into modern tables.
-- Thread and post counts match legacy source for that category.
-- Import report lists skipped or unsafe records.
-- Read-only pages render from modern tables, not directly from legacy forum tables.
-
-Notes:
-
-- Production defaults to `ModernForumRepository` (`ForumData:UseModernForumReads = true`).
-- Other non-forum archive content may continue reading legacy tables unless performance or safety problems appear.
-
-### Blog archive feasibility review
+#### Blog archive feasibility review
 
 Acceptance criteria:
 
 - Blog ownership/profile exposure reviewed.
 - Comments policy documented.
 - Sample blog post renders read-only.
+
+#### FAQ, quotes, featured sites (legacy map Phase 2 leftovers)
+
+- Public FAQ surface if content remains valuable.
+- Quotes / featured sites only if links and copyright policy are clear.
+
+#### Discography polish
+
+- Song pages and lyrics policy if product accepts them (see lyric policy item under completed discography epic if already decided in code/docs).
+- Structured metadata where appropriate.
+
+#### Pictures / media ops
+
+- Ongoing Blob / CDN path hygiene (see `AGENTS.md` media serving table).
+- Admin photography gallery management tracked in [#349](https://github.com/richardorchard/QueenZone.Modern/issues/349) where still open.
+
+### Architecture children still open under #391
+
+Filter: [label `architecture-review-2026-07`](https://github.com/richardorchard/QueenZone.Modern/issues?q=label%3Aarchitecture-review-2026-07). P0/P1 and P3 doc/test children are largely closed; remaining open themes are mainly **P2 structure** (verify on GitHub before starting):
+
+- Folderize Data/Web, extract NewsAgent.Tests, shared test factory, discovery twin shrink, test-double naming, SQL docs source of truth.
+
+### Hosting exploration (deferred)
+
+Static Web Apps / Functions prototypes remain **optional research**, not the production path. Production is App Service Razor Pages on single B1. Revisit only with an explicit hosting decision update.
+
+---
+
+## Archive / completed foundation
+
+The following early backlog epics are **done**. Kept here so historical acceptance criteria remain searchable; do not re-open as greenfield work.
+
+### Epic: Repository Foundation — **done**
+
+| Item | Outcome |
+| --- | --- |
+| Create solution skeleton | `QueenZone.sln`, `src/QueenZone.Web`, `src/QueenZone.Data`, `tests/`, local run with sample data |
+| Add CI | GitHub Actions build, test, coverage gates, smoke publish |
+| Add basic observability | Application Insights wiring, startup/request logging, `/health` |
+
+### Epic: News Vertical Slice — **done** (with ongoing discovery hardening)
+
+| Item | Outcome |
+| --- | --- |
+| Legacy DB connection | Config-driven; secrets not committed; empty connection uses in-memory sample data |
+| Latest news / archive / detail | Shipped with canonical `/news` and `/news/{id}/{slug}` |
+| Canonical news URLs + tests | Covered in web integration tests |
+| Automated discovery design | Architecture + worker + admin queue shipped; see `news-agent.md` |
+
+### Epic: Articles And Biography — **done** (public archive)
+
+| Item | Outcome |
+| --- | --- |
+| Articles archive and detail | `/articles` (+ pagination), detail, community submissions path |
+| Biography list/detail | `/biography`, canonical detail, sitemap inclusion |
+
+### Epic: Discography — **largely done** (public archive)
+
+| Item | Outcome |
+| --- | --- |
+| Album list and detail | `/discography` and album detail via EF + procs |
+| Core archive treatment | Canonical URLs; further song/lyrics policy may remain product decisions |
+
+### Epic: Pictures — **public path done**; admin/ops may continue
+
+| Item | Outcome |
+| --- | --- |
+| Picture categories/detail + Blob URLs | Public photography pages + CDN hosts |
+| Path audit / migration | Historical import/Blob work landed; ops hygiene continues |
+| Admin gallery management | See [#349](https://github.com/richardorchard/QueenZone.Modern/issues/349) |
+
+### Epic: Forum archive — **done** (and expanded)
+
+| Item | Outcome |
+| --- | --- |
+| Feasibility + modern schema + import | Modern `ModernForum*` tables; production defaults to `ModernForumRepository` |
+| Read-only public browse | Shipped; member write path added later as deliberate feature |
+
+### Epic: SEO And Monetisation — **foundation done**
+
+| Item | Outcome |
+| --- | --- |
+| SEO foundation | Titles, descriptions, canonicals, sitemap, robots, Open Graph where implemented |
+| Monetisation exploration | Policy/docs as decided pre-launch; do not reintroduce ads without product decision |
+
+### Epic: Hosting Exploration — **explored; not production path**
+
+| Item | Outcome |
+| --- | --- |
+| Static Web Apps / Functions prototypes | Documented under hosting-options exploration; **not** current production |
+
+---
+
+## How to update this file
+
+1. When an epic or large feature ships, move its acceptance bullets into **Archive / completed** (or delete if duplicated by an ADR).
+2. Link open work to GitHub issues; avoid long unchecked lists that drift from `main`.
+3. Keep data-access and hosting facts aligned with ADR 0006 and `hosting-scale-and-cache.md` — never reintroduce “Dapper as primary client” or multi-instance Redis as defaults.
