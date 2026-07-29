@@ -12,45 +12,7 @@ public sealed class EfLinksRepository : ILinksRepository
     private readonly string validationLinksSql;
 
     public EfLinksRepository(QueenZoneDbContext dbContext)
-        : this(dbContext, """
-            SELECT
-                c.Q_LINK_CAT_ID AS CategoryId,
-                c.CAT_NAME AS CategoryName,
-                s.QUEEN_FEATURED_SITE_ID AS Id,
-                s.QUEEN_FEATURED_SITE_TITLE AS Title,
-                s.QUEEN_FEATURED_SITE_URL AS Url,
-                s.SITE_COMMENT AS Comment,
-                s.FEATURED_SITE AS FeaturedSite
-            FROM dbo.Q_LINK_CAT_T AS c
-            INNER JOIN dbo.QUEEN_FEATURED_SITE_T AS s
-                ON s.Q_LINK_CAT_ID = c.Q_LINK_CAT_ID
-            LEFT JOIN dbo.QueenLinkChecks AS checks
-                ON checks.QueenFeaturedSiteId = s.QUEEN_FEATURED_SITE_ID
-            WHERE
-                ISNULL(s.DISPLAY, 0) <> 0
-                AND ISNULL(checks.IsConfirmedDead, 0) = 0
-                AND NULLIF(LTRIM(RTRIM(s.QUEEN_FEATURED_SITE_TITLE)), '') IS NOT NULL
-                AND NULLIF(LTRIM(RTRIM(s.QUEEN_FEATURED_SITE_URL)), '') IS NOT NULL
-            ORDER BY c.CAT_NAME ASC, s.FEATURED_SITE DESC, s.QUEEN_FEATURED_SITE_TITLE ASC
-            """, """
-            SELECT
-                s.QUEEN_FEATURED_SITE_ID AS Id,
-                s.QUEEN_FEATURED_SITE_TITLE AS Title,
-                s.QUEEN_FEATURED_SITE_URL AS Url,
-                s.SITE_COMMENT AS Comment,
-                s.Q_LINK_CAT_ID AS CategoryId,
-                s.FEATURED_SITE AS FeaturedSite,
-                ISNULL(checks.ConsecutiveFailureCount, 0) AS ConsecutiveFailureCount,
-                ISNULL(checks.IsConfirmedDead, 0) AS IsConfirmedDead
-            FROM dbo.QUEEN_FEATURED_SITE_T AS s
-            LEFT JOIN dbo.QueenLinkChecks AS checks
-                ON checks.QueenFeaturedSiteId = s.QUEEN_FEATURED_SITE_ID
-            WHERE
-                ISNULL(s.DISPLAY, 0) <> 0
-                AND NULLIF(LTRIM(RTRIM(s.QUEEN_FEATURED_SITE_TITLE)), '') IS NOT NULL
-                AND NULLIF(LTRIM(RTRIM(s.QUEEN_FEATURED_SITE_URL)), '') IS NOT NULL
-            ORDER BY s.QUEEN_FEATURED_SITE_ID ASC
-            """)
+        : this(dbContext, PublicLinksSql, ValidationLinksSql)
     {
     }
 
@@ -60,6 +22,91 @@ public sealed class EfLinksRepository : ILinksRepository
         this.publicLinksSql = publicLinksSql;
         this.validationLinksSql = validationLinksSql;
     }
+
+    internal static string PublicLinksSql => """
+            IF OBJECT_ID(N'dbo.QueenLinkChecks', N'U') IS NULL
+            BEGIN
+                SELECT
+                    c.Q_LINK_CAT_ID AS CategoryId,
+                    c.CAT_NAME AS CategoryName,
+                    s.QUEEN_FEATURED_SITE_ID AS Id,
+                    s.QUEEN_FEATURED_SITE_TITLE AS Title,
+                    s.QUEEN_FEATURED_SITE_URL AS Url,
+                    s.SITE_COMMENT AS Comment,
+                    CAST(ISNULL(s.FEATURED_SITE, 0) AS int) AS FeaturedSite
+                FROM dbo.Q_LINK_CAT_T AS c
+                INNER JOIN dbo.QUEEN_FEATURED_SITE_T AS s
+                    ON s.Q_LINK_CAT_ID = c.Q_LINK_CAT_ID
+                WHERE
+                    ISNULL(CAST(s.DISPLAY AS int), 0) <> 0
+                    AND NULLIF(LTRIM(RTRIM(s.QUEEN_FEATURED_SITE_TITLE)), '') IS NOT NULL
+                    AND NULLIF(LTRIM(RTRIM(s.QUEEN_FEATURED_SITE_URL)), '') IS NOT NULL
+                ORDER BY c.CAT_NAME ASC, s.FEATURED_SITE DESC, s.QUEEN_FEATURED_SITE_TITLE ASC
+            END
+            ELSE
+            BEGIN
+                SELECT
+                    c.Q_LINK_CAT_ID AS CategoryId,
+                    c.CAT_NAME AS CategoryName,
+                    s.QUEEN_FEATURED_SITE_ID AS Id,
+                    s.QUEEN_FEATURED_SITE_TITLE AS Title,
+                    s.QUEEN_FEATURED_SITE_URL AS Url,
+                    s.SITE_COMMENT AS Comment,
+                    CAST(ISNULL(s.FEATURED_SITE, 0) AS int) AS FeaturedSite
+                FROM dbo.Q_LINK_CAT_T AS c
+                INNER JOIN dbo.QUEEN_FEATURED_SITE_T AS s
+                    ON s.Q_LINK_CAT_ID = c.Q_LINK_CAT_ID
+                LEFT JOIN dbo.QueenLinkChecks AS checks
+                    ON checks.QueenFeaturedSiteId = s.QUEEN_FEATURED_SITE_ID
+                WHERE
+                    ISNULL(CAST(s.DISPLAY AS int), 0) <> 0
+                    AND ISNULL(checks.IsConfirmedDead, 0) = 0
+                    AND NULLIF(LTRIM(RTRIM(s.QUEEN_FEATURED_SITE_TITLE)), '') IS NOT NULL
+                    AND NULLIF(LTRIM(RTRIM(s.QUEEN_FEATURED_SITE_URL)), '') IS NOT NULL
+                ORDER BY c.CAT_NAME ASC, s.FEATURED_SITE DESC, s.QUEEN_FEATURED_SITE_TITLE ASC
+            END
+            """;
+
+    internal static string ValidationLinksSql => """
+            IF OBJECT_ID(N'dbo.QueenLinkChecks', N'U') IS NULL
+            BEGIN
+                SELECT
+                    s.QUEEN_FEATURED_SITE_ID AS Id,
+                    s.QUEEN_FEATURED_SITE_TITLE AS Title,
+                    s.QUEEN_FEATURED_SITE_URL AS Url,
+                    s.SITE_COMMENT AS Comment,
+                    s.Q_LINK_CAT_ID AS CategoryId,
+                    CAST(ISNULL(s.FEATURED_SITE, 0) AS int) AS FeaturedSite,
+                    0 AS ConsecutiveFailureCount,
+                    CAST(0 AS bit) AS IsConfirmedDead
+                FROM dbo.QUEEN_FEATURED_SITE_T AS s
+                WHERE
+                    ISNULL(CAST(s.DISPLAY AS int), 0) <> 0
+                    AND NULLIF(LTRIM(RTRIM(s.QUEEN_FEATURED_SITE_TITLE)), '') IS NOT NULL
+                    AND NULLIF(LTRIM(RTRIM(s.QUEEN_FEATURED_SITE_URL)), '') IS NOT NULL
+                ORDER BY s.QUEEN_FEATURED_SITE_ID ASC
+            END
+            ELSE
+            BEGIN
+                SELECT
+                    s.QUEEN_FEATURED_SITE_ID AS Id,
+                    s.QUEEN_FEATURED_SITE_TITLE AS Title,
+                    s.QUEEN_FEATURED_SITE_URL AS Url,
+                    s.SITE_COMMENT AS Comment,
+                    s.Q_LINK_CAT_ID AS CategoryId,
+                    CAST(ISNULL(s.FEATURED_SITE, 0) AS int) AS FeaturedSite,
+                    ISNULL(checks.ConsecutiveFailureCount, 0) AS ConsecutiveFailureCount,
+                    ISNULL(checks.IsConfirmedDead, 0) AS IsConfirmedDead
+                FROM dbo.QUEEN_FEATURED_SITE_T AS s
+                LEFT JOIN dbo.QueenLinkChecks AS checks
+                    ON checks.QueenFeaturedSiteId = s.QUEEN_FEATURED_SITE_ID
+                WHERE
+                    ISNULL(CAST(s.DISPLAY AS int), 0) <> 0
+                    AND NULLIF(LTRIM(RTRIM(s.QUEEN_FEATURED_SITE_TITLE)), '') IS NOT NULL
+                    AND NULLIF(LTRIM(RTRIM(s.QUEEN_FEATURED_SITE_URL)), '') IS NOT NULL
+                ORDER BY s.QUEEN_FEATURED_SITE_ID ASC
+            END
+            """;
 
     public async Task<IReadOnlyList<QueenLinkCategory>> GetCategoriesWithLinksAsync(
         CancellationToken cancellationToken = default)
