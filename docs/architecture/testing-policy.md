@@ -53,6 +53,8 @@ Good targets:
 
 These tests are the default place to cover user-visible route behavior.
 
+**Output cache:** environment `Testing` disables public HTML output caching so cases stay deterministic. Production-shaped hit/miss coverage lives in `PublicOutputCacheTests` (uses `UseEnvironment("Production")` plus the Entra host settings helper from `ResponseCompressionTests`). No extra secrets or env vars are required for a normal `dotnet test` run.
+
 Admin editorial routes also have a second HTTP integration layer that wires `EfAdminNewsRepository` and `EfNewsDiscoveryRepository` through SQLite (`AdminNewsEfRoutesTests`, `AdminNewsDiscoveryEfRoutesTests`). Use that layer for create/edit/publish/promote persistence checks that in-memory fakes cannot catch.
 
 Negative antiforgery coverage belongs in the default HTTP integration suite: at least one admin news action and one discovery action should return `400` when `__RequestVerificationToken` is missing.
