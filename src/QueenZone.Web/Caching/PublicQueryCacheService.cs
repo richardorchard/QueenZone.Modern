@@ -20,10 +20,12 @@ public sealed class PublicQueryCacheService(
     };
 
     /// <summary>
-    /// Per-key gates so concurrent cold-cache hits share a single factory execution (no stampede).
+    /// Process-wide per-key gates so concurrent cold-cache hits share a single factory execution
+    /// even when <see cref="PublicQueryCacheService"/> is scoped (one instance per HTTP request).
     /// Key set is small (news version variants, forum stats, on-this-day dates, photo pages).
     /// </summary>
-    private readonly ConcurrentDictionary<string, SemaphoreSlim> loadGates = new(StringComparer.Ordinal);
+    private static readonly ConcurrentDictionary<string, SemaphoreSlim> LoadGates =
+        new(StringComparer.Ordinal);
 
     public Task<IReadOnlyList<NewsItem>> GetLatestNewsAsync(int count, CancellationToken cancellationToken = default)
     {
@@ -139,6 +141,15 @@ public sealed class PublicQueryCacheService(
     }
 
     /// <summary>
+    /// Evicts the public legacy-article published count so archive pagination refreshes after
+    /// editorial changes (or import tooling) that alter the published set.
+    /// </summary>
+    public void InvalidateArticleCountCache()
+    {
+        cache.Remove(PublicQueryCacheKeys.ArticlePublishedCount);
+    }
+
+    /// <summary>
     /// Bumps the photo cache version so category lists and paged grids refresh after admin writes.
     /// </summary>
     public void InvalidatePhotoCache()
@@ -175,7 +186,7 @@ public sealed class PublicQueryCacheService(
             return cached;
         }
 
-        var gate = loadGates.GetOrAdd(key, static _ => new SemaphoreSlim(1, 1));
+        var gate = LoadGates.GetOrAdd(key, static _ => new SemaphoreSlim(1, 1));
         await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {

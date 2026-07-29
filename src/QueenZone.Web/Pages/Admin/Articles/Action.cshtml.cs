@@ -3,7 +3,9 @@ using QueenZone.Data;
 
 namespace QueenZone.Web.Pages.Admin.Articles;
 
-public sealed class ActionModel(IArticleSubmissionRepository articleSubmissionRepository) : AdminArticlesPageModel
+public sealed class ActionModel(
+    IArticleSubmissionRepository articleSubmissionRepository,
+    PublicQueryCacheService publicQueryCache) : AdminArticlesPageModel
 {
     [BindProperty]
     public string? Slug { get; set; }
@@ -59,6 +61,16 @@ public sealed class ActionModel(IArticleSubmissionRepository articleSubmissionRe
             if (updated is null)
             {
                 return NotFound();
+            }
+
+            // Refresh public archive counts when publish visibility may have changed.
+            // Cheap process-local remove; also covers future legacy-article count coupling.
+            if (status is ArticleSubmissionStatus.Published
+                or ArticleSubmissionStatus.ApprovedForPublishing
+                or ArticleSubmissionStatus.Rejected
+                or ArticleSubmissionStatus.RequiresRevision)
+            {
+                publicQueryCache.InvalidateArticleCountCache();
             }
 
             TempData["ArticleMessage"] = successMessage;

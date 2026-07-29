@@ -150,6 +150,31 @@ public sealed class PublicQueryCacheServiceTests
     }
 
     [Fact]
+    public async Task InvalidateArticleCountCache_evicts_article_published_count_only()
+    {
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var newsRepository = new CountingNewsRepository();
+        var articlesRepository = new CountingArticlesRepository();
+        var service = CreateService(
+            memoryCache,
+            newsRepository: newsRepository,
+            articlesRepository: articlesRepository);
+
+        await service.GetNewsPublishedCountAsync();
+        await service.GetArticlePublishedCountAsync();
+        await service.GetArticlePublishedCountAsync();
+        Assert.Equal(1, articlesRepository.PublishedCountCallCount);
+
+        service.InvalidateArticleCountCache();
+
+        await service.GetArticlePublishedCountAsync();
+        await service.GetNewsPublishedCountAsync();
+
+        Assert.Equal(2, articlesRepository.PublishedCountCallCount);
+        Assert.Equal(1, newsRepository.PublishedCountCallCount);
+    }
+
+    [Fact]
     public async Task InvalidateNewsCache_evicts_all_latest_count_variants_not_just_homepage_default()
     {
         using var memoryCache = new MemoryCache(new MemoryCacheOptions());
@@ -207,6 +232,23 @@ public sealed class PublicQueryCacheServiceTests
         var tasks = Enumerable.Range(0, 12)
             .Select(_ => service.GetLatestNewsAsync(5))
             .ToArray();
+        await Task.WhenAll(tasks);
+
+        Assert.Equal(1, newsRepository.LatestCallCount);
+        Assert.All(tasks, t => Assert.Same(tasks[0].Result, t.Result));
+    }
+
+    [Fact]
+    public async Task Concurrent_cold_cache_hits_across_scoped_instances_invoke_factory_once()
+    {
+        // Production registers PublicQueryCacheService as scoped; gates must be process-wide.
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var newsRepository = new SlowCountingNewsRepository(TimeSpan.FromMilliseconds(100));
+        var services = Enumerable.Range(0, 12)
+            .Select(_ => CreateService(memoryCache, newsRepository: newsRepository))
+            .ToArray();
+
+        var tasks = services.Select(s => s.GetLatestNewsAsync(5)).ToArray();
         await Task.WhenAll(tasks);
 
         Assert.Equal(1, newsRepository.LatestCallCount);

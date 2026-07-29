@@ -4,6 +4,8 @@ The public site caches a small set of stable, anonymous query results in ASP.NET
 
 This is a **process-local** cache. Production runs a **single** App Service worker (B1); multi-instance Redis-backed cache is intentionally **not** used for cost reasons. See [`hosting-scale-and-cache.md`](hosting-scale-and-cache.md).
 
+`PublicQueryCacheService` is registered **scoped** (one instance per request) so it can inject scoped repositories, but cold-cache **stampede gates are process-wide** (`static` `SemaphoreSlim` map). Concurrent cold hits from different requests for the same key share a single factory execution against the shared `IMemoryCache`.
+
 This cache is intentionally limited to shared public data:
 
 - homepage latest published news
@@ -28,3 +30,5 @@ Default durations are configured by `PublicQueryCacheOptions`:
 Deployments can override these values with the `PublicQueryCache` configuration section. Short TTLs are preferred for editorial data, while forum and history data can tolerate longer staleness because those slices are mostly archive content.
 
 Admin news publish, unpublish, delete, and edits to already-published articles invalidate the public news cache immediately so visitor-facing news pages do not have to wait for TTL expiry after an editorial change.
+
+Admin article status changes that affect public visibility call `InvalidateArticleCountCache()` so the legacy articles archive published-count entry does not wait for its (longer) TTL.

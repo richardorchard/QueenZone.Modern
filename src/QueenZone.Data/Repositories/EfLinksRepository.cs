@@ -159,17 +159,28 @@ public sealed class EfLinksRepository : ILinksRepository
         IReadOnlyList<QueenLinkCheckUpdate> updates,
         CancellationToken cancellationToken = default)
     {
+        if (updates.Count == 0)
+        {
+            return;
+        }
+
+        // Batch load existing rows once (avoid N FindAsync round-trips for tool bulk checks).
+        var ids = updates.Select(update => update.QueenFeaturedSiteId).Distinct().ToList();
+        var existing = await dbContext.QueenLinkChecks
+            .Where(entity => ids.Contains(entity.QueenFeaturedSiteId))
+            .ToListAsync(cancellationToken);
+        var byId = existing.ToDictionary(entity => entity.QueenFeaturedSiteId);
+
         foreach (var update in updates)
         {
-            var entity = await dbContext.QueenLinkChecks
-                .FindAsync([update.QueenFeaturedSiteId], cancellationToken);
-            if (entity is null)
+            if (!byId.TryGetValue(update.QueenFeaturedSiteId, out var entity))
             {
                 entity = new QueenLinkCheckEntity
                 {
                     QueenFeaturedSiteId = update.QueenFeaturedSiteId,
                 };
                 dbContext.QueenLinkChecks.Add(entity);
+                byId[update.QueenFeaturedSiteId] = entity;
             }
 
             entity.Url = update.Url;

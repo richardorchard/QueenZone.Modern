@@ -9,7 +9,11 @@ namespace QueenZone.Data;
 /// </summary>
 public sealed class ModernForumRepository(QueenZoneDbContext dbContext) : IForumRepository
 {
-    private const int CommandTimeoutSeconds = 120;
+    /// <summary>Interactive public forum pages — align with default request budget.</summary>
+    private const int InteractiveCommandTimeoutSeconds = QueenZoneSqlServerOptions.DefaultCommandTimeoutSeconds;
+
+    /// <summary>Sitemap/export pages may scan large offsets; keep a higher ceiling.</summary>
+    private const int SitemapCommandTimeoutSeconds = 120;
 
     [ExcludeFromCodeCoverage] // SQL Server stored procedures; covered by opt-in legacy probes.
     public async Task<IReadOnlyList<ForumCategoryItem>> GetCategoriesAsync(CancellationToken cancellationToken = default)
@@ -17,7 +21,7 @@ public sealed class ModernForumRepository(QueenZoneDbContext dbContext) : IForum
         var rows = await EfSql.QueryProcAsync<ForumCategoryRow>(
             dbContext,
             "ModernForum_GetCategories",
-            commandTimeoutSeconds: CommandTimeoutSeconds,
+            commandTimeoutSeconds: InteractiveCommandTimeoutSeconds,
             cancellationToken: cancellationToken);
         return rows.Select(Map).ToList();
     }
@@ -29,7 +33,7 @@ public sealed class ModernForumRepository(QueenZoneDbContext dbContext) : IForum
             dbContext,
             "ModernForum_GetCategoryByLegacyForumId",
             command => command.Parameters.Add(EfSql.Input("@Q_FORUM_ID", id)),
-            CommandTimeoutSeconds,
+            InteractiveCommandTimeoutSeconds,
             cancellationToken);
         return row is null ? null : Map(row);
     }
@@ -52,7 +56,7 @@ public sealed class ModernForumRepository(QueenZoneDbContext dbContext) : IForum
                 command.Parameters.Add(EfSql.Input("@Q_FORUM_ID", forumId));
                 command.Parameters.Add(totalRecords);
             },
-            CommandTimeoutSeconds,
+            InteractiveCommandTimeoutSeconds,
             cancellationToken);
 
         return new ForumCategoryTopicsPage(
@@ -91,7 +95,7 @@ public sealed class ModernForumRepository(QueenZoneDbContext dbContext) : IForum
                 command.Parameters.Add(disco);
                 command.Parameters.Add(hasPoll);
             },
-            CommandTimeoutSeconds,
+            InteractiveCommandTimeoutSeconds,
             cancellationToken);
 
         var forumId = EfSql.GetNullableInt(forumIdParam) ?? 0;
@@ -124,7 +128,7 @@ public sealed class ModernForumRepository(QueenZoneDbContext dbContext) : IForum
         EfSql.ExecuteScalarProcAsync(
             dbContext,
             "ModernForum_GetTotalThreadCount",
-            commandTimeoutSeconds: CommandTimeoutSeconds,
+            commandTimeoutSeconds: InteractiveCommandTimeoutSeconds,
             cancellationToken: cancellationToken);
 
     [ExcludeFromCodeCoverage]
@@ -140,7 +144,7 @@ public sealed class ModernForumRepository(QueenZoneDbContext dbContext) : IForum
         EfSql.ExecuteScalarProcAsync(
             dbContext,
             "ModernForum_GetTopicSitemapCount",
-            commandTimeoutSeconds: CommandTimeoutSeconds,
+            commandTimeoutSeconds: SitemapCommandTimeoutSeconds,
             cancellationToken: cancellationToken);
 
     [ExcludeFromCodeCoverage]
@@ -157,7 +161,7 @@ public sealed class ModernForumRepository(QueenZoneDbContext dbContext) : IForum
                 command.Parameters.Add(EfSql.Input("@Offset", Math.Max(offset, 0)));
                 command.Parameters.Add(EfSql.Input("@PageSize", pageSize));
             },
-            CommandTimeoutSeconds,
+            SitemapCommandTimeoutSeconds,
             cancellationToken);
 
         return rows
@@ -201,7 +205,7 @@ public sealed class ModernForumRepository(QueenZoneDbContext dbContext) : IForum
                 command.Parameters.Add(EfSql.Input("@PageSize", pageSize));
                 command.Parameters.Add(totalRecords);
             },
-            CommandTimeoutSeconds,
+            InteractiveCommandTimeoutSeconds,
             cancellationToken);
 
         return new ForumSearchPage(
