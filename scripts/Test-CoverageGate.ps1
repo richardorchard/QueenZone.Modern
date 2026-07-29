@@ -120,14 +120,14 @@ if ($reportFiles.Count -eq 0) {
     throw "No Cobertura coverage reports found under '$Reports'."
 }
 
-$totalLinesValid = 0
-$totalLinesCovered = 0
+# Merge line hits across reports by file path. Do NOT sum each report's lines-valid /
+# lines-covered: coverlet emits overlapping assemblies (e.g. QueenZone.Data from both
+# Web.Tests and NewsAgent.Tests), and summing double-counts those lines and understates
+# global coverage when a sparse report includes a large shared surface.
 $coveredLinesByFile = @{}
 
 foreach ($reportFile in $reportFiles) {
     [xml]$coverage = Get-Content -LiteralPath $reportFile.FullName
-    $totalLinesValid += [int]$coverage.coverage.'lines-valid'
-    $totalLinesCovered += [int]$coverage.coverage.'lines-covered'
 
     $sources = @($coverage.coverage.sources.source | ForEach-Object {
         if ($_ -is [string]) {
@@ -165,12 +165,23 @@ foreach ($reportFile in $reportFiles) {
     }
 }
 
+$totalLinesValid = 0
+$totalLinesCovered = 0
+foreach ($fileHits in $coveredLinesByFile.Values) {
+    foreach ($hits in $fileHits.Values) {
+        $totalLinesValid++
+        if ($hits -gt 0) {
+            $totalLinesCovered++
+        }
+    }
+}
+
 if ($totalLinesValid -eq 0) {
     throw "Coverage report contains no valid lines."
 }
 
 $globalLineCoverage = [math]::Round(($totalLinesCovered / $totalLinesValid) * 100, 2)
-Write-Host "Global line coverage: $globalLineCoverage% ($totalLinesCovered/$totalLinesValid)"
+Write-Host "Global line coverage: $globalLineCoverage% ($totalLinesCovered/$totalLinesValid) [union of $($reportFiles.Count) reports]"
 
 if ($globalLineCoverage -lt $GlobalLineThreshold) {
     throw "Global line coverage $globalLineCoverage% is below the required $GlobalLineThreshold%."

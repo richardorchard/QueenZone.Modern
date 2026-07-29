@@ -15,6 +15,23 @@ namespace QueenZone.Web.Tests;
 public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApplicationFactory<Program>>
 {
     private const string AdminEmail = "admin@test.local";
+
+    private const string SampleDraftJson = """
+        {
+          "title": "Queen announce 2026 tour",
+          "slug": "queen-announce-2026-tour",
+          "excerpt": "Queen have announced new 2026 tour dates.",
+          "body": "Queen will return to the road in 2026 with dates across Europe and the UK.",
+          "related_entities": ["Queen", "tour"],
+          "source_urls": ["https://www.queenonline.com/news/tour-2026"],
+          "source_names": ["Queen Online"],
+          "attribution_text": "Source: Queen Online",
+          "confidence_notes": "Primary official source.",
+          "source_notes": "Official Queen Online announcement.",
+          "suggested_publish_at": "2026-07-02T10:00:00Z",
+          "secondary_source_warning": false
+        }
+        """;
     private readonly WebApplicationFactory<Program> factory;
 
     public AdminNewsDiscoveryRoutesTests(WebApplicationFactory<Program> factory)
@@ -822,7 +839,7 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
                 });
             }
 
-            var draftJson = draftResponseJson ?? NewsAgentTestSupport.SampleDraftJson;
+            var draftJson = draftResponseJson ?? SampleDraftJson;
             builder.ConfigureServices(services =>
             {
                 services.RemoveAll<SharedNewsStore>();

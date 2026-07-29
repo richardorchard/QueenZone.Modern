@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted.
+**Superseded** for the data-access *client library* by [ADR 0006](0006-hybrid-ef-core-admin-writes.md).
+
+This ADR remains useful as history of the initial bootstrap. Do **not** treat Dapper as the target or primary client for new work.
 
 Amended by ADR 0006 (2026-07-09): target client-library direction is EF Core while retaining stored procedures for hot paths. Follow-up work completed the migration of public-read repositories off Dapper; the Dapper package is no longer referenced in `QueenZone.Data`.
 

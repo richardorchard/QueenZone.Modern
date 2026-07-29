@@ -5,21 +5,19 @@ using QueenZone.Web;
 
 namespace QueenZone.Web.Tests;
 
-public sealed class AdminDashboardSectionLinksTests : IClassFixture<WebApplicationFactory<Program>>
+public sealed class AdminDashboardSectionLinksTests : IClassFixture<QueenZoneWebApplicationFactory>
 {
-    private const string AdminEmail = "admin@test.local";
-    private readonly WebApplicationFactory<Program> factory;
+    private readonly QueenZoneWebApplicationFactory factory;
 
-    public AdminDashboardSectionLinksTests(WebApplicationFactory<Program> factory)
+    public AdminDashboardSectionLinksTests(QueenZoneWebApplicationFactory factory)
     {
-        this.factory = factory.WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
+        this.factory = factory;
     }
 
     [Fact]
     public async Task AdminDashboard_RendersLinksToAllAdminSections()
     {
-        var client = factory.CreateClient();
-        client.DefaultRequestHeaders.Add("X-Test-User-Email", AdminEmail);
+        var client = factory.CreateAdminClient();
 
         var response = await client.GetAsync("/admin");
 

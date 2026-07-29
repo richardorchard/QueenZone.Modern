@@ -7,13 +7,13 @@ using QueenZone.Web;
 
 namespace QueenZone.Web.Tests;
 
-public sealed class NewsRoutesTests : IClassFixture<WebApplicationFactory<Program>>
+public sealed class NewsRoutesTests : IClassFixture<QueenZoneWebApplicationFactory>
 {
-    private readonly WebApplicationFactory<Program> factory;
+    private readonly QueenZoneWebApplicationFactory factory;
 
-    public NewsRoutesTests(WebApplicationFactory<Program> factory)
+    public NewsRoutesTests(QueenZoneWebApplicationFactory factory)
     {
-        this.factory = factory.WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
+        this.factory = factory;
     }
 
     [Fact]
@@ -98,7 +98,7 @@ public sealed class NewsRoutesTests : IClassFixture<WebApplicationFactory<Progra
         var client = factory.WithWebHostBuilder(builder =>
             builder.ConfigureServices(services =>
             {
-                services.AddSingleton<INewsRepository>(new InMemoryNewsRepository([]));
+                services.AddSingleton<INewsRepository>(new FixedNewsRepository([]));
             })).CreateClient();
 
         var body = await client.GetStringAsync("/news");
@@ -184,7 +184,7 @@ public sealed class NewsRoutesTests : IClassFixture<WebApplicationFactory<Progra
         var client = factory.WithWebHostBuilder(builder =>
             builder.ConfigureServices(services =>
             {
-                services.AddSingleton<INewsRepository>(new InMemoryNewsRepository(items));
+                services.AddSingleton<INewsRepository>(new FixedNewsRepository(items));
             })).CreateClient();
 
         var safeBody = await client.GetStringAsync("/news/5001/article-with-source");
@@ -215,7 +215,7 @@ public sealed class NewsRoutesTests : IClassFixture<WebApplicationFactory<Progra
         var client = factory.WithWebHostBuilder(builder =>
             builder.ConfigureServices(services =>
             {
-                services.AddSingleton<INewsRepository>(new InMemoryNewsRepository(items));
+                services.AddSingleton<INewsRepository>(new FixedNewsRepository(items));
             })).CreateClient();
 
         var body = await client.GetStringAsync("/news/5003/unsafe-html-article");
@@ -250,7 +250,7 @@ public sealed class NewsRoutesTests : IClassFixture<WebApplicationFactory<Progra
         var client = factory.WithWebHostBuilder(builder =>
             builder.ConfigureServices(services =>
             {
-                services.AddSingleton<INewsRepository>(new InMemoryNewsRepository(items));
+                services.AddSingleton<INewsRepository>(new FixedNewsRepository(items));
             })).CreateClient();
 
         var body = await client.GetStringAsync("/news/4242/latest-duplicate-title");
@@ -315,7 +315,7 @@ public sealed class NewsRoutesTests : IClassFixture<WebApplicationFactory<Progra
         var client = factory.WithWebHostBuilder(builder =>
             builder.ConfigureServices(services =>
             {
-                services.AddSingleton<INewsRepository>(new InMemoryNewsRepository(items));
+                services.AddSingleton<INewsRepository>(new FixedNewsRepository(items));
             })).CreateClient();
 
         var body = await client.GetStringAsync("/news");
@@ -367,7 +367,7 @@ public sealed class NewsRoutesTests : IClassFixture<WebApplicationFactory<Progra
         var client = factory.WithWebHostBuilder(builder =>
             builder.ConfigureServices(services =>
             {
-                services.AddSingleton<INewsRepository>(new InMemoryNewsRepository(duplicateItems));
+                services.AddSingleton<INewsRepository>(new FixedNewsRepository(duplicateItems));
             })).CreateClient();
 
         var pageOne = await client.GetStringAsync("/news");

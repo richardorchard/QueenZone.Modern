@@ -65,6 +65,7 @@ When `ConnectionStrings:QueenZoneLegacy` is empty, the matching `InMemory*` impl
 4. Prefer extending an existing repository over opening a one-off `SqlConnection` elsewhere.
 5. **Do not reintroduce Dapper** (or another micro-ORM) for new code without a new ADR.
 6. **Keep EF migrations and the model snapshot in sync.** Hand-written SQL migrations are allowed for careful idempotent DDL, but EF still requires migration designer metadata and `QueenZoneDbContextModelSnapshot` to match the runtime model. Run `dotnet ef migrations has-pending-model-changes --project src/QueenZone.Data/QueenZone.Data.csproj --startup-project src/QueenZone.Web/QueenZone.Web.csproj` before PRs that change `QueenZoneDbContext`, mapped entities, or migrations.
+7. **Large stored procedure / FTS bodies:** keep a reviewable copy under `docs/sql/` (see `docs/sql/README.md`) and keep the applying EF migration in sync. Prefer `CREATE OR ALTER` for procs.
 
 ### Target direction (standardize on EF Core)
 

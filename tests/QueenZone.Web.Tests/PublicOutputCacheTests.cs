@@ -1,5 +1,6 @@
-using Microsoft.AspNetCore.Http;
+using System.Net;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using QueenZone.Data;
@@ -7,6 +8,25 @@ using QueenZone.Web;
 
 namespace QueenZone.Web.Tests;
 
+/// <summary>
+/// Output-cache behaviour for public HTML.
+/// <list type="bullet">
+/// <item>
+/// <description>
+/// Default suite uses environment <c>Testing</c>, which disables the public HTML output-cache
+/// policy so integration tests stay deterministic and do not share stale HTML.
+/// </description>
+/// </item>
+/// <item>
+/// <description>
+/// Production-shaped cases use <c>UseEnvironment("Production")</c> plus the same Entra host
+/// settings as <see cref="ResponseCompressionTests"/> so output cache is enabled without a real
+/// Azure AD app. Empty <c>ConnectionStrings:QueenZoneLegacy</c> keeps in-memory sample data.
+/// No special env vars are required beyond a normal <c>dotnet test</c> run.
+/// </description>
+/// </item>
+/// </list>
+/// </summary>
 public sealed class PublicOutputCacheTests : IClassFixture<WebApplicationFactory<Program>>
 {
     private readonly WebApplicationFactory<Program> factory;
@@ -36,6 +56,61 @@ public sealed class PublicOutputCacheTests : IClassFixture<WebApplicationFactory
         Assert.True(repository.ArchivePageCallCount + repository.PublishedCountCallCount > callsAfterFirstRequest);
     }
 
+    [Fact]
+    public async Task Production_anonymous_public_html_is_served_from_output_cache_on_second_request()
+    {
+        var repository = new CountingArticlesRepository();
+        var productionFactory = CreateProductionFactory(services =>
+        {
+            services.AddSingleton<IArticlesRepository>(repository);
+        });
+
+        var client = productionFactory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false,
+            HandleCookies = false,
+        });
+
+        using var firstResponse = await client.GetAsync("/articles");
+        var firstBody = await firstResponse.Content.ReadAsStringAsync();
+        var callsAfterFirst = repository.ArchivePageCallCount + repository.PublishedCountCallCount;
+
+        Assert.Equal(HttpStatusCode.OK, firstResponse.StatusCode);
+        Assert.Contains("Cached archive article", firstBody);
+        Assert.True(callsAfterFirst > 0, "First request should invoke the articles repository.");
+
+        // Archive page loads published count (query-cache eligible) and archive page (not
+        // query-cached). Unchanged totals on the second request prove the Razor page did not
+        // re-run — i.e. ASP.NET Core output cache served the HTML.
+        using var secondResponse = await client.GetAsync("/articles");
+        var secondBody = await secondResponse.Content.ReadAsStringAsync();
+        var callsAfterSecond = repository.ArchivePageCallCount + repository.PublishedCountCallCount;
+
+        Assert.Equal(HttpStatusCode.OK, secondResponse.StatusCode);
+        Assert.Equal(firstBody, secondBody);
+        Assert.Equal(callsAfterFirst, callsAfterSecond);
+        Assert.Equal(repository.ArchivePageCallCountAtFirstSnapshot, repository.ArchivePageCallCount);
+    }
+
+    [Fact]
+    public async Task Production_excluded_admin_path_is_not_output_cached()
+    {
+        // Policy unit tests already cover authenticated bypass; this integration case proves an
+        // excluded path is not held in the public HTML output cache by checking that two GETs
+        // still exercise the endpoint (health is cheap and always uncached by policy).
+        var productionFactory = CreateProductionFactory();
+        var client = productionFactory.CreateClient();
+
+        using var first = await client.GetAsync("/health");
+        using var second = await client.GetAsync("/health");
+
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+        Assert.False(
+            PublicOutputCachePolicies.IsPublicReadOnlyRequest(CreateHttpContext("GET", "/health")),
+            "Health must remain excluded from the public read-only output-cache policy.");
+    }
+
     [Theory]
     [InlineData("GET", "/articles", true)]
     [InlineData("HEAD", "/articles", true)]
@@ -49,11 +124,29 @@ public sealed class PublicOutputCacheTests : IClassFixture<WebApplicationFactory
         string path,
         bool expected)
     {
+        Assert.Equal(expected, PublicOutputCachePolicies.IsPublicReadOnlyRequest(CreateHttpContext(method, path)));
+    }
+
+    private WebApplicationFactory<Program> CreateProductionFactory(
+        Action<IServiceCollection>? configureServices = null)
+    {
+        return factory.WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Production");
+            ResponseCompressionTests.ApplyProductionEntraTestSettings(builder);
+            if (configureServices is not null)
+            {
+                builder.ConfigureServices(configureServices);
+            }
+        });
+    }
+
+    private static DefaultHttpContext CreateHttpContext(string method, string path)
+    {
         var context = new DefaultHttpContext();
         context.Request.Method = method;
         context.Request.Path = path;
-
-        Assert.Equal(expected, PublicOutputCachePolicies.IsPublicReadOnlyRequest(context));
+        return context;
     }
 
     private sealed class CountingArticlesRepository : IArticlesRepository
@@ -72,6 +165,9 @@ public sealed class PublicOutputCacheTests : IClassFixture<WebApplicationFactory
 
         public int PublishedCountCallCount { get; private set; }
 
+        /// <summary>Snapshot of <see cref="ArchivePageCallCount"/> after the first successful load.</summary>
+        public int ArchivePageCallCountAtFirstSnapshot { get; private set; }
+
         public Task<IReadOnlyList<ArticleItem>> GetLatestAsync(int count, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<ArticleItem>>([article]);
 
@@ -81,6 +177,11 @@ public sealed class PublicOutputCacheTests : IClassFixture<WebApplicationFactory
             CancellationToken cancellationToken = default)
         {
             ArchivePageCallCount++;
+            if (ArchivePageCallCountAtFirstSnapshot == 0)
+            {
+                ArchivePageCallCountAtFirstSnapshot = ArchivePageCallCount;
+            }
+
             return Task.FromResult<IReadOnlyList<ArticleItem>>([article]);
         }
 

@@ -26,10 +26,4 @@
     <ProjectReference Include="..\..\src\QueenZone.NewsAgent\QueenZone.NewsAgent.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <None Update="Fixtures\NewsAgent\**\*">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
-
 </Project>
