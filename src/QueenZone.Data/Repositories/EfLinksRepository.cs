@@ -119,17 +119,24 @@ public sealed class EfLinksRepository : ILinksRepository
             .Where(row => !string.IsNullOrWhiteSpace(row.CategoryName)
                 && !string.IsNullOrWhiteSpace(row.Title)
                 && !string.IsNullOrWhiteSpace(row.Url))
-            .GroupBy(row => new { row.CategoryId, row.CategoryName })
-            .Select(group => new QueenLinkCategory(
-                group.Key.CategoryId,
-                group.Key.CategoryName.Trim(),
-                group.Select(row => new QueenLink(
+            .Select(row => new
+            {
+                row.CategoryId,
+                row.CategoryName,
+                Link = new QueenLink(
                     row.Id,
                     row.Title.Trim(),
                     row.Url.Trim(),
                     string.IsNullOrWhiteSpace(row.Comment) ? null : row.Comment.Trim(),
                     row.CategoryId,
-                    row.FeaturedSite != 0)).ToList()))
+                    row.FeaturedSite != 0).ToPublicLink()
+            })
+            .Where(row => row.Link is not null)
+            .GroupBy(row => new { row.CategoryId, row.CategoryName })
+            .Select(group => new QueenLinkCategory(
+                group.Key.CategoryId,
+                group.Key.CategoryName.Trim(),
+                group.Select(row => row.Link!).ToList()))
             .ToList();
     }
 

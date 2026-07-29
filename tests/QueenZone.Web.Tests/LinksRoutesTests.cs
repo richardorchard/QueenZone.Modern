@@ -96,6 +96,44 @@ public sealed class LinksRoutesTests : IClassFixture<WebApplicationFactory<Progr
         Assert.DoesNotContain("Dead Only", body);
     }
 
+    [Fact]
+    public async Task LinksPageNormalizesBareLegacyUrlsAndDisplaysHost()
+    {
+        var client = CreateClientWithLinks(
+        [
+            new QueenLinkCategory(
+                1,
+                "Official",
+                [
+                    new QueenLink(1, "Queen Online", "www.queenonline.com", "Official Queen site.", 1, true),
+                ]),
+        ]);
+
+        var body = await client.GetStringAsync("/links");
+
+        Assert.Contains("href=\"https://www.queenonline.com/\"", body);
+        Assert.Contains("www.queenonline.com", body);
+    }
+
+    [Fact]
+    public async Task LinksPageSkipsMalformedLegacyUrls()
+    {
+        var client = CreateClientWithLinks(
+        [
+            new QueenLinkCategory(
+                1,
+                "Broken",
+                [
+                    new QueenLink(1, "Malformed", "mailto:someone@example.test", "Not a public web link.", 1, false),
+                ]),
+        ]);
+
+        var body = await client.GetStringAsync("/links");
+
+        Assert.Contains("No checked Queen links are available yet.", body);
+        Assert.DoesNotContain("Malformed", body);
+    }
+
     private HttpClient CreateClientWithLinks(
         IReadOnlyList<QueenLinkCategory> categories) =>
         CreateClientWithLinks(new InMemoryLinksRepository(categories));
