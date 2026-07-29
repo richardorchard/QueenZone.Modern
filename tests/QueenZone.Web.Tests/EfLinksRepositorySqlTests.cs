@@ -19,4 +19,13 @@ public sealed class EfLinksRepositorySqlTests
         Assert.Contains("CAST(ISNULL(s.FEATURED_SITE, 0) AS int) AS FeaturedSite", EfLinksRepository.ValidationLinksSql);
         Assert.Contains("ISNULL(CAST(s.DISPLAY AS int), 0) <> 0", EfLinksRepository.ValidationLinksSql);
     }
+
+    [Fact]
+    public void LinkSql_CastsLegacyIdColumnsBeforeMapping()
+    {
+        Assert.Contains("CAST(c.Q_LINK_CAT_ID AS int) AS CategoryId", EfLinksRepository.PublicLinksSql);
+        Assert.Contains("CAST(s.QUEEN_FEATURED_SITE_ID AS int) AS Id", EfLinksRepository.PublicLinksSql);
+        Assert.Contains("CAST(s.Q_LINK_CAT_ID AS int) AS CategoryId", EfLinksRepository.ValidationLinksSql);
+        Assert.Contains("CAST(s.QUEEN_FEATURED_SITE_ID AS int) AS Id", EfLinksRepository.ValidationLinksSql);
+    }
 }

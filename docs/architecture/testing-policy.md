@@ -90,6 +90,7 @@ Good targets:
 - `NEWS_T` queries return only published rows.
 - Archive ordering matches the intended legacy behavior.
 - Direct SQL and stored procedure mappings populate the modern read models correctly.
+- Raw SQL projections over legacy tables materialize successfully against SQL Server column types.
 - Nulls, unusual characters, and legacy HTML do not crash the mapping layer.
 - Oldest, newest, and sample records can be loaded for each migrated content area.
 
@@ -101,6 +102,8 @@ ConnectionStrings__QueenZoneLegacy=...
 ```
 
 Do not require these tests in normal CI until the project has a known, repeatable test database.
+
+When EF Core `SqlQueryRaw` maps legacy columns into typed row classes, do not rely only on in-memory route tests. The legacy schema uses many `smallint` and `bit` columns; SQL Server returns those as `System.Int16` and `bool`, not `int`. Either cast projected values to the row model type in SQL (for example, `CAST(Q_LINK_CAT_ID AS int) AS CategoryId`) and cover that SQL shape with a deterministic test, or run an opt-in read-only legacy database probe before deployment to prove the projection materializes.
 
 For pre-release admin write checks against the configured legacy SQL Server database, run `scripts/Probe-AdminNewsLegacyWrites.ps1` with both `ConnectionStrings__QueenZoneLegacy` and `RUN_LEGACY_WRITE_PROBE=true` set. The probe creates, publishes, unpublishes, and deletes a uniquely named test article. Point the connection string at a database you are willing to mutate (often the same Azure SQL instance used locally or in production), not the in-memory sample data path.
 

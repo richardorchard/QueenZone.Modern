@@ -27,9 +27,9 @@ public sealed class EfLinksRepository : ILinksRepository
             IF OBJECT_ID(N'dbo.QueenLinkChecks', N'U') IS NULL
             BEGIN
                 SELECT
-                    c.Q_LINK_CAT_ID AS CategoryId,
+                    CAST(c.Q_LINK_CAT_ID AS int) AS CategoryId,
                     c.CAT_NAME AS CategoryName,
-                    s.QUEEN_FEATURED_SITE_ID AS Id,
+                    CAST(s.QUEEN_FEATURED_SITE_ID AS int) AS Id,
                     s.QUEEN_FEATURED_SITE_TITLE AS Title,
                     s.QUEEN_FEATURED_SITE_URL AS Url,
                     s.SITE_COMMENT AS Comment,
@@ -46,9 +46,9 @@ public sealed class EfLinksRepository : ILinksRepository
             ELSE
             BEGIN
                 SELECT
-                    c.Q_LINK_CAT_ID AS CategoryId,
+                    CAST(c.Q_LINK_CAT_ID AS int) AS CategoryId,
                     c.CAT_NAME AS CategoryName,
-                    s.QUEEN_FEATURED_SITE_ID AS Id,
+                    CAST(s.QUEEN_FEATURED_SITE_ID AS int) AS Id,
                     s.QUEEN_FEATURED_SITE_TITLE AS Title,
                     s.QUEEN_FEATURED_SITE_URL AS Url,
                     s.SITE_COMMENT AS Comment,
@@ -71,11 +71,11 @@ public sealed class EfLinksRepository : ILinksRepository
             IF OBJECT_ID(N'dbo.QueenLinkChecks', N'U') IS NULL
             BEGIN
                 SELECT
-                    s.QUEEN_FEATURED_SITE_ID AS Id,
+                    CAST(s.QUEEN_FEATURED_SITE_ID AS int) AS Id,
                     s.QUEEN_FEATURED_SITE_TITLE AS Title,
                     s.QUEEN_FEATURED_SITE_URL AS Url,
                     s.SITE_COMMENT AS Comment,
-                    s.Q_LINK_CAT_ID AS CategoryId,
+                    CAST(s.Q_LINK_CAT_ID AS int) AS CategoryId,
                     CAST(ISNULL(s.FEATURED_SITE, 0) AS int) AS FeaturedSite,
                     0 AS ConsecutiveFailureCount,
                     CAST(0 AS bit) AS IsConfirmedDead
@@ -89,11 +89,11 @@ public sealed class EfLinksRepository : ILinksRepository
             ELSE
             BEGIN
                 SELECT
-                    s.QUEEN_FEATURED_SITE_ID AS Id,
+                    CAST(s.QUEEN_FEATURED_SITE_ID AS int) AS Id,
                     s.QUEEN_FEATURED_SITE_TITLE AS Title,
                     s.QUEEN_FEATURED_SITE_URL AS Url,
                     s.SITE_COMMENT AS Comment,
-                    s.Q_LINK_CAT_ID AS CategoryId,
+                    CAST(s.Q_LINK_CAT_ID AS int) AS CategoryId,
                     CAST(ISNULL(s.FEATURED_SITE, 0) AS int) AS FeaturedSite,
                     ISNULL(checks.ConsecutiveFailureCount, 0) AS ConsecutiveFailureCount,
                     ISNULL(checks.IsConfirmedDead, 0) AS IsConfirmedDead
