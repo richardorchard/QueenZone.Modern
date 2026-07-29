@@ -10,6 +10,9 @@ public sealed class InMemoryLinksRepository(IReadOnlyList<QueenLinkCategory> see
             {
                 Links = category.Links
                     .Where(link => !checkResults.TryGetValue(link.Id, out var check) || !check.IsConfirmedDead)
+                    .Select(link => link.ToPublicLink())
+                    .Where(link => link is not null)
+                    .Select(link => link!)
                     .ToList()
             })
             .Where(category => category.Links.Count > 0)
