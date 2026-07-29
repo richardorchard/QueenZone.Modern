@@ -4,6 +4,8 @@ The public site caches a small set of stable, anonymous query results in ASP.NET
 
 This is a **process-local** cache. Production runs a **single** App Service worker (B1); multi-instance Redis-backed cache is intentionally **not** used for cost reasons. See [`hosting-scale-and-cache.md`](hosting-scale-and-cache.md).
 
+`PublicQueryCacheService` is registered **scoped** (one instance per request) so it can inject scoped repositories, but cold-cache **stampede gates are process-wide** (`static` `SemaphoreSlim` map). Concurrent cold hits from different requests for the same key share a single factory execution against the shared `IMemoryCache`.
+
 This cache is intentionally limited to shared public data:
 
 - homepage latest published news
