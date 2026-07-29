@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using QueenZone.Data;
+using QueenZone.Web.Archive;
 
 namespace QueenZone.Web.Pages.News;
 
@@ -18,52 +19,39 @@ public abstract class NewsArchivePageModel(
 
     protected async Task<IActionResult> LoadArchivePageAsync(int page, CancellationToken cancellationToken)
     {
-        if (page < 1)
-        {
-            return NotFound();
-        }
-
-        var publishedCount = await publicQueryCache.GetNewsPublishedCountAsync(cancellationToken);
-        var archive = await newsRepository.GetArchivePageAsync(page, NewsRoutes.ArchivePageSize, cancellationToken);
-        var totalPages = NewsRoutes.ResolveArchiveTotalPages(
+        var result = await ArchivePageLoader.LoadAsync<NewsItem>(
             page,
-            archive.Count,
-            publishedCount,
-            NewsRoutes.GetArchiveTotalPages(publishedCount));
+            NewsRoutes.ArchivePageSize,
+            ct => publicQueryCache.GetNewsPublishedCountAsync(ct),
+            (p, size, ct) => newsRepository.GetArchivePageAsync(p, size, ct),
+            (p, ic, pc, tp) => NewsRoutes.ResolveArchiveTotalPages(p, ic, pc, tp),
+            (p, total) => new ArchivePageContext(
+                p, total,
+                NewsRoutes.GetArchivePageTitle(p),
+                NewsRoutes.GetArchiveCanonicalPath(p),
+                p > 1 ? NewsRoutes.GetArchiveCanonicalPath(p - 1) : null,
+                total > 0 && p < total ? NewsRoutes.GetArchiveCanonicalPath(p + 1) : null),
+            cancellationToken);
 
-        if (totalPages == 0)
-        {
-            if (page > 1)
-            {
-                return NotFound();
-            }
-        }
-        else if (page > totalPages)
-        {
+        if (result is ArchivePageResult<NewsItem>.NotFound)
             return NotFound();
-        }
 
-        Items = PublicContentMapper.ToNewsArchiveItems(archive);
-        CurrentPage = page;
-        TotalPages = totalPages;
+        var success = (ArchivePageResult<NewsItem>.Success)result;
+        var ctx = success.Context;
+
+        Items = PublicContentMapper.ToNewsArchiveItems(success.Items);
+        CurrentPage = ctx.CurrentPage;
+        TotalPages = ctx.TotalPages;
         Breadcrumbs = [BreadcrumbItem.Home, new BreadcrumbItem("News", "/news")];
 
-        ViewData["Title"] = NewsRoutes.GetArchivePageTitle(page);
+        ViewData["Title"] = ctx.Title;
         if (page <= 1)
-        {
             ViewData["Description"] = "The latest Queen news and stories from QueenZone.";
-        }
-
-        ViewData["CanonicalPath"] = NewsRoutes.GetArchiveCanonicalPath(page);
-        if (page > 1)
-        {
-            ViewData["PrevPath"] = NewsRoutes.GetArchiveCanonicalPath(page - 1);
-        }
-
-        if (totalPages > 0 && page < totalPages)
-        {
-            ViewData["NextPath"] = NewsRoutes.GetArchiveCanonicalPath(page + 1);
-        }
+        ViewData["CanonicalPath"] = ctx.CanonicalPath;
+        if (ctx.PrevPath is not null)
+            ViewData["PrevPath"] = ctx.PrevPath;
+        if (ctx.NextPath is not null)
+            ViewData["NextPath"] = ctx.NextPath;
 
         return Page();
     }
