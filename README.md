@@ -13,19 +13,23 @@ The goal is to restart QueenZone as a clean, modern public site that fully expos
   QueenZone.sln
   src/
     QueenZone.Data/
+      Entities/ Repositories/ Sql/ SampleData/ SharedStores/ Migrations/
     QueenZone.NewsAgent/
     QueenZone.NewsAgent.Worker/
     QueenZone.Storage/
     QueenZone.Tools/
     QueenZone.Web/
-      Pages/
+      Auth/ Caching/ Content/ Endpoints/ Admin/ Member/ Forum/ Infrastructure/
+      Pages/ Health/ Sitemap/ wwwroot/
   tests/
     QueenZone.Storage.Tests/
     QueenZone.Tools.Tests/
+    QueenZone.NewsAgent.Tests/   # agent unit tests
+    QueenZone.Web.Tests/         # HTTP + composition
     QueenZone.Web.E2E/
-    QueenZone.Web.Tests/
   docs/
     architecture/
+    sql/                         # reviewable proc/FTS SQL
     legacy/
     decisions/
     backlog/
@@ -33,6 +37,8 @@ The goal is to restart QueenZone as a clean, modern public site that fully expos
     Smoke-NewsAgent.bat
     Smoke-LiveSite.ps1
 ```
+
+C# namespaces remain `QueenZone.Data` / `QueenZone.Web` (folders are for navigation only).
 
 ## Local Development
 

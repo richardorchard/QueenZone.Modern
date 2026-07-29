@@ -22,6 +22,8 @@ Use a layered test suite. Keep the default local and CI test path fast, determin
 
 Use unit tests for pure logic with no web host, filesystem, network, or database dependency.
 
+News agent library unit tests (discovery, triage, draft generation, OpenRouter, SSRF URL safety) live in `tests/QueenZone.NewsAgent.Tests`. Web HTTP integration, Razor composition, and admin UI tests stay in `tests/QueenZone.Web.Tests`. Prefer `QueenZoneWebApplicationFactory` for Testing-environment hosts instead of re-applying `UseEnvironment("Testing")` in every class.
+
 Good targets:
 
 - Slug generation.

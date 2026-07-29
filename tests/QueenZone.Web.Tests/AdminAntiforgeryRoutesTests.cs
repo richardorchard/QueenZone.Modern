@@ -8,13 +8,13 @@ using QueenZone.Web;
 
 namespace QueenZone.Web.Tests;
 
-public sealed class AdminAntiforgeryRoutesTests : IClassFixture<WebApplicationFactory<Program>>
+public sealed class AdminAntiforgeryRoutesTests : IClassFixture<QueenZoneWebApplicationFactory>
 {
-    private readonly WebApplicationFactory<Program> factory;
+    private readonly QueenZoneWebApplicationFactory factory;
 
-    public AdminAntiforgeryRoutesTests(WebApplicationFactory<Program> factory)
+    public AdminAntiforgeryRoutesTests(QueenZoneWebApplicationFactory factory)
     {
-        this.factory = factory.WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
+        this.factory = factory;
     }
 
     [Fact]

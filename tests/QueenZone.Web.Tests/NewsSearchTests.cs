@@ -14,7 +14,7 @@ namespace QueenZone.Web.Tests;
 
 public sealed class InMemoryNewsSearchTests
 {
-    private static InMemoryNewsRepository CreateRepository() =>
+    private static FixedNewsRepository CreateRepository() =>
         new(SampleNewsData.CreateSeedArticles()
             .Select(a => new NewsItem(
                 a.Id, a.Title, a.Excerpt, a.Body, a.PublishedAt, a.SourceUrl, a.IsPublished,

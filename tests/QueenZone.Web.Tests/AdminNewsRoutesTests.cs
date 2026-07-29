@@ -1,6 +1,4 @@
 using System.Net;
-using System.Text.RegularExpressions;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,14 +10,14 @@ using QueenZone.Web.Pages.Admin.News;
 namespace QueenZone.Web.Tests;
 
 [Collection(AdminNewsDeleteErrorCollection.Name)]
-public sealed partial class AdminNewsRoutesTests : IClassFixture<WebApplicationFactory<Program>>
+public sealed class AdminNewsRoutesTests : IClassFixture<QueenZoneWebApplicationFactory>
 {
-    private const string AdminEmail = "admin@test.local";
-    private readonly WebApplicationFactory<Program> factory;
+    private const string AdminEmail = AdminHttpTestHelpers.AdminEmail;
+    private readonly QueenZoneWebApplicationFactory factory;
 
-    public AdminNewsRoutesTests(WebApplicationFactory<Program> factory)
+    public AdminNewsRoutesTests(QueenZoneWebApplicationFactory factory)
     {
-        this.factory = factory.WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
+        this.factory = factory;
     }
 
     [Fact]
@@ -878,52 +876,18 @@ public sealed partial class AdminNewsRoutesTests : IClassFixture<WebApplicationF
     private WebApplicationFactory<Program> CreateFactory(SharedNewsStore store) =>
         CreateFactory(store, null, null);
 
-    private static HttpClient CreateClientFromFactory(WebApplicationFactory<Program> appFactory, string? email)
-    {
-        var client = appFactory.CreateClient(new WebApplicationFactoryClientOptions
-        {
-            HandleCookies = true,
-            AllowAutoRedirect = false
-        });
+    private static HttpClient CreateClientFromFactory(WebApplicationFactory<Program> appFactory, string? email) =>
+        AdminHttpTestHelpers.CreateClient(appFactory, email);
 
-        if (!string.IsNullOrWhiteSpace(email))
-        {
-            client.DefaultRequestHeaders.Add(TestAuthHandler.UserEmailHeader, email);
-        }
-
-        return client;
-    }
-
-    private static async Task<HttpResponseMessage> PostArticleAsync(
+    private static Task<HttpResponseMessage> PostArticleAsync(
         HttpClient client,
         string formPath,
         string postPath,
-        Dictionary<string, string> fields)
-    {
-        var formPage = await client.GetStringAsync(formPath);
-        fields[AdminNewsRoutes.AntiforgeryTokenFieldName] = ExtractAntiforgeryToken(formPage);
-        return await client.PostAsync(postPath, new FormUrlEncodedContent(fields));
-    }
+        Dictionary<string, string> fields) =>
+        AdminHttpTestHelpers.PostArticleAsync(client, formPath, postPath, fields);
 
-    private static async Task<HttpResponseMessage> PostActionAsync(HttpClient client, string actionPath)
-    {
-        var listPage = await client.GetStringAsync("/admin/news");
-        var token = ExtractAntiforgeryToken(listPage);
-        return await client.PostAsync(actionPath, new FormUrlEncodedContent(new Dictionary<string, string>
-        {
-            [AdminNewsRoutes.AntiforgeryTokenFieldName] = token
-        }));
-    }
-
-    private static string ExtractAntiforgeryToken(string html)
-    {
-        var match = AntiforgeryTokenRegex().Match(html);
-        Assert.True(match.Success, "Antiforgery token was not found in the form.");
-        return match.Groups["token"].Value;
-    }
-
-    [GeneratedRegex("""name="__RequestVerificationToken" value="(?<token>[^"]+)""", RegexOptions.IgnoreCase)]
-    private static partial Regex AntiforgeryTokenRegex();
+    private static Task<HttpResponseMessage> PostActionAsync(HttpClient client, string actionPath) =>
+        AdminHttpTestHelpers.PostNewsActionAsync(client, actionPath);
 
     private static IEnumerable<AdminNewsArticle> CreateSeedArticles(int count) =>
         Enumerable.Range(1, count).Select(index => new AdminNewsArticle(
