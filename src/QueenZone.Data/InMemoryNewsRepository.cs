@@ -25,4 +25,26 @@ public sealed class InMemoryNewsRepository(SharedNewsStore store) : INewsReposit
         Task.FromResult<IReadOnlyList<SitemapContentEntry>>(store.GetPublishedNewsItems()
             .Select(item => new SitemapContentEntry(item.Id, item.Title, item.PublishedAt, item.Slug))
             .ToList());
+
+    public Task<NewsSearchPage> SearchAsync(string query, int page, int pageSize, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return Task.FromResult(new NewsSearchPage([], 0, page, pageSize));
+        }
+
+        var term = query.Trim();
+        var matches = store.GetPublishedNewsItems()
+            .Where(item =>
+                item.Title.Contains(term, StringComparison.OrdinalIgnoreCase) ||
+                item.Excerpt.Contains(term, StringComparison.OrdinalIgnoreCase) ||
+                item.Body.Contains(term, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        var normalizedPage = Math.Max(page, 1);
+        var skip = (normalizedPage - 1) * pageSize;
+        var items = matches.Skip(skip).Take(pageSize).ToList();
+
+        return Task.FromResult(new NewsSearchPage(items, matches.Count, normalizedPage, pageSize));
+    }
 }
