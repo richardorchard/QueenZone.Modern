@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace QueenZone.Data;
@@ -61,6 +61,7 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddScoped<IArticleSubmissionRepository, EfArticleSubmissionRepository>();
         services.AddScoped<IArticleRepository, EfArticleRepository>();
         services.AddScoped<INewsSuggestionRepository, EfNewsSuggestionRepository>();
+        services.AddScoped<ILinksRepository, EfLinksRepository>();
         services.AddScoped<IFreddieTributeRepository, EfFreddieTributeRepository>();
         services.AddScoped<IAdminFreddieTributeRepository, EfAdminFreddieTributeRepository>();
 
@@ -124,6 +125,7 @@ public static class QueenZoneDataServiceCollectionExtensions
         });
         services.AddSingleton<IArticleRepository>(sp =>
             new InMemoryArticleRepository(sp.GetRequiredService<IArticleSubmissionRepository>()));
+        services.AddSingleton<ILinksRepository>(_ => new InMemoryLinksRepository(SampleLinksData.CreateSeedCategories()));
         services.AddSingleton(_ => new SharedFreddieTributeStore(SampleFreddieTributeData.CreateSeedTributes()));
         services.AddSingleton<IFreddieTributeRepository, InMemoryFreddieTributeRepository>();
         services.AddSingleton<IAdminFreddieTributeRepository, InMemoryAdminFreddieTributeRepository>();

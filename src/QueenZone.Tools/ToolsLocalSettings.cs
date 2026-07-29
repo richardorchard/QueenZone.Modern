@@ -6,6 +6,8 @@ internal sealed class ToolsLocalSettings
 {
     public string? QueenZoneLegacyLive { get; init; }
 
+    public string? QueenZoneLegacy { get; init; }
+
     public string? BlobStorage { get; init; }
 
     public static ToolsLocalSettings? TryLoad(string? explicitPath = null)
@@ -33,6 +35,7 @@ internal sealed class ToolsLocalSettings
             return new ToolsLocalSettings
             {
                 QueenZoneLegacyLive = TryGetString(connectionStrings, "QueenZoneLegacyLive"),
+                QueenZoneLegacy = TryGetString(connectionStrings, "QueenZoneLegacy"),
                 BlobStorage = TryGetString(connectionStrings, "BlobStorage"),
             };
         }

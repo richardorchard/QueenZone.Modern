@@ -18,6 +18,11 @@ internal static class ToolsApp
             return await GeneratePhotoThumbsCommand.RunAsync(args[1..]);
         }
 
+        if (args.Length > 0 && string.Equals(args[0], "check-links", StringComparison.OrdinalIgnoreCase))
+        {
+            return await CheckLinksCommand.RunAsync(args[1..]);
+        }
+
         return await RunImportHistoryAsync(args);
     }
 
@@ -33,6 +38,7 @@ internal static class ToolsApp
             Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- import-history --csv <path> --dry-run");
             Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- check-photos [options]");
             Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- generate-photo-thumbs [options]");
+            Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- check-links [options]");
             Console.Error.WriteLine();
             Console.Error.WriteLine("Connection string can also be supplied with ConnectionStrings__QueenZoneLegacy.");
             return 2;

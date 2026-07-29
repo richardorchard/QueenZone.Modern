@@ -1,4 +1,4 @@
-﻿using QueenZone.Data;
+using QueenZone.Data;
 
 namespace QueenZone.Web.Sitemap;
 
@@ -16,7 +16,8 @@ public sealed class CoreSitemapBuilder(
         Task.FromResult<IReadOnlyList<SitemapEntry>>(
             [
                 new("/"),
-                new("/about")
+                new("/about"),
+                new("/links")
             ]);
 
     public async Task<IReadOnlyList<SitemapEntry>?> BuildSectionAsync(

@@ -2431,6 +2431,81 @@ body.qz-menu-lock .qz-masthead {
   color: var(--qz-gold);
 }
 
+.qz-links-category-list {
+  display: grid;
+  gap: var(--space-8);
+}
+
+.qz-links-category__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border-default);
+  padding-bottom: var(--space-3);
+}
+
+.qz-links-category__header h2 {
+  margin: 0;
+  font-size: clamp(1.5rem, 3vw, 2.4rem);
+}
+
+.qz-links-category__header span {
+  font: var(--type-meta);
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.qz-links-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.qz-link-card {
+  display: grid;
+  gap: var(--space-2);
+  min-height: 100%;
+  padding: var(--space-5);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--qz-white);
+  box-shadow: var(--shadow-sm);
+  color: var(--text-primary);
+  text-decoration: none;
+  transition: transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+}
+
+.qz-link-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lift);
+}
+
+.qz-link-card--featured {
+  border-color: rgba(181, 138, 74, 0.42);
+}
+
+.qz-link-card__title {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  line-height: 1.15;
+}
+
+.qz-link-card__comment {
+  color: var(--text-secondary);
+}
+
+.qz-link-card__host {
+  align-self: end;
+  margin-top: var(--space-2);
+  overflow-wrap: anywhere;
+  font: var(--type-meta);
+  color: var(--text-muted);
+}
+
 .qz-photo-range {
   color: var(--text-muted);
   margin-bottom: var(--space-5);
@@ -3089,7 +3164,8 @@ body.qz-menu-lock .qz-masthead {
   .qz-grid--three,
   .qz-grid--two,
   .qz-error-page__grid,
-  .qz-error-page__links {
+  .qz-error-page__links,
+  .qz-links-grid {
     grid-template-columns: 1fr;
   }
 
@@ -3162,6 +3238,10 @@ body.qz-menu-lock .qz-masthead {
 
   .qz-gallery-grid {
     grid-template-columns: 1fr;
+  }
+
+  .qz-links-category__header {
+    display: block;
   }
 }
 
