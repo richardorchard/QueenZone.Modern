@@ -6,9 +6,17 @@
 <section class="qz-section">
   <div class="qz-container">
     <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
-    <div class="qz-tag-row">
-      <span class="qz-tag qz-tag--active">All</span><span class="qz-tag">1985</span><span class="qz-tag">1986</span><span class="qz-tag">1991</span><span class="qz-tag">1992</span>
-    </div>
+    <form method="get" action="/news/search" style="margin-bottom: var(--space-5);">
+      <div style="display: flex; gap: var(--space-3);">
+        <input name="q"
+               type="search"
+               placeholder="Search the news archive…"
+               autocomplete="off"
+               aria-label="Search news"
+               style="flex: 1; padding: 0.75rem 1rem; border: 1px solid var(--border-strong); border-radius: var(--radius-xs); font: var(--type-body);">
+        <button type="submit" class="qz-button" style="white-space: nowrap;">Search</button>
+      </div>
+    </form>
     <partial name="_NewsArchiveList" model="Model.Items" />
 
     <partial name="_ArchivePagination" model="NewsRoutes.GetArchivePaginationViewModel(Model.CurrentPage, Model.TotalPages)" />

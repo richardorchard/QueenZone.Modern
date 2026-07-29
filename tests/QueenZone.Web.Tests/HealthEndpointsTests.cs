@@ -148,5 +148,8 @@ public sealed class HealthEndpointsTests : IClassFixture<WebApplicationFactory<P
 
         public Task<IReadOnlyList<SitemapContentEntry>> GetPublishedSitemapEntriesAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<SitemapContentEntry>>([]);
+
+        public Task<NewsSearchPage> SearchAsync(string query, int page, int pageSize, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new NewsSearchPage([], 0, page, pageSize));
     }
 }
