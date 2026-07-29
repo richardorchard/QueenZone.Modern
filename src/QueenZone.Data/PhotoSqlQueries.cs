@@ -21,6 +21,12 @@ public sealed class PhotoSqlQueries
     /// <summary>Parameters: catId, picId.</summary>
     public required string PhotoByIdSql { get; init; }
 
+    /// <summary>
+    /// Parameters: catId, picId. Single round-trip for detail navigation:
+    /// photo fields + TotalCount + IndexBefore + PreviousPicId + NextPicId.
+    /// </summary>
+    public required string DetailNavigationSql { get; init; }
+
     /// <summary>Parameters: catId, dateTime, picId — neighbor toward newer (list index - 1).</summary>
     public required string PreviousPicIdSql { get; init; }
 
@@ -92,6 +98,78 @@ public sealed class PhotoSqlQueries
                     ISNULL(p.t_width, 0) AS T_WIDTH,
                     p.PIC_ID AS pic_id,
                     c.name AS category_name
+                FROM dbo.PIC_FILES_T p
+                INNER JOIN dbo.PIC_CAT_T c ON c.cat_id = p.Cat_ID
+                WHERE p.Cat_ID = {0} AND p.PIC_ID = {1} AND p.DISPLAY = 1
+                """,
+            // One round-trip: photo + totals + neighbors. Neighbor subqueries mirror Previous/NextPicIdSql
+            // (seek-friendly UNION ALL; relies on IX_PIC_FILES_T_Cat_Display_Date).
+            DetailNavigationSql = """
+                SELECT
+                    p.Name AS NAME,
+                    p.Date_time AS DATE_TIME,
+                    p.Url AS URL,
+                    p.Thumb_URL AS THUMB_URL,
+                    ISNULL(p.t_height, 0) AS T_HEIGHT,
+                    ISNULL(p.t_width, 0) AS T_WIDTH,
+                    p.PIC_ID AS pic_id,
+                    c.name AS category_name,
+                    (
+                        SELECT COUNT(*)
+                        FROM dbo.PIC_FILES_T t
+                        WHERE t.Cat_ID = {0} AND t.DISPLAY = 1
+                    ) AS TotalCount,
+                    (
+                        (SELECT COUNT(*)
+                         FROM dbo.PIC_FILES_T t
+                         WHERE t.Cat_ID = {0} AND t.DISPLAY = 1 AND t.Date_time > p.Date_time)
+                        +
+                        (SELECT COUNT(*)
+                         FROM dbo.PIC_FILES_T t
+                         WHERE t.Cat_ID = {0} AND t.DISPLAY = 1 AND t.Date_time = p.Date_time AND t.PIC_ID > p.PIC_ID)
+                    ) AS IndexBefore,
+                    (
+                        SELECT TOP (1) PIC_ID
+                        FROM (
+                            SELECT PIC_ID, Date_time
+                            FROM (
+                                SELECT TOP (1) PIC_ID, Date_time
+                                FROM dbo.PIC_FILES_T
+                                WHERE Cat_ID = {0} AND DISPLAY = 1 AND Date_time = p.Date_time AND PIC_ID > p.PIC_ID
+                                ORDER BY PIC_ID ASC
+                            ) same_ts
+                            UNION ALL
+                            SELECT PIC_ID, Date_time
+                            FROM (
+                                SELECT TOP (1) PIC_ID, Date_time
+                                FROM dbo.PIC_FILES_T
+                                WHERE Cat_ID = {0} AND DISPLAY = 1 AND Date_time > p.Date_time
+                                ORDER BY Date_time ASC, PIC_ID ASC
+                            ) newer
+                        ) neighbors
+                        ORDER BY Date_time ASC, PIC_ID ASC
+                    ) AS PreviousPicId,
+                    (
+                        SELECT TOP (1) PIC_ID
+                        FROM (
+                            SELECT PIC_ID, Date_time
+                            FROM (
+                                SELECT TOP (1) PIC_ID, Date_time
+                                FROM dbo.PIC_FILES_T
+                                WHERE Cat_ID = {0} AND DISPLAY = 1 AND Date_time = p.Date_time AND PIC_ID < p.PIC_ID
+                                ORDER BY PIC_ID DESC
+                            ) same_ts
+                            UNION ALL
+                            SELECT PIC_ID, Date_time
+                            FROM (
+                                SELECT TOP (1) PIC_ID, Date_time
+                                FROM dbo.PIC_FILES_T
+                                WHERE Cat_ID = {0} AND DISPLAY = 1 AND Date_time < p.Date_time
+                                ORDER BY Date_time DESC, PIC_ID DESC
+                            ) older
+                        ) neighbors
+                        ORDER BY Date_time DESC, PIC_ID DESC
+                    ) AS NextPicId
                 FROM dbo.PIC_FILES_T p
                 INNER JOIN dbo.PIC_CAT_T c ON c.cat_id = p.Cat_ID
                 WHERE p.Cat_ID = {0} AND p.PIC_ID = {1} AND p.DISPLAY = 1
@@ -221,6 +299,73 @@ public sealed class PhotoSqlQueries
                 SELECT NAME, DATE_TIME, URL, THUMB_URL, T_HEIGHT, T_WIDTH, pic_id, category_name
                 FROM PhotoItems
                 WHERE cat_id = {0} AND pic_id = {1}
+                """,
+            DetailNavigationSql = """
+                SELECT
+                    p.NAME,
+                    p.DATE_TIME,
+                    p.URL,
+                    p.THUMB_URL,
+                    p.T_HEIGHT,
+                    p.T_WIDTH,
+                    p.pic_id,
+                    p.category_name,
+                    (SELECT COUNT(*) FROM PhotoItems t WHERE t.cat_id = {0}) AS TotalCount,
+                    (
+                        (SELECT COUNT(*) FROM PhotoItems t WHERE t.cat_id = {0} AND t.DATE_TIME > p.DATE_TIME)
+                        +
+                        (SELECT COUNT(*) FROM PhotoItems t WHERE t.cat_id = {0} AND t.DATE_TIME = p.DATE_TIME AND t.pic_id > p.pic_id)
+                    ) AS IndexBefore,
+                    (
+                        SELECT pic_id
+                        FROM (
+                            SELECT pic_id, DATE_TIME
+                            FROM (
+                                SELECT pic_id, DATE_TIME
+                                FROM PhotoItems
+                                WHERE cat_id = {0} AND DATE_TIME = p.DATE_TIME AND pic_id > p.pic_id
+                                ORDER BY pic_id ASC
+                                LIMIT 1
+                            ) same_ts
+                            UNION ALL
+                            SELECT pic_id, DATE_TIME
+                            FROM (
+                                SELECT pic_id, DATE_TIME
+                                FROM PhotoItems
+                                WHERE cat_id = {0} AND DATE_TIME > p.DATE_TIME
+                                ORDER BY DATE_TIME ASC, pic_id ASC
+                                LIMIT 1
+                            ) newer
+                        ) neighbors
+                        ORDER BY DATE_TIME ASC, pic_id ASC
+                        LIMIT 1
+                    ) AS PreviousPicId,
+                    (
+                        SELECT pic_id
+                        FROM (
+                            SELECT pic_id, DATE_TIME
+                            FROM (
+                                SELECT pic_id, DATE_TIME
+                                FROM PhotoItems
+                                WHERE cat_id = {0} AND DATE_TIME = p.DATE_TIME AND pic_id < p.pic_id
+                                ORDER BY pic_id DESC
+                                LIMIT 1
+                            ) same_ts
+                            UNION ALL
+                            SELECT pic_id, DATE_TIME
+                            FROM (
+                                SELECT pic_id, DATE_TIME
+                                FROM PhotoItems
+                                WHERE cat_id = {0} AND DATE_TIME < p.DATE_TIME
+                                ORDER BY DATE_TIME DESC, pic_id DESC
+                                LIMIT 1
+                            ) older
+                        ) neighbors
+                        ORDER BY DATE_TIME DESC, pic_id DESC
+                        LIMIT 1
+                    ) AS NextPicId
+                FROM PhotoItems p
+                WHERE p.cat_id = {0} AND p.pic_id = {1}
                 """,
             PreviousPicIdSql = """
                 SELECT pic_id AS Value

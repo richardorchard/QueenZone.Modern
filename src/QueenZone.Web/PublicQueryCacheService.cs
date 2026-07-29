@@ -139,6 +139,15 @@ public sealed class PublicQueryCacheService(
     }
 
     /// <summary>
+    /// Evicts the public legacy-article published count so archive pagination refreshes after
+    /// editorial changes (or import tooling) that alter the published set.
+    /// </summary>
+    public void InvalidateArticleCountCache()
+    {
+        cache.Remove(PublicQueryCacheKeys.ArticlePublishedCount);
+    }
+
+    /// <summary>
     /// Bumps the photo cache version so category lists and paged grids refresh after admin writes.
     /// </summary>
     public void InvalidatePhotoCache()

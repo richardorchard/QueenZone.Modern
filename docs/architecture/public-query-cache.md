@@ -28,3 +28,5 @@ Default durations are configured by `PublicQueryCacheOptions`:
 Deployments can override these values with the `PublicQueryCache` configuration section. Short TTLs are preferred for editorial data, while forum and history data can tolerate longer staleness because those slices are mostly archive content.
 
 Admin news publish, unpublish, delete, and edits to already-published articles invalidate the public news cache immediately so visitor-facing news pages do not have to wait for TTL expiry after an editorial change.
+
+Admin article status changes that affect public visibility call `InvalidateArticleCountCache()` so the legacy articles archive published-count entry does not wait for its (longer) TTL.

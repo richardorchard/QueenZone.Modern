@@ -1,6 +1,8 @@
+using System.Collections.Concurrent;
 using System.Data;
 using System.Data.Common;
 using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 
@@ -227,20 +229,21 @@ internal static class EfSql
         return command;
     }
 
+    /// <summary>
+    /// Writable property maps per row type so hot proc paths do not re-reflect on every row.
+    /// </summary>
+    private static readonly ConcurrentDictionary<Type, PropertyMap> PropertyMaps = new();
+
     private static T MapRow<T>(DbDataReader reader)
         where T : class, new()
     {
         var item = new T();
-        var properties = typeof(T).GetProperties()
-            .Where(property => property.CanWrite)
-            .ToArray();
+        var map = PropertyMaps.GetOrAdd(typeof(T), static type => PropertyMap.Create(type));
 
         for (var ordinal = 0; ordinal < reader.FieldCount; ordinal++)
         {
-            var columnName = reader.GetName(ordinal);
-            var property = properties.FirstOrDefault(candidate =>
-                string.Equals(candidate.Name, columnName, StringComparison.OrdinalIgnoreCase));
-            if (property is null || reader.IsDBNull(ordinal))
+            if (!map.TryGetProperty(reader.GetName(ordinal), out var property)
+                || reader.IsDBNull(ordinal))
             {
                 continue;
             }
@@ -251,5 +254,29 @@ internal static class EfSql
         }
 
         return item;
+    }
+
+    private sealed class PropertyMap
+    {
+        private readonly Dictionary<string, PropertyInfo> propertiesByName;
+
+        private PropertyMap(Dictionary<string, PropertyInfo> propertiesByName)
+        {
+            this.propertiesByName = propertiesByName;
+        }
+
+        public static PropertyMap Create(Type type)
+        {
+            var propertiesByName = new Dictionary<string, PropertyInfo>(StringComparer.OrdinalIgnoreCase);
+            foreach (var property in type.GetProperties().Where(candidate => candidate.CanWrite))
+            {
+                propertiesByName[property.Name] = property;
+            }
+
+            return new PropertyMap(propertiesByName);
+        }
+
+        public bool TryGetProperty(string columnName, out PropertyInfo property) =>
+            propertiesByName.TryGetValue(columnName, out property!);
     }
 }
