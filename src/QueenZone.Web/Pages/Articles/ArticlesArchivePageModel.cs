@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Data.SqlClient;
 using QueenZone.Data;
+using QueenZone.Web.Archive;
 
 namespace QueenZone.Web.Pages.Articles;
 
@@ -34,34 +35,29 @@ public abstract class ArticlesArchivePageModel(
         int communityPage = 1,
         string? tag = null)
     {
-        if (page < 1)
-        {
-            return NotFound();
-        }
-
-        var publishedCount = await publicQueryCache.GetArticlePublishedCountAsync(cancellationToken);
-        var archive = await articlesRepository.GetArchivePageAsync(page, ArticlesRoutes.ArchivePageSize, cancellationToken);
-        var totalPages = ArticlesRoutes.ResolveArchiveTotalPages(
+        var result = await ArchivePageLoader.LoadAsync<ArticleItem>(
             page,
-            archive.Count,
-            publishedCount,
-            ArticlesRoutes.GetArchiveTotalPages(publishedCount));
+            ArticlesRoutes.ArchivePageSize,
+            ct => publicQueryCache.GetArticlePublishedCountAsync(ct),
+            (p, size, ct) => articlesRepository.GetArchivePageAsync(p, size, ct),
+            (p, ic, pc, tp) => ArticlesRoutes.ResolveArchiveTotalPages(p, ic, pc, tp),
+            (p, total) => new ArchivePageContext(
+                p, total,
+                ArticlesRoutes.GetArchivePageTitle(p),
+                ArticlesRoutes.GetArchiveCanonicalPath(p),
+                p > 1 ? ArticlesRoutes.GetArchiveCanonicalPath(p - 1) : null,
+                total > 0 && p < total ? ArticlesRoutes.GetArchiveCanonicalPath(p + 1) : null),
+            cancellationToken);
 
-        if (totalPages == 0)
-        {
-            if (page > 1)
-            {
-                return NotFound();
-            }
-        }
-        else if (page > totalPages)
-        {
+        if (result is ArchivePageResult<ArticleItem>.NotFound)
             return NotFound();
-        }
 
-        Items = PublicContentMapper.ToArticleArchiveItems(archive);
-        CurrentPage = page;
-        TotalPages = totalPages;
+        var success = (ArchivePageResult<ArticleItem>.Success)result;
+        var ctx = success.Context;
+
+        Items = PublicContentMapper.ToArticleArchiveItems(success.Items);
+        CurrentPage = ctx.CurrentPage;
+        TotalPages = ctx.TotalPages;
         ActiveTag = tag;
 
         if (articleRepository is not null)
@@ -91,22 +87,14 @@ public abstract class ArticlesArchivePageModel(
 
         Breadcrumbs = [BreadcrumbItem.Home, new BreadcrumbItem("Articles", "/articles")];
 
-        ViewData["Title"] = ArticlesRoutes.GetArchivePageTitle(page);
+        ViewData["Title"] = ctx.Title;
         if (page <= 1)
-        {
             ViewData["Description"] = "In-depth Queen articles and interviews from the Queenzone.com archive.";
-        }
-
-        ViewData["CanonicalPath"] = ArticlesRoutes.GetArchiveCanonicalPath(page);
-        if (page > 1)
-        {
-            ViewData["PrevPath"] = ArticlesRoutes.GetArchiveCanonicalPath(page - 1);
-        }
-
-        if (totalPages > 0 && page < totalPages)
-        {
-            ViewData["NextPath"] = ArticlesRoutes.GetArchiveCanonicalPath(page + 1);
-        }
+        ViewData["CanonicalPath"] = ctx.CanonicalPath;
+        if (ctx.PrevPath is not null)
+            ViewData["PrevPath"] = ctx.PrevPath;
+        if (ctx.NextPath is not null)
+            ViewData["NextPath"] = ctx.NextPath;
 
         return Page();
     }
