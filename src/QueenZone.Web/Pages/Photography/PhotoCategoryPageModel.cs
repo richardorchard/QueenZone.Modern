@@ -67,6 +67,10 @@ public abstract class PhotoCategoryPageModel(PublicQueryCacheService publicQuery
         if (page <= 1)
         {
             ViewData["Description"] = $"Queen {category.Name} photographs from the Queenzone.com archive.";
+            if (category.CoverThumbnailUrl is string cover)
+            {
+                ViewData["OgImage"] = cover;
+            }
         }
 
         ViewData["CanonicalPath"] = PhotoRoutes.GetCategoryPagePath(category.Slug, page);
