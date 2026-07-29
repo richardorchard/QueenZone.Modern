@@ -1,0 +1,44 @@
+@page "/links"
+@model LinksModel
+
+<partial name="_PageHero" model='@(("Checked Directory", "Queen Links", "Queen-related sites from the preserved Queenzone links archive, filtered so unavailable pages stay hidden.", $"{Model.Categories.Sum(c => c.Links.Count):N0} live links"))' />
+
+<section class="qz-section qz-links-index">
+  <div class="qz-container">
+    <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
+
+    @if (Model.Categories.Count == 0)
+    {
+      <p>No checked Queen links are available yet.</p>
+    }
+    else
+    {
+      <div class="qz-links-category-list">
+        @foreach (var category in Model.Categories)
+        {
+          <section class="qz-links-category" aria-labelledby="links-category-@category.Id">
+            <div class="qz-links-category__header">
+              <h2 id="links-category-@category.Id">@category.Name</h2>
+              <span>@category.Links.Count @(category.Links.Count == 1 ? "link" : "links")</span>
+            </div>
+
+            <div class="qz-links-grid">
+              @foreach (var link in category.Links)
+              {
+                <a class="qz-link-card @(link.IsFeatured ? "qz-link-card--featured" : "")" href="@link.Url" target="_blank" rel="noopener noreferrer">
+                  <span class="qz-card__kicker">@(link.IsFeatured ? "Featured site" : "Queen site")</span>
+                  <span class="qz-link-card__title">@link.Title</span>
+                  @if (!string.IsNullOrWhiteSpace(link.Comment))
+                  {
+                    <span class="qz-link-card__comment">@link.Comment</span>
+                  }
+                  <span class="qz-link-card__host">@(new Uri(link.Url).Host)</span>
+                </a>
+              }
+            </div>
+          </section>
+        }
+      </div>
+    }
+  </div>
+</section>

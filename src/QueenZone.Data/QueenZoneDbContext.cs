@@ -56,6 +56,8 @@ public sealed class QueenZoneDbContext : DbContext
 
     public DbSet<NewsSuggestionEntity> NewsSuggestions => Set<NewsSuggestionEntity>();
 
+    public DbSet<QueenLinkCheckEntity> QueenLinkChecks => Set<QueenLinkCheckEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<NewsTableRow>(entity =>
@@ -580,6 +582,21 @@ public sealed class QueenZoneDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(suggestion => suggestion.DuplicateCandidateId)
                 .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<QueenLinkCheckEntity>(entity =>
+        {
+            entity.ToTable("QueenLinkChecks");
+            entity.HasKey(check => check.QueenFeaturedSiteId);
+            entity.Property(check => check.QueenFeaturedSiteId).ValueGeneratedNever();
+            entity.Property(check => check.Url).HasMaxLength(500).IsRequired();
+            entity.Property(check => check.LastCheckedAtUtc).IsRequired();
+            entity.Property(check => check.IsAvailable).IsRequired();
+            entity.Property(check => check.IsConfirmedDead).IsRequired();
+            entity.Property(check => check.ConsecutiveFailureCount).IsRequired();
+            entity.Property(check => check.LastError).HasMaxLength(500);
+            entity.HasIndex(check => check.IsConfirmedDead);
+            entity.HasIndex(check => check.LastCheckedAtUtc);
         });
     }
 }
