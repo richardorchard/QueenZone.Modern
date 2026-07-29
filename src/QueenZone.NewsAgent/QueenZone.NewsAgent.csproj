@@ -24,6 +24,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="QueenZone.Web.Tests" />
+    <InternalsVisibleTo Include="QueenZone.NewsAgent.Tests" />
   </ItemGroup>
 
 </Project>

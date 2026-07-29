@@ -11,11 +11,17 @@ namespace QueenZone.Data.Migrations;
 /// <see cref="QueenZone.Data.EfNewsRepository"/>.
 /// </summary>
 /// <remarks>
+/// <para>
+/// Procedure body source of truth for review: <c>docs/sql/008-news-full-text-search.sql</c>
+/// (see <c>docs/sql/README.md</c>). Keep that file and this migration in sync.
+/// </para>
+/// <para>
 /// FTS DDL (<c>CREATE FULLTEXT CATALOG</c>, <c>CREATE FULLTEXT INDEX</c>) cannot run inside a
 /// transaction; all three steps use <c>suppressTransaction: true</c>.  Step 2 discovers the
 /// existing primary-key or unique index at runtime via dynamic SQL so the migration does not
 /// assume a specific PK constraint name on the legacy table.  If no unique index exists it
 /// creates <c>UQ_NEWS_T_NEWS_ID_FTS</c> on <c>NEWS_ID</c>.
+/// </para>
 /// </remarks>
 [DbContext(typeof(QueenZoneDbContext))]
 [Migration("20260729000000_AddNewsFullTextSearch")]
