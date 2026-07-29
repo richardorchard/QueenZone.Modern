@@ -31,10 +31,14 @@ public partial class AddNewsFullTextSearch : Migration
 
         // Use dynamic SQL to pick up any existing PK or unique index as the FTS key.
         // If none exists, create an explicit unique index on NEWS_ID.
+        // Build the CREATE FULLTEXT INDEX string into @sql first; EXEC(N'...' + QUOTENAME(...) + N'...')
+        // with multiline literals is rejected by the SQL Server parser.
         migrationBuilder.Sql("""
             IF NOT EXISTS (SELECT 1 FROM sys.fulltext_indexes WHERE object_id = OBJECT_ID(N'dbo.NEWS_T', N'U'))
             BEGIN
                 DECLARE @KeyIdx NVARCHAR(256);
+                DECLARE @sql    NVARCHAR(MAX);
+
                 SELECT TOP 1 @KeyIdx = name
                 FROM   sys.indexes
                 WHERE  object_id  = OBJECT_ID(N'dbo.NEWS_T', N'U')
@@ -44,14 +48,14 @@ public partial class AddNewsFullTextSearch : Migration
 
                 IF @KeyIdx IS NULL
                 BEGIN
-                    EXEC(N'CREATE UNIQUE INDEX UQ_NEWS_T_NEWS_ID_FTS ON dbo.NEWS_T (NEWS_ID);');
+                    EXEC sp_executesql N'CREATE UNIQUE INDEX UQ_NEWS_T_NEWS_ID_FTS ON dbo.NEWS_T (NEWS_ID)';
                     SET @KeyIdx = N'UQ_NEWS_T_NEWS_ID_FTS';
                 END
 
-                EXEC(N'CREATE FULLTEXT INDEX ON dbo.NEWS_T (TITLE, EXCERPT, ARTICLE)
-                           KEY INDEX ' + QUOTENAME(@KeyIdx) + N'
-                           ON FT_NewsCatalog
-                           WITH CHANGE_TRACKING AUTO;');
+                SET @sql = N'CREATE FULLTEXT INDEX ON dbo.NEWS_T (TITLE, EXCERPT, ARTICLE) KEY INDEX '
+                    + QUOTENAME(@KeyIdx)
+                    + N' ON FT_NewsCatalog WITH CHANGE_TRACKING AUTO';
+                EXEC sp_executesql @sql;
             END
             """, suppressTransaction: true);
 
