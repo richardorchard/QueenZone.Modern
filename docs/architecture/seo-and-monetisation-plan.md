@@ -20,7 +20,6 @@ The planned public canonical domain is `https://www.queenzone.org`. Sitemaps, ro
 
 - Static or server-rendered HTML for all important pages.
 - Stable canonical URLs.
-- Stable canonical URLs.
 - XML sitemap split by content type if needed.
 - RSS feeds for news.
 - Schema.org structured data where appropriate.
