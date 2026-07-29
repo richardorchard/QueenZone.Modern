@@ -105,14 +105,28 @@ public static class QueenZoneAuthServiceCollectionExtensions
         options.ForwardDefaultSelector = context =>
             context.Request.Cookies.ContainsKey(AdminAuthenticationSchemes.MemberCookieName)
                 ? MemberAuthenticationSchemes.MembersCookie
-                : useAzureAd
-                    ? CookieAuthenticationDefaults.AuthenticationScheme
-                    : TestAuthHandler.SchemeName;
+                : SelectAdminAuthenticateScheme(useAzureAd);
 
-        options.ForwardChallenge = useAzureAd
-            ? MemberAuthenticationSchemes.MembersCookie
-            : TestAuthHandler.SchemeName;
+        // Challenges must start Entra OIDC (not member social login at /account/login).
+        options.ForwardChallenge = SelectAdminChallengeScheme(useAzureAd);
     }
+
+    /// <summary>
+    /// Scheme used to authenticate an already-signed-in admin principal when no member cookie is present.
+    /// </summary>
+    internal static string SelectAdminAuthenticateScheme(bool useAzureAd) =>
+        useAzureAd
+            ? CookieAuthenticationDefaults.AuthenticationScheme
+            : TestAuthHandler.SchemeName;
+
+    /// <summary>
+    /// Scheme used when the Admin policy challenges an unauthenticated request.
+    /// With Entra enabled this must be OIDC, not the member cookie login path.
+    /// </summary>
+    internal static string SelectAdminChallengeScheme(bool useAzureAd) =>
+        useAzureAd
+            ? OpenIdConnectDefaults.AuthenticationScheme
+            : TestAuthHandler.SchemeName;
 
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     private static void ConfigureMemberAuthentication(

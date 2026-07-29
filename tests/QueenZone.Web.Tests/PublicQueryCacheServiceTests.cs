@@ -214,6 +214,23 @@ public sealed class PublicQueryCacheServiceTests
     }
 
     [Fact]
+    public async Task Concurrent_cold_cache_hits_across_scoped_instances_invoke_factory_once()
+    {
+        // Production registers PublicQueryCacheService as scoped; gates must be process-wide.
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var newsRepository = new SlowCountingNewsRepository(TimeSpan.FromMilliseconds(100));
+        var services = Enumerable.Range(0, 12)
+            .Select(_ => CreateService(memoryCache, newsRepository: newsRepository))
+            .ToArray();
+
+        var tasks = services.Select(s => s.GetLatestNewsAsync(5)).ToArray();
+        await Task.WhenAll(tasks);
+
+        Assert.Equal(1, newsRepository.LatestCallCount);
+        Assert.All(tasks, t => Assert.Same(tasks[0].Result, t.Result));
+    }
+
+    [Fact]
     public async Task Waiting_for_busy_cache_key_observes_cancellation()
     {
         using var memoryCache = new MemoryCache(new MemoryCacheOptions());

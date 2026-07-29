@@ -8,6 +8,19 @@ PR Phase A production hardening (epic [#312](https://github.com/richardorchard/Q
 
 App Service must therefore carry real Entra settings. Committed `appsettings.json` only has placeholders; secrets never belong in git.
 
+## Admin authentication schemes
+
+Admin pages use the composite scheme `AdminAccess` (`AdminAuthenticationSchemes.CompositeScheme`):
+
+| Situation | Scheme used | Purpose |
+| --- | --- | --- |
+| Member cookie present | `MembersCookie` | Dual-role users already signed in as members |
+| Entra configured, no member cookie | Cookie scheme (Microsoft.Identity.Web) | Read existing admin session |
+| Entra configured, **challenge** (unauthenticated `/admin`) | **OpenID Connect** | Start Microsoft Entra sign-in — **not** member `/account/login` |
+| Dev/Testing without Entra | `Test` (`X-Test-User-Email`) | Local and CI admin auth |
+
+Unauthenticated access to `/admin/*` must challenge **Entra OIDC**, not the public member social login page. That selection lives in `QueenZoneAuthServiceCollectionExtensions.SelectAdminChallengeScheme`.
+
 ## What was configured (2026-07-23)
 
 | Item | Value / note |
