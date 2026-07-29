@@ -19,6 +19,10 @@
   {
     <link rel="next" href="@SiteUrl.ToAbsolute(SiteOptionsAccessor.Value.PublicBaseUrl, nextPath)">
   }
+  @if (ViewData["Robots"] is string robotsContent)
+  {
+    <meta name="robots" content="@robotsContent">
+  }
   @if (ViewData["Description"] is string description)
   {
     <meta name="description" content="@description">
