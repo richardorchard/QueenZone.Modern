@@ -46,9 +46,14 @@ public sealed class CommunityDetailModel(
         NextArticle = next;
 
         var canonicalPath = ArticlesRoutes.GetCommunityArticleDetailPath(item.Slug);
-        var baseUrl = siteOptions.Value.PublicBaseUrl.TrimEnd('/');
 
-        StructuredDataJson = BuildStructuredData(item, baseUrl + canonicalPath, baseUrl);
+        StructuredDataJson = EditorialJsonLd.BuildArticle(
+            item.Title,
+            canonicalPath,
+            item.PublishedAt.UtcDateTime,
+            item.Excerpt,
+            siteOptions.Value.PublicBaseUrl,
+            item.AuthorDisplayName);
 
         Breadcrumbs =
         [
@@ -64,27 +69,6 @@ public sealed class CommunityDetailModel(
         return Page();
     }
 
-    private static string BuildStructuredData(PublishedArticleSubmission item, string canonicalUrl, string baseUrl)
-    {
-        static string J(string? s) => System.Text.Json.JsonSerializer.Serialize(s ?? string.Empty);
-        return
-            "{\n" +
-            "  \"@context\": \"https://schema.org\",\n" +
-            "  \"@type\": \"Article\",\n" +
-            "  \"headline\": " + J(item.Title) + ",\n" +
-            "  \"description\": " + J(item.Excerpt ?? string.Empty) + ",\n" +
-            "  \"datePublished\": \"" + item.PublishedAt.ToString("yyyy-MM-ddTHH:mm:ssZ") + "\",\n" +
-            "  \"url\": " + J(canonicalUrl) + ",\n" +
-            "  \"author\": {\n" +
-            "    \"@type\": \"Person\",\n" +
-            "    \"name\": " + J(item.AuthorDisplayName ?? "QueenZone Community") + "\n" +
-            "  },\n" +
-            "  \"publisher\": {\n" +
-            "    \"@type\": \"Organization\",\n" +
-            "    \"name\": \"QueenZone\",\n" +
-            "    \"url\": " + J(baseUrl) + "\n" +
-            "  }\n" +
-            "}";
-    }
+
 }
 
