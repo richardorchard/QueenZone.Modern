@@ -23,5 +23,6 @@ public sealed class ForumPageTests : IClassFixture<WebApplicationFactory<Program
         Assert.Contains("The Music", body);
         Assert.Contains("/forum/1/the-music", body);
         Assert.Contains("<strong>6</strong> boards", body);
+        Assert.Contains(TestSiteConfiguration.CanonicalLink("/forum"), body);
     }
 }

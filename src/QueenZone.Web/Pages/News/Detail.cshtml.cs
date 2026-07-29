@@ -1,12 +1,17 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.Extensions.Options;
 using QueenZone.Data;
 
 namespace QueenZone.Web.Pages.News;
 
-public sealed class DetailModel(INewsRepository newsRepository) : PageModel
+public sealed class DetailModel(
+    INewsRepository newsRepository,
+    IOptions<SiteOptions> siteOptions) : PageModel
 {
     public NewsDetailItem? Item { get; private set; }
+
+    public string StructuredDataJson { get; private set; } = string.Empty;
 
     public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
 
@@ -25,11 +30,20 @@ public sealed class DetailModel(INewsRepository newsRepository) : PageModel
             return RedirectPermanent(detail.DetailPath);
         }
 
+        var canonicalPath = NewsArticleContent.GetDetailCanonicalPath(detail.Id, detail.Title, item.Slug);
+
         Item = detail;
         Breadcrumbs = [BreadcrumbItem.Home, new BreadcrumbItem("News", "/news"), new BreadcrumbItem(detail.Title, detail.DetailPath)];
         ViewData["Title"] = $"{detail.Title} | QueenZone news";
-        ViewData["CanonicalPath"] = NewsArticleContent.GetDetailCanonicalPath(detail.Id, detail.Title, item.Slug);
+        ViewData["CanonicalPath"] = canonicalPath;
         ViewData["Description"] = detail.Excerpt;
+
+        StructuredDataJson = EditorialJsonLd.BuildNewsArticle(
+            detail.Title,
+            canonicalPath,
+            detail.PublishedAt,
+            detail.Excerpt,
+            siteOptions.Value.PublicBaseUrl);
 
         return Page();
     }

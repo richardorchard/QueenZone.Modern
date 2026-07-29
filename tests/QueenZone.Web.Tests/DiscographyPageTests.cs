@@ -22,6 +22,7 @@ public sealed class DiscographyPageTests : IClassFixture<WebApplicationFactory<P
         Assert.Contains("Discography", body);
         Assert.Contains("A Night at the Opera", body);
         Assert.Contains("https://cdn.queenzone.org/images/discography/", body);
+        Assert.Contains(TestSiteConfiguration.CanonicalLink("/discography"), body);
     }
 
     [Fact]
@@ -38,6 +39,7 @@ public sealed class DiscographyPageTests : IClassFixture<WebApplicationFactory<P
         // text containing markup-like content - regression guard for the lyrics-breaking-
         // the-tracklist bug (raw lyrics HTML was previously closing the surrounding <ol>).
         Assert.Contains("God Save the Queen", body);
+        Assert.Contains(TestSiteConfiguration.CanonicalLink("/discography/albums/4/a-night-at-the-opera"), body);
     }
 
     [Fact]

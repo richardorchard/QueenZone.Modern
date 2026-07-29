@@ -70,4 +70,38 @@ public sealed class SearchPageTests : IClassFixture<WebApplicationFactory<Progra
         Assert.Contains("href=\"/search?q=Bohemian%20Rhapsody\"", body);
         Assert.Contains("href=\"/search?q=Freddie%20Mercury\"", body);
     }
+
+    [Fact]
+    public async Task SearchPageEmitsNoindexFollowRobotsTag()
+    {
+        var client = factory.CreateClient();
+
+        var body = await client.GetStringAsync("/search");
+
+        Assert.Contains("""<meta name="robots" content="noindex,follow">""", body);
+    }
+
+    [Fact]
+    public async Task SearchPageWithQueryEmitsNoindexFollowRobotsTag()
+    {
+        var client = factory.CreateClient();
+
+        var body = await client.GetStringAsync("/search?q=studio+album");
+
+        Assert.Contains("""<meta name="robots" content="noindex,follow">""", body);
+    }
+
+    [Theory]
+    [InlineData("/")]
+    [InlineData("/forum")]
+    [InlineData("/news")]
+    [InlineData("/articles")]
+    public async Task IndexablePagesDoNotEmitNoindexRobotsTag(string path)
+    {
+        var client = factory.CreateClient();
+
+        var body = await client.GetStringAsync(path);
+
+        Assert.DoesNotContain("""<meta name="robots" content="noindex""", body);
+    }
 }

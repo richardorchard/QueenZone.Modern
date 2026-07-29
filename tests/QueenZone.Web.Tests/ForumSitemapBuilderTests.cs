@@ -31,7 +31,70 @@ public sealed class ForumSitemapBuilderTests
         Assert.Equal(0, fileCount);
     }
 
-    private sealed class EmptyForumRepository : IForumRepository
+    [Fact]
+    public async Task GetFileCountAsync_SplitsAcrossMultipleFilesWhenTopicCountExceedsLimit()
+    {
+        var totalTopics = ForumSitemapLimits.MaxUrlsPerFile + 1;
+        var builder = new ForumSitemapBuilder(new FixedCountForumRepository(totalTopics));
+
+        var fileCount = await builder.GetFileCountAsync();
+
+        Assert.Equal(2, fileCount);
+    }
+
+    [Fact]
+    public async Task BuildFileAsync_ReturnsFullPageForFirstFileWhenTopicsSpanMultipleFiles()
+    {
+        var totalTopics = ForumSitemapLimits.MaxUrlsPerFile + 500;
+        var builder = new ForumSitemapBuilder(new FixedCountForumRepository(totalTopics));
+
+        var entries = await builder.BuildFileAsync(1);
+
+        Assert.NotNull(entries);
+        Assert.Equal(ForumSitemapLimits.MaxUrlsPerFile, entries.Count);
+    }
+
+    [Fact]
+    public async Task BuildFileAsync_ReturnsRemainingTopicsInLastFile()
+    {
+        var overflow = 500;
+        var totalTopics = ForumSitemapLimits.MaxUrlsPerFile + overflow;
+        var builder = new ForumSitemapBuilder(new FixedCountForumRepository(totalTopics));
+
+        var entries = await builder.BuildFileAsync(2);
+
+        Assert.NotNull(entries);
+        Assert.Equal(overflow, entries.Count);
+    }
+
+    [Fact]
+    public async Task BuildFileAsync_ReturnsNullForFileNumberBeyondCount()
+    {
+        var builder = new ForumSitemapBuilder(new FixedCountForumRepository(ForumSitemapLimits.MaxUrlsPerFile));
+
+        var entries = await builder.BuildFileAsync(2);
+
+        Assert.Null(entries);
+    }
+
+    private sealed class FixedCountForumRepository(int totalCount) : EmptyForumRepository
+    {
+        public override Task<int> GetTopicSitemapCountAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(totalCount);
+
+        public override Task<IReadOnlyList<ForumTopicSitemapItem>> GetTopicSitemapPageAsync(
+            int offset,
+            int pageSize,
+            CancellationToken cancellationToken = default)
+        {
+            var items = Enumerable.Range(offset + 1, Math.Min(pageSize, Math.Max(0, totalCount - offset)))
+                .Select(id => new ForumTopicSitemapItem(id, $"Topic {id}", DateTime.UtcNow))
+                .ToList();
+            return Task.FromResult<IReadOnlyList<ForumTopicSitemapItem>>(items);
+        }
+    }
+
+    private class EmptyForumRepository : IForumRepository
     {
         public Task<IReadOnlyList<ForumCategoryItem>> GetCategoriesAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<ForumCategoryItem>>([]);
@@ -59,10 +122,10 @@ public sealed class ForumSitemapBuilderTests
         public Task<ForumArchiveStats> GetArchiveStatsAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult(new ForumArchiveStats(0, 0, 0));
 
-        public Task<int> GetTopicSitemapCountAsync(CancellationToken cancellationToken = default) =>
+        public virtual Task<int> GetTopicSitemapCountAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult(0);
 
-        public Task<IReadOnlyList<ForumTopicSitemapItem>> GetTopicSitemapPageAsync(
+        public virtual Task<IReadOnlyList<ForumTopicSitemapItem>> GetTopicSitemapPageAsync(
             int offset,
             int pageSize,
             CancellationToken cancellationToken = default) =>

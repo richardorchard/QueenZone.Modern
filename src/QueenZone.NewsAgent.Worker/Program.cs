@@ -21,7 +21,8 @@ var configuration = new ConfigurationBuilder()
 
 var services = new ServiceCollection();
 services.AddLogging(builder => builder.AddConsole());
-services.AddQueenZoneNewsAgent(configuration);
+// Full discovery/triage/draft pipeline (not registered on the public web host — #336).
+services.AddQueenZoneNewsAgentWorker(configuration);
 
 var connectionString = configuration.GetConnectionString("QueenZoneLegacy");
 if (string.IsNullOrWhiteSpace(connectionString))

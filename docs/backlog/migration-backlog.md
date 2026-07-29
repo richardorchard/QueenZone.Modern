@@ -52,6 +52,8 @@ Acceptance criteria:
 
 ### Add SEO foundation
 
+Status: **partly done** — unique titles/descriptions, canonical links, robots.txt, sitemap endpoints, Open Graph/Twitter cards, and editorial JSON-LD for news/articles have shipped. Structured data for albums/images is still future work.
+
 Acceptance criteria:
 
 - Unique title and meta description per page.

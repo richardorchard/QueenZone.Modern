@@ -12,14 +12,17 @@ The goal is to restart QueenZone as a clean, modern public site that fully expos
 /
   QueenZone.sln
   src/
-    QueenZone.Web/
-      Pages/
     QueenZone.Data/
     QueenZone.NewsAgent/
     QueenZone.NewsAgent.Worker/
-    QueenZone.Import/
+    QueenZone.Storage/
+    QueenZone.Tools/
+    QueenZone.Web/
+      Pages/
   tests/
-    QueenZone.Data.Tests/
+    QueenZone.Storage.Tests/
+    QueenZone.Tools.Tests/
+    QueenZone.Web.E2E/
     QueenZone.Web.Tests/
   docs/
     architecture/

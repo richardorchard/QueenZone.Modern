@@ -84,6 +84,16 @@ public sealed class EfPublicReadRepositoryTests : IAsyncDisposable
                 category_name TEXT,
                 cat_id INTEGER NOT NULL
             );
+            CREATE TABLE FreddieTributes (
+                Id INTEGER NOT NULL,
+                Name TEXT,
+                Thought TEXT,
+                Email TEXT,
+                DateText TEXT NOT NULL,
+                TimeText TEXT,
+                Country TEXT,
+                Display INTEGER
+            );
             """);
     }
 
@@ -361,6 +371,155 @@ public sealed class EfPublicReadRepositoryTests : IAsyncDisposable
         Assert.Single(latest);
         Assert.False(string.IsNullOrWhiteSpace(latest[0].Excerpt));
         Assert.Equal(string.Empty, latest[0].Body);
+    }
+
+    [Fact]
+    public async Task FreddieTributes_maps_public_page_and_random_without_email()
+    {
+        dbContext.Database.ExecuteSqlRaw(
+            """
+            INSERT INTO FreddieTributes (Id, Name, Thought, Email, DateText, TimeText, Country, Display)
+            VALUES
+                (1, 'Hidden', 'Private note', 'hidden@example.test', '24 November 2001', '08:00', 'UK', 0),
+                (2, 'Blank', '', 'blank@example.test', '24 November 2001', '09:00', 'UK', 1),
+                (3, '  Maya  ', '  Freddie still shines.  ', 'maya@example.test', '24 November 2001', '10:00', 'India', 1),
+                (4, NULL, 'Anonymous love for Freddie.', 'anon@example.test', '24 November 2001', NULL, NULL, 1);
+            """);
+
+        var repository = new EfFreddieTributeRepository(
+            dbContext,
+            pageSql: """
+                SELECT
+                    Id,
+                    COALESCE(TRIM(Name), 'Anonymous') AS Name,
+                    TRIM(Thought) AS Thought,
+                    NULLIF(TRIM(COALESCE(Country, '')), '') AS Country,
+                    TRIM(DateText) AS DateText,
+                    NULLIF(TRIM(COALESCE(TimeText, '')), '') AS TimeText
+                FROM FreddieTributes
+                WHERE Display = 1 AND NULLIF(TRIM(COALESCE(Thought, '')), '') IS NOT NULL
+                ORDER BY Id DESC
+                LIMIT {1} OFFSET {0}
+                """,
+            countSql: """
+                SELECT COUNT(*) AS Value
+                FROM FreddieTributes
+                WHERE Display = 1 AND NULLIF(TRIM(COALESCE(Thought, '')), '') IS NOT NULL
+                """,
+            randomSql: """
+                SELECT
+                    Id,
+                    COALESCE(TRIM(Name), 'Anonymous') AS Name,
+                    TRIM(Thought) AS Thought,
+                    NULLIF(TRIM(COALESCE(Country, '')), '') AS Country,
+                    TRIM(DateText) AS DateText,
+                    NULLIF(TRIM(COALESCE(TimeText, '')), '') AS TimeText
+                FROM FreddieTributes
+                WHERE Display = 1 AND NULLIF(TRIM(COALESCE(Thought, '')), '') IS NOT NULL
+                ORDER BY Id DESC
+                LIMIT 1
+                """);
+
+        var page = await repository.GetPageAsync(1, 10);
+
+        Assert.Equal(2, page.TotalCount);
+        Assert.Equal(2, page.Items.Count);
+        Assert.Equal(4, page.Items[0].Id);
+        Assert.Equal("Anonymous", page.Items[0].Name);
+        Assert.Equal("Maya", page.Items[1].Name);
+        Assert.Equal("Freddie still shines.", page.Items[1].Thought);
+        Assert.Equal("India", page.Items[1].Country);
+        Assert.Equal("10:00", page.Items[1].TimeText);
+
+        var random = await repository.GetRandomAsync();
+        Assert.NotNull(random);
+        Assert.Equal(4, random.Id);
+    }
+
+    [Fact]
+    public async Task AdminFreddieTributes_maps_filters_duplicate_counts_and_detail()
+    {
+        dbContext.Database.ExecuteSqlRaw(
+            """
+            INSERT INTO FreddieTributes (Id, Name, Thought, Email, DateText, TimeText, Country, Display)
+            VALUES
+                (20, 'Visible', 'Repeated', 'visible@example.test', '24 November 2001', '08:00', 'UK', 1),
+                (21, 'Visible', 'Repeated', 'visible2@example.test', '24 November 2001', '08:01', 'UK', 1),
+                (22, 'Hidden', 'Filtered', 'hidden@example.test', '24 November 2001', NULL, 'US', 0);
+            """);
+
+        const string pageSql = """
+            WITH Filtered AS
+            (
+                SELECT
+                    Id,
+                    COALESCE(TRIM(Name), 'Anonymous') AS Name,
+                    TRIM(Thought) AS Thought,
+                    NULLIF(TRIM(COALESCE(Country, '')), '') AS Country,
+                    TRIM(DateText) AS DateText,
+                    NULLIF(TRIM(COALESCE(TimeText, '')), '') AS TimeText,
+                    Display = 1 AS IsVisible,
+                    COUNT(*) OVER (
+                        PARTITION BY UPPER(TRIM(COALESCE(Name, ''))), UPPER(TRIM(COALESCE(Thought, '')))
+                    ) AS DuplicateCount
+                FROM FreddieTributes
+                WHERE ({2} IS NULL OR Display = {2})
+                  AND ({3} IS NULL OR Name LIKE '%' || {3} || '%' OR Thought LIKE '%' || {3} || '%' OR Country LIKE '%' || {3} || '%')
+            )
+            SELECT Id, Name, Thought, Country, DateText, TimeText, IsVisible, DuplicateCount
+            FROM Filtered
+            WHERE ({4} = 0 OR DuplicateCount > 1)
+            ORDER BY Id DESC
+            LIMIT {1} OFFSET {0}
+            """;
+        const string countSql = """
+            WITH Filtered AS
+            (
+                SELECT
+                    Id,
+                    COUNT(*) OVER (
+                        PARTITION BY UPPER(TRIM(COALESCE(Name, ''))), UPPER(TRIM(COALESCE(Thought, '')))
+                    ) AS DuplicateCount
+                FROM FreddieTributes
+                WHERE ({0} IS NULL OR Display = {0})
+                  AND ({1} IS NULL OR Name LIKE '%' || {1} || '%' OR Thought LIKE '%' || {1} || '%' OR Country LIKE '%' || {1} || '%')
+            )
+            SELECT COUNT(*) AS Value
+            FROM Filtered
+            WHERE ({2} = 0 OR DuplicateCount > 1)
+            """;
+        const string byIdSql = """
+            SELECT
+                Id,
+                COALESCE(TRIM(Name), 'Anonymous') AS Name,
+                TRIM(Thought) AS Thought,
+                NULLIF(TRIM(COALESCE(Country, '')), '') AS Country,
+                TRIM(DateText) AS DateText,
+                NULLIF(TRIM(COALESCE(TimeText, '')), '') AS TimeText,
+                Display = 1 AS IsVisible,
+                COUNT(*) OVER (
+                    PARTITION BY UPPER(TRIM(COALESCE(Name, ''))), UPPER(TRIM(COALESCE(Thought, '')))
+                ) AS DuplicateCount
+            FROM FreddieTributes
+            WHERE Id = {0}
+            """;
+
+        var repository = new EfAdminFreddieTributeRepository(dbContext, pageSql, countSql, byIdSql);
+
+        var duplicates = await repository.GetPageAsync(
+            new AdminFreddieTributeListFilter(true, "Repeated", DuplicatesOnly: true),
+            1,
+            10);
+
+        Assert.Equal(2, duplicates.TotalCount);
+        Assert.Equal(21, duplicates.Items[0].Id);
+        Assert.True(duplicates.Items[0].IsVisible);
+        Assert.Equal(2, duplicates.Items[0].DuplicateCount);
+
+        var hidden = await repository.GetByIdAsync(22);
+        Assert.NotNull(hidden);
+        Assert.False(hidden.IsVisible);
+        Assert.Null(hidden.TimeText);
     }
 
     [Fact]
