@@ -30,6 +30,54 @@ public sealed class ForumTopicPageTests : IClassFixture<WebApplicationFactory<Pr
     }
 
     [Fact]
+    public async Task ForumTopicPage_MetaDescriptionUsesFirstPostPlainText()
+    {
+        var client = factory.CreateClient();
+
+        var body = await client.GetStringAsync("/forum/topic/1002/ranking-every-studio-album");
+
+        Assert.Contains(
+            "meta name=\"description\" content=\"Where would you put A Night at the Opera in the ranking?\"",
+            body);
+        Assert.DoesNotContain(
+            "meta name=\"description\" content=\"Read-only Queenzone forum archive thread in",
+            body);
+        // Markup from the post body must not appear in the meta attribute.
+        Assert.DoesNotContain(
+            "meta name=\"description\" content=\"Where would you put <strong>",
+            body);
+    }
+
+    [Fact]
+    public async Task ForumTopicPages_HaveUniqueMetaDescriptionsAcrossThreads()
+    {
+        var client = factory.CreateClient();
+
+        var ranking = await client.GetStringAsync("/forum/topic/1002/ranking-every-studio-album");
+        var guidelines = await client.GetStringAsync("/forum/topic/1001/forum-guidelines");
+
+        var rankingDesc = ExtractMetaDescription(ranking);
+        var guidelinesDesc = ExtractMetaDescription(guidelines);
+
+        Assert.False(string.IsNullOrWhiteSpace(rankingDesc));
+        Assert.False(string.IsNullOrWhiteSpace(guidelinesDesc));
+        Assert.NotEqual(rankingDesc, guidelinesDesc);
+        Assert.Contains("A Night at the Opera", rankingDesc);
+        Assert.Contains("civil and on-topic", guidelinesDesc);
+    }
+
+    private static string ExtractMetaDescription(string html)
+    {
+        const string marker = "name=\"description\" content=\"";
+        var start = html.IndexOf(marker, StringComparison.Ordinal);
+        Assert.True(start >= 0, "meta description not found");
+        start += marker.Length;
+        var end = html.IndexOf('"', start);
+        Assert.True(end > start);
+        return html[start..end];
+    }
+
+    [Fact]
     public async Task ForumTopicPageTwoIncludesPagination()
     {
         var client = factory.CreateClient();

@@ -110,7 +110,11 @@ public abstract class ForumTopicPageModel : PageModel
 
         ViewData["Title"] = ForumRoutes.GetTopicPageTitle(header, page);
         ViewData["CanonicalPath"] = ForumRoutes.GetTopicCanonicalPath(header, page);
-        ViewData["Description"] = $"Read-only Queenzone forum archive thread in {header.ForumName}.";
+        ViewData["Description"] = PageMetaDescription.ForForumTopic(
+            Posts.Count > 0 ? Posts[0].Body : null,
+            header.Title,
+            header.ForumName,
+            page);
 
         if (page > 1)
         {

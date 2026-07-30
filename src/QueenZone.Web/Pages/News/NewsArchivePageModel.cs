@@ -45,8 +45,9 @@ public abstract class NewsArchivePageModel(
         Breadcrumbs = [BreadcrumbItem.Home, new BreadcrumbItem("News", "/news")];
 
         ViewData["Title"] = ctx.Title;
-        if (page <= 1)
-            ViewData["Description"] = "The latest Queen news and stories from QueenZone.";
+        ViewData["Description"] = PageMetaDescription.ForArchiveIndex(
+            "The latest Queen news and stories from QueenZone.",
+            page);
         ViewData["CanonicalPath"] = ctx.CanonicalPath;
         if (ctx.PrevPath is not null)
             ViewData["PrevPath"] = ctx.PrevPath;
