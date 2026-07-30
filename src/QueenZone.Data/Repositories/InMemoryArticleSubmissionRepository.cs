@@ -1,4 +1,4 @@
-﻿using QueenZone.Data.Entities;
+using QueenZone.Data.Entities;
 
 namespace QueenZone.Data;
 

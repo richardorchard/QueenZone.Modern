@@ -52,6 +52,12 @@ public sealed class ArticlesRoutesTests : IClassFixture<WebApplicationFactory<Pr
         Assert.Contains("/articles/121/archive-sample-article-121", pageTwo);
         Assert.Contains(TestSiteConfiguration.CanonicalLink("/articles/page/2"), pageTwo);
         Assert.Contains(TestSiteConfiguration.PrevLink("/articles"), pageTwo);
+        Assert.Contains(
+            "meta name=\"description\" content=\"In-depth Queen articles and interviews from the Queenzone.com archive.\"",
+            pageOne);
+        Assert.Contains(
+            "meta name=\"description\" content=\"In-depth Queen articles and interviews from the Queenzone.com archive - page 2.\"",
+            pageTwo);
     }
 
     [Fact]

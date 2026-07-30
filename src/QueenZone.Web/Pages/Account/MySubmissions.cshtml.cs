@@ -46,29 +46,29 @@ public sealed class MySubmissionsModel(
         switch (ActiveTab)
         {
             case TabNews:
-            {
-                var result = await newsSuggestionRepository.GetBySubmitterAsync(
-                    memberId.Value, CurrentPage, PageSize, cancellationToken);
-                NewsSuggestions = await MapNewsRowsAsync(result.Items, cancellationToken);
-                Pagination = BuildPagination(result.TotalCount);
-                break;
-            }
+                {
+                    var result = await newsSuggestionRepository.GetBySubmitterAsync(
+                        memberId.Value, CurrentPage, PageSize, cancellationToken);
+                    NewsSuggestions = await MapNewsRowsAsync(result.Items, cancellationToken);
+                    Pagination = BuildPagination(result.TotalCount);
+                    break;
+                }
             case TabArticles:
-            {
-                var result = await articleSubmissionRepository.GetDraftsForMemberAsync(
-                    memberId.Value, CurrentPage, PageSize, cancellationToken);
-                ArticleSubmissions = result.Items;
-                Pagination = BuildPagination(result.TotalCount);
-                break;
-            }
+                {
+                    var result = await articleSubmissionRepository.GetDraftsForMemberAsync(
+                        memberId.Value, CurrentPage, PageSize, cancellationToken);
+                    ArticleSubmissions = result.Items;
+                    Pagination = BuildPagination(result.TotalCount);
+                    break;
+                }
             default:
-            {
-                var result = await photoSubmissionRepository.GetBySubmitterAsync(
-                    memberId.Value, CurrentPage, PageSize, cancellationToken);
-                PhotoSubmissions = result.Items;
-                Pagination = BuildPagination(result.TotalCount);
-                break;
-            }
+                {
+                    var result = await photoSubmissionRepository.GetBySubmitterAsync(
+                        memberId.Value, CurrentPage, PageSize, cancellationToken);
+                    PhotoSubmissions = result.Items;
+                    Pagination = BuildPagination(result.TotalCount);
+                    break;
+                }
         }
 
         ViewData["Title"] = "My submissions";

@@ -185,8 +185,8 @@ public sealed class GetAllPublishedTests
         {
             await ctx.Database.EnsureCreatedAsync();
             ctx.QueenHistoryEvents.AddRange(
-                Entity(1, "Live Aid",   new DateTime(1985, 7, 13, 0, 0, 0, DateTimeKind.Utc), isPublished: true),
-                Entity(2, "Hidden",     new DateTime(1991, 11, 24, 0, 0, 0, DateTimeKind.Utc), isPublished: false));
+                Entity(1, "Live Aid", new DateTime(1985, 7, 13, 0, 0, 0, DateTimeKind.Utc), isPublished: true),
+                Entity(2, "Hidden", new DateTime(1991, 11, 24, 0, 0, 0, DateTimeKind.Utc), isPublished: false));
             await ctx.SaveChangesAsync();
         }
 
@@ -210,9 +210,9 @@ public sealed class GetAllPublishedTests
         {
             await ctx.Database.EnsureCreatedAsync();
             ctx.QueenHistoryEvents.AddRange(
-                Entity(1, "Exact", new DateTime(1985, 7, 13, 0, 0, 0, DateTimeKind.Utc), isPublished: true,  precision: QueenHistoryDatePrecision.ExactDate),
-                Entity(2, "Month", new DateTime(1975, 10, 1, 0, 0, 0, DateTimeKind.Utc),  isPublished: true,  precision: QueenHistoryDatePrecision.MonthYear),
-                Entity(3, "Hidden",new DateTime(1991, 11, 24, 0, 0, 0, DateTimeKind.Utc), isPublished: false, precision: QueenHistoryDatePrecision.ExactDate));
+                Entity(1, "Exact", new DateTime(1985, 7, 13, 0, 0, 0, DateTimeKind.Utc), isPublished: true, precision: QueenHistoryDatePrecision.ExactDate),
+                Entity(2, "Month", new DateTime(1975, 10, 1, 0, 0, 0, DateTimeKind.Utc), isPublished: true, precision: QueenHistoryDatePrecision.MonthYear),
+                Entity(3, "Hidden", new DateTime(1991, 11, 24, 0, 0, 0, DateTimeKind.Utc), isPublished: false, precision: QueenHistoryDatePrecision.ExactDate));
             await ctx.SaveChangesAsync();
         }
 

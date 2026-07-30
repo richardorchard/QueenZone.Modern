@@ -168,8 +168,13 @@ Every pull request must run:
 ```powershell
 dotnet restore QueenZone.sln
 dotnet build QueenZone.sln --configuration Release --no-restore
+dotnet format QueenZone.sln --verify-no-changes
 dotnet test QueenZone.sln --configuration Release --no-build
 ```
+
+CI enforces formatting against the root `.editorconfig` via `dotnet format … --verify-no-changes` in the `build` job (after build, before tests). If that step fails, run `dotnet format QueenZone.sln` locally and commit the result.
+
+Line endings: `.editorconfig` requires CRLF. Root `.gitattributes` sets `* text=auto eol=crlf` so Linux CI and Windows agents share the same working-tree endings. Without that, Linux checkouts stay LF and fail `ENDOFLINE` while Windows with `core.autocrlf=true` stays green.
 
 CI also collects coverage from the deterministic test suite and publishes an HTML/Cobertura report artifact. The coverage report is expected to help reviewers spot untested risk.
 
@@ -195,7 +200,7 @@ These gates are guardrails, not a replacement for useful assertions. New or chan
 
 | Job | Purpose | Blocks merge? |
 | --- | --- | --- |
-| `build` | Restore, build, test, coverage gates | Yes |
+| `build` | Restore, build, format verify, test, coverage gates | Yes |
 | `ef-migrations` | When migration-related paths change: snapshot check + `database update` on Azure SQL | Yes (same-repo PRs only; skipped otherwise) |
 | `smoke-test` | Publish app, curl `/health`, `/`, `/news` | Yes |
 | `e2e-test` | Playwright suite on self-hosted Windows runner | No (`continue-on-error` if runner offline) |
@@ -224,6 +229,7 @@ Before opening a pull request, run the full local gate—not only `dotnet test`:
 git fetch origin main
 dotnet restore QueenZone.sln
 dotnet build QueenZone.sln --configuration Release --no-restore
+dotnet format QueenZone.sln --verify-no-changes
 dotnet test QueenZone.sln --configuration Release --no-build --collect:"XPlat Code Coverage" --settings coverlet.runsettings --results-directory ./TestResults
 powershell -File ./scripts/Test-CoverageGate.ps1 -Reports ./TestResults -GlobalLineThreshold 51 -ChangedLineThreshold 70 -BaseRef origin/main
 ```
@@ -267,12 +273,6 @@ dotnet tool run reportgenerator -reports:".\TestResults\**\coverage.cobertura.xm
 ```
 
 Do not commit generated `TestResults/` or `coverage-report/` output.
-
-Add these checks when the project is ready:
-
-```powershell
-dotnet format QueenZone.sln --verify-no-changes
-```
 
 Playwright browser smoke tests live in `tests/QueenZone.Web.E2E` and run in CI on a self-hosted Windows runner to avoid consuming GitHub Actions minutes. See `docs/architecture/self-hosted-e2e-runner.md` for runner setup and operational notes.
 

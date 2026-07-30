@@ -195,6 +195,10 @@
 
   forms.forEach((form) => {
     form.addEventListener("submit", (event) => {
+      if (event.defaultPrevented) {
+        return;
+      }
+
       if (form.classList.contains("is-submitting")) {
         // Already submitted once; block double-posts.
         event.preventDefault();
@@ -212,9 +216,19 @@
 
       const busyLabel = form.getAttribute("data-busy-label") || "Working…";
       const status = form.querySelector("[data-busy-status]");
+      let timerId = null;
       if (status) {
         status.hidden = false;
         status.textContent = busyLabel;
+        if (form.getAttribute("data-busy-timer") === "true") {
+          const startedAt = Date.now();
+          const updateTimer = () => {
+            const elapsed = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
+            status.textContent = `${busyLabel} (${elapsed}s)`;
+          };
+          updateTimer();
+          timerId = window.setInterval(updateTimer, 1000);
+        }
       }
 
       const submitters = form.querySelectorAll('button[type="submit"], input[type="submit"]');
@@ -236,6 +250,12 @@
           }, 0);
         }
       });
+
+      window.addEventListener("pageshow", () => {
+        if (timerId !== null) {
+          window.clearInterval(timerId);
+        }
+      }, { once: true });
     });
   });
 })();

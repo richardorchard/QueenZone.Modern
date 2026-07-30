@@ -45,9 +45,11 @@ public abstract class NewsArchivePageModel(
         Breadcrumbs = [BreadcrumbItem.Home, new BreadcrumbItem("News", "/news")];
 
         ViewData["Title"] = ctx.Title;
+        ViewData["Description"] = PageMetaDescription.ForArchiveIndex(
+            "The latest Queen news and stories from QueenZone.",
+            page);
         if (page <= 1)
         {
-            ViewData["Description"] = "The latest Queen news and stories from QueenZone.";
             ViewData["RssFeedPath"] = NewsRoutes.FeedPath;
             ViewData["RssFeedTitle"] = "QueenZone News";
         }

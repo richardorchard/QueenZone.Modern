@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using QueenZone.Data;
 
 namespace QueenZone.Web.Pages.Articles;

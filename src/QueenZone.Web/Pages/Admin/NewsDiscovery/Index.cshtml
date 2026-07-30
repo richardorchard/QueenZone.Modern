@@ -1,5 +1,6 @@
 @page "/admin/news-discovery"
 @model IndexModel
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
 
 <div class="admin-shell">
   <h1>News discovery review</h1>
@@ -7,12 +8,17 @@
     <a href="/admin">Back to admin</a>
   </p>
 
+  @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+  {
+    <p class="admin-status admin-status--@(Model.StatusMessageKind ?? "info")">@Model.StatusMessage</p>
+  }
+
   <form method="get" class="admin-filter-form">
     <div class="admin-filter-grid">
       <label>
         Status
         <select name="status">
-          <option value="">All</option>
+          <option value="">Active</option>
           @foreach (var status in Enum.GetValues<QueenZone.Data.NewsCandidateStatus>())
           {
             <option value="@status" selected="@(Model.Status == status)">@NewsDiscoveryStatusLabels.Format(status)</option>
@@ -73,6 +79,43 @@
   }
   else
   {
+    <form method="post" action="/admin/news-discovery?handler=ignorelisted" class="admin-inline-form" onsubmit="return confirm('Ignore all currently listed candidates?');">
+      <input type="hidden" name="@AdminNewsDiscoveryPageModel.AntiforgeryTokenFieldName" value="@Antiforgery.GetAndStoreTokens(HttpContext).RequestToken">
+      @if (Model.Status is not null)
+      {
+        <input type="hidden" name="status" value="@Model.Status">
+      }
+      @if (Model.SourceId is not null)
+      {
+        <input type="hidden" name="sourceId" value="@Model.SourceId">
+      }
+      @if (Model.TrustTier is not null)
+      {
+        <input type="hidden" name="trustTier" value="@Model.TrustTier">
+      }
+      @if (Model.MinConfidence is not null)
+      {
+        <input type="hidden" name="minConfidence" value="@Model.MinConfidence">
+      }
+      @if (!string.IsNullOrWhiteSpace(Model.Entity))
+      {
+        <input type="hidden" name="entity" value="@Model.Entity">
+      }
+      @if (Model.DiscoveredFrom is not null)
+      {
+        <input type="hidden" name="discoveredFrom" value="@(Model.DiscoveredFrom?.ToString("yyyy-MM-dd"))">
+      }
+      @if (Model.DiscoveredTo is not null)
+      {
+        <input type="hidden" name="discoveredTo" value="@(Model.DiscoveredTo?.ToString("yyyy-MM-dd"))">
+      }
+      @if (Model.HasDraft is not null)
+      {
+        <input type="hidden" name="hasDraft" value="@(Model.HasDraft.Value ? "true" : "false")">
+      }
+      <button type="submit">Ignore all listed</button>
+    </form>
+
     <table class="admin-table">
       <thead>
         <tr>
@@ -112,6 +155,46 @@
             <td>@(candidate.DraftTitle ?? "—")</td>
             <td class="admin-actions">
               <a href="/admin/news-discovery/@candidate.Id">Review</a>
+              @if (QueenZone.Data.NewsCandidateWorkflow.CanReject(candidate.Status))
+              {
+                <form method="post" action="/admin/news-discovery?handler=ignore" class="admin-inline-form">
+                  <input type="hidden" name="@AdminNewsDiscoveryPageModel.AntiforgeryTokenFieldName" value="@Antiforgery.GetAndStoreTokens(HttpContext).RequestToken">
+                  <input type="hidden" name="id" value="@candidate.Id">
+                  @if (Model.Status is not null)
+                  {
+                    <input type="hidden" name="status" value="@Model.Status">
+                  }
+                  @if (Model.SourceId is not null)
+                  {
+                    <input type="hidden" name="sourceId" value="@Model.SourceId">
+                  }
+                  @if (Model.TrustTier is not null)
+                  {
+                    <input type="hidden" name="trustTier" value="@Model.TrustTier">
+                  }
+                  @if (Model.MinConfidence is not null)
+                  {
+                    <input type="hidden" name="minConfidence" value="@Model.MinConfidence">
+                  }
+                  @if (!string.IsNullOrWhiteSpace(Model.Entity))
+                  {
+                    <input type="hidden" name="entity" value="@Model.Entity">
+                  }
+                  @if (Model.DiscoveredFrom is not null)
+                  {
+                    <input type="hidden" name="discoveredFrom" value="@(Model.DiscoveredFrom?.ToString("yyyy-MM-dd"))">
+                  }
+                  @if (Model.DiscoveredTo is not null)
+                  {
+                    <input type="hidden" name="discoveredTo" value="@(Model.DiscoveredTo?.ToString("yyyy-MM-dd"))">
+                  }
+                  @if (Model.HasDraft is not null)
+                  {
+                    <input type="hidden" name="hasDraft" value="@(Model.HasDraft.Value ? "true" : "false")">
+                  }
+                  <button type="submit">Ignore</button>
+                </form>
+              }
             </td>
           </tr>
         }

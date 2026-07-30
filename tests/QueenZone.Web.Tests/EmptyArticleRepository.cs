@@ -1,4 +1,4 @@
-﻿using QueenZone.Data;
+using QueenZone.Data;
 
 namespace QueenZone.Web.Tests;
 

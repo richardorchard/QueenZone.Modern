@@ -88,9 +88,11 @@ public abstract class ArticlesArchivePageModel(
         Breadcrumbs = [BreadcrumbItem.Home, new BreadcrumbItem("Articles", "/articles")];
 
         ViewData["Title"] = ctx.Title;
+        ViewData["Description"] = PageMetaDescription.ForArchiveIndex(
+            "In-depth Queen articles and interviews from the Queenzone.com archive.",
+            page);
         if (page <= 1)
         {
-            ViewData["Description"] = "In-depth Queen articles and interviews from the Queenzone.com archive.";
             ViewData["RssFeedPath"] = ArticlesRoutes.FeedPath;
             ViewData["RssFeedTitle"] = "QueenZone Articles";
         }

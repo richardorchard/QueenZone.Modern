@@ -132,6 +132,13 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
         var candidateId = await NewsDiscoveryTestSeeder.SeedDraftedCandidateAsync(discoveryRepository);
         var client = CreateClient(AdminEmail, new SharedNewsStore(), discoveryStore);
 
+        var initialReviewBody = await client.GetStringAsync($"/admin/news-discovery/{candidateId}");
+        Assert.Contains("Regenerate draft with AI", initialReviewBody);
+        Assert.Contains("data-busy-submit", initialReviewBody);
+        Assert.Contains("data-busy-label=\"Regenerating draft\"", initialReviewBody);
+        Assert.Contains("data-busy-timer=\"true\"", initialReviewBody);
+        Assert.Contains("data-busy-status", initialReviewBody);
+
         var response = await PostActionAsync(client, $"/admin/news-discovery/{candidateId}/regeneratedraft", candidateId);
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
 
@@ -142,6 +149,34 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
         var draft = await discoveryRepository.GetDraftByCandidateIdAsync(candidateId);
         Assert.NotNull(draft);
         Assert.Equal("Queen announce 2026 tour", draft.ProposedTitle);
+    }
+
+    [Fact]
+    public async Task AuthorizedAdminCanGenerateDraftForDiscoveredCandidateFromReviewPage()
+    {
+        var discoveryStore = new SharedNewsDiscoveryStore();
+        var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
+        var candidateId = await NewsDiscoveryTestSeeder.SeedDiscoveredCandidateAsync(discoveryRepository);
+        var client = CreateClient(AdminEmail, new SharedNewsStore(), discoveryStore);
+
+        var initialReviewBody = await client.GetStringAsync($"/admin/news-discovery/{candidateId}");
+        Assert.Contains("Generate draft with AI", initialReviewBody);
+        Assert.DoesNotContain("--draft-only", initialReviewBody);
+        Assert.Contains("data-busy-label=\"Generating draft\"", initialReviewBody);
+        Assert.Contains("data-busy-timer=\"true\"", initialReviewBody);
+
+        var response = await PostActionAsync(client, $"/admin/news-discovery/{candidateId}/regeneratedraft", candidateId);
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+
+        var reviewBody = await client.GetStringAsync($"/admin/news-discovery/{candidateId}");
+        Assert.Contains("Draft generated successfully", reviewBody);
+        Assert.Contains("Queen announce 2026 tour", reviewBody);
+
+        var draft = await discoveryRepository.GetDraftByCandidateIdAsync(candidateId);
+        var candidate = await discoveryRepository.GetCandidateByIdAsync(candidateId);
+        Assert.NotNull(draft);
+        Assert.Equal("Queen announce 2026 tour", draft.ProposedTitle);
+        Assert.Equal(NewsCandidateStatus.Drafted, candidate!.Status);
     }
 
     [Fact]
@@ -161,11 +196,11 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
 
         var reviewBody = await client.GetStringAsync($"/admin/news-discovery/{candidateId}");
-        Assert.Contains("Draft regeneration requires OpenRouter configuration", reviewBody);
+        Assert.Contains("Draft generation requires OpenRouter configuration", reviewBody);
     }
 
     [Fact]
-    public async Task RegenerateDraft_reports_error_for_rejected_candidate()
+    public async Task AuthorizedAdminCanGenerateDraftForRejectedCandidateFromReviewPage()
     {
         var discoveryStore = new SharedNewsDiscoveryStore();
         var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
@@ -182,11 +217,21 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
             new NewsCandidateStatusUpdate(NewsCandidateStatus.Rejected));
         var client = CreateClient(AdminEmail, new SharedNewsStore(), discoveryStore);
 
+        var initialReviewBody = await client.GetStringAsync($"/admin/news-discovery/{candidateId}");
+        Assert.Contains("Generate draft with AI", initialReviewBody);
+
         var response = await PostActionAsync(client, $"/admin/news-discovery/{candidateId}/regeneratedraft", candidateId);
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
 
         var reviewBody = await client.GetStringAsync($"/admin/news-discovery/{candidateId}");
-        Assert.Contains("Only needs-review or drafted candidates can regenerate a draft", reviewBody);
+        Assert.Contains("Draft generated successfully", reviewBody);
+        Assert.Contains("Queen announce 2026 tour", reviewBody);
+
+        var draft = await discoveryRepository.GetDraftByCandidateIdAsync(candidateId);
+        var candidate = await discoveryRepository.GetCandidateByIdAsync(candidateId);
+        Assert.NotNull(draft);
+        Assert.Equal("Queen announce 2026 tour", draft.ProposedTitle);
+        Assert.Equal(NewsCandidateStatus.Drafted, candidate!.Status);
     }
 
     [Fact]
@@ -491,6 +536,11 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
 
         var editPage = await client.GetStringAsync($"/admin/news-discovery/{candidateId}/edit-draft");
         Assert.Contains("Needs-review draft title", editPage);
+        Assert.Contains($"action=\"/admin/news-discovery/{candidateId}/edit-draft\"", editPage);
+        Assert.Contains("qz-rte", editPage);
+        Assert.Contains("name=\"form.body\"", editPage);
+        Assert.Contains("/js/editor/rich-text-editor.js", editPage);
+        Assert.Contains("data-af-token", editPage);
 
         var saveResponse = await PostDraftEditAsync(
             client,
@@ -512,10 +562,42 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
         var draft = await discoveryRepository.GetDraftByCandidateIdAsync(candidateId);
         Assert.NotNull(draft);
         Assert.Equal("Edited discovery draft", draft.ProposedTitle);
+        Assert.Equal("Edited body text.", draft.ProposedBody);
 
         var candidate = await discoveryRepository.GetCandidateByIdAsync(candidateId);
         Assert.NotNull(candidate);
         Assert.Equal(NewsCandidateStatus.Drafted, candidate.Status);
+    }
+
+    [Fact]
+    public async Task EditDraftSanitizesRichTextBodyBeforeSaving()
+    {
+        var discoveryStore = new SharedNewsDiscoveryStore();
+        var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
+        var candidateId = await NewsDiscoveryTestSeeder.SeedNeedsReviewCandidateWithDraftAsync(discoveryRepository);
+        var client = CreateClient(AdminEmail, new SharedNewsStore(), discoveryStore);
+
+        var saveResponse = await PostDraftEditAsync(
+            client,
+            candidateId,
+            new Dictionary<string, string>
+            {
+                ["form.title"] = "Rich discovery draft",
+                ["form.slug"] = "rich-discovery-draft",
+                ["form.excerpt"] = "Edited excerpt.",
+                ["form.body"] = """<p><strong>Edited</strong> body.</p><script>alert("x")</script>""",
+                ["form.attributionText"] = "",
+                ["form.sourceNotes"] = "",
+                ["form.confidenceNotes"] = "",
+                ["form.suggestedPublishAt"] = "2026-07-15"
+            });
+
+        Assert.Equal(HttpStatusCode.Redirect, saveResponse.StatusCode);
+
+        var draft = await discoveryRepository.GetDraftByCandidateIdAsync(candidateId);
+        Assert.NotNull(draft);
+        Assert.Contains("<strong>Edited</strong>", draft.ProposedBody);
+        Assert.DoesNotContain("<script", draft.ProposedBody, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -818,6 +900,95 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
         Assert.Contains("No candidates match the current filters.", emptyBody);
     }
 
+    [Fact]
+    public async Task IndexIgnoreActionRejectsCandidateAndHidesItFromDefaultQueue()
+    {
+        var discoveryStore = new SharedNewsDiscoveryStore();
+        var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
+        var candidateId = await NewsDiscoveryTestSeeder.SeedNeedsReviewCandidateAsync(
+            discoveryRepository,
+            canonicalUrl: "https://www.queenonline.com/news/list-ignore",
+            title: "List ignore candidate",
+            excerpt: "Excerpt",
+            sourceFeedOrSiteUrl: null);
+        var client = CreateClient(AdminEmail, new SharedNewsStore(), discoveryStore);
+
+        var indexBody = await client.GetStringAsync("/admin/news-discovery");
+        Assert.Contains("List ignore candidate", indexBody);
+        Assert.Contains("Ignore", indexBody);
+
+        var response = await PostIndexActionAsync(
+            client,
+            "/admin/news-discovery?handler=ignore",
+            new Dictionary<string, string> { ["id"] = candidateId.ToString(System.Globalization.CultureInfo.InvariantCulture) });
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal("/admin/news-discovery", response.Headers.Location!.OriginalString);
+
+        var candidate = await discoveryRepository.GetCandidateByIdAsync(candidateId);
+        Assert.NotNull(candidate);
+        Assert.Equal(NewsCandidateStatus.Rejected, candidate.Status);
+
+        var defaultBody = await client.GetStringAsync("/admin/news-discovery");
+        Assert.DoesNotContain("List ignore candidate", defaultBody);
+        Assert.Contains("Ignored candidate", defaultBody);
+
+        var rejectedBody = await client.GetStringAsync("/admin/news-discovery?status=Rejected");
+        Assert.Contains("List ignore candidate", rejectedBody);
+    }
+
+    [Fact]
+    public async Task IndexBulkIgnoreRejectsAllCurrentlyListedCandidates()
+    {
+        var discoveryStore = new SharedNewsDiscoveryStore();
+        var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
+        var primaryId = await NewsDiscoveryTestSeeder.SeedNeedsReviewCandidateAsync(
+            discoveryRepository,
+            canonicalUrl: "https://www.queenonline.com/news/bulk-ignore-primary",
+            title: "Bulk ignore primary",
+            excerpt: "Excerpt",
+            sourceKey: "bulk-primary",
+            sourceName: "Bulk Primary",
+            sourceFeedOrSiteUrl: null,
+            trustTier: NewsDiscoveryTrustTier.Primary);
+        var secondaryId = await NewsDiscoveryTestSeeder.SeedNeedsReviewCandidateAsync(
+            discoveryRepository,
+            canonicalUrl: "https://www.queenonline.com/news/bulk-ignore-secondary",
+            title: "Bulk ignore secondary",
+            excerpt: "Excerpt",
+            sourceKey: "bulk-secondary",
+            sourceName: "Bulk Secondary",
+            sourceFeedOrSiteUrl: null,
+            trustTier: NewsDiscoveryTrustTier.Secondary);
+        var client = CreateClient(AdminEmail, new SharedNewsStore(), discoveryStore);
+
+        var filteredBody = await client.GetStringAsync("/admin/news-discovery?trustTier=Primary");
+        Assert.Contains("Bulk ignore primary", filteredBody);
+        Assert.DoesNotContain("Bulk ignore secondary", filteredBody);
+        Assert.Contains("Ignore all listed", filteredBody);
+
+        var response = await PostIndexActionAsync(
+            client,
+            "/admin/news-discovery?handler=ignorelisted",
+            new Dictionary<string, string> { ["trustTier"] = "Primary" },
+            "/admin/news-discovery?trustTier=Primary");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal("/admin/news-discovery?trustTier=Primary", response.Headers.Location!.OriginalString);
+
+        var primary = await discoveryRepository.GetCandidateByIdAsync(primaryId);
+        var secondary = await discoveryRepository.GetCandidateByIdAsync(secondaryId);
+        Assert.NotNull(primary);
+        Assert.NotNull(secondary);
+        Assert.Equal(NewsCandidateStatus.Rejected, primary.Status);
+        Assert.Equal(NewsCandidateStatus.NeedsReview, secondary.Status);
+
+        var defaultBody = await client.GetStringAsync("/admin/news-discovery");
+        Assert.DoesNotContain("Bulk ignore primary", defaultBody);
+        Assert.Contains("Bulk ignore secondary", defaultBody);
+        Assert.Contains("Ignored 1 listed candidate", defaultBody);
+    }
+
     private WebApplicationFactory<Program> CreateFactory(
         SharedNewsStore newsStore,
         SharedNewsDiscoveryStore discoveryStore,
@@ -931,6 +1102,17 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
         {
             [QueenZone.Web.Pages.Admin.News.AdminNewsPageModel.AntiforgeryTokenFieldName] = token
         }));
+    }
+
+    private static async Task<HttpResponseMessage> PostIndexActionAsync(
+        HttpClient client,
+        string actionPath,
+        Dictionary<string, string> fields,
+        string indexPath = "/admin/news-discovery")
+    {
+        var indexPage = await client.GetStringAsync(indexPath);
+        fields[AdminNewsDiscoveryPageModel.AntiforgeryTokenFieldName] = ExtractAntiforgeryToken(indexPage);
+        return await client.PostAsync(actionPath, new FormUrlEncodedContent(fields));
     }
 
     private static async Task<HttpResponseMessage> PostDraftEditAsync(

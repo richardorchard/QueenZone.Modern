@@ -29,14 +29,16 @@ public static class NewsCandidateWorkflow
                 NewsCandidateStatus.Rejected,
                 NewsCandidateStatus.IgnoredDuplicate
             ],
-            [NewsCandidateStatus.Rejected] = [],
+            [NewsCandidateStatus.Rejected] =
+            [
+                NewsCandidateStatus.NeedsReview
+            ],
             [NewsCandidateStatus.IgnoredDuplicate] = [],
             [NewsCandidateStatus.PromotedToArticle] = []
         };
 
     public static bool IsTerminal(NewsCandidateStatus status) =>
-        status is NewsCandidateStatus.Rejected
-            or NewsCandidateStatus.IgnoredDuplicate
+        status is NewsCandidateStatus.IgnoredDuplicate
             or NewsCandidateStatus.PromotedToArticle;
 
     public static bool CanTransition(NewsCandidateStatus current, NewsCandidateStatus next) =>

@@ -1,6 +1,11 @@
 @page "/admin/news-discovery/{id:int}/edit-draft"
 @model EditDraftModel
+@using QueenZone.Storage
 @inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@{
+  var antiforgeryToken = Antiforgery.GetAndStoreTokens(HttpContext).RequestToken ?? string.Empty;
+  ViewData["AntiforgeryToken"] = antiforgeryToken;
+}
 
 <div class="admin-shell">
   <h1>Edit generated draft</h1>
@@ -16,8 +21,8 @@
     </ul>
   }
 
-  <form method="post" class="admin-form">
-    <input type="hidden" name="@AdminNewsDiscoveryPageModel.AntiforgeryTokenFieldName" value="@Antiforgery.GetAndStoreTokens(HttpContext).RequestToken" />
+  <form method="post" action="/admin/news-discovery/@Model.Id/edit-draft" class="admin-form">
+    <input type="hidden" name="@AdminNewsDiscoveryPageModel.AntiforgeryTokenFieldName" value="@antiforgeryToken" />
     <label>
       Title
       <input type="text" name="form.title" value="@Model.Form.Title" maxlength="@NewsValidation.MaxTitleLength" required />
@@ -30,10 +35,15 @@
       Excerpt
       <textarea name="form.excerpt" rows="3" maxlength="@NewsValidation.MaxExcerptLength" required>@Model.Form.Excerpt</textarea>
     </label>
-    <label>
-      Body
-      <textarea name="form.body" rows="12" required>@Model.Form.Body</textarea>
-    </label>
+    @{
+      ViewData["TextareaId"] = "form_body";
+      ViewData["TextareaName"] = "form.body";
+      ViewData["EditorValue"] = Model.Form.Body;
+      ViewData["UploadContainer"] = BlobUploadContainers.News;
+      ViewData["EditorLabel"] = "Body";
+      ViewData["TextareaRows"] = 16;
+    }
+    <partial name="_RichTextEditor" />
     <label>
       Attribution
       <textarea name="form.attributionText" rows="2">@Model.Form.AttributionText</textarea>

@@ -1,5 +1,5 @@
-using System.Globalization;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using Google.Analytics.Data.V1Beta;
 using Google.Apis.Auth.OAuth2;
 using Microsoft.Extensions.Options;
