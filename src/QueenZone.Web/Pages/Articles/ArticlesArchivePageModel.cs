@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Data.SqlClient;
 using QueenZone.Data;
@@ -88,8 +88,9 @@ public abstract class ArticlesArchivePageModel(
         Breadcrumbs = [BreadcrumbItem.Home, new BreadcrumbItem("Articles", "/articles")];
 
         ViewData["Title"] = ctx.Title;
-        if (page <= 1)
-            ViewData["Description"] = "In-depth Queen articles and interviews from the Queenzone.com archive.";
+        ViewData["Description"] = PageMetaDescription.ForArchiveIndex(
+            "In-depth Queen articles and interviews from the Queenzone.com archive.",
+            page);
         ViewData["CanonicalPath"] = ctx.CanonicalPath;
         if (ctx.PrevPath is not null)
             ViewData["PrevPath"] = ctx.PrevPath;

@@ -65,6 +65,12 @@ public sealed class NewsRoutesTests : IClassFixture<QueenZoneWebApplicationFacto
         Assert.DoesNotContain("/news/1005/archive-sample-article-1005", pageOne);
         Assert.Contains(TestSiteConfiguration.CanonicalLink("/news/page/2"), pageTwo);
         TestHtmlAssertions.AssertPageTitle(pageTwo, "QueenZone news – Page 2");
+        Assert.Contains(
+            "meta name=\"description\" content=\"The latest Queen news and stories from QueenZone - page 2.\"",
+            pageTwo);
+        Assert.Contains(
+            "meta name=\"description\" content=\"The latest Queen news and stories from QueenZone.\"",
+            pageOne);
         Assert.Contains(TestSiteConfiguration.NextLink("/news/page/2"), pageOne);
         Assert.DoesNotContain(TestSiteConfiguration.PrevLink("/news"), pageOne);
         Assert.Contains(TestSiteConfiguration.PrevLink("/news"), pageTwo);
