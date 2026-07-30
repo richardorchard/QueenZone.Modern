@@ -3,6 +3,7 @@ using QueenZone.Data;
 
 namespace QueenZone.Web.Tests;
 
+[Collection(LiveDatabaseProbeCollection.Name)]
 public sealed class EfAdminNewsRepositoryLegacyWriteProbeTests
 {
     [Fact]

@@ -99,53 +99,18 @@ public sealed class ActionModel(
             return RedirectWithMessage(id, string.Join(" ", validationErrors), "error");
         }
 
-        await using var transaction = serviceProvider.GetService<QueenZoneDbContext>() is { } dbContext
-            ? await dbContext.Database.BeginTransactionAsync(cancellationToken)
-            : null;
-        int newsId;
         var promotionStage = "creating the admin draft";
+        int newsId;
         try
         {
-            newsId = await adminNewsRepository.CreateDraftAsync(adminDraft, EditorEmail, cancellationToken);
-
-            promotionStage = "updating the suggestion";
-            var promoted = await newsSuggestionRepository.PromoteAsync(
-                id,
-                newsId,
-                EditorEmail,
-                ReviewNotes,
-                cancellationToken);
-            if (promoted is null)
-            {
-                if (transaction is not null)
-                {
-                    await transaction.RollbackAsync(cancellationToken);
-                }
-
-                return RedirectWithMessage(id, "Promotion failed while updating the suggestion.", "error");
-            }
-
-            promotionStage = "recording the promotion audit";
-            await auditRepository.AppendAsync(
-                newsId,
-                "promote-from-suggestion",
-                EditorEmail,
-                $"Promoted from member suggestion {id}. URL: {suggestion.Url}",
-                cancellationToken);
-
-            if (transaction is not null)
-            {
-                promotionStage = "committing the promotion";
-                await transaction.CommitAsync(cancellationToken);
-            }
+            newsId = await ExecutePromotionAsync(cancellationToken);
+        }
+        catch (PromotionWorkflowException ex)
+        {
+            return RedirectWithMessage(id, ex.Message, "error");
         }
         catch (Exception ex)
         {
-            if (transaction is not null)
-            {
-                await transaction.RollbackAsync(cancellationToken);
-            }
-
             logger.LogError(
                 ex,
                 "Failed while {PromotionStage} for news suggestion {SuggestionId}",
@@ -158,6 +123,51 @@ public sealed class ActionModel(
         }
 
         return Redirect($"/admin/news/{newsId}/edit");
+
+        async Task<int> ExecutePromotionAsync(CancellationToken ct)
+        {
+            if (serviceProvider.GetService<QueenZoneDbContext>() is not { } dbContext)
+            {
+                return await PromoteCoreAsync(ct);
+            }
+
+            var strategy = dbContext.Database.CreateExecutionStrategy();
+            return await strategy.ExecuteAsync(async () =>
+            {
+                await using var transaction = await dbContext.Database.BeginTransactionAsync(ct);
+                var promotedNewsId = await PromoteCoreAsync(ct);
+                promotionStage = "committing the promotion";
+                await transaction.CommitAsync(ct);
+                return promotedNewsId;
+            });
+        }
+
+        async Task<int> PromoteCoreAsync(CancellationToken ct)
+        {
+            var promotedNewsId = await adminNewsRepository.CreateDraftAsync(adminDraft, EditorEmail, ct);
+
+            promotionStage = "updating the suggestion";
+            var promoted = await newsSuggestionRepository.PromoteAsync(
+                id,
+                promotedNewsId,
+                EditorEmail,
+                ReviewNotes,
+                ct);
+            if (promoted is null)
+            {
+                throw new PromotionWorkflowException("Promotion failed while updating the suggestion.");
+            }
+
+            promotionStage = "recording the promotion audit";
+            await auditRepository.AppendAsync(
+                promotedNewsId,
+                "promote-from-suggestion",
+                EditorEmail,
+                $"Promoted from member suggestion {id}. URL: {suggestion.Url}",
+                ct);
+
+            return promotedNewsId;
+        }
     }
 
     private async Task<IActionResult> ApplyStatusAsync(
@@ -197,4 +207,6 @@ public sealed class ActionModel(
         TempData["NewsSuggestionMessageKind"] = kind;
         return Redirect($"/admin/news-suggestions/{id}");
     }
+
+    private sealed class PromotionWorkflowException(string message) : Exception(message);
 }

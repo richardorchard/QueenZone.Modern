@@ -3,6 +3,7 @@ using QueenZone.Data;
 
 namespace QueenZone.Web.Tests;
 
+[Collection(LiveDatabaseProbeCollection.Name)]
 public sealed class EfAdminNewsRepositoryLegacyProbeTests
 {
     [Fact]
@@ -23,14 +24,15 @@ public sealed class EfAdminNewsRepositoryLegacyProbeTests
         var all = await repository.GetAllAsync();
         Assert.NotEmpty(all);
 
-        var article = all[0];
+        var article = all.FirstOrDefault(item => !item.Title.StartsWith("Probe ", StringComparison.OrdinalIgnoreCase))
+            ?? all[0];
         var loaded = await repository.GetByIdAsync(article.Id);
         Assert.NotNull(loaded);
         Assert.Equal(article.Id, loaded.Id);
         Assert.Equal(article.Title, loaded.Title);
 
-        var promoted = all.FirstOrDefault(a => a.Id > 6900) ?? article;
-        var promotedLoaded = await repository.GetByIdAsync(promoted.Id);
-        Assert.NotNull(promotedLoaded);
+        var page = await repository.GetPageAsync(1, 5);
+        Assert.True(page.TotalCount >= page.Items.Count);
+        Assert.NotEmpty(page.Items);
     }
 }
