@@ -2,6 +2,10 @@
 @model EditDraftModel
 @using QueenZone.Storage
 @inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@{
+  var antiforgeryToken = Antiforgery.GetAndStoreTokens(HttpContext).RequestToken ?? string.Empty;
+  ViewData["AntiforgeryToken"] = antiforgeryToken;
+}
 
 <div class="admin-shell">
   <h1>Edit generated draft</h1>
@@ -17,8 +21,8 @@
     </ul>
   }
 
-  <form method="post" class="admin-form">
-    <input type="hidden" name="@AdminNewsDiscoveryPageModel.AntiforgeryTokenFieldName" value="@Antiforgery.GetAndStoreTokens(HttpContext).RequestToken" />
+  <form method="post" action="/admin/news-discovery/@Model.Id/edit-draft" class="admin-form">
+    <input type="hidden" name="@AdminNewsDiscoveryPageModel.AntiforgeryTokenFieldName" value="@antiforgeryToken" />
     <label>
       Title
       <input type="text" name="form.title" value="@Model.Form.Title" maxlength="@NewsValidation.MaxTitleLength" required />
