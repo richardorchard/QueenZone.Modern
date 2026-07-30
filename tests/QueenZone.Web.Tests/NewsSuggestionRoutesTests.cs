@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using QueenZone.Data;
 using QueenZone.Web;
 
@@ -229,6 +230,106 @@ public sealed partial class NewsSuggestionRoutesTests : IClassFixture<WebApplica
     }
 
     [Fact]
+    public async Task AdminPromote_ShowsErrorAndKeepsSuggestionPending_WhenDraftCreateFails()
+    {
+        var uniqueSuffix = DateTime.UtcNow.ToString("yyyyMMddHHmmssfff", System.Globalization.CultureInfo.InvariantCulture);
+        var store = new SharedNewsStore();
+        var failingFactory = factory.WithWebHostBuilder(builder =>
+        {
+            builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<SharedNewsStore>();
+                services.RemoveAll<IAdminNewsRepository>();
+                services.AddSingleton(store);
+                services.AddSingleton<IAdminNewsRepository>(_ =>
+                    new FailingCreateAdminNewsRepository(
+                        new InMemoryAdminNewsRepository(store),
+                        new InvalidOperationException("Simulated suggestion promote create failure.")));
+            });
+        });
+        var memberClient = await CreateSignedInMemberClientAsync(
+            failingFactory,
+            email: "news-suggestion-create-fails@example.com",
+            displayName: "Create Fail Fan",
+            subject: "google-news-suggestion-create-fails",
+            options: new WebApplicationFactoryClientOptions
+            {
+                HandleCookies = true,
+                AllowAutoRedirect = false,
+            });
+        var suggestionId = await SubmitSuggestionAsync(
+            failingFactory,
+            memberClient,
+            $"https://example.com/suggestion-create-fails-{uniqueSuffix}",
+            "Suggestion create fails");
+        var admin = CreateAdminClient(failingFactory, AdminEmail);
+
+        var response = await PostAdminActionAsync(
+            admin,
+            $"/admin/news-suggestions/{suggestionId}/promote",
+            new Dictionary<string, string> { ["reviewNotes"] = "Trying create failure" });
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        var detail = await admin.GetStringAsync($"/admin/news-suggestions/{suggestionId}");
+        Assert.Contains("Promotion failed while creating the admin draft", detail);
+
+        var repository = failingFactory.Services.GetRequiredService<INewsSuggestionRepository>();
+        var suggestion = await repository.GetByIdAsync(suggestionId);
+        Assert.NotNull(suggestion);
+        Assert.Equal(NewsSuggestionStatus.Pending, suggestion.Status);
+        Assert.Null(suggestion.PromotedNewsId);
+    }
+
+    [Fact]
+    public async Task AdminPromote_ShowsErrorAndKeepsSuggestionPending_WhenSuggestionUpdateFails()
+    {
+        var uniqueSuffix = DateTime.UtcNow.ToString("yyyyMMddHHmmssfff", System.Globalization.CultureInfo.InvariantCulture);
+        var inner = new InMemoryNewsSuggestionRepository();
+        var failingRepository = new ConfigurableNewsSuggestionRepository(inner)
+        {
+            PromoteHandler = (_, _, _, _, _) => Task.FromResult<NewsSuggestion?>(null)
+        };
+        var failingFactory = factory.WithWebHostBuilder(builder =>
+        {
+            builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<INewsSuggestionRepository>();
+                services.AddSingleton<INewsSuggestionRepository>(failingRepository);
+            });
+        });
+        var memberClient = await CreateSignedInMemberClientAsync(
+            failingFactory,
+            email: "news-suggestion-update-fails@example.com",
+            displayName: "Update Fail Fan",
+            subject: "google-news-suggestion-update-fails",
+            options: new WebApplicationFactoryClientOptions
+            {
+                HandleCookies = true,
+                AllowAutoRedirect = false,
+            });
+        var suggestionId = await SubmitSuggestionAsync(
+            failingFactory,
+            memberClient,
+            $"https://example.com/suggestion-update-fails-{uniqueSuffix}",
+            "Suggestion update fails");
+        var admin = CreateAdminClient(failingFactory, AdminEmail);
+
+        var response = await PostAdminActionAsync(
+            admin,
+            $"/admin/news-suggestions/{suggestionId}/promote",
+            new Dictionary<string, string> { ["reviewNotes"] = "Trying update failure" });
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        var detail = await admin.GetStringAsync($"/admin/news-suggestions/{suggestionId}");
+        Assert.Contains("Promotion failed while updating the suggestion", detail);
+
+        var suggestion = await failingRepository.GetByIdAsync(suggestionId);
+        Assert.NotNull(suggestion);
+        Assert.Equal(NewsSuggestionStatus.Pending, suggestion.Status);
+        Assert.Null(suggestion.PromotedNewsId);
+    }
+
+    [Fact]
     public async Task Post_InvalidHttpsUrl_ShowsValidationError()
     {
         var client = await CreateSignedInMemberClientAsync(
@@ -256,6 +357,7 @@ public sealed partial class NewsSuggestionRoutesTests : IClassFixture<WebApplica
     }
 
     private async Task<Guid> SubmitSuggestionAsync(
+        WebApplicationFactory<Program> appFactory,
         HttpClient client,
         string url,
         string title,
@@ -275,12 +377,22 @@ public sealed partial class NewsSuggestionRoutesTests : IClassFixture<WebApplica
 
         using var content = new FormUrlEncodedContent(fields);
         var response = await client.PostAsync("/submit/news", content);
-        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        var responseBody = await response.Content.ReadAsStringAsync();
+        Assert.True(
+            response.StatusCode == HttpStatusCode.Redirect,
+            $"Expected suggestion submission to redirect, got {response.StatusCode}. Body: {responseBody[..Math.Min(responseBody.Length, 500)]}");
 
-        var repository = factory.Services.GetRequiredService<INewsSuggestionRepository>();
+        var repository = appFactory.Services.GetRequiredService<INewsSuggestionRepository>();
         var pending = await repository.GetPendingAsync(1, 50);
         return pending.Single(item => item.Url.Contains(url.Split('/').Last(), StringComparison.Ordinal)).Id;
     }
+
+    private Task<Guid> SubmitSuggestionAsync(
+        HttpClient client,
+        string url,
+        string title,
+        string? notes = null) =>
+        SubmitSuggestionAsync(factory, client, url, title, notes);
 
     private async Task<HttpResponseMessage> PostAdminActionAsync(
         HttpClient client,
@@ -296,9 +408,12 @@ public sealed partial class NewsSuggestionRoutesTests : IClassFixture<WebApplica
         return await client.PostAsync(actionPath, new FormUrlEncodedContent(form));
     }
 
-    private HttpClient CreateAdminClient(string? email = null)
+    private HttpClient CreateAdminClient(string? email = null) =>
+        CreateAdminClient(factory, email);
+
+    private static HttpClient CreateAdminClient(WebApplicationFactory<Program> appFactory, string? email = null)
     {
-        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var client = appFactory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
         if (!string.IsNullOrWhiteSpace(email))
         {
             client.DefaultRequestHeaders.Add(TestAuthHandler.UserEmailHeader, email);
@@ -308,12 +423,13 @@ public sealed partial class NewsSuggestionRoutesTests : IClassFixture<WebApplica
     }
 
     private async Task<HttpClient> CreateSignedInMemberClientAsync(
+        WebApplicationFactory<Program> appFactory,
         string email,
         string displayName,
         string subject,
         WebApplicationFactoryClientOptions? options = null)
     {
-        var client = factory.CreateClient(options ?? new WebApplicationFactoryClientOptions
+        var client = appFactory.CreateClient(options ?? new WebApplicationFactoryClientOptions
         {
             HandleCookies = true,
             AllowAutoRedirect = true,
@@ -330,6 +446,13 @@ public sealed partial class NewsSuggestionRoutesTests : IClassFixture<WebApplica
 
         return client;
     }
+
+    private Task<HttpClient> CreateSignedInMemberClientAsync(
+        string email,
+        string displayName,
+        string subject,
+        WebApplicationFactoryClientOptions? options = null) =>
+        CreateSignedInMemberClientAsync(factory, email, displayName, subject, options);
 
     private async Task<Guid> GetMemberIdForEmailAsync(string email)
     {
