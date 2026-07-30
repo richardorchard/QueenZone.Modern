@@ -1,0 +1,27 @@
+# Normalize text to CRLF in every working tree so Linux CI and Windows
+# agents match root .editorconfig (end_of_line = crlf). Without this,
+# git stores LF and Linux checkouts fail `dotnet format --verify-no-changes`
+# on ENDOFLINE while Windows with core.autocrlf=true stays green.
+* text=auto eol=crlf
+
+# Shell scripts must stay LF for execution on Linux runners/containers.
+*.sh text eol=lf
+
+# Common binary types (do not convert line endings).
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.mp3 binary
+*.mp4 binary
+*.pdf binary
+*.zip binary
+*.dll binary
+*.snupkg binary
+*.nupkg binary

@@ -4,13 +4,13 @@ namespace QueenZone.NewsAgent.Tests;
 
 public sealed class NewsDraftGenerationOptionsTests
 {
-  [Fact]
-  public void Validate_rejects_invalid_per_run_limit()
-  {
-    var options = new NewsDraftGenerationOptions { PerRunCandidateLimit = 0 };
+    [Fact]
+    public void Validate_rejects_invalid_per_run_limit()
+    {
+        var options = new NewsDraftGenerationOptions { PerRunCandidateLimit = 0 };
 
-    var exception = Assert.Throws<InvalidOperationException>(() => options.Validate());
+        var exception = Assert.Throws<InvalidOperationException>(() => options.Validate());
 
-    Assert.Contains("PerRunCandidateLimit", exception.Message, StringComparison.Ordinal);
-  }
+        Assert.Contains("PerRunCandidateLimit", exception.Message, StringComparison.Ordinal);
+    }
 }

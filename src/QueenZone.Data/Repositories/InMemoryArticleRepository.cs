@@ -1,4 +1,4 @@
-﻿namespace QueenZone.Data;
+namespace QueenZone.Data;
 
 public sealed class InMemoryArticleRepository(IArticleSubmissionRepository submissionRepository) : IArticleRepository
 {

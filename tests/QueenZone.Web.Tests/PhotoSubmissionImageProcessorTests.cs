@@ -1,6 +1,6 @@
+using QueenZone.Web;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
-using QueenZone.Web;
 
 namespace QueenZone.Web.Tests;
 
