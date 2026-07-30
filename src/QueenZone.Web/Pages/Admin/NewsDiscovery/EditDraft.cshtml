@@ -1,5 +1,6 @@
 @page "/admin/news-discovery/{id:int}/edit-draft"
 @model EditDraftModel
+@using QueenZone.Storage
 @inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
 
 <div class="admin-shell">
@@ -30,10 +31,15 @@
       Excerpt
       <textarea name="form.excerpt" rows="3" maxlength="@NewsValidation.MaxExcerptLength" required>@Model.Form.Excerpt</textarea>
     </label>
-    <label>
-      Body
-      <textarea name="form.body" rows="12" required>@Model.Form.Body</textarea>
-    </label>
+    @{
+      ViewData["TextareaId"] = "form_body";
+      ViewData["TextareaName"] = "form.body";
+      ViewData["EditorValue"] = Model.Form.Body;
+      ViewData["UploadContainer"] = BlobUploadContainers.News;
+      ViewData["EditorLabel"] = "Body";
+      ViewData["TextareaRows"] = 16;
+    }
+    <partial name="_RichTextEditor" />
     <label>
       Attribution
       <textarea name="form.attributionText" rows="2">@Model.Form.AttributionText</textarea>

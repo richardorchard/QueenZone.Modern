@@ -35,7 +35,7 @@ public sealed class NewsCandidateWorkflowTests
     [InlineData(NewsCandidateStatus.Discovered, NewsCandidateStatus.PromotedToArticle, false)]
     [InlineData(NewsCandidateStatus.NeedsReview, NewsCandidateStatus.Drafted, true)]
     [InlineData(NewsCandidateStatus.Drafted, NewsCandidateStatus.PromotedToArticle, true)]
-    [InlineData(NewsCandidateStatus.Rejected, NewsCandidateStatus.NeedsReview, false)]
+    [InlineData(NewsCandidateStatus.Rejected, NewsCandidateStatus.NeedsReview, true)]
     [InlineData(NewsCandidateStatus.PromotedToArticle, NewsCandidateStatus.Drafted, false)]
     public void TryTransition_enforces_allowed_status_changes(
         NewsCandidateStatus current,
@@ -70,7 +70,6 @@ public sealed class NewsCandidateWorkflowTests
         Assert.Equal(expected, NewsCandidateWorkflow.CanTransition(current, next));
 
     [Theory]
-    [InlineData(NewsCandidateStatus.Rejected)]
     [InlineData(NewsCandidateStatus.IgnoredDuplicate)]
     [InlineData(NewsCandidateStatus.PromotedToArticle)]
     public void IsTerminal_is_true_for_closed_statuses(NewsCandidateStatus status) =>
@@ -80,6 +79,7 @@ public sealed class NewsCandidateWorkflowTests
     [InlineData(NewsCandidateStatus.Discovered)]
     [InlineData(NewsCandidateStatus.NeedsReview)]
     [InlineData(NewsCandidateStatus.Drafted)]
+    [InlineData(NewsCandidateStatus.Rejected)]
     public void IsTerminal_is_false_for_open_statuses(NewsCandidateStatus status) =>
         Assert.False(NewsCandidateWorkflow.IsTerminal(status));
 
@@ -257,7 +257,9 @@ public sealed class NewsCandidateWorkflowTests
                 NewsCandidateStatus.IgnoredDuplicate
             ],
             NewsCandidateWorkflow.GetAllowedTransitions(NewsCandidateStatus.Discovered));
-        Assert.Empty(NewsCandidateWorkflow.GetAllowedTransitions(NewsCandidateStatus.Rejected));
+        Assert.Equal(
+            [NewsCandidateStatus.NeedsReview],
+            NewsCandidateWorkflow.GetAllowedTransitions(NewsCandidateStatus.Rejected));
     }
 
     private static bool ExpectedAllowed(NewsCandidateStatus current, NewsCandidateStatus next) =>
@@ -273,6 +275,7 @@ public sealed class NewsCandidateWorkflowTests
             (NewsCandidateStatus.Drafted, NewsCandidateStatus.NeedsReview) => true,
             (NewsCandidateStatus.Drafted, NewsCandidateStatus.Rejected) => true,
             (NewsCandidateStatus.Drafted, NewsCandidateStatus.IgnoredDuplicate) => true,
+            (NewsCandidateStatus.Rejected, NewsCandidateStatus.NeedsReview) => true,
             _ => false
         };
 }

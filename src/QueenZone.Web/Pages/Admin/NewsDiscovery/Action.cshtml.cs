@@ -232,9 +232,32 @@ public sealed class ActionModel(
 
         if (!draftGenerationService.IsAiEnabled)
         {
-            TempData["DiscoveryMessage"] = "Draft regeneration requires OpenRouter configuration on the web app.";
+            TempData["DiscoveryMessage"] = "Draft generation requires OpenRouter configuration on the web app.";
             TempData["DiscoveryMessageKind"] = "error";
             return Redirect($"/admin/news-discovery/{id}");
+        }
+
+        if (candidate.Status is NewsCandidateStatus.Discovered or NewsCandidateStatus.Rejected)
+        {
+            var prepared = await discoveryRepository.TryUpdateCandidateStatusAsync(
+                id,
+                new NewsCandidateStatusUpdate(
+                    NewsCandidateStatus.NeedsReview,
+                    ReviewNotes: $"Queued for AI draft generation by {EditorEmail}."),
+                cancellationToken);
+
+            if (!prepared)
+            {
+                TempData["DiscoveryMessage"] = "The candidate could not be moved into review before draft generation.";
+                TempData["DiscoveryMessageKind"] = "error";
+                return Redirect($"/admin/news-discovery/{id}");
+            }
+
+            candidate = await discoveryRepository.GetCandidateByIdAsync(id, cancellationToken);
+            if (candidate is null)
+            {
+                return NotFound();
+            }
         }
 
         var draftGenerationError = NewsCandidateWorkflow.GetDraftGenerationError(candidate.Status);
@@ -247,25 +270,31 @@ public sealed class ActionModel(
 
         try
         {
+            var hadDraft = await discoveryRepository.GetDraftByCandidateIdAsync(id, cancellationToken) is not null;
+            var operationName = hadDraft ? "regeneration" : "generation";
             var result = await draftGenerationService.GenerateDraftAsync(
                 candidate,
-                new NewsDraftRunOptions(ForceRegenerate: true),
+                new NewsDraftRunOptions(ForceRegenerate: true, BypassConfidenceThreshold: true),
                 cancellationToken);
 
             if (result.Succeeded && result.DraftId is not null)
             {
-                TempData["DiscoveryMessage"] = "Draft regenerated successfully.";
+                TempData["DiscoveryMessage"] = hadDraft
+                    ? "Draft regenerated successfully."
+                    : "Draft generated successfully.";
                 TempData["DiscoveryMessageKind"] = "success";
             }
             else
             {
-                TempData["DiscoveryMessage"] = "Draft regeneration did not produce a new draft.";
+                TempData["DiscoveryMessage"] = $"Draft {operationName} did not produce a new draft.";
                 TempData["DiscoveryMessageKind"] = "error";
             }
         }
         catch (Exception ex)
         {
-            TempData["DiscoveryMessage"] = $"Draft regeneration failed: {ex.Message}";
+            var hadDraft = await discoveryRepository.GetDraftByCandidateIdAsync(id, cancellationToken) is not null;
+            var operationName = hadDraft ? "regeneration" : "generation";
+            TempData["DiscoveryMessage"] = $"Draft {operationName} failed: {ex.Message}";
             TempData["DiscoveryMessageKind"] = "error";
         }
 

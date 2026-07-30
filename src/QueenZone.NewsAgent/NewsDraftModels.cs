@@ -26,7 +26,8 @@ public sealed record NewsDraftSourceAttribution(
 public sealed record NewsDraftRunOptions(
     bool DryRun = false,
     bool ForceRegenerate = false,
-    int? PerRunCandidateLimit = null);
+    int? PerRunCandidateLimit = null,
+    bool BypassConfidenceThreshold = false);
 
 public sealed record NewsDraftRunResult(
     int CandidatesConsidered,
