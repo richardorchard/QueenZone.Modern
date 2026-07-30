@@ -329,7 +329,7 @@ public sealed class CommunityArticleRoutesTests : IClassFixture<WebApplicationFa
     }
 
     [Fact]
-    public async Task Get_ArticlesFeed_WhenRepoThrowsSqlException_ReturnsEmptyRss()
+    public async Task Get_ArticlesFeed_WhenCommunityRepoThrowsSqlException_StillReturnsArchiveRss()
     {
         var client = WithArticleRepository(new SqlFailingArticleRepo()).CreateClient();
 
@@ -339,7 +339,8 @@ public sealed class CommunityArticleRoutesTests : IClassFixture<WebApplicationFa
         var body = await response.Content.ReadAsStringAsync();
         Assert.Contains("<rss", body);
         Assert.Contains("<channel>", body);
-        Assert.DoesNotContain("<item>", body);
+        // Community table may be unavailable; legacy archive items still syndicate.
+        Assert.Contains("Inside the Making of Bohemian Rhapsody", body);
     }
 
     // -------------------------------------------------------------------------

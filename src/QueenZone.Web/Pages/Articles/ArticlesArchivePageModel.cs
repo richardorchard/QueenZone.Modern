@@ -91,6 +91,12 @@ public abstract class ArticlesArchivePageModel(
         ViewData["Description"] = PageMetaDescription.ForArchiveIndex(
             "In-depth Queen articles and interviews from the Queenzone.com archive.",
             page);
+        if (page <= 1)
+        {
+            ViewData["RssFeedPath"] = ArticlesRoutes.FeedPath;
+            ViewData["RssFeedTitle"] = "QueenZone Articles";
+        }
+
         ViewData["CanonicalPath"] = ctx.CanonicalPath;
         if (ctx.PrevPath is not null)
             ViewData["PrevPath"] = ctx.PrevPath;

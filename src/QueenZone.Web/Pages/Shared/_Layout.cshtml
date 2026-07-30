@@ -27,6 +27,11 @@
   {
     <meta name="description" content="@description">
   }
+  @if (ViewData["RssFeedPath"] is string rssFeedPath)
+  {
+    var rssTitle = ViewData["RssFeedTitle"] as string ?? "RSS";
+    <link rel="alternate" type="application/rss+xml" title="@rssTitle" href="@SiteUrl.ToAbsolute(SiteOptionsAccessor.Value.PublicBaseUrl, rssFeedPath)">
+  }
   @if (ViewData["CanonicalPath"] is string ogCanonicalPath)
   {
     var ogType = ViewData["OgType"] is string ot ? ot : "website";
