@@ -536,9 +536,11 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
 
         var editPage = await client.GetStringAsync($"/admin/news-discovery/{candidateId}/edit-draft");
         Assert.Contains("Needs-review draft title", editPage);
+        Assert.Contains($"action=\"/admin/news-discovery/{candidateId}/edit-draft\"", editPage);
         Assert.Contains("qz-rte", editPage);
         Assert.Contains("name=\"form.body\"", editPage);
         Assert.Contains("/js/editor/rich-text-editor.js", editPage);
+        Assert.Contains("data-af-token", editPage);
 
         var saveResponse = await PostDraftEditAsync(
             client,

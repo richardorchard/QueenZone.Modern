@@ -12,8 +12,9 @@
   var label = ViewData["EditorLabel"] as string ?? "Body";
   var rows = ViewData["TextareaRows"] as int? ?? 12;
   // Ensures the antiforgery cookie is present for subsequent fetch() uploads.
-  var tokens = Antiforgery.GetAndStoreTokens(Context);
-  var token = tokens.RequestToken ?? string.Empty;
+  var token = (ViewData["AntiforgeryToken"] as string)
+    ?? Antiforgery.GetAndStoreTokens(Context).RequestToken
+    ?? string.Empty;
   var uploadUrl = EditorImageUploadEndpoints.Route;
   var maxBytes = EditorImageUploadEndpoints.ResolveMaxBytes(BlobUploadOptions.Value, container);
   var maxMb = Math.Max(1, (int)Math.Ceiling(maxBytes / (1024.0 * 1024.0)));
