@@ -1,9 +1,12 @@
 using Microsoft.AspNetCore.Mvc;
 using QueenZone.Data;
+using QueenZone.Web;
 
 namespace QueenZone.Web.Pages.Admin.NewsDiscovery;
 
-public sealed class EditDraftModel(INewsDiscoveryRepository discoveryRepository) : AdminNewsDiscoveryPageModel
+public sealed class EditDraftModel(
+    INewsDiscoveryRepository discoveryRepository,
+    UgcHtml ugcHtml) : AdminNewsDiscoveryPageModel
 {
     public int Id { get; private set; }
 
@@ -43,9 +46,11 @@ public sealed class EditDraftModel(INewsDiscoveryRepository discoveryRepository)
         }
 
         Id = id;
-        Errors = Validate(Form);
+        var sanitizedBody = ugcHtml.Sanitize(Form.Body);
+        Errors = Validate(Form, sanitizedBody);
         if (Errors.Count > 0)
         {
+            Form.Body = sanitizedBody;
             ViewData["Title"] = $"Edit draft for candidate #{id}";
             return Page();
         }
@@ -59,7 +64,7 @@ public sealed class EditDraftModel(INewsDiscoveryRepository discoveryRepository)
                 Form.Title.Trim(),
                 string.IsNullOrWhiteSpace(Form.Slug) ? null : Form.Slug.Trim(),
                 Form.Excerpt.Trim(),
-                Form.Body.Trim(),
+                sanitizedBody.Trim(),
                 string.IsNullOrWhiteSpace(Form.AttributionText) ? null : Form.AttributionText.Trim(),
                 string.IsNullOrWhiteSpace(Form.SourceNotes) ? null : Form.SourceNotes.Trim(),
                 string.IsNullOrWhiteSpace(Form.ConfidenceNotes) ? null : Form.ConfidenceNotes.Trim(),
@@ -79,7 +84,7 @@ public sealed class EditDraftModel(INewsDiscoveryRepository discoveryRepository)
         return Redirect($"/admin/news-discovery/{id}");
     }
 
-    private static IReadOnlyList<string> Validate(AgentDraftForm form)
+    private static IReadOnlyList<string> Validate(AgentDraftForm form, string sanitizedBody)
     {
         var errors = new List<string>();
         if (string.IsNullOrWhiteSpace(form.Title))
@@ -100,7 +105,7 @@ public sealed class EditDraftModel(INewsDiscoveryRepository discoveryRepository)
             errors.Add($"Excerpt must be {NewsValidation.MaxExcerptLength} characters or fewer.");
         }
 
-        if (string.IsNullOrWhiteSpace(form.Body))
+        if (string.IsNullOrWhiteSpace(sanitizedBody))
         {
             errors.Add("Body is required.");
         }

@@ -87,7 +87,7 @@ public sealed class NewsDraftGenerationService(
             throw new InvalidOperationException($"Candidate {candidate.Id} already has a draft. Use force regenerate.");
         }
 
-        if (!MeetsConfidenceThreshold(candidate))
+        if (!options.BypassConfidenceThreshold && !MeetsConfidenceThreshold(candidate))
         {
             throw new InvalidOperationException($"Candidate {candidate.Id} is below the configured confidence threshold.");
         }

@@ -126,9 +126,9 @@ else
         }
       </dl>
       <p><a href="/admin/news-discovery/@candidate.Id/edit-draft">Edit draft</a></p>
-      @if (candidate.Status is QueenZone.Data.NewsCandidateStatus.NeedsReview or QueenZone.Data.NewsCandidateStatus.Drafted)
+      @if (candidate.Status is QueenZone.Data.NewsCandidateStatus.Discovered or QueenZone.Data.NewsCandidateStatus.NeedsReview or QueenZone.Data.NewsCandidateStatus.Drafted or QueenZone.Data.NewsCandidateStatus.Rejected)
       {
-        <partial name="_PostAction" model="@(new PostActionViewModel($"/admin/news-discovery/{candidate.Id}/regeneratedraft", "Regenerate draft with AI", Confirm: true))" />
+        <partial name="_PostAction" model="@(new PostActionViewModel($"/admin/news-discovery/{candidate.Id}/regeneratedraft", "Regenerate draft with AI", Confirm: true, BusyLabel: "Regenerating draft"))" />
       }
     </section>
   }
@@ -137,13 +137,13 @@ else
     <section class="admin-review-section">
       <h2>Generated draft</h2>
       <p>No draft yet.</p>
-      @if (candidate.Status is QueenZone.Data.NewsCandidateStatus.NeedsReview)
+      @if (candidate.Status is QueenZone.Data.NewsCandidateStatus.Discovered or QueenZone.Data.NewsCandidateStatus.NeedsReview or QueenZone.Data.NewsCandidateStatus.Rejected)
       {
-        <partial name="_PostAction" model="@(new PostActionViewModel($"/admin/news-discovery/{candidate.Id}/regeneratedraft", "Generate draft with AI"))" />
+        <partial name="_PostAction" model="@(new PostActionViewModel($"/admin/news-discovery/{candidate.Id}/regeneratedraft", "Generate draft with AI", BusyLabel: "Generating draft"))" />
       }
       else
       {
-        <p>Run the news agent worker with <code>--draft-only</code> if AI is only configured on the worker.</p>
+        <p>Draft generation is only available for candidates still in discovery review.</p>
       }
     </section>
   }
