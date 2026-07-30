@@ -95,6 +95,124 @@ public sealed class EfNewsSectionLiveProbeTests
         });
     }
 
+    [Fact]
+    public async Task Admin_news_full_lifecycle_probe_creates_edits_publishes_unpublishes_and_deletes_when_enabled()
+    {
+        if (!IsWriteProbeEnabled(out var connectionString))
+        {
+            return;
+        }
+
+        await using var provider = CreateProvider(connectionString);
+        var uniqueSuffix = DateTime.UtcNow.ToString("yyyyMMddHHmmss", System.Globalization.CultureInfo.InvariantCulture);
+        var editorEmail = "legacy-write-probe@queenzone.local";
+        var initialDraft = new AdminNewsDraft(
+            $"Full lifecycle live probe {uniqueSuffix}",
+            $"full-lifecycle-live-probe-{uniqueSuffix}",
+            "Full lifecycle probe initial excerpt.",
+            "Full lifecycle probe initial body.",
+            DateTime.UtcNow.Date,
+            "https://www.queenonline.com/news/full-lifecycle-live-probe");
+        var editedDraft = initialDraft with
+        {
+            Title = $"Full lifecycle live probe edited {uniqueSuffix}",
+            Slug = $"full-lifecycle-live-probe-edited-{uniqueSuffix}",
+            Excerpt = "Full lifecycle probe edited excerpt.",
+            Body = "Full lifecycle probe edited body."
+        };
+
+        int? newsId = null;
+        try
+        {
+            await using (var createScope = provider.CreateAsyncScope())
+            {
+                var adminRepository = createScope.ServiceProvider.GetRequiredService<IAdminNewsRepository>();
+                var newsRepository = createScope.ServiceProvider.GetRequiredService<INewsRepository>();
+                var auditRepository = createScope.ServiceProvider.GetRequiredService<INewsAuditRepository>();
+
+                newsId = await adminRepository.CreateDraftAsync(initialDraft, editorEmail);
+                await auditRepository.AppendAsync(newsId.Value, "create-probe", editorEmail, "Full lifecycle live probe created draft.");
+
+                var created = await adminRepository.GetByIdAsync(newsId.Value);
+                Assert.NotNull(created);
+                Assert.False(created.IsPublished);
+                Assert.Equal(initialDraft.Title, created.Title);
+                Assert.Null(await newsRepository.GetByIdAsync(newsId.Value));
+                var initialSlug = NewsSlug.Resolve(initialDraft.Title, initialDraft.Slug);
+                Assert.True(await adminRepository.IsSlugInUseAsync(initialSlug));
+                Assert.False(await adminRepository.IsSlugInUseAsync(initialSlug, newsId.Value));
+            }
+
+            await using (var editScope = provider.CreateAsyncScope())
+            {
+                var adminRepository = editScope.ServiceProvider.GetRequiredService<IAdminNewsRepository>();
+                var newsRepository = editScope.ServiceProvider.GetRequiredService<INewsRepository>();
+                var auditRepository = editScope.ServiceProvider.GetRequiredService<INewsAuditRepository>();
+
+                await adminRepository.UpdateAsync(newsId.Value, editedDraft, editorEmail);
+                await auditRepository.AppendAsync(newsId.Value, "edit-probe", editorEmail, "Full lifecycle live probe edited draft.");
+
+                var edited = await adminRepository.GetByIdAsync(newsId.Value);
+                Assert.NotNull(edited);
+                Assert.False(edited.IsPublished);
+                Assert.Equal(editedDraft.Title, edited.Title);
+                Assert.Equal(NewsSlug.Resolve(editedDraft.Title, editedDraft.Slug), edited.Slug);
+                Assert.Null(await newsRepository.GetByIdAsync(newsId.Value));
+            }
+
+            await using (var publishScope = provider.CreateAsyncScope())
+            {
+                var adminRepository = publishScope.ServiceProvider.GetRequiredService<IAdminNewsRepository>();
+                var newsRepository = publishScope.ServiceProvider.GetRequiredService<INewsRepository>();
+                var auditRepository = publishScope.ServiceProvider.GetRequiredService<INewsAuditRepository>();
+
+                await adminRepository.PublishAsync(newsId.Value, editorEmail);
+                await auditRepository.AppendAsync(newsId.Value, "publish-probe", editorEmail, "Full lifecycle live probe published draft.");
+
+                var adminPublished = await adminRepository.GetByIdAsync(newsId.Value);
+                Assert.NotNull(adminPublished);
+                Assert.True(adminPublished.IsPublished);
+
+                var publicPublished = await newsRepository.GetByIdAsync(newsId.Value);
+                Assert.NotNull(publicPublished);
+                Assert.True(publicPublished.IsPublished);
+                Assert.Equal(editedDraft.Title, publicPublished.Title);
+                Assert.Equal(editedDraft.Body, publicPublished.Body);
+
+                var sitemapEntries = await newsRepository.GetPublishedSitemapEntriesAsync();
+                Assert.Contains(sitemapEntries, entry => entry.Id == newsId.Value && entry.Title == editedDraft.Title);
+            }
+
+            await using (var unpublishScope = provider.CreateAsyncScope())
+            {
+                var adminRepository = unpublishScope.ServiceProvider.GetRequiredService<IAdminNewsRepository>();
+                var newsRepository = unpublishScope.ServiceProvider.GetRequiredService<INewsRepository>();
+                var auditRepository = unpublishScope.ServiceProvider.GetRequiredService<INewsAuditRepository>();
+
+                await adminRepository.UnpublishAsync(newsId.Value, editorEmail);
+                await auditRepository.AppendAsync(newsId.Value, "unpublish-probe", editorEmail, "Full lifecycle live probe unpublished draft.");
+
+                var adminUnpublished = await adminRepository.GetByIdAsync(newsId.Value);
+                Assert.NotNull(adminUnpublished);
+                Assert.False(adminUnpublished.IsPublished);
+                Assert.Null(await newsRepository.GetByIdAsync(newsId.Value));
+
+                var auditEntries = await auditRepository.GetByNewsIdAsync(newsId.Value);
+                Assert.Contains(auditEntries, entry => entry.Action == "create-probe");
+                Assert.Contains(auditEntries, entry => entry.Action == "edit-probe");
+                Assert.Contains(auditEntries, entry => entry.Action == "publish-probe");
+                Assert.Contains(auditEntries, entry => entry.Action == "unpublish-probe");
+            }
+        }
+        finally
+        {
+            if (newsId is int id)
+            {
+                await CleanupLiveProbeArticleAsync(provider, id, editorEmail);
+            }
+        }
+    }
+
     private static ServiceProvider CreateProvider(string connectionString)
     {
         var services = new ServiceCollection();
@@ -119,5 +237,32 @@ public sealed class EfNewsSectionLiveProbeTests
             Environment.GetEnvironmentVariable("RUN_LEGACY_WRITE_PROBE"),
             "true",
             StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static async Task CleanupLiveProbeArticleAsync(
+        ServiceProvider provider,
+        int newsId,
+        string editorEmail)
+    {
+        await using var cleanupScope = provider.CreateAsyncScope();
+        var dbContext = cleanupScope.ServiceProvider.GetRequiredService<QueenZoneDbContext>();
+        var adminRepository = cleanupScope.ServiceProvider.GetRequiredService<IAdminNewsRepository>();
+
+        try
+        {
+            if (await adminRepository.GetByIdAsync(newsId) is not null)
+            {
+                await adminRepository.DeleteAsync(newsId, editorEmail);
+            }
+        }
+        finally
+        {
+            await dbContext.NewsAuditLogs
+                .Where(entry => entry.NewsId == newsId)
+                .ExecuteDeleteAsync();
+
+            Assert.Null(await adminRepository.GetByIdAsync(newsId));
+            Assert.False(await dbContext.NewsAuditLogs.AnyAsync(entry => entry.NewsId == newsId));
+        }
     }
 }
