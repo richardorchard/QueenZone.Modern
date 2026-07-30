@@ -98,6 +98,31 @@ public sealed class AzureAdClientIdTests
         Assert.Equal(typeof(TestAuthHandler), scheme!.HandlerType);
     }
 
+    [Theory]
+    [InlineData("Production")]
+    [InlineData("Staging")]
+    public async Task AddQueenZoneAuth_does_not_register_test_scheme_in_production_with_real_client_id(string environmentName)
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["AzureAd:ClientId"] = "11111111-2222-3333-4444-555555555555",
+                ["AzureAd:TenantId"] = "common",
+                ["AzureAd:Instance"] = "https://login.microsoftonline.com/",
+            })
+            .Build();
+        var services = new ServiceCollection();
+        services.AddLogging();
+        var env = new FakeHostEnvironment(environmentName);
+
+        services.AddQueenZoneAuth(configuration, env);
+
+        await using var provider = services.BuildServiceProvider();
+        var schemeProvider = provider.GetRequiredService<Microsoft.AspNetCore.Authentication.IAuthenticationSchemeProvider>();
+        var scheme = await schemeProvider.GetSchemeAsync(TestAuthHandler.SchemeName);
+        Assert.Null(scheme);
+    }
+
     private sealed class FakeHostEnvironment(string environmentName) : IHostEnvironment
     {
         public string EnvironmentName { get; set; } = environmentName;
