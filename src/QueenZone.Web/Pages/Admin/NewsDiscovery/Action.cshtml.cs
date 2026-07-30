@@ -144,71 +144,18 @@ public sealed class ActionModel(
             return RedirectToReview(id, string.Join(" ", validationErrors));
         }
 
-        await using var transaction = serviceProvider.GetService<QueenZoneDbContext>() is { } dbContext
-            ? await dbContext.Database.BeginTransactionAsync(cancellationToken)
-            : null;
-        int newsId;
         var promotionStage = "creating the admin draft";
+        int newsId;
         try
         {
-            newsId = await adminNewsRepository.CreateDraftAsync(adminDraft, EditorEmail, cancellationToken);
-
-            if (!NewsCandidateWorkflow.TryValidateStatusChange(
-                    candidate.Status,
-                    NewsCandidateStatus.PromotedToArticle,
-                    out var promoteError))
-            {
-                if (transaction is not null)
-                {
-                    await transaction.RollbackAsync(cancellationToken);
-                }
-
-                return RedirectToReview(id, promoteError);
-            }
-
-            promotionStage = "updating the discovery candidate";
-            var promoted = await discoveryRepository.TryUpdateCandidateStatusAsync(
-                id,
-                new NewsCandidateStatusUpdate(
-                    NewsCandidateStatus.PromotedToArticle,
-                    ReviewNotes: $"Promoted to admin news draft #{newsId} by {EditorEmail} at {DateTime.UtcNow:yyyy-MM-dd HH:mm} UTC.",
-                    PromotedNewsId: newsId),
-                cancellationToken);
-            if (!promoted)
-            {
-                if (transaction is not null)
-                {
-                    await transaction.RollbackAsync(cancellationToken);
-                }
-
-                return RedirectToReview(id, "Promotion failed while updating the discovery candidate.");
-            }
-
-            promotionStage = "loading the discovery audit provenance";
-            var aiRuns = await discoveryRepository.GetAiRunsForCandidateAsync(id, cancellationToken);
-            var provenance = NewsDiscoveryProvenanceBuilder.Build(candidate, agentDraft, aiRuns);
-
-            promotionStage = "recording the promotion audit";
-            await auditRepository.AppendAsync(
-                newsId,
-                "promote-from-discovery",
-                EditorEmail,
-                NewsDiscoveryPromoteAudit.Format(provenance),
-                cancellationToken);
-
-            if (transaction is not null)
-            {
-                promotionStage = "committing the promotion";
-                await transaction.CommitAsync(cancellationToken);
-            }
+            newsId = await ExecutePromotionAsync(cancellationToken);
+        }
+        catch (PromotionWorkflowException ex)
+        {
+            return RedirectToReview(id, ex.Message);
         }
         catch (Exception ex)
         {
-            if (transaction is not null)
-            {
-                await transaction.RollbackAsync(cancellationToken);
-            }
-
             logger.LogError(
                 ex,
                 "Failed while {PromotionStage} for discovery candidate {CandidateId}",
@@ -220,6 +167,64 @@ public sealed class ActionModel(
         }
 
         return Redirect($"/admin/news/{newsId}/edit");
+
+        async Task<int> ExecutePromotionAsync(CancellationToken ct)
+        {
+            if (serviceProvider.GetService<QueenZoneDbContext>() is not { } dbContext)
+            {
+                return await PromoteCoreAsync(ct);
+            }
+
+            var strategy = dbContext.Database.CreateExecutionStrategy();
+            return await strategy.ExecuteAsync(async () =>
+            {
+                await using var transaction = await dbContext.Database.BeginTransactionAsync(ct);
+                var promotedNewsId = await PromoteCoreAsync(ct);
+                promotionStage = "committing the promotion";
+                await transaction.CommitAsync(ct);
+                return promotedNewsId;
+            });
+        }
+
+        async Task<int> PromoteCoreAsync(CancellationToken ct)
+        {
+            var promotedNewsId = await adminNewsRepository.CreateDraftAsync(adminDraft, EditorEmail, ct);
+
+            if (!NewsCandidateWorkflow.TryValidateStatusChange(
+                    candidate.Status,
+                    NewsCandidateStatus.PromotedToArticle,
+                    out var promoteError))
+            {
+                throw new PromotionWorkflowException(promoteError ?? "The candidate cannot be promoted from its current status.");
+            }
+
+            promotionStage = "updating the discovery candidate";
+            var promoted = await discoveryRepository.TryUpdateCandidateStatusAsync(
+                id,
+                new NewsCandidateStatusUpdate(
+                    NewsCandidateStatus.PromotedToArticle,
+                    ReviewNotes: $"Promoted to admin news draft #{promotedNewsId} by {EditorEmail} at {DateTime.UtcNow:yyyy-MM-dd HH:mm} UTC.",
+                    PromotedNewsId: promotedNewsId),
+                ct);
+            if (!promoted)
+            {
+                throw new PromotionWorkflowException("Promotion failed while updating the discovery candidate.");
+            }
+
+            promotionStage = "loading the discovery audit provenance";
+            var aiRuns = await discoveryRepository.GetAiRunsForCandidateAsync(id, ct);
+            var provenance = NewsDiscoveryProvenanceBuilder.Build(candidate, agentDraft, aiRuns);
+
+            promotionStage = "recording the promotion audit";
+            await auditRepository.AppendAsync(
+                promotedNewsId,
+                "promote-from-discovery",
+                EditorEmail,
+                NewsDiscoveryPromoteAudit.Format(provenance),
+                ct);
+
+            return promotedNewsId;
+        }
     }
 
     public async Task<IActionResult> OnPostRegenerateDraftAsync(int id, CancellationToken cancellationToken)
@@ -311,4 +316,6 @@ public sealed class ActionModel(
 
         return Redirect($"/admin/news-discovery/{id}");
     }
+
+    private sealed class PromotionWorkflowException(string message) : Exception(message);
 }

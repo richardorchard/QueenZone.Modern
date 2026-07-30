@@ -157,3 +157,72 @@ internal sealed class ConfigurableNewsDiscoveryRepository(INewsDiscoveryReposito
     public Task<int> UpsertDraftAsync(int candidateId, NewsAgentDraftUpsert draft, CancellationToken cancellationToken = default) =>
         inner.UpsertDraftAsync(candidateId, draft, cancellationToken);
 }
+
+internal sealed class ConfigurableNewsSuggestionRepository(INewsSuggestionRepository inner) : INewsSuggestionRepository
+{
+    public Func<Guid, int, string, string?, CancellationToken, Task<NewsSuggestion?>>? PromoteHandler { get; init; }
+
+    public Task<NewsSuggestion> CreateAsync(NewsSuggestion suggestion, CancellationToken cancellationToken = default) =>
+        inner.CreateAsync(suggestion, cancellationToken);
+
+    public Task<IReadOnlyList<NewsSuggestionListItem>> GetPendingAsync(
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default) =>
+        inner.GetPendingAsync(page, pageSize, cancellationToken);
+
+    public Task<NewsSuggestion?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+        inner.GetByIdAsync(id, cancellationToken);
+
+    public Task<SubmissionListPage<NewsSuggestion>> GetBySubmitterAsync(
+        Guid submitterMemberId,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default) =>
+        inner.GetBySubmitterAsync(submitterMemberId, page, pageSize, cancellationToken);
+
+    public Task<NewsSuggestion?> UpdateStatusAsync(
+        Guid id,
+        string status,
+        string? reviewerEmail,
+        string? reviewNotes,
+        CancellationToken cancellationToken = default) =>
+        inner.UpdateStatusAsync(id, status, reviewerEmail, reviewNotes, cancellationToken);
+
+    public Task<bool> HasActiveDuplicateAsync(string urlHash, CancellationToken cancellationToken = default) =>
+        inner.HasActiveDuplicateAsync(urlHash, cancellationToken);
+
+    public Task<int> CountBySubmitterSinceAsync(
+        Guid submitterMemberId,
+        DateTimeOffset sinceUtc,
+        CancellationToken cancellationToken = default) =>
+        inner.CountBySubmitterSinceAsync(submitterMemberId, sinceUtc, cancellationToken);
+
+    public Task<NewsSuggestion?> PromoteAsync(
+        Guid id,
+        int promotedNewsId,
+        string reviewerEmail,
+        string? reviewNotes,
+        CancellationToken cancellationToken = default) =>
+        PromoteHandler?.Invoke(id, promotedNewsId, reviewerEmail, reviewNotes, cancellationToken)
+        ?? inner.PromoteAsync(id, promotedNewsId, reviewerEmail, reviewNotes, cancellationToken);
+
+    public Task<NewsSuggestion?> MarkDuplicateAsync(
+        Guid id,
+        int duplicateCandidateId,
+        string reviewerEmail,
+        string? reviewNotes,
+        CancellationToken cancellationToken = default) =>
+        inner.MarkDuplicateAsync(id, duplicateCandidateId, reviewerEmail, reviewNotes, cancellationToken);
+
+    public Task<SubmissionTypeCounts> GetDashboardCountsAsync(
+        DateTimeOffset utcNow,
+        CancellationToken cancellationToken = default) =>
+        inner.GetDashboardCountsAsync(utcNow, cancellationToken);
+
+    public Task<IReadOnlyList<SubmissionContributor>> GetTopContributorsThisMonthAsync(
+        DateTimeOffset monthStart,
+        int maxCount,
+        CancellationToken cancellationToken = default) =>
+        inner.GetTopContributorsThisMonthAsync(monthStart, maxCount, cancellationToken);
+}
