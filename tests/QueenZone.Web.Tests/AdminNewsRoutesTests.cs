@@ -85,8 +85,14 @@ public sealed class AdminNewsRoutesTests : IClassFixture<QueenZoneWebApplication
         var publicBodyBeforePublish = await publicBeforePublish.Content.ReadAsStringAsync();
         Assert.DoesNotContain("Admin created article", publicBodyBeforePublish);
 
+        var beforePublishDate = DateTime.UtcNow.Date;
         var publishResponse = await PostActionAsync(client, $"/admin/news/{articleId}/publish");
         Assert.Equal(HttpStatusCode.Redirect, publishResponse.StatusCode);
+
+        var publishedArticle = store.GetArticle(articleId);
+        Assert.NotNull(publishedArticle);
+        Assert.True(publishedArticle.IsPublished);
+        Assert.InRange(publishedArticle.PublishedAt.Date, beforePublishDate, DateTime.UtcNow.Date);
 
         var publicBodyAfterPublish = await client.GetStringAsync("/news");
         Assert.Contains("Admin created article", publicBodyAfterPublish);

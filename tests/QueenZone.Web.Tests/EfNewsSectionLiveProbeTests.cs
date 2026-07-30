@@ -111,7 +111,7 @@ public sealed class EfNewsSectionLiveProbeTests
             $"full-lifecycle-live-probe-{uniqueSuffix}",
             "Full lifecycle probe initial excerpt.",
             "Full lifecycle probe initial body.",
-            DateTime.UtcNow.Date,
+            new DateTime(2024, 6, 10, 0, 0, 0, DateTimeKind.Utc),
             "https://www.queenonline.com/news/full-lifecycle-live-probe");
         var editedDraft = initialDraft with
         {
@@ -166,18 +166,21 @@ public sealed class EfNewsSectionLiveProbeTests
                 var newsRepository = publishScope.ServiceProvider.GetRequiredService<INewsRepository>();
                 var auditRepository = publishScope.ServiceProvider.GetRequiredService<INewsAuditRepository>();
 
+                var beforePublishDate = DateTime.UtcNow.Date;
                 await adminRepository.PublishAsync(newsId.Value, editorEmail);
                 await auditRepository.AppendAsync(newsId.Value, "publish-probe", editorEmail, "Full lifecycle live probe published draft.");
 
                 var adminPublished = await adminRepository.GetByIdAsync(newsId.Value);
                 Assert.NotNull(adminPublished);
                 Assert.True(adminPublished.IsPublished);
+                Assert.InRange(adminPublished.PublishedAt.Date, beforePublishDate, DateTime.UtcNow.Date);
 
                 var publicPublished = await newsRepository.GetByIdAsync(newsId.Value);
                 Assert.NotNull(publicPublished);
                 Assert.True(publicPublished.IsPublished);
                 Assert.Equal(editedDraft.Title, publicPublished.Title);
                 Assert.Equal(editedDraft.Body, publicPublished.Body);
+                Assert.InRange(publicPublished.PublishedAt.Date, beforePublishDate, DateTime.UtcNow.Date);
 
                 var sitemapEntries = await newsRepository.GetPublishedSitemapEntriesAsync();
                 Assert.Contains(sitemapEntries, entry => entry.Id == newsId.Value && entry.Title == editedDraft.Title);

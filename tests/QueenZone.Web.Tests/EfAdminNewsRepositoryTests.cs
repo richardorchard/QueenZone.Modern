@@ -125,13 +125,19 @@ public sealed class EfAdminNewsRepositoryTests : IAsyncDisposable
     }
 
     [Fact]
-    public async Task PublishAsync_sets_display_flag()
+    public async Task PublishAsync_sets_display_flag_and_publication_date()
     {
+        dbContext.Database.ExecuteSql($"""
+            UPDATE NEWS_T SET "DATE" = '2024-06-10' WHERE NEWS_ID = 4201;
+            """);
+        var beforePublishDate = DateTime.UtcNow.Date;
+
         await repository.PublishAsync(4201, "editor@test.local");
 
         var article = await repository.GetByIdAsync(4201);
         Assert.NotNull(article);
         Assert.True(article.IsPublished);
+        Assert.InRange(article.PublishedAt.Date, beforePublishDate, DateTime.UtcNow.Date);
     }
 
     [Fact]

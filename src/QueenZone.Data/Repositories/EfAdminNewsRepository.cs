@@ -137,12 +137,16 @@ public sealed class EfAdminNewsRepository : IAdminNewsRepository
 
     public async Task PublishAsync(int id, string editorEmail, CancellationToken cancellationToken = default)
     {
+        var timestamp = DateTime.UtcNow;
+        var publishedAt = timestamp.Date;
+
         var updated = await dbContext.NewsRows
             .Where(row => row.NewsId == id)
             .ExecuteUpdateAsync(
                 setters => setters
                     .SetProperty(row => row.IsPublished, true)
-                    .SetProperty(row => row.UpdatedAt, DateTime.UtcNow)
+                    .SetProperty(row => row.PublishedAt, publishedAt)
+                    .SetProperty(row => row.UpdatedAt, timestamp)
                     .SetProperty(row => row.EditorEmail, editorEmail),
                 cancellationToken);
 
