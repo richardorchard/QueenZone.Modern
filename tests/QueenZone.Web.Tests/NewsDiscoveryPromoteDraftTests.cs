@@ -97,4 +97,71 @@ public sealed class NewsDiscoveryPromoteDraftTests
         Assert.Equal(longUrl, adminDraft.SourceUrl);
         Assert.Empty(errors);
     }
+
+    [Fact]
+    public void Build_uses_source_date_instead_of_ai_suggested_publish_date()
+    {
+        var discoveredAt = new DateTime(2026, 7, 1, 12, 0, 0, DateTimeKind.Utc);
+        var sourcePublishedAt = new DateTime(2026, 6, 30, 18, 0, 0, DateTimeKind.Utc);
+        var aiSuggestedDate = new DateTime(2024, 6, 10, 9, 0, 0, DateTimeKind.Utc);
+        var candidate = CreateCandidate(discoveredAt, sourcePublishedAt);
+        var agentDraft = CreateDraft(discoveredAt, aiSuggestedDate);
+
+        var adminDraft = NewsDiscoveryPromoteDraft.Build(agentDraft, candidate);
+
+        Assert.Equal(sourcePublishedAt.Date, adminDraft.PublishedAt);
+    }
+
+    [Fact]
+    public void Build_uses_today_when_source_date_is_missing()
+    {
+        var discoveredAt = new DateTime(2026, 7, 1, 12, 0, 0, DateTimeKind.Utc);
+        var aiSuggestedDate = new DateTime(2024, 6, 1, 9, 0, 0, DateTimeKind.Utc);
+        var beforeBuildDate = DateTime.UtcNow.Date;
+        var candidate = CreateCandidate(discoveredAt, sourcePublishedAt: null);
+        var agentDraft = CreateDraft(discoveredAt, aiSuggestedDate);
+
+        var adminDraft = NewsDiscoveryPromoteDraft.Build(agentDraft, candidate);
+
+        Assert.InRange(adminDraft.PublishedAt, beforeBuildDate, DateTime.UtcNow.Date);
+    }
+
+    private static NewsCandidate CreateCandidate(DateTime discoveredAt, DateTime? sourcePublishedAt) =>
+        new(
+            1,
+            2,
+            "https://www.queenonline.com/news/example",
+            "https://www.queenonline.com/news/example",
+            "hash",
+            "Source title",
+            sourcePublishedAt,
+            discoveredAt,
+            null,
+            NewsCandidateStatus.Drafted,
+            0.9m,
+            0.8m,
+            null,
+            null,
+            null,
+            discoveredAt,
+            discoveredAt,
+            "queen-online",
+            "Queen Online",
+            NewsDiscoveryTrustTier.Primary);
+
+    private static NewsAgentDraft CreateDraft(DateTime timestamp, DateTime? suggestedPublishAt) =>
+        new(
+            10,
+            1,
+            null,
+            "Draft title",
+            "draft-title",
+            "Draft excerpt",
+            "Draft body",
+            null,
+            null,
+            null,
+            suggestedPublishAt,
+            timestamp,
+            timestamp);
 }

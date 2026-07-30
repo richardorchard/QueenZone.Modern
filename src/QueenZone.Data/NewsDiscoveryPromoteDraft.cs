@@ -15,7 +15,7 @@ public static class NewsDiscoveryPromoteDraft
             agentDraft.ProposedSlug,
             agentDraft.ProposedExcerpt,
             body,
-            agentDraft.SuggestedPublishAt ?? DateTime.UtcNow.Date,
+            candidate.SourcePublishedAt?.Date ?? DateTime.UtcNow.Date,
             candidate.SourceUrl);
     }
 }
