@@ -6,6 +6,9 @@ public static partial class ArticlesRoutes
 {
     public const int ArchivePageSize = 20;
 
+    /// <summary>Canonical RSS 2.0 feed for published archive + community articles.</summary>
+    public const string FeedPath = "/articles/feed.rss";
+
     public static int GetArchiveTotalPages(int publishedCount, int pageSize = ArchivePageSize) =>
         ArchivePagination.GetTotalPages(publishedCount, pageSize);
 

@@ -46,7 +46,12 @@ public abstract class NewsArchivePageModel(
 
         ViewData["Title"] = ctx.Title;
         if (page <= 1)
+        {
             ViewData["Description"] = "The latest Queen news and stories from QueenZone.";
+            ViewData["RssFeedPath"] = NewsRoutes.FeedPath;
+            ViewData["RssFeedTitle"] = "QueenZone News";
+        }
+
         ViewData["CanonicalPath"] = ctx.CanonicalPath;
         if (ctx.PrevPath is not null)
             ViewData["PrevPath"] = ctx.PrevPath;

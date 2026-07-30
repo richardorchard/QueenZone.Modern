@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Data.SqlClient;
 using QueenZone.Data;
@@ -89,7 +89,12 @@ public abstract class ArticlesArchivePageModel(
 
         ViewData["Title"] = ctx.Title;
         if (page <= 1)
+        {
             ViewData["Description"] = "In-depth Queen articles and interviews from the Queenzone.com archive.";
+            ViewData["RssFeedPath"] = ArticlesRoutes.FeedPath;
+            ViewData["RssFeedTitle"] = "QueenZone Articles";
+        }
+
         ViewData["CanonicalPath"] = ctx.CanonicalPath;
         if (ctx.PrevPath is not null)
             ViewData["PrevPath"] = ctx.PrevPath;
