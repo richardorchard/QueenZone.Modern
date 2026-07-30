@@ -1,0 +1,62 @@
+@model QueenZone.Web.Pages.Admin.Biography.ChapterFormViewModel
+@using QueenZone.Data
+@using QueenZone.Storage
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@{
+  var antiforgeryToken = (ViewData["AntiforgeryToken"] as string)
+    ?? Antiforgery.GetAndStoreTokens(Context).RequestToken;
+}
+
+<div class="admin-form-panel">
+<h1>@Model.Title</h1>
+@if (!string.IsNullOrWhiteSpace(Model.Subtitle))
+{
+  <p class="admin-article-subtitle">@Model.Subtitle</p>
+}
+
+@if (Model.Errors is { Count: > 0 })
+{
+  <ul class="admin-errors">
+    @foreach (var error in Model.Errors)
+    {
+      <li>@error</li>
+    }
+  </ul>
+}
+
+<form method="post" action="@Model.Action" class="admin-form">
+  <input type="hidden" name="@AdminBiographyPageModel.AntiforgeryTokenFieldName" value="@antiforgeryToken">
+  <label>
+    Title
+    <input type="text" name="title" value="@Model.Draft.Title" maxlength="@BiographyValidation.MaxTitleLength" required>
+  </label>
+  <label>
+    Summary
+    <input type="text" name="summary" value="@Model.Draft.Summary" maxlength="@BiographyValidation.MaxSummaryLength">
+  </label>
+  <p class="admin-help">Optional. When blank, the public chapter page derives a short excerpt from the body.</p>
+  <label>
+    Display sequence
+    <input type="number" name="displaySequence" value="@(Model.Draft.DisplaySequence == 0 ? string.Empty : Model.Draft.DisplaySequence.ToString())" min="1" max="255" required>
+  </label>
+  <p class="admin-help">Lower numbers appear earlier when reading the biography in order.</p>
+  @{
+    ViewData["TextareaId"] = "body";
+    ViewData["TextareaName"] = "body";
+    ViewData["EditorValue"] = Model.Draft.Body;
+    ViewData["UploadContainer"] = BlobUploadContainers.Articles;
+    ViewData["EditorLabel"] = "Chapter body";
+  }
+  <partial name="_RichTextEditor" />
+
+  <div class="admin-form-actions">
+    <button type="submit">Save</button>
+    <a href="/admin/biography">Cancel</a>
+    @if (Model.Chapter is not null)
+    {
+      <span>|</span>
+      <a href="@BiographyRoutes.GetChapterDetailPath(Model.Chapter)" target="_blank" rel="noopener">View public page</a>
+    }
+  </div>
+</form>
+</div>

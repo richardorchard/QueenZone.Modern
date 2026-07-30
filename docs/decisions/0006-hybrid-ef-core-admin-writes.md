@@ -41,7 +41,7 @@ Use **EF Core as the single data-access library** in `QueenZone.Data`, while kee
 | --- | --- | --- | --- | --- |
 | Public news archive | `INewsRepository` | `EfNewsRepository` | EF Core + SQL | Legacy `NEWS_T` latest-row projections via `PublishedNewsQuery` (extension point for future modern approved-news tables, issue #7) |
 | Articles | `IArticlesRepository` | `EfArticlesRepository` | EF Core + SQL | Legacy reads |
-| Biography | `IBiographyRepository` | `EfBiographyRepository` | EF Core + stored procedures | `Q_BIO_LIST_SP`, `Q_BIO_DISPLAY_SP` |
+| Biography | `IBiographyRepository` | `EfBiographyRepository` | EF Core + stored procedures / SQL | Reads: `Q_BIO_LIST_SP`, `Q_BIO_DISPLAY_SP`. Admin create/update mirrors `Q_BIO_UPDATE_SP` against `Q_BIO_T`. |
 | Photography | `IPhotoRepository` | `EfPhotoRepository` | EF Core + targeted SQL (`PhotoSqlQueries`) | Counts/paging/neighbor navigation; legacy `Q_PIC_CAT_PAGE4_SP` avoided (full-category temp table) |
 | Discography | `IDiscographyRepository` | `EfDiscographyRepository` | EF Core + stored procedures | `Q_ALBUM_*` procs |
 | Fan performances | `IFanPerformanceRepository` | `EfFanPerformanceRepository` | EF Core + stored procedures / SQL | `Q_STAGE_T_PAGE_SP` + direct count/detail SQL |

@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.EntityFrameworkCore;
 
 namespace QueenZone.Data;
@@ -5,6 +6,7 @@ namespace QueenZone.Data;
 /// <summary>
 /// Public biography reads via the legacy stored procedures, invoked through EF Core
 /// (<c>SqlQuery</c> / <c>SqlQueryRaw</c>) rather than Dapper.
+/// Admin writes mirror <c>Q_BIO_UPDATE_SP</c> against <c>Q_BIO_T</c>.
 /// </summary>
 public sealed class EfBiographyRepository : IBiographyRepository
 {
@@ -12,7 +14,7 @@ public sealed class EfBiographyRepository : IBiographyRepository
     private readonly string listSql;
     private readonly Func<short, FormattableString> detailSql;
 
-    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [ExcludeFromCodeCoverage]
     public EfBiographyRepository(QueenZoneDbContext dbContext)
         : this(
             dbContext,
@@ -71,6 +73,60 @@ public sealed class EfBiographyRepository : IBiographyRepository
         var previous = index > 0 ? chapters[index - 1] : null;
         var next = index < chapters.Count - 1 ? chapters[index + 1] : null;
         return new BiographyChapterNav(previous, next);
+    }
+
+    [ExcludeFromCodeCoverage] // SQL Server legacy Q_BIO_T writes; covered via in-memory admin tests.
+    public async Task<int> CreateAsync(AdminBiographyDraft draft, CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+            INSERT INTO dbo.Q_BIO_T (TITLE, SUMMARY, BIO_TEXT, DISPLAY_SEQUENCE)
+            OUTPUT CAST(INSERTED.Q_BIO_ID AS int)
+            VALUES (@TITLE, @SUMMARY, @BIO_TEXT, @DISPLAY_SEQUENCE);
+            """;
+
+        return await EfSql.ExecuteScalarSqlAsync(
+            dbContext,
+            sql,
+            command => AddDraftParameters(command, draft),
+            cancellationToken: cancellationToken);
+    }
+
+    [ExcludeFromCodeCoverage] // SQL Server legacy Q_BIO_T writes; covered via in-memory admin tests.
+    public async Task UpdateAsync(int id, AdminBiographyDraft draft, CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+            UPDATE dbo.Q_BIO_T
+            SET
+                TITLE = @TITLE,
+                SUMMARY = @SUMMARY,
+                BIO_TEXT = @BIO_TEXT,
+                DISPLAY_SEQUENCE = @DISPLAY_SEQUENCE,
+                CREATE_DATE = GETDATE()
+            WHERE Q_BIO_ID = @Q_BIO_ID;
+            """;
+
+        var rows = await EfSql.ExecuteNonQuerySqlAsync(
+            dbContext,
+            sql,
+            command =>
+            {
+                AddDraftParameters(command, draft);
+                command.Parameters.Add(EfSql.Input("@Q_BIO_ID", (short)id));
+            },
+            cancellationToken: cancellationToken);
+
+        if (rows == 0)
+        {
+            throw new InvalidOperationException($"Biography chapter {id} was not found.");
+        }
+    }
+
+    private static void AddDraftParameters(Microsoft.Data.SqlClient.SqlCommand command, AdminBiographyDraft draft)
+    {
+        command.Parameters.Add(EfSql.Input("@TITLE", draft.Title));
+        command.Parameters.Add(EfSql.Input("@SUMMARY", draft.Summary));
+        command.Parameters.Add(EfSql.Input("@BIO_TEXT", draft.Body));
+        command.Parameters.Add(EfSql.Input("@DISPLAY_SEQUENCE", draft.DisplaySequence));
     }
 
     private static BiographyChapterItem MapListRow(ListRow row) =>
