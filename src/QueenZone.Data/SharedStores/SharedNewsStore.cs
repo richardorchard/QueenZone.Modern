@@ -112,10 +112,12 @@ public sealed class SharedNewsStore
             }
 
             var existing = articles[index];
+            var timestamp = DateTime.UtcNow;
             articles[index] = existing with
             {
                 IsPublished = isPublished,
-                UpdatedAt = DateTime.UtcNow,
+                PublishedAt = isPublished ? timestamp.Date : existing.PublishedAt,
+                UpdatedAt = timestamp,
                 EditorEmail = editorEmail
             };
             return true;

@@ -79,8 +79,10 @@ public sealed class AdminNewsEfRoutesTests : IClassFixture<WebApplicationFactory
             var updated = await repository.GetByIdAsync(articleId);
             Assert.NotNull(updated);
             Assert.Equal("EF integration article updated", updated.Title);
+            Assert.Equal(new DateTime(2026, 6, 15), updated.PublishedAt.Date);
         }
 
+        var beforePublishDate = DateTime.UtcNow.Date;
         var publishResponse = await AdminHttpTestHelpers.PostNewsActionAsync(
             client,
             $"/admin/news/{articleId}/publish");
@@ -92,6 +94,7 @@ public sealed class AdminNewsEfRoutesTests : IClassFixture<WebApplicationFactory
             var published = await repository.GetByIdAsync(articleId);
             Assert.NotNull(published);
             Assert.True(published.IsPublished);
+            Assert.InRange(published.PublishedAt.Date, beforePublishDate, DateTime.UtcNow.Date);
         }
 
         var unpublishResponse = await AdminHttpTestHelpers.PostNewsActionAsync(
