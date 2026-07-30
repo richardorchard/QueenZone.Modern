@@ -93,7 +93,7 @@ GitHub Actions workflow `.github/workflows/ci.yml` blocks merge when these fail:
 | Check | Requirement | Blocks PR? |
 | --- | --- | --- |
 | **Build + test** | `dotnet restore`, `dotnet build`, `dotnet test` (Release) | Yes |
-| **Formatting** | `dotnet format QueenZone.sln --verify-no-changes` (matches root `.editorconfig`) | Yes |
+| **Formatting** | `dotnet format QueenZone.sln --verify-no-changes` (matches root `.editorconfig`; CRLF via `.gitattributes`) | Yes |
 | **Global line coverage** | At least **51%** across the deterministic test suite | Yes |
 | **Changed-line coverage** | At least **70%** of changed, coverable `.cs` lines in the PR diff vs `main` | Yes |
 | **Smoke test** | Published app responds on `/health`, `/`, `/news` | Yes |

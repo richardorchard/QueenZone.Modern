@@ -174,6 +174,8 @@ dotnet test QueenZone.sln --configuration Release --no-build
 
 CI enforces formatting against the root `.editorconfig` via `dotnet format … --verify-no-changes` in the `build` job (after build, before tests). If that step fails, run `dotnet format QueenZone.sln` locally and commit the result.
 
+Line endings: `.editorconfig` requires CRLF. Root `.gitattributes` sets `* text=auto eol=crlf` so Linux CI and Windows agents share the same working-tree endings. Without that, Linux checkouts stay LF and fail `ENDOFLINE` while Windows with `core.autocrlf=true` stays green.
+
 CI also collects coverage from the deterministic test suite and publishes an HTML/Cobertura report artifact. The coverage report is expected to help reviewers spot untested risk.
 
 ### Coverage gates (enforced on every pull request)
