@@ -69,6 +69,7 @@ Follow `docs/architecture/testing-policy.md`.
 ```powershell
 dotnet restore QueenZone.sln
 dotnet build QueenZone.sln --configuration Release --no-restore
+dotnet format QueenZone.sln --verify-no-changes
 dotnet test QueenZone.sln --configuration Release --no-build
 ```
 
@@ -92,6 +93,7 @@ GitHub Actions workflow `.github/workflows/ci.yml` blocks merge when these fail:
 | Check | Requirement | Blocks PR? |
 | --- | --- | --- |
 | **Build + test** | `dotnet restore`, `dotnet build`, `dotnet test` (Release) | Yes |
+| **Formatting** | `dotnet format QueenZone.sln --verify-no-changes` (matches root `.editorconfig`) | Yes |
 | **Global line coverage** | At least **51%** across the deterministic test suite | Yes |
 | **Changed-line coverage** | At least **70%** of changed, coverable `.cs` lines in the PR diff vs `main` | Yes |
 | **Smoke test** | Published app responds on `/health`, `/`, `/news` | Yes |
@@ -137,6 +139,7 @@ Run the same coverage gate locally so CI failures are caught early:
 git fetch origin main
 dotnet restore QueenZone.sln
 dotnet build QueenZone.sln --configuration Release --no-restore
+dotnet format QueenZone.sln --verify-no-changes
 dotnet test QueenZone.sln --configuration Release --no-build --collect:"XPlat Code Coverage" --settings coverlet.runsettings --results-directory ./TestResults
 powershell -File ./scripts/Test-CoverageGate.ps1 -Reports ./TestResults -GlobalLineThreshold 51 -ChangedLineThreshold 70 -BaseRef origin/main
 ```

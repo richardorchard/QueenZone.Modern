@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using QueenZone.Data.Entities;
 
 namespace QueenZone.Data;

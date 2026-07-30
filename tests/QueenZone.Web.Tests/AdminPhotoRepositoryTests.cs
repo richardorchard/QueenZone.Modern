@@ -1,10 +1,10 @@
+using Microsoft.AspNetCore.Http;
 using QueenZone.Data;
 using QueenZone.Storage;
 using QueenZone.Web;
-using Microsoft.AspNetCore.Http;
 using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Formats.Jpeg;
+using SixLabors.ImageSharp.PixelFormats;
 
 namespace QueenZone.Web.Tests;
 

@@ -1,4 +1,4 @@
-﻿namespace QueenZone.Data;
+namespace QueenZone.Data;
 
 /// <summary>Input model for creating or updating a draft.</summary>
 public sealed record ArticleSubmissionDraft(
