@@ -1,6 +1,9 @@
 name: Bitwarden Secrets Test (temporary)
 
 on:
+  push:
+    branches:
+      - claude/github-actions-bitwarden-secrets-15592a
   workflow_dispatch:
 
 permissions:
