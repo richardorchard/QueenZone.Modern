@@ -344,8 +344,9 @@ public sealed class EfNewsDiscoveryRepository(QueenZoneDbContext dbContext) : IN
 
     public async Task<int> AddCandidateEvidenceAsync(int candidateId, NewsCandidateEvidenceDraft evidence, CancellationToken cancellationToken = default)
     {
-        var candidateExists = await dbContext.NewsCandidates.AnyAsync(item => item.Id == candidateId, cancellationToken);
-        if (!candidateExists)
+        var candidate = await dbContext.NewsCandidates
+            .SingleOrDefaultAsync(item => item.Id == candidateId, cancellationToken);
+        if (candidate is null)
         {
             throw new InvalidOperationException($"News candidate {candidateId} was not found.");
         }
@@ -369,13 +370,10 @@ public sealed class EfNewsDiscoveryRepository(QueenZoneDbContext dbContext) : IN
         };
         dbContext.NewsCandidateEvidence.Add(entity);
 
-        await dbContext.NewsCandidates
-            .Where(item => item.Id == candidateId)
-            .ExecuteUpdateAsync(
-                setters => setters
-                    .SetProperty(item => item.ContentHash, entity.ContentHash)
-                    .SetProperty(item => item.UpdatedAt, timestamp),
-                cancellationToken);
+        // Update via the change tracker so the evidence INSERT and candidate UPDATE
+        // are committed atomically in the same SaveChangesAsync call.
+        candidate.ContentHash = entity.ContentHash;
+        candidate.UpdatedAt = timestamp;
 
         await dbContext.SaveChangesAsync(cancellationToken);
         return entity.Id;

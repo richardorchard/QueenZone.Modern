@@ -77,8 +77,8 @@ public sealed class ActionModel(
 
         try
         {
-            await auditRepository.AppendAsync(id, "delete", EditorEmail, $"Deleted \"{article.Title}\"", cancellationToken);
             await adminNewsRepository.DeleteAsync(id, EditorEmail, cancellationToken);
+            await auditRepository.AppendAsync(id, "delete", EditorEmail, $"Deleted \"{article.Title}\"", cancellationToken);
             if (article.IsPublished)
             {
                 await InvalidatePublicNewsCachesAsync(cancellationToken);

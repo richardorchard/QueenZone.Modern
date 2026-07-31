@@ -36,24 +36,46 @@ public sealed class EfNewsSuggestionRepository(QueenZoneDbContext dbContext) : I
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 100);
 
-        var rows = await dbContext.NewsSuggestions
+        // SQLite EF provider cannot translate DateTimeOffset ORDER BY or navigation joins
+        // inside paginated queries; fall back to materialise-then-page in C# for tests.
+        // On SQL Server the full query runs in a single round-trip.
+        if (IsSqliteDatabase())
+        {
+            var allRows = await dbContext.NewsSuggestions
+                .AsNoTracking()
+                .Where(row =>
+                    row.Status == NewsSuggestionStatus.Pending
+                    || row.Status == NewsSuggestionStatus.UnderReview)
+                .Select(row => new
+                {
+                    row.Id,
+                    row.Url,
+                    row.Title,
+                    DisplayName = row.Submitter != null ? row.Submitter.DisplayName : string.Empty,
+                    row.SubmittedAt,
+                    row.Status,
+                })
+                .ToListAsync(cancellationToken);
+
+            return allRows
+                .OrderByDescending(row => row.SubmittedAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(row => new NewsSuggestionListItem(
+                    row.Id,
+                    row.Url,
+                    row.Title,
+                    string.IsNullOrWhiteSpace(row.DisplayName) ? "Unknown member" : row.DisplayName,
+                    row.SubmittedAt,
+                    row.Status))
+                .ToList();
+        }
+
+        return await dbContext.NewsSuggestions
             .AsNoTracking()
             .Where(row =>
                 row.Status == NewsSuggestionStatus.Pending
                 || row.Status == NewsSuggestionStatus.UnderReview)
-            .Select(row => new
-            {
-                row.Id,
-                row.Url,
-                row.Title,
-                row.SubmitterMemberId,
-                DisplayName = row.Submitter != null ? row.Submitter.DisplayName : string.Empty,
-                row.SubmittedAt,
-                row.Status,
-            })
-            .ToListAsync(cancellationToken);
-
-        return rows
             .OrderByDescending(row => row.SubmittedAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
@@ -61,10 +83,10 @@ public sealed class EfNewsSuggestionRepository(QueenZoneDbContext dbContext) : I
                 row.Id,
                 row.Url,
                 row.Title,
-                string.IsNullOrWhiteSpace(row.DisplayName) ? "Unknown member" : row.DisplayName,
+                row.Submitter != null ? row.Submitter.DisplayName : "Unknown member",
                 row.SubmittedAt,
                 row.Status))
-            .ToList();
+            .ToListAsync(cancellationToken);
     }
 
     public async Task<NewsSuggestion?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
@@ -237,19 +259,28 @@ public sealed class EfNewsSuggestionRepository(QueenZoneDbContext dbContext) : I
         int maxCount,
         CancellationToken cancellationToken = default)
     {
-        // Materialize first: SQLite EF provider can't translate DateTimeOffset comparisons.
-        var rows = await dbContext.NewsSuggestions
+        // SQLite EF provider cannot translate DateTimeOffset comparisons; for that
+        // path we materialise then filter in C#. On SQL Server the WHERE is pushed
+        // to the database so only this month's rows transfer.
+        var query = dbContext.NewsSuggestions
             .AsNoTracking()
             .Select(r => new
             {
                 r.SubmitterMemberId,
                 DisplayName = r.Submitter != null ? r.Submitter.DisplayName : string.Empty,
                 r.SubmittedAt,
-            })
-            .ToListAsync(cancellationToken);
+            });
+
+        if (!IsSqliteDatabase())
+        {
+            query = query.Where(r => r.SubmittedAt >= monthStart);
+        }
+
+        var rows = (await query.ToListAsync(cancellationToken))
+            .Where(r => r.SubmittedAt >= monthStart)
+            .ToList();
 
         return rows
-            .Where(r => r.SubmittedAt >= monthStart)
             .GroupBy(r => r.SubmitterMemberId)
             .Select(g => new SubmissionContributor(
                 g.Key,
@@ -259,6 +290,12 @@ public sealed class EfNewsSuggestionRepository(QueenZoneDbContext dbContext) : I
             .Take(maxCount)
             .ToList();
     }
+
+    private bool IsSqliteDatabase() =>
+        string.Equals(
+            dbContext.Database.ProviderName,
+            "Microsoft.EntityFrameworkCore.Sqlite",
+            StringComparison.Ordinal);
 
     private static string? NormalizeOptional(string? value, int maxLength)
     {
