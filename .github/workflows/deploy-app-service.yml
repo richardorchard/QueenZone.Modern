@@ -111,7 +111,7 @@ jobs:
     if: needs.changes.outputs.code == 'true'
     environment:
       name: dev
-      url: https://queenzone-dev.azurewebsites.net
+      url: https://www.queenzone.org
 
     steps:
       - name: Download publish artifact
