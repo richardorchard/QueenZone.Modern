@@ -1,0 +1,31 @@
+name: Bitwarden Secrets Test (temporary)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch Bitwarden deploy secrets
+        id: bitwarden-secrets
+        uses: bitwarden/sm-action@v3.0.1
+        with:
+          access_token: ${{ secrets.BITWARDEN_SECRETS_MANAGER_ACCESS_TOKEN }}
+          secrets: ${{ vars.BITWARDEN_APP_SERVICE_DEPLOY_SECRETS }}
+
+      - name: Verify secrets resolved (lengths only, no values)
+        env:
+          PUBLISH_PROFILE: ${{ steps.bitwarden-secrets.outputs.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          MIGRATION_CONN: ${{ steps.bitwarden-secrets.outputs.QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING }}
+        run: |
+          echo "AZURE_WEBAPP_PUBLISH_PROFILE length: ${#PUBLISH_PROFILE}"
+          echo "QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING length: ${#MIGRATION_CONN}"
+          if [ -z "$PUBLISH_PROFILE" ] || [ -z "$MIGRATION_CONN" ]; then
+            echo "::error::One or more secrets failed to resolve"
+            exit 1
+          fi
+          echo "Both secrets resolved successfully."
