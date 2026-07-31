@@ -271,11 +271,10 @@ jobs:
       - name: Install Playwright browsers
         run: .\tests\QueenZone.Web.E2E\bin\Release\net10.0\playwright.ps1 install chromium
 
-      - name: Download publish artifact
-        uses: actions/download-artifact@v5
-        with:
-          name: web-publish-${{ github.run_id }}
-          path: e2e-app
+      - name: Publish web app
+        # Can't reuse the build job's publish artifact here: it's produced on
+        # ubuntu-latest and only contains a Linux apphost, not QueenZone.Web.exe.
+        run: dotnet publish src/QueenZone.Web/QueenZone.Web.csproj --configuration Release --no-build --output e2e-app
 
       - name: Start app in background
         run: |
