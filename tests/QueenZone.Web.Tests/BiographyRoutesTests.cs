@@ -46,6 +46,33 @@ public sealed class BiographyRoutesTests : IClassFixture<WebApplicationFactory<P
     }
 
     [Fact]
+    public async Task BiographyIndexStripsHtmlFromLegacySummary()
+    {
+        var chapters = new[]
+        {
+            new BiographyChapterItem(
+                8001,
+                "1946 - 1969",
+                "<p>A founding chapter <strong>summary</strong> with HTML.</p>",
+                "<p>Body text.</p>",
+                1,
+                new DateTime(1969, 12, 31, 0, 0, 0, DateTimeKind.Utc))
+        };
+
+        var client = factory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+            {
+                services.AddSingleton<IBiographyRepository>(new InMemoryBiographyRepository(chapters));
+            })).CreateClient();
+
+        var body = await client.GetStringAsync("/biography");
+
+        Assert.Contains("A founding chapter summary with HTML.", body);
+        Assert.DoesNotContain("&lt;p&gt;", body);
+        Assert.DoesNotContain("&lt;strong&gt;", body);
+    }
+
+    [Fact]
     public async Task BiographyDetailRendersChapterBodyAndNavigation()
     {
         var client = factory.CreateClient();
