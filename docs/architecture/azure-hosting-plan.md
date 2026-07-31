@@ -4,7 +4,8 @@
 
 ```mermaid
 flowchart LR
-  User["User browser"] --> App["Azure App Service"]
+  User["User browser"] --> CF["Cloudflare Proxy"]
+  CF --> App["Azure App Service"]
   App --> Sql["Azure SQL Database"]
   App --> Blob["Azure Blob Storage"]
   App --> Insights["Application Insights"]
@@ -20,7 +21,7 @@ flowchart LR
 | Media | Azure Blob Storage | Pictures, thumbnails, downloadable public assets. |
 | Telemetry | Application Insights | Request tracking, exceptions, dependency timings. Keep sampling and daily caps low for the hobby budget. |
 | Secrets | App Service settings or Key Vault | Start with App Service settings, move to Key Vault if needed. |
-| DNS/TLS | App Service custom domain or Azure Front Door | Front Door can wait. |
+| DNS/TLS | Cloudflare proxy plus App Service managed certificates | `www.queenzone.org` and `queenzone.org` are proxied through Cloudflare with SSL/TLS Full (strict). App Service IP restrictions allow Cloudflare origin ranges and deny direct public app ingress. |
 | CI/CD | GitHub Actions | Build, test, deploy. |
 
 ## Environments
@@ -229,6 +230,7 @@ Admin news publishing is an intentional write path, so the production runtime lo
 - Tests pass.
 - App starts without database write permissions.
 - Health endpoint returns OK.
+- Cloudflare proxy is Proxied (orange cloud) for `www.queenzone.org` and `queenzone.org`.
 - Application Insights receives requests.
 - Canonical URLs are tested.
 - No connection strings or secrets are committed.
