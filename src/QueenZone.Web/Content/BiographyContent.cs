@@ -11,6 +11,6 @@ public static class BiographyContent
 
     public static string GetListSummary(BiographyChapterItem chapter) =>
         !string.IsNullOrWhiteSpace(chapter.Summary)
-            ? chapter.Summary
+            ? LegacyArticleText.GetExcerpt(chapter.Summary, BiographyValidation.MaxSummaryLength)
             : LegacyArticleText.GetExcerpt(chapter.Body);
 }
