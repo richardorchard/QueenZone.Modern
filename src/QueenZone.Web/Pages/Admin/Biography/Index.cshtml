@@ -1,0 +1,59 @@
+@page "/admin/biography"
+@model IndexModel
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@{
+  var antiforgeryToken = Antiforgery.GetAndStoreTokens(HttpContext).RequestToken;
+}
+
+<div class="admin-shell">
+@if (Model.CreateForm is not null)
+{
+  ViewData["AntiforgeryToken"] = antiforgeryToken;
+  <partial name="_ChapterForm" model="Model.CreateForm" />
+}
+else
+{
+  <h1>Biography chapters</h1>
+
+  @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+  {
+    <p class="admin-status admin-status--@Model.StatusMessageKind">@Model.StatusMessage</p>
+  }
+
+  <p>
+    <a href="/admin/biography/new">Create chapter</a>
+    <span aria-hidden="true"> · </span>
+    <a href="/biography" target="_blank" rel="noopener">View public biography</a>
+  </p>
+
+  @if (Model.Chapters.Count == 0)
+  {
+    <p>No biography chapters yet.</p>
+  }
+  else
+  {
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Sequence</th>
+          <th>Title</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        @foreach (var chapter in Model.Chapters)
+        {
+          <tr>
+            <td>@chapter.DisplaySequence</td>
+            <td class="admin-title-cell">@chapter.Title</td>
+            <td class="admin-actions">
+              <a href="/admin/biography/@chapter.Id/edit">Edit</a>
+              <a href="@BiographyRoutes.GetChapterDetailPath(chapter)" target="_blank" rel="noopener">View</a>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+}
+</div>

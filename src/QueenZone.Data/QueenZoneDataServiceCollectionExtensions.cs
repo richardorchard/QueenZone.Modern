@@ -74,7 +74,9 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddSingleton(store);
         services.AddSingleton<INewsRepository, InMemoryNewsRepository>();
         services.AddSingleton<IArticlesRepository>(_ => new InMemoryArticlesRepository(SampleArticlesData.CreateSeedArticles()));
-        services.AddSingleton<IBiographyRepository>(_ => new InMemoryBiographyRepository(SampleBiographyData.CreateSeedChapters()));
+        var biographyStore = new SharedBiographyStore(SampleBiographyData.CreateSeedChapters());
+        services.AddSingleton(biographyStore);
+        services.AddSingleton<IBiographyRepository>(_ => new InMemoryBiographyRepository(biographyStore));
         var forumWriteRepository = new InMemoryForumWriteRepository();
         var forumAttachmentRepository = new InMemoryForumAttachmentRepository();
         var forumPollRepository = new InMemoryForumPollRepository();
