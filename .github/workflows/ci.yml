@@ -51,10 +51,10 @@ jobs:
             echo "migrations=false" >> $GITHUB_OUTPUT
           fi
 
-  # Builds, tests, and publishes the Linux app once per commit ("build once,
-  # deploy many"). smoke-test and deploy reuse the publish artifact. e2e-test
-  # still builds on Windows (needs QueenZone.Web.exe) but skips the full
-  # solution unit/integration test graph.
+  # Builds and publishes the Linux app once per commit ("build once, deploy many").
+  # Deterministic tests run in the `test` matrix (mixed Web.Tests shards — see
+  # docs/architecture/testing-policy.md). smoke-test / deploy reuse the publish
+  # artifact. e2e-test still builds on Windows but skips the solution unit graph.
   build:
     runs-on: ubuntu-latest
     needs: changes
@@ -84,8 +84,102 @@ jobs:
       - name: Verify formatting
         run: dotnet format QueenZone.sln --verify-no-changes --no-restore
 
-      - name: Test with coverage
-        run: dotnet test QueenZone.sln --configuration Release --no-build --collect:"XPlat Code Coverage" --settings coverlet.runsettings --results-directory ./TestResults
+      # Sharded test jobs download these binaries and run `dotnet test --no-build`
+      # so we do not pay a second full compile on each matrix leg.
+      - name: Upload build binaries
+        uses: actions/upload-artifact@v5
+        with:
+          name: build-binaries-${{ github.run_id }}
+          path: |
+            src/**/bin/Release/
+            tests/**/bin/Release/
+          retention-days: 1
+          if-no-files-found: error
+
+      # Single Linux publish reused by smoke-test (PR) and deploy (main).
+      - name: Publish web app
+        run: dotnet publish src/QueenZone.Web/QueenZone.Web.csproj --configuration Release --no-build --output publish
+
+      - name: Upload publish artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: web-publish-${{ github.run_id }}
+          path: publish
+          retention-days: 7
+
+  # Mixed Web.Tests shards (unit + WAF in every shard). Do not change this to a
+  # unit-vs-integration split — that regresses wall-clock (issue #442).
+  test:
+    runs-on: ubuntu-latest
+    needs: [changes, build]
+    if: needs.changes.outputs.code == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+          cache: true
+          cache-dependency-path: |
+            **/*.csproj
+            .config/dotnet-tools.json
+
+      - name: Download build binaries
+        uses: actions/download-artifact@v5
+        with:
+          name: build-binaries-${{ github.run_id }}
+          path: .
+
+      - name: Restore (NuGet cache for test host deps)
+        run: dotnet restore QueenZone.sln
+
+      - name: Show shard assignment
+        shell: pwsh
+        run: ./scripts/Get-WebTestShardFilter.ps1 -ShardIndex ${{ matrix.shard }} -ShardCount 2 -List
+
+      - name: Test shard ${{ matrix.shard }} with coverage
+        shell: pwsh
+        run: |
+          $includeSmall = $${{ matrix.shard == 0 }}
+          ./scripts/Invoke-WebTestsShard.ps1 `
+            -ShardIndex ${{ matrix.shard }} `
+            -ShardCount 2 `
+            -CollectCoverage `
+            -IncludeSmallProjects:$includeSmall `
+            -ResultsDirectory ./TestResults `
+            -NoBuild `
+            -NoRestore
+
+      - name: Upload coverage results
+        uses: actions/upload-artifact@v5
+        with:
+          name: coverage-raw-${{ github.run_id }}-shard-${{ matrix.shard }}
+          path: TestResults
+          retention-days: 2
+          if-no-files-found: error
+
+  coverage:
+    runs-on: ubuntu-latest
+    needs: [changes, test]
+    if: needs.changes.outputs.code == 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Download coverage results
+        uses: actions/download-artifact@v5
+        with:
+          pattern: coverage-raw-${{ github.run_id }}-shard-*
+          path: TestResults
+          merge-multiple: true
 
       - name: Generate coverage report
         uses: danielpalme/ReportGenerator-GitHub-Action@v5
@@ -107,17 +201,6 @@ jobs:
           name: coverage-report-${{ github.run_id }}
           path: coverage-report
           retention-days: 14
-
-      # Single Linux publish reused by smoke-test (PR) and deploy (main).
-      - name: Publish web app
-        run: dotnet publish src/QueenZone.Web/QueenZone.Web.csproj --configuration Release --no-build --output publish
-
-      - name: Upload publish artifact
-        uses: actions/upload-artifact@v5
-        with:
-          name: web-publish-${{ github.run_id }}
-          path: publish
-          retention-days: 7
 
   ef-migrations:
     name: EF migrations (Azure SQL)
@@ -181,8 +264,9 @@ jobs:
 
   smoke-test:
     # Reuses the Linux publish artifact from build — no second restore/build.
+    # Waits for coverage so broken unit/integration shards cannot green-path smoke.
     runs-on: ubuntu-latest
-    needs: [changes, build]
+    needs: [changes, build, coverage]
     if: needs.changes.outputs.code == 'true'
     timeout-minutes: 5
 
@@ -243,7 +327,7 @@ jobs:
     # runner is offline; that's intentional (tests must pass before deploy),
     # not an oversight.
     runs-on: [self-hosted, Windows]
-    needs: [changes, build]
+    needs: [changes, build, coverage]
     if: needs.changes.outputs.code == 'true'
     timeout-minutes: 15
 

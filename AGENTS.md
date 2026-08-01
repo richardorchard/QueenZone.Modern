@@ -5,7 +5,7 @@ This repository is the modern QueenZone rebuild. The project is archive-first: i
 ## Source Of Truth
 
 - `README.md` gives the project overview and local development commands.
-- `docs/architecture/testing-policy.md` defines the required testing layers.
+- `docs/architecture/testing-policy.md` defines the required testing layers (including CI Web.Tests mixed sharding).
 - `docs/decisions/` contains accepted architectural decisions.
 - `docs/decisions/0006-hybrid-ef-core-admin-writes.md` is the Dapper vs EF access matrix and contributor rules for SQL in `QueenZone.Data`.
 - `docs/architecture/blob-storage-ugc.md` is the UGC blob upload foundation (`QueenZone.Storage` / `IBlobUploadService`).
@@ -93,17 +93,26 @@ GitHub Actions workflow `.github/workflows/ci.yml` blocks merge when these fail:
 
 | Check | Requirement | Blocks PR? |
 | --- | --- | --- |
-| **Build + test** | `dotnet restore`, `dotnet build`, `dotnet test` (Release) | Yes |
+| **Build** | `dotnet restore`, `dotnet build`, format verify (Release) | Yes |
+| **Test (sharded)** | Mixed `QueenZone.Web.Tests` shards + small test projects (Release, Coverlet) | Yes |
 | **Formatting** | `dotnet format QueenZone.sln --verify-no-changes` (matches root `.editorconfig`; CRLF via `.gitattributes`) | Yes |
-| **Global line coverage** | At least **51%** across the deterministic test suite | Yes |
+| **Global line coverage** | At least **51%** across the union of deterministic suite reports | Yes |
 | **Changed-line coverage** | At least **70%** of changed, coverable `.cs` lines in the PR diff vs `main` | Yes |
 | **Smoke test** | Published app responds on `/health`, `/`, `/news` | Yes |
 | **EF migrations (Azure SQL)** | When migration-related paths change: `has-pending-model-changes` + `database update` against the deploy SQL Server | Yes (job runs only for those PRs) |
-| **Playwright e2e** | Runs on self-hosted Windows runner when available | No (`continue-on-error`) |
+| **Playwright e2e** | Self-hosted Windows runner; gates deploy when the runner is online | Yes (deploy needs a green e2e job) |
 
 Coverage exclusions are configured in `coverlet.runsettings`. EF Core files under `**/Migrations/**/*.cs` are excluded from coverage metrics.
 
 The changed-line gate compares `git diff origin/main...HEAD` for `*.cs` files. Large new modules (services, repositories, workers) usually need targeted unit or integration tests, often with fakes or SQLite/in-memory EF, or the gate will fail.
+
+### CI Web.Tests sharding (agents)
+
+CI parallelizes `QueenZone.Web.Tests` with **mixed** shards (light unit tests + `WebApplicationFactory` tests in every shard). Scripts: `scripts/Get-WebTestShardFilter.ps1`, `scripts/Invoke-WebTestsShard.ps1`. Full policy and anti-patterns: `docs/architecture/testing-policy.md` (section **CI test sharding**).
+
+- Local default remains `dotnet test QueenZone.sln` (no filter).
+- **Do not** split CI/jobs as unit-only vs WAF-only for speed — measured regression in [#442](https://github.com/richardorchard/QueenZone.Modern/issues/442).
+- No shard manifest to maintain when adding tests; discovery is automatic from `*Tests` classes.
 
 ### EF migration PRs (required before merge)
 
