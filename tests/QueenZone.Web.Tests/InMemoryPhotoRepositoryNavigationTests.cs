@@ -19,10 +19,20 @@ public sealed class InMemoryPhotoRepositoryNavigationTests
         Assert.True(page.TotalCount >= 2);
 
         var first = page.Items[0];
+        Assert.True(first.HasPictureDimensions);
+        Assert.Equal(1920, first.PictureWidth);
+        Assert.Equal(1080, first.PictureHeight);
+
         var navigation = await repository.GetDetailNavigationAsync(brian.CatId, first.PicId);
         Assert.NotNull(navigation);
         Assert.Equal(0, navigation.Index);
         Assert.Null(navigation.PreviousPicId);
         Assert.NotNull(navigation.NextPicId);
+        Assert.Equal("1920 x 1080", navigation.Photo.PictureDimensionsLabel);
+
+        var unknown = await repository.GetDetailNavigationAsync(brian.CatId, 103);
+        Assert.NotNull(unknown);
+        Assert.False(unknown.Photo.HasPictureDimensions);
+        Assert.Null(unknown.Photo.PictureDimensionsLabel);
     }
 }

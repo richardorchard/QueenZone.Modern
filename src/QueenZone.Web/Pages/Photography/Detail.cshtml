@@ -21,7 +21,18 @@
       <a class="qz-lightbox__arrow" href="@Model.PreviousHref" rel="prev" aria-label="Previous image" data-lightbox-prev>&#8249;</a>
     }
 
-    <img class="qz-lightbox__image" src="@Model.Photo.ImageUrl" alt="@Model.Photo.Title">
+    @if (Model.Photo.HasPictureDimensions)
+    {
+      <img class="qz-lightbox__image"
+           src="@Model.Photo.ImageUrl"
+           alt="@Model.Photo.Title"
+           width="@Model.Photo.PictureWidth"
+           height="@Model.Photo.PictureHeight">
+    }
+    else
+    {
+      <img class="qz-lightbox__image" src="@Model.Photo.ImageUrl" alt="@Model.Photo.Title">
+    }
 
     @if (Model.NextHref is null)
     {
@@ -35,7 +46,13 @@
 
   <figcaption class="qz-lightbox__caption">
     <h1>@Model.Photo.Title</h1>
-    <p class="qz-lightbox__meta">@Model.Photo.Year &middot; @Model.Category.Name</p>
+    <p class="qz-lightbox__meta">
+      @Model.Photo.Year &middot; @Model.Category.Name
+      @if (Model.Photo.PictureDimensionsLabel is string dimensions)
+      {
+        <text> &middot; @dimensions</text>
+      }
+    </p>
   </figcaption>
 </section>
 

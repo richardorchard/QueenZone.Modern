@@ -80,6 +80,8 @@ public sealed class EfPublicReadRepositoryTests : IAsyncDisposable
                 THUMB_URL TEXT NOT NULL,
                 T_HEIGHT INTEGER NOT NULL,
                 T_WIDTH INTEGER NOT NULL,
+                PIC_WIDTH INTEGER NOT NULL,
+                PIC_HEIGHT INTEGER NOT NULL,
                 pic_id INTEGER NOT NULL,
                 category_name TEXT,
                 cat_id INTEGER NOT NULL
@@ -206,11 +208,11 @@ public sealed class EfPublicReadRepositoryTests : IAsyncDisposable
         dbContext.Database.ExecuteSqlRaw(
             """
             INSERT INTO PhotoCategories (cat_id, name) VALUES (3, 'Live 1986');
-            INSERT INTO PhotoItems (NAME, DATE_TIME, URL, THUMB_URL, T_HEIGHT, T_WIDTH, pic_id, category_name, cat_id)
+            INSERT INTO PhotoItems (NAME, DATE_TIME, URL, THUMB_URL, T_HEIGHT, T_WIDTH, PIC_WIDTH, PIC_HEIGHT, pic_id, category_name, cat_id)
             VALUES
-                ('Newest', '1986-07-12 00:00:00', 'n.jpg', 'n-t.jpg', 100, 150, 11, 'Live 1986', 3),
-                ('Middle', '1986-07-11 00:00:00', 'm.jpg', 'm-t.jpg', 100, 150, 10, 'Live 1986', 3),
-                ('Oldest', '1986-07-10 00:00:00', 'o.jpg', 'o-t.jpg', 100, 150, 9, 'Live 1986', 3);
+                ('Newest', '1986-07-12 00:00:00', 'n.jpg', 'n-t.jpg', 100, 150, 1920, 1080, 11, 'Live 1986', 3),
+                ('Middle', '1986-07-11 00:00:00', 'm.jpg', 'm-t.jpg', 100, 150, 800, 600, 10, 'Live 1986', 3),
+                ('Oldest', '1986-07-10 00:00:00', 'o.jpg', 'o-t.jpg', 100, 150, 0, 0, 9, 'Live 1986', 3);
             """);
 
         var repository = new EfPhotoRepository(dbContext, PhotoSqlQueries.CreateSqliteFixture());
@@ -228,11 +230,16 @@ public sealed class EfPublicReadRepositoryTests : IAsyncDisposable
         Assert.Equal(3, page.TotalCount);
         Assert.Equal(2, page.Items.Count);
         Assert.Equal(11, page.Items[0].PicId);
+        Assert.Equal(1920, page.Items[0].PictureWidth);
+        Assert.Equal(1080, page.Items[0].PictureHeight);
+        Assert.Equal("1920 x 1080", page.Items[0].PictureDimensionsLabel);
         Assert.Equal(10, page.Items[1].PicId);
 
         var page2 = await repository.GetCategoryPageAsync(3, 2, 2);
         Assert.Single(page2.Items);
         Assert.Equal(9, page2.Items[0].PicId);
+        Assert.False(page2.Items[0].HasPictureDimensions);
+        Assert.Null(page2.Items[0].PictureDimensionsLabel);
 
         var middle = await repository.GetDetailNavigationAsync(3, 10);
         Assert.NotNull(middle);
@@ -240,6 +247,8 @@ public sealed class EfPublicReadRepositoryTests : IAsyncDisposable
         Assert.Equal(3, middle.Count);
         Assert.Equal(11, middle.PreviousPicId);
         Assert.Equal(9, middle.NextPicId);
+        Assert.Equal(800, middle.Photo.PictureWidth);
+        Assert.Equal(600, middle.Photo.PictureHeight);
 
         var newest = await repository.GetDetailNavigationAsync(3, 11);
         Assert.NotNull(newest);

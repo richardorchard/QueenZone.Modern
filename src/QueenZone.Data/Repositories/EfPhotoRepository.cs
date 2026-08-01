@@ -158,6 +158,8 @@ public sealed class EfPhotoRepository : IPhotoRepository
             ThumbnailUrl: PhotoImageUrl.Build(row.THUMB_URL),
             ThumbWidth: row.T_WIDTH,
             ThumbHeight: row.T_HEIGHT,
+            PictureWidth: row.PIC_WIDTH,
+            PictureHeight: row.PIC_HEIGHT,
             Year: row.DATE_TIME.Year,
             DateTime: row.DATE_TIME);
 
@@ -174,6 +176,10 @@ public sealed class EfPhotoRepository : IPhotoRepository
         int T_HEIGHT { get; }
 
         int T_WIDTH { get; }
+
+        int PIC_WIDTH { get; }
+
+        int PIC_HEIGHT { get; }
 
         int pic_id { get; }
 
@@ -205,6 +211,10 @@ public sealed class EfPhotoRepository : IPhotoRepository
 
         public int T_WIDTH { get; set; }
 
+        public int PIC_WIDTH { get; set; }
+
+        public int PIC_HEIGHT { get; set; }
+
         public int pic_id { get; set; }
 
         public string? category_name { get; set; }
@@ -223,6 +233,10 @@ public sealed class EfPhotoRepository : IPhotoRepository
         public int T_HEIGHT { get; set; }
 
         public int T_WIDTH { get; set; }
+
+        public int PIC_WIDTH { get; set; }
+
+        public int PIC_HEIGHT { get; set; }
 
         public int pic_id { get; set; }
 

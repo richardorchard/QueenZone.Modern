@@ -64,14 +64,16 @@ public sealed class PhotoSqlQueries
                 """,
             CategoryPageSql = """
                 SELECT
-                    p.Name AS NAME,
+                    ISNULL(p.Name, N'') AS NAME,
                     p.Date_time AS DATE_TIME,
-                    p.Url AS URL,
-                    p.Thumb_URL AS THUMB_URL,
+                    ISNULL(p.Url, N'') AS URL,
+                    ISNULL(p.Thumb_URL, N'') AS THUMB_URL,
                     ISNULL(p.t_height, 0) AS T_HEIGHT,
                     ISNULL(p.t_width, 0) AS T_WIDTH,
+                    CAST(ISNULL(p.PIC_WIDTH, 0) AS int) AS PIC_WIDTH,
+                    CAST(ISNULL(p.PIC_HEIGHT, 0) AS int) AS PIC_HEIGHT,
                     p.PIC_ID AS pic_id,
-                    c.name AS category_name
+                    ISNULL(c.name, N'') AS category_name
                 FROM dbo.PIC_FILES_T p
                 INNER JOIN dbo.PIC_CAT_T c ON c.cat_id = p.Cat_ID
                 WHERE p.Cat_ID = {2} AND p.DISPLAY = 1
@@ -90,14 +92,16 @@ public sealed class PhotoSqlQueries
                 """,
             PhotoByIdSql = """
                 SELECT
-                    p.Name AS NAME,
+                    ISNULL(p.Name, N'') AS NAME,
                     p.Date_time AS DATE_TIME,
-                    p.Url AS URL,
-                    p.Thumb_URL AS THUMB_URL,
+                    ISNULL(p.Url, N'') AS URL,
+                    ISNULL(p.Thumb_URL, N'') AS THUMB_URL,
                     ISNULL(p.t_height, 0) AS T_HEIGHT,
                     ISNULL(p.t_width, 0) AS T_WIDTH,
+                    CAST(ISNULL(p.PIC_WIDTH, 0) AS int) AS PIC_WIDTH,
+                    CAST(ISNULL(p.PIC_HEIGHT, 0) AS int) AS PIC_HEIGHT,
                     p.PIC_ID AS pic_id,
-                    c.name AS category_name
+                    ISNULL(c.name, N'') AS category_name
                 FROM dbo.PIC_FILES_T p
                 INNER JOIN dbo.PIC_CAT_T c ON c.cat_id = p.Cat_ID
                 WHERE p.Cat_ID = {0} AND p.PIC_ID = {1} AND p.DISPLAY = 1
@@ -106,14 +110,16 @@ public sealed class PhotoSqlQueries
             // (seek-friendly UNION ALL; relies on IX_PIC_FILES_T_Cat_Display_Date).
             DetailNavigationSql = """
                 SELECT
-                    p.Name AS NAME,
+                    ISNULL(p.Name, N'') AS NAME,
                     p.Date_time AS DATE_TIME,
-                    p.Url AS URL,
-                    p.Thumb_URL AS THUMB_URL,
+                    ISNULL(p.Url, N'') AS URL,
+                    ISNULL(p.Thumb_URL, N'') AS THUMB_URL,
                     ISNULL(p.t_height, 0) AS T_HEIGHT,
                     ISNULL(p.t_width, 0) AS T_WIDTH,
+                    CAST(ISNULL(p.PIC_WIDTH, 0) AS int) AS PIC_WIDTH,
+                    CAST(ISNULL(p.PIC_HEIGHT, 0) AS int) AS PIC_HEIGHT,
                     p.PIC_ID AS pic_id,
-                    c.name AS category_name,
+                    ISNULL(c.name, N'') AS category_name,
                     (
                         SELECT COUNT(*)
                         FROM dbo.PIC_FILES_T t
@@ -242,14 +248,16 @@ public sealed class PhotoSqlQueries
                 """,
             CategoryAllSql = """
                 SELECT
-                    p.Name AS NAME,
+                    ISNULL(p.Name, N'') AS NAME,
                     p.Date_time AS DATE_TIME,
-                    p.Url AS URL,
-                    p.Thumb_URL AS THUMB_URL,
+                    ISNULL(p.Url, N'') AS URL,
+                    ISNULL(p.Thumb_URL, N'') AS THUMB_URL,
                     ISNULL(p.t_height, 0) AS T_HEIGHT,
                     ISNULL(p.t_width, 0) AS T_WIDTH,
+                    CAST(ISNULL(p.PIC_WIDTH, 0) AS int) AS PIC_WIDTH,
+                    CAST(ISNULL(p.PIC_HEIGHT, 0) AS int) AS PIC_HEIGHT,
                     p.PIC_ID AS pic_id,
-                    c.name AS category_name
+                    ISNULL(c.name, N'') AS category_name
                 FROM dbo.PIC_FILES_T p
                 INNER JOIN dbo.PIC_CAT_T c ON c.cat_id = p.Cat_ID
                 WHERE p.Cat_ID = {0} AND p.DISPLAY = 1
@@ -283,7 +291,7 @@ public sealed class PhotoSqlQueries
                 ORDER BY c.name
                 """,
             CategoryPageSql = """
-                SELECT NAME, DATE_TIME, URL, THUMB_URL, T_HEIGHT, T_WIDTH, pic_id, category_name
+                SELECT NAME, DATE_TIME, URL, THUMB_URL, T_HEIGHT, T_WIDTH, PIC_WIDTH, PIC_HEIGHT, pic_id, category_name
                 FROM PhotoItems
                 WHERE cat_id = {2}
                 ORDER BY DATE_TIME DESC, pic_id DESC
@@ -296,7 +304,7 @@ public sealed class PhotoSqlQueries
                 SELECT name FROM PhotoCategories WHERE cat_id = {0}
                 """,
             PhotoByIdSql = """
-                SELECT NAME, DATE_TIME, URL, THUMB_URL, T_HEIGHT, T_WIDTH, pic_id, category_name
+                SELECT NAME, DATE_TIME, URL, THUMB_URL, T_HEIGHT, T_WIDTH, PIC_WIDTH, PIC_HEIGHT, pic_id, category_name
                 FROM PhotoItems
                 WHERE cat_id = {0} AND pic_id = {1}
                 """,
@@ -308,6 +316,8 @@ public sealed class PhotoSqlQueries
                     p.THUMB_URL,
                     p.T_HEIGHT,
                     p.T_WIDTH,
+                    p.PIC_WIDTH,
+                    p.PIC_HEIGHT,
                     p.pic_id,
                     p.category_name,
                     (SELECT COUNT(*) FROM PhotoItems t WHERE t.cat_id = {0}) AS TotalCount,
@@ -433,7 +443,7 @@ public sealed class PhotoSqlQueries
                 ORDER BY c.name, p.DATE_TIME DESC, p.pic_id DESC
                 """,
             CategoryAllSql = """
-                SELECT NAME, DATE_TIME, URL, THUMB_URL, T_HEIGHT, T_WIDTH, pic_id, category_name
+                SELECT NAME, DATE_TIME, URL, THUMB_URL, T_HEIGHT, T_WIDTH, PIC_WIDTH, PIC_HEIGHT, pic_id, category_name
                 FROM PhotoItems
                 WHERE cat_id = {0}
                 ORDER BY DATE_TIME DESC, pic_id DESC

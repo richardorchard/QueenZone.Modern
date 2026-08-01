@@ -10,5 +10,17 @@ public sealed record PhotoItem(
     string ThumbnailUrl,
     int ThumbWidth,
     int ThumbHeight,
+    /// <summary>Original full-image width from <c>PIC_WIDTH</c>. Zero means unknown/unset.</summary>
+    int PictureWidth,
+    /// <summary>Original full-image height from <c>PIC_HEIGHT</c>. Zero means unknown/unset.</summary>
+    int PictureHeight,
     int Year,
-    DateTime DateTime);
+    DateTime DateTime)
+{
+    /// <summary>True when both original dimensions are positive (usable for display and wallpaper filters).</summary>
+    public bool HasPictureDimensions => PictureWidth > 0 && PictureHeight > 0;
+
+    /// <summary>Visitor-facing label such as <c>1920 x 1080</c>, or null when dimensions are unknown.</summary>
+    public string? PictureDimensionsLabel =>
+        HasPictureDimensions ? $"{PictureWidth} x {PictureHeight}" : null;
+}

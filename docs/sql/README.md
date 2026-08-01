@@ -18,5 +18,18 @@ Authoritative SQL for stored procedures, FTS DDL, and other hand-written databas
 | `006-modern-forum-read-path.sql` | Modern forum read procs + indexes |
 | `007-forum-search.sql` / related | Forum FTS |
 | `008-news-full-text-search.sql` | `dbo.NEWS_T_SearchPublished` proc body (migration `20260729000000_AddNewsFullTextSearch`) |
+| `009-photo-dimension-inventory.sql` | Read-only coverage of `PIC_WIDTH`/`PIC_HEIGHT` for public photos (issue #435) |
 
 Do not put connection strings or secrets in these files.
+
+### Photo dimension inventory (#435)
+
+```powershell
+# Formatted tool report (preferred)
+dotnet run --project src/QueenZone.Tools -- photo-dim-inventory --connection-string $env:ConnectionStrings__QueenZoneLegacy
+
+# Or run the SQL script in SSMS / sqlcmd against the legacy database
+# docs/sql/009-photo-dimension-inventory.sql
+```
+
+Post results as a comment on GitHub issue #435 for filter authors (#437).
