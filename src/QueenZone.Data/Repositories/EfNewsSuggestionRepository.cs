@@ -228,14 +228,39 @@ public sealed class EfNewsSuggestionRepository(QueenZoneDbContext dbContext) : I
         CancellationToken cancellationToken = default)
     {
         var monthAgo = utcNow.AddDays(-30);
+        var today = utcNow.UtcDateTime.Date;
+        var weekAgo = today.AddDays(-6);
 
+        if (!IsSqliteDatabase())
+        {
+            // Conditional-aggregate query so counting uses IX_NewsSuggestions_Status_SubmittedAt
+            // server-side instead of pulling every row into memory.
+            var todayUtc = new DateTimeOffset(today, TimeSpan.Zero);
+            var weekAgoUtc = new DateTimeOffset(weekAgo, TimeSpan.Zero);
+
+            var counts = await dbContext.NewsSuggestions
+                .AsNoTracking()
+                .GroupBy(_ => 1)
+                .Select(g => new SubmissionTypeCounts(
+                    g.Count(r => r.Status == NewsSuggestionStatus.Pending || r.Status == NewsSuggestionStatus.UnderReview),
+                    g.Count(r => r.SubmittedAt >= todayUtc),
+                    g.Count(r => r.SubmittedAt >= weekAgoUtc),
+                    g.Count(r => r.SubmittedAt >= monthAgo && r.Status == NewsSuggestionStatus.Promoted),
+                    g.Count(r => r.SubmittedAt >= monthAgo
+                        && (r.Status == NewsSuggestionStatus.Rejected || r.Status == NewsSuggestionStatus.Duplicate)),
+                    g.Count(r => r.SubmittedAt >= monthAgo
+                        && (r.Status == NewsSuggestionStatus.Pending || r.Status == NewsSuggestionStatus.UnderReview))))
+                .SingleOrDefaultAsync(cancellationToken);
+
+            return counts ?? SubmissionTypeCounts.Empty;
+        }
+
+        // SQLite fallback (tests): the provider cannot translate DateTimeOffset comparisons
+        // inside conditional aggregates, so materialise then count in memory.
         var rows = await dbContext.NewsSuggestions
             .AsNoTracking()
             .Select(r => new { r.Status, r.SubmittedAt })
             .ToListAsync(cancellationToken);
-
-        var today = utcNow.UtcDateTime.Date;
-        var weekAgo = today.AddDays(-6);
 
         var pending = rows.Count(r =>
             r.Status is NewsSuggestionStatus.Pending or NewsSuggestionStatus.UnderReview);
@@ -259,28 +284,44 @@ public sealed class EfNewsSuggestionRepository(QueenZoneDbContext dbContext) : I
         int maxCount,
         CancellationToken cancellationToken = default)
     {
-        // SQLite EF provider cannot translate DateTimeOffset comparisons; for that
-        // path we materialise then filter in C#. On SQL Server the WHERE is pushed
-        // to the database so only this month's rows transfer.
-        var query = dbContext.NewsSuggestions
+        if (!IsSqliteDatabase())
+        {
+            // Group-by-and-count server-side so only the top `maxCount` rows transfer.
+            var aggregated = await dbContext.NewsSuggestions
+                .AsNoTracking()
+                .Where(r => r.SubmittedAt >= monthStart)
+                .GroupBy(r => r.SubmitterMemberId)
+                .Select(g => new
+                {
+                    SubmitterMemberId = g.Key,
+                    DisplayName = g.Max(r => r.Submitter != null ? r.Submitter.DisplayName : null),
+                    Count = g.Count(),
+                })
+                .OrderByDescending(c => c.Count)
+                .Take(maxCount)
+                .ToListAsync(cancellationToken);
+
+            return aggregated
+                .Select(c => new SubmissionContributor(
+                    c.SubmitterMemberId,
+                    string.IsNullOrWhiteSpace(c.DisplayName) ? "Unknown member" : c.DisplayName,
+                    c.Count))
+                .ToList();
+        }
+
+        // SQLite fallback (tests): the provider cannot translate DateTimeOffset comparisons.
+        var rows = await dbContext.NewsSuggestions
             .AsNoTracking()
             .Select(r => new
             {
                 r.SubmitterMemberId,
                 DisplayName = r.Submitter != null ? r.Submitter.DisplayName : string.Empty,
                 r.SubmittedAt,
-            });
-
-        if (!IsSqliteDatabase())
-        {
-            query = query.Where(r => r.SubmittedAt >= monthStart);
-        }
-
-        var rows = (await query.ToListAsync(cancellationToken))
-            .Where(r => r.SubmittedAt >= monthStart)
-            .ToList();
+            })
+            .ToListAsync(cancellationToken);
 
         return rows
+            .Where(r => r.SubmittedAt >= monthStart)
             .GroupBy(r => r.SubmitterMemberId)
             .Select(g => new SubmissionContributor(
                 g.Key,

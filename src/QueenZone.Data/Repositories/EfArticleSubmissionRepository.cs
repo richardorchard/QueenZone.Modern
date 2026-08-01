@@ -254,14 +254,45 @@ public sealed class EfArticleSubmissionRepository(QueenZoneDbContext dbContext) 
         CancellationToken ct = default)
     {
         var monthAgo = utcNow.AddDays(-30);
+        var today = utcNow.UtcDateTime.Date;
+        var weekAgo = today.AddDays(-6);
 
+        if (!IsSqliteDatabase())
+        {
+            // Conditional-aggregate query so counting runs server-side instead of pulling
+            // every row into memory.
+            var todayUtc = new DateTimeOffset(today, TimeSpan.Zero);
+            var weekAgoUtc = new DateTimeOffset(weekAgo, TimeSpan.Zero);
+
+            var counts = await dbContext.ArticleSubmissions
+                .AsNoTracking()
+                .GroupBy(_ => 1)
+                .Select(g => new SubmissionTypeCounts(
+                    g.Count(a => a.Status == ArticleSubmissionStatus.Submitted
+                        || a.Status == ArticleSubmissionStatus.UnderReview
+                        || a.Status == ArticleSubmissionStatus.ApprovedForPublishing),
+                    g.Count(a => a.SubmittedAt.HasValue && a.SubmittedAt.Value >= todayUtc),
+                    g.Count(a => a.SubmittedAt.HasValue && a.SubmittedAt.Value >= weekAgoUtc),
+                    g.Count(a => a.SubmittedAt.HasValue && a.SubmittedAt.Value >= monthAgo
+                        && (a.Status == ArticleSubmissionStatus.Published
+                            || a.Status == ArticleSubmissionStatus.ApprovedForPublishing)),
+                    g.Count(a => a.SubmittedAt.HasValue && a.SubmittedAt.Value >= monthAgo
+                        && (a.Status == ArticleSubmissionStatus.Rejected
+                            || a.Status == ArticleSubmissionStatus.RequiresRevision)),
+                    g.Count(a => a.SubmittedAt.HasValue && a.SubmittedAt.Value >= monthAgo
+                        && (a.Status == ArticleSubmissionStatus.Submitted
+                            || a.Status == ArticleSubmissionStatus.UnderReview))))
+                .SingleOrDefaultAsync(ct);
+
+            return counts ?? SubmissionTypeCounts.Empty;
+        }
+
+        // SQLite fallback (tests): the provider cannot translate DateTimeOffset? comparisons
+        // inside conditional aggregates, so materialise then count in memory.
         var rows = await dbContext.ArticleSubmissions
             .AsNoTracking()
             .Select(a => new { a.Status, a.SubmittedAt })
             .ToListAsync(ct);
-
-        var today = utcNow.UtcDateTime.Date;
-        var weekAgo = today.AddDays(-6);
 
         var pending = rows.Count(a =>
             a.Status is ArticleSubmissionStatus.Submitted
@@ -289,7 +320,32 @@ public sealed class EfArticleSubmissionRepository(QueenZoneDbContext dbContext) 
         int maxCount,
         CancellationToken ct = default)
     {
-        // Materialize first: SQLite EF provider can't translate DateTimeOffset? comparisons.
+        if (!IsSqliteDatabase())
+        {
+            // Group-by-and-count server-side so only the top `maxCount` rows transfer.
+            var aggregated = await dbContext.ArticleSubmissions
+                .AsNoTracking()
+                .Where(a => a.SubmittedAt.HasValue && a.SubmittedAt.Value >= monthStart)
+                .GroupBy(a => a.AuthorMemberId)
+                .Select(g => new
+                {
+                    MemberId = g.Key,
+                    DisplayName = g.Max(a => a.Author != null ? a.Author.DisplayName : null),
+                    Count = g.Count(),
+                })
+                .OrderByDescending(c => c.Count)
+                .Take(maxCount)
+                .ToListAsync(ct);
+
+            return aggregated
+                .Select(c => new SubmissionContributor(
+                    c.MemberId,
+                    string.IsNullOrWhiteSpace(c.DisplayName) ? "Unknown member" : c.DisplayName,
+                    c.Count))
+                .ToList();
+        }
+
+        // SQLite fallback (tests): the provider cannot translate DateTimeOffset? comparisons.
         var rows = await dbContext.ArticleSubmissions
             .AsNoTracking()
             .Select(a => new
@@ -311,6 +367,12 @@ public sealed class EfArticleSubmissionRepository(QueenZoneDbContext dbContext) 
             .Take(maxCount)
             .ToList();
     }
+
+    private bool IsSqliteDatabase() =>
+        string.Equals(
+            dbContext.Database.ProviderName,
+            "Microsoft.EntityFrameworkCore.Sqlite",
+            StringComparison.Ordinal);
 
     internal static int CountVisibleChars(string? html)
     {

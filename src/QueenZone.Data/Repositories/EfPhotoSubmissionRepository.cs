@@ -195,14 +195,42 @@ public sealed class EfPhotoSubmissionRepository(QueenZoneDbContext dbContext) : 
         CancellationToken cancellationToken = default)
     {
         var monthAgo = utcNow.AddDays(-30);
+        var today = utcNow.UtcDateTime.Date;
+        var weekAgo = today.AddDays(-6);
 
+        if (!IsSqliteDatabase())
+        {
+            // Conditional-aggregate query so counting runs server-side instead of pulling
+            // every row into memory.
+            var todayUtc = new DateTimeOffset(today, TimeSpan.Zero);
+            var weekAgoUtc = new DateTimeOffset(weekAgo, TimeSpan.Zero);
+
+            var counts = await dbContext.PhotoSubmissions
+                .AsNoTracking()
+                .GroupBy(_ => 1)
+                .Select(g => new SubmissionTypeCounts(
+                    g.Count(r => r.Status == PhotoSubmissionStatus.Pending
+                        || r.Status == PhotoSubmissionStatus.UnderReview
+                        || r.Status == PhotoSubmissionStatus.NeedsInfo),
+                    g.Count(r => r.SubmittedAt >= todayUtc),
+                    g.Count(r => r.SubmittedAt >= weekAgoUtc),
+                    g.Count(r => r.SubmittedAt >= monthAgo && r.Status == PhotoSubmissionStatus.Approved),
+                    g.Count(r => r.SubmittedAt >= monthAgo && r.Status == PhotoSubmissionStatus.Rejected),
+                    g.Count(r => r.SubmittedAt >= monthAgo
+                        && (r.Status == PhotoSubmissionStatus.Pending
+                            || r.Status == PhotoSubmissionStatus.UnderReview
+                            || r.Status == PhotoSubmissionStatus.NeedsInfo))))
+                .SingleOrDefaultAsync(cancellationToken);
+
+            return counts ?? SubmissionTypeCounts.Empty;
+        }
+
+        // SQLite fallback (tests): the provider cannot translate DateTimeOffset comparisons
+        // inside conditional aggregates, so materialise then count in memory.
         var rows = await dbContext.PhotoSubmissions
             .AsNoTracking()
             .Select(r => new { r.Status, r.SubmittedAt })
             .ToListAsync(cancellationToken);
-
-        var today = utcNow.UtcDateTime.Date;
-        var weekAgo = today.AddDays(-6);
 
         var pending = rows.Count(r =>
             r.Status is PhotoSubmissionStatus.Pending
@@ -229,7 +257,32 @@ public sealed class EfPhotoSubmissionRepository(QueenZoneDbContext dbContext) : 
         int maxCount,
         CancellationToken cancellationToken = default)
     {
-        // Materialize first: SQLite EF provider can't translate DateTimeOffset comparisons.
+        if (!IsSqliteDatabase())
+        {
+            // Group-by-and-count server-side so only the top `maxCount` rows transfer.
+            var aggregated = await dbContext.PhotoSubmissions
+                .AsNoTracking()
+                .Where(r => r.SubmittedAt >= monthStart)
+                .GroupBy(r => r.SubmitterMemberId)
+                .Select(g => new
+                {
+                    SubmitterMemberId = g.Key,
+                    DisplayName = g.Max(r => r.Submitter != null ? r.Submitter.DisplayName : null),
+                    Count = g.Count(),
+                })
+                .OrderByDescending(c => c.Count)
+                .Take(maxCount)
+                .ToListAsync(cancellationToken);
+
+            return aggregated
+                .Select(c => new SubmissionContributor(
+                    c.SubmitterMemberId,
+                    string.IsNullOrWhiteSpace(c.DisplayName) ? "Unknown member" : c.DisplayName,
+                    c.Count))
+                .ToList();
+        }
+
+        // SQLite fallback (tests): the provider cannot translate DateTimeOffset comparisons.
         var rows = await dbContext.PhotoSubmissions
             .AsNoTracking()
             .Select(r => new
@@ -251,6 +304,12 @@ public sealed class EfPhotoSubmissionRepository(QueenZoneDbContext dbContext) : 
             .Take(maxCount)
             .ToList();
     }
+
+    private bool IsSqliteDatabase() =>
+        string.Equals(
+            dbContext.Database.ProviderName,
+            "Microsoft.EntityFrameworkCore.Sqlite",
+            StringComparison.Ordinal);
 
     private static string? BuildAuditDetails(string status, PhotoSubmissionEntity entity) =>
         status switch
