@@ -51,10 +51,10 @@ jobs:
             echo "migrations=false" >> $GITHUB_OUTPUT
           fi
 
-  # Builds, tests, and publishes the app exactly once per commit ("build once,
-  # deploy many"). smoke-test, e2e-test, and deploy all reuse this artifact
-  # instead of rebuilding, so a push to main no longer triggers three separate
-  # full restore/build/test cycles.
+  # Builds, tests, and publishes the Linux app once per commit ("build once,
+  # deploy many"). smoke-test and deploy reuse the publish artifact. e2e-test
+  # still builds on Windows (needs QueenZone.Web.exe) but skips the full
+  # solution unit/integration test graph.
   build:
     runs-on: ubuntu-latest
     needs: changes
@@ -70,6 +70,10 @@ jobs:
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 10.0.x
+          cache: true
+          cache-dependency-path: |
+            **/*.csproj
+            .config/dotnet-tools.json
 
       - name: Restore
         run: dotnet restore QueenZone.sln
@@ -78,7 +82,7 @@ jobs:
         run: dotnet build QueenZone.sln --configuration Release --no-restore
 
       - name: Verify formatting
-        run: dotnet format QueenZone.sln --verify-no-changes
+        run: dotnet format QueenZone.sln --verify-no-changes --no-restore
 
       - name: Test with coverage
         run: dotnet test QueenZone.sln --configuration Release --no-build --collect:"XPlat Code Coverage" --settings coverlet.runsettings --results-directory ./TestResults
@@ -104,6 +108,7 @@ jobs:
           path: coverage-report
           retention-days: 14
 
+      # Single Linux publish reused by smoke-test (PR) and deploy (main).
       - name: Publish web app
         run: dotnet publish src/QueenZone.Web/QueenZone.Web.csproj --configuration Release --no-build --output publish
 
@@ -136,6 +141,10 @@ jobs:
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 10.0.x
+          cache: true
+          cache-dependency-path: |
+            **/*.csproj
+            .config/dotnet-tools.json
 
       - name: Restore tools and solution
         run: |
@@ -171,6 +180,7 @@ jobs:
             --startup-project src/QueenZone.Web/QueenZone.Web.csproj
 
   smoke-test:
+    # Reuses the Linux publish artifact from build — no second restore/build.
     runs-on: ubuntu-latest
     needs: [changes, build]
     if: needs.changes.outputs.code == 'true'
@@ -187,7 +197,7 @@ jobs:
         run: |
           # Content root must be the publish folder so appsettings*.json (including
           # Admin:AllowedEmails in appsettings.Testing.json) are loaded. Without this,
-          # cwd is the repo root and ValidateOnStart fails with empty admin options.
+          # cwd is the job workspace root and ValidateOnStart fails with empty admin options.
           chmod +x ./smoke-app/QueenZone.Web
           APP_DIR="$(pwd)/smoke-app"
           ASPNETCORE_ENVIRONMENT=Testing \
@@ -258,23 +268,22 @@ jobs:
       - name: Verify .NET SDK
         run: dotnet --version
 
-      - name: Restore
+      # E2E does not ProjectReference Web — restore each graph separately and
+      # skip the solution's unit/integration test projects. Linux publish from
+      # the build job is not reusable here (need QueenZone.Web.exe on Windows).
+      - name: Restore E2E tests and web app
         run: |
-          dotnet restore QueenZone.sln
           dotnet restore tests/QueenZone.Web.E2E/QueenZone.Web.E2E.csproj
+          dotnet restore src/QueenZone.Web/QueenZone.Web.csproj
 
-      - name: Build
-        run: |
-          dotnet build QueenZone.sln --configuration Release --no-restore
-          dotnet build tests/QueenZone.Web.E2E/QueenZone.Web.E2E.csproj --configuration Release --no-restore
+      - name: Build E2E tests
+        run: dotnet build tests/QueenZone.Web.E2E/QueenZone.Web.E2E.csproj --configuration Release --no-restore
 
       - name: Install Playwright browsers
         run: .\tests\QueenZone.Web.E2E\bin\Release\net10.0\playwright.ps1 install chromium
 
-      - name: Publish web app
-        # Can't reuse the build job's publish artifact here: it's produced on
-        # ubuntu-latest and only contains a Linux apphost, not QueenZone.Web.exe.
-        run: dotnet publish src/QueenZone.Web/QueenZone.Web.csproj --configuration Release --no-build --output e2e-app
+      - name: Publish web app (Windows)
+        run: dotnet publish src/QueenZone.Web/QueenZone.Web.csproj --configuration Release --no-restore --output e2e-app
 
       - name: Start app in background
         run: |
@@ -399,6 +408,10 @@ jobs:
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 10.0.x
+          cache: true
+          cache-dependency-path: |
+            **/*.csproj
+            .config/dotnet-tools.json
 
       - name: Restore
         run: |
