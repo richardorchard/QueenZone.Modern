@@ -72,7 +72,13 @@ Public hostnames: `queenzone.org`, `www.queenzone.org`, `queenzone-dev.azurewebs
 
 ### Bitwarden Secrets Manager
 
-Development agents on Richard's machines should use Bitwarden Secrets Manager for local secret access. Use the machine account that matches the host platform: `windows-codex` on Windows machines, or `mac-codex` on Macs. The project is `Queenzone Development` (`1c16fd2d-4bfb-4eb7-8357-b49400233490`).
+Use **`bws`** (Secrets Manager), **not** password-manager **`bw`**. Full guide: [`agent-bitwarden-secrets.md`](agent-bitwarden-secrets.md).
+
+| | |
+| --- | --- |
+| Project | `Queenzone Development` (`1c16fd2d-4bfb-4eb7-8357-b49400233490`) |
+| Windows machine account | `windows-codex` — this PC: `bws` at `%USERPROFILE%\bin\bws.exe`, User `Path` includes `%USERPROFILE%\bin`, token in User env `BWS_ACCESS_TOKEN` |
+| macOS machine account | `mac-codex` — separate token; install `bws` via official script or release zip; ensure `PATH` + `BWS_ACCESS_TOKEN` in the agent environment |
 
 ```powershell
 $env:BWS_ACCESS_TOKEN = [Environment]::GetEnvironmentVariable("BWS_ACCESS_TOKEN", "User")

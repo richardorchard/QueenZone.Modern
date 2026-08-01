@@ -63,9 +63,9 @@ Open `coverage-report/index.html` to inspect the report. Coverage reports and ra
 
 Local secrets belong in `src/QueenZone.Web/appsettings.Local.json`, which is ignored by git. You can also set `ConnectionStrings__QueenZoneLegacy` in your shell or a local `.env` file for tooling that loads dotenv values. If no `ConnectionStrings:QueenZoneLegacy` value is present, the site uses sample news data so the first slice can still run locally.
 
-Bitwarden Secrets Manager is the shared local secret store for development agents on Richard's machines. Use the Bitwarden machine account that matches the host platform: `windows-codex` on Windows machines, or `mac-codex` on Macs. The Secrets Manager project is `Queenzone Development`. The `bws` CLI should authenticate from the user-scoped `BWS_ACCESS_TOKEN` environment variable. Do not commit or print that token.
+Bitwarden **Secrets Manager** (`bws` CLI — not the password vault `bw`) is the shared local secret store for development agents. Use machine account **`windows-codex`** on Windows or **`mac-codex`** on Macs; project **`Queenzone Development`**. Auth is user-scoped **`BWS_ACCESS_TOKEN`**. Do not commit or print that token.
 
-Useful local commands:
+On this Windows workstation, `bws` is installed at `%USERPROFILE%\bin\bws.exe` (User `Path` includes `%USERPROFILE%\bin`). Full install, Mac setup, and troubleshooting: [`docs/agent-bitwarden-secrets.md`](docs/agent-bitwarden-secrets.md).
 
 ```powershell
 $env:BWS_ACCESS_TOKEN = [Environment]::GetEnvironmentVariable("BWS_ACCESS_TOKEN", "User")

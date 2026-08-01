@@ -22,6 +22,10 @@ public sealed class PhotoSqlQueriesTests
         Assert.Contains("WHERE p.Cat_ID = {0} AND p.PIC_ID = {1} AND p.DISPLAY = 1", sql.DetailNavigationSql, StringComparison.Ordinal);
         Assert.Contains("ORDER BY c.name, p.Date_time DESC, p.PIC_ID DESC", sql.SitemapSql, StringComparison.Ordinal);
         Assert.Contains("WHERE p.Cat_ID = {0} AND p.DISPLAY = 1", sql.CategoryAllSql, StringComparison.Ordinal);
+        Assert.Contains("CAST(ISNULL(p.PIC_WIDTH, 0) AS int) AS PIC_WIDTH", sql.CategoryPageSql, StringComparison.Ordinal);
+        Assert.Contains("CAST(ISNULL(p.PIC_HEIGHT, 0) AS int) AS PIC_HEIGHT", sql.CategoryPageSql, StringComparison.Ordinal);
+        Assert.Contains("CAST(ISNULL(p.PIC_WIDTH, 0) AS int) AS PIC_WIDTH", sql.DetailNavigationSql, StringComparison.Ordinal);
+        Assert.Contains("CAST(ISNULL(p.PIC_HEIGHT, 0) AS int) AS PIC_HEIGHT", sql.CategoryAllSql, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -34,5 +38,7 @@ public sealed class PhotoSqlQueriesTests
         Assert.Contains("FROM PhotoItems", sql.CategoryCountSql, StringComparison.Ordinal);
         Assert.Contains("AS PreviousPicId", sql.DetailNavigationSql, StringComparison.Ordinal);
         Assert.Contains("AS NextPicId", sql.DetailNavigationSql, StringComparison.Ordinal);
+        Assert.Contains("PIC_WIDTH", sql.CategoryPageSql, StringComparison.Ordinal);
+        Assert.Contains("PIC_HEIGHT", sql.DetailNavigationSql, StringComparison.Ordinal);
     }
 }

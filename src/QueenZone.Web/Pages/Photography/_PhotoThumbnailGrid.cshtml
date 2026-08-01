@@ -14,7 +14,13 @@
       </a>
       <figcaption>
         <a class="qz-photo-thumb__title" href="@PhotoRoutes.GetDetailPath(photo.CategorySlug, photo.PicId)">@photo.Title</a>
-        <span class="qz-photo-thumb__meta">@photo.Year</span>
+        <span class="qz-photo-thumb__meta">
+          @photo.Year
+          @if (photo.PictureDimensionsLabel is string dimensions)
+          {
+            <text> · @dimensions</text>
+          }
+        </span>
       </figcaption>
     </figure>
   }

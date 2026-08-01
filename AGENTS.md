@@ -12,6 +12,7 @@ This repository is the modern QueenZone rebuild. The project is archive-first: i
 - `docs/decisions/0007-rich-text-editor-quill.md` is the shared Quill rich-text editor decision (partial + `/api/uploads/editor-image`).
 - `docs/backlog/migration-backlog.md` tracks migration work.
 - `docs/sql/data-api-builder-mcp.md` explains the local SQL MCP setup for read-only legacy database investigation.
+- `docs/agent-bitwarden-secrets.md` is the multi-machine Bitwarden Secrets Manager (`bws`) setup for local agents (Windows vs macOS).
 
 Keep durable workflow guidance in this file and keep user-facing setup guidance in `README.md`.
 
@@ -162,9 +163,15 @@ Local secrets belong in ignored files such as:
 
 Commit only examples such as `.env.example`.
 
-Bitwarden Secrets Manager is the shared local secret store for development agents on Richard's machines. Use the `bws` CLI with the user-scoped `BWS_ACCESS_TOKEN` environment variable; do not ask the user to paste the token into chat and never print it. Use the Bitwarden machine account that matches the host platform: `windows-codex` on Windows machines, or `mac-codex` on Macs. The project for this repository is `Queenzone Development` (`1c16fd2d-4bfb-4eb7-8357-b49400233490`).
+Bitwarden **Secrets Manager** (`bws` CLI) is the shared local secret store for development agents on Richard's machines. This is **not** the password-manager CLI (`bw`). Full multi-machine setup (Windows vs macOS, install paths, troubleshooting): [`docs/agent-bitwarden-secrets.md`](docs/agent-bitwarden-secrets.md).
 
-For local agent work, prefer reading secrets from Bitwarden instead of copying values into chat:
+Rules for agents:
+
+- Use **`bws`**, never `bw login`, for QueenZone App Service–style secrets.
+- Authenticate with user-scoped **`BWS_ACCESS_TOKEN`**; do not ask the user to paste the token into chat; never print tokens or secret values (key names and value lengths only).
+- Machine account: **`windows-codex`** on Windows, **`mac-codex`** on Macs (separate tokens per host).
+- Project: **`Queenzone Development`** (`1c16fd2d-4bfb-4eb7-8357-b49400233490`).
+- **This Windows workstation:** `bws` lives at `%USERPROFILE%\bin\bws.exe` with `%USERPROFILE%\bin` on the User `Path`; token is User env `BWS_ACCESS_TOKEN`. Restart agent shells after Path changes.
 
 ```powershell
 $env:BWS_ACCESS_TOKEN = [Environment]::GetEnvironmentVariable("BWS_ACCESS_TOKEN", "User")

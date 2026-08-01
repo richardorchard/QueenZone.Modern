@@ -141,6 +141,8 @@ public sealed class CheckPhotosCommandTests
             ThumbnailUrl: "https://cdn.queenzone.org/queen/t_missing-main.jpg",
             ThumbWidth: 120,
             ThumbHeight: 90,
+            PictureWidth: 800,
+            PictureHeight: 600,
             Year: 1985,
             DateTime: new DateTime(1985, 7, 13)),
         new PhotoItem(
@@ -153,6 +155,8 @@ public sealed class CheckPhotosCommandTests
             ThumbnailUrl: "https://cdn.queenzone.org/queen/t_missing-thumb.jpg",
             ThumbWidth: 120,
             ThumbHeight: 90,
+            PictureWidth: 1920,
+            PictureHeight: 1080,
             Year: 1986,
             DateTime: new DateTime(1986, 8, 9)),
     ];

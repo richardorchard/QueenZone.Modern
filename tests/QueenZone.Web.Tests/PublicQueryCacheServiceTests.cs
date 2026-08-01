@@ -604,6 +604,8 @@ public sealed class PublicQueryCacheServiceTests
                         "https://cdn.queenzone.org/brian-may/a-t.jpg",
                         150,
                         150,
+                        1920,
+                        1080,
                         1986,
                         new DateTime(1986, 7, 12)),
                 ],
