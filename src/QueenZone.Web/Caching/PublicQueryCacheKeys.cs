@@ -35,8 +35,13 @@ public static class PublicQueryCacheKeys
     public static string PhotoCategories(string version) =>
         $"{PhotoCategoriesSegment}:v{version}";
 
-    public static string PhotoCategoryPage(string version, int catId, int page, int pageSize) =>
-        $"{PhotoCategoryPageSegment}:v{version}:{catId}:{page}:{pageSize}";
+    public static string PhotoCategoryPage(
+        string version,
+        int catId,
+        int page,
+        int pageSize,
+        string? sizeFilter = null) =>
+        $"{PhotoCategoryPageSegment}:v{version}:{catId}:{page}:{pageSize}:size={sizeFilter ?? string.Empty}";
 
     public static string OnThisDay(DateOnly date, int count) =>
         $"{Prefix}:history:on-this-day:{date:yyyyMMdd}:{count}";

@@ -588,6 +588,7 @@ public sealed class PublicQueryCacheServiceTests
             int catId,
             int page,
             int pageSize,
+            PhotoListFilter? filter = null,
             CancellationToken cancellationToken = default)
         {
             PageCallCount++;
@@ -615,6 +616,7 @@ public sealed class PublicQueryCacheServiceTests
         public Task<PhotoDetailNavigation?> GetDetailNavigationAsync(
             int catId,
             int picId,
+            PhotoListFilter? filter = null,
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 

@@ -22,20 +22,49 @@ public sealed class DetailModel(
 
     public string BackToGridHref { get; private set; } = string.Empty;
 
+    public PhotoListFilter SizeFilter { get; private set; } = PhotoListFilter.None;
+
     public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
+    [BindProperty(SupportsGet = true, Name = PhotoRoutes.SizeQueryParameter)]
+    public string? Size { get; set; }
 
     public async Task<IActionResult> OnGetAsync(string slug, int picId, CancellationToken cancellationToken)
     {
+        SizeFilter = PhotoListFilter.Parse(Size);
+
         var category = await publicQueryCache.GetPhotoCategoryBySlugAsync(slug, cancellationToken);
         if (category is null)
         {
             return NotFound();
         }
 
-        var navigation = await photoRepository.GetDetailNavigationAsync(category.CatId, picId, cancellationToken);
+        var navigation = await photoRepository.GetDetailNavigationAsync(
+            category.CatId,
+            picId,
+            SizeFilter,
+            cancellationToken);
         if (navigation is null)
         {
-            return NotFound();
+            // Active filter that excludes this photo: fall back to unfiltered navigation so deep links work.
+            if (SizeFilter.IsActive)
+            {
+                navigation = await photoRepository.GetDetailNavigationAsync(
+                    category.CatId,
+                    picId,
+                    PhotoListFilter.None,
+                    cancellationToken);
+                if (navigation is null)
+                {
+                    return NotFound();
+                }
+
+                SizeFilter = PhotoListFilter.None;
+            }
+            else
+            {
+                return NotFound();
+            }
         }
 
         Category = category;
@@ -44,27 +73,28 @@ public sealed class DetailModel(
         Count = navigation.Count;
 
         PreviousHref = navigation.PreviousPicId is int previousId
-            ? PhotoRoutes.GetDetailPath(category.Slug, previousId)
+            ? PhotoRoutes.GetDetailPath(category.Slug, previousId, SizeFilter)
             : null;
         NextHref = navigation.NextPicId is int nextId
-            ? PhotoRoutes.GetDetailPath(category.Slug, nextId)
+            ? PhotoRoutes.GetDetailPath(category.Slug, nextId, SizeFilter)
             : null;
 
         var page = (navigation.Index / PhotoRoutes.CategoryPageSize) + 1;
-        BackToGridHref = PhotoRoutes.GetCategoryPagePath(category.Slug, page);
+        BackToGridHref = PhotoRoutes.GetCategoryPagePath(category.Slug, page, SizeFilter);
 
         Breadcrumbs =
         [
             BreadcrumbItem.Home,
             new BreadcrumbItem("Photography", PhotoRoutes.GetCategoriesPath()),
-            new BreadcrumbItem(category.Name, PhotoRoutes.GetCategoryPath(category.Slug)),
-            new BreadcrumbItem(Photo.Title, PhotoRoutes.GetDetailPath(category.Slug, Photo.PicId)),
+            new BreadcrumbItem(category.Name, PhotoRoutes.GetCategoryPath(category.Slug, SizeFilter)),
+            new BreadcrumbItem(Photo.Title, PhotoRoutes.GetDetailPath(category.Slug, Photo.PicId, SizeFilter)),
         ];
 
         ViewData["Title"] = $"{Photo.Title} | {category.Name} | Photography | QueenZone";
         ViewData["Description"] = $"{Photo.Title} – Queen photography from the {category.Name} collection.";
         ViewData["CanonicalPath"] = PhotoRoutes.GetDetailPath(category.Slug, Photo.PicId);
         ViewData["OgImage"] = Photo.ImageUrl;
+        ViewData["PhotoListFilter"] = SizeFilter;
 
         return Page();
     }

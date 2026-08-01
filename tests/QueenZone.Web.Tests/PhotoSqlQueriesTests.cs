@@ -26,6 +26,11 @@ public sealed class PhotoSqlQueriesTests
         Assert.Contains("CAST(ISNULL(p.PIC_HEIGHT, 0) AS int) AS PIC_HEIGHT", sql.CategoryPageSql, StringComparison.Ordinal);
         Assert.Contains("CAST(ISNULL(p.PIC_WIDTH, 0) AS int) AS PIC_WIDTH", sql.DetailNavigationSql, StringComparison.Ordinal);
         Assert.Contains("CAST(ISNULL(p.PIC_HEIGHT, 0) AS int) AS PIC_HEIGHT", sql.CategoryAllSql, StringComparison.Ordinal);
+        Assert.Contains("{PHOTO_FILTER_P}", sql.CategoryPageSql, StringComparison.Ordinal);
+        Assert.Contains("{PHOTO_FILTER_T}", sql.DetailNavigationSql, StringComparison.Ordinal);
+        var filtered = sql.ApplyFilter(sql.CategoryCountSql, new PhotoListFilter(PhotoSizePreset.Desktop));
+        Assert.DoesNotContain("{PHOTO_FILTER_P}", filtered, StringComparison.Ordinal);
+        Assert.Contains("1920", filtered, StringComparison.Ordinal);
     }
 
     [Fact]

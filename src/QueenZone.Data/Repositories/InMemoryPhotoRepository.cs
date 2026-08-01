@@ -34,6 +34,7 @@ public sealed class InMemoryPhotoRepository(SharedPhotoStore store) : IPhotoRepo
         int catId,
         int page,
         int pageSize,
+        PhotoListFilter? filter = null,
         CancellationToken cancellationToken = default)
     {
         var category = store.GetCategory(catId);
@@ -42,7 +43,11 @@ public sealed class InMemoryPhotoRepository(SharedPhotoStore store) : IPhotoRepo
             return Task.FromResult(new PhotoCategoryPage(string.Empty, [], 0));
         }
 
-        var items = store.GetVisiblePhotosByCategory(catId).Select(ToPhotoItem).ToList();
+        var activeFilter = filter ?? PhotoListFilter.None;
+        var items = store.GetVisiblePhotosByCategory(catId)
+            .Select(ToPhotoItem)
+            .Where(activeFilter.Matches)
+            .ToList();
         var paged = items
             .Skip(Math.Max(page - 1, 0) * pageSize)
             .Take(pageSize)
@@ -54,9 +59,14 @@ public sealed class InMemoryPhotoRepository(SharedPhotoStore store) : IPhotoRepo
     public Task<PhotoDetailNavigation?> GetDetailNavigationAsync(
         int catId,
         int picId,
+        PhotoListFilter? filter = null,
         CancellationToken cancellationToken = default)
     {
-        var items = store.GetVisiblePhotosByCategory(catId).Select(ToPhotoItem).ToList();
+        var activeFilter = filter ?? PhotoListFilter.None;
+        var items = store.GetVisiblePhotosByCategory(catId)
+            .Select(ToPhotoItem)
+            .Where(activeFilter.Matches)
+            .ToList();
         var index = items.FindIndex(item => item.PicId == picId);
         if (index < 0)
         {

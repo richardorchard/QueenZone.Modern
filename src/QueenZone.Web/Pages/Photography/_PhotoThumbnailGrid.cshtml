@@ -1,10 +1,15 @@
 @model IReadOnlyList<QueenZone.Data.PhotoItem>
+@using QueenZone.Data
+@{
+  var filter = ViewData["PhotoListFilter"] as PhotoListFilter ?? PhotoListFilter.None;
+}
 
 <div class="qz-photo-grid">
   @foreach (var photo in Model)
   {
+    var detailHref = PhotoRoutes.GetDetailPath(photo.CategorySlug, photo.PicId, filter);
     <figure class="qz-photo-thumb">
-      <a href="@PhotoRoutes.GetDetailPath(photo.CategorySlug, photo.PicId)">
+      <a href="@detailHref">
         <img
           src="@photo.ThumbnailUrl"
           alt="@photo.Title"
@@ -13,7 +18,7 @@
           loading="lazy">
       </a>
       <figcaption>
-        <a class="qz-photo-thumb__title" href="@PhotoRoutes.GetDetailPath(photo.CategorySlug, photo.PicId)">@photo.Title</a>
+        <a class="qz-photo-thumb__title" href="@detailHref">@photo.Title</a>
         <span class="qz-photo-thumb__meta">
           @photo.Year
           @if (photo.PictureDimensionsLabel is string dimensions)

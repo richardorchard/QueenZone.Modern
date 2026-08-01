@@ -53,14 +53,16 @@ public sealed class EfPhotoRepository : IPhotoRepository
         int catId,
         int page,
         int pageSize,
+        PhotoListFilter? filter = null,
         CancellationToken cancellationToken = default)
     {
         var safePage = Math.Max(page, 1);
         var safePageSize = Math.Clamp(pageSize, 1, 200);
         var offset = (safePage - 1) * safePageSize;
+        var activeFilter = filter ?? PhotoListFilter.None;
 
         var total = await dbContext.Database
-            .SqlQueryRaw<IntValueRow>(sql.CategoryCountSql, catId)
+            .SqlQueryRaw<IntValueRow>(sql.ApplyFilter(sql.CategoryCountSql, activeFilter), catId)
             .SingleAsync(cancellationToken);
 
         var nameRows = await dbContext.Database
@@ -70,7 +72,11 @@ public sealed class EfPhotoRepository : IPhotoRepository
         var categorySlug = NewsSlug.Slugify(categoryName);
 
         var rows = await dbContext.Database
-            .SqlQueryRaw<CategoryPageRow>(sql.CategoryPageSql, offset, safePageSize, catId)
+            .SqlQueryRaw<CategoryPageRow>(
+                sql.ApplyFilter(sql.CategoryPageSql, activeFilter),
+                offset,
+                safePageSize,
+                catId)
             .ToListAsync(cancellationToken);
 
         var items = rows.Select(row => MapItem(row, catId, categoryName, categorySlug)).ToList();
@@ -80,11 +86,16 @@ public sealed class EfPhotoRepository : IPhotoRepository
     public async Task<PhotoDetailNavigation?> GetDetailNavigationAsync(
         int catId,
         int picId,
+        PhotoListFilter? filter = null,
         CancellationToken cancellationToken = default)
     {
+        var activeFilter = filter ?? PhotoListFilter.None;
         // Single SQL round-trip: photo fields + total + index + prev/next (see DetailNavigationSql).
         var rows = await dbContext.Database
-            .SqlQueryRaw<DetailNavigationRow>(sql.DetailNavigationSql, catId, picId)
+            .SqlQueryRaw<DetailNavigationRow>(
+                sql.ApplyFilter(sql.DetailNavigationSql, activeFilter),
+                catId,
+                picId)
             .ToListAsync(cancellationToken);
         var row = rows.FirstOrDefault();
         if (row is null)
@@ -115,7 +126,7 @@ public sealed class EfPhotoRepository : IPhotoRepository
         var categorySlug = NewsSlug.Slugify(categoryName);
 
         var rows = await dbContext.Database
-            .SqlQueryRaw<CategoryPageRow>(sql.CategoryAllSql, catId)
+            .SqlQueryRaw<CategoryPageRow>(sql.ApplyFilter(sql.CategoryAllSql, PhotoListFilter.None), catId)
             .ToListAsync(cancellationToken);
 
         IReadOnlyList<PhotoItem> items = rows

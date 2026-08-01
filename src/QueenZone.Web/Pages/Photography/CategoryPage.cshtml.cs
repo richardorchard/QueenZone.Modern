@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using QueenZone.Data;
 
 namespace QueenZone.Web.Pages.Photography;
 
@@ -11,7 +12,8 @@ public sealed class CategoryPageModel(PublicQueryCacheService publicQueryCache) 
     {
         if (PageNumber == 1)
         {
-            return RedirectPermanent(PhotoRoutes.GetCategoryPath(slug));
+            var filter = PhotoListFilter.Parse(Size);
+            return RedirectPermanent(PhotoRoutes.GetCategoryPath(slug, filter));
         }
 
         return await LoadCategoryPageAsync(slug, PageNumber, cancellationToken);
