@@ -42,9 +42,20 @@ public sealed class PhotoSqlQueries
     /// <summary>Parameter: catId. Full visible collection for tools (not detail pages).</summary>
     public required string CategoryAllSql { get; init; }
 
+    /// <summary>
+    /// When true, <see cref="ApplyFilter"/> uses SQLite IFNULL expressions; otherwise SQL Server CAST/ISNULL.
+    /// </summary>
+    public bool UseSqliteFilterExpressions { get; init; }
+
+    public string ApplyFilter(string sql, PhotoListFilter? filter) =>
+        UseSqliteFilterExpressions
+            ? PhotoSqlFilter.ApplySqlite(sql, filter)
+            : PhotoSqlFilter.ApplyProduction(sql, filter);
+
     public static PhotoSqlQueries CreateProduction() =>
         new()
         {
+            UseSqliteFilterExpressions = false,
             CategoriesWithCountsSql = """
                 SELECT
                     c.cat_id,
@@ -76,14 +87,14 @@ public sealed class PhotoSqlQueries
                     ISNULL(c.name, N'') AS category_name
                 FROM dbo.PIC_FILES_T p
                 INNER JOIN dbo.PIC_CAT_T c ON c.cat_id = p.Cat_ID
-                WHERE p.Cat_ID = {2} AND p.DISPLAY = 1
+                WHERE p.Cat_ID = {2} AND p.DISPLAY = 1{PHOTO_FILTER_P}
                 ORDER BY p.Date_time DESC, p.PIC_ID DESC
                 OFFSET {0} ROWS FETCH NEXT {1} ROWS ONLY
                 """,
             CategoryCountSql = """
                 SELECT COUNT(*) AS Value
-                FROM dbo.PIC_FILES_T
-                WHERE Cat_ID = {0} AND DISPLAY = 1
+                FROM dbo.PIC_FILES_T p
+                WHERE p.Cat_ID = {0} AND p.DISPLAY = 1{PHOTO_FILTER_P}
                 """,
             CategoryNameSql = """
                 SELECT name
@@ -104,10 +115,11 @@ public sealed class PhotoSqlQueries
                     ISNULL(c.name, N'') AS category_name
                 FROM dbo.PIC_FILES_T p
                 INNER JOIN dbo.PIC_CAT_T c ON c.cat_id = p.Cat_ID
-                WHERE p.Cat_ID = {0} AND p.PIC_ID = {1} AND p.DISPLAY = 1
+                WHERE p.Cat_ID = {0} AND p.PIC_ID = {1} AND p.DISPLAY = 1{PHOTO_FILTER_P}
                 """,
             // One round-trip: photo + totals + neighbors. Neighbor subqueries mirror Previous/NextPicIdSql
             // (seek-friendly UNION ALL; relies on IX_PIC_FILES_T_Cat_Display_Date).
+            // {PHOTO_FILTER_*} placeholders are filled by PhotoSqlFilter for size presets (#437).
             DetailNavigationSql = """
                 SELECT
                     ISNULL(p.Name, N'') AS NAME,
@@ -123,16 +135,16 @@ public sealed class PhotoSqlQueries
                     (
                         SELECT COUNT(*)
                         FROM dbo.PIC_FILES_T t
-                        WHERE t.Cat_ID = {0} AND t.DISPLAY = 1
+                        WHERE t.Cat_ID = {0} AND t.DISPLAY = 1{PHOTO_FILTER_T}
                     ) AS TotalCount,
                     (
                         (SELECT COUNT(*)
                          FROM dbo.PIC_FILES_T t
-                         WHERE t.Cat_ID = {0} AND t.DISPLAY = 1 AND t.Date_time > p.Date_time)
+                         WHERE t.Cat_ID = {0} AND t.DISPLAY = 1{PHOTO_FILTER_T} AND t.Date_time > p.Date_time)
                         +
                         (SELECT COUNT(*)
                          FROM dbo.PIC_FILES_T t
-                         WHERE t.Cat_ID = {0} AND t.DISPLAY = 1 AND t.Date_time = p.Date_time AND t.PIC_ID > p.PIC_ID)
+                         WHERE t.Cat_ID = {0} AND t.DISPLAY = 1{PHOTO_FILTER_T} AND t.Date_time = p.Date_time AND t.PIC_ID > p.PIC_ID)
                     ) AS IndexBefore,
                     (
                         SELECT TOP (1) PIC_ID
@@ -140,17 +152,17 @@ public sealed class PhotoSqlQueries
                             SELECT PIC_ID, Date_time
                             FROM (
                                 SELECT TOP (1) PIC_ID, Date_time
-                                FROM dbo.PIC_FILES_T
-                                WHERE Cat_ID = {0} AND DISPLAY = 1 AND Date_time = p.Date_time AND PIC_ID > p.PIC_ID
-                                ORDER BY PIC_ID ASC
+                                FROM dbo.PIC_FILES_T t
+                                WHERE t.Cat_ID = {0} AND t.DISPLAY = 1{PHOTO_FILTER_T} AND t.Date_time = p.Date_time AND t.PIC_ID > p.PIC_ID
+                                ORDER BY t.PIC_ID ASC
                             ) same_ts
                             UNION ALL
                             SELECT PIC_ID, Date_time
                             FROM (
                                 SELECT TOP (1) PIC_ID, Date_time
-                                FROM dbo.PIC_FILES_T
-                                WHERE Cat_ID = {0} AND DISPLAY = 1 AND Date_time > p.Date_time
-                                ORDER BY Date_time ASC, PIC_ID ASC
+                                FROM dbo.PIC_FILES_T t
+                                WHERE t.Cat_ID = {0} AND t.DISPLAY = 1{PHOTO_FILTER_T} AND t.Date_time > p.Date_time
+                                ORDER BY t.Date_time ASC, t.PIC_ID ASC
                             ) newer
                         ) neighbors
                         ORDER BY Date_time ASC, PIC_ID ASC
@@ -161,24 +173,24 @@ public sealed class PhotoSqlQueries
                             SELECT PIC_ID, Date_time
                             FROM (
                                 SELECT TOP (1) PIC_ID, Date_time
-                                FROM dbo.PIC_FILES_T
-                                WHERE Cat_ID = {0} AND DISPLAY = 1 AND Date_time = p.Date_time AND PIC_ID < p.PIC_ID
-                                ORDER BY PIC_ID DESC
+                                FROM dbo.PIC_FILES_T t
+                                WHERE t.Cat_ID = {0} AND t.DISPLAY = 1{PHOTO_FILTER_T} AND t.Date_time = p.Date_time AND t.PIC_ID < p.PIC_ID
+                                ORDER BY t.PIC_ID DESC
                             ) same_ts
                             UNION ALL
                             SELECT PIC_ID, Date_time
                             FROM (
                                 SELECT TOP (1) PIC_ID, Date_time
-                                FROM dbo.PIC_FILES_T
-                                WHERE Cat_ID = {0} AND DISPLAY = 1 AND Date_time < p.Date_time
-                                ORDER BY Date_time DESC, PIC_ID DESC
+                                FROM dbo.PIC_FILES_T t
+                                WHERE t.Cat_ID = {0} AND t.DISPLAY = 1{PHOTO_FILTER_T} AND t.Date_time < p.Date_time
+                                ORDER BY t.Date_time DESC, t.PIC_ID DESC
                             ) older
                         ) neighbors
                         ORDER BY Date_time DESC, PIC_ID DESC
                     ) AS NextPicId
                 FROM dbo.PIC_FILES_T p
                 INNER JOIN dbo.PIC_CAT_T c ON c.cat_id = p.Cat_ID
-                WHERE p.Cat_ID = {0} AND p.PIC_ID = {1} AND p.DISPLAY = 1
+                WHERE p.Cat_ID = {0} AND p.PIC_ID = {1} AND p.DISPLAY = 1{PHOTO_FILTER_P}
                 """,
             // Seek-friendly UNION ALL (avoids OR residual predicates that scan the whole category).
             // Relies on IX_PIC_FILES_T_Cat_Display_Date (Cat_ID, DISPLAY, Date_time DESC, PIC_ID DESC).
@@ -260,7 +272,7 @@ public sealed class PhotoSqlQueries
                     ISNULL(c.name, N'') AS category_name
                 FROM dbo.PIC_FILES_T p
                 INNER JOIN dbo.PIC_CAT_T c ON c.cat_id = p.Cat_ID
-                WHERE p.Cat_ID = {0} AND p.DISPLAY = 1
+                WHERE p.Cat_ID = {0} AND p.DISPLAY = 1{PHOTO_FILTER_P}
                 ORDER BY p.Date_time DESC, p.PIC_ID DESC
                 """,
         };
@@ -272,6 +284,7 @@ public sealed class PhotoSqlQueries
     public static PhotoSqlQueries CreateSqliteFixture() =>
         new()
         {
+            UseSqliteFilterExpressions = true,
             CategoriesWithCountsSql = """
                 SELECT
                     c.cat_id,
@@ -292,21 +305,21 @@ public sealed class PhotoSqlQueries
                 """,
             CategoryPageSql = """
                 SELECT NAME, DATE_TIME, URL, THUMB_URL, T_HEIGHT, T_WIDTH, PIC_WIDTH, PIC_HEIGHT, pic_id, category_name
-                FROM PhotoItems
-                WHERE cat_id = {2}
+                FROM PhotoItems p
+                WHERE p.cat_id = {2}{PHOTO_FILTER_P}
                 ORDER BY DATE_TIME DESC, pic_id DESC
                 LIMIT {1} OFFSET {0}
                 """,
             CategoryCountSql = """
-                SELECT COUNT(*) AS Value FROM PhotoItems WHERE cat_id = {0}
+                SELECT COUNT(*) AS Value FROM PhotoItems p WHERE p.cat_id = {0}{PHOTO_FILTER_P}
                 """,
             CategoryNameSql = """
                 SELECT name FROM PhotoCategories WHERE cat_id = {0}
                 """,
             PhotoByIdSql = """
                 SELECT NAME, DATE_TIME, URL, THUMB_URL, T_HEIGHT, T_WIDTH, PIC_WIDTH, PIC_HEIGHT, pic_id, category_name
-                FROM PhotoItems
-                WHERE cat_id = {0} AND pic_id = {1}
+                FROM PhotoItems p
+                WHERE p.cat_id = {0} AND p.pic_id = {1}{PHOTO_FILTER_P}
                 """,
             DetailNavigationSql = """
                 SELECT
@@ -320,11 +333,11 @@ public sealed class PhotoSqlQueries
                     p.PIC_HEIGHT,
                     p.pic_id,
                     p.category_name,
-                    (SELECT COUNT(*) FROM PhotoItems t WHERE t.cat_id = {0}) AS TotalCount,
+                    (SELECT COUNT(*) FROM PhotoItems t WHERE t.cat_id = {0}{PHOTO_FILTER_T}) AS TotalCount,
                     (
-                        (SELECT COUNT(*) FROM PhotoItems t WHERE t.cat_id = {0} AND t.DATE_TIME > p.DATE_TIME)
+                        (SELECT COUNT(*) FROM PhotoItems t WHERE t.cat_id = {0}{PHOTO_FILTER_T} AND t.DATE_TIME > p.DATE_TIME)
                         +
-                        (SELECT COUNT(*) FROM PhotoItems t WHERE t.cat_id = {0} AND t.DATE_TIME = p.DATE_TIME AND t.pic_id > p.pic_id)
+                        (SELECT COUNT(*) FROM PhotoItems t WHERE t.cat_id = {0}{PHOTO_FILTER_T} AND t.DATE_TIME = p.DATE_TIME AND t.pic_id > p.pic_id)
                     ) AS IndexBefore,
                     (
                         SELECT pic_id
@@ -332,18 +345,18 @@ public sealed class PhotoSqlQueries
                             SELECT pic_id, DATE_TIME
                             FROM (
                                 SELECT pic_id, DATE_TIME
-                                FROM PhotoItems
-                                WHERE cat_id = {0} AND DATE_TIME = p.DATE_TIME AND pic_id > p.pic_id
-                                ORDER BY pic_id ASC
+                                FROM PhotoItems t
+                                WHERE t.cat_id = {0}{PHOTO_FILTER_T} AND t.DATE_TIME = p.DATE_TIME AND t.pic_id > p.pic_id
+                                ORDER BY t.pic_id ASC
                                 LIMIT 1
                             ) same_ts
                             UNION ALL
                             SELECT pic_id, DATE_TIME
                             FROM (
                                 SELECT pic_id, DATE_TIME
-                                FROM PhotoItems
-                                WHERE cat_id = {0} AND DATE_TIME > p.DATE_TIME
-                                ORDER BY DATE_TIME ASC, pic_id ASC
+                                FROM PhotoItems t
+                                WHERE t.cat_id = {0}{PHOTO_FILTER_T} AND t.DATE_TIME > p.DATE_TIME
+                                ORDER BY t.DATE_TIME ASC, t.pic_id ASC
                                 LIMIT 1
                             ) newer
                         ) neighbors
@@ -356,18 +369,18 @@ public sealed class PhotoSqlQueries
                             SELECT pic_id, DATE_TIME
                             FROM (
                                 SELECT pic_id, DATE_TIME
-                                FROM PhotoItems
-                                WHERE cat_id = {0} AND DATE_TIME = p.DATE_TIME AND pic_id < p.pic_id
-                                ORDER BY pic_id DESC
+                                FROM PhotoItems t
+                                WHERE t.cat_id = {0}{PHOTO_FILTER_T} AND t.DATE_TIME = p.DATE_TIME AND t.pic_id < p.pic_id
+                                ORDER BY t.pic_id DESC
                                 LIMIT 1
                             ) same_ts
                             UNION ALL
                             SELECT pic_id, DATE_TIME
                             FROM (
                                 SELECT pic_id, DATE_TIME
-                                FROM PhotoItems
-                                WHERE cat_id = {0} AND DATE_TIME < p.DATE_TIME
-                                ORDER BY DATE_TIME DESC, pic_id DESC
+                                FROM PhotoItems t
+                                WHERE t.cat_id = {0}{PHOTO_FILTER_T} AND t.DATE_TIME < p.DATE_TIME
+                                ORDER BY t.DATE_TIME DESC, t.pic_id DESC
                                 LIMIT 1
                             ) older
                         ) neighbors
@@ -375,7 +388,7 @@ public sealed class PhotoSqlQueries
                         LIMIT 1
                     ) AS NextPicId
                 FROM PhotoItems p
-                WHERE p.cat_id = {0} AND p.pic_id = {1}
+                WHERE p.cat_id = {0} AND p.pic_id = {1}{PHOTO_FILTER_P}
                 """,
             PreviousPicIdSql = """
                 SELECT pic_id AS Value
@@ -444,9 +457,10 @@ public sealed class PhotoSqlQueries
                 """,
             CategoryAllSql = """
                 SELECT NAME, DATE_TIME, URL, THUMB_URL, T_HEIGHT, T_WIDTH, PIC_WIDTH, PIC_HEIGHT, pic_id, category_name
-                FROM PhotoItems
-                WHERE cat_id = {0}
+                FROM PhotoItems p
+                WHERE p.cat_id = {0}{PHOTO_FILTER_P}
                 ORDER BY DATE_TIME DESC, pic_id DESC
                 """,
         };
 }
+

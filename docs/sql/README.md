@@ -33,3 +33,17 @@ dotnet run --project src/QueenZone.Tools -- photo-dim-inventory --connection-str
 ```
 
 Post results as a comment on GitHub issue #435 for filter authors (#437).
+
+### Backfill zero original dimensions (#438)
+
+Dry-run first (default). Prefer blob storage connection when applying:
+
+```powershell
+$env:BWS_ACCESS_TOKEN = [Environment]::GetEnvironmentVariable("BWS_ACCESS_TOKEN", "User")
+# load ConnectionStrings__QueenZoneLegacy (+ optional ConnectionStrings__BlobStorage) from bws — never print values
+dotnet run --project src/QueenZone.Tools -- backfill-photo-dimensions --limit 20
+dotnet run --project src/QueenZone.Tools -- backfill-photo-dimensions --limit 20 --apply
+dotnet run --project src/QueenZone.Tools -- photo-dim-inventory
+```
+
+See `docs/agent-bitwarden-secrets.md` for secret loading. Default targets `DISPLAY = 1` rows with width or height zero.

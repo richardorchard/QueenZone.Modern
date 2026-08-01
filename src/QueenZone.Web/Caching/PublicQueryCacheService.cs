@@ -112,13 +112,15 @@ public sealed class PublicQueryCacheService(
         int catId,
         int page,
         int pageSize,
+        PhotoListFilter? filter = null,
         CancellationToken cancellationToken = default)
     {
+        var activeFilter = filter ?? PhotoListFilter.None;
         var version = GetPhotoCacheVersion();
         return GetOrCreateAsync(
-            PublicQueryCacheKeys.PhotoCategoryPage(version, catId, page, pageSize),
+            PublicQueryCacheKeys.PhotoCategoryPage(version, catId, page, pageSize, activeFilter.QueryValue),
             options.Value.PhotoCacheDuration,
-            () => photoRepository.GetCategoryPageAsync(catId, page, pageSize, cancellationToken),
+            () => photoRepository.GetCategoryPageAsync(catId, page, pageSize, activeFilter, cancellationToken),
             cancellationToken);
     }
 

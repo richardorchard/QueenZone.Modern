@@ -20,7 +20,12 @@ public abstract class PhotoCategoryPageModel(PublicQueryCacheService publicQuery
 
     public int RangeEnd { get; private set; }
 
+    public PhotoListFilter SizeFilter { get; private set; } = PhotoListFilter.None;
+
     public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
+    [BindProperty(SupportsGet = true, Name = PhotoRoutes.SizeQueryParameter)]
+    public string? Size { get; set; }
 
     protected async Task<IActionResult> LoadCategoryPageAsync(string slug, int page, CancellationToken cancellationToken)
     {
@@ -28,6 +33,8 @@ public abstract class PhotoCategoryPageModel(PublicQueryCacheService publicQuery
         {
             return NotFound();
         }
+
+        SizeFilter = PhotoListFilter.Parse(Size);
 
         var category = await publicQueryCache.GetPhotoCategoryBySlugAsync(slug, cancellationToken);
         if (category is null)
@@ -39,6 +46,7 @@ public abstract class PhotoCategoryPageModel(PublicQueryCacheService publicQuery
             category.CatId,
             page,
             PhotoRoutes.CategoryPageSize,
+            SizeFilter,
             cancellationToken);
         var totalPages = PhotoRoutes.GetCategoryTotalPages(result.TotalCount);
 
@@ -58,22 +66,27 @@ public abstract class PhotoCategoryPageModel(PublicQueryCacheService publicQuery
         [
             BreadcrumbItem.Home,
             new BreadcrumbItem("Photography", PhotoRoutes.GetCategoriesPath()),
-            new BreadcrumbItem(category.Name, PhotoRoutes.GetCategoryPath(category.Slug)),
+            new BreadcrumbItem(category.Name, PhotoRoutes.GetCategoryPath(category.Slug, SizeFilter)),
         ];
 
         ViewData["Title"] = page <= 1
-            ? $"{category.Name} | Photography | QueenZone"
+            ? SizeFilter.IsActive
+                ? $"{category.Name} – {SizeFilter.Label} | Photography | QueenZone"
+                : $"{category.Name} | Photography | QueenZone"
             : $"{category.Name} | Photography – Page {page} | QueenZone";
         if (page <= 1)
         {
-            ViewData["Description"] = $"Queen {category.Name} photographs from the Queenzone.com archive.";
+            ViewData["Description"] = SizeFilter.IsActive
+                ? $"{SizeFilter.Label} photos in the Queen {category.Name} archive on QueenZone."
+                : $"Queen {category.Name} photographs from the Queenzone.com archive.";
             if (category.CoverThumbnailUrl is string cover)
             {
                 ViewData["OgImage"] = cover;
             }
         }
 
-        ViewData["CanonicalPath"] = PhotoRoutes.GetCategoryPagePath(category.Slug, page);
+        ViewData["CanonicalPath"] = PhotoRoutes.GetCategoryPagePath(category.Slug, page, SizeFilter);
+        ViewData["PhotoListFilter"] = SizeFilter;
 
         return Page();
     }
