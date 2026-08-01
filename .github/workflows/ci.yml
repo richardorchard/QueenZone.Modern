@@ -84,15 +84,19 @@ jobs:
       - name: Verify formatting
         run: dotnet format QueenZone.sln --verify-no-changes --no-restore
 
-      # Sharded test jobs download these binaries and run `dotnet test --no-build`
+      # Sharded test jobs download these outputs and run `dotnet test --no-build`
       # so we do not pay a second full compile on each matrix leg.
+      # Include obj/Release: WebApplicationFactory hosts need build intermediates
+      # such as src/QueenZone.Web/obj/.../compressed/ for static web assets.
       - name: Upload build binaries
         uses: actions/upload-artifact@v5
         with:
           name: build-binaries-${{ github.run_id }}
           path: |
             src/**/bin/Release/
+            src/**/obj/Release/
             tests/**/bin/Release/
+            tests/**/obj/Release/
           retention-days: 1
           if-no-files-found: error
 
