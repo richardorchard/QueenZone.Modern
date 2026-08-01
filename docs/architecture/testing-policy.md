@@ -188,6 +188,8 @@ CI also collects coverage from the deterministic test suite (merged across Web.T
 | `scripts/Invoke-WebTestsShard.ps1` | Runs one shard (optional small projects + filtered Web.Tests) |
 | `.github/workflows/ci.yml` jobs `test` + `coverage` | Matrix `shard: [0, 1]`, then merge Cobertura and run the coverage gate |
 
+The `build` job uploads both `bin/Release` and `obj/Release`. Shards must keep `obj` — ASP.NET Core’s `WebApplicationFactory` resolves compressed static web assets under `src/QueenZone.Web/obj/.../compressed/`. Uploading only `bin` causes `DirectoryNotFoundException` in Development-environment host tests (for example `StaticAssetCacheHeadersTests`).
+
 **Do not** split CI as “all unit tests in job A / all WAF integration tests in job B”. That was measured in [#442](https://github.com/richardorchard/QueenZone.Modern/issues/442) and **regressed** wall-clock: isolating every `WebApplicationFactory` host onto one runner increases contention, and that job became slower than the old single-suite run. Mixed shards are required.
 
 **Local development:** keep using `dotnet test QueenZone.sln` (full suite, no filter). Sharding is a CI wall-clock optimization, not a new project layout. To inspect or time shards locally:
