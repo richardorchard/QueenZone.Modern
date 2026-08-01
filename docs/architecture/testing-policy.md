@@ -163,7 +163,7 @@ powershell -File .\scripts\Measure-FrontendPerformance.ps1 -StartLocalApp -FormF
 
 ## Continuous Integration
 
-Every pull request must run:
+Every pull request must run (local equivalent of the CI gate):
 
 ```powershell
 dotnet restore QueenZone.sln
@@ -172,19 +172,46 @@ dotnet format QueenZone.sln --verify-no-changes
 dotnet test QueenZone.sln --configuration Release --no-build
 ```
 
-CI enforces formatting against the root `.editorconfig` via `dotnet format … --verify-no-changes` in the `build` job (after build, before tests). If that step fails, run `dotnet format QueenZone.sln` locally and commit the result.
+CI enforces formatting against the root `.editorconfig` via `dotnet format … --verify-no-changes` in the `build` job. If that step fails, run `dotnet format QueenZone.sln` locally and commit the result.
 
 Line endings: `.editorconfig` requires CRLF. Root `.gitattributes` sets `* text=auto eol=crlf` so Linux CI and Windows agents share the same working-tree endings. Without that, Linux checkouts stay LF and fail `ENDOFLINE` while Windows with `core.autocrlf=true` stays green.
 
-CI also collects coverage from the deterministic test suite and publishes an HTML/Cobertura report artifact. The coverage report is expected to help reviewers spot untested risk.
+CI also collects coverage from the deterministic test suite (merged across Web.Tests shards) and publishes an HTML/Cobertura report artifact. The coverage report is expected to help reviewers spot untested risk.
+
+### CI test sharding (Web.Tests)
+
+`QueenZone.Web.Tests` dominates suite wall-clock (~85%). CI runs it as **mixed shards** in parallel so each GitHub-hosted runner keeps a blend of light unit tests and heavier `WebApplicationFactory` tests.
+
+| Piece | Role |
+| --- | --- |
+| `scripts/Get-WebTestShardFilter.ps1` | Discovers `*Tests` classes, assigns them with greedy weight balance (WAF weight 5, others 1), emits an xUnit `--filter` |
+| `scripts/Invoke-WebTestsShard.ps1` | Runs one shard (optional small projects + filtered Web.Tests) |
+| `.github/workflows/ci.yml` jobs `test` + `coverage` | Matrix `shard: [0, 1]`, then merge Cobertura and run the coverage gate |
+
+The `build` job uploads both `bin/Release` and `obj/Release`. Shards must keep `obj` — ASP.NET Core’s `WebApplicationFactory` resolves compressed static web assets under `src/QueenZone.Web/obj/.../compressed/`. Uploading only `bin` causes `DirectoryNotFoundException` in Development-environment host tests (for example `StaticAssetCacheHeadersTests`).
+
+**Do not** split CI as “all unit tests in job A / all WAF integration tests in job B”. That was measured in [#442](https://github.com/richardorchard/QueenZone.Modern/issues/442) and **regressed** wall-clock: isolating every `WebApplicationFactory` host onto one runner increases contention, and that job became slower than the old single-suite run. Mixed shards are required.
+
+**Local development:** keep using `dotnet test QueenZone.sln` (full suite, no filter). Sharding is a CI wall-clock optimization, not a new project layout. To inspect or time shards locally:
+
+```powershell
+powershell -File ./scripts/Get-WebTestShardFilter.ps1 -ShardCount 2 -List
+dotnet build QueenZone.sln --configuration Release
+powershell -File ./scripts/Invoke-WebTestsShard.ps1 -ShardIndex 0 -ShardCount 2 -IncludeSmallProjects -NoBuild -NoRestore
+powershell -File ./scripts/Invoke-WebTestsShard.ps1 -ShardIndex 1 -ShardCount 2 -NoBuild -NoRestore
+```
+
+When adding Web.Tests classes: no shard manifest to update — discovery is automatic. Prefer `QueenZoneWebApplicationFactory` for HTTP tests; keep true unit tests free of `WebApplicationFactory` so they stay cheap filler in every shard.
+
+If CI wall-clock grows again, prefer (in order): thin theory-heavy smoke HTTP tests; raise `ShardCount` / matrix size with the same mixed algorithm; paid larger runners. Avoid unit-vs-WAF project splits and raising xUnit `maxParallelThreads` (more threads worsened contention in #442).
 
 ### Coverage gates (enforced on every pull request)
 
-Implemented in `scripts/Test-CoverageGate.ps1` and invoked from `.github/workflows/ci.yml` after tests complete.
+Implemented in `scripts/Test-CoverageGate.ps1` and invoked from the `coverage` job in `.github/workflows/ci.yml` after all `test` matrix shards finish. The gate unions every `coverage.cobertura.xml` under the downloaded results (see the script’s union logic).
 
 | Gate | Threshold | What it measures |
 | --- | --- | --- |
-| **Global line coverage** | **≥ 51%** | Line coverage across the full Cobertura report from `QueenZone.Web.Tests` |
+| **Global line coverage** | **≥ 51%** | Line coverage across the union of Cobertura reports from all shards / test projects |
 | **Changed-line coverage** | **≥ 70%** | Coverable `.cs` lines added or modified in the PR diff against the base branch (`main`) |
 
 Rules:
@@ -200,12 +227,14 @@ These gates are guardrails, not a replacement for useful assertions. New or chan
 
 | Job | Purpose | Blocks merge? |
 | --- | --- | --- |
-| `build` | Restore, build, format verify, test, coverage gates | Yes |
+| `build` | Restore, build, format verify, upload binaries + Linux publish artifact | Yes |
+| `test` | Mixed Web.Tests shards (+ small test projects on shard 0) with Coverlet | Yes |
+| `coverage` | Merge shard Cobertura reports, HTML summary, coverage gates | Yes |
 | `ef-migrations` | When migration-related paths change: snapshot check + `database update` on Azure SQL | Yes (same-repo PRs only; skipped otherwise) |
-| `smoke-test` | Publish app, curl `/health`, `/`, `/news` | Yes |
-| `e2e-test` | Playwright suite on self-hosted Windows runner | No (`continue-on-error` if runner offline) |
+| `smoke-test` | Published app, curl `/health`, `/`, `/news` (after `coverage`) | Yes |
+| `e2e-test` | Playwright suite on self-hosted Windows runner (after `coverage`; gates deploy) | Yes when the runner is online |
 
-Merges to `main` also trigger `.github/workflows/deploy-app-service.yml`, which re-runs tests, applies EF Core migrations, and deploys to the dev App Service. That is separate from pull request checks. The PR `ef-migrations` job uses the same migration connection string so SQL Server failures are caught before merge.
+On `main`, the same workflow continues into `migrate` / `deploy` / `verify` after build + smoke + e2e. The PR `ef-migrations` job uses the same migration connection string so SQL Server failures are caught before merge.
 
 ### EF migration consistency
 

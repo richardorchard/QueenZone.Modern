@@ -37,6 +37,7 @@ Also fill in the **Agent** line when opening the pull request (see `.github/pull
 
 | Category | Must remember |
 | -------- | ------------- |
+| **CI / Web.Tests speed** | CI uses **mixed** Web.Tests shards (`scripts/Get-WebTestShardFilter.ps1`). Never split unit-vs-WAF jobs for wall-clock — that regresses (#442). Local default stays `dotnet test QueenZone.sln`. |
 | **Routes / canonical URLs** | `/news` is canonical page 1; use `/news/page/{n}` for later pages; wrong slugs redirect to canonical detail URLs; do not preserve legacy Web Forms URL shapes by default |
 | **Legacy SQL / data** | Keep SQL in `QueenZone.Data`; treat `DISPLAY = 1` as the public visibility gate; deduplicate by stable article ID before paging; legacy DB tests are opt-in |
 | **SQL MCP** | Local agents can expose a narrow read-only DAB MCP server for legacy DB inspection; see `docs/sql/data-api-builder-mcp.md`; do not expose private/user/mail/IP/moderation data |
