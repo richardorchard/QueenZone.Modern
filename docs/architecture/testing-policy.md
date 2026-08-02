@@ -279,6 +279,8 @@ These gates are guardrails, not a replacement for useful assertions. New or chan
 | `smoke-test` | Published app, curl `/health`, `/`, `/news` (after `coverage`) | Yes |
 | `e2e-test` | Playwright suite on self-hosted Windows runner (after `coverage`; gates deploy) | Yes when the runner is online |
 
+Docs-only pull requests (only `docs/` or root `*.md` changes) skip `build` / `test` / coverage / smoke / e2e. Skipped non-matrix jobs still report under their required check names, which GitHub treats as satisfied. The `test` matrix is different: skipping it entirely would report a single `test` check and never create the required `test (0)` / `test (1)` checks, leaving the PR blocked forever. `ci.yml` therefore runs a lightweight `test-docs-ok` matrix on docs-only PRs that emits success for those exact names without running the suite.
+
 On `main`, the same workflow continues into `migrate` / `deploy` / `verify` after build + smoke + e2e. The PR `ef-migrations` job uses the same migration connection string so SQL Server failures are caught before merge.
 
 ### EF migration consistency
