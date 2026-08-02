@@ -1,0 +1,240 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  # Never cancel an in-flight run here — cancelling mid-migrate/deploy can
+  # leave the DB or App Service half-updated.
+  cancel-in-progress: false
+
+# Runs after a PR merges to main. ci.yml already ran the full test/coverage/
+# e2e suite against this exact tree as a required status check before the
+# merge was allowed (see branch protection on main), so none of that re-runs
+# here — this workflow only rebuilds (artifacts don't survive across
+# workflow runs) and ships. post-deploy-smoke is the safety net after the
+# real deploy.
+jobs:
+  # Builds and publishes the Linux app for this push ("build once, deploy many"
+  # within this run). This is a second build of the same tree ci.yml already
+  # built on the PR — that duplication is intentional: GitHub Actions
+  # artifacts don't carry across separate workflow runs, so getting a
+  # deployable binary here requires building it again. It's a fast rebuild
+  # (no tests), which is the point of not re-running the full suite too.
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+          cache: true
+          cache-dependency-path: |
+            **/*.csproj
+            .config/dotnet-tools.json
+
+      - name: Restore
+        run: dotnet restore QueenZone.sln
+
+      - name: Build
+        run: dotnet build QueenZone.sln --configuration Release --no-restore
+
+      - name: Publish web app
+        run: dotnet publish src/QueenZone.Web/QueenZone.Web.csproj --configuration Release --no-build --output publish
+
+      - name: Upload publish artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: web-publish-${{ github.run_id }}
+          path: publish
+          retention-days: 7
+
+  migrate:
+    name: Apply database migrations
+    runs-on: ubuntu-latest
+    needs: build
+    # main only — pushes to master build above but do not deploy.
+    if: github.ref == 'refs/heads/main'
+    environment: dev
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+          cache: true
+          cache-dependency-path: |
+            **/*.csproj
+            .config/dotnet-tools.json
+
+      - name: Restore
+        run: |
+          dotnet tool restore
+          dotnet restore QueenZone.sln
+
+      - name: Fetch Bitwarden deploy secrets
+        id: bitwarden-secrets
+        uses: bitwarden/sm-action@v3.0.1
+        with:
+          access_token: ${{ secrets.BITWARDEN_SECRETS_MANAGER_ACCESS_TOKEN }}
+          secrets: ${{ vars.BITWARDEN_APP_SERVICE_DEPLOY_SECRETS }}
+
+      - name: Apply database migrations
+        env:
+          ConnectionStrings__QueenZoneLegacy: ${{ steps.bitwarden-secrets.outputs.QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING }}
+        run: |
+          if [ -z "$ConnectionStrings__QueenZoneLegacy" ]; then
+            echo "::error::QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING is not configured. Check the Bitwarden secret and BITWARDEN_APP_SERVICE_DEPLOY_SECRETS mapping before deploying."
+            exit 1
+          fi
+
+          dotnet ef database update \
+            --project src/QueenZone.Data/QueenZone.Data.csproj \
+            --startup-project src/QueenZone.Web/QueenZone.Web.csproj
+
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: [build, migrate]
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: dev
+      url: https://www.queenzone.org
+
+    steps:
+      - name: Download publish artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: web-publish-${{ github.run_id }}
+          path: publish
+
+      - name: Fetch Bitwarden deploy secrets
+        id: bitwarden-secrets
+        uses: bitwarden/sm-action@v3.0.1
+        with:
+          access_token: ${{ secrets.BITWARDEN_SECRETS_MANAGER_ACCESS_TOKEN }}
+          secrets: ${{ vars.BITWARDEN_APP_SERVICE_DEPLOY_SECRETS }}
+
+      - name: Deploy
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: queenzone-dev
+          publish-profile: ${{ steps.bitwarden-secrets.outputs.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: publish
+
+  post-deploy-smoke:
+    name: Post-deploy smoke
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: github.ref == 'refs/heads/main'
+    # Allow retry loop (~8 min) plus request time; avoid false fails during App Service recycle.
+    timeout-minutes: 12
+
+    steps:
+      # Smoke the public custom domain (Site:PublicBaseUrl), not only the App Service hostname.
+      # /health alone is liveness only — content pages can still 500 during recycle/warmup.
+      # Retry the full suite until every path returns 200 (or timeout). A failed smoke fails
+      # this job so GitHub Actions can email watchers.
+      - name: Post-deploy smoke (custom domain)
+        run: |
+          BASE_URL="https://www.queenzone.org"
+          WARMUP_PATH="/warmup"
+          PATHS=(
+            "/health"
+            "/"
+            "/news"
+            "/forum"
+            # Representative modern-forum category/topic pages (guards accidental LegacyForumRepository fallback).
+            "/forum/1/queen-serious-discussion"
+            "/forum/topic/455095/forum-guidelines"
+            "/articles"
+            "/biography"
+            "/photography"
+            "/search"
+          )
+          MAX_ATTEMPTS=32
+          SLEEP_SECONDS=15
+
+          echo "Waiting for warmup on ${BASE_URL}${WARMUP_PATH} after deploy (up to ~$(( MAX_ATTEMPTS * SLEEP_SECONDS / 60 )) minutes)."
+          echo "/health is not sufficient readiness — App Service can answer liveness while pages still 500."
+
+          check_path() {
+            local path="$1"
+            local url="${BASE_URL}${path}"
+            local status body_file
+            body_file="$(mktemp)"
+            # Prefer any HTTP code curl wrote; only use 000 when stdout is empty (avoids "500000").
+            status=$(curl -s -o "$body_file" -w "%{http_code}" --max-time 30 -L "$url") || status="${status:-000}"
+            if [ "$status" != "200" ]; then
+              echo "  ✗ $path → HTTP $status"
+              rm -f "$body_file"
+              return 1
+            fi
+            if [ "$path" = "/health" ]; then
+              if ! grep -q '"status":"ok"' "$body_file"; then
+                echo "  ✗ $path → 200 but body missing \"status\":\"ok\""
+                rm -f "$body_file"
+                return 1
+              fi
+            fi
+            echo "  ✓ $path → HTTP $status"
+            rm -f "$body_file"
+            return 0
+          }
+
+          for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
+            echo "Warmup attempt ${attempt}/${MAX_ATTEMPTS}..."
+            if check_path "$WARMUP_PATH"; then
+              echo "Warmup passed on attempt ${attempt}."
+              break
+            fi
+
+            if [ "$attempt" -eq "$MAX_ATTEMPTS" ]; then
+              echo "::error::Warmup failed against ${BASE_URL}${WARMUP_PATH} after ${MAX_ATTEMPTS} attempts. Check App Service logs."
+              exit 1
+            fi
+
+            echo "Warmup not ready yet. Retrying in ${SLEEP_SECONDS}s..."
+            sleep "$SLEEP_SECONDS"
+          done
+
+          echo "Polling content routes on $BASE_URL after warmup."
+          for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
+            echo "Attempt ${attempt}/${MAX_ATTEMPTS}..."
+            failed=0
+            for path in "${PATHS[@]}"; do
+              if ! check_path "$path"; then
+                failed=1
+              fi
+            done
+
+            if [ "$failed" -eq 0 ]; then
+              echo "All post-deploy smoke checks passed on attempt ${attempt}."
+              exit 0
+            fi
+
+            if [ "$attempt" -lt "$MAX_ATTEMPTS" ]; then
+              echo "Site not ready (App Service recycle/warmup). Retrying in ${SLEEP_SECONDS}s..."
+              sleep "$SLEEP_SECONDS"
+            fi
+          done
+
+          echo "::error::Post-deploy smoke failed against $BASE_URL after ${MAX_ATTEMPTS} attempts. Check App Service logs."
+          exit 1
