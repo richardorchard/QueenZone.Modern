@@ -87,6 +87,34 @@ public sealed class PrivateMessageRoutesTests : IClassFixture<WebApplicationFact
     }
 
     [Fact]
+    public async Task Get_Conversation_PaginatesMessages_AndDefaultsToLatestPage()
+    {
+        var (_, alice) = await CreateMemberAsync("pm-page-alice@example.com", "Page Alice");
+        var (bobClient, bob) = await CreateMemberAsync("pm-page-bob@example.com", "Page Bob");
+        var service = factory.Services.GetRequiredService<PrivateMessageService>();
+
+        const int totalMessages = PrivateMessageLimits.ConversationPageSize + 1;
+        var created = await service.ComposeAsync(alice.Id, bob.Id, "Msg 1");
+        var conversationId = created.ConversationId!.Value;
+        for (var i = 2; i <= totalMessages; i++)
+        {
+            Assert.True((await service.ReplyAsync(conversationId, alice.Id, $"Msg {i}")).Succeeded);
+        }
+
+        var defaultHtml = await bobClient.GetStringAsync($"/messages/{conversationId}");
+        Assert.Contains($"Msg {totalMessages}", defaultHtml);
+        Assert.DoesNotContain(">Msg 1<", defaultHtml);
+        Assert.Contains("Conversation message pagination", defaultHtml);
+        Assert.Contains($"/messages/{conversationId}?pageNumber=1", defaultHtml);
+        Assert.Contains("Page 2 of 2", defaultHtml);
+
+        var pageOneHtml = await bobClient.GetStringAsync($"/messages/{conversationId}?pageNumber=1");
+        Assert.Contains(">Msg 1<", pageOneHtml);
+        Assert.DoesNotContain($">Msg {totalMessages}<", pageOneHtml);
+        Assert.Contains("Page 1 of 2", pageOneHtml);
+    }
+
+    [Fact]
     public async Task Get_Conversation_ReturnsNotFound_ForNonParticipant()
     {
         var (aliceClient, alice) = await CreateMemberAsync("pm-owner@example.com", "Owner");

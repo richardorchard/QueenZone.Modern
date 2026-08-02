@@ -60,8 +60,12 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
     public Task<PrivateConversationDetail?> GetConversationAsync(
         Guid conversationId,
         Guid memberId,
+        int? page = null,
+        int pageSize = PrivateMessageLimits.ConversationPageSize,
         CancellationToken cancellationToken = default)
     {
+        pageSize = Math.Clamp(pageSize, 1, PrivateMessageLimits.MaxConversationPageSize);
+
         lock (sync)
         {
             var participant = participants.SingleOrDefault(
@@ -77,9 +81,21 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
                 : conversation.MemberLowId;
             var otherName = resolveMember?.Invoke(otherId)?.DisplayName ?? "Unknown member";
 
-            IReadOnlyList<PrivateMessageItem> items = messages
+            var ordered = messages
                 .Where(m => m.ConversationId == conversationId)
                 .OrderBy(m => m.SortKey)
+                .ToList();
+            var totalCount = ordered.Count;
+            var totalPages = totalCount <= 0
+                ? 1
+                : (totalCount + pageSize - 1) / pageSize;
+            var effectivePage = page is null or < 1
+                ? totalPages
+                : Math.Min(page.Value, totalPages);
+
+            IReadOnlyList<PrivateMessageItem> items = ordered
+                .Skip((effectivePage - 1) * pageSize)
+                .Take(pageSize)
                 .Select(m => new PrivateMessageItem(
                     m.Id,
                     m.SenderMemberId,
@@ -91,7 +107,14 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
                 .ToList();
 
             return Task.FromResult<PrivateConversationDetail?>(
-                new PrivateConversationDetail(conversationId, otherId, otherName, items));
+                new PrivateConversationDetail(
+                    conversationId,
+                    otherId,
+                    otherName,
+                    items,
+                    totalCount,
+                    effectivePage,
+                    pageSize));
         }
     }
 

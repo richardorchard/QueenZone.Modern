@@ -12,9 +12,16 @@ public interface IPrivateMessageRepository
         Guid memberId,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Loads one page of messages for a conversation the member participates in.
+    /// When <paramref name="page"/> is null or less than 1, returns the latest page
+    /// (newest messages). Messages within the page are ordered oldest-first by SortKey.
+    /// </summary>
     Task<PrivateConversationDetail?> GetConversationAsync(
         Guid conversationId,
         Guid memberId,
+        int? page = null,
+        int pageSize = PrivateMessageLimits.ConversationPageSize,
         CancellationToken cancellationToken = default);
 
     Task<bool> IsParticipantAsync(

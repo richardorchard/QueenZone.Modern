@@ -7,6 +7,10 @@ public static class PrivateMessageLimits
     public const int PreviewLength = 160;
 
     public const int MaxRecipientSearchResults = 20;
+
+    public const int ConversationPageSize = 50;
+
+    public const int MaxConversationPageSize = 100;
 }
 
 public sealed record PrivateConversationListItem(
@@ -31,7 +35,16 @@ public sealed record PrivateConversationDetail(
     Guid ConversationId,
     Guid OtherParticipantId,
     string OtherParticipantDisplayName,
-    IReadOnlyList<PrivateMessageItem> Messages);
+    IReadOnlyList<PrivateMessageItem> Messages,
+    int TotalCount,
+    int Page,
+    int PageSize)
+{
+    public int TotalPages =>
+        TotalCount <= 0
+            ? 1
+            : (TotalCount + PageSize - 1) / PageSize;
+}
 
 public sealed record PrivateMessageSendResult(
     bool Succeeded,

@@ -21,19 +21,25 @@ public sealed class PrivateMessageService(
         Guid conversationId,
         Guid memberId,
         bool markRead = true,
+        int? page = null,
+        int pageSize = PrivateMessageLimits.ConversationPageSize,
         CancellationToken cancellationToken = default)
     {
         var detail = await privateMessageRepository.GetConversationAsync(
             conversationId,
             memberId,
+            page,
+            pageSize,
             cancellationToken);
         if (detail is null)
         {
             return null;
         }
 
-        // Advance using the commit-ordered SortKey of the last message actually returned.
+        // Advance using the commit-ordered SortKey of the last message actually returned on this page.
         // CreatedAt alone is not unique/commit-ordered and can hide delayed or equal-timestamp messages.
+        // Opening the default (latest) page marks through the newest message; older pages only advance
+        // as far as that page's last message (and cannot move the cursor backwards).
         if (markRead && detail.Messages.Count > 0)
         {
             var lastReturned = detail.Messages[^1];

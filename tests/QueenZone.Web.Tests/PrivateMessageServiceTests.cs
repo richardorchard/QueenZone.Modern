@@ -81,6 +81,48 @@ public sealed class PrivateMessageServiceTests
     }
 
     [Fact]
+    public async Task GetConversation_PagesMessages_AndMarkReadUsesReturnedPage()
+    {
+        var (service, _, messages, alice, bob) = CreateSystem();
+        var created = await service.ComposeAsync(alice.Id, bob.Id, "Msg 1");
+        var conversationId = created.ConversationId!.Value;
+        for (var i = 2; i <= 5; i++)
+        {
+            Assert.True((await service.ReplyAsync(conversationId, alice.Id, $"Msg {i}")).Succeeded);
+        }
+
+        var latest = await service.GetConversationAsync(
+            conversationId,
+            bob.Id,
+            markRead: false,
+            page: null,
+            pageSize: 2);
+        Assert.Equal(3, latest!.Page);
+        Assert.Equal(["Msg 5"], latest.Messages.Select(m => m.Body).ToArray());
+
+        // Opening an older page only advances the read cursor as far as that page.
+        await service.GetConversationAsync(
+            conversationId,
+            bob.Id,
+            markRead: true,
+            page: 1,
+            pageSize: 2);
+        var afterOlder = Assert.Single(await service.GetInboxAsync(bob.Id));
+        Assert.True(afterOlder.HasUnread);
+        Assert.Equal(3, afterOlder.UnreadCount);
+
+        // Latest page marks through the newest returned message.
+        await service.GetConversationAsync(
+            conversationId,
+            bob.Id,
+            markRead: true,
+            page: null,
+            pageSize: 2);
+        Assert.Equal(0, await service.CountUnreadConversationsAsync(bob.Id));
+        Assert.Equal(5, (await messages.GetConversationAsync(conversationId, bob.Id))!.TotalCount);
+    }
+
+    [Fact]
     public async Task Reply_RejectsNonParticipant()
     {
         var (service, members, _, alice, bob) = CreateSystem();

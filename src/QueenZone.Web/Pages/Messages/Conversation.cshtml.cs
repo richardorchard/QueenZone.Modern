@@ -13,7 +13,15 @@ public sealed class ConversationModel(PrivateMessageService privateMessageServic
     [BindProperty(SupportsGet = true)]
     public Guid ConversationId { get; set; }
 
+    /// <summary>
+    /// Optional 1-based page. When omitted, the latest page (newest messages) is shown.
+    /// </summary>
+    [BindProperty(SupportsGet = true)]
+    public int? PageNumber { get; set; }
+
     public PrivateConversationDetail? Detail { get; private set; }
+
+    public ArchivePaginationViewModel? Pagination { get; private set; }
 
     [BindProperty]
     public ReplyInput Input { get; set; } = new();
@@ -30,12 +38,15 @@ public sealed class ConversationModel(PrivateMessageService privateMessageServic
             ConversationId,
             memberId.Value,
             markRead: true,
-            cancellationToken);
+            page: PageNumber,
+            cancellationToken: cancellationToken);
         if (Detail is null)
         {
             return NotFound();
         }
 
+        PageNumber = Detail.Page;
+        Pagination = BuildPagination(Detail);
         ViewData["Title"] = $"Message {Detail.OtherParticipantDisplayName}";
         return Page();
     }
@@ -54,12 +65,15 @@ public sealed class ConversationModel(PrivateMessageService privateMessageServic
                 ConversationId,
                 memberId.Value,
                 markRead: false,
-                cancellationToken);
+                page: PageNumber,
+                cancellationToken: cancellationToken);
             if (Detail is null)
             {
                 return NotFound();
             }
 
+            PageNumber = Detail.Page;
+            Pagination = BuildPagination(Detail);
             ViewData["Title"] = $"Message {Detail.OtherParticipantDisplayName}";
             return Page();
         }
@@ -85,18 +99,31 @@ public sealed class ConversationModel(PrivateMessageService privateMessageServic
                 ConversationId,
                 memberId.Value,
                 markRead: false,
-                cancellationToken);
+                page: PageNumber,
+                cancellationToken: cancellationToken);
             if (Detail is null)
             {
                 return NotFound();
             }
 
+            PageNumber = Detail.Page;
+            Pagination = BuildPagination(Detail);
             ViewData["Title"] = $"Message {Detail.OtherParticipantDisplayName}";
             return Page();
         }
 
+        // Redirect to the latest page so the new reply is visible.
         return RedirectToPage("./Conversation", new { conversationId = ConversationId });
     }
+
+    private ArchivePaginationViewModel? BuildPagination(PrivateConversationDetail detail) =>
+        ArchivePagination.BuildViewModel(
+            "Conversation message pagination",
+            detail.Page,
+            detail.TotalPages,
+            page => page >= detail.TotalPages
+                ? $"/messages/{ConversationId}"
+                : $"/messages/{ConversationId}?pageNumber={page}");
 
     private async Task<Guid?> GetCurrentMemberIdAsync()
     {

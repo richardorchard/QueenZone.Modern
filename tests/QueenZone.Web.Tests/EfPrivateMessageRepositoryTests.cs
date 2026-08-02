@@ -228,6 +228,41 @@ public sealed class EfPrivateMessageRepositoryTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task GetConversation_PagesMessages_DefaultingToLatestPage()
+    {
+        var created = await repository.SendNewOrExistingAsync(
+            aliceId,
+            bobId,
+            "Msg 1",
+            DateTimeOffset.Parse("2026-08-02T16:00:00Z"));
+        var conversationId = created.ConversationId!.Value;
+        for (var i = 2; i <= 5; i++)
+        {
+            await repository.ReplyAsync(
+                conversationId,
+                aliceId,
+                $"Msg {i}",
+                DateTimeOffset.Parse("2026-08-02T16:00:00Z").AddMinutes(i));
+        }
+
+        var latest = await repository.GetConversationAsync(conversationId, bobId, page: null, pageSize: 2);
+        Assert.NotNull(latest);
+        Assert.Equal(5, latest.TotalCount);
+        Assert.Equal(3, latest.Page);
+        Assert.Equal(3, latest.TotalPages);
+        Assert.Equal(["Msg 5"], latest.Messages.Select(m => m.Body).ToArray());
+
+        var first = await repository.GetConversationAsync(conversationId, bobId, page: 1, pageSize: 2);
+        Assert.NotNull(first);
+        Assert.Equal(1, first.Page);
+        Assert.Equal(["Msg 1", "Msg 2"], first.Messages.Select(m => m.Body).ToArray());
+
+        var middle = await repository.GetConversationAsync(conversationId, bobId, page: 2, pageSize: 2);
+        Assert.NotNull(middle);
+        Assert.Equal(["Msg 3", "Msg 4"], middle.Messages.Select(m => m.Body).ToArray());
+    }
+
+    [Fact]
     public async Task MarkConversationRead_IsConditionalAcrossContexts()
     {
         var created = await repository.SendNewOrExistingAsync(

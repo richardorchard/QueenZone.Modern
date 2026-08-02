@@ -47,6 +47,38 @@ public sealed class InMemoryPrivateMessageRepositoryTests
     }
 
     [Fact]
+    public async Task GetConversation_PagesMessages_DefaultingToLatestPage()
+    {
+        var members = new InMemoryMemberAccountRepository();
+        var alice = await members.CreateAsync(NewMember("a-page@example.com", "Alice"));
+        var bob = await members.CreateAsync(NewMember("b-page@example.com", "Bob"));
+        var repo = new InMemoryPrivateMessageRepository(id =>
+            members.FindByIdAsync(id).GetAwaiter().GetResult());
+
+        var created = await repo.SendNewOrExistingAsync(
+            alice.Id,
+            bob.Id,
+            "Msg 1",
+            DateTimeOffset.Parse("2026-08-01T11:00:00Z"));
+        var conversationId = created.ConversationId!.Value;
+        for (var i = 2; i <= 5; i++)
+        {
+            await repo.ReplyAsync(
+                conversationId,
+                alice.Id,
+                $"Msg {i}",
+                DateTimeOffset.Parse("2026-08-01T11:00:00Z").AddMinutes(i));
+        }
+
+        var latest = await repo.GetConversationAsync(conversationId, bob.Id, page: null, pageSize: 2);
+        Assert.Equal(3, latest!.Page);
+        Assert.Equal(["Msg 5"], latest.Messages.Select(m => m.Body).ToArray());
+
+        var first = await repo.GetConversationAsync(conversationId, bob.Id, page: 1, pageSize: 2);
+        Assert.Equal(["Msg 1", "Msg 2"], first!.Messages.Select(m => m.Body).ToArray());
+    }
+
+    [Fact]
     public async Task Reply_DoesNotLetOlderSummaryOverwriteNewer()
     {
         var members = new InMemoryMemberAccountRepository();

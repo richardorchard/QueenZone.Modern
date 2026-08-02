@@ -55,8 +55,12 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
     public async Task<PrivateConversationDetail?> GetConversationAsync(
         Guid conversationId,
         Guid memberId,
+        int? page = null,
+        int pageSize = PrivateMessageLimits.ConversationPageSize,
         CancellationToken cancellationToken = default)
     {
+        pageSize = Math.Clamp(pageSize, 1, PrivateMessageLimits.MaxConversationPageSize);
+
         var participant = await dbContext.PrivateConversationParticipants
             .AsNoTracking()
             .SingleOrDefaultAsync(
@@ -84,10 +88,22 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
             ? conversation.MemberHigh?.DisplayName
             : conversation.MemberLow?.DisplayName;
 
+        var totalCount = await dbContext.PrivateMessages
+            .AsNoTracking()
+            .CountAsync(m => m.ConversationId == conversationId, cancellationToken);
+        var totalPages = totalCount <= 0
+            ? 1
+            : (totalCount + pageSize - 1) / pageSize;
+        var effectivePage = page is null or < 1
+            ? totalPages
+            : Math.Min(page.Value, totalPages);
+
         var messageRows = await dbContext.PrivateMessages
             .AsNoTracking()
             .Where(m => m.ConversationId == conversationId)
             .OrderBy(m => m.SortKey)
+            .Skip((effectivePage - 1) * pageSize)
+            .Take(pageSize)
             .Select(m => new
             {
                 m.Id,
@@ -114,7 +130,10 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
             conversationId,
             otherId,
             string.IsNullOrWhiteSpace(otherName) ? "Unknown member" : otherName,
-            items);
+            items,
+            totalCount,
+            effectivePage,
+            pageSize);
     }
 
     public Task<bool> IsParticipantAsync(
