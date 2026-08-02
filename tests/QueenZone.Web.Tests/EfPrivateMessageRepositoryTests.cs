@@ -115,10 +115,10 @@ public sealed class EfPrivateMessageRepositoryTests : IAsyncDisposable
             DateTimeOffset.Parse("2026-08-02T09:00:00Z"));
 
         var inbox = await repository.GetInboxAsync(aliceId);
-        Assert.Equal(["Carol EF", "Bob EF"], inbox.Select(i => i.OtherParticipantDisplayName).ToArray());
+        Assert.Equal(["Carol EF", "Bob EF"], inbox.Items.Select(i => i.OtherParticipantDisplayName).ToArray());
 
         var bobInbox = await repository.GetInboxAsync(bobId);
-        Assert.DoesNotContain(bobInbox, i => i.OtherParticipantId == carolId);
+        Assert.DoesNotContain(bobInbox.Items, i => i.OtherParticipantId == carolId);
     }
 
     [Fact]
@@ -138,7 +138,7 @@ public sealed class EfPrivateMessageRepositoryTests : IAsyncDisposable
     }
 
     [Fact]
-    public async Task Reply_KeepsNewestSummary_WhenOlderReplyCommitsLater()
+    public async Task Reply_UpdatesPreviewToInsertedTip_KeepsMonotonicLastMessageAt()
     {
         var created = await repository.SendNewOrExistingAsync(
             aliceId,
@@ -159,12 +159,14 @@ public sealed class EfPrivateMessageRepositoryTests : IAsyncDisposable
             DateTimeOffset.Parse("2026-08-02T12:01:00Z"));
 
         var inbox = await repository.GetInboxAsync(aliceId);
-        var item = Assert.Single(inbox);
-        Assert.Equal("Newer reply", item.LastMessagePreview);
+        var item = Assert.Single(inbox.Items);
+        // Insert order / SortKey wins for preview; LastMessageAt stays monotonic for inbox ordering.
+        Assert.Equal("Older reply commits later", item.LastMessagePreview);
         Assert.Equal(DateTimeOffset.Parse("2026-08-02T12:02:00Z"), item.LastMessageAt);
 
         var detail = await repository.GetConversationAsync(conversationId, aliceId);
         Assert.Equal(3, detail!.Messages.Count);
+        Assert.Equal("Older reply commits later", detail.Messages[^1].Body);
     }
 
     [Fact]
@@ -278,6 +280,26 @@ public sealed class EfPrivateMessageRepositoryTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task CreateConversation_SetsSenderLastReadSortKeyToFirstMessage()
+    {
+        var created = await repository.SendNewOrExistingAsync(
+            aliceId,
+            bobId,
+            "First",
+            DateTimeOffset.Parse("2026-08-02T17:00:00Z"));
+        var conversationId = created.ConversationId!.Value;
+
+        var detail = await repository.GetConversationAsync(conversationId, aliceId);
+        var firstSortKey = detail!.Messages[0].SortKey;
+
+        var participant = await dbContext.PrivateConversationParticipants
+            .AsNoTracking()
+            .SingleAsync(p => p.ConversationId == conversationId && p.MemberId == aliceId);
+        Assert.Equal(firstSortKey, participant.LastReadSortKey);
+        Assert.NotNull(participant.LastReadAt);
+    }
+
+    [Fact]
     public async Task GetConversation_PagesMessages_DefaultingToLatestPage()
     {
         var created = await repository.SendNewOrExistingAsync(
@@ -300,7 +322,8 @@ public sealed class EfPrivateMessageRepositoryTests : IAsyncDisposable
         Assert.Equal(5, latest.TotalCount);
         Assert.Equal(3, latest.Page);
         Assert.Equal(3, latest.TotalPages);
-        Assert.Equal(["Msg 5"], latest.Messages.Select(m => m.Body).ToArray());
+        // Latest window is newest pageSize messages (not a short remainder page).
+        Assert.Equal(["Msg 4", "Msg 5"], latest.Messages.Select(m => m.Body).ToArray());
 
         var first = await repository.GetConversationAsync(conversationId, bobId, page: 1, pageSize: 2);
         Assert.NotNull(first);
@@ -310,6 +333,9 @@ public sealed class EfPrivateMessageRepositoryTests : IAsyncDisposable
         var middle = await repository.GetConversationAsync(conversationId, bobId, page: 2, pageSize: 2);
         Assert.NotNull(middle);
         Assert.Equal(["Msg 3", "Msg 4"], middle.Messages.Select(m => m.Body).ToArray());
+
+        var explicitLast = await repository.GetConversationAsync(conversationId, bobId, page: 3, pageSize: 2);
+        Assert.Equal(["Msg 4", "Msg 5"], explicitLast!.Messages.Select(m => m.Body).ToArray());
     }
 
     [Fact]
@@ -365,7 +391,7 @@ public sealed class EfPrivateMessageRepositoryTests : IAsyncDisposable
             midpoint.CreatedAt);
 
         var inbox = await repository.GetInboxAsync(bobId);
-        var item = Assert.Single(inbox);
+        var item = Assert.Single(inbox.Items);
         Assert.True(item.HasUnread);
         Assert.Equal(detail.Messages.Count(m => !m.IsMine && m.SortKey > midpoint.SortKey), item.UnreadCount);
     }

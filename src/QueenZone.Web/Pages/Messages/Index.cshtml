@@ -9,14 +9,16 @@
       <a class="qz-button qz-button--cta" href="/messages/compose">New message</a>
     </p>
 
-    @if (Model.Conversations.Count == 0)
+    @if (Model.Inbox.Items.Count == 0)
     {
       <p>You have no private messages yet. <a href="/messages/compose">Start a conversation</a>.</p>
     }
     else
     {
+      <partial name="_ArchivePagination" model="Model.Pagination" />
+
       <ul class="qz-message-list">
-        @foreach (var conversation in Model.Conversations)
+        @foreach (var conversation in Model.Inbox.Items)
         {
           <li class="qz-message-list__item @(conversation.HasUnread ? "qz-message-list__item--unread" : null)">
             <a class="qz-message-list__link" href="/messages/@conversation.ConversationId">
@@ -33,6 +35,8 @@
           </li>
         }
       </ul>
+
+      <partial name="_ArchivePagination" model="Model.Pagination" />
     }
   </div>
 </section>

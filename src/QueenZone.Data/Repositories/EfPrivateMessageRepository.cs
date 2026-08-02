@@ -8,19 +8,25 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
 {
     private const int MaxUniqueConflictRetries = 3;
 
-    public async Task<IReadOnlyList<PrivateConversationListItem>> GetInboxAsync(
+    public async Task<PrivateInboxPage> GetInboxAsync(
         Guid memberId,
         int page = 1,
-        int pageSize = 50,
+        int pageSize = PrivateMessageLimits.InboxPageSize,
         CancellationToken cancellationToken = default)
     {
         page = Math.Max(1, page);
-        pageSize = Math.Clamp(pageSize, 1, 100);
+        pageSize = Math.Clamp(pageSize, 1, PrivateMessageLimits.MaxInboxPageSize);
 
         if (IsSqliteDatabase())
         {
             return await GetInboxSqliteAsync(memberId, page, pageSize, cancellationToken);
         }
+
+        var totalCount = await dbContext.PrivateConversationParticipants
+            .AsNoTracking()
+            .CountAsync(p => p.MemberId == memberId && !p.IsArchived, cancellationToken);
+        var totalPages = totalCount <= 0 ? 1 : (totalCount + pageSize - 1) / pageSize;
+        page = Math.Min(page, totalPages);
 
         var pageRows = await dbContext.PrivateConversationParticipants
             .AsNoTracking()
@@ -42,7 +48,7 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
             .ToListAsync(cancellationToken);
 
         var unreadByConversation = await CountUnreadForPageSqlAsync(memberId, pageRows, cancellationToken);
-        return MapInbox(pageRows, unreadByConversation);
+        return new PrivateInboxPage(MapInbox(pageRows, unreadByConversation), totalCount, page, pageSize);
     }
 
     public Task<int> CountUnreadConversationsAsync(
@@ -94,26 +100,53 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
         var totalPages = totalCount <= 0
             ? 1
             : (totalCount + pageSize - 1) / pageSize;
+
+        // Default and explicit last page use a keyset "latest window" (newest pageSize messages).
+        // That avoids count/offset TOCTOU races and always surfaces the tip; when the final
+        // offset page would be a short remainder, this window can overlap the previous page.
         var effectivePage = page is null or < 1
             ? totalPages
             : Math.Min(page.Value, totalPages);
+        var useLatestWindow = page is null or < 1 || effectivePage >= totalPages;
 
-        var messageRows = await dbContext.PrivateMessages
-            .AsNoTracking()
-            .Where(m => m.ConversationId == conversationId)
-            .OrderBy(m => m.SortKey)
-            .Skip((effectivePage - 1) * pageSize)
-            .Take(pageSize)
-            .Select(m => new
-            {
-                m.Id,
-                m.SenderMemberId,
-                SenderName = m.Sender != null ? m.Sender.DisplayName : string.Empty,
-                m.Body,
-                m.CreatedAt,
-                m.SortKey,
-            })
-            .ToListAsync(cancellationToken);
+        List<ConversationMessageRow> messageRows;
+        if (useLatestWindow)
+        {
+            var latestRows = await dbContext.PrivateMessages
+                .AsNoTracking()
+                .Where(m => m.ConversationId == conversationId)
+                .OrderByDescending(m => m.SortKey)
+                .Take(pageSize)
+                .Select(m => new ConversationMessageRow(
+                    m.Id,
+                    m.SenderMemberId,
+                    m.Sender != null ? m.Sender.DisplayName : string.Empty,
+                    m.Body,
+                    m.CreatedAt,
+                    m.SortKey))
+                .ToListAsync(cancellationToken);
+            messageRows = latestRows
+                .OrderBy(m => m.SortKey)
+                .ToList();
+            effectivePage = totalPages;
+        }
+        else
+        {
+            messageRows = await dbContext.PrivateMessages
+                .AsNoTracking()
+                .Where(m => m.ConversationId == conversationId)
+                .OrderBy(m => m.SortKey)
+                .Skip((effectivePage - 1) * pageSize)
+                .Take(pageSize)
+                .Select(m => new ConversationMessageRow(
+                    m.Id,
+                    m.SenderMemberId,
+                    m.Sender != null ? m.Sender.DisplayName : string.Empty,
+                    m.Body,
+                    m.CreatedAt,
+                    m.SortKey))
+                .ToListAsync(cancellationToken);
+        }
 
         IReadOnlyList<PrivateMessageItem> items = messageRows
             .Select(m => new PrivateMessageItem(
@@ -282,7 +315,7 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
                 await UnarchiveAsync(conversationId, conversation.MemberHighId, cancellationToken);
                 await dbContext.SaveChangesAsync(cancellationToken);
 
-                await UpdateConversationSummaryIfNewerAsync(
+                await UpdateConversationSummaryForInsertedMessageAsync(
                     conversationId,
                     sentAt,
                     preview,
@@ -361,6 +394,15 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
                     dbContext.PrivateMessages.Add(firstMessage);
                     await dbContext.SaveChangesAsync(cancellationToken);
 
+                    // Sender has seen their own first message; align SortKey cursor with LastReadAt.
+                    var senderParticipant = await dbContext.PrivateConversationParticipants
+                        .SingleAsync(
+                            p => p.ConversationId == conversation.Id && p.MemberId == senderMemberId,
+                            cancellationToken);
+                    senderParticipant.LastReadSortKey = firstMessage.SortKey;
+                    senderParticipant.LastReadAt = sentAt;
+                    await dbContext.SaveChangesAsync(cancellationToken);
+
                     await transaction.CommitAsync(cancellationToken);
                     return conversation.Id;
                 }
@@ -384,7 +426,7 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
                 dbContext.PrivateMessages.Add(message);
                 await dbContext.SaveChangesAsync(cancellationToken);
 
-                await UpdateConversationSummaryIfNewerAsync(
+                await UpdateConversationSummaryForInsertedMessageAsync(
                     conversationId,
                     sentAt,
                     preview,
@@ -467,37 +509,31 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
         message.SortKey = max + 1;
     }
 
-    private async Task UpdateConversationSummaryIfNewerAsync(
+    private async Task UpdateConversationSummaryForInsertedMessageAsync(
         Guid conversationId,
         DateTimeOffset sentAt,
         string preview,
         Guid senderMemberId,
         CancellationToken cancellationToken)
     {
-        if (IsSqliteDatabase())
+        // Callers hold the conversation write lock, so this insert is the tip by SortKey.
+        // Always refresh preview/sender to match the thread tip. Keep LastMessageAt monotonic
+        // (max of existing and sentAt) so inbox ordering does not jump backwards under clock skew.
+        var conversation = await dbContext.PrivateConversations
+            .SingleOrDefaultAsync(c => c.Id == conversationId, cancellationToken);
+        if (conversation is null)
         {
-            var conversation = await dbContext.PrivateConversations
-                .SingleOrDefaultAsync(c => c.Id == conversationId, cancellationToken);
-            if (conversation is null || conversation.LastMessageAt > sentAt)
-            {
-                return;
-            }
-
-            conversation.LastMessageAt = sentAt;
-            conversation.LastMessagePreview = preview;
-            conversation.LastMessageSenderId = senderMemberId;
-            await dbContext.SaveChangesAsync(cancellationToken);
             return;
         }
 
-        await dbContext.PrivateConversations
-            .Where(c => c.Id == conversationId && c.LastMessageAt <= sentAt)
-            .ExecuteUpdateAsync(
-                setters => setters
-                    .SetProperty(c => c.LastMessageAt, sentAt)
-                    .SetProperty(c => c.LastMessagePreview, preview)
-                    .SetProperty(c => c.LastMessageSenderId, senderMemberId),
-                cancellationToken);
+        if (sentAt > conversation.LastMessageAt)
+        {
+            conversation.LastMessageAt = sentAt;
+        }
+
+        conversation.LastMessagePreview = preview;
+        conversation.LastMessageSenderId = senderMemberId;
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     private async Task<int> CountUnreadConversationsSqlAsync(
@@ -538,7 +574,7 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
         return unread.Count(pair => pair.Value > 0);
     }
 
-    private async Task<IReadOnlyList<PrivateConversationListItem>> GetInboxSqliteAsync(
+    private async Task<PrivateInboxPage> GetInboxSqliteAsync(
         Guid memberId,
         int page,
         int pageSize,
@@ -562,6 +598,10 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
             })
             .ToListAsync(cancellationToken);
 
+        var totalCount = rows.Count;
+        var totalPages = totalCount <= 0 ? 1 : (totalCount + pageSize - 1) / pageSize;
+        page = Math.Min(page, totalPages);
+
         var pageRows = rows
             .OrderByDescending(r => r.LastMessageAt)
             .Skip((page - 1) * pageSize)
@@ -576,7 +616,7 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
             .ToList();
 
         var unreadByConversation = await CountUnreadForPageSqlAsync(memberId, pageRows, cancellationToken);
-        return MapInbox(pageRows, unreadByConversation);
+        return new PrivateInboxPage(MapInbox(pageRows, unreadByConversation), totalCount, page, pageSize);
     }
 
     private async Task<Dictionary<Guid, int>> CountUnreadForPageSqlAsync(
@@ -713,4 +753,12 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
         DateTimeOffset LastMessageAt,
         string OtherDisplayName,
         Guid OtherId);
+
+    private sealed record ConversationMessageRow(
+        Guid Id,
+        Guid SenderMemberId,
+        string SenderName,
+        string Body,
+        DateTimeOffset CreatedAt,
+        long SortKey);
 }

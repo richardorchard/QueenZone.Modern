@@ -87,6 +87,31 @@ public sealed class PrivateMessageRoutesTests : IClassFixture<WebApplicationFact
     }
 
     [Fact]
+    public async Task Get_Inbox_PaginatesConversations()
+    {
+        var (aliceClient, alice) = await CreateMemberAsync("pm-inbox-page-alice@example.com", "Inbox Alice");
+        var service = factory.Services.GetRequiredService<PrivateMessageService>();
+
+        const int total = PrivateMessageLimits.InboxPageSize + 1;
+        for (var i = 1; i <= total; i++)
+        {
+            var (_, peer) = await CreateMemberAsync($"pm-inbox-peer-{i}@example.com", $"Inbox Peer {i}");
+            Assert.True((await service.ComposeAsync(alice.Id, peer.Id, $"Hello {i}")).Succeeded);
+        }
+
+        var page1 = await aliceClient.GetStringAsync("/messages");
+        Assert.Contains("Inbox conversation pagination", page1);
+        Assert.Contains("Page 1 of 2", page1);
+        Assert.Contains("/messages?pageNumber=2", page1);
+        Assert.Contains("Inbox Peer 51", page1);
+        Assert.DoesNotContain("Inbox Peer 1</", page1);
+
+        var page2 = await aliceClient.GetStringAsync("/messages?pageNumber=2");
+        Assert.Contains("Page 2 of 2", page2);
+        Assert.Contains("Inbox Peer 1</", page2);
+    }
+
+    [Fact]
     public async Task Get_Conversation_PaginatesMessages_AndDefaultsToLatestPage()
     {
         var (_, alice) = await CreateMemberAsync("pm-page-alice@example.com", "Page Alice");

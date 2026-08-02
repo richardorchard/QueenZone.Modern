@@ -2,10 +2,10 @@ namespace QueenZone.Data;
 
 public interface IPrivateMessageRepository
 {
-    Task<IReadOnlyList<PrivateConversationListItem>> GetInboxAsync(
+    Task<PrivateInboxPage> GetInboxAsync(
         Guid memberId,
         int page = 1,
-        int pageSize = 50,
+        int pageSize = PrivateMessageLimits.InboxPageSize,
         CancellationToken cancellationToken = default);
 
     Task<int> CountUnreadConversationsAsync(

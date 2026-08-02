@@ -9,7 +9,13 @@ namespace QueenZone.Web.Pages.Messages;
 [Authorize(Policy = MemberAuthenticationSchemes.MemberPolicy)]
 public sealed class IndexModel(PrivateMessageService privateMessageService) : PageModel
 {
-    public IReadOnlyList<PrivateConversationListItem> Conversations { get; private set; } = [];
+    [BindProperty(SupportsGet = true)]
+    public int PageNumber { get; set; } = 1;
+
+    public PrivateInboxPage Inbox { get; private set; } =
+        new([], 0, 1, PrivateMessageLimits.InboxPageSize);
+
+    public ArchivePaginationViewModel? Pagination { get; private set; }
 
     public async Task<IActionResult> OnGetAsync(CancellationToken cancellationToken)
     {
@@ -19,7 +25,16 @@ public sealed class IndexModel(PrivateMessageService privateMessageService) : Pa
             return Challenge();
         }
 
-        Conversations = await privateMessageService.GetInboxAsync(memberId.Value, cancellationToken);
+        Inbox = await privateMessageService.GetInboxAsync(
+            memberId.Value,
+            PageNumber,
+            cancellationToken: cancellationToken);
+        PageNumber = Inbox.Page;
+        Pagination = ArchivePagination.BuildViewModel(
+            "Inbox conversation pagination",
+            Inbox.Page,
+            Inbox.TotalPages,
+            page => page <= 1 ? "/messages" : $"/messages?pageNumber={page}");
         ViewData["Title"] = "Messages";
         return Page();
     }

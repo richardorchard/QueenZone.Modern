@@ -16,7 +16,7 @@ public sealed class PrivateMessageServiceTests
         Assert.NotNull(result.ConversationId);
 
         var bobInbox = await service.GetInboxAsync(bob.Id);
-        var item = Assert.Single(bobInbox);
+        var item = Assert.Single(bobInbox.Items);
         Assert.Equal(alice.Id, item.OtherParticipantId);
         Assert.True(item.HasUnread);
         Assert.Equal(1, item.UnreadCount);
@@ -98,7 +98,7 @@ public sealed class PrivateMessageServiceTests
             page: null,
             pageSize: 2);
         Assert.Equal(3, latest!.Page);
-        Assert.Equal(["Msg 5"], latest.Messages.Select(m => m.Body).ToArray());
+        Assert.Equal(["Msg 4", "Msg 5"], latest.Messages.Select(m => m.Body).ToArray());
 
         // Opening an older page only advances the read cursor as far as that page.
         await service.GetConversationAsync(
@@ -107,7 +107,7 @@ public sealed class PrivateMessageServiceTests
             markRead: true,
             page: 1,
             pageSize: 2);
-        var afterOlder = Assert.Single(await service.GetInboxAsync(bob.Id));
+        var afterOlder = Assert.Single((await service.GetInboxAsync(bob.Id)).Items);
         Assert.True(afterOlder.HasUnread);
         Assert.Equal(3, afterOlder.UnreadCount);
 
@@ -142,7 +142,7 @@ public sealed class PrivateMessageServiceTests
 
         Assert.True((await service.ReplyAsync(conversationId, bob.Id, "Reply from page one")).Succeeded);
 
-        var inboxItem = Assert.Single(await service.GetInboxAsync(bob.Id));
+        var inboxItem = Assert.Single((await service.GetInboxAsync(bob.Id)).Items);
         Assert.True(inboxItem.HasUnread);
         Assert.Equal(3, inboxItem.UnreadCount);
     }
@@ -155,9 +155,35 @@ public sealed class PrivateMessageServiceTests
 
         Assert.True((await service.ComposeAsync(bob.Id, alice.Id, "Bob composes without opening")).Succeeded);
 
-        var inboxItem = Assert.Single(await service.GetInboxAsync(bob.Id));
+        var inboxItem = Assert.Single((await service.GetInboxAsync(bob.Id)).Items);
         Assert.True(inboxItem.HasUnread);
         Assert.Equal(1, inboxItem.UnreadCount);
+    }
+
+    [Fact]
+    public async Task GetInbox_PagesConversations()
+    {
+        var (service, members, _, alice, _) = CreateSystem();
+        for (var i = 1; i <= 5; i++)
+        {
+            var peer = await members.CreateAsync(new MemberAccount
+            {
+                Id = Guid.NewGuid(),
+                Email = $"peer{i}@example.com",
+                DisplayName = $"Peer {i}",
+                CreatedAt = DateTime.UtcNow,
+            });
+            Assert.True((await service.ComposeAsync(alice.Id, peer.Id, $"Hello {i}")).Succeeded);
+        }
+
+        var page1 = await service.GetInboxAsync(alice.Id, page: 1, pageSize: 2);
+        Assert.Equal(5, page1.TotalCount);
+        Assert.Equal(3, page1.TotalPages);
+        Assert.Equal(2, page1.Items.Count);
+
+        var page3 = await service.GetInboxAsync(alice.Id, page: 3, pageSize: 2);
+        Assert.Equal(3, page3.Page);
+        Assert.Single(page3.Items);
     }
 
     [Fact]
@@ -203,7 +229,7 @@ public sealed class PrivateMessageServiceTests
         await service.ComposeAsync(alice.Id, bob.Id, "Ping");
 
         var aliceInbox = await service.GetInboxAsync(alice.Id);
-        Assert.False(Assert.Single(aliceInbox).HasUnread);
+        Assert.False(Assert.Single(aliceInbox.Items).HasUnread);
         Assert.Equal(0, await service.CountUnreadConversationsAsync(alice.Id));
     }
 

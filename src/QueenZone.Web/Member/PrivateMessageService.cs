@@ -7,10 +7,12 @@ public sealed class PrivateMessageService(
     IMemberAccountRepository memberAccountRepository,
     TimeProvider timeProvider)
 {
-    public Task<IReadOnlyList<PrivateConversationListItem>> GetInboxAsync(
+    public Task<PrivateInboxPage> GetInboxAsync(
         Guid memberId,
+        int page = 1,
+        int pageSize = PrivateMessageLimits.InboxPageSize,
         CancellationToken cancellationToken = default) =>
-        privateMessageRepository.GetInboxAsync(memberId, cancellationToken: cancellationToken);
+        privateMessageRepository.GetInboxAsync(memberId, page, pageSize, cancellationToken);
 
     public Task<int> CountUnreadConversationsAsync(
         Guid memberId,

@@ -16,14 +16,14 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
         this.resolveMember = resolveMember;
     }
 
-    public Task<IReadOnlyList<PrivateConversationListItem>> GetInboxAsync(
+    public Task<PrivateInboxPage> GetInboxAsync(
         Guid memberId,
         int page = 1,
-        int pageSize = 50,
+        int pageSize = PrivateMessageLimits.InboxPageSize,
         CancellationToken cancellationToken = default)
     {
         page = Math.Max(1, page);
-        pageSize = Math.Clamp(pageSize, 1, 100);
+        pageSize = Math.Clamp(pageSize, 1, PrivateMessageLimits.MaxInboxPageSize);
 
         lock (sync)
         {
@@ -32,15 +32,21 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
                 .Select(p => p.ConversationId)
                 .ToHashSet();
 
-            IReadOnlyList<PrivateConversationListItem> items = conversations
+            var ordered = conversations
                 .Where(c => mine.Contains(c.Id))
                 .OrderByDescending(c => c.LastMessageAt)
+                .ToList();
+            var totalCount = ordered.Count;
+            var totalPages = totalCount <= 0 ? 1 : (totalCount + pageSize - 1) / pageSize;
+            page = Math.Min(page, totalPages);
+
+            IReadOnlyList<PrivateConversationListItem> items = ordered
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .Select(c => ToListItem(c, memberId))
                 .ToList();
 
-            return Task.FromResult(items);
+            return Task.FromResult(new PrivateInboxPage(items, totalCount, page, pageSize));
         }
     }
 
@@ -89,13 +95,31 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
             var totalPages = totalCount <= 0
                 ? 1
                 : (totalCount + pageSize - 1) / pageSize;
+
             var effectivePage = page is null or < 1
                 ? totalPages
                 : Math.Min(page.Value, totalPages);
+            var useLatestWindow = page is null or < 1 || effectivePage >= totalPages;
 
-            IReadOnlyList<PrivateMessageItem> items = ordered
-                .Skip((effectivePage - 1) * pageSize)
-                .Take(pageSize)
+            List<PrivateMessageEntity> pageMessages;
+            if (useLatestWindow)
+            {
+                pageMessages = ordered
+                    .OrderByDescending(m => m.SortKey)
+                    .Take(pageSize)
+                    .OrderBy(m => m.SortKey)
+                    .ToList();
+                effectivePage = totalPages;
+            }
+            else
+            {
+                pageMessages = ordered
+                    .Skip((effectivePage - 1) * pageSize)
+                    .Take(pageSize)
+                    .ToList();
+            }
+
+            IReadOnlyList<PrivateMessageItem> items = pageMessages
                 .Select(m => new PrivateMessageItem(
                     m.Id,
                     m.SenderMemberId,
@@ -141,8 +165,12 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
         {
             var participant = participants.SingleOrDefault(
                 p => p.ConversationId == conversationId && p.MemberId == memberId);
-            if (participant is not null
-                && (participant.LastReadSortKey is null || participant.LastReadSortKey < lastReadSortKey))
+            if (participant is null)
+            {
+                return Task.CompletedTask;
+            }
+
+            if (participant.LastReadSortKey is null || participant.LastReadSortKey < lastReadSortKey)
             {
                 participant.LastReadSortKey = lastReadSortKey;
                 participant.LastReadAt = readAt;
@@ -183,6 +211,7 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
             var (low, high) = OrderPair(senderMemberId, recipientMemberId);
             var conversation = conversations.SingleOrDefault(
                 c => c.MemberLowId == low && c.MemberHighId == high);
+            var isNew = conversation is null;
             if (conversation is null)
             {
                 conversation = new PrivateConversationEntity
@@ -217,7 +246,6 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
             {
                 EnsureParticipant(conversation.Id, senderMemberId);
                 EnsureParticipant(conversation.Id, recipientMemberId);
-                UpdateSummaryIfNewer(conversation, sentAt, TruncatePreview(body), senderMemberId);
                 Unarchive(conversation.Id, senderMemberId);
                 Unarchive(conversation.Id, recipientMemberId);
             }
@@ -232,7 +260,23 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
                 SortKey = nextSortKey++,
             };
             messages.Add(message);
-            UpdateSummaryIfNewer(conversation, sentAt, TruncatePreview(body), senderMemberId);
+
+            if (isNew)
+            {
+                var sender = participants.Single(
+                    p => p.ConversationId == conversation.Id && p.MemberId == senderMemberId);
+                sender.LastReadSortKey = message.SortKey;
+                sender.LastReadAt = sentAt;
+            }
+            else
+            {
+                ApplySummaryForInsertedMessage(
+                    conversation,
+                    sentAt,
+                    TruncatePreview(body),
+                    senderMemberId);
+            }
+
             return Task.FromResult(new PrivateMessageSendResult(true, conversation.Id, null));
         }
     }
@@ -285,7 +329,11 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
             };
             messages.Add(message);
 
-            UpdateSummaryIfNewer(conversation, sentAt, TruncatePreview(body), senderMemberId);
+            ApplySummaryForInsertedMessage(
+                conversation,
+                sentAt,
+                TruncatePreview(body),
+                senderMemberId);
             Unarchive(conversationId, conversation.MemberLowId);
             Unarchive(conversationId, conversation.MemberHighId);
 
@@ -346,18 +394,17 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
         }
     }
 
-    private static void UpdateSummaryIfNewer(
+    private static void ApplySummaryForInsertedMessage(
         PrivateConversationEntity conversation,
         DateTimeOffset sentAt,
         string preview,
         Guid senderMemberId)
     {
-        if (sentAt < conversation.LastMessageAt)
+        if (sentAt > conversation.LastMessageAt)
         {
-            return;
+            conversation.LastMessageAt = sentAt;
         }
 
-        conversation.LastMessageAt = sentAt;
         conversation.LastMessagePreview = preview;
         conversation.LastMessageSenderId = senderMemberId;
     }

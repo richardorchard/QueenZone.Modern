@@ -11,6 +11,10 @@ public static class PrivateMessageLimits
     public const int ConversationPageSize = 50;
 
     public const int MaxConversationPageSize = 100;
+
+    public const int InboxPageSize = 50;
+
+    public const int MaxInboxPageSize = 100;
 }
 
 public sealed record PrivateConversationListItem(
@@ -21,6 +25,18 @@ public sealed record PrivateConversationListItem(
     DateTimeOffset LastMessageAt,
     bool HasUnread,
     int UnreadCount);
+
+public sealed record PrivateInboxPage(
+    IReadOnlyList<PrivateConversationListItem> Items,
+    int TotalCount,
+    int Page,
+    int PageSize)
+{
+    public int TotalPages =>
+        TotalCount <= 0
+            ? 1
+            : (TotalCount + PageSize - 1) / PageSize;
+}
 
 public sealed record PrivateMessageItem(
     Guid Id,
