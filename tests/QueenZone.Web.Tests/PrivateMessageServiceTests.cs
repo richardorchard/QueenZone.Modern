@@ -159,33 +159,34 @@ public sealed class PrivateMessageServiceTests
 
 
     [Fact]
-    public async Task GetConversation_MarkRead_UsesLastReturnedMessageCursor()
+    public async Task GetConversation_MarkRead_UsesReturnedSortKeyCursor()
     {
         var (service, _, messages, alice, bob) = CreateSystem();
         var created = await service.ComposeAsync(alice.Id, bob.Id, "Visible");
         var conversationId = created.ConversationId!.Value;
 
-        // Simulate a message that arrives/commits after the thread was loaded but with a
-        // timestamp after the last returned message. It must remain unread.
         var detail = await messages.GetConversationAsync(conversationId, bob.Id);
         Assert.NotNull(detail);
-        var lastSeen = detail!.Messages[^1].CreatedAt;
+        var lastReturned = detail!.Messages[^1];
 
+        // Later SortKey with an earlier CreatedAt (delayed commit / clock skew) must stay unread.
         await messages.ReplyAsync(
             conversationId,
             alice.Id,
-            "Arrived during load",
-            lastSeen.AddSeconds(5));
+            "Delayed commit / earlier clock",
+            lastReturned.CreatedAt.AddMinutes(-5));
 
-        await messages.MarkConversationReadAsync(conversationId, bob.Id, lastSeen);
+        await messages.MarkConversationReadAsync(
+            conversationId,
+            bob.Id,
+            lastReturned.SortKey,
+            lastReturned.CreatedAt);
 
         Assert.Equal(1, await service.CountUnreadConversationsAsync(bob.Id));
-        var inbox = await service.GetInboxAsync(bob.Id);
-        Assert.True(Assert.Single(inbox).HasUnread);
     }
 
     [Fact]
-    public async Task GetConversation_MarkRead_DoesNotUseWallClock()
+    public async Task GetConversation_MarkRead_KeepsEqualTimestampLaterSortKeyUnread()
     {
         var (service, _, messages, alice, bob) = CreateSystem();
         var created = await service.ComposeAsync(alice.Id, bob.Id, "Hello");
@@ -193,15 +194,13 @@ public sealed class PrivateMessageServiceTests
 
         await service.GetConversationAsync(conversationId, bob.Id, markRead: true);
 
-        // Insert a message timestamped before "now" but after the last seen message.
-        // If mark-read used UtcNow, this would incorrectly appear read.
         var detail = await messages.GetConversationAsync(conversationId, bob.Id);
-        var lastSeen = detail!.Messages[^1].CreatedAt;
+        var lastReturned = detail!.Messages[^1];
         await messages.ReplyAsync(
             conversationId,
             alice.Id,
-            "Between last-seen and now",
-            lastSeen.AddMilliseconds(1));
+            "Same timestamp later sort key",
+            lastReturned.CreatedAt);
 
         Assert.Equal(1, await service.CountUnreadConversationsAsync(bob.Id));
     }

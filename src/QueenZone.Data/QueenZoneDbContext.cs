@@ -666,9 +666,14 @@ public sealed class QueenZoneDbContext : DbContext
                 .HasMaxLength(PrivateMessageLimits.MaxBodyLength)
                 .IsRequired();
             entity.Property(message => message.CreatedAt).IsRequired();
+            entity.Property(message => message.SortKey)
+                .ValueGeneratedOnAdd()
+                .IsRequired();
 
             entity.HasIndex(message => new { message.ConversationId, message.CreatedAt })
                 .HasDatabaseName("IX_PrivateMessages_Conversation_CreatedAt");
+            entity.HasIndex(message => new { message.ConversationId, message.SortKey })
+                .HasDatabaseName("IX_PrivateMessages_Conversation_SortKey");
 
             entity.HasOne(message => message.Conversation)
                 .WithMany(conversation => conversation.Messages)

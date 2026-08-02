@@ -22,9 +22,14 @@ public interface IPrivateMessageRepository
         Guid memberId,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Advances the participant read cursor to <paramref name="lastReadSortKey"/> when that value
+    /// is newer than the stored cursor. Uses a conditional database update.
+    /// </summary>
     Task MarkConversationReadAsync(
         Guid conversationId,
         Guid memberId,
+        long lastReadSortKey,
         DateTimeOffset readAt,
         CancellationToken cancellationToken = default);
 

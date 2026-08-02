@@ -82,10 +82,13 @@ public sealed class EfPrivateMessageRepositoryTests : IAsyncDisposable
         Assert.Equal(1, await repository.CountUnreadConversationsAsync(bobId));
         Assert.Equal(0, await repository.CountUnreadConversationsAsync(aliceId));
 
+        var bobView = await repository.GetConversationAsync(result.ConversationId!.Value, bobId);
+        var last = Assert.Single(bobView!.Messages);
         await repository.MarkConversationReadAsync(
             result.ConversationId!.Value,
             bobId,
-            DateTimeOffset.Parse("2026-08-02T11:05:00Z"));
+            last.SortKey,
+            last.CreatedAt);
         Assert.Equal(0, await repository.CountUnreadConversationsAsync(bobId));
 
         await repository.ReplyAsync(
@@ -222,6 +225,64 @@ public sealed class EfPrivateMessageRepositoryTests : IAsyncDisposable
         var sqlite = new Exception("UNIQUE constraint failed: PrivateConversations.MemberLowId, PrivateConversations.MemberHighId");
         var wrapped = new DbUpdateException("conflict", sqlite);
         Assert.True(EfPrivateMessageRepository.IsUniqueConstraintViolation(wrapped));
+    }
+
+    [Fact]
+    public async Task MarkConversationRead_IsConditionalAcrossContexts()
+    {
+        var created = await repository.SendNewOrExistingAsync(
+            aliceId,
+            bobId,
+            "One",
+            DateTimeOffset.Parse("2026-08-02T14:00:00Z"));
+        var conversationId = created.ConversationId!.Value;
+        await repository.ReplyAsync(
+            conversationId,
+            aliceId,
+            "Two",
+            DateTimeOffset.Parse("2026-08-02T14:01:00Z"));
+
+        var detail = await repository.GetConversationAsync(conversationId, bobId);
+        Assert.Equal(2, detail!.Messages.Count);
+        var older = detail.Messages[0];
+        var newer = detail.Messages[1];
+
+        await repository.MarkConversationReadAsync(conversationId, bobId, newer.SortKey, newer.CreatedAt);
+        await repository.MarkConversationReadAsync(conversationId, bobId, older.SortKey, older.CreatedAt);
+
+        Assert.Equal(0, await repository.CountUnreadConversationsAsync(bobId));
+    }
+
+    [Fact]
+    public async Task UnreadCount_UsesSortKeyAggregate_NotFullHistoryScanSemantics()
+    {
+        var created = await repository.SendNewOrExistingAsync(
+            aliceId,
+            bobId,
+            "Seed",
+            DateTimeOffset.Parse("2026-08-02T15:00:00Z"));
+        var conversationId = created.ConversationId!.Value;
+        for (var i = 0; i < 25; i++)
+        {
+            await repository.ReplyAsync(
+                conversationId,
+                aliceId,
+                $"Msg {i}",
+                DateTimeOffset.Parse("2026-08-02T15:00:00Z").AddSeconds(i + 1));
+        }
+
+        var detail = await repository.GetConversationAsync(conversationId, bobId);
+        var midpoint = detail!.Messages[10];
+        await repository.MarkConversationReadAsync(
+            conversationId,
+            bobId,
+            midpoint.SortKey,
+            midpoint.CreatedAt);
+
+        var inbox = await repository.GetInboxAsync(bobId);
+        var item = Assert.Single(inbox);
+        Assert.True(item.HasUnread);
+        Assert.Equal(detail.Messages.Count(m => !m.IsMine && m.SortKey > midpoint.SortKey), item.UnreadCount);
     }
 
     private static QueenZoneDbContext CreateContext(string connectionString)

@@ -32,14 +32,16 @@ public sealed class PrivateMessageService(
             return null;
         }
 
-        // Advance the read cursor only to the last message actually returned. Using UtcNow
-        // would mark messages that arrive (or commit) during the load as read without showing them.
+        // Advance using the commit-ordered SortKey of the last message actually returned.
+        // CreatedAt alone is not unique/commit-ordered and can hide delayed or equal-timestamp messages.
         if (markRead && detail.Messages.Count > 0)
         {
+            var lastReturned = detail.Messages[^1];
             await privateMessageRepository.MarkConversationReadAsync(
                 conversationId,
                 memberId,
-                detail.Messages[^1].CreatedAt,
+                lastReturned.SortKey,
+                lastReturned.CreatedAt,
                 cancellationToken);
         }
 

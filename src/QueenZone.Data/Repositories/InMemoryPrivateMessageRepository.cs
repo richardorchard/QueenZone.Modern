@@ -9,6 +9,7 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
     private readonly List<PrivateConversationParticipantEntity> participants = [];
     private readonly List<PrivateMessageEntity> messages = [];
     private readonly Func<Guid, MemberAccount?>? resolveMember;
+    private long nextSortKey = 1;
 
     public InMemoryPrivateMessageRepository(Func<Guid, MemberAccount?>? resolveMember = null)
     {
@@ -64,7 +65,7 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
         lock (sync)
         {
             var participant = participants.SingleOrDefault(
-                p => p.ConversationId == conversationId && p.MemberId == memberId && !p.IsArchived);
+                p => p.ConversationId == conversationId && p.MemberId == memberId);
             var conversation = conversations.SingleOrDefault(c => c.Id == conversationId);
             if (participant is null || conversation is null)
             {
@@ -78,15 +79,15 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
 
             IReadOnlyList<PrivateMessageItem> items = messages
                 .Where(m => m.ConversationId == conversationId)
-                .OrderBy(m => m.CreatedAt)
-                .ThenBy(m => m.Id)
+                .OrderBy(m => m.SortKey)
                 .Select(m => new PrivateMessageItem(
                     m.Id,
                     m.SenderMemberId,
                     resolveMember?.Invoke(m.SenderMemberId)?.DisplayName ?? "Unknown member",
                     m.Body,
                     m.CreatedAt,
-                    m.SenderMemberId == memberId))
+                    m.SenderMemberId == memberId,
+                    m.SortKey))
                 .ToList();
 
             return Task.FromResult<PrivateConversationDetail?>(
@@ -109,6 +110,7 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
     public Task MarkConversationReadAsync(
         Guid conversationId,
         Guid memberId,
+        long lastReadSortKey,
         DateTimeOffset readAt,
         CancellationToken cancellationToken = default)
     {
@@ -117,8 +119,9 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
             var participant = participants.SingleOrDefault(
                 p => p.ConversationId == conversationId && p.MemberId == memberId);
             if (participant is not null
-                && (participant.LastReadAt is null || readAt > participant.LastReadAt))
+                && (participant.LastReadSortKey is null || participant.LastReadSortKey < lastReadSortKey))
             {
+                participant.LastReadSortKey = lastReadSortKey;
                 participant.LastReadAt = readAt;
             }
 
@@ -175,6 +178,7 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
                     ConversationId = conversation.Id,
                     MemberId = senderMemberId,
                     LastReadAt = sentAt,
+                    LastReadSortKey = null,
                     IsArchived = false,
                 });
                 participants.Add(new PrivateConversationParticipantEntity
@@ -182,33 +186,31 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
                     ConversationId = conversation.Id,
                     MemberId = recipientMemberId,
                     LastReadAt = null,
+                    LastReadSortKey = null,
                     IsArchived = false,
                 });
             }
             else
             {
-                EnsureParticipant(conversation.Id, senderMemberId, sentAt);
-                EnsureParticipant(conversation.Id, recipientMemberId, lastReadAt: null);
+                EnsureParticipant(conversation.Id, senderMemberId);
+                EnsureParticipant(conversation.Id, recipientMemberId);
                 UpdateSummaryIfNewer(conversation, sentAt, TruncatePreview(body), senderMemberId);
                 Unarchive(conversation.Id, senderMemberId);
                 Unarchive(conversation.Id, recipientMemberId);
-                var senderParticipant = participants.Single(
-                    p => p.ConversationId == conversation.Id && p.MemberId == senderMemberId);
-                if (senderParticipant.LastReadAt is null || sentAt > senderParticipant.LastReadAt)
-                {
-                    senderParticipant.LastReadAt = sentAt;
-                }
             }
 
-            messages.Add(new PrivateMessageEntity
+            var message = new PrivateMessageEntity
             {
                 Id = Guid.NewGuid(),
                 ConversationId = conversation.Id,
                 SenderMemberId = senderMemberId,
                 Body = body,
                 CreatedAt = sentAt,
-            });
-
+                SortKey = nextSortKey++,
+            };
+            messages.Add(message);
+            UpdateSummaryIfNewer(conversation, sentAt, TruncatePreview(body), senderMemberId);
+            AdvanceReadCursor(conversation.Id, senderMemberId, message.SortKey, sentAt);
             return Task.FromResult(new PrivateMessageSendResult(true, conversation.Id, null));
         }
     }
@@ -250,26 +252,21 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
                 return Task.FromResult(new PrivateMessageSendResult(false, null, "Conversation not found."));
             }
 
-            messages.Add(new PrivateMessageEntity
+            var message = new PrivateMessageEntity
             {
                 Id = Guid.NewGuid(),
                 ConversationId = conversationId,
                 SenderMemberId = senderMemberId,
                 Body = body,
                 CreatedAt = sentAt,
-            });
+                SortKey = nextSortKey++,
+            };
+            messages.Add(message);
 
             UpdateSummaryIfNewer(conversation, sentAt, TruncatePreview(body), senderMemberId);
-
             Unarchive(conversationId, conversation.MemberLowId);
             Unarchive(conversationId, conversation.MemberHighId);
-
-            var senderParticipant = participants.Single(
-                p => p.ConversationId == conversationId && p.MemberId == senderMemberId);
-            if (senderParticipant.LastReadAt is null || sentAt > senderParticipant.LastReadAt)
-            {
-                senderParticipant.LastReadAt = sentAt;
-            }
+            AdvanceReadCursor(conversationId, senderMemberId, message.SortKey, sentAt);
 
             return Task.FromResult(new PrivateMessageSendResult(true, conversationId, null));
         }
@@ -298,10 +295,10 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
         return messages.Count(m =>
             m.ConversationId == participant.ConversationId
             && m.SenderMemberId != participant.MemberId
-            && (participant.LastReadAt is null || m.CreatedAt > participant.LastReadAt));
+            && (participant.LastReadSortKey is null || m.SortKey > participant.LastReadSortKey));
     }
 
-    private void EnsureParticipant(Guid conversationId, Guid memberId, DateTimeOffset? lastReadAt)
+    private void EnsureParticipant(Guid conversationId, Guid memberId)
     {
         if (participants.Any(p => p.ConversationId == conversationId && p.MemberId == memberId))
         {
@@ -312,7 +309,8 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
         {
             ConversationId = conversationId,
             MemberId = memberId,
-            LastReadAt = lastReadAt,
+            LastReadAt = null,
+            LastReadSortKey = null,
             IsArchived = false,
         });
     }
@@ -324,6 +322,21 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
         if (participant is not null)
         {
             participant.IsArchived = false;
+        }
+    }
+
+    private void AdvanceReadCursor(
+        Guid conversationId,
+        Guid memberId,
+        long sortKey,
+        DateTimeOffset readAt)
+    {
+        var participant = participants.Single(
+            p => p.ConversationId == conversationId && p.MemberId == memberId);
+        if (participant.LastReadSortKey is null || participant.LastReadSortKey < sortKey)
+        {
+            participant.LastReadSortKey = sortKey;
+            participant.LastReadAt = readAt;
         }
     }
 

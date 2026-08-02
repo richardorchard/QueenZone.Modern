@@ -24,7 +24,8 @@ public sealed record PrivateMessageItem(
     string SenderDisplayName,
     string Body,
     DateTimeOffset CreatedAt,
-    bool IsMine);
+    bool IsMine,
+    long SortKey);
 
 public sealed record PrivateConversationDetail(
     Guid ConversationId,

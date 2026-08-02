@@ -15,6 +15,12 @@ public sealed class PrivateMessageEntity
 
     public DateTimeOffset CreatedAt { get; set; }
 
+    /// <summary>
+    /// Database-assigned insert order used as the stable unread cursor.
+    /// Prefer this over <see cref="CreatedAt"/>, which is not unique or commit-ordered.
+    /// </summary>
+    public long SortKey { get; set; }
+
     public PrivateConversationEntity? Conversation { get; set; }
 
     public MemberAccount? Sender { get; set; }
