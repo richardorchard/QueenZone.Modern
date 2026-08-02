@@ -64,6 +64,21 @@
   height: 42px;
 }
 
+.qz-brand .qz-brand__crest {
+  width: 42px;
+  height: 32px;
+  overflow: hidden;
+}
+
+.qz-brand .qz-brand__crest img {
+  display: block;
+  width: 42px;
+  height: 42px;
+  max-width: none;
+  object-fit: cover;
+  object-position: top center;
+}
+
 .qz-brand span {
   font-family: var(--font-titling);
   font-size: 1.3125rem;
@@ -3180,6 +3195,16 @@ body.qz-menu-lock .qz-masthead {
   }
 
   .qz-brand img {
+    height: 34px;
+  }
+
+  .qz-brand .qz-brand__crest {
+    width: 34px;
+    height: 26px;
+  }
+
+  .qz-brand .qz-brand__crest img {
+    width: 34px;
     height: 34px;
   }
 
