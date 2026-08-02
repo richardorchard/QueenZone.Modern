@@ -26,6 +26,17 @@ if ([string]::IsNullOrWhiteSpace($sourceConnectionString)) {
 
 $bacpacPath = Join-Path ([System.IO.Path]::GetTempPath()) "queenzone-legacy-$(Get-Date -Format 'yyyyMMdd-HHmmss').bacpac"
 
+# Defensive cleanup: the finally block below deletes this run's own bacpac,
+# but a hard-killed run (workflow cancellation, runner crash) can skip that
+# and leave one behind. Sweep anything older than 6 hours - safely older
+# than any run in progress - so those don't quietly accumulate in %TEMP%.
+Get-ChildItem -Path ([System.IO.Path]::GetTempPath()) -Filter "queenzone-legacy-*.bacpac" -ErrorAction SilentlyContinue |
+    Where-Object { $_.LastWriteTime -lt (Get-Date).AddHours(-6) } |
+    ForEach-Object {
+        Write-Host "Removing stale leftover bacpac from an interrupted run: $($_.Name)"
+        Remove-Item $_.FullName -Force -ErrorAction SilentlyContinue
+    }
+
 try {
     Write-Host "Exporting live legacy database to $bacpacPath..."
     sqlpackage /Action:Export `
