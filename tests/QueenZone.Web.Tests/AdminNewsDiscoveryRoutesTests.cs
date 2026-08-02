@@ -915,7 +915,7 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
 
         var indexBody = await client.GetStringAsync("/admin/news-discovery");
         Assert.Contains("List ignore candidate", indexBody);
-        Assert.Contains("Ignore", indexBody);
+        Assert.Contains("Ignore / remove from queue", indexBody);
 
         var response = await PostIndexActionAsync(
             client,
@@ -969,6 +969,8 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
         var statusBody = await client.GetStringAsync("/admin/news-discovery");
         Assert.Contains("already pending", statusBody);
         Assert.Contains(AdminEmail, statusBody);
+        Assert.Contains("Recent runner requests (1)", statusBody);
+        Assert.Contains("processing-history records, not news articles", statusBody);
     }
 
     [Fact]
@@ -1070,7 +1072,7 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
         var filteredBody = await client.GetStringAsync("/admin/news-discovery?trustTier=Primary");
         Assert.Contains("Bulk ignore primary", filteredBody);
         Assert.DoesNotContain("Bulk ignore secondary", filteredBody);
-        Assert.Contains("Ignore all listed", filteredBody);
+        Assert.Contains("Ignore all listed / remove from queue", filteredBody);
 
         var response = await PostIndexActionAsync(
             client,
