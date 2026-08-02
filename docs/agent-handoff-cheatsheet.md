@@ -45,7 +45,7 @@ Also fill in the **Agent** line when opening the pull request (see `.github/pull
 | **SEO / crawlability** | Unique page titles, canonical links, and crawlable HTML matter; avoid duplicate canonical pages |
 | **Testing** | Pure logic in unit tests; route behavior in web integration tests with sample/fake data by default; report whether legacy DB checks ran |
 | **Secrets / deploy** | No secrets in git; Bitwarden Secrets Manager project `Queenzone Development` mirrors local/App Service development secrets for agents; App Service runtime uses `ConnectionStrings__QueenZoneLegacy`; GitHub migrations use the separate `QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING` secret; say what was tested before merge |
-| **News agent** | Worker: `QueenZone.NewsAgent.Worker` + `discover-news` flags; secrets in `appsettings.Local.json`; smoke: `scripts/Smoke-NewsAgent.bat`; review: `/admin/news-discovery`; never auto-publish to public `/news` |
+| **News agent** | Worker: `QueenZone.NewsAgent.Worker` + `discover-news` / `process-news-requests`; secrets in `appsettings.Local.json`; smoke: `scripts/Smoke-NewsAgent.bat`; review: `/admin/news-discovery` (queue gathering + submit URL); live URL probe: `scripts/Probe-NewsAgentUrlIngestion.ps1`; never auto-publish to public `/news` |
 
 ## Most-Used Minimal Template
 
