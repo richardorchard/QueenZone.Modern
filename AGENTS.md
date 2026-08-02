@@ -78,6 +78,8 @@ Use deterministic sample or fake data for normal unit and web integration tests.
 
 When changing EF `SqlQueryRaw` projections over legacy tables, check the real SQL Server column types or cast projections to the C# row model types explicitly. Many legacy IDs and counts are `smallint`, which SQL Server materializes as `System.Int16`; in-memory route tests will not catch `Int16`-to-`Int32` mapping failures. Prefer a deterministic SQL-shape test plus an opt-in read-only legacy DB probe for new public legacy read surfaces.
 
+The read-only legacy probes now also run automatically every night against the real legacy database via `.github/workflows/nightly-legacy-checks.yml` on the self-hosted macOS runner — not a PR gate, just continuous signal. See `docs/architecture/testing-policy.md` ("Data Integration Tests").
+
 When a change touches admin news writes or discovery-to-news promotion, prefer running the opt-in admin write probe before release or after deployment verification:
 
 ```powershell
