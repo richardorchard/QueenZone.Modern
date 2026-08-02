@@ -164,5 +164,33 @@ public sealed class InMemoryMemberAccountRepository : IMemberAccountRepository
         }
     }
 
+    public Task<IReadOnlyList<MemberRecipientMatch>> SearchByDisplayNameAsync(
+        string query,
+        Guid? excludeMemberId = null,
+        int maxResults = PrivateMessageLimits.MaxRecipientSearchResults,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return Task.FromResult<IReadOnlyList<MemberRecipientMatch>>([]);
+        }
+
+        maxResults = Math.Clamp(maxResults, 1, PrivateMessageLimits.MaxRecipientSearchResults);
+        var term = query.Trim();
+
+        lock (gate)
+        {
+            IReadOnlyList<MemberRecipientMatch> matches = accounts
+                .Where(account =>
+                    account.DisplayName.Contains(term, StringComparison.OrdinalIgnoreCase)
+                    && (excludeMemberId is null || account.Id != excludeMemberId.Value))
+                .OrderBy(account => account.DisplayName, StringComparer.OrdinalIgnoreCase)
+                .Take(maxResults)
+                .Select(account => new MemberRecipientMatch(account.Id, account.DisplayName))
+                .ToList();
+            return Task.FromResult(matches);
+        }
+    }
+
     private static string Normalize(string email) => email.Trim().ToUpperInvariant();
 }

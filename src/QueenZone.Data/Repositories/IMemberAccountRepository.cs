@@ -35,4 +35,14 @@ public interface IMemberAccountRepository
     Task<IReadOnlyList<RecentLogin>> GetRecentLoginsAsync(int count, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<DailyRegistration>> GetDailyRegistrationsAsync(DateOnly fromDate, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Finds members whose display name contains <paramref name="query"/> (case-insensitive).
+    /// Display names are not unique — callers must present matches for selection.
+    /// </summary>
+    Task<IReadOnlyList<MemberRecipientMatch>> SearchByDisplayNameAsync(
+        string query,
+        Guid? excludeMemberId = null,
+        int maxResults = PrivateMessageLimits.MaxRecipientSearchResults,
+        CancellationToken cancellationToken = default);
 }

@@ -80,6 +80,20 @@ public sealed class EfMemberAccountRepositoryTests : IAsyncDisposable
         Assert.Null(cleared!.AvatarUrl);
     }
 
+    [Fact]
+    public async Task SearchByDisplayNameAsync_MatchesAndExcludesMember()
+    {
+        var alice = await SeedAccountAsync("search-alice@example.com", "Search Alice");
+        var bob = await SeedAccountAsync("search-bob@example.com", "Search Bob");
+        await SeedAccountAsync("search-bobby@example.com", "Search Bobby");
+
+        var matches = await repository.SearchByDisplayNameAsync("Search Bo", excludeMemberId: alice.Id);
+
+        Assert.Contains(matches, m => m.MemberId == bob.Id);
+        Assert.DoesNotContain(matches, m => m.MemberId == alice.Id);
+        Assert.Contains(matches, m => m.DisplayName == "Search Bobby");
+    }
+
     private async Task<MemberAccount> SeedAccountAsync(string email, string displayName)
     {
         return await repository.CreateAsync(new MemberAccount
