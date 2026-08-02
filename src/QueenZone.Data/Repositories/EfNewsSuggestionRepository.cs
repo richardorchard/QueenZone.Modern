@@ -1,4 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
 using Microsoft.EntityFrameworkCore;
 using QueenZone.Data.Entities;
 
@@ -264,11 +263,9 @@ public sealed class EfNewsSuggestionRepository(QueenZoneDbContext dbContext) : I
     }
 
     // SQL Server only: the EF Core SQLite provider cannot translate DateTimeOffset comparisons
-    // inside conditional aggregates, so this path has no automated coverage in this repo's
-    // SQLite-backed CI suite. Verified manually against SQL Server (LocalDB): seeded rows across
-    // Pending/UnderReview/Promoted/Rejected/Duplicate statuses and today/this-week/30-day
-    // boundaries and confirmed the counts match the in-memory implementation above.
-    [ExcludeFromCodeCoverage]
+    // inside conditional aggregates, so this path has no coverage from the default SQLite-backed
+    // QueenZone.Web.Tests suite. Covered instead by tests/QueenZone.SqlServerTests against a
+    // real SQL Server (Docker in CI, LocalDB locally) — see docs/architecture/testing-policy.md.
     private async Task<SubmissionTypeCounts> GetDashboardCountsViaSqlAggregateAsync(
         DateTimeOffset utcNow,
         CancellationToken cancellationToken)
@@ -331,10 +328,7 @@ public sealed class EfNewsSuggestionRepository(QueenZoneDbContext dbContext) : I
             .ToList();
     }
 
-    // SQL Server only: see the note on GetDashboardCountsViaSqlAggregateAsync. Verified manually
-    // against SQL Server (LocalDB) with a mix of submitters/dates and confirmed the counts and
-    // display names match the in-memory implementation above.
-    [ExcludeFromCodeCoverage]
+    // SQL Server only: see the note on GetDashboardCountsViaSqlAggregateAsync.
     private async Task<IReadOnlyList<SubmissionContributor>> GetTopContributorsViaSqlAggregateAsync(
         DateTimeOffset monthStart,
         int maxCount,
