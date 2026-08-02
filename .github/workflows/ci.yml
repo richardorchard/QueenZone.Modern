@@ -424,8 +424,8 @@ jobs:
 
       # E2E does not ProjectReference Web — restore each graph separately and
       # skip the solution's unit/integration test projects. Linux publish from
-      # the `build` job is not reusable here (need a native QueenZone.Web
-      # executable for these OSes).
+      # the `build` job is not reusable here because the self-hosted runner
+      # needs output published for its own OS.
       - name: Restore E2E tests and web app
         run: |
           dotnet restore tests/QueenZone.Web.E2E/QueenZone.Web.E2E.csproj
@@ -449,10 +449,6 @@ jobs:
 
       - name: Publish web app
         run: dotnet publish src/QueenZone.Web/QueenZone.Web.csproj --configuration Release --no-restore --output e2e-app
-
-      - name: Make published app executable (macOS)
-        if: runner.os == 'macOS'
-        run: chmod +x e2e-app/QueenZone.Web
 
       - name: Start app in background (Windows)
         if: runner.os == 'Windows'
@@ -491,12 +487,16 @@ jobs:
         run: |
           # Unlike Windows, a POSIX background process (`&`) survives past the
           # end of this step without needing a WMI-style detach trick — it's
-          # simply re-parented, not tied to the step's own process tree.
+          # simply re-parented, not tied to the step's own process tree. Launch
+          # the framework-dependent DLL through the dotnet executable already
+          # verified on PATH. The native app host only searches DOTNET_ROOT and
+          # standard install locations, so it cannot find SDKs installed in a
+          # user-local or tool-managed directory even when `dotnet` works.
           APP_DIR="$(pwd)/e2e-app"
           ASPNETCORE_ENVIRONMENT=Testing \
           ASPNETCORE_URLS=http://127.0.0.1:5099 \
           ASPNETCORE_CONTENTROOT="$APP_DIR" \
-          "$APP_DIR/QueenZone.Web" > e2e-app.log 2> e2e-app.err.log &
+          dotnet "$APP_DIR/QueenZone.Web.dll" > e2e-app.log 2> e2e-app.err.log &
           echo $! > e2e-app.pid
 
       - name: Wait for app to be ready (Windows)
