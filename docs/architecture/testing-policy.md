@@ -103,6 +103,50 @@ ConnectionStrings__QueenZoneLegacy=...
 
 Do not require these tests in normal CI until the project has a known, repeatable test database.
 
+The **read-only** probes (`EfAdminNewsRepositoryLegacyProbeTests`, and the read-only fact in
+`EfNewsSectionLiveProbeTests`) do run automatically — nightly, via
+`.github/workflows/nightly-legacy-checks.yml`, on the self-hosted macOS runner. This is separate
+from "normal CI": it's not a PR gate, doesn't block merges, and only runs on a schedule (plus
+`workflow_dispatch`).
+
+They run against a same-day SQL Express mirror on the self-hosted Windows runner
+(`scripts/Sync-LegacyDbToSqlExpress.ps1` refreshes it nightly from the live Azure SQL DB via a
+`sqlpackage` bacpac export/import — see the workflow file for the one-time setup this requires),
+not the live database directly. `RUN_LEGACY_WRITE_PROBE` is still deliberately left unset there, so
+the write-capable probes below stay no-ops on this schedule for now — but since the target is now a
+disposable nightly-refreshed mirror rather than the production-equivalent live database, the original
+safety concern about unattended writes mostly goes away. See
+[#449](https://github.com/richardorchard/QueenZone.Modern/issues/449) for the tracked follow-up on
+turning them on.
+
+### Modern-Schema SQL Server Tests
+
+`tests/QueenZone.SqlServerTests` covers modern EF-managed query paths that only run against a real
+SQL Server — most commonly because EF Core's SQLite provider (used by the default `QueenZone.Web.Tests`
+suite) cannot translate `DateTimeOffset` comparisons at all, not just in complex queries. Repositories
+split those methods into an in-memory SQLite fallback (covered by `QueenZone.Web.Tests`, matches
+default CI behavior) and a separate SQL-Server-only method with a short comment pointing here — see
+`EfNewsSuggestionRepository.GetDashboardCountsViaSqlAggregateAsync` for the pattern.
+
+Like `tests/QueenZone.Web.E2E`, this project is **not part of `QueenZone.sln`**, so the default
+`dotnet test QueenZone.sln` (the local equivalent of the CI gate) stays DB-free. Unlike the opt-in
+legacy data integration tests above, it does run on **every pull request** in CI — as its own job
+(`sql-server-tests` in `.github/workflows/ci.yml`) against a throwaway `mcr.microsoft.com/mssql/server`
+Docker service container, not the shared Azure SQL instance used by `ef-migrations`/deploy. Its
+coverage is merged into the same union report as the `test` matrix shards, so these methods count
+toward both coverage gates like any other code.
+
+Run it locally against SQL Server LocalDB (no container needed):
+
+```powershell
+dotnet test tests/QueenZone.SqlServerTests/QueenZone.SqlServerTests.csproj
+```
+
+Set `ConnectionStrings__SqlServerTest` to point at a different SQL Server instance (for example the
+CI container's `Server=localhost,1433;User Id=sa;Password=...;TrustServerCertificate=True`) if LocalDB
+isn't available. Each test creates and drops its own uniquely named scratch database, so tests can run
+in parallel and never touch the legacy or Azure SQL databases.
+
 When EF Core `SqlQueryRaw` maps legacy columns into typed row classes, do not rely only on in-memory route tests. The legacy schema uses many `smallint` and `bit` columns; SQL Server returns those as `System.Int16` and `bool`, not `int`. Either cast projected values to the row model type in SQL (for example, `CAST(Q_LINK_CAT_ID AS int) AS CategoryId`) and cover that SQL shape with a deterministic test, or run an opt-in read-only legacy database probe before deployment to prove the projection materializes.
 
 For pre-release admin write checks against the configured legacy SQL Server database, run `scripts/Probe-AdminNewsLegacyWrites.ps1` with both `ConnectionStrings__QueenZoneLegacy` and `RUN_LEGACY_WRITE_PROBE=true` set. The probe creates, publishes, unpublishes, and deletes a uniquely named test article. Point the connection string at a database you are willing to mutate (often the same Azure SQL instance used locally or in production), not the in-memory sample data path.
@@ -229,7 +273,8 @@ These gates are guardrails, not a replacement for useful assertions. New or chan
 | --- | --- | --- |
 | `build` | Restore, build, format verify, upload binaries + Linux publish artifact | Yes |
 | `test` | Mixed Web.Tests shards (+ small test projects on shard 0) with Coverlet | Yes |
-| `coverage` | Merge shard Cobertura reports, HTML summary, coverage gates | Yes |
+| `sql-server-tests` | `QueenZone.SqlServerTests` against a Docker `mssql` service container | Yes |
+| `coverage` | Merge shard + SQL Server Cobertura reports, HTML summary, coverage gates | Yes |
 | `ef-migrations` | When migration-related paths change: snapshot check + `database update` on Azure SQL | Yes (same-repo PRs only; skipped otherwise) |
 | `smoke-test` | Published app, curl `/health`, `/`, `/news` (after `coverage`) | Yes |
 | `e2e-test` | Playwright suite on self-hosted Windows runner (after `coverage`; gates deploy) | Yes when the runner is online |
