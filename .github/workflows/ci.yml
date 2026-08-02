@@ -375,42 +375,57 @@ jobs:
           retention-days: 7
 
   e2e-test:
-    # Runs on a self-hosted Windows runner (this machine) instead of a
-    # GitHub-hosted runner, so it does not consume billed Actions minutes.
+    # Runs on whichever self-hosted runner with the `e2e` label is online and
+    # idle (currently a Windows box and a Mac — see repo Settings > Actions >
+    # Runners), instead of a GitHub-hosted runner, so it does not consume
+    # billed Actions minutes. GitHub queues to whichever matching runner
+    # picks the job up first; there's no guaranteed preference between them,
+    # so steps below branch on `runner.os` to cover both. Both runners need
+    # the .NET 10 SDK on PATH already (see "Verify .NET SDK" below); the
+    # macOS runner additionally needs PowerShell 7 (`pwsh`, e.g. via
+    # `brew install --cask powershell`) for the Playwright install step,
+    # since that step runs Playwright's generated .ps1 installer script.
     #
     # This is a merge gate enforced by main's required status checks, not a
     # deploy gate — deploy.yml does not re-run e2e, so a deploy is never
-    # blocked by this runner being offline. Untested code still can't reach
+    # blocked by both runners being offline. Untested code still can't reach
     # main because the PR itself can't merge without a green run here.
-    runs-on: [self-hosted, Windows]
+    runs-on: [self-hosted, e2e]
     needs: [changes, build, coverage]
     if: needs.changes.outputs.code == 'true'
     timeout-minutes: 15
 
     steps:
       # If a previous run's "Stop app" step failed to terminate the real
-      # QueenZone.Web.exe child process (see that step's comment below), it
-      # is left running and holding its own exe file locked, which makes
-      # actions/checkout's workspace clean fail with an EPERM unlink error
-      # before any of our own steps even run. Clear out any leftover process
-      # from a prior run first so checkout can clean the workspace.
-      - name: Kill stray app processes from a previous run
+      # QueenZone.Web(.exe) child process (see that step's comment below), it
+      # is left running and (on Windows) holding its own exe file locked,
+      # which makes actions/checkout's workspace clean fail with an EPERM
+      # unlink error before any of our own steps even run. Clear out any
+      # leftover process from a prior run first so checkout can clean the
+      # workspace.
+      - name: Kill stray app processes from a previous run (Windows)
+        if: runner.os == 'Windows'
         run: |
           Get-Process -Name "QueenZone.Web" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+
+      - name: Kill stray app processes from a previous run (macOS)
+        if: runner.os == 'macOS'
+        run: pkill -f QueenZone.Web || true
 
       - name: Checkout
         uses: actions/checkout@v6
 
-      # actions/setup-dotnet tries to (re)install into C:\Program Files\dotnet,
-      # which the runner service account cannot write to without elevation.
-      # This machine already has the .NET 10 SDK installed and on PATH, so
-      # use that directly instead of running the action here.
+      # actions/setup-dotnet tries to (re)install into a system path the
+      # runner service account cannot write to without elevation. Both
+      # machines already have the .NET 10 SDK installed and on PATH, so use
+      # that directly instead of running the action here.
       - name: Verify .NET SDK
         run: dotnet --version
 
       # E2E does not ProjectReference Web — restore each graph separately and
       # skip the solution's unit/integration test projects. Linux publish from
-      # the build job is not reusable here (need QueenZone.Web.exe on Windows).
+      # the `build` job is not reusable here because the self-hosted runner
+      # needs output published for its own OS.
       - name: Restore E2E tests and web app
         run: |
           dotnet restore tests/QueenZone.Web.E2E/QueenZone.Web.E2E.csproj
@@ -419,13 +434,24 @@ jobs:
       - name: Build E2E tests
         run: dotnet build tests/QueenZone.Web.E2E/QueenZone.Web.E2E.csproj --configuration Release --no-restore
 
-      - name: Install Playwright browsers
+      - name: Install Playwright browsers (Windows)
+        if: runner.os == 'Windows'
         run: .\tests\QueenZone.Web.E2E\bin\Release\net10.0\playwright.ps1 install chromium
 
-      - name: Publish web app (Windows)
+      # Uses the same generated .ps1 installer as Windows (it matches the
+      # exact Playwright package/browser version used by the built test
+      # project — a separately-versioned CLI tool could drift out of sync),
+      # invoked via pwsh since macOS's default shell is bash.
+      - name: Install Playwright browsers (macOS)
+        if: runner.os == 'macOS'
+        shell: pwsh
+        run: ./tests/QueenZone.Web.E2E/bin/Release/net10.0/playwright.ps1 install chromium
+
+      - name: Publish web app
         run: dotnet publish src/QueenZone.Web/QueenZone.Web.csproj --configuration Release --no-restore --output e2e-app
 
-      - name: Start app in background
+      - name: Start app in background (Windows)
+        if: runner.os == 'Windows'
         run: |
           # Start-Process makes the app a child of this step's process, which is
           # tied to the runner's Windows Job Object and gets killed when this step
@@ -456,7 +482,25 @@ jobs:
           $appPid | Out-File -Encoding ascii e2e-app.pid
           Write-Host "Started app: cmd.exe PID $cmdPid, QueenZone.Web.exe PID $appPid"
 
-      - name: Wait for app to be ready
+      - name: Start app in background (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          # Unlike Windows, a POSIX background process (`&`) survives past the
+          # end of this step without needing a WMI-style detach trick — it's
+          # simply re-parented, not tied to the step's own process tree. Launch
+          # the framework-dependent DLL through the dotnet executable already
+          # verified on PATH. The native app host only searches DOTNET_ROOT and
+          # standard install locations, so it cannot find SDKs installed in a
+          # user-local or tool-managed directory even when `dotnet` works.
+          APP_DIR="$(pwd)/e2e-app"
+          ASPNETCORE_ENVIRONMENT=Testing \
+          ASPNETCORE_URLS=http://127.0.0.1:5099 \
+          ASPNETCORE_CONTENTROOT="$APP_DIR" \
+          dotnet "$APP_DIR/QueenZone.Web.dll" > e2e-app.log 2> e2e-app.err.log &
+          echo $! > e2e-app.pid
+
+      - name: Wait for app to be ready (Windows)
+        if: runner.os == 'Windows'
         run: |
           Write-Host "Waiting for web app..."
           $appPid = Get-Content e2e-app.pid
@@ -482,6 +526,25 @@ jobs:
           Get-Content e2e-app.err.log -ErrorAction SilentlyContinue
           exit 1
 
+      - name: Wait for app to be ready (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          echo "Waiting for web app..."
+          for i in $(seq 1 60); do
+            if ! kill -0 "$(cat e2e-app.pid)" 2>/dev/null; then
+              echo "App process exited unexpectedly after ${i}s"
+              break
+            fi
+            if curl -sf http://127.0.0.1:5099/health > /dev/null; then
+              echo "App is up after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "App failed to start in time"
+          cat e2e-app.log e2e-app.err.log 2>/dev/null || true
+          exit 1
+
       - name: Run Playwright e2e tests
         env:
           E2E_BASE_URL: http://127.0.0.1:5099
@@ -489,8 +552,8 @@ jobs:
           E2E_ARTIFACT_DIR: test-results/e2e
         run: dotnet test tests/QueenZone.Web.E2E/QueenZone.Web.E2E.csproj --configuration Release --no-build
 
-      - name: Stop app
-        if: always()
+      - name: Stop app (Windows)
+        if: always() && runner.os == 'Windows'
         run: |
           if (Test-Path e2e-app.pid) {
             Stop-Process -Id (Get-Content e2e-app.pid) -Force -ErrorAction SilentlyContinue
@@ -516,6 +579,14 @@ jobs:
             }
             Start-Sleep -Milliseconds 500
           }
+
+      - name: Stop app (macOS)
+        if: always() && runner.os == 'macOS'
+        run: |
+          if [ -f e2e-app.pid ]; then
+            kill "$(cat e2e-app.pid)" 2>/dev/null || true
+          fi
+          pkill -f QueenZone.Web 2>/dev/null || true
 
       - name: Upload Playwright failure artifacts
         if: failure()

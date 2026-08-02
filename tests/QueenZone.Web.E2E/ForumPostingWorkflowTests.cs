@@ -107,7 +107,7 @@ public class ForumPostingWorkflowTests : E2EPageTest
         var editor = Page.Locator(".ql-editor").Last;
         await Expect(editor).ToContainTextAsync(originalBody);
         await editor.ClickAsync();
-        await Page.Keyboard.PressAsync("Control+A");
+        await Page.Keyboard.PressAsync("ControlOrMeta+A");
         await Page.Keyboard.InsertTextAsync(editedBody);
         await Page.GetByRole(AriaRole.Button, new() { Name = "Save changes" }).ClickAsync();
 
