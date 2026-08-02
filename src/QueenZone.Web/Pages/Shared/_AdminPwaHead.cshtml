@@ -1,0 +1,15 @@
+@using Microsoft.AspNetCore.Diagnostics
+@{
+  var originalPath = Context.Features.Get<IStatusCodeReExecuteFeature>()?.OriginalPath;
+  var isAdmin = Context.Request.Path.StartsWithSegments("/Admin", StringComparison.OrdinalIgnoreCase)
+      || (originalPath is not null && originalPath.StartsWith("/Admin", StringComparison.OrdinalIgnoreCase));
+}
+@if (isAdmin)
+{
+  <link rel="manifest" href="/admin-manifest.webmanifest">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="QZ Admin">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#111111">
+}
