@@ -157,6 +157,55 @@ public sealed class PrivateMessageServiceTests
         Assert.Equal(expected, PrivateMessageService.CanMessage(currentId, targetId));
     }
 
+
+    [Fact]
+    public async Task GetConversation_MarkRead_UsesLastReturnedMessageCursor()
+    {
+        var (service, _, messages, alice, bob) = CreateSystem();
+        var created = await service.ComposeAsync(alice.Id, bob.Id, "Visible");
+        var conversationId = created.ConversationId!.Value;
+
+        // Simulate a message that arrives/commits after the thread was loaded but with a
+        // timestamp after the last returned message. It must remain unread.
+        var detail = await messages.GetConversationAsync(conversationId, bob.Id);
+        Assert.NotNull(detail);
+        var lastSeen = detail!.Messages[^1].CreatedAt;
+
+        await messages.ReplyAsync(
+            conversationId,
+            alice.Id,
+            "Arrived during load",
+            lastSeen.AddSeconds(5));
+
+        await messages.MarkConversationReadAsync(conversationId, bob.Id, lastSeen);
+
+        Assert.Equal(1, await service.CountUnreadConversationsAsync(bob.Id));
+        var inbox = await service.GetInboxAsync(bob.Id);
+        Assert.True(Assert.Single(inbox).HasUnread);
+    }
+
+    [Fact]
+    public async Task GetConversation_MarkRead_DoesNotUseWallClock()
+    {
+        var (service, _, messages, alice, bob) = CreateSystem();
+        var created = await service.ComposeAsync(alice.Id, bob.Id, "Hello");
+        var conversationId = created.ConversationId!.Value;
+
+        await service.GetConversationAsync(conversationId, bob.Id, markRead: true);
+
+        // Insert a message timestamped before "now" but after the last seen message.
+        // If mark-read used UtcNow, this would incorrectly appear read.
+        var detail = await messages.GetConversationAsync(conversationId, bob.Id);
+        var lastSeen = detail!.Messages[^1].CreatedAt;
+        await messages.ReplyAsync(
+            conversationId,
+            alice.Id,
+            "Between last-seen and now",
+            lastSeen.AddMilliseconds(1));
+
+        Assert.Equal(1, await service.CountUnreadConversationsAsync(bob.Id));
+    }
+
     private static (
         PrivateMessageService Service,
         IMemberAccountRepository Members,

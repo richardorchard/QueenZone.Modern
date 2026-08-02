@@ -133,6 +133,105 @@ public sealed class EfPrivateMessageRepositoryTests : IAsyncDisposable
         Assert.False(reply.Succeeded);
     }
 
+    [Fact]
+    public async Task Reply_KeepsNewestSummary_WhenOlderReplyCommitsLater()
+    {
+        var created = await repository.SendNewOrExistingAsync(
+            aliceId,
+            bobId,
+            "Start",
+            DateTimeOffset.Parse("2026-08-02T12:00:00Z"));
+        var conversationId = created.ConversationId!.Value;
+
+        await repository.ReplyAsync(
+            conversationId,
+            bobId,
+            "Newer reply",
+            DateTimeOffset.Parse("2026-08-02T12:02:00Z"));
+        await repository.ReplyAsync(
+            conversationId,
+            aliceId,
+            "Older reply commits later",
+            DateTimeOffset.Parse("2026-08-02T12:01:00Z"));
+
+        var inbox = await repository.GetInboxAsync(aliceId);
+        var item = Assert.Single(inbox);
+        Assert.Equal("Newer reply", item.LastMessagePreview);
+        Assert.Equal(DateTimeOffset.Parse("2026-08-02T12:02:00Z"), item.LastMessageAt);
+
+        var detail = await repository.GetConversationAsync(conversationId, aliceId);
+        Assert.Equal(3, detail!.Messages.Count);
+    }
+
+    [Fact]
+    public async Task ConcurrentFirstSends_ReuseSingleConversation()
+    {
+        const string shared = "Data Source=file:pm-race?mode=memory&cache=shared";
+        await using var keepAlive = new SqliteConnection(shared);
+        keepAlive.Open();
+
+        await using (var setup = CreateContext(shared))
+        {
+            setup.Database.EnsureCreated();
+            setup.MemberAccounts.AddRange(
+                new MemberAccount
+                {
+                    Id = aliceId,
+                    Email = "race-alice@example.com",
+                    NormalizedEmail = "RACE-ALICE@EXAMPLE.COM",
+                    DisplayName = "Race Alice",
+                    CreatedAt = DateTime.UtcNow,
+                },
+                new MemberAccount
+                {
+                    Id = bobId,
+                    Email = "race-bob@example.com",
+                    NormalizedEmail = "RACE-BOB@EXAMPLE.COM",
+                    DisplayName = "Race Bob",
+                    CreatedAt = DateTime.UtcNow,
+                });
+            await setup.SaveChangesAsync();
+        }
+
+        async Task<PrivateMessageSendResult> SendAsync(string body, DateTimeOffset sentAt)
+        {
+            await using var context = CreateContext(shared);
+            var repo = new EfPrivateMessageRepository(context);
+            return await repo.SendNewOrExistingAsync(aliceId, bobId, body, sentAt);
+        }
+
+        var t1 = DateTimeOffset.Parse("2026-08-02T13:00:00Z");
+        var t2 = DateTimeOffset.Parse("2026-08-02T13:00:01Z");
+        var results = await Task.WhenAll(
+            SendAsync("Concurrent A", t1),
+            SendAsync("Concurrent B", t2));
+
+        Assert.All(results, r => Assert.True(r.Succeeded, r.ErrorMessage));
+        Assert.Equal(results[0].ConversationId, results[1].ConversationId);
+
+        await using var verify = CreateContext(shared);
+        var conversations = await verify.PrivateConversations.CountAsync();
+        var messageCount = await verify.PrivateMessages.CountAsync();
+        Assert.Equal(1, conversations);
+        Assert.Equal(2, messageCount);
+    }
+
+    [Fact]
+    public void IsUniqueConstraintViolation_DetectsSqliteUniqueErrors()
+    {
+        var sqlite = new Exception("UNIQUE constraint failed: PrivateConversations.MemberLowId, PrivateConversations.MemberHighId");
+        var wrapped = new DbUpdateException("conflict", sqlite);
+        Assert.True(EfPrivateMessageRepository.IsUniqueConstraintViolation(wrapped));
+    }
+
+    private static QueenZoneDbContext CreateContext(string connectionString)
+    {
+        var options = new DbContextOptionsBuilder<QueenZoneDbContext>()
+            .UseSqlite(connectionString)
+            .Options;
+        return new QueenZoneDbContext(options);
+    }
+
     public async ValueTask DisposeAsync()
     {
         await dbContext.DisposeAsync();

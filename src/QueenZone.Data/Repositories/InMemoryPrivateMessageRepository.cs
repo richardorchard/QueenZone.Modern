@@ -116,7 +116,8 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
         {
             var participant = participants.SingleOrDefault(
                 p => p.ConversationId == conversationId && p.MemberId == memberId);
-            if (participant is not null)
+            if (participant is not null
+                && (participant.LastReadAt is null || readAt > participant.LastReadAt))
             {
                 participant.LastReadAt = readAt;
             }
@@ -188,14 +189,15 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
             {
                 EnsureParticipant(conversation.Id, senderMemberId, sentAt);
                 EnsureParticipant(conversation.Id, recipientMemberId, lastReadAt: null);
-                conversation.LastMessageAt = sentAt;
-                conversation.LastMessagePreview = TruncatePreview(body);
-                conversation.LastMessageSenderId = senderMemberId;
+                UpdateSummaryIfNewer(conversation, sentAt, TruncatePreview(body), senderMemberId);
                 Unarchive(conversation.Id, senderMemberId);
                 Unarchive(conversation.Id, recipientMemberId);
                 var senderParticipant = participants.Single(
                     p => p.ConversationId == conversation.Id && p.MemberId == senderMemberId);
-                senderParticipant.LastReadAt = sentAt;
+                if (senderParticipant.LastReadAt is null || sentAt > senderParticipant.LastReadAt)
+                {
+                    senderParticipant.LastReadAt = sentAt;
+                }
             }
 
             messages.Add(new PrivateMessageEntity
@@ -257,16 +259,17 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
                 CreatedAt = sentAt,
             });
 
-            conversation.LastMessageAt = sentAt;
-            conversation.LastMessagePreview = TruncatePreview(body);
-            conversation.LastMessageSenderId = senderMemberId;
+            UpdateSummaryIfNewer(conversation, sentAt, TruncatePreview(body), senderMemberId);
 
             Unarchive(conversationId, conversation.MemberLowId);
             Unarchive(conversationId, conversation.MemberHighId);
 
             var senderParticipant = participants.Single(
                 p => p.ConversationId == conversationId && p.MemberId == senderMemberId);
-            senderParticipant.LastReadAt = sentAt;
+            if (senderParticipant.LastReadAt is null || sentAt > senderParticipant.LastReadAt)
+            {
+                senderParticipant.LastReadAt = sentAt;
+            }
 
             return Task.FromResult(new PrivateMessageSendResult(true, conversationId, null));
         }
@@ -322,6 +325,22 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
         {
             participant.IsArchived = false;
         }
+    }
+
+    private static void UpdateSummaryIfNewer(
+        PrivateConversationEntity conversation,
+        DateTimeOffset sentAt,
+        string preview,
+        Guid senderMemberId)
+    {
+        if (sentAt < conversation.LastMessageAt)
+        {
+            return;
+        }
+
+        conversation.LastMessageAt = sentAt;
+        conversation.LastMessagePreview = preview;
+        conversation.LastMessageSenderId = senderMemberId;
     }
 
     private static (Guid Low, Guid High) OrderPair(Guid a, Guid b) =>

@@ -46,6 +46,37 @@ public sealed class InMemoryPrivateMessageRepositoryTests
         Assert.DoesNotContain('<', item.LastMessagePreview);
     }
 
+    [Fact]
+    public async Task Reply_DoesNotLetOlderSummaryOverwriteNewer()
+    {
+        var members = new InMemoryMemberAccountRepository();
+        var alice = await members.CreateAsync(NewMember("a3@example.com", "Alice"));
+        var bob = await members.CreateAsync(NewMember("b3@example.com", "Bob"));
+        var repo = new InMemoryPrivateMessageRepository(id =>
+            members.FindByIdAsync(id).GetAwaiter().GetResult());
+
+        var created = await repo.SendNewOrExistingAsync(
+            alice.Id,
+            bob.Id,
+            "Start",
+            DateTimeOffset.Parse("2026-08-01T10:00:00Z"));
+        var conversationId = created.ConversationId!.Value;
+
+        await repo.ReplyAsync(
+            conversationId,
+            bob.Id,
+            "Newer",
+            DateTimeOffset.Parse("2026-08-01T10:02:00Z"));
+        await repo.ReplyAsync(
+            conversationId,
+            alice.Id,
+            "Older",
+            DateTimeOffset.Parse("2026-08-01T10:01:00Z"));
+
+        var item = Assert.Single(await repo.GetInboxAsync(alice.Id));
+        Assert.Equal("Newer", item.LastMessagePreview);
+    }
+
     private static MemberAccount NewMember(string email, string name) =>
         new()
         {

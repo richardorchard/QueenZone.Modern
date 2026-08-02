@@ -32,12 +32,14 @@ public sealed class PrivateMessageService(
             return null;
         }
 
-        if (markRead)
+        // Advance the read cursor only to the last message actually returned. Using UtcNow
+        // would mark messages that arrive (or commit) during the load as read without showing them.
+        if (markRead && detail.Messages.Count > 0)
         {
             await privateMessageRepository.MarkConversationReadAsync(
                 conversationId,
                 memberId,
-                timeProvider.GetUtcNow(),
+                detail.Messages[^1].CreatedAt,
                 cancellationToken);
         }
 

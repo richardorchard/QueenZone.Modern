@@ -1,3 +1,4 @@
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using QueenZone.Data.Entities;
 
@@ -5,6 +6,8 @@ namespace QueenZone.Data;
 
 public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : IPrivateMessageRepository
 {
+    private const int MaxUniqueConflictRetries = 3;
+
     public async Task<IReadOnlyList<PrivateConversationListItem>> GetInboxAsync(
         Guid memberId,
         int page = 1,
@@ -14,34 +17,39 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 100);
 
-        var rows = await dbContext.PrivateConversationParticipants
+        // SQLite EF cannot reliably translate DateTimeOffset ORDER BY in paged queries.
+        if (IsSqliteDatabase())
+        {
+            return await GetInboxSqliteAsync(memberId, page, pageSize, cancellationToken);
+        }
+
+        var pageRows = await dbContext.PrivateConversationParticipants
             .AsNoTracking()
             .Where(p => p.MemberId == memberId && !p.IsArchived)
+            .OrderByDescending(p => p.Conversation!.LastMessageAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Select(p => new
             {
                 p.ConversationId,
                 p.LastReadAt,
-                Conversation = p.Conversation!,
-                OtherDisplayName = p.Conversation!.MemberLowId == memberId
+                Preview = p.Conversation!.LastMessagePreview,
+                LastMessageAt = p.Conversation.LastMessageAt,
+                OtherDisplayName = p.Conversation.MemberLowId == memberId
                     ? (p.Conversation.MemberHigh != null ? p.Conversation.MemberHigh.DisplayName : string.Empty)
                     : (p.Conversation.MemberLow != null ? p.Conversation.MemberLow.DisplayName : string.Empty),
-                OtherId = p.Conversation!.MemberLowId == memberId
+                OtherId = p.Conversation.MemberLowId == memberId
                     ? p.Conversation.MemberHighId
                     : p.Conversation.MemberLowId,
             })
             .ToListAsync(cancellationToken);
 
-        var conversationIds = rows.Select(r => r.ConversationId).ToList();
-        var unreadByConversation = await CountUnreadByConversationAsync(
+        var unreadByConversation = await CountUnreadForPageAsync(
             memberId,
-            conversationIds,
-            rows.ToDictionary(r => r.ConversationId, r => r.LastReadAt),
+            pageRows.Select(r => new ConversationReadCursor(r.ConversationId, r.LastReadAt)).ToList(),
             cancellationToken);
 
-        return rows
-            .OrderByDescending(r => r.Conversation.LastMessageAt)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
+        return pageRows
             .Select(r =>
             {
                 var unread = unreadByConversation.GetValueOrDefault(r.ConversationId);
@@ -49,37 +57,20 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
                     r.ConversationId,
                     r.OtherId,
                     string.IsNullOrWhiteSpace(r.OtherDisplayName) ? "Unknown member" : r.OtherDisplayName,
-                    r.Conversation.LastMessagePreview,
-                    r.Conversation.LastMessageAt,
+                    r.Preview,
+                    r.LastMessageAt,
                     unread > 0,
                     unread);
             })
             .ToList();
     }
 
-    public async Task<int> CountUnreadConversationsAsync(
+    public Task<int> CountUnreadConversationsAsync(
         Guid memberId,
-        CancellationToken cancellationToken = default)
-    {
-        var participants = await dbContext.PrivateConversationParticipants
-            .AsNoTracking()
-            .Where(p => p.MemberId == memberId && !p.IsArchived)
-            .Select(p => new { p.ConversationId, p.LastReadAt })
-            .ToListAsync(cancellationToken);
-
-        if (participants.Count == 0)
-        {
-            return 0;
-        }
-
-        var unread = await CountUnreadByConversationAsync(
-            memberId,
-            participants.Select(p => p.ConversationId).ToList(),
-            participants.ToDictionary(p => p.ConversationId, p => p.LastReadAt),
-            cancellationToken);
-
-        return unread.Count(pair => pair.Value > 0);
-    }
+        CancellationToken cancellationToken = default) =>
+        IsSqliteDatabase()
+            ? CountUnreadConversationsSqliteAsync(memberId, cancellationToken)
+            : CountUnreadConversationsSqlAsync(memberId, cancellationToken);
 
     public async Task<PrivateConversationDetail?> GetConversationAsync(
         Guid conversationId,
@@ -168,8 +159,12 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
             return;
         }
 
-        participant.LastReadAt = readAt;
-        await dbContext.SaveChangesAsync(cancellationToken);
+        // Never move the cursor backwards (e.g. concurrent opens).
+        if (participant.LastReadAt is null || readAt > participant.LastReadAt)
+        {
+            participant.LastReadAt = readAt;
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
     }
 
     public async Task<PrivateMessageSendResult> SendNewOrExistingAsync(
@@ -206,66 +201,29 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
             return new PrivateMessageSendResult(false, null, "Recipient was not found.");
         }
 
-        var (low, high) = OrderPair(senderMemberId, recipientMemberId);
-        var conversation = await dbContext.PrivateConversations
-            .SingleOrDefaultAsync(c => c.MemberLowId == low && c.MemberHighId == high, cancellationToken);
-
-        if (conversation is null)
+        var preview = TruncatePreview(body);
+        for (var attempt = 1; attempt <= MaxUniqueConflictRetries; attempt++)
         {
-            conversation = new PrivateConversationEntity
+            try
             {
-                Id = Guid.NewGuid(),
-                MemberLowId = low,
-                MemberHighId = high,
-                CreatedAt = sentAt,
-                LastMessageAt = sentAt,
-                LastMessagePreview = TruncatePreview(body),
-                LastMessageSenderId = senderMemberId,
-            };
-            dbContext.PrivateConversations.Add(conversation);
-            dbContext.PrivateConversationParticipants.Add(new PrivateConversationParticipantEntity
-            {
-                ConversationId = conversation.Id,
-                MemberId = senderMemberId,
-                LastReadAt = sentAt,
-                IsArchived = false,
-            });
-            dbContext.PrivateConversationParticipants.Add(new PrivateConversationParticipantEntity
-            {
-                ConversationId = conversation.Id,
-                MemberId = recipientMemberId,
-                LastReadAt = null,
-                IsArchived = false,
-            });
-        }
-        else
-        {
-            conversation.LastMessageAt = sentAt;
-            conversation.LastMessagePreview = TruncatePreview(body);
-            conversation.LastMessageSenderId = senderMemberId;
-            await EnsureParticipantAsync(conversation.Id, senderMemberId, sentAt, cancellationToken);
-            await EnsureParticipantAsync(conversation.Id, recipientMemberId, null, cancellationToken);
-            await UnarchiveAsync(conversation.Id, senderMemberId, cancellationToken);
-            await UnarchiveAsync(conversation.Id, recipientMemberId, cancellationToken);
-
-            var senderParticipant = await dbContext.PrivateConversationParticipants
-                .SingleAsync(
-                    p => p.ConversationId == conversation.Id && p.MemberId == senderMemberId,
+                var conversationId = await SendOnceAsync(
+                    senderMemberId,
+                    recipientMemberId,
+                    body,
+                    preview,
+                    sentAt,
                     cancellationToken);
-            senderParticipant.LastReadAt = sentAt;
+                return new PrivateMessageSendResult(true, conversationId, null);
+            }
+            catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex) && attempt < MaxUniqueConflictRetries)
+            {
+                // Concurrent first-send raced on the member-pair unique index. Clear tracked
+                // inserts and retry — the next pass will find the winning conversation.
+                dbContext.ChangeTracker.Clear();
+            }
         }
 
-        dbContext.PrivateMessages.Add(new PrivateMessageEntity
-        {
-            Id = Guid.NewGuid(),
-            ConversationId = conversation.Id,
-            SenderMemberId = senderMemberId,
-            Body = body,
-            CreatedAt = sentAt,
-        });
-
-        await dbContext.SaveChangesAsync(cancellationToken);
-        return new PrivateMessageSendResult(true, conversation.Id, null);
+        return new PrivateMessageSendResult(false, null, "Unable to start the conversation. Please try again.");
     }
 
     public async Task<PrivateMessageSendResult> ReplyAsync(
@@ -299,10 +257,112 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
         }
 
         var conversation = await dbContext.PrivateConversations
+            .AsNoTracking()
             .SingleOrDefaultAsync(c => c.Id == conversationId, cancellationToken);
         if (conversation is null)
         {
             return new PrivateMessageSendResult(false, null, "Conversation not found.");
+        }
+
+        var preview = TruncatePreview(body);
+        dbContext.PrivateMessages.Add(new PrivateMessageEntity
+        {
+            Id = Guid.NewGuid(),
+            ConversationId = conversationId,
+            SenderMemberId = senderMemberId,
+            Body = body,
+            CreatedAt = sentAt,
+        });
+
+        var senderParticipant = await dbContext.PrivateConversationParticipants
+            .SingleAsync(
+                p => p.ConversationId == conversationId && p.MemberId == senderMemberId,
+                cancellationToken);
+        if (senderParticipant.LastReadAt is null || sentAt > senderParticipant.LastReadAt)
+        {
+            senderParticipant.LastReadAt = sentAt;
+        }
+
+        await UnarchiveAsync(conversationId, conversation.MemberLowId, cancellationToken);
+        await UnarchiveAsync(conversationId, conversation.MemberHighId, cancellationToken);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        // Conditional summary update so an earlier reply that commits later cannot overwrite
+        // a newer preview/order established by a concurrent later reply.
+        await UpdateConversationSummaryIfNewerAsync(conversationId, sentAt, preview, senderMemberId, cancellationToken);
+
+        return new PrivateMessageSendResult(true, conversationId, null);
+    }
+
+    private async Task<Guid> SendOnceAsync(
+        Guid senderMemberId,
+        Guid recipientMemberId,
+        string body,
+        string preview,
+        DateTimeOffset sentAt,
+        CancellationToken cancellationToken)
+    {
+        var (low, high) = OrderPair(senderMemberId, recipientMemberId);
+        var conversation = await dbContext.PrivateConversations
+            .SingleOrDefaultAsync(c => c.MemberLowId == low && c.MemberHighId == high, cancellationToken);
+
+        if (conversation is null)
+        {
+            conversation = new PrivateConversationEntity
+            {
+                Id = Guid.NewGuid(),
+                MemberLowId = low,
+                MemberHighId = high,
+                CreatedAt = sentAt,
+                LastMessageAt = sentAt,
+                LastMessagePreview = preview,
+                LastMessageSenderId = senderMemberId,
+            };
+            dbContext.PrivateConversations.Add(conversation);
+            dbContext.PrivateConversationParticipants.Add(new PrivateConversationParticipantEntity
+            {
+                ConversationId = conversation.Id,
+                MemberId = senderMemberId,
+                LastReadAt = sentAt,
+                IsArchived = false,
+            });
+            dbContext.PrivateConversationParticipants.Add(new PrivateConversationParticipantEntity
+            {
+                ConversationId = conversation.Id,
+                MemberId = recipientMemberId,
+                LastReadAt = null,
+                IsArchived = false,
+            });
+
+            dbContext.PrivateMessages.Add(new PrivateMessageEntity
+            {
+                Id = Guid.NewGuid(),
+                ConversationId = conversation.Id,
+                SenderMemberId = senderMemberId,
+                Body = body,
+                CreatedAt = sentAt,
+            });
+
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return conversation.Id;
+        }
+
+        var conversationId = conversation.Id;
+        // Detach the tracked conversation — summary is updated conditionally after insert.
+        dbContext.Entry(conversation).State = EntityState.Detached;
+
+        await EnsureParticipantAsync(conversationId, senderMemberId, sentAt, cancellationToken);
+        await EnsureParticipantAsync(conversationId, recipientMemberId, null, cancellationToken);
+        await UnarchiveAsync(conversationId, senderMemberId, cancellationToken);
+        await UnarchiveAsync(conversationId, recipientMemberId, cancellationToken);
+
+        var senderParticipant = await dbContext.PrivateConversationParticipants
+            .SingleAsync(
+                p => p.ConversationId == conversationId && p.MemberId == senderMemberId,
+                cancellationToken);
+        if (senderParticipant.LastReadAt is null || sentAt > senderParticipant.LastReadAt)
+        {
+            senderParticipant.LastReadAt = sentAt;
         }
 
         dbContext.PrivateMessages.Add(new PrivateMessageEntity
@@ -314,34 +374,151 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
             CreatedAt = sentAt,
         });
 
-        conversation.LastMessageAt = sentAt;
-        conversation.LastMessagePreview = TruncatePreview(body);
-        conversation.LastMessageSenderId = senderMemberId;
-
-        await UnarchiveAsync(conversationId, conversation.MemberLowId, cancellationToken);
-        await UnarchiveAsync(conversationId, conversation.MemberHighId, cancellationToken);
-
-        var senderParticipant = await dbContext.PrivateConversationParticipants
-            .SingleAsync(
-                p => p.ConversationId == conversationId && p.MemberId == senderMemberId,
-                cancellationToken);
-        senderParticipant.LastReadAt = sentAt;
-
         await dbContext.SaveChangesAsync(cancellationToken);
-        return new PrivateMessageSendResult(true, conversationId, null);
+        await UpdateConversationSummaryIfNewerAsync(
+            conversationId,
+            sentAt,
+            preview,
+            senderMemberId,
+            cancellationToken);
+        return conversationId;
     }
 
-    private async Task<Dictionary<Guid, int>> CountUnreadByConversationAsync(
-        Guid memberId,
-        IReadOnlyList<Guid> conversationIds,
-        IReadOnlyDictionary<Guid, DateTimeOffset?> lastReadByConversation,
+    private async Task UpdateConversationSummaryIfNewerAsync(
+        Guid conversationId,
+        DateTimeOffset sentAt,
+        string preview,
+        Guid senderMemberId,
         CancellationToken cancellationToken)
     {
-        if (conversationIds.Count == 0)
+        if (IsSqliteDatabase())
+        {
+            // SQLite EF cannot translate DateTimeOffset comparisons inside ExecuteUpdate.
+            var conversation = await dbContext.PrivateConversations
+                .SingleOrDefaultAsync(c => c.Id == conversationId, cancellationToken);
+            if (conversation is null || conversation.LastMessageAt > sentAt)
+            {
+                return;
+            }
+
+            conversation.LastMessageAt = sentAt;
+            conversation.LastMessagePreview = preview;
+            conversation.LastMessageSenderId = senderMemberId;
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return;
+        }
+
+        await dbContext.PrivateConversations
+            .Where(c => c.Id == conversationId && c.LastMessageAt <= sentAt)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(c => c.LastMessageAt, sentAt)
+                    .SetProperty(c => c.LastMessagePreview, preview)
+                    .SetProperty(c => c.LastMessageSenderId, senderMemberId),
+                cancellationToken);
+    }
+
+    private async Task<int> CountUnreadConversationsSqlAsync(
+        Guid memberId,
+        CancellationToken cancellationToken)
+    {
+        // SQL aggregate: count non-archived conversations with at least one unread message.
+        return await dbContext.PrivateConversationParticipants
+            .AsNoTracking()
+            .Where(p => p.MemberId == memberId && !p.IsArchived)
+            .Where(p => dbContext.PrivateMessages.Any(m =>
+                m.ConversationId == p.ConversationId
+                && m.SenderMemberId != memberId
+                && (p.LastReadAt == null || m.CreatedAt > p.LastReadAt)))
+            .CountAsync(cancellationToken);
+    }
+
+    private async Task<int> CountUnreadConversationsSqliteAsync(
+        Guid memberId,
+        CancellationToken cancellationToken)
+    {
+        var participants = await dbContext.PrivateConversationParticipants
+            .AsNoTracking()
+            .Where(p => p.MemberId == memberId && !p.IsArchived)
+            .Select(p => new { p.ConversationId, p.LastReadAt })
+            .ToListAsync(cancellationToken);
+        if (participants.Count == 0)
+        {
+            return 0;
+        }
+
+        var unread = await CountUnreadForPageAsync(
+            memberId,
+            participants.Select(p => new ConversationReadCursor(p.ConversationId, p.LastReadAt)).ToList(),
+            cancellationToken);
+        return unread.Count(pair => pair.Value > 0);
+    }
+
+    private async Task<IReadOnlyList<PrivateConversationListItem>> GetInboxSqliteAsync(
+        Guid memberId,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken)
+    {
+        var rows = await dbContext.PrivateConversationParticipants
+            .AsNoTracking()
+            .Where(p => p.MemberId == memberId && !p.IsArchived)
+            .Select(p => new
+            {
+                p.ConversationId,
+                p.LastReadAt,
+                Preview = p.Conversation!.LastMessagePreview,
+                LastMessageAt = p.Conversation.LastMessageAt,
+                OtherDisplayName = p.Conversation.MemberLowId == memberId
+                    ? (p.Conversation.MemberHigh != null ? p.Conversation.MemberHigh.DisplayName : string.Empty)
+                    : (p.Conversation.MemberLow != null ? p.Conversation.MemberLow.DisplayName : string.Empty),
+                OtherId = p.Conversation.MemberLowId == memberId
+                    ? p.Conversation.MemberHighId
+                    : p.Conversation.MemberLowId,
+            })
+            .ToListAsync(cancellationToken);
+
+        var pageRows = rows
+            .OrderByDescending(r => r.LastMessageAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToList();
+
+        var unreadByConversation = await CountUnreadForPageAsync(
+            memberId,
+            pageRows.Select(r => new ConversationReadCursor(r.ConversationId, r.LastReadAt)).ToList(),
+            cancellationToken);
+
+        return pageRows
+            .Select(r =>
+            {
+                var unread = unreadByConversation.GetValueOrDefault(r.ConversationId);
+                return new PrivateConversationListItem(
+                    r.ConversationId,
+                    r.OtherId,
+                    string.IsNullOrWhiteSpace(r.OtherDisplayName) ? "Unknown member" : r.OtherDisplayName,
+                    r.Preview,
+                    r.LastMessageAt,
+                    unread > 0,
+                    unread);
+            })
+            .ToList();
+    }
+
+    private async Task<Dictionary<Guid, int>> CountUnreadForPageAsync(
+        Guid memberId,
+        IReadOnlyList<ConversationReadCursor> conversations,
+        CancellationToken cancellationToken)
+    {
+        if (conversations.Count == 0)
         {
             return [];
         }
 
+        var conversationIds = conversations.Select(c => c.ConversationId).ToList();
+        var lastReadByConversation = conversations.ToDictionary(c => c.ConversationId, c => c.LastReadAt);
+
+        // Only load unread candidates for the current inbox page, not the full history.
         var messageRows = await dbContext.PrivateMessages
             .AsNoTracking()
             .Where(m => conversationIds.Contains(m.ConversationId) && m.SenderMemberId != memberId)
@@ -398,6 +575,34 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
         }
     }
 
+    private bool IsSqliteDatabase() =>
+        string.Equals(
+            dbContext.Database.ProviderName,
+            "Microsoft.EntityFrameworkCore.Sqlite",
+            StringComparison.Ordinal);
+
+    internal static bool IsUniqueConstraintViolation(DbUpdateException exception)
+    {
+        for (var inner = exception.InnerException; inner is not null; inner = inner.InnerException)
+        {
+            if (inner is SqlException sql && sql.Number is 2601 or 2627)
+            {
+                return true;
+            }
+
+            // SQLite (and provider wrappers) surface uniqueness as text; Data project does not
+            // reference Microsoft.Data.Sqlite, so detect by message rather than exception type.
+            if (inner.Message.Contains("UNIQUE constraint failed", StringComparison.OrdinalIgnoreCase)
+                || inner.Message.Contains("unique index", StringComparison.OrdinalIgnoreCase)
+                || inner.Message.Contains("duplicate key", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private static (Guid Low, Guid High) OrderPair(Guid a, Guid b) =>
         a.CompareTo(b) < 0 ? (a, b) : (b, a);
 
@@ -408,4 +613,6 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
         body.Length <= PrivateMessageLimits.PreviewLength
             ? body
             : body[..PrivateMessageLimits.PreviewLength];
+
+    private sealed record ConversationReadCursor(Guid ConversationId, DateTimeOffset? LastReadAt);
 }
