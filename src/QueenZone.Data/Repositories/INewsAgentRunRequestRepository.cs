@@ -3,7 +3,7 @@ namespace QueenZone.Data;
 public interface INewsAgentRunRequestRepository
 {
     Task<NewsAgentRunRequestQueueResult> QueueAsync(
-        string requestedBy,
+        NewsAgentRunRequestCreate request,
         CancellationToken cancellationToken = default);
 
     Task<NewsAgentRunRequest?> ClaimNextAsync(

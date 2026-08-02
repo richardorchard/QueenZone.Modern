@@ -6,9 +6,15 @@ public sealed class NewsAgentRunRequestEntity
 
     public NewsAgentRunRequestStatus Status { get; set; }
 
+    public NewsAgentRunRequestKind Kind { get; set; }
+
     public string RequestedBy { get; set; } = string.Empty;
 
     public DateTime RequestedAtUtc { get; set; }
+
+    public string? ArticleUrl { get; set; }
+
+    public bool GenerateDraft { get; set; }
 
     public string? RunnerId { get; set; }
 
