@@ -69,7 +69,11 @@ New-NetFirewallRule -DisplayName $ruleName `
     -RemoteAddress $AllowedSourceAddress -Action Allow | Out-Null
 
 Write-Host "Creating a least-privilege SQL login ($ProbeLoginName) for the nightly job..."
-$probeLoginExisted = [bool](sqlcmd -S "localhost\$InstanceName" -h -1 -W -Q "SET NOCOUNT ON; SELECT COUNT(1) FROM sys.server_principals WHERE name = '$ProbeLoginName'" | Select-Object -First 1 | Where-Object { $_.Trim() -eq '1' })
+# PRINT + substring match instead of parsing a COUNT(1) column - sqlcmd's
+# column/header output is easy to get subtly wrong (blank lines, padding)
+# and got this detection wrong on the first attempt.
+$existsCheckOutput = sqlcmd -S "localhost\$InstanceName" -h -1 -W -Q "SET NOCOUNT ON; IF EXISTS (SELECT 1 FROM sys.server_principals WHERE name = '$ProbeLoginName') PRINT 'PROBE_LOGIN_EXISTS' ELSE PRINT 'PROBE_LOGIN_MISSING'"
+$probeLoginExisted = ($existsCheckOutput -join "`n") -match 'PROBE_LOGIN_EXISTS'
 $createLoginSql = @"
 IF NOT EXISTS (SELECT 1 FROM sys.server_principals WHERE name = '$ProbeLoginName')
 BEGIN
