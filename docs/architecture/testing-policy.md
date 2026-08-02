@@ -281,6 +281,8 @@ These gates are guardrails, not a replacement for useful assertions. New or chan
 
 CI/CD uses two workflows. `.github/workflows/ci.yml` runs the pull-request build, deterministic tests, coverage gates, conditional `ef-migrations`, smoke test, and required e2e merge gate. After merge, `.github/workflows/deploy.yml` rebuilds the tree without rerunning tests, then runs `migrate` → `deploy` → `post-deploy-smoke`. The PR `ef-migrations` job uses the same migration connection string as deploy so SQL Server failures are caught before merge.
 
+Docs-only pull requests (only `docs/` or root `*.md` changes) skip `build` / `test` / coverage / smoke / e2e. Skipped non-matrix jobs still report under their required check names, which GitHub treats as satisfied. The `test` matrix is different: skipping it entirely would report a single `test` check and never create the required `test (0)` / `test (1)` checks, leaving the PR blocked forever. `ci.yml` therefore runs a lightweight `test-docs-ok` matrix on docs-only PRs that emits success for those exact names without running the suite.
+
 ### EF migration consistency
 
 When a change adds, removes, or changes an EF-mapped entity in `QueenZoneDbContext`, verify the model snapshot is current before opening the pull request:

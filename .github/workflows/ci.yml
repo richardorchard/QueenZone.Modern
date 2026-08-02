@@ -163,6 +163,24 @@ jobs:
           retention-days: 2
           if-no-files-found: error
 
+  # Docs-only PRs skip the real `test` matrix above. When a matrix job is skipped
+  # entirely, GitHub reports a single check named `test` — not `test (0)` /
+  # `test (1)`. Those matrix names are required status checks on `main`, so
+  # docs-only PRs would stay blocked forever waiting for checks that never
+  # start. Emit matching success checks instead (no self-hosted runners, no
+  # build artifacts). See docs/architecture/testing-policy.md.
+  test-docs-ok:
+    name: test (${{ matrix.shard }})
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.code != 'true'
+    strategy:
+      matrix:
+        shard: [0, 1]
+    steps:
+      - name: Docs-only PR — required check satisfied
+        run: echo "Docs-only PR — marking test (${{ matrix.shard }}) as satisfied without running the suite."
+
   # Runs the modern-schema query paths that only SQL Server can execute (EF Core's SQLite
   # provider used by the `test` job above cannot translate DateTimeOffset comparisons at all).
   # See tests/QueenZone.SqlServerTests and docs/architecture/testing-policy.md
