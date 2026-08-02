@@ -135,5 +135,32 @@ public sealed class EfMemberAccountRepository(QueenZoneDbContext dbContext) : IM
             .ToList();
     }
 
+    public async Task<IReadOnlyList<MemberRecipientMatch>> SearchByDisplayNameAsync(
+        string query,
+        Guid? excludeMemberId = null,
+        int maxResults = PrivateMessageLimits.MaxRecipientSearchResults,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return [];
+        }
+
+        maxResults = Math.Clamp(maxResults, 1, PrivateMessageLimits.MaxRecipientSearchResults);
+        var term = query.Trim();
+
+        var rows = await dbContext.MemberAccounts
+            .AsNoTracking()
+            .Where(account =>
+                account.DisplayName.Contains(term)
+                && (excludeMemberId == null || account.Id != excludeMemberId))
+            .OrderBy(account => account.DisplayName)
+            .Take(maxResults)
+            .Select(account => new MemberRecipientMatch(account.Id, account.DisplayName))
+            .ToListAsync(cancellationToken);
+
+        return rows;
+    }
+
     private static string Normalize(string email) => email.Trim().ToUpperInvariant();
 }

@@ -1,0 +1,38 @@
+@page "/messages"
+@model QueenZone.Web.Pages.Messages.IndexModel
+
+<partial name="_PageHero" model='@(("Community", "Messages", "Private conversations with other members.", ""))' />
+
+<section class="qz-section">
+  <div class="qz-container qz-prose">
+    <p class="qz-messages-toolbar">
+      <a class="qz-button qz-button--cta" href="/messages/compose">New message</a>
+    </p>
+
+    @if (Model.Conversations.Count == 0)
+    {
+      <p>You have no private messages yet. <a href="/messages/compose">Start a conversation</a>.</p>
+    }
+    else
+    {
+      <ul class="qz-message-list">
+        @foreach (var conversation in Model.Conversations)
+        {
+          <li class="qz-message-list__item @(conversation.HasUnread ? "qz-message-list__item--unread" : null)">
+            <a class="qz-message-list__link" href="/messages/@conversation.ConversationId">
+              <span class="qz-message-list__name">@conversation.OtherParticipantDisplayName</span>
+              <span class="qz-message-list__preview">@conversation.LastMessagePreview</span>
+              <time class="qz-message-list__time qz-meta" datetime="@conversation.LastMessageAt.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ssZ")">
+                @conversation.LastMessageAt.UtcDateTime.ToString("dd MMM yyyy HH:mm") UTC
+              </time>
+              @if (conversation.HasUnread)
+              {
+                <span class="qz-message-list__badge">@conversation.UnreadCount unread</span>
+              }
+            </a>
+          </li>
+        }
+      </ul>
+    }
+  </div>
+</section>

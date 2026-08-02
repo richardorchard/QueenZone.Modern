@@ -30,10 +30,17 @@ else
         {
           <p class="qz-forum-post__edited qz-meta">@post.EditedLabel</p>
         }
-        @if (post.CanEdit)
+        @if (post.CanEdit || post.CanMessage)
         {
           <p class="qz-forum-post__actions">
-            <a class="qz-forum-post__edit-link" href="/forum/post/@post.Id/edit">Edit</a>
+            @if (post.CanEdit)
+            {
+              <a class="qz-forum-post__edit-link" href="/forum/post/@post.Id/edit">Edit</a>
+            }
+            @if (post.CanMessage && post.AuthorMemberId is Guid authorMemberId)
+            {
+              <a class="qz-forum-post__message-link" href="/messages/compose?to=@authorMemberId">Message</a>
+            }
           </p>
         }
         @if (post.Attachments is { Count: > 0 })

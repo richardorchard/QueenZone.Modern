@@ -1,0 +1,34 @@
+@page "/members/{memberId:guid}"
+@model QueenZone.Web.Pages.Members.ProfileModel
+
+@{
+  var name = Model.Member?.DisplayName ?? "Member";
+}
+
+<partial name="_PageHero" model='@(("Community", name, "Member profile", ""))' />
+
+<section class="qz-section">
+  <div class="qz-container qz-prose">
+    @if (Model.Member is not null)
+    {
+      <div class="qz-member-profile">
+        <partial name="_MemberAvatar" model="@(new MemberAvatarViewModel { DisplayName = Model.Member.DisplayName, MemberId = Model.Member.Id, HasAvatar = !string.IsNullOrWhiteSpace(Model.Member.AvatarUrl), Size = "lg" })" />
+        <h2>@Model.Member.DisplayName</h2>
+        <p class="qz-meta">Member since @Model.Member.CreatedAt.ToString("MMMM yyyy")</p>
+
+        @if (Model.CanMessage)
+        {
+          <p>
+            <a class="qz-button qz-button--cta" href="/messages/compose?to=@Model.Member.Id">Message</a>
+          </p>
+        }
+        else if (!Model.IsSignedIn)
+        {
+          <p>
+            <a class="qz-button qz-button--outline" href="/account/login?returnUrl=@Uri.EscapeDataString($"/messages/compose?to={Model.Member.Id}")">Sign in to message</a>
+          </p>
+        }
+      </div>
+    }
+  </div>
+</section>

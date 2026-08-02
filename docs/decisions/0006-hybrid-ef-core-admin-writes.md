@@ -51,6 +51,7 @@ Use **EF Core as the single data-access library** in `QueenZone.Data`, while kee
 | Admin news writes | `IAdminNewsRepository` | `EfAdminNewsRepository` | EF Core (+ `FromSqlRaw` for legacy news projections) | Writes/migrations; hybrid SQL for `NEWS_T` reads; latest-row CTE from `PublishedNewsQuery` (same dedup expression as public, without published filter) |
 | News audit | `INewsAuditRepository` | `EfNewsAuditRepository` | EF Core | Modern audit table |
 | Member accounts | `IMemberAccountRepository` | `EfMemberAccountRepository` | EF Core | Modern tables |
+| Private messaging | `IPrivateMessageRepository` | `EfPrivateMessageRepository` | EF Core | Modern `PrivateConversations` / `PrivateMessages` tables (MVP 1:1) |
 | News discovery / agent drafts | `INewsDiscoveryRepository` | `EfNewsDiscoveryRepository` | EF Core | Modern workflow tables |
 | News agent run leases | `INewsAgentRunLeaseService` | `EfNewsAgentRunLeaseService` | EF Core (+ SQL for lease upsert) | Modern lease table |
 | Queen history / on-this-day | `IQueenHistoryRepository` | `EfQueenHistoryRepository` | EF Core | Modern table |
