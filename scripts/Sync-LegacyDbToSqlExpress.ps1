@@ -42,9 +42,18 @@ Get-ChildItem -Path ([System.IO.Path]::GetTempPath()) -Filter "queenzone-legacy-
 
 try {
     Write-Host "Exporting live legacy database to $bacpacPath..."
+    # VerifyExtraction=False: the legacy schema has pre-existing broken forum
+    # views (e.g. Q_FORUM_TOPIC_V) with unresolved/ambiguous column references
+    # - SQL Server tolerates these via deferred name resolution (they only
+    # error if actually queried, which the app doesn't do), but sqlpackage's
+    # default post-extraction model verification is stricter and fails the
+    # whole export over them. Skip that verification pass; it isn't needed
+    # here since this bacpac is only ever used to seed SQL Express, not
+    # round-tripped as a validated artifact.
     dotnet tool run sqlpackage /Action:Export `
         /SourceConnectionString:"$sourceConnectionString" `
-        /TargetFile:"$bacpacPath"
+        /TargetFile:"$bacpacPath" `
+        /p:VerifyExtraction=False
     if ($LASTEXITCODE -ne 0) { throw "sqlpackage export failed with exit code $LASTEXITCODE" }
 
     $targetConnectionString = "Server=localhost\$InstanceName;Database=master;Integrated Security=True;TrustServerCertificate=True"
