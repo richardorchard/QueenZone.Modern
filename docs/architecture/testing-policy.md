@@ -103,6 +103,22 @@ ConnectionStrings__QueenZoneLegacy=...
 
 Do not require these tests in normal CI until the project has a known, repeatable test database.
 
+The **read-only** probes (`EfAdminNewsRepositoryLegacyProbeTests`, and the read-only fact in
+`EfNewsSectionLiveProbeTests`) do run automatically — nightly, via
+`.github/workflows/nightly-legacy-checks.yml`, on the self-hosted macOS runner. This is separate
+from "normal CI": it's not a PR gate, doesn't block merges, and only runs on a schedule (plus
+`workflow_dispatch`).
+
+They run against a same-day SQL Express mirror on the self-hosted Windows runner
+(`scripts/Sync-LegacyDbToSqlExpress.ps1` refreshes it nightly from the live Azure SQL DB via a
+`sqlpackage` bacpac export/import — see the workflow file for the one-time setup this requires),
+not the live database directly. `RUN_LEGACY_WRITE_PROBE` is still deliberately left unset there, so
+the write-capable probes below stay no-ops on this schedule for now — but since the target is now a
+disposable nightly-refreshed mirror rather than the production-equivalent live database, the original
+safety concern about unattended writes mostly goes away. See
+[#449](https://github.com/richardorchard/QueenZone.Modern/issues/449) for the tracked follow-up on
+turning them on.
+
 ### Modern-Schema SQL Server Tests
 
 `tests/QueenZone.SqlServerTests` covers modern EF-managed query paths that only run against a real
