@@ -127,6 +127,8 @@ If the PR touches any of:
 
 then CI runs **EF migrations (Azure SQL)** against the same database as deploy (`QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING`). Unit/SQLite tests do **not** catch SQL Server batch-binding errors or Azure SQL timeouts.
 
+For a safer earlier look before that real-database run, `.github/workflows/test-migrations-against-mirror.yml` (manual `workflow_dispatch`) applies pending migrations to the SQL Express mirror instead — the same disposable, nightly-refreshed copy `nightly-legacy-checks.yml` maintains, with real data. Check "resync first" to force a fresh copy from the live DB (~3-5 min), or leave it against whatever's already there. Not a replacement for the real check: the mirror can be up to a day stale, so a clean run here doesn't guarantee a clean run against the actual deploy target.
+
 Locally, before opening such a PR:
 
 ```powershell
