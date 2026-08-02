@@ -138,7 +138,7 @@ Invoke-WebRequest -Uri https://www.queenzone.org/health -UseBasicParsing | Selec
 Invoke-WebRequest -Uri https://www.queenzone.org/warmup -UseBasicParsing | Select-Object StatusCode
 ```
 
-Post-deploy smoke (custom domain) is a separate job at the end of `.github/workflows/deploy.yml` (`build` → `migrate` → `deploy` → `post-deploy-smoke`, triggered by push to `main` after `ci.yml`'s PR checks have already passed) against `https://www.queenzone.org` (`/warmup`, then `/health` plus key public routes). A failure fails the smoke job so GitHub Actions can notify watchers. Re-run the same checks locally:
+Post-deploy smoke (custom domain) is a separate job at the end of `.github/workflows/deploy.yml` (`build` → `migrate` → `deploy` → `post-deploy-smoke`, triggered by push to `main` after `ci.yml`'s PR checks have already passed) against `https://www.queenzone.org` (`/warmup`, then `/health` plus key public routes). Pull-request tests are not rerun by this post-merge deploy workflow. A failure fails the smoke job so GitHub Actions can notify watchers. Re-run the same checks locally:
 
 ```powershell
 powershell -File .\scripts\Smoke-LiveSite.ps1
