@@ -82,28 +82,41 @@ END
 "@
 sqlcmd -S "localhost\$InstanceName" -Q $createLoginSql
 
-Write-Host "Granting $RunnerServiceAccount dbcreator so it can refresh the mirror DB nightly..."
-# dbcreator, not sysadmin: enough to CREATE/ALTER/DROP DATABASE for the sync
-# script's drop-and-reimport cycle, nothing more. This grants any Windows
-# service running as this shared builtin account that role on this SQL
-# Server instance - acceptable here since it's a single-purpose dev/CI box,
-# but worth knowing if another service ever runs as the same account.
-$grantDbCreatorSql = @"
+# dbcreator: CREATE/ALTER/DROP DATABASE for the sync script's drop-and-reimport
+# cycle. securityadmin: the bacpac import recreates a CREATE LOGIN for a
+# database user carried over from the Azure SQL source (contained database
+# users get translated into a login+user pair on non-Azure targets like SQL
+# Express) - dbcreator alone doesn't cover creating server-level logins.
+# Not sysadmin: this is the minimum found necessary by actually running the
+# import and reacting to each permission error, not a guess.
+#
+# Grants any Windows service running as this shared builtin account these
+# roles on this SQL Server instance - acceptable here since it's a
+# single-purpose dev/CI box, but worth knowing if another service ever runs
+# as the same account.
+$rolesNeeded = @("dbcreator", "securityadmin")
+Write-Host "Granting $RunnerServiceAccount $($rolesNeeded -join ', ') so it can refresh the mirror DB nightly..."
+$grantLoginSql = @"
 IF NOT EXISTS (SELECT 1 FROM sys.server_principals WHERE name = '$RunnerServiceAccount')
 BEGIN
     CREATE LOGIN [$RunnerServiceAccount] FROM WINDOWS;
 END
+"@
+sqlcmd -S "localhost\$InstanceName" -Q $grantLoginSql
+foreach ($role in $rolesNeeded) {
+    $grantRoleSql = @"
 IF NOT EXISTS (
     SELECT 1 FROM sys.server_role_members rm
     JOIN sys.server_principals r ON r.principal_id = rm.role_principal_id
     JOIN sys.server_principals m ON m.principal_id = rm.member_principal_id
-    WHERE r.name = 'dbcreator' AND m.name = '$RunnerServiceAccount'
+    WHERE r.name = '$role' AND m.name = '$RunnerServiceAccount'
 )
 BEGIN
-    ALTER SERVER ROLE dbcreator ADD MEMBER [$RunnerServiceAccount];
+    ALTER SERVER ROLE $role ADD MEMBER [$RunnerServiceAccount];
 END
 "@
-sqlcmd -S "localhost\$InstanceName" -Q $grantDbCreatorSql
+    sqlcmd -S "localhost\$InstanceName" -Q $grantRoleSql
+}
 
 Write-Host ""
 Write-Host "Done. Next steps:"
