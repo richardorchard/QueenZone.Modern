@@ -1,0 +1,117 @@
+name: Nightly legacy DB checks
+
+on:
+  schedule:
+    # 03:00 UTC daily. Adjust here if that stops being a quiet window.
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-legacy-checks
+  cancel-in-progress: false
+
+# The 4 "*ProbeTests" classes in QueenZone.Web.Tests (see
+# docs/architecture/testing-policy.md, "Data Integration Tests") exercise the
+# real legacy SQL Server but are gated behind ConnectionStrings__QueenZoneLegacy
+# and, for the write-capable ones, RUN_LEGACY_WRITE_PROBE — both unset in
+# ci.yml, so they silently no-op on every PR today. This workflow runs the
+# read-only ones nightly for continuous signal against real data, without
+# putting the real legacy/deploy database on the PR merge path.
+#
+# Probes run against a same-day mirror on the Windows runner's local SQL
+# Express (synced from the live Azure SQL DB via sqlpackage each run), not
+# the live database directly — see scripts/Sync-LegacyDbToSqlExpress.ps1.
+# The Mac runner reaches that SQL Express instance over the LAN.
+#
+# One-time prerequisites on the Windows runner before this workflow will
+# succeed (not automated — see scripts/Enable-SqlExpressRemoteAccess.ps1
+# for why):
+#   1. Run scripts/Enable-SqlExpressRemoteAccess.ps1 as Administrator to open
+#      SQL Express to LAN connections and create the queenzone_probe login.
+#   2. Add that login's password to Bitwarden and to the
+#      BITWARDEN_APP_SERVICE_DEPLOY_SECRETS mapping as
+#      QUEENZONE_SQL_EXPRESS_PROBE_PASSWORD.
+#   3. Optionally set the repo variable SQLEXPRESS_LAN_ADDRESS if the
+#      Windows runner's LAN IP (currently 192.168.1.237, ideally a DHCP
+#      reservation) ever changes.
+#
+# Deliberately read-only: RUN_LEGACY_WRITE_PROBE is not set here, so the
+# write-gated Facts in these classes stay no-ops. Now that probes run
+# against a disposable nightly-refreshed mirror rather than the live
+# database, write probes are no longer the safety concern they were against
+# the live DB — see #449 for the tracked follow-up on turning them on here.
+jobs:
+  sync-legacy-db:
+    name: Sync legacy DB to SQL Express
+    # Must run where SQL Express lives (the import target is localhost) —
+    # the Windows box, regardless of its weaker CPU.
+    runs-on: [self-hosted, Windows]
+    timeout-minutes: 15
+    environment: dev
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Fetch Bitwarden deploy secrets
+        id: bitwarden-secrets
+        uses: bitwarden/sm-action@v3.0.1
+        with:
+          access_token: ${{ secrets.BITWARDEN_SECRETS_MANAGER_ACCESS_TOKEN }}
+          secrets: ${{ vars.BITWARDEN_APP_SERVICE_DEPLOY_SECRETS }}
+
+      - name: Sync live legacy DB into local SQL Express
+        env:
+          ConnectionStrings__QueenZoneLegacy: ${{ steps.bitwarden-secrets.outputs.QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:ConnectionStrings__QueenZoneLegacy)) {
+            Write-Error "QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING is not configured. Check the Bitwarden secret and BITWARDEN_APP_SERVICE_DEPLOY_SECRETS mapping."
+          }
+          ./scripts/Sync-LegacyDbToSqlExpress.ps1
+
+  legacy-read-probes:
+    name: Legacy SQL read probes
+    needs: sync-legacy-db
+    # Runs on the Mac Mini (M2) rather than the Windows box (i3) or a
+    # GitHub-hosted runner — this is unattended and not time-sensitive, and
+    # the Mac has the most headroom of the three for a nightly job. Reaches
+    # SQL Express on the Windows box over the LAN (see prerequisites above).
+    runs-on: [self-hosted, queenzone]
+    timeout-minutes: 20
+    environment: dev
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Verify .NET SDK
+        run: dotnet --version
+
+      - name: Restore
+        run: dotnet restore tests/QueenZone.Web.Tests/QueenZone.Web.Tests.csproj
+
+      - name: Fetch Bitwarden deploy secrets
+        id: bitwarden-secrets
+        uses: bitwarden/sm-action@v3.0.1
+        with:
+          access_token: ${{ secrets.BITWARDEN_SECRETS_MANAGER_ACCESS_TOKEN }}
+          secrets: ${{ vars.BITWARDEN_APP_SERVICE_DEPLOY_SECRETS }}
+
+      - name: Run legacy SQL read-only probes against the SQL Express mirror
+        env:
+          SQLEXPRESS_LAN_ADDRESS: ${{ vars.SQLEXPRESS_LAN_ADDRESS || '192.168.1.237,1433' }}
+          SQLEXPRESS_PROBE_PASSWORD: ${{ steps.bitwarden-secrets.outputs.QUEENZONE_SQL_EXPRESS_PROBE_PASSWORD }}
+        run: |
+          if [ -z "$SQLEXPRESS_PROBE_PASSWORD" ]; then
+            echo "::error::QUEENZONE_SQL_EXPRESS_PROBE_PASSWORD is not configured. Check the Bitwarden secret and BITWARDEN_APP_SERVICE_DEPLOY_SECRETS mapping (see prerequisites above)."
+            exit 1
+          fi
+
+          export ConnectionStrings__QueenZoneLegacy="Server=${SQLEXPRESS_LAN_ADDRESS};Database=queenzone_legacy_sync;User Id=queenzone_probe;Password=${SQLEXPRESS_PROBE_PASSWORD};TrustServerCertificate=True"
+
+          dotnet test tests/QueenZone.Web.Tests/QueenZone.Web.Tests.csproj \
+            --configuration Release \
+            --filter "FullyQualifiedName=QueenZone.Web.Tests.EfAdminNewsRepositoryLegacyProbeTests.Probe_legacy_admin_news_repository_when_connection_configured|FullyQualifiedName=QueenZone.Web.Tests.EfNewsSectionLiveProbeTests.Public_news_probe_materializes_archive_detail_search_and_sitemap_when_connection_configured"

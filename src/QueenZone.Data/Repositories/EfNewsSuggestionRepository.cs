@@ -223,19 +223,27 @@ public sealed class EfNewsSuggestionRepository(QueenZoneDbContext dbContext) : I
         return Map(entity);
     }
 
-    public async Task<SubmissionTypeCounts> GetDashboardCountsAsync(
+    public Task<SubmissionTypeCounts> GetDashboardCountsAsync(
         DateTimeOffset utcNow,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        IsSqliteDatabase()
+            ? GetDashboardCountsInMemoryAsync(utcNow, cancellationToken)
+            : GetDashboardCountsViaSqlAggregateAsync(utcNow, cancellationToken);
+
+    // SQLite fallback (also exercised in tests): the provider cannot translate DateTimeOffset
+    // comparisons inside conditional aggregates, so materialise then count in memory.
+    private async Task<SubmissionTypeCounts> GetDashboardCountsInMemoryAsync(
+        DateTimeOffset utcNow,
+        CancellationToken cancellationToken)
     {
         var monthAgo = utcNow.AddDays(-30);
+        var today = utcNow.UtcDateTime.Date;
+        var weekAgo = today.AddDays(-6);
 
         var rows = await dbContext.NewsSuggestions
             .AsNoTracking()
             .Select(r => new { r.Status, r.SubmittedAt })
             .ToListAsync(cancellationToken);
-
-        var today = utcNow.UtcDateTime.Date;
-        var weekAgo = today.AddDays(-6);
 
         var pending = rows.Count(r =>
             r.Status is NewsSuggestionStatus.Pending or NewsSuggestionStatus.UnderReview);
@@ -254,33 +262,62 @@ public sealed class EfNewsSuggestionRepository(QueenZoneDbContext dbContext) : I
             pending, receivedToday, receivedThisWeek, approvedLast30, rejectedLast30, pendingLast30);
     }
 
-    public async Task<IReadOnlyList<SubmissionContributor>> GetTopContributorsThisMonthAsync(
+    // SQL Server only: the EF Core SQLite provider cannot translate DateTimeOffset comparisons
+    // inside conditional aggregates, so this path has no coverage from the default SQLite-backed
+    // QueenZone.Web.Tests suite. Covered instead by tests/QueenZone.SqlServerTests against a
+    // real SQL Server (Docker in CI, LocalDB locally) — see docs/architecture/testing-policy.md.
+    private async Task<SubmissionTypeCounts> GetDashboardCountsViaSqlAggregateAsync(
+        DateTimeOffset utcNow,
+        CancellationToken cancellationToken)
+    {
+        var monthAgo = utcNow.AddDays(-30);
+        var todayUtc = new DateTimeOffset(utcNow.UtcDateTime.Date, TimeSpan.Zero);
+        var weekAgoUtc = todayUtc.AddDays(-6);
+
+        var counts = await dbContext.NewsSuggestions
+            .AsNoTracking()
+            .GroupBy(_ => 1)
+            .Select(g => new SubmissionTypeCounts(
+                g.Count(r => r.Status == NewsSuggestionStatus.Pending || r.Status == NewsSuggestionStatus.UnderReview),
+                g.Count(r => r.SubmittedAt >= todayUtc),
+                g.Count(r => r.SubmittedAt >= weekAgoUtc),
+                g.Count(r => r.SubmittedAt >= monthAgo && r.Status == NewsSuggestionStatus.Promoted),
+                g.Count(r => r.SubmittedAt >= monthAgo
+                    && (r.Status == NewsSuggestionStatus.Rejected || r.Status == NewsSuggestionStatus.Duplicate)),
+                g.Count(r => r.SubmittedAt >= monthAgo
+                    && (r.Status == NewsSuggestionStatus.Pending || r.Status == NewsSuggestionStatus.UnderReview))))
+            .SingleOrDefaultAsync(cancellationToken);
+
+        return counts ?? SubmissionTypeCounts.Empty;
+    }
+
+    public Task<IReadOnlyList<SubmissionContributor>> GetTopContributorsThisMonthAsync(
         DateTimeOffset monthStart,
         int maxCount,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        IsSqliteDatabase()
+            ? GetTopContributorsInMemoryAsync(monthStart, maxCount, cancellationToken)
+            : GetTopContributorsViaSqlAggregateAsync(monthStart, maxCount, cancellationToken);
+
+    // SQLite fallback (also exercised in tests): the provider cannot translate DateTimeOffset
+    // comparisons.
+    private async Task<IReadOnlyList<SubmissionContributor>> GetTopContributorsInMemoryAsync(
+        DateTimeOffset monthStart,
+        int maxCount,
+        CancellationToken cancellationToken)
     {
-        // SQLite EF provider cannot translate DateTimeOffset comparisons; for that
-        // path we materialise then filter in C#. On SQL Server the WHERE is pushed
-        // to the database so only this month's rows transfer.
-        var query = dbContext.NewsSuggestions
+        var rows = await dbContext.NewsSuggestions
             .AsNoTracking()
             .Select(r => new
             {
                 r.SubmitterMemberId,
                 DisplayName = r.Submitter != null ? r.Submitter.DisplayName : string.Empty,
                 r.SubmittedAt,
-            });
-
-        if (!IsSqliteDatabase())
-        {
-            query = query.Where(r => r.SubmittedAt >= monthStart);
-        }
-
-        var rows = (await query.ToListAsync(cancellationToken))
-            .Where(r => r.SubmittedAt >= monthStart)
-            .ToList();
+            })
+            .ToListAsync(cancellationToken);
 
         return rows
+            .Where(r => r.SubmittedAt >= monthStart)
             .GroupBy(r => r.SubmitterMemberId)
             .Select(g => new SubmissionContributor(
                 g.Key,
@@ -288,6 +325,34 @@ public sealed class EfNewsSuggestionRepository(QueenZoneDbContext dbContext) : I
                 g.Count()))
             .OrderByDescending(c => c.Count)
             .Take(maxCount)
+            .ToList();
+    }
+
+    // SQL Server only: see the note on GetDashboardCountsViaSqlAggregateAsync.
+    private async Task<IReadOnlyList<SubmissionContributor>> GetTopContributorsViaSqlAggregateAsync(
+        DateTimeOffset monthStart,
+        int maxCount,
+        CancellationToken cancellationToken)
+    {
+        var aggregated = await dbContext.NewsSuggestions
+            .AsNoTracking()
+            .Where(r => r.SubmittedAt >= monthStart)
+            .GroupBy(r => r.SubmitterMemberId)
+            .Select(g => new
+            {
+                SubmitterMemberId = g.Key,
+                DisplayName = g.Max(r => r.Submitter != null ? r.Submitter.DisplayName : null),
+                Count = g.Count(),
+            })
+            .OrderByDescending(c => c.Count)
+            .Take(maxCount)
+            .ToListAsync(cancellationToken);
+
+        return aggregated
+            .Select(c => new SubmissionContributor(
+                c.SubmitterMemberId,
+                string.IsNullOrWhiteSpace(c.DisplayName) ? "Unknown member" : c.DisplayName,
+                c.Count))
             .ToList();
     }
 

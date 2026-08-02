@@ -2,20 +2,14 @@ name: CI
 
 on:
   pull_request:
-  push:
-    branches:
-      - main
-      - master
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
-  # Never cancel an in-flight run on main — that's the deploy pipeline, and
-  # cancelling it mid-migrate/deploy can leave the DB or App Service half-updated.
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  group: pr-checks-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   changes:
@@ -51,10 +45,11 @@ jobs:
             echo "migrations=false" >> $GITHUB_OUTPUT
           fi
 
-  # Builds and publishes the Linux app once per commit ("build once, deploy many").
+  # Builds and publishes the Linux app once per PR run ("build once, test many").
   # Deterministic tests run in the `test` matrix (mixed Web.Tests shards — see
-  # docs/architecture/testing-policy.md). smoke-test / deploy reuse the publish
+  # docs/architecture/testing-policy.md). smoke-test reuses the publish
   # artifact. e2e-test still builds on Windows but skips the solution unit graph.
+  # deploy.yml rebuilds separately after merge — see that file for why.
   build:
     runs-on: ubuntu-latest
     needs: changes
@@ -100,7 +95,7 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
-      # Single Linux publish reused by smoke-test (PR) and deploy (main).
+      # Single Linux publish reused by smoke-test in this run.
       - name: Publish web app
         run: dotnet publish src/QueenZone.Web/QueenZone.Web.csproj --configuration Release --no-build --output publish
 
@@ -168,9 +163,66 @@ jobs:
           retention-days: 2
           if-no-files-found: error
 
+  # Runs the modern-schema query paths that only SQL Server can execute (EF Core's SQLite
+  # provider used by the `test` job above cannot translate DateTimeOffset comparisons at all).
+  # See tests/QueenZone.SqlServerTests and docs/architecture/testing-policy.md
+  # ("Modern-schema SQL Server tests"). This is a throwaway container scoped to CI, not the
+  # shared Azure SQL used by `ef-migrations`/deploy.yml.
+  sql-server-tests:
+    runs-on: ubuntu-latest
+    needs: [changes, build]
+    if: needs.changes.outputs.code == 'true'
+    services:
+      mssql:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: "Y"
+          MSSQL_SA_PASSWORD: "CiOnly!Sql_2026"
+        ports:
+          - 1433:1433
+        options: >-
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P CiOnly!Sql_2026 -C -Q 'SELECT 1' || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+          cache: true
+          cache-dependency-path: |
+            **/*.csproj
+            .config/dotnet-tools.json
+
+      - name: Restore
+        run: dotnet restore QueenZone.sln
+
+      - name: Run SQL Server-only tests with coverage
+        shell: pwsh
+        env:
+          ConnectionStrings__SqlServerTest: "Server=localhost,1433;User Id=sa;Password=CiOnly!Sql_2026;TrustServerCertificate=True"
+        run: |
+          dotnet test tests/QueenZone.SqlServerTests/QueenZone.SqlServerTests.csproj `
+            --configuration Release `
+            --collect:"XPlat Code Coverage" `
+            --settings coverlet.runsettings `
+            --results-directory ./TestResults
+
+      - name: Upload coverage results
+        uses: actions/upload-artifact@v5
+        with:
+          name: coverage-raw-${{ github.run_id }}-shard-sqlserver
+          path: TestResults
+          retention-days: 2
+          if-no-files-found: error
+
   coverage:
     runs-on: ubuntu-latest
-    needs: [changes, test]
+    needs: [changes, test, sql-server-tests]
     if: needs.changes.outputs.code == 'true'
     steps:
       - name: Checkout
@@ -211,8 +263,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: changes
     # Same-repo PRs only: applies pending migrations to the shared Azure SQL used by deploy.
-    # Skipped on push-to-main (the migrate job below already runs database update) and on
-    # fork PRs (no secret).
+    # Skipped on fork PRs (no secret). deploy.yml's migrate job runs the same
+    # `database update` again after merge, against the same database.
     if: |
       needs.changes.outputs.migrations == 'true' &&
       github.event_name == 'pull_request' &&
@@ -323,42 +375,57 @@ jobs:
           retention-days: 7
 
   e2e-test:
-    # Runs on a self-hosted Windows runner (this machine) instead of a
-    # GitHub-hosted runner, so it does not consume billed Actions minutes.
+    # Runs on whichever self-hosted runner with the `e2e` label is online and
+    # idle (currently a Windows box and a Mac — see repo Settings > Actions >
+    # Runners), instead of a GitHub-hosted runner, so it does not consume
+    # billed Actions minutes. GitHub queues to whichever matching runner
+    # picks the job up first; there's no guaranteed preference between them,
+    # so steps below branch on `runner.os` to cover both. Both runners need
+    # the .NET 10 SDK on PATH already (see "Verify .NET SDK" below); the
+    # macOS runner additionally needs PowerShell 7 (`pwsh`, e.g. via
+    # `brew install --cask powershell`) for the Playwright install step,
+    # since that step runs Playwright's generated .ps1 installer script.
     #
-    # This job gates deploy (see migrate/deploy below) — it must pass before
-    # any build ships. That also means a deploy cannot happen while this
-    # runner is offline; that's intentional (tests must pass before deploy),
-    # not an oversight.
-    runs-on: [self-hosted, Windows]
+    # This is a merge gate enforced by main's required status checks, not a
+    # deploy gate — deploy.yml does not re-run e2e, so a deploy is never
+    # blocked by both runners being offline. Untested code still can't reach
+    # main because the PR itself can't merge without a green run here.
+    runs-on: [self-hosted, e2e]
     needs: [changes, build, coverage]
     if: needs.changes.outputs.code == 'true'
     timeout-minutes: 15
 
     steps:
       # If a previous run's "Stop app" step failed to terminate the real
-      # QueenZone.Web.exe child process (see that step's comment below), it
-      # is left running and holding its own exe file locked, which makes
-      # actions/checkout's workspace clean fail with an EPERM unlink error
-      # before any of our own steps even run. Clear out any leftover process
-      # from a prior run first so checkout can clean the workspace.
-      - name: Kill stray app processes from a previous run
+      # QueenZone.Web(.exe) child process (see that step's comment below), it
+      # is left running and (on Windows) holding its own exe file locked,
+      # which makes actions/checkout's workspace clean fail with an EPERM
+      # unlink error before any of our own steps even run. Clear out any
+      # leftover process from a prior run first so checkout can clean the
+      # workspace.
+      - name: Kill stray app processes from a previous run (Windows)
+        if: runner.os == 'Windows'
         run: |
           Get-Process -Name "QueenZone.Web" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+
+      - name: Kill stray app processes from a previous run (macOS)
+        if: runner.os == 'macOS'
+        run: pkill -f QueenZone.Web || true
 
       - name: Checkout
         uses: actions/checkout@v6
 
-      # actions/setup-dotnet tries to (re)install into C:\Program Files\dotnet,
-      # which the runner service account cannot write to without elevation.
-      # This machine already has the .NET 10 SDK installed and on PATH, so
-      # use that directly instead of running the action here.
+      # actions/setup-dotnet tries to (re)install into a system path the
+      # runner service account cannot write to without elevation. Both
+      # machines already have the .NET 10 SDK installed and on PATH, so use
+      # that directly instead of running the action here.
       - name: Verify .NET SDK
         run: dotnet --version
 
       # E2E does not ProjectReference Web — restore each graph separately and
       # skip the solution's unit/integration test projects. Linux publish from
-      # the build job is not reusable here (need QueenZone.Web.exe on Windows).
+      # the `build` job is not reusable here because the self-hosted runner
+      # needs output published for its own OS.
       - name: Restore E2E tests and web app
         run: |
           dotnet restore tests/QueenZone.Web.E2E/QueenZone.Web.E2E.csproj
@@ -367,13 +434,24 @@ jobs:
       - name: Build E2E tests
         run: dotnet build tests/QueenZone.Web.E2E/QueenZone.Web.E2E.csproj --configuration Release --no-restore
 
-      - name: Install Playwright browsers
+      - name: Install Playwright browsers (Windows)
+        if: runner.os == 'Windows'
         run: .\tests\QueenZone.Web.E2E\bin\Release\net10.0\playwright.ps1 install chromium
 
-      - name: Publish web app (Windows)
+      # Uses the same generated .ps1 installer as Windows (it matches the
+      # exact Playwright package/browser version used by the built test
+      # project — a separately-versioned CLI tool could drift out of sync),
+      # invoked via pwsh since macOS's default shell is bash.
+      - name: Install Playwright browsers (macOS)
+        if: runner.os == 'macOS'
+        shell: pwsh
+        run: ./tests/QueenZone.Web.E2E/bin/Release/net10.0/playwright.ps1 install chromium
+
+      - name: Publish web app
         run: dotnet publish src/QueenZone.Web/QueenZone.Web.csproj --configuration Release --no-restore --output e2e-app
 
-      - name: Start app in background
+      - name: Start app in background (Windows)
+        if: runner.os == 'Windows'
         run: |
           # Start-Process makes the app a child of this step's process, which is
           # tied to the runner's Windows Job Object and gets killed when this step
@@ -404,7 +482,25 @@ jobs:
           $appPid | Out-File -Encoding ascii e2e-app.pid
           Write-Host "Started app: cmd.exe PID $cmdPid, QueenZone.Web.exe PID $appPid"
 
-      - name: Wait for app to be ready
+      - name: Start app in background (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          # Unlike Windows, a POSIX background process (`&`) survives past the
+          # end of this step without needing a WMI-style detach trick — it's
+          # simply re-parented, not tied to the step's own process tree. Launch
+          # the framework-dependent DLL through the dotnet executable already
+          # verified on PATH. The native app host only searches DOTNET_ROOT and
+          # standard install locations, so it cannot find SDKs installed in a
+          # user-local or tool-managed directory even when `dotnet` works.
+          APP_DIR="$(pwd)/e2e-app"
+          ASPNETCORE_ENVIRONMENT=Testing \
+          ASPNETCORE_URLS=http://127.0.0.1:5099 \
+          ASPNETCORE_CONTENTROOT="$APP_DIR" \
+          dotnet "$APP_DIR/QueenZone.Web.dll" > e2e-app.log 2> e2e-app.err.log &
+          echo $! > e2e-app.pid
+
+      - name: Wait for app to be ready (Windows)
+        if: runner.os == 'Windows'
         run: |
           Write-Host "Waiting for web app..."
           $appPid = Get-Content e2e-app.pid
@@ -430,6 +526,25 @@ jobs:
           Get-Content e2e-app.err.log -ErrorAction SilentlyContinue
           exit 1
 
+      - name: Wait for app to be ready (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          echo "Waiting for web app..."
+          for i in $(seq 1 60); do
+            if ! kill -0 "$(cat e2e-app.pid)" 2>/dev/null; then
+              echo "App process exited unexpectedly after ${i}s"
+              break
+            fi
+            if curl -sf http://127.0.0.1:5099/health > /dev/null; then
+              echo "App is up after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "App failed to start in time"
+          cat e2e-app.log e2e-app.err.log 2>/dev/null || true
+          exit 1
+
       - name: Run Playwright e2e tests
         env:
           E2E_BASE_URL: http://127.0.0.1:5099
@@ -437,8 +552,8 @@ jobs:
           E2E_ARTIFACT_DIR: test-results/e2e
         run: dotnet test tests/QueenZone.Web.E2E/QueenZone.Web.E2E.csproj --configuration Release --no-build
 
-      - name: Stop app
-        if: always()
+      - name: Stop app (Windows)
+        if: always() && runner.os == 'Windows'
         run: |
           if (Test-Path e2e-app.pid) {
             Stop-Process -Id (Get-Content e2e-app.pid) -Force -ErrorAction SilentlyContinue
@@ -465,6 +580,14 @@ jobs:
             Start-Sleep -Milliseconds 500
           }
 
+      - name: Stop app (macOS)
+        if: always() && runner.os == 'macOS'
+        run: |
+          if [ -f e2e-app.pid ]; then
+            kill "$(cat e2e-app.pid)" 2>/dev/null || true
+          fi
+          pkill -f QueenZone.Web 2>/dev/null || true
+
       - name: Upload Playwright failure artifacts
         if: failure()
         uses: actions/upload-artifact@v5
@@ -476,182 +599,3 @@ jobs:
             e2e-app.err.log
           if-no-files-found: ignore
           retention-days: 7
-
-  # --- Deploy chain: push to main only. Gated on build, smoke-test, and
-  # e2e-test all passing, so nothing ships without a green build once + full
-  # test pass. ---
-
-  migrate:
-    name: Apply database migrations
-    runs-on: ubuntu-latest
-    needs: [changes, build, smoke-test, e2e-test]
-    if: needs.changes.outputs.code == 'true' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    environment: dev
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v5
-        with:
-          dotnet-version: 10.0.x
-          cache: true
-          cache-dependency-path: |
-            **/*.csproj
-            .config/dotnet-tools.json
-
-      - name: Restore
-        run: |
-          dotnet tool restore
-          dotnet restore QueenZone.sln
-
-      - name: Fetch Bitwarden deploy secrets
-        id: bitwarden-secrets
-        uses: bitwarden/sm-action@v3.0.1
-        with:
-          access_token: ${{ secrets.BITWARDEN_SECRETS_MANAGER_ACCESS_TOKEN }}
-          secrets: ${{ vars.BITWARDEN_APP_SERVICE_DEPLOY_SECRETS }}
-
-      - name: Apply database migrations
-        env:
-          ConnectionStrings__QueenZoneLegacy: ${{ steps.bitwarden-secrets.outputs.QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING }}
-        run: |
-          if [ -z "$ConnectionStrings__QueenZoneLegacy" ]; then
-            echo "::error::QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING is not configured. Check the Bitwarden secret and BITWARDEN_APP_SERVICE_DEPLOY_SECRETS mapping before deploying."
-            exit 1
-          fi
-
-          dotnet ef database update \
-            --project src/QueenZone.Data/QueenZone.Data.csproj \
-            --startup-project src/QueenZone.Web/QueenZone.Web.csproj
-
-  deploy:
-    name: Deploy
-    runs-on: ubuntu-latest
-    needs: [changes, build, migrate]
-    if: needs.changes.outputs.code == 'true' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    environment:
-      name: dev
-      url: https://www.queenzone.org
-
-    steps:
-      - name: Download publish artifact
-        uses: actions/download-artifact@v5
-        with:
-          name: web-publish-${{ github.run_id }}
-          path: publish
-
-      - name: Fetch Bitwarden deploy secrets
-        id: bitwarden-secrets
-        uses: bitwarden/sm-action@v3.0.1
-        with:
-          access_token: ${{ secrets.BITWARDEN_SECRETS_MANAGER_ACCESS_TOKEN }}
-          secrets: ${{ vars.BITWARDEN_APP_SERVICE_DEPLOY_SECRETS }}
-
-      - name: Deploy
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: queenzone-dev
-          publish-profile: ${{ steps.bitwarden-secrets.outputs.AZURE_WEBAPP_PUBLISH_PROFILE }}
-          package: publish
-
-  post-deploy-smoke:
-    name: Post-deploy smoke
-    runs-on: ubuntu-latest
-    needs: [changes, deploy]
-    if: needs.changes.outputs.code == 'true' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    # Allow retry loop (~8 min) plus request time; avoid false fails during App Service recycle.
-    timeout-minutes: 12
-
-    steps:
-      # Smoke the public custom domain (Site:PublicBaseUrl), not only the App Service hostname.
-      # /health alone is liveness only — content pages can still 500 during recycle/warmup.
-      # Retry the full suite until every path returns 200 (or timeout). A failed smoke fails
-      # this job so GitHub Actions can email watchers.
-      - name: Post-deploy smoke (custom domain)
-        run: |
-          BASE_URL="https://www.queenzone.org"
-          WARMUP_PATH="/warmup"
-          PATHS=(
-            "/health"
-            "/"
-            "/news"
-            "/forum"
-            # Representative modern-forum category/topic pages (guards accidental LegacyForumRepository fallback).
-            "/forum/1/queen-serious-discussion"
-            "/forum/topic/455095/forum-guidelines"
-            "/articles"
-            "/biography"
-            "/photography"
-            "/search"
-          )
-          MAX_ATTEMPTS=32
-          SLEEP_SECONDS=15
-
-          echo "Waiting for warmup on ${BASE_URL}${WARMUP_PATH} after deploy (up to ~$(( MAX_ATTEMPTS * SLEEP_SECONDS / 60 )) minutes)."
-          echo "/health is not sufficient readiness — App Service can answer liveness while pages still 500."
-
-          check_path() {
-            local path="$1"
-            local url="${BASE_URL}${path}"
-            local status body_file
-            body_file="$(mktemp)"
-            # Prefer any HTTP code curl wrote; only use 000 when stdout is empty (avoids "500000").
-            status=$(curl -s -o "$body_file" -w "%{http_code}" --max-time 30 -L "$url") || status="${status:-000}"
-            if [ "$status" != "200" ]; then
-              echo "  ✗ $path → HTTP $status"
-              rm -f "$body_file"
-              return 1
-            fi
-            if [ "$path" = "/health" ]; then
-              if ! grep -q '"status":"ok"' "$body_file"; then
-                echo "  ✗ $path → 200 but body missing \"status\":\"ok\""
-                rm -f "$body_file"
-                return 1
-              fi
-            fi
-            echo "  ✓ $path → HTTP $status"
-            rm -f "$body_file"
-            return 0
-          }
-
-          for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
-            echo "Warmup attempt ${attempt}/${MAX_ATTEMPTS}..."
-            if check_path "$WARMUP_PATH"; then
-              echo "Warmup passed on attempt ${attempt}."
-              break
-            fi
-
-            if [ "$attempt" -eq "$MAX_ATTEMPTS" ]; then
-              echo "::error::Warmup failed against ${BASE_URL}${WARMUP_PATH} after ${MAX_ATTEMPTS} attempts. Check App Service logs."
-              exit 1
-            fi
-
-            echo "Warmup not ready yet. Retrying in ${SLEEP_SECONDS}s..."
-            sleep "$SLEEP_SECONDS"
-          done
-
-          echo "Polling content routes on $BASE_URL after warmup."
-          for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
-            echo "Attempt ${attempt}/${MAX_ATTEMPTS}..."
-            failed=0
-            for path in "${PATHS[@]}"; do
-              if ! check_path "$path"; then
-                failed=1
-              fi
-            done
-
-            if [ "$failed" -eq 0 ]; then
-              echo "All post-deploy smoke checks passed on attempt ${attempt}."
-              exit 0
-            fi
-
-            if [ "$attempt" -lt "$MAX_ATTEMPTS" ]; then
-              echo "Site not ready (App Service recycle/warmup). Retrying in ${SLEEP_SECONDS}s..."
-              sleep "$SLEEP_SECONDS"
-            fi
-          done
-
-          echo "::error::Post-deploy smoke failed against $BASE_URL after ${MAX_ATTEMPTS} attempts. Check App Service logs."
-          exit 1

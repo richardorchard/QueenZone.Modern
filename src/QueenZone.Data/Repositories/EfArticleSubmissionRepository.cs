@@ -249,19 +249,27 @@ public sealed class EfArticleSubmissionRepository(QueenZoneDbContext dbContext) 
             .ToList();
     }
 
-    public async Task<SubmissionTypeCounts> GetDashboardCountsAsync(
+    public Task<SubmissionTypeCounts> GetDashboardCountsAsync(
         DateTimeOffset utcNow,
-        CancellationToken ct = default)
+        CancellationToken ct = default) =>
+        IsSqliteDatabase()
+            ? GetDashboardCountsInMemoryAsync(utcNow, ct)
+            : GetDashboardCountsViaSqlAggregateAsync(utcNow, ct);
+
+    // SQLite fallback (also exercised in tests): the provider cannot translate DateTimeOffset?
+    // comparisons inside conditional aggregates, so materialise then count in memory.
+    private async Task<SubmissionTypeCounts> GetDashboardCountsInMemoryAsync(
+        DateTimeOffset utcNow,
+        CancellationToken ct)
     {
         var monthAgo = utcNow.AddDays(-30);
+        var today = utcNow.UtcDateTime.Date;
+        var weekAgo = today.AddDays(-6);
 
         var rows = await dbContext.ArticleSubmissions
             .AsNoTracking()
             .Select(a => new { a.Status, a.SubmittedAt })
             .ToListAsync(ct);
-
-        var today = utcNow.UtcDateTime.Date;
-        var weekAgo = today.AddDays(-6);
 
         var pending = rows.Count(a =>
             a.Status is ArticleSubmissionStatus.Submitted
@@ -284,12 +292,56 @@ public sealed class EfArticleSubmissionRepository(QueenZoneDbContext dbContext) 
             pending, receivedToday, receivedThisWeek, approvedLast30, rejectedLast30, pendingLast30);
     }
 
-    public async Task<IReadOnlyList<SubmissionContributor>> GetTopContributorsThisMonthAsync(
+    // SQL Server only: the EF Core SQLite provider cannot translate DateTimeOffset? comparisons
+    // inside conditional aggregates, so this path has no coverage from the default SQLite-backed
+    // QueenZone.Web.Tests suite. Covered instead by tests/QueenZone.SqlServerTests against a
+    // real SQL Server (Docker in CI, LocalDB locally) — see docs/architecture/testing-policy.md.
+    private async Task<SubmissionTypeCounts> GetDashboardCountsViaSqlAggregateAsync(
+        DateTimeOffset utcNow,
+        CancellationToken ct)
+    {
+        var monthAgo = utcNow.AddDays(-30);
+        var todayUtc = new DateTimeOffset(utcNow.UtcDateTime.Date, TimeSpan.Zero);
+        var weekAgoUtc = todayUtc.AddDays(-6);
+
+        var counts = await dbContext.ArticleSubmissions
+            .AsNoTracking()
+            .GroupBy(_ => 1)
+            .Select(g => new SubmissionTypeCounts(
+                g.Count(a => a.Status == ArticleSubmissionStatus.Submitted
+                    || a.Status == ArticleSubmissionStatus.UnderReview
+                    || a.Status == ArticleSubmissionStatus.ApprovedForPublishing),
+                g.Count(a => a.SubmittedAt.HasValue && a.SubmittedAt.Value >= todayUtc),
+                g.Count(a => a.SubmittedAt.HasValue && a.SubmittedAt.Value >= weekAgoUtc),
+                g.Count(a => a.SubmittedAt.HasValue && a.SubmittedAt.Value >= monthAgo
+                    && (a.Status == ArticleSubmissionStatus.Published
+                        || a.Status == ArticleSubmissionStatus.ApprovedForPublishing)),
+                g.Count(a => a.SubmittedAt.HasValue && a.SubmittedAt.Value >= monthAgo
+                    && (a.Status == ArticleSubmissionStatus.Rejected
+                        || a.Status == ArticleSubmissionStatus.RequiresRevision)),
+                g.Count(a => a.SubmittedAt.HasValue && a.SubmittedAt.Value >= monthAgo
+                    && (a.Status == ArticleSubmissionStatus.Submitted
+                        || a.Status == ArticleSubmissionStatus.UnderReview))))
+            .SingleOrDefaultAsync(ct);
+
+        return counts ?? SubmissionTypeCounts.Empty;
+    }
+
+    public Task<IReadOnlyList<SubmissionContributor>> GetTopContributorsThisMonthAsync(
         DateTimeOffset monthStart,
         int maxCount,
-        CancellationToken ct = default)
+        CancellationToken ct = default) =>
+        IsSqliteDatabase()
+            ? GetTopContributorsInMemoryAsync(monthStart, maxCount, ct)
+            : GetTopContributorsViaSqlAggregateAsync(monthStart, maxCount, ct);
+
+    // SQLite fallback (also exercised in tests): the provider cannot translate DateTimeOffset?
+    // comparisons.
+    private async Task<IReadOnlyList<SubmissionContributor>> GetTopContributorsInMemoryAsync(
+        DateTimeOffset monthStart,
+        int maxCount,
+        CancellationToken ct)
     {
-        // Materialize first: SQLite EF provider can't translate DateTimeOffset? comparisons.
         var rows = await dbContext.ArticleSubmissions
             .AsNoTracking()
             .Select(a => new
@@ -311,6 +363,40 @@ public sealed class EfArticleSubmissionRepository(QueenZoneDbContext dbContext) 
             .Take(maxCount)
             .ToList();
     }
+
+    // SQL Server only: see the note on GetDashboardCountsViaSqlAggregateAsync.
+    private async Task<IReadOnlyList<SubmissionContributor>> GetTopContributorsViaSqlAggregateAsync(
+        DateTimeOffset monthStart,
+        int maxCount,
+        CancellationToken ct)
+    {
+        var aggregated = await dbContext.ArticleSubmissions
+            .AsNoTracking()
+            .Where(a => a.SubmittedAt.HasValue && a.SubmittedAt.Value >= monthStart)
+            .GroupBy(a => a.AuthorMemberId)
+            .Select(g => new
+            {
+                MemberId = g.Key,
+                DisplayName = g.Max(a => a.Author != null ? a.Author.DisplayName : null),
+                Count = g.Count(),
+            })
+            .OrderByDescending(c => c.Count)
+            .Take(maxCount)
+            .ToListAsync(ct);
+
+        return aggregated
+            .Select(c => new SubmissionContributor(
+                c.MemberId,
+                string.IsNullOrWhiteSpace(c.DisplayName) ? "Unknown member" : c.DisplayName,
+                c.Count))
+            .ToList();
+    }
+
+    private bool IsSqliteDatabase() =>
+        string.Equals(
+            dbContext.Database.ProviderName,
+            "Microsoft.EntityFrameworkCore.Sqlite",
+            StringComparison.Ordinal);
 
     internal static int CountVisibleChars(string? html)
     {
