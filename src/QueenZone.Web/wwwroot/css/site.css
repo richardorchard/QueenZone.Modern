@@ -55,6 +55,7 @@
   gap: var(--space-3);
   color: var(--qz-masthead-ink-strong);
   text-decoration: none;
+  transition: none;
 }
 
 .qz-brand img,
@@ -64,12 +65,30 @@
   height: 42px;
 }
 
+.qz-brand .qz-brand__crest {
+  width: 64px;
+  height: 48px;
+  overflow: hidden;
+}
+
+.qz-brand .qz-brand__crest img {
+  display: block;
+  width: 64px;
+  height: 64px;
+  max-width: none;
+  object-fit: cover;
+  object-position: top center;
+}
+
 .qz-brand span {
+  display: block;
   font-family: var(--font-titling);
   font-size: 1.3125rem;
   font-weight: var(--fw-semibold);
+  line-height: 1;
   letter-spacing: 0.18em;
   text-transform: uppercase;
+  transition: none;
 }
 
 .qz-nav {
@@ -3181,6 +3200,16 @@ body.qz-menu-lock .qz-masthead {
 
   .qz-brand img {
     height: 34px;
+  }
+
+  .qz-brand .qz-brand__crest {
+    width: 44px;
+    height: 33px;
+  }
+
+  .qz-brand .qz-brand__crest img {
+    width: 44px;
+    height: 44px;
   }
 
   .qz-brand span {
