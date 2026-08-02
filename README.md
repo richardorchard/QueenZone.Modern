@@ -209,7 +209,7 @@ The local SQL copy may contain production user, mail, IP, moderation, and privat
 
 ### News agent (discovery worker)
 
-The news agent fetches configured public sources, triages items with OpenRouter, generates editor-reviewable drafts, and stores candidates for the admin review queue. It does not publish to public pages automatically.
+The news agent fetches configured public sources, triages items with OpenRouter, and stores candidates for the admin review queue. Scheduled and web-queued runs stop after triage; editors generate AI drafts only for selected candidates. Nothing publishes to public pages automatically.
 
 Full setup, worker flags, and admin review UI are documented in `docs/architecture/news-agent.md`.
 
@@ -219,14 +219,14 @@ Quick start:
 copy src\QueenZone.NewsAgent.Worker\appsettings.Local.json.example src\QueenZone.NewsAgent.Worker\appsettings.Local.json
 # Edit appsettings.Local.json: set OpenRouter:ApiKey and optionally ConnectionStrings:QueenZoneLegacy
 
-dotnet run --project src/QueenZone.NewsAgent.Worker -- discover-news --seed-sources --triage --draft
+dotnet run --project src/QueenZone.NewsAgent.Worker -- discover-news --scheduled
 ```
 
 OpenRouter smoke test (Windows): double-click `scripts/Smoke-NewsAgent.bat`.
 
 Post-deploy live site smoke (custom domain): separate job at the end of the App Service deploy workflow (`build` → `migrate` → `deploy` → `smoke`) against `https://www.queenzone.org`. Re-run locally with `powershell -File .\scripts\Smoke-LiveSite.ps1`.
 
-Admin review queue (after signing in as an allowed admin): `/admin/news-discovery`. Promoted drafts are edited and published through the existing `/admin/news` workflow.
+Admin review queue (after signing in as an allowed admin): `/admin/news-discovery`. Its **Queue news gathering** action writes a request to the shared database for the local Windows runner; see `docs/architecture/news-agent-scheduling.md`. Selected candidates can then have a draft generated, edited, and published through the existing `/admin/news` workflow.
 
 The hosted App Service currently connects to Azure SQL with SQL authentication. For local development, use a local-only SQL auth connection string or another explicitly granted development principal:
 

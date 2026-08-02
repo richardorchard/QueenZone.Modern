@@ -258,15 +258,26 @@ public sealed class DiscoverNewsWorkerTests
     }
 
     [Fact]
-    public void DiscoverNewsCommandOptions_Parse_scheduled_enables_full_pipeline_flags()
+    public void DiscoverNewsCommandOptions_Parse_scheduled_enables_triage_without_drafts()
     {
         var options = DiscoverNewsCommandOptions.Parse(["discover-news", "--scheduled"]);
 
         Assert.NotNull(options);
         Assert.True(options.SeedSources);
         Assert.True(options.Triage);
-        Assert.True(options.Draft);
+        Assert.False(options.Draft);
         Assert.False(options.TriageOnly);
         Assert.False(options.DraftOnly);
+    }
+
+    [Fact]
+    public void DiscoverNewsCommandOptions_Parse_scheduled_with_drafts_enables_full_pipeline()
+    {
+        var options = DiscoverNewsCommandOptions.Parse(["discover-news", "--scheduled-with-drafts"]);
+
+        Assert.NotNull(options);
+        Assert.True(options.SeedSources);
+        Assert.True(options.Triage);
+        Assert.True(options.Draft);
     }
 }

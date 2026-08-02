@@ -5,7 +5,8 @@
 
 .DESCRIPTION
     Wraps `dotnet run --project src/QueenZone.NewsAgent.Worker -- discover-news` with
-    common flag presets. For Task Scheduler, use -Scheduled and ensure appsettings.Local.json
+    common flag presets. For Task Scheduler, use -Scheduled for source gathering and
+    triage only. Draft generation remains an explicit editor action.
     (or environment variables) provides the database connection and OpenRouter key.
 
     See docs/architecture/news-agent-scheduling.md for Task Scheduler and Azure setup.

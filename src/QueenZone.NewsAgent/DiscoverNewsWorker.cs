@@ -15,6 +15,8 @@ public sealed class DiscoverNewsWorker(
     IOptions<NewsAgentSchedulerOptions> schedulerOptions,
     ILogger<DiscoverNewsWorker> logger)
 {
+    public NewsAgentRunSummary? LastRunSummary { get; private set; }
+
     public async Task<int> RunAsync(
         DiscoverNewsCommandOptions options,
         CancellationToken cancellationToken = default)
@@ -24,9 +26,7 @@ public sealed class DiscoverNewsWorker(
         await using var runLease = await TryAcquireRunLeaseAsync(options, cancellationToken);
         if (runLease is null)
         {
-            NewsAgentRunTelemetry.LogRunCompleted(
-                logger,
-                new NewsAgentRunSummary(
+            LastRunSummary = new NewsAgentRunSummary(
                     SkippedDueToLease: true,
                     AiEnabled: aiRunExecutor.IsAiEnabled,
                     DryRun: options.DryRun || openRouterOptions.Value.DryRun,
@@ -34,7 +34,8 @@ public sealed class DiscoverNewsWorker(
                     Triage: null,
                     Draft: null,
                     EstimatedAiSpendUsd: 0,
-                    ExitCode: 0));
+                    ExitCode: 0);
+            NewsAgentRunTelemetry.LogRunCompleted(logger, LastRunSummary);
             return 0;
         }
 
@@ -68,9 +69,7 @@ public sealed class DiscoverNewsWorker(
             DateTime.UtcNow.Date.AddDays(1),
             cancellationToken);
 
-        NewsAgentRunTelemetry.LogRunCompleted(
-            logger,
-            new NewsAgentRunSummary(
+        LastRunSummary = new NewsAgentRunSummary(
                 SkippedDueToLease: false,
                 AiEnabled: aiRunExecutor.IsAiEnabled,
                 DryRun: options.DryRun || openRouterOptions.Value.DryRun,
@@ -78,7 +77,8 @@ public sealed class DiscoverNewsWorker(
                 Triage: triageResult,
                 Draft: draftResult,
                 EstimatedAiSpendUsd: spend,
-                ExitCode: exitCode));
+                ExitCode: exitCode);
+        NewsAgentRunTelemetry.LogRunCompleted(logger, LastRunSummary);
 
         return exitCode;
     }

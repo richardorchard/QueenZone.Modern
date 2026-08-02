@@ -11,16 +11,17 @@ dotnet publish src/QueenZone.NewsAgent.Worker/QueenZone.NewsAgent.Worker.csproj 
 ```
 
 ```powershell
-# Full scheduled pipeline: seed sources, fetch, triage, draft
+# Editorial-safe scheduled pipeline: seed sources, fetch, triage (no drafts)
 dotnet run --project src/QueenZone.NewsAgent.Worker -- discover-news --scheduled
 
-# Equivalent explicit flags
+# Deliberate full pipeline, including bulk drafts
 dotnet run --project src/QueenZone.NewsAgent.Worker -- discover-news --seed-sources --triage --draft
 ```
 
 | Flag | Purpose |
 |------|---------|
-| `--scheduled` | Preset for automation: `--seed-sources --triage --draft` |
+| `--scheduled` | Preset for automation: `--seed-sources --triage` (no drafts) |
+| `--scheduled-with-drafts` | Deliberate full preset including bulk draft generation |
 | `--fetch-only` | Fetch feeds only (no AI) |
 | `--force` | Bypass source poll-interval skip **and** the run lease (manual overlap override) |
 
@@ -61,7 +62,7 @@ dotnet ef database update --project src/QueenZone.Data --startup-project src/Que
 
 ## Windows Task Scheduler (local pilot)
 
-Use `scripts/Run-NewsAgentDiscovery.ps1` as the scheduled action. It runs from the repository root, forwards exit codes, and supports common modes.
+Use `scripts/Run-NewsAgentDiscovery.ps1` for automatic gathering and `scripts/Process-NewsAgentRunRequests.ps1` for requests queued from `/admin/news-discovery`. Both run from the repository root and forward worker exit codes.
 
 ### One-time setup
 
@@ -85,6 +86,28 @@ Optional log file (ignored path, not committed):
 ```powershell
 scripts/Run-NewsAgentDiscovery.ps1 -Scheduled *>&1 | Tee-Object -FilePath "$env:LOCALAPPDATA\QueenZone\news-agent.log" -Append
 ```
+
+### Web-queued runs on the local computer
+
+The admin button does not contact the Windows computer directly. It inserts one pending request into the shared Azure SQL database. The computer polls outbound, records a heartbeat, atomically claims at most one request, and runs the same `--scheduled` triage-only preset. If the computer is off, the request remains pending.
+
+Create a second Task Scheduler task:
+
+1. **General**: run whether the user is logged on or not, using the same account and local worker settings as the scheduled task.
+2. **Trigger**: daily, repeat every 1 minute indefinitely.
+3. **Action**:
+   - **Program**: `powershell.exe`
+   - **Arguments**: `-NoProfile -ExecutionPolicy Bypass -File "C:\path\to\QueenZone.Modern\scripts\Process-NewsAgentRunRequests.ps1"`
+   - **Start in**: `C:\path\to\QueenZone.Modern`
+4. **Settings**: if already running, **Do not start a new instance**.
+
+Smoke-test the poller before saving the task:
+
+```powershell
+scripts/Process-NewsAgentRunRequests.ps1 -RunnerId "news-pc"
+```
+
+With no pending request it exits `0` after updating the heartbeat. Queue a request from `/admin/news-discovery`, run the script again, and confirm that the page shows the request moving from `Pending` to `Completed` or `Failed`. The runner never needs an inbound port, tunnel, or webhook.
 
 ## Azure hosting options
 
@@ -116,7 +139,7 @@ The web app deploy workflow (`.github/workflows/deploy.yml`) publishes `QueenZon
 
 ### Option D — Operator machine (current default)
 
-Run `scripts/Run-NewsAgentDiscovery.ps1 -Scheduled` via Task Scheduler on an always-on Windows PC. Discovery pauses when the machine is off; the public site is unaffected.
+Run `scripts/Run-NewsAgentDiscovery.ps1 -Scheduled` for automatic triage and `scripts/Process-NewsAgentRunRequests.ps1` for web-queued runs via Task Scheduler on the Windows PC. Discovery pauses when the machine is off; queued requests wait and the public site is unaffected.
 
 ## Secrets
 
