@@ -1,0 +1,93 @@
+name: Test EF migrations against SQL Express mirror
+
+on:
+  workflow_dispatch:
+    inputs:
+      force_resync:
+        description: "Resync the mirror from the live legacy DB first (~3-5 min). Leave unchecked to test against whatever's already in the mirror (e.g. last night's sync, or a prior run of this workflow)."
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-migrations-against-mirror
+  cancel-in-progress: false
+
+# On-demand pre-deploy check: applies pending EF migrations to the SQL
+# Express mirror (the same one nightly-legacy-checks.yml maintains) instead
+# of the real Azure SQL DB, so schema changes touching real-shaped data can
+# be tried without touching production.
+#
+# NOT a replacement for the `ef-migrations` job in ci.yml, which applies to
+# the real deploy target and is the authoritative check. This is a faster,
+# safer earlier warning, and stale by design - the mirror only refreshes
+# nightly, or on demand here via the force_resync input.
+jobs:
+  resync-mirror:
+    name: Resync mirror from live DB
+    if: inputs.force_resync
+    runs-on: [self-hosted, Windows]
+    environment: dev
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Restore local dotnet tools (sqlpackage)
+        run: dotnet tool restore
+
+      - name: Fetch Bitwarden deploy secrets
+        id: bitwarden-secrets
+        uses: bitwarden/sm-action@v3.0.1
+        with:
+          access_token: ${{ secrets.BITWARDEN_SECRETS_MANAGER_ACCESS_TOKEN }}
+          secrets: ${{ vars.BITWARDEN_APP_SERVICE_DEPLOY_SECRETS }}
+
+      - name: Sync live legacy DB into local SQL Express
+        env:
+          ConnectionStrings__QueenZoneLegacy: ${{ steps.bitwarden-secrets.outputs.QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:ConnectionStrings__QueenZoneLegacy)) {
+            Write-Error "QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING is not configured. Check the Bitwarden secret and BITWARDEN_APP_SERVICE_DEPLOY_SECRETS mapping."
+          }
+          ./scripts/Sync-LegacyDbToSqlExpress.ps1
+
+  test-migrations:
+    name: Apply pending EF migrations to the mirror
+    needs: resync-mirror
+    # Runs whether resync-mirror ran or was skipped (force_resync=false) -
+    # only blocked if it actually ran and failed.
+    if: always() && needs.resync-mirror.result != 'failure'
+    runs-on: [self-hosted, Windows]
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Restore tools and solution
+        run: |
+          dotnet tool restore
+          dotnet restore QueenZone.sln
+
+      - name: Check EF model snapshot is current
+        run: |
+          dotnet ef migrations has-pending-model-changes `
+            --project src/QueenZone.Data/QueenZone.Data.csproj `
+            --startup-project src/QueenZone.Web/QueenZone.Web.csproj
+
+      # Same Windows box the mirror lives on - plain local Windows-integrated
+      # auth against localhost, no LAN hop or queenzone_probe login needed
+      # (the runner's service account already owns this DB, having created
+      # it via dbcreator during the last sync).
+      - name: Apply migrations to the SQL Express mirror
+        env:
+          ConnectionStrings__QueenZoneLegacy: "Server=localhost\\SQLEXPRESS;Database=queenzone_legacy_sync;Integrated Security=True;TrustServerCertificate=True"
+        run: |
+          dotnet ef database update `
+            --project src/QueenZone.Data/QueenZone.Data.csproj `
+            --startup-project src/QueenZone.Web/QueenZone.Web.csproj
