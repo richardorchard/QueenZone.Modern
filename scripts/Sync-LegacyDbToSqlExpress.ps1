@@ -42,18 +42,24 @@ Get-ChildItem -Path ([System.IO.Path]::GetTempPath()) -Filter "queenzone-legacy-
 
 try {
     Write-Host "Exporting live legacy database to $bacpacPath..."
-    # VerifyExtraction=False: the legacy schema has pre-existing broken forum
-    # views (e.g. Q_FORUM_TOPIC_V) with unresolved/ambiguous column references
-    # - SQL Server tolerates these via deferred name resolution (they only
-    # error if actually queried, which the app doesn't do), but sqlpackage's
-    # default post-extraction model verification is stricter and fails the
-    # whole export over them. Skip that verification pass; it isn't needed
-    # here since this bacpac is only ever used to seed SQL Express, not
-    # round-tripped as a validated artifact.
+    # ExcludeObjectTypes=Views: the legacy schema has pre-existing broken
+    # forum views (e.g. Q_FORUM_TOPIC_V) referencing at least one table
+    # (dbo.Q_FORUM_TOPIC_T) that doesn't actually exist in the source - not
+    # just an ordering/validation quirk SQL Server's deferred name resolution
+    # papers over, but a genuinely dead reference that also broke import
+    # ("Invalid object name") once exported. The probe tests this mirror
+    # serves (EfAdminNewsRepositoryLegacyProbeTests, EfNewsSectionLiveProbeTests)
+    # query news tables directly via raw SQL - no view in the schema is on
+    # that path - so views aren't needed here at all; excluding them
+    # sidesteps every broken-view issue instead of chasing them one by one.
+    # VerifyExtraction=False kept as a safety net for the same class of
+    # pre-existing schema quirks outside of views; this bacpac is only ever
+    # used to seed SQL Express, not round-tripped as a validated artifact.
     dotnet tool run sqlpackage /Action:Export `
         /SourceConnectionString:"$sourceConnectionString" `
         /TargetFile:"$bacpacPath" `
-        /p:VerifyExtraction=False
+        /p:VerifyExtraction=False `
+        /p:ExcludeObjectTypes=Views
     if ($LASTEXITCODE -ne 0) { throw "sqlpackage export failed with exit code $LASTEXITCODE" }
 
     $targetConnectionString = "Server=localhost\$InstanceName;Database=master;Integrated Security=True;TrustServerCertificate=True"
