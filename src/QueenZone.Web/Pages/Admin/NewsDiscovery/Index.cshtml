@@ -13,6 +13,56 @@
     <p class="admin-status admin-status--@(Model.StatusMessageKind ?? "info")">@Model.StatusMessage</p>
   }
 
+  <section class="admin-panel">
+    <h2>News gathering</h2>
+    <p>
+      Queue source gathering and AI triage on the local Windows runner. Drafts are generated only when you select an individual candidate.
+    </p>
+    @if (Model.RunnerHeartbeat is null)
+    {
+      <p class="admin-muted">The local runner has not checked in yet.</p>
+    }
+    else
+    {
+      <p class="admin-muted">
+        Runner <strong>@Model.RunnerHeartbeat.RunnerId</strong> was last seen
+        @Model.RunnerHeartbeat.LastSeenAtUtc.ToString("dd MMM yyyy HH:mm") UTC
+        (@(Model.RunnerRecentlySeen ? "online recently" : "not seen recently")).
+      </p>
+    }
+    <form method="post" action="/admin/news-discovery?handler=queuerun" class="admin-inline-form">
+      <input type="hidden" name="@AdminNewsDiscoveryPageModel.AntiforgeryTokenFieldName" value="@Antiforgery.GetAndStoreTokens(HttpContext).RequestToken">
+      <button type="submit">Queue news gathering</button>
+    </form>
+
+    @if (Model.RecentRuns.Count > 0)
+    {
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Requested</th>
+            <th>Status</th>
+            <th>Requested by</th>
+            <th>Runner</th>
+            <th>Result</th>
+          </tr>
+        </thead>
+        <tbody>
+          @foreach (var run in Model.RecentRuns)
+          {
+            <tr>
+              <td>@run.RequestedAtUtc.ToString("dd MMM yyyy HH:mm") UTC</td>
+              <td>@run.Status</td>
+              <td>@run.RequestedBy</td>
+              <td>@(run.RunnerId ?? "—")</td>
+              <td>@(run.Summary ?? run.ErrorMessage ?? "—")</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+  </section>
+
   <form method="get" class="admin-filter-form">
     <div class="admin-filter-grid">
       <label>

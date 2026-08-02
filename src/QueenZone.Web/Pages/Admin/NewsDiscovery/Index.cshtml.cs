@@ -5,7 +5,9 @@ using QueenZone.Data;
 
 namespace QueenZone.Web.Pages.Admin.NewsDiscovery;
 
-public sealed class IndexModel(INewsDiscoveryRepository discoveryRepository) : AdminNewsDiscoveryPageModel
+public sealed class IndexModel(
+    INewsDiscoveryRepository discoveryRepository,
+    INewsAgentRunRequestRepository runRequestRepository) : AdminNewsDiscoveryPageModel
 {
     [BindProperty(SupportsGet = true)]
     public NewsCandidateStatus? Status { get; set; }
@@ -35,12 +37,29 @@ public sealed class IndexModel(INewsDiscoveryRepository discoveryRepository) : A
 
     public IReadOnlyList<NewsDiscoverySource> Sources { get; private set; } = [];
 
+    public IReadOnlyList<NewsAgentRunRequest> RecentRuns { get; private set; } = [];
+
+    public NewsAgentRunnerHeartbeat? RunnerHeartbeat { get; private set; }
+
+    public bool RunnerRecentlySeen =>
+        RunnerHeartbeat is not null && RunnerHeartbeat.LastSeenAtUtc >= DateTime.UtcNow.AddMinutes(-5);
+
     public string? StatusMessage => TempData["DiscoveryMessage"] as string;
 
     public string? StatusMessageKind => TempData["DiscoveryMessageKind"] as string;
 
     public async Task OnGetAsync(CancellationToken cancellationToken) =>
         await LoadAsync(cancellationToken);
+
+    public async Task<IActionResult> OnPostQueueRunAsync(CancellationToken cancellationToken)
+    {
+        var result = await runRequestRepository.QueueAsync(EditorEmail, cancellationToken);
+        TempData["DiscoveryMessage"] = result.WasCreated
+            ? "News gathering queued. The local Windows runner will fetch and triage it when next online."
+            : $"A news gathering run is already {result.Request.Status.ToString().ToLowerInvariant()}.";
+        TempData["DiscoveryMessageKind"] = result.WasCreated ? "success" : "info";
+        return Redirect(BuildReturnUrl());
+    }
 
     public async Task<IActionResult> OnPostIgnoreAsync(int id, CancellationToken cancellationToken)
     {
@@ -104,6 +123,8 @@ public sealed class IndexModel(INewsDiscoveryRepository discoveryRepository) : A
     private async Task LoadAsync(CancellationToken cancellationToken)
     {
         ViewData["Title"] = "News discovery review";
+        RecentRuns = await runRequestRepository.ListRecentAsync(5, cancellationToken);
+        RunnerHeartbeat = await runRequestRepository.GetLatestHeartbeatAsync(cancellationToken);
         Sources = await discoveryRepository.GetSourcesAsync(cancellationToken: cancellationToken);
         var candidates = await discoveryRepository.ListCandidatesForReviewAsync(
             new NewsCandidateListQuery(

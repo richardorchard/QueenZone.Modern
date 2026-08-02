@@ -938,6 +938,38 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
     }
 
     [Fact]
+    public async Task AuthorizedAdminCanQueueOneTriageRunAndSeeItsStatus()
+    {
+        var appFactory = CreateFactory(new SharedNewsStore(), new SharedNewsDiscoveryStore());
+        var client = CreateClientFromFactory(appFactory, AdminEmail);
+        var repository = appFactory.Services.GetRequiredService<INewsAgentRunRequestRepository>();
+
+        var indexBody = await client.GetStringAsync("/admin/news-discovery");
+        Assert.Contains("Queue news gathering", indexBody);
+        Assert.Contains("Drafts are generated only when you select an individual candidate", indexBody);
+
+        var firstResponse = await PostIndexActionAsync(
+            client,
+            "/admin/news-discovery?handler=queuerun",
+            []);
+        var secondResponse = await PostIndexActionAsync(
+            client,
+            "/admin/news-discovery?handler=queuerun",
+            []);
+        var recent = await repository.ListRecentAsync();
+
+        Assert.Equal(HttpStatusCode.Redirect, firstResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, secondResponse.StatusCode);
+        var request = Assert.Single(recent);
+        Assert.Equal(AdminEmail, request.RequestedBy);
+        Assert.Equal(NewsAgentRunRequestStatus.Pending, request.Status);
+
+        var statusBody = await client.GetStringAsync("/admin/news-discovery");
+        Assert.Contains("already pending", statusBody);
+        Assert.Contains(AdminEmail, statusBody);
+    }
+
+    [Fact]
     public async Task IndexBulkIgnoreRejectsAllCurrentlyListedCandidates()
     {
         var discoveryStore = new SharedNewsDiscoveryStore();

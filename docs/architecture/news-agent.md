@@ -97,7 +97,8 @@ dotnet run --project src/QueenZone.NewsAgent.Worker -- discover-news [options]
 | `--triage-only` | Triage existing `Discovered` candidates only |
 | `--draft` | Generate drafts after fetch/triage |
 | `--draft-only` | Draft existing `NeedsReview` candidates only |
-| `--scheduled` | Preset for automation: `--seed-sources --triage --draft` |
+| `--scheduled` | Editorial-safe automation preset: `--seed-sources --triage` (no drafts) |
+| `--scheduled-with-drafts` | Deliberate legacy/full preset: `--seed-sources --triage --draft` |
 | `--dry-run` | Log AI steps without calling OpenRouter or persisting status changes |
 | `--force` | Bypass source poll-interval skip; force draft regeneration where applicable |
 
@@ -124,6 +125,8 @@ Quick local scheduled preset:
 scripts/Run-NewsAgentDiscovery.ps1 -Scheduled
 ```
 
+This preset fetches and triages only. Generate a draft from the selected candidate's admin review page. To process a run requested from the web admin, configure the local Windows polling task described in `news-agent-scheduling.md`.
+
 Overlapping runs are skipped via a database lease (`NewsAgentScheduler` in worker `appsettings.json`). Use `--force` to bypass the lease for manual reruns.
 
 ## OpenRouter smoke test (Windows)
@@ -148,6 +151,7 @@ Authenticated admins use Razor Pages under `/admin/news-discovery`:
 
 Editor actions (POST, anti-forgery protected):
 
+- **Queue news gathering** → records a triage-only request for the outbound-polling local Windows runner
 - **Mark not relevant** → `Rejected`
 - **Ignore duplicate** → `IgnoredDuplicate`
 - **Edit draft** → save fields; moves `NeedsReview` → `Drafted` when appropriate

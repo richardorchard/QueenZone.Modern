@@ -5,8 +5,9 @@ using Microsoft.Extensions.Options;
 using QueenZone.Data;
 using QueenZone.NewsAgent;
 
-var options = DiscoverNewsCommandOptions.Parse(args);
-if (options is null)
+var discoverOptions = DiscoverNewsCommandOptions.Parse(args);
+var queuedRunOptions = NewsAgentQueuedRunCommandOptions.Parse(args);
+if (discoverOptions is null && queuedRunOptions is null)
 {
     PrintUsage();
     return 1;
@@ -35,14 +36,20 @@ else
 }
 
 await using var provider = services.BuildServiceProvider();
-var worker = provider.GetRequiredService<DiscoverNewsWorker>();
+if (queuedRunOptions is not null)
+{
+    var processor = provider.GetRequiredService<NewsAgentQueuedRunProcessor>();
+    return await processor.RunOnceAsync(queuedRunOptions.RunnerId);
+}
 
-return await worker.RunAsync(options);
+var worker = provider.GetRequiredService<DiscoverNewsWorker>();
+return await worker.RunAsync(discoverOptions!);
 
 static void PrintUsage()
 {
     Console.WriteLine("QueenZone news discovery worker");
     Console.WriteLine();
     Console.WriteLine("Usage:");
-    Console.WriteLine("  dotnet run --project src/QueenZone.NewsAgent.Worker -- discover-news [--fetch-only] [--seed-sources] [--scheduled] [--dry-run] [--force] [--triage] [--triage-only] [--draft] [--draft-only]");
+    Console.WriteLine("  dotnet run --project src/QueenZone.NewsAgent.Worker -- discover-news [--fetch-only] [--seed-sources] [--scheduled] [--scheduled-with-drafts] [--dry-run] [--force] [--triage] [--triage-only] [--draft] [--draft-only]");
+    Console.WriteLine("  dotnet run --project src/QueenZone.NewsAgent.Worker -- process-news-requests [--runner-id <name>]");
 }

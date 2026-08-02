@@ -60,4 +60,19 @@ public sealed class DiscoverNewsCommandTests
         Assert.True(options.DraftOnly);
         Assert.True(options.Force);
     }
+
+    [Fact]
+    public void Queued_run_command_uses_machine_name_or_explicit_runner_id()
+    {
+        var defaultOptions = NewsAgentQueuedRunCommandOptions.Parse(["process-news-requests"]);
+        var namedOptions = NewsAgentQueuedRunCommandOptions.Parse([
+            "process-news-requests",
+            "--runner-id",
+            "news-pc"]);
+
+        Assert.NotNull(defaultOptions);
+        Assert.False(string.IsNullOrWhiteSpace(defaultOptions.RunnerId));
+        Assert.Equal("news-pc", namedOptions?.RunnerId);
+        Assert.Null(NewsAgentQueuedRunCommandOptions.Parse(["process-news-requests", "--unknown"]));
+    }
 }
