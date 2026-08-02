@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using QueenZone.Data;
 
@@ -11,9 +12,11 @@ using QueenZone.Data;
 namespace QueenZone.Data.Migrations
 {
     [DbContext(typeof(QueenZoneDbContext))]
-    partial class QueenZoneDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260802055355_AddPrivateMessaging")]
+    partial class AddPrivateMessaging
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1368,9 +1371,6 @@ namespace QueenZone.Data.Migrations
                     b.Property<DateTimeOffset?>("LastReadAt")
                         .HasColumnType("datetimeoffset");
 
-                    b.Property<long?>("LastReadSortKey")
-                        .HasColumnType("bigint");
-
                     b.HasKey("ConversationId", "MemberId");
 
                     b.HasIndex("MemberId", "IsArchived")
@@ -1399,21 +1399,12 @@ namespace QueenZone.Data.Migrations
                     b.Property<Guid>("SenderMemberId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<long>("SortKey")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("SortKey"));
-
                     b.HasKey("Id");
 
                     b.HasIndex("SenderMemberId");
 
                     b.HasIndex("ConversationId", "CreatedAt")
                         .HasDatabaseName("IX_PrivateMessages_Conversation_CreatedAt");
-
-                    b.HasIndex("ConversationId", "SortKey")
-                        .HasDatabaseName("IX_PrivateMessages_Conversation_SortKey");
 
                     b.ToTable("PrivateMessages", (string)null);
                 });

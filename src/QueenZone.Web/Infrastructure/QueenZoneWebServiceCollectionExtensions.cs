@@ -192,6 +192,7 @@ public static class QueenZoneWebServiceCollectionExtensions
     public static IServiceCollection AddQueenZoneWebAppServices(this IServiceCollection services)
     {
         services.AddScoped<MemberAccountService>();
+        services.AddScoped<PrivateMessageService>();
         services.AddScoped<PhotoSubmissionService>();
         services.AddScoped<AdminPhotoService>();
         services.AddScoped<NewsSuggestionService>();

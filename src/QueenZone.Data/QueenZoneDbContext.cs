@@ -58,6 +58,13 @@ public sealed class QueenZoneDbContext : DbContext
 
     public DbSet<QueenLinkCheckEntity> QueenLinkChecks => Set<QueenLinkCheckEntity>();
 
+    public DbSet<PrivateConversationEntity> PrivateConversations => Set<PrivateConversationEntity>();
+
+    public DbSet<PrivateConversationParticipantEntity> PrivateConversationParticipants =>
+        Set<PrivateConversationParticipantEntity>();
+
+    public DbSet<PrivateMessageEntity> PrivateMessages => Set<PrivateMessageEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<NewsTableRow>(entity =>
@@ -597,6 +604,86 @@ public sealed class QueenZoneDbContext : DbContext
             entity.Property(check => check.LastError).HasMaxLength(500);
             entity.HasIndex(check => check.IsConfirmedDead);
             entity.HasIndex(check => check.LastCheckedAtUtc);
+        });
+
+        modelBuilder.Entity<PrivateConversationEntity>(entity =>
+        {
+            entity.ToTable("PrivateConversations");
+            entity.HasKey(conversation => conversation.Id);
+
+            entity.Property(conversation => conversation.LastMessagePreview)
+                .HasMaxLength(PrivateMessageLimits.PreviewLength)
+                .IsRequired();
+            entity.Property(conversation => conversation.CreatedAt).IsRequired();
+            entity.Property(conversation => conversation.LastMessageAt).IsRequired();
+
+            entity.HasIndex(conversation => new { conversation.MemberLowId, conversation.MemberHighId })
+                .IsUnique()
+                .HasDatabaseName("IX_PrivateConversations_MemberPair");
+
+            entity.HasIndex(conversation => conversation.LastMessageAt)
+                .IsDescending()
+                .HasDatabaseName("IX_PrivateConversations_LastMessageAt");
+
+            entity.HasOne(conversation => conversation.MemberLow)
+                .WithMany()
+                .HasForeignKey(conversation => conversation.MemberLowId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(conversation => conversation.MemberHigh)
+                .WithMany()
+                .HasForeignKey(conversation => conversation.MemberHighId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<PrivateConversationParticipantEntity>(entity =>
+        {
+            entity.ToTable("PrivateConversationParticipants");
+            entity.HasKey(participant => new { participant.ConversationId, participant.MemberId });
+
+            entity.Property(participant => participant.IsArchived).IsRequired();
+
+            entity.HasIndex(participant => new { participant.MemberId, participant.IsArchived })
+                .HasDatabaseName("IX_PrivateConversationParticipants_Member_Archived");
+
+            entity.HasOne(participant => participant.Conversation)
+                .WithMany(conversation => conversation.Participants)
+                .HasForeignKey(participant => participant.ConversationId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(participant => participant.Member)
+                .WithMany()
+                .HasForeignKey(participant => participant.MemberId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<PrivateMessageEntity>(entity =>
+        {
+            entity.ToTable("PrivateMessages");
+            entity.HasKey(message => message.Id);
+
+            entity.Property(message => message.Body)
+                .HasMaxLength(PrivateMessageLimits.MaxBodyLength)
+                .IsRequired();
+            entity.Property(message => message.CreatedAt).IsRequired();
+            entity.Property(message => message.SortKey)
+                .ValueGeneratedOnAdd()
+                .IsRequired();
+
+            entity.HasIndex(message => new { message.ConversationId, message.CreatedAt })
+                .HasDatabaseName("IX_PrivateMessages_Conversation_CreatedAt");
+            entity.HasIndex(message => new { message.ConversationId, message.SortKey })
+                .HasDatabaseName("IX_PrivateMessages_Conversation_SortKey");
+
+            entity.HasOne(message => message.Conversation)
+                .WithMany(conversation => conversation.Messages)
+                .HasForeignKey(message => message.ConversationId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(message => message.Sender)
+                .WithMany()
+                .HasForeignKey(message => message.SenderMemberId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
     }
 }

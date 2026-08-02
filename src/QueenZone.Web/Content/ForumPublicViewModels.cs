@@ -52,7 +52,8 @@ public sealed record ForumPostViewModel(
     DateTimeOffset? EditedAt = null,
     int EditCount = 0,
     bool CanEdit = false,
-    string? EditedLabel = null);
+    string? EditedLabel = null,
+    bool CanMessage = false);
 
 /// <summary>
 /// Stable attachment presentation for forum posts.

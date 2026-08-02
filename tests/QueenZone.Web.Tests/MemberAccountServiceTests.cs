@@ -381,5 +381,12 @@ public sealed class MemberAccountServiceTests
 
         public Task<IReadOnlyList<DailyRegistration>> GetDailyRegistrationsAsync(DateOnly fromDate, CancellationToken cancellationToken = default) =>
             inner.GetDailyRegistrationsAsync(fromDate, cancellationToken);
+
+        public Task<IReadOnlyList<MemberRecipientMatch>> SearchByDisplayNameAsync(
+            string query,
+            Guid? excludeMemberId = null,
+            int maxResults = PrivateMessageLimits.MaxRecipientSearchResults,
+            CancellationToken cancellationToken = default) =>
+            inner.SearchByDisplayNameAsync(query, excludeMemberId, maxResults, cancellationToken);
     }
 }

@@ -277,9 +277,11 @@ These gates are guardrails, not a replacement for useful assertions. New or chan
 | `coverage` | Merge shard + SQL Server Cobertura reports, HTML summary, coverage gates | Yes |
 | `ef-migrations` | When migration-related paths change: snapshot check + `database update` on Azure SQL | Yes (same-repo PRs only; skipped otherwise) |
 | `smoke-test` | Published app, curl `/health`, `/`, `/news` (after `coverage`) | Yes |
-| `e2e-test` | Playwright suite on self-hosted Windows runner (after `coverage`; gates deploy) | Yes when the runner is online |
+| `e2e-test` | Playwright suite on a self-hosted `e2e` runner (Windows or macOS, after `coverage`) | Yes (required PR merge gate) |
 
-On `main`, the same workflow continues into `migrate` / `deploy` / `verify` after build + smoke + e2e. The PR `ef-migrations` job uses the same migration connection string so SQL Server failures are caught before merge.
+CI/CD uses two workflows. `.github/workflows/ci.yml` runs the pull-request build, deterministic tests, coverage gates, conditional `ef-migrations`, smoke test, and required e2e merge gate. After merge, `.github/workflows/deploy.yml` rebuilds the tree without rerunning tests, then runs `migrate` → `deploy` → `post-deploy-smoke`. The PR `ef-migrations` job uses the same migration connection string as deploy so SQL Server failures are caught before merge.
+
+Docs-only pull requests (only `docs/` or root `*.md` changes) skip `build` / `test` / coverage / smoke / e2e. Skipped non-matrix jobs still report under their required check names, which GitHub treats as satisfied. The `test` matrix is different: skipping it entirely would report a single `test` check and never create the required `test (0)` / `test (1)` checks, leaving the PR blocked forever. `ci.yml` therefore runs a lightweight `test-docs-ok` matrix on docs-only PRs that emits success for those exact names without running the suite.
 
 ### EF migration consistency
 
@@ -348,7 +350,7 @@ dotnet tool run reportgenerator -reports:".\TestResults\**\coverage.cobertura.xm
 
 Do not commit generated `TestResults/` or `coverage-report/` output.
 
-Playwright browser smoke tests live in `tests/QueenZone.Web.E2E` and run in CI on a self-hosted Windows runner to avoid consuming GitHub Actions minutes. See `docs/architecture/self-hosted-e2e-runner.md` for runner setup and operational notes.
+Playwright browser smoke tests live in `tests/QueenZone.Web.E2E` and run in CI on whichever self-hosted runner carrying the `e2e` label is available (currently Windows or macOS), avoiding GitHub Actions minutes. This job is a required pull-request merge gate; the deploy workflow does not rerun it. See `docs/architecture/self-hosted-e2e-runner.md` for runner setup and operational notes.
 
 ## Test Selection Rules
 

@@ -136,8 +136,9 @@ public static class PublicContentMapper
         var editedLabel = showEdited && post.EditedAt is not null
             ? ForumPostEditRules.FormatEditedLabel(post.EditCount, post.EditedAt.Value, utcNow)
             : null;
+        var canMessage = PrivateMessageService.CanMessage(currentMemberId, post.AuthorMemberId);
 
-        return post with { CanEdit = canEdit, EditedLabel = editedLabel };
+        return post with { CanEdit = canEdit, EditedLabel = editedLabel, CanMessage = canMessage };
     }
 
     public static IReadOnlyList<ForumPostViewModel> ToForumPostViewModels(

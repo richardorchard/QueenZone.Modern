@@ -257,9 +257,9 @@ dotnet build QueenZone.sln --configuration Release --no-restore
 dotnet test QueenZone.sln --configuration Release --no-build
 ```
 
-CI also publishes a code coverage artifact for pull requests and pushes. Use it to guide test review around risky changes, especially canonical routing, publication rules, legacy data mapping, and HTML sanitisation.
+CI also publishes a code coverage artifact for pull requests and manual CI runs. Use it to guide test review around risky changes, especially canonical routing, publication rules, legacy data mapping, and HTML sanitisation.
 
-A Playwright browser smoke suite (`tests/QueenZone.Web.E2E`) runs in CI on a self-hosted Windows runner so it does not consume GitHub Actions minutes. It covers public homepage/news/forum journeys, mobile nav, axe-core critical a11y checks, and admin/editorial smoke. See `docs/architecture/self-hosted-e2e-runner.md` for runner setup and local commands. On failure, screenshots and traces land in `test-results/e2e/` (uploaded as CI artifacts).
+A Playwright browser smoke suite (`tests/QueenZone.Web.E2E`) runs in CI on whichever self-hosted runner carrying the `e2e` label is available (currently Windows or macOS), so it does not consume GitHub Actions minutes. It is a required pull-request merge gate and is not rerun during deployment. The suite covers public homepage/news/forum journeys, mobile nav, axe-core critical a11y checks, and admin/editorial smoke. See `docs/architecture/self-hosted-e2e-runner.md` for runner setup and local commands. On failure, screenshots and traces land in `test-results/e2e/` (uploaded as CI artifacts).
 
 For advisory frontend performance baselines (LCP, CLS, transfer size, request count on key public pages), use the Lighthouse workflow:
 
@@ -284,16 +284,18 @@ Feature work should happen on an agent-prefixed branch such as `grok/news-pagina
 
 ## Deployment
 
-The `Deploy App Service` GitHub Actions workflow deploys `main` to the `queenzone-dev` Azure App Service at `https://queenzone-dev.azurewebsites.net`.
+The `Deploy` GitHub Actions workflow (`.github/workflows/deploy.yml`) deploys `main` to the `queenzone-dev` Azure App Service at `https://queenzone-dev.azurewebsites.net`.
+
+CI/CD is split across two workflows. `.github/workflows/ci.yml` runs the required build, test, coverage, migration consistency, smoke, and Playwright checks on pull requests. After a checked PR merges, `.github/workflows/deploy.yml` rebuilds the same tree, applies pending EF Core migrations, deploys the published app, and runs the live-site smoke checks. The deploy workflow does not rerun the CI test suite.
 
 The planned public canonical domain for the site is `https://www.queenzone.org`. SEO features that emit absolute public URLs, such as sitemaps and robots.txt, should use that host in production configuration.
 
 Set `Site:PublicBaseUrl` in App Service configuration (or `appsettings.Local.json` for local overrides) when the public host differs from the default in `appsettings.json`.
 
-Repository secrets required:
+GitHub `dev` environment configuration required:
 
-- `AZURE_WEBAPP_PUBLISH_PROFILE`: the App Service publish profile XML.
-- `QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING`: Azure SQL connection string used by the deploy workflow to apply EF Core migrations before each release. This is separate from the App Service runtime connection. Use a dedicated SQL login or other deliberately granted principal with permission to create or alter tables.
+- Secret `BITWARDEN_SECRETS_MANAGER_ACCESS_TOKEN`: authorizes the workflow to read the QueenZone Bitwarden Secrets Manager project.
+- Variable `BITWARDEN_APP_SERVICE_DEPLOY_SECRETS`: maps the Bitwarden secret IDs to `AZURE_WEBAPP_PUBLISH_PROFILE` and `QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING`. See `docs/bitwarden-secrets.md` for the mapping and rotation procedure. The migration connection is separate from the App Service runtime connection and should use a principal with permission to create or alter tables.
 
 App Service configuration required:
 
@@ -316,7 +318,7 @@ ALTER ROLE db_datawriter ADD MEMBER [app_login_name];
 
 Keep read-only environments on `db_datareader` only.
 
-The `Deploy App Service` workflow applies pending EF Core migrations automatically after tests and before deploy. Configure `QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING` in the GitHub `dev` environment secrets.
+The `Deploy` workflow applies pending EF Core migrations after its rebuild and before deployment. Pull-request tests have already passed in the separate `CI` workflow and are not rerun here. Configure the Bitwarden access secret and deploy-secret mapping in the GitHub `dev` environment as described above.
 
 For manual bootstrap or recovery, you can still run:
 

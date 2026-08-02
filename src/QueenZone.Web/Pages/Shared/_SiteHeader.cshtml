@@ -19,10 +19,10 @@
   {
     memberId = parsedMemberId;
   }
-  // Look up avatar presence once per request so the header can show the image without
-  // baking blob URLs into the cookie. Fail soft (initials fallback) if the DB is mid-migration
-  // or unavailable â€” never break sign-in or page render for avatar lookup alone.
+  // Look up avatar presence and unread message count once per request. Fail soft if the DB
+  // is mid-migration or unavailable — never break sign-in or page render for these alone.
   var memberHasAvatar = false;
+  var unreadMessageCount = 0;
   if (memberId is Guid mid)
   {
     try
@@ -34,10 +34,18 @@
         var memberAccount = await memberAccounts.FindByIdAsync(mid);
         memberHasAvatar = !string.IsNullOrWhiteSpace(memberAccount?.AvatarUrl);
       }
+
+      var privateMessages = Context.RequestServices.GetService(typeof(QueenZone.Data.IPrivateMessageRepository))
+        as QueenZone.Data.IPrivateMessageRepository;
+      if (privateMessages is not null)
+      {
+        unreadMessageCount = await privateMessages.CountUnreadConversationsAsync(mid);
+      }
     }
     catch
     {
       memberHasAvatar = false;
+      unreadMessageCount = 0;
     }
   }
   var navGroups = new[]
@@ -78,6 +86,7 @@
       Items = new[]
       {
         new { Title = "Forum", Href = "/forum", Description = "100,000+ posts from the membership", Tag = "" },
+        new { Title = "Messages", Href = "/messages", Description = "Private conversations with other members", Tag = "" },
         new { Title = "Fan Performances", Href = "/fan-performances", Description = "Covers, tributes and live sets", Tag = "New" },
         new { Title = "Freddie Tribute", Href = "/freddie-mercury-tribute", Description = "Visitor messages remembering Freddie Mercury", Tag = "New" }
       }
@@ -144,6 +153,13 @@
           <partial name="_MemberAvatar" model="@(new MemberAvatarViewModel { DisplayName = memberDisplayName, MemberId = memberId, HasAvatar = memberHasAvatar, UseThumbnail = true, Size = "sm" })" />
           <span class="qz-masthead__member-name" title="@memberDisplayName">@memberDisplayName</span>
         </a>
+        <a class="qz-masthead__signin qz-masthead__messages" href="/messages" aria-current="@(IsActive("/messages") ? "page" : null)">
+          Messages
+          @if (unreadMessageCount > 0)
+          {
+            <span class="qz-masthead__unread" aria-label="@unreadMessageCount unread conversations">@unreadMessageCount</span>
+          }
+        </a>
         <a class="qz-masthead__signin" href="/account/settings" aria-current="@(IsActive("/account/settings") ? "page" : null)">Settings</a>
         <partial name="_MemberSignOut" />
       }
@@ -181,6 +197,13 @@
           <a class="qz-masthead__member qz-masthead__member--mobile" href="/account/settings" title="Account settings">
             <partial name="_MemberAvatar" model="@(new MemberAvatarViewModel { DisplayName = memberDisplayName, MemberId = memberId, HasAvatar = memberHasAvatar, UseThumbnail = true, Size = "sm" })" />
             <span class="qz-masthead__member-name qz-masthead__member-name--mobile">@memberDisplayName</span>
+          </a>
+          <a class="qz-masthead__signin qz-masthead__signin--mobile qz-masthead__messages" href="/messages" aria-current="@(IsActive("/messages") ? "page" : null)">
+            Messages
+            @if (unreadMessageCount > 0)
+            {
+              <span class="qz-masthead__unread" aria-label="@unreadMessageCount unread conversations">@unreadMessageCount</span>
+            }
           </a>
           <a class="qz-masthead__signin qz-masthead__signin--mobile" href="/account/settings" aria-current="@(IsActive("/account/settings") ? "page" : null)">Settings</a>
           <partial name="_MemberSignOut" view-data='@new ViewDataDictionary(ViewData) { { "SignOutExtraClass", "qz-masthead__signin--mobile" } }' />
