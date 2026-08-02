@@ -1,5 +1,6 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using QueenZone.Data;
 using QueenZone.Data.Entities;
 
@@ -215,8 +216,57 @@ public sealed class EfPrivateMessageRepositoryTests : IAsyncDisposable
         await using var verify = CreateContext(shared);
         var conversations = await verify.PrivateConversations.CountAsync();
         var messageCount = await verify.PrivateMessages.CountAsync();
+        var sortKeyCount = await verify.PrivateMessages.Select(m => m.SortKey).Distinct().CountAsync();
         Assert.Equal(1, conversations);
         Assert.Equal(2, messageCount);
+        Assert.Equal(2, sortKeyCount);
+    }
+
+    [Fact]
+    public async Task Writes_RunInsideConfiguredRetryingExecutionStrategy()
+    {
+        await using var retryConnection = new SqliteConnection("Data Source=:memory:");
+        await retryConnection.OpenAsync();
+        var options = new DbContextOptionsBuilder<QueenZoneDbContext>()
+            .UseSqlite(retryConnection)
+            .ReplaceService<IExecutionStrategyFactory, RetryingExecutionStrategyFactory>()
+            .Options;
+        await using var context = new QueenZoneDbContext(options);
+        await context.Database.EnsureCreatedAsync();
+        context.MemberAccounts.AddRange(
+            new MemberAccount
+            {
+                Id = aliceId,
+                Email = "retry-alice@example.com",
+                NormalizedEmail = "RETRY-ALICE@EXAMPLE.COM",
+                DisplayName = "Retry Alice",
+                CreatedAt = DateTime.UtcNow,
+            },
+            new MemberAccount
+            {
+                Id = bobId,
+                Email = "retry-bob@example.com",
+                NormalizedEmail = "RETRY-BOB@EXAMPLE.COM",
+                DisplayName = "Retry Bob",
+                CreatedAt = DateTime.UtcNow,
+            });
+        await context.SaveChangesAsync();
+
+        var retryingRepository = new EfPrivateMessageRepository(context);
+        var created = await retryingRepository.SendNewOrExistingAsync(
+            aliceId,
+            bobId,
+            "Created under retry strategy",
+            DateTimeOffset.Parse("2026-08-02T17:00:00Z"));
+        var replied = await retryingRepository.ReplyAsync(
+            created.ConversationId!.Value,
+            bobId,
+            "Reply under retry strategy",
+            DateTimeOffset.Parse("2026-08-02T17:01:00Z"));
+
+        Assert.True(created.Succeeded, created.ErrorMessage);
+        Assert.True(replied.Succeeded, replied.ErrorMessage);
+        Assert.Equal(2, await context.PrivateMessages.CountAsync());
     }
 
     [Fact]
@@ -326,6 +376,18 @@ public sealed class EfPrivateMessageRepositoryTests : IAsyncDisposable
             .UseSqlite(connectionString)
             .Options;
         return new QueenZoneDbContext(options);
+    }
+
+    private sealed class RetryingExecutionStrategyFactory(ExecutionStrategyDependencies dependencies)
+        : IExecutionStrategyFactory
+    {
+        public IExecutionStrategy Create() => new RetryingExecutionStrategy(dependencies);
+    }
+
+    private sealed class RetryingExecutionStrategy(ExecutionStrategyDependencies dependencies)
+        : ExecutionStrategy(dependencies, maxRetryCount: 1, maxRetryDelay: TimeSpan.Zero)
+    {
+        protected override bool ShouldRetryOn(Exception exception) => false;
     }
 
     public async ValueTask DisposeAsync()

@@ -251,50 +251,54 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
                 "You are not a participant in this conversation.");
         }
 
-        var conversation = await dbContext.PrivateConversations
-            .AsNoTracking()
-            .SingleOrDefaultAsync(c => c.Id == conversationId, cancellationToken);
-        if (conversation is null)
-        {
-            return new PrivateMessageSendResult(false, null, "Conversation not found.");
-        }
-
         var preview = TruncatePreview(body);
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
-        try
+        // Explicit transactions must run through the configured execution strategy so Azure SQL
+        // can retry the entire unit of work rather than rejecting a user-started transaction.
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
         {
-            var message = new PrivateMessageEntity
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+            try
             {
-                Id = Guid.NewGuid(),
-                ConversationId = conversationId,
-                SenderMemberId = senderMemberId,
-                Body = body,
-                CreatedAt = sentAt,
-            };
-            await PrepareMessageSortKeyAsync(message, cancellationToken);
-            dbContext.PrivateMessages.Add(message);
+                var conversation = await LockConversationForWriteAsync(conversationId, cancellationToken);
+                if (conversation is null)
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    return new PrivateMessageSendResult(false, null, "Conversation not found.");
+                }
 
-            await UnarchiveAsync(conversationId, conversation.MemberLowId, cancellationToken);
-            await UnarchiveAsync(conversationId, conversation.MemberHighId, cancellationToken);
-            await dbContext.SaveChangesAsync(cancellationToken);
+                var message = new PrivateMessageEntity
+                {
+                    Id = Guid.NewGuid(),
+                    ConversationId = conversationId,
+                    SenderMemberId = senderMemberId,
+                    Body = body,
+                    CreatedAt = sentAt,
+                };
+                await PrepareMessageSortKeyAsync(message, cancellationToken);
+                dbContext.PrivateMessages.Add(message);
 
-            await AdvanceSenderReadCursorAsync(conversationId, senderMemberId, message.SortKey, sentAt, cancellationToken);
-            await UpdateConversationSummaryIfNewerAsync(
-                conversationId,
-                sentAt,
-                preview,
-                senderMemberId,
-                cancellationToken);
+                await UnarchiveAsync(conversationId, conversation.MemberLowId, cancellationToken);
+                await UnarchiveAsync(conversationId, conversation.MemberHighId, cancellationToken);
+                await dbContext.SaveChangesAsync(cancellationToken);
 
-            await transaction.CommitAsync(cancellationToken);
-            return new PrivateMessageSendResult(true, conversationId, null);
-        }
-        catch
-        {
-            await transaction.RollbackAsync(cancellationToken);
-            dbContext.ChangeTracker.Clear();
-            throw;
-        }
+                await UpdateConversationSummaryIfNewerAsync(
+                    conversationId,
+                    sentAt,
+                    preview,
+                    senderMemberId,
+                    cancellationToken);
+
+                await transaction.CommitAsync(cancellationToken);
+                return new PrivateMessageSendResult(true, conversationId, null);
+            }
+            catch
+            {
+                await transaction.RollbackAsync(CancellationToken.None);
+                dbContext.ChangeTracker.Clear();
+                throw;
+            }
+        });
     }
 
     private async Task<Guid> SendOnceAsync(
@@ -306,102 +310,143 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
         CancellationToken cancellationToken)
     {
         var (low, high) = OrderPair(senderMemberId, recipientMemberId);
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
-        try
+        // See ReplyAsync: retry the complete transaction when SQL Server reports a transient fault.
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
         {
-            var conversation = await dbContext.PrivateConversations
-                .SingleOrDefaultAsync(c => c.MemberLowId == low && c.MemberHighId == high, cancellationToken);
-
-            if (conversation is null)
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+            try
             {
-                conversation = new PrivateConversationEntity
-                {
-                    Id = Guid.NewGuid(),
-                    MemberLowId = low,
-                    MemberHighId = high,
-                    CreatedAt = sentAt,
-                    LastMessageAt = sentAt,
-                    LastMessagePreview = preview,
-                    LastMessageSenderId = senderMemberId,
-                };
-                dbContext.PrivateConversations.Add(conversation);
-                dbContext.PrivateConversationParticipants.Add(new PrivateConversationParticipantEntity
-                {
-                    ConversationId = conversation.Id,
-                    MemberId = senderMemberId,
-                    LastReadAt = sentAt,
-                    LastReadSortKey = null,
-                    IsArchived = false,
-                });
-                dbContext.PrivateConversationParticipants.Add(new PrivateConversationParticipantEntity
-                {
-                    ConversationId = conversation.Id,
-                    MemberId = recipientMemberId,
-                    LastReadAt = null,
-                    LastReadSortKey = null,
-                    IsArchived = false,
-                });
+                var conversation = await LockConversationForWriteAsync(low, high, cancellationToken);
 
-                var firstMessage = new PrivateMessageEntity
+                if (conversation is null)
+                {
+                    conversation = new PrivateConversationEntity
+                    {
+                        Id = Guid.NewGuid(),
+                        MemberLowId = low,
+                        MemberHighId = high,
+                        CreatedAt = sentAt,
+                        LastMessageAt = sentAt,
+                        LastMessagePreview = preview,
+                        LastMessageSenderId = senderMemberId,
+                    };
+                    dbContext.PrivateConversations.Add(conversation);
+                    dbContext.PrivateConversationParticipants.Add(new PrivateConversationParticipantEntity
+                    {
+                        ConversationId = conversation.Id,
+                        MemberId = senderMemberId,
+                        LastReadAt = sentAt,
+                        LastReadSortKey = null,
+                        IsArchived = false,
+                    });
+                    dbContext.PrivateConversationParticipants.Add(new PrivateConversationParticipantEntity
+                    {
+                        ConversationId = conversation.Id,
+                        MemberId = recipientMemberId,
+                        LastReadAt = null,
+                        LastReadSortKey = null,
+                        IsArchived = false,
+                    });
+
+                    var firstMessage = new PrivateMessageEntity
+                    {
+                        Id = Guid.NewGuid(),
+                        ConversationId = conversation.Id,
+                        SenderMemberId = senderMemberId,
+                        Body = body,
+                        CreatedAt = sentAt,
+                    };
+                    await PrepareMessageSortKeyAsync(firstMessage, cancellationToken);
+                    dbContext.PrivateMessages.Add(firstMessage);
+                    await dbContext.SaveChangesAsync(cancellationToken);
+
+                    await transaction.CommitAsync(cancellationToken);
+                    return conversation.Id;
+                }
+
+                var conversationId = conversation.Id;
+
+                await EnsureParticipantAsync(conversationId, senderMemberId, cancellationToken);
+                await EnsureParticipantAsync(conversationId, recipientMemberId, cancellationToken);
+                await UnarchiveAsync(conversationId, senderMemberId, cancellationToken);
+                await UnarchiveAsync(conversationId, recipientMemberId, cancellationToken);
+
+                var message = new PrivateMessageEntity
                 {
                     Id = Guid.NewGuid(),
-                    ConversationId = conversation.Id,
+                    ConversationId = conversationId,
                     SenderMemberId = senderMemberId,
                     Body = body,
                     CreatedAt = sentAt,
                 };
-                await PrepareMessageSortKeyAsync(firstMessage, cancellationToken);
-                dbContext.PrivateMessages.Add(firstMessage);
+                await PrepareMessageSortKeyAsync(message, cancellationToken);
+                dbContext.PrivateMessages.Add(message);
                 await dbContext.SaveChangesAsync(cancellationToken);
 
-                await AdvanceSenderReadCursorAsync(
-                    conversation.Id,
-                    senderMemberId,
-                    firstMessage.SortKey,
+                await UpdateConversationSummaryIfNewerAsync(
+                    conversationId,
                     sentAt,
+                    preview,
+                    senderMemberId,
                     cancellationToken);
 
                 await transaction.CommitAsync(cancellationToken);
-                return conversation.Id;
+                return conversationId;
             }
-
-            var conversationId = conversation.Id;
-            dbContext.Entry(conversation).State = EntityState.Detached;
-
-            await EnsureParticipantAsync(conversationId, senderMemberId, cancellationToken);
-            await EnsureParticipantAsync(conversationId, recipientMemberId, cancellationToken);
-            await UnarchiveAsync(conversationId, senderMemberId, cancellationToken);
-            await UnarchiveAsync(conversationId, recipientMemberId, cancellationToken);
-
-            var message = new PrivateMessageEntity
+            catch
             {
-                Id = Guid.NewGuid(),
-                ConversationId = conversationId,
-                SenderMemberId = senderMemberId,
-                Body = body,
-                CreatedAt = sentAt,
-            };
-            await PrepareMessageSortKeyAsync(message, cancellationToken);
-            dbContext.PrivateMessages.Add(message);
-            await dbContext.SaveChangesAsync(cancellationToken);
+                await transaction.RollbackAsync(CancellationToken.None);
+                dbContext.ChangeTracker.Clear();
+                throw;
+            }
+        });
+    }
 
-            await AdvanceSenderReadCursorAsync(conversationId, senderMemberId, message.SortKey, sentAt, cancellationToken);
-            await UpdateConversationSummaryIfNewerAsync(
-                conversationId,
-                sentAt,
-                preview,
-                senderMemberId,
+    private async Task<PrivateConversationEntity?> LockConversationForWriteAsync(
+        Guid conversationId,
+        CancellationToken cancellationToken)
+    {
+        // The no-op update acquires a write lock held until commit. Every message for an existing
+        // conversation therefore receives its identity SortKey only after the previous writer has
+        // committed, making SortKey a safe visible-order/read cursor within that conversation.
+        var affected = await dbContext.PrivateConversations
+            .Where(c => c.Id == conversationId)
+            .ExecuteUpdateAsync(
+                setters => setters.SetProperty(c => c.LastMessageAt, c => c.LastMessageAt),
                 cancellationToken);
-
-            await transaction.CommitAsync(cancellationToken);
-            return conversationId;
-        }
-        catch
+        if (affected == 0)
         {
-            await transaction.RollbackAsync(cancellationToken);
-            dbContext.ChangeTracker.Clear();
-            throw;
+            return null;
         }
+
+        return await dbContext.PrivateConversations
+            .AsNoTracking()
+            .SingleAsync(c => c.Id == conversationId, cancellationToken);
+    }
+
+    private async Task<PrivateConversationEntity?> LockConversationForWriteAsync(
+        Guid memberLowId,
+        Guid memberHighId,
+        CancellationToken cancellationToken)
+    {
+        // Serialize the existing-conversation path before allocating the next message SortKey.
+        // A concurrent first-send can still see no row; the unique-pair retry handles that race.
+        var affected = await dbContext.PrivateConversations
+            .Where(c => c.MemberLowId == memberLowId && c.MemberHighId == memberHighId)
+            .ExecuteUpdateAsync(
+                setters => setters.SetProperty(c => c.LastMessageAt, c => c.LastMessageAt),
+                cancellationToken);
+        if (affected == 0)
+        {
+            return null;
+        }
+
+        return await dbContext.PrivateConversations
+            .AsNoTracking()
+            .SingleAsync(
+                c => c.MemberLowId == memberLowId && c.MemberHighId == memberHighId,
+                cancellationToken);
     }
 
     private async Task PrepareMessageSortKeyAsync(
@@ -420,25 +465,6 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
             .Select(m => (long?)m.SortKey)
             .MaxAsync(cancellationToken) ?? 0L;
         message.SortKey = max + 1;
-    }
-
-    private async Task AdvanceSenderReadCursorAsync(
-        Guid conversationId,
-        Guid senderMemberId,
-        long sortKey,
-        DateTimeOffset sentAt,
-        CancellationToken cancellationToken)
-    {
-        await dbContext.PrivateConversationParticipants
-            .Where(p =>
-                p.ConversationId == conversationId
-                && p.MemberId == senderMemberId
-                && (p.LastReadSortKey == null || p.LastReadSortKey < sortKey))
-            .ExecuteUpdateAsync(
-                setters => setters
-                    .SetProperty(p => p.LastReadSortKey, sortKey)
-                    .SetProperty(p => p.LastReadAt, sentAt),
-                cancellationToken);
     }
 
     private async Task UpdateConversationSummaryIfNewerAsync(

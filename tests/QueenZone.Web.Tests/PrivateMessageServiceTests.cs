@@ -123,6 +123,44 @@ public sealed class PrivateMessageServiceTests
     }
 
     [Fact]
+    public async Task ReplyingFromOlderPage_DoesNotClearMessagesThatWereNotDisplayed()
+    {
+        var (service, _, _, alice, bob) = CreateSystem();
+        var created = await service.ComposeAsync(alice.Id, bob.Id, "Msg 1");
+        var conversationId = created.ConversationId!.Value;
+        for (var i = 2; i <= 5; i++)
+        {
+            Assert.True((await service.ReplyAsync(conversationId, alice.Id, $"Msg {i}")).Succeeded);
+        }
+
+        await service.GetConversationAsync(
+            conversationId,
+            bob.Id,
+            markRead: true,
+            page: 1,
+            pageSize: 2);
+
+        Assert.True((await service.ReplyAsync(conversationId, bob.Id, "Reply from page one")).Succeeded);
+
+        var inboxItem = Assert.Single(await service.GetInboxAsync(bob.Id));
+        Assert.True(inboxItem.HasUnread);
+        Assert.Equal(3, inboxItem.UnreadCount);
+    }
+
+    [Fact]
+    public async Task ComposeToExistingConversation_DoesNotClearUnreadMessages()
+    {
+        var (service, _, _, alice, bob) = CreateSystem();
+        await service.ComposeAsync(alice.Id, bob.Id, "Unread from Alice");
+
+        Assert.True((await service.ComposeAsync(bob.Id, alice.Id, "Bob composes without opening")).Succeeded);
+
+        var inboxItem = Assert.Single(await service.GetInboxAsync(bob.Id));
+        Assert.True(inboxItem.HasUnread);
+        Assert.Equal(1, inboxItem.UnreadCount);
+    }
+
+    [Fact]
     public async Task Reply_RejectsNonParticipant()
     {
         var (service, members, _, alice, bob) = CreateSystem();

@@ -233,7 +233,6 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
             };
             messages.Add(message);
             UpdateSummaryIfNewer(conversation, sentAt, TruncatePreview(body), senderMemberId);
-            AdvanceReadCursor(conversation.Id, senderMemberId, message.SortKey, sentAt);
             return Task.FromResult(new PrivateMessageSendResult(true, conversation.Id, null));
         }
     }
@@ -289,7 +288,6 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
             UpdateSummaryIfNewer(conversation, sentAt, TruncatePreview(body), senderMemberId);
             Unarchive(conversationId, conversation.MemberLowId);
             Unarchive(conversationId, conversation.MemberHighId);
-            AdvanceReadCursor(conversationId, senderMemberId, message.SortKey, sentAt);
 
             return Task.FromResult(new PrivateMessageSendResult(true, conversationId, null));
         }
@@ -345,21 +343,6 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
         if (participant is not null)
         {
             participant.IsArchived = false;
-        }
-    }
-
-    private void AdvanceReadCursor(
-        Guid conversationId,
-        Guid memberId,
-        long sortKey,
-        DateTimeOffset readAt)
-    {
-        var participant = participants.Single(
-            p => p.ConversationId == conversationId && p.MemberId == memberId);
-        if (participant.LastReadSortKey is null || participant.LastReadSortKey < sortKey)
-        {
-            participant.LastReadSortKey = sortKey;
-            participant.LastReadAt = readAt;
         }
     }
 
