@@ -5,8 +5,11 @@
 # Windows runner, where SQL Express lives.
 #
 # Requires ConnectionStrings__QueenZoneLegacy (source, Azure SQL) set in the
-# environment. Requires sqlpackage on PATH (already installed here as a
-# dotnet global tool: `dotnet tool install -g microsoft.sqlpackage`).
+# environment. Invokes sqlpackage as a local dotnet tool (.config/dotnet-tools.json,
+# restored via `dotnet tool restore` before this script runs) rather than assuming
+# it's on PATH - the GitHub Actions runner service on this machine runs as
+# NT AUTHORITY\NETWORK SERVICE, a different profile than the interactive user
+# account a global `dotnet tool install -g` would have put it on PATH for.
 #
 # Ordinary data-sync automation, not a system/security-config change - unlike
 # Enable-SqlExpressRemoteAccess.ps1 (run once, manually, before this is used).
@@ -39,7 +42,7 @@ Get-ChildItem -Path ([System.IO.Path]::GetTempPath()) -Filter "queenzone-legacy-
 
 try {
     Write-Host "Exporting live legacy database to $bacpacPath..."
-    sqlpackage /Action:Export `
+    dotnet tool run sqlpackage /Action:Export `
         /SourceConnectionString:"$sourceConnectionString" `
         /TargetFile:"$bacpacPath"
     if ($LASTEXITCODE -ne 0) { throw "sqlpackage export failed with exit code $LASTEXITCODE" }
@@ -57,7 +60,7 @@ END
     sqlcmd -S "localhost\$InstanceName" -Q $dropSql
 
     Write-Host "Importing bacpac into SQLEXPRESS as $TargetDatabase..."
-    sqlpackage /Action:Import `
+    dotnet tool run sqlpackage /Action:Import `
         /SourceFile:"$bacpacPath" `
         /TargetConnectionString:"Server=localhost\$InstanceName;Database=$TargetDatabase;Integrated Security=True;TrustServerCertificate=True"
     if ($LASTEXITCODE -ne 0) { throw "sqlpackage import failed with exit code $LASTEXITCODE" }
