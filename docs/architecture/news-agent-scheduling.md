@@ -88,7 +88,7 @@ scripts/Run-NewsAgentDiscovery.ps1 -Scheduled *>&1 | Tee-Object -FilePath "$env:
 
 ## Azure hosting options
 
-The web app deploy workflow (`deploy-app-service.yml`) publishes `QueenZone.Web` only. The news agent worker is a **separate** console app. Pick one of the paths below when you need cloud automation.
+The web app deploy workflow (`deploy.yml`) publishes `QueenZone.Web` only. The news agent worker is a **separate** console app. Pick one of the paths below when you need cloud automation.
 
 ### Option A — Azure Container Apps Job (recommended for isolated scheduling)
 
