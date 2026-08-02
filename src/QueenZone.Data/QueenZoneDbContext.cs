@@ -435,8 +435,11 @@ public sealed class QueenZoneDbContext : DbContext
             entity.HasKey(request => request.Id);
 
             entity.Property(request => request.Status).HasConversion<string>().HasMaxLength(50).IsRequired();
+            entity.Property(request => request.Kind).HasConversion<string>().HasMaxLength(50).IsRequired();
             entity.Property(request => request.RequestedBy).HasMaxLength(256).IsRequired();
             entity.Property(request => request.RequestedAtUtc).IsRequired();
+            entity.Property(request => request.ArticleUrl).HasMaxLength(2000);
+            entity.Property(request => request.GenerateDraft).IsRequired();
             entity.Property(request => request.RunnerId).HasMaxLength(100);
             entity.Property(request => request.Summary).HasMaxLength(2000);
             entity.Property(request => request.ErrorMessage).HasMaxLength(2000);

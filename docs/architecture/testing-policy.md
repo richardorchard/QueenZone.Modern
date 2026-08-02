@@ -151,6 +151,8 @@ When EF Core `SqlQueryRaw` maps legacy columns into typed row classes, do not re
 
 For pre-release admin write checks against the configured legacy SQL Server database, run `scripts/Probe-AdminNewsLegacyWrites.ps1` with both `ConnectionStrings__QueenZoneLegacy` and `RUN_LEGACY_WRITE_PROBE=true` set. The probe creates, publishes, unpublishes, and deletes a uniquely named test article. Point the connection string at a database you are willing to mutate (often the same Azure SQL instance used locally or in production), not the in-memory sample data path.
 
+For admin URL ingestion / news-agent run-request queue checks, run `scripts/Probe-NewsAgentUrlIngestion.ps1` with `ConnectionStrings__QueenZoneLegacy` and `RUN_NEWS_AGENT_URL_INGESTION_PROBE=true`. Default mode only exercises SQL queue/claim/complete (and fails clearly if the `Kind`/`ArticleUrl` migration is missing). Pass `-Full` to fetch a public URL and triage via the local worker stack (`RUN_NEWS_AGENT_URL_INGESTION_FULL_PROBE` is set by the script); optional `OPENROUTER_API_KEY` enables AI triage. Full mode creates discovery candidates and never publishes.
+
 ### Migration And Content Validation
 
 Each migrated content area needs validation beyond ordinary unit tests.

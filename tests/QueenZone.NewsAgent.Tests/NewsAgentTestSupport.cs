@@ -16,6 +16,12 @@ internal sealed class FakeNewsDiscoveryHttpClient(IReadOnlyDictionary<string, st
 
         throw new HttpRequestException($"No fixture configured for URL '{url}'.");
     }
+
+    public async Task<NewsDiscoveryHttpResponse> GetAsync(string url, CancellationToken cancellationToken = default)
+    {
+        var body = await GetStringAsync(url, cancellationToken);
+        return new NewsDiscoveryHttpResponse(url, "text/html; charset=utf-8", body);
+    }
 }
 
 internal sealed class ConfigurableNewsAiClient(bool enabled, string content = "{}") : INewsAiClient

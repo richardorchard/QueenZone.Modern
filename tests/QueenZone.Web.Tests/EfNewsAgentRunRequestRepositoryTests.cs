@@ -25,11 +25,11 @@ public sealed class EfNewsAgentRunRequestRepositoryTests : IAsyncDisposable
     {
         await using var firstContext = new QueenZoneDbContext(options);
         var firstRepository = new EfNewsAgentRunRequestRepository(firstContext);
-        var first = await firstRepository.QueueAsync("editor@example.com");
+        var first = await firstRepository.QueueAsync(new QueenZone.Data.NewsAgentRunRequestCreate("editor@example.com"));
 
         await using var secondContext = new QueenZoneDbContext(options);
         var secondRepository = new EfNewsAgentRunRequestRepository(secondContext);
-        var duplicate = await secondRepository.QueueAsync("other@example.com");
+        var duplicate = await secondRepository.QueueAsync(new QueenZone.Data.NewsAgentRunRequestCreate("other@example.com"));
         var claimed = await secondRepository.ClaimNextAsync("news-pc");
 
         await using var thirdContext = new QueenZoneDbContext(options);
@@ -48,11 +48,11 @@ public sealed class EfNewsAgentRunRequestRepositoryTests : IAsyncDisposable
     {
         await using var dbContext = new QueenZoneDbContext(options);
         var repository = new EfNewsAgentRunRequestRepository(dbContext);
-        await repository.QueueAsync("editor@example.com");
+        await repository.QueueAsync(new QueenZone.Data.NewsAgentRunRequestCreate("editor@example.com"));
         var claimed = await repository.ClaimNextAsync("news-pc");
 
         Assert.True(await repository.CompleteAsync(claimed!.Id, "Completed successfully"));
-        var next = await repository.QueueAsync("editor@example.com");
+        var next = await repository.QueueAsync(new QueenZone.Data.NewsAgentRunRequestCreate("editor@example.com"));
         var recent = await repository.ListRecentAsync();
 
         Assert.True(next.WasCreated);

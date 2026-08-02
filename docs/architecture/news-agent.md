@@ -151,11 +151,32 @@ Authenticated admins use Razor Pages under `/admin/news-discovery`:
 
 Editor actions (POST, anti-forgery protected):
 
-- **Queue news gathering** → records a triage-only request for the outbound-polling local Windows runner
+- **Queue news gathering** → records a triage-only scheduled gathering request for the outbound-polling local Windows runner
+- **Submit article URL** → queues forced triage for one public HTTP(S) URL (default triage-only; optional explicit “generate AI draft”). Fetch runs on the local runner with SSRF guards; duplicates reuse existing candidates; never auto-publishes
 - **Mark not relevant** → `Rejected`
 - **Ignore duplicate** → `IgnoredDuplicate`
 - **Edit draft** → save fields; moves `NeedsReview` → `Drafted` when appropriate
 - **Promote to admin news** → creates an unpublished article in `/admin/news` and marks the candidate `PromotedToArticle`
+
+Draft generation uses prompt version `draft-v2`, which requires exact band-member quotations to appear in both the body and a `preserved_quotes` collection backed by evidence. Unverifiable quotation marks are stripped before the draft is stored. Review pages surface preserved quotes for editor comparison before promotion.
+
+### Live URL ingestion probe (opt-in)
+
+After deploying the EF migration and web/worker builds, verify the real Azure SQL queue (and optionally full fetch + triage) before relying on the admin form:
+
+```powershell
+$env:ConnectionStrings__QueenZoneLegacy = "<same DB as App Service + Windows runner>"
+$env:RUN_NEWS_AGENT_URL_INGESTION_PROBE = "true"
+
+# 1) Schema + queue + claim only (no outbound HTTP)
+powershell -File .\scripts\Probe-NewsAgentUrlIngestion.ps1
+
+# 2) Full local runner path: fetch public URL, triage, never publish
+# Optional: $env:OPENROUTER_API_KEY = "..."
+powershell -File .\scripts\Probe-NewsAgentUrlIngestion.ps1 -Full
+```
+
+`-Full` accepts `-ArticleUrl` and `-GenerateDraft`. Default URL is a unique `https://example.com/?qz-url-ingestion-probe=...` request so duplicates stay rare. The full probe creates discovery candidates; it does **not** promote or publish.
 
 Link from **Admin news** (`/admin/news`) → “Review discovered candidates”.
 

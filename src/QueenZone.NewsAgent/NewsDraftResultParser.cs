@@ -46,6 +46,16 @@ public static class NewsDraftResultParser
             throw new InvalidOperationException("Draft structured output is missing body.");
         }
 
+        var preservedQuotes = (parsed.PreservedQuotes ?? [])
+            .Where(quote => quote is not null)
+            .Select(quote => new NewsDraftPreservedQuote(
+                string.IsNullOrWhiteSpace(quote!.Speaker) ? "Unknown" : quote.Speaker.Trim(),
+                (quote.ExactText ?? string.Empty).Trim(),
+                (quote.SourceUrl ?? string.Empty).Trim(),
+                string.IsNullOrWhiteSpace(quote.SourceContext) ? null : quote.SourceContext.Trim()))
+            .Where(quote => !string.IsNullOrWhiteSpace(quote.ExactText))
+            .ToList();
+
         return new NewsDraftStructuredResult(
             parsed.Title.Trim(),
             string.IsNullOrWhiteSpace(parsed.Slug) ? null : parsed.Slug.Trim(),
@@ -58,7 +68,8 @@ public static class NewsDraftResultParser
             string.IsNullOrWhiteSpace(parsed.ConfidenceNotes) ? null : parsed.ConfidenceNotes.Trim(),
             string.IsNullOrWhiteSpace(parsed.SourceNotes) ? null : parsed.SourceNotes.Trim(),
             parsed.SuggestedPublishAt,
-            parsed.SecondarySourceWarning);
+            parsed.SecondarySourceWarning,
+            preservedQuotes);
     }
 
     private static string ExtractJsonObject(string value)
@@ -85,5 +96,12 @@ public static class NewsDraftResultParser
         string? ConfidenceNotes,
         string? SourceNotes,
         DateTime? SuggestedPublishAt,
-        bool SecondarySourceWarning);
+        bool SecondarySourceWarning,
+        IReadOnlyList<ParsedPreservedQuote>? PreservedQuotes);
+
+    private sealed record ParsedPreservedQuote(
+        string? Speaker,
+        string? ExactText,
+        string? SourceUrl,
+        string? SourceContext);
 }

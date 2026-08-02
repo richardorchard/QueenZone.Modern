@@ -89,6 +89,17 @@ powershell -File .\scripts\Probe-AdminNewsLegacyWrites.ps1
 
 Run it only when `ConnectionStrings__QueenZoneLegacy` points at a database you are willing to mutate. The probe creates, publishes, unpublishes, and deletes a uniquely named draft article to confirm the real SQL-backed admin workflow still works.
 
+When a change touches admin URL ingestion, the news-agent run-request queue, or the local `process-news-requests` runner, prefer the opt-in URL ingestion probe after the EF migration is applied:
+
+```powershell
+$env:ConnectionStrings__QueenZoneLegacy = "<same DB as App Service + Windows runner>"
+$env:RUN_NEWS_AGENT_URL_INGESTION_PROBE = "true"
+powershell -File .\scripts\Probe-NewsAgentUrlIngestion.ps1          # schema + queue only
+powershell -File .\scripts\Probe-NewsAgentUrlIngestion.ps1 -Full    # fetch + triage (optional OpenRouter key)
+```
+
+The full probe creates discovery candidates and never publishes. Report whether it was run or skipped.
+
 ### Pull request CI gates (must pass before merge)
 
 GitHub Actions workflow `.github/workflows/ci.yml` blocks merge when these fail:
