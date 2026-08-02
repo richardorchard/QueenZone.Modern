@@ -56,6 +56,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Restore local dotnet tools (sqlpackage)
+        run: dotnet tool restore
+
       - name: Fetch Bitwarden deploy secrets
         id: bitwarden-secrets
         uses: bitwarden/sm-action@v3.0.1
