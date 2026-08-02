@@ -65,17 +65,26 @@ the secret name.
 
 ### `BITWARDEN_APP_SERVICE_DEPLOY_SECRETS`
 
-Used by `.github/workflows/deploy-app-service.yml` (`migrate` and `deploy` jobs):
+Used by `.github/workflows/deploy.yml` (`migrate` and `deploy` jobs), `.github/workflows/ci.yml`
+(`ef-migrations` job — same-repo PRs touching migration paths only), and
+`.github/workflows/nightly-legacy-checks.yml` (`sync-legacy-db` and `legacy-read-probes` jobs):
 
 ```yaml
 743274c8-1837-4abd-b223-b4980080709f > AZURE_WEBAPP_PUBLISH_PROFILE
 d631aa7c-4e7e-4d2d-b3ea-b494002d1b83 > QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING
+51484e1f-4393-41e9-8435-b49a00381ec2 > QUEENZONE_SQL_EXPRESS_PROBE_PASSWORD
 ```
 
 `QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING` maps to the same underlying Bitwarden secret as the
 `ConnectionStrings__QueenZoneLegacy` value used for local dev and Azure App Service settings (see `AGENTS.md`).
 Updating that Bitwarden secret updates both; it does **not** update the live App Service runtime connection string,
 which is configured separately in Azure App Service settings.
+
+`QUEENZONE_SQL_EXPRESS_PROBE_PASSWORD` is the password for the `queenzone_probe` SQL login created by
+`scripts/Enable-SqlExpressRemoteAccess.ps1` on the Windows self-hosted runner. It authenticates
+`legacy-read-probes` (running on the macOS runner) against the SQL Express mirror over the LAN — see
+`docs/architecture/testing-policy.md` ("Data Integration Tests") and the comment block at the top of
+`nightly-legacy-checks.yml`.
 
 ## Migration notes
 
@@ -91,5 +100,6 @@ For this migration:
   secret, which already held the same connection string for local dev.
 
 The old raw GitHub Actions secrets (`AZURE_WEBAPP_PUBLISH_PROFILE`, `QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING`)
-were removed once `deploy-app-service.yml` was verified end-to-end via a real deploy run using the Bitwarden-sourced
-values. The stale `CONNECTIONSTRINGS__QUEENZONELEGACY` secret (unused by any workflow) was removed at the same time.
+were removed once the deploy workflow (`deploy-app-service.yml` at the time, since renamed to `deploy.yml`) was
+verified end-to-end via a real deploy run using the Bitwarden-sourced values. The stale
+`CONNECTIONSTRINGS__QUEENZONELEGACY` secret (unused by any workflow) was removed at the same time.
