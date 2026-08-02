@@ -23,7 +23,12 @@ param(
     [string]$InstanceName = "SQLEXPRESS",
     [int]$Port = 1433,
     [string]$ProbeLoginName = "queenzone_probe",
-    [string]$ProbeLoginPassword = -join ((48..57) + (65..90) + (97..122) | Get-Random -Count 24 | ForEach-Object { [char]$_ })
+    [string]$ProbeLoginPassword = -join ((48..57) + (65..90) + (97..122) | Get-Random -Count 24 | ForEach-Object { [char]$_ }),
+    # The Windows account the actions-runner service runs as (check with
+    # `Get-CimInstance Win32_Service -Filter "Name LIKE '%actions.runner%'"`).
+    # Needs dbcreator so Sync-LegacyDbToSqlExpress.ps1 can drop/recreate the
+    # mirror database each night via Windows-integrated auth on localhost.
+    [string]$RunnerServiceAccount = "NT AUTHORITY\NETWORK SERVICE"
 )
 
 $ErrorActionPreference = "Stop"
@@ -64,6 +69,7 @@ New-NetFirewallRule -DisplayName $ruleName `
     -RemoteAddress $AllowedSourceAddress -Action Allow | Out-Null
 
 Write-Host "Creating a least-privilege SQL login ($ProbeLoginName) for the nightly job..."
+$probeLoginExisted = [bool](sqlcmd -S "localhost\$InstanceName" -h -1 -W -Q "SET NOCOUNT ON; SELECT COUNT(1) FROM sys.server_principals WHERE name = '$ProbeLoginName'" | Select-Object -First 1 | Where-Object { $_.Trim() -eq '1' })
 $createLoginSql = @"
 IF NOT EXISTS (SELECT 1 FROM sys.server_principals WHERE name = '$ProbeLoginName')
 BEGIN
@@ -72,16 +78,49 @@ END
 "@
 sqlcmd -S "localhost\$InstanceName" -Q $createLoginSql
 
+Write-Host "Granting $RunnerServiceAccount dbcreator so it can refresh the mirror DB nightly..."
+# dbcreator, not sysadmin: enough to CREATE/ALTER/DROP DATABASE for the sync
+# script's drop-and-reimport cycle, nothing more. This grants any Windows
+# service running as this shared builtin account that role on this SQL
+# Server instance - acceptable here since it's a single-purpose dev/CI box,
+# but worth knowing if another service ever runs as the same account.
+$grantDbCreatorSql = @"
+IF NOT EXISTS (SELECT 1 FROM sys.server_principals WHERE name = '$RunnerServiceAccount')
+BEGIN
+    CREATE LOGIN [$RunnerServiceAccount] FROM WINDOWS;
+END
+IF NOT EXISTS (
+    SELECT 1 FROM sys.server_role_members rm
+    JOIN sys.server_principals r ON r.principal_id = rm.role_principal_id
+    JOIN sys.server_principals m ON m.principal_id = rm.member_principal_id
+    WHERE r.name = 'dbcreator' AND m.name = '$RunnerServiceAccount'
+)
+BEGIN
+    ALTER SERVER ROLE dbcreator ADD MEMBER [$RunnerServiceAccount];
+END
+"@
+sqlcmd -S "localhost\$InstanceName" -Q $grantDbCreatorSql
+
 Write-Host ""
 Write-Host "Done. Next steps:"
-Write-Host "1. Save this login to Bitwarden (matches the existing convention used by"
-Write-Host "   BITWARDEN_APP_SERVICE_DEPLOY_SECRETS for the Azure SQL connection string):"
-Write-Host "     Login:    $ProbeLoginName"
-Write-Host "     Password: $ProbeLoginPassword"
-Write-Host "2. The sync script (Sync-LegacyDbToSqlExpress.ps1) grants this login access"
+$step = 1
+if ($probeLoginExisted) {
+    Write-Host "$step. $ProbeLoginName already existed - its password was NOT changed (the"
+    Write-Host "   random one generated for this run was never applied, ignore it). Nothing"
+    Write-Host "   to update in Bitwarden if you already saved it from an earlier run."
+} else {
+    Write-Host "$step. Save this new login to Bitwarden (matches the existing convention used by"
+    Write-Host "   BITWARDEN_APP_SERVICE_DEPLOY_SECRETS for the Azure SQL connection string):"
+    Write-Host "     Login:    $ProbeLoginName"
+    Write-Host "     Password: $ProbeLoginPassword"
+}
+$step++
+Write-Host "$step. The sync script (Sync-LegacyDbToSqlExpress.ps1) grants this login access"
 Write-Host "   to the synced database each time it refreshes it - no extra GRANT step needed."
-Write-Host "3. Confirm this machine's LAN IP is stable (DHCP reservation on your router) -"
+$step++
+Write-Host "$step. Confirm this machine's LAN IP is stable (DHCP reservation on your router) -"
 Write-Host "   currently 192.168.1.237 (GLORY11). The nightly workflow will connect to"
 Write-Host "   that address."
-Write-Host "4. From the Mac, sanity-check reachability once both sides are configured:"
+$step++
+Write-Host "$step. From the Mac, sanity-check reachability once both sides are configured:"
 Write-Host "     nc -zv 192.168.1.237 $Port"
