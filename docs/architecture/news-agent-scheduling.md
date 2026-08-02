@@ -74,7 +74,7 @@ Use `scripts/Run-NewsAgentDiscovery.ps1` for automatic gathering and `scripts/Pr
 
 1. Open **Task Scheduler** → **Create Task**.
 2. **General**: run whether user is logged on or not; use an account that can reach SQL Server and the network.
-3. **Triggers**: e.g. daily at 06:00, or every 4 hours for busier sources.
+3. **Triggers**: daily, repeating every 6 hours indefinitely (for example 00:00, 06:00, 12:00, and 18:00 local time).
 4. **Actions** → **Start a program**:
    - **Program**: `powershell.exe`
    - **Arguments**: `-NoProfile -ExecutionPolicy Bypass -File "C:\path\to\QueenZone.Modern\scripts\Run-NewsAgentDiscovery.ps1" -Scheduled`
@@ -94,7 +94,7 @@ The admin button does not contact the Windows computer directly. It inserts one 
 Create a second Task Scheduler task:
 
 1. **General**: run whether the user is logged on or not, using the same account and local worker settings as the scheduled task.
-2. **Trigger**: daily, repeat every 1 minute indefinitely.
+2. **Trigger**: daily, repeat every 1 hour indefinitely.
 3. **Action**:
    - **Program**: `powershell.exe`
    - **Arguments**: `-NoProfile -ExecutionPolicy Bypass -File "C:\path\to\QueenZone.Modern\scripts\Process-NewsAgentRunRequests.ps1"`
@@ -107,7 +107,7 @@ Smoke-test the poller before saving the task:
 scripts/Process-NewsAgentRunRequests.ps1 -RunnerId "news-pc"
 ```
 
-With no pending request it exits `0` after updating the heartbeat. Queue a request from `/admin/news-discovery`, run the script again, and confirm that the page shows the request moving from `Pending` to `Completed` or `Failed`. The runner never needs an inbound port, tunnel, or webhook.
+With no pending request it exits `0` after updating the heartbeat. Queue a request from `/admin/news-discovery`, run the script again, and confirm that the page shows the request moving from `Pending` to `Completed` or `Failed`. The hourly interval means a web-queued run can take up to an hour to start. The runner never needs an inbound port, tunnel, or webhook.
 
 ## Azure hosting options
 
