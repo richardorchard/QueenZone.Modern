@@ -2422,6 +2422,7 @@ body.qz-menu-lock .qz-masthead {
 .qz-photo-cat-card__overlay h2 {
   font-size: 1.5rem;
   margin: 0 0 var(--space-1);
+  color: var(--qz-white);
 }
 
 .qz-photo-cat-card__count {
@@ -2933,6 +2934,7 @@ body.qz-menu-lock .qz-masthead {
 .qz-lightbox__caption h1 {
   font-size: 1.5rem;
   margin: 0 0 var(--space-1);
+  color: var(--qz-white);
 }
 
 .qz-lightbox__meta {
