@@ -123,8 +123,11 @@ app.Use(async (context, next) =>
 });
 
 app.UseStatusCodePagesWithReExecute("/error/{0}");
+var staticFileContentTypeProvider = new FileExtensionContentTypeProvider();
+staticFileContentTypeProvider.Mappings[".webmanifest"] = "application/manifest+json";
 app.UseStaticFiles(new StaticFileOptions
 {
+    ContentTypeProvider = staticFileContentTypeProvider,
     OnPrepareResponse = ctx => StaticFileCacheControl.Apply(ctx.Context, app.Environment),
 });
 app.UseAuthentication();
