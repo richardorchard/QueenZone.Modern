@@ -33,15 +33,24 @@ public sealed class EfMemberLookupRepository : ILegacyMemberLookupRepository
             ?? (userId => throw new InvalidOperationException("FindByUserId SQL was not configured."));
     }
 
-    public async Task<LegacyMemberMatch?> FindByEmailAsync(
+    public async Task<IReadOnlyList<LegacyMemberMatch>> FindAllByEmailAsync(
         string email,
         CancellationToken cancellationToken = default)
     {
         var rows = await dbContext.Database
             .SqlQuery<UserRow>(findByEmailSql(email))
             .ToListAsync(cancellationToken);
-        var row = rows.FirstOrDefault();
-        return row is null ? null : new LegacyMemberMatch(row.USER_ID, row.USERNAME?.Trim() ?? string.Empty);
+        return rows
+            .Select(row => new LegacyMemberMatch(row.USER_ID, row.USERNAME?.Trim() ?? string.Empty))
+            .ToList();
+    }
+
+    public async Task<LegacyMemberMatch?> FindByEmailAsync(
+        string email,
+        CancellationToken cancellationToken = default)
+    {
+        var matches = await FindAllByEmailAsync(email, cancellationToken);
+        return matches.FirstOrDefault();
     }
 
     public async Task<LegacyMemberMatch?> FindByUserIdAsync(

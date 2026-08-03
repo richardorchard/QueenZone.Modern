@@ -186,13 +186,16 @@ public sealed class EfPublicReadRepositoryTests : IAsyncDisposable
         dbContext.Database.ExecuteSqlRaw(
             """
             INSERT INTO UsersLookup (USER_ID, USERNAME, EMAIL)
-            VALUES (42, '  Freddie  ', 'freddie@example.com');
+            VALUES
+                (42, '  Freddie  ', 'freddie@example.com'),
+                (43, '  Mercury  ', 'freddie@example.com'),
+                (99, 'Other', 'other@example.com');
             """);
 
         var repository = new EfMemberLookupRepository(
             dbContext,
             email => $"""
-                SELECT USER_ID, USERNAME FROM UsersLookup WHERE EMAIL = {email} LIMIT 1
+                SELECT USER_ID, USERNAME FROM UsersLookup WHERE EMAIL = {email} ORDER BY USERNAME, USER_ID
                 """,
             userId => $"""
                 SELECT USER_ID, USERNAME FROM UsersLookup WHERE USER_ID = {userId} LIMIT 1
@@ -203,6 +206,12 @@ public sealed class EfPublicReadRepositoryTests : IAsyncDisposable
         Assert.Equal(42, match.UserId);
         Assert.Equal("Freddie", match.Username);
 
+        var all = await repository.FindAllByEmailAsync("freddie@example.com");
+        Assert.Equal(2, all.Count);
+        Assert.Equal([42, 43], all.Select(m => m.UserId).ToArray());
+        Assert.Equal(["Freddie", "Mercury"], all.Select(m => m.Username).ToArray());
+
+        Assert.Empty(await repository.FindAllByEmailAsync("missing@example.com"));
         Assert.Null(await repository.FindByEmailAsync("missing@example.com"));
 
         var byId = await repository.FindByUserIdAsync(42);
