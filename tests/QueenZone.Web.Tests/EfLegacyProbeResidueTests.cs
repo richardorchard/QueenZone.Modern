@@ -36,15 +36,29 @@ public sealed class EfLegacyProbeResidueTests
             && heartbeat.RunnerId.Contains("probe")));
         Assert.False(await dbContext.NewsCandidates.AnyAsync(candidate =>
             candidate.SourceUrl.Contains("qz-url-ingestion-probe")
-            || candidate.CanonicalUrl.Contains("qz-url-ingestion-probe")));
+            || candidate.CanonicalUrl.Contains("qz-url-ingestion-probe")
+            || candidate.SourceUrl.Contains("qz-discovery-promo-probe")
+            || candidate.CanonicalUrl.Contains("qz-discovery-promo-probe")));
+        Assert.False(await dbContext.NewsDiscoverySources.AnyAsync(source =>
+            source.Key.StartsWith("discovery-promo-probe-")));
         Assert.False(await dbContext.MemberAccounts.AnyAsync(member =>
             member.Email.EndsWith("@example.com")
             || member.Email.EndsWith("@example.test")
             || member.Email.EndsWith("@test.local")
-            || member.Email.Contains("pm-probe-", StringComparison.OrdinalIgnoreCase)));
+            || member.Email.Contains("pm-probe-", StringComparison.OrdinalIgnoreCase)
+            || member.Email.Contains("forum-write-probe-", StringComparison.OrdinalIgnoreCase)
+            || member.Email.Contains("photo-submission-probe-", StringComparison.OrdinalIgnoreCase)
+            || member.Email.Contains("article-submission-probe-", StringComparison.OrdinalIgnoreCase)
+            || member.Email.Contains("member-account-probe-", StringComparison.OrdinalIgnoreCase)));
         Assert.False(await dbContext.PrivateMessages.AnyAsync(message =>
             message.Body.Contains("Probe concurrent", StringComparison.Ordinal)
             || message.Body.Contains("Probe reply", StringComparison.Ordinal)));
+        Assert.False(await dbContext.ModernForumThreads.AnyAsync(thread =>
+            thread.Title.Contains("forum-write-probe-", StringComparison.OrdinalIgnoreCase)));
+        Assert.False(await dbContext.PhotoSubmissions.AnyAsync(submission =>
+            submission.Title.Contains("photo-submission-probe-", StringComparison.OrdinalIgnoreCase)));
+        Assert.False(await dbContext.ArticleSubmissions.AnyAsync(submission =>
+            submission.Title.Contains("article-submission-probe-", StringComparison.OrdinalIgnoreCase)));
         Assert.False(await dbContext.PhotoAdminAuditLogs.AnyAsync(audit =>
             audit.ActorEmail == "admin@test.local"));
 

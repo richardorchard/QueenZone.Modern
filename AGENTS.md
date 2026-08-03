@@ -97,7 +97,28 @@ $env:RUN_LEGACY_WRITE_PROBE = "true"
 powershell -File .\scripts\Probe-AdminNewsLegacyWrites.ps1
 ```
 
-`ConnectionStrings__QueenZoneLegacy` must point to `queenzone_legacy_sync` on the local SQL Express instance. The script rejects Azure SQL and remote servers. It runs the admin news write lifecycle probe and the news-section `Admin_news_*` write Facts (rollback visibility + full lifecycle). Discovery promotion probes remain opt-in only until [#503](https://github.com/richardorchard/QueenZone.Modern/issues/503).
+`ConnectionStrings__QueenZoneLegacy` must point to `queenzone_legacy_sync` on the local SQL Express instance. The script rejects Azure SQL and remote servers. It runs the admin news write lifecycle probe, the news-section `Admin_news_*` write Facts, and the self-seeding discovery promotion probe.
+
+When a change touches modern forum thread/post writes, prefer:
+
+```powershell
+$env:RUN_FORUM_WRITE_PROBE = "true"
+powershell -File .\scripts\Probe-ForumWrites.ps1
+```
+
+When a change touches photo or article submissions, prefer:
+
+```powershell
+$env:RUN_CONTENT_SUBMISSION_PROBE = "true"
+powershell -File .\scripts\Probe-ContentSubmissions.ps1
+```
+
+When a change touches member account create or external logins, prefer:
+
+```powershell
+$env:RUN_MEMBER_ACCOUNT_PROBE = "true"
+powershell -File .\scripts\Probe-MemberAccounts.ps1
+```
 
 When a change touches admin URL ingestion, the news-agent run-request queue, or the local `process-news-requests` runner, prefer the opt-in URL ingestion probe after the EF migration is applied:
 

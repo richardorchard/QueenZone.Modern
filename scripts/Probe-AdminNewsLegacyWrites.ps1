@@ -5,10 +5,12 @@
 #   - EfAdminNewsRepositoryLegacyWriteProbeTests (create/publish/unpublish/delete)
 #   - EfNewsSectionLiveProbeTests write Facts (transaction rollback visibility +
 #     full lifecycle create/edit/publish/unpublish/delete)
+#   - EfNewsDiscoveryPromotionLiveProbeTests (self-seed Drafted candidate, promote
+#     inside a rolled-back transaction, then delete seed rows)
 #
 # The public read-only Fact in EfNewsSectionLiveProbeTests stays on the Mac
-# legacy-read-probes job; this script filters only the Admin_news_* write Facts.
-# Discovery promotion remains opt-in only (see #503).
+# legacy-read-probes job; this script filters only the Admin_news_* write Facts
+# plus the self-seeding discovery promotion probe.
 #
 # Example:
 #   $env:ConnectionStrings__QueenZoneLegacy = "Server=localhost\SQLEXPRESS;Database=queenzone_legacy_sync;Integrated Security=True;TrustServerCertificate=True"
@@ -34,4 +36,4 @@ if ($env:RUN_LEGACY_WRITE_PROBE -ne "true") {
 
 dotnet test tests/QueenZone.Web.Tests/QueenZone.Web.Tests.csproj `
     --configuration $Configuration `
-    --filter "FullyQualifiedName~EfAdminNewsRepositoryLegacyWriteProbeTests|FullyQualifiedName~EfNewsSectionLiveProbeTests.Admin_news_"
+    --filter "FullyQualifiedName~EfAdminNewsRepositoryLegacyWriteProbeTests|FullyQualifiedName~EfNewsSectionLiveProbeTests.Admin_news_|FullyQualifiedName~EfNewsDiscoveryPromotionLiveProbeTests"
