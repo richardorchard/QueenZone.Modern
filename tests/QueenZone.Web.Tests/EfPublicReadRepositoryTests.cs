@@ -84,7 +84,8 @@ public sealed class EfPublicReadRepositoryTests : IAsyncDisposable
                 PIC_HEIGHT INTEGER NOT NULL,
                 pic_id INTEGER NOT NULL,
                 category_name TEXT,
-                cat_id INTEGER NOT NULL
+                cat_id INTEGER NOT NULL,
+                submitted_by_display_name TEXT
             );
             CREATE TABLE FreddieTributes (
                 Id INTEGER NOT NULL,
@@ -208,11 +209,11 @@ public sealed class EfPublicReadRepositoryTests : IAsyncDisposable
         dbContext.Database.ExecuteSqlRaw(
             """
             INSERT INTO PhotoCategories (cat_id, name) VALUES (3, 'Live 1986');
-            INSERT INTO PhotoItems (NAME, DATE_TIME, URL, THUMB_URL, T_HEIGHT, T_WIDTH, PIC_WIDTH, PIC_HEIGHT, pic_id, category_name, cat_id)
+            INSERT INTO PhotoItems (NAME, DATE_TIME, URL, THUMB_URL, T_HEIGHT, T_WIDTH, PIC_WIDTH, PIC_HEIGHT, pic_id, category_name, cat_id, submitted_by_display_name)
             VALUES
-                ('Newest', '1986-07-12 00:00:00', 'n.jpg', 'n-t.jpg', 100, 150, 1920, 1080, 11, 'Live 1986', 3),
-                ('Middle', '1986-07-11 00:00:00', 'm.jpg', 'm-t.jpg', 100, 150, 800, 600, 10, 'Live 1986', 3),
-                ('Oldest', '1986-07-10 00:00:00', 'o.jpg', 'o-t.jpg', 100, 150, 0, 0, 9, 'Live 1986', 3);
+                ('Newest', '1986-07-12 00:00:00', 'n.jpg', 'n-t.jpg', 100, 150, 1920, 1080, 11, 'Live 1986', 3, 'LiveAidFan'),
+                ('Middle', '1986-07-11 00:00:00', 'm.jpg', 'm-t.jpg', 100, 150, 800, 600, 10, 'Live 1986', 3, 'YourValentine'),
+                ('Oldest', '1986-07-10 00:00:00', 'o.jpg', 'o-t.jpg', 100, 150, 0, 0, 9, 'Live 1986', 3, NULL);
             """);
 
         var repository = new EfPhotoRepository(dbContext, PhotoSqlQueries.CreateSqliteFixture());
@@ -249,12 +250,18 @@ public sealed class EfPublicReadRepositoryTests : IAsyncDisposable
         Assert.Equal(9, middle.NextPicId);
         Assert.Equal(800, middle.Photo.PictureWidth);
         Assert.Equal(600, middle.Photo.PictureHeight);
+        Assert.Equal("YourValentine", middle.Photo.SubmittedByDisplayName);
 
         var newest = await repository.GetDetailNavigationAsync(3, 11);
         Assert.NotNull(newest);
         Assert.Equal(0, newest.Index);
         Assert.Null(newest.PreviousPicId);
         Assert.Equal(10, newest.NextPicId);
+        Assert.Equal("LiveAidFan", newest.Photo.SubmittedByDisplayName);
+
+        var oldest = await repository.GetDetailNavigationAsync(3, 9);
+        Assert.NotNull(oldest);
+        Assert.Null(oldest.Photo.SubmittedByDisplayName);
 
         Assert.Null(await repository.GetDetailNavigationAsync(3, 9999));
         Assert.Null(await repository.GetDetailNavigationAsync(99, 11));
@@ -602,6 +609,33 @@ public sealed class EfPublicReadRepositoryTests : IAsyncDisposable
     [Fact]
     public async Task News_maps_latest_page_count_detail_and_sitemap()
     {
+        var submitterMemberId = Guid.NewGuid();
+        var submitter = new QueenZone.Data.Entities.MemberAccount
+        {
+            Id = submitterMemberId,
+            Email = "news-submit@example.com",
+            DisplayName = "News Submitter",
+        };
+        var suggestions = new InMemoryNewsSuggestionRepository(
+            id => id == submitterMemberId ? submitter : null);
+        var suggestion = await suggestions.CreateAsync(new NewsSuggestion(
+            Guid.NewGuid(),
+            submitterMemberId,
+            "https://example.com/submitted-news",
+            NewsCandidateDedupe.ComputeUrlHash("https://example.com/submitted-news"),
+            "Headline",
+            null,
+            NewsSuggestionStatus.Pending,
+            DateTimeOffset.UtcNow,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null));
+        await suggestions.PromoteAsync(suggestion.Id, 10, "admin@test.local", null);
+
         dbContext.Database.ExecuteSqlRaw(
             """
             CREATE TABLE IF NOT EXISTS NewsRows (
@@ -641,7 +675,8 @@ public sealed class EfPublicReadRepositoryTests : IAsyncDisposable
             sitemapSql: """
                 SELECT Id, Title, PublishedAt, Slug FROM NewsRows WHERE IsPublished = 1
                 ORDER BY PublishedAt DESC, Id DESC
-                """);
+                """,
+            newsSuggestionRepository: suggestions);
 
         var latest = await repository.GetLatestAsync(5);
         Assert.Equal(2, latest.Count);
@@ -659,6 +694,8 @@ public sealed class EfPublicReadRepositoryTests : IAsyncDisposable
         Assert.NotNull(detail);
         Assert.Equal("Headline", detail.Title);
         Assert.Equal("Full body text for detail", detail.Body);
+        Assert.Equal(submitterMemberId, detail.SubmitterMemberId);
+        Assert.Equal("News Submitter", detail.SubmitterDisplayName);
         Assert.Null(await repository.GetByIdAsync(404));
         Assert.Equal(2, (await repository.GetPublishedSitemapEntriesAsync()).Count);
     }

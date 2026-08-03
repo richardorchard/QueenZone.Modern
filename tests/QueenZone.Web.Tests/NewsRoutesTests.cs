@@ -145,6 +145,94 @@ public sealed class NewsRoutesTests : IClassFixture<QueenZoneWebApplicationFacto
     }
 
     [Fact]
+    public async Task NewsArchiveAndDetail_LinkVerifiedSubmitterProfile()
+    {
+        var submitterMemberId = Guid.NewGuid();
+        var item = new NewsItem(
+            5100,
+            "Member submitted news",
+            "Member-submitted excerpt.",
+            "Member-submitted body.",
+            new DateTime(2026, 8, 3, 8, 0, 0, DateTimeKind.Utc),
+            null,
+            true,
+            SubmitterMemberId: submitterMemberId,
+            SubmitterDisplayName: "News Contributor");
+        var client = factory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+            {
+                services.AddSingleton<INewsRepository>(new FixedNewsRepository([item]));
+            })).CreateClient();
+
+        var archiveBody = await client.GetStringAsync("/news");
+        var detailBody = await client.GetStringAsync("/news/5100/member-submitted-news");
+
+        Assert.Contains($"Submitted by <a class=\"qz-attribution-link\" href=\"/members/{submitterMemberId}\">News Contributor</a>", archiveBody);
+        Assert.Contains($"Submitted by <a class=\"qz-attribution-link\" href=\"/members/{submitterMemberId}\">News Contributor</a>", detailBody);
+    }
+
+    [Fact]
+    public async Task LegacyNews_DoesNotShowUnverifiedSubmitterAttribution()
+    {
+        var client = factory.CreateClient();
+
+        var body = await client.GetStringAsync("/news/1003/queenzone-modernisation-begins");
+
+        Assert.DoesNotContain("Submitted by", body);
+    }
+
+    [Fact]
+    public async Task InMemoryNewsRepository_AddsPromotedSuggestionAttribution()
+    {
+        var memberId = Guid.NewGuid();
+        var member = new QueenZone.Data.Entities.MemberAccount
+        {
+            Id = memberId,
+            Email = "in-memory-news@example.com",
+            DisplayName = "In-memory Contributor",
+        };
+        var suggestions = new InMemoryNewsSuggestionRepository(id => id == memberId ? member : null);
+        var suggestion = await suggestions.CreateAsync(new NewsSuggestion(
+            Guid.NewGuid(),
+            memberId,
+            "https://example.com/in-memory-news",
+            NewsCandidateDedupe.ComputeUrlHash("https://example.com/in-memory-news"),
+            "In-memory news",
+            null,
+            NewsSuggestionStatus.Pending,
+            DateTimeOffset.UtcNow,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null));
+        await suggestions.PromoteAsync(suggestion.Id, 5200, "admin@test.local", null);
+        var publishedAt = new DateTime(2026, 8, 3, 8, 0, 0, DateTimeKind.Utc);
+        var store = new SharedNewsStore(
+        [
+            new AdminNewsArticle(
+                5200,
+                "In-memory news",
+                "in-memory-news",
+                "Excerpt",
+                "Body",
+                publishedAt,
+                null,
+                true,
+                publishedAt,
+                publishedAt,
+                "admin@test.local"),
+        ]);
+
+        var item = await new InMemoryNewsRepository(store, suggestions).GetByIdAsync(5200);
+
+        Assert.Equal(memberId, item!.SubmitterMemberId);
+        Assert.Equal("In-memory Contributor", item.SubmitterDisplayName);
+    }
+
+    [Fact]
     public async Task MissingNewsArticleReturnsNotFound()
     {
         var client = factory.CreateClient();

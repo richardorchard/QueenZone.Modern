@@ -15,7 +15,12 @@ public sealed record PhotoItem(
     /// <summary>Original full-image height from <c>PIC_HEIGHT</c>. Zero means unknown/unset.</summary>
     int PictureHeight,
     int Year,
-    DateTime DateTime)
+    DateTime DateTime,
+    /// <summary>
+    /// Display name of the member who submitted the image, when known.
+    /// Prefers a linked modern <c>MemberAccounts.DisplayName</c>, otherwise legacy <c>USERS_T.USERNAME</c>.
+    /// </summary>
+    string? SubmittedByDisplayName = null)
 {
     /// <summary>True when both original dimensions are positive (usable for display and wallpaper filters).</summary>
     public bool HasPictureDimensions => PictureWidth > 0 && PictureHeight > 0;

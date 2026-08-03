@@ -123,5 +123,6 @@ public sealed class InMemoryPhotoRepository(SharedPhotoStore store) : IPhotoRepo
             item.PictureWidth,
             item.PictureHeight,
             item.Year,
-            item.DateTime);
+            item.DateTime,
+            item.SubmittedByDisplayName);
 }

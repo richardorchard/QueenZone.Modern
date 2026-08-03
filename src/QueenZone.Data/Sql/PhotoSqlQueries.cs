@@ -112,14 +112,26 @@ public sealed class PhotoSqlQueries
                     CAST(ISNULL(p.PIC_WIDTH, 0) AS int) AS PIC_WIDTH,
                     CAST(ISNULL(p.PIC_HEIGHT, 0) AS int) AS PIC_HEIGHT,
                     p.PIC_ID AS pic_id,
-                    ISNULL(c.name, N'') AS category_name
+                    ISNULL(c.name, N'') AS category_name,
+                    COALESCE(
+                        (
+                            SELECT TOP (1) NULLIF(LTRIM(RTRIM(m.DisplayName)), N'')
+                            FROM dbo.MemberAccounts m
+                            WHERE m.LinkedLegacyUserId = p.user_id
+                              AND m.DisplayName IS NOT NULL
+                            ORDER BY m.Id
+                        ),
+                        NULLIF(LTRIM(RTRIM(u.USERNAME)), N'')
+                    ) AS submitted_by_display_name
                 FROM dbo.PIC_FILES_T p
                 INNER JOIN dbo.PIC_CAT_T c ON c.cat_id = p.Cat_ID
+                LEFT JOIN dbo.USERS_T u ON u.USER_ID = p.user_id
                 WHERE p.Cat_ID = {0} AND p.PIC_ID = {1} AND p.DISPLAY = 1{PHOTO_FILTER_P}
                 """,
             // One round-trip: photo + totals + neighbors. Neighbor subqueries mirror Previous/NextPicIdSql
             // (seek-friendly UNION ALL; relies on IX_PIC_FILES_T_Cat_Display_Date).
             // {PHOTO_FILTER_*} placeholders are filled by PhotoSqlFilter for size presets (#437).
+            // Submitted-by prefers a linked modern member display name, else legacy USERS_T.USERNAME.
             DetailNavigationSql = """
                 SELECT
                     ISNULL(p.Name, N'') AS NAME,
@@ -132,6 +144,16 @@ public sealed class PhotoSqlQueries
                     CAST(ISNULL(p.PIC_HEIGHT, 0) AS int) AS PIC_HEIGHT,
                     p.PIC_ID AS pic_id,
                     ISNULL(c.name, N'') AS category_name,
+                    COALESCE(
+                        (
+                            SELECT TOP (1) NULLIF(LTRIM(RTRIM(m.DisplayName)), N'')
+                            FROM dbo.MemberAccounts m
+                            WHERE m.LinkedLegacyUserId = p.user_id
+                              AND m.DisplayName IS NOT NULL
+                            ORDER BY m.Id
+                        ),
+                        NULLIF(LTRIM(RTRIM(u.USERNAME)), N'')
+                    ) AS submitted_by_display_name,
                     (
                         SELECT COUNT(*)
                         FROM dbo.PIC_FILES_T t
@@ -190,6 +212,7 @@ public sealed class PhotoSqlQueries
                     ) AS NextPicId
                 FROM dbo.PIC_FILES_T p
                 INNER JOIN dbo.PIC_CAT_T c ON c.cat_id = p.Cat_ID
+                LEFT JOIN dbo.USERS_T u ON u.USER_ID = p.user_id
                 WHERE p.Cat_ID = {0} AND p.PIC_ID = {1} AND p.DISPLAY = 1{PHOTO_FILTER_P}
                 """,
             // Seek-friendly UNION ALL (avoids OR residual predicates that scan the whole category).
@@ -317,7 +340,7 @@ public sealed class PhotoSqlQueries
                 SELECT name FROM PhotoCategories WHERE cat_id = {0}
                 """,
             PhotoByIdSql = """
-                SELECT NAME, DATE_TIME, URL, THUMB_URL, T_HEIGHT, T_WIDTH, PIC_WIDTH, PIC_HEIGHT, pic_id, category_name
+                SELECT NAME, DATE_TIME, URL, THUMB_URL, T_HEIGHT, T_WIDTH, PIC_WIDTH, PIC_HEIGHT, pic_id, category_name, submitted_by_display_name
                 FROM PhotoItems p
                 WHERE p.cat_id = {0} AND p.pic_id = {1}{PHOTO_FILTER_P}
                 """,
@@ -333,6 +356,7 @@ public sealed class PhotoSqlQueries
                     p.PIC_HEIGHT,
                     p.pic_id,
                     p.category_name,
+                    p.submitted_by_display_name,
                     (SELECT COUNT(*) FROM PhotoItems t WHERE t.cat_id = {0}{PHOTO_FILTER_T}) AS TotalCount,
                     (
                         (SELECT COUNT(*) FROM PhotoItems t WHERE t.cat_id = {0}{PHOTO_FILTER_T} AND t.DATE_TIME > p.DATE_TIME)
