@@ -33,6 +33,11 @@ internal static class ToolsApp
             return await BackfillPhotoDimensionsCommand.RunAsync(args[1..]);
         }
 
+        if (args.Length > 0 && string.Equals(args[0], "convert-legacy-bbcode", StringComparison.OrdinalIgnoreCase))
+        {
+            return await ConvertLegacyBbCodeCommand.RunAsync(args[1..]);
+        }
+
         return await RunImportHistoryAsync(args);
     }
 
@@ -51,6 +56,7 @@ internal static class ToolsApp
             Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- check-links [options]");
             Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- photo-dim-inventory [options]");
             Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- backfill-photo-dimensions [options]");
+            Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- convert-legacy-bbcode [options]");
             Console.Error.WriteLine();
             Console.Error.WriteLine("Connection string can also be supplied with ConnectionStrings__QueenZoneLegacy.");
             return 2;

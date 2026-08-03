@@ -188,6 +188,7 @@ public sealed class QueenZoneDbContext : DbContext
             entity.HasKey(post => post.Id);
             entity.Property(post => post.AuthorDisplayName).HasMaxLength(100).IsRequired();
             entity.Property(post => post.BodyHtml).HasMaxLength(8000).IsUnicode(false).IsRequired();
+            entity.Property(post => post.BodyHtmlLegacyRaw).HasMaxLength(8000).IsUnicode(false);
             entity.Property(post => post.SignatureHtml).HasMaxLength(8000).IsUnicode(false);
             entity.Property(post => post.Attachment).HasMaxLength(120).IsUnicode(false);
             entity.Property(post => post.FileSize).HasMaxLength(12).IsUnicode(false);
@@ -680,9 +681,13 @@ public sealed class QueenZoneDbContext : DbContext
             entity.HasKey(participant => new { participant.ConversationId, participant.MemberId });
 
             entity.Property(participant => participant.IsArchived).IsRequired();
+            entity.Property(participant => participant.IsRemoved).IsRequired();
 
             entity.HasIndex(participant => new { participant.MemberId, participant.IsArchived })
                 .HasDatabaseName("IX_PrivateConversationParticipants_Member_Archived");
+
+            entity.HasIndex(participant => new { participant.MemberId, participant.IsRemoved })
+                .HasDatabaseName("IX_PrivateConversationParticipants_Member_Removed");
 
             entity.HasOne(participant => participant.Conversation)
                 .WithMany(conversation => conversation.Participants)

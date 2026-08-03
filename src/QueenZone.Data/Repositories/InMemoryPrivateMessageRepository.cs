@@ -20,7 +20,55 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
         Guid memberId,
         int page = 1,
         int pageSize = PrivateMessageLimits.InboxPageSize,
+        CancellationToken cancellationToken = default) =>
+        GetInboxCore(memberId, page, pageSize, isArchived: false);
+
+    public Task<PrivateInboxPage> GetArchivedInboxAsync(
+        Guid memberId,
+        int page = 1,
+        int pageSize = PrivateMessageLimits.InboxPageSize,
+        CancellationToken cancellationToken = default) =>
+        GetInboxCore(memberId, page, pageSize, isArchived: true);
+
+    public Task<bool> ArchiveConversationAsync(
+        Guid conversationId,
+        Guid memberId,
         CancellationToken cancellationToken = default)
+    {
+        lock (sync)
+        {
+            var participant = participants.SingleOrDefault(
+                p => p.ConversationId == conversationId && p.MemberId == memberId);
+            if (participant is null)
+            {
+                return Task.FromResult(false);
+            }
+
+            participant.IsArchived = true;
+            return Task.FromResult(true);
+        }
+    }
+
+    public Task<bool> UnarchiveConversationAsync(
+        Guid conversationId,
+        Guid memberId,
+        CancellationToken cancellationToken = default)
+    {
+        lock (sync)
+        {
+            var participant = participants.SingleOrDefault(
+                p => p.ConversationId == conversationId && p.MemberId == memberId);
+            if (participant is null)
+            {
+                return Task.FromResult(false);
+            }
+
+            participant.IsArchived = false;
+            return Task.FromResult(true);
+        }
+    }
+
+    private Task<PrivateInboxPage> GetInboxCore(Guid memberId, int page, int pageSize, bool isArchived)
     {
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, PrivateMessageLimits.MaxInboxPageSize);
@@ -28,7 +76,7 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
         lock (sync)
         {
             var mine = participants
-                .Where(p => p.MemberId == memberId && !p.IsArchived)
+                .Where(p => p.MemberId == memberId && p.IsArchived == isArchived && !p.IsRemoved)
                 .Select(p => p.ConversationId)
                 .ToHashSet();
 
@@ -58,7 +106,7 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
         lock (sync)
         {
             var count = participants
-                .Where(p => p.MemberId == memberId && !p.IsArchived)
+                .Where(p => p.MemberId == memberId && !p.IsArchived && !p.IsRemoved)
                 .Count(p => CountUnread(p) > 0);
             return Task.FromResult(count);
         }
@@ -234,6 +282,7 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
                     LastReadAt = sentAt,
                     LastReadSortKey = null,
                     IsArchived = false,
+                    IsRemoved = false,
                 });
                 participants.Add(new PrivateConversationParticipantEntity
                 {
@@ -242,14 +291,15 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
                     LastReadAt = null,
                     LastReadSortKey = null,
                     IsArchived = false,
+                    IsRemoved = false,
                 });
             }
             else
             {
                 EnsureParticipant(conversation.Id, senderMemberId);
                 EnsureParticipant(conversation.Id, recipientMemberId);
-                Unarchive(conversation.Id, senderMemberId);
-                Unarchive(conversation.Id, recipientMemberId);
+                ReactivateParticipant(conversation.Id, senderMemberId);
+                ReactivateParticipant(conversation.Id, recipientMemberId);
             }
 
             var message = new PrivateMessageEntity
@@ -339,10 +389,29 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
                 TruncatePreview(body),
                 senderMemberId,
                 message.SortKey);
-            Unarchive(conversationId, conversation.MemberLowId);
-            Unarchive(conversationId, conversation.MemberHighId);
+            ReactivateParticipant(conversationId, conversation.MemberLowId);
+            ReactivateParticipant(conversationId, conversation.MemberHighId);
 
             return Task.FromResult(new PrivateMessageSendResult(true, conversationId, null));
+        }
+    }
+
+    public Task<bool> RemoveConversationAsync(
+        Guid conversationId,
+        Guid memberId,
+        CancellationToken cancellationToken = default)
+    {
+        lock (sync)
+        {
+            var participant = participants.SingleOrDefault(
+                p => p.ConversationId == conversationId && p.MemberId == memberId);
+            if (participant is null)
+            {
+                return Task.FromResult(false);
+            }
+
+            participant.IsRemoved = true;
+            return Task.FromResult(true);
         }
     }
 
@@ -386,16 +455,18 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
             LastReadAt = null,
             LastReadSortKey = null,
             IsArchived = false,
+            IsRemoved = false,
         });
     }
 
-    private void Unarchive(Guid conversationId, Guid memberId)
+    private void ReactivateParticipant(Guid conversationId, Guid memberId)
     {
         var participant = participants.SingleOrDefault(
             p => p.ConversationId == conversationId && p.MemberId == memberId);
         if (participant is not null)
         {
             participant.IsArchived = false;
+            participant.IsRemoved = false;
         }
     }
 

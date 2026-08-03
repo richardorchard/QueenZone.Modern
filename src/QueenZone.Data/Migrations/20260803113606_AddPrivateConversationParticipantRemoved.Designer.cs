@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using QueenZone.Data;
 
@@ -11,9 +12,11 @@ using QueenZone.Data;
 namespace QueenZone.Data.Migrations
 {
     [DbContext(typeof(QueenZoneDbContext))]
-    partial class QueenZoneDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260803113606_AddPrivateConversationParticipantRemoved")]
+    partial class AddPrivateConversationParticipantRemoved
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -425,11 +428,6 @@ namespace QueenZone.Data.Migrations
 
                     b.Property<string>("BodyHtml")
                         .IsRequired()
-                        .HasMaxLength(8000)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(8000)");
-
-                    b.Property<string>("BodyHtmlLegacyRaw")
                         .HasMaxLength(8000)
                         .IsUnicode(false)
                         .HasColumnType("varchar(8000)");

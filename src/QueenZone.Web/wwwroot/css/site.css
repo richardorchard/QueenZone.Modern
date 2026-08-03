@@ -1697,6 +1697,22 @@ body.qz-menu-lock .qz-masthead {
   margin: 0;
 }
 
+/* Covers both quotes converted from legacy BBCode (.qz-bbcode-quote) and quotes
+   inserted via the Quill "Quote" reply action / blockquote toolbar button, so
+   old and new quoted posts read consistently. */
+.qz-forum-post__body blockquote {
+  margin: var(--space-3) 0;
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--hairline);
+  background: var(--surface-muted, #f6f6f6);
+  font-style: italic;
+}
+
+.qz-bbcode-quote-author {
+  margin-bottom: 0.25rem;
+  font-style: normal;
+}
+
 .qz-forum-post__edited {
   margin: 0.35rem 0 0;
   font-style: italic;
@@ -1706,6 +1722,7 @@ body.qz-menu-lock .qz-masthead {
   margin: 0.5rem 0 0;
 }
 
+.qz-forum-post__quote-link,
 .qz-forum-post__edit-link {
   font-size: 0.875rem;
   text-decoration: underline;
@@ -3927,6 +3944,9 @@ body.qz-menu-lock .qz-masthead {
 /* Private messaging */
 .qz-messages-toolbar {
   margin-bottom: var(--space-4);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
 }
 
 .qz-message-list {
@@ -3939,6 +3959,10 @@ body.qz-menu-lock .qz-masthead {
 
 .qz-message-list__item {
   border-top: 1px solid var(--border-subtle, #e5e5e5);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
 }
 
 .qz-message-list__item--unread .qz-message-list__name {
@@ -3951,6 +3975,12 @@ body.qz-menu-lock .qz-masthead {
   padding: 0.85rem 0;
   text-decoration: none;
   color: inherit;
+  flex: 1;
+  min-width: 0;
+}
+
+.qz-message-list__action {
+  flex-shrink: 0;
 }
 
 .qz-message-list__name {

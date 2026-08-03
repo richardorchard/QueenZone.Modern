@@ -165,6 +165,137 @@ public sealed class InMemoryPrivateMessageRepositoryTests
         Assert.Single(page3.Items);
     }
 
+    [Fact]
+    public async Task Archive_HidesConversationFromInbox_ButNotForOtherParticipant()
+    {
+        var members = new InMemoryMemberAccountRepository();
+        var alice = await members.CreateAsync(NewMember("a-archive@example.com", "Alice"));
+        var bob = await members.CreateAsync(NewMember("b-archive@example.com", "Bob"));
+        var carol = await members.CreateAsync(NewMember("c-archive@example.com", "Carol"));
+        var repo = new InMemoryPrivateMessageRepository(id =>
+            members.FindByIdAsync(id).GetAwaiter().GetResult());
+
+        var created = await repo.SendNewOrExistingAsync(
+            alice.Id,
+            bob.Id,
+            "Archive me",
+            DateTimeOffset.Parse("2026-08-01T09:00:00Z"));
+        var conversationId = created.ConversationId!.Value;
+
+        Assert.True(await repo.ArchiveConversationAsync(conversationId, alice.Id));
+        Assert.False(await repo.ArchiveConversationAsync(conversationId, carol.Id));
+
+        Assert.Empty((await repo.GetInboxAsync(alice.Id)).Items);
+        Assert.Single((await repo.GetInboxAsync(bob.Id)).Items);
+
+        var archived = Assert.Single((await repo.GetArchivedInboxAsync(alice.Id)).Items);
+        Assert.Equal(bob.Id, archived.OtherParticipantId);
+    }
+
+    [Fact]
+    public async Task NewMessage_UnarchivesConversation_ForBothParticipants()
+    {
+        var members = new InMemoryMemberAccountRepository();
+        var alice = await members.CreateAsync(NewMember("a-reopen@example.com", "Alice"));
+        var bob = await members.CreateAsync(NewMember("b-reopen@example.com", "Bob"));
+        var repo = new InMemoryPrivateMessageRepository(id =>
+            members.FindByIdAsync(id).GetAwaiter().GetResult());
+
+        var created = await repo.SendNewOrExistingAsync(
+            alice.Id,
+            bob.Id,
+            "Start",
+            DateTimeOffset.Parse("2026-08-01T09:10:00Z"));
+        var conversationId = created.ConversationId!.Value;
+
+        await repo.ArchiveConversationAsync(conversationId, alice.Id);
+        Assert.Empty((await repo.GetInboxAsync(alice.Id)).Items);
+
+        await repo.ReplyAsync(
+            conversationId,
+            bob.Id,
+            "Reopens it",
+            DateTimeOffset.Parse("2026-08-01T09:11:00Z"));
+
+        Assert.Single((await repo.GetInboxAsync(alice.Id)).Items);
+        Assert.Empty((await repo.GetArchivedInboxAsync(alice.Id)).Items);
+    }
+
+    [Fact]
+    public async Task Unarchive_MovesConversationBackToInbox()
+    {
+        var members = new InMemoryMemberAccountRepository();
+        var alice = await members.CreateAsync(NewMember("a-unarchive@example.com", "Alice"));
+        var bob = await members.CreateAsync(NewMember("b-unarchive@example.com", "Bob"));
+        var repo = new InMemoryPrivateMessageRepository(id =>
+            members.FindByIdAsync(id).GetAwaiter().GetResult());
+
+        var created = await repo.SendNewOrExistingAsync(
+            alice.Id,
+            bob.Id,
+            "Toggle",
+            DateTimeOffset.Parse("2026-08-01T09:20:00Z"));
+        var conversationId = created.ConversationId!.Value;
+
+        await repo.ArchiveConversationAsync(conversationId, alice.Id);
+        Assert.True(await repo.UnarchiveConversationAsync(conversationId, alice.Id));
+
+        Assert.Single((await repo.GetInboxAsync(alice.Id)).Items);
+        Assert.Empty((await repo.GetArchivedInboxAsync(alice.Id)).Items);
+    }
+
+    [Fact]
+    public async Task Remove_HidesConversationFromInbox_ButNotForOtherParticipant()
+    {
+        var members = new InMemoryMemberAccountRepository();
+        var alice = await members.CreateAsync(NewMember("a-remove@example.com", "Alice"));
+        var bob = await members.CreateAsync(NewMember("b-remove@example.com", "Bob"));
+        var carol = await members.CreateAsync(NewMember("c-remove@example.com", "Carol"));
+        var repo = new InMemoryPrivateMessageRepository(id =>
+            members.FindByIdAsync(id).GetAwaiter().GetResult());
+
+        var created = await repo.SendNewOrExistingAsync(
+            alice.Id,
+            bob.Id,
+            "Remove me",
+            DateTimeOffset.Parse("2026-08-01T09:00:00Z"));
+        var conversationId = created.ConversationId!.Value;
+
+        Assert.True(await repo.RemoveConversationAsync(conversationId, alice.Id));
+        Assert.False(await repo.RemoveConversationAsync(conversationId, carol.Id));
+
+        Assert.Empty((await repo.GetInboxAsync(alice.Id)).Items);
+        Assert.Single((await repo.GetInboxAsync(bob.Id)).Items);
+    }
+
+    [Fact]
+    public async Task NewMessage_RestoresRemovedConversation_ForBothParticipants()
+    {
+        var members = new InMemoryMemberAccountRepository();
+        var alice = await members.CreateAsync(NewMember("a-restore@example.com", "Alice"));
+        var bob = await members.CreateAsync(NewMember("b-restore@example.com", "Bob"));
+        var repo = new InMemoryPrivateMessageRepository(id =>
+            members.FindByIdAsync(id).GetAwaiter().GetResult());
+
+        var created = await repo.SendNewOrExistingAsync(
+            alice.Id,
+            bob.Id,
+            "Start",
+            DateTimeOffset.Parse("2026-08-01T09:10:00Z"));
+        var conversationId = created.ConversationId!.Value;
+
+        await repo.RemoveConversationAsync(conversationId, alice.Id);
+        Assert.Empty((await repo.GetInboxAsync(alice.Id)).Items);
+
+        await repo.ReplyAsync(
+            conversationId,
+            bob.Id,
+            "Reopens it",
+            DateTimeOffset.Parse("2026-08-01T09:11:00Z"));
+
+        Assert.Single((await repo.GetInboxAsync(alice.Id)).Items);
+    }
+
     private static MemberAccount NewMember(string email, string name) =>
         new()
         {
