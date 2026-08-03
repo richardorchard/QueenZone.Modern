@@ -95,6 +95,13 @@ public sealed class EfMemberAccountRepositoryTests : IAsyncDisposable
         // Second link is a no-op when already set.
         var again = await repository.LinkLegacyUserIdAsync(account.Id, 9999);
         Assert.Equal(4242, again!.LinkedLegacyUserId);
+
+        var unlinked = await repository.UnlinkLegacyUserIdAsync(account.Id);
+        Assert.Null(unlinked!.LinkedLegacyUserId);
+        Assert.Null(await repository.FindByLinkedLegacyUserIdAsync(4242));
+
+        var relinked = await repository.LinkLegacyUserIdAsync(account.Id, 9999);
+        Assert.Equal(9999, relinked!.LinkedLegacyUserId);
     }
 
     [Fact]

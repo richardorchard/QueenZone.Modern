@@ -145,6 +145,33 @@ public sealed class SettingsModel(MemberAccountService memberAccountService) : P
         return RedirectToPage();
     }
 
+    public async Task<IActionResult> OnPostUnlinkLegacyAsync(CancellationToken cancellationToken)
+    {
+        var memberId = await GetCurrentMemberIdAsync();
+        if (memberId is null)
+        {
+            return Redirect("/account/login");
+        }
+
+        var account = await memberAccountService.FindByIdAsync(memberId.Value, cancellationToken);
+        if (account is null)
+        {
+            return Redirect("/account/login");
+        }
+
+        var result = await memberAccountService.UnlinkLegacyAccountAsync(memberId.Value, cancellationToken);
+        if (!result.Succeeded || result.Account is null)
+        {
+            await PopulatePageAsync(account, cancellationToken);
+            ModelState.AddModelError(string.Empty, result.Error ?? "Could not unlink the legacy account.");
+            ViewData["Title"] = "Account settings";
+            return Page();
+        }
+
+        TempData[SuccessMessageKey] = "Legacy account unlinked.";
+        return RedirectToPage();
+    }
+
     public async Task<IActionResult> OnPostUploadAvatarAsync(CancellationToken cancellationToken)
     {
         var memberId = await GetCurrentMemberIdAsync();

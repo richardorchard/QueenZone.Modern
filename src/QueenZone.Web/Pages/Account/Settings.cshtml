@@ -51,6 +51,21 @@
             <strong>@Model.LegacyLink.Match.Username</strong>
             <span class="qz-meta">(id @Model.LegacyLink.Match.UserId)</span>.
           </p>
+          <p class="qz-meta">
+            Unlink if this is the wrong classic account. You can then claim another match for your email,
+            if one is free.
+          </p>
+          <form method="post"
+                asp-page-handler="UnlinkLegacy"
+                class="qz-account-form"
+                data-busy-submit
+                data-busy-label="Unlinking…">
+            @Html.AntiForgeryToken()
+            <div class="qz-account-form__actions">
+              <button type="submit" class="qz-button qz-button--outline">Unlink legacy account</button>
+            </div>
+            <p class="qz-account-form__status" data-busy-status hidden role="status" aria-live="polite"></p>
+          </form>
         }
         else if (Model.LegacyLink.Kind == LegacyAccountLinkKind.Claimable && Model.LegacyLink.ClaimableMatches.Count > 0)
         {

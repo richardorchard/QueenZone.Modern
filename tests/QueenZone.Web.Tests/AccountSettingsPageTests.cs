@@ -124,8 +124,57 @@ public sealed partial class AccountSettingsPageTests : IClassFixture<WebApplicat
         Assert.Contains("Legacy account claimed", updated);
         Assert.Contains("Linked to legacy forum account", updated);
         Assert.Contains("ArchiveClaimed", updated);
+        Assert.Contains("Unlink legacy account", updated);
         Assert.DoesNotContain("Claim legacy account", updated);
         Assert.Contains("value=\"ArchiveClaimed\"", updated);
+    }
+
+    [Fact]
+    public async Task PostUnlinkLegacy_ClearsLink_AndShowsClaimOfferAgain()
+    {
+        var client = await CreateSignedInMemberClientWithLegacyMatchAsync(
+            email: "unlink-post@example.com",
+            displayName: "Modern Fan",
+            subject: "google-legacy-unlink-post",
+            legacyUserId: 9003,
+            legacyUsername: "ArchiveUnlink",
+            options: new WebApplicationFactoryClientOptions
+            {
+                HandleCookies = true,
+                AllowAutoRedirect = false,
+            });
+
+        var claimPage = await client.GetStringAsync("/account/settings");
+        var claimResponse = await client.PostAsync(
+            "/account/settings?handler=ClaimLegacy",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(claimPage),
+                ["SelectedLegacyUserId"] = "9003",
+                ["AdoptLegacyDisplayName"] = "false",
+            }));
+        Assert.Equal(HttpStatusCode.Redirect, claimResponse.StatusCode);
+
+        var linkedPage = await client.GetStringAsync("/account/settings");
+        Assert.Contains("Unlink legacy account", linkedPage);
+        Assert.Contains("ArchiveUnlink", linkedPage);
+
+        var unlinkResponse = await client.PostAsync(
+            "/account/settings?handler=UnlinkLegacy",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(linkedPage),
+            }));
+
+        Assert.Equal(HttpStatusCode.Redirect, unlinkResponse.StatusCode);
+        Assert.Equal("/account/settings", unlinkResponse.Headers.Location!.OriginalString);
+
+        var unlinked = await client.GetStringAsync("/account/settings");
+        Assert.Contains("Legacy account unlinked", unlinked);
+        Assert.Contains("Claim legacy account", unlinked);
+        Assert.Contains("ArchiveUnlink", unlinked);
+        Assert.DoesNotContain("Linked to legacy forum account", unlinked);
+        Assert.DoesNotContain("Unlink legacy account", unlinked);
     }
 
     [Fact]

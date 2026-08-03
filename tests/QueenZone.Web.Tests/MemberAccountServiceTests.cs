@@ -205,6 +205,67 @@ public sealed class MemberAccountServiceTests
     }
 
     [Fact]
+    public async Task UnlinkLegacyAccountAsync_ClearsLink_AndAllowsReclaim()
+    {
+        var legacyLookup = new InMemoryLegacyMemberLookupRepository(
+            new Dictionary<string, IReadOnlyList<LegacyMemberMatch>>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["fan@queenzone.org"] =
+                [
+                    new LegacyMemberMatch(100, "WrongFan"),
+                    new LegacyMemberMatch(200, "RightFan"),
+                ],
+            });
+        var service = CreateService(legacyMemberLookupRepository: legacyLookup);
+        var registered = await service.RegisterAsync("fan@queenzone.org", "S3curePass!", "New Fan");
+        Assert.True((await service.ClaimLegacyAccountAsync(
+            registered.Account!.Id,
+            legacyUserId: 100,
+            adoptLegacyDisplayName: false)).Succeeded);
+
+        var unlinked = await service.UnlinkLegacyAccountAsync(registered.Account.Id);
+
+        Assert.True(unlinked.Succeeded);
+        Assert.Null(unlinked.Account!.LinkedLegacyUserId);
+
+        var state = await service.GetLegacyLinkStateAsync(unlinked.Account);
+        Assert.Equal(LegacyAccountLinkKind.Claimable, state.Kind);
+        Assert.True(state.HasMultipleClaimable);
+
+        var reclaimed = await service.ClaimLegacyAccountAsync(
+            registered.Account.Id,
+            legacyUserId: 200,
+            adoptLegacyDisplayName: true);
+
+        Assert.True(reclaimed.Succeeded);
+        Assert.Equal(200, reclaimed.Account!.LinkedLegacyUserId);
+        Assert.Equal("RightFan", reclaimed.Account.DisplayName);
+    }
+
+    [Fact]
+    public async Task UnlinkLegacyAccountAsync_IsNoOp_WhenAlreadyUnlinked()
+    {
+        var service = CreateService();
+        var registered = await service.RegisterAsync("fan@queenzone.org", "S3curePass!", "Fan");
+
+        var result = await service.UnlinkLegacyAccountAsync(registered.Account!.Id);
+
+        Assert.True(result.Succeeded);
+        Assert.Null(result.Account!.LinkedLegacyUserId);
+    }
+
+    [Fact]
+    public async Task UnlinkLegacyAccountAsync_Fails_WhenAccountDoesNotExist()
+    {
+        var service = CreateService();
+
+        var result = await service.UnlinkLegacyAccountAsync(Guid.NewGuid());
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("Account not found.", result.Error);
+    }
+
+    [Fact]
     public async Task GetLegacyLinkStateAsync_ReturnsMultipleClaimable_WhenEmailMatchesSeveralFreeAccounts()
     {
         var legacyLookup = new InMemoryLegacyMemberLookupRepository(
@@ -577,6 +638,9 @@ public sealed class MemberAccountServiceTests
 
         public Task<MemberAccount?> LinkLegacyUserIdAsync(Guid memberId, int legacyUserId, CancellationToken cancellationToken = default) =>
             inner.LinkLegacyUserIdAsync(memberId, legacyUserId, cancellationToken);
+
+        public Task<MemberAccount?> UnlinkLegacyUserIdAsync(Guid memberId, CancellationToken cancellationToken = default) =>
+            inner.UnlinkLegacyUserIdAsync(memberId, cancellationToken);
 
         public Task RecordLoginAsync(Guid memberId, DateTime loginAt, CancellationToken cancellationToken = default) =>
             inner.RecordLoginAsync(memberId, loginAt, cancellationToken);

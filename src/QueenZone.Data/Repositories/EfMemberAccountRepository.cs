@@ -114,6 +114,26 @@ public sealed class EfMemberAccountRepository(QueenZoneDbContext dbContext) : IM
         return account;
     }
 
+    public async Task<MemberAccount?> UnlinkLegacyUserIdAsync(
+        Guid memberId,
+        CancellationToken cancellationToken = default)
+    {
+        var account = await dbContext.MemberAccounts
+            .SingleOrDefaultAsync(a => a.Id == memberId, cancellationToken);
+        if (account is null)
+        {
+            return null;
+        }
+
+        if (account.LinkedLegacyUserId is not null)
+        {
+            account.LinkedLegacyUserId = null;
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+
+        return account;
+    }
+
     public async Task RecordLoginAsync(Guid memberId, DateTime loginAt, CancellationToken cancellationToken = default)
     {
         var account = await dbContext.MemberAccounts
