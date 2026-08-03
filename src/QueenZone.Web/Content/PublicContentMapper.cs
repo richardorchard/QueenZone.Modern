@@ -137,8 +137,15 @@ public static class PublicContentMapper
             ? ForumPostEditRules.FormatEditedLabel(post.EditCount, post.EditedAt.Value, utcNow)
             : null;
         var canMessage = PrivateMessageService.CanMessage(currentMemberId, post.AuthorMemberId);
+        var isAuthor = currentMemberId is not null && post.AuthorMemberId == currentMemberId;
 
-        return post with { CanEdit = canEdit, EditedLabel = editedLabel, CanMessage = canMessage };
+        return post with
+        {
+            CanEdit = canEdit,
+            EditedLabel = editedLabel,
+            CanMessage = canMessage,
+            IsAuthor = isAuthor,
+        };
     }
 
     public static IReadOnlyList<ForumPostViewModel> ToForumPostViewModels(
