@@ -13,18 +13,29 @@ concurrency:
   group: nightly-legacy-checks
   cancel-in-progress: false
 
-# The 4 "*ProbeTests" classes in QueenZone.Web.Tests (see
-# docs/architecture/testing-policy.md, "Data Integration Tests") exercise the
-# real legacy SQL Server but are gated behind ConnectionStrings__QueenZoneLegacy
-# and, for the write-capable ones, RUN_LEGACY_WRITE_PROBE — both unset in
-# ci.yml, so they silently no-op on every PR today. This workflow runs the
-# read-only ones nightly for continuous signal against real data, without
-# putting the real legacy/deploy database on the PR merge path.
+# The "*ProbeTests" classes in QueenZone.Web.Tests (see
+# docs/architecture/testing-policy.md, "Data Integration Tests") exercise
+# legacy SQL Server paths. They are gated behind ConnectionStrings__QueenZoneLegacy
+# and, for write-capable Facts, RUN_LEGACY_WRITE_PROBE — both unset in ci.yml,
+# so they silently no-op on every PR. This workflow runs them nightly for
+# continuous signal against real data, without putting live Azure SQL on the
+# PR merge path.
 #
 # Probes run against a same-day mirror on the Windows runner's local SQL
 # Express (synced from the live Azure SQL DB via sqlpackage each run), not
 # the live database directly — see scripts/Sync-LegacyDbToSqlExpress.ps1.
 # The Mac runner reaches that SQL Express instance over the LAN.
+#
+# Because the target is a disposable nightly-refreshed mirror, this job sets
+# RUN_LEGACY_WRITE_PROBE=true and runs admin news write probes (create /
+# publish / unpublish / delete and transaction-rollback visibility checks)
+# as well as the read-only probes. Never point this connection string at
+# live Azure SQL.
+#
+# Deferred: EfNewsDiscoveryPromotionLiveProbeTests still depends on a fixed
+# candidate id (or env override) that may not be promotable on every mirror
+# snapshot — see #503 so flaky promotion data does not fail the admin write
+# signal.
 #
 # One-time prerequisites on the Windows runner before this workflow will
 # succeed (not automated — see scripts/Enable-SqlExpressRemoteAccess.ps1
@@ -37,12 +48,6 @@ concurrency:
 #   3. Optionally set the repo variable SQLEXPRESS_LAN_ADDRESS if the
 #      Windows runner's LAN IP (currently 192.168.1.237, ideally a DHCP
 #      reservation) ever changes.
-#
-# Deliberately read-only: RUN_LEGACY_WRITE_PROBE is not set here, so the
-# write-gated Facts in these classes stay no-ops. Now that probes run
-# against a disposable nightly-refreshed mirror rather than the live
-# database, write probes are no longer the safety concern they were against
-# the live DB — see #449 for the tracked follow-up on turning them on here.
 jobs:
   sync-legacy-db:
     name: Sync legacy DB to SQL Express
@@ -75,8 +80,8 @@ jobs:
           }
           ./scripts/Sync-LegacyDbToSqlExpress.ps1
 
-  legacy-read-probes:
-    name: Legacy SQL read probes
+  legacy-probes:
+    name: Legacy SQL read and write probes
     needs: sync-legacy-db
     # Runs on the Mac Mini (M2) rather than the Windows box (i3) or a
     # GitHub-hosted runner — this is unattended and not time-sensitive, and
@@ -103,10 +108,12 @@ jobs:
           access_token: ${{ secrets.BITWARDEN_SECRETS_MANAGER_ACCESS_TOKEN }}
           secrets: ${{ vars.BITWARDEN_APP_SERVICE_DEPLOY_SECRETS }}
 
-      - name: Run legacy SQL read-only probes against the SQL Express mirror
+      - name: Run legacy SQL read and write probes against the SQL Express mirror
         env:
           SQLEXPRESS_LAN_ADDRESS: ${{ vars.SQLEXPRESS_LAN_ADDRESS || '192.168.1.237,1433' }}
           SQLEXPRESS_PROBE_PASSWORD: ${{ steps.bitwarden-secrets.outputs.QUEENZONE_SQL_EXPRESS_PROBE_PASSWORD }}
+          # Write probes mutate only the disposable mirror (never live Azure SQL).
+          RUN_LEGACY_WRITE_PROBE: "true"
         run: |
           if [ -z "$SQLEXPRESS_PROBE_PASSWORD" ]; then
             echo "::error::QUEENZONE_SQL_EXPRESS_PROBE_PASSWORD is not configured. Check the Bitwarden secret and BITWARDEN_APP_SERVICE_DEPLOY_SECRETS mapping (see prerequisites above)."
@@ -115,6 +122,9 @@ jobs:
 
           export ConnectionStrings__QueenZoneLegacy="Server=${SQLEXPRESS_LAN_ADDRESS};Database=queenzone_legacy_sync;User Id=queenzone_probe;Password=${SQLEXPRESS_PROBE_PASSWORD};TrustServerCertificate=True"
 
+          # Admin news read + write probes and the public news section probes.
+          # Intentionally omits EfNewsDiscoveryPromotionLiveProbeTests (fixed
+          # candidate id can flake when mirror discovery state changes).
           dotnet test tests/QueenZone.Web.Tests/QueenZone.Web.Tests.csproj \
             --configuration Release \
-            --filter "FullyQualifiedName=QueenZone.Web.Tests.EfAdminNewsRepositoryLegacyProbeTests.Probe_legacy_admin_news_repository_when_connection_configured|FullyQualifiedName=QueenZone.Web.Tests.EfNewsSectionLiveProbeTests.Public_news_probe_materializes_archive_detail_search_and_sitemap_when_connection_configured"
+            --filter "FullyQualifiedName~EfAdminNewsRepositoryLegacyProbeTests|FullyQualifiedName~EfAdminNewsRepositoryLegacyWriteProbeTests|FullyQualifiedName~EfNewsSectionLiveProbeTests"

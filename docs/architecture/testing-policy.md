@@ -103,21 +103,31 @@ ConnectionStrings__QueenZoneLegacy=...
 
 Do not require these tests in normal CI until the project has a known, repeatable test database.
 
-The **read-only** probes (`EfAdminNewsRepositoryLegacyProbeTests`, and the read-only fact in
-`EfNewsSectionLiveProbeTests`) do run automatically — nightly, via
-`.github/workflows/nightly-legacy-checks.yml`, on the self-hosted macOS runner. This is separate
-from "normal CI": it's not a PR gate, doesn't block merges, and only runs on a schedule (plus
+The nightly legacy probes run automatically via `.github/workflows/nightly-legacy-checks.yml`
+on the self-hosted macOS runner (after a Windows job refreshes the mirror). This is separate
+from "normal CI": it is not a PR gate, does not block merges, and only runs on a schedule (plus
 `workflow_dispatch`).
 
 They run against a same-day SQL Express mirror on the self-hosted Windows runner
-(`scripts/Sync-LegacyDbToSqlExpress.ps1` refreshes it nightly from the live Azure SQL DB via a
-`sqlpackage` bacpac export/import — see the workflow file for the one-time setup this requires),
-not the live database directly. `RUN_LEGACY_WRITE_PROBE` is still deliberately left unset there, so
-the write-capable probes below stay no-ops on this schedule for now — but since the target is now a
-disposable nightly-refreshed mirror rather than the production-equivalent live database, the original
-safety concern about unattended writes mostly goes away. See
-[#449](https://github.com/richardorchard/QueenZone.Modern/issues/449) for the tracked follow-up on
-turning them on.
+(`scripts/Sync-LegacyDbToSqlExpress.ps1` refreshes it nightly from the live Azure SQL DB via
+`sqlpackage` extract/publish — see the workflow file for the one-time setup this requires),
+not the live database directly. Because the mirror is disposable and re-imported each night,
+the job sets `RUN_LEGACY_WRITE_PROBE=true` and runs admin news write probes as well as
+read-only probes:
+
+| Probe class | What it covers |
+| --- | --- |
+| `EfAdminNewsRepositoryLegacyProbeTests` | Read-only admin list / detail / search shape |
+| `EfAdminNewsRepositoryLegacyWriteProbeTests` | Create → publish → unpublish → delete (self-cleaning) |
+| `EfNewsSectionLiveProbeTests` | Public archive reads, plus transaction-rollback visibility and full lifecycle write Facts |
+
+`EfNewsDiscoveryPromotionLiveProbeTests` stays **manual / opt-in only** for now: it depends on a
+specific promotable discovery candidate id and can flake when mirror discovery state changes.
+Hardening it for nightly is tracked in
+[#503](https://github.com/richardorchard/QueenZone.Modern/issues/503).
+
+Never point the nightly probe connection string at live Azure SQL. PR CI continues to leave both
+`ConnectionStrings__QueenZoneLegacy` and `RUN_LEGACY_WRITE_PROBE` unset so probes no-op on every PR.
 
 ### Modern-Schema SQL Server Tests
 
@@ -149,7 +159,7 @@ in parallel and never touch the legacy or Azure SQL databases.
 
 When EF Core `SqlQueryRaw` maps legacy columns into typed row classes, do not rely only on in-memory route tests. The legacy schema uses many `smallint` and `bit` columns; SQL Server returns those as `System.Int16` and `bool`, not `int`. Either cast projected values to the row model type in SQL (for example, `CAST(Q_LINK_CAT_ID AS int) AS CategoryId`) and cover that SQL shape with a deterministic test, or run an opt-in read-only legacy database probe before deployment to prove the projection materializes.
 
-For pre-release admin write checks against the configured legacy SQL Server database, run `scripts/Probe-AdminNewsLegacyWrites.ps1` with both `ConnectionStrings__QueenZoneLegacy` and `RUN_LEGACY_WRITE_PROBE=true` set. The probe creates, publishes, unpublishes, and deletes a uniquely named test article. Point the connection string at a database you are willing to mutate (often the same Azure SQL instance used locally or in production), not the in-memory sample data path.
+For ad-hoc admin write checks outside the nightly schedule, run `scripts/Probe-AdminNewsLegacyWrites.ps1` with both `ConnectionStrings__QueenZoneLegacy` and `RUN_LEGACY_WRITE_PROBE=true` set. The probe creates, publishes, unpublishes, and deletes a uniquely named test article. Prefer pointing at the local SQL Express mirror (`queenzone_legacy_sync`) when available; only use live or shared Azure SQL when you deliberately intend to mutate that database. Never rely on the in-memory sample data path for this probe.
 
 ### Migration And Content Validation
 

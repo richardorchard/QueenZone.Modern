@@ -67,7 +67,7 @@ the secret name.
 
 Used by `.github/workflows/deploy.yml` (`migrate` and `deploy` jobs), `.github/workflows/ci.yml`
 (`ef-migrations` job — same-repo PRs touching migration paths only), and
-`.github/workflows/nightly-legacy-checks.yml` (`sync-legacy-db` and `legacy-read-probes` jobs):
+`.github/workflows/nightly-legacy-checks.yml` (`sync-legacy-db` and `legacy-probes` jobs):
 
 ```yaml
 743274c8-1837-4abd-b223-b4980080709f > AZURE_WEBAPP_PUBLISH_PROFILE
@@ -82,7 +82,7 @@ which is configured separately in Azure App Service settings.
 
 `QUEENZONE_SQL_EXPRESS_PROBE_PASSWORD` is the password for the `queenzone_probe` SQL login created by
 `scripts/Enable-SqlExpressRemoteAccess.ps1` on the Windows self-hosted runner. It authenticates
-`legacy-read-probes` (running on the macOS runner) against the SQL Express mirror over the LAN — see
+`legacy-probes` (running on the macOS runner) against the SQL Express mirror over the LAN — see
 `docs/architecture/testing-policy.md` ("Data Integration Tests") and the comment block at the top of
 `nightly-legacy-checks.yml`.
 

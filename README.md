@@ -271,14 +271,14 @@ Results land under `docs/performance/results/` (gitignored). Budgets and compari
 
 Normal CI and pull request checks should not require the restored legacy database. Real legacy database checks are opt-in until a controlled test database exists.
 
-If you change admin news write behavior or discovery promotion behavior, you can run the opt-in legacy write probe against the configured `ConnectionStrings__QueenZoneLegacy` database:
+Admin news write probes also run unattended every night against the disposable SQL Express mirror (see `nightly-legacy-checks.yml`). For ad-hoc checks after admin news or discovery promotion changes:
 
 ```powershell
 $env:RUN_LEGACY_WRITE_PROBE = "true"
 .\scripts\Probe-AdminNewsLegacyWrites.ps1
 ```
 
-The probe is intentionally destructive-but-self-cleaning: it creates, publishes, unpublishes, and deletes a uniquely named admin draft article to verify the real SQL-backed workflow. Only run it when the configured database is one you are comfortable mutating.
+The probe is intentionally destructive-but-self-cleaning: it creates, publishes, unpublishes, and deletes a uniquely named admin draft article to verify the real SQL-backed workflow. Prefer the local SQL Express mirror (`queenzone_legacy_sync`) when available; only point `ConnectionStrings__QueenZoneLegacy` at live or shared Azure SQL when you deliberately intend to mutate that database.
 
 Feature work should happen on an agent-prefixed branch such as `grok/news-pagination` and be reviewed through a pull request before it reaches `main`. See `AGENTS.md` for the branch and PR policy.
 
