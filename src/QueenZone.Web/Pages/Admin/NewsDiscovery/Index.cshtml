@@ -64,33 +64,39 @@
 
     @if (Model.RecentRuns.Count > 0)
     {
-      <table class="admin-table">
-        <thead>
-          <tr>
-            <th>Requested</th>
-            <th>Kind</th>
-            <th>Status</th>
-            <th>Requested by</th>
-            <th>URL / notes</th>
-            <th>Runner</th>
-            <th>Result</th>
-          </tr>
-        </thead>
-        <tbody>
-          @foreach (var run in Model.RecentRuns)
-          {
+      <details>
+        <summary>Recent runner requests (@Model.RecentRuns.Count)</summary>
+        <p class="admin-muted">
+          These are processing-history records, not news articles. Completed test probes remain here for audit purposes and disappear as newer requests replace them.
+        </p>
+        <table class="admin-table">
+          <thead>
             <tr>
-              <td>@run.RequestedAtUtc.ToString("dd MMM yyyy HH:mm") UTC</td>
-              <td>@run.Kind@(run.GenerateDraft ? " + draft" : "")</td>
-              <td>@run.Status</td>
-              <td>@run.RequestedBy</td>
-              <td>@(run.ArticleUrl ?? "Scheduled gathering")</td>
-              <td>@(run.RunnerId ?? "—")</td>
-              <td>@(run.Summary ?? run.ErrorMessage ?? "—")</td>
+              <th>Requested</th>
+              <th>Kind</th>
+              <th>Status</th>
+              <th>Requested by</th>
+              <th>URL / notes</th>
+              <th>Runner</th>
+              <th>Result</th>
             </tr>
-          }
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            @foreach (var run in Model.RecentRuns)
+            {
+              <tr>
+                <td>@run.RequestedAtUtc.ToString("dd MMM yyyy HH:mm") UTC</td>
+                <td>@run.Kind@(run.GenerateDraft ? " + draft" : "")</td>
+                <td>@run.Status</td>
+                <td>@run.RequestedBy</td>
+                <td>@(run.ArticleUrl ?? "Scheduled gathering")</td>
+                <td>@(run.RunnerId ?? "—")</td>
+                <td>@(run.Summary ?? run.ErrorMessage ?? "—")</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </details>
     }
   </section>
 
@@ -194,7 +200,7 @@
       {
         <input type="hidden" name="hasDraft" value="@(Model.HasDraft.Value ? "true" : "false")">
       }
-      <button type="submit">Ignore all listed</button>
+      <button type="submit">Ignore all listed / remove from queue</button>
     </form>
 
     <table class="admin-table">
@@ -273,7 +279,7 @@
                   {
                     <input type="hidden" name="hasDraft" value="@(Model.HasDraft.Value ? "true" : "false")">
                   }
-                  <button type="submit">Ignore</button>
+                  <button type="submit">Ignore / remove from queue</button>
                 </form>
               }
             </td>
