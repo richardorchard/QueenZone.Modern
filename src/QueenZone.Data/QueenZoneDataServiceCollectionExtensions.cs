@@ -56,12 +56,14 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddScoped<IForumPollRepository, EfForumPollRepository>();
         services.AddScoped<INewsDiscoveryRepository, EfNewsDiscoveryRepository>();
         services.AddScoped<INewsAgentRunLeaseService, EfNewsAgentRunLeaseService>();
+        services.AddScoped<INewsAgentRunRequestRepository, EfNewsAgentRunRequestRepository>();
         services.AddScoped<IQueenHistoryRepository, EfQueenHistoryRepository>();
         services.AddScoped<IPhotoSubmissionRepository, EfPhotoSubmissionRepository>();
         services.AddScoped<IArticleSubmissionRepository, EfArticleSubmissionRepository>();
         services.AddScoped<IArticleRepository, EfArticleRepository>();
         services.AddScoped<INewsSuggestionRepository, EfNewsSuggestionRepository>();
         services.AddScoped<IPrivateMessageRepository, EfPrivateMessageRepository>();
+        services.AddScoped<IMemberPublicActivityRepository, EfMemberPublicActivityRepository>();
         services.AddScoped<ILinksRepository, EfLinksRepository>();
         services.AddScoped<IFreddieTributeRepository, EfFreddieTributeRepository>();
         services.AddScoped<IAdminFreddieTributeRepository, EfAdminFreddieTributeRepository>();
@@ -82,6 +84,7 @@ public static class QueenZoneDataServiceCollectionExtensions
         var forumAttachmentRepository = new InMemoryForumAttachmentRepository();
         var forumPollRepository = new InMemoryForumPollRepository();
         forumWriteRepository.AttachPollRepository(forumPollRepository);
+        services.AddSingleton(forumWriteRepository);
         services.AddSingleton<IForumWriteRepository>(forumWriteRepository);
         services.AddSingleton<IForumAttachmentRepository>(forumAttachmentRepository);
         services.AddSingleton<IForumPollRepository>(forumPollRepository);
@@ -107,6 +110,8 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddSingleton<INewsDiscoveryRepository, InMemoryNewsDiscoveryRepository>();
         services.AddSingleton<SharedNewsAgentLeaseStore>();
         services.AddSingleton<INewsAgentRunLeaseService, InMemoryNewsAgentRunLeaseService>();
+        services.AddSingleton<SharedNewsAgentRunRequestStore>();
+        services.AddSingleton<INewsAgentRunRequestRepository, InMemoryNewsAgentRunRequestRepository>();
         services.AddSingleton<IPhotoSubmissionRepository>(sp =>
         {
             var members = sp.GetRequiredService<IMemberAccountRepository>();
@@ -134,6 +139,7 @@ public static class QueenZoneDataServiceCollectionExtensions
         });
         services.AddSingleton<IArticleRepository>(sp =>
             new InMemoryArticleRepository(sp.GetRequiredService<IArticleSubmissionRepository>()));
+        services.AddSingleton<IMemberPublicActivityRepository, InMemoryMemberPublicActivityRepository>();
         services.AddSingleton<ILinksRepository>(_ => new InMemoryLinksRepository(SampleLinksData.CreateSeedCategories()));
         services.AddSingleton(_ => new SharedFreddieTributeStore(SampleFreddieTributeData.CreateSeedTributes()));
         services.AddSingleton<IFreddieTributeRepository, InMemoryFreddieTributeRepository>();

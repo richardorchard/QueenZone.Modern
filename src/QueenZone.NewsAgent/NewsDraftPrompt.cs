@@ -4,7 +4,7 @@ namespace QueenZone.NewsAgent;
 
 public static class NewsDraftPrompt
 {
-    public const string Version = "draft-v1";
+    public const string Version = "draft-v2";
 
     public static IReadOnlyList<NewsAiChatMessage> BuildMessages(
         NewsCandidate candidate,
@@ -22,8 +22,14 @@ public static class NewsDraftPrompt
 
             Write in QueenZone's clear archive-friendly editorial voice.
             Produce original summary/reporting based on the supplied source material.
-            Do not copy full articles, long passages, or copyrighted text from sources.
+            Do not copy full articles, long passages, headlines, or copyrighted narrative from sources.
             Keep the body concise (roughly 2-5 short paragraphs).
+            Preserve only short, newsworthy quotations.
+
+            Quote policy (mandatory):
+            Preserve short, newsworthy direct quotations from Queen band members exactly as supplied in the evidence. Never invent a quote, alter quoted wording, combine fragments, or place a paraphrase inside quotation marks. Identify the speaker and source. If exact wording is unavailable, paraphrase without quotation marks. Quote band members selectively; do not copy the source article’s surrounding prose.
+            "Band members" includes Queen, Freddie Mercury, Brian May, Roger Taylor, and John Deacon. Adam Lambert or another named collaborator may be preserved when directly relevant, but must be identified accurately rather than described as a Queen member.
+            Every quoted passage you place in the body must also appear in preserved_quotes.exact_text and must be taken from the supplied evidence. If a quote cannot be verified exactly from the evidence, omit quotation marks and paraphrase it.
 
             Every draft must include source attribution:
             - at least one source URL
@@ -31,6 +37,7 @@ public static class NewsDraftPrompt
             - attribution_text summarizing sources
             - source_notes with provenance
             - confidence_notes for editors
+            - preserved_quotes array (may be empty) with speaker, exact_text, source_url, optional source_context
 
             Flag secondary_source_warning=true when the story relies only on secondary press or weaker evidence.
             """;
@@ -52,7 +59,8 @@ public static class NewsDraftPrompt
 
             Return JSON with:
             title, slug, excerpt, body, related_entities, source_urls, source_names,
-            attribution_text, confidence_notes, source_notes, suggested_publish_at, secondary_source_warning
+            attribution_text, confidence_notes, source_notes, suggested_publish_at,
+            secondary_source_warning, preserved_quotes
             """;
 
         return

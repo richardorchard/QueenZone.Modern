@@ -16,7 +16,13 @@
       <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
       <div class="qz-eyebrow" style="color: var(--qz-gold);">News archive</div>
       <h1>@Model.Item.Title</h1>
-      <div class="qz-meta" style="color: rgba(255,255,255,0.52);"><time datetime="@Model.Item.PublishedAt.ToString("yyyy-MM-dd")">@Model.Item.PublishedAt.ToString("dd MMMM yyyy")</time></div>
+      <div class="qz-meta" style="color: rgba(255,255,255,0.52);">
+        @if (Model.Item.SubmitterMemberId is Guid submitterMemberId && !string.IsNullOrWhiteSpace(Model.Item.SubmitterDisplayName))
+        {
+          <span>Submitted by <a class="qz-attribution-link" href="/members/@submitterMemberId">@Model.Item.SubmitterDisplayName</a> &middot; </span>
+        }
+        <time datetime="@Model.Item.PublishedAt.ToString("yyyy-MM-dd")">@Model.Item.PublishedAt.ToString("dd MMMM yyyy")</time>
+      </div>
     </div>
   </section>
   <div class="qz-reading">

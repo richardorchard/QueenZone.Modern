@@ -13,6 +13,93 @@
     <p class="admin-status admin-status--@(Model.StatusMessageKind ?? "info")">@Model.StatusMessage</p>
   }
 
+  <section class="admin-panel">
+    <h2>News gathering</h2>
+    <p>
+      Queue source gathering and AI triage on the local Windows runner. Drafts are generated only when you select an individual candidate or explicitly request a draft for a submitted URL.
+    </p>
+    @if (Model.RunnerHeartbeat is null)
+    {
+      <p class="admin-muted">The local runner has not checked in yet.</p>
+    }
+    else
+    {
+      <p class="admin-muted">
+        Runner <strong>@Model.RunnerHeartbeat.RunnerId</strong> was last seen
+        @Model.RunnerHeartbeat.LastSeenAtUtc.ToString("dd MMM yyyy HH:mm") UTC
+        (@(Model.RunnerRecentlySeen ? "online recently" : "not seen recently")).
+      </p>
+    }
+    <form method="post" action="/admin/news-discovery?handler=queuerun" class="admin-inline-form">
+      <input type="hidden" name="@AdminNewsDiscoveryPageModel.AntiforgeryTokenFieldName" value="@Antiforgery.GetAndStoreTokens(HttpContext).RequestToken">
+      <button type="submit">Queue news gathering</button>
+    </form>
+
+    <h3>Submit article URL</h3>
+    <p class="admin-muted">
+      Force triage for a public article URL outside the normal source polling cycle.
+      Outbound fetch runs on the local Windows runner. Default is triage only; draft generation requires an explicit choice.
+    </p>
+    <form method="post" action="/admin/news-discovery?handler=queueurlingestion" class="admin-filter-form">
+      <input type="hidden" name="@AdminNewsDiscoveryPageModel.AntiforgeryTokenFieldName" value="@Antiforgery.GetAndStoreTokens(HttpContext).RequestToken">
+      <div class="admin-filter-grid">
+        <label>
+          Article URL
+          <input type="url" name="ArticleUrl" value="@Model.ArticleUrl" required placeholder="https://example.com/queen-story" maxlength="2000" />
+        </label>
+        <fieldset>
+          <legend>Action</legend>
+          <label>
+            <input type="radio" name="UrlIngestionAction" value="triage" checked="@(Model.UrlIngestionAction != "triage-and-draft")" />
+            Force triage
+          </label>
+          <label>
+            <input type="radio" name="UrlIngestionAction" value="triage-and-draft" checked="@(Model.UrlIngestionAction == "triage-and-draft")" />
+            Force triage and generate AI draft
+          </label>
+        </fieldset>
+      </div>
+      <button type="submit">Queue URL ingestion</button>
+    </form>
+
+    @if (Model.RecentRuns.Count > 0)
+    {
+      <details>
+        <summary>Recent runner requests (@Model.RecentRuns.Count)</summary>
+        <p class="admin-muted">
+          These are processing-history records, not news articles. Completed test probes remain here for audit purposes and disappear as newer requests replace them.
+        </p>
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Requested</th>
+              <th>Kind</th>
+              <th>Status</th>
+              <th>Requested by</th>
+              <th>URL / notes</th>
+              <th>Runner</th>
+              <th>Result</th>
+            </tr>
+          </thead>
+          <tbody>
+            @foreach (var run in Model.RecentRuns)
+            {
+              <tr>
+                <td>@run.RequestedAtUtc.ToString("dd MMM yyyy HH:mm") UTC</td>
+                <td>@run.Kind@(run.GenerateDraft ? " + draft" : "")</td>
+                <td>@run.Status</td>
+                <td>@run.RequestedBy</td>
+                <td>@(run.ArticleUrl ?? "Scheduled gathering")</td>
+                <td>@(run.RunnerId ?? "—")</td>
+                <td>@(run.Summary ?? run.ErrorMessage ?? "—")</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </details>
+    }
+  </section>
+
   <form method="get" class="admin-filter-form">
     <div class="admin-filter-grid">
       <label>
@@ -113,7 +200,7 @@
       {
         <input type="hidden" name="hasDraft" value="@(Model.HasDraft.Value ? "true" : "false")">
       }
-      <button type="submit">Ignore all listed</button>
+      <button type="submit">Ignore all listed / remove from queue</button>
     </form>
 
     <table class="admin-table">
@@ -192,7 +279,7 @@
                   {
                     <input type="hidden" name="hasDraft" value="@(Model.HasDraft.Value ? "true" : "false")">
                   }
-                  <button type="submit">Ignore</button>
+                  <button type="submit">Ignore / remove from queue</button>
                 </form>
               }
             </td>

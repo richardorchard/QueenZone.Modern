@@ -17,6 +17,8 @@ public sealed class ReviewModel(INewsDiscoveryRepository discoveryRepository) : 
 
     public NewsTriageDisplaySummary? LatestTriageSummary { get; private set; }
 
+    public IReadOnlyList<NewsDraftPreservedQuoteDisplay> PreservedQuotes { get; private set; } = [];
+
     public string? StatusMessage { get; private set; }
 
     public string? StatusMessageKind { get; private set; }
@@ -62,6 +64,16 @@ public sealed class ReviewModel(INewsDiscoveryRepository discoveryRepository) : 
             && NewsAiStructuredDisplay.TryReadTriageSummary(latestTriage.StructuredResultJson, out var summary))
         {
             LatestTriageSummary = summary;
+        }
+
+        var latestDraftRun = AiRuns
+            .Where(run => run.Kind == NewsAiRunKind.DraftGeneration && !string.IsNullOrWhiteSpace(run.StructuredResultJson))
+            .OrderByDescending(run => run.StartedAt)
+            .FirstOrDefault();
+        if (latestDraftRun?.StructuredResultJson is not null
+            && NewsAiStructuredDisplay.TryReadPreservedQuotes(latestDraftRun.StructuredResultJson, out var quotes))
+        {
+            PreservedQuotes = quotes;
         }
 
         return true;

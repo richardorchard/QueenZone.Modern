@@ -97,7 +97,8 @@ dotnet run --project src/QueenZone.NewsAgent.Worker -- discover-news [options]
 | `--triage-only` | Triage existing `Discovered` candidates only |
 | `--draft` | Generate drafts after fetch/triage |
 | `--draft-only` | Draft existing `NeedsReview` candidates only |
-| `--scheduled` | Preset for automation: `--seed-sources --triage --draft` |
+| `--scheduled` | Editorial-safe automation preset: `--seed-sources --triage` (no drafts) |
+| `--scheduled-with-drafts` | Deliberate legacy/full preset: `--seed-sources --triage --draft` |
 | `--dry-run` | Log AI steps without calling OpenRouter or persisting status changes |
 | `--force` | Bypass source poll-interval skip; force draft regeneration where applicable |
 
@@ -124,6 +125,8 @@ Quick local scheduled preset:
 scripts/Run-NewsAgentDiscovery.ps1 -Scheduled
 ```
 
+This preset fetches and triages only. Generate a draft from the selected candidate's admin review page. To process a run requested from the web admin, configure the local Windows polling task described in `news-agent-scheduling.md`.
+
 Overlapping runs are skipped via a database lease (`NewsAgentScheduler` in worker `appsettings.json`). Use `--force` to bypass the lease for manual reruns.
 
 ## OpenRouter smoke test (Windows)
@@ -148,10 +151,32 @@ Authenticated admins use Razor Pages under `/admin/news-discovery`:
 
 Editor actions (POST, anti-forgery protected):
 
+- **Queue news gathering** → records a triage-only scheduled gathering request for the outbound-polling local Windows runner
+- **Submit article URL** → queues forced triage for one public HTTP(S) URL (default triage-only; optional explicit “generate AI draft”). Fetch runs on the local runner with SSRF guards; duplicates reuse existing candidates; never auto-publishes
 - **Mark not relevant** → `Rejected`
 - **Ignore duplicate** → `IgnoredDuplicate`
 - **Edit draft** → save fields; moves `NeedsReview` → `Drafted` when appropriate
 - **Promote to admin news** → creates an unpublished article in `/admin/news` and marks the candidate `PromotedToArticle`
+
+Draft generation uses prompt version `draft-v2`, which requires exact band-member quotations to appear in both the body and a `preserved_quotes` collection backed by evidence. Unverifiable quotation marks are stripped before the draft is stored. Review pages surface preserved quotes for editor comparison before promotion.
+
+### SQL Express mirror URL ingestion probe (opt-in)
+
+After the nightly mirror refresh, verify the SQL-backed queue and optionally the full fetch and triage path:
+
+```powershell
+$env:ConnectionStrings__QueenZoneLegacy = "Server=localhost\SQLEXPRESS;Database=queenzone_legacy_sync;Integrated Security=True;TrustServerCertificate=True"
+$env:RUN_NEWS_AGENT_URL_INGESTION_PROBE = "true"
+
+# 1) Schema + queue + claim only (no outbound HTTP)
+powershell -File .\scripts\Probe-NewsAgentUrlIngestion.ps1
+
+# 2) Full local runner path: fetch public URL, triage, never publish
+# Optional: $env:OPENROUTER_API_KEY = "..."
+powershell -File .\scripts\Probe-NewsAgentUrlIngestion.ps1 -Full
+```
+
+The script rejects Azure SQL and remote targets. `-Full` accepts `-ArticleUrl` and `-GenerateDraft`. The default URL is unique. Both modes delete their requests and related records before returning; the full probe does **not** promote or publish.
 
 Link from **Admin news** (`/admin/news`) → “Review discovered candidates”.
 

@@ -5,6 +5,12 @@ on:
     # 03:00 UTC daily. Adjust here if that stops being a quiet window.
     - cron: "0 3 * * *"
   workflow_dispatch:
+    inputs:
+      run_full_url_probe:
+        description: "Also fetch and triage a public URL against the mirror (no OpenRouter key)"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -13,13 +19,12 @@ concurrency:
   group: nightly-legacy-checks
   cancel-in-progress: false
 
-# The 4 "*ProbeTests" classes in QueenZone.Web.Tests (see
+# The opt-in "*ProbeTests" classes in QueenZone.Web.Tests (see
 # docs/architecture/testing-policy.md, "Data Integration Tests") exercise the
 # real legacy SQL Server but are gated behind ConnectionStrings__QueenZoneLegacy
-# and, for the write-capable ones, RUN_LEGACY_WRITE_PROBE — both unset in
-# ci.yml, so they silently no-op on every PR today. This workflow runs the
-# read-only ones nightly for continuous signal against real data, without
-# putting the real legacy/deploy database on the PR merge path.
+# and explicit write-probe flags, all unset in ci.yml. Normal PR tests remain
+# database-free. This workflow runs read and self-cleaning write probes nightly
+# without putting the real legacy/deploy database on the PR merge path.
 #
 # Probes run against a same-day mirror on the Windows runner's local SQL
 # Express (synced from the live Azure SQL DB via sqlpackage each run), not
@@ -38,11 +43,14 @@ concurrency:
 #      Windows runner's LAN IP (currently 192.168.1.237, ideally a DHCP
 #      reservation) ever changes.
 #
-# Deliberately read-only: RUN_LEGACY_WRITE_PROBE is not set here, so the
-# write-gated Facts in these classes stay no-ops. Now that probes run
-# against a disposable nightly-refreshed mirror rather than the live
-# database, write probes are no longer the safety concern they were against
-# the live DB — see #449 for the tracked follow-up on turning them on here.
+# Read probes run first. Self-cleaning write probes then exercise the same
+# SQL Express mirror locally on the Windows runner. Their scripts reject
+# Azure SQL and remote targets. Admin news writes include
+# EfAdminNewsRepositoryLegacyWriteProbeTests plus the Admin_news_* Facts in
+# EfNewsSectionLiveProbeTests (via Probe-AdminNewsLegacyWrites.ps1).
+# EfNewsDiscoveryPromotionLiveProbeTests stays opt-in until hardened (#503).
+# A final residue check fails the workflow if any known probe or leaked
+# web-test markers remain.
 jobs:
   sync-legacy-db:
     name: Sync legacy DB to SQL Express
@@ -118,3 +126,67 @@ jobs:
           dotnet test tests/QueenZone.Web.Tests/QueenZone.Web.Tests.csproj \
             --configuration Release \
             --filter "FullyQualifiedName=QueenZone.Web.Tests.EfAdminNewsRepositoryLegacyProbeTests.Probe_legacy_admin_news_repository_when_connection_configured|FullyQualifiedName=QueenZone.Web.Tests.EfNewsSectionLiveProbeTests.Public_news_probe_materializes_archive_detail_search_and_sitemap_when_connection_configured"
+
+  legacy-write-probes:
+    name: Legacy SQL self-cleaning write probes
+    needs: [sync-legacy-db, legacy-read-probes]
+    runs-on: [self-hosted, Windows]
+    timeout-minutes: 30
+    environment: dev
+    env:
+      ConnectionStrings__QueenZoneLegacy: "Server=localhost\\SQLEXPRESS;Database=queenzone_legacy_sync;Integrated Security=True;TrustServerCertificate=True"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Restore
+        run: dotnet restore tests/QueenZone.Web.Tests/QueenZone.Web.Tests.csproj
+
+      - name: Run admin news and news-section write lifecycle probes
+        env:
+          RUN_LEGACY_WRITE_PROBE: "true"
+        # Probe-AdminNewsLegacyWrites.ps1 asserts mirror-only targeting, then
+        # runs EfAdminNewsRepositoryLegacyWriteProbeTests, the
+        # EfNewsSectionLiveProbeTests.Admin_news_* write Facts, and the
+        # self-seeding EfNewsDiscoveryPromotionLiveProbeTests.
+        run: ./scripts/Probe-AdminNewsLegacyWrites.ps1
+
+      - name: Run URL ingestion queue lifecycle probe
+        env:
+          RUN_NEWS_AGENT_URL_INGESTION_PROBE: "true"
+        run: ./scripts/Probe-NewsAgentUrlIngestion.ps1
+
+      - name: Run private messaging IDENTITY and lock probe
+        env:
+          RUN_PRIVATE_MESSAGE_PROBE: "true"
+        run: ./scripts/Probe-PrivateMessaging.ps1
+
+      - name: Run forum write probe
+        env:
+          RUN_FORUM_WRITE_PROBE: "true"
+        run: ./scripts/Probe-ForumWrites.ps1
+
+      - name: Run photo and article submission probes
+        env:
+          RUN_CONTENT_SUBMISSION_PROBE: "true"
+        run: ./scripts/Probe-ContentSubmissions.ps1
+
+      - name: Run member account create/login probe
+        env:
+          RUN_MEMBER_ACCOUNT_PROBE: "true"
+        run: ./scripts/Probe-MemberAccounts.ps1
+
+      - name: Run full URL fetch and triage probe
+        if: github.event_name == 'workflow_dispatch' && inputs.run_full_url_probe
+        env:
+          RUN_NEWS_AGENT_URL_INGESTION_PROBE: "true"
+        run: ./scripts/Probe-NewsAgentUrlIngestion.ps1 -Full
+
+      - name: Verify no probe or leaked web-test residue remains
+        env:
+          RUN_LEGACY_PROBE_RESIDUE_CHECK: "true"
+        run: |
+          dotnet test tests/QueenZone.Web.Tests/QueenZone.Web.Tests.csproj `
+            --configuration Release `
+            --filter "FullyQualifiedName=QueenZone.Web.Tests.EfLegacyProbeResidueTests.Known_probe_and_web_test_markers_are_absent_when_check_enabled"

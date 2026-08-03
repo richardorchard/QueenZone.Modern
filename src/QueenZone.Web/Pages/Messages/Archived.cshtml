@@ -1,0 +1,47 @@
+@page "/messages/archived"
+@model QueenZone.Web.Pages.Messages.ArchivedModel
+
+<partial name="_PageHero" model='@(("Community", "Archived messages", "Conversations you have archived.", ""))' />
+
+<section class="qz-section">
+  <div class="qz-container qz-prose">
+    @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+    {
+      <p class="qz-account-notice qz-account-notice--success" role="status">@Model.StatusMessage</p>
+    }
+
+    <p class="qz-messages-toolbar">
+      <a class="qz-button qz-button--ghost" href="/messages">Back to inbox</a>
+    </p>
+
+    @if (Model.Inbox.Items.Count == 0)
+    {
+      <p>You have no archived conversations.</p>
+    }
+    else
+    {
+      <partial name="_ArchivePagination" model="Model.Pagination" />
+
+      <ul class="qz-message-list">
+        @foreach (var conversation in Model.Inbox.Items)
+        {
+          <li class="qz-message-list__item">
+            <a class="qz-message-list__link" href="/messages/@conversation.ConversationId">
+              <span class="qz-message-list__name">@conversation.OtherParticipantDisplayName</span>
+              <span class="qz-message-list__preview">@conversation.LastMessagePreview</span>
+              <time class="qz-message-list__time qz-meta" datetime="@conversation.LastMessageAt.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ssZ")">
+                @conversation.LastMessageAt.UtcDateTime.ToString("dd MMM yyyy HH:mm") UTC
+              </time>
+            </a>
+            <form method="post" asp-page-handler="Unarchive" class="qz-message-list__action">
+              <input type="hidden" name="conversationId" value="@conversation.ConversationId" />
+              <button class="qz-button qz-button--ghost" type="submit">Unarchive</button>
+            </form>
+          </li>
+        }
+      </ul>
+
+      <partial name="_ArchivePagination" model="Model.Pagination" />
+    }
+  </div>
+</section>

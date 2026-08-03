@@ -120,6 +120,37 @@ public sealed class QueenZoneWebCompositionTests
     }
 
     [Fact]
+    public void AddQueenZoneWebComposition_uses_in_memory_data_in_testing_even_when_sql_is_configured()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Admin:AllowedEmails:0"] = "admin@test.local",
+                ["Site:PublicBaseUrl"] = "https://www.queenzone.org",
+                ["ConnectionStrings:QueenZoneLegacy"] =
+                    "Server=production.example;Database=QueenZone;User Id=test;Password=do-not-connect",
+                ["ConnectionStrings:BlobStorage"] =
+                    "DefaultEndpointsProtocol=https;AccountName=production;AccountKey=do-not-connect;EndpointSuffix=core.windows.net",
+                ["OpenRouter:DryRun"] = "true",
+            })
+            .Build();
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSingleton<IConfiguration>(configuration);
+        services.AddSingleton<IHostEnvironment>(new FakeHostEnvironment("Testing"));
+        services.AddQueenZoneWebComposition(configuration, new FakeHostEnvironment("Testing"));
+
+        using var provider = services.BuildServiceProvider(validateScopes: true);
+
+        Assert.IsType<InMemoryArticleSubmissionRepository>(
+            provider.GetRequiredService<IArticleSubmissionRepository>());
+        Assert.Null(provider.GetService<QueenZoneDbContext>());
+        Assert.IsType<NullBlobUploadService>(provider.GetRequiredService<IBlobUploadService>());
+        Assert.IsType<NullGalleryPhotoBlobService>(provider.GetRequiredService<IGalleryPhotoBlobService>());
+    }
+
+    [Fact]
     public void SiteOptionsValidator_rejects_non_absolute_url()
     {
         var result = new SiteOptionsValidator().Validate(null, new SiteOptions { PublicBaseUrl = "not-a-url" });

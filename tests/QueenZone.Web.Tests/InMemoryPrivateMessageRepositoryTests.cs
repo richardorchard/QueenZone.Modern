@@ -6,7 +6,7 @@ namespace QueenZone.Web.Tests;
 public sealed class InMemoryPrivateMessageRepositoryTests
 {
     [Fact]
-    public async Task Inbox_IsOrderedByMostRecent_AndIsolatedPerParticipant()
+    public async Task Inbox_IsOrderedByMostRecentSortKey_AndIsolatedPerParticipant()
     {
         var members = new InMemoryMemberAccountRepository();
         var alice = await members.CreateAsync(NewMember("a@example.com", "Alice"));
@@ -27,6 +27,32 @@ public sealed class InMemoryPrivateMessageRepositoryTests
         var bobInbox = await repo.GetInboxAsync(bob.Id);
         Assert.Equal(["Alice"], bobInbox.Items.Select(i => i.OtherParticipantDisplayName).ToArray());
         Assert.DoesNotContain(bobInbox.Items, i => i.OtherParticipantId == carol.Id);
+    }
+
+    [Fact]
+    public async Task Inbox_OrdersByLastMessageSortKey_EvenWhenTimestampsSkew()
+    {
+        var members = new InMemoryMemberAccountRepository();
+        var alice = await members.CreateAsync(NewMember("a-skew@example.com", "Alice"));
+        var bob = await members.CreateAsync(NewMember("b-skew@example.com", "Bob"));
+        var carol = await members.CreateAsync(NewMember("c-skew@example.com", "Carol"));
+        var repo = new InMemoryPrivateMessageRepository(id =>
+            members.FindByIdAsync(id).GetAwaiter().GetResult());
+
+        await repo.SendNewOrExistingAsync(
+            alice.Id,
+            carol.Id,
+            "Carol first insert",
+            DateTimeOffset.Parse("2026-08-01T20:00:00Z"));
+        await repo.SendNewOrExistingAsync(
+            alice.Id,
+            bob.Id,
+            "Bob later insert, earlier clock",
+            DateTimeOffset.Parse("2026-08-01T08:00:00Z"));
+
+        var aliceInbox = await repo.GetInboxAsync(alice.Id);
+        Assert.Equal(["Bob", "Carol"], aliceInbox.Items.Select(i => i.OtherParticipantDisplayName).ToArray());
+        Assert.True(aliceInbox.Items[0].LastMessageAt < aliceInbox.Items[1].LastMessageAt);
     }
 
     [Fact]
@@ -79,7 +105,7 @@ public sealed class InMemoryPrivateMessageRepositoryTests
     }
 
     [Fact]
-    public async Task Reply_UpdatesPreviewToInsertedTip_KeepsMonotonicLastMessageAt()
+    public async Task Reply_UpdatesPreviewAndSortKeyTip_KeepsMonotonicLastMessageAt()
     {
         var members = new InMemoryMemberAccountRepository();
         var alice = await members.CreateAsync(NewMember("a3@example.com", "Alice"));
@@ -137,6 +163,85 @@ public sealed class InMemoryPrivateMessageRepositoryTests
         var page3 = await repo.GetInboxAsync(alice.Id, page: 3, pageSize: 2);
         Assert.Equal(3, page3.Page);
         Assert.Single(page3.Items);
+    }
+
+    [Fact]
+    public async Task Archive_HidesConversationFromInbox_ButNotForOtherParticipant()
+    {
+        var members = new InMemoryMemberAccountRepository();
+        var alice = await members.CreateAsync(NewMember("a-archive@example.com", "Alice"));
+        var bob = await members.CreateAsync(NewMember("b-archive@example.com", "Bob"));
+        var carol = await members.CreateAsync(NewMember("c-archive@example.com", "Carol"));
+        var repo = new InMemoryPrivateMessageRepository(id =>
+            members.FindByIdAsync(id).GetAwaiter().GetResult());
+
+        var created = await repo.SendNewOrExistingAsync(
+            alice.Id,
+            bob.Id,
+            "Archive me",
+            DateTimeOffset.Parse("2026-08-01T09:00:00Z"));
+        var conversationId = created.ConversationId!.Value;
+
+        Assert.True(await repo.ArchiveConversationAsync(conversationId, alice.Id));
+        Assert.False(await repo.ArchiveConversationAsync(conversationId, carol.Id));
+
+        Assert.Empty((await repo.GetInboxAsync(alice.Id)).Items);
+        Assert.Single((await repo.GetInboxAsync(bob.Id)).Items);
+
+        var archived = Assert.Single((await repo.GetArchivedInboxAsync(alice.Id)).Items);
+        Assert.Equal(bob.Id, archived.OtherParticipantId);
+    }
+
+    [Fact]
+    public async Task NewMessage_UnarchivesConversation_ForBothParticipants()
+    {
+        var members = new InMemoryMemberAccountRepository();
+        var alice = await members.CreateAsync(NewMember("a-reopen@example.com", "Alice"));
+        var bob = await members.CreateAsync(NewMember("b-reopen@example.com", "Bob"));
+        var repo = new InMemoryPrivateMessageRepository(id =>
+            members.FindByIdAsync(id).GetAwaiter().GetResult());
+
+        var created = await repo.SendNewOrExistingAsync(
+            alice.Id,
+            bob.Id,
+            "Start",
+            DateTimeOffset.Parse("2026-08-01T09:10:00Z"));
+        var conversationId = created.ConversationId!.Value;
+
+        await repo.ArchiveConversationAsync(conversationId, alice.Id);
+        Assert.Empty((await repo.GetInboxAsync(alice.Id)).Items);
+
+        await repo.ReplyAsync(
+            conversationId,
+            bob.Id,
+            "Reopens it",
+            DateTimeOffset.Parse("2026-08-01T09:11:00Z"));
+
+        Assert.Single((await repo.GetInboxAsync(alice.Id)).Items);
+        Assert.Empty((await repo.GetArchivedInboxAsync(alice.Id)).Items);
+    }
+
+    [Fact]
+    public async Task Unarchive_MovesConversationBackToInbox()
+    {
+        var members = new InMemoryMemberAccountRepository();
+        var alice = await members.CreateAsync(NewMember("a-unarchive@example.com", "Alice"));
+        var bob = await members.CreateAsync(NewMember("b-unarchive@example.com", "Bob"));
+        var repo = new InMemoryPrivateMessageRepository(id =>
+            members.FindByIdAsync(id).GetAwaiter().GetResult());
+
+        var created = await repo.SendNewOrExistingAsync(
+            alice.Id,
+            bob.Id,
+            "Toggle",
+            DateTimeOffset.Parse("2026-08-01T09:20:00Z"));
+        var conversationId = created.ConversationId!.Value;
+
+        await repo.ArchiveConversationAsync(conversationId, alice.Id);
+        Assert.True(await repo.UnarchiveConversationAsync(conversationId, alice.Id));
+
+        Assert.Single((await repo.GetInboxAsync(alice.Id)).Items);
+        Assert.Empty((await repo.GetArchivedInboxAsync(alice.Id)).Items);
     }
 
     private static MemberAccount NewMember(string email, string name) =>

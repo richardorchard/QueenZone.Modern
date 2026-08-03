@@ -119,19 +119,22 @@ AI triage should **reject** out-of-scope items. Editors can always override by c
 
 - Drafts must be **original QueenZone prose** grounded in fetched excerpts — never copy full source articles or long passages.
 - Every draft must retain **source links and attribution** (`AttributionText`, `SourceNotes`).
+- Short, newsworthy **band-member quotations** must be exact and evidence-backed (`draft-v2` / `preserved_quotes`); never invent or alter quotes. Paraphrase without quotation marks when exact wording is unavailable.
 - Uncertainty must appear in `ConfidenceNotes` when the model is not sure.
 - Lower-confidence leads should prefer internal review notes over confident public-facing draft text unless corroborated.
+- Manual URL submissions use the same safety and attribution rules as feed discovery; they do not bypass SSRF checks, budgets, or publication approval.
 
 ## Editor workflow expectations
 
 On `/admin/news-discovery` editors should:
 
-1. Inspect source URL, evidence, and AI rationale.
-2. **Mark not relevant** or **Ignore duplicate** when appropriate.
-3. **Generate / regenerate draft** (admin UI or worker) when triage passed but prose is missing or stale.
-4. **Edit draft** fields before promotion.
-5. **Promote to admin news** — creates an unpublished article; does not publish.
-6. **Publish** only from `/admin/news` after deliberate review.
+1. Optionally **Submit article URL** for forced triage of a public story outside the normal source poll (default triage-only; draft generation requires an explicit choice).
+2. Inspect source URL, evidence, provenance, and AI rationale (including preserved quotes when a draft exists).
+3. **Mark not relevant** or **Ignore duplicate** when appropriate.
+4. **Generate / regenerate draft** (admin UI or worker) when triage passed but prose is missing or stale.
+5. **Edit draft** fields before promotion; verify any band-member quotations against source evidence.
+6. **Promote to admin news** — creates an unpublished article; does not publish.
+7. **Publish** only from `/admin/news` after deliberate review.
 
 Rejected and ignored-duplicate candidates remain in the database to suppress repeat proposals.
 

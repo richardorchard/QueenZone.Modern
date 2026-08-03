@@ -51,6 +51,22 @@ GitHub Actions applies the matching `agent:*` label from the branch prefix via `
 
 Use the prefix for the agent you are, not a default from an earlier session or another tool. Different agents working on the same area should use different branch names, such as `grok/news-pagination` and `claude/news-pagination`, rather than reusing one shared branch.
 
+### Update from `main` before opening a pull request
+
+The default branch is **`main`** (not `master`). `main` is protected: required CI checks and merge gates evaluate the PR against the current tip of `main`. If a feature branch was cut hours or days earlier, `main` may have moved — an outdated PR base can block or confuse checks (coverage vs `origin/main`, migration jobs, mergeability) until the branch is updated.
+
+**Before creating a PR** (and before asking for review on a long-lived branch), always:
+
+```powershell
+git fetch origin main
+git merge origin/main
+# or: git rebase origin/main
+```
+
+Prefer a merge of `origin/main` into the feature branch unless the user or stack workflow asks for a rebase. Resolve any conflicts, re-run the default verification (or the subset relevant to the conflicted files), then push and open or update the PR.
+
+Do this even when the branch was originally created from `main` — time between branch creation and PR open is when `main` usually changes.
+
 Before merging to `main`, open a pull request and fill in `.github/pull_request_template.md`. The pull request should include:
 
 - Which agent authored the change.
@@ -78,7 +94,17 @@ Use deterministic sample or fake data for normal unit and web integration tests.
 
 When changing EF `SqlQueryRaw` projections over legacy tables, check the real SQL Server column types or cast projections to the C# row model types explicitly. Many legacy IDs and counts are `smallint`, which SQL Server materializes as `System.Int16`; in-memory route tests will not catch `Int16`-to-`Int32` mapping failures. Prefer a deterministic SQL-shape test plus an opt-in read-only legacy DB probe for new public legacy read surfaces.
 
-The read-only legacy probes now also run automatically every night via `.github/workflows/nightly-legacy-checks.yml`, on the self-hosted macOS runner, against a same-day SQL Express mirror of the legacy database synced nightly from the live Azure SQL DB (not the live database directly) — not a PR gate, just continuous signal. See `docs/architecture/testing-policy.md` ("Data Integration Tests").
+Legacy read probes and self-cleaning write probes run automatically every night via `.github/workflows/nightly-legacy-checks.yml`. They use a same-day SQL Express mirror synced from the live Azure SQL DB, never the live database. The read probes run on macOS over the LAN; write probes run locally on the Windows SQL Express host. This is continuous signal, not a PR gate. See `docs/architecture/testing-policy.md` ("Data Integration Tests").
+
+When a change touches private messaging writes, SortKey assignment, or conversation locking, prefer the opt-in SQL Express mirror probe after the EF migration is applied:
+
+```powershell
+$env:ConnectionStrings__QueenZoneLegacy = "Server=localhost\SQLEXPRESS;Database=queenzone_legacy_sync;Integrated Security=True;TrustServerCertificate=True"
+$env:RUN_PRIVATE_MESSAGE_PROBE = "true"
+powershell -File .\scripts\Probe-PrivateMessaging.ps1
+```
+
+`ConnectionStrings__QueenZoneLegacy` must point to `queenzone_legacy_sync` on the local SQL Express instance. The script rejects Azure SQL and remote servers. The probe creates throwaway members, concurrent first-sends and replies, asserts IDENTITY `SortKey` + `LastMessageSortKey` tip consistency, then deletes the probe rows. Report whether it was run or skipped.
 
 When a change touches admin news writes or discovery-to-news promotion, prefer running the opt-in admin write probe before release or after deployment verification:
 
@@ -87,7 +113,39 @@ $env:RUN_LEGACY_WRITE_PROBE = "true"
 powershell -File .\scripts\Probe-AdminNewsLegacyWrites.ps1
 ```
 
-Run it only when `ConnectionStrings__QueenZoneLegacy` points at a database you are willing to mutate. The probe creates, publishes, unpublishes, and deletes a uniquely named draft article to confirm the real SQL-backed admin workflow still works.
+`ConnectionStrings__QueenZoneLegacy` must point to `queenzone_legacy_sync` on the local SQL Express instance. The script rejects Azure SQL and remote servers. It runs the admin news write lifecycle probe, the news-section `Admin_news_*` write Facts, and the self-seeding discovery promotion probe.
+
+When a change touches modern forum thread/post writes, prefer:
+
+```powershell
+$env:RUN_FORUM_WRITE_PROBE = "true"
+powershell -File .\scripts\Probe-ForumWrites.ps1
+```
+
+When a change touches photo or article submissions, prefer:
+
+```powershell
+$env:RUN_CONTENT_SUBMISSION_PROBE = "true"
+powershell -File .\scripts\Probe-ContentSubmissions.ps1
+```
+
+When a change touches member account create or external logins, prefer:
+
+```powershell
+$env:RUN_MEMBER_ACCOUNT_PROBE = "true"
+powershell -File .\scripts\Probe-MemberAccounts.ps1
+```
+
+When a change touches admin URL ingestion, the news-agent run-request queue, or the local `process-news-requests` runner, prefer the opt-in URL ingestion probe after the EF migration is applied:
+
+```powershell
+$env:ConnectionStrings__QueenZoneLegacy = "Server=localhost\SQLEXPRESS;Database=queenzone_legacy_sync;Integrated Security=True;TrustServerCertificate=True"
+$env:RUN_NEWS_AGENT_URL_INGESTION_PROBE = "true"
+powershell -File .\scripts\Probe-NewsAgentUrlIngestion.ps1          # schema + queue only
+powershell -File .\scripts\Probe-NewsAgentUrlIngestion.ps1 -Full    # fetch + triage (optional OpenRouter key)
+```
+
+Both modes delete their requests, heartbeats, candidates, evidence, AI runs, and drafts before returning. The full probe never publishes. Report whether it was run or skipped.
 
 ### Pull request CI gates (must pass before merge)
 
@@ -95,9 +153,10 @@ GitHub Actions workflow `.github/workflows/ci.yml` blocks merge when these fail:
 
 | Check | Requirement | Blocks PR? |
 | --- | --- | --- |
-| **Build** | `dotnet restore`, `dotnet build`, format verify (Release) | Yes |
-| **Test (sharded)** | Mixed `QueenZone.Web.Tests` shards + small test projects (Release, Coverlet) | Yes |
-| **Formatting** | `dotnet format QueenZone.sln --verify-no-changes` (matches root `.editorconfig`; CRLF via `.gitattributes`) | Yes |
+| **Build** | `dotnet restore`, `dotnet build` (Release), uploads binaries + Linux publish artifact | Yes |
+| **Formatting** | `dotnet format QueenZone.sln --verify-no-changes` (matches root `.editorconfig`; CRLF via `.gitattributes`) — runs as its own job in parallel with Build/Test, not a Build step | Yes |
+| **Test (sharded)** | Mixed `QueenZone.Web.Tests` shards (Release, Coverlet) | Yes |
+| **Small test projects** | `Tools`/`Storage`/`NewsAgent` test projects, in parallel with the Web.Tests shards | Yes |
 | **Global line coverage** | At least **51%** across the union of deterministic suite reports | Yes |
 | **Changed-line coverage** | At least **70%** of changed, coverable `.cs` lines in the PR diff vs `main` | Yes |
 | **Smoke test** | Published app responds on `/health`, `/`, `/news` | Yes |
@@ -147,13 +206,11 @@ Rules of thumb for hand-written SQL migrations:
 
 ### Pre-PR verification (recommended before opening the PR)
 
-Run the same coverage gate locally so CI failures are caught early:
+Run the [default verification](#default-verification-before-a-pull-request) first, then the same coverage gate CI enforces so failures are caught early:
 
 ```powershell
 git fetch origin main
-dotnet restore QueenZone.sln
-dotnet build QueenZone.sln --configuration Release --no-restore
-dotnet format QueenZone.sln --verify-no-changes
+# After default restore/build/format, collect coverage and gate:
 dotnet test QueenZone.sln --configuration Release --no-build --collect:"XPlat Code Coverage" --settings coverlet.runsettings --results-directory ./TestResults
 powershell -File ./scripts/Test-CoverageGate.ps1 -Reports ./TestResults -GlobalLineThreshold 51 -ChangedLineThreshold 70 -BaseRef origin/main
 ```

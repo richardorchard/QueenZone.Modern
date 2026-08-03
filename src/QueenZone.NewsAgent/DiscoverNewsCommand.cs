@@ -55,6 +55,10 @@ public sealed record DiscoverNewsCommandOptions(
                 case "--scheduled":
                     seedSources = true;
                     triage = true;
+                    break;
+                case "--scheduled-with-drafts":
+                    seedSources = true;
+                    triage = true;
                     draft = true;
                     break;
                 default:
@@ -63,5 +67,30 @@ public sealed record DiscoverNewsCommandOptions(
         }
 
         return new DiscoverNewsCommandOptions(seedSources, dryRun, force, triage, triageOnly, draft, draftOnly);
+    }
+}
+
+public sealed record NewsAgentQueuedRunCommandOptions(string RunnerId)
+{
+    public static NewsAgentQueuedRunCommandOptions? Parse(string[] args)
+    {
+        if (args.Length == 0 || !string.Equals(args[0], "process-news-requests", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        var runnerId = Environment.MachineName;
+        for (var index = 1; index < args.Length; index++)
+        {
+            if (!string.Equals(args[index], "--runner-id", StringComparison.OrdinalIgnoreCase)
+                || index + 1 >= args.Length)
+            {
+                return null;
+            }
+
+            runnerId = args[++index];
+        }
+
+        return string.IsNullOrWhiteSpace(runnerId) ? null : new NewsAgentQueuedRunCommandOptions(runnerId.Trim());
     }
 }

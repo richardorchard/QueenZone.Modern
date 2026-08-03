@@ -81,6 +81,36 @@ public sealed class InMemoryNewsSuggestionRepository : INewsSuggestionRepository
         }
     }
 
+    public Task<IReadOnlyList<NewsSubmissionAttribution>> GetPromotedAttributionsAsync(
+        IReadOnlyCollection<int> newsIds,
+        CancellationToken cancellationToken = default)
+    {
+        lock (sync)
+        {
+            var requestedIds = newsIds.ToHashSet();
+            var rows = suggestions
+                .Where(row => row.Status == NewsSuggestionStatus.Promoted
+                    && row.PromotedNewsId is int newsId
+                    && requestedIds.Contains(newsId))
+                .Select(row =>
+                {
+                    var member = resolveMember?.Invoke(row.SubmitterMemberId);
+                    return member is null
+                        ? null
+                        : new NewsSubmissionAttribution(
+                            row.PromotedNewsId!.Value,
+                            row.SubmitterMemberId,
+                            member.DisplayName);
+                })
+                .Where(row => row is not null)
+                .Select(row => row!)
+                .ToList();
+
+            return Task.FromResult(
+                EfNewsSuggestionRepository.ResolveUnambiguousAttributions(rows));
+        }
+    }
+
     public Task<SubmissionListPage<NewsSuggestion>> GetBySubmitterAsync(
         Guid submitterMemberId,
         int page = 1,

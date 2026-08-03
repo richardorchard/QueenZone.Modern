@@ -229,6 +229,7 @@ public sealed class EfArticleSubmissionRepository(QueenZoneDbContext dbContext) 
                 a.CoverImageBlobPath,
                 a.Tags,
                 a.PublishedAt,
+                a.AuthorMemberId,
                 DisplayName = a.Author != null ? a.Author.DisplayName : string.Empty,
             })
             .ToListAsync(ct);
@@ -245,7 +246,8 @@ public sealed class EfArticleSubmissionRepository(QueenZoneDbContext dbContext) 
                 a.Tags,
                 a.PublishedAt!.Value,
                 string.IsNullOrWhiteSpace(a.DisplayName) ? null : a.DisplayName,
-                EstimateWordCount(a.Body)))
+                EstimateWordCount(a.Body),
+                a.AuthorMemberId))
             .ToList();
     }
 

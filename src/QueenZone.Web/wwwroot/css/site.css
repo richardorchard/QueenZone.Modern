@@ -534,6 +534,29 @@
   color: var(--text-secondary);
 }
 
+.qz-account-settings__legacy {
+  margin: 0 0 var(--space-6);
+  padding-bottom: var(--space-6);
+  border-bottom: 1px solid var(--hairline, #e5e5e5);
+}
+
+.qz-account-settings__legacy-status {
+  margin: 0;
+}
+
+.qz-account-form__checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-4);
+  cursor: pointer;
+}
+
+.qz-account-form__checkbox input {
+  margin-top: 0.2rem;
+  flex-shrink: 0;
+}
+
 .qz-account-settings__avatar {
   margin: 0 0 var(--space-6);
   padding-bottom: var(--space-6);
@@ -3909,6 +3932,19 @@ body.qz-menu-lock .qz-masthead {
 
 .qz-message-list__item {
   border-top: 1px solid var(--border-subtle, #e5e5e5);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.qz-message-list__link {
+  flex: 1;
+  min-width: 0;
+}
+
+.qz-message-list__action {
+  flex-shrink: 0;
 }
 
 .qz-message-list__item--unread .qz-message-list__name {
@@ -4017,13 +4053,54 @@ body.qz-menu-lock .qz-masthead {
 }
 
 .qz-forum-post__message-link {
-  font-size: 0.875rem;
-  text-decoration: underline;
-  text-underline-offset: 0.15em;
+  display: inline-flex;
+  align-items: center;
+  color: inherit;
+}
+
+.qz-forum-post__message-link svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
 }
 
 .qz-member-profile {
   display: grid;
   gap: var(--space-3);
   justify-items: start;
+}
+
+.qz-member-activity {
+  margin-top: var(--space-7);
+}
+
+.qz-member-activity__list {
+  display: grid;
+  gap: var(--space-4);
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.qz-member-activity__item {
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--qz-border, #d8d2c8);
+}
+
+.qz-member-activity__item > * {
+  margin: 0.35rem 0 0;
+}
+
+.qz-member-activity__type {
+  font-weight: var(--fw-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.qz-attribution-link {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
 }

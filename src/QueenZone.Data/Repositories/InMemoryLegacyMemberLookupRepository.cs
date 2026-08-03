@@ -11,4 +11,10 @@ public sealed class InMemoryLegacyMemberLookupRepository : ILegacyMemberLookupRe
 
     public Task<LegacyMemberMatch?> FindByEmailAsync(string email, CancellationToken cancellationToken = default) =>
         Task.FromResult(matchesByEmail.TryGetValue(email, out var match) ? match : null);
+
+    public Task<LegacyMemberMatch?> FindByUserIdAsync(int userId, CancellationToken cancellationToken = default)
+    {
+        var match = matchesByEmail.Values.FirstOrDefault(item => item.UserId == userId);
+        return Task.FromResult(match);
+    }
 }

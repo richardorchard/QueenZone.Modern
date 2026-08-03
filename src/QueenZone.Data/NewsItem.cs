@@ -8,4 +8,6 @@ public sealed record NewsItem(
     DateTime PublishedAt,
     string? SourceUrl,
     bool IsPublished,
-    string? Slug = null);
+    string? Slug = null,
+    Guid? SubmitterMemberId = null,
+    string? SubmitterDisplayName = null);

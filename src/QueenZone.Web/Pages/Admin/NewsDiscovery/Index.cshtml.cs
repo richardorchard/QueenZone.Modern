@@ -2,10 +2,13 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.WebUtilities;
 using QueenZone.Data;
+using QueenZone.NewsAgent;
 
 namespace QueenZone.Web.Pages.Admin.NewsDiscovery;
 
-public sealed class IndexModel(INewsDiscoveryRepository discoveryRepository) : AdminNewsDiscoveryPageModel
+public sealed class IndexModel(
+    INewsDiscoveryRepository discoveryRepository,
+    INewsAgentRunRequestRepository runRequestRepository) : AdminNewsDiscoveryPageModel
 {
     [BindProperty(SupportsGet = true)]
     public NewsCandidateStatus? Status { get; set; }
@@ -35,12 +38,65 @@ public sealed class IndexModel(INewsDiscoveryRepository discoveryRepository) : A
 
     public IReadOnlyList<NewsDiscoverySource> Sources { get; private set; } = [];
 
+    public IReadOnlyList<NewsAgentRunRequest> RecentRuns { get; private set; } = [];
+
+    public NewsAgentRunnerHeartbeat? RunnerHeartbeat { get; private set; }
+
+    public bool RunnerRecentlySeen =>
+        RunnerHeartbeat is not null && RunnerHeartbeat.LastSeenAtUtc >= DateTime.UtcNow.AddMinutes(-5);
+
+    [BindProperty]
+    public string? ArticleUrl { get; set; }
+
+    [BindProperty]
+    public string UrlIngestionAction { get; set; } = "triage";
+
     public string? StatusMessage => TempData["DiscoveryMessage"] as string;
 
     public string? StatusMessageKind => TempData["DiscoveryMessageKind"] as string;
 
     public async Task OnGetAsync(CancellationToken cancellationToken) =>
         await LoadAsync(cancellationToken);
+
+    public async Task<IActionResult> OnPostQueueRunAsync(CancellationToken cancellationToken)
+    {
+        var result = await runRequestRepository.QueueAsync(
+            new NewsAgentRunRequestCreate(EditorEmail, NewsAgentRunRequestKind.ScheduledGathering),
+            cancellationToken);
+        TempData["DiscoveryMessage"] = result.WasCreated
+            ? "News gathering queued. The local Windows runner will fetch and triage it when next online."
+            : $"A news gathering run is already {result.Request.Status.ToString().ToLowerInvariant()}.";
+        TempData["DiscoveryMessageKind"] = result.WasCreated ? "success" : "info";
+        return Redirect(BuildReturnUrl());
+    }
+
+    public async Task<IActionResult> OnPostQueueUrlIngestionAsync(CancellationToken cancellationToken)
+    {
+        if (!OutboundUrlSafety.TryValidatePublicHttpUrl(ArticleUrl, out var error, out var normalizedUrl)
+            || string.IsNullOrWhiteSpace(normalizedUrl))
+        {
+            TempData["DiscoveryMessage"] = error;
+            TempData["DiscoveryMessageKind"] = "error";
+            return Redirect(BuildReturnUrl());
+        }
+
+        var generateDraft = string.Equals(UrlIngestionAction, "triage-and-draft", StringComparison.OrdinalIgnoreCase);
+        var result = await runRequestRepository.QueueAsync(
+            new NewsAgentRunRequestCreate(
+                EditorEmail,
+                NewsAgentRunRequestKind.UrlIngestion,
+                normalizedUrl,
+                generateDraft),
+            cancellationToken);
+
+        TempData["DiscoveryMessage"] = result.WasCreated
+            ? generateDraft
+                ? "URL queued for forced triage and AI draft generation on the local Windows runner."
+                : "URL queued for forced triage on the local Windows runner (no draft generation)."
+            : $"URL request #{result.Request.Id} was already queued.";
+        TempData["DiscoveryMessageKind"] = "success";
+        return Redirect(BuildReturnUrl());
+    }
 
     public async Task<IActionResult> OnPostIgnoreAsync(int id, CancellationToken cancellationToken)
     {
@@ -104,6 +160,8 @@ public sealed class IndexModel(INewsDiscoveryRepository discoveryRepository) : A
     private async Task LoadAsync(CancellationToken cancellationToken)
     {
         ViewData["Title"] = "News discovery review";
+        RecentRuns = await runRequestRepository.ListRecentAsync(5, cancellationToken);
+        RunnerHeartbeat = await runRequestRepository.GetLatestHeartbeatAsync(cancellationToken);
         Sources = await discoveryRepository.GetSourcesAsync(cancellationToken: cancellationToken);
         var candidates = await discoveryRepository.ListCandidatesForReviewAsync(
             new NewsCandidateListQuery(

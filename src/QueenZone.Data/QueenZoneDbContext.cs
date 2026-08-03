@@ -44,6 +44,10 @@ public sealed class QueenZoneDbContext : DbContext
 
     public DbSet<NewsAgentRunLeaseEntity> NewsAgentRunLeases => Set<NewsAgentRunLeaseEntity>();
 
+    public DbSet<NewsAgentRunRequestEntity> NewsAgentRunRequests => Set<NewsAgentRunRequestEntity>();
+
+    public DbSet<NewsAgentRunnerHeartbeatEntity> NewsAgentRunnerHeartbeats => Set<NewsAgentRunnerHeartbeatEntity>();
+
     public DbSet<QueenHistoryEventEntity> QueenHistoryEvents => Set<QueenHistoryEventEntity>();
 
     public DbSet<PhotoSubmissionEntity> PhotoSubmissions => Set<PhotoSubmissionEntity>();
@@ -426,6 +430,39 @@ public sealed class QueenZoneDbContext : DbContext
             entity.Property(lease => lease.ExpiresAtUtc).IsRequired();
         });
 
+        modelBuilder.Entity<NewsAgentRunRequestEntity>(entity =>
+        {
+            entity.ToTable("NewsAgentRunRequests");
+            entity.HasKey(request => request.Id);
+
+            entity.Property(request => request.Status).HasConversion<string>().HasMaxLength(50).IsRequired();
+            entity.Property(request => request.Kind).HasConversion<string>().HasMaxLength(50).IsRequired();
+            entity.Property(request => request.RequestedBy).HasMaxLength(256).IsRequired();
+            entity.Property(request => request.RequestedAtUtc).IsRequired();
+            entity.Property(request => request.ArticleUrl).HasMaxLength(2000);
+            entity.Property(request => request.GenerateDraft).IsRequired();
+            entity.Property(request => request.RunnerId).HasMaxLength(100);
+            entity.Property(request => request.Summary).HasMaxLength(2000);
+            entity.Property(request => request.ErrorMessage).HasMaxLength(2000);
+            entity.Property(request => request.ActiveKey).HasMaxLength(20);
+            entity.Property(request => request.UpdatedAtUtc).IsRequired();
+
+            entity.HasIndex(request => request.ActiveKey)
+                .IsUnique()
+                .HasFilter("[ActiveKey] IS NOT NULL")
+                .HasDatabaseName("UX_NewsAgentRunRequests_ActiveKey");
+            entity.HasIndex(request => new { request.Status, request.RequestedAtUtc })
+                .HasDatabaseName("IX_NewsAgentRunRequests_Status_RequestedAtUtc");
+        });
+
+        modelBuilder.Entity<NewsAgentRunnerHeartbeatEntity>(entity =>
+        {
+            entity.ToTable("NewsAgentRunnerHeartbeats");
+            entity.HasKey(heartbeat => heartbeat.RunnerId);
+            entity.Property(heartbeat => heartbeat.RunnerId).HasMaxLength(100).IsRequired();
+            entity.Property(heartbeat => heartbeat.LastSeenAtUtc).IsRequired();
+        });
+
         modelBuilder.Entity<QueenHistoryEventEntity>(entity =>
         {
             entity.ToTable("QueenHistoryEvents");
@@ -617,14 +654,15 @@ public sealed class QueenZoneDbContext : DbContext
                 .IsRequired();
             entity.Property(conversation => conversation.CreatedAt).IsRequired();
             entity.Property(conversation => conversation.LastMessageAt).IsRequired();
+            entity.Property(conversation => conversation.LastMessageSortKey).IsRequired();
 
             entity.HasIndex(conversation => new { conversation.MemberLowId, conversation.MemberHighId })
                 .IsUnique()
                 .HasDatabaseName("IX_PrivateConversations_MemberPair");
 
-            entity.HasIndex(conversation => conversation.LastMessageAt)
+            entity.HasIndex(conversation => conversation.LastMessageSortKey)
                 .IsDescending()
-                .HasDatabaseName("IX_PrivateConversations_LastMessageAt");
+                .HasDatabaseName("IX_PrivateConversations_LastMessageSortKey");
 
             entity.HasOne(conversation => conversation.MemberLow)
                 .WithMany()

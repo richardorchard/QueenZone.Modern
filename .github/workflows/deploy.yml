@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: deploy-${{ github.ref }}
@@ -19,56 +20,99 @@ concurrency:
 # Runs after a PR merges to main. ci.yml already ran the full test/coverage/
 # e2e suite against this exact tree as a required status check before the
 # merge was allowed (see branch protection on main), so none of that re-runs
-# here — this workflow only rebuilds (artifacts don't survive across
-# workflow runs) and ships. post-deploy-smoke is the safety net after the
-# real deploy.
+# here. This workflow no longer rebuilds — it reuses the exact binaries
+# ci.yml already built and tested on the PR, resolved below by PR head SHA.
+# Docs-only merges skip migrate/deploy/post-deploy-smoke entirely (see
+# `changes`) since ci.yml never produced a binary to reuse for those.
+# post-deploy-smoke is the safety net after the real deploy.
 jobs:
-  # Builds and publishes the Linux app for this push ("build once, deploy many"
-  # within this run). This is a second build of the same tree ci.yml already
-  # built on the PR — that duplication is intentional: GitHub Actions
-  # artifacts don't carry across separate workflow runs, so getting a
-  # deployable binary here requires building it again. It's a fast rebuild
-  # (no tests), which is the point of not re-running the full suite too.
-  build:
+  # Mirrors ci.yml's docs-only bypass. ci.yml skips `build` (no web-publish
+  # artifact produced) for docs-only PRs, so deploy has nothing to download
+  # for one of those commits — and there's genuinely nothing to redeploy
+  # anyway, since no code changed. Without this gate, resolve-ci-run still
+  # finds the (successful, but build-skipped) ci.yml run and `deploy` fails
+  # trying to download an artifact that was never uploaded.
+  changes:
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    outputs:
+      code: ${{ steps.check.outputs.code }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Check for code changes
+        id: check
+        run: |
+          if [ "${{ github.event_name }}" != "push" ] || [ -z "${{ github.event.before }}" ]; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
 
+          if git diff --name-only ${{ github.event.before }}...${{ github.sha }} | grep -qvE '^(docs/|[^/]*\.md$)'; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=false" >> "$GITHUB_OUTPUT"
+            echo "Docs-only push to main — nothing to deploy."
+          fi
+
+  # Finds the ci.yml run that built+tested this exact code, so `deploy` can
+  # download its publish artifact instead of rebuilding. main is updated via
+  # merge commits (see branch protection / PR merge method), so github.sha
+  # here is the merge commit, not the PR head that ci.yml actually ran
+  # against — walk to the merge commit's second parent to get that head SHA.
+  # (A non-merge push, e.g. an admin push straight to main, has no second
+  # parent; fall back to github.sha itself in that case.)
+  resolve-ci-run:
+    runs-on: ubuntu-latest
+    needs: changes
+    if: github.ref == 'refs/heads/main' && needs.changes.outputs.code == 'true'
+    outputs:
+      run_id: ${{ steps.find.outputs.run_id }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v5
-        with:
-          dotnet-version: 10.0.x
-          cache: true
-          cache-dependency-path: |
-            **/*.csproj
-            .config/dotnet-tools.json
+      - name: Determine PR head SHA
+        id: sha
+        run: |
+          PARENTS=($(git rev-list --parents -n 1 HEAD))
+          if [ "${#PARENTS[@]}" -ge 3 ]; then
+            HEAD_SHA="${PARENTS[2]}"
+          else
+            HEAD_SHA="${PARENTS[0]}"
+          fi
+          echo "Resolved PR head SHA: $HEAD_SHA"
+          echo "head_sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
 
-      - name: Restore
-        run: dotnet restore QueenZone.sln
+      - name: Find matching CI run
+        id: find
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_SHA: ${{ steps.sha.outputs.head_sha }}
+        run: |
+          RUN_ID=$(gh run list --repo "${{ github.repository }}" --workflow=ci.yml \
+            --json databaseId,headSha,conclusion,event \
+            --jq "[.[] | select(.headSha == \"$HEAD_SHA\" and .conclusion == \"success\" and .event == \"pull_request\")][0].databaseId")
 
-      - name: Build
-        run: dotnet build QueenZone.sln --configuration Release --no-restore
+          if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ]; then
+            echo "::error::No successful ci.yml run found for PR head SHA $HEAD_SHA. Cannot deploy without a tested build artifact."
+            exit 1
+          fi
 
-      - name: Publish web app
-        run: dotnet publish src/QueenZone.Web/QueenZone.Web.csproj --configuration Release --no-build --output publish
-
-      - name: Upload publish artifact
-        uses: actions/upload-artifact@v5
-        with:
-          name: web-publish-${{ github.run_id }}
-          path: publish
-          retention-days: 7
+          echo "Using ci.yml run $RUN_ID (artifact web-publish-$RUN_ID)"
+          echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
 
   migrate:
     name: Apply database migrations
     runs-on: ubuntu-latest
-    needs: build
-    # main only — pushes to master build above but do not deploy.
-    if: github.ref == 'refs/heads/main'
+    needs: [changes, resolve-ci-run]
+    # main only, and only when this push actually changed code — resolve-ci-run
+    # and changes are themselves gated the same way, so pushes to master or
+    # docs-only pushes to main produce no jobs at all past `changes`.
+    if: github.ref == 'refs/heads/main' && needs.changes.outputs.code == 'true'
     environment: dev
 
     steps:
@@ -112,17 +156,20 @@ jobs:
   deploy:
     name: Deploy
     runs-on: ubuntu-latest
-    needs: [build, migrate]
-    if: github.ref == 'refs/heads/main'
+    needs: [changes, resolve-ci-run, migrate]
+    if: github.ref == 'refs/heads/main' && needs.changes.outputs.code == 'true'
     environment:
       name: dev
       url: https://www.queenzone.org
 
     steps:
-      - name: Download publish artifact
+      # Reuses the exact binary ci.yml built and tested on the PR — no rebuild.
+      - name: Download publish artifact from CI run
         uses: actions/download-artifact@v5
         with:
-          name: web-publish-${{ github.run_id }}
+          name: web-publish-${{ needs.resolve-ci-run.outputs.run_id }}
+          run-id: ${{ needs.resolve-ci-run.outputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           path: publish
 
       - name: Fetch Bitwarden deploy secrets
@@ -142,8 +189,8 @@ jobs:
   post-deploy-smoke:
     name: Post-deploy smoke
     runs-on: ubuntu-latest
-    needs: deploy
-    if: github.ref == 'refs/heads/main'
+    needs: [changes, deploy]
+    if: github.ref == 'refs/heads/main' && needs.changes.outputs.code == 'true'
     # Allow retry loop (~8 min) plus request time; avoid false fails during App Service recycle.
     timeout-minutes: 12
 

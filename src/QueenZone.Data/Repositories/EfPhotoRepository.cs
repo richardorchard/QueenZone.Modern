@@ -105,7 +105,7 @@ public sealed class EfPhotoRepository : IPhotoRepository
 
         var categoryName = row.category_name ?? string.Empty;
         var categorySlug = NewsSlug.Slugify(categoryName);
-        var photo = MapItem(row, catId, categoryName, categorySlug);
+        var photo = MapDetailItem(row, catId, categoryName, categorySlug);
 
         return new PhotoDetailNavigation(
             photo,
@@ -173,6 +173,25 @@ public sealed class EfPhotoRepository : IPhotoRepository
             PictureHeight: row.PIC_HEIGHT,
             Year: row.DATE_TIME.Year,
             DateTime: row.DATE_TIME);
+
+    private static PhotoItem MapDetailItem(DetailNavigationRow row, int catId, string categoryName, string categorySlug) =>
+        new(
+            PicId: row.pic_id,
+            CatId: catId,
+            CategoryName: categoryName,
+            CategorySlug: categorySlug,
+            Title: row.NAME,
+            ImageUrl: PhotoImageUrl.Build(row.URL),
+            ThumbnailUrl: PhotoImageUrl.Build(row.THUMB_URL),
+            ThumbWidth: row.T_WIDTH,
+            ThumbHeight: row.T_HEIGHT,
+            PictureWidth: row.PIC_WIDTH,
+            PictureHeight: row.PIC_HEIGHT,
+            Year: row.DATE_TIME.Year,
+            DateTime: row.DATE_TIME,
+            SubmittedByDisplayName: string.IsNullOrWhiteSpace(row.submitted_by_display_name)
+                ? null
+                : row.submitted_by_display_name.Trim());
 
     private interface IPhotoRow
     {
@@ -252,6 +271,8 @@ public sealed class EfPhotoRepository : IPhotoRepository
         public int pic_id { get; set; }
 
         public string? category_name { get; set; }
+
+        public string? submitted_by_display_name { get; set; }
 
         public int TotalCount { get; set; }
 
