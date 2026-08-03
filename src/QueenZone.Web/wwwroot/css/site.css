@@ -534,6 +534,29 @@
   color: var(--text-secondary);
 }
 
+.qz-account-settings__legacy {
+  margin: 0 0 var(--space-6);
+  padding-bottom: var(--space-6);
+  border-bottom: 1px solid var(--hairline, #e5e5e5);
+}
+
+.qz-account-settings__legacy-status {
+  margin: 0;
+}
+
+.qz-account-form__checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-4);
+  cursor: pointer;
+}
+
+.qz-account-form__checkbox input {
+  margin-top: 0.2rem;
+  flex-shrink: 0;
+}
+
 .qz-account-settings__avatar {
   margin: 0 0 var(--space-6);
   padding-bottom: var(--space-6);
