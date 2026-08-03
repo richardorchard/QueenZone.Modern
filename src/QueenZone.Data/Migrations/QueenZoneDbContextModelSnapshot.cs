@@ -429,6 +429,11 @@ namespace QueenZone.Data.Migrations
                         .IsUnicode(false)
                         .HasColumnType("varchar(8000)");
 
+                    b.Property<string>("BodyHtmlLegacyRaw")
+                        .HasMaxLength(8000)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(8000)");
+
                     b.Property<int>("EditCount")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int")

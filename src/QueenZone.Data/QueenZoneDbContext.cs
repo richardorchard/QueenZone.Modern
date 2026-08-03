@@ -184,6 +184,7 @@ public sealed class QueenZoneDbContext : DbContext
             entity.HasKey(post => post.Id);
             entity.Property(post => post.AuthorDisplayName).HasMaxLength(100).IsRequired();
             entity.Property(post => post.BodyHtml).HasMaxLength(8000).IsUnicode(false).IsRequired();
+            entity.Property(post => post.BodyHtmlLegacyRaw).HasMaxLength(8000).IsUnicode(false);
             entity.Property(post => post.SignatureHtml).HasMaxLength(8000).IsUnicode(false);
             entity.Property(post => post.Attachment).HasMaxLength(120).IsUnicode(false);
             entity.Property(post => post.FileSize).HasMaxLength(12).IsUnicode(false);

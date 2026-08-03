@@ -574,11 +574,28 @@
     document.querySelectorAll(".qz-rte").forEach(initOne);
   }
 
+  // Inserts an HTML fragment (e.g. a quote blockquote) at the top of the editor
+  // bound to the textarea with the given id, and focuses it. Used by the forum
+  // "Quote" reply action. Returns false if that editor isn't mounted/ready yet.
+  function insertQuoteBlock(textareaId, html) {
+    var root = document.querySelector('.qz-rte[data-textarea="' + textareaId + '"]');
+    var entry = root ? editorsByRoot.get(root) : null;
+    if (!entry) {
+      return false;
+    }
+
+    var quill = entry.quill;
+    quill.clipboard.dangerouslyPasteHTML(0, html);
+    quill.setSelection(quill.getLength(), 0);
+    quill.focus();
+    return true;
+  }
+
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", initAll);
   } else {
     initAll();
   }
 
-  window.QueenZoneRichTextEditor = { initAll: initAll };
+  window.QueenZoneRichTextEditor = { initAll: initAll, insertQuoteBlock: insertQuoteBlock };
 })();
