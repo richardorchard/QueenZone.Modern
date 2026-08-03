@@ -557,6 +557,30 @@
   flex-shrink: 0;
 }
 
+.qz-account-form__legacy-choices {
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  border: 0;
+}
+
+.qz-account-form__legend {
+  margin: 0 0 var(--space-3);
+  font-weight: 600;
+}
+
+.qz-account-form__radio {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-2);
+  cursor: pointer;
+}
+
+.qz-account-form__radio input {
+  margin-top: 0.2rem;
+  flex-shrink: 0;
+}
+
 .qz-account-settings__avatar {
   margin: 0 0 var(--space-6);
   padding-bottom: var(--space-6);

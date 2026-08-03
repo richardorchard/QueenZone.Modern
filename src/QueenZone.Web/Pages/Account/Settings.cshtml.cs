@@ -27,6 +27,12 @@ public sealed class SettingsModel(MemberAccountService memberAccountService) : P
     [BindProperty]
     public bool AdoptLegacyDisplayName { get; set; } = true;
 
+    /// <summary>
+    /// Legacy USERS_T id chosen when claiming. Required when one or more free matches exist.
+    /// </summary>
+    [BindProperty]
+    public int? SelectedLegacyUserId { get; set; }
+
     public string Email { get; private set; } = string.Empty;
 
     public Guid MemberId { get; private set; }
@@ -105,8 +111,19 @@ public sealed class SettingsModel(MemberAccountService memberAccountService) : P
             return Redirect("/account/login");
         }
 
+        if (SelectedLegacyUserId is null)
+        {
+            await PopulatePageAsync(account, cancellationToken);
+            ModelState.AddModelError(
+                nameof(SelectedLegacyUserId),
+                "Choose which legacy forum account to claim.");
+            ViewData["Title"] = "Account settings";
+            return Page();
+        }
+
         var result = await memberAccountService.ClaimLegacyAccountAsync(
             memberId.Value,
+            SelectedLegacyUserId.Value,
             AdoptLegacyDisplayName,
             cancellationToken);
 
