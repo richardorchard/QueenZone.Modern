@@ -52,6 +52,35 @@ public sealed class ForumWriteRoutesTests : IClassFixture<WebApplicationFactory<
     }
 
     [Fact]
+    public async Task TopicPage_AuthorNameLinksToPublicMemberProfile_WhenAuthorMemberIdPresent()
+    {
+        var memberId = Guid.NewGuid();
+        await SeedMemberAccountAsync(memberId, "Profile Linked Fan");
+        var client = CreateMemberClient(factory, memberId, "Profile Linked Fan");
+        var form = await client.GetStringAsync("/forum/c/the-music/new-thread");
+        var token = ExtractAntiforgeryToken(form);
+
+        var response = await client.PostAsync("/forum/c/the-music/new-thread", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = token,
+            ["Subject"] = "Profile link check thread",
+            ["Body"] = "<p>Author name should link to my public profile.</p>",
+        }));
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        var topicHtml = await client.GetStringAsync(response.Headers.Location!);
+
+        Assert.Contains($"href=\"/members/{memberId}\"", topicHtml);
+        Assert.Contains("Profile Linked Fan", topicHtml);
+        Assert.Contains("qz-forum-post__author-link", topicHtml);
+
+        // Legacy seed authors (no AuthorMemberId) stay plain text, not profile links.
+        var archiveBody = await factory.CreateClient().GetStringAsync("/forum/topic/1001/forum-guidelines");
+        Assert.Contains("<strong class=\"qz-forum-post__author\">Richard Orchard</strong>", archiveBody);
+        Assert.DoesNotContain("href=\"/members/", archiveBody);
+    }
+
+    [Fact]
     public async Task ValidNewThreadPost_WithPoll_CreatesThreadAndRedirectedTopicRendersPoll()
     {
         var client = CreateMemberClient(factory, Guid.NewGuid());
