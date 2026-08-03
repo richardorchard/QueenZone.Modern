@@ -557,6 +557,30 @@
   flex-shrink: 0;
 }
 
+.qz-account-form__legacy-choices {
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  border: 0;
+}
+
+.qz-account-form__legend {
+  margin: 0 0 var(--space-3);
+  font-weight: 600;
+}
+
+.qz-account-form__radio {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-2);
+  cursor: pointer;
+}
+
+.qz-account-form__radio input {
+  margin-top: 0.2rem;
+  flex-shrink: 0;
+}
+
 .qz-account-settings__avatar {
   margin: 0 0 var(--space-6);
   padding-bottom: var(--space-6);
@@ -1673,6 +1697,22 @@ body.qz-menu-lock .qz-masthead {
   margin: 0;
 }
 
+/* Covers both quotes converted from legacy BBCode (.qz-bbcode-quote) and quotes
+   inserted via the Quill "Quote" reply action / blockquote toolbar button, so
+   old and new quoted posts read consistently. */
+.qz-forum-post__body blockquote {
+  margin: var(--space-3) 0;
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--hairline);
+  background: var(--surface-muted, #f6f6f6);
+  font-style: italic;
+}
+
+.qz-bbcode-quote-author {
+  margin-bottom: 0.25rem;
+  font-style: normal;
+}
+
 .qz-forum-post__edited {
   margin: 0.35rem 0 0;
   font-style: italic;
@@ -1682,6 +1722,7 @@ body.qz-menu-lock .qz-masthead {
   margin: 0.5rem 0 0;
 }
 
+.qz-forum-post__quote-link,
 .qz-forum-post__edit-link {
   font-size: 0.875rem;
   text-decoration: underline;

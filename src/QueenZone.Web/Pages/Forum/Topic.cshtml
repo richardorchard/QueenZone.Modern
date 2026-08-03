@@ -8,6 +8,7 @@
   ViewData["EditorValue"] = Model.Body;
   ViewData["EditorLabel"] = "Reply";
   ViewData["UploadContainer"] = BlobUploadContainers.Forum;
+  ViewData["CanReply"] = Model.CanReply;
 }
 
 <section class="qz-page-hero">
@@ -47,6 +48,7 @@
           <p class="qz-form__busy-status" data-busy-status hidden role="status" aria-live="polite"></p>
         </div>
       </form>
+      <script src="~/js/forum/quote-reply.js" asp-append-version="true"></script>
     }
     else
     {

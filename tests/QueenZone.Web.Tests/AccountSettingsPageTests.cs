@@ -113,6 +113,7 @@ public sealed partial class AccountSettingsPageTests : IClassFixture<WebApplicat
             new FormUrlEncodedContent(new Dictionary<string, string>
             {
                 ["__RequestVerificationToken"] = ExtractAntiforgeryToken(formPage),
+                ["SelectedLegacyUserId"] = "9002",
                 ["AdoptLegacyDisplayName"] = "true",
             }));
 
@@ -125,6 +126,71 @@ public sealed partial class AccountSettingsPageTests : IClassFixture<WebApplicat
         Assert.Contains("ArchiveClaimed", updated);
         Assert.DoesNotContain("Claim legacy account", updated);
         Assert.Contains("value=\"ArchiveClaimed\"", updated);
+    }
+
+    [Fact]
+    public async Task Get_ShowsLegacyChoiceList_WhenEmailMatchesMultipleAccounts()
+    {
+        var client = await CreateSignedInMemberClientWithLegacyMatchesAsync(
+            email: "multi-claim@example.com",
+            displayName: "Modern Fan",
+            subject: "google-legacy-multi-claim-get",
+            matches:
+            [
+                new LegacyMemberMatch(9101, "FirstArchive"),
+                new LegacyMemberMatch(9102, "SecondArchive"),
+            ]);
+
+        var body = await client.GetStringAsync("/account/settings");
+
+        Assert.Contains("multiple classic QueenZone forum accounts", body);
+        Assert.Contains("FirstArchive", body);
+        Assert.Contains("SecondArchive", body);
+        Assert.Contains("name=\"SelectedLegacyUserId\"", body);
+        Assert.Contains("value=\"9101\"", body);
+        Assert.Contains("value=\"9102\"", body);
+        Assert.Contains("Claim legacy account", body);
+    }
+
+    [Fact]
+    public async Task PostClaimLegacy_ClaimsSelectedAccount_WhenMultipleMatches()
+    {
+        var client = await CreateSignedInMemberClientWithLegacyMatchesAsync(
+            email: "multi-claim-post@example.com",
+            displayName: "Modern Fan",
+            subject: "google-legacy-multi-claim-post",
+            matches:
+            [
+                new LegacyMemberMatch(9201, "KeepMe"),
+                new LegacyMemberMatch(9202, "PickMe"),
+            ],
+            options: new WebApplicationFactoryClientOptions
+            {
+                HandleCookies = true,
+                AllowAutoRedirect = false,
+            });
+
+        var formPage = await client.GetStringAsync("/account/settings");
+        Assert.Contains("PickMe", formPage);
+
+        var response = await client.PostAsync(
+            "/account/settings?handler=ClaimLegacy",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(formPage),
+                ["SelectedLegacyUserId"] = "9202",
+                ["AdoptLegacyDisplayName"] = "true",
+            }));
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+
+        var updated = await client.GetStringAsync("/account/settings");
+        Assert.Contains("Legacy account claimed", updated);
+        Assert.Contains("Linked to legacy forum account", updated);
+        Assert.Contains("PickMe", updated);
+        Assert.Contains("(id 9202)", updated);
+        Assert.DoesNotContain("Claim legacy account", updated);
+        Assert.Contains("value=\"PickMe\"", updated);
     }
 
     [Fact]
@@ -328,6 +394,19 @@ public sealed partial class AccountSettingsPageTests : IClassFixture<WebApplicat
         string subject,
         int legacyUserId,
         string legacyUsername,
+        WebApplicationFactoryClientOptions? options = null) =>
+        await CreateSignedInMemberClientWithLegacyMatchesAsync(
+            email,
+            displayName,
+            subject,
+            [new LegacyMemberMatch(legacyUserId, legacyUsername)],
+            options);
+
+    private async Task<HttpClient> CreateSignedInMemberClientWithLegacyMatchesAsync(
+        string email,
+        string displayName,
+        string subject,
+        IReadOnlyList<LegacyMemberMatch> matches,
         WebApplicationFactoryClientOptions? options = null)
     {
         var specialized = factory.WithWebHostBuilder(builder =>
@@ -337,10 +416,11 @@ public sealed partial class AccountSettingsPageTests : IClassFixture<WebApplicat
             {
                 services.RemoveAll<ILegacyMemberLookupRepository>();
                 services.AddSingleton<ILegacyMemberLookupRepository>(_ =>
-                    new InMemoryLegacyMemberLookupRepository(new Dictionary<string, LegacyMemberMatch>
-                    {
-                        [email] = new LegacyMemberMatch(legacyUserId, legacyUsername),
-                    }));
+                    new InMemoryLegacyMemberLookupRepository(
+                        new Dictionary<string, IReadOnlyList<LegacyMemberMatch>>(StringComparer.OrdinalIgnoreCase)
+                        {
+                            [email] = matches,
+                        }));
             });
         });
 
