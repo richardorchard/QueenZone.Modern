@@ -3920,6 +3920,9 @@ body.qz-menu-lock .qz-masthead {
 /* Private messaging */
 .qz-messages-toolbar {
   margin-bottom: var(--space-4);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
 }
 
 .qz-message-list {
@@ -3938,15 +3941,6 @@ body.qz-menu-lock .qz-masthead {
   gap: var(--space-2);
 }
 
-.qz-message-list__link {
-  flex: 1;
-  min-width: 0;
-}
-
-.qz-message-list__action {
-  flex-shrink: 0;
-}
-
 .qz-message-list__item--unread .qz-message-list__name {
   font-weight: var(--fw-bold, 700);
 }
@@ -3957,6 +3951,12 @@ body.qz-menu-lock .qz-masthead {
   padding: 0.85rem 0;
   text-decoration: none;
   color: inherit;
+  flex: 1;
+  min-width: 0;
+}
+
+.qz-message-list__action {
+  flex-shrink: 0;
 }
 
 .qz-message-list__name {

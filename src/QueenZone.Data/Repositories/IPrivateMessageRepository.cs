@@ -81,4 +81,14 @@ public interface IPrivateMessageRepository
         Guid conversationId,
         Guid memberId,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Removes the conversation from this member's own inbox. The other participant's copy is
+    /// unaffected. A later message from either participant restores visibility for both. Returns
+    /// false when the member is not a participant in the conversation.
+    /// </summary>
+    Task<bool> RemoveConversationAsync(
+        Guid conversationId,
+        Guid memberId,
+        CancellationToken cancellationToken = default);
 }

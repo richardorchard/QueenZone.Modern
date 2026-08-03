@@ -681,9 +681,13 @@ public sealed class QueenZoneDbContext : DbContext
             entity.HasKey(participant => new { participant.ConversationId, participant.MemberId });
 
             entity.Property(participant => participant.IsArchived).IsRequired();
+            entity.Property(participant => participant.IsRemoved).IsRequired();
 
             entity.HasIndex(participant => new { participant.MemberId, participant.IsArchived })
                 .HasDatabaseName("IX_PrivateConversationParticipants_Member_Archived");
+
+            entity.HasIndex(participant => new { participant.MemberId, participant.IsRemoved })
+                .HasDatabaseName("IX_PrivateConversationParticipants_Member_Removed");
 
             entity.HasOne(participant => participant.Conversation)
                 .WithMany(conversation => conversation.Participants)

@@ -250,6 +250,76 @@ public sealed class EfPrivateMessageRepositoryTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task Remove_HidesConversationFromInbox_ButNotForOtherParticipant()
+    {
+        var created = await repository.SendNewOrExistingAsync(
+            aliceId,
+            bobId,
+            "Remove me",
+            DateTimeOffset.Parse("2026-08-03T09:00:00Z"));
+        var conversationId = created.ConversationId!.Value;
+
+        Assert.True(await repository.RemoveConversationAsync(conversationId, aliceId));
+
+        var aliceInbox = await repository.GetInboxAsync(aliceId);
+        Assert.Empty(aliceInbox.Items);
+
+        var bobInbox = await repository.GetInboxAsync(bobId);
+        Assert.Single(bobInbox.Items);
+    }
+
+    [Fact]
+    public async Task Remove_ReturnsFalse_WhenMemberIsNotParticipant()
+    {
+        var created = await repository.SendNewOrExistingAsync(
+            aliceId,
+            bobId,
+            "Not yours",
+            DateTimeOffset.Parse("2026-08-03T09:05:00Z"));
+
+        Assert.False(await repository.RemoveConversationAsync(created.ConversationId!.Value, carolId));
+    }
+
+    [Fact]
+    public async Task Remove_ExcludesConversationFromUnreadCount()
+    {
+        var created = await repository.SendNewOrExistingAsync(
+            aliceId,
+            bobId,
+            "Unread then removed",
+            DateTimeOffset.Parse("2026-08-03T09:07:00Z"));
+        var conversationId = created.ConversationId!.Value;
+
+        Assert.Equal(1, await repository.CountUnreadConversationsAsync(bobId));
+
+        Assert.True(await repository.RemoveConversationAsync(conversationId, bobId));
+        Assert.Equal(0, await repository.CountUnreadConversationsAsync(bobId));
+    }
+
+    [Fact]
+    public async Task NewMessage_RestoresRemovedConversation_ForBothParticipants()
+    {
+        var created = await repository.SendNewOrExistingAsync(
+            aliceId,
+            bobId,
+            "Start",
+            DateTimeOffset.Parse("2026-08-03T09:10:00Z"));
+        var conversationId = created.ConversationId!.Value;
+
+        await repository.RemoveConversationAsync(conversationId, aliceId);
+        Assert.Empty((await repository.GetInboxAsync(aliceId)).Items);
+
+        await repository.ReplyAsync(
+            conversationId,
+            bobId,
+            "New reply reopens it",
+            DateTimeOffset.Parse("2026-08-03T09:11:00Z"));
+
+        var aliceInbox = await repository.GetInboxAsync(aliceId);
+        Assert.Single(aliceInbox.Items);
+    }
+
+    [Fact]
     public async Task Reply_UpdatesPreviewAndSortKeyTip_KeepsMonotonicLastMessageAt()
     {
         var created = await repository.SendNewOrExistingAsync(
