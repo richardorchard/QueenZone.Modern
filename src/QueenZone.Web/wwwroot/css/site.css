@@ -4045,3 +4045,9 @@ body.qz-menu-lock .qz-masthead {
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
+
+.qz-attribution-link {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}

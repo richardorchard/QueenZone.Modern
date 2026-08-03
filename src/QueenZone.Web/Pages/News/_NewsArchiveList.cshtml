@@ -17,6 +17,10 @@ else
         <div>
           <h2><a href="@item.DetailPath">@item.Title</a></h2>
           <p>@item.Excerpt</p>
+          @if (item.SubmitterMemberId is Guid submitterMemberId && !string.IsNullOrWhiteSpace(item.SubmitterDisplayName))
+          {
+            <p class="qz-meta">Submitted by <a class="qz-attribution-link" href="/members/@submitterMemberId">@item.SubmitterDisplayName</a></p>
+          }
         </div>
       </li>
     }

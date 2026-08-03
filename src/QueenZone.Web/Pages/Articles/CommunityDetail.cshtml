@@ -17,9 +17,9 @@
       <div class="qz-eyebrow" style="color: var(--qz-gold);">Community article</div>
       <h1>@Model.Item.Title</h1>
       <div class="qz-meta" style="color: rgba(255,255,255,0.52);">
-        @if (!string.IsNullOrWhiteSpace(Model.Item.AuthorDisplayName))
+        @if (Model.Item.AuthorMemberId is Guid authorMemberId && !string.IsNullOrWhiteSpace(Model.Item.AuthorDisplayName))
         {
-          <span>By @Model.Item.AuthorDisplayName &middot; </span>
+          <span>Submitted by <a class="qz-attribution-link" href="/members/@authorMemberId">@Model.Item.AuthorDisplayName</a> &middot; </span>
         }
         <time datetime="@Model.Item.PublishedAt.ToString("yyyy-MM-dd")">@Model.Item.PublishedAt.ToString("dd MMMM yyyy")</time>
         <span> &middot; @Model.Item.ReadTimeMinutes min read</span>

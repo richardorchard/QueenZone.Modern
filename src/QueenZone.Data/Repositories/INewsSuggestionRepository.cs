@@ -11,6 +11,11 @@ public interface INewsSuggestionRepository
 
     Task<NewsSuggestion?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<NewsSubmissionAttribution>> GetPromotedAttributionsAsync(
+        IReadOnlyCollection<int> newsIds,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<NewsSubmissionAttribution>>([]);
+
     Task<SubmissionListPage<NewsSuggestion>> GetBySubmitterAsync(
         Guid submitterMemberId,
         int page = 1,

@@ -14,7 +14,9 @@ public static class PublicContentMapper
             item.Title,
             item.Excerpt,
             item.PublishedAt,
-            NewsRoutes.GetNewsDetailPath(item.Id, item.Title, item.Slug));
+            NewsRoutes.GetNewsDetailPath(item.Id, item.Title, item.Slug),
+            item.SubmitterMemberId,
+            item.SubmitterDisplayName);
 
     public static IReadOnlyList<NewsArchiveItem> ToNewsArchiveItems(IEnumerable<NewsItem> items) =>
         items.Select(ToNewsArchiveItem).ToList();
@@ -27,7 +29,9 @@ public static class PublicContentMapper
             item.Body,
             item.PublishedAt,
             item.SourceUrl,
-            NewsRoutes.GetNewsDetailPath(item.Id, item.Title, item.Slug));
+            NewsRoutes.GetNewsDetailPath(item.Id, item.Title, item.Slug),
+            item.SubmitterMemberId,
+            item.SubmitterDisplayName);
 
     public static NewsDetailItem ToNewsDetailItem(AdminNewsArticle article) =>
         new(
