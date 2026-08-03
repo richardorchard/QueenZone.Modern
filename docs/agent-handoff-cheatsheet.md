@@ -45,7 +45,7 @@ Also fill in the **Agent** line when opening the pull request (see `.github/pull
 | **SEO / crawlability** | Unique page titles, canonical links, and crawlable HTML matter; avoid duplicate canonical pages |
 | **Testing** | Pure logic in unit tests; route behavior in web integration tests with sample/fake data by default; report whether legacy DB checks ran |
 | **Secrets / deploy** | No secrets in git; Bitwarden Secrets Manager project `Queenzone Development` mirrors local/App Service development secrets for agents; App Service runtime uses `ConnectionStrings__QueenZoneLegacy`; GitHub migrations use the separate `QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING` secret; say what was tested before merge |
-| **News agent** | Worker: `QueenZone.NewsAgent.Worker` + `discover-news` flags; secrets in `appsettings.Local.json`; smoke: `scripts/Smoke-NewsAgent.bat`; review: `/admin/news-discovery`; never auto-publish to public `/news` |
+| **News agent** | Worker: `QueenZone.NewsAgent.Worker` + `discover-news` / `process-news-requests`; secrets in `appsettings.Local.json`; smoke: `scripts/Smoke-NewsAgent.bat`; review: `/admin/news-discovery` (queue gathering + submit URL); live URL probe: `scripts/Probe-NewsAgentUrlIngestion.ps1`; never auto-publish to public `/news` |
 
 ## Most-Used Minimal Template
 
@@ -138,7 +138,7 @@ Invoke-WebRequest -Uri https://www.queenzone.org/health -UseBasicParsing | Selec
 Invoke-WebRequest -Uri https://www.queenzone.org/warmup -UseBasicParsing | Select-Object StatusCode
 ```
 
-Post-deploy smoke (custom domain) is a separate job at the end of `.github/workflows/deploy.yml` (`build` → `migrate` → `deploy` → `post-deploy-smoke`, triggered by push to `main` after `ci.yml`'s PR checks have already passed) against `https://www.queenzone.org` (`/warmup`, then `/health` plus key public routes). Pull-request tests are not rerun by this post-merge deploy workflow. A failure fails the smoke job so GitHub Actions can notify watchers. Re-run the same checks locally:
+Post-deploy smoke (custom domain) is a separate job at the end of `.github/workflows/deploy.yml` (`resolve-ci-run` → `migrate` → `deploy` → `post-deploy-smoke`, triggered by push to `main` after `ci.yml`'s PR checks have already passed). `resolve-ci-run` finds the `ci.yml` run that already built and tested the merged PR's head commit and `deploy` reuses its `web-publish` artifact — no rebuild. Pull-request tests are not rerun by this post-merge deploy workflow. Checks hit `https://www.queenzone.org` (`/warmup`, then `/health` plus key public routes); a failure fails the smoke job so GitHub Actions can notify watchers. Re-run the same checks locally:
 
 ```powershell
 powershell -File .\scripts\Smoke-LiveSite.ps1

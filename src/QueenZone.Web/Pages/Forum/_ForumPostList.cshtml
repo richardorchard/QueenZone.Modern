@@ -16,7 +16,14 @@ else
             @* Legacy archive posts are not linked to modern MemberAccounts; show initials fallback. *@
             <partial name="_MemberAvatar" model="@(new MemberAvatarViewModel { DisplayName = post.AuthorUsername, Size = "sm" })" />
             <div>
-              <strong class="qz-forum-post__author">@post.AuthorUsername</strong>
+              @if (post.AuthorMemberId is Guid profileMemberId)
+              {
+                <strong class="qz-forum-post__author"><a href="/members/@profileMemberId">@post.AuthorUsername</a></strong>
+              }
+              else
+              {
+                <strong class="qz-forum-post__author">@post.AuthorUsername</strong>
+              }
               @if (post.AuthorMemberSince is not null)
               {
                 <span class="qz-meta"> · Member since <time datetime="@post.AuthorMemberSince.Value.ToString("yyyy-MM-dd")">@post.AuthorMemberSince.Value.ToString("MMMM yyyy")</time></span>
@@ -30,16 +37,22 @@ else
         {
           <p class="qz-forum-post__edited qz-meta">@post.EditedLabel</p>
         }
-        @if (post.CanEdit || post.CanMessage)
+        @if ((post.IsAuthor && post.CanEdit) || post.CanMessage)
         {
           <p class="qz-forum-post__actions">
-            @if (post.CanEdit)
+            @if (post.IsAuthor && post.CanEdit)
             {
               <a class="qz-forum-post__edit-link" href="/forum/post/@post.Id/edit">Edit</a>
             }
             @if (post.CanMessage && post.AuthorMemberId is Guid authorMemberId)
             {
-              <a class="qz-forum-post__message-link" href="/messages/compose?to=@authorMemberId">Message</a>
+              <a class="qz-forum-post__message-link" href="/messages/compose?to=@authorMemberId" aria-label="Message @post.AuthorUsername" title="Message @post.AuthorUsername">
+                <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M4 5h16v11H8l-4 3V5Z" />
+                  <path d="m7 9 5 3 5-3" />
+                </svg>
+                <span class="visually-hidden">Message @post.AuthorUsername</span>
+              </a>
             }
           </p>
         }

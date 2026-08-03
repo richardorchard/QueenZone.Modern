@@ -6,21 +6,29 @@ namespace QueenZone.Storage;
 
 public static class QueenZoneStorageServiceCollectionExtensions
 {
-    public static IServiceCollection AddQueenZoneStorage(
+    public static IServiceCollection AddQueenZoneInMemoryStorage(
         this IServiceCollection services,
         IConfiguration configuration)
     {
         services.AddOptions<BlobUploadOptions>()
             .Bind(configuration.GetSection(BlobUploadOptions.SectionName));
+        services.AddSingleton<IBlobUploadService, NullBlobUploadService>();
+        services.AddGalleryPhotoBlobService();
+        return services;
+    }
 
+    public static IServiceCollection AddQueenZoneStorage(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
         var connectionString = configuration.GetConnectionString(BlobUploadOptions.ConnectionStringName);
         if (string.IsNullOrWhiteSpace(connectionString))
         {
-            services.AddSingleton<IBlobUploadService, NullBlobUploadService>();
-            services.AddGalleryPhotoBlobService();
-            return services;
+            return services.AddQueenZoneInMemoryStorage(configuration);
         }
 
+        services.AddOptions<BlobUploadOptions>()
+            .Bind(configuration.GetSection(BlobUploadOptions.SectionName));
         services.AddSingleton(_ => new BlobServiceClient(connectionString));
         services.AddSingleton<IBlobStorageBackend>(sp =>
             new AzureBlobStorageBackend(sp.GetRequiredService<BlobServiceClient>()));

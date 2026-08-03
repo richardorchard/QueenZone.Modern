@@ -6,6 +6,7 @@ namespace QueenZone.NewsAgent;
 public sealed class NewsAgentQueuedRunProcessor(
     INewsAgentRunRequestRepository runRequestRepository,
     INewsAgentQueuedRunExecutor executor,
+    NewsAgentUrlIngestionService urlIngestionService,
     ILogger<NewsAgentQueuedRunProcessor> logger)
 {
     public async Task<int> RunOnceAsync(string runnerId, CancellationToken cancellationToken = default)
@@ -18,13 +19,19 @@ public sealed class NewsAgentQueuedRunProcessor(
         }
 
         logger.LogInformation(
-            "Runner {RunnerId} claimed news gathering request {RequestId} from {RequestedBy}.",
+            "Runner {RunnerId} claimed news request {RequestId} ({Kind}) from {RequestedBy}.",
             runnerId,
             request.Id,
+            request.Kind,
             request.RequestedBy);
 
         try
         {
+            if (request.Kind == NewsAgentRunRequestKind.UrlIngestion)
+            {
+                return await RunUrlIngestionAsync(request, cancellationToken);
+            }
+
             var result = await executor.RunAsync(cancellationToken);
             if (result.Summary?.SkippedDueToLease == true)
             {
@@ -56,6 +63,36 @@ public sealed class NewsAgentQueuedRunProcessor(
                 cancellationToken);
             return 1;
         }
+    }
+
+    private async Task<int> RunUrlIngestionAsync(
+        NewsAgentRunRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.ArticleUrl))
+        {
+            await runRequestRepository.FailAsync(
+                request.Id,
+                "URL ingestion request is missing ArticleUrl.",
+                cancellationToken);
+            return 1;
+        }
+
+        var result = await urlIngestionService.IngestAsync(
+            request.ArticleUrl,
+            request.GenerateDraft,
+            cancellationToken);
+
+        if (result.ExitCode == 0)
+        {
+            await runRequestRepository.CompleteAsync(request.Id, result.Summary, cancellationToken);
+        }
+        else
+        {
+            await runRequestRepository.FailAsync(request.Id, result.Summary, cancellationToken);
+        }
+
+        return result.ExitCode;
     }
 
     internal static string FormatSummary(NewsAgentRunSummary? summary, int exitCode)

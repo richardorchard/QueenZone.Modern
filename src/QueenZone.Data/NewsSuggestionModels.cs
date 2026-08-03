@@ -24,3 +24,8 @@ public sealed record NewsSuggestionListItem(
     string SubmitterDisplayName,
     DateTimeOffset SubmittedAt,
     string Status);
+
+public sealed record NewsSubmissionAttribution(
+    int NewsId,
+    Guid MemberId,
+    string DisplayName);

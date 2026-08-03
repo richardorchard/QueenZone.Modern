@@ -915,7 +915,7 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
 
         var indexBody = await client.GetStringAsync("/admin/news-discovery");
         Assert.Contains("List ignore candidate", indexBody);
-        Assert.Contains("Ignore", indexBody);
+        Assert.Contains("Ignore / remove from queue", indexBody);
 
         var response = await PostIndexActionAsync(
             client,
@@ -946,6 +946,8 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
 
         var indexBody = await client.GetStringAsync("/admin/news-discovery");
         Assert.Contains("Queue news gathering", indexBody);
+        Assert.Contains("Submit article URL", indexBody);
+        Assert.Contains("Force triage", indexBody);
         Assert.Contains("Drafts are generated only when you select an individual candidate", indexBody);
 
         var firstResponse = await PostIndexActionAsync(
@@ -967,6 +969,79 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
         var statusBody = await client.GetStringAsync("/admin/news-discovery");
         Assert.Contains("already pending", statusBody);
         Assert.Contains(AdminEmail, statusBody);
+        Assert.Contains("Recent runner requests (1)", statusBody);
+        Assert.Contains("processing-history records, not news articles", statusBody);
+    }
+
+    [Fact]
+    public async Task AuthorizedAdminCanQueueUrlIngestionDefaultingToTriageOnly()
+    {
+        var appFactory = CreateFactory(new SharedNewsStore(), new SharedNewsDiscoveryStore());
+        var client = CreateClientFromFactory(appFactory, AdminEmail);
+        var repository = appFactory.Services.GetRequiredService<INewsAgentRunRequestRepository>();
+
+        var response = await PostIndexActionAsync(
+            client,
+            "/admin/news-discovery?handler=queueurlingestion",
+            new Dictionary<string, string>
+            {
+                ["ArticleUrl"] = "https://www.queenonline.com/news/manual-url",
+                ["UrlIngestionAction"] = "triage"
+            });
+        var recent = await repository.ListRecentAsync();
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        var request = Assert.Single(recent);
+        Assert.Equal(NewsAgentRunRequestKind.UrlIngestion, request.Kind);
+        Assert.Equal("https://www.queenonline.com/news/manual-url", request.ArticleUrl);
+        Assert.False(request.GenerateDraft);
+
+        var statusBody = await client.GetStringAsync("/admin/news-discovery");
+        Assert.Contains("no draft generation", statusBody, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task AuthorizedAdminCanQueueUrlIngestionWithExplicitDraftOverride()
+    {
+        var appFactory = CreateFactory(new SharedNewsStore(), new SharedNewsDiscoveryStore());
+        var client = CreateClientFromFactory(appFactory, AdminEmail);
+        var repository = appFactory.Services.GetRequiredService<INewsAgentRunRequestRepository>();
+
+        var response = await PostIndexActionAsync(
+            client,
+            "/admin/news-discovery?handler=queueurlingestion",
+            new Dictionary<string, string>
+            {
+                ["ArticleUrl"] = "https://www.queenonline.com/news/manual-url-draft",
+                ["UrlIngestionAction"] = "triage-and-draft"
+            });
+        var request = Assert.Single(await repository.ListRecentAsync());
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.True(request.GenerateDraft);
+        Assert.Equal(NewsAgentRunRequestKind.UrlIngestion, request.Kind);
+    }
+
+    [Fact]
+    public async Task UrlIngestion_rejects_private_urls_without_queueing()
+    {
+        var appFactory = CreateFactory(new SharedNewsStore(), new SharedNewsDiscoveryStore());
+        var client = CreateClientFromFactory(appFactory, AdminEmail);
+        var repository = appFactory.Services.GetRequiredService<INewsAgentRunRequestRepository>();
+
+        var response = await PostIndexActionAsync(
+            client,
+            "/admin/news-discovery?handler=queueurlingestion",
+            new Dictionary<string, string>
+            {
+                ["ArticleUrl"] = "http://127.0.0.1/secret",
+                ["UrlIngestionAction"] = "triage"
+            });
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Empty(await repository.ListRecentAsync());
+        var body = await client.GetStringAsync("/admin/news-discovery");
+        Assert.Contains("blocked", body, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -997,7 +1072,7 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
         var filteredBody = await client.GetStringAsync("/admin/news-discovery?trustTier=Primary");
         Assert.Contains("Bulk ignore primary", filteredBody);
         Assert.DoesNotContain("Bulk ignore secondary", filteredBody);
-        Assert.Contains("Ignore all listed", filteredBody);
+        Assert.Contains("Ignore all listed / remove from queue", filteredBody);
 
         var response = await PostIndexActionAsync(
             client,

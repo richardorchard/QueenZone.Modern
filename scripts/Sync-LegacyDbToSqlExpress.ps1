@@ -11,8 +11,9 @@
 # exist in the source - not an ordering/validation quirk SQL Server's
 # deferred name resolution papers over, but a genuinely dead reference. The
 # probe tests this mirror serves (EfAdminNewsRepositoryLegacyProbeTests,
-# EfNewsSectionLiveProbeTests) query news tables directly via raw SQL - no
-# view in the schema is on that path - so views aren't needed here at all.
+# EfAdminNewsRepositoryLegacyWriteProbeTests, EfNewsSectionLiveProbeTests)
+# query news tables directly via EF/SQL - no view in the schema is on that
+# path - so views aren't needed here at all.
 # /Action:Export doesn't support excluding object types at all; /Action:Extract
 # doesn't either (verified against this sqlpackage version's own /? help, not
 # assumed); but /Action:Publish does via /p:ExcludeObjectTypes=Views, and
