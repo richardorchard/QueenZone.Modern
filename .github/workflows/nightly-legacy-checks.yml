@@ -45,8 +45,12 @@ concurrency:
 #
 # Read probes run first. Self-cleaning write probes then exercise the same
 # SQL Express mirror locally on the Windows runner. Their scripts reject
-# Azure SQL and remote targets. A final residue check fails the workflow if
-# any known probe or leaked web-test markers remain.
+# Azure SQL and remote targets. Admin news writes include
+# EfAdminNewsRepositoryLegacyWriteProbeTests plus the Admin_news_* Facts in
+# EfNewsSectionLiveProbeTests (via Probe-AdminNewsLegacyWrites.ps1).
+# EfNewsDiscoveryPromotionLiveProbeTests stays opt-in until hardened (#503).
+# A final residue check fails the workflow if any known probe or leaked
+# web-test markers remain.
 jobs:
   sync-legacy-db:
     name: Sync legacy DB to SQL Express
@@ -139,9 +143,12 @@ jobs:
       - name: Restore
         run: dotnet restore tests/QueenZone.Web.Tests/QueenZone.Web.Tests.csproj
 
-      - name: Run admin news write lifecycle probe
+      - name: Run admin news and news-section write lifecycle probes
         env:
           RUN_LEGACY_WRITE_PROBE: "true"
+        # Probe-AdminNewsLegacyWrites.ps1 asserts mirror-only targeting, then
+        # runs EfAdminNewsRepositoryLegacyWriteProbeTests and the
+        # EfNewsSectionLiveProbeTests.Admin_news_* write Facts.
         run: ./scripts/Probe-AdminNewsLegacyWrites.ps1
 
       - name: Run URL ingestion queue lifecycle probe

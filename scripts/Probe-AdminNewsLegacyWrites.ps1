@@ -1,5 +1,14 @@
-# Runs an opt-in create/publish/unpublish/delete probe against the local SQL Express mirror.
+# Runs opt-in admin news write probes against the local SQL Express mirror.
 # Requires both ConnectionStrings__QueenZoneLegacy and RUN_LEGACY_WRITE_PROBE=true.
+#
+# Covers the same write surface as nightly legacy-write-probes:
+#   - EfAdminNewsRepositoryLegacyWriteProbeTests (create/publish/unpublish/delete)
+#   - EfNewsSectionLiveProbeTests write Facts (transaction rollback visibility +
+#     full lifecycle create/edit/publish/unpublish/delete)
+#
+# The public read-only Fact in EfNewsSectionLiveProbeTests stays on the Mac
+# legacy-read-probes job; this script filters only the Admin_news_* write Facts.
+# Discovery promotion remains opt-in only (see #503).
 #
 # Example:
 #   $env:ConnectionStrings__QueenZoneLegacy = "Server=localhost\SQLEXPRESS;Database=queenzone_legacy_sync;Integrated Security=True;TrustServerCertificate=True"
@@ -25,4 +34,4 @@ if ($env:RUN_LEGACY_WRITE_PROBE -ne "true") {
 
 dotnet test tests/QueenZone.Web.Tests/QueenZone.Web.Tests.csproj `
     --configuration $Configuration `
-    --filter "FullyQualifiedName~EfAdminNewsRepositoryLegacyWriteProbeTests"
+    --filter "FullyQualifiedName~EfAdminNewsRepositoryLegacyWriteProbeTests|FullyQualifiedName~EfNewsSectionLiveProbeTests.Admin_news_"
