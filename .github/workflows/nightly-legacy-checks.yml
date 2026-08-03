@@ -149,6 +149,11 @@ jobs:
           RUN_NEWS_AGENT_URL_INGESTION_PROBE: "true"
         run: ./scripts/Probe-NewsAgentUrlIngestion.ps1
 
+      - name: Run private messaging IDENTITY and lock probe
+        env:
+          RUN_PRIVATE_MESSAGE_PROBE: "true"
+        run: ./scripts/Probe-PrivateMessaging.ps1
+
       - name: Run full URL fetch and triage probe
         if: github.event_name == 'workflow_dispatch' && inputs.run_full_url_probe
         env:

@@ -40,7 +40,11 @@ public sealed class EfLegacyProbeResidueTests
         Assert.False(await dbContext.MemberAccounts.AnyAsync(member =>
             member.Email.EndsWith("@example.com")
             || member.Email.EndsWith("@example.test")
-            || member.Email.EndsWith("@test.local")));
+            || member.Email.EndsWith("@test.local")
+            || member.Email.Contains("pm-probe-", StringComparison.OrdinalIgnoreCase)));
+        Assert.False(await dbContext.PrivateMessages.AnyAsync(message =>
+            message.Body.Contains("Probe concurrent", StringComparison.Ordinal)
+            || message.Body.Contains("Probe reply", StringComparison.Ordinal)));
         Assert.False(await dbContext.PhotoAdminAuditLogs.AnyAsync(audit =>
             audit.ActorEmail == "admin@test.local"));
 

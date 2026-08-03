@@ -147,6 +147,8 @@ When EF Core `SqlQueryRaw` maps legacy columns into typed row classes, do not re
 
 For admin write checks, run `scripts/Probe-AdminNewsLegacyWrites.ps1` with `ConnectionStrings__QueenZoneLegacy` pointing to the local `queenzone_legacy_sync` SQL Express mirror and `RUN_LEGACY_WRITE_PROBE=true`. The script refuses other targets. The probe creates, publishes, unpublishes, and deletes a uniquely named test article.
 
+For private messaging IDENTITY `SortKey` and conversation write-lock checks, use the same SQL Express mirror with `scripts/Probe-PrivateMessaging.ps1` and `RUN_PRIVATE_MESSAGE_PROBE=true`. The script refuses Azure SQL and remote servers. The probe creates throwaway members, exercises concurrent first-sends and replies, asserts tip `LastMessageSortKey` consistency, and deletes the probe rows.
+
 For admin URL ingestion and run-request queue checks, use the same SQL Express mirror with `scripts/Probe-NewsAgentUrlIngestion.ps1` and `RUN_NEWS_AGENT_URL_INGESTION_PROBE=true`. Default mode exercises SQL queue, claim, and completion. Pass `-Full` to fetch a public URL and triage through the local worker stack; an optional `OPENROUTER_API_KEY` enables AI triage. Both modes delete their requests, heartbeats, and related discovery records before returning. The full mode never publishes.
 
 ### Migration And Content Validation

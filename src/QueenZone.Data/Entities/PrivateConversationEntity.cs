@@ -19,6 +19,13 @@ public sealed class PrivateConversationEntity
 
     public DateTimeOffset LastMessageAt { get; set; }
 
+    /// <summary>
+    /// Tip message <see cref="PrivateMessageEntity.SortKey"/> used for inbox ranking.
+    /// Prefer this over <see cref="LastMessageAt"/>, which stays monotonic for display but can
+    /// disagree with commit order under clock skew.
+    /// </summary>
+    public long LastMessageSortKey { get; set; }
+
     public string LastMessagePreview { get; set; } = string.Empty;
 
     public Guid? LastMessageSenderId { get; set; }

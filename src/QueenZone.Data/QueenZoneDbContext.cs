@@ -653,14 +653,15 @@ public sealed class QueenZoneDbContext : DbContext
                 .IsRequired();
             entity.Property(conversation => conversation.CreatedAt).IsRequired();
             entity.Property(conversation => conversation.LastMessageAt).IsRequired();
+            entity.Property(conversation => conversation.LastMessageSortKey).IsRequired();
 
             entity.HasIndex(conversation => new { conversation.MemberLowId, conversation.MemberHighId })
                 .IsUnique()
                 .HasDatabaseName("IX_PrivateConversations_MemberPair");
 
-            entity.HasIndex(conversation => conversation.LastMessageAt)
+            entity.HasIndex(conversation => conversation.LastMessageSortKey)
                 .IsDescending()
-                .HasDatabaseName("IX_PrivateConversations_LastMessageAt");
+                .HasDatabaseName("IX_PrivateConversations_LastMessageSortKey");
 
             entity.HasOne(conversation => conversation.MemberLow)
                 .WithMany()
