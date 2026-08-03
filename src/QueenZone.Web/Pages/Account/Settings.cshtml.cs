@@ -24,6 +24,9 @@ public sealed class SettingsModel(MemberAccountService memberAccountService) : P
     [BindProperty]
     public IFormFile? AvatarFile { get; set; }
 
+    [BindProperty]
+    public bool AdoptLegacyDisplayName { get; set; } = true;
+
     public string Email { get; private set; } = string.Empty;
 
     public Guid MemberId { get; private set; }
@@ -31,6 +34,8 @@ public sealed class SettingsModel(MemberAccountService memberAccountService) : P
     public bool HasAvatar { get; private set; }
 
     public IReadOnlyList<string> LinkedProviders { get; private set; } = [];
+
+    public LegacyAccountLinkState LegacyLink { get; private set; } = LegacyAccountLinkState.None();
 
     public string? StatusMessage { get; private set; }
 
@@ -42,8 +47,7 @@ public sealed class SettingsModel(MemberAccountService memberAccountService) : P
             return Redirect("/account/login");
         }
 
-        PopulateFromAccount(account);
-        LinkedProviders = await memberAccountService.ListExternalProvidersAsync(account.Id, cancellationToken);
+        await PopulatePageAsync(account, cancellationToken);
         StatusMessage = TempData[SuccessMessageKey] as string;
         ViewData["Title"] = "Account settings";
         return Page();
@@ -65,9 +69,8 @@ public sealed class SettingsModel(MemberAccountService memberAccountService) : P
 
         // Preserve form-bound DisplayName; only repopulate read-only fields.
         var submittedDisplayName = DisplayName?.Trim() ?? string.Empty;
-        PopulateFromAccount(account);
+        await PopulatePageAsync(account, cancellationToken);
         DisplayName = submittedDisplayName;
-        LinkedProviders = await memberAccountService.ListExternalProvidersAsync(account.Id, cancellationToken);
         ViewData["Title"] = "Account settings";
 
         if (!ModelState.IsValid)
@@ -88,6 +91,43 @@ public sealed class SettingsModel(MemberAccountService memberAccountService) : P
         return RedirectToPage();
     }
 
+    public async Task<IActionResult> OnPostClaimLegacyAsync(CancellationToken cancellationToken)
+    {
+        var memberId = await GetCurrentMemberIdAsync();
+        if (memberId is null)
+        {
+            return Redirect("/account/login");
+        }
+
+        var account = await memberAccountService.FindByIdAsync(memberId.Value, cancellationToken);
+        if (account is null)
+        {
+            return Redirect("/account/login");
+        }
+
+        var result = await memberAccountService.ClaimLegacyAccountAsync(
+            memberId.Value,
+            AdoptLegacyDisplayName,
+            cancellationToken);
+
+        if (!result.Succeeded || result.Account is null)
+        {
+            await PopulatePageAsync(account, cancellationToken);
+            ModelState.AddModelError(string.Empty, result.Error ?? "Could not claim the legacy account.");
+            ViewData["Title"] = "Account settings";
+            return Page();
+        }
+
+        await ReissueMemberCookieAsync(result.Account);
+        TempData[SuccessMessageKey] = AdoptLegacyDisplayName && !string.Equals(
+                account.DisplayName,
+                result.Account.DisplayName,
+                StringComparison.Ordinal)
+            ? "Legacy account claimed and display name updated."
+            : "Legacy account claimed.";
+        return RedirectToPage();
+    }
+
     public async Task<IActionResult> OnPostUploadAvatarAsync(CancellationToken cancellationToken)
     {
         var memberId = await GetCurrentMemberIdAsync();
@@ -102,8 +142,7 @@ public sealed class SettingsModel(MemberAccountService memberAccountService) : P
             return Redirect("/account/login");
         }
 
-        PopulateFromAccount(account);
-        LinkedProviders = await memberAccountService.ListExternalProvidersAsync(account.Id, cancellationToken);
+        await PopulatePageAsync(account, cancellationToken);
         ViewData["Title"] = "Account settings";
 
         if (AvatarFile is null || AvatarFile.Length <= 0)
@@ -146,8 +185,7 @@ public sealed class SettingsModel(MemberAccountService memberAccountService) : P
                 return Redirect("/account/login");
             }
 
-            PopulateFromAccount(account);
-            LinkedProviders = await memberAccountService.ListExternalProvidersAsync(account.Id, cancellationToken);
+            await PopulatePageAsync(account, cancellationToken);
             ModelState.AddModelError(string.Empty, result.Error ?? "Could not remove avatar.");
             ViewData["Title"] = "Account settings";
             return Page();
@@ -157,12 +195,14 @@ public sealed class SettingsModel(MemberAccountService memberAccountService) : P
         return RedirectToPage();
     }
 
-    private void PopulateFromAccount(Data.Entities.MemberAccount account)
+    private async Task PopulatePageAsync(Data.Entities.MemberAccount account, CancellationToken cancellationToken)
     {
         MemberId = account.Id;
         DisplayName = account.DisplayName;
         Email = account.Email;
         HasAvatar = !string.IsNullOrWhiteSpace(account.AvatarUrl);
+        LinkedProviders = await memberAccountService.ListExternalProvidersAsync(account.Id, cancellationToken);
+        LegacyLink = await memberAccountService.GetLegacyLinkStateAsync(account, cancellationToken);
     }
 
     private async Task<Data.Entities.MemberAccount?> LoadCurrentAccountAsync(CancellationToken cancellationToken)

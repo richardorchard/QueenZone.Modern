@@ -192,6 +192,9 @@ public sealed class EfPublicReadRepositoryTests : IAsyncDisposable
             dbContext,
             email => $"""
                 SELECT USER_ID, USERNAME FROM UsersLookup WHERE EMAIL = {email} LIMIT 1
+                """,
+            userId => $"""
+                SELECT USER_ID, USERNAME FROM UsersLookup WHERE USER_ID = {userId} LIMIT 1
                 """);
 
         var match = await repository.FindByEmailAsync("freddie@example.com");
@@ -200,6 +203,11 @@ public sealed class EfPublicReadRepositoryTests : IAsyncDisposable
         Assert.Equal("Freddie", match.Username);
 
         Assert.Null(await repository.FindByEmailAsync("missing@example.com"));
+
+        var byId = await repository.FindByUserIdAsync(42);
+        Assert.NotNull(byId);
+        Assert.Equal("Freddie", byId.Username);
+        Assert.Null(await repository.FindByUserIdAsync(999));
     }
 
     [Fact]
