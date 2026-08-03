@@ -156,6 +156,115 @@ public sealed class PrivateMessageRoutesTests : IClassFixture<WebApplicationFact
     }
 
     [Fact]
+    public async Task Archive_FromInbox_HidesConversation_AndListsInArchivedView()
+    {
+        var (aliceClient, alice) = await CreateMemberAsync("pm-archive-alice@example.com", "Archive Alice");
+        var (bobClient, bob) = await CreateMemberAsync("pm-archive-bob@example.com", "Archive Bob");
+        var service = factory.Services.GetRequiredService<PrivateMessageService>();
+        var created = await service.ComposeAsync(alice.Id, bob.Id, "Archive this thread");
+        var conversationId = created.ConversationId!.Value;
+
+        var inboxHtml = await aliceClient.GetStringAsync("/messages");
+        var archiveResponse = await aliceClient.PostAsync(
+            "/messages?handler=Archive",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(inboxHtml),
+                ["conversationId"] = conversationId.ToString(),
+            }));
+        Assert.Equal(HttpStatusCode.Redirect, archiveResponse.StatusCode);
+
+        var aliceInboxAfter = await aliceClient.GetStringAsync("/messages");
+        Assert.Contains("You have no private messages yet", aliceInboxAfter);
+        Assert.Contains("Conversation archived", aliceInboxAfter);
+
+        var bobInbox = await bobClient.GetStringAsync("/messages");
+        Assert.Contains("Archive Alice", bobInbox);
+
+        var archivedPage = await aliceClient.GetStringAsync("/messages/archived");
+        Assert.Contains("Archive Bob", archivedPage);
+
+        var unarchiveResponse = await aliceClient.PostAsync(
+            "/messages/archived?handler=Unarchive",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(archivedPage),
+                ["conversationId"] = conversationId.ToString(),
+            }));
+        Assert.Equal(HttpStatusCode.Redirect, unarchiveResponse.StatusCode);
+
+        var aliceInboxRestored = await aliceClient.GetStringAsync("/messages");
+        Assert.Contains("Archive Bob", aliceInboxRestored);
+    }
+
+    [Fact]
+    public async Task Archive_ReceivingNewMessage_ReturnsConversationToInbox()
+    {
+        var (aliceClient, alice) = await CreateMemberAsync("pm-reopen-alice@example.com", "Reopen Alice");
+        var (bobClient, bob) = await CreateMemberAsync("pm-reopen-bob@example.com", "Reopen Bob");
+        var service = factory.Services.GetRequiredService<PrivateMessageService>();
+        var created = await service.ComposeAsync(alice.Id, bob.Id, "Hello");
+        var conversationId = created.ConversationId!.Value;
+
+        var inboxHtml = await aliceClient.GetStringAsync("/messages");
+        await aliceClient.PostAsync(
+            "/messages?handler=Archive",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(inboxHtml),
+                ["conversationId"] = conversationId.ToString(),
+            }));
+        Assert.Contains("You have no private messages yet", await aliceClient.GetStringAsync("/messages"));
+
+        Assert.True((await service.ReplyAsync(conversationId, bob.Id, "New reply")).Succeeded);
+
+        var aliceInboxAfter = await aliceClient.GetStringAsync("/messages");
+        Assert.Contains("Reopen Bob", aliceInboxAfter);
+    }
+
+    [Fact]
+    public async Task Archive_FromConversationView_RedirectsToInbox()
+    {
+        var (aliceClient, alice) = await CreateMemberAsync("pm-conv-archive-alice@example.com", "Conv Archive Alice");
+        var (_, bob) = await CreateMemberAsync("pm-conv-archive-bob@example.com", "Conv Archive Bob");
+        var service = factory.Services.GetRequiredService<PrivateMessageService>();
+        var created = await service.ComposeAsync(alice.Id, bob.Id, "Hello there");
+        var conversationId = created.ConversationId!.Value;
+
+        var conversationHtml = await aliceClient.GetStringAsync($"/messages/{conversationId}");
+        var archiveResponse = await aliceClient.PostAsync(
+            $"/messages/{conversationId}?handler=Archive",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(conversationHtml),
+            }));
+        Assert.Equal(HttpStatusCode.Redirect, archiveResponse.StatusCode);
+        Assert.Equal("/messages", archiveResponse.Headers.Location!.OriginalString);
+
+        Assert.Contains("You have no private messages yet", await aliceClient.GetStringAsync("/messages"));
+    }
+
+    [Fact]
+    public async Task Archive_ReturnsNotFound_ForNonParticipant()
+    {
+        var (aliceClient, alice) = await CreateMemberAsync("pm-archive-owner@example.com", "Archive Owner");
+        var (_, bob) = await CreateMemberAsync("pm-archive-peer@example.com", "Archive Peer");
+        var (carolClient, _) = await CreateMemberAsync("pm-archive-outsider@example.com", "Archive Outsider");
+        var service = factory.Services.GetRequiredService<PrivateMessageService>();
+        var created = await service.ComposeAsync(alice.Id, bob.Id, "Top secret");
+
+        var composeHtml = await carolClient.GetStringAsync("/messages/compose");
+        var response = await carolClient.PostAsync(
+            "/messages?handler=Archive",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(composeHtml),
+                ["conversationId"] = created.ConversationId.ToString()!,
+            }));
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Remove_FromInbox_HidesConversation_ButNotForOtherParticipant()
     {
         var (aliceClient, alice) = await CreateMemberAsync("pm-remove-alice@example.com", "Remove Alice");

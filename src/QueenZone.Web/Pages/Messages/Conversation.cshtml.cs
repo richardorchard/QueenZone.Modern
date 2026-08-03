@@ -116,6 +116,27 @@ public sealed class ConversationModel(PrivateMessageService privateMessageServic
         return RedirectToPage("./Conversation", new { conversationId = ConversationId });
     }
 
+    public async Task<IActionResult> OnPostArchiveAsync(CancellationToken cancellationToken)
+    {
+        var memberId = await GetCurrentMemberIdAsync();
+        if (memberId is null)
+        {
+            return Challenge();
+        }
+
+        var archived = await privateMessageService.ArchiveConversationAsync(
+            ConversationId,
+            memberId.Value,
+            cancellationToken);
+        if (!archived)
+        {
+            return NotFound();
+        }
+
+        TempData[IndexModel.SuccessMessageKey] = "Conversation archived.";
+        return RedirectToPage("./Index");
+    }
+
     public async Task<IActionResult> OnPostRemoveAsync(CancellationToken cancellationToken)
     {
         var memberId = await GetCurrentMemberIdAsync();

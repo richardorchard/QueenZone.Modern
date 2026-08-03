@@ -55,6 +55,34 @@ public interface IPrivateMessageRepository
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Loads one page of the member's archived conversations (mirrors <see cref="GetInboxAsync"/>
+    /// but only conversations the member has archived).
+    /// </summary>
+    Task<PrivateInboxPage> GetArchivedInboxAsync(
+        Guid memberId,
+        int page = 1,
+        int pageSize = PrivateMessageLimits.InboxPageSize,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Archives the conversation for this member only. Returns false when the member is not a
+    /// participant in the conversation.
+    /// </summary>
+    Task<bool> ArchiveConversationAsync(
+        Guid conversationId,
+        Guid memberId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Unarchives the conversation for this member only. Returns false when the member is not a
+    /// participant in the conversation.
+    /// </summary>
+    Task<bool> UnarchiveConversationAsync(
+        Guid conversationId,
+        Guid memberId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Removes the conversation from this member's own inbox. The other participant's copy is
     /// unaffected. A later message from either participant restores visibility for both. Returns
     /// false when the member is not a participant in the conversation.

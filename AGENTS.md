@@ -51,6 +51,22 @@ GitHub Actions applies the matching `agent:*` label from the branch prefix via `
 
 Use the prefix for the agent you are, not a default from an earlier session or another tool. Different agents working on the same area should use different branch names, such as `grok/news-pagination` and `claude/news-pagination`, rather than reusing one shared branch.
 
+### Update from `main` before opening a pull request
+
+The default branch is **`main`** (not `master`). `main` is protected: required CI checks and merge gates evaluate the PR against the current tip of `main`. If a feature branch was cut hours or days earlier, `main` may have moved — an outdated PR base can block or confuse checks (coverage vs `origin/main`, migration jobs, mergeability) until the branch is updated.
+
+**Before creating a PR** (and before asking for review on a long-lived branch), always:
+
+```powershell
+git fetch origin main
+git merge origin/main
+# or: git rebase origin/main
+```
+
+Prefer a merge of `origin/main` into the feature branch unless the user or stack workflow asks for a rebase. Resolve any conflicts, re-run the default verification (or the subset relevant to the conflicted files), then push and open or update the PR.
+
+Do this even when the branch was originally created from `main` — time between branch creation and PR open is when `main` usually changes.
+
 Before merging to `main`, open a pull request and fill in `.github/pull_request_template.md`. The pull request should include:
 
 - Which agent authored the change.

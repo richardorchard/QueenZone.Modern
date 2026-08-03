@@ -172,6 +172,84 @@ public sealed class EfPrivateMessageRepositoryTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task Archive_HidesConversationFromInbox_ButNotForOtherParticipant()
+    {
+        var created = await repository.SendNewOrExistingAsync(
+            aliceId,
+            bobId,
+            "Archive me",
+            DateTimeOffset.Parse("2026-08-03T09:00:00Z"));
+        var conversationId = created.ConversationId!.Value;
+
+        Assert.True(await repository.ArchiveConversationAsync(conversationId, aliceId));
+
+        var aliceInbox = await repository.GetInboxAsync(aliceId);
+        Assert.Empty(aliceInbox.Items);
+
+        var bobInbox = await repository.GetInboxAsync(bobId);
+        Assert.Single(bobInbox.Items);
+
+        var aliceArchived = await repository.GetArchivedInboxAsync(aliceId);
+        Assert.Single(aliceArchived.Items);
+        Assert.Equal(bobId, aliceArchived.Items[0].OtherParticipantId);
+    }
+
+    [Fact]
+    public async Task Archive_ReturnsFalse_WhenMemberIsNotParticipant()
+    {
+        var created = await repository.SendNewOrExistingAsync(
+            aliceId,
+            bobId,
+            "Not yours",
+            DateTimeOffset.Parse("2026-08-03T09:05:00Z"));
+
+        Assert.False(await repository.ArchiveConversationAsync(created.ConversationId!.Value, carolId));
+    }
+
+    [Fact]
+    public async Task NewMessage_UnarchivesConversation_ForBothParticipants()
+    {
+        var created = await repository.SendNewOrExistingAsync(
+            aliceId,
+            bobId,
+            "Start",
+            DateTimeOffset.Parse("2026-08-03T09:10:00Z"));
+        var conversationId = created.ConversationId!.Value;
+
+        await repository.ArchiveConversationAsync(conversationId, aliceId);
+        Assert.Empty((await repository.GetInboxAsync(aliceId)).Items);
+
+        await repository.ReplyAsync(
+            conversationId,
+            bobId,
+            "New reply reopens it",
+            DateTimeOffset.Parse("2026-08-03T09:11:00Z"));
+
+        var aliceInbox = await repository.GetInboxAsync(aliceId);
+        Assert.Single(aliceInbox.Items);
+
+        var aliceArchived = await repository.GetArchivedInboxAsync(aliceId);
+        Assert.Empty(aliceArchived.Items);
+    }
+
+    [Fact]
+    public async Task Unarchive_MovesConversationBackToInbox()
+    {
+        var created = await repository.SendNewOrExistingAsync(
+            aliceId,
+            bobId,
+            "Toggle me",
+            DateTimeOffset.Parse("2026-08-03T09:15:00Z"));
+        var conversationId = created.ConversationId!.Value;
+
+        await repository.ArchiveConversationAsync(conversationId, aliceId);
+        Assert.True(await repository.UnarchiveConversationAsync(conversationId, aliceId));
+
+        Assert.Single((await repository.GetInboxAsync(aliceId)).Items);
+        Assert.Empty((await repository.GetArchivedInboxAsync(aliceId)).Items);
+    }
+
+    [Fact]
     public async Task Remove_HidesConversationFromInbox_ButNotForOtherParticipant()
     {
         var created = await repository.SendNewOrExistingAsync(

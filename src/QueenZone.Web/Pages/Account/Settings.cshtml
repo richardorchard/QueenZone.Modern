@@ -42,6 +42,54 @@
         </div>
       </dl>
 
+      <section class="qz-account-settings__legacy" aria-labelledby="legacy-heading">
+        <h2 id="legacy-heading" class="qz-account-settings__section-title">Legacy forum account</h2>
+        @if (Model.LegacyLink.Kind == LegacyAccountLinkKind.Linked && Model.LegacyLink.Match is not null)
+        {
+          <p class="qz-account-settings__legacy-status" role="status">
+            Linked to legacy forum account
+            <strong>@Model.LegacyLink.Match.Username</strong>
+            <span class="qz-meta">(id @Model.LegacyLink.Match.UserId)</span>.
+          </p>
+        }
+        else if (Model.LegacyLink.Kind == LegacyAccountLinkKind.Claimable && Model.LegacyLink.Match is not null)
+        {
+          <p>
+            We found a classic QueenZone forum account matching your email:
+            <strong>@Model.LegacyLink.Match.Username</strong>.
+            Claim it to connect your modern membership with your archive history.
+          </p>
+          <form method="post"
+                asp-page-handler="ClaimLegacy"
+                class="qz-account-form"
+                data-busy-submit
+                data-busy-label="Claiming…">
+            @Html.AntiForgeryToken()
+            <label class="qz-account-form__checkbox">
+              <input asp-for="AdoptLegacyDisplayName" type="checkbox" />
+              <span>Use legacy username <strong>@Model.LegacyLink.Match.Username</strong> as my display name</span>
+            </label>
+            <div class="qz-account-form__actions">
+              <button type="submit" class="qz-button">Claim legacy account</button>
+            </div>
+            <p class="qz-account-form__status" data-busy-status hidden role="status" aria-live="polite"></p>
+          </form>
+        }
+        else if (Model.LegacyLink.Kind == LegacyAccountLinkKind.Unavailable && Model.LegacyLink.Match is not null)
+        {
+          <p class="qz-account-settings__legacy-status">
+            A legacy account for <strong>@Model.LegacyLink.Match.Username</strong> matches your email,
+            but it is already linked to another modern member.
+          </p>
+        }
+        else
+        {
+          <p class="qz-account-settings__legacy-status qz-meta">
+            No legacy forum account is linked to this email.
+          </p>
+        }
+      </section>
+
       <section class="qz-account-settings__avatar" aria-labelledby="avatar-heading">
         <h2 id="avatar-heading" class="qz-account-settings__section-title">Profile avatar</h2>
         <div class="qz-account-settings__avatar-row">
