@@ -131,7 +131,7 @@ jobs:
     name: Legacy SQL self-cleaning write probes
     needs: [sync-legacy-db, legacy-read-probes]
     runs-on: [self-hosted, Windows]
-    timeout-minutes: 20
+    timeout-minutes: 30
     environment: dev
     env:
       ConnectionStrings__QueenZoneLegacy: "Server=localhost\\SQLEXPRESS;Database=queenzone_legacy_sync;Integrated Security=True;TrustServerCertificate=True"
@@ -147,8 +147,9 @@ jobs:
         env:
           RUN_LEGACY_WRITE_PROBE: "true"
         # Probe-AdminNewsLegacyWrites.ps1 asserts mirror-only targeting, then
-        # runs EfAdminNewsRepositoryLegacyWriteProbeTests and the
-        # EfNewsSectionLiveProbeTests.Admin_news_* write Facts.
+        # runs EfAdminNewsRepositoryLegacyWriteProbeTests, the
+        # EfNewsSectionLiveProbeTests.Admin_news_* write Facts, and the
+        # self-seeding EfNewsDiscoveryPromotionLiveProbeTests.
         run: ./scripts/Probe-AdminNewsLegacyWrites.ps1
 
       - name: Run URL ingestion queue lifecycle probe
@@ -160,6 +161,21 @@ jobs:
         env:
           RUN_PRIVATE_MESSAGE_PROBE: "true"
         run: ./scripts/Probe-PrivateMessaging.ps1
+
+      - name: Run forum write probe
+        env:
+          RUN_FORUM_WRITE_PROBE: "true"
+        run: ./scripts/Probe-ForumWrites.ps1
+
+      - name: Run photo and article submission probes
+        env:
+          RUN_CONTENT_SUBMISSION_PROBE: "true"
+        run: ./scripts/Probe-ContentSubmissions.ps1
+
+      - name: Run member account create/login probe
+        env:
+          RUN_MEMBER_ACCOUNT_PROBE: "true"
+        run: ./scripts/Probe-MemberAccounts.ps1
 
       - name: Run full URL fetch and triage probe
         if: github.event_name == 'workflow_dispatch' && inputs.run_full_url_probe

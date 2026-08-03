@@ -118,8 +118,8 @@ run locally on Windows after the read checks pass:
 | `EfNewsSectionLiveProbeTests` public read Fact | Mac `legacy-read-probes` |
 | `EfAdminNewsRepositoryLegacyWriteProbeTests` | Windows `legacy-write-probes` via `Probe-AdminNewsLegacyWrites.ps1` |
 | `EfNewsSectionLiveProbeTests` `Admin_news_*` write Facts | Same script (rollback visibility + full lifecycle) |
-| URL ingestion / private messaging write probes | Dedicated Windows probe scripts |
-| `EfNewsDiscoveryPromotionLiveProbeTests` | Still **manual / opt-in only** until hardened for mirror data churn ([#503](https://github.com/richardorchard/QueenZone.Modern/issues/503)) |
+| `EfNewsDiscoveryPromotionLiveProbeTests` | Same script (self-seeds disposable candidate, promote inside rollback, then deletes seed) |
+| URL ingestion / private messaging / forum / content submission / member-account write probes | Dedicated Windows probe scripts |
 
 Their scripts reject Azure SQL, remote servers, and databases other than `queenzone_legacy_sync`. A
 final marker scan fails the workflow if probe or leaked web-test residue remains. The optional full
@@ -155,9 +155,15 @@ in parallel and never touch the legacy or Azure SQL databases.
 
 When EF Core `SqlQueryRaw` maps legacy columns into typed row classes, do not rely only on in-memory route tests. The legacy schema uses many `smallint` and `bit` columns; SQL Server returns those as `System.Int16` and `bool`, not `int`. Either cast projected values to the row model type in SQL (for example, `CAST(Q_LINK_CAT_ID AS int) AS CategoryId`) and cover that SQL shape with a deterministic test, or run an opt-in read-only legacy database probe before deployment to prove the projection materializes.
 
-For admin write checks, run `scripts/Probe-AdminNewsLegacyWrites.ps1` with `ConnectionStrings__QueenZoneLegacy` pointing to the local `queenzone_legacy_sync` SQL Express mirror and `RUN_LEGACY_WRITE_PROBE=true`. The script refuses other targets. It runs `EfAdminNewsRepositoryLegacyWriteProbeTests` and the `EfNewsSectionLiveProbeTests.Admin_news_*` write Facts (transaction-rollback visibility plus create/edit/publish/unpublish/delete).
+For admin write checks, run `scripts/Probe-AdminNewsLegacyWrites.ps1` with `ConnectionStrings__QueenZoneLegacy` pointing to the local `queenzone_legacy_sync` SQL Express mirror and `RUN_LEGACY_WRITE_PROBE=true`. The script refuses other targets. It runs `EfAdminNewsRepositoryLegacyWriteProbeTests`, the `EfNewsSectionLiveProbeTests.Admin_news_*` write Facts, and the self-seeding `EfNewsDiscoveryPromotionLiveProbeTests` (promote inside a rolled-back transaction, then delete seed rows).
 
 For private messaging IDENTITY `SortKey` and conversation write-lock checks, use the same SQL Express mirror with `scripts/Probe-PrivateMessaging.ps1` and `RUN_PRIVATE_MESSAGE_PROBE=true`. The script refuses Azure SQL and remote servers. The probe creates throwaway members, exercises concurrent first-sends and replies, asserts tip `LastMessageSortKey` consistency, and deletes the probe rows.
+
+For modern forum thread/post writes (SQL Server sequences + read stats), use `scripts/Probe-ForumWrites.ps1` with `RUN_FORUM_WRITE_PROBE=true`.
+
+For photo and article submission lifecycles, use `scripts/Probe-ContentSubmissions.ps1` with `RUN_CONTENT_SUBMISSION_PROBE=true`.
+
+For member account create + external login, use `scripts/Probe-MemberAccounts.ps1` with `RUN_MEMBER_ACCOUNT_PROBE=true`.
 
 For admin URL ingestion and run-request queue checks, use the same SQL Express mirror with `scripts/Probe-NewsAgentUrlIngestion.ps1` and `RUN_NEWS_AGENT_URL_INGESTION_PROBE=true`. Default mode exercises SQL queue, claim, and completion. Pass `-Full` to fetch a public URL and triage through the local worker stack; an optional `OPENROUTER_API_KEY` enables AI triage. Both modes delete their requests, heartbeats, and related discovery records before returning. The full mode never publishes.
 
