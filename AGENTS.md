@@ -147,13 +147,11 @@ Rules of thumb for hand-written SQL migrations:
 
 ### Pre-PR verification (recommended before opening the PR)
 
-Run the same coverage gate locally so CI failures are caught early:
+Run the [default verification](#default-verification-before-a-pull-request) first, then the same coverage gate CI enforces so failures are caught early:
 
 ```powershell
 git fetch origin main
-dotnet restore QueenZone.sln
-dotnet build QueenZone.sln --configuration Release --no-restore
-dotnet format QueenZone.sln --verify-no-changes
+# After default restore/build/format, collect coverage and gate:
 dotnet test QueenZone.sln --configuration Release --no-build --collect:"XPlat Code Coverage" --settings coverlet.runsettings --results-directory ./TestResults
 powershell -File ./scripts/Test-CoverageGate.ps1 -Reports ./TestResults -GlobalLineThreshold 51 -ChangedLineThreshold 70 -BaseRef origin/main
 ```
