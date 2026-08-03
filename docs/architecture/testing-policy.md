@@ -218,7 +218,7 @@ dotnet format QueenZone.sln --verify-no-changes
 dotnet test QueenZone.sln --configuration Release --no-build
 ```
 
-CI enforces formatting against the root `.editorconfig` via `dotnet format … --verify-no-changes` in the `build` job. If that step fails, run `dotnet format QueenZone.sln` locally and commit the result.
+CI enforces formatting against the root `.editorconfig` via `dotnet format … --verify-no-changes` in its own `format` job (runs in parallel with `build`/`test`, not as a step inside `build` — see "Other CI jobs" below). If that step fails, run `dotnet format QueenZone.sln` locally and commit the result.
 
 Line endings: `.editorconfig` requires CRLF. Root `.gitattributes` sets `* text=auto eol=crlf` so Linux CI and Windows agents share the same working-tree endings. Without that, Linux checkouts stay LF and fail `ENDOFLINE` while Windows with `core.autocrlf=true` stays green.
 
