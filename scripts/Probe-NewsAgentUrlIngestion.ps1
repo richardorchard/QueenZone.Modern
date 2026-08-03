@@ -1,7 +1,7 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Opt-in live probe for admin URL ingestion (issue #489).
+    Opt-in SQL Express mirror probe for admin URL ingestion (issue #489).
 
 .DESCRIPTION
     Verifies the real SQL-backed run-request queue used by /admin/news-discovery
@@ -18,20 +18,20 @@
       - Also sets RUN_NEWS_AGENT_URL_INGESTION_FULL_PROBE=true
       - Fetches a public URL (default https://example.com/?qz-url-ingestion-probe=...)
       - Runs triage via the worker DI stack (OpenRouter when OPENROUTER_API_KEY is set)
-      - Creates a discovery candidate; never publishes to public /news
+      - Creates and then deletes a discovery candidate; never publishes to public /news
 
-    Point the connection string at a database you are willing to mutate (same Azure SQL
-    as App Service + the Windows runner is ideal for pre/post deploy checks).
+    The script refuses any target except the local queenzone_legacy_sync SQL Express
+    mirror. Probe rows are deleted before the test returns.
 
 .EXAMPLE
     # Schema + queue only (safe first step after migration deploy)
-    $env:ConnectionStrings__QueenZoneLegacy = "<connection string>"
+    $env:ConnectionStrings__QueenZoneLegacy = "Server=localhost\SQLEXPRESS;Database=queenzone_legacy_sync;Integrated Security=True;TrustServerCertificate=True"
     $env:RUN_NEWS_AGENT_URL_INGESTION_PROBE = "true"
     .\scripts\Probe-NewsAgentUrlIngestion.ps1
 
 .EXAMPLE
     # Full fetch + triage on the real stack
-    $env:ConnectionStrings__QueenZoneLegacy = "<connection string>"
+    $env:ConnectionStrings__QueenZoneLegacy = "Server=localhost\SQLEXPRESS;Database=queenzone_legacy_sync;Integrated Security=True;TrustServerCertificate=True"
     $env:RUN_NEWS_AGENT_URL_INGESTION_PROBE = "true"
     $env:OPENROUTER_API_KEY = "<optional but recommended for AI triage>"
     .\scripts\Probe-NewsAgentUrlIngestion.ps1 -Full
@@ -82,13 +82,16 @@ if ($env:RUN_NEWS_AGENT_URL_INGESTION_PROBE -ne 'true') {
     Write-Error "Set RUN_NEWS_AGENT_URL_INGESTION_PROBE=true to run live URL ingestion probes against the configured database."
 }
 
+& "$PSScriptRoot/Assert-SqlExpressMirrorConnection.ps1" `
+    -ConnectionString $env:ConnectionStrings__QueenZoneLegacy
+
 Write-Host "QueenZone News Agent URL ingestion probe"
 Write-Host "Configuration: $Configuration"
 Write-Host "Full pipeline: $Full"
 Write-Host "Generate draft: $GenerateDraft"
 Write-Host "Connection string length: $($env:ConnectionStrings__QueenZoneLegacy.Length) (value not printed)"
 
-Write-Step "Schema / queue / claim lifecycle (Azure SQL)"
+Write-Step "Schema / queue / claim lifecycle (SQL Express mirror)"
 $schemaArgs = @(
     'test',
     'tests/QueenZone.Web.Tests/QueenZone.Web.Tests.csproj',
@@ -103,7 +106,7 @@ if ($LASTEXITCODE -ne 0) {
 if (-not $Full) {
     Write-Host ""
     Write-Host "Schema/lifecycle probe passed." -ForegroundColor Green
-    Write-Host "Re-run with -Full to fetch a public URL and triage on this machine (creates a discovery candidate; never publishes)."
+    Write-Host "Re-run with -Full to fetch and triage a public URL on the disposable mirror."
     exit 0
 }
 
@@ -150,5 +153,5 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host ""
 Write-Host "Full URL ingestion probe passed." -ForegroundColor Green
-Write-Host "Confirm public /news was not changed, then review the candidate under /admin/news-discovery if desired."
+Write-Host "Probe artifacts were removed; public /news was not changed."
 exit 0

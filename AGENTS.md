@@ -78,7 +78,7 @@ Use deterministic sample or fake data for normal unit and web integration tests.
 
 When changing EF `SqlQueryRaw` projections over legacy tables, check the real SQL Server column types or cast projections to the C# row model types explicitly. Many legacy IDs and counts are `smallint`, which SQL Server materializes as `System.Int16`; in-memory route tests will not catch `Int16`-to-`Int32` mapping failures. Prefer a deterministic SQL-shape test plus an opt-in read-only legacy DB probe for new public legacy read surfaces.
 
-The read-only legacy probes now also run automatically every night via `.github/workflows/nightly-legacy-checks.yml`, on the self-hosted macOS runner, against a same-day SQL Express mirror of the legacy database synced nightly from the live Azure SQL DB (not the live database directly) — not a PR gate, just continuous signal. See `docs/architecture/testing-policy.md` ("Data Integration Tests").
+Legacy read probes and self-cleaning write probes run automatically every night via `.github/workflows/nightly-legacy-checks.yml`. They use a same-day SQL Express mirror synced from the live Azure SQL DB, never the live database. The read probes run on macOS over the LAN; write probes run locally on the Windows SQL Express host. This is continuous signal, not a PR gate. See `docs/architecture/testing-policy.md` ("Data Integration Tests").
 
 When a change touches admin news writes or discovery-to-news promotion, prefer running the opt-in admin write probe before release or after deployment verification:
 
@@ -87,18 +87,18 @@ $env:RUN_LEGACY_WRITE_PROBE = "true"
 powershell -File .\scripts\Probe-AdminNewsLegacyWrites.ps1
 ```
 
-Run it only when `ConnectionStrings__QueenZoneLegacy` points at a database you are willing to mutate. The probe creates, publishes, unpublishes, and deletes a uniquely named draft article to confirm the real SQL-backed admin workflow still works.
+`ConnectionStrings__QueenZoneLegacy` must point to `queenzone_legacy_sync` on the local SQL Express instance. The script rejects Azure SQL and remote servers. The probe creates, publishes, unpublishes, and deletes a uniquely named draft article.
 
 When a change touches admin URL ingestion, the news-agent run-request queue, or the local `process-news-requests` runner, prefer the opt-in URL ingestion probe after the EF migration is applied:
 
 ```powershell
-$env:ConnectionStrings__QueenZoneLegacy = "<same DB as App Service + Windows runner>"
+$env:ConnectionStrings__QueenZoneLegacy = "Server=localhost\SQLEXPRESS;Database=queenzone_legacy_sync;Integrated Security=True;TrustServerCertificate=True"
 $env:RUN_NEWS_AGENT_URL_INGESTION_PROBE = "true"
 powershell -File .\scripts\Probe-NewsAgentUrlIngestion.ps1          # schema + queue only
 powershell -File .\scripts\Probe-NewsAgentUrlIngestion.ps1 -Full    # fetch + triage (optional OpenRouter key)
 ```
 
-The full probe creates discovery candidates and never publishes. Report whether it was run or skipped.
+Both modes delete their requests, heartbeats, candidates, evidence, AI runs, and drafts before returning. The full probe never publishes. Report whether it was run or skipped.
 
 ### Pull request CI gates (must pass before merge)
 

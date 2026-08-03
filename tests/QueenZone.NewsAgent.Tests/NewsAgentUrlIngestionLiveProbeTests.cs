@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -61,6 +62,8 @@ public sealed class NewsAgentUrlIngestionLiveProbeTests
         Assert.True(queued.WasCreated, "Expected a new full-probe URL ingestion request.");
 
         long requestId = queued.Request.Id;
+        int? candidateId = null;
+        var probeStartedAtUtc = DateTime.UtcNow.AddSeconds(-5);
         try
         {
             var exitCode = await processor.RunOnceAsync(runnerId);
@@ -86,13 +89,14 @@ public sealed class NewsAgentUrlIngestionLiveProbeTests
                     @"candidate #(\d+)",
                     System.Text.RegularExpressions.RegexOptions.IgnoreCase);
                 if (match.Success
-                    && int.TryParse(match.Groups[1].Value, out var candidateId))
+                    && int.TryParse(match.Groups[1].Value, out var parsedCandidateId))
                 {
-                    candidate = await discovery.GetCandidateByIdAsync(candidateId);
+                    candidate = await discovery.GetCandidateByIdAsync(parsedCandidateId);
                 }
             }
 
             Assert.NotNull(candidate);
+            candidateId = candidate.Id;
             Assert.NotEqual(NewsCandidateStatus.PromotedToArticle, candidate.Status);
             Assert.Null(candidate.PromotedNewsId);
 
@@ -127,6 +131,69 @@ public sealed class NewsAgentUrlIngestionLiveProbeTests
 
             throw;
         }
+        finally
+        {
+            await CleanupProbeArtifactsAsync(
+                provider,
+                requestId,
+                runnerId,
+                candidateId,
+                probeSuffix,
+                normalizedUrl,
+                probeStartedAtUtc);
+        }
+    }
+
+    private static async Task CleanupProbeArtifactsAsync(
+        ServiceProvider provider,
+        long requestId,
+        string runnerId,
+        int? candidateId,
+        string probeSuffix,
+        string normalizedUrl,
+        DateTime probeStartedAtUtc)
+    {
+        await using var cleanupScope = provider.CreateAsyncScope();
+        var dbContext = cleanupScope.ServiceProvider.GetRequiredService<QueenZoneDbContext>();
+
+        var candidateIds = await dbContext.NewsCandidates
+            .Where(candidate =>
+                candidate.PromotedNewsId == null
+                && candidate.CreatedAt >= probeStartedAtUtc
+                && ((candidateId.HasValue && candidate.Id == candidateId.Value)
+                    || candidate.SourceUrl.Contains(probeSuffix)
+                    || candidate.CanonicalUrl.Contains(probeSuffix)
+                    || candidate.SourceUrl == normalizedUrl
+                    || candidate.CanonicalUrl == normalizedUrl))
+            .Select(candidate => candidate.Id)
+            .ToListAsync();
+
+        if (candidateIds.Count > 0)
+        {
+            await dbContext.NewsAgentDrafts
+                .Where(draft => candidateIds.Contains(draft.CandidateId))
+                .ExecuteDeleteAsync();
+            await dbContext.NewsCandidateEvidence
+                .Where(evidence => candidateIds.Contains(evidence.CandidateId))
+                .ExecuteDeleteAsync();
+            await dbContext.NewsAiRuns
+                .Where(run => candidateIds.Contains(run.CandidateId))
+                .ExecuteDeleteAsync();
+            await dbContext.NewsCandidates
+                .Where(candidate => candidateIds.Contains(candidate.Id))
+                .ExecuteDeleteAsync();
+        }
+
+        await dbContext.NewsAgentRunRequests
+            .Where(request => request.Id == requestId)
+            .ExecuteDeleteAsync();
+        await dbContext.NewsAgentRunnerHeartbeats
+            .Where(heartbeat => heartbeat.RunnerId == runnerId)
+            .ExecuteDeleteAsync();
+
+        Assert.False(await dbContext.NewsAgentRunRequests.AnyAsync(request => request.Id == requestId));
+        Assert.False(await dbContext.NewsAgentRunnerHeartbeats.AnyAsync(heartbeat => heartbeat.RunnerId == runnerId));
+        Assert.False(await dbContext.NewsCandidates.AnyAsync(candidate => candidateIds.Contains(candidate.Id)));
     }
 
     private static ServiceProvider BuildProvider(string connectionString)

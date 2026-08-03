@@ -103,21 +103,17 @@ ConnectionStrings__QueenZoneLegacy=...
 
 Do not require these tests in normal CI until the project has a known, repeatable test database.
 
-The **read-only** probes (`EfAdminNewsRepositoryLegacyProbeTests`, and the read-only fact in
-`EfNewsSectionLiveProbeTests`) do run automatically — nightly, via
-`.github/workflows/nightly-legacy-checks.yml`, on the self-hosted macOS runner. This is separate
-from "normal CI": it's not a PR gate, doesn't block merges, and only runs on a schedule (plus
-`workflow_dispatch`).
+The legacy probes run automatically each night through
+`.github/workflows/nightly-legacy-checks.yml`. This is separate from normal CI: it is not a PR gate,
+does not block merges, and runs only on a schedule or through `workflow_dispatch`.
 
-They run against a same-day SQL Express mirror on the self-hosted Windows runner
-(`scripts/Sync-LegacyDbToSqlExpress.ps1` refreshes it nightly from the live Azure SQL DB via a
-`sqlpackage` bacpac export/import — see the workflow file for the one-time setup this requires),
-not the live database directly. `RUN_LEGACY_WRITE_PROBE` is still deliberately left unset there, so
-the write-capable probes below stay no-ops on this schedule for now — but since the target is now a
-disposable nightly-refreshed mirror rather than the production-equivalent live database, the original
-safety concern about unattended writes mostly goes away. See
-[#449](https://github.com/richardorchard/QueenZone.Modern/issues/449) for the tracked follow-up on
-turning them on.
+They run against a same-day SQL Express mirror on the self-hosted Windows runner.
+`scripts/Sync-LegacyDbToSqlExpress.ps1` refreshes it from live Azure SQL via a `sqlpackage` bacpac
+export/import. Read probes then run from the macOS runner over the LAN. Self-cleaning admin-news and
+URL-ingestion write probes run locally on Windows after the read checks pass. Their scripts reject
+Azure SQL, remote servers, and databases other than `queenzone_legacy_sync`. A final marker scan fails
+the workflow if probe or leaked web-test residue remains. The optional full URL fetch probe is manual
+through the workflow's `run_full_url_probe` input.
 
 ### Modern-Schema SQL Server Tests
 
@@ -149,9 +145,9 @@ in parallel and never touch the legacy or Azure SQL databases.
 
 When EF Core `SqlQueryRaw` maps legacy columns into typed row classes, do not rely only on in-memory route tests. The legacy schema uses many `smallint` and `bit` columns; SQL Server returns those as `System.Int16` and `bool`, not `int`. Either cast projected values to the row model type in SQL (for example, `CAST(Q_LINK_CAT_ID AS int) AS CategoryId`) and cover that SQL shape with a deterministic test, or run an opt-in read-only legacy database probe before deployment to prove the projection materializes.
 
-For pre-release admin write checks against the configured legacy SQL Server database, run `scripts/Probe-AdminNewsLegacyWrites.ps1` with both `ConnectionStrings__QueenZoneLegacy` and `RUN_LEGACY_WRITE_PROBE=true` set. The probe creates, publishes, unpublishes, and deletes a uniquely named test article. Point the connection string at a database you are willing to mutate (often the same Azure SQL instance used locally or in production), not the in-memory sample data path.
+For admin write checks, run `scripts/Probe-AdminNewsLegacyWrites.ps1` with `ConnectionStrings__QueenZoneLegacy` pointing to the local `queenzone_legacy_sync` SQL Express mirror and `RUN_LEGACY_WRITE_PROBE=true`. The script refuses other targets. The probe creates, publishes, unpublishes, and deletes a uniquely named test article.
 
-For admin URL ingestion / news-agent run-request queue checks, run `scripts/Probe-NewsAgentUrlIngestion.ps1` with `ConnectionStrings__QueenZoneLegacy` and `RUN_NEWS_AGENT_URL_INGESTION_PROBE=true`. Default mode only exercises SQL queue/claim/complete (and fails clearly if the `Kind`/`ArticleUrl` migration is missing). Pass `-Full` to fetch a public URL and triage via the local worker stack (`RUN_NEWS_AGENT_URL_INGESTION_FULL_PROBE` is set by the script); optional `OPENROUTER_API_KEY` enables AI triage. Full mode creates discovery candidates and never publishes.
+For admin URL ingestion and run-request queue checks, use the same SQL Express mirror with `scripts/Probe-NewsAgentUrlIngestion.ps1` and `RUN_NEWS_AGENT_URL_INGESTION_PROBE=true`. Default mode exercises SQL queue, claim, and completion. Pass `-Full` to fetch a public URL and triage through the local worker stack; an optional `OPENROUTER_API_KEY` enables AI triage. Both modes delete their requests, heartbeats, and related discovery records before returning. The full mode never publishes.
 
 ### Migration And Content Validation
 
