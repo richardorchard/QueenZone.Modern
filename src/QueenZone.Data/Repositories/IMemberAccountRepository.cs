@@ -28,6 +28,17 @@ public interface IMemberAccountRepository
     /// </summary>
     Task<MemberAccount?> UpdateAvatarUrlAsync(Guid memberId, string? avatarBlobPath, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Returns the modern account already linked to the given legacy USERS_T id, if any.
+    /// </summary>
+    Task<MemberAccount?> FindByLinkedLegacyUserIdAsync(int legacyUserId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Sets <see cref="MemberAccount.LinkedLegacyUserId"/> when the member is still unlinked.
+    /// Callers must enforce uniqueness before calling.
+    /// </summary>
+    Task<MemberAccount?> LinkLegacyUserIdAsync(Guid memberId, int legacyUserId, CancellationToken cancellationToken = default);
+
     Task RecordLoginAsync(Guid memberId, DateTime loginAt, CancellationToken cancellationToken = default);
 
     Task<MemberStats> GetStatsAsync(DateTime utcNow, CancellationToken cancellationToken = default);
