@@ -106,6 +106,24 @@ public sealed class AdminAntiforgeryRoutesTests : IClassFixture<QueenZoneWebAppl
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Discovery_queue_url_ingestion_without_antiforgery_token_returns_bad_request()
+    {
+        var client = AdminHttpTestHelpers.CreateClient(
+            CreateInMemoryFactory(new SharedNewsStore()),
+            AdminHttpTestHelpers.AdminEmail);
+
+        var response = await client.PostAsync(
+            "/admin/news-discovery?handler=queueurlingestion",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["ArticleUrl"] = "https://www.queenonline.com/news/example",
+                ["UrlIngestionAction"] = "triage"
+            }));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
     private WebApplicationFactory<Program> CreateInMemoryFactory(
         SharedNewsStore store,
         INewsDiscoveryRepository? discoveryRepository = null) =>

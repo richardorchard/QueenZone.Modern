@@ -120,10 +120,13 @@ public sealed class NewsDraftGenerationService(
             return new NewsDraftCandidateResult(candidate.Id, null, false, null);
         }
 
-        var structuredDraft = NewsDraftResultParser.Parse(execution.Completion.Content);
+        var structuredDraft = NewsDraftQuotePolicy.Enforce(
+            NewsDraftResultParser.Parse(execution.Completion.Content),
+            evidence);
         var attribution = NewsDraftAttributionBuilder.Build(structuredDraft, candidate, source, evidence);
         var proposedSlug = NewsSlug.Slugify(
             structuredDraft.Slug ?? structuredDraft.Title);
+        var sourceNotes = AppendPreservedQuotes(attribution.SourceNotes, structuredDraft.PreservedQuotes);
 
         if (!options.DryRun)
         {
@@ -135,7 +138,7 @@ public sealed class NewsDraftGenerationService(
                     structuredDraft.Excerpt,
                     structuredDraft.Body,
                     attribution.AttributionText,
-                    attribution.SourceNotes,
+                    sourceNotes,
                     attribution.ConfidenceNotes,
                     structuredDraft.SuggestedPublishAt,
                     execution.AiRunId),
@@ -180,5 +183,22 @@ public sealed class NewsDraftGenerationService(
     {
         var minimum = draftOptions.Value.MinConfidenceScore(candidate.SourceTrustTier);
         return (candidate.ConfidenceScore ?? 0m) >= minimum;
+    }
+
+    private static string AppendPreservedQuotes(
+        string sourceNotes,
+        IReadOnlyList<NewsDraftPreservedQuote> preservedQuotes)
+    {
+        if (preservedQuotes.Count == 0)
+        {
+            return sourceNotes;
+        }
+
+        var lines = preservedQuotes.Select(quote =>
+            $"- {quote.Speaker}: \"{quote.ExactText}\" ({quote.SourceUrl})");
+        var block = "Preserved quotes:" + Environment.NewLine + string.Join(Environment.NewLine, lines);
+        return string.IsNullOrWhiteSpace(sourceNotes)
+            ? block
+            : sourceNotes.TrimEnd() + Environment.NewLine + Environment.NewLine + block;
     }
 }

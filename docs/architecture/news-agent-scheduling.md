@@ -89,7 +89,16 @@ scripts/Run-NewsAgentDiscovery.ps1 -Scheduled *>&1 | Tee-Object -FilePath "$env:
 
 ### Web-queued runs on the local computer
 
-The admin button does not contact the Windows computer directly. It inserts one pending request into the shared Azure SQL database. The computer polls outbound, records a heartbeat, atomically claims at most one request, and runs the same `--scheduled` triage-only preset. If the computer is off, the request remains pending.
+Admin actions on `/admin/news-discovery` do not contact the Windows computer directly. They insert a pending request into the shared Azure SQL database. The computer polls outbound, records a heartbeat, and atomically claims at most one request.
+
+Request kinds:
+
+| Kind | Source in admin UI | What the runner does |
+|------|--------------------|----------------------|
+| `ScheduledGathering` | **Queue news gathering** | Same `--scheduled` preset: seed sources, fetch feeds, triage (no bulk drafts) |
+| `UrlIngestion` | **Submit article URL** | Fetch that public URL, create/reuse a candidate, triage; optional explicit draft only when the form requested it |
+
+If the computer is off, the request remains pending. URL submissions stay in the queue independently of the single active gathering slot.
 
 Create a second Task Scheduler task:
 
@@ -107,7 +116,9 @@ Smoke-test the poller before saving the task:
 scripts/Process-NewsAgentRunRequests.ps1 -RunnerId "news-pc"
 ```
 
-With no pending request it exits `0` after updating the heartbeat. Queue a request from `/admin/news-discovery`, run the script again, and confirm that the page shows the request moving from `Pending` to `Completed` or `Failed`. The hourly interval means a web-queued run can take up to an hour to start. The runner never needs an inbound port, tunnel, or webhook.
+With no pending request it exits `0` after updating the heartbeat. Queue a gathering or URL request from `/admin/news-discovery`, run the script again, and confirm that the page shows the request moving from `Pending` to `Completed` or `Failed`. The hourly interval means a web-queued run can take up to an hour to start. The runner never needs an inbound port, tunnel, or webhook.
+
+Opt-in live probe (schema or full fetch+triage against the real DB): `scripts/Probe-NewsAgentUrlIngestion.ps1` — see `docs/architecture/news-agent.md`.
 
 ## Azure hosting options
 

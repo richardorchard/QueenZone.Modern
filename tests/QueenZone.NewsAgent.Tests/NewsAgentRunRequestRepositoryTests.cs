@@ -9,8 +9,8 @@ public sealed class NewsAgentRunRequestRepositoryTests
     {
         var repository = CreateRepository();
 
-        var first = await repository.QueueAsync("editor@example.com");
-        var duplicate = await repository.QueueAsync("other@example.com");
+        var first = await repository.QueueAsync(new QueenZone.Data.NewsAgentRunRequestCreate("editor@example.com"));
+        var duplicate = await repository.QueueAsync(new QueenZone.Data.NewsAgentRunRequestCreate("other@example.com"));
 
         Assert.True(first.WasCreated);
         Assert.False(duplicate.WasCreated);
@@ -21,7 +21,7 @@ public sealed class NewsAgentRunRequestRepositoryTests
         Assert.Equal(NewsAgentRunRequestStatus.Running, claimed.Status);
         Assert.True(await repository.CompleteAsync(claimed.Id, "Done"));
 
-        var next = await repository.QueueAsync("editor@example.com");
+        var next = await repository.QueueAsync(new QueenZone.Data.NewsAgentRunRequestCreate("editor@example.com"));
         Assert.True(next.WasCreated);
         Assert.NotEqual(first.Request.Id, next.Request.Id);
     }
@@ -30,7 +30,7 @@ public sealed class NewsAgentRunRequestRepositoryTests
     public async Task Claim_is_single_consumer_and_records_heartbeat()
     {
         var repository = CreateRepository();
-        await repository.QueueAsync("editor@example.com");
+        await repository.QueueAsync(new QueenZone.Data.NewsAgentRunRequestCreate("editor@example.com"));
 
         var first = await repository.ClaimNextAsync("news-pc");
         var second = await repository.ClaimNextAsync("news-pc-2");
@@ -46,7 +46,7 @@ public sealed class NewsAgentRunRequestRepositoryTests
     public async Task Return_to_pending_allows_a_later_poll_to_retry()
     {
         var repository = CreateRepository();
-        await repository.QueueAsync("editor@example.com");
+        await repository.QueueAsync(new QueenZone.Data.NewsAgentRunRequestCreate("editor@example.com"));
         var claimed = await repository.ClaimNextAsync("news-pc");
 
         Assert.True(await repository.ReturnToPendingAsync(claimed!.Id));

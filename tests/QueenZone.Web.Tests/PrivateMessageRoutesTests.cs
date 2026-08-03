@@ -3,9 +3,11 @@ using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using QueenZone.Data;
 using QueenZone.Data.Entities;
 using QueenZone.Web;
+using QueenZone.Web.Pages.Members;
 
 namespace QueenZone.Web.Tests;
 
@@ -179,6 +181,46 @@ public sealed class PrivateMessageRoutesTests : IClassFixture<WebApplicationFact
         Assert.Contains("/account/login", html);
     }
 
+    [Fact]
+    public async Task MemberProfile_ListsAndPaginatesPublicActivity()
+    {
+        var memberId = Guid.NewGuid();
+        var activity = Enumerable.Range(1, ProfileModel.ActivityPageSize + 1)
+            .Select(index => new MemberPublicActivityItem(
+                MemberPublicActivityType.ForumPost,
+                $"Topic {index}",
+                $"Post summary {index}",
+                DateTimeOffset.UtcNow.AddMinutes(-index),
+                ContentId: index,
+                ParentId: 1000 + index,
+                Slug: $"topic-{index}"))
+            .ToList();
+        using var profileFactory = factory.WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<IMemberPublicActivityRepository>();
+            services.AddSingleton<IMemberPublicActivityRepository>(new StubMemberPublicActivityRepository(activity));
+        }));
+        var members = profileFactory.Services.GetRequiredService<IMemberAccountRepository>();
+        await members.CreateAsync(new MemberAccount
+        {
+            Id = memberId,
+            Email = "activity@example.com",
+            DisplayName = "Active Member",
+            CreatedAt = DateTime.UtcNow,
+        });
+        var client = profileFactory.CreateClient();
+
+        var firstPage = await client.GetStringAsync($"/members/{memberId}");
+        Assert.Contains("Public contributions", firstPage);
+        Assert.Contains("Topic 1", firstPage);
+        Assert.DoesNotContain("Topic 21", firstPage);
+        Assert.Contains("Member activity pagination", firstPage);
+
+        var secondPage = await client.GetStringAsync($"/members/{memberId}?pageNumber=2");
+        Assert.Contains("Topic 21", secondPage);
+        Assert.DoesNotContain("Topic 1</a>", secondPage);
+    }
+
     private async Task<(HttpClient Client, MemberAccount Member)> CreateMemberAsync(
         string email,
         string displayName)
@@ -229,5 +271,19 @@ public sealed class PrivateMessageRoutesTests : IClassFixture<WebApplicationFact
 
         var start = Math.Max(0, idx - 80);
         return html.Substring(start, Math.Min(500, html.Length - start));
+    }
+
+    private sealed class StubMemberPublicActivityRepository(IReadOnlyList<MemberPublicActivityItem> items)
+        : IMemberPublicActivityRepository
+    {
+        public Task<MemberPublicActivityPage> GetPageAsync(
+            Guid memberId,
+            int page,
+            int pageSize,
+            CancellationToken cancellationToken = default)
+        {
+            var pageItems = items.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+            return Task.FromResult(new MemberPublicActivityPage(pageItems, items.Count, page, pageSize));
+        }
     }
 }

@@ -236,7 +236,8 @@ public sealed class InMemoryArticleSubmissionRepository : IArticleSubmissionRepo
                     a.Tags,
                     a.PublishedAt!.Value,
                     a.Author?.DisplayName,
-                    EfArticleSubmissionRepository.EstimateWordCount(a.Body)))
+                    EfArticleSubmissionRepository.EstimateWordCount(a.Body),
+                    a.AuthorMemberId))
                 .ToList();
 
             return Task.FromResult<IReadOnlyList<PublishedArticleSubmission>>(result);

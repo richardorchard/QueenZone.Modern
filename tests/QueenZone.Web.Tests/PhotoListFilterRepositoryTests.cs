@@ -96,14 +96,15 @@ internal sealed class SqlitePhotoFixture : IAsyncDisposable
                 PIC_HEIGHT INTEGER NOT NULL,
                 pic_id INTEGER NOT NULL,
                 category_name TEXT,
-                cat_id INTEGER NOT NULL
+                cat_id INTEGER NOT NULL,
+                submitted_by_display_name TEXT
             );
             INSERT INTO PhotoCategories (cat_id, name) VALUES (3, 'Live 1986');
-            INSERT INTO PhotoItems (NAME, DATE_TIME, URL, THUMB_URL, T_HEIGHT, T_WIDTH, PIC_WIDTH, PIC_HEIGHT, pic_id, category_name, cat_id)
+            INSERT INTO PhotoItems (NAME, DATE_TIME, URL, THUMB_URL, T_HEIGHT, T_WIDTH, PIC_WIDTH, PIC_HEIGHT, pic_id, category_name, cat_id, submitted_by_display_name)
             VALUES
-                ('Newest', '1986-07-12 00:00:00', 'n.jpg', 'n-t.jpg', 100, 150, 1920, 1080, 11, 'Live 1986', 3),
-                ('Middle', '1986-07-11 00:00:00', 'm.jpg', 'm-t.jpg', 100, 150, 800, 600, 10, 'Live 1986', 3),
-                ('Oldest', '1986-07-10 00:00:00', 'o.jpg', 'o-t.jpg', 100, 150, 0, 0, 9, 'Live 1986', 3);
+                ('Newest', '1986-07-12 00:00:00', 'n.jpg', 'n-t.jpg', 100, 150, 1920, 1080, 11, 'Live 1986', 3, 'LiveAidFan'),
+                ('Middle', '1986-07-11 00:00:00', 'm.jpg', 'm-t.jpg', 100, 150, 800, 600, 10, 'Live 1986', 3, NULL),
+                ('Oldest', '1986-07-10 00:00:00', 'o.jpg', 'o-t.jpg', 100, 150, 0, 0, 9, 'Live 1986', 3, NULL);
             """);
         return new SqlitePhotoFixture(connection, db);
     }
