@@ -80,6 +80,16 @@ When changing EF `SqlQueryRaw` projections over legacy tables, check the real SQ
 
 Legacy read probes and self-cleaning write probes run automatically every night via `.github/workflows/nightly-legacy-checks.yml`. They use a same-day SQL Express mirror synced from the live Azure SQL DB, never the live database. The read probes run on macOS over the LAN; write probes run locally on the Windows SQL Express host. This is continuous signal, not a PR gate. See `docs/architecture/testing-policy.md` ("Data Integration Tests").
 
+When a change touches private messaging writes, SortKey assignment, or conversation locking, prefer the opt-in SQL Express mirror probe after the EF migration is applied:
+
+```powershell
+$env:ConnectionStrings__QueenZoneLegacy = "Server=localhost\SQLEXPRESS;Database=queenzone_legacy_sync;Integrated Security=True;TrustServerCertificate=True"
+$env:RUN_PRIVATE_MESSAGE_PROBE = "true"
+powershell -File .\scripts\Probe-PrivateMessaging.ps1
+```
+
+`ConnectionStrings__QueenZoneLegacy` must point to `queenzone_legacy_sync` on the local SQL Express instance. The script rejects Azure SQL and remote servers. The probe creates throwaway members, concurrent first-sends and replies, asserts IDENTITY `SortKey` + `LastMessageSortKey` tip consistency, then deletes the probe rows. Report whether it was run or skipped.
+
 When a change touches admin news writes or discovery-to-news promotion, prefer running the opt-in admin write probe before release or after deployment verification:
 
 ```powershell

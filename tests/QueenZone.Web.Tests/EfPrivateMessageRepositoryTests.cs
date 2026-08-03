@@ -1,5 +1,6 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Storage;
 using QueenZone.Data;
 using QueenZone.Data.Entities;
@@ -101,7 +102,7 @@ public sealed class EfPrivateMessageRepositoryTests : IAsyncDisposable
     }
 
     [Fact]
-    public async Task Inbox_OrdersByLastMessage_AndHidesOtherConversations()
+    public async Task Inbox_OrdersByLastMessageSortKey_AndHidesOtherConversations()
     {
         await repository.SendNewOrExistingAsync(
             aliceId,
@@ -122,6 +123,39 @@ public sealed class EfPrivateMessageRepositoryTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task Inbox_OrdersByLastMessageSortKey_EvenWhenTimestampsSkew()
+    {
+        // Insert Carol first with a late wall-clock timestamp, then Bob with an earlier timestamp.
+        // SortKey (insert order) must win inbox ranking over LastMessageAt.
+        await repository.SendNewOrExistingAsync(
+            aliceId,
+            carolId,
+            "Carol first insert",
+            DateTimeOffset.Parse("2026-08-02T20:00:00Z"));
+        await repository.SendNewOrExistingAsync(
+            aliceId,
+            bobId,
+            "Bob later insert, earlier clock",
+            DateTimeOffset.Parse("2026-08-02T08:00:00Z"));
+
+        var inbox = await repository.GetInboxAsync(aliceId);
+        Assert.Equal(["Bob EF", "Carol EF"], inbox.Items.Select(i => i.OtherParticipantDisplayName).ToArray());
+        Assert.True(inbox.Items[0].LastMessageAt < inbox.Items[1].LastMessageAt);
+
+        var bobConversation = await dbContext.PrivateConversations
+            .AsNoTracking()
+            .SingleAsync(c =>
+                (c.MemberLowId == aliceId && c.MemberHighId == bobId)
+                || (c.MemberLowId == bobId && c.MemberHighId == aliceId));
+        var carolConversation = await dbContext.PrivateConversations
+            .AsNoTracking()
+            .SingleAsync(c =>
+                (c.MemberLowId == aliceId && c.MemberHighId == carolId)
+                || (c.MemberLowId == carolId && c.MemberHighId == aliceId));
+        Assert.True(bobConversation.LastMessageSortKey > carolConversation.LastMessageSortKey);
+    }
+
+    [Fact]
     public async Task Reply_RejectsNonParticipant()
     {
         var created = await repository.SendNewOrExistingAsync(
@@ -138,7 +172,7 @@ public sealed class EfPrivateMessageRepositoryTests : IAsyncDisposable
     }
 
     [Fact]
-    public async Task Reply_UpdatesPreviewToInsertedTip_KeepsMonotonicLastMessageAt()
+    public async Task Reply_UpdatesPreviewAndSortKeyTip_KeepsMonotonicLastMessageAt()
     {
         var created = await repository.SendNewOrExistingAsync(
             aliceId,
@@ -160,9 +194,18 @@ public sealed class EfPrivateMessageRepositoryTests : IAsyncDisposable
 
         var inbox = await repository.GetInboxAsync(aliceId);
         var item = Assert.Single(inbox.Items);
-        // Insert order / SortKey wins for preview; LastMessageAt stays monotonic for inbox ordering.
+        // Insert order / SortKey wins for preview and tip ranking; LastMessageAt stays monotonic.
         Assert.Equal("Older reply commits later", item.LastMessagePreview);
         Assert.Equal(DateTimeOffset.Parse("2026-08-02T12:02:00Z"), item.LastMessageAt);
+
+        var conversation = await dbContext.PrivateConversations
+            .AsNoTracking()
+            .SingleAsync(c => c.Id == conversationId);
+        var tipSortKey = await dbContext.PrivateMessages
+            .AsNoTracking()
+            .Where(m => m.ConversationId == conversationId)
+            .MaxAsync(m => m.SortKey);
+        Assert.Equal(tipSortKey, conversation.LastMessageSortKey);
 
         var detail = await repository.GetConversationAsync(conversationId, aliceId);
         Assert.Equal(3, detail!.Messages.Count);
@@ -225,6 +268,86 @@ public sealed class EfPrivateMessageRepositoryTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task ConcurrentReplies_SerializeUnderWriteLock()
+    {
+        const string shared = "Data Source=file:pm-reply-race?mode=memory&cache=shared";
+        await using var keepAlive = new SqliteConnection(shared);
+        keepAlive.Open();
+
+        Guid conversationId;
+        await using (var setup = CreateContext(shared))
+        {
+            setup.Database.EnsureCreated();
+            setup.MemberAccounts.AddRange(
+                new MemberAccount
+                {
+                    Id = aliceId,
+                    Email = "reply-race-alice@example.com",
+                    NormalizedEmail = "REPLY-RACE-ALICE@EXAMPLE.COM",
+                    DisplayName = "Reply Race Alice",
+                    CreatedAt = DateTime.UtcNow,
+                },
+                new MemberAccount
+                {
+                    Id = bobId,
+                    Email = "reply-race-bob@example.com",
+                    NormalizedEmail = "REPLY-RACE-BOB@EXAMPLE.COM",
+                    DisplayName = "Reply Race Bob",
+                    CreatedAt = DateTime.UtcNow,
+                });
+            await setup.SaveChangesAsync();
+
+            var seedRepo = new EfPrivateMessageRepository(setup);
+            var created = await seedRepo.SendNewOrExistingAsync(
+                aliceId,
+                bobId,
+                "Seed",
+                DateTimeOffset.Parse("2026-08-02T18:00:00Z"));
+            Assert.True(created.Succeeded, created.ErrorMessage);
+            conversationId = created.ConversationId!.Value;
+        }
+
+        async Task<PrivateMessageSendResult> ReplyAsync(Guid senderId, string body, DateTimeOffset sentAt)
+        {
+            await using var context = CreateContext(shared);
+            var repo = new EfPrivateMessageRepository(context);
+            return await repo.ReplyAsync(conversationId, senderId, body, sentAt);
+        }
+
+        const int replyCount = 12;
+        var replyTasks = Enumerable.Range(0, replyCount)
+            .Select(i =>
+            {
+                var senderId = i % 2 == 0 ? aliceId : bobId;
+                var sentAt = DateTimeOffset.Parse("2026-08-02T18:01:00Z").AddMilliseconds(i);
+                return ReplyAsync(senderId, $"Reply {i}", sentAt);
+            })
+            .ToArray();
+
+        var results = await Task.WhenAll(replyTasks);
+        Assert.All(results, r => Assert.True(r.Succeeded, r.ErrorMessage));
+
+        await using var verify = CreateContext(shared);
+        var messages = await verify.PrivateMessages
+            .AsNoTracking()
+            .Where(m => m.ConversationId == conversationId)
+            .OrderBy(m => m.SortKey)
+            .ToListAsync();
+        Assert.Equal(replyCount + 1, messages.Count);
+        Assert.Equal(messages.Count, messages.Select(m => m.SortKey).Distinct().Count());
+        for (var i = 1; i < messages.Count; i++)
+        {
+            Assert.True(messages[i].SortKey > messages[i - 1].SortKey);
+        }
+
+        var conversation = await verify.PrivateConversations
+            .AsNoTracking()
+            .SingleAsync(c => c.Id == conversationId);
+        Assert.Equal(messages[^1].SortKey, conversation.LastMessageSortKey);
+        Assert.Equal(messages[^1].Body, conversation.LastMessagePreview);
+    }
+
+    [Fact]
     public async Task Writes_RunInsideConfiguredRetryingExecutionStrategy()
     {
         await using var retryConnection = new SqliteConnection("Data Source=:memory:");
@@ -272,6 +395,62 @@ public sealed class EfPrivateMessageRepositoryTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task Writes_RetryTransientFault_WithoutDuplicatingMessages()
+    {
+        await using var retryConnection = new SqliteConnection("Data Source=:memory:");
+        await retryConnection.OpenAsync();
+        var failOnce = new FailOnceSaveChangesInterceptor();
+        var options = new DbContextOptionsBuilder<QueenZoneDbContext>()
+            .UseSqlite(retryConnection)
+            .ReplaceService<IExecutionStrategyFactory, ForcedRetryExecutionStrategyFactory>()
+            .AddInterceptors(failOnce)
+            .Options;
+        await using var context = new QueenZoneDbContext(options);
+        failOnce.Armed = false;
+        await context.Database.EnsureCreatedAsync();
+        context.MemberAccounts.AddRange(
+            new MemberAccount
+            {
+                Id = aliceId,
+                Email = "forced-retry-alice@example.com",
+                NormalizedEmail = "FORCED-RETRY-ALICE@EXAMPLE.COM",
+                DisplayName = "Forced Retry Alice",
+                CreatedAt = DateTime.UtcNow,
+            },
+            new MemberAccount
+            {
+                Id = bobId,
+                Email = "forced-retry-bob@example.com",
+                NormalizedEmail = "FORCED-RETRY-BOB@EXAMPLE.COM",
+                DisplayName = "Forced Retry Bob",
+                CreatedAt = DateTime.UtcNow,
+            });
+        await context.SaveChangesAsync();
+
+        var retryingRepository = new EfPrivateMessageRepository(context);
+        failOnce.Armed = true;
+        var created = await retryingRepository.SendNewOrExistingAsync(
+            aliceId,
+            bobId,
+            "Created with forced retry",
+            DateTimeOffset.Parse("2026-08-02T19:00:00Z"));
+        Assert.True(created.Succeeded, created.ErrorMessage);
+        Assert.True(failOnce.FailuresInjected >= 1);
+
+        failOnce.ResetArm();
+        var replied = await retryingRepository.ReplyAsync(
+            created.ConversationId!.Value,
+            bobId,
+            "Reply with forced retry",
+            DateTimeOffset.Parse("2026-08-02T19:01:00Z"));
+        Assert.True(replied.Succeeded, replied.ErrorMessage);
+        Assert.True(failOnce.FailuresInjected >= 2);
+
+        Assert.Equal(2, await context.PrivateMessages.CountAsync());
+        Assert.Equal(1, await context.PrivateConversations.CountAsync());
+    }
+
+    [Fact]
     public void IsUniqueConstraintViolation_DetectsSqliteUniqueErrors()
     {
         var sqlite = new Exception("UNIQUE constraint failed: PrivateConversations.MemberLowId, PrivateConversations.MemberHighId");
@@ -297,6 +476,11 @@ public sealed class EfPrivateMessageRepositoryTests : IAsyncDisposable
             .SingleAsync(p => p.ConversationId == conversationId && p.MemberId == aliceId);
         Assert.Equal(firstSortKey, participant.LastReadSortKey);
         Assert.NotNull(participant.LastReadAt);
+
+        var conversation = await dbContext.PrivateConversations
+            .AsNoTracking()
+            .SingleAsync(c => c.Id == conversationId);
+        Assert.Equal(firstSortKey, conversation.LastMessageSortKey);
     }
 
     [Fact]
@@ -414,6 +598,64 @@ public sealed class EfPrivateMessageRepositoryTests : IAsyncDisposable
         : ExecutionStrategy(dependencies, maxRetryCount: 1, maxRetryDelay: TimeSpan.Zero)
     {
         protected override bool ShouldRetryOn(Exception exception) => false;
+    }
+
+    private sealed class ForcedRetryExecutionStrategyFactory(ExecutionStrategyDependencies dependencies)
+        : IExecutionStrategyFactory
+    {
+        public IExecutionStrategy Create() => new ForcedRetryExecutionStrategy(dependencies);
+    }
+
+    private sealed class ForcedRetryExecutionStrategy(ExecutionStrategyDependencies dependencies)
+        : ExecutionStrategy(dependencies, maxRetryCount: 3, maxRetryDelay: TimeSpan.Zero)
+    {
+        protected override bool ShouldRetryOn(Exception exception) =>
+            exception is ForcedTransientException;
+    }
+
+    private sealed class ForcedTransientException() : Exception("Forced transient failure for retry coverage.");
+
+    private sealed class FailOnceSaveChangesInterceptor : SaveChangesInterceptor
+    {
+        private int failuresInjected;
+
+        public bool Armed { get; set; }
+
+        public int FailuresInjected => failuresInjected;
+
+        public void ResetArm()
+        {
+            Armed = true;
+        }
+
+        public override InterceptionResult<int> SavingChanges(
+            DbContextEventData eventData,
+            InterceptionResult<int> result)
+        {
+            ThrowIfArmed();
+            return result;
+        }
+
+        public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
+            DbContextEventData eventData,
+            InterceptionResult<int> result,
+            CancellationToken cancellationToken = default)
+        {
+            ThrowIfArmed();
+            return ValueTask.FromResult(result);
+        }
+
+        private void ThrowIfArmed()
+        {
+            if (!Armed)
+            {
+                return;
+            }
+
+            Armed = false;
+            Interlocked.Increment(ref failuresInjected);
+            throw new ForcedTransientException();
+        }
     }
 
     public async ValueTask DisposeAsync()
