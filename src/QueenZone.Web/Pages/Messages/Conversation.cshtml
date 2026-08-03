@@ -20,6 +20,13 @@
 
     @if (Model.Detail is not null)
     {
+      <form method="post" asp-page-handler="Remove" class="qz-messages-toolbar" onsubmit="return confirm('Remove this conversation from your inbox?');">
+        <button class="qz-button qz-button--ghost" type="submit">Remove conversation</button>
+      </form>
+    }
+
+    @if (Model.Detail is not null)
+    {
       <partial name="_ArchivePagination" model="Model.Pagination" />
 
       <div class="qz-message-thread">

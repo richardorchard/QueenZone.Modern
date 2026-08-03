@@ -116,6 +116,27 @@ public sealed class ConversationModel(PrivateMessageService privateMessageServic
         return RedirectToPage("./Conversation", new { conversationId = ConversationId });
     }
 
+    public async Task<IActionResult> OnPostRemoveAsync(CancellationToken cancellationToken)
+    {
+        var memberId = await GetCurrentMemberIdAsync();
+        if (memberId is null)
+        {
+            return Challenge();
+        }
+
+        var removed = await privateMessageService.RemoveConversationAsync(
+            ConversationId,
+            memberId.Value,
+            cancellationToken);
+        if (!removed)
+        {
+            return NotFound();
+        }
+
+        TempData[IndexModel.SuccessMessageKey] = "Conversation removed from your inbox.";
+        return RedirectToPage("./Index");
+    }
+
     private ArchivePaginationViewModel? BuildPagination(PrivateConversationDetail detail) =>
         ArchivePagination.BuildViewModel(
             "Conversation message pagination",

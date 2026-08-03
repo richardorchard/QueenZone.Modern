@@ -3892,6 +3892,10 @@ body.qz-menu-lock .qz-masthead {
 
 .qz-message-list__item {
   border-top: 1px solid var(--border-subtle, #e5e5e5);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
 }
 
 .qz-message-list__item--unread .qz-message-list__name {
@@ -3904,6 +3908,12 @@ body.qz-menu-lock .qz-masthead {
   padding: 0.85rem 0;
   text-decoration: none;
   color: inherit;
+  flex: 1;
+  min-width: 0;
+}
+
+.qz-message-list__action {
+  flex-shrink: 0;
 }
 
 .qz-message-list__name {

@@ -107,6 +107,12 @@ public sealed class PrivateMessageService(
             cancellationToken);
     }
 
+    public Task<bool> RemoveConversationAsync(
+        Guid conversationId,
+        Guid memberId,
+        CancellationToken cancellationToken = default) =>
+        privateMessageRepository.RemoveConversationAsync(conversationId, memberId, cancellationToken);
+
     public Task<IReadOnlyList<MemberRecipientMatch>> SearchRecipientsAsync(
         Guid currentMemberId,
         string? query,

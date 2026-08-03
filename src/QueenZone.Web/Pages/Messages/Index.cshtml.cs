@@ -9,6 +9,8 @@ namespace QueenZone.Web.Pages.Messages;
 [Authorize(Policy = MemberAuthenticationSchemes.MemberPolicy)]
 public sealed class IndexModel(PrivateMessageService privateMessageService) : PageModel
 {
+    public const string SuccessMessageKey = "MessagesInboxSuccess";
+
     [BindProperty(SupportsGet = true)]
     public int PageNumber { get; set; } = 1;
 
@@ -16,6 +18,8 @@ public sealed class IndexModel(PrivateMessageService privateMessageService) : Pa
         new([], 0, 1, PrivateMessageLimits.InboxPageSize);
 
     public ArchivePaginationViewModel? Pagination { get; private set; }
+
+    public string? StatusMessage { get; private set; }
 
     public async Task<IActionResult> OnGetAsync(CancellationToken cancellationToken)
     {
@@ -35,8 +39,32 @@ public sealed class IndexModel(PrivateMessageService privateMessageService) : Pa
             Inbox.Page,
             Inbox.TotalPages,
             page => page <= 1 ? "/messages" : $"/messages?pageNumber={page}");
+        StatusMessage = TempData[SuccessMessageKey] as string;
         ViewData["Title"] = "Messages";
         return Page();
+    }
+
+    public async Task<IActionResult> OnPostRemoveAsync(
+        Guid conversationId,
+        CancellationToken cancellationToken)
+    {
+        var memberId = await GetCurrentMemberIdAsync();
+        if (memberId is null)
+        {
+            return Challenge();
+        }
+
+        var removed = await privateMessageService.RemoveConversationAsync(
+            conversationId,
+            memberId.Value,
+            cancellationToken);
+        if (!removed)
+        {
+            return NotFound();
+        }
+
+        TempData[SuccessMessageKey] = "Conversation removed from your inbox.";
+        return RedirectToPage("./Index");
     }
 
     private async Task<Guid?> GetCurrentMemberIdAsync()
