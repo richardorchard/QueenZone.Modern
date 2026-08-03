@@ -20,6 +20,13 @@
 
     @if (Model.Detail is not null)
     {
+      <form method="post" asp-page-handler="Archive" class="qz-messages-toolbar">
+        <button class="qz-button qz-button--ghost" type="submit">Archive conversation</button>
+      </form>
+    }
+
+    @if (Model.Detail is not null)
+    {
       <partial name="_ArchivePagination" model="Model.Pagination" />
 
       <div class="qz-message-thread">

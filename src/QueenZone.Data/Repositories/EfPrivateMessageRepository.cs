@@ -8,29 +8,79 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
 {
     private const int MaxUniqueConflictRetries = 3;
 
-    public async Task<PrivateInboxPage> GetInboxAsync(
+    public Task<PrivateInboxPage> GetInboxAsync(
         Guid memberId,
         int page = 1,
         int pageSize = PrivateMessageLimits.InboxPageSize,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        GetInboxCoreAsync(memberId, page, pageSize, isArchived: false, cancellationToken);
+
+    public Task<PrivateInboxPage> GetArchivedInboxAsync(
+        Guid memberId,
+        int page = 1,
+        int pageSize = PrivateMessageLimits.InboxPageSize,
+        CancellationToken cancellationToken = default) =>
+        GetInboxCoreAsync(memberId, page, pageSize, isArchived: true, cancellationToken);
+
+    public Task<bool> ArchiveConversationAsync(
+        Guid conversationId,
+        Guid memberId,
+        CancellationToken cancellationToken = default) =>
+        SetArchivedAsync(conversationId, memberId, isArchived: true, cancellationToken);
+
+    public Task<bool> UnarchiveConversationAsync(
+        Guid conversationId,
+        Guid memberId,
+        CancellationToken cancellationToken = default) =>
+        SetArchivedAsync(conversationId, memberId, isArchived: false, cancellationToken);
+
+    private async Task<bool> SetArchivedAsync(
+        Guid conversationId,
+        Guid memberId,
+        bool isArchived,
+        CancellationToken cancellationToken)
+    {
+        // Tracked query + mutate + save, matching UnarchiveAsync below: ExecuteUpdateAsync bypasses
+        // the change tracker and would leave any already-tracked participant instance stale within
+        // the same DbContext (e.g. a subsequent reply's own unarchive-on-send within one request).
+        var participant = await dbContext.PrivateConversationParticipants
+            .SingleOrDefaultAsync(
+                p => p.ConversationId == conversationId && p.MemberId == memberId,
+                cancellationToken);
+        if (participant is null)
+        {
+            return false;
+        }
+
+        participant.IsArchived = isArchived;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    private async Task<PrivateInboxPage> GetInboxCoreAsync(
+        Guid memberId,
+        int page,
+        int pageSize,
+        bool isArchived,
+        CancellationToken cancellationToken)
     {
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, PrivateMessageLimits.MaxInboxPageSize);
 
         if (IsSqliteDatabase())
         {
-            return await GetInboxSqliteAsync(memberId, page, pageSize, cancellationToken);
+            return await GetInboxSqliteAsync(memberId, page, pageSize, isArchived, cancellationToken);
         }
 
         var totalCount = await dbContext.PrivateConversationParticipants
             .AsNoTracking()
-            .CountAsync(p => p.MemberId == memberId && !p.IsArchived, cancellationToken);
+            .CountAsync(p => p.MemberId == memberId && p.IsArchived == isArchived, cancellationToken);
         var totalPages = totalCount <= 0 ? 1 : (totalCount + pageSize - 1) / pageSize;
         page = Math.Min(page, totalPages);
 
         var pageRows = await dbContext.PrivateConversationParticipants
             .AsNoTracking()
-            .Where(p => p.MemberId == memberId && !p.IsArchived)
+            .Where(p => p.MemberId == memberId && p.IsArchived == isArchived)
             .OrderByDescending(p => p.Conversation!.LastMessageSortKey)
             .ThenByDescending(p => p.ConversationId)
             .Skip((page - 1) * pageSize)
@@ -586,11 +636,12 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
         Guid memberId,
         int page,
         int pageSize,
+        bool isArchived,
         CancellationToken cancellationToken)
     {
         var rows = await dbContext.PrivateConversationParticipants
             .AsNoTracking()
-            .Where(p => p.MemberId == memberId && !p.IsArchived)
+            .Where(p => p.MemberId == memberId && p.IsArchived == isArchived)
             .Select(p => new
             {
                 p.ConversationId,

@@ -7,9 +7,9 @@ using QueenZone.Data;
 namespace QueenZone.Web.Pages.Messages;
 
 [Authorize(Policy = MemberAuthenticationSchemes.MemberPolicy)]
-public sealed class IndexModel(PrivateMessageService privateMessageService) : PageModel
+public sealed class ArchivedModel(PrivateMessageService privateMessageService) : PageModel
 {
-    public const string SuccessMessageKey = "MessagesInboxSuccess";
+    public const string SuccessMessageKey = "MessagesArchivedSuccess";
 
     [BindProperty(SupportsGet = true)]
     public int PageNumber { get; set; } = 1;
@@ -29,22 +29,22 @@ public sealed class IndexModel(PrivateMessageService privateMessageService) : Pa
             return Challenge();
         }
 
-        Inbox = await privateMessageService.GetInboxAsync(
+        Inbox = await privateMessageService.GetArchivedInboxAsync(
             memberId.Value,
             PageNumber,
             cancellationToken: cancellationToken);
         PageNumber = Inbox.Page;
         Pagination = ArchivePagination.BuildViewModel(
-            "Inbox conversation pagination",
+            "Archived conversation pagination",
             Inbox.Page,
             Inbox.TotalPages,
-            page => page <= 1 ? "/messages" : $"/messages?pageNumber={page}");
+            page => page <= 1 ? "/messages/archived" : $"/messages/archived?pageNumber={page}");
         StatusMessage = TempData[SuccessMessageKey] as string;
-        ViewData["Title"] = "Messages";
+        ViewData["Title"] = "Archived messages";
         return Page();
     }
 
-    public async Task<IActionResult> OnPostArchiveAsync(
+    public async Task<IActionResult> OnPostUnarchiveAsync(
         Guid conversationId,
         CancellationToken cancellationToken)
     {
@@ -54,17 +54,17 @@ public sealed class IndexModel(PrivateMessageService privateMessageService) : Pa
             return Challenge();
         }
 
-        var archived = await privateMessageService.ArchiveConversationAsync(
+        var unarchived = await privateMessageService.UnarchiveConversationAsync(
             conversationId,
             memberId.Value,
             cancellationToken);
-        if (!archived)
+        if (!unarchived)
         {
             return NotFound();
         }
 
-        TempData[SuccessMessageKey] = "Conversation archived.";
-        return RedirectToPage("./Index");
+        TempData[SuccessMessageKey] = "Conversation moved back to your inbox.";
+        return RedirectToPage("./Archived");
     }
 
     private async Task<Guid?> GetCurrentMemberIdAsync()
