@@ -20,7 +20,55 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
         Guid memberId,
         int page = 1,
         int pageSize = PrivateMessageLimits.InboxPageSize,
+        CancellationToken cancellationToken = default) =>
+        GetInboxCore(memberId, page, pageSize, isArchived: false);
+
+    public Task<PrivateInboxPage> GetArchivedInboxAsync(
+        Guid memberId,
+        int page = 1,
+        int pageSize = PrivateMessageLimits.InboxPageSize,
+        CancellationToken cancellationToken = default) =>
+        GetInboxCore(memberId, page, pageSize, isArchived: true);
+
+    public Task<bool> ArchiveConversationAsync(
+        Guid conversationId,
+        Guid memberId,
         CancellationToken cancellationToken = default)
+    {
+        lock (sync)
+        {
+            var participant = participants.SingleOrDefault(
+                p => p.ConversationId == conversationId && p.MemberId == memberId);
+            if (participant is null)
+            {
+                return Task.FromResult(false);
+            }
+
+            participant.IsArchived = true;
+            return Task.FromResult(true);
+        }
+    }
+
+    public Task<bool> UnarchiveConversationAsync(
+        Guid conversationId,
+        Guid memberId,
+        CancellationToken cancellationToken = default)
+    {
+        lock (sync)
+        {
+            var participant = participants.SingleOrDefault(
+                p => p.ConversationId == conversationId && p.MemberId == memberId);
+            if (participant is null)
+            {
+                return Task.FromResult(false);
+            }
+
+            participant.IsArchived = false;
+            return Task.FromResult(true);
+        }
+    }
+
+    private Task<PrivateInboxPage> GetInboxCore(Guid memberId, int page, int pageSize, bool isArchived)
     {
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, PrivateMessageLimits.MaxInboxPageSize);
@@ -28,7 +76,7 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
         lock (sync)
         {
             var mine = participants
-                .Where(p => p.MemberId == memberId && !p.IsArchived)
+                .Where(p => p.MemberId == memberId && p.IsArchived == isArchived)
                 .Select(p => p.ConversationId)
                 .ToHashSet();
 

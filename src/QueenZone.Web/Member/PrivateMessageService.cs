@@ -107,6 +107,25 @@ public sealed class PrivateMessageService(
             cancellationToken);
     }
 
+    public Task<PrivateInboxPage> GetArchivedInboxAsync(
+        Guid memberId,
+        int page = 1,
+        int pageSize = PrivateMessageLimits.InboxPageSize,
+        CancellationToken cancellationToken = default) =>
+        privateMessageRepository.GetArchivedInboxAsync(memberId, page, pageSize, cancellationToken);
+
+    public Task<bool> ArchiveConversationAsync(
+        Guid conversationId,
+        Guid memberId,
+        CancellationToken cancellationToken = default) =>
+        privateMessageRepository.ArchiveConversationAsync(conversationId, memberId, cancellationToken);
+
+    public Task<bool> UnarchiveConversationAsync(
+        Guid conversationId,
+        Guid memberId,
+        CancellationToken cancellationToken = default) =>
+        privateMessageRepository.UnarchiveConversationAsync(conversationId, memberId, cancellationToken);
+
     public Task<IReadOnlyList<MemberRecipientMatch>> SearchRecipientsAsync(
         Guid currentMemberId,
         string? query,
