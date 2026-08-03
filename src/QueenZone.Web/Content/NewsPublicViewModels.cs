@@ -8,7 +8,9 @@ public sealed record NewsArchiveItem(
     string Title,
     string Excerpt,
     DateTime PublishedAt,
-    string DetailPath);
+    string DetailPath,
+    Guid? SubmitterMemberId = null,
+    string? SubmitterDisplayName = null);
 
 /// <summary>
 /// Stable detail shape for public (and admin preview) news article pages.
@@ -20,4 +22,6 @@ public sealed record NewsDetailItem(
     string Body,
     DateTime PublishedAt,
     string? SourceUrl,
-    string DetailPath);
+    string DetailPath,
+    Guid? SubmitterMemberId = null,
+    string? SubmitterDisplayName = null);

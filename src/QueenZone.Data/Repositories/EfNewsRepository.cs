@@ -1,3 +1,4 @@
+using System.Data.Common;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.EntityFrameworkCore;
 
@@ -22,11 +23,15 @@ public sealed class EfNewsRepository : INewsRepository
     // On SQL Server the SearchAsync path uses dbo.NEWS_T_SearchPublished instead.
     private readonly string sqliteLikeSearchSql;
     private readonly string sqliteLikeSearchCountSql;
+    private readonly INewsSuggestionRepository? newsSuggestionRepository;
 
     [ExcludeFromCodeCoverage]
-    public EfNewsRepository(QueenZoneDbContext dbContext)
+    public EfNewsRepository(
+        QueenZoneDbContext dbContext,
+        INewsSuggestionRepository newsSuggestionRepository)
     {
         this.dbContext = dbContext;
+        this.newsSuggestionRepository = newsSuggestionRepository;
         var connectionString = dbContext.Database.GetConnectionString()
             ?? throw new InvalidOperationException("QueenZone legacy database connection string is not configured.");
         var includeSlug = LegacyNewsSchema.HasSlugColumn(connectionString);
@@ -53,7 +58,8 @@ public sealed class EfNewsRepository : INewsRepository
         string byIdSql,
         string sitemapSql,
         string sqliteLikeSearchSql = "",
-        string sqliteLikeSearchCountSql = "")
+        string sqliteLikeSearchCountSql = "",
+        INewsSuggestionRepository? newsSuggestionRepository = null)
     {
         this.dbContext = dbContext;
         this.latestSql = latestSql;
@@ -63,6 +69,7 @@ public sealed class EfNewsRepository : INewsRepository
         this.sitemapSql = sitemapSql;
         this.sqliteLikeSearchSql = sqliteLikeSearchSql;
         this.sqliteLikeSearchCountSql = sqliteLikeSearchCountSql;
+        this.newsSuggestionRepository = newsSuggestionRepository;
     }
 
     public async Task<IReadOnlyList<NewsItem>> GetLatestAsync(int count, CancellationToken cancellationToken = default)
@@ -71,7 +78,7 @@ public sealed class EfNewsRepository : INewsRepository
         var rows = await dbContext.Database
             .SqlQueryRaw<NewsRow>(latestSql, take)
             .ToListAsync(cancellationToken);
-        return rows.Select(Map).ToList();
+        return await AddSubmissionAttributionAsync(rows.Select(Map).ToList(), cancellationToken);
     }
 
     public async Task<int> GetPublishedCountAsync(CancellationToken cancellationToken = default)
@@ -94,7 +101,7 @@ public sealed class EfNewsRepository : INewsRepository
         var rows = await dbContext.Database
             .SqlQueryRaw<NewsRow>(archivePageSql, offset, take)
             .ToListAsync(cancellationToken);
-        return rows.Select(Map).ToList();
+        return await AddSubmissionAttributionAsync(rows.Select(Map).ToList(), cancellationToken);
     }
 
     public async Task<NewsItem?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
@@ -103,7 +110,12 @@ public sealed class EfNewsRepository : INewsRepository
             .SqlQueryRaw<NewsRow>(byIdSql, id)
             .ToListAsync(cancellationToken);
         var row = rows.FirstOrDefault();
-        return row is null ? null : Map(row);
+        if (row is null)
+        {
+            return null;
+        }
+
+        return (await AddSubmissionAttributionAsync([Map(row)], cancellationToken))[0];
     }
 
     public async Task<IReadOnlyList<SitemapContentEntry>> GetPublishedSitemapEntriesAsync(
@@ -155,8 +167,9 @@ public sealed class EfNewsRepository : INewsRepository
             },
             cancellationToken: cancellationToken);
 
+        var items = await AddSubmissionAttributionAsync(rows.Select(Map).ToList(), cancellationToken);
         return new NewsSearchPage(
-            rows.Select(Map).ToList(),
+            items,
             EfSql.GetNullableInt(totalRecords) ?? 0,
             normalizedPage,
             take);
@@ -187,7 +200,8 @@ public sealed class EfNewsRepository : INewsRepository
             .SqlQueryRaw<NewsRow>(sqliteLikeSearchSql, likePattern, offset, take)
             .ToListAsync(cancellationToken);
 
-        return new NewsSearchPage(rows.Select(Map).ToList(), totalCount, normalizedPage, take);
+        var items = await AddSubmissionAttributionAsync(rows.Select(Map).ToList(), cancellationToken);
+        return new NewsSearchPage(items, totalCount, normalizedPage, take);
     }
 
     private bool IsSqliteDatabase() =>
@@ -195,6 +209,38 @@ public sealed class EfNewsRepository : INewsRepository
             dbContext.Database.ProviderName,
             "Microsoft.EntityFrameworkCore.Sqlite",
             StringComparison.Ordinal);
+
+    private async Task<IReadOnlyList<NewsItem>> AddSubmissionAttributionAsync(
+        IReadOnlyList<NewsItem> items,
+        CancellationToken cancellationToken)
+    {
+        if (items.Count == 0 || newsSuggestionRepository is null)
+        {
+            return items;
+        }
+
+        IReadOnlyList<NewsSubmissionAttribution> attributions;
+        try
+        {
+            attributions = await newsSuggestionRepository.GetPromotedAttributionsAsync(
+                items.Select(item => item.Id).Distinct().ToArray(),
+                cancellationToken);
+        }
+        catch (DbException)
+        {
+            return items;
+        }
+
+        var byNewsId = attributions.ToDictionary(attribution => attribution.NewsId);
+        return items.Select(item => byNewsId.TryGetValue(item.Id, out var attribution)
+                ? item with
+                {
+                    SubmitterMemberId = attribution.MemberId,
+                    SubmitterDisplayName = attribution.DisplayName,
+                }
+                : item)
+            .ToList();
+    }
 
     private static NewsItem Map(NewsRow row) =>
         new(

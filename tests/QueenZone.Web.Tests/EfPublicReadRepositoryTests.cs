@@ -609,6 +609,33 @@ public sealed class EfPublicReadRepositoryTests : IAsyncDisposable
     [Fact]
     public async Task News_maps_latest_page_count_detail_and_sitemap()
     {
+        var submitterMemberId = Guid.NewGuid();
+        var submitter = new QueenZone.Data.Entities.MemberAccount
+        {
+            Id = submitterMemberId,
+            Email = "news-submit@example.com",
+            DisplayName = "News Submitter",
+        };
+        var suggestions = new InMemoryNewsSuggestionRepository(
+            id => id == submitterMemberId ? submitter : null);
+        var suggestion = await suggestions.CreateAsync(new NewsSuggestion(
+            Guid.NewGuid(),
+            submitterMemberId,
+            "https://example.com/submitted-news",
+            NewsCandidateDedupe.ComputeUrlHash("https://example.com/submitted-news"),
+            "Headline",
+            null,
+            NewsSuggestionStatus.Pending,
+            DateTimeOffset.UtcNow,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null));
+        await suggestions.PromoteAsync(suggestion.Id, 10, "admin@test.local", null);
+
         dbContext.Database.ExecuteSqlRaw(
             """
             CREATE TABLE IF NOT EXISTS NewsRows (
@@ -648,7 +675,8 @@ public sealed class EfPublicReadRepositoryTests : IAsyncDisposable
             sitemapSql: """
                 SELECT Id, Title, PublishedAt, Slug FROM NewsRows WHERE IsPublished = 1
                 ORDER BY PublishedAt DESC, Id DESC
-                """);
+                """,
+            newsSuggestionRepository: suggestions);
 
         var latest = await repository.GetLatestAsync(5);
         Assert.Equal(2, latest.Count);
@@ -666,6 +694,8 @@ public sealed class EfPublicReadRepositoryTests : IAsyncDisposable
         Assert.NotNull(detail);
         Assert.Equal("Headline", detail.Title);
         Assert.Equal("Full body text for detail", detail.Body);
+        Assert.Equal(submitterMemberId, detail.SubmitterMemberId);
+        Assert.Equal("News Submitter", detail.SubmitterDisplayName);
         Assert.Null(await repository.GetByIdAsync(404));
         Assert.Equal(2, (await repository.GetPublishedSitemapEntriesAsync()).Count);
     }

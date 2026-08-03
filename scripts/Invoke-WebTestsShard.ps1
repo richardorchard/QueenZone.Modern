@@ -22,7 +22,12 @@
   Collect Coverlet XPlat coverage into -ResultsDirectory.
 
 .PARAMETER IncludeSmallProjects
-  Also run Tools/Storage/NewsAgent test projects (CI enables this on shard 0 only).
+  Also run Tools/Storage/NewsAgent test projects alongside the Web.Tests shard.
+
+.PARAMETER SmallProjectsOnly
+  Run only the Tools/Storage/NewsAgent test projects, skipping Web.Tests entirely.
+  CI runs these in their own parallel job instead of piling them onto shard 0 —
+  see the `small-projects-tests` job in .github/workflows/ci.yml and issue #496.
 
 .PARAMETER ResultsDirectory
   Coverage / TRX results directory.
@@ -59,6 +64,9 @@ param(
     [switch] $IncludeSmallProjects,
 
     [Parameter()]
+    [switch] $SmallProjectsOnly,
+
+    [Parameter()]
     [string] $ResultsDirectory = "./TestResults",
 
     [Parameter()]
@@ -73,14 +81,6 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 Set-Location $repoRoot
-
-$filterScript = Join-Path $PSScriptRoot "Get-WebTestShardFilter.ps1"
-$filter = & $filterScript -ShardIndex $ShardIndex -ShardCount $ShardCount
-if ([string]::IsNullOrWhiteSpace($filter)) {
-    throw "Empty shard filter for shard $ShardIndex / $ShardCount."
-}
-
-Write-Host "Web.Tests shard $ShardIndex / $ShardCount filter length=$($filter.Length)"
 
 function Invoke-DotNetTest {
     param(
@@ -112,7 +112,7 @@ function Invoke-DotNetTest {
     }
 }
 
-if ($IncludeSmallProjects) {
+if ($IncludeSmallProjects -or $SmallProjectsOnly) {
     $smallProjects = @(
         "tests/QueenZone.Tools.Tests/QueenZone.Tools.Tests.csproj",
         "tests/QueenZone.Storage.Tests/QueenZone.Storage.Tests.csproj",
@@ -122,6 +122,19 @@ if ($IncludeSmallProjects) {
         Invoke-DotNetTest -Project $project
     }
 }
+
+if ($SmallProjectsOnly) {
+    Write-Host "Small test projects completed successfully."
+    return
+}
+
+$filterScript = Join-Path $PSScriptRoot "Get-WebTestShardFilter.ps1"
+$filter = & $filterScript -ShardIndex $ShardIndex -ShardCount $ShardCount
+if ([string]::IsNullOrWhiteSpace($filter)) {
+    throw "Empty shard filter for shard $ShardIndex / $ShardCount."
+}
+
+Write-Host "Web.Tests shard $ShardIndex / $ShardCount filter length=$($filter.Length)"
 
 Invoke-DotNetTest `
     -Project "tests/QueenZone.Web.Tests/QueenZone.Web.Tests.csproj" `
