@@ -26,6 +26,14 @@ public sealed class PrivateConversationParticipantEntity
     /// </summary>
     public bool IsArchived { get; set; }
 
+    /// <summary>
+    /// When true, this member has removed the conversation from their own account. Hidden from
+    /// both the inbox and the archive view. A new message from either participant clears this
+    /// (and <see cref="IsArchived"/>) for both participants, restoring visibility rather than
+    /// silently dropping the message.
+    /// </summary>
+    public bool IsRemoved { get; set; }
+
     public PrivateConversationEntity? Conversation { get; set; }
 
     public MemberAccount? Member { get; set; }

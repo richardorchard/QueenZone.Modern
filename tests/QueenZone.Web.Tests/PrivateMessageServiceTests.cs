@@ -352,6 +352,41 @@ public sealed class PrivateMessageServiceTests
         Assert.Single((await service.GetInboxAsync(alice.Id)).Items);
     }
 
+    [Fact]
+    public async Task RemoveConversation_RemovesFromInbox_ButNotOtherParticipant()
+    {
+        var (service, members, _, alice, bob) = CreateSystem();
+        var carol = await members.CreateAsync(new MemberAccount
+        {
+            Id = Guid.NewGuid(),
+            Email = "carol-remove@example.com",
+            DisplayName = "Carol",
+            CreatedAt = DateTime.UtcNow,
+        });
+
+        var created = await service.ComposeAsync(alice.Id, bob.Id, "Remove this");
+        var conversationId = created.ConversationId!.Value;
+
+        Assert.False(await service.RemoveConversationAsync(conversationId, carol.Id));
+
+        Assert.True(await service.RemoveConversationAsync(conversationId, alice.Id));
+        Assert.Empty((await service.GetInboxAsync(alice.Id)).Items);
+        Assert.Single((await service.GetInboxAsync(bob.Id)).Items);
+    }
+
+    [Fact]
+    public async Task RemoveConversation_RestoredOnNewMessage()
+    {
+        var (service, _, _, alice, bob) = CreateSystem();
+        var created = await service.ComposeAsync(alice.Id, bob.Id, "Hello");
+        var conversationId = created.ConversationId!.Value;
+
+        Assert.True(await service.RemoveConversationAsync(conversationId, alice.Id));
+        Assert.True((await service.ReplyAsync(conversationId, bob.Id, "Still here")).Succeeded);
+
+        Assert.Single((await service.GetInboxAsync(alice.Id)).Items);
+    }
+
     private static (
         PrivateMessageService Service,
         IMemberAccountRepository Members,
