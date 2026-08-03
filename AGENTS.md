@@ -106,9 +106,10 @@ GitHub Actions workflow `.github/workflows/ci.yml` blocks merge when these fail:
 
 | Check | Requirement | Blocks PR? |
 | --- | --- | --- |
-| **Build** | `dotnet restore`, `dotnet build`, format verify (Release) | Yes |
-| **Test (sharded)** | Mixed `QueenZone.Web.Tests` shards + small test projects (Release, Coverlet) | Yes |
-| **Formatting** | `dotnet format QueenZone.sln --verify-no-changes` (matches root `.editorconfig`; CRLF via `.gitattributes`) | Yes |
+| **Build** | `dotnet restore`, `dotnet build` (Release), uploads binaries + Linux publish artifact | Yes |
+| **Formatting** | `dotnet format QueenZone.sln --verify-no-changes` (matches root `.editorconfig`; CRLF via `.gitattributes`) — runs as its own job in parallel with Build/Test, not a Build step | Yes |
+| **Test (sharded)** | Mixed `QueenZone.Web.Tests` shards (Release, Coverlet) | Yes |
+| **Small test projects** | `Tools`/`Storage`/`NewsAgent` test projects, in parallel with the Web.Tests shards | Yes |
 | **Global line coverage** | At least **51%** across the union of deterministic suite reports | Yes |
 | **Changed-line coverage** | At least **70%** of changed, coverable `.cs` lines in the PR diff vs `main` | Yes |
 | **Smoke test** | Published app responds on `/health`, `/`, `/news` | Yes |
