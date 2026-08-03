@@ -45,47 +45,71 @@ public sealed class EfNewsAgentUrlIngestionLiveProbeTests
         var draftUrl = $"https://example.com/qz-url-ingestion-probe-draft-{probeSuffix}";
         var runnerId = $"url-ingestion-schema-probe-{probeSuffix}";
         var editor = "url-ingestion-probe@queenzone.local";
+        var requestIds = new List<long>();
 
-        var queued = await repository.QueueAsync(new NewsAgentRunRequestCreate(
-            RequestedBy: editor,
-            Kind: NewsAgentRunRequestKind.UrlIngestion,
-            ArticleUrl: articleUrl,
-            GenerateDraft: false));
-        Assert.True(queued.WasCreated, "Expected a new URL ingestion request to be created.");
-        Assert.Equal(NewsAgentRunRequestKind.UrlIngestion, queued.Request.Kind);
-        Assert.Equal(articleUrl, queued.Request.ArticleUrl);
-        Assert.False(queued.Request.GenerateDraft);
-        Assert.Equal(NewsAgentRunRequestStatus.Pending, queued.Request.Status);
+        try
+        {
+            var queued = await repository.QueueAsync(new NewsAgentRunRequestCreate(
+                RequestedBy: editor,
+                Kind: NewsAgentRunRequestKind.UrlIngestion,
+                ArticleUrl: articleUrl,
+                GenerateDraft: false));
+            requestIds.Add(queued.Request.Id);
+            Assert.True(queued.WasCreated, "Expected a new URL ingestion request to be created.");
+            Assert.Equal(NewsAgentRunRequestKind.UrlIngestion, queued.Request.Kind);
+            Assert.Equal(articleUrl, queued.Request.ArticleUrl);
+            Assert.False(queued.Request.GenerateDraft);
+            Assert.Equal(NewsAgentRunRequestStatus.Pending, queued.Request.Status);
 
-        // A second URL request must also queue (URL rows do not use the gathering ActiveKey).
-        var secondUrl = await repository.QueueAsync(new NewsAgentRunRequestCreate(
-            editor,
-            NewsAgentRunRequestKind.UrlIngestion,
-            draftUrl,
-            GenerateDraft: true));
-        Assert.True(secondUrl.WasCreated);
-        Assert.True(secondUrl.Request.GenerateDraft);
+            // A second URL request must also queue (URL rows do not use the gathering ActiveKey).
+            var secondUrl = await repository.QueueAsync(new NewsAgentRunRequestCreate(
+                editor,
+                NewsAgentRunRequestKind.UrlIngestion,
+                draftUrl,
+                GenerateDraft: true));
+            requestIds.Add(secondUrl.Request.Id);
+            Assert.True(secondUrl.WasCreated);
+            Assert.True(secondUrl.Request.GenerateDraft);
 
-        var listed = await repository.ListRecentAsync(50);
-        Assert.Contains(listed, request =>
-            request.Id == queued.Request.Id
-            && request.Kind == NewsAgentRunRequestKind.UrlIngestion
-            && request.ArticleUrl == articleUrl
-            && !request.GenerateDraft);
-        Assert.Contains(listed, request =>
-            request.Id == secondUrl.Request.Id
-            && request.GenerateDraft
-            && request.ArticleUrl == draftUrl);
+            var listed = await repository.ListRecentAsync(50);
+            Assert.Contains(listed, request =>
+                request.Id == queued.Request.Id
+                && request.Kind == NewsAgentRunRequestKind.UrlIngestion
+                && request.ArticleUrl == articleUrl
+                && !request.GenerateDraft);
+            Assert.Contains(listed, request =>
+                request.Id == secondUrl.Request.Id
+                && request.GenerateDraft
+                && request.ArticleUrl == draftUrl);
 
-        // Only claim/complete our probe rows. Never finish unrelated production requests.
-        await DrainProbeRequestAsync(repository, runnerId, queued.Request.Id, probeSuffix);
-        await DrainProbeRequestAsync(repository, runnerId, secondUrl.Request.Id, probeSuffix);
+            // Only claim/complete our probe rows. Never finish unrelated requests.
+            await DrainProbeRequestAsync(repository, runnerId, queued.Request.Id, probeSuffix);
+            await DrainProbeRequestAsync(repository, runnerId, secondUrl.Request.Id, probeSuffix);
 
-        var heartbeat = await repository.GetLatestHeartbeatAsync();
-        Assert.NotNull(heartbeat);
-        Assert.True(
-            heartbeat.LastSeenAtUtc >= DateTime.UtcNow.AddMinutes(-5),
-            "Expected a recent runner heartbeat after claim attempts.");
+            var heartbeat = await repository.GetLatestHeartbeatAsync();
+            Assert.NotNull(heartbeat);
+            Assert.True(
+                heartbeat.LastSeenAtUtc >= DateTime.UtcNow.AddMinutes(-5),
+                "Expected a recent runner heartbeat after claim attempts.");
+        }
+        finally
+        {
+            if (requestIds.Count > 0)
+            {
+                await dbContext.NewsAgentRunRequests
+                    .Where(request => requestIds.Contains(request.Id))
+                    .ExecuteDeleteAsync();
+            }
+
+            await dbContext.NewsAgentRunnerHeartbeats
+                .Where(heartbeat => heartbeat.RunnerId == runnerId)
+                .ExecuteDeleteAsync();
+
+            Assert.False(await dbContext.NewsAgentRunRequests
+                .AnyAsync(request => requestIds.Contains(request.Id)));
+            Assert.False(await dbContext.NewsAgentRunnerHeartbeats
+                .AnyAsync(heartbeat => heartbeat.RunnerId == runnerId));
+        }
     }
 
     private static async Task DrainProbeRequestAsync(

@@ -160,12 +160,12 @@ Editor actions (POST, anti-forgery protected):
 
 Draft generation uses prompt version `draft-v2`, which requires exact band-member quotations to appear in both the body and a `preserved_quotes` collection backed by evidence. Unverifiable quotation marks are stripped before the draft is stored. Review pages surface preserved quotes for editor comparison before promotion.
 
-### Live URL ingestion probe (opt-in)
+### SQL Express mirror URL ingestion probe (opt-in)
 
-After deploying the EF migration and web/worker builds, verify the real Azure SQL queue (and optionally full fetch + triage) before relying on the admin form:
+After the nightly mirror refresh, verify the SQL-backed queue and optionally the full fetch and triage path:
 
 ```powershell
-$env:ConnectionStrings__QueenZoneLegacy = "<same DB as App Service + Windows runner>"
+$env:ConnectionStrings__QueenZoneLegacy = "Server=localhost\SQLEXPRESS;Database=queenzone_legacy_sync;Integrated Security=True;TrustServerCertificate=True"
 $env:RUN_NEWS_AGENT_URL_INGESTION_PROBE = "true"
 
 # 1) Schema + queue + claim only (no outbound HTTP)
@@ -176,7 +176,7 @@ powershell -File .\scripts\Probe-NewsAgentUrlIngestion.ps1
 powershell -File .\scripts\Probe-NewsAgentUrlIngestion.ps1 -Full
 ```
 
-`-Full` accepts `-ArticleUrl` and `-GenerateDraft`. Default URL is a unique `https://example.com/?qz-url-ingestion-probe=...` request so duplicates stay rare. The full probe creates discovery candidates; it does **not** promote or publish.
+The script rejects Azure SQL and remote targets. `-Full` accepts `-ArticleUrl` and `-GenerateDraft`. The default URL is unique. Both modes delete their requests and related records before returning; the full probe does **not** promote or publish.
 
 Link from **Admin news** (`/admin/news`) → “Review discovered candidates”.
 
