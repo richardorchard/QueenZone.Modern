@@ -99,6 +99,30 @@ public sealed class EfNewsSuggestionRepository(QueenZoneDbContext dbContext) : I
         return entity is null ? null : Map(entity);
     }
 
+    public async Task<IReadOnlyList<NewsSubmissionAttribution>> GetPromotedAttributionsAsync(
+        IReadOnlyCollection<int> newsIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (newsIds.Count == 0)
+        {
+            return [];
+        }
+
+        var rows = await dbContext.NewsSuggestions
+            .AsNoTracking()
+            .Where(row => row.Status == NewsSuggestionStatus.Promoted
+                && row.PromotedNewsId != null
+                && newsIds.Contains(row.PromotedNewsId.Value)
+                && row.Submitter != null)
+            .Select(row => new NewsSubmissionAttribution(
+                row.PromotedNewsId!.Value,
+                row.SubmitterMemberId,
+                row.Submitter!.DisplayName))
+            .ToListAsync(cancellationToken);
+
+        return ResolveUnambiguousAttributions(rows);
+    }
+
     public async Task<SubmissionListPage<NewsSuggestion>> GetBySubmitterAsync(
         Guid submitterMemberId,
         int page = 1,
@@ -390,4 +414,11 @@ public sealed class EfNewsSuggestionRepository(QueenZoneDbContext dbContext) : I
             entity.DuplicateCandidateId,
             entity.Submitter?.DisplayName,
             entity.Submitter?.Email);
+
+    internal static IReadOnlyList<NewsSubmissionAttribution> ResolveUnambiguousAttributions(
+        IEnumerable<NewsSubmissionAttribution> rows) =>
+        rows.GroupBy(row => row.NewsId)
+            .Where(group => group.Select(row => row.MemberId).Distinct().Count() == 1)
+            .Select(group => group.First())
+            .ToList();
 }

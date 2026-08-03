@@ -98,6 +98,10 @@ public sealed class EfNewsSuggestionRepositoryTests : IAsyncDisposable
             "Promoted");
         Assert.Equal(NewsSuggestionStatus.Promoted, promoted!.Status);
         Assert.Equal(42, promoted.PromotedNewsId);
+        var attribution = Assert.Single(await repository.GetPromotedAttributionsAsync([42, 99]));
+        Assert.Equal(42, attribution.NewsId);
+        Assert.Equal(memberId, attribution.MemberId);
+        Assert.Equal("EF News Fan", attribution.DisplayName);
 
         dbContext.NewsDiscoverySources.Add(new NewsDiscoverySourceEntity
         {
@@ -136,6 +140,18 @@ public sealed class EfNewsSuggestionRepositoryTests : IAsyncDisposable
             "Already discovered");
         Assert.Equal(NewsSuggestionStatus.Duplicate, marked!.Status);
         Assert.Equal(candidateId, marked.DuplicateCandidateId);
+    }
+
+    [Fact]
+    public void ResolveUnambiguousAttributions_RejectsConflictingMemberClaims()
+    {
+        var rows = new[]
+        {
+            new NewsSubmissionAttribution(42, Guid.NewGuid(), "First member"),
+            new NewsSubmissionAttribution(42, Guid.NewGuid(), "Second member"),
+        };
+
+        Assert.Empty(EfNewsSuggestionRepository.ResolveUnambiguousAttributions(rows));
     }
 
     [Fact]

@@ -199,6 +199,26 @@ public sealed class CommunityArticleRoutesTests : IClassFixture<WebApplicationFa
     }
 
     [Fact]
+    public async Task CommunityArticle_ListAndDetailLinkSubmittedByProfile()
+    {
+        var authorMemberId = Guid.NewGuid();
+        var client = WithRepo(
+        [
+            Published(
+                "linked-author",
+                "Linked Author Article",
+                DateTimeOffset.UtcNow.AddDays(-1),
+                authorMemberId: authorMemberId),
+        ]).CreateClient();
+
+        var listBody = await client.GetStringAsync("/articles");
+        var detailBody = await client.GetStringAsync("/articles/linked-author");
+
+        Assert.Contains($"Submitted by <a class=\"qz-attribution-link\" href=\"/members/{authorMemberId}\">Test Author</a>", listBody);
+        Assert.Contains($"Submitted by <a class=\"qz-attribution-link\" href=\"/members/{authorMemberId}\">Test Author</a>", detailBody);
+    }
+
+    [Fact]
     public async Task Get_CommunityDetail_Returns404_ForUnknownSlug()
     {
         var client = WithRepo([]).CreateClient();
@@ -356,7 +376,8 @@ public sealed class CommunityArticleRoutesTests : IClassFixture<WebApplicationFa
 
     private static PublishedArticleSubmission Published(
         string slug, string title, DateTimeOffset publishedAt,
-        string? tags = null) =>
+        string? tags = null,
+        Guid? authorMemberId = null) =>
         new(
             Guid.NewGuid(),
             title,
@@ -367,7 +388,8 @@ public sealed class CommunityArticleRoutesTests : IClassFixture<WebApplicationFa
             tags,
             publishedAt,
             "Test Author",
-            100);
+            100,
+            authorMemberId);
 
     private sealed class SqlFailingArticleRepo : IArticleRepository
     {

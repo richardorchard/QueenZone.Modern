@@ -53,7 +53,8 @@ public sealed record ForumPostViewModel(
     int EditCount = 0,
     bool CanEdit = false,
     string? EditedLabel = null,
-    bool CanMessage = false);
+    bool CanMessage = false,
+    bool IsAuthor = false);
 
 /// <summary>
 /// Stable attachment presentation for forum posts.
