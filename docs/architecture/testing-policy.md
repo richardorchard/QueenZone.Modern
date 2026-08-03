@@ -108,12 +108,22 @@ The legacy probes run automatically each night through
 does not block merges, and runs only on a schedule or through `workflow_dispatch`.
 
 They run against a same-day SQL Express mirror on the self-hosted Windows runner.
-`scripts/Sync-LegacyDbToSqlExpress.ps1` refreshes it from live Azure SQL via a `sqlpackage` bacpac
-export/import. Read probes then run from the macOS runner over the LAN. Self-cleaning admin-news and
-URL-ingestion write probes run locally on Windows after the read checks pass. Their scripts reject
-Azure SQL, remote servers, and databases other than `queenzone_legacy_sync`. A final marker scan fails
-the workflow if probe or leaked web-test residue remains. The optional full URL fetch probe is manual
-through the workflow's `run_full_url_probe` input.
+`scripts/Sync-LegacyDbToSqlExpress.ps1` refreshes it from live Azure SQL via a `sqlpackage`
+extract/publish. Read probes then run from the macOS runner over the LAN. Self-cleaning write probes
+run locally on Windows after the read checks pass:
+
+| Probe surface | How nightly runs it |
+| --- | --- |
+| `EfAdminNewsRepositoryLegacyProbeTests` | Mac `legacy-read-probes` |
+| `EfNewsSectionLiveProbeTests` public read Fact | Mac `legacy-read-probes` |
+| `EfAdminNewsRepositoryLegacyWriteProbeTests` | Windows `legacy-write-probes` via `Probe-AdminNewsLegacyWrites.ps1` |
+| `EfNewsSectionLiveProbeTests` `Admin_news_*` write Facts | Same script (rollback visibility + full lifecycle) |
+| URL ingestion / private messaging write probes | Dedicated Windows probe scripts |
+| `EfNewsDiscoveryPromotionLiveProbeTests` | Still **manual / opt-in only** until hardened for mirror data churn ([#503](https://github.com/richardorchard/QueenZone.Modern/issues/503)) |
+
+Their scripts reject Azure SQL, remote servers, and databases other than `queenzone_legacy_sync`. A
+final marker scan fails the workflow if probe or leaked web-test residue remains. The optional full
+URL fetch probe is manual through the workflow's `run_full_url_probe` input.
 
 ### Modern-Schema SQL Server Tests
 
@@ -145,7 +155,7 @@ in parallel and never touch the legacy or Azure SQL databases.
 
 When EF Core `SqlQueryRaw` maps legacy columns into typed row classes, do not rely only on in-memory route tests. The legacy schema uses many `smallint` and `bit` columns; SQL Server returns those as `System.Int16` and `bool`, not `int`. Either cast projected values to the row model type in SQL (for example, `CAST(Q_LINK_CAT_ID AS int) AS CategoryId`) and cover that SQL shape with a deterministic test, or run an opt-in read-only legacy database probe before deployment to prove the projection materializes.
 
-For admin write checks, run `scripts/Probe-AdminNewsLegacyWrites.ps1` with `ConnectionStrings__QueenZoneLegacy` pointing to the local `queenzone_legacy_sync` SQL Express mirror and `RUN_LEGACY_WRITE_PROBE=true`. The script refuses other targets. The probe creates, publishes, unpublishes, and deletes a uniquely named test article.
+For admin write checks, run `scripts/Probe-AdminNewsLegacyWrites.ps1` with `ConnectionStrings__QueenZoneLegacy` pointing to the local `queenzone_legacy_sync` SQL Express mirror and `RUN_LEGACY_WRITE_PROBE=true`. The script refuses other targets. It runs `EfAdminNewsRepositoryLegacyWriteProbeTests` and the `EfNewsSectionLiveProbeTests.Admin_news_*` write Facts (transaction-rollback visibility plus create/edit/publish/unpublish/delete).
 
 For private messaging IDENTITY `SortKey` and conversation write-lock checks, use the same SQL Express mirror with `scripts/Probe-PrivateMessaging.ps1` and `RUN_PRIVATE_MESSAGE_PROBE=true`. The script refuses Azure SQL and remote servers. The probe creates throwaway members, exercises concurrent first-sends and replies, asserts tip `LastMessageSortKey` consistency, and deletes the probe rows.
 

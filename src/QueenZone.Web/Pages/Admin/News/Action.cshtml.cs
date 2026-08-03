@@ -70,9 +70,14 @@ public sealed class ActionModel(
         {
             await discoveryRepository.ClearPromotedNewsLinksAsync(id, cancellationToken);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
             // Best-effort cleanup when discovery tables are unavailable or unmigrated.
+            // Delete the news row even if provenance unlink fails; do not hide the failure from logs.
+            logger.LogWarning(
+                ex,
+                "Best-effort discovery link cleanup failed for news article {NewsId}; continuing with delete",
+                id);
         }
 
         try
