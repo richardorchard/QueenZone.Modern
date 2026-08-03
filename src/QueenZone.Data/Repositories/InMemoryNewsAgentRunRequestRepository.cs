@@ -4,9 +4,15 @@ public sealed class InMemoryNewsAgentRunRequestRepository(SharedNewsAgentRunRequ
     : INewsAgentRunRequestRepository
 {
     public Task<NewsAgentRunRequestQueueResult> QueueAsync(
-        string requestedBy,
+        NewsAgentRunRequestCreate request,
         CancellationToken cancellationToken = default) =>
-        Task.FromResult(store.Queue(Normalize(requestedBy, 256)));
+        Task.FromResult(store.Queue(request with
+        {
+            RequestedBy = Normalize(request.RequestedBy, 256),
+            ArticleUrl = string.IsNullOrWhiteSpace(request.ArticleUrl)
+                ? null
+                : Normalize(request.ArticleUrl, 2000)
+        }));
 
     public Task<NewsAgentRunRequest?> ClaimNextAsync(
         string runnerId,

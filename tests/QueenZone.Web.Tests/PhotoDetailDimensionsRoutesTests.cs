@@ -24,6 +24,7 @@ public sealed class PhotoDetailDimensionsRoutesTests : IClassFixture<WebApplicat
         Assert.Contains("1920 x 1080", body, StringComparison.Ordinal);
         Assert.Contains("width=\"1920\"", body, StringComparison.Ordinal);
         Assert.Contains("height=\"1080\"", body, StringComparison.Ordinal);
+        Assert.Contains("Submitted by QueenFan86", body, StringComparison.Ordinal);
         Assert.DoesNotContain("0 x 0", body, StringComparison.Ordinal);
     }
 
@@ -38,6 +39,7 @@ public sealed class PhotoDetailDimensionsRoutesTests : IClassFixture<WebApplicat
         Assert.DoesNotContain("0 x 0", body, StringComparison.Ordinal);
         Assert.DoesNotContain("width=\"0\"", body, StringComparison.Ordinal);
         Assert.Contains("Red Special close-up", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("Submitted by", body, StringComparison.Ordinal);
     }
 
     [Fact]

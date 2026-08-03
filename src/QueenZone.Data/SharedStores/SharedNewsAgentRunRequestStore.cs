@@ -8,22 +8,31 @@ public sealed class SharedNewsAgentRunRequestStore
         new(StringComparer.OrdinalIgnoreCase);
     private long nextId = 1;
 
-    internal NewsAgentRunRequestQueueResult Queue(string requestedBy)
+    internal NewsAgentRunRequestQueueResult Queue(NewsAgentRunRequestCreate create)
     {
+        ArgumentNullException.ThrowIfNull(create);
+
         lock (gate)
         {
-            var active = requests.LastOrDefault(request =>
-                request.Status is NewsAgentRunRequestStatus.Pending or NewsAgentRunRequestStatus.Running);
-            if (active is not null)
+            if (create.Kind == NewsAgentRunRequestKind.ScheduledGathering)
             {
-                return new NewsAgentRunRequestQueueResult(active, WasCreated: false);
+                var activeGathering = requests.LastOrDefault(request =>
+                    request.Kind == NewsAgentRunRequestKind.ScheduledGathering
+                    && request.Status is NewsAgentRunRequestStatus.Pending or NewsAgentRunRequestStatus.Running);
+                if (activeGathering is not null)
+                {
+                    return new NewsAgentRunRequestQueueResult(activeGathering, WasCreated: false);
+                }
             }
 
             var request = new NewsAgentRunRequest(
                 nextId++,
                 NewsAgentRunRequestStatus.Pending,
-                requestedBy,
+                create.Kind,
+                create.RequestedBy,
                 DateTime.UtcNow,
+                create.ArticleUrl,
+                create.GenerateDraft,
                 RunnerId: null,
                 StartedAtUtc: null,
                 CompletedAtUtc: null,

@@ -209,7 +209,7 @@ The local SQL copy may contain production user, mail, IP, moderation, and privat
 
 ### News agent (discovery worker)
 
-The news agent fetches configured public sources, triages items with OpenRouter, and stores candidates for the admin review queue. Scheduled and web-queued runs stop after triage; editors generate AI drafts only for selected candidates. Nothing publishes to public pages automatically.
+The news agent fetches configured public sources, triages items with OpenRouter, and stores candidates for the admin review queue. Admins can also submit a single public article URL for forced triage. Scheduled gathering and default URL actions stop after triage; AI drafts require an explicit per-candidate action or an explicit “generate AI draft” choice on URL submit. Nothing publishes to public pages automatically.
 
 Full setup, worker flags, and admin review UI are documented in `docs/architecture/news-agent.md`.
 
@@ -226,7 +226,7 @@ OpenRouter smoke test (Windows): double-click `scripts/Smoke-NewsAgent.bat`.
 
 Post-deploy live site smoke (custom domain): separate job at the end of the App Service deploy workflow (`build` → `migrate` → `deploy` → `smoke`) against `https://www.queenzone.org`. Re-run locally with `powershell -File .\scripts\Smoke-LiveSite.ps1`.
 
-Admin review queue (after signing in as an allowed admin): `/admin/news-discovery`. Its **Queue news gathering** action writes a request to the shared database for the local Windows runner; see `docs/architecture/news-agent-scheduling.md`. Selected candidates can then have a draft generated, edited, and published through the existing `/admin/news` workflow.
+Admin review queue (after signing in as an allowed admin): `/admin/news-discovery`. **Queue news gathering** and **Submit article URL** write requests to the shared database for the local Windows runner (`process-news-requests`); see `docs/architecture/news-agent-scheduling.md`. Selected candidates can then have a draft generated, edited, and published through the existing `/admin/news` workflow.
 
 The hosted App Service currently connects to Azure SQL with SQL authentication. For local development, use a local-only SQL auth connection string or another explicitly granted development principal:
 
@@ -271,14 +271,14 @@ Results land under `docs/performance/results/` (gitignored). Budgets and compari
 
 Normal CI and pull request checks should not require the restored legacy database. Real legacy database checks are opt-in until a controlled test database exists.
 
-If you change admin news write behavior or discovery promotion behavior, you can run the opt-in legacy write probe against the configured `ConnectionStrings__QueenZoneLegacy` database:
+If you change admin news write behavior or discovery promotion behavior, run the opt-in legacy write probe against the nightly-refreshed SQL Express mirror:
 
 ```powershell
 $env:RUN_LEGACY_WRITE_PROBE = "true"
 .\scripts\Probe-AdminNewsLegacyWrites.ps1
 ```
 
-The probe is intentionally destructive-but-self-cleaning: it creates, publishes, unpublishes, and deletes a uniquely named admin draft article to verify the real SQL-backed workflow. Only run it when the configured database is one you are comfortable mutating.
+The probe creates, publishes, unpublishes, and deletes a uniquely named admin draft article. Its script refuses Azure SQL, remote servers, and databases other than `queenzone_legacy_sync`. The nightly workflow runs it after the mirror refresh and read probes, then checks for residue.
 
 Feature work should happen on an agent-prefixed branch such as `grok/news-pagination` and be reviewed through a pull request before it reaches `main`. See `AGENTS.md` for the branch and PR policy.
 

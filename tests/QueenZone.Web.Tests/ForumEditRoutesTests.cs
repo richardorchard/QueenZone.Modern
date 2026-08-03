@@ -97,6 +97,28 @@ public sealed class ForumEditRoutesTests : IClassFixture<WebApplicationFactory<P
         var write = scope.ServiceProvider.GetRequiredService<IForumWriteRepository>();
         var updated = await write.GetPostAsync(postId);
         Assert.Equal("Admin rewrite", updated!.Body);
+
+        var topicPath = ForumRoutes.GetTopicCanonicalPath(updated.TopicId, updated.TopicSubject);
+        var topicHtml = await adminClient.GetStringAsync(topicPath);
+        Assert.DoesNotContain($"href=\"/forum/post/{postId}/edit\"", topicHtml);
+    }
+
+    [Fact]
+    public async Task ForumPost_LinksAuthorProfileAndMessageCompose_ForAnotherMember()
+    {
+        var ownerId = Guid.NewGuid();
+        var postId = await CreateOwnedPostAsync(ownerId, "Contact the author");
+        using var scope = factory.Services.CreateScope();
+        var post = await scope.ServiceProvider.GetRequiredService<IForumWriteRepository>().GetPostAsync(postId);
+        var viewerClient = CreateMemberClient(Guid.NewGuid(), displayName: "Forum Viewer");
+
+        var html = await viewerClient.GetStringAsync(
+            ForumRoutes.GetTopicCanonicalPath(post!.TopicId, post.TopicSubject));
+
+        Assert.Contains($"href=\"/members/{ownerId}\"", html);
+        Assert.Contains($"href=\"/messages/compose?to={ownerId}\"", html);
+        Assert.Contains("aria-label=\"Message Forum Fan\"", html);
+        Assert.DoesNotContain($"href=\"/forum/post/{postId}/edit\"", html);
     }
 
     private async Task<int> CreateOwnedPostAsync(Guid memberId, string body)

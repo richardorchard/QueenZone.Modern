@@ -2,6 +2,12 @@ using QueenZone.Data;
 
 namespace QueenZone.NewsAgent;
 
+public sealed record NewsDraftPreservedQuote(
+    string Speaker,
+    string ExactText,
+    string SourceUrl,
+    string? SourceContext);
+
 public sealed record NewsDraftStructuredResult(
     string Title,
     string? Slug,
@@ -14,7 +20,8 @@ public sealed record NewsDraftStructuredResult(
     string? ConfidenceNotes,
     string? SourceNotes,
     DateTime? SuggestedPublishAt,
-    bool SecondarySourceWarning);
+    bool SecondarySourceWarning,
+    IReadOnlyList<NewsDraftPreservedQuote> PreservedQuotes);
 
 public sealed record NewsDraftSourceAttribution(
     IReadOnlyList<string> SourceUrls,

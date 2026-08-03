@@ -1,36 +1,43 @@
 namespace QueenZone.Data;
 
-public sealed class InMemoryNewsRepository(SharedNewsStore store) : INewsRepository
+public sealed class InMemoryNewsRepository(
+    SharedNewsStore store,
+    INewsSuggestionRepository? newsSuggestionRepository = null) : INewsRepository
 {
-    public Task<IReadOnlyList<NewsItem>> GetLatestAsync(int count, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<NewsItem>> GetLatestAsync(int count, CancellationToken cancellationToken = default)
     {
         var published = store.GetPublishedNewsItems();
-        return Task.FromResult<IReadOnlyList<NewsItem>>(published.Take(count).ToList());
+        return await AddSubmissionAttributionAsync(published.Take(count).ToList(), cancellationToken);
     }
 
-    public Task<IReadOnlyList<NewsItem>> GetArchivePageAsync(int page, int pageSize, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<NewsItem>> GetArchivePageAsync(int page, int pageSize, CancellationToken cancellationToken = default)
     {
         var published = store.GetPublishedNewsItems();
         var skip = Math.Max(page - 1, 0) * pageSize;
-        return Task.FromResult<IReadOnlyList<NewsItem>>(published.Skip(skip).Take(pageSize).ToList());
+        return await AddSubmissionAttributionAsync(published.Skip(skip).Take(pageSize).ToList(), cancellationToken);
     }
 
     public Task<int> GetPublishedCountAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(store.GetPublishedNewsItems().Count);
 
-    public Task<NewsItem?> GetByIdAsync(int id, CancellationToken cancellationToken = default) =>
-        Task.FromResult(store.GetPublishedNewsItems().SingleOrDefault(item => item.Id == id));
+    public async Task<NewsItem?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
+    {
+        var item = store.GetPublishedNewsItems().SingleOrDefault(item => item.Id == id);
+        return item is null
+            ? null
+            : (await AddSubmissionAttributionAsync([item], cancellationToken))[0];
+    }
 
     public Task<IReadOnlyList<SitemapContentEntry>> GetPublishedSitemapEntriesAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<SitemapContentEntry>>(store.GetPublishedNewsItems()
             .Select(item => new SitemapContentEntry(item.Id, item.Title, item.PublishedAt, item.Slug))
             .ToList());
 
-    public Task<NewsSearchPage> SearchAsync(string query, int page, int pageSize, CancellationToken cancellationToken = default)
+    public async Task<NewsSearchPage> SearchAsync(string query, int page, int pageSize, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(query))
         {
-            return Task.FromResult(new NewsSearchPage([], 0, page, pageSize));
+            return new NewsSearchPage([], 0, page, pageSize);
         }
 
         var term = query.Trim();
@@ -45,6 +52,30 @@ public sealed class InMemoryNewsRepository(SharedNewsStore store) : INewsReposit
         var skip = (normalizedPage - 1) * pageSize;
         var items = matches.Skip(skip).Take(pageSize).ToList();
 
-        return Task.FromResult(new NewsSearchPage(items, matches.Count, normalizedPage, pageSize));
+        var attributedItems = await AddSubmissionAttributionAsync(items, cancellationToken);
+        return new NewsSearchPage(attributedItems, matches.Count, normalizedPage, pageSize);
+    }
+
+    private async Task<IReadOnlyList<NewsItem>> AddSubmissionAttributionAsync(
+        IReadOnlyList<NewsItem> items,
+        CancellationToken cancellationToken)
+    {
+        if (items.Count == 0 || newsSuggestionRepository is null)
+        {
+            return items;
+        }
+
+        var attributions = await newsSuggestionRepository.GetPromotedAttributionsAsync(
+            items.Select(item => item.Id).Distinct().ToArray(),
+            cancellationToken);
+        var byNewsId = attributions.ToDictionary(attribution => attribution.NewsId);
+        return items.Select(item => byNewsId.TryGetValue(item.Id, out var attribution)
+                ? item with
+                {
+                    SubmitterMemberId = attribution.MemberId,
+                    SubmitterDisplayName = attribution.DisplayName,
+                }
+                : item)
+            .ToList();
     }
 }

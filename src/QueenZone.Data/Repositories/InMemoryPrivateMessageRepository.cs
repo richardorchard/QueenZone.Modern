@@ -34,7 +34,8 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
 
             var ordered = conversations
                 .Where(c => mine.Contains(c.Id))
-                .OrderByDescending(c => c.LastMessageAt)
+                .OrderByDescending(c => c.LastMessageSortKey)
+                .ThenByDescending(c => c.Id)
                 .ToList();
             var totalCount = ordered.Count;
             var totalPages = totalCount <= 0 ? 1 : (totalCount + pageSize - 1) / pageSize;
@@ -221,6 +222,7 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
                     MemberHighId = high,
                     CreatedAt = sentAt,
                     LastMessageAt = sentAt,
+                    LastMessageSortKey = 0,
                     LastMessagePreview = TruncatePreview(body),
                     LastMessageSenderId = senderMemberId,
                 };
@@ -263,6 +265,7 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
 
             if (isNew)
             {
+                conversation.LastMessageSortKey = message.SortKey;
                 var sender = participants.Single(
                     p => p.ConversationId == conversation.Id && p.MemberId == senderMemberId);
                 sender.LastReadSortKey = message.SortKey;
@@ -274,7 +277,8 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
                     conversation,
                     sentAt,
                     TruncatePreview(body),
-                    senderMemberId);
+                    senderMemberId,
+                    message.SortKey);
             }
 
             return Task.FromResult(new PrivateMessageSendResult(true, conversation.Id, null));
@@ -333,7 +337,8 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
                 conversation,
                 sentAt,
                 TruncatePreview(body),
-                senderMemberId);
+                senderMemberId,
+                message.SortKey);
             Unarchive(conversationId, conversation.MemberLowId);
             Unarchive(conversationId, conversation.MemberHighId);
 
@@ -398,13 +403,15 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
         PrivateConversationEntity conversation,
         DateTimeOffset sentAt,
         string preview,
-        Guid senderMemberId)
+        Guid senderMemberId,
+        long sortKey)
     {
         if (sentAt > conversation.LastMessageAt)
         {
             conversation.LastMessageAt = sentAt;
         }
 
+        conversation.LastMessageSortKey = sortKey;
         conversation.LastMessagePreview = preview;
         conversation.LastMessageSenderId = senderMemberId;
     }

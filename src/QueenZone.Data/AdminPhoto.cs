@@ -17,7 +17,8 @@ public sealed record AdminPhotoItem(
     int Year,
     DateTime DateTime,
     string? Keywords,
-    bool IsVisible);
+    bool IsVisible,
+    string? SubmittedByDisplayName = null);
 
 public sealed record AdminPhotoPage(
     IReadOnlyList<AdminPhotoItem> Items,

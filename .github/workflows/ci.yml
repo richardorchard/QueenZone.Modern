@@ -49,7 +49,8 @@ jobs:
   # Deterministic tests run in the `test` matrix (mixed Web.Tests shards — see
   # docs/architecture/testing-policy.md). smoke-test reuses the publish
   # artifact. e2e-test still builds on Windows but skips the solution unit graph.
-  # deploy.yml rebuilds separately after merge — see that file for why.
+  # deploy.yml reuses this run's web-publish artifact after merge instead of
+  # rebuilding — see that file for how it resolves which run to pull from.
   build:
     runs-on: ubuntu-latest
     needs: changes
@@ -75,9 +76,6 @@ jobs:
 
       - name: Build
         run: dotnet build QueenZone.sln --configuration Release --no-restore
-
-      - name: Verify formatting
-        run: dotnet format QueenZone.sln --verify-no-changes --no-restore
 
       # Sharded test jobs download these outputs and run `dotnet test --no-build`
       # so we do not pay a second full compile on each matrix leg.
@@ -105,6 +103,36 @@ jobs:
           name: web-publish-${{ github.run_id }}
           path: publish
           retention-days: 7
+
+  # Runs in parallel with build/test instead of as a step inside `build` (issue #495).
+  # dotnet format re-analyzes the whole solution and took ~90s standalone — nearly as
+  # long as the actual compile — and previously ran *before* the build/publish
+  # artifacts were uploaded, so `test`/`sql-server-tests` waited on it for no reason
+  # (they only need the compiled binaries, not the formatting result).
+  format:
+    name: Verify formatting
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+          cache: true
+          cache-dependency-path: |
+            **/*.csproj
+            .config/dotnet-tools.json
+
+      - name: Restore
+        run: dotnet restore QueenZone.sln
+
+      - name: Verify formatting
+        run: dotnet format QueenZone.sln --verify-no-changes --no-restore
 
   # Mixed Web.Tests shards (unit + WAF in every shard). Do not change this to a
   # unit-vs-integration split — that regresses wall-clock (issue #442).
@@ -145,12 +173,10 @@ jobs:
       - name: Test shard ${{ matrix.shard }} with coverage
         shell: pwsh
         run: |
-          $includeSmall = $${{ matrix.shard == 0 }}
           ./scripts/Invoke-WebTestsShard.ps1 `
             -ShardIndex ${{ matrix.shard }} `
             -ShardCount 2 `
             -CollectCoverage `
-            -IncludeSmallProjects:$includeSmall `
             -ResultsDirectory ./TestResults `
             -NoBuild `
             -NoRestore
@@ -159,6 +185,57 @@ jobs:
         uses: actions/upload-artifact@v5
         with:
           name: coverage-raw-${{ github.run_id }}-shard-${{ matrix.shard }}
+          path: TestResults
+          retention-days: 2
+          if-no-files-found: error
+
+  # Split out of shard 0 (issue #496): shard 0 previously also ran the Tools/Storage/
+  # NewsAgent projects on top of its even Web.Tests share, making it ~60% slower in
+  # wall-clock than shard 1 despite the Web.Tests greedy balancer already splitting
+  # weight 244/244 evenly. Running these small, independent projects as their own
+  # parallel job removes that skew instead of guessing at new Web.Tests weights.
+  small-projects-tests:
+    name: Small test projects (Tools/Storage/NewsAgent)
+    runs-on: ubuntu-latest
+    needs: [changes, build]
+    if: needs.changes.outputs.code == 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+          cache: true
+          cache-dependency-path: |
+            **/*.csproj
+            .config/dotnet-tools.json
+
+      - name: Download build binaries
+        uses: actions/download-artifact@v5
+        with:
+          name: build-binaries-${{ github.run_id }}
+          path: .
+
+      - name: Restore (NuGet cache for test host deps)
+        run: dotnet restore QueenZone.sln
+
+      - name: Run small test projects with coverage
+        shell: pwsh
+        run: |
+          ./scripts/Invoke-WebTestsShard.ps1 `
+            -SmallProjectsOnly `
+            -CollectCoverage `
+            -ResultsDirectory ./TestResults `
+            -NoBuild `
+            -NoRestore
+
+      - name: Upload coverage results
+        uses: actions/upload-artifact@v5
+        with:
+          name: coverage-raw-${{ github.run_id }}-shard-small
           path: TestResults
           retention-days: 2
           if-no-files-found: error
@@ -240,7 +317,7 @@ jobs:
 
   coverage:
     runs-on: ubuntu-latest
-    needs: [changes, test, sql-server-tests]
+    needs: [changes, test, sql-server-tests, small-projects-tests]
     if: needs.changes.outputs.code == 'true'
     steps:
       - name: Checkout
