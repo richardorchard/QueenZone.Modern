@@ -265,6 +265,100 @@ public sealed class PrivateMessageRoutesTests : IClassFixture<WebApplicationFact
     }
 
     [Fact]
+    public async Task Remove_FromInbox_HidesConversation_ButNotForOtherParticipant()
+    {
+        var (aliceClient, alice) = await CreateMemberAsync("pm-remove-alice@example.com", "Remove Alice");
+        var (bobClient, bob) = await CreateMemberAsync("pm-remove-bob@example.com", "Remove Bob");
+        var service = factory.Services.GetRequiredService<PrivateMessageService>();
+        var created = await service.ComposeAsync(alice.Id, bob.Id, "Remove this thread");
+        var conversationId = created.ConversationId!.Value;
+
+        var inboxHtml = await aliceClient.GetStringAsync("/messages");
+        var removeResponse = await aliceClient.PostAsync(
+            "/messages?handler=Remove",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(inboxHtml),
+                ["conversationId"] = conversationId.ToString(),
+            }));
+        Assert.Equal(HttpStatusCode.Redirect, removeResponse.StatusCode);
+
+        var aliceInboxAfter = await aliceClient.GetStringAsync("/messages");
+        Assert.Contains("You have no private messages yet", aliceInboxAfter);
+        Assert.Contains("Conversation removed", aliceInboxAfter);
+
+        var bobInbox = await bobClient.GetStringAsync("/messages");
+        Assert.Contains("Remove Alice", bobInbox);
+    }
+
+    [Fact]
+    public async Task Remove_ReceivingNewMessage_ReturnsConversationToInbox()
+    {
+        var (aliceClient, alice) = await CreateMemberAsync("pm-remove-reopen-alice@example.com", "Reopen Alice");
+        var (_, bob) = await CreateMemberAsync("pm-remove-reopen-bob@example.com", "Reopen Bob");
+        var service = factory.Services.GetRequiredService<PrivateMessageService>();
+        var created = await service.ComposeAsync(alice.Id, bob.Id, "Hello");
+        var conversationId = created.ConversationId!.Value;
+
+        var inboxHtml = await aliceClient.GetStringAsync("/messages");
+        await aliceClient.PostAsync(
+            "/messages?handler=Remove",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(inboxHtml),
+                ["conversationId"] = conversationId.ToString(),
+            }));
+        Assert.Contains("You have no private messages yet", await aliceClient.GetStringAsync("/messages"));
+
+        Assert.True((await service.ReplyAsync(conversationId, bob.Id, "New reply")).Succeeded);
+
+        var aliceInboxAfter = await aliceClient.GetStringAsync("/messages");
+        Assert.Contains("Reopen Bob", aliceInboxAfter);
+    }
+
+    [Fact]
+    public async Task Remove_FromConversationView_RedirectsToInbox()
+    {
+        var (aliceClient, alice) = await CreateMemberAsync("pm-conv-remove-alice@example.com", "Conv Remove Alice");
+        var (_, bob) = await CreateMemberAsync("pm-conv-remove-bob@example.com", "Conv Remove Bob");
+        var service = factory.Services.GetRequiredService<PrivateMessageService>();
+        var created = await service.ComposeAsync(alice.Id, bob.Id, "Hello there");
+        var conversationId = created.ConversationId!.Value;
+
+        var conversationHtml = await aliceClient.GetStringAsync($"/messages/{conversationId}");
+        var removeResponse = await aliceClient.PostAsync(
+            $"/messages/{conversationId}?handler=Remove",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(conversationHtml),
+            }));
+        Assert.Equal(HttpStatusCode.Redirect, removeResponse.StatusCode);
+        Assert.Equal("/messages", removeResponse.Headers.Location!.OriginalString);
+
+        Assert.Contains("You have no private messages yet", await aliceClient.GetStringAsync("/messages"));
+    }
+
+    [Fact]
+    public async Task Remove_ReturnsNotFound_ForNonParticipant()
+    {
+        var (aliceClient, alice) = await CreateMemberAsync("pm-remove-owner@example.com", "Remove Owner");
+        var (_, bob) = await CreateMemberAsync("pm-remove-peer@example.com", "Remove Peer");
+        var (carolClient, _) = await CreateMemberAsync("pm-remove-outsider@example.com", "Remove Outsider");
+        var service = factory.Services.GetRequiredService<PrivateMessageService>();
+        var created = await service.ComposeAsync(alice.Id, bob.Id, "Top secret");
+
+        var composeHtml = await carolClient.GetStringAsync("/messages/compose");
+        var response = await carolClient.PostAsync(
+            "/messages?handler=Remove",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(composeHtml),
+                ["conversationId"] = created.ConversationId.ToString()!,
+            }));
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
     public async Task MemberProfile_ShowsMessageAction_WhenAllowed()
     {
         var (aliceClient, alice) = await CreateMemberAsync("profile-alice@example.com", "Profile Alice");

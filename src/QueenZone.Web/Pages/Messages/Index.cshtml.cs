@@ -67,6 +67,29 @@ public sealed class IndexModel(PrivateMessageService privateMessageService) : Pa
         return RedirectToPage("./Index");
     }
 
+    public async Task<IActionResult> OnPostRemoveAsync(
+        Guid conversationId,
+        CancellationToken cancellationToken)
+    {
+        var memberId = await GetCurrentMemberIdAsync();
+        if (memberId is null)
+        {
+            return Challenge();
+        }
+
+        var removed = await privateMessageService.RemoveConversationAsync(
+            conversationId,
+            memberId.Value,
+            cancellationToken);
+        if (!removed)
+        {
+            return NotFound();
+        }
+
+        TempData[SuccessMessageKey] = "Conversation removed from your inbox.";
+        return RedirectToPage("./Index");
+    }
+
     private async Task<Guid?> GetCurrentMemberIdAsync()
     {
         var directId = ForumMember.GetMemberId(User);
