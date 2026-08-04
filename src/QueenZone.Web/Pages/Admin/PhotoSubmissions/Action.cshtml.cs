@@ -1,9 +1,16 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OutputCaching;
 using QueenZone.Data;
+using QueenZone.Web.Sitemap;
 
 namespace QueenZone.Web.Pages.Admin.PhotoSubmissions;
 
-public sealed class ActionModel(IPhotoSubmissionRepository photoSubmissionRepository) : AdminPhotoSubmissionsPageModel
+public sealed class ActionModel(
+    IPhotoSubmissionRepository photoSubmissionRepository,
+    PhotoSubmissionPromotionService photoSubmissionPromotionService,
+    PublicQueryCacheService publicQueryCache,
+    CoreSitemapService coreSitemapService,
+    IOutputCacheStore outputCacheStore) : AdminPhotoSubmissionsPageModel
 {
     [BindProperty]
     public string? ApprovedCategory { get; set; }
@@ -16,13 +23,36 @@ public sealed class ActionModel(IPhotoSubmissionRepository photoSubmissionReposi
 
     public async Task<IActionResult> OnPostApproveAsync(Guid id, CancellationToken cancellationToken)
     {
-        return await ApplyAsync(
-            id,
-            PhotoSubmissionStatus.Approved,
-            rejectionReason: null,
-            approvedCategory: ApprovedCategory,
-            successMessage: "Photo approved.",
-            cancellationToken);
+        var submission = await photoSubmissionRepository.GetByIdAsync(id, cancellationToken);
+        if (submission is null)
+        {
+            return NotFound();
+        }
+
+        var category = ApprovedCategory ?? submission.SuggestedCategory;
+        if (string.IsNullOrWhiteSpace(category))
+        {
+            return RedirectWithMessage(id, "A gallery category is required.", "error");
+        }
+
+        try
+        {
+            await photoSubmissionPromotionService.PromoteAsync(
+                submission,
+                category,
+                EditorEmail,
+                ReviewNotes,
+                cancellationToken);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return RedirectWithMessage(id, ex.Message, "error");
+        }
+
+        await QueenZone.Web.Pages.Admin.Photos.ActionModel.InvalidatePublicPhotoCachesAsync(
+            publicQueryCache, coreSitemapService, outputCacheStore, cancellationToken);
+
+        return RedirectWithMessage(id, "Photo approved and published to the gallery.", "success");
     }
 
     public async Task<IActionResult> OnPostRejectAsync(Guid id, CancellationToken cancellationToken)
@@ -105,6 +135,13 @@ public sealed class ActionModel(IPhotoSubmissionRepository photoSubmissionReposi
             TempData["PhotoSubmissionMessageKind"] = "error";
         }
 
+        return Redirect($"/admin/photo-submissions/{id}");
+    }
+
+    private IActionResult RedirectWithMessage(Guid id, string message, string kind)
+    {
+        TempData["PhotoSubmissionMessage"] = message;
+        TempData["PhotoSubmissionMessageKind"] = kind;
         return Redirect($"/admin/photo-submissions/{id}");
     }
 }

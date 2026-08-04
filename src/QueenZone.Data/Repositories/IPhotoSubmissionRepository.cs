@@ -31,6 +31,21 @@ public interface IPhotoSubmissionRepository
         string? approvedCategory = null,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Marks a submission as approved and promoted, recording the legacy PIC_ID it was
+    /// published as and writing an audit log entry. Only valid from a status that can
+    /// transition to <see cref="PhotoSubmissionStatus.Approved"/>.
+    /// </summary>
+    /// <returns>The updated submission, or null when not found.</returns>
+    /// <exception cref="InvalidOperationException">When the status transition is not allowed.</exception>
+    Task<PhotoSubmission?> PromoteAsync(
+        Guid id,
+        int promotedPicId,
+        string approvedCategory,
+        string reviewerEmail,
+        string? reviewNotes,
+        CancellationToken cancellationToken = default);
+
     Task<SubmissionTypeCounts> GetDashboardCountsAsync(
         DateTimeOffset utcNow,
         CancellationToken cancellationToken = default);

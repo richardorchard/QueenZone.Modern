@@ -23,6 +23,7 @@ public sealed record PhotoSubmission(
     string? ReviewerEmail,
     string? ReviewNotes,
     string? RejectionReason,
+    int? PromotedPicId = null,
     string? SubmitterDisplayName = null,
     string? SubmitterEmail = null);
 

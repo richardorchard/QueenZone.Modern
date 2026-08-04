@@ -206,6 +206,49 @@ public sealed class InMemoryPhotoSubmissionRepository : IPhotoSubmissionReposito
         }
     }
 
+    public Task<PhotoSubmission?> PromoteAsync(
+        Guid id,
+        int promotedPicId,
+        string approvedCategory,
+        string reviewerEmail,
+        string? reviewNotes,
+        CancellationToken cancellationToken = default)
+    {
+        lock (sync)
+        {
+            var entity = submissions.SingleOrDefault(row => row.Id == id);
+            if (entity is null)
+            {
+                return Task.FromResult<PhotoSubmission?>(null);
+            }
+
+            if (!PhotoSubmissionWorkflow.TryValidateStatusChange(entity.Status, PhotoSubmissionStatus.Approved, out var error))
+            {
+                throw new InvalidOperationException(error);
+            }
+
+            entity.Status = PhotoSubmissionStatus.Approved;
+            entity.ApprovedCategory = NormalizeOptional(approvedCategory, 100)
+                ?? throw new InvalidOperationException("An approved gallery category is required.");
+            entity.PromotedPicId = promotedPicId;
+            entity.ReviewedAt = DateTimeOffset.UtcNow;
+            entity.ReviewerEmail = NormalizeOptional(reviewerEmail, 256);
+            entity.ReviewNotes = NormalizeOptional(reviewNotes, 500);
+
+            auditLogs.Add(new PhotoSubmissionAuditLogEntity
+            {
+                Id = nextAuditId++,
+                PhotoSubmissionId = entity.Id,
+                Action = PhotoSubmissionStatus.Approved,
+                ActorEmail = entity.ReviewerEmail ?? string.Empty,
+                OccurredAt = entity.ReviewedAt.Value,
+                Details = $"Approved for category '{entity.ApprovedCategory}' and published to gallery as photo #{promotedPicId}. Notes: {entity.ReviewNotes ?? "(none)"}",
+            });
+
+            return Task.FromResult<PhotoSubmission?>(Map(entity));
+        }
+    }
+
     public Task<SubmissionTypeCounts> GetDashboardCountsAsync(
         DateTimeOffset utcNow,
         CancellationToken cancellationToken = default)
@@ -295,6 +338,7 @@ public sealed class InMemoryPhotoSubmissionRepository : IPhotoSubmissionReposito
             entity.ReviewerEmail,
             entity.ReviewNotes,
             entity.RejectionReason,
+            entity.PromotedPicId,
             member?.DisplayName,
             member?.Email);
     }
