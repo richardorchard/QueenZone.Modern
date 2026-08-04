@@ -52,6 +52,9 @@ public sealed class PhotoSubmissionEntity
 
     public string? RejectionReason { get; set; }
 
+    /// <summary>PIC_ID of the legacy gallery row created when this submission was promoted.</summary>
+    public int? PromotedPicId { get; set; }
+
     public MemberAccount? Submitter { get; set; }
 
     public ICollection<PhotoSubmissionAuditLogEntity> AuditLogs { get; set; } =

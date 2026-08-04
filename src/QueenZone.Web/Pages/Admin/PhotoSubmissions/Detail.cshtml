@@ -65,7 +65,7 @@
           <form method="post" action="/admin/photo-submissions/@submission.Id/approve" class="admin-inline-form">
             <input type="hidden" name="@AdminPhotoSubmissionsPageModel.AntiforgeryTokenFieldName" value="@token" />
             <label>
-              Gallery category
+              Gallery category (must match an existing category)
               <input name="approvedCategory" list="approve-categories" value="@(submission.SuggestedCategory ?? "")" required maxlength="100" />
               <datalist id="approve-categories">
                 @foreach (var category in Model.Categories)
