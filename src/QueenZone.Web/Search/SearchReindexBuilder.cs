@@ -1,0 +1,135 @@
+using QueenZone.Data;
+using QueenZone.Data.Entities;
+
+namespace QueenZone.Web.Search;
+
+/// <summary>
+/// Repeatable batch job that rebuilds <c>SearchDocument</c> rows for one or more content types by
+/// reading the same public repositories the archive pages already use — so the visibility rules
+/// applied there (published/display flags) are exactly the rules search inherits. Lives in
+/// QueenZone.Web (not QueenZone.Data) because it needs the same canonical-URL route helpers
+/// (<see cref="NewsRoutes"/>, <see cref="ForumRoutes"/>, <see cref="ArticlesRoutes"/>) that
+/// <see cref="Sitemap.ForumSitemapBuilder"/> uses for the same reason.
+/// </summary>
+/// <remarks>
+/// Covers News, Forum threads, and Community Articles today. Biography, Discography,
+/// Photography, Timeline, Fan Performances, Freddie Tribute, and legacy Articles are not yet
+/// wired in — each needs the same three-step treatment (paginate the existing public repository,
+/// map to <see cref="SearchDocumentEntity"/>, call <see cref="ISearchIndexService.ReplaceContentTypeAsync"/>)
+/// and can be added as additional <c>Reindex*Async</c> methods following the pattern below.
+/// </remarks>
+public sealed class SearchReindexBuilder(
+    ISearchIndexService searchIndexService,
+    INewsRepository newsRepository,
+    IForumRepository forumRepository,
+    IArticleRepository articleRepository)
+{
+    private const int BatchSize = 200;
+
+    public async Task ReindexAllAsync(CancellationToken cancellationToken = default)
+    {
+        await ReindexNewsAsync(cancellationToken);
+        await ReindexForumAsync(cancellationToken);
+        await ReindexArticlesAsync(cancellationToken);
+    }
+
+    public async Task ReindexNewsAsync(CancellationToken cancellationToken = default)
+    {
+        var totalCount = await newsRepository.GetPublishedCountAsync(cancellationToken);
+        var documents = new List<SearchDocumentEntity>();
+
+        for (var page = 1; (page - 1) * BatchSize < totalCount; page++)
+        {
+            var items = await newsRepository.GetArchivePageAsync(page, BatchSize, cancellationToken);
+            documents.AddRange(items.Select(MapNews));
+        }
+
+        await searchIndexService.ReplaceContentTypeAsync(SiteSearchContentType.News, documents, cancellationToken);
+    }
+
+    public async Task ReindexForumAsync(CancellationToken cancellationToken = default)
+    {
+        var totalCount = await forumRepository.GetTopicSitemapCountAsync(cancellationToken);
+        var documents = new List<SearchDocumentEntity>();
+
+        for (var offset = 0; offset < totalCount; offset += BatchSize)
+        {
+            var items = await forumRepository.GetTopicSitemapPageAsync(offset, BatchSize, cancellationToken);
+            documents.AddRange(items.Select(MapForumThread));
+        }
+
+        await searchIndexService.ReplaceContentTypeAsync(SiteSearchContentType.Forum, documents, cancellationToken);
+    }
+
+    public async Task ReindexArticlesAsync(CancellationToken cancellationToken = default)
+    {
+        var totalCount = await articleRepository.GetCountAsync(ct: cancellationToken);
+        var documents = new List<SearchDocumentEntity>();
+
+        for (var page = 1; (page - 1) * BatchSize < totalCount; page++)
+        {
+            var items = await articleRepository.GetPageAsync(page, BatchSize, ct: cancellationToken);
+            documents.AddRange(items.Select(MapArticle));
+        }
+
+        await searchIndexService.ReplaceContentTypeAsync(SiteSearchContentType.Article, documents, cancellationToken);
+    }
+
+    /// <summary>
+    /// Maps one published news item to its <see cref="SearchDocumentEntity"/> shape. Exposed so
+    /// admin publish/unpublish handlers can upsert a single document immediately rather than
+    /// waiting for the next full reindex — see <c>Admin/News/Action.cshtml.cs</c>.
+    /// </summary>
+    public static SearchDocumentEntity MapNews(NewsItem item)
+    {
+        var plainBody = SearchDocumentText.ToPlainText(item.Body);
+        return new SearchDocumentEntity
+        {
+            SourceKey = $"news:{item.Id}",
+            ContentType = SiteSearchContentType.News,
+            Title = item.Title,
+            Body = plainBody,
+            Summary = SearchDocumentText.Summarize(
+                string.IsNullOrWhiteSpace(item.Excerpt) ? plainBody : item.Excerpt),
+            Url = NewsRoutes.GetNewsDetailPath(item),
+            PublishedAt = item.PublishedAt,
+        };
+    }
+
+    private static SearchDocumentEntity MapForumThread(ForumTopicSitemapItem item) =>
+        new()
+        {
+            SourceKey = $"forum-thread:{item.TopicId}",
+            ContentType = SiteSearchContentType.Forum,
+            Title = item.Title,
+            // Sitemap projection only carries the thread title, not post bodies — full post
+            // text would need a dedicated bulk read from ModernForumPost; title-only indexing
+            // is a deliberate scope trade-off for the initial reindex source (see remarks above).
+            Body = item.Title,
+            Summary = item.Title,
+            Url = ForumRoutes.GetTopicCanonicalPath(item.TopicId, item.Title),
+            PublishedAt = item.LastActivityAt,
+        };
+
+    /// <summary>
+    /// Maps one published community article to its <see cref="SearchDocumentEntity"/> shape.
+    /// Exposed for the same immediate-upsert reason as <see cref="MapNews"/> — see
+    /// <c>Admin/Articles/Action.cshtml.cs</c>.
+    /// </summary>
+    public static SearchDocumentEntity MapArticle(PublishedArticleSubmission item)
+    {
+        var plainBody = SearchDocumentText.ToPlainText(item.Body);
+        return new SearchDocumentEntity
+        {
+            SourceKey = $"article:{item.Slug}",
+            ContentType = SiteSearchContentType.Article,
+            Title = item.Title,
+            Body = plainBody,
+            Summary = SearchDocumentText.Summarize(
+                string.IsNullOrWhiteSpace(item.Excerpt) ? plainBody : item.Excerpt),
+            Url = ArticlesRoutes.GetCommunityArticleDetailPath(item.Slug),
+            PublishedAt = item.PublishedAt,
+            AuthorDisplayName = item.AuthorDisplayName,
+        };
+    }
+}

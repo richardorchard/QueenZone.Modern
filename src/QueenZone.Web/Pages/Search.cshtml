@@ -1,17 +1,35 @@
 @page "/search"
 @model SearchModel
+@using QueenZone.Data
 @using QueenZone.Web
+@using QueenZone.Web.Search
 @{
   ViewData["Title"] = string.IsNullOrWhiteSpace(Model.Query)
     ? "Search"
     : $"Search: {Model.Query}";
-  ViewData["Description"] = "Search the Queenzone archive — articles, photographs and forum discussions.";
+  ViewData["Description"] = "Search the Queenzone archive — news, articles and forum discussions.";
   ViewData["Robots"] = "noindex,follow";
 
   var exampleTags = new[] { "Bohemian Rhapsody", "Live Aid 1985", "Freddie Mercury", "Wembley 1986" };
+
+  var filterTypes = new[] { SiteSearchContentType.News, SiteSearchContentType.Forum, SiteSearchContentType.Article };
+
+  string BuildSearchLink(string? type, int page = 1)
+  {
+    var link = $"/search?q={Uri.EscapeDataString(Model.Query ?? string.Empty)}";
+    if (type is not null)
+    {
+      link += $"&type={Uri.EscapeDataString(type)}";
+    }
+    if (page > 1)
+    {
+      link += $"&page={page}";
+    }
+    return link;
+  }
 }
 
-<partial name="_PageHero" model='@(("Search the Archive", "Search", "Search 4,000+ articles, photographs and discussions.", "Articles, photos and discussions"))' />
+<partial name="_PageHero" model='@(("Search the Archive", "Search", "Search news, articles and forum discussions.", "News, articles and discussions"))' />
 
 <section class="qz-section">
   <div class="qz-container" style="max-width: 760px;">
@@ -22,11 +40,16 @@
                name="q"
                type="search"
                value="@Model.Query"
-               placeholder="Search articles, photos and discussions..."
+               maxlength="200"
+               placeholder="Search news, articles and discussions..."
                autocomplete="off"
                style="flex: 1; padding: 1rem 1.125rem; border: 1px solid var(--border-strong); border-radius: var(--radius-xs); font: var(--type-body);">
         <button type="submit" class="qz-button" style="white-space: nowrap;">Search</button>
       </div>
+      @if (!string.IsNullOrWhiteSpace(Model.ActiveContentType))
+      {
+        <input type="hidden" name="type" value="@Model.ActiveContentType">
+      }
     </form>
 
     @if (string.IsNullOrWhiteSpace(Model.Query))
@@ -46,48 +69,54 @@
   <section class="qz-section">
     <div class="qz-container" style="max-width: 760px;">
 
+      <nav class="qz-tag-row" aria-label="Filter search results by content type">
+        <a class="qz-tag @(Model.ActiveContentType is null ? "qz-tag--active" : "")" href="@BuildSearchLink(null)">All</a>
+        @foreach (var type in filterTypes)
+        {
+          <a class="qz-tag @(Model.ActiveContentType == type ? "qz-tag--active" : "")" href="@BuildSearchLink(type)">@SiteSearchContentType.DisplayLabel(type)</a>
+        }
+      </nav>
+
       @if (Model.Results is null || Model.Results.TotalCount == 0)
       {
-        <p class="qz-meta">No results found for <strong>@Model.Query</strong>. Try different keywords.</p>
+        <p class="qz-meta" style="margin-top: var(--space-4);">No results found for <strong>@Model.Query</strong>. Try different keywords.</p>
       }
       else
       {
-        <partial name="_SectionHeader" model="@(($"{Model.Results.TotalCount:N0} result{(Model.Results.TotalCount == 1 ? "" : "s")} for \"{Model.Query}\"", "Forum threads", false, (string?)null, (string?)null))" />
+        <partial name="_SectionHeader" model="@(($"{Model.Results.TotalCount:N0} result{(Model.Results.TotalCount == 1 ? "" : "s")} for \"{Model.Query}\"", "Search results", false, (string?)null, (string?)null))" />
 
-        <table class="qz-table">
-          <thead>
-            <tr>
-              <th>Thread</th>
-              <th>Board</th>
-              <th>Replies</th>
-              <th>Last post</th>
-            </tr>
-          </thead>
-          <tbody>
-            @foreach (var result in Model.Results.Results)
-            {
-              <tr>
-                <td><a href="@ForumRoutes.GetTopicCanonicalPath(result.TopicId, result.Title)">@result.Title</a></td>
-                <td><a href="@ForumRoutes.GetCategoryCanonicalPath(result.CategoryId, result.CategoryName)">@result.CategoryName</a></td>
-                <td>@result.ReplyCount.ToString("N0")</td>
-                <td>
-                  @if (result.LastActivityAt.HasValue)
-                  {
-                    <time datetime="@result.LastActivityAt.Value.ToString("yyyy-MM-dd")">@result.LastActivityAt.Value.ToString("dd MMM yyyy")</time>
-                  }
-                </td>
-              </tr>
-            }
-          </tbody>
-        </table>
+        <div class="qz-grid qz-grid--two" style="margin-top: var(--space-4);">
+          @foreach (var result in Model.Results.Results)
+          {
+            <a class="qz-card" href="@result.Url">
+              <div class="qz-card__kicker">@SiteSearchContentType.DisplayLabel(result.ContentType)</div>
+              <h3>@result.Title</h3>
+              <p>@SearchResultHighlighter.Highlight(result.Summary, Model.Query!)</p>
+              <p class="qz-meta">
+                @if (!string.IsNullOrWhiteSpace(result.Category))
+                {
+                  @result.Category
+                  <text> · </text>
+                }
+                @if (!string.IsNullOrWhiteSpace(result.AuthorDisplayName))
+                {
+                  @result.AuthorDisplayName
+                  <text> · </text>
+                }
+                @if (result.PublishedAt.HasValue)
+                {
+                  <time datetime="@result.PublishedAt.Value.ToString("yyyy-MM-dd")">@result.PublishedAt.Value.ToString("dd MMM yyyy")</time>
+                }
+              </p>
+            </a>
+          }
+        </div>
 
         var pagination = ArchivePagination.BuildViewModel(
           "Search results pagination",
           Model.CurrentPage,
           Model.TotalPages,
-          p => p <= 1
-            ? $"/search?q={Uri.EscapeDataString(Model.Query!)}"
-            : $"/search?q={Uri.EscapeDataString(Model.Query!)}&page={p}");
+          p => BuildSearchLink(Model.ActiveContentType, p));
         <partial name="_ArchivePagination" model="pagination" />
       }
 

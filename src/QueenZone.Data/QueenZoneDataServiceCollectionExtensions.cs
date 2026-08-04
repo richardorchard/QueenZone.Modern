@@ -67,6 +67,8 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddScoped<ILinksRepository, EfLinksRepository>();
         services.AddScoped<IFreddieTributeRepository, EfFreddieTributeRepository>();
         services.AddScoped<IAdminFreddieTributeRepository, EfAdminFreddieTributeRepository>();
+        services.AddScoped<ISearchIndexService, EfSearchIndexService>();
+        services.AddScoped<ISiteSearchService, EfSiteSearchService>();
 
         return services;
     }
@@ -144,6 +146,9 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddSingleton(_ => new SharedFreddieTributeStore(SampleFreddieTributeData.CreateSeedTributes()));
         services.AddSingleton<IFreddieTributeRepository, InMemoryFreddieTributeRepository>();
         services.AddSingleton<IAdminFreddieTributeRepository, InMemoryAdminFreddieTributeRepository>();
+        services.AddSingleton<SharedSearchIndexStore>();
+        services.AddSingleton<ISearchIndexService, InMemorySearchIndexService>();
+        services.AddSingleton<ISiteSearchService, InMemorySiteSearchService>();
 
         return services;
     }
