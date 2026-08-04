@@ -73,6 +73,25 @@
   height: auto;
 }
 
+.qz-rte .ql-editor blockquote {
+  margin: 0.75rem 0;
+  padding: 0.75rem 1rem;
+  border-left: 2px solid var(--qz-blue, #244a8f);
+  background: var(--surface-raised, #f7f6f3);
+  font-family: var(--font-display, "Cormorant Garamond", Georgia, serif);
+  font-style: italic;
+  color: var(--text-primary, #2b2b2b);
+}
+
+.qz-rte .ql-editor blockquote strong {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-family: var(--font-body, "Inter", sans-serif);
+  font-style: normal;
+  font-weight: var(--fw-medium, 500);
+  color: var(--link, #244a8f);
+}
+
 .qz-rte-error {
   color: #a40000;
   margin: 0.5rem 0.75rem;

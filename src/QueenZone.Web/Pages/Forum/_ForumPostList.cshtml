@@ -14,11 +14,11 @@ else
     @foreach (var post in Model)
     {
       <article class="qz-forum-post" id="post-@post.Id">
-        <header class="qz-forum-post__header">
-          <div class="qz-forum-post__author-row">
+        <div class="qz-forum-post__content">
+          <header class="qz-forum-post__header">
             @* Legacy archive posts are not linked to modern MemberAccounts; show initials fallback. *@
             <partial name="_MemberAvatar" model="@(new MemberAvatarViewModel { DisplayName = post.AuthorUsername, Size = "sm" })" />
-            <div>
+            <div class="qz-forum-post__author-meta">
               @if (post.AuthorMemberId is Guid profileMemberId)
               {
                 <strong class="qz-forum-post__author"><a href="/members/@profileMemberId">@post.AuthorUsername</a></strong>
@@ -27,29 +27,77 @@ else
               {
                 <strong class="qz-forum-post__author">@post.AuthorUsername</strong>
               }
-              @if (post.AuthorMemberSince is not null)
-              {
-                <span class="qz-meta"> · Member since <time datetime="@post.AuthorMemberSince.Value.ToString("yyyy-MM-dd")">@post.AuthorMemberSince.Value.ToString("MMMM yyyy")</time></span>
-              }
+              <span class="qz-meta qz-forum-post__meta-line">
+                <time datetime="@post.PostedAt.ToString("yyyy-MM-ddTHH:mm:ss")">@post.PostedAt.ToString("dd MMMM yyyy HH:mm")</time>
+                @if (post.AuthorMemberSince is not null)
+                {
+                  <text> · Member since <time datetime="@post.AuthorMemberSince.Value.ToString("yyyy-MM-dd")">@post.AuthorMemberSince.Value.ToString("MMMM yyyy")</time></text>
+                }
+                @if (!string.IsNullOrWhiteSpace(post.EditedLabel))
+                {
+                  <text> · <em>@post.EditedLabel</em></text>
+                }
+              </span>
             </div>
-          </div>
-          <time class="qz-meta" datetime="@post.PostedAt.ToString("yyyy-MM-ddTHH:mm:ss")">@post.PostedAt.ToString("dd MMMM yyyy HH:mm")</time>
-        </header>
-        <div class="qz-forum-post__body article-body">@Html.Raw(UgcHtml.FormatForDisplay(post.Body))</div>
-        @if (!string.IsNullOrWhiteSpace(post.EditedLabel))
-        {
-          <p class="qz-forum-post__edited qz-meta">@post.EditedLabel</p>
-        }
+          </header>
+          <div class="qz-forum-post__body article-body">@Html.Raw(UgcHtml.FormatForDisplay(post.Body))</div>
+          @if (post.Attachments is { Count: > 0 })
+          {
+            <div class="qz-forum-post__attachments">
+              <p class="qz-forum-post__attachments-label qz-meta">ATTACHMENT@(post.Attachments.Count > 1 ? "S" : "")</p>
+              <ul class="qz-forum-post__attachment-list">
+                @foreach (var attachment in post.Attachments)
+                {
+                  <li class="qz-forum-post__attachment-item">
+                    @if (attachment.IsImage && !string.IsNullOrEmpty(attachment.ThumbnailUrl))
+                    {
+                      <a class="qz-forum-post__attachment-thumb-link" href="@attachment.Url" rel="noopener noreferrer">
+                        <img class="qz-forum-post__attachment-thumb" src="@attachment.ThumbnailUrl" alt="@attachment.FileName" loading="lazy" width="120" height="120" />
+                      </a>
+                    }
+                    <a class="qz-forum-post__attachment-link" href="@attachment.Url" rel="noopener noreferrer">
+                      <svg class="qz-forum-post__attachment-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+                      </svg>
+                      <span class="qz-forum-post__attachment-name">@attachment.FileName</span>
+                      <span class="qz-forum-post__attachment-meta qz-meta">
+                        @if (!string.IsNullOrEmpty(attachment.Extension))
+                        {
+                          <span>@attachment.Extension</span>
+                        }
+                        @if (!string.IsNullOrEmpty(attachment.FormattedSize))
+                        {
+                          <span>@attachment.FormattedSize</span>
+                        }
+                        <span>Members only</span>
+                      </span>
+                    </a>
+                  </li>
+                }
+              </ul>
+            </div>
+          }
+          @if (!string.IsNullOrWhiteSpace(post.Signature))
+          {
+            <footer class="qz-forum-post__signature qz-meta">@post.Signature</footer>
+          }
+        </div>
         @if ((post.IsAuthor && post.CanEdit) || post.CanMessage || canReply)
         {
-          <p class="qz-forum-post__actions">
+          <div class="qz-forum-post__actions">
             @if (canReply)
             {
-              <a class="qz-forum-post__quote-link" href="#Body" data-qz-quote-trigger>Quote</a>
+              <a class="qz-forum-post__quote-link" href="#Body" data-qz-quote-trigger>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-3 2s-1 2 1 2z"></path><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v2z"></path></svg>
+                Quote
+              </a>
             }
             @if (post.IsAuthor && post.CanEdit)
             {
-              <a class="qz-forum-post__edit-link" href="/forum/post/@post.Id/edit">Edit</a>
+              <a class="qz-forum-post__edit-link" href="/forum/post/@post.Id/edit">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path><path d="m15 5 4 4"></path></svg>
+                Edit
+              </a>
             }
             @if (post.CanMessage && post.AuthorMemberId is Guid authorMemberId)
             {
@@ -61,51 +109,11 @@ else
                 <span class="visually-hidden">Message @post.AuthorUsername</span>
               </a>
             }
-          </p>
+          </div>
         }
         @if (canReply)
         {
           <template data-qz-quote-source data-post-author="@post.AuthorUsername">@Html.Raw(UgcHtml.FormatForDisplay(post.Body))</template>
-        }
-        @if (post.Attachments is { Count: > 0 })
-        {
-          <div class="qz-forum-post__attachments">
-            <p class="qz-forum-post__attachments-label qz-meta">ATTACHMENT@(post.Attachments.Count > 1 ? "S" : "")</p>
-            <ul class="qz-forum-post__attachment-list">
-              @foreach (var attachment in post.Attachments)
-              {
-                <li class="qz-forum-post__attachment-item">
-                  @if (attachment.IsImage && !string.IsNullOrEmpty(attachment.ThumbnailUrl))
-                  {
-                    <a class="qz-forum-post__attachment-thumb-link" href="@attachment.Url" rel="noopener noreferrer">
-                      <img class="qz-forum-post__attachment-thumb" src="@attachment.ThumbnailUrl" alt="@attachment.FileName" loading="lazy" width="120" height="120" />
-                    </a>
-                  }
-                  <a class="qz-forum-post__attachment-link" href="@attachment.Url" rel="noopener noreferrer">
-                    <svg class="qz-forum-post__attachment-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                      <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
-                    </svg>
-                    <span class="qz-forum-post__attachment-name">@attachment.FileName</span>
-                    <span class="qz-forum-post__attachment-meta qz-meta">
-                      @if (!string.IsNullOrEmpty(attachment.Extension))
-                      {
-                        <span>@attachment.Extension</span>
-                      }
-                      @if (!string.IsNullOrEmpty(attachment.FormattedSize))
-                      {
-                        <span>@attachment.FormattedSize</span>
-                      }
-                      <span>Members only</span>
-                    </span>
-                  </a>
-                </li>
-              }
-            </ul>
-          </div>
-        }
-        @if (!string.IsNullOrWhiteSpace(post.Signature))
-        {
-          <footer class="qz-forum-post__signature qz-meta">@post.Signature</footer>
         }
       </article>
     }
