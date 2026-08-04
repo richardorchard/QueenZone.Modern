@@ -368,7 +368,6 @@ public sealed class EfForumWriteRepositoryTests : IAsyncDisposable
                 AuthorPostCount INTEGER NULL,
                 AuthorJoinedAt TEXT NULL,
                 BodyHtml TEXT NOT NULL,
-                BodyHtmlLegacyRaw TEXT NULL,
                 SignatureHtml TEXT NULL,
                 PostedAt TEXT NULL,
                 LegacyDiscography INTEGER NOT NULL,

@@ -89,4 +89,30 @@ public sealed class ConvertLegacyBbCodeCommandTests
 
         Assert.Equal(0, exit);
     }
+
+    [Fact]
+    public async Task RunCore_Apply_AttemptsUpdateAndFailsGracefullyWithoutADatabase()
+    {
+        var options = ConvertLegacyBbCodeOptions.Parse(
+        [
+            "--connection-string", "Server=.;Database=does-not-exist;Connect Timeout=1;",
+            "--apply",
+            "--delay-ms", "0",
+        ]);
+        var candidates = new[] { new BbCodeCandidateRow(1, "[b]hello[/b]") };
+
+        var exit = await ConvertLegacyBbCodeCommand.RunCoreAsync(options, candidates);
+
+        // No real database is reachable in this unit test; the write attempt fails and is
+        // reported, rather than crashing the whole run.
+        Assert.Equal(1, exit);
+    }
+
+    [Fact]
+    public async Task RunAsync_MissingConnectionString_PrintsUsageAndReturnsError()
+    {
+        var exit = await ConvertLegacyBbCodeCommand.RunAsync([]);
+
+        Assert.Equal(2, exit);
+    }
 }

@@ -27,8 +27,6 @@ public sealed class ModernForumPostEntity
 
     public string BodyHtml { get; set; } = string.Empty;
 
-    public string? BodyHtmlLegacyRaw { get; set; }
-
     public string? SignatureHtml { get; set; }
 
     public DateTime? PostedAt { get; set; }
