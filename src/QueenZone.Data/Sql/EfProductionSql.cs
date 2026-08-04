@@ -224,9 +224,17 @@ internal static class EfProductionSql
 
     public static Func<string, FormattableString> CreateMemberLookupSql() =>
         email => $"""
-            SELECT TOP 1 USER_ID, USERNAME
+            SELECT USER_ID, USERNAME
             FROM dbo.USERS_T
             WHERE EMAIL = {email}
+            ORDER BY USERNAME, USER_ID
+            """;
+
+    public static Func<int, FormattableString> CreateMemberLookupByUserIdSql() =>
+        userId => $"""
+            SELECT TOP 1 USER_ID, USERNAME
+            FROM dbo.USERS_T
+            WHERE USER_ID = {userId}
             """;
 
     public static (string ListSql, Func<short, FormattableString> DetailSql) CreateBiographyQueries() =>

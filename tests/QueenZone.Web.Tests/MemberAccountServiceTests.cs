@@ -45,7 +45,7 @@ public sealed class MemberAccountServiceTests
     }
 
     [Fact]
-    public async Task RegisterAsync_CreatesAccount_AndAutoLinksMatchingLegacyEmail()
+    public async Task RegisterAsync_CreatesAccount_WithoutSilentLegacyLink()
     {
         var legacyLookup = new InMemoryLegacyMemberLookupRepository(new Dictionary<string, LegacyMemberMatch>
         {
@@ -56,8 +56,13 @@ public sealed class MemberAccountServiceTests
         var result = await service.RegisterAsync("fan@queenzone.org", "S3curePass!", "New Fan");
 
         Assert.True(result.Succeeded);
-        Assert.Equal(123, result.Account!.LinkedLegacyUserId);
+        Assert.Null(result.Account!.LinkedLegacyUserId);
         Assert.Equal("fan@queenzone.org", result.Account.Email);
+
+        var state = await service.GetLegacyLinkStateAsync(result.Account);
+        Assert.Equal(LegacyAccountLinkKind.Claimable, state.Kind);
+        Assert.Equal(123, state.Match!.UserId);
+        Assert.Equal("OldFan", state.Match.Username);
     }
 
     [Fact]
@@ -69,6 +74,9 @@ public sealed class MemberAccountServiceTests
 
         Assert.True(result.Succeeded);
         Assert.Null(result.Account!.LinkedLegacyUserId);
+
+        var state = await service.GetLegacyLinkStateAsync(result.Account);
+        Assert.Equal(LegacyAccountLinkKind.None, state.Kind);
     }
 
     [Fact]
@@ -116,7 +124,7 @@ public sealed class MemberAccountServiceTests
     }
 
     [Fact]
-    public async Task FindOrCreateFromExternalLoginAsync_CreatesNewAccount_AndAutoLinksLegacyEmail()
+    public async Task FindOrCreateFromExternalLoginAsync_CreatesNewAccount_WithoutSilentLegacyLink()
     {
         var legacyLookup = new InMemoryLegacyMemberLookupRepository(new Dictionary<string, LegacyMemberMatch>
         {
@@ -126,7 +134,262 @@ public sealed class MemberAccountServiceTests
 
         var account = await service.FindOrCreateFromExternalLoginAsync("Google", "google-subject-1", "fan@queenzone.org", "Fan");
 
-        Assert.Equal(123, account.LinkedLegacyUserId);
+        Assert.Null(account.LinkedLegacyUserId);
+        var state = await service.GetLegacyLinkStateAsync(account);
+        Assert.Equal(LegacyAccountLinkKind.Claimable, state.Kind);
+    }
+
+    [Fact]
+    public async Task SignInAsync_BackfillsLegacyLink_ForExistingUnlinkedAccount()
+    {
+        var legacyLookup = new InMemoryLegacyMemberLookupRepository(new Dictionary<string, LegacyMemberMatch>
+        {
+            ["fan@queenzone.org"] = new LegacyMemberMatch(123, "OldFan"),
+        });
+        var service = CreateService(legacyMemberLookupRepository: legacyLookup);
+        await service.RegisterAsync("fan@queenzone.org", "S3curePass!", "Fan");
+
+        var signedIn = await service.SignInAsync("fan@queenzone.org", "S3curePass!");
+
+        Assert.True(signedIn.Succeeded);
+        Assert.Equal(123, signedIn.Account!.LinkedLegacyUserId);
+    }
+
+    [Fact]
+    public async Task ClaimLegacyAccountAsync_LinksAndOptionallyAdoptsDisplayName()
+    {
+        var legacyLookup = new InMemoryLegacyMemberLookupRepository(new Dictionary<string, LegacyMemberMatch>
+        {
+            ["fan@queenzone.org"] = new LegacyMemberMatch(123, "OldFan"),
+        });
+        var service = CreateService(legacyMemberLookupRepository: legacyLookup);
+        var registered = await service.RegisterAsync("fan@queenzone.org", "S3curePass!", "New Fan");
+
+        var claimed = await service.ClaimLegacyAccountAsync(
+            registered.Account!.Id,
+            legacyUserId: 123,
+            adoptLegacyDisplayName: true);
+
+        Assert.True(claimed.Succeeded);
+        Assert.Equal(123, claimed.Account!.LinkedLegacyUserId);
+        Assert.Equal("OldFan", claimed.Account.DisplayName);
+
+        var state = await service.GetLegacyLinkStateAsync(claimed.Account);
+        Assert.Equal(LegacyAccountLinkKind.Linked, state.Kind);
+        Assert.Equal("OldFan", state.Match!.Username);
+    }
+
+    [Fact]
+    public async Task ClaimLegacyAccountAsync_Fails_WhenLegacyIdAlreadyTaken()
+    {
+        var legacyLookup = new InMemoryLegacyMemberLookupRepository(new Dictionary<string, LegacyMemberMatch>
+        {
+            ["first@queenzone.org"] = new LegacyMemberMatch(123, "OldFan"),
+            ["second@queenzone.org"] = new LegacyMemberMatch(123, "OldFan"),
+        });
+        var service = CreateService(legacyMemberLookupRepository: legacyLookup);
+        var first = await service.RegisterAsync("first@queenzone.org", "S3curePass!", "First");
+        Assert.True((await service.ClaimLegacyAccountAsync(
+            first.Account!.Id,
+            legacyUserId: 123,
+            adoptLegacyDisplayName: false)).Succeeded);
+
+        var second = await service.RegisterAsync("second@queenzone.org", "S3curePass!", "Second");
+        var conflict = await service.ClaimLegacyAccountAsync(
+            second.Account!.Id,
+            legacyUserId: 123,
+            adoptLegacyDisplayName: false);
+
+        Assert.False(conflict.Succeeded);
+        Assert.Contains("already linked", conflict.Error, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task UnlinkLegacyAccountAsync_ClearsLink_AndAllowsReclaim()
+    {
+        var legacyLookup = new InMemoryLegacyMemberLookupRepository(
+            new Dictionary<string, IReadOnlyList<LegacyMemberMatch>>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["fan@queenzone.org"] =
+                [
+                    new LegacyMemberMatch(100, "WrongFan"),
+                    new LegacyMemberMatch(200, "RightFan"),
+                ],
+            });
+        var service = CreateService(legacyMemberLookupRepository: legacyLookup);
+        var registered = await service.RegisterAsync("fan@queenzone.org", "S3curePass!", "New Fan");
+        Assert.True((await service.ClaimLegacyAccountAsync(
+            registered.Account!.Id,
+            legacyUserId: 100,
+            adoptLegacyDisplayName: false)).Succeeded);
+
+        var unlinked = await service.UnlinkLegacyAccountAsync(registered.Account.Id);
+
+        Assert.True(unlinked.Succeeded);
+        Assert.Null(unlinked.Account!.LinkedLegacyUserId);
+
+        var state = await service.GetLegacyLinkStateAsync(unlinked.Account);
+        Assert.Equal(LegacyAccountLinkKind.Claimable, state.Kind);
+        Assert.True(state.HasMultipleClaimable);
+
+        var reclaimed = await service.ClaimLegacyAccountAsync(
+            registered.Account.Id,
+            legacyUserId: 200,
+            adoptLegacyDisplayName: true);
+
+        Assert.True(reclaimed.Succeeded);
+        Assert.Equal(200, reclaimed.Account!.LinkedLegacyUserId);
+        Assert.Equal("RightFan", reclaimed.Account.DisplayName);
+    }
+
+    [Fact]
+    public async Task UnlinkLegacyAccountAsync_IsNoOp_WhenAlreadyUnlinked()
+    {
+        var service = CreateService();
+        var registered = await service.RegisterAsync("fan@queenzone.org", "S3curePass!", "Fan");
+
+        var result = await service.UnlinkLegacyAccountAsync(registered.Account!.Id);
+
+        Assert.True(result.Succeeded);
+        Assert.Null(result.Account!.LinkedLegacyUserId);
+    }
+
+    [Fact]
+    public async Task UnlinkLegacyAccountAsync_Fails_WhenAccountDoesNotExist()
+    {
+        var service = CreateService();
+
+        var result = await service.UnlinkLegacyAccountAsync(Guid.NewGuid());
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("Account not found.", result.Error);
+    }
+
+    [Fact]
+    public async Task GetLegacyLinkStateAsync_ReturnsMultipleClaimable_WhenEmailMatchesSeveralFreeAccounts()
+    {
+        var legacyLookup = new InMemoryLegacyMemberLookupRepository(
+            new Dictionary<string, IReadOnlyList<LegacyMemberMatch>>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["fan@queenzone.org"] =
+                [
+                    new LegacyMemberMatch(200, "BetaFan"),
+                    new LegacyMemberMatch(100, "AlphaFan"),
+                ],
+            });
+        var service = CreateService(legacyMemberLookupRepository: legacyLookup);
+        var registered = await service.RegisterAsync("fan@queenzone.org", "S3curePass!", "New Fan");
+
+        var state = await service.GetLegacyLinkStateAsync(registered.Account!);
+
+        Assert.Equal(LegacyAccountLinkKind.Claimable, state.Kind);
+        Assert.True(state.HasMultipleClaimable);
+        Assert.Null(state.Match);
+        Assert.Equal([100, 200], state.ClaimableMatches.Select(m => m.UserId).ToArray());
+        Assert.Equal(["AlphaFan", "BetaFan"], state.ClaimableMatches.Select(m => m.Username).ToArray());
+    }
+
+    [Fact]
+    public async Task ClaimLegacyAccountAsync_ClaimsChosenMatch_WhenMultipleShareEmail()
+    {
+        var legacyLookup = new InMemoryLegacyMemberLookupRepository(
+            new Dictionary<string, IReadOnlyList<LegacyMemberMatch>>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["fan@queenzone.org"] =
+                [
+                    new LegacyMemberMatch(100, "AlphaFan"),
+                    new LegacyMemberMatch(200, "BetaFan"),
+                ],
+            });
+        var service = CreateService(legacyMemberLookupRepository: legacyLookup);
+        var registered = await service.RegisterAsync("fan@queenzone.org", "S3curePass!", "New Fan");
+
+        var claimed = await service.ClaimLegacyAccountAsync(
+            registered.Account!.Id,
+            legacyUserId: 200,
+            adoptLegacyDisplayName: true);
+
+        Assert.True(claimed.Succeeded);
+        Assert.Equal(200, claimed.Account!.LinkedLegacyUserId);
+        Assert.Equal("BetaFan", claimed.Account.DisplayName);
+    }
+
+    [Fact]
+    public async Task ClaimLegacyAccountAsync_Fails_WhenChosenIdDoesNotMatchEmail()
+    {
+        var legacyLookup = new InMemoryLegacyMemberLookupRepository(
+            new Dictionary<string, IReadOnlyList<LegacyMemberMatch>>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["fan@queenzone.org"] = [new LegacyMemberMatch(100, "AlphaFan")],
+                ["other@queenzone.org"] = [new LegacyMemberMatch(999, "OtherFan")],
+            });
+        var service = CreateService(legacyMemberLookupRepository: legacyLookup);
+        var registered = await service.RegisterAsync("fan@queenzone.org", "S3curePass!", "New Fan");
+
+        var result = await service.ClaimLegacyAccountAsync(
+            registered.Account!.Id,
+            legacyUserId: 999,
+            adoptLegacyDisplayName: false);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("does not match", result.Error, StringComparison.OrdinalIgnoreCase);
+        Assert.Null((await service.FindByIdAsync(registered.Account.Id))!.LinkedLegacyUserId);
+    }
+
+    [Fact]
+    public async Task SignInAsync_DoesNotBackfill_WhenMultipleFreeLegacyMatches()
+    {
+        var legacyLookup = new InMemoryLegacyMemberLookupRepository(
+            new Dictionary<string, IReadOnlyList<LegacyMemberMatch>>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["fan@queenzone.org"] =
+                [
+                    new LegacyMemberMatch(100, "AlphaFan"),
+                    new LegacyMemberMatch(200, "BetaFan"),
+                ],
+            });
+        var service = CreateService(legacyMemberLookupRepository: legacyLookup);
+        await service.RegisterAsync("fan@queenzone.org", "S3curePass!", "Fan");
+
+        var signedIn = await service.SignInAsync("fan@queenzone.org", "S3curePass!");
+
+        Assert.True(signedIn.Succeeded);
+        Assert.Null(signedIn.Account!.LinkedLegacyUserId);
+
+        var state = await service.GetLegacyLinkStateAsync(signedIn.Account);
+        Assert.Equal(LegacyAccountLinkKind.Claimable, state.Kind);
+        Assert.True(state.HasMultipleClaimable);
+    }
+
+    [Fact]
+    public async Task GetLegacyLinkStateAsync_SplitsFreeAndTakenMatches()
+    {
+        var legacyLookup = new InMemoryLegacyMemberLookupRepository(
+            new Dictionary<string, IReadOnlyList<LegacyMemberMatch>>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["shared@queenzone.org"] =
+                [
+                    new LegacyMemberMatch(100, "FreeFan"),
+                    new LegacyMemberMatch(200, "TakenFan"),
+                ],
+                ["other@queenzone.org"] = [new LegacyMemberMatch(200, "TakenFan")],
+            });
+        var service = CreateService(legacyMemberLookupRepository: legacyLookup);
+        var other = await service.RegisterAsync("other@queenzone.org", "S3curePass!", "Other");
+        Assert.True((await service.ClaimLegacyAccountAsync(
+            other.Account!.Id,
+            legacyUserId: 200,
+            adoptLegacyDisplayName: false)).Succeeded);
+
+        var shared = await service.RegisterAsync("shared@queenzone.org", "S3curePass!", "Shared");
+        var state = await service.GetLegacyLinkStateAsync(shared.Account!);
+
+        Assert.Equal(LegacyAccountLinkKind.Claimable, state.Kind);
+        Assert.False(state.HasMultipleClaimable);
+        Assert.Single(state.ClaimableMatches);
+        Assert.Equal(100, state.ClaimableMatches[0].UserId);
+        Assert.Single(state.UnavailableMatches);
+        Assert.Equal(200, state.UnavailableMatches[0].UserId);
     }
 
     [Fact]
@@ -369,6 +632,15 @@ public sealed class MemberAccountServiceTests
 
         public Task<MemberAccount?> UpdateAvatarUrlAsync(Guid memberId, string? avatarBlobPath, CancellationToken cancellationToken = default) =>
             throw new InvalidOperationException("Simulated database failure.");
+
+        public Task<MemberAccount?> FindByLinkedLegacyUserIdAsync(int legacyUserId, CancellationToken cancellationToken = default) =>
+            inner.FindByLinkedLegacyUserIdAsync(legacyUserId, cancellationToken);
+
+        public Task<MemberAccount?> LinkLegacyUserIdAsync(Guid memberId, int legacyUserId, CancellationToken cancellationToken = default) =>
+            inner.LinkLegacyUserIdAsync(memberId, legacyUserId, cancellationToken);
+
+        public Task<MemberAccount?> UnlinkLegacyUserIdAsync(Guid memberId, CancellationToken cancellationToken = default) =>
+            inner.UnlinkLegacyUserIdAsync(memberId, cancellationToken);
 
         public Task RecordLoginAsync(Guid memberId, DateTime loginAt, CancellationToken cancellationToken = default) =>
             inner.RecordLoginAsync(memberId, loginAt, cancellationToken);

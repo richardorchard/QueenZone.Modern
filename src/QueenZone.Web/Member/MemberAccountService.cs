@@ -7,9 +7,16 @@ namespace QueenZone.Web;
 
 /// <summary>
 /// Shared find-or-link-or-create logic for both the native Queenzone.org signup and every
-/// external provider's first sign-in. Linking to a legacy USERS_T account is automatic and
-/// silent, by email match only — the legacy PASSWORD column is never read or verified.
+/// external provider's first sign-in.
 /// </summary>
+/// <remarks>
+/// Legacy USERS_T matching is by email only — the legacy PASSWORD column is never read.
+/// New accounts do not auto-claim; members confirm the link from Account settings.
+/// When several USERS_T rows share the same email, Settings offers a choice; silent login
+/// backfill only runs when exactly one free match remains.
+/// Existing unlinked accounts get that single-match silent backfill on later sign-in,
+/// repairing accounts that missed create-time linking under the old model.
+/// </remarks>
 public sealed class MemberAccountService(
     IMemberAccountRepository memberAccountRepository,
     ILegacyMemberLookupRepository legacyMemberLookupRepository,
@@ -32,7 +39,6 @@ public sealed class MemberAccountService(
             Email = email,
             DisplayName = displayName,
             CreatedAt = DateTime.UtcNow,
-            LinkedLegacyUserId = (await legacyMemberLookupRepository.FindByEmailAsync(email, cancellationToken))?.UserId,
         };
         account.PasswordHash = passwordHasher.HashPassword(account, password);
 
@@ -54,6 +60,7 @@ public sealed class MemberAccountService(
             return MemberAccountResult.Failure("Incorrect email or password.");
         }
 
+        account = await TryBackfillLegacyLinkAsync(account, cancellationToken);
         await memberAccountRepository.RecordLoginAsync(account.Id, DateTime.UtcNow, cancellationToken);
         return MemberAccountResult.Success(account);
     }
@@ -66,6 +73,7 @@ public sealed class MemberAccountService(
         CancellationToken cancellationToken = default)
     {
         MemberAccount result;
+        var isNewAccount = false;
 
         var existingByLogin = await memberAccountRepository.FindByExternalLoginAsync(provider, providerKey, cancellationToken);
         if (existingByLogin is not null)
@@ -88,13 +96,20 @@ public sealed class MemberAccountService(
                     Email = email,
                     DisplayName = displayName,
                     CreatedAt = DateTime.UtcNow,
-                    LinkedLegacyUserId = (await legacyMemberLookupRepository.FindByEmailAsync(email, cancellationToken))?.UserId,
                 };
 
                 var created = await memberAccountRepository.CreateAsync(account, cancellationToken);
                 await memberAccountRepository.AddExternalLoginAsync(created.Id, provider, providerKey, email, cancellationToken);
                 result = created;
+                isNewAccount = true;
             }
+        }
+
+        // Existing accounts only: silent backfill for people who never claimed yet.
+        // New accounts keep LinkedLegacyUserId null so Settings can offer an explicit claim.
+        if (!isNewAccount)
+        {
+            result = await TryBackfillLegacyLinkAsync(result, cancellationToken);
         }
 
         await memberAccountRepository.RecordLoginAsync(result.Id, DateTime.UtcNow, cancellationToken);
@@ -106,6 +121,182 @@ public sealed class MemberAccountService(
 
     public async Task<IReadOnlyList<string>> ListExternalProvidersAsync(Guid memberId, CancellationToken cancellationToken = default) =>
         await memberAccountRepository.ListExternalProvidersAsync(memberId, cancellationToken);
+
+    /// <summary>
+    /// Resolves whether the member is already linked to a legacy account, or can claim one
+    /// or more free USERS_T rows that match their modern email.
+    /// </summary>
+    public async Task<LegacyAccountLinkState> GetLegacyLinkStateAsync(
+        MemberAccount account,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(account);
+
+        if (account.LinkedLegacyUserId is int linkedId)
+        {
+            var linked = await legacyMemberLookupRepository.FindByUserIdAsync(linkedId, cancellationToken)
+                ?? new LegacyMemberMatch(linkedId, $"User #{linkedId}");
+            return LegacyAccountLinkState.Linked(linked);
+        }
+
+        var matches = await legacyMemberLookupRepository.FindAllByEmailAsync(account.Email, cancellationToken);
+        if (matches.Count == 0)
+        {
+            return LegacyAccountLinkState.None();
+        }
+
+        var claimable = new List<LegacyMemberMatch>(matches.Count);
+        var unavailable = new List<LegacyMemberMatch>();
+        foreach (var match in matches)
+        {
+            var takenBy = await memberAccountRepository.FindByLinkedLegacyUserIdAsync(match.UserId, cancellationToken);
+            if (takenBy is not null && takenBy.Id != account.Id)
+            {
+                unavailable.Add(match);
+            }
+            else
+            {
+                claimable.Add(match);
+            }
+        }
+
+        if (claimable.Count > 0)
+        {
+            return LegacyAccountLinkState.Claimable(claimable, unavailable);
+        }
+
+        return LegacyAccountLinkState.Unavailable(unavailable);
+    }
+
+    /// <summary>
+    /// Explicitly claims a free legacy USERS_T account that matches the member's email.
+    /// When multiple rows share that email, <paramref name="legacyUserId"/> selects which one.
+    /// Optionally adopts the legacy username as the modern display name.
+    /// </summary>
+    public async Task<MemberAccountResult> ClaimLegacyAccountAsync(
+        Guid memberId,
+        int legacyUserId,
+        bool adoptLegacyDisplayName,
+        CancellationToken cancellationToken = default)
+    {
+        var account = await memberAccountRepository.FindByIdAsync(memberId, cancellationToken);
+        if (account is null)
+        {
+            return MemberAccountResult.Failure("Account not found.");
+        }
+
+        if (account.LinkedLegacyUserId is not null)
+        {
+            return MemberAccountResult.Success(account);
+        }
+
+        var matches = await legacyMemberLookupRepository.FindAllByEmailAsync(account.Email, cancellationToken);
+        var match = matches.FirstOrDefault(item => item.UserId == legacyUserId);
+        if (match is null)
+        {
+            return MemberAccountResult.Failure(
+                "That legacy account does not match your email, or was not found.");
+        }
+
+        var takenBy = await memberAccountRepository.FindByLinkedLegacyUserIdAsync(match.UserId, cancellationToken);
+        if (takenBy is not null && takenBy.Id != memberId)
+        {
+            return MemberAccountResult.Failure(
+                "That legacy account is already linked to another modern member.");
+        }
+
+        var linked = await memberAccountRepository.LinkLegacyUserIdAsync(memberId, match.UserId, cancellationToken);
+        if (linked is null)
+        {
+            return MemberAccountResult.Failure("Account not found.");
+        }
+
+        if (adoptLegacyDisplayName && !string.IsNullOrWhiteSpace(match.Username))
+        {
+            var renamed = await UpdateDisplayNameAsync(memberId, match.Username, cancellationToken);
+            if (renamed.Succeeded && renamed.Account is not null)
+            {
+                return renamed;
+            }
+        }
+
+        return MemberAccountResult.Success(linked);
+    }
+
+    /// <summary>
+    /// Clears the member's legacy USERS_T link so they can claim a different free match
+    /// (or remain unlinked). Does not change display name.
+    /// </summary>
+    public async Task<MemberAccountResult> UnlinkLegacyAccountAsync(
+        Guid memberId,
+        CancellationToken cancellationToken = default)
+    {
+        var account = await memberAccountRepository.FindByIdAsync(memberId, cancellationToken);
+        if (account is null)
+        {
+            return MemberAccountResult.Failure("Account not found.");
+        }
+
+        if (account.LinkedLegacyUserId is null)
+        {
+            return MemberAccountResult.Success(account);
+        }
+
+        var unlinked = await memberAccountRepository.UnlinkLegacyUserIdAsync(memberId, cancellationToken);
+        if (unlinked is null)
+        {
+            return MemberAccountResult.Failure("Account not found.");
+        }
+
+        return MemberAccountResult.Success(unlinked);
+    }
+
+    /// <summary>
+    /// Silently links a free legacy account when the member is still unlinked and their email
+    /// matches exactly one free USERS_T row. Used to backfill accounts created before the claim UI
+    /// existed. Multiple free matches are left unlinked so the member can choose in Settings.
+    /// </summary>
+    private async Task<MemberAccount> TryBackfillLegacyLinkAsync(
+        MemberAccount account,
+        CancellationToken cancellationToken)
+    {
+        if (account.LinkedLegacyUserId is not null)
+        {
+            return account;
+        }
+
+        var matches = await legacyMemberLookupRepository.FindAllByEmailAsync(account.Email, cancellationToken);
+        if (matches.Count == 0)
+        {
+            return account;
+        }
+
+        LegacyMemberMatch? soleFree = null;
+        foreach (var match in matches)
+        {
+            var takenBy = await memberAccountRepository.FindByLinkedLegacyUserIdAsync(match.UserId, cancellationToken);
+            if (takenBy is not null && takenBy.Id != account.Id)
+            {
+                continue;
+            }
+
+            if (soleFree is not null)
+            {
+                // Ambiguous: more than one free legacy account for this email.
+                return account;
+            }
+
+            soleFree = match;
+        }
+
+        if (soleFree is null)
+        {
+            return account;
+        }
+
+        return await memberAccountRepository.LinkLegacyUserIdAsync(account.Id, soleFree.UserId, cancellationToken)
+            ?? account;
+    }
 
     /// <summary>
     /// Updates the member's display name. Names are not unique — multiple members may share
@@ -323,4 +514,56 @@ public sealed record MemberAccountResult(bool Succeeded, MemberAccount? Account,
     public static MemberAccountResult Success(MemberAccount account) => new(true, account, null);
 
     public static MemberAccountResult Failure(string error) => new(false, null, error);
+}
+
+public enum LegacyAccountLinkKind
+{
+    None = 0,
+    Linked = 1,
+    Claimable = 2,
+    Unavailable = 3,
+}
+
+public sealed record LegacyAccountLinkState(
+    LegacyAccountLinkKind Kind,
+    LegacyMemberMatch? Match,
+    IReadOnlyList<LegacyMemberMatch> ClaimableMatches,
+    IReadOnlyList<LegacyMemberMatch> UnavailableMatches)
+{
+    public bool HasMultipleClaimable => ClaimableMatches.Count > 1;
+
+    public static LegacyAccountLinkState None() =>
+        new(LegacyAccountLinkKind.None, null, [], []);
+
+    public static LegacyAccountLinkState Linked(LegacyMemberMatch match) =>
+        new(LegacyAccountLinkKind.Linked, match, [], []);
+
+    public static LegacyAccountLinkState Claimable(
+        IReadOnlyList<LegacyMemberMatch> claimableMatches,
+        IReadOnlyList<LegacyMemberMatch>? unavailableMatches = null)
+    {
+        ArgumentNullException.ThrowIfNull(claimableMatches);
+        if (claimableMatches.Count == 0)
+        {
+            throw new ArgumentException("At least one claimable match is required.", nameof(claimableMatches));
+        }
+
+        var unavailable = unavailableMatches ?? [];
+        // Match is set for the common single-match UI/tests; multi-match leaves it null.
+        var primary = claimableMatches.Count == 1 ? claimableMatches[0] : null;
+        return new(LegacyAccountLinkKind.Claimable, primary, claimableMatches, unavailable);
+    }
+
+    public static LegacyAccountLinkState Claimable(LegacyMemberMatch match) =>
+        Claimable([match], []);
+
+    public static LegacyAccountLinkState Unavailable(IReadOnlyList<LegacyMemberMatch> unavailableMatches)
+    {
+        ArgumentNullException.ThrowIfNull(unavailableMatches);
+        var primary = unavailableMatches.Count > 0 ? unavailableMatches[0] : null;
+        return new(LegacyAccountLinkKind.Unavailable, primary, [], unavailableMatches);
+    }
+
+    public static LegacyAccountLinkState Unavailable(LegacyMemberMatch match) =>
+        Unavailable([match]);
 }

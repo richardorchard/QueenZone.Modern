@@ -10,22 +10,32 @@ public sealed class EfNewsAgentRunRequestRepository(QueenZoneDbContext dbContext
     private static readonly TimeSpan StaleRunTimeout = TimeSpan.FromHours(3);
 
     public async Task<NewsAgentRunRequestQueueResult> QueueAsync(
-        string requestedBy,
+        NewsAgentRunRequestCreate request,
         CancellationToken cancellationToken = default)
     {
-        var active = await GetActiveAsync(cancellationToken);
-        if (active is not null)
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (request.Kind == NewsAgentRunRequestKind.ScheduledGathering)
         {
-            return new NewsAgentRunRequestQueueResult(Map(active), WasCreated: false);
+            var active = await GetActiveGatheringAsync(cancellationToken);
+            if (active is not null)
+            {
+                return new NewsAgentRunRequestQueueResult(Map(active), WasCreated: false);
+            }
         }
 
         var now = DateTime.UtcNow;
         var entity = new NewsAgentRunRequestEntity
         {
             Status = NewsAgentRunRequestStatus.Pending,
-            RequestedBy = Normalize(requestedBy, 256),
+            Kind = request.Kind,
+            RequestedBy = Normalize(request.RequestedBy, 256),
             RequestedAtUtc = now,
-            ActiveKey = ActiveKey,
+            ArticleUrl = string.IsNullOrWhiteSpace(request.ArticleUrl)
+                ? null
+                : Normalize(request.ArticleUrl, 2000),
+            GenerateDraft = request.GenerateDraft,
+            ActiveKey = request.Kind == NewsAgentRunRequestKind.ScheduledGathering ? ActiveKey : null,
             UpdatedAtUtc = now
         };
         dbContext.NewsAgentRunRequests.Add(entity);
@@ -38,7 +48,12 @@ public sealed class EfNewsAgentRunRequestRepository(QueenZoneDbContext dbContext
         catch (DbUpdateException)
         {
             dbContext.Entry(entity).State = EntityState.Detached;
-            active = await GetActiveAsync(cancellationToken);
+            if (request.Kind != NewsAgentRunRequestKind.ScheduledGathering)
+            {
+                throw;
+            }
+
+            var active = await GetActiveGatheringAsync(cancellationToken);
             if (active is null)
             {
                 throw;
@@ -177,7 +192,7 @@ public sealed class EfNewsAgentRunRequestRepository(QueenZoneDbContext dbContext
         return updated == 1;
     }
 
-    private Task<NewsAgentRunRequestEntity?> GetActiveAsync(CancellationToken cancellationToken) =>
+    private Task<NewsAgentRunRequestEntity?> GetActiveGatheringAsync(CancellationToken cancellationToken) =>
         dbContext.NewsAgentRunRequests
             .AsNoTracking()
             .SingleOrDefaultAsync(request => request.ActiveKey == ActiveKey, cancellationToken);
@@ -229,8 +244,11 @@ public sealed class EfNewsAgentRunRequestRepository(QueenZoneDbContext dbContext
         new(
             request.Id,
             request.Status,
+            request.Kind,
             request.RequestedBy,
             request.RequestedAtUtc,
+            request.ArticleUrl,
+            request.GenerateDraft,
             request.RunnerId,
             request.StartedAtUtc,
             request.CompletedAtUtc,

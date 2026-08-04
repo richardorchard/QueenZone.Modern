@@ -8,30 +8,83 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
 {
     private const int MaxUniqueConflictRetries = 3;
 
-    public async Task<PrivateInboxPage> GetInboxAsync(
+    public Task<PrivateInboxPage> GetInboxAsync(
         Guid memberId,
         int page = 1,
         int pageSize = PrivateMessageLimits.InboxPageSize,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        GetInboxCoreAsync(memberId, page, pageSize, isArchived: false, cancellationToken);
+
+    public Task<PrivateInboxPage> GetArchivedInboxAsync(
+        Guid memberId,
+        int page = 1,
+        int pageSize = PrivateMessageLimits.InboxPageSize,
+        CancellationToken cancellationToken = default) =>
+        GetInboxCoreAsync(memberId, page, pageSize, isArchived: true, cancellationToken);
+
+    public Task<bool> ArchiveConversationAsync(
+        Guid conversationId,
+        Guid memberId,
+        CancellationToken cancellationToken = default) =>
+        SetArchivedAsync(conversationId, memberId, isArchived: true, cancellationToken);
+
+    public Task<bool> UnarchiveConversationAsync(
+        Guid conversationId,
+        Guid memberId,
+        CancellationToken cancellationToken = default) =>
+        SetArchivedAsync(conversationId, memberId, isArchived: false, cancellationToken);
+
+    private async Task<bool> SetArchivedAsync(
+        Guid conversationId,
+        Guid memberId,
+        bool isArchived,
+        CancellationToken cancellationToken)
+    {
+        // Tracked query + mutate + save, matching UnarchiveAsync below: ExecuteUpdateAsync bypasses
+        // the change tracker and would leave any already-tracked participant instance stale within
+        // the same DbContext (e.g. a subsequent reply's own unarchive-on-send within one request).
+        var participant = await dbContext.PrivateConversationParticipants
+            .SingleOrDefaultAsync(
+                p => p.ConversationId == conversationId && p.MemberId == memberId,
+                cancellationToken);
+        if (participant is null)
+        {
+            return false;
+        }
+
+        participant.IsArchived = isArchived;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    private async Task<PrivateInboxPage> GetInboxCoreAsync(
+        Guid memberId,
+        int page,
+        int pageSize,
+        bool isArchived,
+        CancellationToken cancellationToken)
     {
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, PrivateMessageLimits.MaxInboxPageSize);
 
         if (IsSqliteDatabase())
         {
-            return await GetInboxSqliteAsync(memberId, page, pageSize, cancellationToken);
+            return await GetInboxSqliteAsync(memberId, page, pageSize, isArchived, cancellationToken);
         }
 
         var totalCount = await dbContext.PrivateConversationParticipants
             .AsNoTracking()
-            .CountAsync(p => p.MemberId == memberId && !p.IsArchived, cancellationToken);
+            .CountAsync(
+                p => p.MemberId == memberId && p.IsArchived == isArchived && !p.IsRemoved,
+                cancellationToken);
         var totalPages = totalCount <= 0 ? 1 : (totalCount + pageSize - 1) / pageSize;
         page = Math.Min(page, totalPages);
 
         var pageRows = await dbContext.PrivateConversationParticipants
             .AsNoTracking()
-            .Where(p => p.MemberId == memberId && !p.IsArchived)
-            .OrderByDescending(p => p.Conversation!.LastMessageAt)
+            .Where(p => p.MemberId == memberId && p.IsArchived == isArchived && !p.IsRemoved)
+            .OrderByDescending(p => p.Conversation!.LastMessageSortKey)
+            .ThenByDescending(p => p.ConversationId)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(p => new InboxPageRow(
@@ -311,8 +364,8 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
                 await PrepareMessageSortKeyAsync(message, cancellationToken);
                 dbContext.PrivateMessages.Add(message);
 
-                await UnarchiveAsync(conversationId, conversation.MemberLowId, cancellationToken);
-                await UnarchiveAsync(conversationId, conversation.MemberHighId, cancellationToken);
+                await ReactivateParticipantAsync(conversationId, conversation.MemberLowId, cancellationToken);
+                await ReactivateParticipantAsync(conversationId, conversation.MemberHighId, cancellationToken);
                 await dbContext.SaveChangesAsync(cancellationToken);
 
                 await UpdateConversationSummaryForInsertedMessageAsync(
@@ -320,6 +373,7 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
                     sentAt,
                     preview,
                     senderMemberId,
+                    message.SortKey,
                     cancellationToken);
 
                 await transaction.CommitAsync(cancellationToken);
@@ -361,6 +415,7 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
                         MemberHighId = high,
                         CreatedAt = sentAt,
                         LastMessageAt = sentAt,
+                        LastMessageSortKey = 0,
                         LastMessagePreview = preview,
                         LastMessageSenderId = senderMemberId,
                     };
@@ -372,6 +427,7 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
                         LastReadAt = sentAt,
                         LastReadSortKey = null,
                         IsArchived = false,
+                        IsRemoved = false,
                     });
                     dbContext.PrivateConversationParticipants.Add(new PrivateConversationParticipantEntity
                     {
@@ -380,6 +436,7 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
                         LastReadAt = null,
                         LastReadSortKey = null,
                         IsArchived = false,
+                        IsRemoved = false,
                     });
 
                     var firstMessage = new PrivateMessageEntity
@@ -395,6 +452,8 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
                     await dbContext.SaveChangesAsync(cancellationToken);
 
                     // Sender has seen their own first message; align SortKey cursor with LastReadAt.
+                    // Tip SortKey is only known after IDENTITY (SQL Server) or in-process assignment (SQLite).
+                    conversation.LastMessageSortKey = firstMessage.SortKey;
                     var senderParticipant = await dbContext.PrivateConversationParticipants
                         .SingleAsync(
                             p => p.ConversationId == conversation.Id && p.MemberId == senderMemberId,
@@ -411,8 +470,8 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
 
                 await EnsureParticipantAsync(conversationId, senderMemberId, cancellationToken);
                 await EnsureParticipantAsync(conversationId, recipientMemberId, cancellationToken);
-                await UnarchiveAsync(conversationId, senderMemberId, cancellationToken);
-                await UnarchiveAsync(conversationId, recipientMemberId, cancellationToken);
+                await ReactivateParticipantAsync(conversationId, senderMemberId, cancellationToken);
+                await ReactivateParticipantAsync(conversationId, recipientMemberId, cancellationToken);
 
                 var message = new PrivateMessageEntity
                 {
@@ -431,6 +490,7 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
                     sentAt,
                     preview,
                     senderMemberId,
+                    message.SortKey,
                     cancellationToken);
 
                 await transaction.CommitAsync(cancellationToken);
@@ -514,11 +574,12 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
         DateTimeOffset sentAt,
         string preview,
         Guid senderMemberId,
+        long sortKey,
         CancellationToken cancellationToken)
     {
         // Callers hold the conversation write lock, so this insert is the tip by SortKey.
-        // Always refresh preview/sender to match the thread tip. Keep LastMessageAt monotonic
-        // (max of existing and sentAt) so inbox ordering does not jump backwards under clock skew.
+        // Always refresh preview/sender/SortKey tip. Keep LastMessageAt monotonic (max of existing
+        // and sentAt) for display; inbox ranking uses LastMessageSortKey instead.
         var conversation = await dbContext.PrivateConversations
             .SingleOrDefaultAsync(c => c.Id == conversationId, cancellationToken);
         if (conversation is null)
@@ -531,6 +592,7 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
             conversation.LastMessageAt = sentAt;
         }
 
+        conversation.LastMessageSortKey = sortKey;
         conversation.LastMessagePreview = preview;
         conversation.LastMessageSenderId = senderMemberId;
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -542,7 +604,7 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
     {
         return await dbContext.PrivateConversationParticipants
             .AsNoTracking()
-            .Where(p => p.MemberId == memberId && !p.IsArchived)
+            .Where(p => p.MemberId == memberId && !p.IsArchived && !p.IsRemoved)
             .Where(p => dbContext.PrivateMessages.Any(m =>
                 m.ConversationId == p.ConversationId
                 && m.SenderMemberId != memberId
@@ -556,7 +618,7 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
     {
         var pageRows = await dbContext.PrivateConversationParticipants
             .AsNoTracking()
-            .Where(p => p.MemberId == memberId && !p.IsArchived)
+            .Where(p => p.MemberId == memberId && !p.IsArchived && !p.IsRemoved)
             .Select(p => new InboxPageRow(
                 p.ConversationId,
                 p.LastReadSortKey,
@@ -578,17 +640,19 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
         Guid memberId,
         int page,
         int pageSize,
+        bool isArchived,
         CancellationToken cancellationToken)
     {
         var rows = await dbContext.PrivateConversationParticipants
             .AsNoTracking()
-            .Where(p => p.MemberId == memberId && !p.IsArchived)
+            .Where(p => p.MemberId == memberId && p.IsArchived == isArchived && !p.IsRemoved)
             .Select(p => new
             {
                 p.ConversationId,
                 p.LastReadSortKey,
                 Preview = p.Conversation!.LastMessagePreview,
                 LastMessageAt = p.Conversation.LastMessageAt,
+                LastMessageSortKey = p.Conversation.LastMessageSortKey,
                 OtherDisplayName = p.Conversation.MemberLowId == memberId
                     ? (p.Conversation.MemberHigh != null ? p.Conversation.MemberHigh.DisplayName : string.Empty)
                     : (p.Conversation.MemberLow != null ? p.Conversation.MemberLow.DisplayName : string.Empty),
@@ -603,7 +667,8 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
         page = Math.Min(page, totalPages);
 
         var pageRows = rows
-            .OrderByDescending(r => r.LastMessageAt)
+            .OrderByDescending(r => r.LastMessageSortKey)
+            .ThenByDescending(r => r.ConversationId)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(r => new InboxPageRow(
@@ -691,14 +756,17 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
             LastReadAt = null,
             LastReadSortKey = null,
             IsArchived = false,
+            IsRemoved = false,
         });
     }
 
-    private async Task UnarchiveAsync(
+    private async Task ReactivateParticipantAsync(
         Guid conversationId,
         Guid memberId,
         CancellationToken cancellationToken)
     {
+        // New activity restores visibility rather than silently dropping the message on an
+        // archived or removed conversation.
         var participant = await dbContext.PrivateConversationParticipants
             .SingleOrDefaultAsync(
                 p => p.ConversationId == conversationId && p.MemberId == memberId,
@@ -706,7 +774,30 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
         if (participant is not null)
         {
             participant.IsArchived = false;
+            participant.IsRemoved = false;
         }
+    }
+
+    public async Task<bool> RemoveConversationAsync(
+        Guid conversationId,
+        Guid memberId,
+        CancellationToken cancellationToken = default)
+    {
+        // Tracked query + mutate + save (not ExecuteUpdateAsync) so this stays consistent with
+        // ReactivateParticipantAsync within the same DbContext: bypassing the change tracker would
+        // leave an already-tracked participant instance stale for a later reply in the same request.
+        var participant = await dbContext.PrivateConversationParticipants
+            .SingleOrDefaultAsync(
+                p => p.ConversationId == conversationId && p.MemberId == memberId,
+                cancellationToken);
+        if (participant is null)
+        {
+            return false;
+        }
+
+        participant.IsRemoved = true;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return true;
     }
 
     private bool IsSqliteDatabase() =>

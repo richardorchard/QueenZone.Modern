@@ -27,6 +27,7 @@ public sealed class ForumTopicPageTests : IClassFixture<WebApplicationFactory<Pr
         Assert.Contains("A Night at the Opera", body);
         Assert.Contains("<strong>26</strong> posts", body);
         Assert.Contains(TestSiteConfiguration.CanonicalLink("/forum/topic/1002/ranking-every-studio-album"), body);
+        Assert.DoesNotContain("Private conversations with other members", body);
     }
 
     [Fact]

@@ -10,6 +10,7 @@ namespace QueenZone.NewsAgent;
 public static class OutboundUrlSafety
 {
     public const int DefaultMaxResponseBytes = 5 * 1024 * 1024;
+    public const int MaxUrlLength = 2000;
 
     /// <summary>
     /// Ensures <paramref name="url"/> is an absolute http(s) URL suitable for discovery fetch.
@@ -17,40 +18,74 @@ public static class OutboundUrlSafety
     /// </summary>
     public static void EnsureAllowedHttpUrl(string url)
     {
+        if (!TryValidatePublicHttpUrl(url, out var error, out _))
+        {
+            throw new InvalidOperationException(error);
+        }
+    }
+
+    /// <summary>
+    /// Deterministic URL safety check for admin submission and worker ingestion.
+    /// Does not perform DNS; DNS-aware IP blocking still runs on connect and redirects.
+    /// </summary>
+    public static bool TryValidatePublicHttpUrl(string? url, out string error, out string? normalizedUrl)
+    {
+        error = string.Empty;
+        normalizedUrl = null;
+
         if (string.IsNullOrWhiteSpace(url))
         {
-            throw new InvalidOperationException("Outbound URL is required.");
+            error = "Article URL is required.";
+            return false;
         }
 
-        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+        var trimmed = url.Trim();
+        if (trimmed.Length > MaxUrlLength)
         {
-            throw new InvalidOperationException($"Outbound URL is not absolute: '{url}'.");
+            error = $"Article URL must be at most {MaxUrlLength} characters.";
+            return false;
+        }
+
+        if (!Uri.TryCreate(trimmed, UriKind.Absolute, out var uri))
+        {
+            error = "Article URL must be an absolute HTTP or HTTPS address.";
+            return false;
         }
 
         if (uri.Scheme != Uri.UriSchemeHttps && uri.Scheme != Uri.UriSchemeHttp)
         {
-            throw new InvalidOperationException(
-                $"Outbound URL scheme '{uri.Scheme}' is not allowed. Use http or https.");
+            error = $"URL scheme '{uri.Scheme}' is not allowed. Use http or https.";
+            return false;
         }
 
         if (string.IsNullOrWhiteSpace(uri.Host))
         {
-            throw new InvalidOperationException("Outbound URL host is required.");
+            error = "Article URL host is required.";
+            return false;
+        }
+
+        if (!string.IsNullOrEmpty(uri.UserInfo))
+        {
+            error = "Article URL must not include credentials.";
+            return false;
         }
 
         // Literal IP in the URL — check immediately (no DNS required).
         if (IPAddress.TryParse(uri.DnsSafeHost, out var literal)
             && IsBlockedAddress(literal))
         {
-            throw new InvalidOperationException(
-                $"Outbound URL host resolves to a blocked address family ({literal}).");
+            error = $"Article URL host resolves to a blocked address family ({literal}).";
+            return false;
         }
 
         if (IsBlockedHostName(uri.DnsSafeHost))
         {
-            throw new InvalidOperationException(
-                $"Outbound URL host '{uri.DnsSafeHost}' is not allowed.");
+            error = $"Article URL host '{uri.DnsSafeHost}' is not allowed.";
+            return false;
         }
+
+        normalizedUrl = uri.AbsoluteUri;
+        return true;
     }
 
     public static bool IsBlockedHostName(string host)
@@ -154,5 +189,22 @@ public static class OutboundUrlSafety
         }
 
         return false;
+    }
+
+    public static bool IsAllowedTextContentType(string? contentType)
+    {
+        if (string.IsNullOrWhiteSpace(contentType))
+        {
+            return true;
+        }
+
+        var mediaType = contentType.Split(';', 2)[0].Trim();
+        return mediaType.Equals("text/html", StringComparison.OrdinalIgnoreCase)
+            || mediaType.Equals("application/xhtml+xml", StringComparison.OrdinalIgnoreCase)
+            || mediaType.Equals("text/plain", StringComparison.OrdinalIgnoreCase)
+            || mediaType.Equals("application/xml", StringComparison.OrdinalIgnoreCase)
+            || mediaType.Equals("text/xml", StringComparison.OrdinalIgnoreCase)
+            || mediaType.Equals("application/rss+xml", StringComparison.OrdinalIgnoreCase)
+            || mediaType.Equals("application/atom+xml", StringComparison.OrdinalIgnoreCase);
     }
 }

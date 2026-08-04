@@ -3,9 +3,11 @@ using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using QueenZone.Data;
 using QueenZone.Data.Entities;
 using QueenZone.Web;
+using QueenZone.Web.Pages.Members;
 
 namespace QueenZone.Web.Tests;
 
@@ -154,6 +156,209 @@ public sealed class PrivateMessageRoutesTests : IClassFixture<WebApplicationFact
     }
 
     [Fact]
+    public async Task Archive_FromInbox_HidesConversation_AndListsInArchivedView()
+    {
+        var (aliceClient, alice) = await CreateMemberAsync("pm-archive-alice@example.com", "Archive Alice");
+        var (bobClient, bob) = await CreateMemberAsync("pm-archive-bob@example.com", "Archive Bob");
+        var service = factory.Services.GetRequiredService<PrivateMessageService>();
+        var created = await service.ComposeAsync(alice.Id, bob.Id, "Archive this thread");
+        var conversationId = created.ConversationId!.Value;
+
+        var inboxHtml = await aliceClient.GetStringAsync("/messages");
+        var archiveResponse = await aliceClient.PostAsync(
+            "/messages?handler=Archive",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(inboxHtml),
+                ["conversationId"] = conversationId.ToString(),
+            }));
+        Assert.Equal(HttpStatusCode.Redirect, archiveResponse.StatusCode);
+
+        var aliceInboxAfter = await aliceClient.GetStringAsync("/messages");
+        Assert.Contains("You have no private messages yet", aliceInboxAfter);
+        Assert.Contains("Conversation archived", aliceInboxAfter);
+
+        var bobInbox = await bobClient.GetStringAsync("/messages");
+        Assert.Contains("Archive Alice", bobInbox);
+
+        var archivedPage = await aliceClient.GetStringAsync("/messages/archived");
+        Assert.Contains("Archive Bob", archivedPage);
+
+        var unarchiveResponse = await aliceClient.PostAsync(
+            "/messages/archived?handler=Unarchive",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(archivedPage),
+                ["conversationId"] = conversationId.ToString(),
+            }));
+        Assert.Equal(HttpStatusCode.Redirect, unarchiveResponse.StatusCode);
+
+        var aliceInboxRestored = await aliceClient.GetStringAsync("/messages");
+        Assert.Contains("Archive Bob", aliceInboxRestored);
+    }
+
+    [Fact]
+    public async Task Archive_ReceivingNewMessage_ReturnsConversationToInbox()
+    {
+        var (aliceClient, alice) = await CreateMemberAsync("pm-reopen-alice@example.com", "Reopen Alice");
+        var (bobClient, bob) = await CreateMemberAsync("pm-reopen-bob@example.com", "Reopen Bob");
+        var service = factory.Services.GetRequiredService<PrivateMessageService>();
+        var created = await service.ComposeAsync(alice.Id, bob.Id, "Hello");
+        var conversationId = created.ConversationId!.Value;
+
+        var inboxHtml = await aliceClient.GetStringAsync("/messages");
+        await aliceClient.PostAsync(
+            "/messages?handler=Archive",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(inboxHtml),
+                ["conversationId"] = conversationId.ToString(),
+            }));
+        Assert.Contains("You have no private messages yet", await aliceClient.GetStringAsync("/messages"));
+
+        Assert.True((await service.ReplyAsync(conversationId, bob.Id, "New reply")).Succeeded);
+
+        var aliceInboxAfter = await aliceClient.GetStringAsync("/messages");
+        Assert.Contains("Reopen Bob", aliceInboxAfter);
+    }
+
+    [Fact]
+    public async Task Archive_FromConversationView_RedirectsToInbox()
+    {
+        var (aliceClient, alice) = await CreateMemberAsync("pm-conv-archive-alice@example.com", "Conv Archive Alice");
+        var (_, bob) = await CreateMemberAsync("pm-conv-archive-bob@example.com", "Conv Archive Bob");
+        var service = factory.Services.GetRequiredService<PrivateMessageService>();
+        var created = await service.ComposeAsync(alice.Id, bob.Id, "Hello there");
+        var conversationId = created.ConversationId!.Value;
+
+        var conversationHtml = await aliceClient.GetStringAsync($"/messages/{conversationId}");
+        var archiveResponse = await aliceClient.PostAsync(
+            $"/messages/{conversationId}?handler=Archive",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(conversationHtml),
+            }));
+        Assert.Equal(HttpStatusCode.Redirect, archiveResponse.StatusCode);
+        Assert.Equal("/messages", archiveResponse.Headers.Location!.OriginalString);
+
+        Assert.Contains("You have no private messages yet", await aliceClient.GetStringAsync("/messages"));
+    }
+
+    [Fact]
+    public async Task Archive_ReturnsNotFound_ForNonParticipant()
+    {
+        var (aliceClient, alice) = await CreateMemberAsync("pm-archive-owner@example.com", "Archive Owner");
+        var (_, bob) = await CreateMemberAsync("pm-archive-peer@example.com", "Archive Peer");
+        var (carolClient, _) = await CreateMemberAsync("pm-archive-outsider@example.com", "Archive Outsider");
+        var service = factory.Services.GetRequiredService<PrivateMessageService>();
+        var created = await service.ComposeAsync(alice.Id, bob.Id, "Top secret");
+
+        var composeHtml = await carolClient.GetStringAsync("/messages/compose");
+        var response = await carolClient.PostAsync(
+            "/messages?handler=Archive",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(composeHtml),
+                ["conversationId"] = created.ConversationId.ToString()!,
+            }));
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Remove_FromInbox_HidesConversation_ButNotForOtherParticipant()
+    {
+        var (aliceClient, alice) = await CreateMemberAsync("pm-remove-alice@example.com", "Remove Alice");
+        var (bobClient, bob) = await CreateMemberAsync("pm-remove-bob@example.com", "Remove Bob");
+        var service = factory.Services.GetRequiredService<PrivateMessageService>();
+        var created = await service.ComposeAsync(alice.Id, bob.Id, "Remove this thread");
+        var conversationId = created.ConversationId!.Value;
+
+        var inboxHtml = await aliceClient.GetStringAsync("/messages");
+        var removeResponse = await aliceClient.PostAsync(
+            "/messages?handler=Remove",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(inboxHtml),
+                ["conversationId"] = conversationId.ToString(),
+            }));
+        Assert.Equal(HttpStatusCode.Redirect, removeResponse.StatusCode);
+
+        var aliceInboxAfter = await aliceClient.GetStringAsync("/messages");
+        Assert.Contains("You have no private messages yet", aliceInboxAfter);
+        Assert.Contains("Conversation removed", aliceInboxAfter);
+
+        var bobInbox = await bobClient.GetStringAsync("/messages");
+        Assert.Contains("Remove Alice", bobInbox);
+    }
+
+    [Fact]
+    public async Task Remove_ReceivingNewMessage_ReturnsConversationToInbox()
+    {
+        var (aliceClient, alice) = await CreateMemberAsync("pm-remove-reopen-alice@example.com", "Reopen Alice");
+        var (_, bob) = await CreateMemberAsync("pm-remove-reopen-bob@example.com", "Reopen Bob");
+        var service = factory.Services.GetRequiredService<PrivateMessageService>();
+        var created = await service.ComposeAsync(alice.Id, bob.Id, "Hello");
+        var conversationId = created.ConversationId!.Value;
+
+        var inboxHtml = await aliceClient.GetStringAsync("/messages");
+        await aliceClient.PostAsync(
+            "/messages?handler=Remove",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(inboxHtml),
+                ["conversationId"] = conversationId.ToString(),
+            }));
+        Assert.Contains("You have no private messages yet", await aliceClient.GetStringAsync("/messages"));
+
+        Assert.True((await service.ReplyAsync(conversationId, bob.Id, "New reply")).Succeeded);
+
+        var aliceInboxAfter = await aliceClient.GetStringAsync("/messages");
+        Assert.Contains("Reopen Bob", aliceInboxAfter);
+    }
+
+    [Fact]
+    public async Task Remove_FromConversationView_RedirectsToInbox()
+    {
+        var (aliceClient, alice) = await CreateMemberAsync("pm-conv-remove-alice@example.com", "Conv Remove Alice");
+        var (_, bob) = await CreateMemberAsync("pm-conv-remove-bob@example.com", "Conv Remove Bob");
+        var service = factory.Services.GetRequiredService<PrivateMessageService>();
+        var created = await service.ComposeAsync(alice.Id, bob.Id, "Hello there");
+        var conversationId = created.ConversationId!.Value;
+
+        var conversationHtml = await aliceClient.GetStringAsync($"/messages/{conversationId}");
+        var removeResponse = await aliceClient.PostAsync(
+            $"/messages/{conversationId}?handler=Remove",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(conversationHtml),
+            }));
+        Assert.Equal(HttpStatusCode.Redirect, removeResponse.StatusCode);
+        Assert.Equal("/messages", removeResponse.Headers.Location!.OriginalString);
+
+        Assert.Contains("You have no private messages yet", await aliceClient.GetStringAsync("/messages"));
+    }
+
+    [Fact]
+    public async Task Remove_ReturnsNotFound_ForNonParticipant()
+    {
+        var (aliceClient, alice) = await CreateMemberAsync("pm-remove-owner@example.com", "Remove Owner");
+        var (_, bob) = await CreateMemberAsync("pm-remove-peer@example.com", "Remove Peer");
+        var (carolClient, _) = await CreateMemberAsync("pm-remove-outsider@example.com", "Remove Outsider");
+        var service = factory.Services.GetRequiredService<PrivateMessageService>();
+        var created = await service.ComposeAsync(alice.Id, bob.Id, "Top secret");
+
+        var composeHtml = await carolClient.GetStringAsync("/messages/compose");
+        var response = await carolClient.PostAsync(
+            "/messages?handler=Remove",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(composeHtml),
+                ["conversationId"] = created.ConversationId.ToString()!,
+            }));
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
     public async Task MemberProfile_ShowsMessageAction_WhenAllowed()
     {
         var (aliceClient, alice) = await CreateMemberAsync("profile-alice@example.com", "Profile Alice");
@@ -177,6 +382,46 @@ public sealed class PrivateMessageRoutesTests : IClassFixture<WebApplicationFact
         var html = await anon.GetStringAsync($"/members/{bob.Id}");
         Assert.Contains("Sign in to message", html);
         Assert.Contains("/account/login", html);
+    }
+
+    [Fact]
+    public async Task MemberProfile_ListsAndPaginatesPublicActivity()
+    {
+        var memberId = Guid.NewGuid();
+        var activity = Enumerable.Range(1, ProfileModel.ActivityPageSize + 1)
+            .Select(index => new MemberPublicActivityItem(
+                MemberPublicActivityType.ForumPost,
+                $"Topic {index}",
+                $"Post summary {index}",
+                DateTimeOffset.UtcNow.AddMinutes(-index),
+                ContentId: index,
+                ParentId: 1000 + index,
+                Slug: $"topic-{index}"))
+            .ToList();
+        using var profileFactory = factory.WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<IMemberPublicActivityRepository>();
+            services.AddSingleton<IMemberPublicActivityRepository>(new StubMemberPublicActivityRepository(activity));
+        }));
+        var members = profileFactory.Services.GetRequiredService<IMemberAccountRepository>();
+        await members.CreateAsync(new MemberAccount
+        {
+            Id = memberId,
+            Email = "activity@example.com",
+            DisplayName = "Active Member",
+            CreatedAt = DateTime.UtcNow,
+        });
+        var client = profileFactory.CreateClient();
+
+        var firstPage = await client.GetStringAsync($"/members/{memberId}");
+        Assert.Contains("Public contributions", firstPage);
+        Assert.Contains("Topic 1", firstPage);
+        Assert.DoesNotContain("Topic 21", firstPage);
+        Assert.Contains("Member activity pagination", firstPage);
+
+        var secondPage = await client.GetStringAsync($"/members/{memberId}?pageNumber=2");
+        Assert.Contains("Topic 21", secondPage);
+        Assert.DoesNotContain("Topic 1</a>", secondPage);
     }
 
     private async Task<(HttpClient Client, MemberAccount Member)> CreateMemberAsync(
@@ -229,5 +474,19 @@ public sealed class PrivateMessageRoutesTests : IClassFixture<WebApplicationFact
 
         var start = Math.Max(0, idx - 80);
         return html.Substring(start, Math.Min(500, html.Length - start));
+    }
+
+    private sealed class StubMemberPublicActivityRepository(IReadOnlyList<MemberPublicActivityItem> items)
+        : IMemberPublicActivityRepository
+    {
+        public Task<MemberPublicActivityPage> GetPageAsync(
+            Guid memberId,
+            int page,
+            int pageSize,
+            CancellationToken cancellationToken = default)
+        {
+            var pageItems = items.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+            return Task.FromResult(new MemberPublicActivityPage(pageItems, items.Count, page, pageSize));
+        }
     }
 }

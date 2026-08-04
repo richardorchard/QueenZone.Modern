@@ -188,6 +188,7 @@ public sealed class QueenZoneDbContext : DbContext
             entity.HasKey(post => post.Id);
             entity.Property(post => post.AuthorDisplayName).HasMaxLength(100).IsRequired();
             entity.Property(post => post.BodyHtml).HasMaxLength(8000).IsUnicode(false).IsRequired();
+            entity.Property(post => post.BodyHtmlLegacyRaw).HasMaxLength(8000).IsUnicode(false);
             entity.Property(post => post.SignatureHtml).HasMaxLength(8000).IsUnicode(false);
             entity.Property(post => post.Attachment).HasMaxLength(120).IsUnicode(false);
             entity.Property(post => post.FileSize).HasMaxLength(12).IsUnicode(false);
@@ -435,8 +436,11 @@ public sealed class QueenZoneDbContext : DbContext
             entity.HasKey(request => request.Id);
 
             entity.Property(request => request.Status).HasConversion<string>().HasMaxLength(50).IsRequired();
+            entity.Property(request => request.Kind).HasConversion<string>().HasMaxLength(50).IsRequired();
             entity.Property(request => request.RequestedBy).HasMaxLength(256).IsRequired();
             entity.Property(request => request.RequestedAtUtc).IsRequired();
+            entity.Property(request => request.ArticleUrl).HasMaxLength(2000);
+            entity.Property(request => request.GenerateDraft).IsRequired();
             entity.Property(request => request.RunnerId).HasMaxLength(100);
             entity.Property(request => request.Summary).HasMaxLength(2000);
             entity.Property(request => request.ErrorMessage).HasMaxLength(2000);
@@ -650,14 +654,15 @@ public sealed class QueenZoneDbContext : DbContext
                 .IsRequired();
             entity.Property(conversation => conversation.CreatedAt).IsRequired();
             entity.Property(conversation => conversation.LastMessageAt).IsRequired();
+            entity.Property(conversation => conversation.LastMessageSortKey).IsRequired();
 
             entity.HasIndex(conversation => new { conversation.MemberLowId, conversation.MemberHighId })
                 .IsUnique()
                 .HasDatabaseName("IX_PrivateConversations_MemberPair");
 
-            entity.HasIndex(conversation => conversation.LastMessageAt)
+            entity.HasIndex(conversation => conversation.LastMessageSortKey)
                 .IsDescending()
-                .HasDatabaseName("IX_PrivateConversations_LastMessageAt");
+                .HasDatabaseName("IX_PrivateConversations_LastMessageSortKey");
 
             entity.HasOne(conversation => conversation.MemberLow)
                 .WithMany()
@@ -676,9 +681,13 @@ public sealed class QueenZoneDbContext : DbContext
             entity.HasKey(participant => new { participant.ConversationId, participant.MemberId });
 
             entity.Property(participant => participant.IsArchived).IsRequired();
+            entity.Property(participant => participant.IsRemoved).IsRequired();
 
             entity.HasIndex(participant => new { participant.MemberId, participant.IsArchived })
                 .HasDatabaseName("IX_PrivateConversationParticipants_Member_Archived");
+
+            entity.HasIndex(participant => new { participant.MemberId, participant.IsRemoved })
+                .HasDatabaseName("IX_PrivateConversationParticipants_Member_Removed");
 
             entity.HasOne(participant => participant.Conversation)
                 .WithMany(conversation => conversation.Participants)

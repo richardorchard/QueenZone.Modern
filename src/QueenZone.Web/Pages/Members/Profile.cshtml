@@ -29,6 +29,34 @@
           </p>
         }
       </div>
+
+      <div class="qz-member-activity">
+        <h2>Public contributions</h2>
+        @if (Model.Activity.Count == 0)
+        {
+          <p class="qz-meta">No public contributions yet.</p>
+        }
+        else
+        {
+          <ol class="qz-member-activity__list">
+            @foreach (var item in Model.Activity)
+            {
+              <li class="qz-member-activity__item">
+                <p class="qz-meta"><span class="qz-member-activity__type">@item.Type</span> · <time datetime="@item.PublishedAt.ToString("O")">@item.PublishedAt.ToString("dd MMMM yyyy")</time></p>
+                <h3><a href="@item.Href">@item.Title</a></h3>
+                @if (!string.IsNullOrWhiteSpace(item.Summary))
+                {
+                  <p>@item.Summary</p>
+                }
+              </li>
+            }
+          </ol>
+          @if (Model.Pagination is not null)
+          {
+            <partial name="_ArchivePagination" model="Model.Pagination" />
+          }
+        }
+      </div>
     }
   </div>
 </section>

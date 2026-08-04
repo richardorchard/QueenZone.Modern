@@ -18,6 +18,8 @@ public static class AzureAdClientId
         }
 
         var trimmed = clientId.Trim();
+        // Placeholder sentinels sometimes left in local/appsettings when Entra is not wired yet.
+        // "TODO" is intentional config text (not a code TODO); treat it as unset so TestAuthHandler can run.
         if (trimmed.Contains("YOUR_", StringComparison.OrdinalIgnoreCase)
             || string.Equals(trimmed, "CHANGE_ME", StringComparison.OrdinalIgnoreCase)
             || string.Equals(trimmed, "TODO", StringComparison.OrdinalIgnoreCase))

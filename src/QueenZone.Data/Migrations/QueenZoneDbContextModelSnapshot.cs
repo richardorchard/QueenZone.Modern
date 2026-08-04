@@ -429,6 +429,11 @@ namespace QueenZone.Data.Migrations
                         .IsUnicode(false)
                         .HasColumnType("varchar(8000)");
 
+                    b.Property<string>("BodyHtmlLegacyRaw")
+                        .HasMaxLength(8000)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(8000)");
+
                     b.Property<int>("EditCount")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int")
@@ -668,12 +673,24 @@ namespace QueenZone.Data.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
+                    b.Property<string>("ArticleUrl")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
                     b.Property<DateTime?>("CompletedAtUtc")
                         .HasColumnType("datetime2");
 
                     b.Property<string>("ErrorMessage")
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
+
+                    b.Property<bool>("GenerateDraft")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<DateTime>("RequestedAtUtc")
                         .HasColumnType("datetime2");
@@ -1409,6 +1426,9 @@ namespace QueenZone.Data.Migrations
                     b.Property<Guid?>("LastMessageSenderId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<long>("LastMessageSortKey")
+                        .HasColumnType("bigint");
+
                     b.Property<Guid>("MemberHighId")
                         .HasColumnType("uniqueidentifier");
 
@@ -1417,9 +1437,9 @@ namespace QueenZone.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("LastMessageAt")
+                    b.HasIndex("LastMessageSortKey")
                         .IsDescending()
-                        .HasDatabaseName("IX_PrivateConversations_LastMessageAt");
+                        .HasDatabaseName("IX_PrivateConversations_LastMessageSortKey");
 
                     b.HasIndex("MemberHighId");
 
@@ -1441,6 +1461,9 @@ namespace QueenZone.Data.Migrations
                     b.Property<bool>("IsArchived")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("IsRemoved")
+                        .HasColumnType("bit");
+
                     b.Property<DateTimeOffset?>("LastReadAt")
                         .HasColumnType("datetimeoffset");
 
@@ -1451,6 +1474,9 @@ namespace QueenZone.Data.Migrations
 
                     b.HasIndex("MemberId", "IsArchived")
                         .HasDatabaseName("IX_PrivateConversationParticipants_Member_Archived");
+
+                    b.HasIndex("MemberId", "IsRemoved")
+                        .HasDatabaseName("IX_PrivateConversationParticipants_Member_Removed");
 
                     b.ToTable("PrivateConversationParticipants", (string)null);
                 });

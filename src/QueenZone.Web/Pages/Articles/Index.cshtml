@@ -35,12 +35,12 @@
                 {
                   <p class="qz-article-card__excerpt">@item.Excerpt</p>
                 }
-                @if (!string.IsNullOrWhiteSpace(item.AuthorDisplayName))
-                {
-                  <div class="qz-article-card__author">By @item.AuthorDisplayName</div>
-                }
               </div>
             </a>
+            @if (item.AuthorMemberId is Guid authorMemberId && !string.IsNullOrWhiteSpace(item.AuthorDisplayName))
+            {
+              <div class="qz-article-card__author">Submitted by <a class="qz-attribution-link" href="/members/@authorMemberId">@item.AuthorDisplayName</a></div>
+            }
             @if (!string.IsNullOrWhiteSpace(item.Tags))
             {
               <div class="qz-article-card__tags">

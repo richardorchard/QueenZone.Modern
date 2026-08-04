@@ -81,6 +81,30 @@ public sealed class EfMemberAccountRepositoryTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task LinkLegacyUserIdAsync_PersistsAndIsFindable()
+    {
+        var account = await SeedAccountAsync("legacy-link@example.com", "Legacy Link");
+
+        var linked = await repository.LinkLegacyUserIdAsync(account.Id, 4242);
+        Assert.Equal(4242, linked!.LinkedLegacyUserId);
+
+        var found = await repository.FindByLinkedLegacyUserIdAsync(4242);
+        Assert.NotNull(found);
+        Assert.Equal(account.Id, found.Id);
+
+        // Second link is a no-op when already set.
+        var again = await repository.LinkLegacyUserIdAsync(account.Id, 9999);
+        Assert.Equal(4242, again!.LinkedLegacyUserId);
+
+        var unlinked = await repository.UnlinkLegacyUserIdAsync(account.Id);
+        Assert.Null(unlinked!.LinkedLegacyUserId);
+        Assert.Null(await repository.FindByLinkedLegacyUserIdAsync(4242));
+
+        var relinked = await repository.LinkLegacyUserIdAsync(account.Id, 9999);
+        Assert.Equal(9999, relinked!.LinkedLegacyUserId);
+    }
+
+    [Fact]
     public async Task SearchByDisplayNameAsync_MatchesAndExcludesMember()
     {
         var alice = await SeedAccountAsync("search-alice@example.com", "Search Alice");

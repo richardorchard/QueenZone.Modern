@@ -107,6 +107,56 @@ public sealed class InMemoryMemberAccountRepository : IMemberAccountRepository
         }
     }
 
+    public Task<MemberAccount?> FindByLinkedLegacyUserIdAsync(
+        int legacyUserId,
+        CancellationToken cancellationToken = default)
+    {
+        lock (gate)
+        {
+            var account = accounts.FirstOrDefault(a => a.LinkedLegacyUserId == legacyUserId);
+            return Task.FromResult(account);
+        }
+    }
+
+    public Task<MemberAccount?> LinkLegacyUserIdAsync(
+        Guid memberId,
+        int legacyUserId,
+        CancellationToken cancellationToken = default)
+    {
+        lock (gate)
+        {
+            var account = accounts.FirstOrDefault(a => a.Id == memberId);
+            if (account is null)
+            {
+                return Task.FromResult<MemberAccount?>(null);
+            }
+
+            if (account.LinkedLegacyUserId is null)
+            {
+                account.LinkedLegacyUserId = legacyUserId;
+            }
+
+            return Task.FromResult<MemberAccount?>(account);
+        }
+    }
+
+    public Task<MemberAccount?> UnlinkLegacyUserIdAsync(
+        Guid memberId,
+        CancellationToken cancellationToken = default)
+    {
+        lock (gate)
+        {
+            var account = accounts.FirstOrDefault(a => a.Id == memberId);
+            if (account is null)
+            {
+                return Task.FromResult<MemberAccount?>(null);
+            }
+
+            account.LinkedLegacyUserId = null;
+            return Task.FromResult<MemberAccount?>(account);
+        }
+    }
+
     public Task RecordLoginAsync(Guid memberId, DateTime loginAt, CancellationToken cancellationToken = default)
     {
         lock (gate)

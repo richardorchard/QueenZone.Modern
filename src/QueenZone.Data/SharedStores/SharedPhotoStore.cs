@@ -277,7 +277,8 @@ public sealed class SharedPhotoStore
             photo.Year,
             photo.DateTime,
             photo.Keywords,
-            photo.IsVisible);
+            photo.IsVisible,
+            photo.SubmittedByDisplayName);
 
     private static MutablePhoto ToMutable(PhotoCategorySeed category, PhotoItemSeed item) =>
         new(
@@ -295,7 +296,8 @@ public sealed class SharedPhotoStore
             item.DateTime.Year,
             item.DateTime,
             null,
-            true);
+            true,
+            string.IsNullOrWhiteSpace(item.SubmittedByDisplayName) ? null : item.SubmittedByDisplayName.Trim());
 
     private static bool Matches(AdminPhotoItem item, AdminPhotoListFilter filter)
     {
@@ -346,5 +348,6 @@ public sealed class SharedPhotoStore
         int Year,
         DateTime DateTime,
         string? Keywords,
-        bool IsVisible);
+        bool IsVisible,
+        string? SubmittedByDisplayName = null);
 }

@@ -215,8 +215,18 @@ public static class QueenZoneWebServiceCollectionExtensions
 
     public static IServiceCollection AddQueenZoneData(
         this IServiceCollection services,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IHostEnvironment environment)
     {
+        // WebApplicationFactory tests must never inherit a developer or CI shell's
+        // production connection string. Opt-in live probes construct their SQL-backed
+        // repositories directly and do not use the Testing web host composition.
+        if (environment.IsEnvironment("Testing"))
+        {
+            services.AddQueenZoneInMemoryData();
+            return services;
+        }
+
         var legacyConnectionString = configuration.GetConnectionString("QueenZoneLegacy");
         if (!string.IsNullOrWhiteSpace(legacyConnectionString))
         {
@@ -250,8 +260,16 @@ public static class QueenZoneWebServiceCollectionExtensions
             ResponseCompressionBootstrap.ConfigureServices(services);
         }
 
-        services.AddQueenZoneData(configuration);
-        services.AddQueenZoneStorage(configuration);
+        services.AddQueenZoneData(configuration, environment);
+        if (environment.IsEnvironment("Testing"))
+        {
+            services.AddQueenZoneInMemoryStorage(configuration);
+        }
+        else
+        {
+            services.AddQueenZoneStorage(configuration);
+        }
+
         services.AddQueenZoneHealthChecks();
         // Admin draft regenerate only — discovery fetchers/worker stay on NewsAgent.Worker (#336).
         services.AddQueenZoneNewsAgentWeb(configuration);

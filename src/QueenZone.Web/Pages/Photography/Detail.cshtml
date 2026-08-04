@@ -52,6 +52,10 @@
       {
         <text> &middot; @dimensions</text>
       }
+      @if (!string.IsNullOrWhiteSpace(Model.Photo.SubmittedByDisplayName))
+      {
+        <text> &middot; Submitted by @Model.Photo.SubmittedByDisplayName</text>
+      }
     </p>
   </figcaption>
 </section>

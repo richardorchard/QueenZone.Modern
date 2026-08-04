@@ -36,6 +36,7 @@ internal sealed class AdminEfWebTestHarness : IAsyncDisposable
                 services.RemoveAll<IAdminNewsRepository>();
                 services.RemoveAll<INewsAuditRepository>();
                 services.RemoveAll<INewsDiscoveryRepository>();
+                services.RemoveAll<INewsSuggestionRepository>();
                 services.RemoveAll<INewsAgentRunLeaseService>();
                 services.RemoveAll<IMemberAccountRepository>();
                 services.RemoveAll<SharedNewsDiscoveryStore>();
@@ -58,6 +59,7 @@ internal sealed class AdminEfWebTestHarness : IAsyncDisposable
                 });
                 services.AddScoped<INewsAuditRepository, EfNewsAuditRepository>();
                 services.AddScoped<INewsDiscoveryRepository, EfNewsDiscoveryRepository>();
+                services.AddScoped<INewsSuggestionRepository, EfNewsSuggestionRepository>();
 
                 configureServices?.Invoke(services);
             });

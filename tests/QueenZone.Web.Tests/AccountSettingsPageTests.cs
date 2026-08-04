@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
+using QueenZone.Data;
 using QueenZone.Storage;
 using QueenZone.Web;
 using SixLabors.ImageSharp;
@@ -67,6 +68,178 @@ public sealed partial class AccountSettingsPageTests : IClassFixture<WebApplicat
         Assert.Contains("Google", body);
         Assert.Contains("name=\"DisplayName\"", body, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Save display name", body);
+        Assert.Contains("Legacy forum account", body);
+        Assert.Contains("No legacy forum account is linked to this email.", body);
+    }
+
+    [Fact]
+    public async Task Get_ShowsLegacyClaimOffer_WhenEmailMatchesLegacyAccount()
+    {
+        var client = await CreateSignedInMemberClientWithLegacyMatchAsync(
+            email: "claim-offer@example.com",
+            displayName: "Modern Fan",
+            subject: "google-legacy-claim-offer",
+            legacyUserId: 9001,
+            legacyUsername: "ArchiveOffer");
+
+        var body = await client.GetStringAsync("/account/settings");
+
+        Assert.Contains("ArchiveOffer", body);
+        Assert.Contains("Claim legacy account", body);
+        Assert.Contains("Use legacy username", body);
+        Assert.DoesNotContain("Linked to legacy forum account", body);
+    }
+
+    [Fact]
+    public async Task PostClaimLegacy_LinksAccount_AndShowsLinkedStatus()
+    {
+        var client = await CreateSignedInMemberClientWithLegacyMatchAsync(
+            email: "claim-post@example.com",
+            displayName: "Modern Fan",
+            subject: "google-legacy-claim-post",
+            legacyUserId: 9002,
+            legacyUsername: "ArchiveClaimed",
+            options: new WebApplicationFactoryClientOptions
+            {
+                HandleCookies = true,
+                AllowAutoRedirect = false,
+            });
+
+        var formPage = await client.GetStringAsync("/account/settings");
+        Assert.Contains("Claim legacy account", formPage);
+
+        var response = await client.PostAsync(
+            "/account/settings?handler=ClaimLegacy",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(formPage),
+                ["SelectedLegacyUserId"] = "9002",
+                ["AdoptLegacyDisplayName"] = "true",
+            }));
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal("/account/settings", response.Headers.Location!.OriginalString);
+
+        var updated = await client.GetStringAsync("/account/settings");
+        Assert.Contains("Legacy account claimed", updated);
+        Assert.Contains("Linked to legacy forum account", updated);
+        Assert.Contains("ArchiveClaimed", updated);
+        Assert.Contains("Unlink legacy account", updated);
+        Assert.DoesNotContain("Claim legacy account", updated);
+        Assert.Contains("value=\"ArchiveClaimed\"", updated);
+    }
+
+    [Fact]
+    public async Task PostUnlinkLegacy_ClearsLink_AndShowsClaimOfferAgain()
+    {
+        var client = await CreateSignedInMemberClientWithLegacyMatchAsync(
+            email: "unlink-post@example.com",
+            displayName: "Modern Fan",
+            subject: "google-legacy-unlink-post",
+            legacyUserId: 9003,
+            legacyUsername: "ArchiveUnlink",
+            options: new WebApplicationFactoryClientOptions
+            {
+                HandleCookies = true,
+                AllowAutoRedirect = false,
+            });
+
+        var claimPage = await client.GetStringAsync("/account/settings");
+        var claimResponse = await client.PostAsync(
+            "/account/settings?handler=ClaimLegacy",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(claimPage),
+                ["SelectedLegacyUserId"] = "9003",
+                ["AdoptLegacyDisplayName"] = "false",
+            }));
+        Assert.Equal(HttpStatusCode.Redirect, claimResponse.StatusCode);
+
+        var linkedPage = await client.GetStringAsync("/account/settings");
+        Assert.Contains("Unlink legacy account", linkedPage);
+        Assert.Contains("ArchiveUnlink", linkedPage);
+
+        var unlinkResponse = await client.PostAsync(
+            "/account/settings?handler=UnlinkLegacy",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(linkedPage),
+            }));
+
+        Assert.Equal(HttpStatusCode.Redirect, unlinkResponse.StatusCode);
+        Assert.Equal("/account/settings", unlinkResponse.Headers.Location!.OriginalString);
+
+        var unlinked = await client.GetStringAsync("/account/settings");
+        Assert.Contains("Legacy account unlinked", unlinked);
+        Assert.Contains("Claim legacy account", unlinked);
+        Assert.Contains("ArchiveUnlink", unlinked);
+        Assert.DoesNotContain("Linked to legacy forum account", unlinked);
+        Assert.DoesNotContain("Unlink legacy account", unlinked);
+    }
+
+    [Fact]
+    public async Task Get_ShowsLegacyChoiceList_WhenEmailMatchesMultipleAccounts()
+    {
+        var client = await CreateSignedInMemberClientWithLegacyMatchesAsync(
+            email: "multi-claim@example.com",
+            displayName: "Modern Fan",
+            subject: "google-legacy-multi-claim-get",
+            matches:
+            [
+                new LegacyMemberMatch(9101, "FirstArchive"),
+                new LegacyMemberMatch(9102, "SecondArchive"),
+            ]);
+
+        var body = await client.GetStringAsync("/account/settings");
+
+        Assert.Contains("multiple classic QueenZone forum accounts", body);
+        Assert.Contains("FirstArchive", body);
+        Assert.Contains("SecondArchive", body);
+        Assert.Contains("name=\"SelectedLegacyUserId\"", body);
+        Assert.Contains("value=\"9101\"", body);
+        Assert.Contains("value=\"9102\"", body);
+        Assert.Contains("Claim legacy account", body);
+    }
+
+    [Fact]
+    public async Task PostClaimLegacy_ClaimsSelectedAccount_WhenMultipleMatches()
+    {
+        var client = await CreateSignedInMemberClientWithLegacyMatchesAsync(
+            email: "multi-claim-post@example.com",
+            displayName: "Modern Fan",
+            subject: "google-legacy-multi-claim-post",
+            matches:
+            [
+                new LegacyMemberMatch(9201, "KeepMe"),
+                new LegacyMemberMatch(9202, "PickMe"),
+            ],
+            options: new WebApplicationFactoryClientOptions
+            {
+                HandleCookies = true,
+                AllowAutoRedirect = false,
+            });
+
+        var formPage = await client.GetStringAsync("/account/settings");
+        Assert.Contains("PickMe", formPage);
+
+        var response = await client.PostAsync(
+            "/account/settings?handler=ClaimLegacy",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(formPage),
+                ["SelectedLegacyUserId"] = "9202",
+                ["AdoptLegacyDisplayName"] = "true",
+            }));
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+
+        var updated = await client.GetStringAsync("/account/settings");
+        Assert.Contains("Legacy account claimed", updated);
+        Assert.Contains("Linked to legacy forum account", updated);
+        Assert.Contains("PickMe", updated);
+        Assert.Contains("(id 9202)", updated);
+        Assert.DoesNotContain("Claim legacy account", updated);
+        Assert.Contains("value=\"PickMe\"", updated);
     }
 
     [Fact]
@@ -261,9 +434,56 @@ public sealed partial class AccountSettingsPageTests : IClassFixture<WebApplicat
         string email,
         string displayName,
         string subject,
+        WebApplicationFactoryClientOptions? options = null) =>
+        await CreateSignedInMemberClientAsync(factory, email, displayName, subject, options);
+
+    private async Task<HttpClient> CreateSignedInMemberClientWithLegacyMatchAsync(
+        string email,
+        string displayName,
+        string subject,
+        int legacyUserId,
+        string legacyUsername,
+        WebApplicationFactoryClientOptions? options = null) =>
+        await CreateSignedInMemberClientWithLegacyMatchesAsync(
+            email,
+            displayName,
+            subject,
+            [new LegacyMemberMatch(legacyUserId, legacyUsername)],
+            options);
+
+    private async Task<HttpClient> CreateSignedInMemberClientWithLegacyMatchesAsync(
+        string email,
+        string displayName,
+        string subject,
+        IReadOnlyList<LegacyMemberMatch> matches,
         WebApplicationFactoryClientOptions? options = null)
     {
-        var client = factory.CreateClient(options ?? new WebApplicationFactoryClientOptions
+        var specialized = factory.WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<ILegacyMemberLookupRepository>();
+                services.AddSingleton<ILegacyMemberLookupRepository>(_ =>
+                    new InMemoryLegacyMemberLookupRepository(
+                        new Dictionary<string, IReadOnlyList<LegacyMemberMatch>>(StringComparer.OrdinalIgnoreCase)
+                        {
+                            [email] = matches,
+                        }));
+            });
+        });
+
+        return await CreateSignedInMemberClientAsync(specialized, email, displayName, subject, options);
+    }
+
+    private static async Task<HttpClient> CreateSignedInMemberClientAsync(
+        WebApplicationFactory<Program> sourceFactory,
+        string email,
+        string displayName,
+        string subject,
+        WebApplicationFactoryClientOptions? options = null)
+    {
+        var client = sourceFactory.CreateClient(options ?? new WebApplicationFactoryClientOptions
         {
             HandleCookies = true,
             AllowAutoRedirect = true,
