@@ -224,6 +224,34 @@ public sealed class MemberAccountService(
     }
 
     /// <summary>
+    /// Clears the member's legacy USERS_T link so they can claim a different free match
+    /// (or remain unlinked). Does not change display name.
+    /// </summary>
+    public async Task<MemberAccountResult> UnlinkLegacyAccountAsync(
+        Guid memberId,
+        CancellationToken cancellationToken = default)
+    {
+        var account = await memberAccountRepository.FindByIdAsync(memberId, cancellationToken);
+        if (account is null)
+        {
+            return MemberAccountResult.Failure("Account not found.");
+        }
+
+        if (account.LinkedLegacyUserId is null)
+        {
+            return MemberAccountResult.Success(account);
+        }
+
+        var unlinked = await memberAccountRepository.UnlinkLegacyUserIdAsync(memberId, cancellationToken);
+        if (unlinked is null)
+        {
+            return MemberAccountResult.Failure("Account not found.");
+        }
+
+        return MemberAccountResult.Success(unlinked);
+    }
+
+    /// <summary>
     /// Silently links a free legacy account when the member is still unlinked and their email
     /// matches exactly one free USERS_T row. Used to backfill accounts created before the claim UI
     /// existed. Multiple free matches are left unlinked so the member can choose in Settings.

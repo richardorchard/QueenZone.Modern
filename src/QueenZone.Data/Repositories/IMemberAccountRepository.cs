@@ -39,6 +39,12 @@ public interface IMemberAccountRepository
     /// </summary>
     Task<MemberAccount?> LinkLegacyUserIdAsync(Guid memberId, int legacyUserId, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Clears <see cref="MemberAccount.LinkedLegacyUserId"/> so the member can claim a different
+    /// free legacy account (or remain unlinked).
+    /// </summary>
+    Task<MemberAccount?> UnlinkLegacyUserIdAsync(Guid memberId, CancellationToken cancellationToken = default);
+
     Task RecordLoginAsync(Guid memberId, DateTime loginAt, CancellationToken cancellationToken = default);
 
     Task<MemberStats> GetStatsAsync(DateTime utcNow, CancellationToken cancellationToken = default);
