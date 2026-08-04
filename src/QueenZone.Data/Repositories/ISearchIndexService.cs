@@ -23,4 +23,7 @@ public interface ISearchIndexService
         string contentType,
         IReadOnlyList<SearchDocumentEntity> documents,
         CancellationToken cancellationToken = default);
+
+    /// <summary>Total indexed document count, grouped by content type. Used by the admin reindex page.</summary>
+    Task<IReadOnlyDictionary<string, int>> GetContentTypeCountsAsync(CancellationToken cancellationToken = default);
 }

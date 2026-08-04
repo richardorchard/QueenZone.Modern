@@ -73,4 +73,10 @@ public sealed class EfSearchIndexService(QueenZoneDbContext dbContext) : ISearch
         await dbContext.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyDictionary<string, int>> GetContentTypeCountsAsync(CancellationToken cancellationToken = default) =>
+        await dbContext.SearchDocuments
+            .GroupBy(d => d.ContentType)
+            .Select(g => new { ContentType = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(g => g.ContentType, g => g.Count, cancellationToken);
 }
