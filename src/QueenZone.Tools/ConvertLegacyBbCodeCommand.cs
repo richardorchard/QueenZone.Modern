@@ -5,11 +5,12 @@ using QueenZone.Tools.BbCode;
 namespace QueenZone.Tools;
 
 /// <summary>
-/// One-time backfill converting literal legacy BBCode markup (e.g. [quote], [b], [i], [u], [url])
-/// still sitting unconverted in ModernForumPost.BodyHtml into sanitized HTML (issue: forum quoting).
-/// Dry-run by default; use --apply to write. Preserves each row's original text in
-/// BodyHtmlLegacyRaw before overwriting BodyHtml, which also serves as the idempotency guard —
-/// re-running never reconverts a row that already has a backup.
+/// Converts literal legacy BBCode markup (e.g. [quote], [b], [i], [u], [url]) still sitting
+/// unconverted in ModernForumPost.BodyHtml into sanitized HTML (issue: forum quoting), including
+/// any freshly re-imported from the legacy database. Dry-run by default; use --apply to write.
+/// Re-running is naturally idempotent: converted rows no longer contain recognized BBCode
+/// markers, so BbCodeConverter.ContainsBbCode excludes them from future runs without needing a
+/// separate backup/flag column.
 /// </summary>
 internal static class ConvertLegacyBbCodeCommand
 {
@@ -77,7 +78,7 @@ internal static class ConvertLegacyBbCodeCommand
 
                 if (options.Apply)
                 {
-                    await UpdateBodyAsync(options.ConnectionString, row.Id, row.BodyHtml, converted, options.CancellationToken);
+                    await UpdateBodyAsync(options.ConnectionString, row.Id, converted, options.CancellationToken);
                     updated++;
                 }
             }
@@ -129,8 +130,7 @@ internal static class ConvertLegacyBbCodeCommand
         command.CommandText = $"""
             SELECT {top}Id, BodyHtml
             FROM dbo.ModernForumPost
-            WHERE BodyHtmlLegacyRaw IS NULL
-              AND CHARINDEX(CHAR(91), BodyHtml) > 0
+            WHERE CHARINDEX(CHAR(91), BodyHtml) > 0
             ORDER BY Id
             """;
 
@@ -148,7 +148,6 @@ internal static class ConvertLegacyBbCodeCommand
     private static async Task UpdateBodyAsync(
         string connectionString,
         long id,
-        string original,
         string converted,
         CancellationToken cancellationToken)
     {
@@ -158,10 +157,9 @@ internal static class ConvertLegacyBbCodeCommand
         command.CommandTimeout = 60;
         command.CommandText = """
             UPDATE dbo.ModernForumPost
-            SET BodyHtmlLegacyRaw = @original, BodyHtml = @converted
-            WHERE Id = @id AND BodyHtmlLegacyRaw IS NULL
+            SET BodyHtml = @converted
+            WHERE Id = @id
             """;
-        command.Parameters.Add("@original", System.Data.SqlDbType.VarChar, 8000).Value = original;
         command.Parameters.Add("@converted", System.Data.SqlDbType.VarChar, 8000).Value = converted;
         command.Parameters.AddWithValue("@id", id);
         await command.ExecuteNonQueryAsync(cancellationToken);
@@ -184,8 +182,8 @@ internal static class ConvertLegacyBbCodeCommand
         Console.Error.WriteLine("  --delay-ms <n>              Pause between items (default 50)");
         Console.Error.WriteLine("  --apply                    Write updates (default is dry-run)");
         Console.Error.WriteLine();
-        Console.Error.WriteLine("Default: dry-run. Original BodyHtml is preserved in BodyHtmlLegacyRaw before overwrite;");
-        Console.Error.WriteLine("re-running is idempotent (rows with a BodyHtmlLegacyRaw backup are never touched again).");
+        Console.Error.WriteLine("Default: dry-run. Re-running is idempotent — converted rows no longer contain");
+        Console.Error.WriteLine("recognized BBCode markers, so they're skipped on subsequent runs automatically.");
     }
 }
 
