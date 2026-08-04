@@ -1724,6 +1724,22 @@ body.qz-menu-lock .qz-masthead {
   letter-spacing: 0;
 }
 
+a.qz-forum-post__author-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+a.qz-forum-post__author-link:hover,
+a.qz-forum-post__author-link:focus-visible {
+  color: var(--qz-blue);
+  text-decoration: underline;
+}
+
+a.qz-forum-post__author-link:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
 .qz-forum-post__body {
   margin: 0;
   font: var(--fw-regular) var(--fs-body)/1.6 var(--font-body);

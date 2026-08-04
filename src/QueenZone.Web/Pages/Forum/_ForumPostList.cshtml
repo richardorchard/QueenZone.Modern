@@ -16,12 +16,21 @@ else
       <article class="qz-forum-post" id="post-@post.Id">
         <div class="qz-forum-post__content">
           <header class="qz-forum-post__header">
-            @* Legacy archive posts are not linked to modern MemberAccounts; show initials fallback. *@
-            <partial name="_MemberAvatar" model="@(new MemberAvatarViewModel { DisplayName = post.AuthorUsername, Size = "sm" })" />
+            @* Legacy archive posts have no AuthorMemberId; modern posts link to /members/{id}. *@
+            @if (post.AuthorMemberId is Guid authorProfileId)
+            {
+              <a class="qz-forum-post__author-link" href="/members/@authorProfileId" title="View @post.AuthorUsername's profile">
+                <partial name="_MemberAvatar" model="@(new MemberAvatarViewModel { DisplayName = post.AuthorUsername, MemberId = authorProfileId, Size = "sm" })" />
+              </a>
+            }
+            else
+            {
+              <partial name="_MemberAvatar" model="@(new MemberAvatarViewModel { DisplayName = post.AuthorUsername, Size = "sm" })" />
+            }
             <div class="qz-forum-post__author-meta">
               @if (post.AuthorMemberId is Guid profileMemberId)
               {
-                <strong class="qz-forum-post__author"><a href="/members/@profileMemberId">@post.AuthorUsername</a></strong>
+                <strong class="qz-forum-post__author"><a class="qz-forum-post__author-link" href="/members/@profileMemberId">@post.AuthorUsername</a></strong>
               }
               else
               {
