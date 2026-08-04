@@ -19,6 +19,7 @@ Authoritative SQL for stored procedures, FTS DDL, and other hand-written databas
 | `007-forum-search.sql` / related | Forum FTS |
 | `008-news-full-text-search.sql` | `dbo.NEWS_T_SearchPublished` proc body (migration `20260729000000_AddNewsFullTextSearch`) |
 | `009-photo-dimension-inventory.sql` | Read-only coverage of `PIC_WIDTH`/`PIC_HEIGHT` for public photos (issue #435) |
+| `010-search-document-full-text-search.sql` | `dbo.SearchDocument_Search` proc body — unified whole-site search (migration `20260804000000_AddSearchDocumentFullTextSearch`) |
 
 Do not put connection strings or secrets in these files.
 

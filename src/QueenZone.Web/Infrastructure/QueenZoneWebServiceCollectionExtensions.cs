@@ -221,9 +221,12 @@ public static class QueenZoneWebServiceCollectionExtensions
         // WebApplicationFactory tests must never inherit a developer or CI shell's
         // production connection string. Opt-in live probes construct their SQL-backed
         // repositories directly and do not use the Testing web host composition.
+        services.AddScoped<Search.SearchReindexBuilder>();
+
         if (environment.IsEnvironment("Testing"))
         {
             services.AddQueenZoneInMemoryData();
+            services.AddHostedService<Search.SearchIndexSeedHostedService>();
             return services;
         }
 
@@ -239,6 +242,7 @@ public static class QueenZoneWebServiceCollectionExtensions
         else
         {
             services.AddQueenZoneInMemoryData();
+            services.AddHostedService<Search.SearchIndexSeedHostedService>();
         }
 
         return services;

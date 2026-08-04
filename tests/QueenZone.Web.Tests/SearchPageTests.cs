@@ -26,7 +26,7 @@ public sealed class SearchPageTests : IClassFixture<WebApplicationFactory<Progra
     }
 
     [Fact]
-    public async Task SearchPageRendersResultsForMatchingQuery()
+    public async Task SearchPageRendersForumResultsForMatchingQuery()
     {
         var client = factory.CreateClient();
 
@@ -35,7 +35,17 @@ public sealed class SearchPageTests : IClassFixture<WebApplicationFactory<Progra
         Assert.Contains("studio album", body, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Ranking every studio album", body);
         Assert.Contains("/forum/topic/1002/ranking-every-studio-album", body);
-        Assert.Contains("The Music", body);
+    }
+
+    [Fact]
+    public async Task SearchPageRendersNewsResultsForMatchingQuery()
+    {
+        var client = factory.CreateClient();
+
+        var body = await client.GetStringAsync("/search?q=modernisation");
+
+        Assert.Contains("QueenZone modernisation begins", body);
+        Assert.Contains("/news/1003/", body);
     }
 
     [Fact]
@@ -46,6 +56,40 @@ public sealed class SearchPageTests : IClassFixture<WebApplicationFactory<Progra
         var body = await client.GetStringAsync("/search?q=xyzzy_no_match_zzzqq");
 
         Assert.Contains("No results found", body);
+    }
+
+    [Fact]
+    public async Task SearchPageTypeFilterNarrowsToOneContentType()
+    {
+        var client = factory.CreateClient();
+
+        // "archive" matches both forum threads and news articles in seed data.
+        var allBody = await client.GetStringAsync("/search?q=archive");
+        var newsOnlyBody = await client.GetStringAsync("/search?q=archive&type=news");
+
+        Assert.Contains("Forum", allBody);
+        Assert.DoesNotContain("/forum/topic/", newsOnlyBody);
+    }
+
+    [Fact]
+    public async Task SearchPageTypeFilterTabsLinkWithTypeParameter()
+    {
+        var client = factory.CreateClient();
+
+        var body = await client.GetStringAsync("/search?q=archive");
+
+        Assert.Contains("href=\"/search?q=archive&amp;type=news\"", body);
+        Assert.Contains("href=\"/search?q=archive&amp;type=forum\"", body);
+    }
+
+    [Fact]
+    public async Task SearchPageInvalidTypeFilterFallsBackToAllResults()
+    {
+        var client = factory.CreateClient();
+
+        var body = await client.GetStringAsync("/search?q=archive&type=not-a-real-type");
+
+        Assert.DoesNotContain("No results found", body);
     }
 
     [Fact]

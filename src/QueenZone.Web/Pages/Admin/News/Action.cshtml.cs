@@ -1,17 +1,20 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
 using QueenZone.Data;
+using QueenZone.Web.Search;
 using QueenZone.Web.Sitemap;
 
 namespace QueenZone.Web.Pages.Admin.News;
 
 public sealed class ActionModel(
     IAdminNewsRepository adminNewsRepository,
+    INewsRepository newsRepository,
     INewsAuditRepository auditRepository,
     INewsDiscoveryRepository discoveryRepository,
     PublicQueryCacheService publicQueryCache,
     CoreSitemapService coreSitemapService,
     IOutputCacheStore outputCacheStore,
+    ISearchIndexService searchIndexService,
     ILogger<ActionModel> logger) : AdminNewsPageModel
 {
     public IActionResult OnGet(int id, string handler) =>
@@ -41,6 +44,7 @@ public sealed class ActionModel(
         await adminNewsRepository.PublishAsync(id, EditorEmail, cancellationToken);
         await InvalidatePublicNewsCachesAsync(cancellationToken);
         await auditRepository.AppendAsync(id, "publish", EditorEmail, $"Published \"{article.Title}\"", cancellationToken);
+        await UpsertSearchIndexAsync(id, cancellationToken);
         return Redirect("/admin/news");
     }
 
@@ -55,6 +59,7 @@ public sealed class ActionModel(
         await adminNewsRepository.UnpublishAsync(id, EditorEmail, cancellationToken);
         await InvalidatePublicNewsCachesAsync(cancellationToken);
         await auditRepository.AppendAsync(id, "unpublish", EditorEmail, $"Unpublished \"{article.Title}\"", cancellationToken);
+        await RemoveSearchIndexAsync(id, cancellationToken);
         return Redirect("/admin/news");
     }
 
@@ -84,6 +89,7 @@ public sealed class ActionModel(
         {
             await adminNewsRepository.DeleteAsync(id, EditorEmail, cancellationToken);
             await auditRepository.AppendAsync(id, "delete", EditorEmail, $"Deleted \"{article.Title}\"", cancellationToken);
+            await RemoveSearchIndexAsync(id, cancellationToken);
             if (article.IsPublished)
             {
                 await InvalidatePublicNewsCachesAsync(cancellationToken);
@@ -104,6 +110,36 @@ public sealed class ActionModel(
         }
 
         return Redirect("/admin/news");
+    }
+
+    private async Task UpsertSearchIndexAsync(int id, CancellationToken cancellationToken)
+    {
+        // Best-effort: the scheduled batch reindex is the correctness backstop if this fails
+        // or if the published item can't be re-read (e.g. attribution lookup issues).
+        try
+        {
+            var published = await newsRepository.GetByIdAsync(id, cancellationToken);
+            if (published is not null)
+            {
+                await searchIndexService.UpsertAsync(SearchReindexBuilder.MapNews(published), cancellationToken);
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Best-effort search index upsert failed for news article {NewsId}", id);
+        }
+    }
+
+    private async Task RemoveSearchIndexAsync(int id, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await searchIndexService.RemoveAsync($"news:{id}", cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Best-effort search index removal failed for news article {NewsId}", id);
+        }
     }
 
     private async Task InvalidatePublicNewsCachesAsync(CancellationToken cancellationToken)

@@ -69,6 +69,8 @@ public sealed class QueenZoneDbContext : DbContext
 
     public DbSet<PrivateMessageEntity> PrivateMessages => Set<PrivateMessageEntity>();
 
+    public DbSet<SearchDocumentEntity> SearchDocuments => Set<SearchDocumentEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<NewsTableRow>(entity =>
@@ -553,6 +555,31 @@ public sealed class QueenZoneDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(a => a.AuthorMemberId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<SearchDocumentEntity>(entity =>
+        {
+            entity.ToTable("SearchDocument");
+            entity.HasKey(document => document.Id);
+
+            entity.Property(document => document.SourceKey).HasMaxLength(200).IsRequired();
+            entity.Property(document => document.ContentType).HasMaxLength(50).IsRequired();
+            entity.Property(document => document.Title).HasMaxLength(300).IsRequired();
+            entity.Property(document => document.Body).IsRequired();
+            entity.Property(document => document.Summary).HasMaxLength(500);
+            entity.Property(document => document.Url).HasMaxLength(500).IsRequired();
+            entity.Property(document => document.ImageUrl).HasMaxLength(512);
+            entity.Property(document => document.Category).HasMaxLength(200);
+            entity.Property(document => document.AuthorDisplayName).HasMaxLength(256);
+            entity.Property(document => document.IndexedAt).IsRequired();
+
+            entity.HasIndex(document => document.SourceKey)
+                .IsUnique()
+                .HasDatabaseName("UQ_SearchDocument_SourceKey");
+
+            entity.HasIndex(document => new { document.ContentType, document.PublishedAt })
+                .IsDescending(false, true)
+                .HasDatabaseName("IX_SearchDocument_ContentType_PublishedAt");
         });
 
         modelBuilder.Entity<PhotoSubmissionAuditLogEntity>(entity =>
