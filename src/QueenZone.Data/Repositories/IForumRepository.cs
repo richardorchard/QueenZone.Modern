@@ -20,6 +20,10 @@ public interface IForumRepository
 
     Task<int> GetTotalThreadCountAsync(CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<ForumRecentThreadItem>> GetRecentThreadsAsync(
+        int count,
+        CancellationToken cancellationToken = default);
+
     Task<ForumArchiveStats> GetArchiveStatsAsync(CancellationToken cancellationToken = default);
 
     Task<int> GetTopicSitemapCountAsync(CancellationToken cancellationToken = default);

@@ -50,6 +50,21 @@ public sealed class LegacyForumRepository(QueenZoneDbContext dbContext) : IForum
         FROM dbUser.Q_FORUM_TOPIC_THREAD_COUNT_V
         """;
 
+    private const string RecentThreadsSelect = """
+        SELECT TOP ({0})
+            CAST(t.Q_FORUM_TOPIC_ID AS int) AS TopicId,
+            LTRIM(RTRIM(t.TOPIC_SUBJECT)) AS Title,
+            CAST(t.Q_FORUM_ID AS int) AS CategoryId,
+            f.Q_FORUM_NAME AS CategoryName,
+            ISNULL(CAST(t.TOPIC_REPLIES AS int), 0) AS ReplyCount,
+            t.TOPIC_LAST_POST AS LastActivityAt
+        FROM Q_FORUM_TOPIC_T t
+        INNER JOIN Q_FORUM_T f ON f.Q_FORUM_ID = t.Q_FORUM_ID
+        WHERE t.TOPIC_STARTER = 1
+          AND LTRIM(RTRIM(ISNULL(t.TOPIC_SUBJECT, ''))) <> ''
+        ORDER BY t.TOPIC_LAST_POST DESC, t.Q_FORUM_TOPIC_ID DESC
+        """;
+
     private const string TopicSitemapCountSelect = """
         SELECT COUNT(*) AS Value
         FROM Q_FORUM_TOPIC_T
@@ -179,6 +194,27 @@ public sealed class LegacyForumRepository(QueenZoneDbContext dbContext) : IForum
         return await dbContext.Database
             .SqlQueryRaw<int>(TotalThreadCountSelect)
             .FirstAsync(cancellationToken);
+    }
+
+    [ExcludeFromCodeCoverage]
+    public async Task<IReadOnlyList<ForumRecentThreadItem>> GetRecentThreadsAsync(
+        int count,
+        CancellationToken cancellationToken = default)
+    {
+        var take = Math.Clamp(count, 1, 50);
+        dbContext.Database.SetCommandTimeout(CommandTimeoutSeconds);
+        var rows = await dbContext.Database
+            .SqlQueryRaw<ForumRecentThreadRow>(RecentThreadsSelect, take)
+            .ToListAsync(cancellationToken);
+        return rows
+            .Select(row => new ForumRecentThreadItem(
+                row.TopicId,
+                row.Title?.Trim() ?? string.Empty,
+                row.CategoryId,
+                row.CategoryName?.Trim() ?? string.Empty,
+                row.ReplyCount,
+                row.LastActivityAt ?? DateTime.MinValue))
+            .ToList();
     }
 
     [ExcludeFromCodeCoverage]
@@ -333,6 +369,21 @@ public sealed class LegacyForumRepository(QueenZoneDbContext dbContext) : IForum
         public int TopicId { get; set; }
 
         public string? Title { get; set; }
+
+        public DateTime? LastActivityAt { get; set; }
+    }
+
+    internal sealed class ForumRecentThreadRow
+    {
+        public int TopicId { get; set; }
+
+        public string? Title { get; set; }
+
+        public int CategoryId { get; set; }
+
+        public string? CategoryName { get; set; }
+
+        public int ReplyCount { get; set; }
 
         public DateTime? LastActivityAt { get; set; }
     }

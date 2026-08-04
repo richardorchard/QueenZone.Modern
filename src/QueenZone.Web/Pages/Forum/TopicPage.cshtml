@@ -19,6 +19,7 @@
 <section class="qz-section">
   <div class="qz-container">
     <partial name="_SectionHeader" model="@(("Thread", "Posts in chronological order", false, "/search", "Search forum"))" />
+    <partial name="_ArchivePagination" model="ForumRoutes.GetTopicPaginationViewModel(header, Model.CurrentPage, Model.TotalPages)" />
     <partial name="_ForumPostList" model="Model.Posts" />
     <partial name="_ArchivePagination" model="ForumRoutes.GetTopicPaginationViewModel(header, Model.CurrentPage, Model.TotalPages)" />
   </div>

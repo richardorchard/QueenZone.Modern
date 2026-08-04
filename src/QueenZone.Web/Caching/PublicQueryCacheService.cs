@@ -68,6 +68,15 @@ public sealed class PublicQueryCacheService(
             () => forumRepository.GetTotalThreadCountAsync(cancellationToken),
             cancellationToken);
 
+    public Task<IReadOnlyList<ForumRecentThreadItem>> GetForumRecentThreadsAsync(
+        int count,
+        CancellationToken cancellationToken = default) =>
+        GetOrCreateAsync(
+            PublicQueryCacheKeys.ForumRecentThreads(count),
+            options.Value.ForumStatsCacheDuration,
+            () => forumRepository.GetRecentThreadsAsync(count, cancellationToken),
+            cancellationToken);
+
     public Task<IReadOnlyList<QueenHistoryEvent>> GetOnThisDayAsync(
         DateOnly date,
         int count,
@@ -140,6 +149,7 @@ public sealed class PublicQueryCacheService(
     {
         cache.Remove(PublicQueryCacheKeys.ForumCategories);
         cache.Remove(PublicQueryCacheKeys.ForumThreadCount);
+        cache.Remove(PublicQueryCacheKeys.ForumRecentThreads(ForumRoutes.RecentThreadsCount));
     }
 
     /// <summary>

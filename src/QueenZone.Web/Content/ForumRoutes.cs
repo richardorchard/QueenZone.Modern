@@ -8,6 +8,8 @@ public static class ForumRoutes
 
     public const int PostsPageSize = 15;
 
+    public const int RecentThreadsCount = 15;
+
     public static string GetCategoryPath(ForumCategorySummary category) =>
         category.DetailPath;
 
