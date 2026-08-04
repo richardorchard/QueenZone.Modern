@@ -42,7 +42,7 @@
         <partial name="_RichTextEditor" />
         <span asp-validation-for="Body" class="text-danger"></span>
         <div class="qz-form-actions">
-          <button type="submit" class="qz-button">Save changes</button>
+          <button type="submit" class="qz-button qz-button--cta">Save changes</button>
           @if (Model.Post is not null)
           {
             <a class="qz-button qz-button--ghost" href="@ForumRoutes.GetTopicCanonicalPath(Model.Post.TopicId, Model.Post.TopicSubject)#post-@Model.Post.PostId">Cancel</a>
