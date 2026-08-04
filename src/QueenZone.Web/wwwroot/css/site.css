@@ -290,10 +290,12 @@
   padding: 0 0.875rem;
   border: 1px solid var(--qz-masthead-border);
   border-radius: var(--radius-sm);
+  background: var(--qz-masthead-surface-hover);
   color: var(--qz-masthead-ink-strong);
   font: var(--fw-medium) 0.8125rem/1 var(--font-body);
   letter-spacing: 0.04em;
   text-decoration: none;
+  transition: background var(--dur-base) var(--ease-out), border-color var(--dur-base) var(--ease-out), color var(--dur-base) var(--ease-out);
 }
 
 .qz-masthead__member-name {
@@ -320,6 +322,7 @@
 
 .qz-masthead__signin:hover,
 .qz-masthead__admin-link:hover {
+  border-color: var(--qz-masthead-accent);
   color: var(--qz-masthead-accent);
 }
 
@@ -1387,6 +1390,18 @@ body.qz-menu-lock .qz-masthead {
 
 .qz-section-header--dark h2 {
   color: var(--qz-white);
+}
+
+.qz-section-header--dark .qz-button {
+  background: var(--qz-white);
+  border-color: var(--qz-white);
+  color: var(--qz-black);
+}
+
+.qz-section-header--dark .qz-button:hover {
+  background: var(--qz-gold);
+  border-color: var(--qz-gold);
+  color: var(--qz-black);
 }
 
 .qz-grid {
