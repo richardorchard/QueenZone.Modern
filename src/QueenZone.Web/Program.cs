@@ -76,6 +76,9 @@ var forwardedHeadersOptions = new ForwardedHeadersOptions
 forwardedHeadersOptions.KnownIPNetworks.Clear();
 forwardedHeadersOptions.KnownProxies.Clear();
 app.UseForwardedHeaders(forwardedHeadersOptions);
+// Azure Monitor uses client.address for request geolocation, then masks the raw IP by
+// default. The origin restriction makes Cloudflare's connecting-IP header trustworthy.
+app.UseClientAddressTelemetry();
 app.UseCanonicalHostRedirect();
 
 if (ResponseCompressionBootstrap.IsEnabled(app.Environment))
