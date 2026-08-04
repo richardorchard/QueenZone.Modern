@@ -54,6 +54,10 @@ public sealed class PublicWarmupService
             publicQueryCache.GetForumThreadCountAsync,
             cancellationToken);
         await WarmStepAsync(
+            "forum-recent-threads",
+            stepToken => publicQueryCache.GetForumRecentThreadsAsync(ForumRoutes.RecentThreadsCount, stepToken),
+            cancellationToken);
+        await WarmStepAsync(
             "on-this-day",
             stepToken => publicQueryCache.GetOnThisDayAsync(today, 3, stepToken),
             cancellationToken);

@@ -119,6 +119,11 @@ public sealed class ForumSitemapBuilderTests
         public Task<int> GetTotalThreadCountAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult(0);
 
+        public Task<IReadOnlyList<ForumRecentThreadItem>> GetRecentThreadsAsync(
+            int count,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<ForumRecentThreadItem>>([]);
+
         public Task<ForumArchiveStats> GetArchiveStatsAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult(new ForumArchiveStats(0, 0, 0));
 

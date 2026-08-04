@@ -7,6 +7,9 @@ namespace QueenZone.Web;
 /// </summary>
 internal static class ArchivePagination
 {
+    /// <summary>First/last cluster size when the current page is near either end of a long archive.</summary>
+    private const int EdgePageCount = 4;
+
     public static int GetTotalPages(int totalCount, int pageSize)
     {
         if (totalCount <= 0)
@@ -74,7 +77,8 @@ internal static class ArchivePagination
 
     private static IEnumerable<int?> GetVisiblePageNumbers(int currentPage, int totalPages)
     {
-        if (totalPages <= 7)
+        // Two edge clusters with no gap would overlap or abut — list every page.
+        if (totalPages <= EdgePageCount * 2)
         {
             for (var page = 1; page <= totalPages; page++)
             {
@@ -84,21 +88,39 @@ internal static class ArchivePagination
             yield break;
         }
 
+        if (currentPage <= EdgePageCount || currentPage > totalPages - EdgePageCount)
+        {
+            for (var page = 1; page <= EdgePageCount; page++)
+            {
+                yield return page;
+            }
+
+            yield return null;
+
+            for (var page = totalPages - EdgePageCount + 1; page <= totalPages; page++)
+            {
+                yield return page;
+            }
+
+            yield break;
+        }
+
         yield return 1;
 
-        if (currentPage > 3)
+        var start = currentPage - 1;
+        var end = currentPage + 1;
+
+        if (start > 2)
         {
             yield return null;
         }
 
-        var start = Math.Max(2, currentPage - 1);
-        var end = Math.Min(totalPages - 1, currentPage + 1);
-        for (var page = start; page <= end; page++)
+        for (var page = Math.Max(2, start); page <= Math.Min(totalPages - 1, end); page++)
         {
             yield return page;
         }
 
-        if (currentPage < totalPages - 2)
+        if (end < totalPages - 1)
         {
             yield return null;
         }

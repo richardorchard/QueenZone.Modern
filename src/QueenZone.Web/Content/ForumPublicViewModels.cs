@@ -74,3 +74,16 @@ public sealed record ForumIndexStats(
     int ForumCount,
     int ThreadCount,
     long PostCount);
+
+/// <summary>
+/// Cross-board recent thread row for the public forum index activity feed.
+/// </summary>
+public sealed record ForumRecentThreadSummary(
+    int TopicId,
+    string Title,
+    string DetailPath,
+    int CategoryId,
+    string CategoryName,
+    string CategoryPath,
+    int ReplyCount,
+    DateTime LastActivityAt);

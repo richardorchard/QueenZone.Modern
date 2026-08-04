@@ -143,6 +143,17 @@
     "relevanceKeywords": "queen,freddie mercury,brian may,roger taylor"
   },
   {
+    "key": "musicradar",
+    "displayName": "MusicRadar",
+    "homepageUrl": "https://www.musicradar.com/",
+    "feedOrSiteUrl": "https://www.musicradar.com/feeds/all",
+    "sourceType": "Rss",
+    "trustTier": "Secondary",
+    "pollIntervalMinutes": 90,
+    "enabled": true,
+    "relevanceKeywords": "queen,freddie mercury,brian may,roger taylor,adam lambert"
+  },
+  {
     "key": "ultimate-classic-rock",
     "displayName": "Ultimate Classic Rock",
     "homepageUrl": "https://ultimateclassicrock.com/",

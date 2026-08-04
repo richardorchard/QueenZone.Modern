@@ -20,6 +20,8 @@ public static class PublicQueryCacheKeys
 
     public const string ForumThreadCount = Prefix + ":forum:thread-count";
 
+    public const string ForumRecentThreadsSegment = Prefix + ":forum:recent-threads";
+
     public const string PhotoVersion = Prefix + ":photo:version";
 
     public const string PhotoCategoriesSegment = Prefix + ":photo:categories";
@@ -48,4 +50,7 @@ public static class PublicQueryCacheKeys
 
     public static string AroundThisDay(DateOnly date, int dayWindow, int count) =>
         $"{Prefix}:history:around-this-day:{date:yyyyMMdd}:{dayWindow}:{count}";
+
+    public static string ForumRecentThreads(int count) =>
+        $"{ForumRecentThreadsSegment}:{count}";
 }
