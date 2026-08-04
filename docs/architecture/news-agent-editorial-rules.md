@@ -61,6 +61,7 @@ Also in scope for future registry entries: official YouTube/community posts when
 | `nme-music` | https://www.nme.com/music |
 | `nme-queen` | https://www.nme.com/artists/queen/ |
 | `louder` | https://www.loudersound.com/ |
+| `musicradar` | https://www.musicradar.com/ |
 | `ultimate-classic-rock` | https://ultimateclassicrock.com/ |
 | `music-news` | https://www.music-news.com/ |
 | `gold-radio` | https://www.goldradiouk.com/ |
