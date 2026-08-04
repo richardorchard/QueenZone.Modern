@@ -29,4 +29,12 @@ public sealed class InMemorySearchIndexService(SharedSearchIndexStore store) : I
         store.ReplaceContentType(contentType, documents);
         return Task.CompletedTask;
     }
+
+    public Task<IReadOnlyDictionary<string, int>> GetContentTypeCountsAsync(CancellationToken cancellationToken = default)
+    {
+        IReadOnlyDictionary<string, int> counts = store.GetAll()
+            .GroupBy(d => d.ContentType)
+            .ToDictionary(g => g.Key, g => g.Count());
+        return Task.FromResult(counts);
+    }
 }
