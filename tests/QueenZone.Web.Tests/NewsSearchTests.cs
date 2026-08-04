@@ -303,69 +303,52 @@ public sealed class NewsSearchRoutesTests : IClassFixture<WebApplicationFactory<
         this.factory = factory.WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
     }
 
+    private HttpClient CreateNonRedirectingClient() =>
+        factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
     [Fact]
-    public async Task NewsSearchPage_renders_empty_state_without_query()
+    public async Task NewsSearchPage_redirects_to_unified_search_without_query()
     {
-        var client = factory.CreateClient();
+        var client = CreateNonRedirectingClient();
 
-        var body = await client.GetStringAsync("/news/search");
+        var response = await client.GetAsync("/news/search");
 
-        Assert.Contains("Search News", body);
-        Assert.DoesNotContain("results for", body);
+        Assert.Equal(HttpStatusCode.MovedPermanently, response.StatusCode);
+        Assert.Equal("/search?type=news", response.Headers.Location!.OriginalString);
     }
 
     [Fact]
-    public async Task NewsSearchPage_returns_results_for_known_keyword()
+    public async Task NewsSearchPage_redirects_to_unified_search_with_query()
     {
-        var client = factory.CreateClient();
+        var client = CreateNonRedirectingClient();
 
-        var body = await client.GetStringAsync("/news/search?q=modernisation");
+        var response = await client.GetAsync("/news/search?q=modernisation");
 
-        Assert.Contains("1 result", body);
-        Assert.Contains("QueenZone modernisation begins", body);
-        Assert.Contains("/news/1003/", body);
+        Assert.Equal(HttpStatusCode.MovedPermanently, response.StatusCode);
+        Assert.Equal("/search?type=news&q=modernisation", response.Headers.Location!.OriginalString);
     }
 
     [Fact]
-    public async Task NewsSearchPage_shows_no_results_state_for_unknown_keyword()
+    public async Task NewsSearchPage_redirects_preserving_page_number()
     {
-        var client = factory.CreateClient();
+        var client = CreateNonRedirectingClient();
 
-        var body = await client.GetStringAsync("/news/search?q=xyzzy_no_match_zzzqq");
+        var response = await client.GetAsync("/news/search?q=archive&page=2");
 
-        Assert.Contains("No results found", body);
-        Assert.DoesNotContain("qz-news-list", body);
+        Assert.Equal(HttpStatusCode.MovedPermanently, response.StatusCode);
+        Assert.Equal("/search?type=news&q=archive&page=2", response.Headers.Location!.OriginalString);
     }
 
     [Fact]
-    public async Task NewsSearchPage_never_exposes_hidden_records()
+    public async Task NewsSearchRedirect_lands_on_working_unified_search_page()
     {
         var client = factory.CreateClient();
 
-        // "moderation" appears in the unpublished seed record's body
-        var body = await client.GetStringAsync("/news/search?q=moderation");
-
-        Assert.DoesNotContain("Hidden moderation draft", body);
-    }
-
-    [Fact]
-    public async Task NewsSearchPage_is_reachable_and_returns_ok()
-    {
-        var client = factory.CreateClient();
-
-        var response = await client.GetAsync("/news/search?q=archive");
+        var response = await client.GetAsync("/news/search?q=modernisation");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task NewsSearchPage_has_search_form_pointing_to_news_search()
-    {
-        var client = factory.CreateClient();
-
-        var body = await client.GetStringAsync("/news/search");
-
-        Assert.Contains("action=\"/news/search\"", body);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("QueenZone modernisation begins", body);
     }
 
     [Fact]

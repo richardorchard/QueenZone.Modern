@@ -9,13 +9,19 @@ public sealed class ForumModel(PublicQueryCacheService publicQueryCache) : PageM
 
     public IReadOnlyList<ForumCategorySummary> Categories { get; private set; } = [];
 
+    public IReadOnlyList<ForumRecentThreadSummary> RecentThreads { get; private set; } = [];
+
     public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; } = [BreadcrumbItem.Home, new BreadcrumbItem("Forum", "/forum")];
 
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
         var categories = await publicQueryCache.GetForumCategoriesAsync(cancellationToken);
         var threadCount = await publicQueryCache.GetForumThreadCountAsync(cancellationToken);
+        var recentThreads = await publicQueryCache.GetForumRecentThreadsAsync(
+            ForumRoutes.RecentThreadsCount,
+            cancellationToken);
         Categories = PublicContentMapper.ToForumCategorySummaries(categories);
         Stats = PublicContentMapper.ToForumIndexStats(categories, threadCount);
+        RecentThreads = PublicContentMapper.ToForumRecentThreadSummaries(recentThreads);
     }
 }

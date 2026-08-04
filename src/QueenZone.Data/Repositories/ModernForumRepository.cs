@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using Microsoft.EntityFrameworkCore;
 
 namespace QueenZone.Data;
 
@@ -130,6 +131,34 @@ public sealed class ModernForumRepository(QueenZoneDbContext dbContext) : IForum
             "ModernForum_GetTotalThreadCount",
             commandTimeoutSeconds: InteractiveCommandTimeoutSeconds,
             cancellationToken: cancellationToken);
+
+    public async Task<IReadOnlyList<ForumRecentThreadItem>> GetRecentThreadsAsync(
+        int count,
+        CancellationToken cancellationToken = default)
+    {
+        var take = Math.Clamp(count, 1, 50);
+        dbContext.Database.SetCommandTimeout(InteractiveCommandTimeoutSeconds);
+
+        return await dbContext.ModernForumThreads
+            .AsNoTracking()
+            .Where(thread =>
+                thread.IsLegacyTopicStarter
+                && thread.StartedByUserValidated == true
+                && thread.LastActivityAt != null
+                && thread.Category != null
+                && !thread.Category.IsSynthetic)
+            .OrderByDescending(thread => thread.LastActivityAt)
+            .ThenByDescending(thread => thread.LegacyTopicId)
+            .Take(take)
+            .Select(thread => new ForumRecentThreadItem(
+                thread.LegacyTopicId,
+                thread.Title,
+                thread.Category!.LegacyForumId,
+                thread.Category.Name,
+                thread.ReplyCount,
+                thread.LastActivityAt!.Value))
+            .ToListAsync(cancellationToken);
+    }
 
     [ExcludeFromCodeCoverage]
     public async Task<ForumArchiveStats> GetArchiveStatsAsync(CancellationToken cancellationToken = default)

@@ -29,6 +29,7 @@
     {
       <partial name="_ForumPoll" model="Model.Poll" />
     }
+    <partial name="_ArchivePagination" model="ForumRoutes.GetTopicPaginationViewModel(header, Model.CurrentPage, Model.TotalPages)" />
     <partial name="_ForumPostList" model="Model.Posts" />
     <partial name="_ArchivePagination" model="ForumRoutes.GetTopicPaginationViewModel(header, Model.CurrentPage, Model.TotalPages)" />
     @if (Model.CanReply)

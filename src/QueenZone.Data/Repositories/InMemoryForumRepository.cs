@@ -63,6 +63,28 @@ public sealed class InMemoryForumRepository(
     public Task<int> GetTotalThreadCountAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(seedStats.ThreadCount + (writeRepository?.GetCreatedThreads().Count ?? 0));
 
+    public Task<IReadOnlyList<ForumRecentThreadItem>> GetRecentThreadsAsync(
+        int count,
+        CancellationToken cancellationToken = default)
+    {
+        var take = Math.Clamp(count, 1, 50);
+        var items = seedCategories
+            .SelectMany(category => SampleForumData.CreateSeedTopics(category.Id)
+                .Concat(GetCreatedTopics(category.Id))
+                .Select(topic => new ForumRecentThreadItem(
+                    topic.Id,
+                    topic.Title,
+                    category.Id,
+                    category.Name,
+                    topic.ReplyCount,
+                    topic.LastActivityAt)))
+            .OrderByDescending(item => item.LastActivityAt)
+            .ThenByDescending(item => item.TopicId)
+            .Take(take)
+            .ToList();
+        return Task.FromResult<IReadOnlyList<ForumRecentThreadItem>>(items);
+    }
+
     public async Task<ForumArchiveStats> GetArchiveStatsAsync(CancellationToken cancellationToken = default) =>
         ForumArchiveStats.FromCategories(
             await GetCategoriesAsync(cancellationToken),

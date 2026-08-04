@@ -1,11 +1,15 @@
 using Microsoft.AspNetCore.Mvc;
 using QueenZone.Data;
+using QueenZone.Web.Search;
 
 namespace QueenZone.Web.Pages.Admin.Articles;
 
 public sealed class ActionModel(
     IArticleSubmissionRepository articleSubmissionRepository,
-    PublicQueryCacheService publicQueryCache) : AdminArticlesPageModel
+    IArticleRepository articleRepository,
+    PublicQueryCacheService publicQueryCache,
+    ISearchIndexService searchIndexService,
+    ILogger<ActionModel> logger) : AdminArticlesPageModel
 {
     [BindProperty]
     public string? Slug { get; set; }
@@ -73,6 +77,8 @@ public sealed class ActionModel(
                 publicQueryCache.InvalidateArticleCountCache();
             }
 
+            await SyncSearchIndexAsync(updated, cancellationToken);
+
             TempData["ArticleMessage"] = successMessage;
             TempData["ArticleMessageKind"] = "success";
         }
@@ -83,6 +89,33 @@ public sealed class ActionModel(
         }
 
         return Redirect($"/admin/articles/{id}");
+    }
+
+    /// <summary>
+    /// Best-effort: keeps the article's search document in step with its new status. The
+    /// scheduled batch reindex is the correctness backstop if this fails.
+    /// </summary>
+    private async Task SyncSearchIndexAsync(ArticleSubmission updated, CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (updated.Status == ArticleSubmissionStatus.Published)
+            {
+                var published = await articleRepository.GetBySlugAsync(updated.Slug, cancellationToken);
+                if (published is not null)
+                {
+                    await searchIndexService.UpsertAsync(SearchReindexBuilder.MapArticle(published), cancellationToken);
+                }
+            }
+            else
+            {
+                await searchIndexService.RemoveAsync($"article:{updated.Slug}", cancellationToken);
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Best-effort search index sync failed for article submission {ArticleId}", updated.Id);
+        }
     }
 
     private async Task<IActionResult> ApplyRevisionRequestAsync(Guid id, CancellationToken cancellationToken)

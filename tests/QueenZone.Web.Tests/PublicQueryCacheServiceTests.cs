@@ -68,13 +68,16 @@ public sealed class PublicQueryCacheServiceTests
         await service.GetForumCategoriesAsync();
         await service.GetForumThreadCountAsync();
         await service.GetForumThreadCountAsync();
+        await service.GetForumRecentThreadsAsync(ForumRoutes.RecentThreadsCount);
+        await service.GetForumRecentThreadsAsync(ForumRoutes.RecentThreadsCount);
 
         Assert.Equal(1, forumRepository.CategoriesCallCount);
         Assert.Equal(1, forumRepository.ThreadCountCallCount);
+        Assert.Equal(1, forumRepository.RecentThreadsCallCount);
     }
 
     [Fact]
-    public async Task InvalidateForumStatsCache_evicts_categories_and_thread_count()
+    public async Task InvalidateForumStatsCache_evicts_categories_thread_count_and_recent_threads()
     {
         using var memoryCache = new MemoryCache(new MemoryCacheOptions());
         var forumRepository = new CountingForumRepository();
@@ -82,14 +85,17 @@ public sealed class PublicQueryCacheServiceTests
 
         await service.GetForumCategoriesAsync();
         await service.GetForumThreadCountAsync();
+        await service.GetForumRecentThreadsAsync(ForumRoutes.RecentThreadsCount);
 
         service.InvalidateForumStatsCache();
 
         await service.GetForumCategoriesAsync();
         await service.GetForumThreadCountAsync();
+        await service.GetForumRecentThreadsAsync(ForumRoutes.RecentThreadsCount);
 
         Assert.Equal(2, forumRepository.CategoriesCallCount);
         Assert.Equal(2, forumRepository.ThreadCountCallCount);
+        Assert.Equal(2, forumRepository.RecentThreadsCallCount);
     }
 
     [Fact]
@@ -491,6 +497,8 @@ public sealed class PublicQueryCacheServiceTests
 
         public int ThreadCountCallCount { get; private set; }
 
+        public int RecentThreadsCallCount { get; private set; }
+
         public Task<IReadOnlyList<ForumCategoryItem>> GetCategoriesAsync(CancellationToken cancellationToken = default)
         {
             CategoriesCallCount++;
@@ -501,6 +509,22 @@ public sealed class PublicQueryCacheServiceTests
         {
             ThreadCountCallCount++;
             return Task.FromResult(4);
+        }
+
+        public Task<IReadOnlyList<ForumRecentThreadItem>> GetRecentThreadsAsync(
+            int count,
+            CancellationToken cancellationToken = default)
+        {
+            RecentThreadsCallCount++;
+            return Task.FromResult<IReadOnlyList<ForumRecentThreadItem>>([
+                new ForumRecentThreadItem(
+                    1001,
+                    "Cached recent thread",
+                    category.Id,
+                    category.Name,
+                    3,
+                    category.LastActivityAt ?? DateTime.UtcNow)
+            ]);
         }
 
         public Task<ForumArchiveStats> GetArchiveStatsAsync(CancellationToken cancellationToken = default) =>

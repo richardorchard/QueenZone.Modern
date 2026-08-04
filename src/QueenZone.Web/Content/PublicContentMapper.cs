@@ -98,6 +98,21 @@ public static class PublicContentMapper
         IEnumerable<ForumTopicItem> topics) =>
         topics.Select(ToForumThreadSummary).ToList();
 
+    public static ForumRecentThreadSummary ToForumRecentThreadSummary(ForumRecentThreadItem item) =>
+        new(
+            item.TopicId,
+            item.Title,
+            ForumRoutes.GetTopicCanonicalPath(item.TopicId, item.Title),
+            item.CategoryId,
+            item.CategoryName,
+            ForumRoutes.GetCategoryCanonicalPath(item.CategoryId, item.CategoryName),
+            item.ReplyCount,
+            item.LastActivityAt);
+
+    public static IReadOnlyList<ForumRecentThreadSummary> ToForumRecentThreadSummaries(
+        IEnumerable<ForumRecentThreadItem> items) =>
+        items.Select(ToForumRecentThreadSummary).ToList();
+
     public static ForumThreadHeader ToForumThreadHeader(ForumTopicHeader header) =>
         new(
             header.TopicId,

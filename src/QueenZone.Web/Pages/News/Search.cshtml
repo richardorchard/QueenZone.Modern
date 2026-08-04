@@ -1,64 +1,6 @@
 @page "/news/search"
 @model NewsSearchModel
-@using QueenZone.Web
-
-<partial name="_PageHero" model='@(("Search News", "Search", "Search the QueenZone news archive.", "4,000+ articles"))' />
-
-<section class="qz-section">
-  <div class="qz-container" style="max-width: 760px;">
-    <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
-
-    <form method="get" action="/news/search">
-      <label class="qz-eyebrow" for="qz-news-search">Search news</label>
-      <div style="display: flex; gap: var(--space-3); margin-top: var(--space-3);">
-        <input id="qz-news-search"
-               name="q"
-               type="search"
-               value="@Model.Query"
-               placeholder="Artist, event, date, keyword…"
-               autocomplete="off"
-               style="flex: 1; padding: 1rem 1.125rem; border: 1px solid var(--border-strong); border-radius: var(--radius-xs); font: var(--type-body);">
-        <button type="submit" class="qz-button" style="white-space: nowrap;">Search</button>
-      </div>
-    </form>
-
-    @if (string.IsNullOrWhiteSpace(Model.Query))
-    {
-      <div class="qz-tag-row" style="margin-top: var(--space-5);">
-        @foreach (var tag in new[] { "Freddie Mercury", "Live Aid 1985", "Wembley 1986", "Innuendo" })
-        {
-          <a class="qz-tag" href="/news/search?q=@Uri.EscapeDataString(tag)">@tag</a>
-        }
-      </div>
-    }
-  </div>
-</section>
-
-@if (!string.IsNullOrWhiteSpace(Model.Query))
-{
-  <section class="qz-section">
-    <div class="qz-container" style="max-width: 760px;">
-
-      @if (Model.TotalCount == 0)
-      {
-        <p class="qz-meta">No results found for <strong>@Model.Query</strong>. Try different keywords.</p>
-      }
-      else
-      {
-        <partial name="_SectionHeader" model="@(($"{Model.TotalCount:N0} result{(Model.TotalCount == 1 ? "" : "s")} for \"{Model.Query}\"", "News articles", false, (string?)null, (string?)null))" />
-
-        <partial name="_NewsArchiveList" model="Model.Items" />
-
-        var newsPagination = ArchivePagination.BuildViewModel(
-          "News search results pagination",
-          Model.CurrentPage,
-          Model.TotalPages,
-          p => p <= 1
-            ? $"/news/search?q={Uri.EscapeDataString(Model.Query!)}"
-            : $"/news/search?q={Uri.EscapeDataString(Model.Query!)}&page={p}");
-        <partial name="_ArchivePagination" model="newsPagination" />
-      }
-
-    </div>
-  </section>
-}
+@*
+  This page always redirects to the unified /search page (see NewsSearchModel.OnGet) —
+  the route is kept only so existing inbound links to /news/search keep working.
+*@

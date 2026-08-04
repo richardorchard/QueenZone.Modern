@@ -73,7 +73,10 @@ public class SmokeTests : E2EPageTest
         await Page.GotoAsync("/forum");
 
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Forum", Level = 1 })).ToBeVisibleAsync();
-        await Expect(Page.GetByRole(AriaRole.Link, new() { Name = "The Music" })).ToBeVisibleAsync();
+        // Board cards and the recent-threads table both link to categories; target the card.
+        await Expect(Page.Locator("a.qz-card[href='/forum/1/the-music']")).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Latest activity across boards", Level = 2 })).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Link, new() { Name = "Ranking every studio album", Exact = true })).ToBeVisibleAsync();
     }
 
     [Test]

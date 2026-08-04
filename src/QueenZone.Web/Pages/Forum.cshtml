@@ -64,14 +64,29 @@
 
 <section class="qz-section">
   <div class="qz-container">
-    <partial name="_SectionHeader" model="@(("Recent Threads", "Activity pattern", false, (string?)null, (string?)null))" />
-    <table class="qz-table">
-      <thead><tr><th>Thread</th><th>Board</th><th>Replies</th><th>Latest</th></tr></thead>
-      <tbody>
-        <tr><td>The definitive ranking of every studio album</td><td>The Music</td><td>1,284</td><td>2h ago</td></tr>
-        <tr><td>Unheard Montreux session tapes</td><td>Rarities</td><td>642</td><td>5h ago</td></tr>
-        <tr><td>Restoring the 1977 News of the World tour photos</td><td>Archive Project</td><td>318</td><td>1d ago</td></tr>
-      </tbody>
-    </table>
+    <partial name="_SectionHeader" model="@(("Recent Threads", "Latest activity across boards", false, (string?)null, (string?)null))" />
+    @if (Model.RecentThreads.Count == 0)
+    {
+      <p>No recent threads are available yet.</p>
+    }
+    else
+    {
+      <table class="qz-table">
+        <thead><tr><th>Thread</th><th>Board</th><th>Replies</th><th>Latest</th></tr></thead>
+        <tbody>
+          @foreach (var thread in Model.RecentThreads)
+          {
+            <tr>
+              <td><a href="@thread.DetailPath">@thread.Title</a></td>
+              <td><a href="@thread.CategoryPath">@thread.CategoryName</a></td>
+              <td>@thread.ReplyCount.ToString("N0")</td>
+              <td>
+                <time datetime="@thread.LastActivityAt.ToString("yyyy-MM-dd")">@thread.LastActivityAt.ToString("dd MMMM yyyy")</time>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
   </div>
 </section>

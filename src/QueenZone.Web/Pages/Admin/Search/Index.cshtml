@@ -1,0 +1,52 @@
+@page "/admin/search"
+@model IndexModel
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@{
+  ViewData["Title"] = "Search index";
+  ViewData["ShowAdminNav"] = true;
+  var antiforgeryToken = Antiforgery.GetAndStoreTokens(HttpContext).RequestToken;
+}
+
+<div class="admin-shell">
+  <h1>Search index</h1>
+
+  @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+  {
+    <p class="admin-status admin-status--@Model.StatusMessageKind">@Model.StatusMessage</p>
+  }
+
+  <p>
+    Rebuilds the <code>SearchDocument</code> index that powers <a href="/search" target="_blank" rel="noopener">/search</a>
+    from News, Forum threads, and Community Articles. Publishing/unpublishing content updates the
+    index automatically going forward — use this if the index looks stale or empty (for example,
+    right after deploying this feature for the first time).
+  </p>
+
+  <p><strong>@Model.TotalCount.ToString("N0")</strong> documents indexed.</p>
+
+  @if (Model.ContentTypeCounts.Count > 0)
+  {
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Content type</th>
+          <th>Count</th>
+        </tr>
+      </thead>
+      <tbody>
+        @foreach (var (contentType, count) in Model.ContentTypeCounts.OrderBy(pair => pair.Key))
+        {
+          <tr>
+            <td>@QueenZone.Data.SiteSearchContentType.DisplayLabel(contentType)</td>
+            <td>@count.ToString("N0")</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+
+  <form method="post" action="/admin/search?handler=Reindex">
+    <input type="hidden" name="__RequestVerificationToken" value="@antiforgeryToken" />
+    <button type="submit" class="qz-button">Rebuild search index now</button>
+  </form>
+</div>
