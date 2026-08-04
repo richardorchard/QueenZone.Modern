@@ -68,6 +68,8 @@ Use configuration keys like:
 
 The app clears `KnownIPNetworks` / `KnownProxies` so `X-Forwarded-For`, `X-Forwarded-Proto`, and `X-Forwarded-Host` from **App Service / Cloudflare** are accepted (required for correct OAuth redirect URIs and scheme).
 
+Immediately after forwarded-header processing, the app adds the trusted Cloudflare `CF-Connecting-IP` value to the active OpenTelemetry request span as `client.address` (falling back to the processed remote address). Application Insights uses that value for visitor geolocation and masks the stored `client_IP` to `0.0.0.0` by default. Keep masking enabled unless a separate privacy review approves raw IP retention.
+
 | Trust | Implication |
 | --- | --- |
 | Edge is the only public ingress | Normal production path — forwarded headers are trusted |
