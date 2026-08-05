@@ -73,6 +73,7 @@ public sealed class PublicOutputCacheTests : IClassFixture<WebApplicationFactory
 
         using var firstResponse = await client.GetAsync("/articles");
         var firstBody = await firstResponse.Content.ReadAsStringAsync();
+        var archivePageCallsAfterFirst = repository.ArchivePageCallCount;
         var callsAfterFirst = repository.ArchivePageCallCount + repository.PublishedCountCallCount;
 
         Assert.Equal(HttpStatusCode.OK, firstResponse.StatusCode);
@@ -81,7 +82,10 @@ public sealed class PublicOutputCacheTests : IClassFixture<WebApplicationFactory
 
         // Archive page loads published count (query-cache eligible) and archive page (not
         // query-cached). Unchanged totals on the second request prove the Razor page did not
-        // re-run — i.e. ASP.NET Core output cache served the HTML.
+        // re-run — i.e. ASP.NET Core output cache served the HTML. Baselines are taken after the
+        // first request (not from a "first ever call" flag on the fake) because the background
+        // search-index seed job (SearchIndexSeedHostedService) also calls into this same
+        // substituted repository once during host startup, before any HTTP request is made.
         using var secondResponse = await client.GetAsync("/articles");
         var secondBody = await secondResponse.Content.ReadAsStringAsync();
         var callsAfterSecond = repository.ArchivePageCallCount + repository.PublishedCountCallCount;
@@ -89,7 +93,7 @@ public sealed class PublicOutputCacheTests : IClassFixture<WebApplicationFactory
         Assert.Equal(HttpStatusCode.OK, secondResponse.StatusCode);
         Assert.Equal(firstBody, secondBody);
         Assert.Equal(callsAfterFirst, callsAfterSecond);
-        Assert.Equal(repository.ArchivePageCallCountAtFirstSnapshot, repository.ArchivePageCallCount);
+        Assert.Equal(archivePageCallsAfterFirst, repository.ArchivePageCallCount);
     }
 
     [Fact]
@@ -165,9 +169,6 @@ public sealed class PublicOutputCacheTests : IClassFixture<WebApplicationFactory
 
         public int PublishedCountCallCount { get; private set; }
 
-        /// <summary>Snapshot of <see cref="ArchivePageCallCount"/> after the first successful load.</summary>
-        public int ArchivePageCallCountAtFirstSnapshot { get; private set; }
-
         public Task<IReadOnlyList<ArticleItem>> GetLatestAsync(int count, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<ArticleItem>>([article]);
 
@@ -177,11 +178,6 @@ public sealed class PublicOutputCacheTests : IClassFixture<WebApplicationFactory
             CancellationToken cancellationToken = default)
         {
             ArchivePageCallCount++;
-            if (ArchivePageCallCountAtFirstSnapshot == 0)
-            {
-                ArchivePageCallCountAtFirstSnapshot = ArchivePageCallCount;
-            }
-
             return Task.FromResult<IReadOnlyList<ArticleItem>>([article]);
         }
 

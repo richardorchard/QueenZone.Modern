@@ -12,17 +12,23 @@ namespace QueenZone.Web.Search;
 /// <see cref="Sitemap.ForumSitemapBuilder"/> uses for the same reason.
 /// </summary>
 /// <remarks>
-/// Covers News, Forum threads, and Community Articles today. Biography, Discography,
-/// Photography, Timeline, Fan Performances, Freddie Tribute, and legacy Articles are not yet
-/// wired in — each needs the same three-step treatment (paginate the existing public repository,
-/// map to <see cref="SearchDocumentEntity"/>, call <see cref="ISearchIndexService.ReplaceContentTypeAsync"/>)
-/// and can be added as additional <c>Reindex*Async</c> methods following the pattern below.
+/// Covers News, Forum threads, Community Articles, legacy Articles, Biography, Discography,
+/// Timeline, Fan Performances, and Freddie Tribute. Photography is not yet wired in — it needs
+/// the same three-step treatment (paginate the existing public repository, map to
+/// <see cref="SearchDocumentEntity"/>, call <see cref="ISearchIndexService.ReplaceContentTypeAsync"/>)
+/// and can be added as an additional <c>Reindex*Async</c> method following the pattern below.
 /// </remarks>
 public sealed class SearchReindexBuilder(
     ISearchIndexService searchIndexService,
     INewsRepository newsRepository,
     IForumRepository forumRepository,
-    IArticleRepository articleRepository)
+    IArticleRepository articleRepository,
+    IArticlesRepository articlesRepository,
+    IBiographyRepository biographyRepository,
+    IDiscographyRepository discographyRepository,
+    IQueenHistoryRepository queenHistoryRepository,
+    IFanPerformanceRepository fanPerformanceRepository,
+    IFreddieTributeRepository freddieTributeRepository)
 {
     private const int BatchSize = 200;
 
@@ -31,6 +37,12 @@ public sealed class SearchReindexBuilder(
         await ReindexNewsAsync(cancellationToken);
         await ReindexForumAsync(cancellationToken);
         await ReindexArticlesAsync(cancellationToken);
+        await ReindexLegacyArticlesAsync(cancellationToken);
+        await ReindexBiographyAsync(cancellationToken);
+        await ReindexDiscographyAsync(cancellationToken);
+        await ReindexTimelineAsync(cancellationToken);
+        await ReindexFanPerformancesAsync(cancellationToken);
+        await ReindexFreddieTributeAsync(cancellationToken);
     }
 
     public async Task ReindexNewsAsync(CancellationToken cancellationToken = default)
@@ -74,6 +86,161 @@ public sealed class SearchReindexBuilder(
 
         await searchIndexService.ReplaceContentTypeAsync(SiteSearchContentType.Article, documents, cancellationToken);
     }
+
+    public async Task ReindexLegacyArticlesAsync(CancellationToken cancellationToken = default)
+    {
+        var totalCount = await articlesRepository.GetPublishedCountAsync(cancellationToken);
+        var documents = new List<SearchDocumentEntity>();
+
+        for (var page = 1; (page - 1) * BatchSize < totalCount; page++)
+        {
+            var items = await articlesRepository.GetArchivePageAsync(page, BatchSize, cancellationToken);
+            documents.AddRange(items.Select(MapLegacyArticle));
+        }
+
+        await searchIndexService.ReplaceContentTypeAsync(SiteSearchContentType.LegacyArticle, documents, cancellationToken);
+    }
+
+    public async Task ReindexBiographyAsync(CancellationToken cancellationToken = default)
+    {
+        var chapters = await biographyRepository.GetChaptersAsync(cancellationToken);
+        var documents = chapters.Select(MapBiographyChapter).ToList();
+
+        await searchIndexService.ReplaceContentTypeAsync(SiteSearchContentType.Biography, documents, cancellationToken);
+    }
+
+    public async Task ReindexDiscographyAsync(CancellationToken cancellationToken = default)
+    {
+        var albums = await discographyRepository.GetAlbumsAsync(cancellationToken);
+        var documents = albums.Select(MapAlbum).ToList();
+
+        await searchIndexService.ReplaceContentTypeAsync(SiteSearchContentType.Discography, documents, cancellationToken);
+    }
+
+    public async Task ReindexTimelineAsync(CancellationToken cancellationToken = default)
+    {
+        var events = await queenHistoryRepository.GetAllPublishedAsync(cancellationToken);
+        var documents = events.Select(MapTimelineEvent).ToList();
+
+        await searchIndexService.ReplaceContentTypeAsync(SiteSearchContentType.Timeline, documents, cancellationToken);
+    }
+
+    public async Task ReindexFanPerformancesAsync(CancellationToken cancellationToken = default)
+    {
+        var totalCount = await fanPerformanceRepository.GetVisibleCountAsync(cancellationToken);
+        var documents = new List<SearchDocumentEntity>();
+
+        for (var page = 1; (page - 1) * BatchSize < totalCount; page++)
+        {
+            var items = await fanPerformanceRepository.GetPageAsync(page, BatchSize, cancellationToken);
+            documents.AddRange(items.Select(MapFanPerformance));
+        }
+
+        await searchIndexService.ReplaceContentTypeAsync(SiteSearchContentType.FanPerformance, documents, cancellationToken);
+    }
+
+    public async Task ReindexFreddieTributeAsync(CancellationToken cancellationToken = default)
+    {
+        var documents = new List<SearchDocumentEntity>();
+        var page = 1;
+        int totalCount;
+
+        do
+        {
+            var result = await freddieTributeRepository.GetPageAsync(page, BatchSize, cancellationToken);
+            totalCount = result.TotalCount;
+            documents.AddRange(result.Items.Select(MapFreddieTribute));
+            page++;
+        }
+        while ((page - 1) * BatchSize < totalCount);
+
+        await searchIndexService.ReplaceContentTypeAsync(SiteSearchContentType.Tribute, documents, cancellationToken);
+    }
+
+    private static SearchDocumentEntity MapLegacyArticle(ArticleItem item)
+    {
+        var plainBody = SearchDocumentText.ToPlainText(item.Body);
+        return new SearchDocumentEntity
+        {
+            SourceKey = $"legacy-article:{item.Id}",
+            ContentType = SiteSearchContentType.LegacyArticle,
+            Title = item.Title,
+            Body = plainBody,
+            Summary = SearchDocumentText.Summarize(
+                string.IsNullOrWhiteSpace(item.Excerpt) ? plainBody : item.Excerpt),
+            Url = ArticlesRoutes.GetArticleDetailPath(item.Id, item.Title),
+            PublishedAt = item.PublishedAt,
+            Category = item.CategoryName,
+        };
+    }
+
+    private static SearchDocumentEntity MapBiographyChapter(BiographyChapterItem chapter)
+    {
+        var plainBody = SearchDocumentText.ToPlainText(chapter.Body);
+        return new SearchDocumentEntity
+        {
+            SourceKey = $"biography:{chapter.Id}",
+            ContentType = SiteSearchContentType.Biography,
+            Title = chapter.Title,
+            Body = plainBody,
+            Summary = SearchDocumentText.Summarize(
+                string.IsNullOrWhiteSpace(chapter.Summary) ? plainBody : chapter.Summary),
+            Url = BiographyRoutes.GetChapterDetailPath(chapter),
+            PublishedAt = chapter.CreatedAt == DateTime.MinValue ? null : chapter.CreatedAt,
+        };
+    }
+
+    private static SearchDocumentEntity MapAlbum(AlbumSummary album) =>
+        new()
+        {
+            SourceKey = $"discography:{album.AlbumId}",
+            ContentType = SiteSearchContentType.Discography,
+            Title = album.Name,
+            Body = album.Name,
+            Summary = album.Name,
+            Url = DiscographyRoutes.GetAlbumPath(album),
+            PublishedAt = album.ReleaseYear.HasValue
+                ? new DateTimeOffset(album.ReleaseYear.Value, 1, 1, 0, 0, 0, TimeSpan.Zero)
+                : null,
+        };
+
+    private static SearchDocumentEntity MapTimelineEvent(QueenHistoryEvent historyEvent) =>
+        new()
+        {
+            SourceKey = $"timeline:{historyEvent.Id}",
+            ContentType = SiteSearchContentType.Timeline,
+            Title = historyEvent.Title,
+            Body = historyEvent.Summary,
+            Summary = SearchDocumentText.Summarize(historyEvent.Summary),
+            Url = $"/timeline#event-{historyEvent.Id}",
+            PublishedAt = historyEvent.EventDate,
+            Category = historyEvent.Category.ToString(),
+        };
+
+    private static SearchDocumentEntity MapFanPerformance(FanPerformance performance) =>
+        new()
+        {
+            SourceKey = $"fan-performance:{performance.Id}",
+            ContentType = SiteSearchContentType.FanPerformance,
+            Title = performance.Title,
+            Body = performance.Description,
+            Summary = SearchDocumentText.Summarize(performance.Description),
+            Url = FanPerformanceRoutes.GetIndexPath(),
+            PublishedAt = performance.DateAdded,
+            AuthorDisplayName = performance.PerformedBy,
+        };
+
+    private static SearchDocumentEntity MapFreddieTribute(FreddieTribute tribute) =>
+        new()
+        {
+            SourceKey = $"tribute:{tribute.Id}",
+            ContentType = SiteSearchContentType.Tribute,
+            Title = tribute.Name,
+            Body = tribute.Thought,
+            Summary = SearchDocumentText.Summarize(tribute.Thought),
+            Url = $"/freddie-mercury-tribute#tribute-{tribute.Id}",
+            AuthorDisplayName = tribute.Name,
+        };
 
     /// <summary>
     /// Maps one published news item to its <see cref="SearchDocumentEntity"/> shape. Exposed so
