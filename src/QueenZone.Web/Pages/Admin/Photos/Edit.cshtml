@@ -106,7 +106,7 @@
     </form>
 
     <form method="post" action="/admin/photos/@photo.PicId/delete" style="display:inline; margin-left: .5rem;"
-          onsubmit="return confirm('Hard-delete this photo row from the database? Blobs will be left in place. Prefer Hide for soft removal.');">
+          onsubmit="return confirm('Hard-delete this photo and its gallery blobs (original + thumbnail)? Prefer Hide for soft removal.');">
       <input type="hidden" name="@AdminPhotosPageModel.AntiforgeryTokenFieldName" value="@antiforgeryToken" />
       <button type="submit">Hard delete</button>
     </form>

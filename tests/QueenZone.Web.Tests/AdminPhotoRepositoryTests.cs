@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging.Abstractions;
 using QueenZone.Data;
 using QueenZone.Storage;
 using QueenZone.Web;
@@ -90,7 +91,7 @@ public sealed class AdminPhotoServiceTests
         var store = new SharedPhotoStore(SamplePhotoData.CreateSeedCategories());
         var admin = new InMemoryAdminPhotoRepository(store);
         var blobs = new NullGalleryPhotoBlobService();
-        var service = new AdminPhotoService(admin, blobs);
+        var service = new AdminPhotoService(admin, blobs, NullLogger<AdminPhotoService>.Instance);
 
         await using var imageStream = await CreateJpegAsync(640, 480);
         var file = new FormFile(imageStream, 0, imageStream.Length, "file", "shot.jpg")
@@ -127,7 +128,7 @@ public sealed class AdminPhotoServiceTests
         var store = new SharedPhotoStore(SamplePhotoData.CreateSeedCategories());
         var admin = new InMemoryAdminPhotoRepository(store);
         var blobs = new NullGalleryPhotoBlobService();
-        var service = new AdminPhotoService(admin, blobs);
+        var service = new AdminPhotoService(admin, blobs, NullLogger<AdminPhotoService>.Instance);
 
         await using var imageStream = await CreateJpegAsync(500, 500);
         var file = new FormFile(imageStream, 0, imageStream.Length, "file", "regen.jpg")
@@ -155,6 +156,97 @@ public sealed class AdminPhotoServiceTests
         Assert.EndsWith("_t.webp", photo.LegacyThumbUrl, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task Delete_RemovesDatabaseRowAndGalleryBlobs()
+    {
+        var store = new SharedPhotoStore(SamplePhotoData.CreateSeedCategories());
+        var admin = new InMemoryAdminPhotoRepository(store);
+        var blobs = new NullGalleryPhotoBlobService();
+        var service = new AdminPhotoService(admin, blobs, NullLogger<AdminPhotoService>.Instance);
+
+        await using var imageStream = await CreateJpegAsync(320, 240);
+        var file = new FormFile(imageStream, 0, imageStream.Length, "file", "delete-me.jpg")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "image/jpeg",
+        };
+
+        var picId = await service.CreateAsync(
+            file,
+            catId: 9,
+            title: "Delete target",
+            keywords: null,
+            year: 2024,
+            dateTime: DateTime.UtcNow,
+            isVisible: true,
+            editorEmail: "admin@test.local");
+
+        var photo = await admin.GetByIdAsync(picId);
+        Assert.NotNull(photo);
+
+        var originalUrl = PhotoImageUrl.ToBlobStorageUrl(photo.LegacyUrl);
+        var thumbUrl = PhotoImageUrl.ToBlobStorageUrl(photo.LegacyThumbUrl);
+        Assert.True(PhotoImageUrl.TryParseBlobLocation(originalUrl, out var originalContainer, out var originalBlob));
+        Assert.True(PhotoImageUrl.TryParseBlobLocation(thumbUrl, out var thumbContainer, out var thumbBlob));
+
+        await using (var original = await blobs.OpenReadAsync(originalContainer, originalBlob))
+        {
+            Assert.NotNull(original);
+        }
+
+        await using (var thumb = await blobs.OpenReadAsync(thumbContainer, thumbBlob))
+        {
+            Assert.NotNull(thumb);
+        }
+
+        var result = await service.DeleteAsync(picId, "admin@test.local");
+
+        Assert.True(result.BlobCleanupSucceeded);
+        Assert.Equal(2, result.BlobsAttempted);
+        Assert.Equal(2, result.BlobsDeleted);
+        Assert.Equal(0, result.BlobsFailed);
+        Assert.Equal(0, result.BlobsUnresolved);
+        Assert.Null(await admin.GetByIdAsync(picId));
+        Assert.Null(await blobs.OpenReadAsync(originalContainer, originalBlob));
+        Assert.Null(await blobs.OpenReadAsync(thumbContainer, thumbBlob));
+    }
+
+    [Fact]
+    public async Task Delete_WhenBlobCleanupFails_StillRemovesDatabaseRow()
+    {
+        var store = new SharedPhotoStore(SamplePhotoData.CreateSeedCategories());
+        var admin = new InMemoryAdminPhotoRepository(store);
+        var inner = new NullGalleryPhotoBlobService();
+        var blobs = new ThrowingDeleteGalleryPhotoBlobService(inner);
+        var service = new AdminPhotoService(admin, blobs, NullLogger<AdminPhotoService>.Instance);
+
+        await using var imageStream = await CreateJpegAsync(320, 240);
+        var file = new FormFile(imageStream, 0, imageStream.Length, "file", "delete-fail.jpg")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "image/jpeg",
+        };
+
+        var picId = await service.CreateAsync(
+            file,
+            catId: 9,
+            title: "Delete fail target",
+            keywords: null,
+            year: 2024,
+            dateTime: DateTime.UtcNow,
+            isVisible: true,
+            editorEmail: "admin@test.local");
+
+        var result = await service.DeleteAsync(picId, "admin@test.local");
+
+        Assert.Null(await admin.GetByIdAsync(picId));
+        Assert.False(result.BlobCleanupSucceeded);
+        Assert.Equal(2, result.BlobsAttempted);
+        Assert.Equal(0, result.BlobsDeleted);
+        Assert.Equal(2, result.BlobsFailed);
+        Assert.Equal(0, result.BlobsUnresolved);
+    }
+
     private static async Task<MemoryStream> CreateJpegAsync(int width, int height)
     {
         using var image = new Image<Rgba32>(width, height);
@@ -162,6 +254,31 @@ public sealed class AdminPhotoServiceTests
         await image.SaveAsJpegAsync(stream, new JpegEncoder { Quality = 80 });
         stream.Position = 0;
         return stream;
+    }
+
+    private sealed class ThrowingDeleteGalleryPhotoBlobService(IGalleryPhotoBlobService inner) : IGalleryPhotoBlobService
+    {
+        public bool IsConfigured => inner.IsConfigured;
+
+        public Task UploadAsync(
+            string containerName,
+            string blobName,
+            Stream content,
+            string contentType,
+            CancellationToken cancellationToken = default) =>
+            inner.UploadAsync(containerName, blobName, content, contentType, cancellationToken);
+
+        public Task<Stream?> OpenReadAsync(
+            string containerName,
+            string blobName,
+            CancellationToken cancellationToken = default) =>
+            inner.OpenReadAsync(containerName, blobName, cancellationToken);
+
+        public Task DeleteAsync(
+            string containerName,
+            string blobName,
+            CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException($"Simulated blob delete failure for {containerName}/{blobName}");
     }
 }
 
