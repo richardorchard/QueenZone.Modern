@@ -23,6 +23,10 @@ public sealed class ConversationModel(PrivateMessageService privateMessageServic
 
     public ArchivePaginationViewModel? Pagination { get; private set; }
 
+    public bool HasBlockedOtherParticipant { get; private set; }
+
+    public string? StatusMessage { get; private set; }
+
     [BindProperty]
     public ReplyInput Input { get; set; } = new();
 
@@ -47,6 +51,11 @@ public sealed class ConversationModel(PrivateMessageService privateMessageServic
 
         PageNumber = Detail.Page;
         Pagination = BuildPagination(Detail);
+        HasBlockedOtherParticipant = await privateMessageService.HasBlockedAsync(
+            memberId.Value,
+            Detail.OtherParticipantId,
+            cancellationToken);
+        StatusMessage = TempData[IndexModel.SuccessMessageKey] as string;
         ViewData["Title"] = $"Message {Detail.OtherParticipantDisplayName}";
         return Page();
     }
@@ -74,6 +83,10 @@ public sealed class ConversationModel(PrivateMessageService privateMessageServic
 
             PageNumber = Detail.Page;
             Pagination = BuildPagination(Detail);
+            HasBlockedOtherParticipant = await privateMessageService.HasBlockedAsync(
+                memberId.Value,
+                Detail.OtherParticipantId,
+                cancellationToken);
             ViewData["Title"] = $"Message {Detail.OtherParticipantDisplayName}";
             return Page();
         }
@@ -108,6 +121,10 @@ public sealed class ConversationModel(PrivateMessageService privateMessageServic
 
             PageNumber = Detail.Page;
             Pagination = BuildPagination(Detail);
+            HasBlockedOtherParticipant = await privateMessageService.HasBlockedAsync(
+                memberId.Value,
+                Detail.OtherParticipantId,
+                cancellationToken);
             ViewData["Title"] = $"Message {Detail.OtherParticipantDisplayName}";
             return Page();
         }
@@ -156,6 +173,67 @@ public sealed class ConversationModel(PrivateMessageService privateMessageServic
 
         TempData[IndexModel.SuccessMessageKey] = "Conversation removed from your inbox.";
         return RedirectToPage("./Index");
+    }
+
+    public async Task<IActionResult> OnPostBlockAsync(CancellationToken cancellationToken)
+    {
+        var memberId = await GetCurrentMemberIdAsync();
+        if (memberId is null)
+        {
+            return Challenge();
+        }
+
+        var detail = await privateMessageService.GetConversationAsync(
+            ConversationId,
+            memberId.Value,
+            markRead: false,
+            page: PageNumber,
+            cancellationToken: cancellationToken);
+        if (detail is null)
+        {
+            return NotFound();
+        }
+
+        var result = await privateMessageService.BlockAsync(
+            memberId.Value,
+            detail.OtherParticipantId,
+            cancellationToken);
+        if (!result.Succeeded)
+        {
+            TempData[IndexModel.SuccessMessageKey] = result.ErrorMessage ?? "Unable to block member.";
+            return RedirectToPage(new { conversationId = ConversationId, pageNumber = PageNumber });
+        }
+
+        TempData[IndexModel.SuccessMessageKey] =
+            "Member blocked. They can no longer send you private messages.";
+        return RedirectToPage(new { conversationId = ConversationId, pageNumber = PageNumber });
+    }
+
+    public async Task<IActionResult> OnPostUnblockAsync(CancellationToken cancellationToken)
+    {
+        var memberId = await GetCurrentMemberIdAsync();
+        if (memberId is null)
+        {
+            return Challenge();
+        }
+
+        var detail = await privateMessageService.GetConversationAsync(
+            ConversationId,
+            memberId.Value,
+            markRead: false,
+            page: PageNumber,
+            cancellationToken: cancellationToken);
+        if (detail is null)
+        {
+            return NotFound();
+        }
+
+        await privateMessageService.UnblockAsync(
+            memberId.Value,
+            detail.OtherParticipantId,
+            cancellationToken);
+        TempData[IndexModel.SuccessMessageKey] = "Member unblocked.";
+        return RedirectToPage(new { conversationId = ConversationId, pageNumber = PageNumber });
     }
 
     private ArchivePaginationViewModel? BuildPagination(PrivateConversationDetail detail) =>

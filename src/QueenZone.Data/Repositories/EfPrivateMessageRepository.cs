@@ -800,6 +800,90 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
         return true;
     }
 
+    public async Task<Guid?> GetOtherParticipantIdAsync(
+        Guid conversationId,
+        Guid memberId,
+        CancellationToken cancellationToken = default)
+    {
+        var conversation = await dbContext.PrivateConversations
+            .AsNoTracking()
+            .Where(c => c.Id == conversationId
+                && (c.MemberLowId == memberId || c.MemberHighId == memberId))
+            .Select(c => new { c.MemberLowId, c.MemberHighId })
+            .SingleOrDefaultAsync(cancellationToken);
+        if (conversation is null)
+        {
+            return null;
+        }
+
+        return conversation.MemberLowId == memberId
+            ? conversation.MemberHighId
+            : conversation.MemberLowId;
+    }
+
+    public Task<bool> IsBlockedAsync(
+        Guid blockerMemberId,
+        Guid blockedMemberId,
+        CancellationToken cancellationToken = default) =>
+        dbContext.MemberMessageBlocks
+            .AsNoTracking()
+            .AnyAsync(
+                b => b.BlockerMemberId == blockerMemberId && b.BlockedMemberId == blockedMemberId,
+                cancellationToken);
+
+    public Task<bool> IsMessagingBlockedAsync(
+        Guid memberA,
+        Guid memberB,
+        CancellationToken cancellationToken = default) =>
+        dbContext.MemberMessageBlocks
+            .AsNoTracking()
+            .AnyAsync(
+                b => (b.BlockerMemberId == memberA && b.BlockedMemberId == memberB)
+                    || (b.BlockerMemberId == memberB && b.BlockedMemberId == memberA),
+                cancellationToken);
+
+    public async Task BlockAsync(
+        Guid blockerMemberId,
+        Guid blockedMemberId,
+        DateTimeOffset blockedAt,
+        CancellationToken cancellationToken = default)
+    {
+        var exists = await IsBlockedAsync(blockerMemberId, blockedMemberId, cancellationToken);
+        if (exists)
+        {
+            return;
+        }
+
+        dbContext.MemberMessageBlocks.Add(new MemberMessageBlockEntity
+        {
+            Id = Guid.NewGuid(),
+            BlockerMemberId = blockerMemberId,
+            BlockedMemberId = blockedMemberId,
+            CreatedAt = blockedAt,
+        });
+
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
+        {
+            // Concurrent block insert — treat as already blocked.
+            dbContext.ChangeTracker.Clear();
+        }
+    }
+
+    public async Task<bool> UnblockAsync(
+        Guid blockerMemberId,
+        Guid blockedMemberId,
+        CancellationToken cancellationToken = default)
+    {
+        var deleted = await dbContext.MemberMessageBlocks
+            .Where(b => b.BlockerMemberId == blockerMemberId && b.BlockedMemberId == blockedMemberId)
+            .ExecuteDeleteAsync(cancellationToken);
+        return deleted > 0;
+    }
+
     private bool IsSqliteDatabase() =>
         string.Equals(
             dbContext.Database.ProviderName,

@@ -387,6 +387,60 @@ public sealed class PrivateMessageServiceTests
         Assert.Single((await service.GetInboxAsync(alice.Id)).Items);
     }
 
+    [Fact]
+    public async Task Block_RejectsSelfAndMissingMember()
+    {
+        var (service, _, _, alice, _) = CreateSystem();
+
+        var self = await service.BlockAsync(alice.Id, alice.Id);
+        Assert.False(self.Succeeded);
+        Assert.Contains("yourself", self.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+
+        var missing = await service.BlockAsync(alice.Id, Guid.NewGuid());
+        Assert.False(missing.Succeeded);
+        Assert.Contains("not found", missing.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Block_StopsBlockedUserFromComposingAndReplying_WithGenericError()
+    {
+        var (service, _, _, alice, bob) = CreateSystem();
+        var created = await service.ComposeAsync(alice.Id, bob.Id, "Hello");
+        var conversationId = created.ConversationId!.Value;
+
+        Assert.True((await service.BlockAsync(alice.Id, bob.Id)).Succeeded);
+        Assert.True(await service.HasBlockedAsync(alice.Id, bob.Id));
+        Assert.False(await service.CanMessageAsync(bob.Id, alice.Id));
+        Assert.False(await service.CanMessageAsync(alice.Id, bob.Id));
+
+        var bobCompose = await service.ComposeAsync(bob.Id, alice.Id, "Blocked compose");
+        Assert.False(bobCompose.Succeeded);
+        Assert.Equal(PrivateMessageService.UnableToSendMessage, bobCompose.ErrorMessage);
+
+        var bobReply = await service.ReplyAsync(conversationId, bob.Id, "Blocked reply");
+        Assert.False(bobReply.Succeeded);
+        Assert.Equal(PrivateMessageService.UnableToSendMessage, bobReply.ErrorMessage);
+
+        // Existing conversation remains visible for both participants.
+        Assert.Single((await service.GetInboxAsync(alice.Id)).Items);
+        Assert.Single((await service.GetInboxAsync(bob.Id)).Items);
+    }
+
+    [Fact]
+    public async Task Unblock_RestoresMessaging()
+    {
+        var (service, _, _, alice, bob) = CreateSystem();
+        Assert.True((await service.ComposeAsync(alice.Id, bob.Id, "Hello")).Succeeded);
+        Assert.True((await service.BlockAsync(alice.Id, bob.Id)).Succeeded);
+
+        Assert.True(await service.UnblockAsync(alice.Id, bob.Id));
+        Assert.False(await service.HasBlockedAsync(alice.Id, bob.Id));
+        Assert.True(await service.CanMessageAsync(bob.Id, alice.Id));
+
+        var restored = await service.ComposeAsync(bob.Id, alice.Id, "Back again");
+        Assert.True(restored.Succeeded);
+    }
+
     private static (
         PrivateMessageService Service,
         IMemberAccountRepository Members,

@@ -368,9 +368,97 @@ public sealed class PrivateMessageRoutesTests : IClassFixture<WebApplicationFact
         Assert.Contains("Profile Bob", html);
         Assert.Contains($"/messages/compose?to={bob.Id}", html);
         Assert.Contains(">Message<", html);
+        Assert.Contains(">Block<", html);
 
         var selfHtml = await aliceClient.GetStringAsync($"/members/{alice.Id}");
         Assert.DoesNotContain($"/messages/compose?to={alice.Id}", selfHtml);
+        Assert.DoesNotContain(">Block<", selfHtml);
+    }
+
+    [Fact]
+    public async Task Block_FromProfile_StopsMessaging_AndUnblockRestores()
+    {
+        var (aliceClient, alice) = await CreateMemberAsync("pm-block-profile-alice@example.com", "Block Profile Alice");
+        var (bobClient, bob) = await CreateMemberAsync("pm-block-profile-bob@example.com", "Block Profile Bob");
+        var service = factory.Services.GetRequiredService<PrivateMessageService>();
+        Assert.True((await service.ComposeAsync(alice.Id, bob.Id, "Hello")).Succeeded);
+
+        var profileHtml = await aliceClient.GetStringAsync($"/members/{bob.Id}");
+        var blockResponse = await aliceClient.PostAsync(
+            $"/members/{bob.Id}?handler=Block",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(profileHtml),
+            }));
+        Assert.Equal(HttpStatusCode.Redirect, blockResponse.StatusCode);
+
+        var aliceProfileAfter = await aliceClient.GetStringAsync($"/members/{bob.Id}");
+        Assert.Contains("Member blocked", aliceProfileAfter);
+        Assert.Contains(">Unblock<", aliceProfileAfter);
+        Assert.DoesNotContain($"/messages/compose?to={bob.Id}", aliceProfileAfter);
+
+        var bobCompose = await service.ComposeAsync(bob.Id, alice.Id, "Should fail");
+        Assert.False(bobCompose.Succeeded);
+        Assert.Equal(PrivateMessageService.UnableToSendMessage, bobCompose.ErrorMessage);
+
+        // Bob never sees an explicit "you are blocked" message on the profile.
+        var bobView = await bobClient.GetStringAsync($"/members/{alice.Id}");
+        Assert.DoesNotContain("you are blocked", bobView, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Member blocked", bobView, StringComparison.OrdinalIgnoreCase);
+
+        var unblockResponse = await aliceClient.PostAsync(
+            $"/members/{bob.Id}?handler=Unblock",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(aliceProfileAfter),
+            }));
+        Assert.Equal(HttpStatusCode.Redirect, unblockResponse.StatusCode);
+
+        var aliceProfileRestored = await aliceClient.GetStringAsync($"/members/{bob.Id}");
+        Assert.Contains("Member unblocked", aliceProfileRestored);
+        Assert.Contains($"/messages/compose?to={bob.Id}", aliceProfileRestored);
+        Assert.True((await service.ComposeAsync(bob.Id, alice.Id, "Allowed again")).Succeeded);
+    }
+
+    [Fact]
+    public async Task Block_FromConversation_KeepsThreadVisible_AndBlocksReply()
+    {
+        var (aliceClient, alice) = await CreateMemberAsync("pm-block-conv-alice@example.com", "Block Conv Alice");
+        var (bobClient, bob) = await CreateMemberAsync("pm-block-conv-bob@example.com", "Block Conv Bob");
+        var service = factory.Services.GetRequiredService<PrivateMessageService>();
+        var created = await service.ComposeAsync(alice.Id, bob.Id, "Hello there");
+        var conversationId = created.ConversationId!.Value;
+
+        var conversationHtml = await aliceClient.GetStringAsync($"/messages/{conversationId}");
+        Assert.Contains("Block Block Conv Bob", conversationHtml);
+
+        var blockResponse = await aliceClient.PostAsync(
+            $"/messages/{conversationId}?handler=Block",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(conversationHtml),
+            }));
+        Assert.Equal(HttpStatusCode.Redirect, blockResponse.StatusCode);
+
+        var aliceConversationAfter = await aliceClient.GetStringAsync($"/messages/{conversationId}");
+        Assert.Contains("Hello there", aliceConversationAfter);
+        Assert.Contains("Member blocked", aliceConversationAfter);
+        Assert.Contains("Unblock Block Conv Bob", aliceConversationAfter);
+
+        var bobConversation = await bobClient.GetStringAsync($"/messages/{conversationId}");
+        Assert.Contains("Hello there", bobConversation);
+
+        var replyResponse = await bobClient.PostAsync(
+            $"/messages/{conversationId}",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(bobConversation),
+                ["Input.Body"] = "Should fail",
+            }));
+        Assert.Equal(HttpStatusCode.OK, replyResponse.StatusCode);
+        var replyHtml = await replyResponse.Content.ReadAsStringAsync();
+        Assert.Contains(PrivateMessageService.UnableToSendMessage, replyHtml);
+        Assert.DoesNotContain("blocked", replyHtml, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

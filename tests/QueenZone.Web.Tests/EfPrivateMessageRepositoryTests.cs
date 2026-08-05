@@ -73,6 +73,34 @@ public sealed class EfPrivateMessageRepositoryTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task Block_Unblock_AndOtherParticipant_RoundTrip()
+    {
+        var created = await repository.SendNewOrExistingAsync(
+            aliceId,
+            bobId,
+            "Before block",
+            DateTimeOffset.Parse("2026-08-05T10:00:00Z"));
+        Assert.True(created.Succeeded);
+        var conversationId = created.ConversationId!.Value;
+
+        Assert.Equal(bobId, await repository.GetOtherParticipantIdAsync(conversationId, aliceId));
+        Assert.Null(await repository.GetOtherParticipantIdAsync(conversationId, carolId));
+
+        await repository.BlockAsync(aliceId, bobId, DateTimeOffset.Parse("2026-08-05T10:05:00Z"));
+        Assert.True(await repository.IsBlockedAsync(aliceId, bobId));
+        Assert.False(await repository.IsBlockedAsync(bobId, aliceId));
+        Assert.True(await repository.IsMessagingBlockedAsync(aliceId, bobId));
+
+        // Idempotent second block.
+        await repository.BlockAsync(aliceId, bobId, DateTimeOffset.Parse("2026-08-05T10:06:00Z"));
+        Assert.Equal(1, await dbContext.MemberMessageBlocks.CountAsync());
+
+        Assert.True(await repository.UnblockAsync(aliceId, bobId));
+        Assert.False(await repository.IsBlockedAsync(aliceId, bobId));
+        Assert.False(await repository.UnblockAsync(aliceId, bobId));
+    }
+
+    [Fact]
     public async Task UnreadCount_AndMarkRead_ArePerParticipant()
     {
         var result = await repository.SendNewOrExistingAsync(

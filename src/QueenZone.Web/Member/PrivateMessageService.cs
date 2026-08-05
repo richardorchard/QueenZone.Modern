@@ -7,6 +7,8 @@ public sealed class PrivateMessageService(
     IMemberAccountRepository memberAccountRepository,
     TimeProvider timeProvider)
 {
+    public const string UnableToSendMessage = "Unable to send message.";
+
     public Task<PrivateInboxPage> GetInboxAsync(
         Guid memberId,
         int page = 1,
@@ -73,6 +75,14 @@ public sealed class PrivateMessageService(
             return new PrivateMessageSendResult(false, null, "Recipient was not found.");
         }
 
+        if (await privateMessageRepository.IsMessagingBlockedAsync(
+                senderMemberId,
+                recipientMemberId,
+                cancellationToken))
+        {
+            return new PrivateMessageSendResult(false, null, UnableToSendMessage);
+        }
+
         return await privateMessageRepository.SendNewOrExistingAsync(
             senderMemberId,
             recipientMemberId,
@@ -97,6 +107,19 @@ public sealed class PrivateMessageService(
                 false,
                 null,
                 "You are not a participant in this conversation.");
+        }
+
+        var otherParticipantId = await privateMessageRepository.GetOtherParticipantIdAsync(
+            conversationId,
+            senderMemberId,
+            cancellationToken);
+        if (otherParticipantId is Guid other
+            && await privateMessageRepository.IsMessagingBlockedAsync(
+                senderMemberId,
+                other,
+                cancellationToken))
+        {
+            return new PrivateMessageSendResult(false, null, UnableToSendMessage);
         }
 
         return await privateMessageRepository.ReplyAsync(
@@ -132,6 +155,48 @@ public sealed class PrivateMessageService(
         CancellationToken cancellationToken = default) =>
         privateMessageRepository.RemoveConversationAsync(conversationId, memberId, cancellationToken);
 
+    public async Task<PrivateMessageBlockResult> BlockAsync(
+        Guid blockerMemberId,
+        Guid blockedMemberId,
+        CancellationToken cancellationToken = default)
+    {
+        if (blockerMemberId == blockedMemberId)
+        {
+            return new PrivateMessageBlockResult(false, "You cannot block yourself.");
+        }
+
+        var target = await memberAccountRepository.FindByIdAsync(blockedMemberId, cancellationToken);
+        if (target is null)
+        {
+            return new PrivateMessageBlockResult(false, "Member was not found.");
+        }
+
+        await privateMessageRepository.BlockAsync(
+            blockerMemberId,
+            blockedMemberId,
+            timeProvider.GetUtcNow(),
+            cancellationToken);
+        return new PrivateMessageBlockResult(true, null);
+    }
+
+    public Task<bool> UnblockAsync(
+        Guid blockerMemberId,
+        Guid blockedMemberId,
+        CancellationToken cancellationToken = default) =>
+        privateMessageRepository.UnblockAsync(blockerMemberId, blockedMemberId, cancellationToken);
+
+    public Task<bool> HasBlockedAsync(
+        Guid blockerMemberId,
+        Guid blockedMemberId,
+        CancellationToken cancellationToken = default) =>
+        privateMessageRepository.IsBlockedAsync(blockerMemberId, blockedMemberId, cancellationToken);
+
+    public Task<bool> IsMessagingBlockedAsync(
+        Guid memberA,
+        Guid memberB,
+        CancellationToken cancellationToken = default) =>
+        privateMessageRepository.IsMessagingBlockedAsync(memberA, memberB, cancellationToken);
+
     public Task<IReadOnlyList<MemberRecipientMatch>> SearchRecipientsAsync(
         Guid currentMemberId,
         string? query,
@@ -146,4 +211,20 @@ public sealed class PrivateMessageService(
         currentMemberId is Guid current
         && targetMemberId is Guid target
         && current != target;
+
+    public async Task<bool> CanMessageAsync(
+        Guid? currentMemberId,
+        Guid? targetMemberId,
+        CancellationToken cancellationToken = default)
+    {
+        if (!CanMessage(currentMemberId, targetMemberId))
+        {
+            return false;
+        }
+
+        return !await privateMessageRepository.IsMessagingBlockedAsync(
+            currentMemberId!.Value,
+            targetMemberId!.Value,
+            cancellationToken);
+    }
 }
