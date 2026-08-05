@@ -57,12 +57,13 @@ public static class PublicOutputCachePolicies
 
     /// <summary>
     /// True when the request may use the public HTML output-cache policy.
-    /// Disabled in Testing so WebApplicationFactory suites do not share stale HTML across cases.
+    /// Disabled on automated-test hosts so WebApplicationFactory/E2E suites do not share stale
+    /// HTML across cases.
     /// </summary>
     public static bool IsCacheablePublicHtmlRequest(HttpContext httpContext)
     {
         var environment = httpContext.RequestServices.GetService<IHostEnvironment>();
-        if (environment is not null && environment.IsEnvironment("Testing"))
+        if (environment is not null && QueenZoneEnvironments.IsAutomatedTestHost(environment))
         {
             return false;
         }

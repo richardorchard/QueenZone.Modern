@@ -6,7 +6,7 @@ namespace QueenZone.Web;
 public static class ResponseCompressionBootstrap
 {
     public static bool IsEnabled(IHostEnvironment environment) =>
-        !environment.IsDevelopment() && !environment.IsEnvironment("Testing");
+        !environment.IsDevelopment() && !QueenZoneEnvironments.IsAutomatedTestHost(environment);
 
     public static void ConfigureServices(IServiceCollection services)
     {

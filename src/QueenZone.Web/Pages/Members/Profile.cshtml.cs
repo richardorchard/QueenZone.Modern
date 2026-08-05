@@ -171,22 +171,8 @@ public sealed class ProfileModel(
             return directId;
         }
 
-        var memberCookie = await HttpContext.AuthenticateAsync(MemberAuthenticationSchemes.MembersCookie);
-        if (memberCookie.Succeeded)
-        {
-            return ForumMember.GetMemberId(memberCookie.Principal);
-        }
-
-        if (HttpContext.RequestServices.GetService<IHostEnvironment>()?.IsEnvironment("Testing") == true)
-        {
-            var testMember = await HttpContext.AuthenticateAsync(TestMemberAuthHandler.SchemeName);
-            if (testMember.Succeeded)
-            {
-                return ForumMember.GetMemberId(testMember.Principal);
-            }
-        }
-
-        return null;
+        var memberAuth = await HttpContext.AuthenticateMemberAsync();
+        return memberAuth.Succeeded ? ForumMember.GetMemberId(memberAuth.Principal) : null;
     }
 }
 

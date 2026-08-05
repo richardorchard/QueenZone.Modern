@@ -31,15 +31,16 @@ public static class AzureAdClientId
     }
 
     /// <summary>
-    /// Ensures non-Development/Testing hosts have a real Entra client id.
-    /// Development may omit it and use <see cref="TestAuthHandler"/> for local admin testing.
+    /// Ensures hosts outside Development and <see cref="QueenZoneEnvironments.UsesTestAuth"/> have
+    /// a real Entra client id. Development may omit it and use <see cref="TestAuthHandler"/> for
+    /// local admin testing.
     /// </summary>
     /// <exception cref="InvalidOperationException">
     /// Thrown when the environment requires Entra and the client id is missing or a placeholder.
     /// </exception>
     public static void EnsureConfiguredForEnvironment(IHostEnvironment environment, string? clientId)
     {
-        if (environment.IsDevelopment() || environment.IsEnvironment("Testing"))
+        if (environment.IsDevelopment() || QueenZoneEnvironments.UsesTestAuth(environment))
         {
             return;
         }
