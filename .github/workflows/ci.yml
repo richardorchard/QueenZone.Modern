@@ -687,12 +687,14 @@ jobs:
           cat e2e-app.log e2e-app.err.log 2>/dev/null || true
           exit 1
 
+      # Pin to Deterministic so nightly RealData fixtures never enter the merge gate
+      # (see #543 / epic #540). RealData is selected only by nightly / Run-E2E.ps1.
       - name: Run Playwright e2e tests
         env:
           E2E_BASE_URL: http://127.0.0.1:5099
           E2E_ADMIN_EMAIL: admin@test.local
           E2E_ARTIFACT_DIR: test-results/e2e
-        run: dotnet test tests/QueenZone.Web.E2E/QueenZone.Web.E2E.csproj --configuration Release --no-build
+        run: dotnet test tests/QueenZone.Web.E2E/QueenZone.Web.E2E.csproj --configuration Release --no-build --filter "TestCategory=Deterministic"
 
       - name: Stop app (Windows)
         if: always() && runner.os == 'Windows'
