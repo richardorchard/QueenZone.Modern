@@ -5,11 +5,14 @@ using QueenZone.Data.Entities;
 namespace QueenZone.Web.Tests;
 
 /// <summary>
-/// Opt-in SQL Express mirror probe for photo and article submission write lifecycles.
+/// Opt-in SQL Express mirror probe for photo and article submission write lifecycles,
+/// including photo-submission promotion into legacy <c>PIC_FILES_T</c>/<c>PIC_CAT_T</c>.
 /// </summary>
 [Collection(LiveDatabaseProbeCollection.Name)]
 public sealed class EfContentSubmissionLiveProbeTests
 {
+    private const string ProbeEditor = "photo-submission-probe@queenzone.local";
+
     [Fact]
     public async Task Photo_submission_create_and_review_status_when_enabled()
     {
@@ -54,7 +57,7 @@ public sealed class EfContentSubmissionLiveProbeTests
             var underReview = await repo.UpdateStatusAsync(
                 created.Id,
                 PhotoSubmissionStatus.UnderReview,
-                "photo-submission-probe@queenzone.local",
+                ProbeEditor,
                 "Mirror probe under review.",
                 null);
             Assert.NotNull(underReview);
@@ -63,7 +66,7 @@ public sealed class EfContentSubmissionLiveProbeTests
             var rejected = await repo.UpdateStatusAsync(
                 created.Id,
                 PhotoSubmissionStatus.Rejected,
-                "photo-submission-probe@queenzone.local",
+                ProbeEditor,
                 "Mirror probe rejection.",
                 "Rejected by disposable mirror probe.");
             Assert.NotNull(rejected);
@@ -71,7 +74,136 @@ public sealed class EfContentSubmissionLiveProbeTests
         }
         finally
         {
-            await CleanupPhotoAsync(connectionString, memberId, submissionId, marker);
+            await CleanupPhotoAsync(connectionString, memberId, submissionId, marker, promotedPicId: null);
+        }
+    }
+
+    /// <summary>
+    /// Self-seeds a pending photo submission, promotes it through the same repository
+    /// path as <c>PhotoSubmissionPromotionService</c> (legacy <c>PIC_FILES_T</c> insert +
+    /// submission <c>PromoteAsync</c>), asserts a visible gallery row joins
+    /// <c>PIC_CAT_T</c>, then deletes all probe rows. Blob copy is skipped — that is
+    /// covered by unit tests; this probe targets real SQL Server column types.
+    /// </summary>
+    [Fact]
+    public async Task Photo_submission_promotion_writes_visible_pic_files_row_when_enabled()
+    {
+        if (!IsProbeEnabled(out var connectionString))
+        {
+            return;
+        }
+
+        var uniqueSuffix = DateTime.UtcNow.ToString("yyyyMMddHHmmssfff", System.Globalization.CultureInfo.InvariantCulture);
+        var memberId = Guid.NewGuid();
+        var marker = $"photo-submission-probe-{uniqueSuffix}";
+        var title = $"{marker} promotion title";
+        Guid? submissionId = null;
+        int? promotedPicId = null;
+
+        try
+        {
+            await using var context = CreateContext(connectionString);
+            context.MemberAccounts.Add(NewProbeMember(
+                memberId,
+                $"{marker}@queenzone.local",
+                $"Photo Submission Promotion Probe {uniqueSuffix}"));
+            await context.SaveChangesAsync();
+
+            var submissionRepo = new EfPhotoSubmissionRepository(context);
+            var adminPhotoRepo = new EfAdminPhotoRepository(context);
+
+            var categories = await adminPhotoRepo.GetCategoriesAsync();
+            Assert.NotEmpty(categories);
+            var category = categories[0];
+            Assert.True(category.CatId > 0);
+            Assert.False(string.IsNullOrWhiteSpace(category.Name));
+
+            var created = await submissionRepo.CreateAsync(new NewPhotoSubmission(
+                memberId,
+                title,
+                "Disposable mirror photo submission promotion probe.",
+                category.Name,
+                1986,
+                new DateOnly(1986, 7, 12),
+                $"probe/{marker}/original.jpg",
+                $"probe/{marker}/web.webp",
+                $"probe/{marker}/thumb.webp",
+                "probe.webp",
+                2048,
+                "image/webp",
+                800,
+                600));
+            submissionId = created.Id;
+            Assert.Equal(PhotoSubmissionStatus.Pending, created.Status);
+            Assert.Null(created.PromotedPicId);
+
+            // Mirrors PhotoSubmissionPromotionService.PromoteCoreAsync without blob I/O.
+            var stem = Guid.NewGuid().ToString("N");
+            var originalFileName = stem + ".webp";
+            var thumbFileName = stem + "_t.webp";
+            var legacyUrl = PhotoLegacyPath.BuildLegacyPath(category.Name, originalFileName);
+            var legacyThumbUrl = PhotoLegacyPath.BuildLegacyPath(category.Name, thumbFileName);
+            const int thumbSize = 400;
+
+            promotedPicId = await adminPhotoRepo.CreateAsync(
+                new AdminPhotoCreateRequest(
+                    category.CatId,
+                    created.Title,
+                    Keywords: null,
+                    created.ApproximateYear ?? DateTime.UtcNow.Year,
+                    created.ApproximateDate?.ToDateTime(TimeOnly.MinValue) ?? DateTime.UtcNow,
+                    IsVisible: true,
+                    legacyUrl,
+                    legacyThumbUrl,
+                    thumbSize,
+                    thumbSize,
+                    created.ImageWidthPx ?? 0,
+                    created.ImageHeightPx ?? 0),
+                ProbeEditor);
+
+            var promoted = await submissionRepo.PromoteAsync(
+                created.Id,
+                promotedPicId.Value,
+                category.Name,
+                ProbeEditor,
+                "Mirror promotion probe notes.");
+            Assert.NotNull(promoted);
+            Assert.Equal(PhotoSubmissionStatus.Approved, promoted.Status);
+            Assert.Equal(promotedPicId.Value, promoted.PromotedPicId);
+            Assert.Equal(category.Name, promoted.ApprovedCategory);
+
+            var publicRow = await adminPhotoRepo.GetByIdAsync(promotedPicId.Value);
+            Assert.NotNull(publicRow);
+            Assert.Equal(promotedPicId.Value, publicRow.PicId);
+            Assert.Equal(category.CatId, publicRow.CatId);
+            Assert.Equal(category.Name, publicRow.CategoryName);
+            Assert.Equal(title, publicRow.Title);
+            Assert.True(publicRow.IsVisible);
+            Assert.Equal(legacyUrl, publicRow.LegacyUrl);
+            Assert.Equal(legacyThumbUrl, publicRow.LegacyThumbUrl);
+            Assert.Equal(1986, publicRow.Year);
+            Assert.Equal(800, publicRow.PictureWidth);
+            Assert.Equal(600, publicRow.PictureHeight);
+
+            // Direct join proof that PIC_FILES_T + PIC_CAT_T materialize on real SQL Server.
+            var joinCount = await context.Database
+                .SqlQueryRaw<int>(
+                    """
+                    SELECT CAST(COUNT(*) AS int) AS [Value]
+                    FROM dbo.PIC_FILES_T p
+                    INNER JOIN dbo.PIC_CAT_T c ON c.cat_id = p.Cat_ID
+                    WHERE p.PIC_ID = {0}
+                      AND p.DISPLAY = 1
+                      AND c.cat_id = {1}
+                    """,
+                    promotedPicId.Value,
+                    category.CatId)
+                .SingleAsync();
+            Assert.Equal(1, joinCount);
+        }
+        finally
+        {
+            await CleanupPhotoAsync(connectionString, memberId, submissionId, marker, promotedPicId);
         }
     }
 
@@ -160,9 +292,43 @@ public sealed class EfContentSubmissionLiveProbeTests
         string connectionString,
         Guid memberId,
         Guid? submissionId,
-        string marker)
+        string marker,
+        int? promotedPicId)
     {
         await using var cleanup = CreateContext(connectionString);
+
+        if (promotedPicId is int picId)
+        {
+            // Prefer raw cleanup over DeleteAsync so we do not leave an extra audit row
+            // if the PIC row is already gone.
+            await cleanup.Database.ExecuteSqlRawAsync(
+                """
+                DELETE FROM dbo.PIC_FILES_T
+                WHERE PIC_ID = {0}
+                   OR Name LIKE {1}
+                """,
+                picId,
+                marker + "%");
+
+            await cleanup.PhotoAdminAuditLogs
+                .Where(a => a.PicId == picId || a.ActorEmail == ProbeEditor)
+                .ExecuteDeleteAsync();
+        }
+        else
+        {
+            // Status-only probe never touches PIC_FILES_T; still scrub probe-named leftovers.
+            await cleanup.Database.ExecuteSqlRawAsync(
+                """
+                DELETE FROM dbo.PIC_FILES_T
+                WHERE Name LIKE {0}
+                """,
+                marker + "%");
+
+            await cleanup.PhotoAdminAuditLogs
+                .Where(a => a.ActorEmail == ProbeEditor)
+                .ExecuteDeleteAsync();
+        }
+
         if (submissionId is Guid id)
         {
             await cleanup.PhotoSubmissionAuditLogs
