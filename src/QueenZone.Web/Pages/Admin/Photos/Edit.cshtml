@@ -25,9 +25,25 @@
       </p>
     }
 
-    <p>
-      <img src="@photo.ThumbnailUrl" alt="" width="160" height="160" style="object-fit: cover;" />
-    </p>
+    <figure class="admin-photo-preview">
+      <a href="@photo.ImageUrl" target="_blank" rel="noopener">
+        <img src="@photo.ImageUrl" alt="@photo.Title" />
+      </a>
+      <figcaption class="admin-photo-preview__meta">
+        @if (photo.PictureWidth > 0 && photo.PictureHeight > 0)
+        {
+          <text>Full image: @photo.PictureWidth &times; @photo.PictureHeight</text>
+        }
+        else
+        {
+          <text>Full image dimensions unavailable</text>
+        }
+        @if (photo.ThumbWidth > 0 && photo.ThumbHeight > 0)
+        {
+          <text> · Thumbnail: @photo.ThumbWidth &times; @photo.ThumbHeight</text>
+        }
+      </figcaption>
+    </figure>
 
     <form class="admin-form" method="post" action="/admin/photos/@photo.PicId/save" enctype="multipart/form-data">
       <input type="hidden" name="@AdminPhotosPageModel.AntiforgeryTokenFieldName" value="@antiforgeryToken" />

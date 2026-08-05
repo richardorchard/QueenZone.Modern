@@ -122,12 +122,14 @@ $env:RUN_FORUM_WRITE_PROBE = "true"
 powershell -File .\scripts\Probe-ForumWrites.ps1
 ```
 
-When a change touches photo or article submissions, prefer:
+When a change touches photo or article submissions, or photo-submission promotion into the public gallery (`PIC_FILES_T` / `PIC_CAT_T`), prefer:
 
 ```powershell
 $env:RUN_CONTENT_SUBMISSION_PROBE = "true"
 powershell -File .\scripts\Probe-ContentSubmissions.ps1
 ```
+
+`ConnectionStrings__QueenZoneLegacy` must point to `queenzone_legacy_sync` on the local SQL Express instance. The script refuses Azure SQL and remote servers. It runs `EfContentSubmissionLiveProbeTests`: photo/article submission status transitions plus the self-cleaning photo-promotion probe (inserts a visible `PIC_FILES_T` row joined to a real `PIC_CAT_T` category via the same repository path as `PhotoSubmissionPromotionService`, then deletes probe rows). Report whether it was run or skipped.
 
 When a change touches member account create or external logins, prefer:
 
