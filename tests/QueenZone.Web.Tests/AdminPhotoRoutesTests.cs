@@ -73,6 +73,9 @@ public sealed class AdminPhotoRoutesTests : IClassFixture<WebApplicationFactory<
         var editBody = await editPage.Content.ReadAsStringAsync();
         Assert.Contains("Route upload photo", editBody);
         Assert.Contains("Hide from gallery", editBody);
+        Assert.Contains("admin-photo-preview", editBody);
+        Assert.Contains("Full image: 320 &times; 240", editBody);
+        Assert.DoesNotContain("object-fit: cover", editBody);
     }
 
     [Fact]
