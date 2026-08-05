@@ -23,6 +23,21 @@ if (builder.Environment.IsDevelopment())
 }
 else if (QueenZoneEnvironments.IsAutomatedTestHost(builder.Environment))
 {
+    if (builder.Environment.IsEnvironment(QueenZoneEnvironments.E2E))
+    {
+        // appsettings.E2E.json ships the "admin@test.local" default; E2E_ADMIN_EMAIL lets the
+        // nightly runner override it with a single env var instead of the nested
+        // Admin__AllowedEmails__0 binding syntax.
+        var e2eAdminEmail = Environment.GetEnvironmentVariable("E2E_ADMIN_EMAIL");
+        if (!string.IsNullOrWhiteSpace(e2eAdminEmail))
+        {
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Admin:AllowedEmails:0"] = e2eAdminEmail,
+            });
+        }
+    }
+
     // Avoid DPAPI-backed key persistence under the service profile, which is slow
     // (and unnecessary for short-lived smoke test runs) on the self-hosted CI runner.
     builder.Services.AddDataProtection().UseEphemeralDataProtectionProvider();
