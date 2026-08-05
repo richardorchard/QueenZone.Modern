@@ -32,17 +32,32 @@ public sealed class SearchReindexBuilder(
 {
     private const int BatchSize = 200;
 
-    public async Task ReindexAllAsync(CancellationToken cancellationToken = default)
+    /// <param name="onContentTypeStarted">
+    /// Optional progress callback with the <see cref="SiteSearchContentType"/> key about to be replaced.
+    /// Used by the admin background job UI; ignored by startup seed and unit tests.
+    /// </param>
+    public async Task ReindexAllAsync(
+        CancellationToken cancellationToken = default,
+        Action<string>? onContentTypeStarted = null)
     {
-        await ReindexNewsAsync(cancellationToken);
-        await ReindexForumAsync(cancellationToken);
-        await ReindexArticlesAsync(cancellationToken);
-        await ReindexLegacyArticlesAsync(cancellationToken);
-        await ReindexBiographyAsync(cancellationToken);
-        await ReindexDiscographyAsync(cancellationToken);
-        await ReindexTimelineAsync(cancellationToken);
-        await ReindexFanPerformancesAsync(cancellationToken);
-        await ReindexFreddieTributeAsync(cancellationToken);
+        await RunContentTypeAsync(SiteSearchContentType.News, () => ReindexNewsAsync(cancellationToken), onContentTypeStarted);
+        await RunContentTypeAsync(SiteSearchContentType.Forum, () => ReindexForumAsync(cancellationToken), onContentTypeStarted);
+        await RunContentTypeAsync(SiteSearchContentType.Article, () => ReindexArticlesAsync(cancellationToken), onContentTypeStarted);
+        await RunContentTypeAsync(SiteSearchContentType.LegacyArticle, () => ReindexLegacyArticlesAsync(cancellationToken), onContentTypeStarted);
+        await RunContentTypeAsync(SiteSearchContentType.Biography, () => ReindexBiographyAsync(cancellationToken), onContentTypeStarted);
+        await RunContentTypeAsync(SiteSearchContentType.Discography, () => ReindexDiscographyAsync(cancellationToken), onContentTypeStarted);
+        await RunContentTypeAsync(SiteSearchContentType.Timeline, () => ReindexTimelineAsync(cancellationToken), onContentTypeStarted);
+        await RunContentTypeAsync(SiteSearchContentType.FanPerformance, () => ReindexFanPerformancesAsync(cancellationToken), onContentTypeStarted);
+        await RunContentTypeAsync(SiteSearchContentType.Tribute, () => ReindexFreddieTributeAsync(cancellationToken), onContentTypeStarted);
+    }
+
+    private static async Task RunContentTypeAsync(
+        string contentType,
+        Func<Task> reindex,
+        Action<string>? onContentTypeStarted)
+    {
+        onContentTypeStarted?.Invoke(contentType);
+        await reindex();
     }
 
     public async Task ReindexNewsAsync(CancellationToken cancellationToken = default)
