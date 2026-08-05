@@ -35,6 +35,18 @@ public sealed class QueenZoneEnvironmentsTests
     [InlineData("E2E", true)]
     [InlineData("Staging", false)]
     [InlineData("Production", false)]
+    public void UsesInMemoryBlobStorage_matches_expected(string environmentName, bool expected)
+    {
+        var env = new FakeHostEnvironment(environmentName);
+        Assert.Equal(expected, QueenZoneEnvironments.UsesInMemoryBlobStorage(env));
+    }
+
+    [Theory]
+    [InlineData("Development", false)]
+    [InlineData("Testing", true)]
+    [InlineData("E2E", true)]
+    [InlineData("Staging", false)]
+    [InlineData("Production", false)]
     public void IsAutomatedTestHost_matches_expected(string environmentName, bool expected)
     {
         var env = new FakeHostEnvironment(environmentName);
