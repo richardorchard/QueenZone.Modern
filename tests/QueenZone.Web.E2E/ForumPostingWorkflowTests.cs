@@ -5,6 +5,7 @@ namespace QueenZone.Web.E2E;
 
 [Parallelizable(ParallelScope.Self)]
 [TestFixture]
+[Category(E2ECategories.Deterministic)]
 public class ForumPostingWorkflowTests : E2EPageTest
 {
     private static readonly Regex NewTopicUrl = new(".*/forum/topic/\\d+/playwright-forum-topic-.*", RegexOptions.IgnoreCase);

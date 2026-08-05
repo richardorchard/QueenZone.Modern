@@ -5,6 +5,7 @@ namespace QueenZone.Web.E2E;
 
 [Parallelizable(ParallelScope.Self)]
 [TestFixture]
+[Category(E2ECategories.Deterministic)]
 public class AdminSmokeTests : E2EPageTest
 {
     private static string AdminEmail =>

@@ -91,7 +91,8 @@ $env:ASPNETCORE_CONTENTROOT = (Resolve-Path .\e2e-app).Path
 $env:E2E_BASE_URL = "http://127.0.0.1:5099"
 $env:E2E_ADMIN_EMAIL = "admin@test.local"
 $env:E2E_ARTIFACT_DIR = "test-results/e2e"
-dotnet test tests/QueenZone.Web.E2E/QueenZone.Web.E2E.csproj --configuration Release --no-build
+# Pin to Deterministic (same as the CI merge gate). RealData is the nightly suite.
+dotnet test tests/QueenZone.Web.E2E/QueenZone.Web.E2E.csproj --configuration Release --no-build --filter "TestCategory=Deterministic"
 ```
 
 Failed tests write screenshots (`.png`) and Playwright traces (`.zip`) under `test-results/e2e/`. Open a trace with:

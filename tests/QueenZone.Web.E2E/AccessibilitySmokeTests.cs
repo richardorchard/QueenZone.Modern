@@ -9,6 +9,8 @@ namespace QueenZone.Web.E2E;
 /// </summary>
 [Parallelizable(ParallelScope.Self)]
 [TestFixture]
+[Category(E2ECategories.Deterministic)]
+[Category(E2ECategories.ReadOnly)]
 public class AccessibilitySmokeTests : E2EPageTest
 {
     [Test]
