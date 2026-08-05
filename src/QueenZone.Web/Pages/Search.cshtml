@@ -12,7 +12,18 @@
 
   var exampleTags = new[] { "Bohemian Rhapsody", "Live Aid 1985", "Freddie Mercury", "Wembley 1986" };
 
-  var filterTypes = new[] { SiteSearchContentType.News, SiteSearchContentType.Forum, SiteSearchContentType.Article };
+  var filterTypes = new[]
+  {
+    SiteSearchContentType.News,
+    SiteSearchContentType.Forum,
+    SiteSearchContentType.Article,
+    SiteSearchContentType.LegacyArticle,
+    SiteSearchContentType.Biography,
+    SiteSearchContentType.Discography,
+    SiteSearchContentType.Timeline,
+    SiteSearchContentType.FanPerformance,
+    SiteSearchContentType.Tribute,
+  };
 
   string BuildSearchLink(string? type, int page = 1)
   {
