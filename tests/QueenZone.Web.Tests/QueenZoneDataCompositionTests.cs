@@ -14,13 +14,16 @@ public sealed class QueenZoneDataCompositionTests
     [Fact]
     public void AddQueenZoneData_E2E_with_mirror_connection_string_uses_real_legacy_data()
     {
+        // Resolving EfNewsRepository would eagerly probe the legacy schema over a real SQL
+        // connection (EfNewsRepository -> LegacyNewsSchema.HasSlugColumn), which isn't available
+        // in this unit test. Assert the DI registration instead of building the provider.
         var services = BuildServices(
             environmentName: QueenZoneEnvironments.E2E,
             connectionString: MirrorConnectionString);
 
-        var repository = services.BuildServiceProvider().GetRequiredService<INewsRepository>();
+        var registration = Assert.Single(services, sd => sd.ServiceType == typeof(INewsRepository));
 
-        Assert.IsType<EfNewsRepository>(repository);
+        Assert.Equal(typeof(EfNewsRepository), registration.ImplementationType);
     }
 
     [Fact]
