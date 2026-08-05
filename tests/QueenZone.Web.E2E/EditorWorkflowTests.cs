@@ -6,6 +6,7 @@ namespace QueenZone.Web.E2E;
 
 [Parallelizable(ParallelScope.Self)]
 [TestFixture]
+[Category(E2ECategories.Deterministic)]
 public class EditorWorkflowTests : E2EPageTest
 {
     // Must match SampleNewsDiscoveryData seed titles used by AddQueenZoneInMemoryData.
