@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using QueenZone.Data;
 using QueenZone.Storage;
 using SixLabors.ImageSharp;
@@ -5,11 +6,25 @@ using SixLabors.ImageSharp;
 namespace QueenZone.Web;
 
 /// <summary>
+/// Outcome of hard-deleting a gallery photo row and best-effort CDN blob cleanup.
+/// </summary>
+public sealed record AdminPhotoDeleteResult(
+    int PicId,
+    int BlobsAttempted,
+    int BlobsDeleted,
+    int BlobsFailed,
+    int BlobsUnresolved)
+{
+    public bool BlobCleanupSucceeded => BlobsFailed == 0 && BlobsUnresolved == 0;
+}
+
+/// <summary>
 /// Orchestrates gallery admin uploads, replacements, hard deletes, and WebP thumbnail regeneration.
 /// </summary>
 public sealed class AdminPhotoService(
     IAdminPhotoRepository adminPhotoRepository,
-    IGalleryPhotoBlobService galleryPhotoBlobService)
+    IGalleryPhotoBlobService galleryPhotoBlobService,
+    ILogger<AdminPhotoService> logger)
 {
     public async Task<int> CreateAsync(
         IFormFile file,
@@ -145,7 +160,7 @@ public sealed class AdminPhotoService(
         }
     }
 
-    public async Task DeleteAsync(
+    public async Task<AdminPhotoDeleteResult> DeleteAsync(
         int picId,
         string editorEmail,
         CancellationToken cancellationToken = default)
@@ -153,21 +168,37 @@ public sealed class AdminPhotoService(
         var existing = await adminPhotoRepository.GetByIdAsync(picId, cancellationToken)
             ?? throw new InvalidOperationException($"Photo {picId} was not found.");
 
-        var blobLocations = ResolveBlobLocations(existing);
+        var (blobLocations, unresolvedCount) = ResolveBlobLocations(existing, picId);
 
         await adminPhotoRepository.DeleteAsync(picId, editorEmail, cancellationToken);
 
+        var deletedCount = 0;
+        var failedCount = 0;
         foreach (var (container, blobName) in blobLocations)
         {
             try
             {
                 await galleryPhotoBlobService.DeleteAsync(container, blobName, cancellationToken);
+                deletedCount++;
             }
-            catch
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                // Best-effort cleanup after the database row is already gone.
+                failedCount++;
+                logger.LogWarning(
+                    ex,
+                    "Gallery blob cleanup failed for photo {PicId} ({Container}/{BlobName})",
+                    picId,
+                    container,
+                    blobName);
             }
         }
+
+        return new AdminPhotoDeleteResult(
+            picId,
+            BlobsAttempted: blobLocations.Count,
+            BlobsDeleted: deletedCount,
+            BlobsFailed: failedCount,
+            BlobsUnresolved: unresolvedCount);
     }
 
     public async Task RegenerateThumbnailAsync(
@@ -227,12 +258,15 @@ public sealed class AdminPhotoService(
         };
     }
 
-    private static List<(string Container, string BlobName)> ResolveBlobLocations(AdminPhotoItem photo)
+    private (List<(string Container, string BlobName)> Locations, int UnresolvedCount) ResolveBlobLocations(
+        AdminPhotoItem photo,
+        int picId)
     {
         var locations = new List<(string Container, string BlobName)>(capacity: 2);
+        var unresolvedCount = 0;
         TryAdd(photo.LegacyUrl);
         TryAdd(photo.LegacyThumbUrl);
-        return locations;
+        return (locations, unresolvedCount);
 
         void TryAdd(string? legacyPath)
         {
@@ -245,7 +279,14 @@ public sealed class AdminPhotoService(
             if (PhotoImageUrl.TryParseBlobLocation(blobUrl, out var container, out var blobName))
             {
                 locations.Add((container, blobName));
+                return;
             }
+
+            unresolvedCount++;
+            logger.LogWarning(
+                "Could not resolve gallery blob location for photo {PicId} path {LegacyPath}",
+                picId,
+                legacyPath);
         }
     }
 }

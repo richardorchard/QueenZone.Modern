@@ -266,10 +266,19 @@ public sealed class ActionModel(
     {
         try
         {
-            await adminPhotoService.DeleteAsync(id, EditorEmail, cancellationToken);
+            var result = await adminPhotoService.DeleteAsync(id, EditorEmail, cancellationToken);
             await InvalidatePublicPhotoCachesAsync(publicQueryCache, coreSitemapService, outputCacheStore, cancellationToken);
-            TempData[MessageKey] = $"Deleted photo #{id} and associated gallery blobs.";
-            TempData[MessageKindKey] = "success";
+            if (result.BlobCleanupSucceeded)
+            {
+                TempData[MessageKey] = $"Deleted photo #{id} and associated gallery blobs.";
+                TempData[MessageKindKey] = "success";
+            }
+            else
+            {
+                TempData[MessageKey] =
+                    $"Deleted photo #{id}. Blob cleanup incomplete — check logs.";
+                TempData[MessageKindKey] = "error";
+            }
         }
         catch (InvalidOperationException ex)
         {
