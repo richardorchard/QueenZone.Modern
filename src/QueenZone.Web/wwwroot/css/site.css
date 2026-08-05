@@ -2322,6 +2322,32 @@ a.qz-forum-post__author-link:focus-visible {
   max-width: var(--container-text);
 }
 
+.admin-photo-preview {
+  margin: 0 0 1.25rem;
+}
+
+.admin-photo-preview a {
+  display: inline-block;
+  line-height: 0;
+}
+
+.admin-photo-preview img {
+  display: block;
+  max-width: 320px;
+  max-height: 320px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  background: var(--surface-muted, #f6f6f6);
+}
+
+.admin-photo-preview__meta {
+  margin: 0.4rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
 .admin-form-panel h1 {
   font-size: clamp(1.5rem, 2.5vw, 2rem);
   line-height: 1.2;
