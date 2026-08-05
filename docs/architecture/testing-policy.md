@@ -119,7 +119,7 @@ run locally on Windows after the read checks pass:
 | `EfAdminNewsRepositoryLegacyWriteProbeTests` | Windows `legacy-write-probes` via `Probe-AdminNewsLegacyWrites.ps1` |
 | `EfNewsSectionLiveProbeTests` `Admin_news_*` write Facts | Same script (rollback visibility + full lifecycle) |
 | `EfNewsDiscoveryPromotionLiveProbeTests` | Same script (self-seeds disposable candidate, promote inside rollback, then deletes seed) |
-| URL ingestion / private messaging / forum / content submission / member-account write probes | Dedicated Windows probe scripts |
+| URL ingestion / private messaging / forum / content submission (incl. photo promotion → `PIC_FILES_T`) / member-account write probes | Dedicated Windows probe scripts |
 
 Their scripts reject Azure SQL, remote servers, and databases other than `queenzone_legacy_sync`. A
 final marker scan fails the workflow if probe or leaked web-test residue remains. The optional full
@@ -161,7 +161,7 @@ For private messaging IDENTITY `SortKey` and conversation write-lock checks, use
 
 For modern forum thread/post writes (SQL Server sequences + read stats), use `scripts/Probe-ForumWrites.ps1` with `RUN_FORUM_WRITE_PROBE=true`.
 
-For photo and article submission lifecycles, use `scripts/Probe-ContentSubmissions.ps1` with `RUN_CONTENT_SUBMISSION_PROBE=true`.
+For photo and article submission lifecycles (including photo-submission promotion into legacy `PIC_FILES_T` / `PIC_CAT_T`), use `scripts/Probe-ContentSubmissions.ps1` with `RUN_CONTENT_SUBMISSION_PROBE=true`. The promotion Fact self-seeds a disposable submission, writes a visible gallery row through `EfAdminPhotoRepository.CreateAsync` + `EfPhotoSubmissionRepository.PromoteAsync` (the repository path used by `PhotoSubmissionPromotionService`, without blob copy), asserts the `PIC_FILES_T`/`PIC_CAT_T` join, and deletes probe rows.
 
 For member account create + external login, use `scripts/Probe-MemberAccounts.ps1` with `RUN_MEMBER_ACCOUNT_PROBE=true`.
 

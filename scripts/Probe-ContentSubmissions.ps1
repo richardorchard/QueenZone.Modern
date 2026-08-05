@@ -1,6 +1,12 @@
 # Runs opt-in photo and article submission write probes against the local SQL Express mirror.
 # Requires both ConnectionStrings__QueenZoneLegacy and RUN_CONTENT_SUBMISSION_PROBE=true.
 #
+# Covers:
+#   - Photo submission create + review status transitions
+#   - Photo submission promotion into legacy PIC_FILES_T / PIC_CAT_T
+#     (same repository path as PhotoSubmissionPromotionService, without blob copy)
+#   - Article submission draft / submit / reject
+#
 # Example:
 #   $env:ConnectionStrings__QueenZoneLegacy = "Server=localhost\SQLEXPRESS;Database=queenzone_legacy_sync;Integrated Security=True;TrustServerCertificate=True"
 #   $env:RUN_CONTENT_SUBMISSION_PROBE = "true"

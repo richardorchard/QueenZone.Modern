@@ -60,6 +60,7 @@ public sealed class EfLegacyProbeResidueTests
                 SELECT CAST(COUNT(*) AS int) AS [Value]
                 FROM dbo.PIC_FILES_T
                 WHERE Name IN ('Thumb regen photo', 'Route upload photo')
+                   OR Name LIKE 'photo-submission-probe-%'
                 """)
             .SingleAsync();
         Assert.Equal(0, legacyTestPhotoCount);
@@ -141,7 +142,8 @@ public sealed class EfLegacyProbeResidueTests
 
     private static IQueryable<PhotoAdminAuditLogEntity> PhotoAdminAuditResidueQuery(QueenZoneDbContext dbContext) =>
         dbContext.PhotoAdminAuditLogs.Where(audit =>
-            audit.ActorEmail == "admin@test.local");
+            audit.ActorEmail == "admin@test.local"
+            || audit.ActorEmail == "photo-submission-probe@queenzone.local");
 
     private static bool IsCheckEnabled(out string connectionString)
     {
