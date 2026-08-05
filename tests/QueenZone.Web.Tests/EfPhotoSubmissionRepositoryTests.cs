@@ -259,6 +259,55 @@ public sealed class EfPhotoSubmissionRepositoryTests : IAsyncDisposable
         Assert.Equal(500, underReview.RejectionReason!.Length);
     }
 
+    [Fact]
+    public async Task PromoteAsync_SetsApprovedStatusPromotedPicIdAndAudit()
+    {
+        var created = await repository.CreateAsync(NewSubmission(Guid.NewGuid(), "Promote me", "Queen"));
+
+        var promoted = await repository.PromoteAsync(
+            created.Id,
+            42,
+            "Queen",
+            "admin@test.local",
+            "Looks great");
+
+        Assert.Equal(PhotoSubmissionStatus.Approved, promoted!.Status);
+        Assert.Equal("Queen", promoted.ApprovedCategory);
+        Assert.Equal(42, promoted.PromotedPicId);
+        Assert.Equal("Looks great", promoted.ReviewNotes);
+
+        var log = Assert.Single(dbContext.PhotoSubmissionAuditLogs.Where(l => l.PhotoSubmissionId == created.Id
+            && l.Action == PhotoSubmissionStatus.Approved));
+        Assert.Contains("photo #42", log.Details);
+    }
+
+    [Fact]
+    public async Task PromoteAsync_ReturnsNull_WhenMissing()
+    {
+        var promoted = await repository.PromoteAsync(
+            Guid.NewGuid(),
+            1,
+            "Queen",
+            "admin@test.local",
+            null);
+        Assert.Null(promoted);
+    }
+
+    [Fact]
+    public async Task PromoteAsync_Throws_WhenTransitionNotAllowed()
+    {
+        var created = await repository.CreateAsync(NewSubmission(Guid.NewGuid(), "Already rejected", "Queen"));
+        await repository.UpdateStatusAsync(
+            created.Id,
+            PhotoSubmissionStatus.Rejected,
+            "admin@test.local",
+            null,
+            "Blurry");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            repository.PromoteAsync(created.Id, 1, "Queen", "admin@test.local", null));
+    }
+
     private NewPhotoSubmission NewSubmission(Guid? id, string title, string? category) =>
         new(
             memberId,
