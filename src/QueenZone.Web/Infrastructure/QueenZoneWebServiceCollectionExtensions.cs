@@ -221,7 +221,9 @@ public static class QueenZoneWebServiceCollectionExtensions
     {
         // WebApplicationFactory tests must never inherit a developer or CI shell's
         // production connection string. Opt-in live probes construct their SQL-backed
-        // repositories directly and do not use the Testing web host composition.
+        // repositories directly and do not use the Testing web host composition. E2E falls
+        // through to the real legacy data branch below, but only after E2EConnectionGuard
+        // confirms the connection string targets the disposable SQL Express mirror.
         services.AddScoped<Search.SearchReindexBuilder>();
         // In-process single-flight job for /admin/search (single-instance hosting).
         services.AddSingleton<Search.SearchReindexJobService>();
@@ -234,6 +236,11 @@ public static class QueenZoneWebServiceCollectionExtensions
         }
 
         var legacyConnectionString = configuration.GetConnectionString("QueenZoneLegacy");
+        if (environment.IsEnvironment(QueenZoneEnvironments.E2E))
+        {
+            E2EConnectionGuard.EnsureSafe(legacyConnectionString);
+        }
+
         if (!string.IsNullOrWhiteSpace(legacyConnectionString))
         {
             var forumDataOptions = configuration
@@ -268,7 +275,7 @@ public static class QueenZoneWebServiceCollectionExtensions
         }
 
         services.AddQueenZoneData(configuration, environment);
-        if (QueenZoneEnvironments.UsesInMemoryData(environment))
+        if (QueenZoneEnvironments.UsesInMemoryBlobStorage(environment))
         {
             services.AddQueenZoneInMemoryStorage(configuration);
         }

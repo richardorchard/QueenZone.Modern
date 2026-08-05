@@ -52,9 +52,9 @@ public static class AzureAdClientId
 
         throw new InvalidOperationException(
             "AzureAd:ClientId must be set to a real Microsoft Entra application (client) ID " +
-            "outside Development and Testing. " +
+            "outside Development, Testing, and E2E. " +
             "Header-based TestAuthHandler (X-Test-User-Email) is only available in Development " +
-            "when ClientId is empty, and in the Testing environment for automated tests. " +
+            "when ClientId is empty, and in the Testing/E2E environments for automated tests. " +
             "Configure AzureAd:ClientId (and related Entra settings) in App Service or " +
             "appsettings.Local.json for staging/production hosts.");
     }

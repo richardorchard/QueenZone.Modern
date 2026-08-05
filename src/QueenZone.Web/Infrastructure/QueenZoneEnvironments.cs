@@ -23,11 +23,21 @@ public static class QueenZoneEnvironments
 
     /// <summary>
     /// True only for the WebApplicationFactory <see cref="Testing"/> host, which uses in-memory
-    /// repositories and in-memory blob storage instead of the legacy SQL/blob backends. The
-    /// nightly E2E suite needs the real SQL mirror, so it must not match this predicate.
+    /// repositories instead of the legacy SQL backend. The nightly <see cref="E2E"/> suite needs
+    /// the real SQL mirror (guarded by <see cref="E2EConnectionGuard"/>), so it must not match
+    /// this predicate.
     /// </summary>
     public static bool UsesInMemoryData(IHostEnvironment environment) =>
         environment.IsEnvironment(Testing);
+
+    /// <summary>
+    /// True for hosts that must never write upload bytes to a real blob container: the
+    /// WebApplicationFactory <see cref="Testing"/> host and the nightly <see cref="E2E"/> suite.
+    /// E2E exercises real SQL rows and moderation state but keeps blob storage in-memory, so a
+    /// nightly run can never write junk objects into production containers.
+    /// </summary>
+    public static bool UsesInMemoryBlobStorage(IHostEnvironment environment) =>
+        environment.IsEnvironment(Testing) || environment.IsEnvironment(E2E);
 
     /// <summary>
     /// True for hosts running as an automated test suite (WebApplicationFactory or the nightly
