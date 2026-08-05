@@ -25,6 +25,7 @@ public sealed class AzureAdClientIdTests
     [Theory]
     [InlineData("Development")]
     [InlineData("Testing")]
+    [InlineData("E2E")]
     public void EnsureConfiguredForEnvironment_allows_empty_client_in_dev_and_testing(string environmentName)
     {
         var env = new FakeHostEnvironment(environmentName);
@@ -96,6 +97,34 @@ public sealed class AzureAdClientIdTests
         var scheme = await schemeProvider.GetSchemeAsync(TestAuthHandler.SchemeName);
         Assert.NotNull(scheme);
         Assert.Equal(typeof(TestAuthHandler), scheme!.HandlerType);
+    }
+
+    [Fact]
+    public async Task AddQueenZoneAuth_registers_test_member_scheme_in_e2e()
+    {
+        var configuration = new ConfigurationBuilder().Build();
+        var services = new ServiceCollection();
+        services.AddLogging();
+        var env = new FakeHostEnvironment("E2E");
+
+        services.AddQueenZoneAuth(configuration, env);
+        services.AddQueenZoneAuthorization(configuration, env);
+
+        await using var provider = services.BuildServiceProvider();
+        var schemeProvider = provider.GetRequiredService<Microsoft.AspNetCore.Authentication.IAuthenticationSchemeProvider>();
+
+        var testAuthScheme = await schemeProvider.GetSchemeAsync(TestAuthHandler.SchemeName);
+        Assert.NotNull(testAuthScheme);
+        Assert.Equal(typeof(TestAuthHandler), testAuthScheme!.HandlerType);
+
+        var testMemberScheme = await schemeProvider.GetSchemeAsync(TestMemberAuthHandler.SchemeName);
+        Assert.NotNull(testMemberScheme);
+        Assert.Equal(typeof(TestMemberAuthHandler), testMemberScheme!.HandlerType);
+
+        var authorizationOptions = provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<Microsoft.AspNetCore.Authorization.AuthorizationOptions>>().Value;
+        var memberPolicy = authorizationOptions.GetPolicy(MemberAuthenticationSchemes.MemberPolicy);
+        Assert.NotNull(memberPolicy);
+        Assert.Contains(TestMemberAuthHandler.SchemeName, memberPolicy!.AuthenticationSchemes);
     }
 
     [Theory]
