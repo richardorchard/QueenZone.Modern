@@ -525,8 +525,9 @@ jobs:
     # so steps below branch on `runner.os` to cover both. Both runners need
     # the .NET 10 SDK on PATH already (see "Verify .NET SDK" below); the
     # macOS runner additionally needs PowerShell 7 (`pwsh`, e.g. via
-    # `brew install --cask powershell`) for the Playwright install step,
-    # since that step runs Playwright's generated .ps1 installer script.
+    # `brew install --cask powershell`) because the job invokes
+    # scripts/Run-E2E.ps1 (publish/start/test/stop + Playwright's generated
+    # installer).
     #
     # This is a merge gate enforced by main's required status checks, not a
     # deploy gate — deploy.yml does not re-run e2e, so a deploy is never
@@ -538,8 +539,8 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      # If a previous run's "Stop app" step failed to terminate the real
-      # QueenZone.Web(.exe) child process (see that step's comment below), it
+      # If a previous run's stop logic failed to terminate the real
+      # QueenZone.Web(.exe) child process (see scripts/Run-E2E.ps1), it
       # is left running and (on Windows) holding its own exe file locked,
       # which makes actions/checkout's workspace clean fail with an EPERM
       # unlink error before any of our own steps even run. Clear out any
@@ -564,173 +565,14 @@ jobs:
       - name: Verify .NET SDK
         run: dotnet --version
 
-      # E2E does not ProjectReference Web — restore each graph separately and
-      # skip the solution's unit/integration test projects. Linux publish from
-      # the `build` job is not reusable here because the self-hosted runner
-      # needs output published for its own OS.
-      - name: Restore E2E tests and web app
-        run: |
-          dotnet restore tests/QueenZone.Web.E2E/QueenZone.Web.E2E.csproj
-          dotnet restore src/QueenZone.Web/QueenZone.Web.csproj
-
-      - name: Build E2E tests
-        run: dotnet build tests/QueenZone.Web.E2E/QueenZone.Web.E2E.csproj --configuration Release --no-restore
-
-      - name: Install Playwright browsers (Windows)
-        if: runner.os == 'Windows'
-        run: .\tests\QueenZone.Web.E2E\bin\Release\net10.0\playwright.ps1 install chromium
-
-      # Uses the same generated .ps1 installer as Windows (it matches the
-      # exact Playwright package/browser version used by the built test
-      # project — a separately-versioned CLI tool could drift out of sync),
-      # invoked via pwsh since macOS's default shell is bash.
-      - name: Install Playwright browsers (macOS)
-        if: runner.os == 'macOS'
-        shell: pwsh
-        run: ./tests/QueenZone.Web.E2E/bin/Release/net10.0/playwright.ps1 install chromium
-
-      - name: Publish web app
-        run: dotnet publish src/QueenZone.Web/QueenZone.Web.csproj --configuration Release --no-restore --output e2e-app
-
-      - name: Start app in background (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          # Start-Process makes the app a child of this step's process, which is
-          # tied to the runner's Windows Job Object and gets killed when this step
-          # exits. Launch via WMI instead so it survives into later steps.
-          $appDir = (Resolve-Path ".\e2e-app").Path
-          $exePath = Join-Path $appDir "QueenZone.Web.exe"
-          $logPath = Join-Path (Get-Location).Path "e2e-app.log"
-          $errPath = Join-Path (Get-Location).Path "e2e-app.err.log"
-          $cmdLine = "cmd.exe /c `"set ASPNETCORE_ENVIRONMENT=Testing&&set ASPNETCORE_URLS=http://127.0.0.1:5099&&set ASPNETCORE_CONTENTROOT=$appDir&&`"$exePath`" > `"$logPath`" 2> `"$errPath`"`""
-          $result = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = $cmdLine; CurrentDirectory = $appDir }
-          if ($result.ReturnValue -ne 0) {
-            throw "Failed to start app via WMI, return code $($result.ReturnValue)"
-          }
-          $cmdPid = $result.ProcessId
-          $cmdPid | Out-File -Encoding ascii e2e-app-cmd.pid
-
-          # $cmdPid is cmd.exe's PID, not QueenZone.Web.exe's. Find the real child
-          # so "Stop app" can target the actual listener.
-          $appPid = $cmdPid
-          for ($i = 1; $i -le 10; $i++) {
-            $child = Get-CimInstance Win32_Process -Filter "ParentProcessId=$cmdPid" -ErrorAction SilentlyContinue | Select-Object -First 1
-            if ($child) {
-              $appPid = $child.ProcessId
-              break
-            }
-            Start-Sleep -Milliseconds 500
-          }
-          $appPid | Out-File -Encoding ascii e2e-app.pid
-          Write-Host "Started app: cmd.exe PID $cmdPid, QueenZone.Web.exe PID $appPid"
-
-      - name: Start app in background (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          # Unlike Windows, a POSIX background process (`&`) survives past the
-          # end of this step without needing a WMI-style detach trick — it's
-          # simply re-parented, not tied to the step's own process tree. Launch
-          # the framework-dependent DLL through the dotnet executable already
-          # verified on PATH. The native app host only searches DOTNET_ROOT and
-          # standard install locations, so it cannot find SDKs installed in a
-          # user-local or tool-managed directory even when `dotnet` works.
-          APP_DIR="$(pwd)/e2e-app"
-          ASPNETCORE_ENVIRONMENT=Testing \
-          ASPNETCORE_URLS=http://127.0.0.1:5099 \
-          ASPNETCORE_CONTENTROOT="$APP_DIR" \
-          dotnet "$APP_DIR/QueenZone.Web.dll" > e2e-app.log 2> e2e-app.err.log &
-          echo $! > e2e-app.pid
-
-      - name: Wait for app to be ready (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          Write-Host "Waiting for web app..."
-          $appPid = Get-Content e2e-app.pid
-          for ($i = 1; $i -le 60; $i++) {
-            $proc = Get-Process -Id $appPid -ErrorAction SilentlyContinue
-            if (-not $proc) {
-              Write-Host "App process (PID $appPid) exited unexpectedly after $($i * 2)s"
-              break
-            }
-            try {
-              $response = Invoke-WebRequest -Uri "http://127.0.0.1:5099/health" -UseBasicParsing -TimeoutSec 2
-              if ($response.StatusCode -eq 200) {
-                Write-Host "App is up after $($i * 2)s"
-                exit 0
-              }
-            } catch {
-              Write-Host "Attempt ${i}: $($_.Exception.Message)"
-            }
-            Start-Sleep -Seconds 2
-          }
-          Write-Host "App failed to start in time. Process running: $([bool](Get-Process -Id $appPid -ErrorAction SilentlyContinue))"
-          Get-Content e2e-app.log -ErrorAction SilentlyContinue
-          Get-Content e2e-app.err.log -ErrorAction SilentlyContinue
-          exit 1
-
-      - name: Wait for app to be ready (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          echo "Waiting for web app..."
-          for i in $(seq 1 60); do
-            if ! kill -0 "$(cat e2e-app.pid)" 2>/dev/null; then
-              echo "App process exited unexpectedly after ${i}s"
-              break
-            fi
-            if curl -sf http://127.0.0.1:5099/health > /dev/null; then
-              echo "App is up after ${i}s"
-              exit 0
-            fi
-            sleep 1
-          done
-          echo "App failed to start in time"
-          cat e2e-app.log e2e-app.err.log 2>/dev/null || true
-          exit 1
-
-      # Pin to Deterministic so nightly RealData fixtures never enter the merge gate
-      # (see #543 / epic #540). RealData is selected only by nightly / Run-E2E.ps1.
+      # Publish → start → poll /health → Deterministic Playwright → stop lives in
+      # scripts/Run-E2E.ps1 (issue #544) so local on-demand runs and CI share one
+      # implementation. Pin Mode=Deterministic so nightly RealData fixtures never
+      # enter the merge gate (see #543 / epic #540).
+      # macOS needs pwsh for the script and for Playwright's generated installer.
       - name: Run Playwright e2e tests
-        env:
-          E2E_BASE_URL: http://127.0.0.1:5099
-          E2E_ADMIN_EMAIL: admin@test.local
-          E2E_ARTIFACT_DIR: test-results/e2e
-        run: dotnet test tests/QueenZone.Web.E2E/QueenZone.Web.E2E.csproj --configuration Release --no-build --filter "TestCategory=Deterministic"
-
-      - name: Stop app (Windows)
-        if: always() && runner.os == 'Windows'
-        run: |
-          if (Test-Path e2e-app.pid) {
-            Stop-Process -Id (Get-Content e2e-app.pid) -Force -ErrorAction SilentlyContinue
-          }
-          if (Test-Path e2e-app-cmd.pid) {
-            Stop-Process -Id (Get-Content e2e-app-cmd.pid) -Force -ErrorAction SilentlyContinue
-          }
-
-          # Belt-and-suspenders: "Start app in background" can fall back to
-          # cmd.exe's PID if its child-process lookup doesn't find the real
-          # QueenZone.Web.exe PID in time, which orphans it. An orphaned
-          # QueenZone.Web.exe keeps its own exe file locked, which makes the
-          # *next* run's checkout fail before any of that run's steps even
-          # execute. Kill by image name too, and confirm it actually exited
-          # (Stop-Process returning doesn't guarantee the OS has released the
-          # file handle yet) before finishing this step.
-          Get-Process -Name "QueenZone.Web" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-
-          for ($i = 1; $i -le 15; $i++) {
-            if (-not (Get-Process -Name "QueenZone.Web" -ErrorAction SilentlyContinue)) {
-              Write-Host "QueenZone.Web.exe confirmed stopped"
-              break
-            }
-            Start-Sleep -Milliseconds 500
-          }
-
-      - name: Stop app (macOS)
-        if: always() && runner.os == 'macOS'
-        run: |
-          if [ -f e2e-app.pid ]; then
-            kill "$(cat e2e-app.pid)" 2>/dev/null || true
-          fi
-          pkill -f QueenZone.Web 2>/dev/null || true
+        shell: pwsh
+        run: ./scripts/Run-E2E.ps1 -Mode Deterministic
 
       - name: Upload Playwright failure artifacts
         if: failure()

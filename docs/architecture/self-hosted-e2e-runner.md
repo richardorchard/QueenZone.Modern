@@ -76,24 +76,23 @@ A self-hosted runner executes code from pull requests on the machine. Because th
 
 The workflow also accepts `workflow_dispatch`, so you can trigger `e2e-test` (along with the rest of CI) on demand from the **Actions** tab, useful for checking that at least one matching runner is online after machine restarts or service updates.
 
-### Local run (against a published Testing app)
+### Local run
+
+Use `scripts/Run-E2E.ps1` (same path CI uses). It restores/builds, installs Chromium via the generated `playwright.ps1`, publishes the app, starts it, runs the suite, and stops the process — including stray-process cleanup so a failed run does not leave `QueenZone.Web` locking files.
 
 ```powershell
-dotnet build tests/QueenZone.Web.E2E/QueenZone.Web.E2E.csproj --configuration Release
-.\tests\QueenZone.Web.E2E\bin\Release\net10.0\playwright.ps1 install chromium
-dotnet publish src/QueenZone.Web/QueenZone.Web.csproj --configuration Release --output ./e2e-app
-# Terminal A:
-$env:ASPNETCORE_ENVIRONMENT = "Testing"
-$env:ASPNETCORE_URLS = "http://127.0.0.1:5099"
-$env:ASPNETCORE_CONTENTROOT = (Resolve-Path .\e2e-app).Path
-.\e2e-app\QueenZone.Web.exe
-# Terminal B:
-$env:E2E_BASE_URL = "http://127.0.0.1:5099"
-$env:E2E_ADMIN_EMAIL = "admin@test.local"
-$env:E2E_ARTIFACT_DIR = "test-results/e2e"
-# Pin to Deterministic (same as the CI merge gate). RealData is the nightly suite.
-dotnet test tests/QueenZone.Web.E2E/QueenZone.Web.E2E.csproj --configuration Release --no-build --filter "TestCategory=Deterministic"
+# Same as the CI merge gate (in-memory Testing host, Deterministic category):
+powershell -File ./scripts/Run-E2E.ps1 -Mode Deterministic
+
+# Nightly real-data suite against the SQL Express mirror (requires the connection string):
+$env:ConnectionStrings__QueenZoneLegacy = "Server=localhost\SQLEXPRESS;Database=queenzone_legacy_sync;Integrated Security=True;TrustServerCertificate=True"
+powershell -File ./scripts/Run-E2E.ps1 -Mode RealData
+
+# Read-only sweep against a deployed site (refuses localhost):
+powershell -File ./scripts/Run-E2E.ps1 -Mode LiveSite -BaseUrl https://www.queenzone.org
 ```
+
+On macOS, invoke with `pwsh` instead of `powershell`. Pass `-SkipAppStart` to attach to an app you already started at `-BaseUrl`.
 
 Failed tests write screenshots (`.png`) and Playwright traces (`.zip`) under `test-results/e2e/`. Open a trace with:
 
@@ -106,4 +105,4 @@ npx playwright show-trace test-results/e2e\<name>.zip
 - **Job stuck in "Waiting for a runner to pick up this job"**: neither matching runner is available. Confirm each runner is online in **Settings > Actions > Runners**, has the `e2e` label, and has its service running (`.\svc.cmd status` on Windows or `./svc.sh status` on macOS).
 - **Job fails immediately with a missing SDK/tool error**: re-check the prerequisites above; the self-hosted runner uses whatever is already on `PATH` on this machine, unlike GitHub-hosted runners which come preconfigured.
 - **Stale Chromium after a Playwright version bump**: remove the runner account's Playwright browser cache and let the next run re-download it (`%USERPROFILE%\AppData\Local\ms-playwright` on Windows; `~/Library/Caches/ms-playwright` on macOS).
-- **Checkout fails with `EPERM: operation not permitted, unlink ... QueenZone.Web.exe`**: a previous run's "Stop app" step failed to terminate the real `QueenZone.Web.exe` process (the child-process PID lookup in "Start app in background" can occasionally miss it), leaving it orphaned and holding its own exe file locked. The `e2e-test` job now kills any leftover `QueenZone.Web` process by image name both before checkout and at the end of the job, so this should self-heal on the next run. If it still happens, the orphaned process may be running with higher privileges than the runner's own session (this has happened when a run was started or affected by an elevated/admin process) — open an elevated PowerShell on this machine and run `Stop-Process -Name QueenZone.Web -Force`, then re-run the job.
+- **Checkout fails with `EPERM: operation not permitted, unlink ... QueenZone.Web.exe`**: a previous run failed to terminate the real `QueenZone.Web.exe` process (the child-process PID lookup during app start can occasionally miss it), leaving it orphaned and holding its own exe file locked. `scripts/Run-E2E.ps1` kills leftover `QueenZone.Web` processes by image name both before start and after stop, and the `e2e-test` job still sweeps before checkout, so this should self-heal on the next run. If it still happens, the orphaned process may be running with higher privileges than the runner's own session (this has happened when a run was started or affected by an elevated/admin process) — open an elevated PowerShell on this machine and run `Stop-Process -Name QueenZone.Web -Force`, then re-run the job.
