@@ -54,7 +54,7 @@
                maxlength="200"
                placeholder="Search news, articles and discussions..."
                autocomplete="off"
-               style="flex: 1; padding: 1rem 1.125rem; border: 1px solid var(--border-strong); border-radius: var(--radius-xs); font: var(--type-body);">
+               style="flex: 1; min-width: 0; padding: 1rem 1.125rem; border: 1px solid var(--border-strong); border-radius: var(--radius-xs); font: var(--type-body);">
         <button type="submit" class="qz-button" style="white-space: nowrap;">Search</button>
       </div>
       @if (!string.IsNullOrWhiteSpace(Model.ActiveContentType))
