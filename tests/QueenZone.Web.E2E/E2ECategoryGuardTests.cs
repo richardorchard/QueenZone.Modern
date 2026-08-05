@@ -70,19 +70,25 @@ public class E2ECategoryGuardTests
     }
 
     [Test]
-    public void RealDataFixturesAreNoneUntilPhase2()
+    public void RealDataFixturesArePresent()
     {
-        // Acceptance for #543: --filter TestCategory=RealData selects zero tests.
-        // Phase 2 issues (#545–#548) will add RealData fixtures; update this then.
+        // Acceptance for #545 (phase 2 of #543): --filter TestCategory=RealData now selects
+        // the sitemap sweep. Keep this list in sync as further phase-2 issues (#546-#548) land.
         var assembly = typeof(E2EPageTest).Assembly;
         var realData = assembly.GetTypes()
             .Where(t => t is { IsClass: true, IsAbstract: false, IsPublic: true })
             .Where(IsNUnitFixture)
             .Where(t => HasCategory(t, E2ECategories.RealData))
             .Select(t => t.Name)
+            .OrderBy(n => n, StringComparer.Ordinal)
             .ToList();
 
-        Assert.That(realData, Is.Empty);
+        var expected = new[]
+        {
+            nameof(SitemapPublicRouteSweepTests),
+        };
+
+        Assert.That(realData, Is.EqualTo(expected));
     }
 
 

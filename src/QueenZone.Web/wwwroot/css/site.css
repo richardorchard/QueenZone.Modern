@@ -1967,6 +1967,10 @@ a.qz-forum-post__author-link:focus-visible {
   margin-right: var(--space-2);
 }
 
+.qz-table-wrap {
+  overflow-x: auto;
+}
+
 .qz-table {
   width: 100%;
   border-collapse: collapse;
@@ -3067,6 +3071,7 @@ a.qz-forum-post__author-link:focus-visible {
 }
 
 .qz-lightbox__image {
+  min-width: 0;
   max-width: 100%;
   max-height: 72vh;
   object-fit: contain;

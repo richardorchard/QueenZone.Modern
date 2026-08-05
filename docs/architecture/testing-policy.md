@@ -199,6 +199,8 @@ Good targets (covered or expanding):
 - Admin news list and create-draft flow with `X-Test-User-Email` test auth in the `Testing` environment.
 - Editorial discovery promote → publish → public visibility journey.
 
+`SitemapPublicRouteSweepTests` (`[Category("RealData")]`, `[Category("ReadOnly")]`) is a nightly-only sweep: it discovers URLs at runtime from `/sitemap.xml` (sampling first/last/seeded-random per section, capped and logged for reproducibility), plus a fixed list of routes not in the sitemap, and asserts page *shape* rather than content — HTTP 200, a single non-empty `<h1>`, a single matching canonical link, no console errors, no horizontal overflow at 390px, and no unrendered HTML-encoding artifacts. It also checks the negative cases (unknown path → styled 404, stale slug → redirect) and runs the axe-core critical-violation check on one representative page per section. It performs no writes and passes with `E2E_READONLY=true`, so the live-site job can reuse it unchanged.
+
 Keep end-to-end tests small. They should prove critical user journeys and browser behavior, not duplicate all route integration tests.
 
 On failure, tests write screenshots and Playwright traces under `test-results/e2e/` (gitignored). CI uploads that folder as an artifact when the e2e job fails.

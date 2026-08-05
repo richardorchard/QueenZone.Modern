@@ -71,22 +71,24 @@
     }
     else
     {
-      <table class="qz-table">
-        <thead><tr><th>Thread</th><th>Board</th><th>Replies</th><th>Latest</th></tr></thead>
-        <tbody>
-          @foreach (var thread in Model.RecentThreads)
-          {
-            <tr>
-              <td><a href="@thread.DetailPath">@thread.Title</a></td>
-              <td><a href="@thread.CategoryPath">@thread.CategoryName</a></td>
-              <td>@thread.ReplyCount.ToString("N0")</td>
-              <td>
-                <time datetime="@thread.LastActivityAt.ToString("yyyy-MM-dd")">@thread.LastActivityAt.ToString("dd MMMM yyyy")</time>
-              </td>
-            </tr>
-          }
-        </tbody>
-      </table>
+      <div class="qz-table-wrap">
+        <table class="qz-table">
+          <thead><tr><th>Thread</th><th>Board</th><th>Replies</th><th>Latest</th></tr></thead>
+          <tbody>
+            @foreach (var thread in Model.RecentThreads)
+            {
+              <tr>
+                <td><a href="@thread.DetailPath">@thread.Title</a></td>
+                <td><a href="@thread.CategoryPath">@thread.CategoryName</a></td>
+                <td>@thread.ReplyCount.ToString("N0")</td>
+                <td>
+                  <time datetime="@thread.LastActivityAt.ToString("yyyy-MM-dd")">@thread.LastActivityAt.ToString("dd MMMM yyyy")</time>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
     }
   </div>
 </section>

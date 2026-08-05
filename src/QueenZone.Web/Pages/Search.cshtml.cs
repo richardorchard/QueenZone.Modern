@@ -29,6 +29,8 @@ public sealed class SearchModel(ISiteSearchService siteSearchService) : PageMode
 
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
+        ViewData["CanonicalPath"] = "/search";
+
         ActiveContentType = SiteSearchContentType.Normalize(TypeFilter);
 
         if (string.IsNullOrWhiteSpace(Query))
