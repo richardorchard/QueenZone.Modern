@@ -67,6 +67,10 @@ public sealed record PrivateMessageSendResult(
     Guid? ConversationId,
     string? ErrorMessage);
 
+public sealed record PrivateMessageBlockResult(
+    bool Succeeded,
+    string? ErrorMessage);
+
 public sealed record MemberRecipientMatch(
     Guid MemberId,
     string DisplayName);

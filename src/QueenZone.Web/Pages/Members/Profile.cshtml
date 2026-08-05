@@ -16,6 +16,11 @@
         <h2>@Model.Member.DisplayName</h2>
         <p class="qz-meta">Member since @Model.Member.CreatedAt.ToString("MMMM yyyy")</p>
 
+        @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+        {
+          <p class="qz-account-notice qz-account-notice--success" role="status">@Model.StatusMessage</p>
+        }
+
         @if (Model.CanMessage)
         {
           <p>
@@ -26,6 +31,24 @@
         {
           <p>
             <a class="qz-button qz-button--outline" href="/account/login?returnUrl=@Uri.EscapeDataString($"/messages/compose?to={Model.Member.Id}")">Sign in to message</a>
+          </p>
+        }
+
+        @if (Model.IsSignedIn && Model.CurrentMemberId != Model.Member.Id)
+        {
+          <p class="qz-messages-toolbar">
+            @if (Model.HasBlockedMember)
+            {
+              <form method="post" asp-page-handler="Unblock" class="qz-messages-toolbar__action">
+                <button class="qz-button qz-button--ghost" type="submit">Unblock</button>
+              </form>
+            }
+            else
+            {
+              <form method="post" asp-page-handler="Block" class="qz-messages-toolbar__action" onsubmit="return confirm('Block this member from sending you private messages?');">
+                <button class="qz-button qz-button--ghost" type="submit">Block</button>
+              </form>
+            }
           </p>
         }
       </div>

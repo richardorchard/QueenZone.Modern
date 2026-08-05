@@ -69,6 +69,8 @@ public sealed class QueenZoneDbContext : DbContext
 
     public DbSet<PrivateMessageEntity> PrivateMessages => Set<PrivateMessageEntity>();
 
+    public DbSet<MemberMessageBlockEntity> MemberMessageBlocks => Set<MemberMessageBlockEntity>();
+
     public DbSet<SearchDocumentEntity> SearchDocuments => Set<SearchDocumentEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -752,6 +754,31 @@ public sealed class QueenZoneDbContext : DbContext
             entity.HasOne(message => message.Sender)
                 .WithMany()
                 .HasForeignKey(message => message.SenderMemberId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<MemberMessageBlockEntity>(entity =>
+        {
+            entity.ToTable("MemberMessageBlocks");
+            entity.HasKey(block => block.Id);
+
+            entity.Property(block => block.CreatedAt).IsRequired();
+
+            entity.HasIndex(block => new { block.BlockerMemberId, block.BlockedMemberId })
+                .IsUnique()
+                .HasDatabaseName("IX_MemberMessageBlocks_Blocker_Blocked");
+
+            entity.HasIndex(block => block.BlockedMemberId)
+                .HasDatabaseName("IX_MemberMessageBlocks_Blocked");
+
+            entity.HasOne(block => block.Blocker)
+                .WithMany()
+                .HasForeignKey(block => block.BlockerMemberId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(block => block.Blocked)
+                .WithMany()
+                .HasForeignKey(block => block.BlockedMemberId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
     }

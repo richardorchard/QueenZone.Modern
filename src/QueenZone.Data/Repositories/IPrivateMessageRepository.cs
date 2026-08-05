@@ -91,4 +91,47 @@ public interface IPrivateMessageRepository
         Guid conversationId,
         Guid memberId,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns the other participant in a 1:1 conversation when <paramref name="memberId"/> is a
+    /// participant; otherwise null.
+    /// </summary>
+    Task<Guid?> GetOtherParticipantIdAsync(
+        Guid conversationId,
+        Guid memberId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// True when <paramref name="blockerMemberId"/> has blocked <paramref name="blockedMemberId"/>.
+    /// </summary>
+    Task<bool> IsBlockedAsync(
+        Guid blockerMemberId,
+        Guid blockedMemberId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// True when either member has blocked the other for private messaging.
+    /// </summary>
+    Task<bool> IsMessagingBlockedAsync(
+        Guid memberA,
+        Guid memberB,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Creates a block from <paramref name="blockerMemberId"/> to <paramref name="blockedMemberId"/>.
+    /// Idempotent when the block already exists. Caller must validate self-block and membership.
+    /// </summary>
+    Task BlockAsync(
+        Guid blockerMemberId,
+        Guid blockedMemberId,
+        DateTimeOffset blockedAt,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Removes a block. Returns false when no such block existed.
+    /// </summary>
+    Task<bool> UnblockAsync(
+        Guid blockerMemberId,
+        Guid blockedMemberId,
+        CancellationToken cancellationToken = default);
 }

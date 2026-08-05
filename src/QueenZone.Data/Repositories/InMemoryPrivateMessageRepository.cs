@@ -8,6 +8,7 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
     private readonly List<PrivateConversationEntity> conversations = [];
     private readonly List<PrivateConversationParticipantEntity> participants = [];
     private readonly List<PrivateMessageEntity> messages = [];
+    private readonly List<MemberMessageBlockEntity> blocks = [];
     private readonly Func<Guid, MemberAccount?>? resolveMember;
     private long nextSortKey = 1;
 
@@ -412,6 +413,89 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
 
             participant.IsRemoved = true;
             return Task.FromResult(true);
+        }
+    }
+
+    public Task<Guid?> GetOtherParticipantIdAsync(
+        Guid conversationId,
+        Guid memberId,
+        CancellationToken cancellationToken = default)
+    {
+        lock (sync)
+        {
+            var conversation = conversations.SingleOrDefault(c => c.Id == conversationId);
+            if (conversation is null
+                || (conversation.MemberLowId != memberId && conversation.MemberHighId != memberId))
+            {
+                return Task.FromResult<Guid?>(null);
+            }
+
+            return Task.FromResult<Guid?>(
+                conversation.MemberLowId == memberId
+                    ? conversation.MemberHighId
+                    : conversation.MemberLowId);
+        }
+    }
+
+    public Task<bool> IsBlockedAsync(
+        Guid blockerMemberId,
+        Guid blockedMemberId,
+        CancellationToken cancellationToken = default)
+    {
+        lock (sync)
+        {
+            return Task.FromResult(blocks.Any(
+                b => b.BlockerMemberId == blockerMemberId && b.BlockedMemberId == blockedMemberId));
+        }
+    }
+
+    public Task<bool> IsMessagingBlockedAsync(
+        Guid memberA,
+        Guid memberB,
+        CancellationToken cancellationToken = default)
+    {
+        lock (sync)
+        {
+            return Task.FromResult(blocks.Any(
+                b => (b.BlockerMemberId == memberA && b.BlockedMemberId == memberB)
+                    || (b.BlockerMemberId == memberB && b.BlockedMemberId == memberA)));
+        }
+    }
+
+    public Task BlockAsync(
+        Guid blockerMemberId,
+        Guid blockedMemberId,
+        DateTimeOffset blockedAt,
+        CancellationToken cancellationToken = default)
+    {
+        lock (sync)
+        {
+            if (blocks.Any(b => b.BlockerMemberId == blockerMemberId && b.BlockedMemberId == blockedMemberId))
+            {
+                return Task.CompletedTask;
+            }
+
+            blocks.Add(new MemberMessageBlockEntity
+            {
+                Id = Guid.NewGuid(),
+                BlockerMemberId = blockerMemberId,
+                BlockedMemberId = blockedMemberId,
+                CreatedAt = blockedAt,
+            });
+            return Task.CompletedTask;
+        }
+    }
+
+    public Task<bool> UnblockAsync(
+        Guid blockerMemberId,
+        Guid blockedMemberId,
+        CancellationToken cancellationToken = default)
+    {
+        lock (sync)
+        {
+            var removed = blocks.RemoveAll(
+                b => b.BlockerMemberId == blockerMemberId && b.BlockedMemberId == blockedMemberId);
+            return Task.FromResult(removed > 0);
         }
     }
 
