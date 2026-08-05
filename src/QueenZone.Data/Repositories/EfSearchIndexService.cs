@@ -55,23 +55,39 @@ public sealed class EfSearchIndexService(QueenZoneDbContext dbContext) : ISearch
         ArgumentException.ThrowIfNullOrWhiteSpace(contentType);
         ArgumentNullException.ThrowIfNull(documents);
 
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
-
-        await dbContext.SearchDocuments
-            .Where(d => d.ContentType == contentType)
-            .ExecuteDeleteAsync(cancellationToken);
-
-        var now = DateTimeOffset.UtcNow;
-        foreach (var document in documents)
+        // Explicit transactions under EnableRetryOnFailure must run inside the execution strategy
+        // so Azure SQL transient failures can retry the whole unit of work (see QueenZoneSqlServerOptions).
+        // Without this wrapper, ExecuteDelete/SaveChanges under a user-initiated transaction throws
+        // InvalidOperationException ("does not support user-initiated transactions") and the admin
+        // /admin/search reindex fails immediately — observed in production App Insights 2026-08-04.
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
         {
-            document.Id = document.Id == Guid.Empty ? Guid.NewGuid() : document.Id;
-            document.ContentType = contentType;
-            document.IndexedAt = now;
-            dbContext.SearchDocuments.Add(document);
-        }
+            // Detach any leftover SearchDocument entries so a retry after a failed SaveChanges
+            // can re-Add the same document instances without "already tracked" errors.
+            foreach (var entry in dbContext.ChangeTracker.Entries<SearchDocumentEntity>().ToList())
+            {
+                entry.State = EntityState.Detached;
+            }
 
-        await dbContext.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+            await dbContext.SearchDocuments
+                .Where(d => d.ContentType == contentType)
+                .ExecuteDeleteAsync(cancellationToken);
+
+            var now = DateTimeOffset.UtcNow;
+            foreach (var document in documents)
+            {
+                document.Id = document.Id == Guid.Empty ? Guid.NewGuid() : document.Id;
+                document.ContentType = contentType;
+                document.IndexedAt = now;
+                dbContext.SearchDocuments.Add(document);
+            }
+
+            await dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        });
     }
 
     public async Task<IReadOnlyDictionary<string, int>> GetContentTypeCountsAsync(CancellationToken cancellationToken = default) =>
