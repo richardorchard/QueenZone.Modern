@@ -6,15 +6,14 @@ using QueenZone.Web.Search;
 namespace QueenZone.Web.Pages.Admin.Search;
 
 /// <summary>
-/// Lets an admin manually trigger a full <c>SearchDocument</c> reindex. Standing in for the
-/// scheduled reindex worker (tracked separately) — without it, an admin has no way to backfill
-/// the search index after deploying, or to recover if a write-path's best-effort immediate
-/// index hook silently failed.
+/// Lets an admin manually trigger a full <c>SearchDocument</c> reindex. The rebuild runs in a
+/// single-flight background job so the HTTP request returns immediately — reverse-proxy timeouts
+/// previously aborted mid-sequence (often after News only). Standing in for a durable scheduled
+/// worker tracked separately.
 /// </summary>
 public sealed class IndexModel(
     ISearchIndexService searchIndexService,
-    SearchReindexBuilder reindexBuilder,
-    ILogger<IndexModel> logger) : PageModel
+    SearchReindexJobService reindexJobService) : PageModel
 {
     private const string MessageKey = "SearchIndexMessage";
     private const string MessageKindKey = "SearchIndexMessageKind";
@@ -28,29 +27,68 @@ public sealed class IndexModel(
 
     public string? StatusMessageKind { get; private set; }
 
+    public SearchReindexJobSnapshot Job { get; private set; } = new(
+        SearchReindexJobPhase.Idle,
+        CurrentContentType: null,
+        Message: string.Empty,
+        StartedAt: null,
+        FinishedAt: null);
+
+    public bool IsRunning => Job.Phase == SearchReindexJobPhase.Running;
+
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
         StatusMessage = TempData[MessageKey] as string;
         StatusMessageKind = TempData[MessageKindKey] as string;
+        Job = reindexJobService.GetSnapshot();
         await LoadCountsAsync(cancellationToken);
     }
 
-    public async Task<IActionResult> OnPostReindexAsync(CancellationToken cancellationToken)
+    public IActionResult OnPostReindex()
     {
-        try
+        if (reindexJobService.TryStart())
         {
-            await reindexBuilder.ReindexAllAsync(cancellationToken);
-            TempData[MessageKey] = "Search index rebuilt.";
+            TempData[MessageKey] = "Reindex started in the background. This page will update as it progresses.";
             TempData[MessageKindKey] = "success";
         }
-        catch (Exception ex)
+        else
         {
-            logger.LogError(ex, "Manual search reindex failed");
-            TempData[MessageKey] = "Reindex failed — see application logs for details.";
-            TempData[MessageKindKey] = "error";
+            TempData[MessageKey] = "A reindex is already in progress.";
+            TempData[MessageKindKey] = "info";
         }
 
         return RedirectToPage();
+    }
+
+    /// <summary>JSON status + live document counts for the admin page poller.</summary>
+    public async Task<IActionResult> OnGetStatusAsync(CancellationToken cancellationToken)
+    {
+        var job = reindexJobService.GetSnapshot();
+        var counts = await searchIndexService.GetContentTypeCountsAsync(cancellationToken);
+        var total = counts.Values.Sum();
+
+        return new JsonResult(new
+        {
+            phase = job.Phase.ToString(),
+            currentContentType = job.CurrentContentType,
+            currentContentTypeLabel = string.IsNullOrEmpty(job.CurrentContentType)
+                ? null
+                : SiteSearchContentType.DisplayLabel(job.CurrentContentType),
+            message = job.Message,
+            startedAt = job.StartedAt,
+            finishedAt = job.FinishedAt,
+            isRunning = job.Phase == SearchReindexJobPhase.Running,
+            totalCount = total,
+            contentTypeCounts = counts
+                .OrderBy(pair => pair.Key)
+                .Select(pair => new
+                {
+                    contentType = pair.Key,
+                    label = SiteSearchContentType.DisplayLabel(pair.Key),
+                    count = pair.Value,
+                })
+                .ToList(),
+        });
     }
 
     private async Task LoadCountsAsync(CancellationToken cancellationToken)

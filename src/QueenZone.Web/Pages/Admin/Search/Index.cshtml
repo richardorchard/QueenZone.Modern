@@ -5,35 +5,75 @@
   ViewData["Title"] = "Search index";
   ViewData["ShowAdminNav"] = true;
   var antiforgeryToken = Antiforgery.GetAndStoreTokens(HttpContext).RequestToken;
+  var jobPhase = Model.Job.Phase.ToString();
 }
 
-<div class="admin-shell">
+<div class="admin-shell" id="search-index-admin"
+     data-phase="@jobPhase"
+     data-running="@(Model.IsRunning ? "true" : "false")">
   <h1>Search index</h1>
 
   @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
   {
-    <p class="admin-status admin-status--@Model.StatusMessageKind">@Model.StatusMessage</p>
+    <p class="admin-status admin-status--@Model.StatusMessageKind" id="flash-status">@Model.StatusMessage</p>
   }
 
   <p>
     Rebuilds the <code>SearchDocument</code> index that powers <a href="/search" target="_blank" rel="noopener">/search</a>
-    from News, Forum threads, and Community Articles. Publishing/unpublishing content updates the
-    index automatically going forward — use this if the index looks stale or empty (for example,
+    from News, Forum threads, Community Articles, and other public archive content. Publishing/unpublishing
+    updates the index automatically going forward — use this if the index looks stale or empty (for example,
     right after deploying this feature for the first time).
   </p>
+  <p>
+    Reindex runs in the background on the web app process so the browser is not held open for the whole rebuild.
+    Leave this page open (or come back later) to watch progress; closing the tab does not cancel the job.
+  </p>
 
-  <p><strong>@Model.TotalCount.ToString("N0")</strong> documents indexed.</p>
+  <p id="job-status"
+     class="admin-status admin-status--@(Model.Job.Phase switch {
+       QueenZone.Web.Search.SearchReindexJobPhase.Running => "info",
+       QueenZone.Web.Search.SearchReindexJobPhase.Succeeded => "success",
+       QueenZone.Web.Search.SearchReindexJobPhase.Failed => "error",
+       _ => "info"
+     })"
+     data-phase="@jobPhase">
+    <strong>Job:</strong> <span id="job-message">@Model.Job.Message</span>
+    @if (Model.Job.StartedAt is { } startedAt)
+    {
+      <span id="job-started"> (started @startedAt.UtcDateTime.ToString("u"))</span>
+    }
+    else
+    {
+      <span id="job-started"></span>
+    }
+    @if (Model.Job.FinishedAt is { } finishedAt)
+    {
+      <span id="job-finished"> — finished @finishedAt.UtcDateTime.ToString("u")</span>
+    }
+    else
+    {
+      <span id="job-finished"></span>
+    }
+  </p>
 
-  @if (Model.ContentTypeCounts.Count > 0)
-  {
-    <table class="admin-table">
-      <thead>
-        <tr>
-          <th>Content type</th>
-          <th>Count</th>
+  <p><strong id="total-count">@Model.TotalCount.ToString("N0")</strong> documents indexed.</p>
+
+  <table class="admin-table" id="counts-table">
+    <thead>
+      <tr>
+        <th>Content type</th>
+        <th>Count</th>
+      </tr>
+    </thead>
+    <tbody id="counts-body">
+      @if (Model.ContentTypeCounts.Count == 0)
+      {
+        <tr id="counts-empty-row">
+          <td colspan="2">No documents indexed yet.</td>
         </tr>
-      </thead>
-      <tbody>
+      }
+      else
+      {
         @foreach (var (contentType, count) in Model.ContentTypeCounts.OrderBy(pair => pair.Key))
         {
           <tr>
@@ -41,12 +81,129 @@
             <td>@count.ToString("N0")</td>
           </tr>
         }
-      </tbody>
-    </table>
-  }
+      }
+    </tbody>
+  </table>
 
-  <form method="post" action="/admin/search?handler=Reindex">
+  <form method="post" action="/admin/search?handler=Reindex" id="reindex-form">
     <input type="hidden" name="__RequestVerificationToken" value="@antiforgeryToken" />
-    <button type="submit" class="qz-button">Rebuild search index now</button>
+    <button type="submit" class="qz-button" id="reindex-button" @(Model.IsRunning ? "disabled" : null)>
+      @(Model.IsRunning ? "Reindex in progress…" : "Rebuild search index now")
+    </button>
   </form>
 </div>
+
+<script>
+(function () {
+  var root = document.getElementById('search-index-admin');
+  if (!root) return;
+
+  var pollMs = 2000;
+  var timer = null;
+
+  function formatCount(n) {
+    try {
+      return Number(n).toLocaleString();
+    } catch (e) {
+      return String(n);
+    }
+  }
+
+  function setJobStatusClass(phase) {
+    var el = document.getElementById('job-status');
+    if (!el) return;
+    el.className = 'admin-status admin-status--' + (
+      phase === 'Running' ? 'info' :
+      phase === 'Succeeded' ? 'success' :
+      phase === 'Failed' ? 'error' : 'info'
+    );
+    el.setAttribute('data-phase', phase);
+  }
+
+  function applyStatus(data) {
+    var msg = document.getElementById('job-message');
+    if (msg) msg.textContent = data.message || '';
+
+    var started = document.getElementById('job-started');
+    if (started) {
+      started.textContent = data.startedAt
+        ? ' (started ' + new Date(data.startedAt).toISOString().replace('T', ' ').replace(/\.\d+Z$/, 'Z') + ')'
+        : '';
+    }
+
+    var finished = document.getElementById('job-finished');
+    if (finished) {
+      finished.textContent = data.finishedAt
+        ? ' — finished ' + new Date(data.finishedAt).toISOString().replace('T', ' ').replace(/\.\d+Z$/, 'Z')
+        : '';
+    }
+
+    setJobStatusClass(data.phase || 'Idle');
+
+    var total = document.getElementById('total-count');
+    if (total) total.textContent = formatCount(data.totalCount || 0);
+
+    var body = document.getElementById('counts-body');
+    if (body) {
+      var rows = data.contentTypeCounts || [];
+      if (rows.length === 0) {
+        body.innerHTML = '<tr id="counts-empty-row"><td colspan="2">No documents indexed yet.</td></tr>';
+      } else {
+        var html = '';
+        for (var i = 0; i < rows.length; i++) {
+          var row = rows[i];
+          html += '<tr><td>' + escapeHtml(row.label || row.contentType) + '</td><td>' + formatCount(row.count) + '</td></tr>';
+        }
+        body.innerHTML = html;
+      }
+    }
+
+    var button = document.getElementById('reindex-button');
+    if (button) {
+      if (data.isRunning) {
+        button.disabled = true;
+        button.textContent = 'Reindex in progress…';
+      } else {
+        button.disabled = false;
+        button.textContent = 'Rebuild search index now';
+      }
+    }
+
+    root.setAttribute('data-phase', data.phase || 'Idle');
+    root.setAttribute('data-running', data.isRunning ? 'true' : 'false');
+  }
+
+  function escapeHtml(value) {
+    return String(value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  async function pollOnce() {
+    try {
+      var res = await fetch('/admin/search?handler=Status', {
+        headers: { 'Accept': 'application/json' },
+        credentials: 'same-origin'
+      });
+      if (!res.ok) return root.getAttribute('data-running') === 'true';
+      var data = await res.json();
+      applyStatus(data);
+      return !!data.isRunning;
+    } catch (e) {
+      return root.getAttribute('data-running') === 'true';
+    }
+  }
+
+  async function tick() {
+    var stillRunning = await pollOnce();
+    if (stillRunning) {
+      timer = setTimeout(tick, pollMs);
+    }
+  }
+
+  // Always refresh once shortly after load (covers the post-redirect race), then keep polling while running.
+  timer = setTimeout(tick, 500);
+})();
+</script>
