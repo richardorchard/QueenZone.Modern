@@ -569,8 +569,15 @@ jobs:
       # scripts/Run-E2E.ps1 (issue #544) so local on-demand runs and CI share one
       # implementation. Pin Mode=Deterministic so nightly RealData fixtures never
       # enter the merge gate (see #543 / epic #540).
-      # macOS needs pwsh for the script and for Playwright's generated installer.
-      - name: Run Playwright e2e tests
+      # Windows runners have Windows PowerShell 5.1 (`powershell`); macOS needs
+      # PowerShell 7 (`pwsh`) for the script and Playwright's generated installer.
+      - name: Run Playwright e2e tests (Windows)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: ./scripts/Run-E2E.ps1 -Mode Deterministic
+
+      - name: Run Playwright e2e tests (macOS)
+        if: runner.os == 'macOS'
         shell: pwsh
         run: ./scripts/Run-E2E.ps1 -Mode Deterministic
 
