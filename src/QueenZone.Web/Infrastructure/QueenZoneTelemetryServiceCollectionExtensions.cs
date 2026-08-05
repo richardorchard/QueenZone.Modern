@@ -14,7 +14,7 @@ public static class QueenZoneTelemetryServiceCollectionExtensions
         IHostEnvironment environment,
         ILoggingBuilder logging)
     {
-        if (environment.IsEnvironment("Testing"))
+        if (QueenZoneEnvironments.IsAutomatedTestHost(environment))
         {
             return services;
         }

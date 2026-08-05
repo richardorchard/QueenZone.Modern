@@ -92,20 +92,6 @@ public abstract class ForumCategoryPageModel(IForumRepository forumRepository) :
         return Page();
     }
 
-    private async Task<bool> IsMemberAuthenticatedAsync()
-    {
-        var memberCookie = await HttpContext.AuthenticateAsync(MemberAuthenticationSchemes.MembersCookie);
-        if (memberCookie.Succeeded)
-        {
-            return true;
-        }
-
-        if (HttpContext.RequestServices.GetService<IHostEnvironment>()?.IsEnvironment("Testing") == true)
-        {
-            var testMember = await HttpContext.AuthenticateAsync(TestMemberAuthHandler.SchemeName);
-            return testMember.Succeeded;
-        }
-
-        return false;
-    }
+    private async Task<bool> IsMemberAuthenticatedAsync() =>
+        (await HttpContext.AuthenticateMemberAsync()).Succeeded;
 }

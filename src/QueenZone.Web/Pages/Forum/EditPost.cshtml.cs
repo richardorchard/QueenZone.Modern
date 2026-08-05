@@ -167,21 +167,7 @@ public sealed class EditPostModel(
             return AuthenticateResult.Success(new AuthenticationTicket(User, MemberAuthenticationSchemes.MembersCookie));
         }
 
-        var memberCookie = await HttpContext.AuthenticateAsync(MemberAuthenticationSchemes.MembersCookie);
-        if (memberCookie.Succeeded)
-        {
-            return memberCookie;
-        }
-
-        if (HttpContext.RequestServices.GetService<IHostEnvironment>()?.IsEnvironment("Testing") == true)
-        {
-            var testMember = await HttpContext.AuthenticateAsync(TestMemberAuthHandler.SchemeName);
-            if (testMember.Succeeded)
-            {
-                return testMember;
-            }
-        }
-
-        return null;
+        var memberAuth = await HttpContext.AuthenticateMemberAsync();
+        return memberAuth.Succeeded ? memberAuth : null;
     }
 }

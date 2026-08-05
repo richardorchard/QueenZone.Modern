@@ -226,7 +226,7 @@ public static class QueenZoneWebServiceCollectionExtensions
         // In-process single-flight job for /admin/search (single-instance hosting).
         services.AddSingleton<Search.SearchReindexJobService>();
 
-        if (environment.IsEnvironment("Testing"))
+        if (QueenZoneEnvironments.UsesInMemoryData(environment))
         {
             services.AddQueenZoneInMemoryData();
             services.AddHostedService<Search.SearchIndexSeedHostedService>();
@@ -268,7 +268,7 @@ public static class QueenZoneWebServiceCollectionExtensions
         }
 
         services.AddQueenZoneData(configuration, environment);
-        if (environment.IsEnvironment("Testing"))
+        if (QueenZoneEnvironments.UsesInMemoryData(environment))
         {
             services.AddQueenZoneInMemoryStorage(configuration);
         }

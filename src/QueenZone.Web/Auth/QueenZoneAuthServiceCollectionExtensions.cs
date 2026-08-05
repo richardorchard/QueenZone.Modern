@@ -19,9 +19,9 @@ public static class QueenZoneAuthServiceCollectionExtensions
         var clientId = azureAdSection["ClientId"];
         // Fail closed outside Development/Testing when Entra is missing or still a placeholder.
         AzureAdClientId.EnsureConfiguredForEnvironment(environment, clientId);
-        var useAzureAd = !environment.IsEnvironment("Testing") && AzureAdClientId.IsConfigured(clientId);
+        var useAzureAd = !QueenZoneEnvironments.UsesTestAuth(environment) && AzureAdClientId.IsConfigured(clientId);
 
-        if (environment.IsEnvironment("Testing"))
+        if (QueenZoneEnvironments.UsesTestAuth(environment))
         {
             services.AddAuthentication(TestAuthHandler.SchemeName)
                 .AddPolicyScheme(AdminAuthenticationSchemes.CompositeScheme, null, options =>
@@ -82,7 +82,7 @@ public static class QueenZoneAuthServiceCollectionExtensions
             options.AddPolicy(MemberAuthenticationSchemes.MemberPolicy, policy =>
             {
                 policy.AddAuthenticationSchemes(MemberAuthenticationSchemes.MembersCookie);
-                if (environment.IsEnvironment("Testing"))
+                if (QueenZoneEnvironments.UsesTestAuth(environment))
                 {
                     policy.AddAuthenticationSchemes(TestMemberAuthHandler.SchemeName);
                 }

@@ -21,7 +21,7 @@ if (builder.Environment.IsDevelopment())
     // Keep environment variables above Local.json so CI/shell overrides still win.
     builder.Configuration.AddEnvironmentVariables();
 }
-else if (builder.Environment.IsEnvironment("Testing"))
+else if (QueenZoneEnvironments.IsAutomatedTestHost(builder.Environment))
 {
     // Avoid DPAPI-backed key persistence under the service profile, which is slow
     // (and unnecessary for short-lived smoke test runs) on the self-hosted CI runner.
@@ -110,7 +110,7 @@ if (wellKnownPath is not null && Directory.Exists(wellKnownPath))
     });
 }
 
-if (!app.Environment.IsDevelopment() && !app.Environment.IsEnvironment("Testing"))
+if (!app.Environment.IsDevelopment() && !QueenZoneEnvironments.IsAutomatedTestHost(app.Environment))
 {
     app.UseHsts();
 }
