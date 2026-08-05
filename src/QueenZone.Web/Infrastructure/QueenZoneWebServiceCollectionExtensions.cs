@@ -223,6 +223,8 @@ public static class QueenZoneWebServiceCollectionExtensions
         // production connection string. Opt-in live probes construct their SQL-backed
         // repositories directly and do not use the Testing web host composition.
         services.AddScoped<Search.SearchReindexBuilder>();
+        // In-process single-flight job for /admin/search (single-instance hosting).
+        services.AddSingleton<Search.SearchReindexJobService>();
 
         if (environment.IsEnvironment("Testing"))
         {

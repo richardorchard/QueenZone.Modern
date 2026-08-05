@@ -2359,6 +2359,11 @@ a.qz-forum-post__author-link:focus-visible {
   background: var(--surface-muted, #f6f6f6);
 }
 
+.admin-status--info {
+  border-color: var(--border-strong);
+  background: var(--surface-muted, #f6f6f6);
+}
+
 .admin-table {
   border-collapse: collapse;
   width: 100%;
