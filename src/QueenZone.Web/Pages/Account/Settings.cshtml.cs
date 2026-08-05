@@ -263,7 +263,7 @@ public sealed class SettingsModel(MemberAccountService memberAccountService) : P
     private async Task<Guid?> GetCurrentMemberIdAsync()
     {
         // Authenticate the member cookie explicitly — ambient User may be the admin scheme.
-        var authResult = await HttpContext.AuthenticateAsync(MemberAuthenticationSchemes.MembersCookie);
+        var authResult = await HttpContext.AuthenticateMemberAsync();
         if (!authResult.Succeeded || authResult.Principal is null)
         {
             return null;

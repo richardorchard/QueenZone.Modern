@@ -33,7 +33,8 @@ public sealed partial class AccountSettingsPageTests : IClassFixture<WebApplicat
                     .AddScheme<AuthenticationSchemeOptions, ExternalCookieTestHandler>(
                         MemberAuthenticationSchemes.ExternalCookie, _ => { });
 
-                // Avatar upload requires a real blob service (default Testing uses NullBlobUploadService).
+                // Swap in a backend this test can inspect directly (default Testing composition
+                // also uses an in-memory-backed AzureBlobUploadService, but not this instance).
                 services.RemoveAll<IBlobUploadService>();
                 services.AddSingleton<IBlobUploadService>(_ =>
                     new AzureBlobUploadService(blobBackend, Options.Create(new BlobUploadOptions())));

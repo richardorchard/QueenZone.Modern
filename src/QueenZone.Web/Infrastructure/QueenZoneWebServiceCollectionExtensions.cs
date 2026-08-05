@@ -277,7 +277,7 @@ public static class QueenZoneWebServiceCollectionExtensions
         services.AddQueenZoneData(configuration, environment);
         if (QueenZoneEnvironments.UsesInMemoryBlobStorage(environment))
         {
-            services.AddQueenZoneInMemoryStorage(configuration);
+            services.AddQueenZoneFunctionalInMemoryStorage(configuration);
         }
         else
         {

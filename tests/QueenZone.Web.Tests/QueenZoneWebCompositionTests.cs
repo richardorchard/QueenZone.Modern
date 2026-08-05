@@ -37,7 +37,10 @@ public sealed class QueenZoneWebCompositionTests
         using var provider = services.BuildServiceProvider(validateScopes: true);
 
         Assert.NotNull(provider.GetRequiredService<INewsRepository>());
-        Assert.IsType<NullBlobUploadService>(provider.GetRequiredService<IBlobUploadService>());
+        // Testing/E2E use a functional in-memory-backed AzureBlobUploadService (#546) so
+        // member upload flows (photo/article/avatar submission) actually succeed, not the
+        // NullBlobUploadService fail-loud fallback used for a truly unconfigured local dev.
+        Assert.IsType<AzureBlobUploadService>(provider.GetRequiredService<IBlobUploadService>());
         using (var scope = provider.CreateScope())
         {
             Assert.NotNull(scope.ServiceProvider.GetRequiredService<INewsDiscoveryRepository>());
@@ -146,7 +149,10 @@ public sealed class QueenZoneWebCompositionTests
         Assert.IsType<InMemoryArticleSubmissionRepository>(
             provider.GetRequiredService<IArticleSubmissionRepository>());
         Assert.Null(provider.GetService<QueenZoneDbContext>());
-        Assert.IsType<NullBlobUploadService>(provider.GetRequiredService<IBlobUploadService>());
+        // Testing/E2E use a functional in-memory-backed AzureBlobUploadService (#546) so
+        // member upload flows (photo/article/avatar submission) actually succeed, not the
+        // NullBlobUploadService fail-loud fallback used for a truly unconfigured local dev.
+        Assert.IsType<AzureBlobUploadService>(provider.GetRequiredService<IBlobUploadService>());
         Assert.IsType<NullGalleryPhotoBlobService>(provider.GetRequiredService<IGalleryPhotoBlobService>());
     }
 

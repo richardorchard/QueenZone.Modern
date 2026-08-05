@@ -163,7 +163,7 @@ public sealed class ArticleModel(
 
     private async Task<Guid?> GetCurrentMemberIdAsync()
     {
-        var authResult = await HttpContext.AuthenticateAsync(MemberAuthenticationSchemes.MembersCookie);
+        var authResult = await HttpContext.AuthenticateMemberAsync();
         if (!authResult.Succeeded || authResult.Principal is null)
         {
             return null;
