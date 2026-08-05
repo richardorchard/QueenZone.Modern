@@ -27,6 +27,12 @@ smoke-*.log
 perf-app/
 docs/performance/results/
 
+e2e-app/
+e2e-app.log
+e2e-app.err.log
+e2e-app.pid
+e2e-app-cmd.pid
+
 appservice-logs.zip
 
 appservice-logs/
