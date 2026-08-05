@@ -5,7 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace QueenZone.Storage;
 
 /// <summary>
-/// Uploads and reads public gallery blobs in legacy CDN containers (not UGC containers).
+/// Uploads, reads, and deletes public gallery blobs in legacy CDN containers (not UGC containers).
 /// </summary>
 public interface IGalleryPhotoBlobService
 {
@@ -17,6 +17,14 @@ public interface IGalleryPhotoBlobService
         CancellationToken cancellationToken = default);
 
     Task<Stream?> OpenReadAsync(
+        string containerName,
+        string blobName,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Deletes the blob if it exists. Missing blobs are a no-op.
+    /// </summary>
+    Task DeleteAsync(
         string containerName,
         string blobName,
         CancellationToken cancellationToken = default);
@@ -64,6 +72,19 @@ public sealed class NullGalleryPhotoBlobService : IGalleryPhotoBlobService
         }
     }
 
+    public Task DeleteAsync(
+        string containerName,
+        string blobName,
+        CancellationToken cancellationToken = default)
+    {
+        lock (sync)
+        {
+            blobs.Remove(Key(containerName, blobName));
+        }
+
+        return Task.CompletedTask;
+    }
+
     private static string Key(string containerName, string blobName) =>
         $"{containerName}/{blobName}";
 }
@@ -98,6 +119,15 @@ public sealed class AzureGalleryPhotoBlobService(BlobServiceClient blobServiceCl
         }
 
         return await blob.OpenReadAsync(cancellationToken: cancellationToken);
+    }
+
+    public async Task DeleteAsync(
+        string containerName,
+        string blobName,
+        CancellationToken cancellationToken = default)
+    {
+        var blob = blobServiceClient.GetBlobContainerClient(containerName).GetBlobClient(blobName);
+        await blob.DeleteIfExistsAsync(cancellationToken: cancellationToken);
     }
 }
 

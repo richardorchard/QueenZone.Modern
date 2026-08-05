@@ -5,7 +5,7 @@ using SixLabors.ImageSharp;
 namespace QueenZone.Web;
 
 /// <summary>
-/// Orchestrates gallery admin uploads, replacements, and WebP thumbnail regeneration.
+/// Orchestrates gallery admin uploads, replacements, hard deletes, and WebP thumbnail regeneration.
 /// </summary>
 public sealed class AdminPhotoService(
     IAdminPhotoRepository adminPhotoRepository,
@@ -145,6 +145,31 @@ public sealed class AdminPhotoService(
         }
     }
 
+    public async Task DeleteAsync(
+        int picId,
+        string editorEmail,
+        CancellationToken cancellationToken = default)
+    {
+        var existing = await adminPhotoRepository.GetByIdAsync(picId, cancellationToken)
+            ?? throw new InvalidOperationException($"Photo {picId} was not found.");
+
+        var blobLocations = ResolveBlobLocations(existing);
+
+        await adminPhotoRepository.DeleteAsync(picId, editorEmail, cancellationToken);
+
+        foreach (var (container, blobName) in blobLocations)
+        {
+            try
+            {
+                await galleryPhotoBlobService.DeleteAsync(container, blobName, cancellationToken);
+            }
+            catch
+            {
+                // Best-effort cleanup after the database row is already gone.
+            }
+        }
+    }
+
     public async Task RegenerateThumbnailAsync(
         int picId,
         string editorEmail,
@@ -200,5 +225,27 @@ public sealed class AdminPhotoService(
             "image/tiff" => ".tif",
             _ => Path.GetExtension(fileName) is { Length: > 0 } ext ? ext.ToLowerInvariant() : ".jpg",
         };
+    }
+
+    private static List<(string Container, string BlobName)> ResolveBlobLocations(AdminPhotoItem photo)
+    {
+        var locations = new List<(string Container, string BlobName)>(capacity: 2);
+        TryAdd(photo.LegacyUrl);
+        TryAdd(photo.LegacyThumbUrl);
+        return locations;
+
+        void TryAdd(string? legacyPath)
+        {
+            if (string.IsNullOrWhiteSpace(legacyPath))
+            {
+                return;
+            }
+
+            var blobUrl = PhotoImageUrl.ToBlobStorageUrl(legacyPath);
+            if (PhotoImageUrl.TryParseBlobLocation(blobUrl, out var container, out var blobName))
+            {
+                locations.Add((container, blobName));
+            }
+        }
     }
 }

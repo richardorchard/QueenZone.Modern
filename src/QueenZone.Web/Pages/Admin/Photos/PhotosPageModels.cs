@@ -264,10 +264,20 @@ public sealed class ActionModel(
 
     public async Task<IActionResult> OnPostDeleteAsync(int id, CancellationToken cancellationToken)
     {
-        await adminPhotoRepository.DeleteAsync(id, EditorEmail, cancellationToken);
-        await InvalidatePublicPhotoCachesAsync(publicQueryCache, coreSitemapService, outputCacheStore, cancellationToken);
-        TempData[MessageKey] = $"Deleted photo #{id} (database row only; blobs left in place).";
-        TempData[MessageKindKey] = "success";
+        try
+        {
+            await adminPhotoService.DeleteAsync(id, EditorEmail, cancellationToken);
+            await InvalidatePublicPhotoCachesAsync(publicQueryCache, coreSitemapService, outputCacheStore, cancellationToken);
+            TempData[MessageKey] = $"Deleted photo #{id} and associated gallery blobs.";
+            TempData[MessageKindKey] = "success";
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData[MessageKey] = ex.Message;
+            TempData[MessageKindKey] = "error";
+            return Redirect($"/admin/photos/{id}");
+        }
+
         return Redirect("/admin/photos");
     }
 

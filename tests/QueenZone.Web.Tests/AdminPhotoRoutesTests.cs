@@ -107,6 +107,39 @@ public sealed class AdminPhotoRoutesTests : IClassFixture<WebApplicationFactory<
         Assert.Contains("Thumbnail regenerated", editBody);
     }
 
+    [Fact]
+    public async Task AdminPhotos_HardDelete_RemovesPhotoFromAdminEdit()
+    {
+        var client = AdminHttpTestHelpers.CreateClient(factory, AdminHttpTestHelpers.AdminEmail);
+        var newPage = await client.GetStringAsync("/admin/photos/new");
+        var token = AdminHttpTestHelpers.ExtractAntiforgeryToken(newPage);
+
+        await using var imageStream = await CreateJpegAsync(280, 200);
+        using var content = new MultipartFormDataContent();
+        content.Add(new StringContent(token), AdminPhotosPageModel.AntiforgeryTokenFieldName);
+        content.Add(new StringContent("9"), "catId");
+        content.Add(new StringContent("Hard delete photo"), "title");
+        content.Add(new StringContent("true"), "isVisible");
+        var fileContent = new StreamContent(imageStream);
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
+        content.Add(fileContent, "file", "hard-delete.jpg");
+
+        var createResponse = await client.PostAsync("/admin/photos/create", content);
+        var picId = int.Parse(
+            createResponse.Headers.Location!.OriginalString.Split('/')[^1],
+            System.Globalization.CultureInfo.InvariantCulture);
+
+        var deleteResponse = await PostActionAsync(client, $"/admin/photos/{picId}/delete");
+        Assert.Equal(HttpStatusCode.Redirect, deleteResponse.StatusCode);
+        Assert.Equal("/admin/photos", deleteResponse.Headers.Location!.OriginalString);
+
+        var editPage = await client.GetAsync($"/admin/photos/{picId}");
+        Assert.Equal(HttpStatusCode.NotFound, editPage.StatusCode);
+
+        var indexBody = await client.GetStringAsync("/admin/photos");
+        Assert.Contains("associated gallery blobs", indexBody);
+    }
+
     private static async Task<HttpResponseMessage> PostActionAsync(HttpClient client, string actionPath)
     {
         var editPath = string.Join('/', actionPath.Split('/')[..^1]);

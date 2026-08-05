@@ -155,6 +155,56 @@ public sealed class AdminPhotoServiceTests
         Assert.EndsWith("_t.webp", photo.LegacyThumbUrl, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task Delete_RemovesDatabaseRowAndGalleryBlobs()
+    {
+        var store = new SharedPhotoStore(SamplePhotoData.CreateSeedCategories());
+        var admin = new InMemoryAdminPhotoRepository(store);
+        var blobs = new NullGalleryPhotoBlobService();
+        var service = new AdminPhotoService(admin, blobs);
+
+        await using var imageStream = await CreateJpegAsync(320, 240);
+        var file = new FormFile(imageStream, 0, imageStream.Length, "file", "delete-me.jpg")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "image/jpeg",
+        };
+
+        var picId = await service.CreateAsync(
+            file,
+            catId: 9,
+            title: "Delete target",
+            keywords: null,
+            year: 2024,
+            dateTime: DateTime.UtcNow,
+            isVisible: true,
+            editorEmail: "admin@test.local");
+
+        var photo = await admin.GetByIdAsync(picId);
+        Assert.NotNull(photo);
+
+        var originalUrl = PhotoImageUrl.ToBlobStorageUrl(photo.LegacyUrl);
+        var thumbUrl = PhotoImageUrl.ToBlobStorageUrl(photo.LegacyThumbUrl);
+        Assert.True(PhotoImageUrl.TryParseBlobLocation(originalUrl, out var originalContainer, out var originalBlob));
+        Assert.True(PhotoImageUrl.TryParseBlobLocation(thumbUrl, out var thumbContainer, out var thumbBlob));
+
+        await using (var original = await blobs.OpenReadAsync(originalContainer, originalBlob))
+        {
+            Assert.NotNull(original);
+        }
+
+        await using (var thumb = await blobs.OpenReadAsync(thumbContainer, thumbBlob))
+        {
+            Assert.NotNull(thumb);
+        }
+
+        await service.DeleteAsync(picId, "admin@test.local");
+
+        Assert.Null(await admin.GetByIdAsync(picId));
+        Assert.Null(await blobs.OpenReadAsync(originalContainer, originalBlob));
+        Assert.Null(await blobs.OpenReadAsync(thumbContainer, thumbBlob));
+    }
+
     private static async Task<MemoryStream> CreateJpegAsync(int width, int height)
     {
         using var image = new Image<Rgba32>(width, height);
