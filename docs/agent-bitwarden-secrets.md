@@ -54,8 +54,21 @@ bws --version
 1. Install `bws` (pick one):
    - Official install: `curl https://bws.bitwarden.com/install | sh` (see [Bitwarden Secrets Manager CLI](https://bitwarden.com/help/secrets-manager-cli/))
    - Or download the macOS zip from [sdk-sm releases](https://github.com/bitwarden/sdk-sm/releases) (`bws-macos-universal-*.zip` or arch-specific) into `~/bin` and ensure `~/bin` is on `PATH`.
-2. Create/use machine account **`mac-codex`** and store its access token as **`BWS_ACCESS_TOKEN`** for that user (launchd/user env or shell profile that GUI agents inherit if needed).
-3. Verify: `command -v bws && bws --version` and that `BWS_ACCESS_TOKEN` is set in the agent’s process environment.
+2. Create/use machine account **`mac-codex`** and store its access token as **`BWS_ACCESS_TOKEN`** in **`~/.zprofile`** (not `~/.zshrc` — `.zprofile` is sourced by login shells, which is what GUI-launched agents and new Terminal windows both get; `.zshrc` alone is not enough):
+   ```bash
+   printf '\nexport BWS_ACCESS_TOKEN="paste-token-here"\n' >> ~/.zprofile
+   source ~/.zprofile
+   ```
+3. Verify: `command -v bws && bws --version` and that `BWS_ACCESS_TOKEN` is set in the agent's process environment (see quick check below).
+
+**This token has gone missing before** (found on 2026-08-05: `bws` was installed but `BWS_ACCESS_TOKEN` wasn't in `.zprofile`, `.zshrc`, `.zshenv`, `.profile`, or launchd's user environment — likely lost in a shell-profile reset or new-machine setup that didn't carry it over). If a fresh Claude/agent session on this Mac reports the token missing, don't assume it's still set somewhere unsearched — regenerate a new `mac-codex` token in the Bitwarden Secrets Manager web vault (Queenzone Development project → Machine accounts → `mac-codex`; old tokens can't be viewed again, only revoked) and re-run step 2 above. Agents should never try to read it out of Keychain or other credential stores directly — ask the user to set it and confirm.
+
+**Quick check (macOS, do not print the token):**
+```bash
+if [ -n "$BWS_ACCESS_TOKEN" ]; then echo "BWS_ACCESS_TOKEN: present len=${#BWS_ACCESS_TOKEN}"; else echo "BWS_ACCESS_TOKEN: MISSING"; fi
+bws --version
+bws project list
+```
 
 ## Common agent commands
 
@@ -89,7 +102,31 @@ $env:ConnectionStrings__QueenZoneLegacy = $cs.value
 # dotnet run --project src/QueenZone.Tools -- photo-dim-inventory
 ```
 
-Related keys that may exist in the same project (names only): `ConnectionStrings__QueenZoneLegacyLive`, `ConnectionStrings__QueenZoneLegacyLocal`, `ConnectionStrings__BlobStorage`, `AzureAd__ClientSecret`, `OPENROUTER_API_KEY`, etc.
+Related keys that may exist in the same project (names only): `ConnectionStrings__QueenZoneLegacyLive`, `ConnectionStrings__QueenZoneLegacyLocal`, `ConnectionStrings__BlobStorage`, `AzureAd__ClientSecret`, `OPENROUTER_API_KEY`, `QUEENZONE_SQL_EXPRESS_PROBE_PASSWORD`, `QUEENZONE_SQL_EXPRESS_PROBE_USERNAME`, etc.
+
+`QUEENZONE_SQL_EXPRESS_PROBE_USERNAME` / `QUEENZONE_SQL_EXPRESS_PROBE_PASSWORD` are the paired SQL-login credentials (`queenzone_probe`) for connecting to the SQL Express mirror from a non-domain-joined host (e.g. the Mac runner reaching `glory11` over LAN, where Windows Integrated Security isn't usable) — see [issue #540](https://github.com/richardorchard/QueenZone.Modern/issues/540). The username secret was added 2026-08-05 after the password-only secret left the username undocumented anywhere; confirmed working from the Mac: `sqlcmd -S glory11 -U queenzone_probe -C -Q "SELECT 1"`.
+
+### macOS SQL client tooling (sqlcmd)
+
+Needed for any script that connects to the `glory11` SQL Express mirror from macOS (Windows Integrated Security doesn't apply here — use the `queenzone_probe` SQL login above instead):
+
+```bash
+brew tap microsoft/mssql-release https://github.com/Microsoft/homebrew-mssql-release
+brew trust --taps microsoft/mssql-release   # required: Homebrew refuses third-party taps until trusted
+HOMEBREW_ACCEPT_EULA=Y brew install msodbcsql18 mssql-tools18
+```
+
+**Use `HOMEBREW_ACCEPT_EULA`, not `ACCEPT_EULA`** — the wrong variable name doesn't error, it silently leaves the formula waiting on an interactive EULA prompt (`STDIN.gets`) that never resolves in a non-interactive shell, so the install just hangs indefinitely with no error output.
+
+`sqlcmd` installs to `/opt/homebrew/opt/mssql-tools18/bin`, which isn't on `PATH` by default — add it in `~/.zprofile`:
+```bash
+export PATH="/opt/homebrew/opt/mssql-tools18/bin:$PATH"
+```
+
+Verify:
+```bash
+sqlcmd -S glory11 -U queenzone_probe -C -Q "SELECT 1 AS ok"
+```
 
 ## Install / repair `bws` (Windows)
 
