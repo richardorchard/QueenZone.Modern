@@ -61,6 +61,10 @@ concurrency:
 # ordering, rather than a second workflow racing this one, so nothing can
 # rebuild the mirror underneath a running UI suite.
 #
+# Independently (no `needs`): livesite-readonly-sweep hits https://www.queenzone.org
+# with E2E_READONLY=true. A failure there means production is broken (CDN/deploy
+# drift), not that the mirror or code path under test is wrong.
+#
 # Read probes run first. Self-cleaning write probes then exercise the same
 # SQL Express mirror locally on the Windows runner. Their scripts reject
 # Azure SQL and remote targets (the Mac's LAN address to that same mirror is
@@ -79,6 +83,9 @@ concurrency:
 # A final residue-check job — after both write probes and the UI suite, so it
 # validates UI-test cleanup too — fails the workflow if any known probe or
 # leaked web-test markers remain.
+#
+# livesite-readonly-sweep does not depend on the mirror and still runs when
+# sync-legacy-db fails. It is continuous signal only — not a required PR check.
 jobs:
   sync-legacy-db:
     name: Sync legacy DB to SQL Express
@@ -299,11 +306,77 @@ jobs:
           if-no-files-found: ignore
           retention-days: 1
 
+  livesite-readonly-sweep:
+    # Production signal only. No DB, no mirror, no writes.
+    # Failure attribution: "PRODUCTION LIVE-SITE" in test messages means the
+    # deployed site (or CDN) is broken — not the SQL Express mirror suite.
+    name: Live-site read-only public sweep (production)
+    # Intentionally no `needs` — still runs when sync-legacy-db fails.
+    runs-on: [self-hosted, queenzone]
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Verify .NET SDK
+        run: dotnet --version
+
+      - name: Run live-site read-only public sweep
+        shell: pwsh
+        env:
+          E2E_ARTIFACT_DIR: test-results/e2e-livesite
+          # Structural write protection: RealDataPageTest throws if a write-capable
+          # fixture is selected while this is set (also set inside Run-E2E LiveSite).
+          E2E_READONLY: "true"
+        run: |
+          Write-Host "::notice::Live-site read-only public sweep against production (not the SQL Express mirror)."
+          Write-Host "Failures here mean production/CDN/deploy drift — different signal from ui-e2e-realdata."
+          ./scripts/Run-E2E.ps1 -Mode LiveSite -BaseUrl https://www.queenzone.org
+
+      - name: Summarize production sweep result
+        if: always()
+        shell: pwsh
+        run: |
+          $status = "${{ job.status }}"
+          if ($status -eq "success") {
+            @"
+          ## Live-site read-only public sweep (production)
+
+          **Result:** passed against ``https://www.queenzone.org``.
+
+          This job does not use the SQL Express mirror. A green result means the
+          public production surface (shape + sampled media CDN hosts) is healthy.
+          "@ | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          }
+          else {
+            @"
+          ## Live-site read-only public sweep (production)
+
+          **Result:** FAILED against ``https://www.queenzone.org``.
+
+          This is a **production** signal (CDN, deploy config, or live content),
+          not a mirror/code-path failure from ``ui-e2e-realdata``. Look for
+          ``PRODUCTION LIVE-SITE`` in the test output and Playwright artifacts.
+          "@ | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          }
+
+      - name: Upload Playwright failure artifacts (production sweep)
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: e2e-livesite-production-${{ github.run_id }}
+          path: |
+            test-results/e2e-livesite/
+            test-results/e2e/
+          if-no-files-found: ignore
+          retention-days: 7
+
   residue-check:
     name: Verify no probe or UI-test residue remains
     # Runs after both the write probes and the UI suite (not as the last step
     # of legacy-write-probes) so it validates UI-test cleanup too, not just
-    # probe cleanup.
+    # probe cleanup. Does not wait on livesite-readonly-sweep (no DB writes there).
     needs: [legacy-write-probes, ui-e2e-realdata]
     if: always() && needs.legacy-write-probes.result == 'success'
     runs-on: [self-hosted, Windows]
