@@ -30,6 +30,7 @@ public sealed class EfLegacyProbeResidueTests
         Assert.False(string.IsNullOrWhiteSpace(ArticleSubmissionResidueQuery(dbContext).ToQueryString()));
         Assert.False(string.IsNullOrWhiteSpace(NewsSuggestionResidueQuery(dbContext).ToQueryString()));
         Assert.False(string.IsNullOrWhiteSpace(PhotoAdminAuditResidueQuery(dbContext).ToQueryString()));
+        Assert.False(string.IsNullOrWhiteSpace(SearchDocumentResidueQuery(dbContext).ToQueryString()));
     }
 
     [Fact]
@@ -55,6 +56,7 @@ public sealed class EfLegacyProbeResidueTests
         Assert.False(await ArticleSubmissionResidueQuery(dbContext).AnyAsync());
         Assert.False(await NewsSuggestionResidueQuery(dbContext).AnyAsync());
         Assert.False(await PhotoAdminAuditResidueQuery(dbContext).AnyAsync());
+        Assert.False(await SearchDocumentResidueQuery(dbContext).AnyAsync());
 
         var legacyTestPhotoCount = await dbContext.Database
             .SqlQueryRaw<int>(
@@ -160,7 +162,13 @@ public sealed class EfLegacyProbeResidueTests
     private static IQueryable<PhotoAdminAuditLogEntity> PhotoAdminAuditResidueQuery(QueenZoneDbContext dbContext) =>
         dbContext.PhotoAdminAuditLogs.Where(audit =>
             audit.ActorEmail == "admin@test.local"
-            || audit.ActorEmail == "photo-submission-probe@queenzone.local");
+            || audit.ActorEmail == "photo-submission-probe@queenzone.local"
+            || (audit.Details != null && audit.Details.Contains("uie2e-")));
+
+    private static IQueryable<SearchDocumentEntity> SearchDocumentResidueQuery(QueenZoneDbContext dbContext) =>
+        dbContext.SearchDocuments.Where(document =>
+            document.Title.Contains("uie2e-")
+            || document.SourceKey.Contains("uie2e-"));
 
     private static bool IsCheckEnabled(out string connectionString)
     {
