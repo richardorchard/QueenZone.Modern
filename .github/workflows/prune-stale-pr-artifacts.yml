@@ -1,0 +1,89 @@
+name: Prune stale PR CI artifacts
+
+# ci.yml's own cleanup-ephemeral-artifacts job only ever cleans up *its own*
+# run's build-binaries/coverage-raw once that run's coverage job finishes.
+# It has no way to reach web-publish or coverage-report from an *earlier*
+# push to the same PR once a later push supersedes it — those just sit for
+# the full 1-day retention. On an actively-iterated PR (several pushes in a
+# few hours) that leaves multiple ~50MB (web-publish + coverage-report) sets
+# alive at once for no reason: deploy.yml's resolve-ci-run only ever looks
+# at a branch's latest head SHA (see that file), so anything from a
+# superseded push on the same branch is unreachable dead weight the moment
+# the next push's ci.yml run exists. Repeated across several actively
+# iterated PRs at once, this was enough to blow the 2GB Actions artifact
+# storage quota well before any individual run's 1-day retention expired.
+on:
+  pull_request:
+    types: [synchronize]
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: prune-stale-artifacts-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    # Forked PRs get a read-only GITHUB_TOKEN regardless of the permissions
+    # block above; skip rather than fail noisily on every fork push.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - name: Delete artifacts from superseded CI runs on this PR's branch
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const branch = context.payload.pull_request.head.ref;
+
+            const runs = await github.paginate(
+              github.rest.actions.listWorkflowRuns,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: "ci.yml",
+                branch,
+                per_page: 100,
+              },
+            );
+
+            // Keep the newest run's artifacts untouched (deploy.yml may still
+            // need its web-publish after merge); every older run on the same
+            // branch is superseded and safe to delete outright.
+            const stale = runs
+              .sort((a, b) => b.run_number - a.run_number)
+              .slice(1);
+
+            if (stale.length === 0) {
+              core.info(`No superseded ci.yml runs for ${branch} yet.`);
+              return;
+            }
+
+            for (const run of stale) {
+              const artifacts = await github.paginate(
+                github.rest.actions.listWorkflowRunArtifacts,
+                {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  run_id: run.id,
+                  per_page: 100,
+                },
+              );
+
+              for (const artifact of artifacts) {
+                try {
+                  await github.rest.actions.deleteArtifact({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    artifact_id: artifact.id,
+                  });
+                  core.info(
+                    `Deleted ${artifact.name} (${artifact.size_in_bytes} bytes) from superseded run ${run.id} (#${run.run_number}).`,
+                  );
+                } catch (err) {
+                  // Already deleted (e.g. ci.yml's own cleanup got there first) or expired; not fatal.
+                  core.warning(`Could not delete ${artifact.name} from run ${run.id}: ${err.message}`);
+                }
+              }
+            }
