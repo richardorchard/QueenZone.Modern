@@ -5,7 +5,7 @@ using QueenZone.Data;
 namespace QueenZone.NewsAgent;
 
 /// <summary>
-/// Enforces draft-v2 quote safety: only evidence-backed band quotes may remain in quotation marks.
+/// Enforces draft quote safety: only evidence-backed quotes may remain in quotation marks.
 /// </summary>
 public static partial class NewsDraftQuotePolicy
 {

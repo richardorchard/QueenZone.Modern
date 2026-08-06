@@ -66,6 +66,10 @@ public sealed class NewsTriagePromptTests
         Assert.Equal(2, messages.Count);
         Assert.Contains("Queen announce 2026 tour", messages[1].Content, StringComparison.Ordinal);
         Assert.Contains("triage", messages[0].Content, StringComparison.OrdinalIgnoreCase);
-        Assert.Equal("triage-v1", NewsTriagePrompt.Version);
+        Assert.Equal("triage-v2", NewsTriagePrompt.Version);
+        Assert.Contains("Tony Iommi", messages[0].Content, StringComparison.Ordinal);
+        Assert.Contains("guest performance", messages[0].Content, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("substantive, attributable comments", messages[0].Content, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("should be preserved for review", messages[0].Content, StringComparison.OrdinalIgnoreCase);
     }
 }
