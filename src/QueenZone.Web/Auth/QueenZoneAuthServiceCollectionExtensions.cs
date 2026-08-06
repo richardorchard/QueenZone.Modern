@@ -91,10 +91,20 @@ public static class QueenZoneAuthServiceCollectionExtensions
             });
 
             // Shared authoring (rich text image upload). Composite scheme selects member cookie
-            // when present, otherwise Entra/test admin auth (same as admin pages).
+            // when present, otherwise Entra/test admin auth (same as admin pages). Members
+            // impersonated purely via X-Test-Member-Id (no MembersCookie) still need to reach
+            // this endpoint from Submit/Article and Submit/Photo's rich text editors, so add the
+            // TestMember scheme the same way MemberPolicy above does.
             options.AddPolicy("Authoring", policy =>
-                policy.AddAuthenticationSchemes(AdminAuthenticationSchemes.CompositeScheme)
-                    .RequireAuthenticatedUser());
+            {
+                policy.AddAuthenticationSchemes(AdminAuthenticationSchemes.CompositeScheme);
+                if (QueenZoneEnvironments.UsesTestAuth(environment))
+                {
+                    policy.AddAuthenticationSchemes(TestMemberAuthHandler.SchemeName);
+                }
+
+                policy.RequireAuthenticatedUser();
+            });
         });
 
         return services;

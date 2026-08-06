@@ -28,6 +28,7 @@ public sealed class EfLegacyProbeResidueTests
         Assert.False(string.IsNullOrWhiteSpace(ForumThreadResidueQuery(dbContext).ToQueryString()));
         Assert.False(string.IsNullOrWhiteSpace(PhotoSubmissionResidueQuery(dbContext).ToQueryString()));
         Assert.False(string.IsNullOrWhiteSpace(ArticleSubmissionResidueQuery(dbContext).ToQueryString()));
+        Assert.False(string.IsNullOrWhiteSpace(NewsSuggestionResidueQuery(dbContext).ToQueryString()));
         Assert.False(string.IsNullOrWhiteSpace(PhotoAdminAuditResidueQuery(dbContext).ToQueryString()));
     }
 
@@ -52,6 +53,7 @@ public sealed class EfLegacyProbeResidueTests
         Assert.False(await ForumThreadResidueQuery(dbContext).AnyAsync());
         Assert.False(await PhotoSubmissionResidueQuery(dbContext).AnyAsync());
         Assert.False(await ArticleSubmissionResidueQuery(dbContext).AnyAsync());
+        Assert.False(await NewsSuggestionResidueQuery(dbContext).AnyAsync());
         Assert.False(await PhotoAdminAuditResidueQuery(dbContext).AnyAsync());
 
         var legacyTestPhotoCount = await dbContext.Database
@@ -121,7 +123,10 @@ public sealed class EfLegacyProbeResidueTests
             || member.Email.Contains("forum-write-probe-")
             || member.Email.Contains("photo-submission-probe-")
             || member.Email.Contains("article-submission-probe-")
-            || member.Email.Contains("member-account-probe-"));
+            || member.Email.Contains("member-account-probe-")
+            // uie2e-{runId}-{fixture}-{n}: RealDataPageTest marker convention (Web.E2E),
+            // e.g. CommunitySubmissionWorkflowTests member seeding for #546.
+            || member.Email.Contains("uie2e-"));
 
     private static IQueryable<PrivateMessageEntity> PrivateMessageResidueQuery(QueenZoneDbContext dbContext) =>
         dbContext.PrivateMessages.Where(message =>
@@ -134,11 +139,20 @@ public sealed class EfLegacyProbeResidueTests
 
     private static IQueryable<PhotoSubmissionEntity> PhotoSubmissionResidueQuery(QueenZoneDbContext dbContext) =>
         dbContext.PhotoSubmissions.Where(submission =>
-            submission.Title.Contains("photo-submission-probe-"));
+            submission.Title.Contains("photo-submission-probe-")
+            || submission.Title.Contains("uie2e-"));
 
     private static IQueryable<ArticleSubmissionEntity> ArticleSubmissionResidueQuery(QueenZoneDbContext dbContext) =>
         dbContext.ArticleSubmissions.Where(submission =>
-            submission.Title.Contains("article-submission-probe-"));
+            submission.Title.Contains("article-submission-probe-")
+            || submission.Title.Contains("uie2e-"));
+
+    // No existing probe seeds NewsSuggestions; this covers CommunitySubmissionWorkflowTests (#546)
+    // only. If CleanupCreatedRowsAsync ever fails to run, this catches it in the nightly scan.
+    private static IQueryable<NewsSuggestionEntity> NewsSuggestionResidueQuery(QueenZoneDbContext dbContext) =>
+        dbContext.NewsSuggestions.Where(suggestion =>
+            suggestion.Url.Contains("uie2e-")
+            || (suggestion.Title != null && suggestion.Title.Contains("uie2e-")));
 
     private static IQueryable<PhotoAdminAuditLogEntity> PhotoAdminAuditResidueQuery(QueenZoneDbContext dbContext) =>
         dbContext.PhotoAdminAuditLogs.Where(audit =>
