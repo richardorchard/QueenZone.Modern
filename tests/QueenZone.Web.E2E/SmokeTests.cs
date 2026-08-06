@@ -12,6 +12,47 @@ namespace QueenZone.Web.E2E;
 [Category(E2ECategories.ReadOnly)]
 public class SmokeTests : E2EPageTest
 {
+    private readonly List<string> _consoleErrors = [];
+
+    // Runs for every test in this fixture (deterministic app, so no mirror-data 404 noise is
+    // expected). Promotes the nightly sitemap sweep's console-error check into the PR gate so a
+    // regression is caught before merge instead of the following night.
+    [SetUp]
+    public void SubscribeConsoleErrors()
+    {
+        _consoleErrors.Clear();
+        Page.Console += OnConsoleMessage;
+    }
+
+    [TearDown]
+    public void AssertNoActionableConsoleErrors()
+    {
+        Page.Console -= OnConsoleMessage;
+        var actionable = _consoleErrors.Where(PageShapeAssertions.IsActionableConsoleError).ToList();
+        Assert.That(
+            actionable,
+            Is.Empty,
+            "Unexpected browser console error(s): " + string.Join(" | ", actionable));
+    }
+
+    private void OnConsoleMessage(object? _, IConsoleMessage message)
+    {
+        if (string.Equals(message.Type, "error", StringComparison.OrdinalIgnoreCase))
+        {
+            _consoleErrors.Add(message.Text);
+        }
+    }
+
+    private async Task AssertNoEncodingArtifactsAsync()
+    {
+        var bodyText = await Page.Locator("body").InnerTextAsync();
+        var match = PageShapeAssertions.FindEncodingArtifact(bodyText);
+        Assert.That(
+            match.Success,
+            Is.False,
+            $"Unrendered HTML-encoding artifact in visible text: '{match.Value}'");
+    }
+
     [Test]
     public async Task Homepage_ShowsLatestNews()
     {
@@ -19,6 +60,8 @@ public class SmokeTests : E2EPageTest
 
         await Expect(Page.GetByText("Latest news")).ToBeVisibleAsync();
         await Expect(Page.Locator("a.qz-card[href='/news']")).ToBeVisibleAsync();
+
+        await AssertNoEncodingArtifactsAsync();
     }
 
     [Test]
@@ -67,6 +110,8 @@ public class SmokeTests : E2EPageTest
         await Expect(canonical).ToHaveCountAsync(1);
         var href = await canonical.GetAttributeAsync("href");
         Assert.That(href, Does.Contain("/news/1003/queenzone-modernisation-begins"));
+
+        await AssertNoEncodingArtifactsAsync();
     }
 
     [Test]

@@ -66,6 +66,7 @@ public class E2ECategoryGuardTests
             nameof(RealDataMarkerTests),
             nameof(RealDataWriteGuardTests),
             nameof(SeededSamplerTests),
+            nameof(SelectorConventionGuardTests),
             nameof(SitemapRouteParserTests),
             nameof(SmokeTests),
         };

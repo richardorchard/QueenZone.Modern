@@ -82,7 +82,7 @@ public class CommunitySubmissionWorkflowTests : RealDataPageTest
             Buffer = GeneratePngBytes(600, 400),
         });
         await Expect(Page.Locator(".qz-rte-progress")).ToBeHiddenAsync();
-        await Expect(Page.Locator(".ql-editor img")).ToBeVisibleAsync();
+        await Expect(Page.Locator("[data-testid='rich-text-editor'] img")).ToBeVisibleAsync();
 
         await Page.GetByRole(AriaRole.Button, new() { Name = "Submit for review" }).ClickAsync();
 
@@ -272,7 +272,7 @@ public class CommunitySubmissionWorkflowTests : RealDataPageTest
 
     private async Task FillRichTextEditorAsync(string text)
     {
-        var editor = Page.Locator(".ql-editor").Last;
+        var editor = Page.Locator("[data-testid='rich-text-editor']").Last;
         await Expect(editor).ToBeVisibleAsync();
         await editor.ClickAsync();
         await Page.Keyboard.InsertTextAsync(text);
