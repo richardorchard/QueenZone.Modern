@@ -1,0 +1,102 @@
+name: Live-site read-only public sweep
+
+on:
+  schedule:
+    # 06:00 UTC daily — offset from nightly-legacy-checks (03:00 UTC) so this
+    # cheap no-DB job does not contend with the Mac for mirror probes / RealData UI.
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Public site base URL (must not be localhost)"
+        required: false
+        type: string
+        default: "https://www.queenzone.org"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: livesite-readonly-sweep
+  cancel-in-progress: false
+
+# Production signal only (issue #551). No SQL Express mirror, no database, no writes.
+# Structural protection: Run-E2E -Mode LiveSite sets E2E_READONLY=true and filters to
+# TestCategory=RealData&TestCategory=ReadOnly; RealDataWriteGuard throws if a write-capable
+# fixture is selected. Continuous signal only — not a required check on any PR, and
+# deploy.yml does not depend on it.
+#
+# Failures mean production/CDN/deploy drift is broken — a different signal from
+# ui-e2e-realdata in nightly-legacy-checks.yml (which means the mirror/code path is broken).
+
+jobs:
+  livesite-readonly-sweep:
+    name: Live-site read-only public sweep (production)
+    runs-on: [self-hosted, queenzone]
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Verify .NET SDK
+        run: dotnet --version
+
+      - name: Run live-site read-only public sweep
+        shell: pwsh
+        env:
+          E2E_ARTIFACT_DIR: test-results/e2e-livesite
+          # Structural write protection: RealDataPageTest throws if a write-capable
+          # fixture is selected while this is set (also set inside Run-E2E LiveSite).
+          E2E_READONLY: "true"
+        run: |
+          $baseUrl = "${{ inputs.base_url }}"
+          if ([string]::IsNullOrWhiteSpace($baseUrl)) {
+            $baseUrl = "https://www.queenzone.org"
+          }
+          Write-Host "::notice::Live-site read-only public sweep against production (not the SQL Express mirror)."
+          Write-Host "Failures here mean production/CDN/deploy drift — different signal from nightly ui-e2e-realdata."
+          Write-Host "BaseUrl=$baseUrl"
+          ./scripts/Run-E2E.ps1 -Mode LiveSite -BaseUrl $baseUrl
+
+      - name: Summarize production sweep result
+        if: always()
+        shell: pwsh
+        run: |
+          $baseUrl = "${{ inputs.base_url }}"
+          if ([string]::IsNullOrWhiteSpace($baseUrl)) {
+            $baseUrl = "https://www.queenzone.org"
+          }
+          $status = "${{ job.status }}"
+          if ($status -eq "success") {
+            @"
+          ## Live-site read-only public sweep (production)
+
+          **Result:** passed against ``$baseUrl``.
+
+          This workflow does not use the SQL Express mirror. A green result means the
+          public production surface (shape + sampled media CDN hosts) is healthy.
+          "@ | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          }
+          else {
+            @"
+          ## Live-site read-only public sweep (production)
+
+          **Result:** FAILED against ``$baseUrl``.
+
+          This is a **production** signal (CDN, deploy config, or live content),
+          not a mirror/code-path failure from nightly ``ui-e2e-realdata``. Look for
+          ``PRODUCTION LIVE-SITE`` in the test output and Playwright artifacts.
+          "@ | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          }
+
+      - name: Upload Playwright failure artifacts (production sweep)
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: e2e-livesite-production-${{ github.run_id }}
+          path: |
+            test-results/e2e-livesite/
+            test-results/e2e/
+          if-no-files-found: ignore
+          retention-days: 7
