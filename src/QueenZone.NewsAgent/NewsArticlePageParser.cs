@@ -16,9 +16,9 @@ public static partial class NewsArticlePageParser
     {
         ArgumentNullException.ThrowIfNull(html);
 
-        var title = FirstMatch(TitleTagRegex(), html)
-            ?? FirstMatch(OgTitleRegex(), html)
+        var title = FirstMatch(OgTitleRegex(), html)
             ?? FirstMatch(TwitterTitleRegex(), html)
+            ?? FirstMatch(TitleTagRegex(), html)
             ?? DeriveTitleFromUrl(pageUrl);
 
         var excerpt = FirstMatch(MetaDescriptionRegex(), html)
@@ -82,27 +82,27 @@ public static partial class NewsArticlePageParser
     private static partial Regex TitleTagRegex();
 
     [GeneratedRegex(
-        @"<meta\s+[^>]*property\s*=\s*[""']og:title[""'][^>]*content\s*=\s*[""'](?<value>[^""']+)[""']",
+        @"<meta\s+[^>]*property\s*=\s*[""']og:title[""'][^>]*content\s*=\s*(?<delimiter>[""'])(?<value>[\s\S]*?)\k<delimiter>",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex OgTitleRegex();
 
     [GeneratedRegex(
-        @"<meta\s+[^>]*name\s*=\s*[""']twitter:title[""'][^>]*content\s*=\s*[""'](?<value>[^""']+)[""']",
+        @"<meta\s+[^>]*name\s*=\s*[""']twitter:title[""'][^>]*content\s*=\s*(?<delimiter>[""'])(?<value>[\s\S]*?)\k<delimiter>",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex TwitterTitleRegex();
 
     [GeneratedRegex(
-        @"<meta\s+[^>]*name\s*=\s*[""']description[""'][^>]*content\s*=\s*[""'](?<value>[^""']+)[""']",
+        @"<meta\s+[^>]*name\s*=\s*[""']description[""'][^>]*content\s*=\s*(?<delimiter>[""'])(?<value>[\s\S]*?)\k<delimiter>",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex MetaDescriptionRegex();
 
     [GeneratedRegex(
-        @"<meta\s+[^>]*property\s*=\s*[""']og:description[""'][^>]*content\s*=\s*[""'](?<value>[^""']+)[""']",
+        @"<meta\s+[^>]*property\s*=\s*[""']og:description[""'][^>]*content\s*=\s*(?<delimiter>[""'])(?<value>[\s\S]*?)\k<delimiter>",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex OgDescriptionRegex();
 
     [GeneratedRegex(
-        @"<meta\s+[^>]*name\s*=\s*[""']twitter:description[""'][^>]*content\s*=\s*[""'](?<value>[^""']+)[""']",
+        @"<meta\s+[^>]*name\s*=\s*[""']twitter:description[""'][^>]*content\s*=\s*(?<delimiter>[""'])(?<value>[\s\S]*?)\k<delimiter>",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex TwitterDescriptionRegex();
 }

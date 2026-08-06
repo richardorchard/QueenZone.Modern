@@ -45,7 +45,41 @@ public sealed class NewsDraftQuotePolicyTests
     }
 
     [Fact]
-    public void Parse_includes_preserved_quotes_and_prompt_is_draft_v2()
+    public void Enforce_keeps_evidence_backed_quote_from_artist_about_Queen_member()
+    {
+        var quote = "Brian came in and played a fantastic solo";
+        var evidence = CreateEvidence($"Tony Iommi said, \"{quote}\".");
+        var draft = new NewsDraftStructuredResult(
+            "Iommi discusses Brian May guest appearance",
+            "iommi-brian-may-guest-appearance",
+            "Tony Iommi has discussed Brian May's contribution to his album.",
+            $"Iommi said \"{quote}\" when discussing May's guest appearance.",
+            ["Brian May", "Tony Iommi"],
+            ["https://example.com/story"],
+            ["Example"],
+            null,
+            null,
+            null,
+            null,
+            true,
+            [
+                new NewsDraftPreservedQuote(
+                    "Tony Iommi",
+                    quote,
+                    "https://example.com/story",
+                    "Discussing Brian May's guest solo")
+            ]);
+
+        var enforced = NewsDraftQuotePolicy.Enforce(draft, evidence);
+
+        var preserved = Assert.Single(enforced.PreservedQuotes);
+        Assert.Equal("Tony Iommi", preserved.Speaker);
+        Assert.Equal(quote, preserved.ExactText);
+        Assert.Contains($"\"{quote}\"", enforced.Body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Parse_includes_preserved_quotes_and_prompt_is_draft_v3()
     {
         var json = """
             {
@@ -74,7 +108,7 @@ public sealed class NewsDraftQuotePolicyTests
 
         var parsed = NewsDraftResultParser.Parse(json);
 
-        Assert.Equal("draft-v2", NewsDraftPrompt.Version);
+        Assert.Equal("draft-v3", NewsDraftPrompt.Version);
         Assert.Single(parsed.PreservedQuotes);
         Assert.Equal("Brian May", parsed.PreservedQuotes[0].Speaker);
         Assert.Equal("We love the fans", parsed.PreservedQuotes[0].ExactText);
