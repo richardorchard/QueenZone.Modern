@@ -28,7 +28,11 @@ internal static class RealDataDb
                 connectionString,
                 sql =>
                 {
-                    sql.CommandTimeout(QueenZoneSqlServerOptions.DefaultCommandTimeoutSeconds);
+                    // LAN-connected macOS E2E runners see extra round-trip latency to the
+                    // glory11 mirror vs. the Windows leg's local Integrated Security connection
+                    // (#574), so cleanup here uses the long-running timeout rather than the
+                    // 30s public-request default.
+                    sql.CommandTimeout(QueenZoneSqlServerOptions.LongRunningCommandTimeoutSeconds);
                     sql.EnableRetryOnFailure(
                         maxRetryCount: QueenZoneSqlServerOptions.MaxRetryCount,
                         maxRetryDelay: QueenZoneSqlServerOptions.MaxRetryDelay,
