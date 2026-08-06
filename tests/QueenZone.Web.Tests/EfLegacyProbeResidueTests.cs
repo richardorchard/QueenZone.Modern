@@ -131,7 +131,10 @@ public sealed class EfLegacyProbeResidueTests
     private static IQueryable<PrivateMessageEntity> PrivateMessageResidueQuery(QueenZoneDbContext dbContext) =>
         dbContext.PrivateMessages.Where(message =>
             message.Body.Contains("Probe concurrent")
-            || message.Body.Contains("Probe reply"));
+            || message.Body.Contains("Probe reply")
+            // uie2e-{runId}-{fixture}-{n}: RealDataPageTest marker convention (Web.E2E),
+            // e.g. PrivateMessagingWorkflowTests message bodies for #547.
+            || message.Body.Contains("uie2e-"));
 
     private static IQueryable<ModernForumThreadEntity> ForumThreadResidueQuery(QueenZoneDbContext dbContext) =>
         dbContext.ModernForumThreads.Where(thread =>
