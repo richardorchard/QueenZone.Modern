@@ -1,6 +1,5 @@
 using System.Net.Http;
 using System.Text.RegularExpressions;
-using System.Xml.Linq;
 using Microsoft.Playwright;
 
 namespace QueenZone.Web.E2E;
@@ -103,10 +102,20 @@ public class SitemapPublicRouteSweepTests : RealDataPageTest
     [Test]
     public async Task StaleSlug_RedirectsToCanonicalUrlAsync()
     {
-        var response = await Page.GotoAsync("/news/1003/wrong-slug-here");
+        using var httpClient = CreateHttpClient();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var sectionedUrls = await DiscoverSectionUrlsAsync(httpClient, cts.Token);
+        var canonicalPath = sectionedUrls.GetValueOrDefault("news")?
+            .FirstOrDefault(path => Regex.IsMatch(path, @"^/news/\d+/[^/?#]+/?$"));
+
+        Assert.That(canonicalPath, Is.Not.Null, "Expected the news sitemap to contain a detail URL.");
+        var lastSlash = canonicalPath!.TrimEnd('/').LastIndexOf('/');
+        var stalePath = canonicalPath[..(lastSlash + 1)] + "stale-slug-e2e-545";
+
+        var response = await Page.GotoAsync(stalePath);
 
         Assert.That(response?.Request.RedirectedFrom, Is.Not.Null, "Expected the stale slug to redirect.");
-        await Expect(Page).ToHaveURLAsync(new Regex(".*/news/1003/queenzone-modernisation-begins/?$"));
+        await Expect(Page).ToHaveURLAsync(new Regex($"{Regex.Escape(canonicalPath.TrimEnd('/'))}/?$"));
     }
 
     [Test]
@@ -220,15 +229,27 @@ public class SitemapPublicRouteSweepTests : RealDataPageTest
     {
         var perSectionCap = ResolvePerSectionSampleCap();
 
+        var sectioned = await DiscoverSectionUrlsAsync(httpClient, cancellationToken);
+        return sectioned.ToDictionary(
+            pair => pair.Key,
+            pair => SeededSampler.SampleFirstLastAndRandom(pair.Value, perSectionCap),
+            StringComparer.Ordinal);
+    }
+
+    private static async Task<IReadOnlyDictionary<string, IReadOnlyList<string>>> DiscoverSectionUrlsAsync(
+        HttpClient httpClient,
+        CancellationToken cancellationToken)
+    {
+
         var indexXml = await httpClient.GetStringAsync("/sitemap.xml", cancellationToken);
-        var childSitemapPaths = ParseLocPaths(indexXml);
+        var childSitemapPaths = SitemapRouteParser.ParseIndexPaths(indexXml);
 
         var sectioned = new Dictionary<string, List<string>>(StringComparer.Ordinal);
         foreach (var sitemapPath in childSitemapPaths)
         {
-            var section = ResolveSectionName(sitemapPath);
+            var section = SitemapRouteParser.ResolveSectionName(sitemapPath);
             var childXml = await httpClient.GetStringAsync(sitemapPath, cancellationToken);
-            var urlPaths = ParseLocPaths(childXml);
+            var urlPaths = SitemapRouteParser.ParseUrlSetPaths(childXml);
 
             if (!sectioned.TryGetValue(section, out var list))
             {
@@ -239,51 +260,16 @@ public class SitemapPublicRouteSweepTests : RealDataPageTest
             list.AddRange(urlPaths);
         }
 
-        var sampled = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
-        foreach (var (section, urls) in sectioned)
-        {
-            sampled[section] = SeededSampler.SampleFirstLastAndRandom(urls, perSectionCap);
-        }
-
-        return sampled;
+        return sectioned.ToDictionary(
+            pair => pair.Key,
+            pair => (IReadOnlyList<string>)pair.Value,
+            StringComparer.Ordinal);
     }
 
     private static int ResolvePerSectionSampleCap() =>
         int.TryParse(Environment.GetEnvironmentVariable("E2E_SITEMAP_SWEEP_PER_SECTION_LIMIT"), out var value) && value > 0
             ? value
             : DefaultPerSectionSampleCap;
-
-    private static string ResolveSectionName(string sitemapPath)
-    {
-        var fileName = sitemapPath.TrimStart('/');
-        if (string.Equals(fileName, "sitemap-core.xml", StringComparison.OrdinalIgnoreCase))
-        {
-            return "core";
-        }
-
-        var forumMatch = Regex.Match(fileName, @"^sitemap-forum-\d+\.xml$", RegexOptions.IgnoreCase);
-        if (forumMatch.Success)
-        {
-            return "forum";
-        }
-
-        var sectionMatch = Regex.Match(fileName, @"^sitemap-(.+)\.xml$", RegexOptions.IgnoreCase);
-        return sectionMatch.Success ? sectionMatch.Groups[1].Value : fileName;
-    }
-
-    private static IReadOnlyList<string> ParseLocPaths(string xml)
-    {
-        var doc = XDocument.Parse(xml);
-        var ns = doc.Root?.GetDefaultNamespace() ?? XNamespace.None;
-        return doc.Descendants(ns + "loc")
-            .Select(e => e.Value.Trim())
-            .Where(v => v.Length > 0)
-            .Select(ToPath)
-            .ToList();
-    }
-
-    private static string ToPath(string locValue) =>
-        Uri.TryCreate(locValue, UriKind.Absolute, out var uri) ? uri.PathAndQuery : locValue;
 
     private HttpClient CreateHttpClient() => new() { BaseAddress = new Uri(BaseUrl) };
 }
