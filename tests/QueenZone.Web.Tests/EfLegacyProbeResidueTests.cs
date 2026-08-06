@@ -123,7 +123,6 @@ public sealed class EfLegacyProbeResidueTests
         Assert.False(await NewsSuggestionResidueQuery(dbContext).AnyAsync(), "Residue found in NewsSuggestions.");
         Assert.False(await PhotoAdminAuditResidueQuery(dbContext).AnyAsync(), "Residue found in PhotoAdminAuditLog.");
         Assert.False(await SearchDocumentResidueQuery(dbContext).AnyAsync(), "Residue found in SearchDocument.");
-
         var legacyTestPhotoCount = await dbContext.Database
             .SqlQueryRaw<int>(LegacyPhotoResidueSql)
             .SingleAsync();
@@ -273,6 +272,7 @@ public sealed class EfLegacyProbeResidueTests
     private static IQueryable<SearchDocumentEntity> SearchDocumentResidueQuery(QueenZoneDbContext dbContext) =>
         dbContext.SearchDocuments.Where(document =>
             document.Title.Contains(UiTestMarker)
+            || document.SourceKey.Contains(UiTestMarker)
             || document.Body.Contains(UiTestMarker)
             || document.Url.Contains(UiTestMarker)
             || (document.Summary != null && document.Summary.Contains(UiTestMarker))
@@ -433,7 +433,6 @@ public sealed class EfLegacyProbeResidueTests
             VALUES (900001, 900001, 'uie2e-predicate-proof', 'Residue proof');
             """);
     }
-
     private static bool IsCheckEnabled(out string connectionString)
     {
         connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__QueenZoneLegacy") ?? string.Empty;

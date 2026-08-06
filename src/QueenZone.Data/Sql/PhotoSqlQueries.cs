@@ -7,6 +7,36 @@ namespace QueenZone.Data;
 /// </summary>
 public sealed class PhotoSqlQueries
 {
+    /// <summary>
+    /// Prefer linked modern member via legacy <c>PIC_FILES_T.user_id</c>, then modern photo
+    /// submission submitter via <c>PhotoSubmissions.PromotedPicId</c>, then legacy username.
+    /// </summary>
+    private const string SubmittedByDisplayNameSql = """
+        COALESCE(
+            (
+                SELECT TOP (1) NULLIF(LTRIM(RTRIM(m.DisplayName)), N'')
+                FROM dbo.MemberAccounts m
+                WHERE m.LinkedLegacyUserId = p.user_id
+                  AND m.DisplayName IS NOT NULL
+                ORDER BY m.Id
+            ),
+            (
+                SELECT TOP (1) NULLIF(LTRIM(RTRIM(m.DisplayName)), N'')
+                FROM dbo.PhotoSubmissions ps
+                INNER JOIN dbo.MemberAccounts m ON m.Id = ps.SubmitterMemberId
+                WHERE ps.PromotedPicId = p.PIC_ID
+                  AND m.DisplayName IS NOT NULL
+                ORDER BY ps.ReviewedAt DESC, ps.Id
+            ),
+            NULLIF(LTRIM(RTRIM(u.USERNAME)), N'')
+        )
+        """;
+
+    private const string SubmittedByPlaceholder = "__SUBMITTED_BY_DISPLAY_NAME__";
+
+    private static string EmbedSubmittedBy(string sql) =>
+        sql.Replace(SubmittedByPlaceholder, SubmittedByDisplayNameSql, StringComparison.Ordinal);
+
     public required string CategoriesWithCountsSql { get; init; }
 
     /// <summary>Parameters: offset, pageSize, catId.</summary>
@@ -101,7 +131,7 @@ public sealed class PhotoSqlQueries
                 FROM dbo.PIC_CAT_T
                 WHERE cat_id = {0}
                 """,
-            PhotoByIdSql = """
+            PhotoByIdSql = EmbedSubmittedBy("""
                 SELECT
                     ISNULL(p.Name, N'') AS NAME,
                     p.Date_time AS DATE_TIME,
@@ -113,26 +143,17 @@ public sealed class PhotoSqlQueries
                     CAST(ISNULL(p.PIC_HEIGHT, 0) AS int) AS PIC_HEIGHT,
                     p.PIC_ID AS pic_id,
                     ISNULL(c.name, N'') AS category_name,
-                    COALESCE(
-                        (
-                            SELECT TOP (1) NULLIF(LTRIM(RTRIM(m.DisplayName)), N'')
-                            FROM dbo.MemberAccounts m
-                            WHERE m.LinkedLegacyUserId = p.user_id
-                              AND m.DisplayName IS NOT NULL
-                            ORDER BY m.Id
-                        ),
-                        NULLIF(LTRIM(RTRIM(u.USERNAME)), N'')
-                    ) AS submitted_by_display_name
+                    __SUBMITTED_BY_DISPLAY_NAME__ AS submitted_by_display_name
                 FROM dbo.PIC_FILES_T p
                 INNER JOIN dbo.PIC_CAT_T c ON c.cat_id = p.Cat_ID
                 LEFT JOIN dbo.USERS_T u ON u.USER_ID = p.user_id
                 WHERE p.Cat_ID = {0} AND p.PIC_ID = {1} AND p.DISPLAY = 1{PHOTO_FILTER_P}
-                """,
+                """),
             // One round-trip: photo + totals + neighbors. Neighbor subqueries mirror Previous/NextPicIdSql
             // (seek-friendly UNION ALL; relies on IX_PIC_FILES_T_Cat_Display_Date).
             // {PHOTO_FILTER_*} placeholders are filled by PhotoSqlFilter for size presets (#437).
-            // Submitted-by prefers a linked modern member display name, else legacy USERS_T.USERNAME.
-            DetailNavigationSql = """
+            // Submitted-by: linked modern member, else promoted PhotoSubmissions submitter, else legacy username.
+            DetailNavigationSql = EmbedSubmittedBy("""
                 SELECT
                     ISNULL(p.Name, N'') AS NAME,
                     p.Date_time AS DATE_TIME,
@@ -144,16 +165,7 @@ public sealed class PhotoSqlQueries
                     CAST(ISNULL(p.PIC_HEIGHT, 0) AS int) AS PIC_HEIGHT,
                     p.PIC_ID AS pic_id,
                     ISNULL(c.name, N'') AS category_name,
-                    COALESCE(
-                        (
-                            SELECT TOP (1) NULLIF(LTRIM(RTRIM(m.DisplayName)), N'')
-                            FROM dbo.MemberAccounts m
-                            WHERE m.LinkedLegacyUserId = p.user_id
-                              AND m.DisplayName IS NOT NULL
-                            ORDER BY m.Id
-                        ),
-                        NULLIF(LTRIM(RTRIM(u.USERNAME)), N'')
-                    ) AS submitted_by_display_name,
+                    __SUBMITTED_BY_DISPLAY_NAME__ AS submitted_by_display_name,
                     (
                         SELECT COUNT(*)
                         FROM dbo.PIC_FILES_T t
@@ -214,7 +226,7 @@ public sealed class PhotoSqlQueries
                 INNER JOIN dbo.PIC_CAT_T c ON c.cat_id = p.Cat_ID
                 LEFT JOIN dbo.USERS_T u ON u.USER_ID = p.user_id
                 WHERE p.Cat_ID = {0} AND p.PIC_ID = {1} AND p.DISPLAY = 1{PHOTO_FILTER_P}
-                """,
+                """),
             // Seek-friendly UNION ALL (avoids OR residual predicates that scan the whole category).
             // Relies on IX_PIC_FILES_T_Cat_Display_Date (Cat_ID, DISPLAY, Date_time DESC, PIC_ID DESC).
             PreviousPicIdSql = """
