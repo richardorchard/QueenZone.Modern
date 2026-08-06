@@ -199,13 +199,15 @@ public class SitemapPublicRouteSweepTests : RealDataPageTest
         }
         catch (Exception ex)
         {
-            failures.Add($"{url}: navigation failed - {ex.Message}");
+            failures.Add($"{FailureAttributionPrefix()}{url}: navigation failed - {ex.Message}");
             return;
         }
 
+        var prefix = FailureAttributionPrefix();
+
         if (response is null || response.Status != 200)
         {
-            failures.Add($"{url}: expected HTTP 200, got {(response is null ? "no response" : response.Status.ToString())}");
+            failures.Add($"{prefix}{url}: expected HTTP 200, got {(response is null ? "no response" : response.Status.ToString())}");
             return;
         }
 
@@ -213,41 +215,42 @@ public class SitemapPublicRouteSweepTests : RealDataPageTest
         var h1Count = await h1Locator.CountAsync();
         if (h1Count != 1)
         {
-            failures.Add($"{url}: expected exactly one <h1>, found {h1Count}");
+            failures.Add($"{prefix}{url}: expected exactly one <h1>, found {h1Count}");
         }
         else if (string.IsNullOrWhiteSpace(await h1Locator.InnerTextAsync()))
         {
-            failures.Add($"{url}: <h1> is empty");
+            failures.Add($"{prefix}{url}: <h1> is empty");
         }
 
         var canonicalLocator = Page.Locator("link[rel='canonical']");
         var canonicalCount = await canonicalLocator.CountAsync();
         if (canonicalCount != 1)
         {
-            failures.Add($"{url}: expected exactly one canonical link, found {canonicalCount}");
+            failures.Add($"{prefix}{url}: expected exactly one canonical link, found {canonicalCount}");
         }
         else
         {
             var href = await canonicalLocator.GetAttributeAsync("href");
             if (string.IsNullOrWhiteSpace(href) || !Uri.TryCreate(href, UriKind.Absolute, out var canonicalUri))
             {
-                failures.Add($"{url}: canonical href is missing or not absolute ('{href}')");
+                failures.Add($"{prefix}{url}: canonical href is missing or not absolute ('{href}')");
             }
             else if (!string.Equals(canonicalUri.PathAndQuery.TrimEnd('/'), url.TrimEnd('/'), StringComparison.OrdinalIgnoreCase))
             {
-                failures.Add($"{url}: canonical href '{canonicalUri.PathAndQuery}' does not match requested path");
+                failures.Add($"{prefix}{url}: canonical href '{canonicalUri.PathAndQuery}' does not match requested path");
             }
         }
 
         if (consoleErrors.Count > 0)
         {
             // Mirror archives often have missing CDN thumbs; ignore resource 404 noise.
+            // Live-site may also report CDN redirect noise; keep non-404 console errors hard.
             var actionable = consoleErrors
                 .Where(error => !error.Contains("status of 404", StringComparison.OrdinalIgnoreCase))
                 .ToList();
             if (actionable.Count > 0)
             {
-                failures.Add($"{url}: {actionable.Count} browser console error(s): {string.Join(" | ", actionable)}");
+                failures.Add($"{prefix}{url}: {actionable.Count} browser console error(s): {string.Join(" | ", actionable)}");
             }
             else
             {
@@ -338,6 +341,12 @@ public class SitemapPublicRouteSweepTests : RealDataPageTest
         int.TryParse(Environment.GetEnvironmentVariable("E2E_SITEMAP_SWEEP_PER_SECTION_LIMIT"), out var value) && value > 0
             ? value
             : DefaultPerSectionSampleCap;
+
+    /// <summary>
+    /// Live-site failures mean production is broken (different signal from a mirror failure).
+    /// </summary>
+    private static string FailureAttributionPrefix() =>
+        RealDataMarkers.IsReadOnlyMode() ? "PRODUCTION LIVE-SITE: " : string.Empty;
 
     private HttpClient CreateHttpClient()
     {

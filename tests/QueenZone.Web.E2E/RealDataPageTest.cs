@@ -37,13 +37,9 @@ public abstract class RealDataPageTest : E2EPageTest
     [SetUp]
     public void RealDataSetUp()
     {
-        if (AllowsWrites && RealDataMarkers.IsReadOnlyMode())
-        {
-            throw new InvalidOperationException(
-                $"{GetType().Name} allows writes but E2E_READONLY=true. " +
-                "Write-capable RealData fixtures must not run in the live-site read-only job. " +
-                "Use --filter TestCategory=ReadOnly (or a read-only fixture base) instead.");
-        }
+        // Structural guarantee: write-capable fixtures never start under E2E_READONLY=true
+        // (live-site job). Covered by RealDataWriteGuardTests — do not rely on filter convention alone.
+        RealDataWriteGuard.EnsureNotWriteCapableInReadOnlyMode(AllowsWrites, GetType().Name);
 
         RunId = RealDataMarkers.ResolveRunId();
         _markerSequence = 0;

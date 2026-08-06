@@ -524,6 +524,13 @@ try {
         # amplify navigation/reindex timeouts (#568). Deterministic stays parallel.
         $testArgs += @("--", "NUnit.NumberOfTestWorkers=1")
     }
+    elseif ($Mode -eq "LiveSite") {
+        # Production is a single-instance B1 App Service. Cap to one test worker so the public
+        # sweep uses at most ~2 browser contexts (main + mobile in the sitemap fixture) and
+        # does not trip in-app rate limiting (AddQueenZoneRateLimiting).
+        $testArgs += @("--", "NUnit.NumberOfTestWorkers=1")
+        Write-Host "LiveSite: single NUnit worker (polite load against production)."
+    }
 
     Write-Host ">> dotnet $($testArgs -join ' ')"
     & dotnet @testArgs
