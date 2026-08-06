@@ -77,4 +77,31 @@ public sealed class E2EConnectionGuardTests
 
         Assert.Null(exception);
     }
+
+    [Theory]
+    [InlineData("Server=glory11;Database=queenzone_legacy_sync;User Id=queenzone_probe;Password=pw;TrustServerCertificate=True")]
+    [InlineData(@"Server=glory11\SQLEXPRESS;Database=queenzone_legacy_sync;User Id=queenzone_probe;Password=pw;TrustServerCertificate=True")]
+    public void EnsureSafe_allows_glory11_lan_login(string connectionString)
+    {
+        var exception = Record.Exception(() => E2EConnectionGuard.EnsureSafe(connectionString, MachineName));
+        Assert.Null(exception);
+    }
+
+    [Fact]
+    public void EnsureSafe_allows_sqlexpress_lan_address_env_var_with_port()
+    {
+        Environment.SetEnvironmentVariable("SQLEXPRESS_LAN_ADDRESS", "192.168.1.237,1433");
+        try
+        {
+            var exception = Record.Exception(() => E2EConnectionGuard.EnsureSafe(
+                "Server=192.168.1.237,1433;Database=queenzone_legacy_sync;User Id=queenzone_probe;Password=pw;TrustServerCertificate=True",
+                MachineName));
+
+            Assert.Null(exception);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("SQLEXPRESS_LAN_ADDRESS", null);
+        }
+    }
 }
