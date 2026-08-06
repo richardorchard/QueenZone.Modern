@@ -209,6 +209,20 @@ Keep end-to-end tests small. They should prove critical user journeys and browse
 
 On failure, tests write screenshots and Playwright traces under `test-results/e2e/` (gitignored). CI uploads that folder as an artifact when the e2e job fails.
 
+#### Selector conventions
+
+The [behavior-first principle](#behavior-first-html-assertions) for HTML integration tests applies to Playwright locators too, with one addition specific to browser-level tests: prefer, in order —
+
+1. **`GetByRole`** (with an accessible name) — matches how a user or assistive tech finds the element and survives markup/styling refactors.
+2. **`data-testid`** — add one to the markup when role-based targeting isn't specific enough (e.g. picking one of several similar rows, or targeting a third-party widget's internals). This is a project-owned contract: renaming or removing it is a deliberate, reviewable change, unlike a CSS class that can shift for styling reasons alone.
+3. **Project-owned CSS classes** (e.g. `qz-*`, `admin-*`) — acceptable when the class is effectively a stable hook, but prefer promoting it to a `data-testid` if the test starts chaining `.Filter(HasText: ...)` or nested class selectors to disambiguate.
+
+Avoid:
+
+- Selecting on **third-party library internals** (for example Quill's own `.ql-editor` class). A library upgrade can rename or restructure these with no relation to a code change in this repo. Tag the element you actually need with `data-testid` instead — see `quill.root.setAttribute("data-testid", "rich-text-editor")` in `wwwroot/js/editor/rich-text-editor.js`, used by `Page.Locator("[data-testid='rich-text-editor']")` across `tests/QueenZone.Web.E2E`.
+- **Full-sentence `GetByText` matches on product copy** (e.g. a whole validation or confirmation message). A copy edit unrelated to the behavior under test then breaks the test. Prefer matching a shorter, structural fragment, or asserting via a `data-testid`d status element instead of the sentence itself.
+- Deeply chained locators that combine several fragile signals at once (class → text filter → nested class) — each link is a separate way for the test to break for reasons unrelated to the behavior it's meant to prove.
+
 ### Frontend performance checks (advisory)
 
 Use Lighthouse via `scripts/Measure-FrontendPerformance.ps1` when a change may affect end-user load cost on public pages (homepage, news, forum).

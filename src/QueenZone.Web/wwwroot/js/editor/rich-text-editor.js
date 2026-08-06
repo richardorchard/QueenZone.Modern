@@ -516,6 +516,10 @@
       ],
     });
 
+    // Project-owned test hook: Quill's own ".ql-editor" class is a third-party
+    // implementation detail that can change on a library upgrade.
+    quill.root.setAttribute("data-testid", "rich-text-editor");
+
     if (textarea.value) {
       quill.root.innerHTML = textarea.value;
     }

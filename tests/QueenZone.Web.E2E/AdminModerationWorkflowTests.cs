@@ -444,7 +444,7 @@ public class AdminModerationWorkflowTests : RealDataPageTest
 
     private async Task FillRichTextEditorAsync(IPage page, string text)
     {
-        var editor = page.Locator(".ql-editor").Last;
+        var editor = page.Locator("[data-testid='rich-text-editor']").Last;
         await Expect(editor).ToBeVisibleAsync();
         await editor.ClickAsync();
         await page.Keyboard.InsertTextAsync(text);
