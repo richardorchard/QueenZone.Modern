@@ -29,7 +29,7 @@
 
 ## Issues
 
-<!-- Closes #123 or Relates to #123 -->
+<!-- If this PR fully resolves an issue, use a real closing keyword so GitHub auto-closes it on merge: "Closes #123" / "Fixes #123" / "Resolves #123". Use "Relates to #123" for issues this PR only touches. A prose mention elsewhere in this PR (e.g. "Implements #123") does NOT auto-close the issue and is checked by CI (pr-issue-link-check). -->
 
 ## Follow-up
 
