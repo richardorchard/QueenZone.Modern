@@ -63,6 +63,7 @@ public sealed class EfLegacyProbeResidueTests
                 FROM dbo.PIC_FILES_T
                 WHERE Name IN ('Thumb regen photo', 'Route upload photo')
                    OR Name LIKE 'photo-submission-probe-%'
+                   OR Name LIKE 'uie2e-%'
                 """)
             .SingleAsync();
         Assert.Equal(0, legacyTestPhotoCount);
@@ -86,11 +87,18 @@ public sealed class EfLegacyProbeResidueTests
                 && (row.Slug.StartsWith("probe-write-")
                     || row.Slug.StartsWith("news-section-live-probe-")
                     || row.Slug.StartsWith("full-lifecycle-live-probe-")))
-            || row.EditorEmail == "legacy-write-probe@queenzone.local");
+            || row.EditorEmail == "legacy-write-probe@queenzone.local"
+            // uie2e-{runId}-{fixture}-{n}: RealDataPageTest marker convention (Web.E2E),
+            // e.g. AdminModerationWorkflowTests publishing an approved article for #548.
+            || row.Title.Contains("uie2e-"));
 
     private static IQueryable<NewsAuditLogEntity> NewsAuditResidueQuery(QueenZoneDbContext dbContext) =>
         dbContext.NewsAuditLogs.Where(audit =>
-            audit.ActorEmail == "legacy-write-probe@queenzone.local");
+            audit.ActorEmail == "legacy-write-probe@queenzone.local"
+            // AdminModerationWorkflowTests (#548) acts as the E2E admin test identity when
+            // publishing/unpublishing news; catches audit rows orphaned if CleanupCreatedRowsAsync's
+            // NewsId-scoped delete never runs.
+            || audit.ActorEmail == "admin@test.local");
 
     private static IQueryable<NewsAgentRunRequestEntity> RunRequestResidueQuery(QueenZoneDbContext dbContext) =>
         dbContext.NewsAgentRunRequests.Where(request =>
