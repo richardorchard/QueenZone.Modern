@@ -11,6 +11,16 @@ on:
         required: false
         type: boolean
         default: false
+      skip_sync:
+        description: "Skip the DB sync and reuse the existing SQL Express mirror (saves the 3-5 minute sqlpackage extract/publish)"
+        required: false
+        type: boolean
+        default: false
+      category_filter:
+        description: "Optional substring to narrow the real-data UI suite to matching test names (dotnet test FullyQualifiedName~<value>), e.g. PrivateMessaging"
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -23,10 +33,13 @@ concurrency:
 # docs/architecture/testing-policy.md, "Data Integration Tests") exercise the
 # real legacy SQL Server but are gated behind ConnectionStrings__QueenZoneLegacy
 # and explicit write-probe flags, all unset in ci.yml. Normal PR tests remain
-# database-free. This workflow runs read and self-cleaning write probes nightly
-# without putting the real legacy/deploy database on the PR merge path.
+# database-free. This workflow runs read probes, self-cleaning write probes,
+# and the real-data Playwright UI suite nightly, without putting the real
+# legacy/deploy database on the PR merge path. It is continuous signal, like
+# the probes it extends — it is not a required check on any PR, and
+# deploy.yml does not depend on it.
 #
-# Probes run against a same-day mirror on the Windows runner's local SQL
+# Everything runs against a same-day mirror on the Windows runner's local SQL
 # Express (synced from the live Azure SQL DB via sqlpackage each run), not
 # the live database directly — see scripts/Sync-LegacyDbToSqlExpress.ps1.
 # The Mac runner reaches that SQL Express instance over the LAN.
@@ -43,20 +56,38 @@ concurrency:
 #      Windows runner's LAN IP (currently 192.168.1.237, ideally a DHCP
 #      reservation) ever changes.
 #
+# Sequence: sync-legacy-db -> legacy-read-probes -> legacy-write-probes ->
+# ui-e2e-realdata -> residue-check. One workflow with explicit `needs`
+# ordering, rather than a second workflow racing this one, so nothing can
+# rebuild the mirror underneath a running UI suite.
+#
 # Read probes run first. Self-cleaning write probes then exercise the same
 # SQL Express mirror locally on the Windows runner. Their scripts reject
-# Azure SQL and remote targets. Admin news writes include
-# EfAdminNewsRepositoryLegacyWriteProbeTests plus the Admin_news_* Facts in
-# EfNewsSectionLiveProbeTests (via Probe-AdminNewsLegacyWrites.ps1).
-# EfNewsDiscoveryPromotionLiveProbeTests stays opt-in until hardened (#503).
-# A final residue check fails the workflow if any known probe or leaked
-# web-test markers remain.
+# Azure SQL and remote targets (the Mac's LAN address to that same mirror is
+# allow-listed alongside localhost — see Assert-SqlExpressMirrorConnection.ps1).
+# Admin news writes include EfAdminNewsRepositoryLegacyWriteProbeTests plus
+# the Admin_news_* Facts in EfNewsSectionLiveProbeTests (via
+# Probe-AdminNewsLegacyWrites.ps1). EfNewsDiscoveryPromotionLiveProbeTests
+# stays opt-in until hardened (#503).
+#
+# ui-e2e-realdata then runs the TestCategory=RealData Playwright suite
+# (scripts/Run-E2E.ps1 -Mode RealData) on both the Windows runner (localhost
+# mirror, Integrated Security) and the Mac runner (mirror over LAN, the
+# queenzone_probe SQL login) — the database only lives on the Windows box
+# (glory11), but the UI suite itself needs coverage on both OSes.
+#
+# A final residue-check job — after both write probes and the UI suite, so it
+# validates UI-test cleanup too — fails the workflow if any known probe or
+# leaked web-test markers remain.
 jobs:
   sync-legacy-db:
     name: Sync legacy DB to SQL Express
     # Must run where SQL Express lives (the import target is localhost) —
     # the Windows box, regardless of its weaker CPU.
     runs-on: [self-hosted, Windows]
+    # workflow_dispatch's skip_sync input lets an on-demand run reuse the
+    # existing mirror instead of paying the 3-5 minute sqlpackage extract/publish.
+    if: github.event_name != 'workflow_dispatch' || inputs.skip_sync != true
     timeout-minutes: 15
     environment: dev
 
@@ -86,6 +117,9 @@ jobs:
   legacy-read-probes:
     name: Legacy SQL read probes
     needs: sync-legacy-db
+    # sync-legacy-db can be skipped via workflow_dispatch's skip_sync input;
+    # tolerate that instead of treating it like a failure.
+    if: always() && (needs.sync-legacy-db.result == 'success' || needs.sync-legacy-db.result == 'skipped')
     # Runs on the Mac Mini (M2) rather than the Windows box (i3) or a
     # GitHub-hosted runner — this is unattended and not time-sensitive, and
     # the Mac has the most headroom of the three for a nightly job. Reaches
@@ -130,6 +164,7 @@ jobs:
   legacy-write-probes:
     name: Legacy SQL self-cleaning write probes
     needs: [sync-legacy-db, legacy-read-probes]
+    if: always() && needs.legacy-read-probes.result == 'success' && (needs.sync-legacy-db.result == 'success' || needs.sync-legacy-db.result == 'skipped')
     runs-on: [self-hosted, Windows]
     timeout-minutes: 30
     environment: dev
@@ -182,6 +217,107 @@ jobs:
         env:
           RUN_NEWS_AGENT_URL_INGESTION_PROBE: "true"
         run: ./scripts/Probe-NewsAgentUrlIngestion.ps1 -Full
+
+  ui-e2e-realdata:
+    name: UI E2E RealData (${{ matrix.os }})
+    needs: [sync-legacy-db, legacy-read-probes, legacy-write-probes]
+    if: always() && needs.legacy-write-probes.result == 'success' && (needs.sync-legacy-db.result == 'success' || needs.sync-legacy-db.result == 'skipped')
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: Windows
+            runner: '["self-hosted", "Windows"]'
+          - os: macOS
+            runner: '["self-hosted", "queenzone"]'
+    runs-on: ${{ fromJSON(matrix.runner) }}
+    timeout-minutes: 45
+    environment: dev
+
+    steps:
+      - name: Kill stray app processes from a previous run (Windows)
+        if: matrix.os == 'Windows'
+        run: |
+          Get-Process -Name "QueenZone.Web" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+
+      - name: Kill stray app processes from a previous run (macOS)
+        if: matrix.os == 'macOS'
+        run: pkill -f QueenZone.Web || true
+
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Verify .NET SDK
+        run: dotnet --version
+
+      # The Mac has no Integrated Security path to the Windows box, so it
+      # needs the queenzone_probe SQL login's password (same secret the
+      # legacy-read-probes job already uses) to reach the mirror over LAN.
+      - name: Fetch Bitwarden deploy secrets
+        if: matrix.os == 'macOS'
+        id: bitwarden-secrets
+        uses: bitwarden/sm-action@v3.0.1
+        with:
+          access_token: ${{ secrets.BITWARDEN_SECRETS_MANAGER_ACCESS_TOKEN }}
+          secrets: ${{ vars.BITWARDEN_APP_SERVICE_DEPLOY_SECRETS }}
+
+      - name: Run real-data UI suite (Windows, local mirror)
+        if: matrix.os == 'Windows'
+        shell: powershell
+        env:
+          ASPNETCORE_ENVIRONMENT: E2E
+          ConnectionStrings__QueenZoneLegacy: "Server=localhost\\SQLEXPRESS;Database=queenzone_legacy_sync;Integrated Security=True;TrustServerCertificate=True"
+          E2E_ADMIN_EMAIL: admin@test.local
+          E2E_ARTIFACT_DIR: test-results/e2e
+        run: ./scripts/Run-E2E.ps1 -Mode RealData -CategoryFilter "${{ inputs.category_filter }}"
+
+      - name: Run real-data UI suite (macOS, mirror over LAN)
+        if: matrix.os == 'macOS'
+        shell: pwsh
+        env:
+          ASPNETCORE_ENVIRONMENT: E2E
+          SQLEXPRESS_LAN_ADDRESS: ${{ vars.SQLEXPRESS_LAN_ADDRESS || '192.168.1.237,1433' }}
+          SQLEXPRESS_PROBE_PASSWORD: ${{ steps.bitwarden-secrets.outputs.QUEENZONE_SQL_EXPRESS_PROBE_PASSWORD }}
+          E2E_ADMIN_EMAIL: admin@test.local
+          E2E_ARTIFACT_DIR: test-results/e2e
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:SQLEXPRESS_PROBE_PASSWORD)) {
+            Write-Error "QUEENZONE_SQL_EXPRESS_PROBE_PASSWORD is not configured. Check the Bitwarden secret and BITWARDEN_APP_SERVICE_DEPLOY_SECRETS mapping (see prerequisites above)."
+          }
+          $env:ConnectionStrings__QueenZoneLegacy = "Server=$env:SQLEXPRESS_LAN_ADDRESS;Database=queenzone_legacy_sync;User Id=queenzone_probe;Password=$env:SQLEXPRESS_PROBE_PASSWORD;TrustServerCertificate=True"
+          ./scripts/Run-E2E.ps1 -Mode RealData -CategoryFilter "${{ inputs.category_filter }}"
+
+      - name: Upload Playwright failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: e2e-realdata-${{ matrix.os }}-${{ github.run_id }}
+          path: |
+            test-results/e2e/
+            e2e-app.log
+            e2e-app.err.log
+          if-no-files-found: ignore
+          retention-days: 1
+
+  residue-check:
+    name: Verify no probe or UI-test residue remains
+    # Runs after both the write probes and the UI suite (not as the last step
+    # of legacy-write-probes) so it validates UI-test cleanup too, not just
+    # probe cleanup.
+    needs: [legacy-write-probes, ui-e2e-realdata]
+    if: always() && needs.legacy-write-probes.result == 'success'
+    runs-on: [self-hosted, Windows]
+    timeout-minutes: 15
+    environment: dev
+    env:
+      ConnectionStrings__QueenZoneLegacy: "Server=localhost\\SQLEXPRESS;Database=queenzone_legacy_sync;Integrated Security=True;TrustServerCertificate=True"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Restore
+        run: dotnet restore tests/QueenZone.Web.Tests/QueenZone.Web.Tests.csproj
 
       - name: Verify no probe or leaked web-test residue remains
         env:
