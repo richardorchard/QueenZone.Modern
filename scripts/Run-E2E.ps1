@@ -507,6 +507,12 @@ try {
     elseif ($NoRestore) { $testArgs += "--no-restore" }
     else { $testArgs += "--no-build" }
 
+    if ($Mode -eq "RealData") {
+        # One app + one SQL Express mirror: parallel RealData fixtures contend for connections and
+        # amplify navigation/reindex timeouts (#568). Deterministic stays parallel.
+        $testArgs += @("--", "NUnit.NumberOfTestWorkers=1")
+    }
+
     Write-Host ">> dotnet $($testArgs -join ' ')"
     & dotnet @testArgs
     $testExitCode = $LASTEXITCODE

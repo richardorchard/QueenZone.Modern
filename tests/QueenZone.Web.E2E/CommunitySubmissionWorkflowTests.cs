@@ -112,7 +112,7 @@ public class CommunitySubmissionWorkflowTests : RealDataPageTest
         await Expect(Page).ToHaveURLAsync(new Regex(".*/submit/news/confirmation"));
         await Expect(Page.GetByRole(AriaRole.Status)).ToContainTextAsync("Thank you for the suggestion!");
 
-        await using var adminContext = await Browser.NewContextAsync(new BrowserNewContextOptions
+        var adminContext = await CreateExtraContextAsync(new BrowserNewContextOptions
         {
             BaseURL = BaseUrl,
             ExtraHTTPHeaders = new Dictionary<string, string> { [AdminEmailHeader] = AdminEmail },

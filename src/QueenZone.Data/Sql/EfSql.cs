@@ -5,6 +5,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace QueenZone.Data;
 
@@ -24,7 +25,7 @@ internal static class EfSql
         where T : class, new()
     {
         var connection = await OpenSqlConnectionAsync(dbContext, cancellationToken);
-        await using var command = CreateProcCommand(connection, procedureName, commandTimeoutSeconds);
+        await using var command = CreateProcCommand(connection, dbContext, procedureName, commandTimeoutSeconds);
         configure?.Invoke(command);
 
         var rows = new List<T>();
@@ -46,14 +47,7 @@ internal static class EfSql
         where T : class, new()
     {
         var connection = await OpenSqlConnectionAsync(dbContext, cancellationToken);
-        await using var command = connection.CreateCommand();
-        command.CommandText = sql;
-        command.CommandType = CommandType.Text;
-        if (commandTimeoutSeconds is not null)
-        {
-            command.CommandTimeout = commandTimeoutSeconds.Value;
-        }
-
+        await using var command = CreateTextCommand(connection, dbContext, sql, commandTimeoutSeconds);
         configure?.Invoke(command);
 
         var rows = new List<T>();
@@ -91,7 +85,7 @@ internal static class EfSql
         CancellationToken cancellationToken = default)
     {
         var connection = await OpenSqlConnectionAsync(dbContext, cancellationToken);
-        await using var command = CreateProcCommand(connection, procedureName, commandTimeoutSeconds);
+        await using var command = CreateProcCommand(connection, dbContext, procedureName, commandTimeoutSeconds);
         configure?.Invoke(command);
         var result = await command.ExecuteScalarAsync(cancellationToken);
         return result is null or DBNull ? 0 : Convert.ToInt32(result);
@@ -105,14 +99,7 @@ internal static class EfSql
         CancellationToken cancellationToken = default)
     {
         var connection = await OpenSqlConnectionAsync(dbContext, cancellationToken);
-        await using var command = connection.CreateCommand();
-        command.CommandText = sql;
-        command.CommandType = CommandType.Text;
-        if (commandTimeoutSeconds is not null)
-        {
-            command.CommandTimeout = commandTimeoutSeconds.Value;
-        }
-
+        await using var command = CreateTextCommand(connection, dbContext, sql, commandTimeoutSeconds);
         configure?.Invoke(command);
         var result = await command.ExecuteScalarAsync(cancellationToken);
         return result is null or DBNull ? 0 : Convert.ToInt32(result);
@@ -126,14 +113,7 @@ internal static class EfSql
         CancellationToken cancellationToken = default)
     {
         var connection = await OpenSqlConnectionAsync(dbContext, cancellationToken);
-        await using var command = connection.CreateCommand();
-        command.CommandText = sql;
-        command.CommandType = CommandType.Text;
-        if (commandTimeoutSeconds is not null)
-        {
-            command.CommandTimeout = commandTimeoutSeconds.Value;
-        }
-
+        await using var command = CreateTextCommand(connection, dbContext, sql, commandTimeoutSeconds);
         configure?.Invoke(command);
         return await command.ExecuteNonQueryAsync(cancellationToken);
     }
@@ -213,8 +193,25 @@ internal static class EfSql
         return sqlConnection;
     }
 
+    /// <summary>
+    /// Enlists a raw <see cref="SqlCommand"/> in the ambient EF transaction when one is active.
+    /// Without this, ADO.NET throws when EF has begun a local transaction on the shared connection
+    /// (for example photo-submission promotion wrapping <c>PIC_FILES_T</c> insert + submission update).
+    /// </summary>
+    private static void ApplyAmbientTransaction(SqlCommand command, QueenZoneDbContext dbContext)
+    {
+        var current = dbContext.Database.CurrentTransaction;
+        if (current is null)
+        {
+            return;
+        }
+
+        command.Transaction = (SqlTransaction)current.GetDbTransaction();
+    }
+
     private static SqlCommand CreateProcCommand(
         SqlConnection connection,
+        QueenZoneDbContext dbContext,
         string procedureName,
         int? commandTimeoutSeconds)
     {
@@ -226,6 +223,25 @@ internal static class EfSql
             command.CommandTimeout = commandTimeoutSeconds.Value;
         }
 
+        ApplyAmbientTransaction(command, dbContext);
+        return command;
+    }
+
+    private static SqlCommand CreateTextCommand(
+        SqlConnection connection,
+        QueenZoneDbContext dbContext,
+        string sql,
+        int? commandTimeoutSeconds)
+    {
+        var command = connection.CreateCommand();
+        command.CommandText = sql;
+        command.CommandType = CommandType.Text;
+        if (commandTimeoutSeconds is not null)
+        {
+            command.CommandTimeout = commandTimeoutSeconds.Value;
+        }
+
+        ApplyAmbientTransaction(command, dbContext);
         return command;
     }
 
