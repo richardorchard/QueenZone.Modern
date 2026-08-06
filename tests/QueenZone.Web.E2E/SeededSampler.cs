@@ -22,6 +22,11 @@ internal static class SeededSampler
             return items;
         }
 
+        if (cap == 1)
+        {
+            return [items[0]];
+        }
+
         var picked = new List<T> { items[0] };
         if (items.Count > 1)
         {
