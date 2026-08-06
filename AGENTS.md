@@ -77,6 +77,10 @@ Before merging to `main`, open a pull request and fill in `.github/pull_request_
 
 For multi-session work, use `docs/agent-handoff-cheatsheet.md`.
 
+### Linking issues so merge auto-closes them
+
+Fill in the template's `## Issues` section with a real GitHub closing keyword — `Closes #123`, `Fixes #123`, or `Resolves #123` — for every issue the PR fully resolves. GitHub only auto-closes an issue on merge when one of those keywords appears; a prose mention like "Implements #123" or a bare `[#123](...)` link anywhere else in the PR body (including `## Summary`) does not trigger it and leaves the issue open after merge. Use `Relates to #123` for issues the PR only touches without resolving. The `pr-issue-link-check` CI job fails the PR if it references an issue number without a recognized closing or relating keyword, so use the correct keyword up front rather than fixing it after the check fails.
+
 ## Testing Expectations
 
 Follow `docs/architecture/testing-policy.md`.
