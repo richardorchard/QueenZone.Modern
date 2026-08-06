@@ -62,6 +62,7 @@ public class E2ECategoryGuardTests
             nameof(E2ECategoryGuardTests),
             nameof(EditorWorkflowTests),
             nameof(ForumPostingWorkflowTests),
+            nameof(RealDataDbTests),
             nameof(RealDataMarkerTests),
             nameof(RealDataWriteGuardTests),
             nameof(SeededSamplerTests),
