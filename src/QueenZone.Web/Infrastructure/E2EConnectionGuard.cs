@@ -41,11 +41,11 @@ public static class E2EConnectionGuard
 
         var server = GetValue(builder, ServerKeys);
         var allowedServers = GetAllowedServers(machineName);
-        if (!allowedServers.Contains(server, StringComparer.OrdinalIgnoreCase))
+        if (!allowedServers.Contains(RemovePort(server), StringComparer.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException(
-                $"E2E refused server '{server}'. Use the local SQL Express mirror; Azure SQL and " +
-                "remote servers are blocked.");
+                $"E2E refused server '{server}'. Use the local SQL Express mirror (or its LAN " +
+                "address for the Mac runner); Azure SQL and other remote servers are blocked.");
         }
     }
 
@@ -70,6 +70,12 @@ public static class E2EConnectionGuard
             @".\SQLEXPRESS",
             @"(local)\SQLEXPRESS",
             @"127.0.0.1\SQLEXPRESS",
+            // The Mac runner has no Integrated Security path to the Windows box, so it reaches
+            // the same disposable mirror over the LAN with a SQL login instead (see
+            // docs/agent-bitwarden-secrets.md and scripts/Assert-SqlExpressMirrorConnection.ps1,
+            // which this guard mirrors). Still the local mirror, not a remote server.
+            "glory11",
+            @"glory11\SQLEXPRESS",
         };
 
         var effectiveMachineName = machineName ?? Environment.MachineName;
@@ -78,6 +84,17 @@ public static class E2EConnectionGuard
             allowed.Add($@"{effectiveMachineName}\SQLEXPRESS");
         }
 
+        var lanAddress = Environment.GetEnvironmentVariable("SQLEXPRESS_LAN_ADDRESS");
+        if (!string.IsNullOrWhiteSpace(lanAddress))
+        {
+            allowed.Add(RemovePort(lanAddress));
+        }
+
         return allowed;
     }
+
+    // Strips a trailing ",<port>" (e.g. "192.168.1.237,1433") so LAN addresses compare the same
+    // way regardless of whether a port was supplied.
+    private static string RemovePort(string value) =>
+        value.Contains(',') ? value[..value.IndexOf(',')] : value;
 }

@@ -63,6 +63,7 @@ public class E2ECategoryGuardTests
             nameof(EditorWorkflowTests),
             nameof(ForumPostingWorkflowTests),
             nameof(RealDataMarkerTests),
+            nameof(RealDataWriteGuardTests),
             nameof(SeededSamplerTests),
             nameof(SelectorConventionGuardTests),
             nameof(SitemapRouteParserTests),
@@ -75,8 +76,8 @@ public class E2ECategoryGuardTests
     [Test]
     public void RealDataFixturesArePresent()
     {
-        // Acceptance for #545 (phase 2 of #543): --filter TestCategory=RealData now selects
-        // the sitemap sweep. Keep this list in sync as further phase-2 issues (#546-#548) land.
+        // Keep this list in sync as RealData fixtures land. LiveSite filter is
+        // TestCategory=RealData&TestCategory=ReadOnly (sitemap + media CDN only).
         var assembly = typeof(E2EPageTest).Assembly;
         var realData = assembly.GetTypes()
             .Where(t => t is { IsClass: true, IsAbstract: false, IsPublic: true })
@@ -90,11 +91,38 @@ public class E2ECategoryGuardTests
         {
             nameof(AdminModerationWorkflowTests),
             nameof(CommunitySubmissionWorkflowTests),
+            nameof(LiveSiteMediaCdnTests),
             nameof(PrivateMessagingWorkflowTests),
             nameof(SitemapPublicRouteSweepTests),
         };
 
         Assert.That(realData, Is.EqualTo(expected));
+    }
+
+    [Test]
+    public void LiveSiteFilterSelectsOnlyReadOnlyRealDataFixtures()
+    {
+        // Mirrors Run-E2E.ps1 -Mode LiveSite: TestCategory=RealData&TestCategory=ReadOnly
+        var assembly = typeof(E2EPageTest).Assembly;
+        var liveSite = assembly.GetTypes()
+            .Where(t => t is { IsClass: true, IsAbstract: false, IsPublic: true })
+            .Where(IsNUnitFixture)
+            .Where(t => HasCategory(t, E2ECategories.RealData) && HasCategory(t, E2ECategories.ReadOnly))
+            .Select(t => t.Name)
+            .OrderBy(n => n, StringComparer.Ordinal)
+            .ToList();
+
+        var expected = new[]
+        {
+            nameof(LiveSiteMediaCdnTests),
+            nameof(SitemapPublicRouteSweepTests),
+        };
+
+        Assert.That(
+            liveSite,
+            Is.EqualTo(expected),
+            "Live-site job must only select write-free RealData fixtures. " +
+            "Mark new read-only RealData fixtures with [Category(\"ReadOnly\")].");
     }
 
 
