@@ -35,6 +35,11 @@
   Do not publish or start a local app; attach to whatever is already listening at -BaseUrl.
   Ignored for LiveSite (which never starts an app).
 
+.PARAMETER CategoryFilter
+  Optional substring narrowing the run to fully-qualified test names containing it (dotnet test
+  `FullyQualifiedName~<value>`), combined with the mode's TestCategory filter. Lets a nightly
+  on-demand run re-run a single failing area instead of the whole suite. Ignored when empty.
+
 .EXAMPLE
   powershell -File ./scripts/Run-E2E.ps1 -Mode Deterministic
 
@@ -64,7 +69,10 @@ param(
     [switch] $NoRestore,
 
     [Parameter()]
-    [switch] $SkipAppStart
+    [switch] $SkipAppStart,
+
+    [Parameter()]
+    [string] $CategoryFilter = ""
 )
 
 Set-StrictMode -Version Latest
@@ -422,6 +430,10 @@ switch ($Mode) {
             Write-Host "SkipAppStart is implied for LiveSite; ignoring the switch."
         }
     }
+}
+
+if (-not [string]::IsNullOrWhiteSpace($CategoryFilter)) {
+    $testFilter = "$testFilter&FullyQualifiedName~$CategoryFilter"
 }
 
 Write-Host "Run-E2E mode=$Mode baseUrl=$BaseUrl filter=$testFilter startsApp=$startsApp"
