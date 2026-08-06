@@ -29,6 +29,9 @@ public sealed class PhotoSqlQueriesTests
         Assert.Contains("AS submitted_by_display_name", sql.DetailNavigationSql, StringComparison.Ordinal);
         Assert.Contains("LEFT JOIN dbo.USERS_T u ON u.USER_ID = p.user_id", sql.DetailNavigationSql, StringComparison.Ordinal);
         Assert.Contains("MemberAccounts m", sql.DetailNavigationSql, StringComparison.Ordinal);
+        Assert.Contains("PhotoSubmissions ps", sql.DetailNavigationSql, StringComparison.Ordinal);
+        Assert.Contains("ps.PromotedPicId = p.PIC_ID", sql.DetailNavigationSql, StringComparison.Ordinal);
+        Assert.Contains("PhotoSubmissions ps", sql.PhotoByIdSql, StringComparison.Ordinal);
         Assert.Contains("{PHOTO_FILTER_P}", sql.CategoryPageSql, StringComparison.Ordinal);
         Assert.Contains("{PHOTO_FILTER_T}", sql.DetailNavigationSql, StringComparison.Ordinal);
         var filtered = sql.ApplyFilter(sql.CategoryCountSql, new PhotoListFilter(PhotoSizePreset.Desktop));

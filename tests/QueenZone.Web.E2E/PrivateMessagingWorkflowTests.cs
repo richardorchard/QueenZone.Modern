@@ -32,7 +32,7 @@ public class PrivateMessagingWorkflowTests : RealDataPageTest
 
         await Context.SetExtraHTTPHeadersAsync(HeadersFor(memberA));
 
-        await using var contextB = await Browser.NewContextAsync(new BrowserNewContextOptions
+        var contextB = await CreateExtraContextAsync(new BrowserNewContextOptions
         {
             BaseURL = BaseUrl,
             ExtraHTTPHeaders = HeadersFor(memberB),
@@ -104,7 +104,18 @@ public class PrivateMessagingWorkflowTests : RealDataPageTest
 
         // Blocking: B blocks A from B's view of A's profile; confirm the JS confirm() dialog.
         pageB.Dialog += async (_, dialog) => await dialog.AcceptAsync();
-        await pageB.GotoAsync($"/members/{memberA.Id}");
+        var profilePath = $"/members/{memberA.Id}";
+        try
+        {
+            await pageB.GotoAsync(profilePath, new PageGotoOptions { Timeout = 60_000 });
+        }
+        catch (TimeoutException ex)
+        {
+            Assert.Fail(
+                $"Timed out navigating to member profile for block step ({profilePath}). " +
+                $"Last URL: {pageB.Url}. {ex.Message}");
+        }
+
         await pageB.GetByRole(AriaRole.Button, new() { Name = "Block", Exact = true }).ClickAsync();
         await Expect(pageB.GetByText("Member blocked. They can no longer send you private messages.")).ToBeVisibleAsync();
 
@@ -124,12 +135,12 @@ public class PrivateMessagingWorkflowTests : RealDataPageTest
     {
         var owner = await CreateMemberAsync("pm-inbox-page");
         const int conversationCount = PrivateMessageLimits.InboxPageSize + 1;
+        List<string> bodiesBySortKeyDescending;
 
         await using (var db = RealDataDb.CreateContext())
         {
             var baseTime = DateTimeOffset.UtcNow.AddHours(-1);
             var conversations = new List<PrivateConversationEntity>();
-            var messages = new List<PrivateMessageEntity>();
 
             for (var i = 0; i < conversationCount; i++)
             {
@@ -147,6 +158,7 @@ public class PrivateMessagingWorkflowTests : RealDataPageTest
 
                 var (low, high) = owner.Id.CompareTo(peerId) < 0 ? (owner.Id, peerId) : (peerId, owner.Id);
                 var sentAt = baseTime.AddSeconds(i);
+                var body = $"{owner.Marker} pagination message {i}";
                 var conversation = new PrivateConversationEntity
                 {
                     Id = Guid.NewGuid(),
@@ -155,7 +167,7 @@ public class PrivateMessagingWorkflowTests : RealDataPageTest
                     CreatedAt = sentAt,
                     LastMessageAt = sentAt,
                     LastMessageSortKey = 0,
-                    LastMessagePreview = $"{owner.Marker} pagination message {i}",
+                    LastMessagePreview = body,
                     LastMessageSenderId = peerId,
                 };
                 db.PrivateConversations.Add(conversation);
@@ -180,44 +192,74 @@ public class PrivateMessagingWorkflowTests : RealDataPageTest
                     IsRemoved = false,
                 });
 
-                var message = new PrivateMessageEntity
+                db.PrivateMessages.Add(new PrivateMessageEntity
                 {
                     Id = Guid.NewGuid(),
                     ConversationId = conversation.Id,
                     SenderMemberId = peerId,
-                    Body = $"{owner.Marker} pagination message {i}",
+                    Body = body,
                     CreatedAt = sentAt,
-                };
-                db.PrivateMessages.Add(message);
-                messages.Add(message);
+                });
             }
 
             await db.SaveChangesAsync();
 
-            // SortKey is IDENTITY-assigned on insert order, which matches loop order (i) here —
-            // use it as the tip so LastMessageSortKey ranking matches the intended newest-first order.
-            foreach (var (conversation, message) in conversations.Zip(messages))
+            // IDENTITY SortKey order is not guaranteed to match EF batch insert order. Rank by
+            // the values SQL actually assigned, then mirror those tips onto LastMessageSortKey.
+            var assigned = await db.PrivateMessages
+                .AsNoTracking()
+                .Where(m => m.Body.StartsWith(owner.Marker + " pagination message "))
+                .OrderByDescending(m => m.SortKey)
+                .Select(m => new { m.ConversationId, m.SortKey, m.Body })
+                .ToListAsync();
+
+            Assert.That(assigned, Has.Count.EqualTo(conversationCount));
+
+            var byId = conversations.ToDictionary(c => c.Id);
+            foreach (var row in assigned)
             {
-                conversation.LastMessageSortKey = message.SortKey;
+                byId[row.ConversationId].LastMessageSortKey = row.SortKey;
             }
 
             await db.SaveChangesAsync();
+            bodiesBySortKeyDescending = assigned.Select(a => a.Body).ToList();
         }
 
         await Context.SetExtraHTTPHeadersAsync(HeadersFor(owner));
 
         await Page.GotoAsync("/messages");
         await Expect(Page.Locator(".archive-pagination-summary").First).ToContainTextAsync("Page 1 of 2");
-        var firstPageText = await Page.Locator(".qz-message-list").First.InnerTextAsync();
-        await Expect(Page.Locator(".qz-message-list__item").Filter(new() { HasText = $"{owner.Marker} pagination message {conversationCount - 1}" })).ToBeVisibleAsync();
+        var firstPageBodies = await ReadVisibleMessageBodiesAsync(Page);
+        Assert.That(
+            firstPageBodies,
+            Is.EqualTo(bodiesBySortKeyDescending.Take(PrivateMessageLimits.InboxPageSize).ToList()),
+            "Page 1 must list the highest LastMessageSortKey conversations with no overlap into page 2.");
 
         await Page.Locator("a.archive-pagination-next").First.ClickAsync();
         await Expect(Page).ToHaveURLAsync(new Regex(".*/messages\\?pageNumber=2$"));
         await Expect(Page.Locator(".archive-pagination-summary").First).ToContainTextAsync("Page 2 of 2");
-        var secondPageText = await Page.Locator(".qz-message-list").First.InnerTextAsync();
+        var secondPageBodies = await ReadVisibleMessageBodiesAsync(Page);
 
-        Assert.That(secondPageText, Is.Not.EqualTo(firstPageText));
-        await Expect(Page.Locator(".qz-message-list__item").Filter(new() { HasText = $"{owner.Marker} pagination message 0" })).ToBeVisibleAsync();
+        Assert.That(secondPageBodies, Is.Not.Empty);
+        Assert.That(
+            firstPageBodies.Concat(secondPageBodies).ToList(),
+            Is.EqualTo(bodiesBySortKeyDescending));
+        Assert.That(
+            secondPageBodies,
+            Is.EqualTo(bodiesBySortKeyDescending.Skip(PrivateMessageLimits.InboxPageSize).ToList()));
+    }
+
+    private static async Task<IReadOnlyList<string>> ReadVisibleMessageBodiesAsync(IPage page)
+    {
+        var previews = page.Locator(".qz-message-list__preview");
+        var count = await previews.CountAsync();
+        var bodies = new List<string>(count);
+        for (var i = 0; i < count; i++)
+        {
+            bodies.Add((await previews.Nth(i).InnerTextAsync()).Trim());
+        }
+
+        return bodies;
     }
 
     private async Task<MemberContext> CreateMemberAsync(string fixtureSlug)

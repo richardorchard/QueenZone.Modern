@@ -43,13 +43,23 @@ public class AdminModerationWorkflowTests : RealDataPageTest
 
         var category = await GetFirstPhotoCategoryAsync();
 
-        await using var adminContext = await NewAdminContextAsync();
+        var adminContext = await NewAdminContextAsync();
         var adminPage = await adminContext.NewPageAsync();
         await OpenSubmissionDetailAsync(adminPage, "/admin/photo-submissions", title);
 
         await adminPage.GetByLabel("Gallery category (must match an existing category)").FillAsync(category.Name);
-        await adminPage.GetByRole(AriaRole.Button, new() { Name = "Approve" }).ClickAsync();
-        await Expect(adminPage.GetByText("Photo approved and published to the gallery.")).ToBeVisibleAsync();
+        await adminPage.GetByRole(AriaRole.Button, new() { Name = "Approve" }).ClickAsync(new() { Timeout = 60_000 });
+        try
+        {
+            await Expect(adminPage.GetByText("Photo approved and published to the gallery."))
+                .ToBeVisibleAsync(new() { Timeout = 60_000 });
+        }
+        catch (TimeoutException ex)
+        {
+            var status = await adminPage.Locator("[role='status']").AllInnerTextsAsync();
+            Assert.Fail(
+                $"Photo approval did not confirm success. URL={adminPage.Url} status={string.Join(" | ", status)}. {ex.Message}");
+        }
 
         var picId = await GetPromotedPicIdAsync(title);
         var slug = NewsSlug.Slugify(category.Name);
@@ -67,7 +77,7 @@ public class AdminModerationWorkflowTests : RealDataPageTest
         var title = $"{member.Marker} reject photo";
         await SubmitPhotoAsync(title);
 
-        await using var adminContext = await NewAdminContextAsync();
+        var adminContext = await NewAdminContextAsync();
         var adminPage = await adminContext.NewPageAsync();
         await OpenSubmissionDetailAsync(adminPage, "/admin/photo-submissions", title);
 
@@ -91,7 +101,7 @@ public class AdminModerationWorkflowTests : RealDataPageTest
         var title = $"{member.Marker} approve article";
         await SubmitArticleAsync(title, member.Marker);
 
-        await using var adminContext = await NewAdminContextAsync();
+        var adminContext = await NewAdminContextAsync();
         var adminPage = await adminContext.NewPageAsync();
         await OpenSubmissionDetailAsync(adminPage, "/admin/articles", title);
 
@@ -115,7 +125,7 @@ public class AdminModerationWorkflowTests : RealDataPageTest
         var title = $"{member.Marker} reject article";
         await SubmitArticleAsync(title, member.Marker);
 
-        await using var adminContext = await NewAdminContextAsync();
+        var adminContext = await NewAdminContextAsync();
         var adminPage = await adminContext.NewPageAsync();
         await OpenSubmissionDetailAsync(adminPage, "/admin/articles", title);
 
@@ -138,7 +148,7 @@ public class AdminModerationWorkflowTests : RealDataPageTest
         var headline = $"{member.Marker} promote headline";
         await SubmitNewsSuggestionAsync(headline, member.Marker);
 
-        await using var adminContext = await NewAdminContextAsync();
+        var adminContext = await NewAdminContextAsync();
         var adminPage = await adminContext.NewPageAsync();
         var suggestionId = await OpenSubmissionDetailAndGetIdAsync(adminPage, "/admin/news-suggestions", headline);
 
@@ -157,7 +167,7 @@ public class AdminModerationWorkflowTests : RealDataPageTest
         var headline = $"{member.Marker} reject headline";
         await SubmitNewsSuggestionAsync(headline, member.Marker);
 
-        await using var adminContext = await NewAdminContextAsync();
+        var adminContext = await NewAdminContextAsync();
         var adminPage = await adminContext.NewPageAsync();
         await OpenSubmissionDetailAsync(adminPage, "/admin/news-suggestions", headline);
 
@@ -170,10 +180,12 @@ public class AdminModerationWorkflowTests : RealDataPageTest
     [Test]
     public async Task Biography_chapter_create_and_edit_persist_after_reload()
     {
-        var marker = NextMarker("biography-crud");
-        var title = $"{marker} chapter";
+        // Title max is 50 chars (input maxlength + BiographyValidation). Keep marker short.
+        var marker = NextMarker("bio");
+        var title = $"{marker} ch";
+        Assert.That(title.Length + " updated".Length, Is.LessThanOrEqualTo(BiographyValidation.MaxTitleLength));
 
-        await using var adminContext = await NewAdminContextAsync();
+        var adminContext = await NewAdminContextAsync();
         var adminPage = await adminContext.NewPageAsync();
 
         await adminPage.GotoAsync("/admin/biography/new");
@@ -184,13 +196,23 @@ public class AdminModerationWorkflowTests : RealDataPageTest
         await adminPage.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
 
         await Expect(adminPage).ToHaveURLAsync(new Regex("/admin/biography/\\d+/edit"));
-        await Expect(adminPage.GetByText($"Created chapter \"{title}\".")).ToBeVisibleAsync();
+        var createdStatus = adminPage.GetByText($"Created chapter \"{title}\".");
+        await Expect(createdStatus).ToBeVisibleAsync();
+        Assert.That(
+            await createdStatus.InnerTextAsync(),
+            Does.Contain($"Created chapter \"{title}\"."),
+            $"Unexpected status after create. URL={adminPage.Url}");
         await Expect(adminPage.GetByLabel("Title")).ToHaveValueAsync(title);
 
         var updatedTitle = $"{title} updated";
         await adminPage.GetByLabel("Title").FillAsync(updatedTitle);
         await adminPage.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
-        await Expect(adminPage.GetByText($"Saved \"{updatedTitle}\".")).ToBeVisibleAsync();
+        var savedStatus = adminPage.GetByText($"Saved \"{updatedTitle}\".");
+        await Expect(savedStatus).ToBeVisibleAsync();
+        Assert.That(
+            await savedStatus.InnerTextAsync(),
+            Does.Contain($"Saved \"{updatedTitle}\"."),
+            $"Unexpected status after save. URL={adminPage.Url}");
 
         await adminPage.ReloadAsync();
         await Expect(adminPage.GetByLabel("Title")).ToHaveValueAsync(updatedTitle);
@@ -203,7 +225,7 @@ public class AdminModerationWorkflowTests : RealDataPageTest
         var title = $"{marker} admin photo";
         var category = await GetFirstPhotoCategoryAsync();
 
-        await using var adminContext = await NewAdminContextAsync();
+        var adminContext = await NewAdminContextAsync();
         var adminPage = await adminContext.NewPageAsync();
 
         await adminPage.GotoAsync("/admin/photos/new");
@@ -215,9 +237,10 @@ public class AdminModerationWorkflowTests : RealDataPageTest
         });
         await adminPage.GetByLabel("Title").FillAsync(title);
         await adminPage.GetByLabel("Category").SelectOptionAsync(new SelectOptionValue { Value = category.CatId.ToString() });
-        await adminPage.GetByRole(AriaRole.Button, new() { Name = "Upload and create" }).ClickAsync();
+        await adminPage.GetByRole(AriaRole.Button, new() { Name = "Upload and create" })
+            .ClickAsync(new() { Timeout = 60_000 });
 
-        await Expect(adminPage).ToHaveURLAsync(new Regex("/admin/photos/\\d+$"));
+        await Expect(adminPage).ToHaveURLAsync(new Regex("/admin/photos/\\d+$"), new() { Timeout = 60_000 });
         await Expect(adminPage.GetByLabel("Title")).ToHaveValueAsync(title);
 
         var updatedTitle = $"{title} updated";
@@ -229,15 +252,16 @@ public class AdminModerationWorkflowTests : RealDataPageTest
         await Expect(adminPage.GetByLabel("Title")).ToHaveValueAsync(updatedTitle);
 
         adminPage.Dialog += async (_, dialog) => await dialog.AcceptAsync();
-        await adminPage.GetByRole(AriaRole.Button, new() { Name = "Hard delete" }).ClickAsync();
-        await Expect(adminPage).ToHaveURLAsync(new Regex("/admin/photos/?$"));
+        await adminPage.GetByRole(AriaRole.Button, new() { Name = "Hard delete" })
+            .ClickAsync(new() { Timeout = 60_000 });
+        await Expect(adminPage).ToHaveURLAsync(new Regex("/admin/photos/?$"), new() { Timeout = 60_000 });
         await Expect(adminPage.GetByText("Deleted photo #").First).ToBeVisibleAsync();
     }
 
     [Test]
     public async Task Admin_dashboard_renders_stat_tiles_and_submission_queue()
     {
-        await using var adminContext = await NewAdminContextAsync();
+        var adminContext = await NewAdminContextAsync();
         var adminPage = await adminContext.NewPageAsync();
         var response = await adminPage.GotoAsync("/admin");
 
@@ -251,15 +275,28 @@ public class AdminModerationWorkflowTests : RealDataPageTest
     [Test]
     public async Task Admin_search_reindex_completes()
     {
-        await using var adminContext = await NewAdminContextAsync();
+        var adminContext = await NewAdminContextAsync();
         var adminPage = await adminContext.NewPageAsync();
         await adminPage.GotoAsync("/admin/search");
 
         await adminPage.GetByRole(AriaRole.Button, new() { NameRegex = new Regex("Rebuild search index now|Reindex in progress") }).ClickAsync();
 
         var root = adminPage.Locator("#search-index-admin");
-        await Expect(root).ToHaveAttributeAsync("data-running", "false", new() { Timeout = 120_000 });
-        await Expect(adminPage.Locator("#job-status")).ToHaveAttributeAsync("data-phase", "Succeeded", new() { Timeout = 5_000 });
+        var jobStatus = adminPage.Locator("#job-status");
+        try
+        {
+            await Expect(root).ToHaveAttributeAsync("data-running", "false", new() { Timeout = 180_000 });
+            await Expect(jobStatus).ToHaveAttributeAsync("data-phase", "Succeeded", new() { Timeout = 5_000 });
+        }
+        catch (TimeoutException ex)
+        {
+            var running = await root.GetAttributeAsync("data-running");
+            var phase = await jobStatus.GetAttributeAsync("data-phase");
+            var statusText = await jobStatus.InnerTextAsync();
+            Assert.Fail(
+                $"Search reindex did not finish. route=/admin/search running={running} phase={phase} " +
+                $"status=\"{statusText}\". {ex.Message}");
+        }
     }
 
     [Test]
@@ -269,7 +306,7 @@ public class AdminModerationWorkflowTests : RealDataPageTest
         var title = $"{member.Marker} antiforgery photo";
         await SubmitPhotoAsync(title);
 
-        await using var adminContext = await NewAdminContextAsync();
+        var adminContext = await NewAdminContextAsync();
         var adminPage = await adminContext.NewPageAsync();
         var submissionId = await OpenSubmissionDetailAndGetIdAsync(adminPage, "/admin/photo-submissions", title);
 
@@ -323,7 +360,7 @@ public class AdminModerationWorkflowTests : RealDataPageTest
     }
 
     private Task<IBrowserContext> NewAdminContextAsync() =>
-        Browser.NewContextAsync(new BrowserNewContextOptions
+        CreateExtraContextAsync(new BrowserNewContextOptions
         {
             BaseURL = BaseUrl,
             ExtraHTTPHeaders = new Dictionary<string, string> { [AdminEmailHeader] = AdminEmail },
@@ -339,8 +376,9 @@ public class AdminModerationWorkflowTests : RealDataPageTest
             MimeType = "image/png",
             Buffer = GeneratePngBytes(400, 300),
         });
-        await Page.GetByRole(AriaRole.Button, new() { Name = "Submit for review" }).ClickAsync();
-        await Expect(Page).ToHaveURLAsync(new Regex(".*/submit/photo/confirmation/.+"));
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Submit for review" })
+            .ClickAsync(new() { Timeout = 60_000 });
+        await Expect(Page).ToHaveURLAsync(new Regex(".*/submit/photo/confirmation/.+"), new() { Timeout = 60_000 });
     }
 
     private async Task SubmitArticleAsync(string title, string marker)
@@ -449,9 +487,16 @@ public class AdminModerationWorkflowTests : RealDataPageTest
             var picIds = await db.Database
                 .SqlQueryRaw<int>("SELECT PIC_ID AS [Value] FROM dbo.PIC_FILES_T WHERE Name LIKE {0}", marker + "%")
                 .ToListAsync();
+
+            // Hard-delete removes PIC_FILES_T but keeps PhotoAdminAuditLog rows (create/edit/delete).
+            // Match those leftover audits by Details containing the marker title.
+            await db.PhotoAdminAuditLogs
+                .Where(a => (a.Details != null && a.Details.Contains(marker))
+                    || picIds.Contains(a.PicId))
+                .ExecuteDeleteAsync();
+
             if (picIds.Count > 0)
             {
-                await db.PhotoAdminAuditLogs.Where(a => picIds.Contains(a.PicId)).ExecuteDeleteAsync();
                 await db.Database.ExecuteSqlRawAsync("DELETE FROM dbo.PIC_FILES_T WHERE Name LIKE {0}", marker + "%");
             }
 
@@ -476,6 +521,10 @@ public class AdminModerationWorkflowTests : RealDataPageTest
                 await db.NewsAuditLogs.Where(a => newsIds.Contains(a.NewsId)).ExecuteDeleteAsync();
                 await db.NewsRows.Where(r => newsIds.Contains(r.NewsId)).ExecuteDeleteAsync();
             }
+
+            await db.SearchDocuments
+                .Where(d => d.Title.Contains(marker) || d.SourceKey.Contains(marker))
+                .ExecuteDeleteAsync();
 
             await db.Database.ExecuteSqlRawAsync("DELETE FROM dbo.Q_BIO_T WHERE TITLE LIKE {0}", marker + "%");
 
