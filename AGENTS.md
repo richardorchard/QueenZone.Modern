@@ -100,6 +100,30 @@ When changing EF `SqlQueryRaw` projections over legacy tables, check the real SQ
 
 Legacy read probes and self-cleaning write probes run automatically every night via `.github/workflows/nightly-legacy-checks.yml`. They use a same-day SQL Express mirror synced from the live Azure SQL DB, never the live database. The read probes run on macOS over the LAN; write probes run locally on the Windows SQL Express host. This is continuous signal, not a PR gate. See `docs/architecture/testing-policy.md` ("Data Integration Tests").
 
+### The `E2E` hosting environment
+
+`QueenZoneEnvironments.E2E` (`src/QueenZone.Web/Infrastructure/QueenZoneEnvironments.cs`) is a second automated-test environment, distinct from `Testing`: it composes the same test auth handlers (`UsesTestAuth`) and in-memory blob storage (`UsesInMemoryBlobStorage`) as `Testing`, but it does **not** use in-memory data (`UsesInMemoryData` matches only `Testing`) — it points at the real SQL Express mirror instead, so the nightly Playwright suite can exercise real legacy rows, `smallint`/`bit` projections, and encoding edge cases that sample data cannot reproduce.
+
+**`Testing` must never be given a real connection string.** `WebApplicationFactory` tests (207+ files in `QueenZone.Web.Tests`) rely on `Testing` always resolving to in-memory sample data regardless of what `ConnectionStrings__QueenZoneLegacy` happens to be set to in the ambient environment — that is the guarantee `QueenZoneWebServiceCollectionExtensions.cs` provides by short-circuiting to `AddQueenZoneInMemoryData()` before it even reads the connection string for `Testing`. If `Testing` were changed to read a real connection string, every WAF test would start silently depending on whatever database happened to be configured on the machine or CI runner, and a bad row in that database could make unrelated PRs fail (or, worse, pass against stale data) for reasons that have nothing to do with the code under test. `E2E` exists as a separate environment specifically so this guarantee never has to be relaxed.
+
+`E2E` has its own guard in the other direction: `E2EConnectionGuard.EnsureSafe` (`src/QueenZone.Web/Infrastructure/E2EConnectionGuard.cs`) runs at startup and refuses to boot unless `ConnectionStrings__QueenZoneLegacy` targets the `queenzone_legacy_sync` database on an allow-listed local SQL Express server (`localhost\SQLEXPRESS` and equivalents, or the Mac runner's LAN address to the Windows box, `glory11`). It mirrors `scripts/Assert-SqlExpressMirrorConnection.ps1` in-process, so a misconfigured nightly run can never point the write-heavy Playwright suite at Azure SQL or any other remote server — the guard fails closed on an empty connection string too, rather than silently falling back to in-memory data the way `Testing` does.
+
+Run the E2E-suite locally or on demand with `scripts/Run-E2E.ps1`:
+
+```powershell
+# Same as the PR merge gate (Testing environment, in-memory, Deterministic category):
+powershell -File ./scripts/Run-E2E.ps1 -Mode Deterministic
+
+# Nightly real-data suite against the SQL Express mirror (E2E environment):
+$env:ConnectionStrings__QueenZoneLegacy = "Server=localhost\SQLEXPRESS;Database=queenzone_legacy_sync;Integrated Security=True;TrustServerCertificate=True"
+powershell -File ./scripts/Run-E2E.ps1 -Mode RealData
+
+# Read-only sweep against a deployed site, no local app or database:
+powershell -File ./scripts/Run-E2E.ps1 -Mode LiveSite -BaseUrl https://www.queenzone.org
+```
+
+See `docs/architecture/testing-policy.md` ("Nightly UI Regression (Real Data)") and `docs/architecture/self-hosted-e2e-runner.md` for suite content, runner setup, and troubleshooting.
+
 When a change touches private messaging writes, SortKey assignment, or conversation locking, prefer the opt-in SQL Express mirror probe after the EF migration is applied:
 
 ```powershell
