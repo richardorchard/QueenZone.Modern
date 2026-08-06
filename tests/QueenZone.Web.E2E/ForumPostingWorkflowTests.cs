@@ -105,7 +105,7 @@ public class ForumPostingWorkflowTests : E2EPageTest
         await post.GetByRole(AriaRole.Link, new() { Name = "Edit" }).ClickAsync();
 
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Edit post", Level = 1 })).ToBeVisibleAsync();
-        var editor = Page.Locator(".ql-editor").Last;
+        var editor = Page.Locator("[data-testid='rich-text-editor']").Last;
         await Expect(editor).ToContainTextAsync(originalBody);
         await editor.ClickAsync();
         await Page.Keyboard.PressAsync("ControlOrMeta+A");
@@ -119,7 +119,7 @@ public class ForumPostingWorkflowTests : E2EPageTest
 
     private async Task FillRichTextEditorAsync(string text)
     {
-        var editor = Page.Locator(".ql-editor").Last;
+        var editor = Page.Locator("[data-testid='rich-text-editor']").Last;
         await Expect(editor).ToBeVisibleAsync();
         await editor.ClickAsync();
         await Page.Keyboard.InsertTextAsync(text);

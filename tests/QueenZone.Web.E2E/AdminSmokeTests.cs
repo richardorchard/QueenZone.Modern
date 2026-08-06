@@ -40,7 +40,7 @@ public class AdminSmokeTests : E2EPageTest
         await GotoAdminAsync("/admin/news/new");
         await Page.GetByLabel("Title").FillAsync(uniqueTitle);
         await Page.GetByLabel("Excerpt").FillAsync("Playwright admin smoke excerpt.");
-        await Page.Locator(".ql-editor").FillAsync("Playwright admin smoke body.");
+        await Page.Locator("[data-testid='rich-text-editor']").FillAsync("Playwright admin smoke body.");
         await Page.GetByLabel("Publication date").FillAsync("2026-06-14");
         await Page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
 

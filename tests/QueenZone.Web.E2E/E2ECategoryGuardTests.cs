@@ -64,6 +64,7 @@ public class E2ECategoryGuardTests
             nameof(ForumPostingWorkflowTests),
             nameof(RealDataMarkerTests),
             nameof(SeededSamplerTests),
+            nameof(SelectorConventionGuardTests),
             nameof(SitemapRouteParserTests),
             nameof(SmokeTests),
         };

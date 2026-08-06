@@ -30,10 +30,6 @@ public class SitemapPublicRouteSweepTests : RealDataPageTest
         "/links",
     ];
 
-    private static readonly Regex EncodingArtifactPattern = new(
-        @"&(amp|lt|gt|quot|apos|\#39|nbsp);",
-        RegexOptions.Compiled);
-
     protected override bool AllowsWrites => false;
 
     [Test]
@@ -243,7 +239,7 @@ public class SitemapPublicRouteSweepTests : RealDataPageTest
         {
             // Mirror archives often have missing CDN thumbs; ignore resource 404 noise.
             var actionable = consoleErrors
-                .Where(error => !error.Contains("status of 404", StringComparison.OrdinalIgnoreCase))
+                .Where(PageShapeAssertions.IsActionableConsoleError)
                 .ToList();
             if (actionable.Count > 0)
             {
@@ -274,7 +270,7 @@ public class SitemapPublicRouteSweepTests : RealDataPageTest
         }
 
         var bodyText = await Page.Locator("body").InnerTextAsync();
-        var artifactMatch = EncodingArtifactPattern.Match(bodyText);
+        var artifactMatch = PageShapeAssertions.FindEncodingArtifact(bodyText);
         if (artifactMatch.Success)
         {
             TestContext.Out.WriteLine(
