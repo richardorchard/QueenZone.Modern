@@ -100,6 +100,24 @@ Failed tests write screenshots (`.png`) and Playwright traces (`.zip`) under `te
 npx playwright show-trace test-results/e2e\<name>.zip
 ```
 
+### Nightly real-data run budget
+
+The `ui-e2e-realdata` job in `nightly-legacy-checks.yml` has a 45-minute timeout on both runners — the Windows box (an i3, the weaker of the two) and the Mac Mini (M2). If a run hits that timeout:
+
+1. Check whether the SQL Express mirror sync (`sync-legacy-db`) actually completed before the UI job started — a stale or partially-synced mirror can make queries and page loads slower than usual, not just fail outright.
+2. Check for a stray `QueenZone.Web` process left over from a previous run holding port 5099 or files locked, forcing `Run-E2E.ps1`'s cleanup/retry path to spend time it wouldn't otherwise need — see the `EPERM` entry below.
+3. Compare the two OS shards: if only the Windows (i3) shard is slow, it's likely just weaker hardware, not a regression — the Mac timing out too is the stronger signal something changed (a new slow test, a mirror-side data growth, or a network issue reaching the mirror over the LAN).
+4. If the budget is consistently too tight as the suite grows, raise `timeout-minutes` on the `ui-e2e-realdata` job rather than trimming test coverage to fit.
+
+### Reproducing a nightly failure locally from a downloaded trace
+
+The `ui-e2e-realdata` job uploads `test-results/e2e/`, `e2e-app.log`, and `e2e-app.err.log` as a build artifact (`e2e-realdata-<os>-<run-id>`, 1-day retention) whenever it fails. To investigate on this machine:
+
+1. Download the artifact from the failed run's **Actions** page (or `gh run download <run-id> -n e2e-realdata-<os>-<run-id>`).
+2. Open the relevant `.zip` trace with `npx playwright show-trace <path>.zip` — this replays the DOM, network, and console state at the point of failure without needing the mirror or a running app.
+3. Read `e2e-app.log` / `e2e-app.err.log` from the artifact for server-side errors (stack traces, SQL exceptions) that happened around the same timestamp as the test failure.
+4. To re-run the same test against a fresh local mirror instead of just replaying the trace, sync a mirror copy (`scripts/Sync-LegacyDbToSqlExpress.ps1`, or reuse an existing one) and run `Run-E2E.ps1 -Mode RealData -CategoryFilter "<TestClassName>"` to scope the run to the failing fixture. Mirror data drifts daily, so a failure that reproduces against a same-day sync is a code issue; one that only reproduced against the original (now-stale) nightly mirror may just be transient real-data shape drift.
+
 ## Troubleshooting
 
 - **Job stuck in "Waiting for a runner to pick up this job"**: neither matching runner is available. Confirm each runner is online in **Settings > Actions > Runners**, has the `e2e` label, and has its service running (`.\svc.cmd status` on Windows or `./svc.sh status` on macOS).

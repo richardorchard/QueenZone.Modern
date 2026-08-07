@@ -120,6 +120,7 @@ run locally on Windows after the read checks pass:
 | `EfNewsSectionLiveProbeTests` `Admin_news_*` write Facts | Same script (rollback visibility + full lifecycle) |
 | `EfNewsDiscoveryPromotionLiveProbeTests` | Same script (self-seeds disposable candidate, promote inside rollback, then deletes seed) |
 | URL ingestion / private messaging / forum / content submission (incl. photo promotion → `PIC_FILES_T`) / member-account write probes | Dedicated Windows probe scripts |
+| Real-data Playwright UI suite (see "Nightly UI Regression (Real Data)" below) | Windows + Mac `ui-e2e-realdata` via `scripts/Run-E2E.ps1 -Mode RealData` |
 
 Their scripts reject Azure SQL, remote servers, and databases other than `queenzone_legacy_sync`. A
 final marker scan fails the workflow if probe or leaked web-test residue remains. The optional full
@@ -199,15 +200,23 @@ Good targets (covered or expanding):
 - Admin news list and create-draft flow with `X-Test-User-Email` test auth in the `Testing` environment.
 - Editorial discovery promote → publish → public visibility journey.
 
-`SitemapPublicRouteSweepTests` (`[Category("RealData")]`, `[Category("ReadOnly")]`) is a nightly-only sweep: it discovers URLs at runtime from `/sitemap.xml` (sampling first/last/seeded-random per section, capped and logged for reproducibility), plus a fixed list of routes not in the sitemap, and asserts page *shape* rather than content — HTTP 200, a single non-empty `<h1>`, a single matching canonical link, no console errors, no horizontal overflow at 390px, and no unrendered HTML-encoding artifacts. It also checks the negative cases (unknown path → styled 404, stale slug → redirect) and runs the axe-core critical-violation check on one representative page per section. It performs no writes and passes with `E2E_READONLY=true`, so the live-site job can reuse it unchanged.
+Keep the PR-gate end-to-end suite small. It should prove critical user journeys and browser behavior, not duplicate all route integration tests, and it must stay small, deterministic, and in-memory — see "Nightly UI Regression (Real Data)" below for the separate tier that intentionally trades that speed for real-data coverage.
+
+On failure, tests write screenshots and Playwright traces under `test-results/e2e/` (gitignored). CI uploads that folder as an artifact when the e2e job fails.
+
+### Nightly UI Regression (Real Data)
+
+> **Nightly UI regression (real data)** — extensive browser coverage against the SQL Express mirror in the `E2E` environment. Not a PR gate. Assertions must be shape-based, not content-based, because mirror data changes nightly. All writes must be marked `uie2e-` and self-cleaning, and covered by `EfLegacyProbeResidueTests`. The PR-gate e2e suite stays small, deterministic, and in-memory.
+
+This is a second, separate layer from the End-To-End Tests above, sharing the same `tests/QueenZone.Web.E2E` project but running under the `E2E` hosting environment (real SQL Express mirror + test auth, see `AGENTS.md`) instead of `Testing` (in-memory). It runs nightly through `.github/workflows/nightly-legacy-checks.yml`, not on pull requests.
+
+`SitemapPublicRouteSweepTests` (`[Category("RealData")]`, `[Category("ReadOnly")]`) discovers URLs at runtime from `/sitemap.xml` (sampling first/last/seeded-random per section, capped and logged for reproducibility), plus a fixed list of routes not in the sitemap, and asserts page *shape* rather than content — HTTP 200, a single non-empty `<h1>`, a single matching canonical link, no console errors, no horizontal overflow at 390px, and no unrendered HTML-encoding artifacts. It also checks the negative cases (unknown path → styled 404, stale slug → redirect) and runs the axe-core critical-violation check on one representative page per section. It performs no writes and passes with `E2E_READONLY=true`, so the live-site job can reuse it unchanged.
 
 **Live-site read-only public sweep** (`.github/workflows/livesite-readonly-sweep.yml`, issue #551): its own scheduled workflow (06:00 UTC daily, plus `workflow_dispatch`) on the Mac runner against `https://www.queenzone.org` via `scripts/Run-E2E.ps1 -Mode LiveSite`. Separate from `nightly-legacy-checks.yml` so it needs no database and does not wait on mirror sync. That mode sets `E2E_READONLY=true`, filters to `TestCategory=RealData&TestCategory=ReadOnly` (currently `SitemapPublicRouteSweepTests` + `LiveSiteMediaCdnTests`), refuses a localhost base URL, and caps NUnit to one worker so production rate limiting is not tripped. Write-capable RealData fixtures throw at setup under `E2E_READONLY` (`RealDataWriteGuard`). Failures are production/CDN signal (messages prefix `PRODUCTION LIVE-SITE`), not mirror/code-path signal — continuous only, never a PR gate.
 
 `CommunitySubmissionWorkflowTests` (`[Category("RealData")]`, write-capable — **not** `ReadOnly`) covers the member-facing content submission pipeline against the SQL Express mirror: photo submission (title, description, category, upload) through to a Pending status badge on `/account/my-submissions`; article submission through the shared Quill editor (`Shared/_RichTextEditor.cshtml`) including an attached cover image, through to a Submitted status; news suggestion submission through to the admin suggestion queue (`/admin/news-suggestions`) as Pending; an account settings display-name change that persists across a subsequent submission; and one validation case per form (missing required field or wrong-type upload), asserted on the user-visible `asp-validation-for` copy. It seeds a real `MemberAccounts` row per test via direct EF access (`QueenZone.Data`, referenced only by the E2E project, not the web app) before impersonating that member with `X-Test-Member-Id`/`-Name`/`-Email`, since the submission and account pages look the member up through `MemberAccountService`/the submission repositories rather than trusting the test-auth claim alone. Every row it creates carries a `uie2e-{runId}-{fixture}-{n}` marker (`RealDataMarkers`/`RealDataPageTest`); teardown deletes them via the same EF context, and `EfLegacyProbeResidueTests` in `QueenZone.Web.Tests` also scans for that marker as a nightly backstop.
 
-Keep end-to-end tests small. They should prove critical user journeys and browser behavior, not duplicate all route integration tests.
-
-On failure, tests write screenshots and Playwright traces under `test-results/e2e/` (gitignored). CI uploads that folder as an artifact when the e2e job fails.
+Run it on demand with `scripts/Run-E2E.ps1 -Mode RealData` (requires `ConnectionStrings__QueenZoneLegacy` pointing at the local SQL Express mirror; see `docs/architecture/self-hosted-e2e-runner.md`). Nightly runs it on both self-hosted runners (`ui-e2e-realdata` job, one shard per OS) so the UI suite itself gets coverage on both operating systems, even though the mirror database only lives on the Windows box.
 
 #### Selector conventions
 
@@ -322,6 +331,8 @@ These gates are guardrails, not a replacement for useful assertions. New or chan
 
 CI/CD uses two workflows. `.github/workflows/ci.yml` runs the pull-request build, deterministic tests, coverage gates, conditional `ef-migrations`, smoke test, and required e2e merge gate. After merge, `.github/workflows/deploy.yml` resolves the `ci.yml` run that built and tested the merged PR's head commit and reuses its `web-publish` artifact (no rebuild), then runs `migrate` → `deploy` → `post-deploy-smoke`. The PR `ef-migrations` job uses the same migration connection string as deploy so SQL Server failures are caught before merge.
 
+Two further workflows run on a schedule only and never gate a PR merge or a deploy: `.github/workflows/nightly-legacy-checks.yml` (legacy read/write probes, then the real-data Playwright UI suite, then a residue check — see "Data Integration Tests" and "Nightly UI Regression (Real Data)" above) and `.github/workflows/livesite-readonly-sweep.yml` (the live-site read-only sweep). Both are continuous signal for catching drift, not merge gates; a failure there does not block or revert anything automatically.
+
 Docs-only pull requests (only `docs/` or root `*.md` changes) skip `build` / `test` / coverage / smoke / e2e. Skipped non-matrix jobs still report under their required check names, which GitHub treats as satisfied. The `test` matrix is different: skipping it entirely would report a single `test` check and never create the required `test (0)` / `test (1)` checks, leaving the PR blocked forever. `ci.yml` therefore runs a lightweight `test-docs-ok` matrix on docs-only PRs that emits success for those exact names without running the suite.
 
 ### EF migration consistency
@@ -399,7 +410,8 @@ Playwright browser smoke tests live in `tests/QueenZone.Web.E2E` and run in CI o
 - Route and page behavior belongs in web integration tests.
 - SQL mapping belongs in opt-in data integration tests.
 - Migration confidence belongs in content validation reports.
-- Browser behavior belongs in a small Playwright end-to-end suite.
+- Browser behavior belongs in a small, deterministic, in-memory Playwright end-to-end suite that runs as a PR gate.
+- Extensive real-data browser coverage belongs in the nightly-only `E2E`-environment Playwright tier, never a PR gate.
 - End-user load cost belongs in the advisory frontend performance workflow, not in every PR.
 
 ## Pull Request Expectations
