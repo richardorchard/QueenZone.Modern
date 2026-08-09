@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Extensions.Options;
+using QueenZone.Web.Infrastructure;
 
 namespace QueenZone.Web.Pages.Account;
 
@@ -13,8 +14,5 @@ public abstract class AccountPageModel(IOptions<MemberAuthenticationOptions> mem
 
     public bool GitHubEnabled => memberAuthenticationOptions.Value.GitHub?.ClientId is { Length: > 0 };
 
-    protected static string ResolveReturnUrl(string? returnUrl) =>
-        !string.IsNullOrWhiteSpace(returnUrl) && Uri.IsWellFormedUriString(returnUrl, UriKind.Relative)
-            ? returnUrl
-            : "/";
+    protected static string ResolveReturnUrl(string? returnUrl) => LocalReturnUrl.Resolve(returnUrl);
 }

@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using QueenZone.Web.Infrastructure;
 
 namespace QueenZone.Web.Pages.Account;
 
@@ -36,6 +37,6 @@ public sealed class ExternalLoginCallbackModel(MemberAccountService memberAccoun
         await HttpContext.SignInAsync(MemberAuthenticationSchemes.MembersCookie, new ClaimsPrincipal(identity));
         await HttpContext.SignOutAsync(MemberAuthenticationSchemes.ExternalCookie);
 
-        return Redirect(!string.IsNullOrWhiteSpace(returnUrl) && Uri.IsWellFormedUriString(returnUrl, UriKind.Relative) ? returnUrl : "/");
+        return Redirect(LocalReturnUrl.Resolve(returnUrl));
     }
 }
