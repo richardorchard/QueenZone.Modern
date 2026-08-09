@@ -121,6 +121,44 @@ public sealed class ExternalLoginCallbackTests : IClassFixture<WebApplicationFac
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
         Assert.Equal("/", response.Headers.Location!.OriginalString);
     }
+
+    [Theory]
+    [InlineData("//evil.example.com")]
+    [InlineData("//evil.example.com/phish")]
+    [InlineData("/\\evil.example.com")]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task Callback_WithValidExternalCookie_RejectsProtocolRelativeAndEmptyReturnUrl(string returnUrl)
+    {
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var subject = "google-subject-open-redirect-" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(returnUrl)))[..12];
+        client.DefaultRequestHeaders.Add(ExternalCookieTestHandler.ProviderHeader, "Google");
+        client.DefaultRequestHeaders.Add(ExternalCookieTestHandler.SubjectHeader, subject);
+        client.DefaultRequestHeaders.Add(ExternalCookieTestHandler.EmailHeader, $"{subject}@example.com");
+        client.DefaultRequestHeaders.Add(ExternalCookieTestHandler.NameHeader, "Protocol Relative Attempt");
+
+        var response = await client.GetAsync(
+            $"/account/external-login-callback?returnUrl={Uri.EscapeDataString(returnUrl)}");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal("/", response.Headers.Location!.OriginalString);
+        Assert.DoesNotContain("evil.example.com", response.Headers.Location.OriginalString, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Callback_WithValidExternalCookie_HonoursNestedLocalReturnUrl()
+    {
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        client.DefaultRequestHeaders.Add(ExternalCookieTestHandler.ProviderHeader, "Google");
+        client.DefaultRequestHeaders.Add(ExternalCookieTestHandler.SubjectHeader, "google-subject-forum-topic");
+        client.DefaultRequestHeaders.Add(ExternalCookieTestHandler.EmailHeader, "forumtopic@example.com");
+        client.DefaultRequestHeaders.Add(ExternalCookieTestHandler.NameHeader, "Forum Topic Return");
+
+        var response = await client.GetAsync("/account/external-login-callback?returnUrl=%2Fforum%2Ftopic%2F1");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal("/forum/topic/1", response.Headers.Location!.OriginalString);
+    }
 }
 
 /// <summary>

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using QueenZone.Web.Infrastructure;
 
 namespace QueenZone.Web.Pages.Account;
 
@@ -21,7 +22,11 @@ public sealed class ExternalLoginModel : PageModel
             return NotFound();
         }
 
-        var callbackUrl = Url.Page("/Account/ExternalLoginCallback", pageHandler: null, values: new { returnUrl })!;
+        var safeReturnUrl = LocalReturnUrl.Resolve(returnUrl);
+        var callbackUrl = Url.Page(
+            "/Account/ExternalLoginCallback",
+            pageHandler: null,
+            values: new { returnUrl = safeReturnUrl })!;
         var properties = new AuthenticationProperties { RedirectUri = callbackUrl };
         properties.SetParameter("prompt", "select_account");
         return Challenge(properties, provider);
