@@ -37,6 +37,25 @@ public class RealDataMarkerTests
     }
 
     [Test]
+    public void ResolveRunId_AppendsSanitizedRunnerNameWhenPresent()
+    {
+        var runId = RealDataMarkers.ResolveRunId(name => name switch
+        {
+            "GITHUB_RUN_ID" => "42",
+            "RUNNER_NAME" => "Richards-Mac (queenzone)",
+            _ => null,
+        });
+        Assert.That(runId, Is.EqualTo("42-richards-mac-queenzone"));
+    }
+
+    [Test]
+    public void ResolveRunId_OmitsRunnerSuffixWhenRunnerNameBlank()
+    {
+        var runId = RealDataMarkers.ResolveRunId(name => name == "GITHUB_RUN_ID" ? "42" : null);
+        Assert.That(runId, Is.EqualTo("42"));
+    }
+
+    [Test]
     public void IsReadOnlyMode_TrueForTrueAndOne()
     {
         Assert.That(RealDataMarkers.IsReadOnlyMode(n => n == "E2E_READONLY" ? "true" : null), Is.True);
