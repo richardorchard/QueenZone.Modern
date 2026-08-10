@@ -185,6 +185,56 @@ public sealed class NewsTriageServiceTests
         Assert.Single(result.Errors);
     }
 
+    [Fact]
+    public async Task RunTriageAsync_respects_per_run_candidate_limit()
+    {
+        var repository = new InMemoryNewsDiscoveryRepository(new SharedNewsDiscoveryStore());
+        var baseTime = DateTime.UtcNow;
+        for (var i = 0; i < 4; i++)
+        {
+            await NewsDiscoveryTestSeeder.SeedDiscoveredCandidateAsync(
+                repository,
+                canonicalUrl: $"https://www.queenonline.com/news/limit-{i}",
+                title: $"Candidate {i}",
+                discoveredAt: baseTime.AddMinutes(i));
+        }
+
+        var service = CreateService(
+            repository,
+            new FakeNewsAiClient(
+                true,
+                """
+                {
+                  "verdict": "relevant",
+                  "relevance_score": 0.93,
+                  "confidence_score": 0.90,
+                  "rationale": "Official Queen tour announcement.",
+                  "suggested_category": "tour",
+                  "entities": ["Queen"],
+                  "review_notes": "Primary source."
+                }
+                """));
+
+        var result = await service.RunTriageAsync(new NewsTriageRunOptions(PerRunCandidateLimit: 2));
+
+        Assert.Equal(2, result.CandidatesConsidered);
+        Assert.Equal(2, result.PromotedToReview);
+        Assert.Equal(2, (await repository.GetCandidatesAsync(NewsCandidateStatus.Discovered)).Count);
+        Assert.Equal(2, (await repository.GetCandidatesAsync(NewsCandidateStatus.NeedsReview)).Count);
+    }
+
+    [Fact]
+    public async Task RunTriageAsync_returns_empty_when_no_discovered_candidates()
+    {
+        var repository = new InMemoryNewsDiscoveryRepository(new SharedNewsDiscoveryStore());
+        var service = CreateService(repository, new FakeNewsAiClient(true, shouldNotBeCalled: true));
+
+        var result = await service.RunTriageAsync(new NewsTriageRunOptions());
+
+        Assert.Equal(0, result.CandidatesConsidered);
+        Assert.Empty(result.Errors);
+    }
+
     private static NewsTriageService CreateService(INewsDiscoveryRepository repository, FakeNewsAiClient fakeClient)
     {
         var budgetGuard = new NewsAiBudgetGuard(

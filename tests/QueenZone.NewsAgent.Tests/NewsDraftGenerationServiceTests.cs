@@ -108,6 +108,55 @@ public sealed class NewsDraftGenerationServiceTests
     }
 
     [Fact]
+    public async Task RunDraftGenerationAsync_respects_per_run_candidate_limit_and_confidence()
+    {
+        var repository = new InMemoryNewsDiscoveryRepository(new SharedNewsDiscoveryStore());
+        var baseTime = DateTime.UtcNow;
+        await NewsDiscoveryTestSeeder.SeedNeedsReviewCandidateAsync(
+            repository,
+            canonicalUrl: "https://www.queenonline.com/news/low",
+            title: "Low",
+            discoveredAt: baseTime,
+            confidenceScore: 0.10m);
+        for (var i = 0; i < 3; i++)
+        {
+            await NewsDiscoveryTestSeeder.SeedNeedsReviewCandidateAsync(
+                repository,
+                canonicalUrl: $"https://www.queenonline.com/news/ready-{i}",
+                title: $"Ready {i}",
+                discoveredAt: baseTime.AddMinutes(i + 1),
+                confidenceScore: 0.90m);
+        }
+
+        var service = NewsAgentTestSupport.CreateDraftGenerationService(
+            repository,
+            new DraftGenerationFakeAiClient(NewsAgentTestSupport.SampleDraftJson));
+
+        var result = await service.RunDraftGenerationAsync(new NewsDraftRunOptions(PerRunCandidateLimit: 2));
+
+        Assert.Equal(2, result.CandidatesConsidered);
+        Assert.Equal(2, result.DraftsCreated);
+        Assert.Equal(2, (await repository.GetCandidatesAsync(NewsCandidateStatus.NeedsReview)).Count);
+    }
+
+    [Fact]
+    public async Task RunDraftGenerationAsync_returns_empty_when_no_ready_candidates()
+    {
+        var repository = new InMemoryNewsDiscoveryRepository(new SharedNewsDiscoveryStore());
+        await NewsDiscoveryTestSeeder.SeedNeedsReviewCandidateAsync(
+            repository,
+            confidenceScore: 0.10m);
+        var service = NewsAgentTestSupport.CreateDraftGenerationService(
+            repository,
+            new DraftGenerationFakeAiClient(NewsAgentTestSupport.SampleDraftJson));
+
+        var result = await service.RunDraftGenerationAsync(new NewsDraftRunOptions());
+
+        Assert.Equal(0, result.CandidatesConsidered);
+        Assert.Equal(0, result.DraftsCreated);
+    }
+
+    [Fact]
     public async Task GenerateDraftAsync_rejects_candidates_outside_draftable_statuses()
     {
         var repository = new InMemoryNewsDiscoveryRepository(new SharedNewsDiscoveryStore());

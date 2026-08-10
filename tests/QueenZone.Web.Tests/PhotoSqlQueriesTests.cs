@@ -22,6 +22,8 @@ public sealed class PhotoSqlQueriesTests
         Assert.Contains("WHERE p.Cat_ID = {0} AND p.PIC_ID = {1} AND p.DISPLAY = 1", sql.DetailNavigationSql, StringComparison.Ordinal);
         Assert.Contains("ORDER BY c.name, p.Date_time DESC, p.PIC_ID DESC", sql.SitemapSql, StringComparison.Ordinal);
         Assert.Contains("WHERE p.Cat_ID = {0} AND p.DISPLAY = 1", sql.CategoryAllSql, StringComparison.Ordinal);
+        Assert.Contains("ORDER BY NEWID()", sql.RandomInCategorySql, StringComparison.Ordinal);
+        Assert.Contains("SELECT TOP ({1})", sql.RandomInCategorySql, StringComparison.Ordinal);
         Assert.Contains("CAST(ISNULL(p.PIC_WIDTH, 0) AS int) AS PIC_WIDTH", sql.CategoryPageSql, StringComparison.Ordinal);
         Assert.Contains("CAST(ISNULL(p.PIC_HEIGHT, 0) AS int) AS PIC_HEIGHT", sql.CategoryPageSql, StringComparison.Ordinal);
         Assert.Contains("CAST(ISNULL(p.PIC_WIDTH, 0) AS int) AS PIC_WIDTH", sql.DetailNavigationSql, StringComparison.Ordinal);
@@ -52,5 +54,7 @@ public sealed class PhotoSqlQueriesTests
         Assert.Contains("PIC_WIDTH", sql.CategoryPageSql, StringComparison.Ordinal);
         Assert.Contains("PIC_HEIGHT", sql.DetailNavigationSql, StringComparison.Ordinal);
         Assert.Contains("submitted_by_display_name", sql.DetailNavigationSql, StringComparison.Ordinal);
+        Assert.Contains("ORDER BY RANDOM()", sql.RandomInCategorySql, StringComparison.Ordinal);
+        Assert.Contains("LIMIT {1}", sql.RandomInCategorySql, StringComparison.Ordinal);
     }
 }

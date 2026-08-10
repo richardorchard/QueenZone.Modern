@@ -20,10 +20,10 @@ public sealed class NewsTriageService(
         triageOptions.Value.Validate();
 
         var limit = options.PerRunCandidateLimit ?? triageOptions.Value.PerRunCandidateLimit;
-        var candidates = await repository.GetCandidatesAsync(
+        var toProcess = await repository.GetCandidatesAsync(
             NewsCandidateStatus.Discovered,
+            take: limit,
             cancellationToken: cancellationToken);
-        var toProcess = candidates.Take(limit).ToList();
 
         if (toProcess.Count == 0)
         {

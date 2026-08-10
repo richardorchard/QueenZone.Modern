@@ -25,13 +25,12 @@ public sealed class NewsDraftGenerationService(
         }
 
         var limit = options.PerRunCandidateLimit ?? draftOptions.Value.PerRunCandidateLimit;
-        var candidates = await repository.GetCandidatesAsync(
+        var toProcess = await repository.GetCandidatesAsync(
             NewsCandidateStatus.NeedsReview,
+            take: limit,
+            primaryMinConfidence: draftOptions.Value.PrimaryMinConfidenceScore,
+            secondaryMinConfidence: draftOptions.Value.SecondaryMinConfidenceScore,
             cancellationToken: cancellationToken);
-        var toProcess = candidates
-            .Where(candidate => MeetsConfidenceThreshold(candidate))
-            .Take(limit)
-            .ToList();
 
         if (toProcess.Count == 0)
         {
