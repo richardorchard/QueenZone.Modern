@@ -647,6 +647,12 @@ public sealed class PublicQueryCacheServiceTests
         public Task<IReadOnlyList<PhotoItem>> GetCategoryAllAsync(int catId, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
+        public Task<IReadOnlyList<PhotoItem>> GetRandomPublishedInCategoryAsync(
+            int catId,
+            int take,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public Task<IReadOnlyList<PhotoSitemapCategory>> GetPublishedSitemapCategoriesAsync(
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();

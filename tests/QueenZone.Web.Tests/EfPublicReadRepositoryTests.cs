@@ -286,6 +286,11 @@ public sealed class EfPublicReadRepositoryTests : IAsyncDisposable
         var all = await repository.GetCategoryAllAsync(3);
         Assert.Equal(3, all.Count);
 
+        var randomSample = await repository.GetRandomPublishedInCategoryAsync(3, take: 2);
+        Assert.Equal(2, randomSample.Count);
+        Assert.All(randomSample, photo => Assert.Equal(3, photo.CatId));
+        Assert.Empty(await repository.GetRandomPublishedInCategoryAsync(99, take: 4));
+
         var sitemap = await repository.GetPublishedSitemapCategoriesAsync();
         Assert.Single(sitemap);
         Assert.Equal(3, sitemap[0].CatId);

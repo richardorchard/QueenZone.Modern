@@ -31,6 +31,15 @@ public interface IPhotoRepository
     Task<IReadOnlyList<PhotoItem>> GetCategoryAllAsync(int catId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Returns up to <paramref name="take"/> published photos from a category in random order
+    /// without materializing the full category (SQL <c>TOP</c> / <c>LIMIT</c> + random order).
+    /// </summary>
+    Task<IReadOnlyList<PhotoItem>> GetRandomPublishedInCategoryAsync(
+        int catId,
+        int take,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Returns visible categories and photo detail ids/dates in one repository pass
     /// for sitemap generation (avoids a second full category reload in the builder).
     /// </summary>

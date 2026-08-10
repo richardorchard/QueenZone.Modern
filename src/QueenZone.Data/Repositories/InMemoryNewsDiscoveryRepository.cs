@@ -68,8 +68,14 @@ public sealed class InMemoryNewsDiscoveryRepository(SharedNewsDiscoveryStore sto
     public Task<IReadOnlyList<NewsCandidate>> GetCandidatesAsync(
         NewsCandidateStatus? status = null,
         int? sourceId = null,
+        int? take = null,
+        decimal? primaryMinConfidence = null,
+        decimal? secondaryMinConfidence = null,
         CancellationToken cancellationToken = default) =>
-        Task.FromResult<IReadOnlyList<NewsCandidate>>(store.GetCandidates(status, sourceId).Select(MapCandidate).ToList());
+        Task.FromResult<IReadOnlyList<NewsCandidate>>(
+            store.GetCandidates(status, sourceId, take, primaryMinConfidence, secondaryMinConfidence)
+                .Select(MapCandidate)
+                .ToList());
 
     public Task<IReadOnlyList<NewsCandidateReviewListItem>> ListCandidatesForReviewAsync(
         NewsCandidateListQuery query,

@@ -135,6 +135,28 @@ public sealed class EfPhotoRepository : IPhotoRepository
         return items;
     }
 
+    public async Task<IReadOnlyList<PhotoItem>> GetRandomPublishedInCategoryAsync(
+        int catId,
+        int take,
+        CancellationToken cancellationToken = default)
+    {
+        var safeTake = Math.Clamp(take, 1, 100);
+        var nameRows = await dbContext.Database
+            .SqlQueryRaw<NameRow>(sql.CategoryNameSql, catId)
+            .ToListAsync(cancellationToken);
+        var categoryName = nameRows.FirstOrDefault()?.name ?? string.Empty;
+        var categorySlug = NewsSlug.Slugify(categoryName);
+
+        var rows = await dbContext.Database
+            .SqlQueryRaw<CategoryPageRow>(sql.RandomInCategorySql, catId, safeTake)
+            .ToListAsync(cancellationToken);
+
+        IReadOnlyList<PhotoItem> items = rows
+            .Select(row => MapItem(row, catId, categoryName, categorySlug))
+            .ToList();
+        return items;
+    }
+
     public async Task<IReadOnlyList<PhotoSitemapCategory>> GetPublishedSitemapCategoriesAsync(
         CancellationToken cancellationToken = default)
     {

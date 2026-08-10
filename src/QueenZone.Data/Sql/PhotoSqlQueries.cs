@@ -73,6 +73,12 @@ public sealed class PhotoSqlQueries
     public required string CategoryAllSql { get; init; }
 
     /// <summary>
+    /// Parameters: catId, take. Random sample of published photos in a category
+    /// (SQL Server <c>ORDER BY NEWID()</c> / SQLite <c>ORDER BY RANDOM()</c>).
+    /// </summary>
+    public required string RandomInCategorySql { get; init; }
+
+    /// <summary>
     /// When true, <see cref="ApplyFilter"/> uses SQLite IFNULL expressions; otherwise SQL Server CAST/ISNULL.
     /// </summary>
     public bool UseSqliteFilterExpressions { get; init; }
@@ -310,6 +316,23 @@ public sealed class PhotoSqlQueries
                 WHERE p.Cat_ID = {0} AND p.DISPLAY = 1{PHOTO_FILTER_P}
                 ORDER BY p.Date_time DESC, p.PIC_ID DESC
                 """,
+            RandomInCategorySql = """
+                SELECT TOP ({1})
+                    ISNULL(p.Name, N'') AS NAME,
+                    p.Date_time AS DATE_TIME,
+                    ISNULL(p.Url, N'') AS URL,
+                    ISNULL(p.Thumb_URL, N'') AS THUMB_URL,
+                    ISNULL(p.t_height, 0) AS T_HEIGHT,
+                    ISNULL(p.t_width, 0) AS T_WIDTH,
+                    CAST(ISNULL(p.PIC_WIDTH, 0) AS int) AS PIC_WIDTH,
+                    CAST(ISNULL(p.PIC_HEIGHT, 0) AS int) AS PIC_HEIGHT,
+                    p.PIC_ID AS pic_id,
+                    ISNULL(c.name, N'') AS category_name
+                FROM dbo.PIC_FILES_T p
+                INNER JOIN dbo.PIC_CAT_T c ON c.cat_id = p.Cat_ID
+                WHERE p.Cat_ID = {0} AND p.DISPLAY = 1
+                ORDER BY NEWID()
+                """,
         };
 
     /// <summary>
@@ -496,6 +519,13 @@ public sealed class PhotoSqlQueries
                 FROM PhotoItems p
                 WHERE p.cat_id = {0}{PHOTO_FILTER_P}
                 ORDER BY DATE_TIME DESC, pic_id DESC
+                """,
+            RandomInCategorySql = """
+                SELECT NAME, DATE_TIME, URL, THUMB_URL, T_HEIGHT, T_WIDTH, PIC_WIDTH, PIC_HEIGHT, pic_id, category_name
+                FROM PhotoItems p
+                WHERE p.cat_id = {0}
+                ORDER BY RANDOM()
+                LIMIT {1}
                 """,
         };
 }

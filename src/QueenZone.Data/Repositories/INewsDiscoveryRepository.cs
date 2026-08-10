@@ -31,6 +31,9 @@ public interface INewsDiscoveryRepository
     Task<IReadOnlyList<NewsCandidate>> GetCandidatesAsync(
         NewsCandidateStatus? status = null,
         int? sourceId = null,
+        int? take = null,
+        decimal? primaryMinConfidence = null,
+        decimal? secondaryMinConfidence = null,
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<NewsCandidateReviewListItem>> ListCandidatesForReviewAsync(
