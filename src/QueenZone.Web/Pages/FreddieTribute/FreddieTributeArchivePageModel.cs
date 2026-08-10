@@ -79,10 +79,6 @@ public abstract class FreddieTributeArchivePageModel(
             return [];
         }
 
-        var photos = await photoRepository.GetCategoryAllAsync(category.CatId, cancellationToken);
-        return photos
-            .OrderBy(_ => Random.Shared.Next())
-            .Take(4)
-            .ToList();
+        return await photoRepository.GetRandomPublishedInCategoryAsync(category.CatId, take: 4, cancellationToken);
     }
 }

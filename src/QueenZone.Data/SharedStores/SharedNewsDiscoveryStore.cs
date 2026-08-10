@@ -177,7 +177,12 @@ public sealed class SharedNewsDiscoveryStore
         }
     }
 
-    public IReadOnlyList<NewsCandidateEntity> GetCandidates(NewsCandidateStatus? status, int? sourceId)
+    public IReadOnlyList<NewsCandidateEntity> GetCandidates(
+        NewsCandidateStatus? status,
+        int? sourceId,
+        int? take = null,
+        decimal? primaryMinConfidence = null,
+        decimal? secondaryMinConfidence = null)
     {
         lock (sync)
         {
@@ -192,10 +197,31 @@ public sealed class SharedNewsDiscoveryStore
                 query = query.Where(candidate => candidate.SourceId == sourceId);
             }
 
-            return query
+            if (primaryMinConfidence is not null && secondaryMinConfidence is not null)
+            {
+                var primaryMin = primaryMinConfidence.Value;
+                var secondaryMin = secondaryMinConfidence.Value;
+                query = query.Where(candidate =>
+                {
+                    var trustTier = sources.SingleOrDefault(item => item.Id == candidate.SourceId)?.TrustTier
+                        ?? NewsDiscoveryTrustTier.LowConfidence;
+                    var score = candidate.ConfidenceScore ?? 0m;
+                    return trustTier == NewsDiscoveryTrustTier.Primary
+                        ? score >= primaryMin
+                        : score >= secondaryMin;
+                });
+            }
+
+            query = query
                 .OrderByDescending(candidate => candidate.DiscoveredAt)
-                .ThenByDescending(candidate => candidate.Id)
-                .ToList();
+                .ThenByDescending(candidate => candidate.Id);
+
+            if (take is not null)
+            {
+                query = query.Take(Math.Max(take.Value, 0));
+            }
+
+            return query.ToList();
         }
     }
 

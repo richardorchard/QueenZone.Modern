@@ -401,6 +401,66 @@ public sealed class NewsDiscoveryRepositoryTests
     }
 
     [Fact]
+    public async Task GetCandidatesAsync_applies_take_and_returns_empty_when_none_match()
+    {
+        var repository = CreateRepository();
+        var older = DateTime.UtcNow.AddHours(-2);
+        var newer = DateTime.UtcNow.AddHours(-1);
+
+        await NewsDiscoveryTestSeeder.SeedDiscoveredCandidateAsync(
+            repository,
+            canonicalUrl: "https://www.queenonline.com/news/older",
+            title: "Older",
+            discoveredAt: older);
+        await NewsDiscoveryTestSeeder.SeedDiscoveredCandidateAsync(
+            repository,
+            canonicalUrl: "https://www.queenonline.com/news/newer",
+            title: "Newer",
+            discoveredAt: newer);
+        var newestId = await NewsDiscoveryTestSeeder.SeedDiscoveredCandidateAsync(
+            repository,
+            canonicalUrl: "https://www.queenonline.com/news/newest",
+            title: "Newest",
+            discoveredAt: DateTime.UtcNow);
+
+        var limited = await repository.GetCandidatesAsync(NewsCandidateStatus.Discovered, take: 2);
+        Assert.Equal(2, limited.Count);
+        Assert.Equal(newestId, limited[0].Id);
+        Assert.Equal("Newest", limited[0].SourceTitle);
+        Assert.Equal("Newer", limited[1].SourceTitle);
+
+        Assert.Empty(await repository.GetCandidatesAsync(NewsCandidateStatus.NeedsReview, take: 5));
+        Assert.Empty(await repository.GetCandidatesAsync(NewsCandidateStatus.Discovered, take: 0));
+    }
+
+    [Fact]
+    public async Task GetCandidatesAsync_applies_confidence_filter_before_take()
+    {
+        var repository = CreateRepository();
+        await NewsDiscoveryTestSeeder.SeedNeedsReviewCandidateAsync(
+            repository,
+            canonicalUrl: "https://www.queenonline.com/news/low",
+            title: "Low confidence",
+            discoveredAt: DateTime.UtcNow,
+            confidenceScore: 0.20m);
+        var highId = await NewsDiscoveryTestSeeder.SeedNeedsReviewCandidateAsync(
+            repository,
+            canonicalUrl: "https://www.queenonline.com/news/high",
+            title: "High confidence",
+            discoveredAt: DateTime.UtcNow.AddMinutes(-1),
+            confidenceScore: 0.90m);
+
+        var limited = await repository.GetCandidatesAsync(
+            NewsCandidateStatus.NeedsReview,
+            take: 1,
+            primaryMinConfidence: 0.55m,
+            secondaryMinConfidence: 0.75m);
+
+        Assert.Single(limited);
+        Assert.Equal(highId, limited[0].Id);
+    }
+
+    [Fact]
     public async Task CreateCandidate_throws_when_source_or_duplicate_url_is_invalid()
     {
         var repository = CreateRepository();

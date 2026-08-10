@@ -114,8 +114,11 @@ internal sealed class ConfigurableNewsDiscoveryRepository(INewsDiscoveryReposito
     public Task<IReadOnlyList<NewsCandidate>> GetCandidatesAsync(
         NewsCandidateStatus? status = null,
         int? sourceId = null,
+        int? take = null,
+        decimal? primaryMinConfidence = null,
+        decimal? secondaryMinConfidence = null,
         CancellationToken cancellationToken = default) =>
-        inner.GetCandidatesAsync(status, sourceId, cancellationToken);
+        inner.GetCandidatesAsync(status, sourceId, take, primaryMinConfidence, secondaryMinConfidence, cancellationToken);
 
     public Task<IReadOnlyList<NewsCandidateReviewListItem>> ListCandidatesForReviewAsync(
         NewsCandidateListQuery query,

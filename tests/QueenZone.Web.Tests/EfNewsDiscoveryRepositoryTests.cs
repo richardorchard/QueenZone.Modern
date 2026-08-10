@@ -152,6 +152,14 @@ public sealed class EfNewsDiscoveryRepositoryTests : IAsyncDisposable
 
         var primaryCandidates = await repository.GetCandidatesAsync(sourceId: primarySourceId);
         Assert.Single(primaryCandidates);
+
+        var all = await repository.GetCandidatesAsync();
+        var limited = await repository.GetCandidatesAsync(take: 1);
+        Assert.Equal(2, all.Count);
+        Assert.Single(limited);
+        Assert.Equal(all[0].Id, limited[0].Id);
+
+        Assert.Empty(await repository.GetCandidatesAsync(NewsCandidateStatus.Rejected, take: 5));
     }
 
     [Fact]

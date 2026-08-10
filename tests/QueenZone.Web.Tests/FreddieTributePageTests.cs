@@ -1,6 +1,10 @@
 using System.Net;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using QueenZone.Data;
 
 namespace QueenZone.Web.Tests;
 
@@ -54,5 +58,33 @@ public sealed class FreddieTributePageTests : IClassFixture<WebApplicationFactor
         var response = await client.GetAsync("/freddie-mercury-tribute/page/3");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task FreddieTributePage_WithoutFreddieCategory_OmitsPhotoGallery()
+    {
+        await using var customFactory = factory.WithWebHostBuilder(builder =>
+        {
+            builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<SharedPhotoStore>();
+                services.RemoveAll<IPhotoRepository>();
+                services.AddSingleton(_ => new SharedPhotoStore(
+                [
+                    new PhotoCategorySeed(9, "Brian May",
+                    [
+                        new PhotoItemSeed(101, "Brian", "/Brian_May/img-101.jpg", "/Brian_May/img-101-t.jpg", new DateTime(1986, 7, 12)),
+                    ]),
+                ]));
+                services.AddSingleton<IPhotoRepository, InMemoryPhotoRepository>();
+            });
+        });
+        var client = customFactory.CreateClient();
+
+        var body = await client.GetStringAsync("/freddie-mercury-tribute");
+
+        Assert.Contains("Freddie Mercury Tribute", body);
+        Assert.DoesNotContain("Selected Freddie Mercury photographs", body);
+        Assert.DoesNotContain("https://cdn.queenzone.org/freddie-mercury/", body);
     }
 }

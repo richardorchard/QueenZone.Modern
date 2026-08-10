@@ -190,6 +190,9 @@ public sealed class EfNewsDiscoveryRepository(QueenZoneDbContext dbContext) : IN
     public async Task<IReadOnlyList<NewsCandidate>> GetCandidatesAsync(
         NewsCandidateStatus? status = null,
         int? sourceId = null,
+        int? take = null,
+        decimal? primaryMinConfidence = null,
+        decimal? secondaryMinConfidence = null,
         CancellationToken cancellationToken = default)
     {
         var query = dbContext.NewsCandidates.AsNoTracking().Include(item => item.Source).AsQueryable();
@@ -203,9 +206,27 @@ public sealed class EfNewsDiscoveryRepository(QueenZoneDbContext dbContext) : IN
             query = query.Where(candidate => candidate.SourceId == sourceId);
         }
 
-        return await query
+        if (primaryMinConfidence is not null && secondaryMinConfidence is not null)
+        {
+            var primaryMin = primaryMinConfidence.Value;
+            var secondaryMin = secondaryMinConfidence.Value;
+            query = query.Where(candidate =>
+                (candidate.Source.TrustTier == NewsDiscoveryTrustTier.Primary
+                    && (candidate.ConfidenceScore ?? 0m) >= primaryMin)
+                || (candidate.Source.TrustTier != NewsDiscoveryTrustTier.Primary
+                    && (candidate.ConfidenceScore ?? 0m) >= secondaryMin));
+        }
+
+        query = query
             .OrderByDescending(candidate => candidate.DiscoveredAt)
-            .ThenByDescending(candidate => candidate.Id)
+            .ThenByDescending(candidate => candidate.Id);
+
+        if (take is not null)
+        {
+            query = query.Take(Math.Max(take.Value, 0));
+        }
+
+        return await query
             .Select(candidate => MapCandidate(candidate))
             .ToListAsync(cancellationToken);
     }

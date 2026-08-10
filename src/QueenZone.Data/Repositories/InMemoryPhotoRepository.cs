@@ -87,6 +87,20 @@ public sealed class InMemoryPhotoRepository(SharedPhotoStore store) : IPhotoRepo
         return Task.FromResult(items);
     }
 
+    public Task<IReadOnlyList<PhotoItem>> GetRandomPublishedInCategoryAsync(
+        int catId,
+        int take,
+        CancellationToken cancellationToken = default)
+    {
+        var safeTake = Math.Clamp(take, 1, 100);
+        IReadOnlyList<PhotoItem> items = store.GetVisiblePhotosByCategory(catId)
+            .Select(ToPhotoItem)
+            .OrderBy(_ => Random.Shared.Next())
+            .Take(safeTake)
+            .ToList();
+        return Task.FromResult(items);
+    }
+
     public Task<IReadOnlyList<PhotoSitemapCategory>> GetPublishedSitemapCategoriesAsync(
         CancellationToken cancellationToken = default)
     {
