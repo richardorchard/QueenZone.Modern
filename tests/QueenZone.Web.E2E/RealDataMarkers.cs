@@ -22,18 +22,42 @@ internal static class RealDataMarkers
     }
 
     /// <summary>
-    /// <c>GITHUB_RUN_ID</c> in CI, otherwise a UTC <c>yyyyMMddHHmmss</c> timestamp.
+    /// <c>GITHUB_RUN_ID</c> in CI, otherwise a UTC <c>yyyyMMddHHmmss</c> timestamp. When
+    /// <c>RUNNER_NAME</c> is set, it is appended as a suffix so parallel matrix legs that
+    /// share a <c>GITHUB_RUN_ID</c> (e.g. the Windows and macOS RealData jobs, which both
+    /// write to the same shared SQL Express mirror) never allocate colliding markers.
     /// </summary>
     public static string ResolveRunId(Func<string, string?>? getEnv = null)
     {
         getEnv ??= static name => Environment.GetEnvironmentVariable(name);
+
+        string baseId;
         var githubRunId = getEnv("GITHUB_RUN_ID");
         if (!string.IsNullOrWhiteSpace(githubRunId))
         {
-            return githubRunId.Trim();
+            baseId = githubRunId.Trim();
+        }
+        else
+        {
+            baseId = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
         }
 
-        return DateTime.UtcNow.ToString("yyyyMMddHHmmss");
+        var runnerSuffix = SanitizeRunnerSuffix(getEnv("RUNNER_NAME"));
+        return runnerSuffix is null ? baseId : $"{baseId}-{runnerSuffix}";
+    }
+
+    private static string? SanitizeRunnerSuffix(string? runnerName)
+    {
+        if (string.IsNullOrWhiteSpace(runnerName))
+        {
+            return null;
+        }
+
+        var chars = runnerName.Trim().ToLowerInvariant()
+            .Select(c => char.IsLetterOrDigit(c) ? c : '-')
+            .ToArray();
+        var collapsed = string.Join('-', new string(chars).Split('-', StringSplitOptions.RemoveEmptyEntries));
+        return collapsed.Length == 0 ? null : collapsed;
     }
 
     public static bool IsReadOnlyMode(Func<string, string?>? getEnv = null)
