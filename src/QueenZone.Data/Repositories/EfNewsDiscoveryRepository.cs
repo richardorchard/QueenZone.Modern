@@ -231,12 +231,16 @@ public sealed class EfNewsDiscoveryRepository(QueenZoneDbContext dbContext) : IN
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<NewsCandidateReviewListItem>> ListCandidatesForReviewAsync(
+    public async Task<NewsCandidateReviewPage> ListCandidatesForReviewAsync(
         NewsCandidateListQuery query,
         CancellationToken cancellationToken = default)
     {
-        var candidates = NewsCandidateReviewQuery.ApplyEntityFilters(
-            dbContext.NewsCandidates.AsNoTracking().Include(item => item.Source).AsQueryable(),
+        var (page, pageSize) = NewsCandidateListQueryDefaults.Normalize(query.Page, query.PageSize);
+
+        var candidates = NewsCandidateReviewQuery.ApplyActiveQueueFilter(
+            NewsCandidateReviewQuery.ApplyEntityFilters(
+                dbContext.NewsCandidates.AsNoTracking().Include(item => item.Source).AsQueryable(),
+                query),
             query);
 
         if (query.HasDraft == true)
@@ -261,9 +265,13 @@ public sealed class EfNewsDiscoveryRepository(QueenZoneDbContext dbContext) : IN
                     && run.StructuredResultJson.Contains(entity)));
         }
 
-        return await candidates
+        var totalCount = await candidates.CountAsync(cancellationToken);
+
+        var items = await candidates
             .OrderByDescending(candidate => candidate.DiscoveredAt)
             .ThenByDescending(candidate => candidate.Id)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Select(candidate => new NewsCandidateReviewListItem(
                 candidate.Id,
                 candidate.SourceTitle,
@@ -280,6 +288,8 @@ public sealed class EfNewsDiscoveryRepository(QueenZoneDbContext dbContext) : IN
                     .Select(draft => draft.ProposedTitle)
                     .FirstOrDefault()))
             .ToListAsync(cancellationToken);
+
+        return new NewsCandidateReviewPage(items, totalCount, page, pageSize);
     }
 
     public async Task<int> CreateCandidateAsync(NewsCandidateCreateRequest request, CancellationToken cancellationToken = default)

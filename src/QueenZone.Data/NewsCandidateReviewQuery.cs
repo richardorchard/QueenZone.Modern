@@ -57,6 +57,42 @@ public static class NewsCandidateReviewQuery
     }
 
     /// <summary>
+    /// When no explicit status filter is set, the admin review queue shows "active" candidates only.
+    /// </summary>
+    public static IQueryable<NewsCandidateEntity> ApplyActiveQueueFilter(
+        IQueryable<NewsCandidateEntity> candidates,
+        NewsCandidateListQuery query)
+    {
+        if (query.Status is not null)
+        {
+            return candidates;
+        }
+
+        return candidates.Where(candidate =>
+            candidate.Status != NewsCandidateStatus.Rejected
+            && candidate.Status != NewsCandidateStatus.IgnoredDuplicate
+            && candidate.Status != NewsCandidateStatus.PromotedToArticle);
+    }
+
+    /// <summary>
+    /// In-memory equivalent of <see cref="ApplyActiveQueueFilter"/>.
+    /// </summary>
+    public static IEnumerable<NewsCandidateEntity> ApplyActiveQueueFilter(
+        IEnumerable<NewsCandidateEntity> candidates,
+        NewsCandidateListQuery query)
+    {
+        if (query.Status is not null)
+        {
+            return candidates;
+        }
+
+        return candidates.Where(candidate =>
+            candidate.Status is not NewsCandidateStatus.Rejected
+                and not NewsCandidateStatus.IgnoredDuplicate
+                and not NewsCandidateStatus.PromotedToArticle);
+    }
+
+    /// <summary>
     /// In-memory equivalent of <see cref="ApplyEntityFilters"/> when Source is resolved via a lookup.
     /// </summary>
     public static IEnumerable<NewsCandidateEntity> ApplyEntityFilters(

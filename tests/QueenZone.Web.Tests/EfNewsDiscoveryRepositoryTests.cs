@@ -391,9 +391,77 @@ public sealed class EfNewsDiscoveryRepositoryTests : IAsyncDisposable
             Entity: "Roger Taylor",
             MinConfidence: 0.9m));
 
-        Assert.Single(matches);
-        Assert.Equal(candidateId, matches[0].Id);
-        Assert.Equal("EF filtered draft", matches[0].DraftTitle);
+        Assert.Single(matches.Items);
+        Assert.Equal(candidateId, matches.Items[0].Id);
+        Assert.Equal("EF filtered draft", matches.Items[0].DraftTitle);
+    }
+
+    [Fact]
+    public async Task ListCandidatesForReviewAsync_pages_results_and_returns_total_count()
+    {
+        var baseTime = new DateTime(2026, 7, 1, 12, 0, 0, DateTimeKind.Utc);
+
+        await SeedNeedsReviewCandidateAsync("https://example.com/ef-page-one", "EF page one", baseTime.AddMinutes(3));
+        await SeedNeedsReviewCandidateAsync("https://example.com/ef-page-two", "EF page two", baseTime.AddMinutes(2));
+        var thirdId = await SeedNeedsReviewCandidateAsync("https://example.com/ef-page-three", "EF page three", baseTime.AddMinutes(1));
+
+        var firstPage = await repository.ListCandidatesForReviewAsync(new NewsCandidateListQuery(
+            Status: NewsCandidateStatus.NeedsReview,
+            Page: 1,
+            PageSize: 2));
+        var secondPage = await repository.ListCandidatesForReviewAsync(new NewsCandidateListQuery(
+            Status: NewsCandidateStatus.NeedsReview,
+            Page: 2,
+            PageSize: 2));
+
+        Assert.Equal(3, firstPage.TotalCount);
+        Assert.Equal(2, firstPage.Items.Count);
+        Assert.Equal(thirdId, secondPage.Items.Single().Id);
+    }
+
+    [Fact]
+    public async Task ListCandidatesForReviewAsync_clamps_page_size_to_maximum()
+    {
+        await SeedNeedsReviewCandidateAsync(
+            "https://example.com/ef-clamp",
+            "EF clamp candidate",
+            new DateTime(2026, 7, 1, 12, 0, 0, DateTimeKind.Utc));
+
+        var page = await repository.ListCandidatesForReviewAsync(new NewsCandidateListQuery(
+            Status: NewsCandidateStatus.NeedsReview,
+            Page: 1,
+            PageSize: 500));
+
+        Assert.Equal(NewsCandidateListQueryDefaults.MaxPageSize, page.PageSize);
+        Assert.Single(page.Items);
+    }
+
+    private async Task<int> SeedNeedsReviewCandidateAsync(string url, string title, DateTime discoveredAt)
+    {
+        var sourceId = await repository.UpsertSourceAsync(new NewsDiscoverySourceDraft(
+            $"source-{Guid.NewGuid():N}",
+            "Test source",
+            "https://example.com/",
+            null,
+            NewsDiscoverySourceType.Rss,
+            NewsDiscoveryTrustTier.Primary,
+            60,
+            true,
+            null));
+        var candidateId = await repository.CreateCandidateAsync(new NewsCandidateCreateRequest(
+            sourceId,
+            url,
+            title,
+            discoveredAt,
+            "Excerpt",
+            discoveredAt));
+        await repository.TryUpdateCandidateStatusAsync(
+            candidateId,
+            new NewsCandidateStatusUpdate(
+                NewsCandidateStatus.NeedsReview,
+                RelevanceScore: 0.9m,
+                ConfidenceScore: 0.9m));
+        return candidateId;
     }
 
     public async ValueTask DisposeAsync()
