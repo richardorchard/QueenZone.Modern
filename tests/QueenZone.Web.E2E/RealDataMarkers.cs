@@ -1,3 +1,6 @@
+using System.Security.Cryptography;
+using System.Text;
+
 namespace QueenZone.Web.E2E;
 
 /// <summary>
@@ -22,10 +25,18 @@ internal static class RealDataMarkers
     }
 
     /// <summary>
+    /// Length of the hashed <see cref="RunnerSuffixLength"/> runner suffix (see
+    /// <see cref="ResolveRunId"/>), including its leading hyphen.
+    /// </summary>
+    public const int RunnerSuffixLength = 7;
+
+    /// <summary>
     /// <c>GITHUB_RUN_ID</c> in CI, otherwise a UTC <c>yyyyMMddHHmmss</c> timestamp. When
-    /// <c>RUNNER_NAME</c> is set, it is appended as a suffix so parallel matrix legs that
-    /// share a <c>GITHUB_RUN_ID</c> (e.g. the Windows and macOS RealData jobs, which both
-    /// write to the same shared SQL Express mirror) never allocate colliding markers.
+    /// <c>RUNNER_NAME</c> is set, a short deterministic hash of it is appended so parallel
+    /// matrix legs that share a <c>GITHUB_RUN_ID</c> (e.g. the Windows and macOS RealData
+    /// jobs, which both write to the same shared SQL Express mirror) never allocate
+    /// colliding markers. A hash (rather than the raw runner name) keeps the suffix short
+    /// and bounded, since fixture titles built from markers are length-constrained.
     /// </summary>
     public static string ResolveRunId(Func<string, string?>? getEnv = null)
     {
@@ -42,22 +53,19 @@ internal static class RealDataMarkers
             baseId = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
         }
 
-        var runnerSuffix = SanitizeRunnerSuffix(getEnv("RUNNER_NAME"));
+        var runnerSuffix = HashRunnerSuffix(getEnv("RUNNER_NAME"));
         return runnerSuffix is null ? baseId : $"{baseId}-{runnerSuffix}";
     }
 
-    private static string? SanitizeRunnerSuffix(string? runnerName)
+    private static string? HashRunnerSuffix(string? runnerName)
     {
         if (string.IsNullOrWhiteSpace(runnerName))
         {
             return null;
         }
 
-        var chars = runnerName.Trim().ToLowerInvariant()
-            .Select(c => char.IsLetterOrDigit(c) ? c : '-')
-            .ToArray();
-        var collapsed = string.Join('-', new string(chars).Split('-', StringSplitOptions.RemoveEmptyEntries));
-        return collapsed.Length == 0 ? null : collapsed;
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(runnerName.Trim()));
+        return Convert.ToHexString(hash)[..6].ToLowerInvariant();
     }
 
     public static bool IsReadOnlyMode(Func<string, string?>? getEnv = null)
