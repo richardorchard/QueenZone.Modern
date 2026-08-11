@@ -1072,7 +1072,7 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
         var filteredBody = await client.GetStringAsync("/admin/news-discovery?trustTier=Primary");
         Assert.Contains("Bulk ignore primary", filteredBody);
         Assert.DoesNotContain("Bulk ignore secondary", filteredBody);
-        Assert.Contains("Ignore all listed / remove from queue", filteredBody);
+        Assert.Contains("Ignore this page / remove from queue", filteredBody);
 
         var response = await PostIndexActionAsync(
             client,
@@ -1094,6 +1094,64 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
         Assert.DoesNotContain("Bulk ignore primary", defaultBody);
         Assert.Contains("Bulk ignore secondary", defaultBody);
         Assert.Contains("Ignored 1 listed candidate", defaultBody);
+    }
+
+    [Fact]
+    public async Task DiscoveryIndex_pages_candidates_and_preserves_filters()
+    {
+        var discoveryStore = new SharedNewsDiscoveryStore();
+        var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
+        var baseTime = new DateTime(2026, 7, 1, 12, 0, 0, DateTimeKind.Utc);
+
+        await NewsDiscoveryTestSeeder.SeedNeedsReviewCandidateAsync(
+            discoveryRepository,
+            canonicalUrl: "https://example.com/filter-one",
+            title: "Filter page one",
+            discoveredAt: baseTime.AddMinutes(3));
+        await NewsDiscoveryTestSeeder.SeedNeedsReviewCandidateAsync(
+            discoveryRepository,
+            canonicalUrl: "https://example.com/filter-two",
+            title: "Filter page two",
+            discoveredAt: baseTime.AddMinutes(2));
+        await NewsDiscoveryTestSeeder.SeedNeedsReviewCandidateAsync(
+            discoveryRepository,
+            canonicalUrl: "https://example.com/filter-three",
+            title: "Filter page three",
+            discoveredAt: baseTime.AddMinutes(1));
+
+        var client = CreateClient(AdminEmail, discoveryStore: discoveryStore);
+
+        var firstPage = await client.GetStringAsync("/admin/news-discovery?status=NeedsReview&pageSize=2");
+        Assert.Contains("Filter page one", firstPage);
+        Assert.Contains("Filter page two", firstPage);
+        Assert.DoesNotContain("Filter page three", firstPage);
+        Assert.Contains("Showing 1–2 of 3 candidates", firstPage);
+        Assert.Contains("page=2", firstPage);
+        Assert.Contains("status=NeedsReview", firstPage);
+        Assert.Contains("pageSize=2", firstPage);
+
+        var secondPage = await client.GetStringAsync("/admin/news-discovery?status=NeedsReview&pageSize=2&page=2");
+        Assert.Contains("Filter page three", secondPage);
+        Assert.DoesNotContain("Filter page one", secondPage);
+        Assert.Contains("Showing 3–3 of 3 candidates", secondPage);
+    }
+
+    [Fact]
+    public async Task DiscoveryIndex_clamps_page_size_and_redirects_out_of_range_page()
+    {
+        var discoveryStore = new SharedNewsDiscoveryStore();
+        var discoveryRepository = new InMemoryNewsDiscoveryRepository(discoveryStore);
+        await NewsDiscoveryTestSeeder.SeedNeedsReviewCandidateAsync(
+            discoveryRepository,
+            title: "Clamped page candidate");
+        var client = CreateClient(AdminEmail, discoveryStore: discoveryStore);
+
+        var clampedPage = await client.GetStringAsync("/admin/news-discovery?status=NeedsReview&pageSize=500");
+        Assert.Contains("Clamped page candidate", clampedPage);
+
+        var outOfRangeResponse = await client.GetAsync("/admin/news-discovery?status=NeedsReview&page=99");
+        Assert.Equal(HttpStatusCode.Redirect, outOfRangeResponse.StatusCode);
+        Assert.Equal("/admin/news-discovery?status=NeedsReview", outOfRangeResponse.Headers.Location!.OriginalString);
     }
 
     private WebApplicationFactory<Program> CreateFactory(

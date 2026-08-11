@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using Microsoft.AspNetCore.WebUtilities;
 using QueenZone.Data;
 using QueenZone.NewsAgent;
 
@@ -34,6 +33,12 @@ public sealed class IndexModel(
     [BindProperty(SupportsGet = true)]
     public bool? HasDraft { get; set; }
 
+    [FromQuery(Name = "page")]
+    public int PageNumber { get; set; } = 1;
+
+    [BindProperty(SupportsGet = true)]
+    public int PageSize { get; set; } = AdminNewsDiscoveryRoutes.ListPageSize;
+
     public IReadOnlyList<NewsCandidateReviewListItem> Candidates { get; private set; } = [];
 
     public IReadOnlyList<NewsDiscoverySource> Sources { get; private set; } = [];
@@ -45,6 +50,18 @@ public sealed class IndexModel(
     public bool RunnerRecentlySeen =>
         RunnerHeartbeat is not null && RunnerHeartbeat.LastSeenAtUtc >= DateTime.UtcNow.AddMinutes(-5);
 
+    public int CurrentPage { get; private set; }
+
+    public int TotalPages { get; private set; }
+
+    public int TotalCount { get; private set; }
+
+    public int RangeStart { get; private set; }
+
+    public int RangeEnd { get; private set; }
+
+    public ArchivePaginationViewModel? Pagination { get; private set; }
+
     [BindProperty]
     public string? ArticleUrl { get; set; }
 
@@ -55,8 +72,22 @@ public sealed class IndexModel(
 
     public string? StatusMessageKind => TempData["DiscoveryMessageKind"] as string;
 
-    public async Task OnGetAsync(CancellationToken cancellationToken) =>
+    public async Task<IActionResult> OnGetAsync(CancellationToken cancellationToken)
+    {
+        if (PageNumber < 1)
+        {
+            return Redirect(BuildReturnUrl(1));
+        }
+
         await LoadAsync(cancellationToken);
+
+        if (TotalPages > 0 && PageNumber > TotalPages)
+        {
+            return Redirect(BuildReturnUrl(TotalPages));
+        }
+
+        return Page();
+    }
 
     public async Task<IActionResult> OnPostQueueRunAsync(CancellationToken cancellationToken)
     {
@@ -159,11 +190,18 @@ public sealed class IndexModel(
 
     private async Task LoadAsync(CancellationToken cancellationToken)
     {
-        ViewData["Title"] = "News discovery review";
+        var (normalizedPage, normalizedPageSize) = NewsCandidateListQueryDefaults.Normalize(
+            GetEffectivePageNumber(),
+            GetEffectivePageSize());
+        CurrentPage = normalizedPage;
+        PageSize = normalizedPageSize;
+
+        ViewData["Title"] = CurrentPage <= 1 ? "News discovery review" : $"News discovery review – Page {CurrentPage}";
         RecentRuns = await runRequestRepository.ListRecentAsync(5, cancellationToken);
         RunnerHeartbeat = await runRequestRepository.GetLatestHeartbeatAsync(cancellationToken);
         Sources = await discoveryRepository.GetSourcesAsync(cancellationToken: cancellationToken);
-        var candidates = await discoveryRepository.ListCandidatesForReviewAsync(
+
+        var result = await discoveryRepository.ListCandidatesForReviewAsync(
             new NewsCandidateListQuery(
                 Status: Status,
                 SourceId: SourceId,
@@ -172,63 +210,59 @@ public sealed class IndexModel(
                 Entity: string.IsNullOrWhiteSpace(Entity) ? null : Entity.Trim(),
                 DiscoveredFromUtc: DiscoveredFrom?.ToUniversalTime(),
                 DiscoveredToUtc: DiscoveredTo?.AddDays(1).ToUniversalTime(),
-                HasDraft: HasDraft),
+                HasDraft: HasDraft,
+                Page: normalizedPage,
+                PageSize: normalizedPageSize),
             cancellationToken);
 
-        Candidates = Status is null
-            ? candidates
-                .Where(candidate => candidate.Status is not NewsCandidateStatus.Rejected
-                    and not NewsCandidateStatus.IgnoredDuplicate
-                    and not NewsCandidateStatus.PromotedToArticle)
-                .ToList()
-            : candidates;
+        Candidates = result.Items;
+        TotalCount = result.TotalCount;
+        CurrentPage = result.Page;
+        PageSize = result.PageSize;
+        TotalPages = AdminNewsDiscoveryRoutes.GetListTotalPages(TotalCount, PageSize);
+        RangeStart = TotalCount == 0 ? 0 : ((CurrentPage - 1) * PageSize) + 1;
+        RangeEnd = TotalCount == 0 ? 0 : RangeStart + Candidates.Count - 1;
+        Pagination = AdminNewsDiscoveryRoutes.GetListPaginationViewModel(
+            CurrentPage,
+            TotalPages,
+            page => BuildReturnUrl(page));
     }
 
-    private string BuildReturnUrl()
+    private string BuildReturnUrl(int? page = null) =>
+        AdminNewsDiscoveryRoutes.BuildIndexPath(
+            new NewsDiscoveryIndexQuery(
+                Status,
+                SourceId,
+                TrustTier,
+                MinConfidence,
+                Entity,
+                DiscoveredFrom,
+                DiscoveredTo,
+                HasDraft,
+                GetEffectivePageSize()),
+            page ?? GetEffectivePageNumber());
+
+    private int GetEffectivePageNumber()
     {
-        var query = new Dictionary<string, string?>();
-        if (Status is not null)
+        if (Request.HasFormContentType
+            && Request.Form.TryGetValue("page", out var pageValue)
+            && int.TryParse(pageValue, out var formPage))
         {
-            query["status"] = Status.Value.ToString();
+            return formPage;
         }
 
-        if (SourceId is not null)
+        return PageNumber;
+    }
+
+    private int GetEffectivePageSize()
+    {
+        if (Request.HasFormContentType
+            && Request.Form.TryGetValue("pageSize", out var pageSizeValue)
+            && int.TryParse(pageSizeValue, out var formPageSize))
         {
-            query["sourceId"] = SourceId.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            return formPageSize;
         }
 
-        if (TrustTier is not null)
-        {
-            query["trustTier"] = TrustTier.Value.ToString();
-        }
-
-        if (MinConfidence is not null)
-        {
-            query["minConfidence"] = MinConfidence.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
-        }
-
-        if (!string.IsNullOrWhiteSpace(Entity))
-        {
-            query["entity"] = Entity.Trim();
-        }
-
-        if (DiscoveredFrom is not null)
-        {
-            query["discoveredFrom"] = DiscoveredFrom.Value.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
-        }
-
-        if (DiscoveredTo is not null)
-        {
-            query["discoveredTo"] = DiscoveredTo.Value.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
-        }
-
-        if (HasDraft is not null)
-        {
-            query["hasDraft"] = HasDraft.Value ? "true" : "false";
-        }
-
-        return query.Count == 0
-            ? "/admin/news-discovery"
-            : QueryHelpers.AddQueryString("/admin/news-discovery", query);
+        return PageSize;
     }
 }

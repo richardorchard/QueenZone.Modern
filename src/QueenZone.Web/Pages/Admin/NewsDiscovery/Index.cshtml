@@ -166,8 +166,18 @@
   }
   else
   {
-    <form method="post" action="/admin/news-discovery?handler=ignorelisted" class="admin-inline-form" onsubmit="return confirm('Ignore all currently listed candidates?');">
+    <p class="admin-muted">Showing @Model.RangeStart–@Model.RangeEnd of @Model.TotalCount candidates.</p>
+
+    <form method="post" action="/admin/news-discovery?handler=ignorelisted" class="admin-inline-form" onsubmit="return confirm('Ignore all candidates shown on this page?');">
       <input type="hidden" name="@AdminNewsDiscoveryPageModel.AntiforgeryTokenFieldName" value="@Antiforgery.GetAndStoreTokens(HttpContext).RequestToken">
+      @if (Model.CurrentPage > 1)
+      {
+        <input type="hidden" name="page" value="@Model.CurrentPage">
+      }
+      @if (Model.PageSize != AdminNewsDiscoveryRoutes.ListPageSize)
+      {
+        <input type="hidden" name="pageSize" value="@Model.PageSize">
+      }
       @if (Model.Status is not null)
       {
         <input type="hidden" name="status" value="@Model.Status">
@@ -200,7 +210,7 @@
       {
         <input type="hidden" name="hasDraft" value="@(Model.HasDraft.Value ? "true" : "false")">
       }
-      <button type="submit">Ignore all listed / remove from queue</button>
+      <button type="submit">Ignore this page / remove from queue</button>
     </form>
 
     <table class="admin-table">
@@ -247,6 +257,14 @@
                 <form method="post" action="/admin/news-discovery?handler=ignore" class="admin-inline-form">
                   <input type="hidden" name="@AdminNewsDiscoveryPageModel.AntiforgeryTokenFieldName" value="@Antiforgery.GetAndStoreTokens(HttpContext).RequestToken">
                   <input type="hidden" name="id" value="@candidate.Id">
+                  @if (Model.CurrentPage > 1)
+                  {
+                    <input type="hidden" name="page" value="@Model.CurrentPage">
+                  }
+                  @if (Model.PageSize != AdminNewsDiscoveryRoutes.ListPageSize)
+                  {
+                    <input type="hidden" name="pageSize" value="@Model.PageSize">
+                  }
                   @if (Model.Status is not null)
                   {
                     <input type="hidden" name="status" value="@Model.Status">
@@ -287,5 +305,7 @@
         }
       </tbody>
     </table>
+
+    <partial name="_ArchivePagination" model="Model.Pagination" />
   }
 </div>

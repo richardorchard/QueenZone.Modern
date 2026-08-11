@@ -36,7 +36,7 @@ public interface INewsDiscoveryRepository
         decimal? secondaryMinConfidence = null,
         CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<NewsCandidateReviewListItem>> ListCandidatesForReviewAsync(
+    Task<NewsCandidateReviewPage> ListCandidatesForReviewAsync(
         NewsCandidateListQuery query,
         CancellationToken cancellationToken = default);
 

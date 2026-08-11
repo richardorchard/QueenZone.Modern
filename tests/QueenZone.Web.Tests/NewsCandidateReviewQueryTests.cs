@@ -46,4 +46,23 @@ public sealed class NewsCandidateReviewQueryTests
         Assert.Single(filtered);
         Assert.Equal(1, filtered[0].Id);
     }
+
+    [Fact]
+    public void ApplyActiveQueueFilter_excludes_rejected_promoted_and_duplicate_ignored_when_status_unset()
+    {
+        var candidates = new[]
+        {
+            new NewsCandidateEntity { Id = 1, Status = NewsCandidateStatus.NeedsReview },
+            new NewsCandidateEntity { Id = 2, Status = NewsCandidateStatus.Rejected },
+            new NewsCandidateEntity { Id = 3, Status = NewsCandidateStatus.PromotedToArticle },
+            new NewsCandidateEntity { Id = 4, Status = NewsCandidateStatus.IgnoredDuplicate },
+        };
+
+        var filtered = NewsCandidateReviewQuery.ApplyActiveQueueFilter(
+            candidates,
+            new NewsCandidateListQuery()).ToList();
+
+        Assert.Single(filtered);
+        Assert.Equal(1, filtered[0].Id);
+    }
 }

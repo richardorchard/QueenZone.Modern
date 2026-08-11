@@ -8,4 +8,6 @@ public sealed record NewsCandidateListQuery(
     string? Entity = null,
     DateTime? DiscoveredFromUtc = null,
     DateTime? DiscoveredToUtc = null,
-    bool? HasDraft = null);
+    bool? HasDraft = null,
+    int Page = 1,
+    int PageSize = NewsCandidateListQueryDefaults.PageSize);

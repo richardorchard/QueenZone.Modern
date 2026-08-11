@@ -225,14 +225,21 @@ public sealed class SharedNewsDiscoveryStore
         }
     }
 
-    public IReadOnlyList<NewsCandidateReviewListItem> ListCandidatesForReview(NewsCandidateListQuery query)
+    public IReadOnlyList<NewsCandidateReviewListItem> ListCandidatesForReview(NewsCandidateListQuery query) =>
+        ListCandidatesForReviewPage(query).Items;
+
+    public NewsCandidateReviewPage ListCandidatesForReviewPage(NewsCandidateListQuery query)
     {
         lock (sync)
         {
-            var queryable = NewsCandidateReviewQuery.ApplyEntityFilters(
-                candidates,
-                query,
-                sourceId => sources.SingleOrDefault(item => item.Id == sourceId));
+            var (page, pageSize) = NewsCandidateListQueryDefaults.Normalize(query.Page, query.PageSize);
+
+            var queryable = NewsCandidateReviewQuery.ApplyActiveQueueFilter(
+                NewsCandidateReviewQuery.ApplyEntityFilters(
+                    candidates,
+                    query,
+                    sourceId => sources.SingleOrDefault(item => item.Id == sourceId)),
+                query);
 
             if (query.HasDraft == true)
             {
@@ -254,9 +261,14 @@ public sealed class SharedNewsDiscoveryStore
                         && run.StructuredResultJson.Contains(entity, StringComparison.OrdinalIgnoreCase)));
             }
 
-            return queryable
+            var ordered = queryable
                 .OrderByDescending(candidate => candidate.DiscoveredAt)
                 .ThenByDescending(candidate => candidate.Id)
+                .ToList();
+
+            var pageItems = ordered
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
                 .Select(candidate =>
                 {
                     var source = sources.Single(item => item.Id == candidate.SourceId);
@@ -275,6 +287,8 @@ public sealed class SharedNewsDiscoveryStore
                         draft?.ProposedTitle);
                 })
                 .ToList();
+
+            return new NewsCandidateReviewPage(pageItems, ordered.Count, page, pageSize);
         }
     }
 

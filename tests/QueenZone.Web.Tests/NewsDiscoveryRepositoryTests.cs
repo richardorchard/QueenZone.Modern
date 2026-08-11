@@ -562,8 +562,83 @@ public sealed class NewsDiscoveryRepositoryTests
             Entity: "Brian May",
             MinConfidence: 0.8m));
 
-        Assert.Single(matches);
-        Assert.Equal(candidateId, matches[0].Id);
-        Assert.Equal("Filtered draft title", matches[0].DraftTitle);
+        Assert.Single(matches.Items);
+        Assert.Equal(candidateId, matches.Items[0].Id);
+        Assert.Equal("Filtered draft title", matches.Items[0].DraftTitle);
+    }
+
+    [Fact]
+    public async Task ListCandidatesForReviewAsync_pages_results_and_returns_total_count()
+    {
+        var repository = CreateRepository();
+        var baseTime = new DateTime(2026, 7, 1, 12, 0, 0, DateTimeKind.Utc);
+
+        await NewsDiscoveryTestSeeder.SeedNeedsReviewCandidateAsync(
+            repository,
+            canonicalUrl: "https://example.com/page-one",
+            title: "Page one",
+            discoveredAt: baseTime.AddMinutes(3));
+        await NewsDiscoveryTestSeeder.SeedNeedsReviewCandidateAsync(
+            repository,
+            canonicalUrl: "https://example.com/page-two",
+            title: "Page two",
+            discoveredAt: baseTime.AddMinutes(2));
+        var thirdId = await NewsDiscoveryTestSeeder.SeedNeedsReviewCandidateAsync(
+            repository,
+            canonicalUrl: "https://example.com/page-three",
+            title: "Page three",
+            discoveredAt: baseTime.AddMinutes(1));
+
+        var firstPage = await repository.ListCandidatesForReviewAsync(new NewsCandidateListQuery(
+            Status: NewsCandidateStatus.NeedsReview,
+            Page: 1,
+            PageSize: 2));
+        var secondPage = await repository.ListCandidatesForReviewAsync(new NewsCandidateListQuery(
+            Status: NewsCandidateStatus.NeedsReview,
+            Page: 2,
+            PageSize: 2));
+
+        Assert.Equal(3, firstPage.TotalCount);
+        Assert.Equal(2, firstPage.Items.Count);
+        Assert.Equal("Page one", firstPage.Items[0].SourceTitle);
+        Assert.Equal("Page two", firstPage.Items[1].SourceTitle);
+        Assert.Single(secondPage.Items);
+        Assert.Equal(thirdId, secondPage.Items[0].Id);
+    }
+
+    [Fact]
+    public async Task ListCandidatesForReviewAsync_clamps_page_size_to_maximum()
+    {
+        var repository = CreateRepository();
+        await NewsDiscoveryTestSeeder.SeedNeedsReviewCandidateAsync(repository);
+
+        var page = await repository.ListCandidatesForReviewAsync(new NewsCandidateListQuery(
+            Page: 1,
+            PageSize: 500));
+
+        Assert.Equal(NewsCandidateListQueryDefaults.MaxPageSize, page.PageSize);
+        Assert.Single(page.Items);
+    }
+
+    [Fact]
+    public async Task ListCandidatesForReviewAsync_excludes_inactive_statuses_by_default()
+    {
+        var repository = CreateRepository();
+        var activeId = await NewsDiscoveryTestSeeder.SeedNeedsReviewCandidateAsync(
+            repository,
+            canonicalUrl: "https://example.com/active",
+            title: "Active candidate");
+        var rejectedId = await NewsDiscoveryTestSeeder.SeedNeedsReviewCandidateAsync(
+            repository,
+            canonicalUrl: "https://example.com/rejected",
+            title: "Rejected candidate");
+        await repository.TryUpdateCandidateStatusAsync(
+            rejectedId,
+            new NewsCandidateStatusUpdate(NewsCandidateStatus.Rejected));
+
+        var page = await repository.ListCandidatesForReviewAsync(new NewsCandidateListQuery());
+
+        Assert.Single(page.Items);
+        Assert.Equal(activeId, page.Items[0].Id);
     }
 }
