@@ -7,7 +7,7 @@ namespace QueenZone.Web.E2E;
 /// <b>Marker convention</b> (matches probe discipline such as <c>photo-submission-probe-%</c>):
 /// <c>uie2e-{runId}-{fixture}-{n}</c>
 /// where <c>runId</c> is <c>GITHUB_RUN_ID</c> in CI or a UTC timestamp locally, optionally
-/// suffixed with the sanitized <c>RUNNER_NAME</c> so parallel matrix legs sharing one
+/// suffixed with a short hash of <c>RUNNER_NAME</c> so parallel matrix legs sharing one
 /// <c>GITHUB_RUN_ID</c> (and one shared SQL Express mirror) don't collide,
 /// <c>fixture</c> is a short kebab slug for the fixture, and <c>n</c> is a per-fixture counter.
 /// Use <see cref="NextMarker"/> for any title/body/email the fixture inserts so residue checks

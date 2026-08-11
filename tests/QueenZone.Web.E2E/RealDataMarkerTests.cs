@@ -37,7 +37,7 @@ public class RealDataMarkerTests
     }
 
     [Test]
-    public void ResolveRunId_AppendsSanitizedRunnerNameWhenPresent()
+    public void ResolveRunId_AppendsHashedRunnerSuffixWhenPresent()
     {
         var runId = RealDataMarkers.ResolveRunId(name => name switch
         {
@@ -45,7 +45,47 @@ public class RealDataMarkerTests
             "RUNNER_NAME" => "Richards-Mac (queenzone)",
             _ => null,
         });
-        Assert.That(runId, Is.EqualTo("42-richards-mac-queenzone"));
+        Assert.That(runId, Does.Match(@"^42-[0-9a-f]{6}$"));
+        Assert.That(runId.Length, Is.EqualTo(2 + RealDataMarkers.RunnerSuffixLength));
+    }
+
+    [Test]
+    public void ResolveRunId_RunnerSuffixIsStableForSameRunnerName()
+    {
+        var first = RealDataMarkers.ResolveRunId(name => name switch
+        {
+            "GITHUB_RUN_ID" => "42",
+            "RUNNER_NAME" => "richards-pc",
+            _ => null,
+        });
+        var second = RealDataMarkers.ResolveRunId(name => name switch
+        {
+            "GITHUB_RUN_ID" => "99",
+            "RUNNER_NAME" => "richards-pc",
+            _ => null,
+        });
+
+        var firstSuffix = first[(first.IndexOf('-') + 1)..];
+        var secondSuffix = second[(second.IndexOf('-') + 1)..];
+        Assert.That(firstSuffix, Is.EqualTo(secondSuffix));
+    }
+
+    [Test]
+    public void ResolveRunId_DifferentRunnerNamesProduceDifferentSuffixes()
+    {
+        var windows = RealDataMarkers.ResolveRunId(name => name switch
+        {
+            "GITHUB_RUN_ID" => "42",
+            "RUNNER_NAME" => "richards-pc",
+            _ => null,
+        });
+        var macOs = RealDataMarkers.ResolveRunId(name => name switch
+        {
+            "GITHUB_RUN_ID" => "42",
+            "RUNNER_NAME" => "richards-mac-queenzone",
+            _ => null,
+        });
+        Assert.That(windows, Is.Not.EqualTo(macOs));
     }
 
     [Test]
