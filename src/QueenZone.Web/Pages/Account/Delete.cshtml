@@ -1,0 +1,34 @@
+@page "/account/delete"
+@model DeleteModel
+
+<partial name="_PageHero" model='@(("Members", "Delete account", "Permanently remove your sign-in and personal account data.", ""))' />
+
+<section class="qz-section">
+  <div class="qz-container qz-prose">
+    <h2>What happens</h2>
+    <ul>
+      <li>You are signed out and cannot sign in to this account again.</li>
+      <li>Your public name changes immediately to <strong>Deleted member</strong>.</li>
+      <li>Your forum posts and private messages remain, with anonymised attribution.</li>
+      <li>Your avatar is removed immediately.</li>
+      <li>Your email, password hash, and social sign-ins are purged after <strong>30 days</strong>.</li>
+      <li>Your existing legacy account link is retained.</li>
+    </ul>
+    <p>This action cannot be undone.</p>
+
+    <form method="post" class="qz-account-form" data-busy-submit data-busy-label="Deleting…">
+      @Html.AntiForgeryToken()
+      <div asp-validation-summary="ModelOnly" class="qz-account-form__errors" role="alert"></div>
+      <label class="qz-account-form__field">
+        <span>Type <strong>DELETE</strong> to delete the account for @Model.Email</span>
+        <input asp-for="Confirmation" type="text" autocomplete="off" required />
+        <span asp-validation-for="Confirmation" class="qz-account-form__field-error"></span>
+      </label>
+      <div class="qz-account-form__actions">
+        <button type="submit" class="qz-button qz-button--danger">Delete my account</button>
+        <a class="qz-button qz-button--outline" href="/account/settings">Cancel</a>
+      </div>
+      <p class="qz-account-form__status" data-busy-status hidden role="status" aria-live="polite"></p>
+    </form>
+  </div>
+</section>

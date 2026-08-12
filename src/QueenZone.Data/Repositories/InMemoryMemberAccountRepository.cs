@@ -8,6 +8,8 @@ public sealed class InMemoryMemberAccountRepository : IMemberAccountRepository
     private readonly List<MemberExternalLogin> externalLogins = [];
     private readonly Lock gate = new();
 
+    private readonly List<MemberAccountDeletionAuditLogEntity> deletionAuditLogs = [];
+
     public Task<MemberAccount?> FindByEmailAsync(string email, CancellationToken cancellationToken = default)
     {
         lock (gate)
@@ -233,6 +235,7 @@ public sealed class InMemoryMemberAccountRepository : IMemberAccountRepository
             IReadOnlyList<MemberRecipientMatch> matches = accounts
                 .Where(account =>
                     account.DisplayName.Contains(term, StringComparison.OrdinalIgnoreCase)
+                    && account.DeletionRequestedAt is null
                     && (excludeMemberId is null || account.Id != excludeMemberId.Value))
                 .OrderBy(account => account.DisplayName, StringComparer.OrdinalIgnoreCase)
                 .Take(maxResults)
@@ -306,6 +309,84 @@ public sealed class InMemoryMemberAccountRepository : IMemberAccountRepository
             account.SuspendedReason = null;
             account.SuspendedByAdminEmail = null;
             return Task.FromResult<MemberAccount?>(account);
+        }
+    }
+
+    public Task<MemberAccountDeletionRequestResult?> RequestDeletionAsync(
+        Guid memberId,
+        DateTime requestedAt,
+        CancellationToken cancellationToken = default)
+    {
+        lock (gate)
+        {
+            var account = accounts.FirstOrDefault(a => a.Id == memberId);
+            if (account is null)
+            {
+                return Task.FromResult<MemberAccountDeletionRequestResult?>(null);
+            }
+
+            if (account.DeletionRequestedAt is not null)
+            {
+                return Task.FromResult<MemberAccountDeletionRequestResult?>(
+                    new(account, null, AlreadyRequested: true));
+            }
+
+            var previousAvatarUrl = account.AvatarUrl;
+            account.DisplayName = MemberAccountDeletionPolicy.DeletedDisplayName;
+            account.AvatarUrl = null;
+            account.IsSuspended = true;
+            account.SuspendedAt = requestedAt;
+            account.SuspendedReason = "Account deletion requested";
+            account.SuspendedByAdminEmail = null;
+            account.DeletionRequestedAt = requestedAt;
+            deletionAuditLogs.Add(new MemberAccountDeletionAuditLogEntity
+            {
+                MemberAccountId = memberId,
+                Action = MemberAccountDeletionPolicy.RequestedAuditAction,
+                OccurredAt = requestedAt,
+            });
+
+            return Task.FromResult<MemberAccountDeletionRequestResult?>(
+                new(account, previousAvatarUrl, AlreadyRequested: false));
+        }
+    }
+
+    public Task<int> PurgeDeletedAccountsAsync(
+        DateTime purgeBefore,
+        DateTime purgedAt,
+        CancellationToken cancellationToken = default)
+    {
+        lock (gate)
+        {
+            var dueAccounts = accounts
+                .Where(account =>
+                    account.DeletionRequestedAt is not null
+                    && account.DeletionRequestedAt <= purgeBefore
+                    && account.PersonalDataPurgedAt is null)
+                .ToList();
+
+            foreach (var account in dueAccounts)
+            {
+                externalLogins.RemoveAll(login => login.MemberAccountId == account.Id);
+                var deletedEmail = MemberAccountDeletionPolicy.CreateDeletedEmail(account.Id);
+                account.Email = deletedEmail;
+                account.NormalizedEmail = Normalize(deletedEmail);
+                account.DisplayName = MemberAccountDeletionPolicy.DeletedDisplayName;
+                account.AvatarUrl = null;
+                account.PasswordHash = null;
+                account.LastLoginAt = null;
+                account.SuspendedReason = null;
+                account.SuspendedByAdminEmail = null;
+                account.PersonalDataPurgedAt = purgedAt;
+                deletionAuditLogs.Add(new MemberAccountDeletionAuditLogEntity
+                {
+                    MemberAccountId = account.Id,
+                    Action = MemberAccountDeletionPolicy.PurgedAuditAction,
+                    OccurredAt = purgedAt,
+                });
+            }
+
+            return Task.FromResult(dueAccounts.Count);
         }
     }
 

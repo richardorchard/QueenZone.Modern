@@ -31,4 +31,8 @@ public sealed class MemberAccount
     public string? SuspendedReason { get; set; }
 
     public string? SuspendedByAdminEmail { get; set; }
+
+    public DateTime? DeletionRequestedAt { get; set; }
+
+    public DateTime? PersonalDataPurgedAt { get; set; }
 }

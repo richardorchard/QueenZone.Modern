@@ -5,21 +5,23 @@
   ViewData["CanonicalPath"] = "/data-deletion";
 }
 
-<partial name="_PageHero" model='@(("Your Data", "Data Deletion", "How to request removal of your personal information from Queenzone.", "Last updated 2 July 2026"))' />
+<partial name="_PageHero" model='@(("Your Data", "Data Deletion", "How to remove your personal information from Queenzone.", "Last updated 12 August 2026"))' />
 
 <section class="qz-section qz-section--warm">
   <div class="qz-container" style="max-width: var(--container-text);">
 
-    <p class="lede">You can request that we delete your personal data at any time. Here's how.</p>
+    <p class="lede">You can delete your account and personal sign-in data at any time.</p>
 
     <h2>What we store</h2>
     <p>If you have a Queenzone account, we store your email address, display name, and (where applicable) a reference to the social login provider you used (Google, Microsoft, Discord, or GitHub). We do not store passwords in plain text.</p>
 
-    <h2>How to request deletion</h2>
-    <p>Send an email to <a href="mailto:privacy@queenzone.org">privacy@queenzone.org</a> with the subject line <strong>"Data Deletion Request"</strong> and include the email address associated with your account. We will process your request within 30 days and confirm by email once complete.</p>
+    <h2>How to delete your account</h2>
+    <p>Sign in, open <a href="/account/settings">Account settings</a>, and select <strong>Delete my account</strong>. You will be signed out immediately and cannot sign in to that account again.</p>
+    <p>If you cannot sign in, email <a href="mailto:privacy@queenzone.org">privacy@queenzone.org</a> from the address associated with your account.</p>
 
-    <h2>What gets deleted</h2>
-    <p>We will delete your account and the personal information associated with it (email address, display name, social login references). Public content you posted (such as forum posts) may be anonymised rather than deleted to preserve archive integrity, unless you specifically request otherwise.</p>
+    <h2>What happens after deletion</h2>
+    <p>Your public display name changes immediately to <strong>Deleted member</strong>. Forum posts and private messages remain with anonymised attribution to preserve conversations and archive integrity.</p>
+    <p>Your avatar is removed immediately. After 30 days, we permanently purge your email address, password hash, and social sign-in references. We retain a non-personal account record so content relationships remain valid. Any existing link to a legacy QueenZone account is retained for now.</p>
 
     <h2>Contact</h2>
     <p>For any questions about your data, email <a href="mailto:privacy@queenzone.org">privacy@queenzone.org</a>.</p>

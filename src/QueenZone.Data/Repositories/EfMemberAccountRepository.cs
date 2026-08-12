@@ -202,6 +202,7 @@ public sealed class EfMemberAccountRepository(QueenZoneDbContext dbContext) : IM
             .AsNoTracking()
             .Where(account =>
                 account.DisplayName.Contains(term)
+                && account.DeletionRequestedAt == null
                 && (excludeMemberId == null || account.Id != excludeMemberId))
             .OrderBy(account => account.DisplayName)
             .Take(maxResults)
@@ -275,6 +276,138 @@ public sealed class EfMemberAccountRepository(QueenZoneDbContext dbContext) : IM
         account.SuspendedByAdminEmail = null;
         await dbContext.SaveChangesAsync(cancellationToken);
         return account;
+    }
+
+    public Task<MemberAccountDeletionRequestResult?> RequestDeletionAsync(
+        Guid memberId,
+        DateTime requestedAt,
+        CancellationToken cancellationToken = default)
+    {
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        return strategy.ExecuteAsync<MemberAccountDeletionRequestResult?>(async () =>
+        {
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+            var account = await dbContext.MemberAccounts
+                .SingleOrDefaultAsync(a => a.Id == memberId, cancellationToken);
+            if (account is null)
+            {
+                return null;
+            }
+
+            if (account.DeletionRequestedAt is not null)
+            {
+                return new MemberAccountDeletionRequestResult(account, null, AlreadyRequested: true);
+            }
+
+            var previousAvatarUrl = account.AvatarUrl;
+            var starterThreadIds = dbContext.ModernForumPosts
+                .Where(post =>
+                    post.AuthorMemberId == memberId
+                    && !dbContext.ModernForumPosts.Any(other =>
+                        other.ThreadId == post.ThreadId
+                        && other.LegacyPostId < post.LegacyPostId))
+                .Select(post => post.ThreadId);
+
+            await dbContext.ModernForumThreads
+                .Where(thread => starterThreadIds.Contains(thread.Id))
+                .ExecuteUpdateAsync(
+                    setters => setters
+                        .SetProperty(thread => thread.StartedByDisplayName, MemberAccountDeletionPolicy.DeletedDisplayName)
+                        .SetProperty(thread => thread.UpdatedAt, requestedAt),
+                    cancellationToken);
+
+            await dbContext.ModernForumPosts
+                .Where(post => post.AuthorMemberId == memberId)
+                .ExecuteUpdateAsync(
+                    setters => setters
+                        .SetProperty(post => post.AuthorMemberId, (Guid?)null)
+                        .SetProperty(post => post.AuthorDisplayName, MemberAccountDeletionPolicy.DeletedDisplayName)
+                        .SetProperty(post => post.UpdatedAt, requestedAt),
+                    cancellationToken);
+
+            var articleSourceKeys = dbContext.ArticleSubmissions
+                .Where(article => article.AuthorMemberId == memberId)
+                .Select(article => "article:" + article.Slug);
+            await dbContext.SearchDocuments
+                .Where(document => articleSourceKeys.Contains(document.SourceKey))
+                .ExecuteUpdateAsync(
+                    setters => setters.SetProperty(
+                        document => document.AuthorDisplayName,
+                        MemberAccountDeletionPolicy.DeletedDisplayName),
+                    cancellationToken);
+
+            account.DisplayName = MemberAccountDeletionPolicy.DeletedDisplayName;
+            account.AvatarUrl = null;
+            account.IsSuspended = true;
+            account.SuspendedAt = requestedAt;
+            account.SuspendedReason = "Account deletion requested";
+            account.SuspendedByAdminEmail = null;
+            account.DeletionRequestedAt = requestedAt;
+
+            dbContext.MemberAccountDeletionAuditLogs.Add(new MemberAccountDeletionAuditLogEntity
+            {
+                MemberAccountId = memberId,
+                Action = MemberAccountDeletionPolicy.RequestedAuditAction,
+                OccurredAt = requestedAt,
+            });
+
+            await dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return new MemberAccountDeletionRequestResult(account, previousAvatarUrl, AlreadyRequested: false);
+        });
+    }
+
+    public Task<int> PurgeDeletedAccountsAsync(
+        DateTime purgeBefore,
+        DateTime purgedAt,
+        CancellationToken cancellationToken = default)
+    {
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        return strategy.ExecuteAsync(async () =>
+        {
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+            var accounts = await dbContext.MemberAccounts
+                .Where(account =>
+                    account.DeletionRequestedAt != null
+                    && account.DeletionRequestedAt <= purgeBefore
+                    && account.PersonalDataPurgedAt == null)
+                .ToListAsync(cancellationToken);
+            if (accounts.Count == 0)
+            {
+                await transaction.CommitAsync(cancellationToken);
+                return 0;
+            }
+
+            var memberIds = accounts.Select(account => account.Id).ToList();
+            await dbContext.MemberExternalLogins
+                .Where(login => memberIds.Contains(login.MemberAccountId))
+                .ExecuteDeleteAsync(cancellationToken);
+
+            foreach (var account in accounts)
+            {
+                var deletedEmail = MemberAccountDeletionPolicy.CreateDeletedEmail(account.Id);
+                account.Email = deletedEmail;
+                account.NormalizedEmail = Normalize(deletedEmail);
+                account.DisplayName = MemberAccountDeletionPolicy.DeletedDisplayName;
+                account.AvatarUrl = null;
+                account.PasswordHash = null;
+                account.LastLoginAt = null;
+                account.SuspendedReason = null;
+                account.SuspendedByAdminEmail = null;
+                account.PersonalDataPurgedAt = purgedAt;
+
+                dbContext.MemberAccountDeletionAuditLogs.Add(new MemberAccountDeletionAuditLogEntity
+                {
+                    MemberAccountId = account.Id,
+                    Action = MemberAccountDeletionPolicy.PurgedAuditAction,
+                    OccurredAt = purgedAt,
+                });
+            }
+
+            await dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return accounts.Count;
+        });
     }
 
     private static string Normalize(string email) => email.Trim().ToUpperInvariant();

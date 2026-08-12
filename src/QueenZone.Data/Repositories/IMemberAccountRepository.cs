@@ -88,4 +88,22 @@ public interface IMemberAccountRepository
     /// Clears a suspension, restoring normal sign-in access.
     /// </summary>
     Task<MemberAccount?> ReinstateAsync(Guid memberId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Blocks sign-in and immediately anonymises public attribution. Credential and email data
+    /// remain for the policy retention window and are removed by <see cref="PurgeDeletedAccountsAsync"/>.
+    /// </summary>
+    Task<MemberAccountDeletionRequestResult?> RequestDeletionAsync(
+        Guid memberId,
+        DateTime requestedAt,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Irreversibly removes personal and authentication data for deletion requests at or before
+    /// <paramref name="purgeBefore"/>. The member tombstone and linked legacy id are retained.
+    /// </summary>
+    Task<int> PurgeDeletedAccountsAsync(
+        DateTime purgeBefore,
+        DateTime purgedAt,
+        CancellationToken cancellationToken = default);
 }

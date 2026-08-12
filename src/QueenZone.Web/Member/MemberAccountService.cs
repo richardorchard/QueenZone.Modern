@@ -90,7 +90,11 @@ public sealed class MemberAccountService(
             var existingByEmail = await memberAccountRepository.FindByEmailAsync(email, cancellationToken);
             if (existingByEmail is not null)
             {
-                await memberAccountRepository.AddExternalLoginAsync(existingByEmail.Id, provider, providerKey, email, cancellationToken);
+                if (existingByEmail.DeletionRequestedAt is null)
+                {
+                    await memberAccountRepository.AddExternalLoginAsync(existingByEmail.Id, provider, providerKey, email, cancellationToken);
+                }
+
                 result = existingByEmail;
             }
             else
@@ -112,12 +116,16 @@ public sealed class MemberAccountService(
 
         // Existing accounts only: silent backfill for people who never claimed yet.
         // New accounts keep LinkedLegacyUserId null so Settings can offer an explicit claim.
-        if (!isNewAccount)
+        if (!isNewAccount && result.DeletionRequestedAt is null)
         {
             result = await TryBackfillLegacyLinkAsync(result, cancellationToken);
         }
 
-        await memberAccountRepository.RecordLoginAsync(result.Id, DateTime.UtcNow, cancellationToken);
+        if (!result.IsSuspended)
+        {
+            await memberAccountRepository.RecordLoginAsync(result.Id, DateTime.UtcNow, cancellationToken);
+        }
+
         return result;
     }
 
@@ -478,6 +486,38 @@ public sealed class MemberAccountService(
 
         return MemberAccountResult.Success(updated);
     }
+
+    public async Task<MemberAccountResult> RequestDeletionAsync(
+        Guid memberId,
+        CancellationToken cancellationToken = default)
+    {
+        var requested = await memberAccountRepository.RequestDeletionAsync(
+            memberId,
+            DateTime.UtcNow,
+            cancellationToken);
+        if (requested is null)
+        {
+            return MemberAccountResult.Failure("Account not found.");
+        }
+
+        if (!requested.AlreadyRequested && !string.IsNullOrWhiteSpace(requested.PreviousAvatarUrl))
+        {
+            await SafeDeleteAsync(
+                requested.PreviousAvatarUrl,
+                MemberAvatarPaths.ToThumbBlobName(requested.PreviousAvatarUrl),
+                cancellationToken);
+        }
+
+        return MemberAccountResult.Success(requested.Account);
+    }
+
+    public Task<int> PurgeDueDeletionsAsync(
+        DateTime utcNow,
+        CancellationToken cancellationToken = default) =>
+        memberAccountRepository.PurgeDeletedAccountsAsync(
+            utcNow.AddDays(-MemberAccountDeletionPolicy.RetentionDays),
+            utcNow,
+            cancellationToken);
 
     private async Task SafeDeleteAsync(
         string? avatarBlobName,

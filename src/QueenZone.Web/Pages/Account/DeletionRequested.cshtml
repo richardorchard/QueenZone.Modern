@@ -1,0 +1,13 @@
+@page "/account/deletion-requested"
+@{
+  ViewData["Title"] = "Account deletion requested";
+}
+
+<partial name="_PageHero" model='@(("Members", "Account deletion requested", "Your account is now disabled and publicly anonymised.", ""))' />
+
+<section class="qz-section">
+  <div class="qz-container qz-prose">
+    <p>Your personal sign-in data will be permanently purged after <strong>30 days</strong>.</p>
+    <p>Forum posts and private messages remain attributed to <strong>Deleted member</strong>.</p>
+  </div>
+</section>

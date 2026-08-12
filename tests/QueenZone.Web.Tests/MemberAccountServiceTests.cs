@@ -558,6 +558,59 @@ public sealed class MemberAccountServiceTests
     }
 
     [Fact]
+    public async Task RequestDeletionAsync_RemovesAvatar_AndBlocksPasswordSignIn()
+    {
+        var backend = new InMemoryBlobStorageBackend();
+        var repository = new InMemoryMemberAccountRepository();
+        var service = CreateService(memberAccountRepository: repository, blobBackend: backend);
+        var registered = await service.RegisterAsync(
+            "delete-service@example.com",
+            "S3curePass!",
+            "Delete Service");
+        await using var png = await CreatePngAsync();
+        var uploaded = await service.UpdateAvatarAsync(registered.Account!.Id, png, "avatar.png");
+        var avatarPath = uploaded.Account!.AvatarUrl!;
+        var thumbPath = MemberAvatarPaths.ToThumbBlobName(avatarPath);
+
+        var result = await service.RequestDeletionAsync(registered.Account.Id);
+        var signIn = await service.SignInAsync("delete-service@example.com", "S3curePass!");
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(MemberAccountDeletionPolicy.DeletedDisplayName, result.Account!.DisplayName);
+        Assert.NotNull(result.Account.DeletionRequestedAt);
+        Assert.True(result.Account.IsSuspended);
+        Assert.False(backend.Exists(MemberAvatarPaths.Container, avatarPath));
+        Assert.False(backend.Exists(MemberAvatarPaths.Container, thumbPath));
+        Assert.False(signIn.Succeeded);
+        Assert.Equal(MemberAccountService.SuspendedSignInError, signIn.Error);
+    }
+
+    [Fact]
+    public async Task DeletedAccount_ExternalSignInDoesNotRelinkOrRecordLogin()
+    {
+        var repository = new InMemoryMemberAccountRepository();
+        var service = CreateService(memberAccountRepository: repository);
+        var account = await service.FindOrCreateFromExternalLoginAsync(
+            "Google",
+            "deleted-google-subject",
+            "deleted-external@example.com",
+            "External Delete");
+        var lastLoginBeforeDeletion = account.LastLoginAt;
+        await service.RequestDeletionAsync(account.Id);
+
+        var returned = await service.FindOrCreateFromExternalLoginAsync(
+            "GitHub",
+            "deleted-github-subject",
+            "deleted-external@example.com",
+            "External Delete");
+
+        Assert.Equal(account.Id, returned.Id);
+        Assert.True(returned.IsSuspended);
+        Assert.Equal(lastLoginBeforeDeletion, returned.LastLoginAt);
+        Assert.Equal(["Google"], await service.ListExternalProvidersAsync(account.Id));
+    }
+
+    [Fact]
     public async Task UpdateAvatarAsync_RejectsOversizedFile_BeforeUpload()
     {
         var backend = new InMemoryBlobStorageBackend();
@@ -692,5 +745,17 @@ public sealed class MemberAccountServiceTests
 
         public Task<MemberAccount?> ReinstateAsync(Guid memberId, CancellationToken cancellationToken = default) =>
             inner.ReinstateAsync(memberId, cancellationToken);
+
+        public Task<MemberAccountDeletionRequestResult?> RequestDeletionAsync(
+            Guid memberId,
+            DateTime requestedAt,
+            CancellationToken cancellationToken = default) =>
+            inner.RequestDeletionAsync(memberId, requestedAt, cancellationToken);
+
+        public Task<int> PurgeDeletedAccountsAsync(
+            DateTime purgeBefore,
+            DateTime purgedAt,
+            CancellationToken cancellationToken = default) =>
+            inner.PurgeDeletedAccountsAsync(purgeBefore, purgedAt, cancellationToken);
     }
 }
