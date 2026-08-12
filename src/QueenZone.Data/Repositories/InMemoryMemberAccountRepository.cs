@@ -235,7 +235,7 @@ public sealed class InMemoryMemberAccountRepository : IMemberAccountRepository
             IReadOnlyList<MemberRecipientMatch> matches = accounts
                 .Where(account =>
                     account.DisplayName.Contains(term, StringComparison.OrdinalIgnoreCase)
-                    && account.PersonalDataPurgedAt is null
+                    && account.DeletionRequestedAt is null
                     && (excludeMemberId is null || account.Id != excludeMemberId.Value))
                 .OrderBy(account => account.DisplayName, StringComparer.OrdinalIgnoreCase)
                 .Take(maxResults)
@@ -331,6 +331,10 @@ public sealed class InMemoryMemberAccountRepository : IMemberAccountRepository
                     new(account, AlreadyRequested: true));
             }
 
+            account.DeletionRecoveryDisplayName = account.DisplayName;
+            account.DeletionRecoveryAvatarUrl = account.AvatarUrl;
+            account.DisplayName = MemberAccountDeletionPolicy.DeletedDisplayName;
+            account.AvatarUrl = null;
             account.DeletionRequestedAt = requestedAt;
             deletionAuditLogs.Add(new MemberAccountDeletionAuditLogEntity
             {
@@ -362,7 +366,11 @@ public sealed class InMemoryMemberAccountRepository : IMemberAccountRepository
                 return Task.FromResult<MemberAccount?>(account);
             }
 
+            account.DisplayName = account.DeletionRecoveryDisplayName ?? MemberAccountDeletionPolicy.DeletedDisplayName;
+            account.AvatarUrl = account.DeletionRecoveryAvatarUrl;
             account.DeletionRequestedAt = null;
+            account.DeletionRecoveryDisplayName = null;
+            account.DeletionRecoveryAvatarUrl = null;
             deletionAuditLogs.Add(new MemberAccountDeletionAuditLogEntity
             {
                 MemberAccountId = memberId,
@@ -387,7 +395,7 @@ public sealed class InMemoryMemberAccountRepository : IMemberAccountRepository
                     && account.PersonalDataPurgedAt is null)
                 .ToList();
             var avatarBlobPaths = dueAccounts
-                .Select(account => account.AvatarUrl)
+                .Select(account => account.DeletionRecoveryAvatarUrl)
                 .Where(path => !string.IsNullOrWhiteSpace(path))
                 .Cast<string>()
                 .ToList();
@@ -400,6 +408,8 @@ public sealed class InMemoryMemberAccountRepository : IMemberAccountRepository
                 account.NormalizedEmail = Normalize(deletedEmail);
                 account.DisplayName = MemberAccountDeletionPolicy.DeletedDisplayName;
                 account.AvatarUrl = null;
+                account.DeletionRecoveryDisplayName = null;
+                account.DeletionRecoveryAvatarUrl = null;
                 account.PasswordHash = null;
                 account.LastLoginAt = null;
                 account.IsSuspended = true;

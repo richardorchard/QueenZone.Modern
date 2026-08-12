@@ -27,7 +27,7 @@ public sealed class PrivateMessageServiceTests
     }
 
     [Fact]
-    public async Task PendingDeletion_AllowsMessages_UntilPermanentPurge()
+    public async Task PendingDeletion_AnonymisesAndBlocksMessages_AndCancellationRestoresThem()
     {
         var (service, members, _, alice, bob) = CreateSystem();
         var created = await service.ComposeAsync(alice.Id, bob.Id, "Retained message");
@@ -42,21 +42,21 @@ public sealed class PrivateMessageServiceTests
         var recipientMatches = await service.SearchRecipientsAsync(bob.Id, "Alice");
 
         Assert.NotNull(detail);
-        Assert.Equal("Alice", detail.OtherParticipantDisplayName);
-        Assert.Equal("Alice", Assert.Single(detail.Messages).SenderDisplayName);
-        Assert.True(reply.Succeeded);
-        Assert.Single(recipientMatches);
-
-        await members.PurgeDeletedAccountsAsync(requestedAt, requestedAt.AddDays(30));
-        detail = await service.GetConversationAsync(created.ConversationId.Value, bob.Id, markRead: false);
-        reply = await service.ReplyAsync(created.ConversationId.Value, bob.Id, "Are you still there?");
-        recipientMatches = await service.SearchRecipientsAsync(bob.Id, "Deleted");
-
-        Assert.Equal(MemberAccountDeletionPolicy.DeletedDisplayName, detail!.OtherParticipantDisplayName);
-        Assert.Equal(MemberAccountDeletionPolicy.DeletedDisplayName, detail.Messages[0].SenderDisplayName);
+        Assert.Equal(MemberAccountDeletionPolicy.DeletedDisplayName, detail.OtherParticipantDisplayName);
+        Assert.Equal(MemberAccountDeletionPolicy.DeletedDisplayName, Assert.Single(detail.Messages).SenderDisplayName);
         Assert.False(reply.Succeeded);
         Assert.Equal(PrivateMessageService.UnableToSendMessage, reply.ErrorMessage);
         Assert.Empty(recipientMatches);
+
+        await members.CancelDeletionAsync(alice.Id, requestedAt.AddDays(2));
+        detail = await service.GetConversationAsync(created.ConversationId.Value, bob.Id, markRead: false);
+        reply = await service.ReplyAsync(created.ConversationId.Value, bob.Id, "Welcome back");
+        recipientMatches = await service.SearchRecipientsAsync(bob.Id, "Alice");
+
+        Assert.Equal("Alice", detail!.OtherParticipantDisplayName);
+        Assert.Equal("Alice", detail.Messages[0].SenderDisplayName);
+        Assert.True(reply.Succeeded);
+        Assert.Single(recipientMatches);
     }
 
     [Fact]

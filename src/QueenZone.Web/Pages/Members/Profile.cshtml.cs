@@ -42,7 +42,7 @@ public sealed class ProfileModel(
         }
 
         Member = await memberAccountRepository.FindByIdAsync(memberId, cancellationToken);
-        if (Member is null || Member.PersonalDataPurgedAt is not null)
+        if (Member is null || Member.DeletionRequestedAt is not null)
         {
             return NotFound();
         }

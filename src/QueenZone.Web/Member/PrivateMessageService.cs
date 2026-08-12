@@ -70,7 +70,7 @@ public sealed class PrivateMessageService(
         }
 
         var recipient = await memberAccountRepository.FindByIdAsync(recipientMemberId, cancellationToken);
-        if (recipient is null || recipient.PersonalDataPurgedAt is not null)
+        if (recipient is null || recipient.DeletionRequestedAt is not null)
         {
             return new PrivateMessageSendResult(false, null, "Recipient was not found.");
         }
@@ -116,7 +116,7 @@ public sealed class PrivateMessageService(
         if (otherParticipantId is Guid other)
         {
             var otherParticipant = await memberAccountRepository.FindByIdAsync(other, cancellationToken);
-            if (otherParticipant?.PersonalDataPurgedAt is not null
+            if (otherParticipant?.DeletionRequestedAt is not null
                 || await privateMessageRepository.IsMessagingBlockedAsync(
                     senderMemberId,
                     other,
@@ -170,7 +170,7 @@ public sealed class PrivateMessageService(
         }
 
         var target = await memberAccountRepository.FindByIdAsync(blockedMemberId, cancellationToken);
-        if (target is null || target.PersonalDataPurgedAt is not null)
+        if (target is null || target.DeletionRequestedAt is not null)
         {
             return new PrivateMessageBlockResult(false, "Member was not found.");
         }
@@ -227,7 +227,7 @@ public sealed class PrivateMessageService(
         }
 
         var target = await memberAccountRepository.FindByIdAsync(targetMemberId!.Value, cancellationToken);
-        return target?.PersonalDataPurgedAt is null
+        return target?.DeletionRequestedAt is null
             && !await privateMessageRepository.IsMessagingBlockedAsync(
                 currentMemberId!.Value,
                 targetMemberId.Value,

@@ -90,7 +90,7 @@ public sealed class MemberAccountService(
             var existingByEmail = await memberAccountRepository.FindByEmailAsync(email, cancellationToken);
             if (existingByEmail is not null)
             {
-                if (existingByEmail.PersonalDataPurgedAt is null)
+                if (existingByEmail.DeletionRequestedAt is null)
                 {
                     await memberAccountRepository.AddExternalLoginAsync(existingByEmail.Id, provider, providerKey, email, cancellationToken);
                 }
@@ -317,6 +317,12 @@ public sealed class MemberAccountService(
     /// </summary>
     public async Task<MemberAccountResult> UpdateDisplayNameAsync(Guid memberId, string displayName, CancellationToken cancellationToken = default)
     {
+        var account = await memberAccountRepository.FindByIdAsync(memberId, cancellationToken);
+        if (account?.DeletionRequestedAt is not null)
+        {
+            return MemberAccountResult.Failure(PendingDeletionEditError);
+        }
+
         var trimmed = displayName?.Trim() ?? string.Empty;
         if (trimmed.Length == 0)
         {
@@ -359,6 +365,11 @@ public sealed class MemberAccountService(
         if (account is null)
         {
             return MemberAccountResult.Failure("Account not found.");
+        }
+
+        if (account.DeletionRequestedAt is not null)
+        {
+            return MemberAccountResult.Failure(PendingDeletionEditError);
         }
 
         MemberAvatarImageProcessor.ProcessedAvatar processed;
@@ -465,6 +476,11 @@ public sealed class MemberAccountService(
         if (account is null)
         {
             return MemberAccountResult.Failure("Account not found.");
+        }
+
+        if (account.DeletionRequestedAt is not null)
+        {
+            return MemberAccountResult.Failure(PendingDeletionEditError);
         }
 
         if (string.IsNullOrWhiteSpace(account.AvatarUrl))
@@ -581,6 +597,8 @@ public sealed class MemberAccountService(
     public const int MinDisplayNameLength = 2;
 
     public const int MaxDisplayNameLength = 100;
+
+    public const string PendingDeletionEditError = "Cancel account deletion before changing your public profile.";
 
     public const string SuspendedSignInError = "This account has been suspended.";
 }

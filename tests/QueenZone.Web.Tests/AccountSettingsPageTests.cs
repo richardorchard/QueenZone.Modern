@@ -107,7 +107,7 @@ public sealed partial class AccountSettingsPageTests : IClassFixture<WebApplicat
     }
 
     [Fact]
-    public async Task DeleteAccount_SignsOut_ButAllowsLoginAndCancellationDuringCoolingOff()
+    public async Task DeleteAccount_AnonymisesAndSignsOut_ButLoginAndCancellationRestoreIdentity()
     {
         const string email = "delete-valid@example.com";
         var client = await CreateSignedInMemberClientAsync(
@@ -142,9 +142,10 @@ public sealed partial class AccountSettingsPageTests : IClassFixture<WebApplicat
         Assert.NotNull(deleted);
         Assert.False(deleted.IsSuspended);
         Assert.NotNull(deleted.DeletionRequestedAt);
-        Assert.Equal("Delete Valid", deleted.DisplayName);
+        Assert.Equal(MemberAccountDeletionPolicy.DeletedDisplayName, deleted.DisplayName);
+        Assert.Equal("Delete Valid", deleted.DeletionRecoveryDisplayName);
         Assert.Equal(["Google"], await members.ListExternalProvidersAsync(deleted.Id));
-        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync($"/members/{deleted.Id}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/members/{deleted.Id}")).StatusCode);
 
         var signedInAgain = await CreateSignedInMemberClientAsync(
             email,
@@ -171,6 +172,9 @@ public sealed partial class AccountSettingsPageTests : IClassFixture<WebApplicat
         var restored = await members.FindByEmailAsync(email);
         Assert.Null(restored!.DeletionRequestedAt);
         Assert.False(restored.IsSuspended);
+        Assert.Equal("Delete Valid", restored.DisplayName);
+        Assert.Null(restored.DeletionRecoveryDisplayName);
+        Assert.Equal(HttpStatusCode.OK, (await signedInAgain.GetAsync($"/members/{restored.Id}")).StatusCode);
     }
 
     [Fact]

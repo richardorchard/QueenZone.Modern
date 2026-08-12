@@ -144,6 +144,8 @@ public sealed class QueenZoneDbContext : DbContext
             entity.Property(account => account.SuspendedReason).HasMaxLength(1000);
             entity.Property(account => account.SuspendedByAdminEmail).HasMaxLength(256);
             entity.Property(account => account.DeletionRequestedAt);
+            entity.Property(account => account.DeletionRecoveryDisplayName).HasMaxLength(100);
+            entity.Property(account => account.DeletionRecoveryAvatarUrl).HasMaxLength(512);
             entity.Property(account => account.PersonalDataPurgedAt);
 
             entity.HasIndex(account => account.NormalizedEmail)

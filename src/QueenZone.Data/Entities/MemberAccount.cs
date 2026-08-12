@@ -34,5 +34,15 @@ public sealed class MemberAccount
 
     public DateTime? DeletionRequestedAt { get; set; }
 
+    /// <summary>
+    /// Private recovery snapshot retained only during the deletion cooling-off period.
+    /// </summary>
+    public string? DeletionRecoveryDisplayName { get; set; }
+
+    /// <summary>
+    /// Private avatar blob-path snapshot retained only during the deletion cooling-off period.
+    /// </summary>
+    public string? DeletionRecoveryAvatarUrl { get; set; }
+
     public DateTime? PersonalDataPurgedAt { get; set; }
 }

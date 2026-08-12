@@ -169,7 +169,7 @@ public sealed class EfMemberAccountRepositoryTests : IAsyncDisposable
     }
 
     [Fact]
-    public async Task RequestDeletionAsync_PreservesAccountAndAttribution_UntilPurge()
+    public async Task RequestDeletionAsync_AnonymisesImmediately_CancelRestores_AndPurgeMakesPermanent()
     {
         var account = await SeedAccountAsync("delete-me@example.com", "Delete Me");
         account.AvatarUrl = $"members/{account.Id:N}/avatar.webp";
@@ -238,18 +238,35 @@ public sealed class EfMemberAccountRepositoryTests : IAsyncDisposable
         var reloaded = await dbContext.MemberAccounts.AsNoTracking().SingleAsync(a => a.Id == account.Id);
         Assert.False(reloaded.IsSuspended);
         Assert.Equal(requestedAt, reloaded.DeletionRequestedAt);
-        Assert.Equal("Delete Me", reloaded.DisplayName);
-        Assert.Equal($"members/{account.Id:N}/avatar.webp", reloaded.AvatarUrl);
+        Assert.Equal(MemberAccountDeletionPolicy.DeletedDisplayName, reloaded.DisplayName);
+        Assert.Null(reloaded.AvatarUrl);
+        Assert.Equal("Delete Me", reloaded.DeletionRecoveryDisplayName);
+        Assert.Equal($"members/{account.Id:N}/avatar.webp", reloaded.DeletionRecoveryAvatarUrl);
         var post = await dbContext.ModernForumPosts.AsNoTracking().SingleAsync();
         Assert.Equal(account.Id, post.AuthorMemberId);
-        Assert.Equal("Delete Me", post.AuthorDisplayName);
-        Assert.Equal("Delete Me", (await dbContext.ModernForumThreads.AsNoTracking().SingleAsync()).StartedByDisplayName);
-        Assert.Equal("Delete Me", (await dbContext.SearchDocuments.AsNoTracking().SingleAsync()).AuthorDisplayName);
+        Assert.Equal(MemberAccountDeletionPolicy.DeletedDisplayName, post.AuthorDisplayName);
+        Assert.Equal(MemberAccountDeletionPolicy.DeletedDisplayName, (await dbContext.ModernForumThreads.AsNoTracking().SingleAsync()).StartedByDisplayName);
+        Assert.Equal(MemberAccountDeletionPolicy.DeletedDisplayName, (await dbContext.SearchDocuments.AsNoTracking().SingleAsync()).AuthorDisplayName);
         var audit = await dbContext.MemberAccountDeletionAuditLogs.AsNoTracking().SingleAsync();
         Assert.Equal(MemberAccountDeletionPolicy.RequestedAuditAction, audit.Action);
         Assert.Equal(account.Id, audit.MemberAccountId);
 
-        var purge = await repository.PurgeDeletedAccountsAsync(requestedAt, requestedAt.AddDays(30));
+        await repository.CancelDeletionAsync(account.Id, requestedAt.AddDays(2));
+
+        reloaded = await dbContext.MemberAccounts.AsNoTracking().SingleAsync(a => a.Id == account.Id);
+        Assert.Equal("Delete Me", reloaded.DisplayName);
+        Assert.Equal($"members/{account.Id:N}/avatar.webp", reloaded.AvatarUrl);
+        Assert.Null(reloaded.DeletionRecoveryDisplayName);
+        Assert.Null(reloaded.DeletionRecoveryAvatarUrl);
+        post = await dbContext.ModernForumPosts.AsNoTracking().SingleAsync();
+        Assert.Equal(account.Id, post.AuthorMemberId);
+        Assert.Equal("Delete Me", post.AuthorDisplayName);
+        Assert.Equal("Delete Me", (await dbContext.ModernForumThreads.AsNoTracking().SingleAsync()).StartedByDisplayName);
+        Assert.Equal("Delete Me", (await dbContext.SearchDocuments.AsNoTracking().SingleAsync()).AuthorDisplayName);
+
+        var secondRequestAt = requestedAt.AddDays(3);
+        await repository.RequestDeletionAsync(account.Id, secondRequestAt);
+        var purge = await repository.PurgeDeletedAccountsAsync(secondRequestAt, secondRequestAt.AddDays(30));
 
         Assert.Equal(1, purge.PurgedCount);
         Assert.Equal([$"members/{account.Id:N}/avatar.webp"], purge.AvatarBlobPaths);
@@ -278,6 +295,8 @@ public sealed class EfMemberAccountRepositoryTests : IAsyncDisposable
         Assert.Null(cancelled.DeletionRequestedAt);
         Assert.False(cancelled.IsSuspended);
         Assert.Equal("Changed Mind", cancelled.DisplayName);
+        Assert.Null(cancelled.DeletionRecoveryDisplayName);
+        Assert.Null(cancelled.DeletionRecoveryAvatarUrl);
         Assert.Equal(0, purge.PurgedCount);
         Assert.Equal(
             [MemberAccountDeletionPolicy.RequestedAuditAction, MemberAccountDeletionPolicy.CancelledAuditAction],

@@ -202,7 +202,7 @@ public sealed class EfMemberAccountRepository(QueenZoneDbContext dbContext) : IM
             .AsNoTracking()
             .Where(account =>
                 account.DisplayName.Contains(term)
-                && account.PersonalDataPurgedAt == null
+                && account.DeletionRequestedAt == null
                 && (excludeMemberId == null || account.Id != excludeMemberId))
             .OrderBy(account => account.DisplayName)
             .Take(maxResults)
@@ -299,7 +299,13 @@ public sealed class EfMemberAccountRepository(QueenZoneDbContext dbContext) : IM
                 return new MemberAccountDeletionRequestResult(account, AlreadyRequested: true);
             }
 
+            account.DeletionRecoveryDisplayName = account.DisplayName;
+            account.DeletionRecoveryAvatarUrl = account.AvatarUrl;
+            account.DisplayName = MemberAccountDeletionPolicy.DeletedDisplayName;
+            account.AvatarUrl = null;
             account.DeletionRequestedAt = requestedAt;
+
+            await AnonymiseRetainedAttributionAsync(memberId, requestedAt, clearMemberLink: false, cancellationToken);
 
             dbContext.MemberAccountDeletionAuditLogs.Add(new MemberAccountDeletionAuditLogEntity
             {
@@ -338,13 +344,19 @@ public sealed class EfMemberAccountRepository(QueenZoneDbContext dbContext) : IM
                 return account;
             }
 
+            var recoveryDisplayName = account.DeletionRecoveryDisplayName;
             var updated = await dbContext.MemberAccounts
                 .Where(candidate =>
                     candidate.Id == memberId
                     && candidate.DeletionRequestedAt == account.DeletionRequestedAt
                     && candidate.PersonalDataPurgedAt == null)
                 .ExecuteUpdateAsync(
-                    setters => setters.SetProperty(candidate => candidate.DeletionRequestedAt, (DateTime?)null),
+                    setters => setters
+                        .SetProperty(candidate => candidate.DisplayName, recoveryDisplayName ?? MemberAccountDeletionPolicy.DeletedDisplayName)
+                        .SetProperty(candidate => candidate.AvatarUrl, account.DeletionRecoveryAvatarUrl)
+                        .SetProperty(candidate => candidate.DeletionRequestedAt, (DateTime?)null)
+                        .SetProperty(candidate => candidate.DeletionRecoveryDisplayName, (string?)null)
+                        .SetProperty(candidate => candidate.DeletionRecoveryAvatarUrl, (string?)null),
                     cancellationToken);
             if (updated == 0)
             {
@@ -352,6 +364,18 @@ public sealed class EfMemberAccountRepository(QueenZoneDbContext dbContext) : IM
                 return await dbContext.MemberAccounts
                     .AsNoTracking()
                     .SingleOrDefaultAsync(candidate => candidate.Id == memberId, cancellationToken);
+            }
+
+            if (!string.IsNullOrWhiteSpace(recoveryDisplayName))
+            {
+                await RestoreRetainedAttributionAsync(memberId, recoveryDisplayName, cancelledAt, cancellationToken);
+            }
+
+            var trackedAccount = dbContext.ChangeTracker.Entries<MemberAccount>()
+                .FirstOrDefault(entry => entry.Entity.Id == memberId);
+            if (trackedAccount is not null)
+            {
+                trackedAccount.State = EntityState.Detached;
             }
 
             dbContext.MemberAccountDeletionAuditLogs.Add(new MemberAccountDeletionAuditLogEntity
@@ -391,49 +415,14 @@ public sealed class EfMemberAccountRepository(QueenZoneDbContext dbContext) : IM
 
             var memberIds = accounts.Select(account => account.Id).ToList();
             var avatarBlobPaths = accounts
-                .Select(account => account.AvatarUrl)
+                .Select(account => account.DeletionRecoveryAvatarUrl)
                 .Where(path => !string.IsNullOrWhiteSpace(path))
                 .Cast<string>()
                 .ToList();
 
             foreach (var account in accounts)
             {
-                var memberId = account.Id;
-                var starterThreadIds = dbContext.ModernForumPosts
-                    .Where(post =>
-                        post.AuthorMemberId == memberId
-                        && !dbContext.ModernForumPosts.Any(other =>
-                            other.ThreadId == post.ThreadId
-                            && other.LegacyPostId < post.LegacyPostId))
-                    .Select(post => post.ThreadId);
-
-                await dbContext.ModernForumThreads
-                    .Where(thread => starterThreadIds.Contains(thread.Id))
-                    .ExecuteUpdateAsync(
-                        setters => setters
-                            .SetProperty(thread => thread.StartedByDisplayName, MemberAccountDeletionPolicy.DeletedDisplayName)
-                            .SetProperty(thread => thread.UpdatedAt, purgedAt),
-                        cancellationToken);
-
-                await dbContext.ModernForumPosts
-                    .Where(post => post.AuthorMemberId == memberId)
-                    .ExecuteUpdateAsync(
-                        setters => setters
-                            .SetProperty(post => post.AuthorMemberId, (Guid?)null)
-                            .SetProperty(post => post.AuthorDisplayName, MemberAccountDeletionPolicy.DeletedDisplayName)
-                            .SetProperty(post => post.UpdatedAt, purgedAt),
-                        cancellationToken);
-
-                var articleSourceKeys = dbContext.ArticleSubmissions
-                    .Where(article => article.AuthorMemberId == memberId)
-                    .Select(article => "article:" + article.Slug);
-                await dbContext.SearchDocuments
-                    .Where(document => articleSourceKeys.Contains(document.SourceKey))
-                    .ExecuteUpdateAsync(
-                        setters => setters.SetProperty(
-                            document => document.AuthorDisplayName,
-                            MemberAccountDeletionPolicy.DeletedDisplayName),
-                        cancellationToken);
+                await AnonymiseRetainedAttributionAsync(account.Id, purgedAt, clearMemberLink: true, cancellationToken);
             }
 
             await dbContext.MemberExternalLogins
@@ -447,6 +436,8 @@ public sealed class EfMemberAccountRepository(QueenZoneDbContext dbContext) : IM
                 account.NormalizedEmail = Normalize(deletedEmail);
                 account.DisplayName = MemberAccountDeletionPolicy.DeletedDisplayName;
                 account.AvatarUrl = null;
+                account.DeletionRecoveryDisplayName = null;
+                account.DeletionRecoveryAvatarUrl = null;
                 account.PasswordHash = null;
                 account.LastLoginAt = null;
                 account.IsSuspended = true;
@@ -467,6 +458,97 @@ public sealed class EfMemberAccountRepository(QueenZoneDbContext dbContext) : IM
             await transaction.CommitAsync(cancellationToken);
             return new MemberAccountDeletionPurgeResult(accounts.Count, avatarBlobPaths);
         });
+    }
+
+    private async Task AnonymiseRetainedAttributionAsync(
+        Guid memberId,
+        DateTime occurredAt,
+        bool clearMemberLink,
+        CancellationToken cancellationToken)
+    {
+        var starterThreadIds = dbContext.ModernForumPosts
+            .Where(post =>
+                post.AuthorMemberId == memberId
+                && !dbContext.ModernForumPosts.Any(other =>
+                    other.ThreadId == post.ThreadId
+                    && other.LegacyPostId < post.LegacyPostId))
+            .Select(post => post.ThreadId);
+
+        await dbContext.ModernForumThreads
+            .Where(thread => starterThreadIds.Contains(thread.Id))
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(thread => thread.StartedByDisplayName, MemberAccountDeletionPolicy.DeletedDisplayName)
+                    .SetProperty(thread => thread.UpdatedAt, occurredAt),
+                cancellationToken);
+
+        var posts = dbContext.ModernForumPosts.Where(post => post.AuthorMemberId == memberId);
+        if (clearMemberLink)
+        {
+            await posts.ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(post => post.AuthorMemberId, (Guid?)null)
+                    .SetProperty(post => post.AuthorDisplayName, MemberAccountDeletionPolicy.DeletedDisplayName)
+                    .SetProperty(post => post.UpdatedAt, occurredAt),
+                cancellationToken);
+        }
+        else
+        {
+            await posts.ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(post => post.AuthorDisplayName, MemberAccountDeletionPolicy.DeletedDisplayName)
+                    .SetProperty(post => post.UpdatedAt, occurredAt),
+                cancellationToken);
+        }
+
+        var articleSourceKeys = dbContext.ArticleSubmissions
+            .Where(article => article.AuthorMemberId == memberId)
+            .Select(article => "article:" + article.Slug);
+        await dbContext.SearchDocuments
+            .Where(document => articleSourceKeys.Contains(document.SourceKey))
+            .ExecuteUpdateAsync(
+                setters => setters.SetProperty(
+                    document => document.AuthorDisplayName,
+                    MemberAccountDeletionPolicy.DeletedDisplayName),
+                cancellationToken);
+    }
+
+    private async Task RestoreRetainedAttributionAsync(
+        Guid memberId,
+        string displayName,
+        DateTime occurredAt,
+        CancellationToken cancellationToken)
+    {
+        var starterThreadIds = dbContext.ModernForumPosts
+            .Where(post =>
+                post.AuthorMemberId == memberId
+                && !dbContext.ModernForumPosts.Any(other =>
+                    other.ThreadId == post.ThreadId
+                    && other.LegacyPostId < post.LegacyPostId))
+            .Select(post => post.ThreadId);
+        await dbContext.ModernForumThreads
+            .Where(thread => starterThreadIds.Contains(thread.Id))
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(thread => thread.StartedByDisplayName, displayName)
+                    .SetProperty(thread => thread.UpdatedAt, occurredAt),
+                cancellationToken);
+        await dbContext.ModernForumPosts
+            .Where(post => post.AuthorMemberId == memberId)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(post => post.AuthorDisplayName, displayName)
+                    .SetProperty(post => post.UpdatedAt, occurredAt),
+                cancellationToken);
+
+        var articleSourceKeys = dbContext.ArticleSubmissions
+            .Where(article => article.AuthorMemberId == memberId)
+            .Select(article => "article:" + article.Slug);
+        await dbContext.SearchDocuments
+            .Where(document => articleSourceKeys.Contains(document.SourceKey))
+            .ExecuteUpdateAsync(
+                setters => setters.SetProperty(document => document.AuthorDisplayName, displayName),
+                cancellationToken);
     }
 
     private static string Normalize(string email) => email.Trim().ToUpperInvariant();

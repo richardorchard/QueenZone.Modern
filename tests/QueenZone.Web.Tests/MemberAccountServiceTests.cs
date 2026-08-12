@@ -558,7 +558,7 @@ public sealed class MemberAccountServiceTests
     }
 
     [Fact]
-    public async Task RequestDeletionAsync_PreservesAccountDuringCoolingOff_AndCanCancel()
+    public async Task RequestDeletionAsync_AnonymisesImmediately_AndCancellationRestoresIdentity()
     {
         var backend = new InMemoryBlobStorageBackend();
         var repository = new InMemoryMemberAccountRepository();
@@ -574,23 +574,33 @@ public sealed class MemberAccountServiceTests
 
         var result = await service.RequestDeletionAsync(registered.Account.Id);
         var signIn = await service.SignInAsync("delete-service@example.com", "S3curePass!");
+        var rename = await service.UpdateDisplayNameAsync(registered.Account.Id, "Visible Again");
 
         Assert.True(result.Succeeded);
-        Assert.Equal("Delete Service", result.Account!.DisplayName);
+        Assert.Equal(MemberAccountDeletionPolicy.DeletedDisplayName, result.Account!.DisplayName);
+        Assert.Equal("Delete Service", result.Account.DeletionRecoveryDisplayName);
+        Assert.Equal(avatarPath, result.Account.DeletionRecoveryAvatarUrl);
+        Assert.Null(result.Account.AvatarUrl);
         Assert.NotNull(result.Account.DeletionRequestedAt);
         Assert.False(result.Account.IsSuspended);
         Assert.True(backend.Exists(MemberAvatarPaths.Container, avatarPath));
         Assert.True(backend.Exists(MemberAvatarPaths.Container, thumbPath));
         Assert.True(signIn.Succeeded);
+        Assert.False(rename.Succeeded);
+        Assert.Equal(MemberAccountService.PendingDeletionEditError, rename.Error);
 
         var cancelled = await service.CancelDeletionAsync(registered.Account.Id);
 
         Assert.True(cancelled.Succeeded);
         Assert.Null(cancelled.Account!.DeletionRequestedAt);
+        Assert.Equal("Delete Service", cancelled.Account.DisplayName);
+        Assert.Equal(avatarPath, cancelled.Account.AvatarUrl);
+        Assert.Null(cancelled.Account.DeletionRecoveryDisplayName);
+        Assert.Null(cancelled.Account.DeletionRecoveryAvatarUrl);
     }
 
     [Fact]
-    public async Task PendingDeletion_ExternalSignInRemainsAvailable()
+    public async Task PendingDeletion_ExistingExternalSignInRemainsAvailable_WithoutAddingProvider()
     {
         var repository = new InMemoryMemberAccountRepository();
         var service = CreateService(memberAccountRepository: repository);
@@ -609,8 +619,9 @@ public sealed class MemberAccountServiceTests
 
         Assert.Equal(account.Id, returned.Id);
         Assert.False(returned.IsSuspended);
+        Assert.Equal(MemberAccountDeletionPolicy.DeletedDisplayName, returned.DisplayName);
         Assert.NotNull(returned.LastLoginAt);
-        Assert.Equal(["GitHub", "Google"], await service.ListExternalProvidersAsync(account.Id));
+        Assert.Equal(["Google"], await service.ListExternalProvidersAsync(account.Id));
     }
 
     [Fact]
