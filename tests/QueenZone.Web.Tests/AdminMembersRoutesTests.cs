@@ -145,6 +145,53 @@ public sealed class AdminMembersRoutesTests : IClassFixture<WebApplicationFactor
         Assert.Equal(HttpStatusCode.OK, settingsAfterReinstate.StatusCode);
     }
 
+    [Fact]
+    public async Task Suspend_HidesMembersForumPosts_AndReinstateRestoresThem()
+    {
+        const string email = "post-spammer@example.com";
+        await CreateSignedInMemberClientAsync(email, "Post Spammer", "google-post-spammer");
+        var memberId = await GetMemberIdForEmailAsync(email);
+
+        var forumWriteRepository = factory.Services.GetRequiredService<IForumWriteRepository>();
+        await forumWriteRepository.CreateThreadAsync(new NewForumThread(
+            1,
+            memberId,
+            "Post Spammer",
+            "Buy cheap watches here",
+            "<p>Click this link for cheap watches</p>",
+            DateTimeOffset.UtcNow));
+
+        var profileClient = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var beforeSuspend = await profileClient.GetStringAsync($"/members/{memberId}");
+        Assert.Contains("Buy cheap watches here", beforeSuspend);
+
+        var admin = CreateAdminClient(AdminEmail);
+        var detail = await admin.GetStringAsync($"/admin/members/{memberId}");
+        var suspendResponse = await admin.PostAsync(
+            $"/admin/members/{memberId}/Suspend",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(detail),
+                ["Reason"] = "Posting spam links",
+            }));
+        Assert.Equal(HttpStatusCode.Redirect, suspendResponse.StatusCode);
+
+        var afterSuspend = await profileClient.GetStringAsync($"/members/{memberId}");
+        Assert.DoesNotContain("Buy cheap watches here", afterSuspend);
+
+        var reinstateDetail = await admin.GetStringAsync($"/admin/members/{memberId}");
+        var reinstateResponse = await admin.PostAsync(
+            $"/admin/members/{memberId}/Reinstate",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(reinstateDetail),
+            }));
+        Assert.Equal(HttpStatusCode.Redirect, reinstateResponse.StatusCode);
+
+        var afterReinstate = await profileClient.GetStringAsync($"/members/{memberId}");
+        Assert.Contains("Buy cheap watches here", afterReinstate);
+    }
+
     private HttpClient CreateAdminClient(string? email = null)
     {
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });

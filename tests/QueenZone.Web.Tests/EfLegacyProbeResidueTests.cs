@@ -433,7 +433,8 @@ public sealed class EfLegacyProbeResidueTests
                 Id INTEGER PRIMARY KEY,
                 ThreadId INTEGER NOT NULL,
                 BodyHtml TEXT NOT NULL,
-                AuthorDisplayName TEXT NOT NULL
+                AuthorDisplayName TEXT NOT NULL,
+                IsHidden INTEGER NOT NULL DEFAULT 0
             );
             INSERT INTO ModernForumPost (Id, ThreadId, BodyHtml, AuthorDisplayName)
             VALUES (900001, 900001, 'uie2e-predicate-proof', 'Residue proof');

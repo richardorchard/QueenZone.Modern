@@ -207,6 +207,7 @@ public sealed class QueenZoneDbContext : DbContext
             entity.Property(post => post.Attachment).HasMaxLength(120).IsUnicode(false);
             entity.Property(post => post.FileSize).HasMaxLength(12).IsUnicode(false);
             entity.Property(post => post.EditCount).HasDefaultValue(0);
+            entity.Property(post => post.IsHidden).IsRequired().HasDefaultValue(false);
             entity.HasIndex(post => post.LegacyPostId)
                 .IsUnique()
                 .HasDatabaseName("UQ_ModernForumPost_LegacyPostId");

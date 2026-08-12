@@ -21,4 +21,13 @@ public interface IForumWriteRepository
     Task<int> CountPostsByMemberSinceAsync(Guid memberId, DateTimeOffset since, CancellationToken cancellationToken = default);
 
     Task<int> CountApprovedPostsByMemberAsync(Guid memberId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Hides every post by the given member from public forum views. Used when an admin
+    /// suspends a spamming member; rows are kept so <see cref="UnhidePostsByMemberAsync"/> can
+    /// restore them on reinstatement.
+    /// </summary>
+    Task HidePostsByMemberAsync(Guid memberId, CancellationToken cancellationToken = default);
+
+    Task UnhidePostsByMemberAsync(Guid memberId, CancellationToken cancellationToken = default);
 }
