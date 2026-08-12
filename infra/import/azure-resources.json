@@ -1,0 +1,214 @@
+{
+  "auditDate": "2026-08-12",
+  "issue": 624,
+  "subscription": {
+    "id": "610e3b3a-028d-4f1b-ac1d-a5567a4f8b9d",
+    "name": "Base Subscription",
+    "tenantId": "c9f094fd-23bf-4a35-a406-bcaacd7e1a8e"
+  },
+  "resourceGroup": {
+    "name": "Queenzone-RG",
+    "id": "/subscriptions/610e3b3a-028d-4f1b-ac1d-a5567a4f8b9d/resourceGroups/Queenzone-RG",
+    "location": "australiaeast",
+    "opentofuTreatment": "import"
+  },
+  "resources": [
+    {
+      "name": "ASP-Queenzone",
+      "type": "Microsoft.Web/serverFarms",
+      "id": "/subscriptions/610e3b3a-028d-4f1b-ac1d-a5567a4f8b9d/resourceGroups/Queenzone-RG/providers/Microsoft.Web/serverFarms/ASP-Queenzone",
+      "sku": "B1",
+      "capacity": 1,
+      "kind": "linux",
+      "opentofuTreatment": "import",
+      "neverRecreate": true
+    },
+    {
+      "name": "queenzone-dev",
+      "type": "Microsoft.Web/sites",
+      "id": "/subscriptions/610e3b3a-028d-4f1b-ac1d-a5567a4f8b9d/resourceGroups/Queenzone-RG/providers/Microsoft.Web/sites/queenzone-dev",
+      "kind": "app,linux",
+      "linuxFxVersion": "DOTNETCORE|10.0",
+      "httpsOnly": true,
+      "alwaysOn": true,
+      "healthCheckPath": "/health",
+      "numberOfWorkers": 1,
+      "identity": {
+        "type": "SystemAssigned",
+        "principalId": "2924c429-8228-430a-ae74-c514a18a7d0e",
+        "tenantId": "c9f094fd-23bf-4a35-a406-bcaacd7e1a8e"
+      },
+      "hostNames": ["www.queenzone.org", "queenzone.org", "queenzone-dev.azurewebsites.net"],
+      "opentofuTreatment": "import",
+      "neverRecreate": true
+    },
+    {
+      "name": "queenzone.org",
+      "type": "Microsoft.Web/sites/hostNameBindings",
+      "id": "/subscriptions/610e3b3a-028d-4f1b-ac1d-a5567a4f8b9d/resourceGroups/Queenzone-RG/providers/Microsoft.Web/sites/queenzone-dev/hostNameBindings/queenzone.org",
+      "sslState": "SniEnabled",
+      "opentofuTreatment": "import",
+      "neverRecreate": true
+    },
+    {
+      "name": "www.queenzone.org",
+      "type": "Microsoft.Web/sites/hostNameBindings",
+      "id": "/subscriptions/610e3b3a-028d-4f1b-ac1d-a5567a4f8b9d/resourceGroups/Queenzone-RG/providers/Microsoft.Web/sites/queenzone-dev/hostNameBindings/www.queenzone.org",
+      "sslState": "SniEnabled",
+      "opentofuTreatment": "import",
+      "neverRecreate": true
+    },
+    {
+      "name": "queenzone.org",
+      "type": "Microsoft.Web/certificates",
+      "id": "/subscriptions/610e3b3a-028d-4f1b-ac1d-a5567a4f8b9d/resourceGroups/Queenzone-RG/providers/Microsoft.Web/certificates/queenzone.org",
+      "issuer": "GeoTrust TLS RSA CA G1",
+      "expirationDate": "2026-12-29T23:59:59+00:00",
+      "opentofuTreatment": "defer",
+      "notes": "Confirm renewal path before import encoding"
+    },
+    {
+      "name": "www.queenzone.org",
+      "type": "Microsoft.Web/certificates",
+      "id": "/subscriptions/610e3b3a-028d-4f1b-ac1d-a5567a4f8b9d/resourceGroups/Queenzone-RG/providers/Microsoft.Web/certificates/www.queenzone.org",
+      "issuer": "GeoTrust TLS RSA CA G1",
+      "expirationDate": "2026-12-29T23:59:59+00:00",
+      "opentofuTreatment": "defer"
+    },
+    {
+      "name": "queenzone-sql-server",
+      "type": "Microsoft.Sql/servers",
+      "id": "/subscriptions/610e3b3a-028d-4f1b-ac1d-a5567a4f8b9d/resourceGroups/Queenzone-RG/providers/Microsoft.Sql/servers/queenzone-sql-server",
+      "fqdn": "queenzone-sql-server.database.windows.net",
+      "minimalTlsVersion": "1.2",
+      "publicNetworkAccess": "Enabled",
+      "opentofuTreatment": "import",
+      "neverRecreate": true
+    },
+    {
+      "name": "queenzone-db",
+      "type": "Microsoft.Sql/servers/databases",
+      "id": "/subscriptions/610e3b3a-028d-4f1b-ac1d-a5567a4f8b9d/resourceGroups/Queenzone-RG/providers/Microsoft.Sql/servers/queenzone-sql-server/databases/queenzone-db",
+      "sku": "Basic",
+      "capacity": 5,
+      "maxSizeBytes": 2147483648,
+      "collation": "SQL_Latin1_General_CP1_CI_AS",
+      "backupStorageRedundancy": "Local",
+      "shortTermRetentionDays": 7,
+      "opentofuTreatment": "import",
+      "neverRecreate": true
+    },
+    {
+      "name": "AllowAllWindowsAzureIps",
+      "type": "Microsoft.Sql/servers/firewallRules",
+      "id": "/subscriptions/610e3b3a-028d-4f1b-ac1d-a5567a4f8b9d/resourceGroups/Queenzone-RG/providers/Microsoft.Sql/servers/queenzone-sql-server/firewallRules/AllowAllWindowsAzureIps",
+      "opentofuTreatment": "import"
+    },
+    {
+      "name": "ClientIPAddress_2026-6-11_20-28-58",
+      "type": "Microsoft.Sql/servers/firewallRules",
+      "id": "/subscriptions/610e3b3a-028d-4f1b-ac1d-a5567a4f8b9d/resourceGroups/Queenzone-RG/providers/Microsoft.Sql/servers/queenzone-sql-server/firewallRules/ClientIPAddress_2026-6-11_20-28-58",
+      "opentofuTreatment": "defer",
+      "notes": "Operator workstation IP; do not hard-code personal IPs without renaming"
+    },
+    {
+      "name": "queenzone",
+      "type": "Microsoft.Storage/storageAccounts",
+      "id": "/subscriptions/610e3b3a-028d-4f1b-ac1d-a5567a4f8b9d/resourceGroups/Queenzone-RG/providers/Microsoft.Storage/storageAccounts/queenzone",
+      "sku": "Standard_LRS",
+      "kind": "StorageV2",
+      "accessTier": "Hot",
+      "allowBlobPublicAccess": true,
+      "allowSharedKeyAccess": true,
+      "minimumTlsVersion": "TLS1_2",
+      "customDomain": "cdn.queenzone.org",
+      "blobSoftDeleteDays": 7,
+      "containerSoftDeleteDays": 7,
+      "versioningEnabled": false,
+      "lifecyclePolicy": null,
+      "opentofuTreatment": "import",
+      "neverRecreate": true
+    },
+    {
+      "name": "queenzone-dev-law",
+      "type": "Microsoft.OperationalInsights/workspaces",
+      "id": "/subscriptions/610e3b3a-028d-4f1b-ac1d-a5567a4f8b9d/resourceGroups/Queenzone-RG/providers/Microsoft.OperationalInsights/workspaces/queenzone-dev-law",
+      "sku": "PerGB2018",
+      "retentionInDays": 30,
+      "dailyQuotaGb": 0.1,
+      "opentofuTreatment": "import"
+    },
+    {
+      "name": "queenzone-dev-ai",
+      "type": "Microsoft.Insights/components",
+      "id": "/subscriptions/610e3b3a-028d-4f1b-ac1d-a5567a4f8b9d/resourceGroups/Queenzone-RG/providers/microsoft.insights/components/queenzone-dev-ai",
+      "applicationId": "6f9fe43e-204e-4aaa-80d6-9d58a7afcab3",
+      "retentionInDays": 90,
+      "workspaceResourceId": "/subscriptions/610e3b3a-028d-4f1b-ac1d-a5567a4f8b9d/resourceGroups/Queenzone-RG/providers/Microsoft.OperationalInsights/workspaces/queenzone-dev-law",
+      "opentofuTreatment": "import"
+    },
+    {
+      "name": "queenzone-alerts",
+      "type": "Microsoft.Insights/actionGroups",
+      "id": "/subscriptions/610e3b3a-028d-4f1b-ac1d-a5567a4f8b9d/resourceGroups/Queenzone-RG/providers/microsoft.insights/actionGroups/queenzone-alerts",
+      "opentofuTreatment": "import"
+    },
+    {
+      "name": "queenzone-dev-health",
+      "type": "Microsoft.Insights/webtests",
+      "id": "/subscriptions/610e3b3a-028d-4f1b-ac1d-a5567a4f8b9d/resourceGroups/Queenzone-RG/providers/Microsoft.Insights/webtests/queenzone-dev-health",
+      "requestUrl": "https://queenzone-dev.azurewebsites.net/health",
+      "opentofuTreatment": "defer",
+      "notes": "Direct App Service hostname is IP-forbidden outside Cloudflare; probe likely always fails"
+    },
+    {
+      "name": "queenzone-dev-health-unavailable",
+      "type": "Microsoft.Insights/metricAlerts",
+      "id": "/subscriptions/610e3b3a-028d-4f1b-ac1d-a5567a4f8b9d/resourceGroups/Queenzone-RG/providers/Microsoft.Insights/metricAlerts/queenzone-dev-health-unavailable",
+      "enabled": true,
+      "opentofuTreatment": "import"
+    },
+    {
+      "name": "queenzone-dev-server-exceptions",
+      "type": "Microsoft.Insights/metricAlerts",
+      "id": "/subscriptions/610e3b3a-028d-4f1b-ac1d-a5567a4f8b9d/resourceGroups/Queenzone-RG/providers/Microsoft.Insights/metricAlerts/queenzone-dev-server-exceptions",
+      "enabled": true,
+      "opentofuTreatment": "import"
+    },
+    {
+      "name": "queenzone-dev-failed-requests",
+      "type": "Microsoft.Insights/metricAlerts",
+      "id": "/subscriptions/610e3b3a-028d-4f1b-ac1d-a5567a4f8b9d/resourceGroups/Queenzone-RG/providers/Microsoft.Insights/metricAlerts/queenzone-dev-failed-requests",
+      "enabled": false,
+      "opentofuTreatment": "import",
+      "notes": "Intentionally disabled; replaced by server-5xx query alert"
+    },
+    {
+      "name": "queenzone-dev-ingestion-warning",
+      "type": "Microsoft.Insights/scheduledqueryrules",
+      "id": "/subscriptions/610e3b3a-028d-4f1b-ac1d-a5567a4f8b9d/resourceGroups/Queenzone-RG/providers/Microsoft.Insights/scheduledqueryrules/queenzone-dev-ingestion-warning",
+      "enabled": true,
+      "opentofuTreatment": "import"
+    },
+    {
+      "name": "queenzone-dev-server-5xx",
+      "type": "Microsoft.Insights/scheduledqueryrules",
+      "id": "/subscriptions/610e3b3a-028d-4f1b-ac1d-a5567a4f8b9d/resourceGroups/Queenzone-RG/providers/Microsoft.Insights/scheduledqueryrules/queenzone-dev-server-5xx",
+      "enabled": true,
+      "opentofuTreatment": "import"
+    },
+    {
+      "name": "Failure Anomalies - queenzone-dev-ai",
+      "type": "microsoft.alertsmanagement/smartDetectorAlertRules",
+      "id": "/subscriptions/610e3b3a-028d-4f1b-ac1d-a5567a4f8b9d/resourceGroups/Queenzone-RG/providers/microsoft.alertsmanagement/smartDetectorAlertRules/Failure Anomalies - queenzone-dev-ai",
+      "opentofuTreatment": "defer",
+      "notes": "Dashboard/provider default; avoid copying blindly"
+    }
+  ],
+  "confirmedAbsent": [
+    "Microsoft.Cache/Redis",
+    "Microsoft.Cdn/*",
+    "Microsoft.Network/frontDoors",
+    "Microsoft.Web/sites/slots"
+  ]
+}

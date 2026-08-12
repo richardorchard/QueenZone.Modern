@@ -1,0 +1,243 @@
+{
+  "auditDate": "2026-08-12",
+  "issue": 624,
+  "cloudflareApiInventory": "complete",
+  "bitwardenSecretKey": "CLOUDFLARE_API_TOKEN_READONLY",
+  "account": {
+    "id": "f93121b2086286e79a7a9fdb8d03cb4c",
+    "name": "Me@richardorchard.com's Account",
+    "opentofuTreatment": "data"
+  },
+  "zone": {
+    "id": "079fc2f37095c82fb3a2b4da65718b2b",
+    "name": "queenzone.org",
+    "status": "active",
+    "type": "full",
+    "plan": "Free Website",
+    "nameServers": ["daisy.ns.cloudflare.com", "skip.ns.cloudflare.com"],
+    "dnssec": "disabled",
+    "opentofuTreatment": "import",
+    "neverRecreate": true
+  },
+  "ssl": {
+    "mode": "strict",
+    "tls_1_3": "on",
+    "min_tls_version": "1.0",
+    "always_use_https": "on",
+    "automatic_https_rewrites": "on",
+    "certificatePacks": [
+      {
+        "type": "universal",
+        "status": "active",
+        "hosts": ["queenzone.org", "*.queenzone.org"]
+      },
+      {
+        "type": "universal",
+        "status": "backup_issued",
+        "hosts": ["queenzone.org", "*.queenzone.org"]
+      }
+    ],
+    "originCaCertificates": [],
+    "opentofuTreatment": "import",
+    "notes": "Edge Universal SSL. App Service origin certs are separate GeoTrust certs in Azure (expire 2026-12-29). min_tls_version 1.0 is a dashboard default — consider raising later, do not copy blindly as desired state without decision."
+  },
+  "zoneSettings": {
+    "security_level": "medium",
+    "cache_level": "aggressive",
+    "browser_check": "on",
+    "challenge_ttl": 1800,
+    "brotli": "on",
+    "http2": "on",
+    "http3": "on",
+    "websockets": "on",
+    "polish": "off",
+    "hotlink_protection": "off",
+    "development_mode": "off",
+    "opentofuTreatment": "import"
+  },
+  "dnsRecords": [
+    {
+      "id": "c22f8759158c7a3f06e290e5f51f5da8",
+      "type": "A",
+      "name": "queenzone.org",
+      "content": "52.237.246.162",
+      "proxied": true,
+      "ttl": 1,
+      "role": "apex → App Service inbound IP",
+      "opentofuTreatment": "import",
+      "neverRecreate": true
+    },
+    {
+      "id": "fdd05b163df7c2941ae1e36986558228",
+      "type": "CNAME",
+      "name": "www.queenzone.org",
+      "content": "queenzone-dev.azurewebsites.net",
+      "proxied": true,
+      "ttl": 1,
+      "opentofuTreatment": "import",
+      "neverRecreate": true
+    },
+    {
+      "id": "c8989e49d2d624756ddf35a05e3ac153",
+      "type": "CNAME",
+      "name": "cdn.queenzone.org",
+      "content": "queenzone.blob.core.windows.net",
+      "proxied": true,
+      "ttl": 1,
+      "worker": false,
+      "opentofuTreatment": "import",
+      "neverRecreate": true
+    },
+    {
+      "id": "1af26073508a0494bc5d66f5b23df57f",
+      "type": "CNAME",
+      "name": "cdn2.queenzone.org",
+      "content": "queenzone.blob.core.windows.net",
+      "proxied": true,
+      "ttl": 1,
+      "worker": true,
+      "opentofuTreatment": "import",
+      "neverRecreate": true
+    },
+    {
+      "id": "9b996207c2701bd567962763ed653142",
+      "type": "CNAME",
+      "name": "asverify.cdn.queenzone.org",
+      "content": "asverify.queenzone.blob.core.windows.net",
+      "proxied": false,
+      "ttl": 1,
+      "role": "Azure Storage custom-domain verification",
+      "opentofuTreatment": "import"
+    },
+    {
+      "id": "afd377459a21a49b39458293e929221a",
+      "type": "TXT",
+      "name": "asuid.queenzone.org",
+      "role": "App Service custom domain verification",
+      "opentofuTreatment": "import",
+      "notes": "content is a verification hash — treat as non-secret config"
+    },
+    {
+      "id": "b3d6ee3412118593835755b3a424f0c8",
+      "type": "TXT",
+      "name": "asuid.www.queenzone.org",
+      "role": "App Service custom domain verification",
+      "opentofuTreatment": "import"
+    },
+    {
+      "id": "4d6c859c709bc0f9382ba74f93465b89",
+      "type": "TXT",
+      "name": "queenzone.org",
+      "role": "Google site verification",
+      "opentofuTreatment": "import"
+    },
+    {
+      "id": "30eaa5bf1d4ad3834d5c7db37174c83b",
+      "type": "CNAME",
+      "name": "809286c091b4aeaedf6cd9c90b65a333.queenzone.org",
+      "content": "verify.bing.com",
+      "proxied": false,
+      "role": "Bing verification",
+      "opentofuTreatment": "import"
+    },
+    {
+      "id": "fd000f4e7e714d719eb3ae0618e9ff4c",
+      "type": "CNAME",
+      "name": "a0151149b4c5e0d0ac33d250b9dd6db4.queenzone.org",
+      "content": "verify.bing.com",
+      "proxied": false,
+      "role": "Bing verification",
+      "opentofuTreatment": "import"
+    }
+  ],
+  "workers": [
+    {
+      "scriptName": "pictures-queenzone-org",
+      "createdOn": "2026-06-25T05:06:18.328439Z",
+      "modifiedOn": "2026-06-25T05:06:18.328439Z",
+      "sourcePath": "infra/import/workers/pictures-queenzone-org.js",
+      "behaviour": [
+        "GET/HEAD only",
+        "Rewrites path to https://queenzone.blob.core.windows.net",
+        "Sets Cache-Control public max-age=86400 s-maxage=2592000 on 200",
+        "Sets Access-Control-Allow-Origin: *",
+        "Sets X-Content-Type-Options: nosniff",
+        "Does not currently set Content-Disposition"
+      ],
+      "opentofuTreatment": "import",
+      "neverRecreate": true,
+      "notes": "Historical name says pictures but live route is cdn2 only"
+    }
+  ],
+  "workerRoutes": [
+    {
+      "id": "0fd4ebdc9c3e4825a1d9e6527fbd4d24",
+      "pattern": "cdn2.queenzone.org/*",
+      "script": "pictures-queenzone-org",
+      "opentofuTreatment": "import",
+      "neverRecreate": true
+    }
+  ],
+  "rules": {
+    "pageRules": [],
+    "firewallRulesLegacy": [],
+    "customEntrypointRulesets": [],
+    "managedRulesetsPresent": [
+      {
+        "id": "70339d97bdb34195bbf054b1ebe81f76",
+        "name": "Cloudflare Normalization Ruleset",
+        "phase": "http_request_sanitize",
+        "kind": "managed",
+        "opentofuTreatment": "outside"
+      },
+      {
+        "id": "77454fe2d30c4220b5701f6fdfb893ba",
+        "name": "Cloudflare Managed Free Ruleset",
+        "phase": "http_request_firewall_managed",
+        "kind": "managed",
+        "opentofuTreatment": "outside",
+        "notes": "Provider default; do not copy rule bodies into OpenTofu"
+      },
+      {
+        "id": "4d21379b4f9f4bb088e0729962c8b3cf",
+        "name": "DDoS L7 ruleset",
+        "phase": "ddos_l7",
+        "kind": "managed",
+        "opentofuTreatment": "outside"
+      }
+    ]
+  },
+  "hostnamesVerifiedLive": [
+    {
+      "hostname": "cdn.queenzone.org",
+      "proxied": true,
+      "worker": false,
+      "azureStorageCustomDomain": true,
+      "dnsRecordId": "c8989e49d2d624756ddf35a05e3ac153",
+      "opentofuTreatment": "import"
+    },
+    {
+      "hostname": "cdn2.queenzone.org",
+      "proxied": true,
+      "worker": true,
+      "workerScript": "pictures-queenzone-org",
+      "workerRoute": "cdn2.queenzone.org/*",
+      "azureStorageCustomDomain": false,
+      "dnsRecordId": "1af26073508a0494bc5d66f5b23df57f",
+      "opentofuTreatment": "import",
+      "neverRecreate": true
+    },
+    {
+      "hostname": "www.queenzone.org",
+      "proxied": true,
+      "dnsRecordId": "fdd05b163df7c2941ae1e36986558228",
+      "opentofuTreatment": "import"
+    },
+    {
+      "hostname": "queenzone.org",
+      "proxied": true,
+      "dnsRecordId": "c22f8759158c7a3f06e290e5f51f5da8",
+      "opentofuTreatment": "import"
+    }
+  ]
+}
