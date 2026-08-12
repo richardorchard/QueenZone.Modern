@@ -13,7 +13,7 @@
 @if (!string.IsNullOrWhiteSpace(measurementId) && !isAdmin && !isAccount && !isAdminFallbackPath && !isAdminReturnUrl && !isErrorResponse)
 {
   @* Load after idle/load so gtag stays off the LCP critical path. *@
-  <script>
+  <script nonce="@Context.GetCspNonce()">
     (function () {
       var measurementId = '@measurementId';
       var loadAnalytics = function () {
