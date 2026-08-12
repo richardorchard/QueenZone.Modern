@@ -14,8 +14,10 @@ public static class SecurityHeaders
     /// that element's src matches the explicit googletagmanager.com host allowance below, so it
     /// loads without needing 'strict-dynamic' — which would otherwise disable the 'self'
     /// host-allowlist for every other &lt;script src&gt; tag on the site (site.js, Quill, etc.).
-    /// Inline styles remain widespread enough across the site (see #585 inventory) that
-    /// style-src keeps 'unsafe-inline' for now.
+    /// Inline style="" attributes have all been removed in favour of CSS classes (or, for
+    /// genuinely dynamic values such as poll bar widths, a data-* attribute applied via
+    /// site.js CSSOM calls, which style-src does not govern) — see issue #608 — so style-src
+    /// no longer needs 'unsafe-inline'.
     /// </summary>
     public static string BuildContentSecurityPolicy(string nonce) =>
         "default-src 'self'; " +
@@ -24,7 +26,7 @@ public static class SecurityHeaders
         "frame-ancestors 'none'; " +
         "img-src 'self' data: blob: https://cdn.queenzone.org https://cdn2.queenzone.org https://*.blob.core.windows.net https://www.googletagmanager.com https://www.google-analytics.com; " +
         "font-src 'self' data:; " +
-        "style-src 'self' 'unsafe-inline'; " +
+        "style-src 'self'; " +
         $"script-src 'self' 'nonce-{nonce}' https://www.googletagmanager.com https://www.google-analytics.com; " +
         "connect-src 'self' https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com; " +
         "frame-src 'self' https://www.googletagmanager.com; " +
