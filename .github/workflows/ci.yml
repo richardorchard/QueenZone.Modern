@@ -191,7 +191,7 @@ jobs:
             .config/dotnet-tools.json
 
       - name: Download build binaries
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: build-binaries-${{ github.run_id }}
           path: .
@@ -247,7 +247,7 @@ jobs:
             .config/dotnet-tools.json
 
       - name: Download build binaries
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: build-binaries-${{ github.run_id }}
           path: .
@@ -359,7 +359,7 @@ jobs:
           fetch-depth: 0
 
       - name: Download coverage results
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           pattern: coverage-raw-${{ github.run_id }}-shard-*
           path: TestResults
@@ -501,7 +501,7 @@ jobs:
 
     steps:
       - name: Download publish artifact
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: web-publish-${{ github.run_id }}
           path: smoke-app

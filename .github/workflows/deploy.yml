@@ -165,7 +165,7 @@ jobs:
     steps:
       # Reuses the exact binary ci.yml built and tested on the PR — no rebuild.
       - name: Download publish artifact from CI run
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: web-publish-${{ needs.resolve-ci-run.outputs.run_id }}
           run-id: ${{ needs.resolve-ci-run.outputs.run_id }}
