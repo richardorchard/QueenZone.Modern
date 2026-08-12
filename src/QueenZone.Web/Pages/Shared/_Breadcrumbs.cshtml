@@ -22,5 +22,5 @@
       }
     </ol>
   </nav>
-  @Html.Raw($"""<script type="application/ld+json">{BreadcrumbJsonLd.Build(Model, SiteOptionsAccessor.Value.PublicBaseUrl)}</script>""")
+  @Html.Raw($"""<script type="application/ld+json" nonce="{Context.GetCspNonce()}">{BreadcrumbJsonLd.Build(Model, SiteOptionsAccessor.Value.PublicBaseUrl)}</script>""")
 }

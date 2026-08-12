@@ -58,12 +58,47 @@ public sealed class SecurityHeadersTests : IClassFixture<WebApplicationFactory<P
     [InlineData("/")]
     [InlineData("/news")]
     [InlineData("/account/login")]
-    public async Task Response_HasContentSecurityPolicyReportOnly(string path)
+    public async Task Response_HasEnforcingContentSecurityPolicy(string path)
     {
         var response = await factory.CreateClient().GetAsync(path);
-        var csp = response.Headers.GetValues("Content-Security-Policy-Report-Only").First();
-        Assert.Equal(SecurityHeaders.ContentSecurityPolicyReportOnly, csp);
+        Assert.False(response.Headers.Contains("Content-Security-Policy-Report-Only"));
+        var csp = response.Headers.GetValues("Content-Security-Policy").First();
         Assert.Contains("default-src 'self'", csp, StringComparison.Ordinal);
         Assert.Contains("frame-ancestors 'none'", csp, StringComparison.Ordinal);
+        Assert.Contains("object-src 'none'", csp, StringComparison.Ordinal);
+        Assert.DoesNotContain("script-src 'self' 'unsafe-inline'", csp, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ContentSecurityPolicy_ScriptSrc_UsesPerRequestNonce()
+    {
+        var client = factory.CreateClient();
+        var firstCsp = (await client.GetAsync("/")).Headers.GetValues("Content-Security-Policy").First();
+        var secondCsp = (await client.GetAsync("/")).Headers.GetValues("Content-Security-Policy").First();
+
+        var firstNonce = ExtractNonce(firstCsp);
+        var secondNonce = ExtractNonce(secondCsp);
+
+        Assert.NotEqual(firstNonce, secondNonce);
+        Assert.Equal(SecurityHeaders.BuildContentSecurityPolicy(firstNonce), firstCsp);
+    }
+
+    [Fact]
+    public async Task Response_TimelineInlineScript_CarriesMatchingNonce()
+    {
+        var response = await factory.CreateClient().GetAsync("/timeline");
+        var csp = response.Headers.GetValues("Content-Security-Policy").First();
+        var nonce = ExtractNonce(csp);
+        var html = await response.Content.ReadAsStringAsync();
+
+        Assert.Contains($"nonce=\"{nonce}\"", html, StringComparison.Ordinal);
+    }
+
+    private static string ExtractNonce(string csp)
+    {
+        const string marker = "'nonce-";
+        var start = csp.IndexOf(marker, StringComparison.Ordinal) + marker.Length;
+        var end = csp.IndexOf('\'', start);
+        return csp[start..end];
     }
 }

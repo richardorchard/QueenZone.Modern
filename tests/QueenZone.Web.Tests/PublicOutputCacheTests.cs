@@ -51,7 +51,9 @@ public sealed class PublicOutputCacheTests : IClassFixture<WebApplicationFactory
         var second = await client.GetStringAsync("/articles");
 
         Assert.Contains("Cached archive article", first);
-        Assert.Equal(first, second);
+        // Each render gets a fresh CSP nonce (see #585), so strip it before comparing bodies —
+        // an unchanged repository call count is what actually proves the page was not cached.
+        Assert.Equal(StripCspNonces(first), StripCspNonces(second));
         Assert.True(callsAfterFirstRequest > 0);
         Assert.True(repository.ArchivePageCallCount + repository.PublishedCountCallCount > callsAfterFirstRequest);
     }
@@ -144,6 +146,9 @@ public sealed class PublicOutputCacheTests : IClassFixture<WebApplicationFactory
             }
         });
     }
+
+    private static string StripCspNonces(string html) =>
+        System.Text.RegularExpressions.Regex.Replace(html, "nonce=\"[^\"]*\"", "nonce=\"\"");
 
     private static DefaultHttpContext CreateHttpContext(string method, string path)
     {
