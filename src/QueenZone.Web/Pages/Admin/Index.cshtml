@@ -156,7 +156,7 @@
             @foreach (var sessions in trafficDays)
             {
               <span class="admin-dashboard__traffic-bar"
-                    style="height: @TrafficBarHeight(sessions)"
+                    data-bar-height="@TrafficBarHeight(sessions)"
                     title="@sessions.ToString("N0") sessions"></span>
             }
           </div>
