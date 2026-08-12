@@ -136,6 +136,37 @@ jobs:
       - name: Verify formatting
         run: dotnet format QueenZone.sln --verify-no-changes --no-restore
 
+  # Informational only (issue #592): surfaces known vulnerable NuGet packages in the
+  # PR summary without failing the build. Package-level suppressions with rationale
+  # live in Directory.Build.props; promote this to a gating check if the team decides
+  # vulnerable transitive deps should block merges.
+  vulnerable-packages:
+    name: Check for vulnerable packages
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+          cache: true
+          cache-dependency-path: |
+            **/*.csproj
+            .config/dotnet-tools.json
+
+      - name: Restore
+        run: dotnet restore QueenZone.sln
+
+      - name: List vulnerable packages
+        run: |
+          dotnet list QueenZone.sln package --vulnerable --include-transitive \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+
   # Mixed Web.Tests shards (unit + WAF in every shard). Do not change this to a
   # unit-vs-integration split — that regresses wall-clock (issue #442).
   test:
