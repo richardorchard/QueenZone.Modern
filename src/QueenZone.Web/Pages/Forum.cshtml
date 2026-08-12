@@ -10,9 +10,9 @@
   <partial name="_PictureImage" model="@("/design-system/assets/crest-white.png", "", false, "qz-page-hero__crest")" />
   <div class="qz-container qz-breadcrumbs-on-dark">
     <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
-    <div class="qz-eyebrow" style="color: var(--qz-gold);">Community Archive</div>
+    <div class="qz-eyebrow">Community Archive</div>
     <h1>Forum</h1>
-    <p class="lede" style="max-width: var(--container-text);">A read-only modern index for the original community discussions, boards and recent thread patterns.</p>
+    <p class="lede">A read-only modern index for the original community discussions, boards and recent thread patterns.</p>
     <div class="qz-forum-stats">
       <span><strong>@Model.Stats.ForumCount.ToString("N0")</strong> boards</span>
       <span><strong>@ForumRoutes.FormatCount(Model.Stats.ThreadCount)</strong> threads</span>

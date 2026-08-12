@@ -10,7 +10,7 @@
     <partial name="_PictureImage" model="@("/design-system/assets/crest-white.png", "", false, "qz-bio-detail-hero__crest")" />
     <div class="qz-container qz-bio-detail-hero__content qz-breadcrumbs-on-dark">
       <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
-      <div class="qz-eyebrow" style="color: var(--qz-gold);">
+      <div class="qz-eyebrow">
         Chapter @BiographyRoutes.GetChapterNumeral(Math.Max(Model.ChapterIndex, 0)) · @BiographyRoutes.GetChapterMarker(chapter)
       </div>
       <h1>@chapter.Title</h1>

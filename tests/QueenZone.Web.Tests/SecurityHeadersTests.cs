@@ -67,6 +67,8 @@ public sealed class SecurityHeadersTests : IClassFixture<WebApplicationFactory<P
         Assert.Contains("frame-ancestors 'none'", csp, StringComparison.Ordinal);
         Assert.Contains("object-src 'none'", csp, StringComparison.Ordinal);
         Assert.DoesNotContain("script-src 'self' 'unsafe-inline'", csp, StringComparison.Ordinal);
+        Assert.Contains("style-src 'self'; ", csp, StringComparison.Ordinal);
+        Assert.DoesNotContain("style-src 'self' 'unsafe-inline'", csp, StringComparison.Ordinal);
     }
 
     [Fact]

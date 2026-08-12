@@ -19,7 +19,7 @@
     </p>
   }
 
-  <form method="get" class="admin-form" style="margin-bottom: 1.5rem;">
+  <form method="get" class="admin-form admin-form--filter">
     <label>
       Category
         <select name="catId">
@@ -93,7 +93,7 @@
         {
           <tr>
             <td>
-              <img src="@item.ThumbnailUrl" alt="" width="72" height="72" style="object-fit: cover;" />
+              <img src="@item.ThumbnailUrl" alt="" width="72" height="72" class="qz-thumb-cover" />
             </td>
             <td>@item.Title</td>
             <td>@item.CategoryName</td>
