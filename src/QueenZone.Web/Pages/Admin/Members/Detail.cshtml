@@ -52,7 +52,7 @@
   {
     <section class="admin-form">
       <h2>Suspend this member</h2>
-      <p>Suspending blocks future sign-ins (including via Google, Microsoft, Discord, or GitHub) and ends any active session on their next request. Existing posts are not deleted.</p>
+      <p>Suspending blocks future sign-ins (including via Google, Microsoft, Discord, or GitHub), ends any active session on their next request, and hides their existing forum posts from public view. Reinstating restores both.</p>
       <form method="post" action="/admin/members/@Model.Member.Id/Suspend">
         @Html.AntiForgeryToken()
         <label>

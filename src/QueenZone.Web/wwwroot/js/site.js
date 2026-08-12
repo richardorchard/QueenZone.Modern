@@ -259,3 +259,20 @@
     });
   });
 })();
+
+// Apply per-element inline styles that come from server-rendered data (percentages,
+// computed bar heights, avatar colours) via the CSSOM instead of a style="" attribute,
+// so these stay CSP-compliant without needing style-src 'unsafe-inline'.
+(() => {
+  document.querySelectorAll("[data-bar-height]").forEach((el) => {
+    el.style.setProperty("height", el.dataset.barHeight);
+  });
+
+  document.querySelectorAll("[data-bar-width]").forEach((el) => {
+    el.style.setProperty("width", el.dataset.barWidth);
+  });
+
+  document.querySelectorAll("[data-avatar-bg]").forEach((el) => {
+    el.style.setProperty("--qz-avatar-bg", el.dataset.avatarBg);
+  });
+})();

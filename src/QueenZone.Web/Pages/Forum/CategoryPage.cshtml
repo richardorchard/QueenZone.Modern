@@ -11,7 +11,7 @@
     <h1>@category.Name</h1>
     @if (!string.IsNullOrWhiteSpace(category.Description))
     {
-      <p class="lede" style="max-width: var(--container-text);">@category.Description</p>
+      <p class="lede">@category.Description</p>
     }
     <div class="qz-forum-stats">
       <span><strong>@Model.TotalTopics.ToString("N0")</strong> threads</span>

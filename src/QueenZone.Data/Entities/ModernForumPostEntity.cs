@@ -49,5 +49,12 @@ public sealed class ModernForumPostEntity
 
     public DateTime UpdatedAt { get; set; }
 
+    /// <summary>
+    /// True when an admin suspended the author's account. Hidden posts are excluded from
+    /// public thread views, member activity, and the write-side post/count queries below;
+    /// the row itself is kept so reinstating the member restores visibility.
+    /// </summary>
+    public bool IsHidden { get; set; }
+
     public ModernForumThreadEntity? Thread { get; set; }
 }

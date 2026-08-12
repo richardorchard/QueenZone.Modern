@@ -14,9 +14,9 @@
           }
         </div>
         <div>
-          <div class="qz-eyebrow" style="color: var(--qz-gold);">Studio Album</div>
+          <div class="qz-eyebrow">Studio Album</div>
           <h1>@Model.Album.Name</h1>
-          <div class="qz-meta" style="color: rgba(255,255,255,0.55);">
+          <div class="qz-meta">
             @Model.Album.ArtistName
             @if (Model.Album.ReleaseYear is int year)
             {
@@ -26,7 +26,7 @@
           </div>
           @if (Model.Album.GeneralNotes is not null)
           {
-            <div class="lede" style="color: rgba(255,255,255,0.82); max-width: var(--container-text);">@Html.Raw(NewsArticleContent.FormatBody(Model.Album.GeneralNotes))</div>
+            <div class="lede">@Html.Raw(NewsArticleContent.FormatBody(Model.Album.GeneralNotes))</div>
           }
         </div>
       </div>

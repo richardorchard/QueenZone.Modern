@@ -213,7 +213,8 @@ public sealed class InMemoryForumWriteRepository : IForumWriteRepository
     {
         lock (sync)
         {
-            return Task.FromResult(posts.Count(post => post.MemberId == memberId && post.CreatedAt >= since));
+            return Task.FromResult(posts.Count(post =>
+                post.MemberId == memberId && post.CreatedAt >= since && !post.IsHidden));
         }
     }
 
@@ -221,7 +222,39 @@ public sealed class InMemoryForumWriteRepository : IForumWriteRepository
     {
         lock (sync)
         {
-            return Task.FromResult(posts.Count(post => post.MemberId == memberId));
+            return Task.FromResult(posts.Count(post => post.MemberId == memberId && !post.IsHidden));
+        }
+    }
+
+    public Task HidePostsByMemberAsync(Guid memberId, CancellationToken cancellationToken = default)
+    {
+        lock (sync)
+        {
+            for (var i = 0; i < posts.Count; i++)
+            {
+                if (posts[i].MemberId == memberId)
+                {
+                    posts[i] = posts[i] with { IsHidden = true };
+                }
+            }
+
+            return Task.CompletedTask;
+        }
+    }
+
+    public Task UnhidePostsByMemberAsync(Guid memberId, CancellationToken cancellationToken = default)
+    {
+        lock (sync)
+        {
+            for (var i = 0; i < posts.Count; i++)
+            {
+                if (posts[i].MemberId == memberId)
+                {
+                    posts[i] = posts[i] with { IsHidden = false };
+                }
+            }
+
+            return Task.CompletedTask;
         }
     }
 
@@ -237,7 +270,7 @@ public sealed class InMemoryForumWriteRepository : IForumWriteRepository
     {
         lock (sync)
         {
-            return posts.Where(post => post.TopicId == topicId).ToList();
+            return posts.Where(post => post.TopicId == topicId && !post.IsHidden).ToList();
         }
     }
 }
@@ -250,4 +283,5 @@ public sealed record InMemoryForumWritePost(
     string Body,
     DateTimeOffset CreatedAt,
     DateTimeOffset? EditedAt = null,
-    int EditCount = 0);
+    int EditCount = 0,
+    bool IsHidden = false);

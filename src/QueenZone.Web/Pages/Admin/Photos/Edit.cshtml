@@ -95,17 +95,17 @@
 
     <hr />
 
-    <form method="post" action="/admin/photos/@photo.PicId/@(photo.IsVisible ? "hide" : "show")" style="display:inline;">
+    <form method="post" action="/admin/photos/@photo.PicId/@(photo.IsVisible ? "hide" : "show")" class="qz-inline-form">
       <input type="hidden" name="@AdminPhotosPageModel.AntiforgeryTokenFieldName" value="@antiforgeryToken" />
       <button type="submit">@(photo.IsVisible ? "Hide from gallery" : "Show in gallery")</button>
     </form>
 
-    <form method="post" action="/admin/photos/@photo.PicId/regeneratethumb" style="display:inline; margin-left: .5rem;">
+    <form method="post" action="/admin/photos/@photo.PicId/regeneratethumb" class="qz-inline-form qz-inline-form--spaced">
       <input type="hidden" name="@AdminPhotosPageModel.AntiforgeryTokenFieldName" value="@antiforgeryToken" />
       <button type="submit">Regenerate WebP thumbnail</button>
     </form>
 
-    <form method="post" action="/admin/photos/@photo.PicId/delete" style="display:inline; margin-left: .5rem;"
+    <form method="post" action="/admin/photos/@photo.PicId/delete" class="qz-inline-form qz-inline-form--spaced"
           onsubmit="return confirm('Hard-delete this photo and its gallery blobs (original + thumbnail)? Prefer Hide for soft removal.');">
       <input type="hidden" name="@AdminPhotosPageModel.AntiforgeryTokenFieldName" value="@antiforgeryToken" />
       <button type="submit">Hard delete</button>

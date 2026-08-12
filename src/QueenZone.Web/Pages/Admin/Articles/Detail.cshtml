@@ -50,7 +50,7 @@
     </dl>
 
     <h2>Article preview</h2>
-    <div class="qz-reading" style="max-height: 600px; overflow-y: auto; border: 1px solid var(--qz-border); padding: 1rem; margin-bottom: 2rem;">
+    <div class="qz-reading qz-admin-preview">
       <article class="article-body">@Html.Raw(Model.FormattedBody)</article>
     </div>
 
@@ -58,10 +58,10 @@
     {
       <h2>Actions</h2>
 
-      <form method="post" action="/admin/articles/@submission.Id/action" style="display:contents;">
+      <form method="post" action="/admin/articles/@submission.Id/action" class="qz-admin-review-form">
         <input type="hidden" name="__RequestVerificationToken" value="@token" />
 
-        <fieldset style="margin-bottom: 1.5rem; border: 1px solid var(--qz-border); padding: 1rem;">
+        <fieldset class="qz-admin-fieldset">
           <legend>Approve &amp; publish</legend>
           <label class="qz-account-form__field">
             <span>Final slug</span>
@@ -79,7 +79,7 @@
             <span>Reviewer notes (optional)</span>
             <textarea name="ReviewNotes" rows="2" maxlength="1000"></textarea>
           </label>
-          <div style="display:flex; gap: 0.5rem; flex-wrap: wrap;">
+          <div class="qz-admin-actions">
             @if (submission.Status == ArticleSubmissionStatus.Submitted || submission.Status == ArticleSubmissionStatus.UnderReview)
             {
               <button type="submit" name="submitAction" value="approve" class="qz-button qz-button--secondary">Approve for publishing</button>
@@ -91,7 +91,7 @@
           </div>
         </fieldset>
 
-        <fieldset style="margin-bottom: 1.5rem; border: 1px solid var(--qz-border); padding: 1rem;">
+        <fieldset class="qz-admin-fieldset">
           <legend>Request revision / Reject</legend>
           <label class="qz-account-form__field">
             <span>Reason (required for rejection; optional for revision)</span>
@@ -101,15 +101,15 @@
             <span>Reviewer notes (optional)</span>
             <textarea name="ReviewNotes" rows="2" maxlength="1000"></textarea>
           </label>
-          <div style="display:flex; gap: 0.5rem; flex-wrap: wrap;">
+          <div class="qz-admin-actions">
             <button type="submit" name="submitAction" value="revise" class="qz-button qz-button--secondary">Request revision</button>
-            <button type="submit" name="submitAction" value="reject" class="qz-button" style="background: var(--qz-error, #c0392b);">Reject</button>
+            <button type="submit" name="submitAction" value="reject" class="qz-button qz-button--reject">Reject</button>
           </div>
         </fieldset>
 
         @if (submission.Status == ArticleSubmissionStatus.Submitted)
         {
-          <fieldset style="border: 1px solid var(--qz-border); padding: 1rem;">
+          <fieldset class="qz-admin-fieldset--last">
             <legend>Mark under review</legend>
             <button type="submit" name="submitAction" value="underreview" class="qz-button qz-button--secondary">Mark under review</button>
           </fieldset>

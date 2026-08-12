@@ -57,6 +57,34 @@ public sealed class InMemoryForumWriteRepositoryTests
     }
 
     [Fact]
+    public async Task HidePostsByMemberAsync_ExcludesPostsFromTopicView_UnhideRestoresThem()
+    {
+        var repository = new InMemoryForumWriteRepository();
+        var spammerId = Guid.NewGuid();
+        var innocentId = Guid.NewGuid();
+
+        var thread = await repository.CreateThreadAsync(new NewForumThread(
+            1, spammerId, "Spammer", "Spam thread", "<p>Spam 1</p>", DateTimeOffset.UtcNow));
+        await repository.CreatePostAsync(new NewForumPost(
+            thread.TopicId, innocentId, "Innocent", "<p>Not spam</p>", DateTimeOffset.UtcNow));
+
+        Assert.Equal(2, repository.GetPostsForTopic(thread.TopicId).Count);
+        Assert.Equal(1, await repository.CountApprovedPostsByMemberAsync(spammerId));
+
+        await repository.HidePostsByMemberAsync(spammerId);
+
+        var visiblePosts = repository.GetPostsForTopic(thread.TopicId);
+        Assert.Single(visiblePosts);
+        Assert.DoesNotContain(visiblePosts, post => post.MemberId == spammerId);
+        Assert.Equal(0, await repository.CountApprovedPostsByMemberAsync(spammerId));
+
+        await repository.UnhidePostsByMemberAsync(spammerId);
+
+        Assert.Equal(2, repository.GetPostsForTopic(thread.TopicId).Count);
+        Assert.Equal(1, await repository.CountApprovedPostsByMemberAsync(spammerId));
+    }
+
+    [Fact]
     public async Task InMemoryForumRepository_ReflectsCreatedThreadsInCategoryStats()
     {
         var writeRepository = new InMemoryForumWriteRepository();
