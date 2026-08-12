@@ -3,7 +3,9 @@ using QueenZone.Data;
 
 namespace QueenZone.Web.Pages.Admin.Members;
 
-public sealed class ActionModel(IMemberAccountRepository memberAccountRepository) : AdminMembersPageModel
+public sealed class ActionModel(
+    IMemberAccountRepository memberAccountRepository,
+    IForumWriteRepository forumWriteRepository) : AdminMembersPageModel
 {
     [BindProperty]
     public string? Reason { get; set; }
@@ -22,7 +24,12 @@ public sealed class ActionModel(IMemberAccountRepository memberAccountRepository
             return NotFound();
         }
 
-        return RedirectWithMessage(id, "Member suspended. Their session will end on their next request.", "success");
+        await forumWriteRepository.HidePostsByMemberAsync(id, cancellationToken);
+
+        return RedirectWithMessage(
+            id,
+            "Member suspended and their forum posts hidden. Their session will end on their next request.",
+            "success");
     }
 
     public async Task<IActionResult> OnPostReinstateAsync(Guid id, CancellationToken cancellationToken)
@@ -33,7 +40,9 @@ public sealed class ActionModel(IMemberAccountRepository memberAccountRepository
             return NotFound();
         }
 
-        return RedirectWithMessage(id, "Member reinstated.", "success");
+        await forumWriteRepository.UnhidePostsByMemberAsync(id, cancellationToken);
+
+        return RedirectWithMessage(id, "Member reinstated and their forum posts restored.", "success");
     }
 
     private IActionResult RedirectWithMessage(Guid id, string message, string kind)
