@@ -3,12 +3,12 @@
 <section class="qz-page-hero">
   <partial name="_PictureImage" model="@("/design-system/assets/crest-white.png", "", false, "qz-page-hero__crest")" />
   <div class="qz-container">
-    <div class="qz-eyebrow" style="color: var(--qz-gold);">@Model.Eyebrow</div>
+    <div class="qz-eyebrow">@Model.Eyebrow</div>
     <h1>@Model.Title</h1>
-    <p class="lede" style="max-width: var(--container-text);">@Model.Standfirst</p>
+    <p class="lede">@Model.Standfirst</p>
     @if (!string.IsNullOrWhiteSpace(Model.Meta))
     {
-      <div class="qz-meta" style="color: rgba(255,255,255,0.52);">@Model.Meta</div>
+      <div class="qz-meta">@Model.Meta</div>
     }
   </div>
 </section>

@@ -67,7 +67,7 @@
             <span class="qz-meta">@option.VoteCount · @option.Percentage.ToString("0.#")%</span>
           </div>
           <div class="qz-forum-poll__bar" role="img" aria-label="@option.Percentage.ToString("0.#") percent">
-            <span class="qz-forum-poll__bar-fill" style="width: @(option.Percentage.ToString(System.Globalization.CultureInfo.InvariantCulture))%"></span>
+            <span class="qz-forum-poll__bar-fill" data-bar-width="@(option.Percentage.ToString(System.Globalization.CultureInfo.InvariantCulture))%"></span>
           </div>
           @if (option.SelectedByViewer)
           {

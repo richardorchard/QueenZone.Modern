@@ -42,10 +42,10 @@
 <partial name="_PageHero" model='@(("Search the Archive", "Search", "Search news, articles and forum discussions.", "News, articles and discussions"))' />
 
 <section class="qz-section">
-  <div class="qz-container" style="max-width: 760px;">
+  <div class="qz-container qz-container--search">
     <form method="get" action="/search">
       <label class="qz-eyebrow" for="qz-search">Search query</label>
-      <div style="display: flex; gap: var(--space-3); margin-top: var(--space-3);">
+      <div class="qz-search-row u-mt-3">
         <input id="qz-search"
                name="q"
                type="search"
@@ -53,8 +53,8 @@
                maxlength="200"
                placeholder="Search news, articles and discussions..."
                autocomplete="off"
-               style="flex: 1; min-width: 0; padding: 1rem 1.125rem; border: 1px solid var(--border-strong); border-radius: var(--radius-xs); font: var(--type-body);">
-        <button type="submit" class="qz-button" style="white-space: nowrap;">Search</button>
+               class="qz-search-input">
+        <button type="submit" class="qz-button qz-button--nowrap">Search</button>
       </div>
       @if (!string.IsNullOrWhiteSpace(Model.ActiveContentType))
       {
@@ -64,7 +64,7 @@
 
     @if (string.IsNullOrWhiteSpace(Model.Query))
     {
-      <div class="qz-tag-row" style="margin-top: var(--space-5);">
+      <div class="qz-tag-row u-mt-5">
         @foreach (var tag in exampleTags)
         {
           <a class="qz-tag" href="/search?q=@Uri.EscapeDataString(tag)">@tag</a>
@@ -77,7 +77,7 @@
 @if (!string.IsNullOrWhiteSpace(Model.Query))
 {
   <section class="qz-section">
-    <div class="qz-container" style="max-width: 760px;">
+    <div class="qz-container qz-container--search">
 
       <nav class="qz-tag-row" aria-label="Filter search results by content type">
         <a class="qz-tag @(Model.ActiveContentType is null ? "qz-tag--active" : "")" href="@BuildSearchLink(null)">All</a>
@@ -89,13 +89,13 @@
 
       @if (Model.Results is null || Model.Results.TotalCount == 0)
       {
-        <p class="qz-meta" style="margin-top: var(--space-4);">No results found for <strong>@Model.Query</strong>. Try different keywords.</p>
+        <p class="qz-meta u-mt-4">No results found for <strong>@Model.Query</strong>. Try different keywords.</p>
       }
       else
       {
         <partial name="_SectionHeader" model="@(($"{Model.Results.TotalCount:N0} result{(Model.Results.TotalCount == 1 ? "" : "s")} for \"{Model.Query}\"", "Search results", false, (string?)null, (string?)null))" />
 
-        <div class="qz-grid qz-grid--two" style="margin-top: var(--space-4);">
+        <div class="qz-grid qz-grid--two u-mt-4">
           @foreach (var result in Model.Results.Results)
           {
             <a class="qz-card" href="@result.Url">
