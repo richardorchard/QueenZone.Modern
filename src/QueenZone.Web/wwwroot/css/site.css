@@ -4,6 +4,7 @@
   --qz-masthead-accent: var(--qz-gold);
   --qz-masthead-border: var(--border-on-dark);
   --qz-masthead-surface-hover: rgba(255, 255, 255, 0.05);
+  --qz-masthead-status-success: #6ee7b7;
   position: sticky;
   top: 0;
   z-index: 50;
@@ -18,6 +19,7 @@
   --qz-masthead-accent: var(--qz-blue);
   --qz-masthead-border: var(--qz-grey-300);
   --qz-masthead-surface-hover: var(--qz-warm-white);
+  --qz-masthead-status-success: #065f46;
   background: var(--qz-white);
 }
 
@@ -304,6 +306,18 @@
   letter-spacing: 0.04em;
   text-decoration: none;
   transition: background var(--dur-base) var(--ease-out), border-color var(--dur-base) var(--ease-out), color var(--dur-base) var(--ease-out);
+}
+
+.qz-masthead__admin-status {
+  display: inline-flex;
+  align-items: center;
+  max-width: 14rem;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--qz-masthead-status-success);
+  font: var(--fw-medium) 0.75rem/1 var(--font-body);
+  letter-spacing: 0.03em;
 }
 
 .qz-masthead__member-name {
@@ -3452,6 +3466,7 @@ a.qz-forum-post__author-link:focus-visible {
 
   .qz-masthead__actions .qz-masthead__signin,
   .qz-masthead__actions .qz-masthead__admin-link,
+  .qz-masthead__actions .qz-masthead__admin-status,
   .qz-masthead__actions .qz-masthead__signout-form {
     display: none;
   }
