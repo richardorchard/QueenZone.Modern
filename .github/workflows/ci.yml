@@ -82,7 +82,7 @@ jobs:
       # Include obj/Release: WebApplicationFactory hosts need build intermediates
       # such as src/QueenZone.Web/obj/.../compressed/ for static web assets.
       - name: Upload build binaries
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: build-binaries-${{ github.run_id }}
           path: |
@@ -98,7 +98,7 @@ jobs:
         run: dotnet publish src/QueenZone.Web/QueenZone.Web.csproj --configuration Release --no-build --output publish
 
       - name: Upload publish artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: web-publish-${{ github.run_id }}
           path: publish
@@ -191,7 +191,7 @@ jobs:
             .config/dotnet-tools.json
 
       - name: Download build binaries
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: build-binaries-${{ github.run_id }}
           path: .
@@ -215,7 +215,7 @@ jobs:
             -NoRestore
 
       - name: Upload coverage results
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-raw-${{ github.run_id }}-shard-${{ matrix.shard }}
           path: TestResults
@@ -247,7 +247,7 @@ jobs:
             .config/dotnet-tools.json
 
       - name: Download build binaries
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: build-binaries-${{ github.run_id }}
           path: .
@@ -266,7 +266,7 @@ jobs:
             -NoRestore
 
       - name: Upload coverage results
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-raw-${{ github.run_id }}-shard-small
           path: TestResults
@@ -341,7 +341,7 @@ jobs:
             --results-directory ./TestResults
 
       - name: Upload coverage results
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-raw-${{ github.run_id }}-shard-sqlserver
           path: TestResults
@@ -359,7 +359,7 @@ jobs:
           fetch-depth: 0
 
       - name: Download coverage results
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           pattern: coverage-raw-${{ github.run_id }}-shard-*
           path: TestResults
@@ -380,7 +380,7 @@ jobs:
         run: ./scripts/Test-CoverageGate.ps1 -Reports ./TestResults -GlobalLineThreshold 51 -ChangedLineThreshold 70
 
       - name: Upload coverage report
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-report-${{ github.run_id }}
           path: coverage-report
@@ -501,7 +501,7 @@ jobs:
 
     steps:
       - name: Download publish artifact
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: web-publish-${{ github.run_id }}
           path: smoke-app
@@ -541,7 +541,7 @@ jobs:
 
       - name: Upload app log on failure
         if: failure()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: smoke-app-log-${{ github.run_id }}
           path: smoke-app.log
@@ -614,7 +614,7 @@ jobs:
 
       - name: Upload Playwright failure artifacts
         if: failure()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: e2e-playwright-${{ github.run_id }}
           path: |
