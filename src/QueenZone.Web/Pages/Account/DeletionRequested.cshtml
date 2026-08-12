@@ -3,11 +3,12 @@
   ViewData["Title"] = "Account deletion requested";
 }
 
-<partial name="_PageHero" model='@(("Members", "Account deletion requested", "Your account is now disabled and publicly anonymised.", ""))' />
+<partial name="_PageHero" model='@(("Members", "Account deletion scheduled", "Your 30-day cooling-off period has started.", ""))' />
 
 <section class="qz-section">
   <div class="qz-container qz-prose">
-    <p>Your personal sign-in data will be permanently purged after <strong>30 days</strong>.</p>
-    <p>Forum posts and private messages remain attributed to <strong>Deleted member</strong>.</p>
+    <p>You have been signed out, but your account and content remain unchanged for <strong>30 days</strong>.</p>
+    <p>You can <a href="/account/login?returnUrl=%2Faccount%2Fdelete">sign back in and cancel deletion</a> at any time during that period.</p>
+    <p>After 30 days, your sign-in data and avatar are permanently removed. Retained forum posts and private messages are then attributed to <strong>Deleted member</strong>.</p>
   </div>
 </section>

@@ -107,7 +107,7 @@ public sealed partial class AccountSettingsPageTests : IClassFixture<WebApplicat
     }
 
     [Fact]
-    public async Task DeleteAccount_DisablesAndAnonymisesAccount_ThenSignsOut()
+    public async Task DeleteAccount_SignsOut_ButAllowsLoginAndCancellationDuringCoolingOff()
     {
         const string email = "delete-valid@example.com";
         var client = await CreateSignedInMemberClientAsync(
@@ -120,7 +120,8 @@ public sealed partial class AccountSettingsPageTests : IClassFixture<WebApplicat
                 AllowAutoRedirect = false,
             });
         var page = await client.GetStringAsync("/account/delete");
-        Assert.Contains("purged after <strong>30 days</strong>", page);
+        Assert.Contains("30-day cooling-off period", page);
+        Assert.Contains("sign back in and cancel deletion", page);
 
         var response = await client.PostAsync(
             "/account/delete",
@@ -139,12 +140,37 @@ public sealed partial class AccountSettingsPageTests : IClassFixture<WebApplicat
         var members = scope.ServiceProvider.GetRequiredService<IMemberAccountRepository>();
         var deleted = await members.FindByEmailAsync(email);
         Assert.NotNull(deleted);
-        Assert.True(deleted.IsSuspended);
+        Assert.False(deleted.IsSuspended);
         Assert.NotNull(deleted.DeletionRequestedAt);
-        Assert.Equal(MemberAccountDeletionPolicy.DeletedDisplayName, deleted.DisplayName);
-        Assert.Null(deleted.AvatarUrl);
+        Assert.Equal("Delete Valid", deleted.DisplayName);
         Assert.Equal(["Google"], await members.ListExternalProvidersAsync(deleted.Id));
-        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/members/{deleted.Id}")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync($"/members/{deleted.Id}")).StatusCode);
+
+        var signedInAgain = await CreateSignedInMemberClientAsync(
+            email,
+            displayName: "Delete Valid",
+            subject: "google-delete-valid",
+            options: new WebApplicationFactoryClientOptions
+            {
+                HandleCookies = true,
+                AllowAutoRedirect = false,
+            });
+        var pendingPage = await signedInAgain.GetStringAsync("/account/delete");
+        Assert.Contains("Deletion scheduled", pendingPage);
+        Assert.Contains("Cancel account deletion", pendingPage);
+
+        var cancelResponse = await signedInAgain.PostAsync(
+            "/account/delete?handler=Cancel",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(pendingPage),
+            }));
+
+        Assert.Equal(HttpStatusCode.Redirect, cancelResponse.StatusCode);
+        Assert.Equal("/account/settings", cancelResponse.Headers.Location!.OriginalString);
+        var restored = await members.FindByEmailAsync(email);
+        Assert.Null(restored!.DeletionRequestedAt);
+        Assert.False(restored.IsSuspended);
     }
 
     [Fact]

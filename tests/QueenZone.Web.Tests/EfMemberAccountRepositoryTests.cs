@@ -169,7 +169,7 @@ public sealed class EfMemberAccountRepositoryTests : IAsyncDisposable
     }
 
     [Fact]
-    public async Task RequestDeletionAsync_AnonymisesAccountAndForumAttribution_AndAuditsOnce()
+    public async Task RequestDeletionAsync_PreservesAccountAndAttribution_UntilPurge()
     {
         var account = await SeedAccountAsync("delete-me@example.com", "Delete Me");
         account.AvatarUrl = $"members/{account.Id:N}/avatar.webp";
@@ -234,14 +234,26 @@ public sealed class EfMemberAccountRepositoryTests : IAsyncDisposable
 
         Assert.NotNull(result);
         Assert.False(result.AlreadyRequested);
-        Assert.Equal($"members/{account.Id:N}/avatar.webp", result.PreviousAvatarUrl);
         Assert.True(second!.AlreadyRequested);
         var reloaded = await dbContext.MemberAccounts.AsNoTracking().SingleAsync(a => a.Id == account.Id);
-        Assert.True(reloaded.IsSuspended);
+        Assert.False(reloaded.IsSuspended);
         Assert.Equal(requestedAt, reloaded.DeletionRequestedAt);
-        Assert.Equal(MemberAccountDeletionPolicy.DeletedDisplayName, reloaded.DisplayName);
-        Assert.Null(reloaded.AvatarUrl);
+        Assert.Equal("Delete Me", reloaded.DisplayName);
+        Assert.Equal($"members/{account.Id:N}/avatar.webp", reloaded.AvatarUrl);
         var post = await dbContext.ModernForumPosts.AsNoTracking().SingleAsync();
+        Assert.Equal(account.Id, post.AuthorMemberId);
+        Assert.Equal("Delete Me", post.AuthorDisplayName);
+        Assert.Equal("Delete Me", (await dbContext.ModernForumThreads.AsNoTracking().SingleAsync()).StartedByDisplayName);
+        Assert.Equal("Delete Me", (await dbContext.SearchDocuments.AsNoTracking().SingleAsync()).AuthorDisplayName);
+        var audit = await dbContext.MemberAccountDeletionAuditLogs.AsNoTracking().SingleAsync();
+        Assert.Equal(MemberAccountDeletionPolicy.RequestedAuditAction, audit.Action);
+        Assert.Equal(account.Id, audit.MemberAccountId);
+
+        var purge = await repository.PurgeDeletedAccountsAsync(requestedAt, requestedAt.AddDays(30));
+
+        Assert.Equal(1, purge.PurgedCount);
+        Assert.Equal([$"members/{account.Id:N}/avatar.webp"], purge.AvatarBlobPaths);
+        post = await dbContext.ModernForumPosts.AsNoTracking().SingleAsync();
         Assert.Null(post.AuthorMemberId);
         Assert.Equal(MemberAccountDeletionPolicy.DeletedDisplayName, post.AuthorDisplayName);
         Assert.Equal(
@@ -250,9 +262,44 @@ public sealed class EfMemberAccountRepositoryTests : IAsyncDisposable
         Assert.Equal(
             MemberAccountDeletionPolicy.DeletedDisplayName,
             (await dbContext.SearchDocuments.AsNoTracking().SingleAsync()).AuthorDisplayName);
-        var audit = await dbContext.MemberAccountDeletionAuditLogs.AsNoTracking().SingleAsync();
-        Assert.Equal(MemberAccountDeletionPolicy.RequestedAuditAction, audit.Action);
-        Assert.Equal(account.Id, audit.MemberAccountId);
+    }
+
+    [Fact]
+    public async Task CancelDeletionAsync_ClearsPendingRequest_AndPreventsPurge()
+    {
+        var account = await SeedAccountAsync("changed-mind@example.com", "Changed Mind");
+        var requestedAt = new DateTime(2026, 8, 12, 7, 0, 0, DateTimeKind.Utc);
+        await repository.RequestDeletionAsync(account.Id, requestedAt);
+
+        var cancelled = await repository.CancelDeletionAsync(account.Id, requestedAt.AddDays(2));
+        var purge = await repository.PurgeDeletedAccountsAsync(requestedAt, requestedAt.AddDays(30));
+
+        Assert.NotNull(cancelled);
+        Assert.Null(cancelled.DeletionRequestedAt);
+        Assert.False(cancelled.IsSuspended);
+        Assert.Equal("Changed Mind", cancelled.DisplayName);
+        Assert.Equal(0, purge.PurgedCount);
+        Assert.Equal(
+            [MemberAccountDeletionPolicy.RequestedAuditAction, MemberAccountDeletionPolicy.CancelledAuditAction],
+            await dbContext.MemberAccountDeletionAuditLogs
+                .OrderBy(log => log.OccurredAt)
+                .Select(log => log.Action)
+                .ToListAsync());
+    }
+
+    [Fact]
+    public async Task CancelDeletionAsync_AtThirtyDayCutoff_KeepsRequestPending()
+    {
+        var account = await SeedAccountAsync("too-late@example.com", "Too Late");
+        var requestedAt = new DateTime(2026, 8, 12, 7, 0, 0, DateTimeKind.Utc);
+        await repository.RequestDeletionAsync(account.Id, requestedAt);
+
+        var result = await repository.CancelDeletionAsync(account.Id, requestedAt.AddDays(30));
+
+        Assert.Equal(requestedAt, result!.DeletionRequestedAt);
+        Assert.Equal(
+            [MemberAccountDeletionPolicy.RequestedAuditAction],
+            await dbContext.MemberAccountDeletionAuditLogs.Select(log => log.Action).ToListAsync());
     }
 
     [Fact]
@@ -273,8 +320,8 @@ public sealed class EfMemberAccountRepositoryTests : IAsyncDisposable
         var purgedAt = requestedAt.AddDays(30);
         var purged = await repository.PurgeDeletedAccountsAsync(requestedAt, purgedAt);
 
-        Assert.Equal(0, early);
-        Assert.Equal(1, purged);
+        Assert.Equal(0, early.PurgedCount);
+        Assert.Equal(1, purged.PurgedCount);
         var reloaded = await dbContext.MemberAccounts.AsNoTracking().SingleAsync(a => a.Id == account.Id);
         Assert.Equal(MemberAccountDeletionPolicy.CreateDeletedEmail(account.Id), reloaded.Email);
         Assert.Null(reloaded.PasswordHash);

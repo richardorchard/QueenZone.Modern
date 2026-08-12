@@ -235,7 +235,7 @@ public sealed class InMemoryMemberAccountRepository : IMemberAccountRepository
             IReadOnlyList<MemberRecipientMatch> matches = accounts
                 .Where(account =>
                     account.DisplayName.Contains(term, StringComparison.OrdinalIgnoreCase)
-                    && account.DeletionRequestedAt is null
+                    && account.PersonalDataPurgedAt is null
                     && (excludeMemberId is null || account.Id != excludeMemberId.Value))
                 .OrderBy(account => account.DisplayName, StringComparer.OrdinalIgnoreCase)
                 .Take(maxResults)
@@ -328,16 +328,9 @@ public sealed class InMemoryMemberAccountRepository : IMemberAccountRepository
             if (account.DeletionRequestedAt is not null)
             {
                 return Task.FromResult<MemberAccountDeletionRequestResult?>(
-                    new(account, null, AlreadyRequested: true));
+                    new(account, AlreadyRequested: true));
             }
 
-            var previousAvatarUrl = account.AvatarUrl;
-            account.DisplayName = MemberAccountDeletionPolicy.DeletedDisplayName;
-            account.AvatarUrl = null;
-            account.IsSuspended = true;
-            account.SuspendedAt = requestedAt;
-            account.SuspendedReason = "Account deletion requested";
-            account.SuspendedByAdminEmail = null;
             account.DeletionRequestedAt = requestedAt;
             deletionAuditLogs.Add(new MemberAccountDeletionAuditLogEntity
             {
@@ -347,11 +340,40 @@ public sealed class InMemoryMemberAccountRepository : IMemberAccountRepository
             });
 
             return Task.FromResult<MemberAccountDeletionRequestResult?>(
-                new(account, previousAvatarUrl, AlreadyRequested: false));
+                new(account, AlreadyRequested: false));
         }
     }
 
-    public Task<int> PurgeDeletedAccountsAsync(
+    public Task<MemberAccount?> CancelDeletionAsync(
+        Guid memberId,
+        DateTime cancelledAt,
+        CancellationToken cancellationToken = default)
+    {
+        lock (gate)
+        {
+            var account = accounts.FirstOrDefault(a => a.Id == memberId);
+            if (account is null || account.DeletionRequestedAt is null || account.PersonalDataPurgedAt is not null)
+            {
+                return Task.FromResult(account);
+            }
+
+            if (cancelledAt >= account.DeletionRequestedAt.Value.AddDays(MemberAccountDeletionPolicy.RetentionDays))
+            {
+                return Task.FromResult<MemberAccount?>(account);
+            }
+
+            account.DeletionRequestedAt = null;
+            deletionAuditLogs.Add(new MemberAccountDeletionAuditLogEntity
+            {
+                MemberAccountId = memberId,
+                Action = MemberAccountDeletionPolicy.CancelledAuditAction,
+                OccurredAt = cancelledAt,
+            });
+            return Task.FromResult<MemberAccount?>(account);
+        }
+    }
+
+    public Task<MemberAccountDeletionPurgeResult> PurgeDeletedAccountsAsync(
         DateTime purgeBefore,
         DateTime purgedAt,
         CancellationToken cancellationToken = default)
@@ -364,6 +386,11 @@ public sealed class InMemoryMemberAccountRepository : IMemberAccountRepository
                     && account.DeletionRequestedAt <= purgeBefore
                     && account.PersonalDataPurgedAt is null)
                 .ToList();
+            var avatarBlobPaths = dueAccounts
+                .Select(account => account.AvatarUrl)
+                .Where(path => !string.IsNullOrWhiteSpace(path))
+                .Cast<string>()
+                .ToList();
 
             foreach (var account in dueAccounts)
             {
@@ -375,6 +402,8 @@ public sealed class InMemoryMemberAccountRepository : IMemberAccountRepository
                 account.AvatarUrl = null;
                 account.PasswordHash = null;
                 account.LastLoginAt = null;
+                account.IsSuspended = true;
+                account.SuspendedAt = purgedAt;
                 account.SuspendedReason = null;
                 account.SuspendedByAdminEmail = null;
                 account.PersonalDataPurgedAt = purgedAt;
@@ -386,7 +415,7 @@ public sealed class InMemoryMemberAccountRepository : IMemberAccountRepository
                 });
             }
 
-            return Task.FromResult(dueAccounts.Count);
+            return Task.FromResult(new MemberAccountDeletionPurgeResult(dueAccounts.Count, avatarBlobPaths));
         }
     }
 

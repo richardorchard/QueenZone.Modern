@@ -27,24 +27,33 @@ public sealed class PrivateMessageServiceTests
     }
 
     [Fact]
-    public async Task DeletedMember_MessagesRemainAnonymised_AndCannotReceiveReplies()
+    public async Task PendingDeletion_AllowsMessages_UntilPermanentPurge()
     {
         var (service, members, _, alice, bob) = CreateSystem();
         var created = await service.ComposeAsync(alice.Id, bob.Id, "Retained message");
-        await members.RequestDeletionAsync(
-            alice.Id,
-            new DateTime(2026, 8, 12, 7, 0, 0, DateTimeKind.Utc));
+        var requestedAt = new DateTime(2026, 8, 12, 7, 0, 0, DateTimeKind.Utc);
+        await members.RequestDeletionAsync(alice.Id, requestedAt);
 
         var detail = await service.GetConversationAsync(
             created.ConversationId!.Value,
             bob.Id,
             markRead: false);
         var reply = await service.ReplyAsync(created.ConversationId.Value, bob.Id, "Are you there?");
-        var recipientMatches = await service.SearchRecipientsAsync(bob.Id, "Deleted");
+        var recipientMatches = await service.SearchRecipientsAsync(bob.Id, "Alice");
 
         Assert.NotNull(detail);
-        Assert.Equal(MemberAccountDeletionPolicy.DeletedDisplayName, detail.OtherParticipantDisplayName);
-        Assert.Equal(MemberAccountDeletionPolicy.DeletedDisplayName, Assert.Single(detail.Messages).SenderDisplayName);
+        Assert.Equal("Alice", detail.OtherParticipantDisplayName);
+        Assert.Equal("Alice", Assert.Single(detail.Messages).SenderDisplayName);
+        Assert.True(reply.Succeeded);
+        Assert.Single(recipientMatches);
+
+        await members.PurgeDeletedAccountsAsync(requestedAt, requestedAt.AddDays(30));
+        detail = await service.GetConversationAsync(created.ConversationId.Value, bob.Id, markRead: false);
+        reply = await service.ReplyAsync(created.ConversationId.Value, bob.Id, "Are you still there?");
+        recipientMatches = await service.SearchRecipientsAsync(bob.Id, "Deleted");
+
+        Assert.Equal(MemberAccountDeletionPolicy.DeletedDisplayName, detail!.OtherParticipantDisplayName);
+        Assert.Equal(MemberAccountDeletionPolicy.DeletedDisplayName, detail.Messages[0].SenderDisplayName);
         Assert.False(reply.Succeeded);
         Assert.Equal(PrivateMessageService.UnableToSendMessage, reply.ErrorMessage);
         Assert.Empty(recipientMatches);

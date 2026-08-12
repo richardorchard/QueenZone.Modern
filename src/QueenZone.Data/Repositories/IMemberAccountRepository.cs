@@ -90,8 +90,8 @@ public interface IMemberAccountRepository
     Task<MemberAccount?> ReinstateAsync(Guid memberId, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Blocks sign-in and immediately anonymises public attribution. Credential and email data
-    /// remain for the policy retention window and are removed by <see cref="PurgeDeletedAccountsAsync"/>.
+    /// Schedules deletion after the policy cooling-off period. The account remains usable and
+    /// unchanged until it is cancelled or <see cref="PurgeDeletedAccountsAsync"/> runs.
     /// </summary>
     Task<MemberAccountDeletionRequestResult?> RequestDeletionAsync(
         Guid memberId,
@@ -99,10 +99,18 @@ public interface IMemberAccountRepository
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Cancels a pending deletion request before personal data has been purged.
+    /// </summary>
+    Task<MemberAccount?> CancelDeletionAsync(
+        Guid memberId,
+        DateTime cancelledAt,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Irreversibly removes personal and authentication data for deletion requests at or before
     /// <paramref name="purgeBefore"/>. The member tombstone and linked legacy id are retained.
     /// </summary>
-    Task<int> PurgeDeletedAccountsAsync(
+    Task<MemberAccountDeletionPurgeResult> PurgeDeletedAccountsAsync(
         DateTime purgeBefore,
         DateTime purgedAt,
         CancellationToken cancellationToken = default);

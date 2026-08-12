@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using QueenZone.Data;
 
 namespace QueenZone.Web.Pages.Account;
 
@@ -14,6 +15,8 @@ public sealed class DeleteModel(MemberAccountService memberAccountService) : Pag
 
     public string Email { get; private set; } = string.Empty;
 
+    public DateTime? ScheduledDeletionAt { get; private set; }
+
     public async Task<IActionResult> OnGetAsync(CancellationToken cancellationToken)
     {
         var account = await LoadCurrentAccountAsync(cancellationToken);
@@ -22,7 +25,7 @@ public sealed class DeleteModel(MemberAccountService memberAccountService) : Pag
             return Redirect("/account/login");
         }
 
-        Email = account.Email;
+        PopulatePage(account);
         ViewData["Title"] = "Delete account";
         return Page();
     }
@@ -35,7 +38,7 @@ public sealed class DeleteModel(MemberAccountService memberAccountService) : Pag
             return Redirect("/account/login");
         }
 
-        Email = account.Email;
+        PopulatePage(account);
         ViewData["Title"] = "Delete account";
         if (!string.Equals(Confirmation?.Trim(), "DELETE", StringComparison.Ordinal))
         {
@@ -52,6 +55,33 @@ public sealed class DeleteModel(MemberAccountService memberAccountService) : Pag
 
         await HttpContext.SignOutAsync(MemberAuthenticationSchemes.MembersCookie);
         return RedirectToPage("/Account/DeletionRequested");
+    }
+
+    public async Task<IActionResult> OnPostCancelAsync(CancellationToken cancellationToken)
+    {
+        var account = await LoadCurrentAccountAsync(cancellationToken);
+        if (account is null)
+        {
+            return Redirect("/account/login");
+        }
+
+        var result = await memberAccountService.CancelDeletionAsync(account.Id, cancellationToken);
+        if (!result.Succeeded)
+        {
+            PopulatePage(account);
+            ViewData["Title"] = "Delete account";
+            ModelState.AddModelError(string.Empty, result.Error ?? "Could not cancel account deletion.");
+            return Page();
+        }
+
+        TempData[SettingsModel.SuccessMessageKey] = "Account deletion cancelled.";
+        return RedirectToPage("/Account/Settings");
+    }
+
+    private void PopulatePage(Data.Entities.MemberAccount account)
+    {
+        Email = account.Email;
+        ScheduledDeletionAt = account.DeletionRequestedAt?.AddDays(MemberAccountDeletionPolicy.RetentionDays);
     }
 
     private async Task<Data.Entities.MemberAccount?> LoadCurrentAccountAsync(CancellationToken cancellationToken)

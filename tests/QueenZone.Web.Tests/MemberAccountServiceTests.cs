@@ -558,7 +558,7 @@ public sealed class MemberAccountServiceTests
     }
 
     [Fact]
-    public async Task RequestDeletionAsync_RemovesAvatar_AndBlocksPasswordSignIn()
+    public async Task RequestDeletionAsync_PreservesAccountDuringCoolingOff_AndCanCancel()
     {
         var backend = new InMemoryBlobStorageBackend();
         var repository = new InMemoryMemberAccountRepository();
@@ -576,17 +576,21 @@ public sealed class MemberAccountServiceTests
         var signIn = await service.SignInAsync("delete-service@example.com", "S3curePass!");
 
         Assert.True(result.Succeeded);
-        Assert.Equal(MemberAccountDeletionPolicy.DeletedDisplayName, result.Account!.DisplayName);
+        Assert.Equal("Delete Service", result.Account!.DisplayName);
         Assert.NotNull(result.Account.DeletionRequestedAt);
-        Assert.True(result.Account.IsSuspended);
-        Assert.False(backend.Exists(MemberAvatarPaths.Container, avatarPath));
-        Assert.False(backend.Exists(MemberAvatarPaths.Container, thumbPath));
-        Assert.False(signIn.Succeeded);
-        Assert.Equal(MemberAccountService.SuspendedSignInError, signIn.Error);
+        Assert.False(result.Account.IsSuspended);
+        Assert.True(backend.Exists(MemberAvatarPaths.Container, avatarPath));
+        Assert.True(backend.Exists(MemberAvatarPaths.Container, thumbPath));
+        Assert.True(signIn.Succeeded);
+
+        var cancelled = await service.CancelDeletionAsync(registered.Account.Id);
+
+        Assert.True(cancelled.Succeeded);
+        Assert.Null(cancelled.Account!.DeletionRequestedAt);
     }
 
     [Fact]
-    public async Task DeletedAccount_ExternalSignInDoesNotRelinkOrRecordLogin()
+    public async Task PendingDeletion_ExternalSignInRemainsAvailable()
     {
         var repository = new InMemoryMemberAccountRepository();
         var service = CreateService(memberAccountRepository: repository);
@@ -595,7 +599,6 @@ public sealed class MemberAccountServiceTests
             "deleted-google-subject",
             "deleted-external@example.com",
             "External Delete");
-        var lastLoginBeforeDeletion = account.LastLoginAt;
         await service.RequestDeletionAsync(account.Id);
 
         var returned = await service.FindOrCreateFromExternalLoginAsync(
@@ -605,9 +608,9 @@ public sealed class MemberAccountServiceTests
             "External Delete");
 
         Assert.Equal(account.Id, returned.Id);
-        Assert.True(returned.IsSuspended);
-        Assert.Equal(lastLoginBeforeDeletion, returned.LastLoginAt);
-        Assert.Equal(["Google"], await service.ListExternalProvidersAsync(account.Id));
+        Assert.False(returned.IsSuspended);
+        Assert.NotNull(returned.LastLoginAt);
+        Assert.Equal(["GitHub", "Google"], await service.ListExternalProvidersAsync(account.Id));
     }
 
     [Fact]
@@ -752,7 +755,13 @@ public sealed class MemberAccountServiceTests
             CancellationToken cancellationToken = default) =>
             inner.RequestDeletionAsync(memberId, requestedAt, cancellationToken);
 
-        public Task<int> PurgeDeletedAccountsAsync(
+        public Task<MemberAccount?> CancelDeletionAsync(
+            Guid memberId,
+            DateTime cancelledAt,
+            CancellationToken cancellationToken = default) =>
+            inner.CancelDeletionAsync(memberId, cancelledAt, cancellationToken);
+
+        public Task<MemberAccountDeletionPurgeResult> PurgeDeletedAccountsAsync(
             DateTime purgeBefore,
             DateTime purgedAt,
             CancellationToken cancellationToken = default) =>

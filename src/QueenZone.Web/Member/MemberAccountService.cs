@@ -90,7 +90,7 @@ public sealed class MemberAccountService(
             var existingByEmail = await memberAccountRepository.FindByEmailAsync(email, cancellationToken);
             if (existingByEmail is not null)
             {
-                if (existingByEmail.DeletionRequestedAt is null)
+                if (existingByEmail.PersonalDataPurgedAt is null)
                 {
                     await memberAccountRepository.AddExternalLoginAsync(existingByEmail.Id, provider, providerKey, email, cancellationToken);
                 }
@@ -500,24 +500,53 @@ public sealed class MemberAccountService(
             return MemberAccountResult.Failure("Account not found.");
         }
 
-        if (!requested.AlreadyRequested && !string.IsNullOrWhiteSpace(requested.PreviousAvatarUrl))
-        {
-            await SafeDeleteAsync(
-                requested.PreviousAvatarUrl,
-                MemberAvatarPaths.ToThumbBlobName(requested.PreviousAvatarUrl),
-                cancellationToken);
-        }
-
         return MemberAccountResult.Success(requested.Account);
     }
 
-    public Task<int> PurgeDueDeletionsAsync(
+    public async Task<MemberAccountResult> CancelDeletionAsync(
+        Guid memberId,
+        CancellationToken cancellationToken = default)
+    {
+        var account = await memberAccountRepository.CancelDeletionAsync(
+            memberId,
+            DateTime.UtcNow,
+            cancellationToken);
+        if (account is null)
+        {
+            return MemberAccountResult.Failure("Account not found.");
+        }
+
+        if (account.PersonalDataPurgedAt is not null)
+        {
+            return MemberAccountResult.Failure("Account deletion can no longer be cancelled.");
+        }
+
+        if (account.DeletionRequestedAt is not null)
+        {
+            return MemberAccountResult.Failure("The 30-day cooling-off period has ended.");
+        }
+
+        return MemberAccountResult.Success(account);
+    }
+
+    public async Task<int> PurgeDueDeletionsAsync(
         DateTime utcNow,
-        CancellationToken cancellationToken = default) =>
-        memberAccountRepository.PurgeDeletedAccountsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var result = await memberAccountRepository.PurgeDeletedAccountsAsync(
             utcNow.AddDays(-MemberAccountDeletionPolicy.RetentionDays),
             utcNow,
             cancellationToken);
+        foreach (var avatarBlobPath in result.AvatarBlobPaths)
+        {
+            await SafeDeleteAsync(
+                avatarBlobPath,
+                MemberAvatarPaths.ToThumbBlobName(avatarBlobPath),
+                cancellationToken);
+        }
+
+        return result.PurgedCount;
+    }
 
     private async Task SafeDeleteAsync(
         string? avatarBlobName,

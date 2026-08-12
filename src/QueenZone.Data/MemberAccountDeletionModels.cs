@@ -10,6 +10,8 @@ public static class MemberAccountDeletionPolicy
 
     public const string RequestedAuditAction = "Requested";
 
+    public const string CancelledAuditAction = "Cancelled";
+
     public const string PurgedAuditAction = "PersonalDataPurged";
 
     public static string CreateDeletedEmail(Guid memberId) =>
@@ -18,5 +20,8 @@ public static class MemberAccountDeletionPolicy
 
 public sealed record MemberAccountDeletionRequestResult(
     MemberAccount Account,
-    string? PreviousAvatarUrl,
     bool AlreadyRequested);
+
+public sealed record MemberAccountDeletionPurgeResult(
+    int PurgedCount,
+    IReadOnlyList<string> AvatarBlobPaths);

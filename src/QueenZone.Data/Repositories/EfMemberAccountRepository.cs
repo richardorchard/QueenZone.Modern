@@ -202,7 +202,7 @@ public sealed class EfMemberAccountRepository(QueenZoneDbContext dbContext) : IM
             .AsNoTracking()
             .Where(account =>
                 account.DisplayName.Contains(term)
-                && account.DeletionRequestedAt == null
+                && account.PersonalDataPurgedAt == null
                 && (excludeMemberId == null || account.Id != excludeMemberId))
             .OrderBy(account => account.DisplayName)
             .Take(maxResults)
@@ -296,52 +296,9 @@ public sealed class EfMemberAccountRepository(QueenZoneDbContext dbContext) : IM
 
             if (account.DeletionRequestedAt is not null)
             {
-                return new MemberAccountDeletionRequestResult(account, null, AlreadyRequested: true);
+                return new MemberAccountDeletionRequestResult(account, AlreadyRequested: true);
             }
 
-            var previousAvatarUrl = account.AvatarUrl;
-            var starterThreadIds = dbContext.ModernForumPosts
-                .Where(post =>
-                    post.AuthorMemberId == memberId
-                    && !dbContext.ModernForumPosts.Any(other =>
-                        other.ThreadId == post.ThreadId
-                        && other.LegacyPostId < post.LegacyPostId))
-                .Select(post => post.ThreadId);
-
-            await dbContext.ModernForumThreads
-                .Where(thread => starterThreadIds.Contains(thread.Id))
-                .ExecuteUpdateAsync(
-                    setters => setters
-                        .SetProperty(thread => thread.StartedByDisplayName, MemberAccountDeletionPolicy.DeletedDisplayName)
-                        .SetProperty(thread => thread.UpdatedAt, requestedAt),
-                    cancellationToken);
-
-            await dbContext.ModernForumPosts
-                .Where(post => post.AuthorMemberId == memberId)
-                .ExecuteUpdateAsync(
-                    setters => setters
-                        .SetProperty(post => post.AuthorMemberId, (Guid?)null)
-                        .SetProperty(post => post.AuthorDisplayName, MemberAccountDeletionPolicy.DeletedDisplayName)
-                        .SetProperty(post => post.UpdatedAt, requestedAt),
-                    cancellationToken);
-
-            var articleSourceKeys = dbContext.ArticleSubmissions
-                .Where(article => article.AuthorMemberId == memberId)
-                .Select(article => "article:" + article.Slug);
-            await dbContext.SearchDocuments
-                .Where(document => articleSourceKeys.Contains(document.SourceKey))
-                .ExecuteUpdateAsync(
-                    setters => setters.SetProperty(
-                        document => document.AuthorDisplayName,
-                        MemberAccountDeletionPolicy.DeletedDisplayName),
-                    cancellationToken);
-
-            account.DisplayName = MemberAccountDeletionPolicy.DeletedDisplayName;
-            account.AvatarUrl = null;
-            account.IsSuspended = true;
-            account.SuspendedAt = requestedAt;
-            account.SuspendedReason = "Account deletion requested";
-            account.SuspendedByAdminEmail = null;
             account.DeletionRequestedAt = requestedAt;
 
             dbContext.MemberAccountDeletionAuditLogs.Add(new MemberAccountDeletionAuditLogEntity
@@ -353,11 +310,65 @@ public sealed class EfMemberAccountRepository(QueenZoneDbContext dbContext) : IM
 
             await dbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
-            return new MemberAccountDeletionRequestResult(account, previousAvatarUrl, AlreadyRequested: false);
+            return new MemberAccountDeletionRequestResult(account, AlreadyRequested: false);
         });
     }
 
-    public Task<int> PurgeDeletedAccountsAsync(
+    public Task<MemberAccount?> CancelDeletionAsync(
+        Guid memberId,
+        DateTime cancelledAt,
+        CancellationToken cancellationToken = default)
+    {
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        return strategy.ExecuteAsync(async () =>
+        {
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+            var account = await dbContext.MemberAccounts
+                .AsNoTracking()
+                .SingleOrDefaultAsync(a => a.Id == memberId, cancellationToken);
+            if (account is null || account.DeletionRequestedAt is null || account.PersonalDataPurgedAt is not null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+                return account;
+            }
+
+            if (cancelledAt >= account.DeletionRequestedAt.Value.AddDays(MemberAccountDeletionPolicy.RetentionDays))
+            {
+                await transaction.CommitAsync(cancellationToken);
+                return account;
+            }
+
+            var updated = await dbContext.MemberAccounts
+                .Where(candidate =>
+                    candidate.Id == memberId
+                    && candidate.DeletionRequestedAt == account.DeletionRequestedAt
+                    && candidate.PersonalDataPurgedAt == null)
+                .ExecuteUpdateAsync(
+                    setters => setters.SetProperty(candidate => candidate.DeletionRequestedAt, (DateTime?)null),
+                    cancellationToken);
+            if (updated == 0)
+            {
+                await transaction.CommitAsync(cancellationToken);
+                return await dbContext.MemberAccounts
+                    .AsNoTracking()
+                    .SingleOrDefaultAsync(candidate => candidate.Id == memberId, cancellationToken);
+            }
+
+            dbContext.MemberAccountDeletionAuditLogs.Add(new MemberAccountDeletionAuditLogEntity
+            {
+                MemberAccountId = memberId,
+                Action = MemberAccountDeletionPolicy.CancelledAuditAction,
+                OccurredAt = cancelledAt,
+            });
+            await dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return await dbContext.MemberAccounts
+                .AsNoTracking()
+                .SingleAsync(candidate => candidate.Id == memberId, cancellationToken);
+        });
+    }
+
+    public Task<MemberAccountDeletionPurgeResult> PurgeDeletedAccountsAsync(
         DateTime purgeBefore,
         DateTime purgedAt,
         CancellationToken cancellationToken = default)
@@ -375,10 +386,56 @@ public sealed class EfMemberAccountRepository(QueenZoneDbContext dbContext) : IM
             if (accounts.Count == 0)
             {
                 await transaction.CommitAsync(cancellationToken);
-                return 0;
+                return new MemberAccountDeletionPurgeResult(0, []);
             }
 
             var memberIds = accounts.Select(account => account.Id).ToList();
+            var avatarBlobPaths = accounts
+                .Select(account => account.AvatarUrl)
+                .Where(path => !string.IsNullOrWhiteSpace(path))
+                .Cast<string>()
+                .ToList();
+
+            foreach (var account in accounts)
+            {
+                var memberId = account.Id;
+                var starterThreadIds = dbContext.ModernForumPosts
+                    .Where(post =>
+                        post.AuthorMemberId == memberId
+                        && !dbContext.ModernForumPosts.Any(other =>
+                            other.ThreadId == post.ThreadId
+                            && other.LegacyPostId < post.LegacyPostId))
+                    .Select(post => post.ThreadId);
+
+                await dbContext.ModernForumThreads
+                    .Where(thread => starterThreadIds.Contains(thread.Id))
+                    .ExecuteUpdateAsync(
+                        setters => setters
+                            .SetProperty(thread => thread.StartedByDisplayName, MemberAccountDeletionPolicy.DeletedDisplayName)
+                            .SetProperty(thread => thread.UpdatedAt, purgedAt),
+                        cancellationToken);
+
+                await dbContext.ModernForumPosts
+                    .Where(post => post.AuthorMemberId == memberId)
+                    .ExecuteUpdateAsync(
+                        setters => setters
+                            .SetProperty(post => post.AuthorMemberId, (Guid?)null)
+                            .SetProperty(post => post.AuthorDisplayName, MemberAccountDeletionPolicy.DeletedDisplayName)
+                            .SetProperty(post => post.UpdatedAt, purgedAt),
+                        cancellationToken);
+
+                var articleSourceKeys = dbContext.ArticleSubmissions
+                    .Where(article => article.AuthorMemberId == memberId)
+                    .Select(article => "article:" + article.Slug);
+                await dbContext.SearchDocuments
+                    .Where(document => articleSourceKeys.Contains(document.SourceKey))
+                    .ExecuteUpdateAsync(
+                        setters => setters.SetProperty(
+                            document => document.AuthorDisplayName,
+                            MemberAccountDeletionPolicy.DeletedDisplayName),
+                        cancellationToken);
+            }
+
             await dbContext.MemberExternalLogins
                 .Where(login => memberIds.Contains(login.MemberAccountId))
                 .ExecuteDeleteAsync(cancellationToken);
@@ -392,6 +449,8 @@ public sealed class EfMemberAccountRepository(QueenZoneDbContext dbContext) : IM
                 account.AvatarUrl = null;
                 account.PasswordHash = null;
                 account.LastLoginAt = null;
+                account.IsSuspended = true;
+                account.SuspendedAt = purgedAt;
                 account.SuspendedReason = null;
                 account.SuspendedByAdminEmail = null;
                 account.PersonalDataPurgedAt = purgedAt;
@@ -406,7 +465,7 @@ public sealed class EfMemberAccountRepository(QueenZoneDbContext dbContext) : IM
 
             await dbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
-            return accounts.Count;
+            return new MemberAccountDeletionPurgeResult(accounts.Count, avatarBlobPaths);
         });
     }
 
