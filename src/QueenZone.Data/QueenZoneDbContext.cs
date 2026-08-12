@@ -73,6 +73,10 @@ public sealed class QueenZoneDbContext : DbContext
 
     public DbSet<SearchDocumentEntity> SearchDocuments => Set<SearchDocumentEntity>();
 
+    public DbSet<SearchReindexLeaseEntity> SearchReindexLeases => Set<SearchReindexLeaseEntity>();
+
+    public DbSet<SearchReindexRunRequestEntity> SearchReindexRunRequests => Set<SearchReindexRunRequestEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<NewsTableRow>(entity =>
@@ -589,6 +593,39 @@ public sealed class QueenZoneDbContext : DbContext
             entity.HasIndex(document => new { document.ContentType, document.PublishedAt })
                 .IsDescending(false, true)
                 .HasDatabaseName("IX_SearchDocument_ContentType_PublishedAt");
+        });
+
+        modelBuilder.Entity<SearchReindexLeaseEntity>(entity =>
+        {
+            entity.ToTable("SearchReindexLeases");
+            entity.HasKey(lease => lease.LeaseName);
+
+            entity.Property(lease => lease.LeaseName).HasMaxLength(100).IsRequired();
+            entity.Property(lease => lease.HolderId).HasMaxLength(64).IsRequired();
+            entity.Property(lease => lease.AcquiredAtUtc).IsRequired();
+            entity.Property(lease => lease.ExpiresAtUtc).IsRequired();
+        });
+
+        modelBuilder.Entity<SearchReindexRunRequestEntity>(entity =>
+        {
+            entity.ToTable("SearchReindexRunRequests");
+            entity.HasKey(request => request.Id);
+
+            entity.Property(request => request.Status).HasConversion<string>().HasMaxLength(50).IsRequired();
+            entity.Property(request => request.RequestedBy).HasMaxLength(256).IsRequired();
+            entity.Property(request => request.RequestedAtUtc).IsRequired();
+            entity.Property(request => request.RunnerId).HasMaxLength(100);
+            entity.Property(request => request.Summary).HasMaxLength(2000);
+            entity.Property(request => request.ErrorMessage).HasMaxLength(2000);
+            entity.Property(request => request.ActiveKey).HasMaxLength(20);
+            entity.Property(request => request.UpdatedAtUtc).IsRequired();
+
+            entity.HasIndex(request => request.ActiveKey)
+                .IsUnique()
+                .HasFilter("[ActiveKey] IS NOT NULL")
+                .HasDatabaseName("UX_SearchReindexRunRequests_ActiveKey");
+            entity.HasIndex(request => new { request.Status, request.RequestedAtUtc })
+                .HasDatabaseName("IX_SearchReindexRunRequests_Status_RequestedAtUtc");
         });
 
         modelBuilder.Entity<PhotoSubmissionAuditLogEntity>(entity =>

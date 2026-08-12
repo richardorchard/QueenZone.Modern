@@ -29,8 +29,6 @@ public sealed class SearchReindexBuilderTests
         var discographyRepository = new InMemoryDiscographyRepository(SampleDiscographyData.CreateSeedAlbums());
         var queenHistoryRepository = new InMemoryQueenHistoryRepository(SampleQueenHistoryData.CreateSeedEvents());
         var fanPerformanceRepository = new InMemoryFanPerformanceRepository(SampleFanPerformanceData.CreateSeedPerformances());
-        var freddieTributeStore = new SharedFreddieTributeStore(SampleFreddieTributeData.CreateSeedTributes());
-        var freddieTributeRepository = new InMemoryFreddieTributeRepository(freddieTributeStore);
 
         var builder = new SearchReindexBuilder(
             indexService,
@@ -41,8 +39,7 @@ public sealed class SearchReindexBuilderTests
             biographyRepository,
             discographyRepository,
             queenHistoryRepository,
-            fanPerformanceRepository,
-            freddieTributeRepository);
+            fanPerformanceRepository);
         return (builder, store);
     }
 
@@ -109,8 +106,7 @@ public sealed class SearchReindexBuilderTests
             new InMemoryBiographyRepository(SampleBiographyData.CreateSeedChapters()),
             new InMemoryDiscographyRepository(SampleDiscographyData.CreateSeedAlbums()),
             new InMemoryQueenHistoryRepository(SampleQueenHistoryData.CreateSeedEvents()),
-            new InMemoryFanPerformanceRepository(SampleFanPerformanceData.CreateSeedPerformances()),
-            new InMemoryFreddieTributeRepository(new SharedFreddieTributeStore(SampleFreddieTributeData.CreateSeedTributes())));
+            new InMemoryFanPerformanceRepository(SampleFanPerformanceData.CreateSeedPerformances()));
 
         await builder.ReindexArticlesAsync();
 
@@ -179,8 +175,7 @@ public sealed class SearchReindexBuilderTests
             new InMemoryBiographyRepository(SampleBiographyData.CreateSeedChapters()),
             new InMemoryDiscographyRepository(SampleDiscographyData.CreateSeedAlbums()),
             queenHistoryRepository,
-            new InMemoryFanPerformanceRepository(SampleFanPerformanceData.CreateSeedPerformances()),
-            new InMemoryFreddieTributeRepository(new SharedFreddieTributeStore(SampleFreddieTributeData.CreateSeedTributes())));
+            new InMemoryFanPerformanceRepository(SampleFanPerformanceData.CreateSeedPerformances()));
 
         await builder.ReindexTimelineAsync();
 
@@ -199,39 +194,6 @@ public sealed class SearchReindexBuilderTests
         var documents = store.GetAll().Where(d => d.ContentType == SiteSearchContentType.FanPerformance).ToList();
         Assert.Equal(SampleFanPerformanceData.CreateSeedPerformances().Count, documents.Count);
         Assert.Contains(documents, doc => doc.Title == "Reaching Out" && doc.AuthorDisplayName == "Mike Ryde");
-    }
-
-    [Fact]
-    public async Task ReindexFreddieTributeAsync_IndexesOnlyVisibleTributes()
-    {
-        var store = new SharedSearchIndexStore();
-        var indexService = new InMemorySearchIndexService(store);
-        var freddieTributeStore = new SharedFreddieTributeStore(SampleFreddieTributeData.CreateSeedTributes());
-        var firstTributeId = SampleFreddieTributeData.CreateSeedTributes()[0].Id;
-        freddieTributeStore.SetVisibility(firstTributeId, isVisible: false);
-        var freddieTributeRepository = new InMemoryFreddieTributeRepository(freddieTributeStore);
-
-        var builder = new SearchReindexBuilder(
-            indexService,
-            new InMemoryNewsRepository(new SharedNewsStore(SampleNewsData.CreateSeedArticles())),
-            new InMemoryForumRepository(
-                SampleForumData.CreateSeedCategories(),
-                SampleForumData.CreateSeedStats(),
-                new InMemoryForumWriteRepository(),
-                new InMemoryForumAttachmentRepository()),
-            new InMemoryArticleRepository(new InMemoryArticleSubmissionRepository()),
-            new InMemoryArticlesRepository(SampleArticlesData.CreateSeedArticles()),
-            new InMemoryBiographyRepository(SampleBiographyData.CreateSeedChapters()),
-            new InMemoryDiscographyRepository(SampleDiscographyData.CreateSeedAlbums()),
-            new InMemoryQueenHistoryRepository(SampleQueenHistoryData.CreateSeedEvents()),
-            new InMemoryFanPerformanceRepository(SampleFanPerformanceData.CreateSeedPerformances()),
-            freddieTributeRepository);
-
-        await builder.ReindexFreddieTributeAsync();
-
-        var documents = store.GetAll().Where(d => d.ContentType == SiteSearchContentType.Tribute).ToList();
-        Assert.DoesNotContain(documents, doc => doc.SourceKey == $"tribute:{firstTributeId}");
-        Assert.NotEmpty(documents);
     }
 
     [Fact]
