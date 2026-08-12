@@ -9,6 +9,7 @@ This repository is the modern QueenZone rebuild. The project is archive-first: i
 - `docs/decisions/` contains accepted architectural decisions.
 - `docs/decisions/0006-hybrid-ef-core-admin-writes.md` is the Dapper vs EF access matrix and contributor rules for SQL in `QueenZone.Data`.
 - `docs/architecture/blob-storage-ugc.md` is the UGC blob upload foundation (`QueenZone.Storage` / `IBlobUploadService`).
+- `docs/architecture/opentofu-inventory.md` is the live Azure/Cloudflare ownership inventory for OpenTofu adoption (`infra/import/` holds sanitised IDs).
 - `docs/decisions/0007-rich-text-editor-quill.md` is the shared Quill rich-text editor decision (partial + `/api/uploads/editor-image`).
 - `docs/backlog/migration-backlog.md` tracks migration work.
 - `docs/sql/data-api-builder-mcp.md` explains the local SQL MCP setup for read-only legacy database investigation.
@@ -309,11 +310,11 @@ Two Cloudflare hostnames serve Azure Blob Storage content. They are **not interc
 | Hostname | Type | Can set response headers? | Use for |
 | --- | --- | --- | --- |
 | `cdn.queenzone.org` | Straight CDN proxy | No | Photos and images (`PhotoImageUrl`) |
-| `cdn2.queenzone.org` | Cloudflare Worker proxy | Yes | Fan performance audio (`SongFileUrl`); legacy forum attachment redirect target |
+| `cdn2.queenzone.org` | Cloudflare Worker proxy (`pictures-queenzone-org` → `cdn2.queenzone.org/*`) | Yes (cache/CORS/nosniff today; `Content-Disposition` not set yet) | Fan performance audio (`SongFileUrl`); legacy forum attachment redirect target |
 
-`cdn2.queenzone.org` goes through a Worker, which allows `Content-Disposition` headers to be set on responses. This is required for fan performance audio so that the browser's native download button shows a consistent filename instead of "audio" (the last segment of the auth-gated endpoint path). Legacy forum attachments use the same Worker host after a member-auth gate (`/forum/attachment/legacy/{postId}`).
+`cdn2.queenzone.org` goes through Worker `pictures-queenzone-org` (route `cdn2.queenzone.org/*`), which can set response headers. Today it sets cache/CORS/nosniff; it does **not** yet set `Content-Disposition` (so browser download filenames for direct `cdn2` audio links may still be weak until the Worker is extended). Legacy forum attachments use the same Worker host after a member-auth gate (`/forum/attachment/legacy/{postId}`).
 
-Do not switch `SongFileUrl` back to `cdn.queenzone.org`. Doing so silently breaks the download filename without causing any test failure. New forum uploads live in private `ugc-forum` and download via `/forum/attachment/{postId}/{attachmentId}` (member-only, app-streamed).
+Do not switch `SongFileUrl` back to `cdn.queenzone.org`. New forum uploads live in private `ugc-forum` and download via `/forum/attachment/{postId}/{attachmentId}` (member-only, app-streamed).
 
 ## Migration Principles
 

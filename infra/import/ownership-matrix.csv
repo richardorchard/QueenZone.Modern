@@ -1,0 +1,29 @@
+area,name,id_or_ref,treatment,never_recreate,notes
+azure-rg,Queenzone-RG,/subscriptions/610e3b3a-028d-4f1b-ac1d-a5567a4f8b9d/resourceGroups/Queenzone-RG,import,no,QueenZone boundary only
+azure-web,ASP-Queenzone,.../serverFarms/ASP-Queenzone,import,yes,B1 capacity 1
+azure-web,queenzone-dev,.../sites/queenzone-dev,import,yes,Linux DOTNETCORE 10 Always On
+azure-web,hostname www/apex,.../hostNameBindings/*,import,yes,SNI bindings
+azure-web,certs www/apex,.../certificates/*,import,yes,GeoTrust expire 2026-12-29
+azure-web,site access restrictions,site config Cloudflare allow+deny,import,yes,SCM allow-all separate
+azure-web,app setting values,App Service / Bitwarden,defer→#618,n/a,names inventoried only
+azure-sql,queenzone-sql-server,.../servers/queenzone-sql-server,import,yes,public + AAD admin
+azure-sql,queenzone-db,.../databases/queenzone-db,import,yes,Basic 5 DTU production data
+azure-sql,firewall AllowAllWindowsAzureIps,.../firewallRules/AllowAllWindowsAzureIps,import,no,0.0.0.0 Azure services
+azure-sql,firewall ClientIPAddress_2026-6-11,.../firewallRules/ClientIPAddress_*,defer,no,personal /32
+azure-sql,EF schema/data,inside database,outside,yes,GitHub migrate path
+azure-storage,queenzone,.../storageAccounts/queenzone,import,yes,Standard_LRS customDomain cdn
+azure-storage,containers,see storage-containers.json,import,yes,songfiles live public vs docs
+azure-monitor,queenzone-dev-law,.../workspaces/queenzone-dev-law,import,no,0.1GB/day 30d
+azure-monitor,queenzone-dev-ai,.../components/queenzone-dev-ai,import,no,90d retention
+azure-monitor,alerts/webtest/action group,Queenzone-RG insights resources,import,no,webtest URL likely wrong under IP lock
+azure-absent,Redis/Front Door/CDN/slots,n/a,outside,n/a,confirmed absent
+cloudflare,cdn.queenzone.org,behavioural only,import,yes,straight proxy + Azure custom domain
+cloudflare,cdn2.queenzone.org,behavioural only,import,yes,Worker headers; name/route pending API
+cloudflare,www/apex,behavioural only,import,yes,proxied to App Service
+cloudflare,zone/worker exact IDs,pending API,defer,yes,needs CLOUDFLARE_API_TOKEN
+github,workflows ci/deploy,repo .github/workflows,outside,n/a,app delivery stays GH Actions
+github,env dev,GitHub Environments,defer,n/a,no protection rules today
+github,secret values,GH secrets / Bitwarden,outside,n/a,names only
+bitwarden,Queenzone Development project,BWS project,outside,n/a,secret value store
+entra,admin/member app registrations,Entra,outside,n/a,settings strategy in #618
+registrar,queenzone.org domain,registrar,outside,n/a,not OpenTofu

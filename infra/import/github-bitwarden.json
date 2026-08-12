@@ -1,0 +1,113 @@
+{
+  "auditDate": "2026-08-12",
+  "issue": 624,
+  "github": {
+    "environment": {
+      "name": "dev",
+      "protectionRules": [],
+      "opentofuTreatment": "outside",
+      "notes": "Used by deploy.yml; app deploy stays in GitHub Actions"
+    },
+    "repositorySecretNames": [
+      "AZURE_WEBAPP_PUBLISH_PROFILE",
+      "BITWARDEN_SECRETS_MANAGER_ACCESS_TOKEN",
+      "CONNECTIONSTRINGS__QUEENZONELEGACY",
+      "QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING"
+    ],
+    "repositoryVariables": [
+      "BITWARDEN_APP_SERVICE_DEPLOY_SECRETS"
+    ],
+    "workflows": [
+      "agent-pr-label.yml",
+      "ci.yml",
+      "deploy.yml",
+      "livesite-readonly-sweep.yml",
+      "nightly-legacy-checks.yml",
+      "pr-issue-link-check.yml",
+      "prune-stale-pr-artifacts.yml",
+      "test-migrations-against-mirror.yml"
+    ],
+    "opentofuTreatment": "outside",
+    "notes": "Secret values not recorded. Bitwarden is intended SoT for deploy secrets; legacy raw GH secrets may still exist for cleanup under #618"
+  },
+  "bitwarden": {
+    "projectName": "Queenzone Development",
+    "projectId": "1c16fd2d-4bfb-4eb7-8357-b49400233490",
+    "secretKeysPresent": [
+      "Admin__AllowedEmails__0",
+      "Admin__AllowedEmails__1",
+      "Analytics__GoogleAnalyticsPropertyId",
+      "Analytics__GoogleAnalyticsServiceAccountJson",
+      "Analytics__TrafficCacheMinutes",
+      "APPLICATIONINSIGHTS_CONNECTION_STRING",
+      "Authentication__Discord__ClientId",
+      "Authentication__Discord__ClientSecret",
+      "Authentication__Facebook__ClientId",
+      "Authentication__Facebook__ClientSecret",
+      "Authentication__GitHub__ClientId",
+      "Authentication__GitHub__ClientSecret",
+      "Authentication__Google__ClientId",
+      "Authentication__Google__ClientSecret",
+      "Authentication__GoogleAnalytics__ClientSecret",
+      "Authentication__GoogleAnalytics__GoogleAnalyticsPropertyId",
+      "Authentication__Microsoft__ClientId",
+      "Authentication__Microsoft__ClientSecret",
+      "AZURE_WEBAPP_PUBLISH_PROFILE",
+      "AzureAd__CallbackPath",
+      "AzureAd__ClientId",
+      "AzureAd__ClientSecret",
+      "AzureAd__Instance",
+      "AzureAd__TenantId",
+      "BlobUpload__PublicBaseUrl",
+      "ConnectionStrings__BlobStorage",
+      "ConnectionStrings__QueenZoneLegacy",
+      "ConnectionStrings__QueenZoneLegacyLive",
+      "ConnectionStrings__QueenZoneLegacyLocal",
+      "OpenRouter__ApiKey",
+      "OPENROUTER_API_KEY",
+      "QUEENZONE_SQL_EXPRESS_PROBE_PASSWORD",
+      "QUEENZONE_SQL_EXPRESS_PROBE_USERNAME",
+      "CLOUDFLARE_API_TOKEN_READONLY"
+    ],
+    "cloudflareApiTokenKey": "CLOUDFLARE_API_TOKEN_READONLY",
+    "opentofuTreatment": "outside",
+    "notes": "Values never recorded in repo or OpenTofu state. CLOUDFLARE_API_TOKEN_READONLY is inventory/ops read-only."
+  },
+  "appServiceSettingNames": [
+    "APPLICATIONINSIGHTS_CONNECTION_STRING",
+    "Authentication__Discord__ClientId",
+    "Authentication__Discord__ClientSecret",
+    "Authentication__Facebook__ClientId",
+    "Authentication__Facebook__ClientSecret",
+    "Authentication__GitHub__ClientId",
+    "Authentication__GitHub__ClientSecret",
+    "Authentication__Google__ClientId",
+    "Authentication__Google__ClientSecret",
+    "Authentication__Microsoft__ClientId",
+    "Authentication__Microsoft__ClientSecret",
+    "BlobUpload__PublicBaseUrl",
+    "ConnectionStrings__BlobStorage",
+    "ConnectionStrings__QueenZoneLegacy",
+    "DIAGNOSTICS_AZUREBLOBRETENTIONINDAYS",
+    "OPENROUTER_API_KEY",
+    "WEBSITE_HEALTHCHECK_MAXPINGFAILURES",
+    "WEBSITE_HTTPLOGGING_RETENTION_DAYS",
+    "Analytics__GoogleAnalyticsServiceAccountJson",
+    "Analytics__TrafficCacheMinutes",
+    "Analytics__GoogleAnalyticsPropertyId",
+    "AzureAd__Instance",
+    "AzureAd__TenantId",
+    "AzureAd__ClientId",
+    "AzureAd__ClientSecret",
+    "AzureAd__CallbackPath",
+    "Admin__AllowedEmails__0",
+    "Admin__AllowedEmails__1",
+    "SCM_DO_BUILD_DURING_DEPLOYMENT",
+    "ENABLE_ORYX_BUILD"
+  ],
+  "accessRestrictions": {
+    "mainSite": ["Cloudflare-IPv4-1", "Cloudflare-IPv4-2", "Cloudflare-IPv6", "Deny all"],
+    "scm": ["Allow all"],
+    "scmUseMain": false
+  }
+}
