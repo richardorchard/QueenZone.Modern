@@ -51,6 +51,12 @@ GitHub Actions applies the matching `agent:*` label from the branch prefix via `
 
 Use the prefix for the agent you are, not a default from an earlier session or another tool. Different agents working on the same area should use different branch names, such as `grok/news-pagination` and `claude/news-pagination`, rather than reusing one shared branch.
 
+### Open a pull request when a task is finished
+
+When an agent finishes a task that changed tracked files, commit the work, push the branch, and open a pull request against `main` — don't leave finished work sitting uncommitted or unpublished for the user to package up. This applies once the change is actually complete and verified (default verification passed, or a clear note on what was skipped and why); it does not mean opening a PR mid-task or for exploratory/throwaway work the user didn't ask to keep.
+
+Exceptions: skip auto-opening a PR when the user says they'll commit or push themselves, when work is explicitly a draft/spike not meant for review, or when repo/session instructions say not to. If a git identity, push access, or `gh` auth isn't available, say so instead of silently skipping.
+
 ### Update from `main` before opening a pull request
 
 The default branch is **`main`** (not `master`). `main` is protected: required CI checks and merge gates evaluate the PR against the current tip of `main`. If a feature branch was cut hours or days earlier, `main` may have moved — an outdated PR base can block or confuse checks (coverage vs `origin/main`, migration jobs, mergeability) until the branch is updated.
