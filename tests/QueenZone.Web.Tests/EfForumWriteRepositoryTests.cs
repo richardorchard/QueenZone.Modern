@@ -153,6 +153,40 @@ public sealed class EfForumWriteRepositoryTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task HidePostsByMemberAsync_HidesAllPostsAndExcludesThemFromCounts_ThenUnhideRestoresThem()
+    {
+        var spammer = await SeedMemberAsync("spammer@example.com", "Spammer");
+        var innocent = await SeedMemberAsync("innocent@example.com", "Innocent");
+        await SeedCategoryAsync();
+
+        var thread = await repository.CreateThreadAsync(new NewForumThread(
+            1, spammer.Id, spammer.DisplayName, "Spam thread", "<p>Spam 1</p>", DateTimeOffset.UtcNow));
+        await repository.CreatePostAsync(new NewForumPost(
+            thread.TopicId, spammer.Id, spammer.DisplayName, "<p>Spam 2</p>", DateTimeOffset.UtcNow));
+        await repository.CreatePostAsync(new NewForumPost(
+            thread.TopicId, innocent.Id, innocent.DisplayName, "<p>Not spam</p>", DateTimeOffset.UtcNow));
+
+        Assert.Equal(2, await repository.CountApprovedPostsByMemberAsync(spammer.Id));
+
+        await repository.HidePostsByMemberAsync(spammer.Id);
+
+        // ExecuteUpdateAsync bypasses the change tracker, so re-query untracked to see the write.
+        Assert.All(
+            await dbContext.ModernForumPosts.AsNoTracking().Where(p => p.AuthorMemberId == spammer.Id).ToListAsync(),
+            post => Assert.True(post.IsHidden));
+        Assert.False((await dbContext.ModernForumPosts.AsNoTracking().SingleAsync(p => p.AuthorMemberId == innocent.Id)).IsHidden);
+        Assert.Equal(0, await repository.CountApprovedPostsByMemberAsync(spammer.Id));
+        Assert.Equal(1, await repository.CountApprovedPostsByMemberAsync(innocent.Id));
+
+        await repository.UnhidePostsByMemberAsync(spammer.Id);
+
+        Assert.All(
+            await dbContext.ModernForumPosts.AsNoTracking().Where(p => p.AuthorMemberId == spammer.Id).ToListAsync(),
+            post => Assert.False(post.IsHidden));
+        Assert.Equal(2, await repository.CountApprovedPostsByMemberAsync(spammer.Id));
+    }
+
+    [Fact]
     public async Task CreateThreadAsync_TruncatesBodyToLegacyColumnLimit()
     {
         var member = await SeedMemberAsync();
@@ -286,14 +320,14 @@ public sealed class EfForumWriteRepositoryTests : IAsyncDisposable
         await connection.DisposeAsync();
     }
 
-    private async Task<MemberAccount> SeedMemberAsync()
+    private async Task<MemberAccount> SeedMemberAsync(string email = "fan@example.com", string displayName = "Forum Fan")
     {
         var member = new MemberAccount
         {
             Id = Guid.NewGuid(),
-            Email = "fan@example.com",
-            NormalizedEmail = "FAN@EXAMPLE.COM",
-            DisplayName = "Forum Fan",
+            Email = email,
+            NormalizedEmail = email.ToUpperInvariant(),
+            DisplayName = displayName,
             CreatedAt = DateTime.UtcNow,
         };
         dbContext.MemberAccounts.Add(member);
@@ -378,6 +412,7 @@ public sealed class EfForumWriteRepositoryTests : IAsyncDisposable
                 AuthorMemberId TEXT NULL,
                 EditedAt TEXT NULL,
                 EditCount INTEGER NOT NULL DEFAULT 0,
+                IsHidden INTEGER NOT NULL DEFAULT 0,
                 ImportedAt TEXT NOT NULL,
                 UpdatedAt TEXT NOT NULL,
                 FOREIGN KEY (ThreadId) REFERENCES ModernForumThread (Id)

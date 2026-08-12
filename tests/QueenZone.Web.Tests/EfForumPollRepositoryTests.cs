@@ -302,6 +302,7 @@ public sealed class EfForumPollRepositoryTests : IAsyncDisposable
                 AuthorMemberId TEXT NULL,
                 EditedAt TEXT NULL,
                 EditCount INTEGER NOT NULL DEFAULT 0,
+                IsHidden INTEGER NOT NULL DEFAULT 0,
                 ImportedAt TEXT NOT NULL,
                 UpdatedAt TEXT NOT NULL,
                 FOREIGN KEY (ThreadId) REFERENCES ModernForumThread (Id)

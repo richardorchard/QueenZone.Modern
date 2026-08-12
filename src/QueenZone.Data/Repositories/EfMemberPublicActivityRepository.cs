@@ -18,7 +18,7 @@ public sealed class EfMemberPublicActivityRepository(QueenZoneDbContext dbContex
 
         var forumRows = await dbContext.ModernForumPosts
             .AsNoTracking()
-            .Where(post => post.AuthorMemberId == memberId && post.Thread != null)
+            .Where(post => post.AuthorMemberId == memberId && post.Thread != null && !post.IsHidden)
             .OrderByDescending(post => post.PostedAt)
             .Take(take)
             .Select(post => new
@@ -85,7 +85,7 @@ public sealed class EfMemberPublicActivityRepository(QueenZoneDbContext dbContex
                 .ToListAsync(cancellationToken);
 
         var totalCount = await dbContext.ModernForumPosts.CountAsync(
-                post => post.AuthorMemberId == memberId && post.Thread != null,
+                post => post.AuthorMemberId == memberId && post.Thread != null && !post.IsHidden,
                 cancellationToken)
             + await dbContext.ArticleSubmissions.CountAsync(
                 article => article.AuthorMemberId == memberId

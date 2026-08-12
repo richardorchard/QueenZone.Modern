@@ -274,7 +274,9 @@ public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForu
         var sinceUtc = ToUtcDateTime(since);
         return await dbContext.ModernForumPosts
             .AsNoTracking()
-            .CountAsync(post => post.AuthorDisplayName == displayName && post.PostedAt >= sinceUtc, cancellationToken);
+            .CountAsync(
+                post => post.AuthorDisplayName == displayName && post.PostedAt >= sinceUtc && !post.IsHidden,
+                cancellationToken);
     }
 
     public async Task<int> CountApprovedPostsByMemberAsync(Guid memberId, CancellationToken cancellationToken = default)
@@ -287,8 +289,18 @@ public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForu
 
         return await dbContext.ModernForumPosts
             .AsNoTracking()
-            .CountAsync(post => post.AuthorDisplayName == displayName, cancellationToken);
+            .CountAsync(post => post.AuthorDisplayName == displayName && !post.IsHidden, cancellationToken);
     }
+
+    public async Task HidePostsByMemberAsync(Guid memberId, CancellationToken cancellationToken = default) =>
+        await dbContext.ModernForumPosts
+            .Where(post => post.AuthorMemberId == memberId && !post.IsHidden)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(post => post.IsHidden, true), cancellationToken);
+
+    public async Task UnhidePostsByMemberAsync(Guid memberId, CancellationToken cancellationToken = default) =>
+        await dbContext.ModernForumPosts
+            .Where(post => post.AuthorMemberId == memberId && post.IsHidden)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(post => post.IsHidden, false), cancellationToken);
 
     private async Task<int> AllocateNextTopicIdAsync(CancellationToken cancellationToken) =>
         await AllocateNextLegacyIdAsync(

@@ -337,11 +337,14 @@ BEGIN
     FROM dbo.ModernForumThreadReadStats
     WHERE ThreadId = @ThreadId;
 
+    -- Cached PostCount includes hidden posts (refreshed by a periodic full sweep, not
+    -- incrementally on hide/unhide); fall back to an exact filtered count when absent.
     IF @TotalRecords IS NULL
     BEGIN
         SELECT @TotalRecords = COUNT_BIG(*)
         FROM dbo.ModernForumPost p WITH (INDEX(IX_ModernForumPost_Thread_Posted))
-        WHERE p.ThreadId = @ThreadId;
+        WHERE p.ThreadId = @ThreadId
+          AND p.IsHidden = 0;
     END;
 
     SELECT
@@ -365,6 +368,7 @@ BEGIN
         p.EditCount
     FROM dbo.ModernForumPost p WITH (INDEX(IX_ModernForumPost_Thread_Posted))
     WHERE p.ThreadId = @ThreadId
+      AND p.IsHidden = 0
     ORDER BY p.LegacyPostId ASC
     OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;
 END;

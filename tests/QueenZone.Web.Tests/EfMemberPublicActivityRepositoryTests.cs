@@ -64,6 +64,7 @@ public sealed class EfMemberPublicActivityRepositoryTests : IAsyncDisposable
                 Attachment TEXT NULL,
                 FileSize TEXT NULL,
                 AttachCount INTEGER NOT NULL,
+                IsHidden INTEGER NOT NULL DEFAULT 0,
                 ImportedAt TEXT NOT NULL,
                 UpdatedAt TEXT NOT NULL,
                 FOREIGN KEY (ThreadId) REFERENCES ModernForumThread(Id)
@@ -102,6 +103,19 @@ public sealed class EfMemberPublicActivityRepositoryTests : IAsyncDisposable
             BodyHtml = "Public forum post",
             PostedAt = now.UtcDateTime,
         });
+        dbContext.ModernForumPosts.Add(new ModernForumPostEntity
+        {
+            Id = 2,
+            LegacyPostId = 202,
+            LegacyThreadTopicId = 101,
+            ThreadId = 1,
+            LegacyForumId = 1,
+            AuthorMemberId = memberId,
+            AuthorDisplayName = "Public Activity",
+            BodyHtml = "Hidden spam post",
+            PostedAt = now.UtcDateTime,
+            IsHidden = true,
+        });
         dbContext.ArticleSubmissions.AddRange(
             Article("Published article", ArticleSubmissionStatus.Published, now.AddHours(-1)),
             Article("Private draft", ArticleSubmissionStatus.Draft, null));
@@ -122,6 +136,7 @@ public sealed class EfMemberPublicActivityRepositoryTests : IAsyncDisposable
             result.Items.Select(item => item.Type).ToArray());
         Assert.DoesNotContain(result.Items, item => item.Title.Contains("Private", StringComparison.Ordinal));
         Assert.DoesNotContain(result.Items, item => item.Title.Contains("Pending", StringComparison.Ordinal));
+        Assert.DoesNotContain(result.Items, item => item.Summary != null && item.Summary.Contains("Hidden spam", StringComparison.Ordinal));
     }
 
     private ArticleSubmissionEntity Article(string title, string status, DateTimeOffset? publishedAt) => new()
