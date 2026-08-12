@@ -7,20 +7,20 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="AspNet.Security.OAuth.Discord" Version="10.0.0" />
-    <PackageReference Include="AspNet.Security.OAuth.GitHub" Version="10.0.0" />
-    <PackageReference Include="Azure.Monitor.OpenTelemetry.AspNetCore" Version="1.5.0" />
-    <PackageReference Include="Google.Analytics.Data.V1Beta" Version="2.0.0-beta10" />
-    <PackageReference Include="HtmlSanitizer" Version="9.1.968-beta" />
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.Facebook" Version="10.0.10" />
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.Google" Version="10.0.10" />
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.MicrosoftAccount" Version="10.0.10" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.10">
+    <PackageReference Include="AspNet.Security.OAuth.Discord" />
+    <PackageReference Include="AspNet.Security.OAuth.GitHub" />
+    <PackageReference Include="Azure.Monitor.OpenTelemetry.AspNetCore" />
+    <PackageReference Include="Google.Analytics.Data.V1Beta" />
+    <PackageReference Include="HtmlSanitizer" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.Facebook" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.Google" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.MicrosoftAccount" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.Identity.Web" Version="3.8.4" />
-    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
+    <PackageReference Include="Microsoft.Identity.Web" />
+    <PackageReference Include="SixLabors.ImageSharp" />
   </ItemGroup>
 
   <PropertyGroup>
