@@ -5,7 +5,7 @@
 @section Head {
   @if (!string.IsNullOrWhiteSpace(Model.StructuredDataJson))
   {
-    <script type="application/ld+json">@Html.Raw(Model.StructuredDataJson)</script>
+    <script type="application/ld+json" nonce="@HttpContext.GetCspNonce()">@Html.Raw(Model.StructuredDataJson)</script>
   }
 }
 

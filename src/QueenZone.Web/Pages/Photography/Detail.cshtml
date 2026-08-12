@@ -60,7 +60,7 @@
   </figcaption>
 </section>
 
-<script data-back-href="@Model.BackToGridHref" data-prev-href="@Model.PreviousHref" data-next-href="@Model.NextHref">
+<script nonce="@HttpContext.GetCspNonce()" data-back-href="@Model.BackToGridHref" data-prev-href="@Model.PreviousHref" data-next-href="@Model.NextHref">
   (function () {
     var script = document.currentScript;
     document.addEventListener('keydown', function (event) {

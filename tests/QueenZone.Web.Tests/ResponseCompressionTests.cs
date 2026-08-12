@@ -97,9 +97,8 @@ public sealed class ResponseCompressionTests : IClassFixture<WebApplicationFacto
         Assert.Equal("DENY", response.Headers.GetValues("X-Frame-Options").First());
         Assert.Equal("strict-origin-when-cross-origin", response.Headers.GetValues("Referrer-Policy").First());
         Assert.Equal(SecurityHeaders.PermissionsPolicy, response.Headers.GetValues("Permissions-Policy").First());
-        Assert.Equal(
-            SecurityHeaders.ContentSecurityPolicyReportOnly,
-            response.Headers.GetValues("Content-Security-Policy-Report-Only").First());
+        Assert.True(response.Headers.Contains("Content-Security-Policy"));
+        Assert.False(response.Headers.Contains("Content-Security-Policy-Report-Only"));
     }
 
     [Fact]
