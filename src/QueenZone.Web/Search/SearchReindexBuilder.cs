@@ -13,10 +13,11 @@ namespace QueenZone.Web.Search;
 /// </summary>
 /// <remarks>
 /// Covers News, Forum threads, Community Articles, legacy Articles, Biography, Discography,
-/// Timeline, Fan Performances, and Freddie Tribute. Photography is not yet wired in — it needs
-/// the same three-step treatment (paginate the existing public repository, map to
+/// Timeline, and Fan Performances. Photography is not yet wired in — it needs the same
+/// three-step treatment (paginate the existing public repository, map to
 /// <see cref="SearchDocumentEntity"/>, call <see cref="ISearchIndexService.ReplaceContentTypeAsync"/>)
 /// and can be added as an additional <c>Reindex*Async</c> method following the pattern below.
+/// Freddie Tribute content is deliberately not indexed.
 /// </remarks>
 public sealed class SearchReindexBuilder(
     ISearchIndexService searchIndexService,
@@ -27,8 +28,7 @@ public sealed class SearchReindexBuilder(
     IBiographyRepository biographyRepository,
     IDiscographyRepository discographyRepository,
     IQueenHistoryRepository queenHistoryRepository,
-    IFanPerformanceRepository fanPerformanceRepository,
-    IFreddieTributeRepository freddieTributeRepository)
+    IFanPerformanceRepository fanPerformanceRepository)
 {
     private const int BatchSize = 200;
 
@@ -48,7 +48,6 @@ public sealed class SearchReindexBuilder(
         await RunContentTypeAsync(SiteSearchContentType.Discography, () => ReindexDiscographyAsync(cancellationToken), onContentTypeStarted);
         await RunContentTypeAsync(SiteSearchContentType.Timeline, () => ReindexTimelineAsync(cancellationToken), onContentTypeStarted);
         await RunContentTypeAsync(SiteSearchContentType.FanPerformance, () => ReindexFanPerformancesAsync(cancellationToken), onContentTypeStarted);
-        await RunContentTypeAsync(SiteSearchContentType.Tribute, () => ReindexFreddieTributeAsync(cancellationToken), onContentTypeStarted);
     }
 
     private static async Task RunContentTypeAsync(
@@ -154,24 +153,6 @@ public sealed class SearchReindexBuilder(
         await searchIndexService.ReplaceContentTypeAsync(SiteSearchContentType.FanPerformance, documents, cancellationToken);
     }
 
-    public async Task ReindexFreddieTributeAsync(CancellationToken cancellationToken = default)
-    {
-        var documents = new List<SearchDocumentEntity>();
-        var page = 1;
-        int totalCount;
-
-        do
-        {
-            var result = await freddieTributeRepository.GetPageAsync(page, BatchSize, cancellationToken);
-            totalCount = result.TotalCount;
-            documents.AddRange(result.Items.Select(MapFreddieTribute));
-            page++;
-        }
-        while ((page - 1) * BatchSize < totalCount);
-
-        await searchIndexService.ReplaceContentTypeAsync(SiteSearchContentType.Tribute, documents, cancellationToken);
-    }
-
     private static SearchDocumentEntity MapLegacyArticle(ArticleItem item)
     {
         var plainBody = SearchDocumentText.ToPlainText(item.Body);
@@ -243,18 +224,6 @@ public sealed class SearchReindexBuilder(
             Url = FanPerformanceRoutes.GetIndexPath(),
             PublishedAt = performance.DateAdded,
             AuthorDisplayName = performance.PerformedBy,
-        };
-
-    private static SearchDocumentEntity MapFreddieTribute(FreddieTribute tribute) =>
-        new()
-        {
-            SourceKey = $"tribute:{tribute.Id}",
-            ContentType = SiteSearchContentType.Tribute,
-            Title = tribute.Name,
-            Body = tribute.Thought,
-            Summary = SearchDocumentText.Summarize(tribute.Thought),
-            Url = $"/freddie-mercury-tribute#tribute-{tribute.Id}",
-            AuthorDisplayName = tribute.Name,
         };
 
     /// <summary>
