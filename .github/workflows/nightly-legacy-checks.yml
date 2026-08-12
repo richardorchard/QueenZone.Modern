@@ -96,7 +96,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Restore local dotnet tools (sqlpackage)
         run: dotnet tool restore
@@ -133,7 +133,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Verify .NET SDK
         run: dotnet --version
@@ -176,7 +176,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Restore
         run: dotnet restore tests/QueenZone.Web.Tests/QueenZone.Web.Tests.csproj
@@ -248,7 +248,7 @@ jobs:
         run: pkill -f QueenZone.Web || true
 
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Verify .NET SDK
         run: dotnet --version
@@ -317,7 +317,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Restore
         run: dotnet restore tests/QueenZone.Web.Tests/QueenZone.Web.Tests.csproj
