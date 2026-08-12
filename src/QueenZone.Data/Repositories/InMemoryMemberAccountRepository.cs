@@ -242,5 +242,72 @@ public sealed class InMemoryMemberAccountRepository : IMemberAccountRepository
         }
     }
 
+    public Task<MemberSearchResult> SearchMembersAsync(
+        string? query,
+        int pageNumber,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        pageNumber = Math.Max(1, pageNumber);
+        pageSize = Math.Clamp(pageSize, 1, 200);
+        var term = query?.Trim();
+
+        lock (gate)
+        {
+            IEnumerable<MemberAccount> matches = accounts;
+            if (!string.IsNullOrWhiteSpace(term))
+            {
+                matches = matches.Where(account =>
+                    account.DisplayName.Contains(term, StringComparison.OrdinalIgnoreCase)
+                    || account.Email.Contains(term, StringComparison.OrdinalIgnoreCase));
+            }
+
+            var ordered = matches.OrderByDescending(account => account.CreatedAt).ToList();
+            var page = ordered.Skip((pageNumber - 1) * pageSize).Take(pageSize).ToList();
+            return Task.FromResult(new MemberSearchResult(page, ordered.Count));
+        }
+    }
+
+    public Task<MemberAccount?> SuspendAsync(
+        Guid memberId,
+        string reason,
+        string suspendedByAdminEmail,
+        DateTime suspendedAt,
+        CancellationToken cancellationToken = default)
+    {
+        lock (gate)
+        {
+            var account = accounts.FirstOrDefault(a => a.Id == memberId);
+            if (account is null)
+            {
+                return Task.FromResult<MemberAccount?>(null);
+            }
+
+            account.IsSuspended = true;
+            account.SuspendedAt = suspendedAt;
+            account.SuspendedReason = reason;
+            account.SuspendedByAdminEmail = suspendedByAdminEmail;
+            return Task.FromResult<MemberAccount?>(account);
+        }
+    }
+
+    public Task<MemberAccount?> ReinstateAsync(Guid memberId, CancellationToken cancellationToken = default)
+    {
+        lock (gate)
+        {
+            var account = accounts.FirstOrDefault(a => a.Id == memberId);
+            if (account is null)
+            {
+                return Task.FromResult<MemberAccount?>(null);
+            }
+
+            account.IsSuspended = false;
+            account.SuspendedAt = null;
+            account.SuspendedReason = null;
+            account.SuspendedByAdminEmail = null;
+            return Task.FromResult<MemberAccount?>(account);
+        }
+    }
+
     private static string Normalize(string email) => email.Trim().ToUpperInvariant();
 }

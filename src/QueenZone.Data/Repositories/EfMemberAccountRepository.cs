@@ -211,5 +211,71 @@ public sealed class EfMemberAccountRepository(QueenZoneDbContext dbContext) : IM
         return rows;
     }
 
+    public async Task<MemberSearchResult> SearchMembersAsync(
+        string? query,
+        int pageNumber,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        pageNumber = Math.Max(1, pageNumber);
+        pageSize = Math.Clamp(pageSize, 1, 200);
+        var term = query?.Trim();
+
+        var matches = dbContext.MemberAccounts.AsNoTracking().AsQueryable();
+        if (!string.IsNullOrWhiteSpace(term))
+        {
+            matches = matches.Where(account =>
+                account.DisplayName.Contains(term) || account.Email.Contains(term));
+        }
+
+        var totalCount = await matches.CountAsync(cancellationToken);
+        var members = await matches
+            .OrderByDescending(account => account.CreatedAt)
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+        return new MemberSearchResult(members, totalCount);
+    }
+
+    public async Task<MemberAccount?> SuspendAsync(
+        Guid memberId,
+        string reason,
+        string suspendedByAdminEmail,
+        DateTime suspendedAt,
+        CancellationToken cancellationToken = default)
+    {
+        var account = await dbContext.MemberAccounts
+            .SingleOrDefaultAsync(a => a.Id == memberId, cancellationToken);
+        if (account is null)
+        {
+            return null;
+        }
+
+        account.IsSuspended = true;
+        account.SuspendedAt = suspendedAt;
+        account.SuspendedReason = reason;
+        account.SuspendedByAdminEmail = suspendedByAdminEmail;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return account;
+    }
+
+    public async Task<MemberAccount?> ReinstateAsync(Guid memberId, CancellationToken cancellationToken = default)
+    {
+        var account = await dbContext.MemberAccounts
+            .SingleOrDefaultAsync(a => a.Id == memberId, cancellationToken);
+        if (account is null)
+        {
+            return null;
+        }
+
+        account.IsSuspended = false;
+        account.SuspendedAt = null;
+        account.SuspendedReason = null;
+        account.SuspendedByAdminEmail = null;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return account;
+    }
+
     private static string Normalize(string email) => email.Trim().ToUpperInvariant();
 }

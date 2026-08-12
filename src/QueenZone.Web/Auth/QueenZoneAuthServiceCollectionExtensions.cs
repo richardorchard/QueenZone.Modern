@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.Identity.Web;
+using QueenZone.Data;
 
 namespace QueenZone.Web;
 
@@ -35,6 +36,7 @@ public static class QueenZoneAuthServiceCollectionExtensions
                 {
                     options.LoginPath = "/account/login";
                     options.LogoutPath = "/account/logout";
+                    options.Events = MemberCookieEvents;
                 });
             return services;
         }
@@ -153,6 +155,7 @@ public static class QueenZoneAuthServiceCollectionExtensions
             // Lax (not Strict): the OAuth callback is a top-level GET redirected back from the
             // external provider's domain, and Strict would drop the cookie on that navigation.
             options.Cookie.SameSite = SameSiteMode.Lax;
+            options.Events = MemberCookieEvents;
         });
 
         authenticationBuilder.AddCookie(MemberAuthenticationSchemes.ExternalCookie, options =>
@@ -209,6 +212,31 @@ public static class QueenZoneAuthServiceCollectionExtensions
             });
         }
     }
+
+    /// <summary>
+    /// Re-checks suspension status on every request that carries the members cookie, so a
+    /// suspension takes effect immediately rather than waiting for the 30-day cookie to expire.
+    /// Shared between the test-auth and Entra branches so both sign out a newly suspended member.
+    /// </summary>
+    private static CookieAuthenticationEvents MemberCookieEvents { get; } = new()
+    {
+        OnValidatePrincipal = async context =>
+        {
+            var memberIdClaim = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (memberIdClaim is null || !Guid.TryParse(memberIdClaim, out var memberId))
+            {
+                return;
+            }
+
+            var repository = context.HttpContext.RequestServices.GetRequiredService<IMemberAccountRepository>();
+            var account = await repository.FindByIdAsync(memberId, context.HttpContext.RequestAborted);
+            if (account is null || account.IsSuspended)
+            {
+                context.RejectPrincipal();
+                await context.HttpContext.SignOutAsync(MemberAuthenticationSchemes.MembersCookie);
+            }
+        },
+    };
 
     private static bool IsAdminEmail(ClaimsPrincipal user, IConfiguration configuration)
     {

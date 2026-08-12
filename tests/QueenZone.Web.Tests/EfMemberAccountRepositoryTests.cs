@@ -118,6 +118,55 @@ public sealed class EfMemberAccountRepositoryTests : IAsyncDisposable
         Assert.Contains(matches, m => m.DisplayName == "Search Bobby");
     }
 
+    [Fact]
+    public async Task SearchMembersAsync_MatchesDisplayNameOrEmail_AndPaginates()
+    {
+        await SeedAccountAsync("spammer@example.com", "Spam Bot");
+        await SeedAccountAsync("regular@example.com", "Regular Fan");
+        await SeedAccountAsync("other-spammer@junk.com", "Other Member");
+
+        var byName = await repository.SearchMembersAsync("Spam", pageNumber: 1, pageSize: 50);
+        Assert.Equal(1, byName.TotalCount);
+        Assert.Equal("Spam Bot", byName.Members[0].DisplayName);
+
+        var byEmail = await repository.SearchMembersAsync("junk.com", pageNumber: 1, pageSize: 50);
+        Assert.Equal(1, byEmail.TotalCount);
+        Assert.Equal("Other Member", byEmail.Members[0].DisplayName);
+
+        var page1 = await repository.SearchMembersAsync(null, pageNumber: 1, pageSize: 2);
+        Assert.Equal(3, page1.TotalCount);
+        Assert.Equal(2, page1.Members.Count);
+
+        var page2 = await repository.SearchMembersAsync(null, pageNumber: 2, pageSize: 2);
+        Assert.Single(page2.Members);
+    }
+
+    [Fact]
+    public async Task SuspendAsync_ThenReinstateAsync_RoundTrips()
+    {
+        var account = await SeedAccountAsync("spammer2@example.com", "Spam Bot 2");
+        var suspendedAt = new DateTime(2026, 8, 12, 0, 0, 0, DateTimeKind.Utc);
+
+        var suspended = await repository.SuspendAsync(account.Id, "Posting spam links", "admin@queenzone.org", suspendedAt);
+        Assert.True(suspended!.IsSuspended);
+        Assert.Equal("Posting spam links", suspended.SuspendedReason);
+        Assert.Equal("admin@queenzone.org", suspended.SuspendedByAdminEmail);
+        Assert.Equal(suspendedAt, suspended.SuspendedAt);
+
+        var reinstated = await repository.ReinstateAsync(account.Id);
+        Assert.False(reinstated!.IsSuspended);
+        Assert.Null(reinstated.SuspendedReason);
+        Assert.Null(reinstated.SuspendedByAdminEmail);
+        Assert.Null(reinstated.SuspendedAt);
+    }
+
+    [Fact]
+    public async Task SuspendAsync_ReturnsNull_WhenAccountMissing()
+    {
+        var result = await repository.SuspendAsync(Guid.NewGuid(), "reason", "admin@queenzone.org", DateTime.UtcNow);
+        Assert.Null(result);
+    }
+
     private async Task<MemberAccount> SeedAccountAsync(string email, string displayName)
     {
         return await repository.CreateAsync(new MemberAccount

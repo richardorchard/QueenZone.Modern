@@ -23,4 +23,12 @@ public sealed class MemberAccount
     public DateTime? LastLoginAt { get; set; }
 
     public int? LinkedLegacyUserId { get; set; }
+
+    public bool IsSuspended { get; set; }
+
+    public DateTime? SuspendedAt { get; set; }
+
+    public string? SuspendedReason { get; set; }
+
+    public string? SuspendedByAdminEmail { get; set; }
 }

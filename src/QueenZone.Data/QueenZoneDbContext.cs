@@ -132,10 +132,17 @@ public sealed class QueenZoneDbContext : DbContext
             entity.Property(account => account.PasswordHash).HasMaxLength(512);
             entity.Property(account => account.CreatedAt).IsRequired();
             entity.Property(account => account.LastLoginAt);
+            entity.Property(account => account.IsSuspended).IsRequired().HasDefaultValue(false);
+            entity.Property(account => account.SuspendedAt);
+            entity.Property(account => account.SuspendedReason).HasMaxLength(1000);
+            entity.Property(account => account.SuspendedByAdminEmail).HasMaxLength(256);
 
             entity.HasIndex(account => account.NormalizedEmail)
                 .IsUnique()
                 .HasDatabaseName("IX_MemberAccounts_NormalizedEmail");
+
+            entity.HasIndex(account => account.IsSuspended)
+                .HasDatabaseName("IX_MemberAccounts_IsSuspended");
         });
 
         modelBuilder.Entity<MemberExternalLogin>(entity =>
