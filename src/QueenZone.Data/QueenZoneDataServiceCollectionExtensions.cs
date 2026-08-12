@@ -69,6 +69,8 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddScoped<IAdminFreddieTributeRepository, EfAdminFreddieTributeRepository>();
         services.AddScoped<ISearchIndexService, EfSearchIndexService>();
         services.AddScoped<ISiteSearchService, EfSiteSearchService>();
+        services.AddScoped<ISearchReindexRunLeaseService, EfSearchReindexRunLeaseService>();
+        services.AddScoped<ISearchReindexRunRequestRepository, EfSearchReindexRunRequestRepository>();
 
         return services;
     }
@@ -149,6 +151,10 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddSingleton<SharedSearchIndexStore>();
         services.AddSingleton<ISearchIndexService, InMemorySearchIndexService>();
         services.AddSingleton<ISiteSearchService, InMemorySiteSearchService>();
+        services.AddSingleton<SharedSearchReindexLeaseStore>();
+        services.AddSingleton<ISearchReindexRunLeaseService, InMemorySearchReindexRunLeaseService>();
+        services.AddSingleton<SharedSearchReindexRunRequestStore>();
+        services.AddSingleton<ISearchReindexRunRequestRepository, InMemorySearchReindexRunRequestRepository>();
 
         return services;
     }

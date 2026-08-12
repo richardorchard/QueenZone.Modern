@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.0.10" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.10" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.10" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.10" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      SearchReindexBuilder lives in QueenZone.Web (it needs NewsRoutes/ForumRoutes/etc. route
+      helpers that live there — see remarks on SearchReindexBuilder), unlike QueenZone.NewsAgent
+      which is a dependency-free class library. So unlike QueenZone.NewsAgent.Worker, this
+      project must reference the ASP.NET Core web app project directly as a build-time library
+      dependency. Moving SearchReindexBuilder/route helpers into a shared non-Web project would
+      remove this, but that's a larger refactor out of scope for #527.
+    -->
+    <ProjectReference Include="..\QueenZone.Data\QueenZone.Data.csproj" />
+    <ProjectReference Include="..\QueenZone.Web\QueenZone.Web.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="appsettings.Local.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>

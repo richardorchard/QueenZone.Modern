@@ -15,11 +15,10 @@ public static class SiteSearchContentType
     public const string Photo = "photo";
     public const string Timeline = "timeline";
     public const string FanPerformance = "fan-performance";
-    public const string Tribute = "tribute";
 
     public static readonly IReadOnlyList<string> All =
     [
-        News, Article, LegacyArticle, Forum, Biography, Discography, Photo, Timeline, FanPerformance, Tribute,
+        News, Article, LegacyArticle, Forum, Biography, Discography, Photo, Timeline, FanPerformance,
     ];
 
     public static string? Normalize(string? value)
@@ -52,7 +51,6 @@ public static class SiteSearchContentType
         Photo => "Photography",
         Timeline => "Timeline",
         FanPerformance => "Fan Performances",
-        Tribute => "Freddie Tribute",
         _ => contentType,
     };
 }
