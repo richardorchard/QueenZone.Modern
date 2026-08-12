@@ -259,6 +259,7 @@ public sealed class DashboardAggregateQueriesTests : IAsyncLifetime
                 entity.Property(a => a.Email).HasMaxLength(256).IsRequired();
                 entity.Property(a => a.NormalizedEmail).HasMaxLength(256).IsRequired();
                 entity.Property(a => a.DisplayName).HasMaxLength(100).IsRequired();
+                entity.Property(a => a.IsSuspended).IsRequired().HasDefaultValue(false);
             });
 
             modelBuilder.Entity<NewsSuggestionEntity>(entity =>
