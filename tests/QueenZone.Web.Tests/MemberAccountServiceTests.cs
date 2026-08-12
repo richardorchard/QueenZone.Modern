@@ -124,6 +124,20 @@ public sealed class MemberAccountServiceTests
     }
 
     [Fact]
+    public async Task SignInAsync_Fails_WhenAccountIsSuspended()
+    {
+        var repository = new InMemoryMemberAccountRepository();
+        var service = CreateService(memberAccountRepository: repository);
+        var registered = await service.RegisterAsync("fan@queenzone.org", "S3curePass!", "Fan");
+        await repository.SuspendAsync(registered.Account!.Id, "Spamming the board", "admin@queenzone.org", DateTime.UtcNow);
+
+        var result = await service.SignInAsync("fan@queenzone.org", "S3curePass!");
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(MemberAccountService.SuspendedSignInError, result.Error);
+    }
+
+    [Fact]
     public async Task FindOrCreateFromExternalLoginAsync_CreatesNewAccount_WithoutSilentLegacyLink()
     {
         var legacyLookup = new InMemoryLegacyMemberLookupRepository(new Dictionary<string, LegacyMemberMatch>
@@ -660,5 +674,23 @@ public sealed class MemberAccountServiceTests
             int maxResults = PrivateMessageLimits.MaxRecipientSearchResults,
             CancellationToken cancellationToken = default) =>
             inner.SearchByDisplayNameAsync(query, excludeMemberId, maxResults, cancellationToken);
+
+        public Task<MemberSearchResult> SearchMembersAsync(
+            string? query,
+            int pageNumber,
+            int pageSize,
+            CancellationToken cancellationToken = default) =>
+            inner.SearchMembersAsync(query, pageNumber, pageSize, cancellationToken);
+
+        public Task<MemberAccount?> SuspendAsync(
+            Guid memberId,
+            string reason,
+            string suspendedByAdminEmail,
+            DateTime suspendedAt,
+            CancellationToken cancellationToken = default) =>
+            inner.SuspendAsync(memberId, reason, suspendedByAdminEmail, suspendedAt, cancellationToken);
+
+        public Task<MemberAccount?> ReinstateAsync(Guid memberId, CancellationToken cancellationToken = default) =>
+            inner.ReinstateAsync(memberId, cancellationToken);
     }
 }

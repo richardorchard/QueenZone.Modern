@@ -27,6 +27,13 @@ public sealed class ExternalLoginCallbackModel(MemberAccountService memberAccoun
         var account = await memberAccountService.FindOrCreateFromExternalLoginAsync(
             provider, providerKey, email, displayName, cancellationToken);
 
+        await HttpContext.SignOutAsync(MemberAuthenticationSchemes.ExternalCookie);
+
+        if (account.IsSuspended)
+        {
+            return Redirect("/account/login?suspended=1");
+        }
+
         var claims = new[]
         {
             new Claim(ClaimTypes.NameIdentifier, account.Id.ToString()),
@@ -35,7 +42,6 @@ public sealed class ExternalLoginCallbackModel(MemberAccountService memberAccoun
         };
         var identity = new ClaimsIdentity(claims, MemberAuthenticationSchemes.MembersCookie);
         await HttpContext.SignInAsync(MemberAuthenticationSchemes.MembersCookie, new ClaimsPrincipal(identity));
-        await HttpContext.SignOutAsync(MemberAuthenticationSchemes.ExternalCookie);
 
         return Redirect(LocalReturnUrl.Resolve(returnUrl));
     }

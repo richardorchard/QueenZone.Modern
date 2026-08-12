@@ -62,4 +62,30 @@ public interface IMemberAccountRepository
         Guid? excludeMemberId = null,
         int maxResults = PrivateMessageLimits.MaxRecipientSearchResults,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Admin member lookup: matches <paramref name="query"/> against display name or email
+    /// (case-insensitive, substring), newest members first. Pass null/empty to list everyone.
+    /// </summary>
+    Task<MemberSearchResult> SearchMembersAsync(
+        string? query,
+        int pageNumber,
+        int pageSize,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Marks a member account suspended, blocking new sign-ins and (via cookie re-validation)
+    /// ending any existing session. Posts and other content are left untouched.
+    /// </summary>
+    Task<MemberAccount?> SuspendAsync(
+        Guid memberId,
+        string reason,
+        string suspendedByAdminEmail,
+        DateTime suspendedAt,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Clears a suspension, restoring normal sign-in access.
+    /// </summary>
+    Task<MemberAccount?> ReinstateAsync(Guid memberId, CancellationToken cancellationToken = default);
 }

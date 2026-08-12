@@ -345,6 +345,10 @@
   color: var(--qz-blue-deep, #1a3a6b);
 }
 
+.qz-account-notice--error {
+  color: var(--qz-burgundy);
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;
@@ -882,6 +886,11 @@ body.qz-menu-lock .qz-masthead {
 .qz-button--outline:hover {
   color: var(--qz-charcoal);
   background: var(--qz-grey-100, #f3f3f3);
+}
+
+.qz-button--danger {
+  background: var(--qz-burgundy);
+  border-color: var(--qz-burgundy);
 }
 
 .qz-button:disabled,
@@ -2394,6 +2403,27 @@ a.qz-forum-post__author-link:focus-visible {
   background: var(--surface-muted, #f6f6f6);
 }
 
+.admin-search-form {
+  display: flex;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+.admin-search-form input[type="search"] {
+  flex: 1;
+  max-width: 24rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xs);
+}
+
+.admin-pagination {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-top: var(--space-5);
+}
+
 .admin-table {
   border-collapse: collapse;
   width: 100%;
@@ -2405,6 +2435,21 @@ a.qz-forum-post__author-link:focus-visible {
   padding: 0.75rem;
   text-align: left;
   vertical-align: top;
+}
+
+.admin-detail-list {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.5rem 1.5rem;
+  margin: 0 0 var(--space-5);
+}
+
+.admin-detail-list dt {
+  color: var(--text-muted);
+}
+
+.admin-detail-list dd {
+  margin: 0;
 }
 
 .admin-form label {

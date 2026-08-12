@@ -1,0 +1,66 @@
+@page "/admin/members/{id:guid}"
+@model DetailModel
+
+<div class="admin-shell">
+  <h1>@Model.Member!.DisplayName</h1>
+  <p>
+    <a href="/admin/members">Back to members</a>
+    &middot;
+    <a href="/members/@Model.Member.Id">View public profile</a>
+  </p>
+
+  @if (Model.StatusMessage is not null)
+  {
+    <div class="admin-status admin-status--@Model.StatusMessageKind">@Model.StatusMessage</div>
+  }
+
+  <dl class="admin-detail-list">
+    <dt>Email</dt>
+    <dd>@Model.Member.Email</dd>
+    <dt>Joined</dt>
+    <dd>@Model.Member.CreatedAt.ToString("u")</dd>
+    <dt>Last login</dt>
+    <dd>@(Model.Member.LastLoginAt?.ToString("u") ?? "Never")</dd>
+    <dt>Status</dt>
+    <dd>
+      @if (Model.Member.IsSuspended)
+      {
+        <span class="admin-status admin-status--error">Suspended</span>
+      }
+      else
+      {
+        <span>Active</span>
+      }
+    </dd>
+  </dl>
+
+  @if (Model.Member.IsSuspended)
+  {
+    <section class="admin-form">
+      <h2>Suspension details</h2>
+      <p><strong>Reason:</strong> @Model.Member.SuspendedReason</p>
+      <p><strong>Suspended by:</strong> @Model.Member.SuspendedByAdminEmail</p>
+      <p><strong>Suspended at:</strong> @(Model.Member.SuspendedAt?.ToString("u"))</p>
+
+      <form method="post" action="/admin/members/@Model.Member.Id/Reinstate">
+        @Html.AntiForgeryToken()
+        <button type="submit" class="qz-button">Reinstate member</button>
+      </form>
+    </section>
+  }
+  else
+  {
+    <section class="admin-form">
+      <h2>Suspend this member</h2>
+      <p>Suspending blocks future sign-ins (including via Google, Microsoft, Discord, or GitHub) and ends any active session on their next request. Existing posts are not deleted.</p>
+      <form method="post" action="/admin/members/@Model.Member.Id/Suspend">
+        @Html.AntiForgeryToken()
+        <label>
+          Reason (visible to other admins, not to the member)
+          <textarea name="Reason" rows="3" required></textarea>
+        </label>
+        <button type="submit" class="qz-button qz-button--danger">Suspend member</button>
+      </form>
+    </section>
+  }
+</div>

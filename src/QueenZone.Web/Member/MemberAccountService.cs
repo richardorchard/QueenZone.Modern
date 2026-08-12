@@ -60,6 +60,11 @@ public sealed class MemberAccountService(
             return MemberAccountResult.Failure("Incorrect email or password.");
         }
 
+        if (account.IsSuspended)
+        {
+            return MemberAccountResult.Failure(SuspendedSignInError);
+        }
+
         account = await TryBackfillLegacyLinkAsync(account, cancellationToken);
         await memberAccountRepository.RecordLoginAsync(account.Id, DateTime.UtcNow, cancellationToken);
         return MemberAccountResult.Success(account);
@@ -507,6 +512,8 @@ public sealed class MemberAccountService(
     public const int MinDisplayNameLength = 2;
 
     public const int MaxDisplayNameLength = 100;
+
+    public const string SuspendedSignInError = "This account has been suspended.";
 }
 
 public sealed record MemberAccountResult(bool Succeeded, MemberAccount? Account, string? Error)

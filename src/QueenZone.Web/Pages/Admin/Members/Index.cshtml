@@ -1,0 +1,71 @@
+@page "/admin/members"
+@model IndexModel
+
+<div class="admin-shell">
+  <h1>Members</h1>
+  <p>
+    <a href="/admin">Back to admin</a>
+  </p>
+
+  <form method="get" class="admin-search-form">
+    <input type="search" name="query" value="@Model.Query" placeholder="Search by display name or email" />
+    <button type="submit" class="qz-button">Search</button>
+  </form>
+
+  @if (Model.Members.Count == 0)
+  {
+    <p>No members found.</p>
+  }
+  else
+  {
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Display name</th>
+          <th>Email</th>
+          <th>Joined</th>
+          <th>Last login</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @foreach (var member in Model.Members)
+        {
+          <tr>
+            <td>@member.DisplayName</td>
+            <td>@member.Email</td>
+            <td>@member.CreatedAt.ToString("u")</td>
+            <td>@(member.LastLoginAt?.ToString("u") ?? "Never")</td>
+            <td>
+              @if (member.IsSuspended)
+              {
+                <span class="admin-status admin-status--error">Suspended</span>
+              }
+              else
+              {
+                <span>Active</span>
+              }
+            </td>
+            <td><a href="/admin/members/@member.Id">Review</a></td>
+          </tr>
+        }
+      </tbody>
+    </table>
+
+    @if (Model.TotalPages > 1)
+    {
+      <nav class="admin-pagination" aria-label="Member pages">
+        @if (Model.PageNumber > 1)
+        {
+          <a href="/admin/members?query=@Model.Query&pageNumber=@(Model.PageNumber - 1)">Previous</a>
+        }
+        <span>Page @Model.PageNumber of @Model.TotalPages (@Model.TotalCount total)</span>
+        @if (Model.PageNumber < Model.TotalPages)
+        {
+          <a href="/admin/members?query=@Model.Query&pageNumber=@(Model.PageNumber + 1)">Next</a>
+        }
+      </nav>
+    }
+  }
+</div>

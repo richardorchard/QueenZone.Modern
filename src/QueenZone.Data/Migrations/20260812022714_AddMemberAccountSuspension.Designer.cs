@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using QueenZone.Data;
 
@@ -11,9 +12,11 @@ using QueenZone.Data;
 namespace QueenZone.Data.Migrations
 {
     [DbContext(typeof(QueenZoneDbContext))]
-    partial class QueenZoneDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260812022714_AddMemberAccountSuspension")]
+    partial class AddMemberAccountSuspension
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1737,87 +1740,6 @@ namespace QueenZone.Data.Migrations
                         .HasDatabaseName("IX_SearchDocument_ContentType_PublishedAt");
 
                     b.ToTable("SearchDocument", (string)null);
-                });
-
-            modelBuilder.Entity("QueenZone.Data.Entities.SearchReindexLeaseEntity", b =>
-                {
-                    b.Property<string>("LeaseName")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<DateTime>("AcquiredAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime>("ExpiresAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("HolderId")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.HasKey("LeaseName");
-
-                    b.ToTable("SearchReindexLeases", (string)null);
-                });
-
-            modelBuilder.Entity("QueenZone.Data.Entities.SearchReindexRunRequestEntity", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
-
-                    b.Property<string>("ActiveKey")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<DateTime?>("CompletedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("ErrorMessage")
-                        .HasMaxLength(2000)
-                        .HasColumnType("nvarchar(2000)");
-
-                    b.Property<DateTime>("RequestedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("RequestedBy")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)");
-
-                    b.Property<string>("RunnerId")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<DateTime?>("StartedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<string>("Summary")
-                        .HasMaxLength(2000)
-                        .HasColumnType("nvarchar(2000)");
-
-                    b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ActiveKey")
-                        .IsUnique()
-                        .HasDatabaseName("UX_SearchReindexRunRequests_ActiveKey")
-                        .HasFilter("[ActiveKey] IS NOT NULL");
-
-                    b.HasIndex("Status", "RequestedAtUtc")
-                        .HasDatabaseName("IX_SearchReindexRunRequests_Status_RequestedAtUtc");
-
-                    b.ToTable("SearchReindexRunRequests", (string)null);
                 });
 
             modelBuilder.Entity("QueenZone.Data.Entities.ArticleSubmissionEntity", b =>
