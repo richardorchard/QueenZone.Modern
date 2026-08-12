@@ -158,19 +158,25 @@ is budget-contained.
 
 ## Public Media Delivery
 
-Public archive media is served from Azure Blob Storage through Cloudflare:
+Public archive media is served from Azure Blob Storage through two Cloudflare hostnames. They are **not** interchangeable (verified live 2026-08-12; see [`opentofu-inventory.md`](opentofu-inventory.md)):
 
 ```text
-Visitor URL: https://cdn.queenzone.org/{container}/{blob}
-Cloudflare Worker: pictures-queenzone-org
-Worker route: cdn.queenzone.org/*
-Azure origin: https://queenzone.blob.core.windows.net
-Storage account: queenzone
+Photos/images:  https://cdn.queenzone.org/{container}/{blob}
+                Cloudflare straight proxy (no Worker)
+                Azure Storage custom domain: cdn.queenzone.org on account queenzone
+                Origin: https://queenzone.blob.core.windows.net
+
+Audio/legacy attachments CDN:
+                https://cdn2.queenzone.org/{container}/{blob}
+                Cloudflare Worker proxy (sets response headers)
+                No Azure custom domain on cdn2 — Worker fetches the blob origin host
 ```
 
-The Worker is used because Cloudflare Free supports proxied DNS and Workers, but Host header, SNI, and DNS origin overrides in Origin Rules are Enterprise-only. Azure Blob Storage rejects direct proxied requests to `cdn.queenzone.org` unless the request to Azure uses the storage account host. The Worker fetches the equivalent Azure Blob URL directly, avoiding the need for Enterprise Origin Rules.
+### `cdn.queenzone.org` (photos / images)
 
-The Cloudflare DNS record should remain:
+Straight proxied CNAME to the storage account, accepted by Azure because **`cdn.queenzone.org` is registered as the storage account custom domain**. Responses pass through Azure blob headers; Cloudflare applies its default edge cache (`Cache-Control: max-age=14400` observed). This hostname cannot set custom download filenames.
+
+DNS shape:
 
 ```text
 Type: CNAME
@@ -180,22 +186,28 @@ Proxy status: Proxied
 TTL: Auto
 ```
 
-Worker behavior as configured on 2026-06-25:
+### `cdn2.queenzone.org` (fan audio / legacy attachment redirect target)
 
-- Accepts `GET` and `HEAD` only.
-- Maps the request path and query string to `https://queenzone.blob.core.windows.net`.
-- Adds `Access-Control-Allow-Origin: *`.
-- Adds `X-Content-Type-Options: nosniff`.
-- Sets `Cache-Control: public, max-age=86400, s-maxage=2592000`.
-- Uses Cloudflare edge cache for non-range `GET` responses.
+Worker script **`pictures-queenzone-org`** (historical name) on route **`cdn2.queenzone.org/*`**. Source snapshot: [`infra/import/workers/pictures-queenzone-org.js`](../../infra/import/workers/pictures-queenzone-org.js).
 
-Azure requirements:
+Live Worker behaviour:
 
-- `queenzone` must keep blob public access enabled.
+- Accepts `GET` / `HEAD` only; rewrites path to `https://queenzone.blob.core.windows.net`
+- Adds `Access-Control-Allow-Origin: *`
+- Adds `X-Content-Type-Options: nosniff`
+- Sets `Cache-Control: public, max-age=86400, s-maxage=2592000` on HTTP 200
+- Does **not** currently set `Content-Disposition` (capable of doing so later if product wants download filenames)
+
+Used by `SongFileUrl` and legacy forum attachment redirects after member auth. Do not attach this Worker to `cdn`.
+
+### Azure storage requirements
+
+- Account `queenzone` keeps blob public access enabled for legacy public gallery containers.
 - Public archive containers must remain public where visitor access is expected.
-- Private containers such as `databasebackup` and `songfiles` should remain private.
+- `databasebackup`, `ugc-avatars`, and `ugc-forum` are private.
+- **`songfiles` is currently public blob ACL in live Azure** even though product docs previously said it should stay private; locking it down is [#177](https://github.com/richardorchard/QueenZone.Modern/issues/177). Do not encode the old “private songfiles” assumption into OpenTofu until that issue is resolved.
 
-Do not configure Azure CDN, Azure Front Door, or an Azure Storage custom domain for `cdn.queenzone.org` unless the architecture is deliberately changed.
+Do not add Azure CDN or Azure Front Door for these hostnames unless the architecture is deliberately changed. Keep the existing Azure Storage custom domain for `cdn.queenzone.org` — removing it breaks the non-Worker photo CDN.
 
 ## Database Access
 

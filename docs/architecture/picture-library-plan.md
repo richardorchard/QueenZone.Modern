@@ -55,11 +55,12 @@ Current public media delivery configuration:
 Public base URL: https://cdn.queenzone.org
 CDN: Cloudflare (straight CDN proxy, no Worker)
 Azure storage account: queenzone
+Azure storage custom domain: cdn.queenzone.org
 Azure blob endpoint: https://queenzone.blob.core.windows.net
 URL shape: https://cdn.queenzone.org/{container}/{blob}
 ```
 
-Use `https://cdn.queenzone.org` for new public image references instead of direct `*.blob.core.windows.net` URLs. Cloudflare proxies requests directly to the Azure Blob endpoint — the URL path is passed through as-is, so `{container}` must match the Azure container name exactly and the container must have public read access.
+Use `https://cdn.queenzone.org` for new public image references instead of direct `*.blob.core.windows.net` URLs. Cloudflare proxies requests to the blob account; the Azure custom domain makes the `cdn` Host acceptable without a Worker. The URL path is passed through as-is, so `{container}` must match the Azure container name exactly and the container must have public read access.
 
 Suggested containers:
 

@@ -2,7 +2,7 @@
 
 Decision for QueenZone production (App Service `queenzone-dev`, plan **ASP-Queenzone**).
 
-## Current production shape (verified 2026-07-23)
+## Current production shape (re-verified 2026-08-12)
 
 | Setting | Value |
 | --- | --- |
@@ -12,6 +12,9 @@ Decision for QueenZone production (App Service `queenzone-dev`, plan **ASP-Queen
 | SKU / tier | **B1 / Basic** (lowest paid plan in use) |
 | Worker / instance count | **1** |
 | Always On | enabled |
+| Redis / Azure CDN / Front Door | **none** |
+
+Full estate inventory for OpenTofu: [`opentofu-inventory.md`](opentofu-inventory.md).
 
 **Explicit product decision:** stay on a **single instance** of the current low-cost plan. Do **not** scale out App Service instances and do **not** add **Azure Cache for Redis** (or similar paid distributed cache) unless budget and traffic later justify revisiting this document.
 
@@ -67,5 +70,6 @@ Until then, **assume single instance** in all performance and caching designs.
 ## Related docs
 
 - [`azure-hosting-plan.md`](azure-hosting-plan.md) — overall Azure shape  
+- [`opentofu-inventory.md`](opentofu-inventory.md) — live estate ownership for OpenTofu  
 - [`public-query-cache.md`](public-query-cache.md) — process-local public query cache  
 - Epic [#312](https://github.com/richardorchard/QueenZone.Modern/issues/312) — performance / security improvement backlog  
