@@ -42,6 +42,7 @@
     </Exec>
     <PropertyGroup>
       <GitCommitShort>$([System.String]::Copy('$(GitCommitShort)').Trim())</GitCommitShort>
+      <GitCommitShort Condition="'$(OverrideGitCommitShort)' != ''">$(OverrideGitCommitShort)</GitCommitShort>
       <GitCommitShort Condition="'$(GitCommitShort)' == ''">local</GitCommitShort>
       <BuildTimestampUtc>$([System.DateTime]::UtcNow.ToString("o"))</BuildTimestampUtc>
       <InformationalVersion>$(GitCommitShort)</InformationalVersion>
