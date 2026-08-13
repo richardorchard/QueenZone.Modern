@@ -228,7 +228,14 @@ jobs:
     name: Post-deploy smoke
     runs-on: ubuntu-latest
     needs: [changes, deploy]
-    if: github.ref == 'refs/heads/main' && needs.changes.outputs.code == 'true'
+    # always() is required: migrate is skipped on non-EF pushes, and GitHub
+    # then skips every descendant that does not opt out of that cascade —
+    # even when `deploy` itself ran (run 31702420754 after #660).
+    if: |
+      always() &&
+      github.ref == 'refs/heads/main' &&
+      needs.changes.outputs.code == 'true' &&
+      needs.deploy.result == 'success'
     # Allow retry loop (~8 min) plus request time; avoid false fails during App Service recycle.
     timeout-minutes: 12
 
