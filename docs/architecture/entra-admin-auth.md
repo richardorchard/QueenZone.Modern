@@ -10,16 +10,18 @@ App Service must therefore carry real Entra settings. Committed `appsettings.jso
 
 ## Admin authentication schemes
 
-Admin pages use the composite scheme `AdminAccess` (`AdminAuthenticationSchemes.CompositeScheme`):
+Admin pages use the policy scheme `AdminAccess` (`AdminAuthenticationSchemes.CompositeScheme`):
 
 | Situation | Scheme used | Purpose |
 | --- | --- | --- |
-| Member cookie present | `MembersCookie` | Dual-role users already signed in as members |
-| Entra configured, no member cookie | Cookie scheme (Microsoft.Identity.Web) | Read existing admin session |
+| Member cookie only | Ignored by `AdminAccess` | Member OAuth never grants admin access, even for an allowlisted email |
+| Entra configured | Cookie scheme (Microsoft.Identity.Web) | Read the dedicated admin session |
 | Entra configured, **challenge** (unauthenticated `/admin`) | **OpenID Connect** | Start Microsoft Entra sign-in — **not** member `/account/login` |
 | Dev/Testing without Entra | `Test` (`X-Test-User-Email`) | Local and CI admin auth |
 
 Unauthenticated access to `/admin/*` must challenge **Entra OIDC**, not the public member social login page. That selection lives in `QueenZoneAuthServiceCollectionExtensions.SelectAdminChallengeScheme`.
+
+Dual-role users may hold both member and Entra cookies. `AdminAccess` always reads the Entra admin cookie; the member cookie cannot override it. Shared editor uploads use the separate `AuthoringAccess` composite scheme so both members and authenticated admins can continue to upload rich-text images.
 
 ## What was configured (2026-07-23)
 
@@ -35,6 +37,8 @@ Unauthenticated access to `/admin/*` must challenge **Entra OIDC**, not the publ
 | **Renew secret by** | **2028-07-01** (allow ~3 weeks before the 2-year expiry; do not wait for outage) |
 | ID token issuance | Enabled on the web platform |
 | Access control | Entra signs the user in; **admin rights** still require the signed-in email to match `Admin:AllowedEmails` |
+
+This hobby-site configuration supports personal Microsoft accounts through the `common` endpoint. MFA is controlled on each personal Microsoft account. QueenZone does not claim to enforce tenant Conditional Access or enterprise-app assignment.
 
 ### Admin allowlist (not secrets, still not committed)
 
@@ -173,6 +177,7 @@ Local Development may leave `AzureAd:ClientId` empty and use `X-Test-User-Email`
 | App fails to start after deploy | Missing/placeholder `AzureAd__ClientId` on App Service (Phase A fail-closed) |
 | Entra login error on redirect | Redirect URI not registered, or wrong ClientId |
 | Signed in but 403 on `/admin` | Email not in `Admin:AllowedEmails` (check claim `email` / `preferred_username`) |
+| Signed in as a member but challenged again on `/admin` | Expected: member OAuth is separate; complete the QueenZone Admin Microsoft sign-in |
 | Sudden admin login failure after long uptime | **Expired client secret** — follow renewal steps above |
 
 ## Related docs
