@@ -5,8 +5,8 @@
 
 .DESCRIPTION
   Waits for /warmup to return 200 with status=ok, then checks key public routes.
-  Matches the post-deploy smoke in .github/workflows/deploy-app-service.yml so you
-  can re-run the same checks locally after a deploy or when debugging a failure.
+  Matches scripts/Invoke-PostDeploySmoke.sh (used by .github/workflows/deploy.yml)
+  so you can re-run the same checks locally after a deploy or when debugging a failure.
 
 .EXAMPLE
   .\scripts\Smoke-LiveSite.ps1
