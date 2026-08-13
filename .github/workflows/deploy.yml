@@ -10,6 +10,7 @@ on:
 permissions:
   contents: read
   actions: read
+  pull-requests: read
 
 concurrency:
   group: deploy-${{ github.ref }}
@@ -57,12 +58,11 @@ jobs:
           fi
 
   # Finds the ci.yml run that built+tested this exact code, so `deploy` can
-  # download its publish artifact instead of rebuilding. main is updated via
-  # merge commits (see branch protection / PR merge method), so github.sha
-  # here is the merge commit, not the PR head that ci.yml actually ran
-  # against — walk to the merge commit's second parent to get that head SHA.
-  # (A non-merge push, e.g. an admin push straight to main, has no second
-  # parent; fall back to github.sha itself in that case.)
+  # download its publish artifact instead of rebuilding. github.sha on main is
+  # the merge result, not the PR head that ci.yml ran against:
+  #   - merge commits (2 parents): second parent is the PR head
+  #   - squash/rebase merges (1 parent): look up the associated PR head via API
+  #   - direct pushes with no PR: fall back to github.sha itself
   resolve-ci-run:
     runs-on: ubuntu-latest
     needs: changes
@@ -77,12 +77,24 @@ jobs:
 
       - name: Determine PR head SHA
         id: sha
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           PARENTS=($(git rev-list --parents -n 1 HEAD))
           if [ "${#PARENTS[@]}" -ge 3 ]; then
             HEAD_SHA="${PARENTS[2]}"
+            echo "Merge commit — using second parent as PR head SHA."
           else
-            HEAD_SHA="${PARENTS[0]}"
+            # Squash/rebase merge: the commit on main is not the PR head that
+            # ci.yml tested. Resolve via the commit→PR association.
+            HEAD_SHA=$(gh api "repos/${{ github.repository }}/commits/${PARENTS[0]}/pulls" \
+              --jq '.[0].head.sha // empty')
+            if [ -n "$HEAD_SHA" ]; then
+              echo "Single-parent commit — resolved associated PR head SHA."
+            else
+              HEAD_SHA="${PARENTS[0]}"
+              echo "No associated PR — falling back to commit SHA itself."
+            fi
           fi
           echo "Resolved PR head SHA: $HEAD_SHA"
           echo "head_sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
