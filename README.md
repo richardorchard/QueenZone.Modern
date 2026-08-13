@@ -360,7 +360,7 @@ Use `src/QueenZone.Web/appsettings.Local.json` for local Entra values and local 
 
 Do not log secrets (connection strings, client secrets, storage keys, API keys) to App Insights, issues, or PR text. When auditing App Service settings, prefer name + value length over printing values.
 
-For automated tests, send `X-Test-User-Email` with an allowed admin email address, or sign in through the OAuth callback test double with an allowlisted email.
+For automated admin tests, send `X-Test-User-Email` with an allowed admin email address. The member OAuth callback test double only creates a member session and must not grant admin access, even when its email is allowlisted.
 
 Member sign-in at `/account/login` (Google, Microsoft, Facebook OAuth) is separate from admin access. Stripping member OAuth does not remove the admin requirement: admins still need Entra sign-in in production, or the test-header fallback locally as described above.
 

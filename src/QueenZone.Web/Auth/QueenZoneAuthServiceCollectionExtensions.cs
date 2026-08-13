@@ -27,6 +27,8 @@ public static class QueenZoneAuthServiceCollectionExtensions
             services.AddAuthentication(TestAuthHandler.SchemeName)
                 .AddPolicyScheme(AdminAuthenticationSchemes.CompositeScheme, null, options =>
                     ConfigureAdminAuthenticationScheme(options, useAzureAd: false))
+                .AddPolicyScheme(AdminAuthenticationSchemes.AuthoringCompositeScheme, null, options =>
+                    ConfigureAuthoringAuthenticationScheme(options, useAzureAd: false))
                 .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestAuthHandler.SchemeName, null)
                 .AddScheme<AuthenticationSchemeOptions, TestMemberAuthHandler>(TestMemberAuthHandler.SchemeName, null)
                 // A real (not test-shortcut) cookie scheme: native register/sign-in pages call
@@ -49,6 +51,8 @@ public static class QueenZoneAuthServiceCollectionExtensions
                 .AddAuthentication(TestAuthHandler.SchemeName)
                 .AddPolicyScheme(AdminAuthenticationSchemes.CompositeScheme, null, options =>
                     ConfigureAdminAuthenticationScheme(options, useAzureAd: false))
+                .AddPolicyScheme(AdminAuthenticationSchemes.AuthoringCompositeScheme, null, options =>
+                    ConfigureAuthoringAuthenticationScheme(options, useAzureAd: false))
                 .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestAuthHandler.SchemeName, null);
         }
         else
@@ -59,7 +63,9 @@ public static class QueenZoneAuthServiceCollectionExtensions
 
             services.AddAuthentication()
                 .AddPolicyScheme(AdminAuthenticationSchemes.CompositeScheme, null, options =>
-                    ConfigureAdminAuthenticationScheme(options, useAzureAd: true));
+                    ConfigureAdminAuthenticationScheme(options, useAzureAd: true))
+                .AddPolicyScheme(AdminAuthenticationSchemes.AuthoringCompositeScheme, null, options =>
+                    ConfigureAuthoringAuthenticationScheme(options, useAzureAd: true));
         }
 
         // A second AddAuthentication() call doesn't reset the default scheme set above; it just
@@ -92,14 +98,15 @@ public static class QueenZoneAuthServiceCollectionExtensions
                 policy.RequireAuthenticatedUser();
             });
 
-            // Shared authoring (rich text image upload). Composite scheme selects member cookie
-            // when present, otherwise Entra/test admin auth (same as admin pages). Members
+            // Shared authoring (rich text image upload) accepts either a member cookie or
+            // Entra/test admin auth. This uses a separate composite scheme because AdminAccess
+            // must never accept a member cookie. Members
             // impersonated purely via X-Test-Member-Id (no MembersCookie) still need to reach
             // this endpoint from Submit/Article and Submit/Photo's rich text editors, so add the
             // TestMember scheme the same way MemberPolicy above does.
             options.AddPolicy("Authoring", policy =>
             {
-                policy.AddAuthenticationSchemes(AdminAuthenticationSchemes.CompositeScheme);
+                policy.AddAuthenticationSchemes(AdminAuthenticationSchemes.AuthoringCompositeScheme);
                 if (QueenZoneEnvironments.UsesTestAuth(environment))
                 {
                     policy.AddAuthenticationSchemes(TestMemberAuthHandler.SchemeName);
@@ -114,17 +121,25 @@ public static class QueenZoneAuthServiceCollectionExtensions
 
     private static void ConfigureAdminAuthenticationScheme(PolicySchemeOptions options, bool useAzureAd)
     {
-        options.ForwardDefaultSelector = context =>
-            context.Request.Cookies.ContainsKey(AdminAuthenticationSchemes.MemberCookieName)
-                ? MemberAuthenticationSchemes.MembersCookie
-                : SelectAdminAuthenticateScheme(useAzureAd);
+        // A public member session is not proof of admin authentication. Always authenticate
+        // AdminAccess through the dedicated Entra cookie (or the local/test admin handler).
+        options.ForwardDefault = SelectAdminAuthenticateScheme(useAzureAd);
 
         // Challenges must start Entra OIDC (not member social login at /account/login).
         options.ForwardChallenge = SelectAdminChallengeScheme(useAzureAd);
     }
 
+    private static void ConfigureAuthoringAuthenticationScheme(PolicySchemeOptions options, bool useAzureAd)
+    {
+        options.ForwardDefaultSelector = context => SelectAuthoringAuthenticateScheme(
+            useAzureAd,
+            context.Request.Cookies.ContainsKey(AdminAuthenticationSchemes.MemberCookieName));
+
+        options.ForwardChallenge = SelectAdminChallengeScheme(useAzureAd);
+    }
+
     /// <summary>
-    /// Scheme used to authenticate an already-signed-in admin principal when no member cookie is present.
+    /// Scheme used to authenticate an already-signed-in admin principal.
     /// </summary>
     internal static string SelectAdminAuthenticateScheme(bool useAzureAd) =>
         useAzureAd
@@ -139,6 +154,11 @@ public static class QueenZoneAuthServiceCollectionExtensions
         useAzureAd
             ? OpenIdConnectDefaults.AuthenticationScheme
             : TestAuthHandler.SchemeName;
+
+    internal static string SelectAuthoringAuthenticateScheme(bool useAzureAd, bool hasMemberCookie) =>
+        hasMemberCookie
+            ? MemberAuthenticationSchemes.MembersCookie
+            : SelectAdminAuthenticateScheme(useAzureAd);
 
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     private static void ConfigureMemberAuthentication(
