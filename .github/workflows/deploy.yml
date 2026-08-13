@@ -26,21 +26,22 @@ concurrency:
 # merge was allowed (see branch protection on main), so none of that re-runs
 # here. This workflow no longer rebuilds — it reuses the exact binaries
 # ci.yml already built and tested on the PR, resolved below by PR head SHA.
-# Docs-only merges skip migrate/deploy/post-deploy-smoke entirely (see
-# `changes`) since ci.yml never produced a binary to reuse for those.
+# Docs/infra/design/workflow-only merges skip migrate/deploy/post-deploy-smoke
+# (see `changes`) since ci.yml never produced a binary to reuse for those.
 # post-deploy-smoke is the safety net after the real deploy.
 jobs:
-  # Mirrors ci.yml's docs-only bypass. ci.yml skips `build` (no web-publish
-  # artifact produced) for docs-only PRs, so deploy has nothing to download
-  # for one of those commits — and there's genuinely nothing to redeploy
-  # anyway, since no code changed. Without this gate, resolve-ci-run still
-  # finds the (successful, but build-skipped) ci.yml run and `deploy` fails
-  # trying to download an artifact that was never uploaded.
+  # Mirrors ci.yml's non-code bypass (scripts/classify-pipeline-changes.sh).
+  # ci.yml skips `build` (no web-publish artifact) for those PRs, so deploy
+  # has nothing to download — and there's genuinely nothing to redeploy.
+  # Without this gate, resolve-ci-run still finds the successful-but-skipped
+  # ci.yml run and `deploy` fails downloading an artifact that was never
+  # uploaded.
   changes:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     outputs:
       code: ${{ steps.check.outputs.code }}
+      migrations: ${{ steps.check.outputs.migrations }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -50,15 +51,13 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" != "push" ] || [ -z "${{ github.event.before }}" ]; then
             echo "code=true" >> "$GITHUB_OUTPUT"
+            echo "migrations=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          if git diff --name-only ${{ github.event.before }}...${{ github.sha }} | grep -qvE '^(docs/|[^/]*\.md$)'; then
-            echo "code=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "code=false" >> "$GITHUB_OUTPUT"
-            echo "Docs-only push to main — nothing to deploy."
-          fi
+          git diff --name-only ${{ github.event.before }}...${{ github.sha }} \
+            | bash ./scripts/classify-pipeline-changes.sh \
+            >> "$GITHUB_OUTPUT"
 
   # Finds the ci.yml run that built+tested this exact code, so `deploy` can
   # download its publish artifact instead of rebuilding. github.sha on main is
@@ -123,11 +122,14 @@ jobs:
   migrate:
     name: Apply database migrations
     runs-on: ubuntu-latest
-    needs: [changes, resolve-ci-run]
-    # main only, and only when this push actually changed code — resolve-ci-run
-    # and changes are themselves gated the same way, so pushes to master or
-    # docs-only pushes to main produce no jobs at all past `changes`.
-    if: github.ref == 'refs/heads/main' && needs.changes.outputs.code == 'true'
+    needs: [changes]
+    # Does not wait on resolve-ci-run — that output is only for the zip deploy.
+    # Skip the restore/`database update` when the push did not touch EF paths
+    # (issue #659). workflow_dispatch still fails closed (migrations=true).
+    if: |
+      github.ref == 'refs/heads/main' &&
+      needs.changes.outputs.code == 'true' &&
+      needs.changes.outputs.migrations == 'true'
     environment: dev
 
     steps:
@@ -172,12 +174,22 @@ jobs:
     name: Deploy
     runs-on: ubuntu-latest
     needs: [changes, resolve-ci-run, migrate]
-    if: github.ref == 'refs/heads/main' && needs.changes.outputs.code == 'true'
+    # migrate is skipped on non-EF pushes; treat skipped as success so the
+    # zip deploy still runs (issue #659).
+    if: |
+      always() &&
+      github.ref == 'refs/heads/main' &&
+      needs.changes.outputs.code == 'true' &&
+      needs.resolve-ci-run.result == 'success' &&
+      (needs.migrate.result == 'success' || needs.migrate.result == 'skipped')
     environment:
       name: dev
       url: https://www.queenzone.org
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
       # Reuses the exact binary ci.yml built and tested on the PR — no rebuild.
       - name: Download publish artifact from CI run
         uses: actions/download-artifact@v8
@@ -194,12 +206,23 @@ jobs:
           access_token: ${{ secrets.BITWARDEN_SECRETS_MANAGER_ACCESS_TOKEN }}
           secrets: ${{ vars.BITWARDEN_APP_SERVICE_DEPLOY_SECRETS }}
 
+      # Enable run-from-package + platform warmup in the same job as the zip
+      # push (issue #655). Do not flip WEBSITE_RUN_FROM_PACKAGE outside a
+      # deploy — the current site is extracted files, not a package.
+      - name: Ensure run-from-package and warmup settings
+        env:
+          AZURE_WEBAPP_PUBLISH_PROFILE: ${{ steps.bitwarden-secrets.outputs.AZURE_WEBAPP_PUBLISH_PROFILE }}
+        run: python3 ./scripts/Set-AppServiceWebSettings.py
+
       - name: Deploy
         uses: azure/webapps-deploy@v3
         with:
           app-name: queenzone-dev
           publish-profile: ${{ steps.bitwarden-secrets.outputs.AZURE_WEBAPP_PUBLISH_PROFILE }}
           package: publish
+
+      - name: Warm up custom domain
+        run: bash ./scripts/Invoke-PostDeploySmoke.sh --warmup-only
 
   post-deploy-smoke:
     name: Post-deploy smoke
@@ -210,93 +233,12 @@ jobs:
     timeout-minutes: 12
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
       # Smoke the public custom domain (Site:PublicBaseUrl), not only the App Service hostname.
       # /health alone is liveness only — content pages can still 500 during recycle/warmup.
-      # Retry the full suite until every path returns 200 (or timeout). A failed smoke fails
-      # this job so GitHub Actions can email watchers.
+      # The deploy job already polled /warmup; this job still starts with warmup
+      # then the content-route suite. A failure fails the job so watchers get mail.
       - name: Post-deploy smoke (custom domain)
-        run: |
-          BASE_URL="https://www.queenzone.org"
-          WARMUP_PATH="/warmup"
-          PATHS=(
-            "/health"
-            "/"
-            "/news"
-            "/forum"
-            # Representative modern-forum category/topic pages (guards accidental LegacyForumRepository fallback).
-            "/forum/1/queen-serious-discussion"
-            "/forum/topic/455095/forum-guidelines"
-            "/articles"
-            "/biography"
-            "/photography"
-            "/search"
-          )
-          MAX_ATTEMPTS=32
-          SLEEP_SECONDS=15
-
-          echo "Waiting for warmup on ${BASE_URL}${WARMUP_PATH} after deploy (up to ~$(( MAX_ATTEMPTS * SLEEP_SECONDS / 60 )) minutes)."
-          echo "/health is not sufficient readiness — App Service can answer liveness while pages still 500."
-
-          check_path() {
-            local path="$1"
-            local url="${BASE_URL}${path}"
-            local status body_file
-            body_file="$(mktemp)"
-            # Prefer any HTTP code curl wrote; only use 000 when stdout is empty (avoids "500000").
-            status=$(curl -s -o "$body_file" -w "%{http_code}" --max-time 30 -L "$url") || status="${status:-000}"
-            if [ "$status" != "200" ]; then
-              echo "  ✗ $path → HTTP $status"
-              rm -f "$body_file"
-              return 1
-            fi
-            if [ "$path" = "/health" ]; then
-              if ! grep -q '"status":"ok"' "$body_file"; then
-                echo "  ✗ $path → 200 but body missing \"status\":\"ok\""
-                rm -f "$body_file"
-                return 1
-              fi
-            fi
-            echo "  ✓ $path → HTTP $status"
-            rm -f "$body_file"
-            return 0
-          }
-
-          for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
-            echo "Warmup attempt ${attempt}/${MAX_ATTEMPTS}..."
-            if check_path "$WARMUP_PATH"; then
-              echo "Warmup passed on attempt ${attempt}."
-              break
-            fi
-
-            if [ "$attempt" -eq "$MAX_ATTEMPTS" ]; then
-              echo "::error::Warmup failed against ${BASE_URL}${WARMUP_PATH} after ${MAX_ATTEMPTS} attempts. Check App Service logs."
-              exit 1
-            fi
-
-            echo "Warmup not ready yet. Retrying in ${SLEEP_SECONDS}s..."
-            sleep "$SLEEP_SECONDS"
-          done
-
-          echo "Polling content routes on $BASE_URL after warmup."
-          for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
-            echo "Attempt ${attempt}/${MAX_ATTEMPTS}..."
-            failed=0
-            for path in "${PATHS[@]}"; do
-              if ! check_path "$path"; then
-                failed=1
-              fi
-            done
-
-            if [ "$failed" -eq 0 ]; then
-              echo "All post-deploy smoke checks passed on attempt ${attempt}."
-              exit 0
-            fi
-
-            if [ "$attempt" -lt "$MAX_ATTEMPTS" ]; then
-              echo "Site not ready (App Service recycle/warmup). Retrying in ${SLEEP_SECONDS}s..."
-              sleep "$SLEEP_SECONDS"
-            fi
-          done
-
-          echo "::error::Post-deploy smoke failed against $BASE_URL after ${MAX_ATTEMPTS} attempts. Check App Service logs."
-          exit 1
+        run: bash ./scripts/Invoke-PostDeploySmoke.sh

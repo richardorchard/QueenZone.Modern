@@ -121,12 +121,15 @@ Summary of what is live on App Service `queenzone-dev` (as of 2026-07-23):
 
 Use `/health` for App Service / CI pings. Point deeper monitors at `/health/ready` when you want SQL/blob failure to page.
 
-For the B1 App Service plan, keep deployment slots out of the critical path and configure App Service startup warmup instead:
+For the B1 App Service plan, keep deployment slots out of the critical path and configure App Service startup warmup plus run-from-package instead:
 
 ```text
+WEBSITE_RUN_FROM_PACKAGE=1
 WEBSITE_WARMUP_PATH=/warmup
 WEBSITE_WARMUP_STATUSES=200
 ```
+
+`WEBSITE_RUN_FROM_PACKAGE=1` makes zip deploy atomic (the package is mounted read-only). Do not flip that setting outside a deploy: the live site is extracted files until the next zip push lands a package. `.github/workflows/deploy.yml` merges these settings via Kudu immediately before `azure/webapps-deploy`, then polls `/warmup` in the same job.
 
 Enable **Always On** for the App Service when available on the active SKU so the single B1 worker is not unloaded after idle periods. Always On prevents idle cold starts; `WEBSITE_WARMUP_PATH` controls the platform startup ping when the app process/container starts. Keep the GitHub Actions post-deploy smoke route suite in place after `/warmup` passes, because real public pages still prove routing, Razor rendering, and output-cache behavior on the custom domain.
 

@@ -277,7 +277,7 @@ CI also collects coverage from the deterministic test suite (merged across Web.T
 | `scripts/Invoke-WebTestsShard.ps1` | Runs one shard's filtered Web.Tests (`-SmallProjectsOnly` runs just the Tools/Storage/NewsAgent projects instead) |
 | `.github/workflows/ci.yml` jobs `test` + `small-projects-tests` + `coverage` | Matrix `shard: [0, 1]` for Web.Tests, a separate parallel job for the small projects, then merge Cobertura and run the coverage gate |
 
-The `build` job uploads both `bin/Release` and `obj/Release`. Shards must keep `obj` — ASP.NET Core’s `WebApplicationFactory` resolves compressed static web assets under `src/QueenZone.Web/obj/.../compressed/`. Uploading only `bin` causes `DirectoryNotFoundException` in Development-environment host tests (for example `StaticAssetCacheHeadersTests`).
+The `build` job uploads `src/**/bin/Release`, `tests/**/bin/Release`, and `src/QueenZone.Web/obj/Release`. Keep PDBs — Coverlet maps executed lines from them, so a `--no-build` shard without symbols collapses global coverage. Keep `*.xml` — NewsAgent tests copy fixture XML into the output directory and `--no-build` shards read those files from disk. Shards must keep the QueenZone.Web `obj` tree — ASP.NET Core’s `WebApplicationFactory` resolves compressed static web assets under `src/QueenZone.Web/obj/.../compressed/`. Uploading only `bin` causes `DirectoryNotFoundException` in Development-environment host tests (for example `StaticAssetCacheHeadersTests`). Other project `obj` trees are not required for `--no-build` shard runs.
 
 **Do not** split CI as “all unit tests in job A / all WAF integration tests in job B”. That was measured in [#442](https://github.com/richardorchard/QueenZone.Modern/issues/442) and **regressed** wall-clock: isolating every `WebApplicationFactory` host onto one runner increases contention, and that job became slower than the old single-suite run. Mixed shards are required.
 
@@ -295,7 +295,7 @@ powershell -File ./scripts/Invoke-WebTestsShard.ps1 -SmallProjectsOnly -NoBuild 
 
 When adding Web.Tests classes: no shard manifest to update — discovery is automatic. Prefer `QueenZoneWebApplicationFactory` for HTTP tests; keep true unit tests free of `WebApplicationFactory` so they stay cheap filler in every shard.
 
-If CI wall-clock grows again, prefer (in order): thin theory-heavy smoke HTTP tests; raise `ShardCount` / matrix size with the same mixed algorithm; paid larger runners. Avoid unit-vs-WAF project splits and raising xUnit `maxParallelThreads` (more threads worsened contention in #442).
+If CI wall-clock grows again, prefer (in order): thin theory-heavy smoke HTTP tests; raise `ShardCount` / matrix size with the same mixed algorithm; paid larger runners. Avoid unit-vs-WAF project splits and raising xUnit `maxParallelThreads` (more threads worsened contention in #442). Smaller parked ideas (format `--include`, EF migrations bundle, extra shards today) live in [#657](https://github.com/richardorchard/QueenZone.Modern/issues/657).
 
 ### Coverage gates (enforced on every pull request)
 
@@ -326,14 +326,16 @@ These gates are guardrails, not a replacement for useful assertions. New or chan
 | `sql-server-tests` | `QueenZone.SqlServerTests` against a Docker `mssql` service container | Yes |
 | `coverage` | Merge shard + SQL Server + small-projects Cobertura reports, HTML summary, coverage gates | Yes |
 | `ef-migrations` | When migration-related paths change: snapshot check + `database update` on Azure SQL | Yes (same-repo PRs only; skipped otherwise) |
-| `smoke-test` | Published app, curl `/health`, `/`, `/news` (after `coverage`) | Yes |
-| `e2e-test` | Playwright suite on a self-hosted `e2e` runner (Windows or macOS, after `coverage`) | Yes (required PR merge gate) |
+| `smoke-test` | Published app, curl `/health`, `/`, `/news` (starts after `build`, overlaps shards/coverage) | Yes |
+| `e2e-test` | Playwright suite on a self-hosted `e2e` runner (Windows or macOS; starts after `build`, overlaps coverage) | Yes (required PR merge gate) |
 
-CI/CD uses two workflows. `.github/workflows/ci.yml` runs the pull-request build, deterministic tests, coverage gates, conditional `ef-migrations`, smoke test, and required e2e merge gate. After merge, `.github/workflows/deploy.yml` resolves the `ci.yml` run that built and tested the merged PR's head commit (via merge-commit second parent, or the commit→PR association for squash/rebase merges) and reuses its `web-publish` artifact (no rebuild), then runs `migrate` → `deploy` → `post-deploy-smoke`. The PR `ef-migrations` job uses the same migration connection string as deploy so SQL Server failures are caught before merge.
+CI/CD uses two workflows. `.github/workflows/ci.yml` runs the pull-request build, deterministic tests, coverage gates, conditional `ef-migrations`, smoke test, and required e2e merge gate. After merge, `.github/workflows/deploy.yml` resolves the `ci.yml` run that built and tested the merged PR's head commit (via merge-commit second parent, or the commit→PR association for squash/rebase merges) and reuses its `web-publish` artifact (no rebuild), then runs `migrate` (only when EF paths changed) → `deploy` (sets run-from-package, zip-pushes, polls `/warmup`) → `post-deploy-smoke`. The PR `ef-migrations` job uses the same migration connection string as deploy so SQL Server failures are caught before merge.
 
 Two further workflows run on a schedule only and never gate a PR merge or a deploy: `.github/workflows/nightly-legacy-checks.yml` (legacy read/write probes, then the real-data Playwright UI suite, then a residue check — see "Data Integration Tests" and "Nightly UI Regression (Real Data)" above) and `.github/workflows/livesite-readonly-sweep.yml` (the live-site read-only sweep). Both are continuous signal for catching drift, not merge gates; a failure there does not block or revert anything automatically.
 
-Docs-only pull requests (only `docs/` or root `*.md` changes) skip `build` / `test` / coverage / smoke / e2e. Skipped non-matrix jobs still report under their required check names, which GitHub treats as satisfied. The `test` matrix is different: skipping it entirely would report a single `test` check and never create the required `test (0)` / `test (1)` checks, leaving the PR blocked forever. `ci.yml` therefore runs a lightweight `test-docs-ok` matrix on docs-only PRs that emits success for those exact names without running the suite.
+Non-code pull requests skip `build` / `test` / coverage / smoke / e2e. Classification lives in `scripts/classify-pipeline-changes.sh`: a PR is non-code when **every** changed file is under `docs/`, `infra/`, `design/`, `.github/` (except `.github/workflows/ci.yml`), a root `*.md`, `LICENSE`, or `THIRD-PARTY-NOTICES.md`. Changing `ci.yml` itself still runs the full suite. `src/`, `tests/`, `scripts/`, project files, and `wwwroot` stay on the full path. Deploy uses the same classifier so an infra-only merge does not zip-deploy unchanged binaries.
+
+Skipped non-matrix jobs still report under their required check names, which GitHub treats as satisfied. The `test` matrix is different: skipping it entirely would report a single `test` check and never create the required `test (0)` / `test (1)` checks, leaving the PR blocked forever. `ci.yml` therefore runs a lightweight `test-docs-ok` matrix on non-code PRs that emits success for those exact names without running the suite.
 
 ### EF migration consistency
 
