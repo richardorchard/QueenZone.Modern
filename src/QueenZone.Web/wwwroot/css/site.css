@@ -1,3 +1,45 @@
+.qz-skip-link {
+  position: absolute;
+  z-index: 100;
+  inset-inline-start: var(--space-4);
+  top: var(--space-4);
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+  background: var(--qz-white);
+  color: var(--qz-charcoal);
+  font: var(--fw-medium) 0.875rem/1 var(--font-body);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-decoration: none;
+}
+
+.qz-skip-link:focus,
+.qz-skip-link:focus-visible {
+  width: auto;
+  height: auto;
+  margin: 0;
+  padding: 0.75rem 1.5rem;
+  overflow: visible;
+  clip: auto;
+  clip-path: none;
+  border: 1px solid var(--qz-black);
+  border-radius: var(--radius-sm);
+  outline: none;
+  box-shadow: var(--shadow-focus);
+  color: var(--qz-charcoal);
+}
+
+#main-content:focus {
+  outline: none;
+}
+
 .qz-masthead {
   --qz-masthead-ink-muted: rgba(255, 255, 255, 0.82);
   --qz-masthead-ink-strong: var(--qz-white);

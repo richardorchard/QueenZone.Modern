@@ -73,8 +73,9 @@
 @await RenderSectionAsync("Head", required: false)
 </head>
 <body>
+  <a class="qz-skip-link" href="#main-content">Skip to content</a>
   <partial name="_SiteHeader" />
-  <main>
+  <main id="main-content" tabindex="-1">
     @RenderBody()
   </main>
   <partial name="_SiteFooter" />
