@@ -16,6 +16,9 @@ on:
 permissions:
   contents: read
 
+env:
+  SIXLABORS_LICENSE_KEY: ${{ secrets.SIXLABORS_LICENSE_KEY }}
+
 concurrency:
   group: livesite-readonly-sweep
   cancel-in-progress: false

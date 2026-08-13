@@ -51,6 +51,19 @@ dotnet test QueenZone.sln
 dotnet run --project src/QueenZone.Web/QueenZone.Web.csproj
 ```
 
+ImageSharp 4 requires a Six Labors licence at build time. Store the complete
+contents of the supplied `sixlabors.lic` file in the user environment variable
+`SIXLABORS_LICENSE_KEY`; do not commit the file or value. Restart terminals and
+development tools after setting a persistent environment variable.
+
+```powershell
+$licenseValue = [IO.File]::ReadAllText("C:\path\to\sixlabors.lic")
+[Environment]::SetEnvironmentVariable("SIXLABORS_LICENSE_KEY", $licenseValue, "User")
+```
+
+GitHub Actions uses a repository secret with the same name. External contributors
+must obtain their own licence from [Six Labors](https://licensing.sixlabors.com/).
+
 To generate a local code coverage report:
 
 ```powershell
