@@ -46,4 +46,14 @@ public static class QueenZoneEnvironments
     /// </summary>
     public static bool IsAutomatedTestHost(IHostEnvironment environment) =>
         environment.IsEnvironment(Testing) || environment.IsEnvironment(E2E);
+
+    /// <summary>
+    /// True for deployed environments that must fail closed on missing secrets and connection
+    /// strings. Development, Testing, and E2E are excluded so local and automated hosts can
+    /// boot with empty connection strings and test auth.
+    /// </summary>
+    public static bool IsProductionLike(IHostEnvironment environment) =>
+        environment.IsProduction()
+        || environment.IsEnvironment("Staging")
+        || environment.IsEnvironment("Preview");
 }

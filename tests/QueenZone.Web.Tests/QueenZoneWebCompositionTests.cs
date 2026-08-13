@@ -56,6 +56,14 @@ public sealed class QueenZoneWebCompositionTests
 
         Assert.Equal(["admin@test.local"], provider.GetRequiredService<IOptions<AdminOptions>>().Value.AllowedEmails);
         Assert.Equal("https://www.queenzone.org", provider.GetRequiredService<IOptions<SiteOptions>>().Value.PublicBaseUrl);
+        Assert.Equal(50, provider.GetRequiredService<IOptions<UploadQuotaOptions>>().Value.MaxUploadsPerDay);
+        Assert.True(provider.GetRequiredService<IOptions<ForumDataOptions>>().Value.UseModernForumReads);
+        Assert.Equal(60, provider.GetRequiredService<IOptions<ForumOptions>>().Value.PostEditWindowMinutes);
+        Assert.Equal(5, provider.GetRequiredService<IOptions<ForumAttachmentOptions>>().Value.MaxFilesPerPost);
+        Assert.Equal(60, provider.GetRequiredService<IOptions<AnalyticsOptions>>().Value.TrafficCacheMinutes);
+        Assert.Null(provider.GetRequiredService<IOptions<MemberAuthenticationOptions>>().Value.Google?.ClientId);
+        Assert.Equal(10, provider.GetRequiredService<IOptions<FanPerformanceRateLimitingOptions>>().Value.AudioPermitLimit);
+        Assert.Equal(10 * 1024 * 1024, provider.GetRequiredService<IOptions<BlobUploadOptions>>().Value.DefaultMaxBytes);
 
         // #336: web composition uses editorial AI surface only (not discovery worker pipeline).
         using (var newsScope = provider.CreateScope())
