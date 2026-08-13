@@ -56,6 +56,14 @@ public sealed class QueenZoneWebCompositionTests
 
         Assert.Equal(["admin@test.local"], provider.GetRequiredService<IOptions<AdminOptions>>().Value.AllowedEmails);
         Assert.Equal("https://www.queenzone.org", provider.GetRequiredService<IOptions<SiteOptions>>().Value.PublicBaseUrl);
+        Assert.Equal(50, provider.GetRequiredService<IOptions<UploadQuotaOptions>>().Value.MaxUploadsPerDay);
+        Assert.True(provider.GetRequiredService<IOptions<ForumDataOptions>>().Value.UseModernForumReads);
+        Assert.Equal(60, provider.GetRequiredService<IOptions<ForumOptions>>().Value.PostEditWindowMinutes);
+        Assert.Equal(5, provider.GetRequiredService<IOptions<ForumAttachmentOptions>>().Value.MaxFilesPerPost);
+        Assert.Equal(60, provider.GetRequiredService<IOptions<AnalyticsOptions>>().Value.TrafficCacheMinutes);
+        Assert.Null(provider.GetRequiredService<IOptions<MemberAuthenticationOptions>>().Value.Google?.ClientId);
+        Assert.Equal(10, provider.GetRequiredService<IOptions<FanPerformanceRateLimitingOptions>>().Value.AudioPermitLimit);
+        Assert.Equal(10 * 1024 * 1024, provider.GetRequiredService<IOptions<BlobUploadOptions>>().Value.DefaultMaxBytes);
 
         // #336: web composition uses editorial AI surface only (not discovery worker pipeline).
         using (var newsScope = provider.CreateScope())
@@ -90,6 +98,70 @@ public sealed class QueenZoneWebCompositionTests
         var result = new AdminOptionsValidator(new FakeHostEnvironment("Development"))
             .Validate(null, new AdminOptions { AllowedEmails = ["admin@test.local", "  "] });
         Assert.True(result.Failed);
+    }
+
+    [Fact]
+    public void AddQueenZoneWebOptions_rejects_production_without_blob_or_member_oauth()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Admin:AllowedEmails:0"] = "admin@test.local",
+                ["Site:PublicBaseUrl"] = "https://www.queenzone.org",
+                ["Analytics:MeasurementId"] = "G-V2W56BZ3KZ",
+            })
+            .Build();
+
+        var environment = new FakeHostEnvironment("Production");
+        var services = new ServiceCollection();
+        services.AddSingleton<IConfiguration>(configuration);
+        services.AddSingleton<IHostEnvironment>(environment);
+        services.AddQueenZoneWebOptions(configuration);
+
+        using var provider = services.BuildServiceProvider(validateScopes: true);
+
+        var blobEx = Assert.Throws<OptionsValidationException>(
+            () => provider.GetRequiredService<IOptions<BlobUploadOptions>>().Value);
+        Assert.Contains("ConnectionStrings:BlobStorage", blobEx.Message);
+
+        var authEx = Assert.Throws<OptionsValidationException>(
+            () => provider.GetRequiredService<IOptions<MemberAuthenticationOptions>>().Value);
+        Assert.Contains("OAuth provider", authEx.Message);
+    }
+
+    [Fact]
+    public void AddQueenZoneWebOptions_accepts_complete_production_settings()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Admin:AllowedEmails:0"] = "admin@test.local",
+                ["Site:PublicBaseUrl"] = "https://www.queenzone.org",
+                ["Analytics:MeasurementId"] = "G-V2W56BZ3KZ",
+                ["Authentication:Google:ClientId"] = "google-client",
+                ["Authentication:Google:ClientSecret"] = "google-secret",
+                ["ConnectionStrings:BlobStorage"] =
+                    "DefaultEndpointsProtocol=https;AccountName=test;AccountKey=dGVzdA==;EndpointSuffix=core.windows.net",
+            })
+            .Build();
+
+        var environment = new FakeHostEnvironment("Production");
+        var services = new ServiceCollection();
+        services.AddSingleton<IConfiguration>(configuration);
+        services.AddSingleton<IHostEnvironment>(environment);
+        services.AddQueenZoneWebOptions(configuration);
+
+        using var provider = services.BuildServiceProvider(validateScopes: true);
+
+        Assert.Equal(
+            "G-V2W56BZ3KZ",
+            provider.GetRequiredService<IOptions<AnalyticsOptions>>().Value.MeasurementId);
+        Assert.Equal(
+            "google-client",
+            provider.GetRequiredService<IOptions<MemberAuthenticationOptions>>().Value.Google?.ClientId);
+        Assert.Equal(
+            10 * 1024 * 1024,
+            provider.GetRequiredService<IOptions<BlobUploadOptions>>().Value.DefaultMaxBytes);
     }
 
     [Fact]

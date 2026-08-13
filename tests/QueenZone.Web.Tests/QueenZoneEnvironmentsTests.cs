@@ -53,6 +53,19 @@ public sealed class QueenZoneEnvironmentsTests
         Assert.Equal(expected, QueenZoneEnvironments.IsAutomatedTestHost(env));
     }
 
+    [Theory]
+    [InlineData("Development", false)]
+    [InlineData("Testing", false)]
+    [InlineData("E2E", false)]
+    [InlineData("Staging", true)]
+    [InlineData("Preview", true)]
+    [InlineData("Production", true)]
+    public void IsProductionLike_matches_expected(string environmentName, bool expected)
+    {
+        var env = new FakeHostEnvironment(environmentName);
+        Assert.Equal(expected, QueenZoneEnvironments.IsProductionLike(env));
+    }
+
     private sealed class FakeHostEnvironment(string environmentName) : IHostEnvironment
     {
         public string EnvironmentName { get; set; } = environmentName;

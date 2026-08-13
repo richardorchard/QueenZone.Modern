@@ -19,7 +19,7 @@ namespace QueenZone.Web.Tests;
 /// </item>
 /// <item>
 /// <description>
-/// Production-shaped cases use <c>UseEnvironment("Production")</c> plus the same Entra host
+/// Production-shaped cases use <c>UseEnvironment("Production")</c> plus the same production host
 /// settings as <see cref="ResponseCompressionTests"/> so output cache is enabled without a real
 /// Azure AD app. Empty <c>ConnectionStrings:QueenZoneLegacy</c> keeps in-memory sample data.
 /// No special env vars are required beyond a normal <c>dotnet test</c> run.
@@ -139,7 +139,7 @@ public sealed class PublicOutputCacheTests : IClassFixture<WebApplicationFactory
         return factory.WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Production");
-            ResponseCompressionTests.ApplyProductionEntraTestSettings(builder);
+            ResponseCompressionTests.ApplyProductionHostTestSettings(builder);
             if (configureServices is not null)
             {
                 builder.ConfigureServices(configureServices);

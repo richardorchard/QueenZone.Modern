@@ -27,7 +27,9 @@ public static class QueenZoneWebServiceCollectionExtensions
         services.AddSingleton<IValidateOptions<SiteOptions>, SiteOptionsValidator>();
 
         services.AddOptions<AnalyticsOptions>()
-            .Bind(configuration.GetSection(AnalyticsOptions.SectionName));
+            .Bind(configuration.GetSection(AnalyticsOptions.SectionName))
+            .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<AnalyticsOptions>, AnalyticsOptionsValidator>();
 
         services.AddOptions<SitemapOptions>()
             .Bind(configuration.GetSection(SitemapOptions.SectionName))
@@ -35,13 +37,19 @@ public static class QueenZoneWebServiceCollectionExtensions
         services.AddSingleton<IValidateOptions<SitemapOptions>, SitemapOptionsValidator>();
 
         services.AddOptions<MemberAuthenticationOptions>()
-            .Bind(configuration.GetSection(MemberAuthenticationOptions.SectionName));
+            .Bind(configuration.GetSection(MemberAuthenticationOptions.SectionName))
+            .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<MemberAuthenticationOptions>, MemberAuthenticationOptionsValidator>();
 
         services.AddOptions<ForumDataOptions>()
-            .Bind(configuration.GetSection(ForumDataOptions.SectionName));
+            .Bind(configuration.GetSection(ForumDataOptions.SectionName))
+            .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<ForumDataOptions>, ForumDataOptionsValidator>();
 
         services.AddOptions<ForumOptions>()
-            .Bind(configuration.GetSection(ForumOptions.SectionName));
+            .Bind(configuration.GetSection(ForumOptions.SectionName))
+            .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<ForumOptions>, ForumOptionsValidator>();
 
         services.AddOptions<PublicQueryCacheOptions>()
             .Bind(configuration.GetSection(PublicQueryCacheOptions.SectionName))
@@ -49,10 +57,19 @@ public static class QueenZoneWebServiceCollectionExtensions
         services.AddSingleton<IValidateOptions<PublicQueryCacheOptions>, PublicQueryCacheOptionsValidator>();
 
         services.AddOptions<ForumAttachmentOptions>()
-            .Bind(configuration.GetSection(ForumAttachmentOptions.SectionName));
+            .Bind(configuration.GetSection(ForumAttachmentOptions.SectionName))
+            .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<ForumAttachmentOptions>, ForumAttachmentOptionsValidator>();
 
         services.AddOptions<UploadQuotaOptions>()
-            .Bind(configuration.GetSection(UploadQuotaOptions.SectionName));
+            .Bind(configuration.GetSection(UploadQuotaOptions.SectionName))
+            .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<UploadQuotaOptions>, UploadQuotaOptionsValidator>();
+
+        services.AddOptions<BlobUploadOptions>()
+            .Bind(configuration.GetSection(BlobUploadOptions.SectionName))
+            .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<BlobUploadOptions>, BlobUploadOptionsValidator>();
 
         services.AddOptions<NewsSuggestionOptions>()
             .Bind(configuration.GetSection(NewsSuggestionOptions.SectionName));
@@ -65,7 +82,9 @@ public static class QueenZoneWebServiceCollectionExtensions
         IConfiguration configuration)
     {
         services.AddOptions<FanPerformanceRateLimitingOptions>()
-            .Bind(configuration.GetSection(FanPerformanceRateLimitingOptions.SectionName));
+            .Bind(configuration.GetSection(FanPerformanceRateLimitingOptions.SectionName))
+            .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<FanPerformanceRateLimitingOptions>, FanPerformanceRateLimitingOptionsValidator>();
 
         services.AddRateLimiter(limiter =>
         {

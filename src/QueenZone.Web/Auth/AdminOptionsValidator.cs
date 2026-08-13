@@ -21,7 +21,7 @@ public sealed class AdminOptionsValidator(IHostEnvironment environment) : IValid
 
         // Committed appsettings.json ships an empty allowlist on purpose. Production must
         // supply Admin__AllowedEmails__N via App Service application settings or Key Vault.
-        if (emails.Length == 0 && IsProductionLike(environment))
+        if (emails.Length == 0 && QueenZoneEnvironments.IsProductionLike(environment))
         {
             return ValidateOptionsResult.Fail(
                 $"{AdminOptions.SectionName}:AllowedEmails must contain at least one admin email in {environment.EnvironmentName}. " +
@@ -31,9 +31,4 @@ public sealed class AdminOptionsValidator(IHostEnvironment environment) : IValid
 
         return ValidateOptionsResult.Success;
     }
-
-    internal static bool IsProductionLike(IHostEnvironment environment) =>
-        environment.IsProduction()
-        || environment.IsEnvironment("Staging")
-        || string.Equals(environment.EnvironmentName, "Preview", StringComparison.OrdinalIgnoreCase);
 }
