@@ -37,3 +37,11 @@ e2e-app-cmd.pid
 appservice-logs.zip
 
 appservice-logs/
+
+# OpenTofu local/generated files. Remote state is never committed.
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log

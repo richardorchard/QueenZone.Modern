@@ -1,0 +1,56 @@
+name: OpenTofu backend smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      identity:
+        description: Workload identity to verify
+        required: true
+        default: plan
+        type: choice
+        options:
+          - plan
+          - apply
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  backend-smoke:
+    runs-on: ubuntu-latest
+    environment: opentofu-${{ inputs.identity }}
+    env:
+      ARM_CLIENT_ID: ${{ vars.ARM_CLIENT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ vars.ARM_SUBSCRIPTION_ID }}
+      ARM_TENANT_ID: ${{ vars.ARM_TENANT_ID }}
+      ARM_USE_AZUREAD: "true"
+      ARM_USE_OIDC: "true"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup OpenTofu
+        uses: opentofu/setup-opentofu@v2
+        with:
+          tofu_version: 1.12.5
+          tofu_wrapper: false
+
+      - name: Verify remote backend access
+        shell: bash
+        run: |
+          set -euo pipefail
+          workdir="$(mktemp -d)"
+          trap 'rm -rf "$workdir"' EXIT
+
+          cat > "$workdir/backend.tf" <<'EOF'
+          terraform {
+            backend "azurerm" {}
+          }
+          EOF
+
+          tofu -chdir="$workdir" init \
+            -input=false \
+            -backend-config="$GITHUB_WORKSPACE/infra/backend/production.backend.hcl"
+          tofu -chdir="$workdir" state list
