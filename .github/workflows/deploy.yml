@@ -71,6 +71,7 @@ jobs:
     if: github.ref == 'refs/heads/main' && needs.changes.outputs.code == 'true'
     outputs:
       run_id: ${{ steps.find.outputs.run_id }}
+      head_sha: ${{ steps.sha.outputs.head_sha }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -206,13 +207,15 @@ jobs:
           access_token: ${{ secrets.BITWARDEN_SECRETS_MANAGER_ACCESS_TOKEN }}
           secrets: ${{ vars.BITWARDEN_APP_SERVICE_DEPLOY_SECRETS }}
 
-      # Enable run-from-package + platform warmup in the same job as the zip
-      # push (issue #655). Do not flip WEBSITE_RUN_FROM_PACKAGE outside a
-      # deploy — the current site is extracted files, not a package.
-      - name: Ensure run-from-package and warmup settings
+      # Kudu POST /api/settings does not persist WEBSITE_RUN_FROM_PACKAGE as
+      # an ARM app setting and left the site serving the previous extract
+      # (#660). Clear that SCM key, zip-deploy as extract (the path that
+      # last actually swapped the running DLL), then recycle so the new
+      # binaries load.
+      - name: Clear broken Kudu run-from-package key
         env:
           AZURE_WEBAPP_PUBLISH_PROFILE: ${{ steps.bitwarden-secrets.outputs.AZURE_WEBAPP_PUBLISH_PROFILE }}
-        run: python3 ./scripts/Set-AppServiceWebSettings.py
+        run: python3 ./scripts/Invoke-AppServiceKudu.py --delete-setting WEBSITE_RUN_FROM_PACKAGE
 
       - name: Deploy
         uses: azure/webapps-deploy@v3
@@ -221,13 +224,18 @@ jobs:
           publish-profile: ${{ steps.bitwarden-secrets.outputs.AZURE_WEBAPP_PUBLISH_PROFILE }}
           package: publish
 
+      - name: Recycle App Service
+        env:
+          AZURE_WEBAPP_PUBLISH_PROFILE: ${{ steps.bitwarden-secrets.outputs.AZURE_WEBAPP_PUBLISH_PROFILE }}
+        run: python3 ./scripts/Invoke-AppServiceKudu.py --restart
+
       - name: Warm up custom domain
         run: bash ./scripts/Invoke-PostDeploySmoke.sh --warmup-only
 
   post-deploy-smoke:
     name: Post-deploy smoke
     runs-on: ubuntu-latest
-    needs: [changes, deploy]
+    needs: [changes, resolve-ci-run, deploy]
     # always() is required: migrate is skipped on non-EF pushes, and GitHub
     # then skips every descendant that does not opt out of that cascade —
     # even when `deploy` itself ran (run 31702420754 after #660).
@@ -235,6 +243,7 @@ jobs:
       always() &&
       github.ref == 'refs/heads/main' &&
       needs.changes.outputs.code == 'true' &&
+      needs.resolve-ci-run.result == 'success' &&
       needs.deploy.result == 'success'
     # Allow retry loop (~8 min) plus request time; avoid false fails during App Service recycle.
     timeout-minutes: 12
@@ -248,4 +257,6 @@ jobs:
       # The deploy job already polled /warmup; this job still starts with warmup
       # then the content-route suite. A failure fails the job so watchers get mail.
       - name: Post-deploy smoke (custom domain)
-        run: bash ./scripts/Invoke-PostDeploySmoke.sh
+        run: |
+          bash ./scripts/Invoke-PostDeploySmoke.sh \
+            --expect-build-version "${{ needs.resolve-ci-run.outputs.head_sha }}"

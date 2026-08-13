@@ -138,16 +138,15 @@ Invoke-WebRequest -Uri https://www.queenzone.org/health -UseBasicParsing | Selec
 Invoke-WebRequest -Uri https://www.queenzone.org/warmup -UseBasicParsing | Select-Object StatusCode
 ```
 
-Post-deploy smoke (custom domain) is a separate job at the end of `.github/workflows/deploy.yml` (`resolve-ci-run` in parallel with `migrate` → `deploy` → `post-deploy-smoke`, triggered by push to `main` after `ci.yml`'s PR checks have already passed). `migrate` runs only when the push touched EF model/migration paths; `resolve-ci-run` finds the `ci.yml` run that already built and tested the merged PR's head commit and `deploy` reuses its `web-publish` artifact — no rebuild. The deploy job enables `WEBSITE_RUN_FROM_PACKAGE` and polls `/warmup` before smoke starts. Pull-request tests are not rerun by this post-merge deploy workflow. Checks hit `https://www.queenzone.org` (`/warmup`, then `/health` plus key public routes); a failure fails the smoke job so GitHub Actions can notify watchers. Re-run the same checks locally:
+Post-deploy smoke (custom domain) is a separate job at the end of `.github/workflows/deploy.yml` (`resolve-ci-run` in parallel with `migrate` → `deploy` → `post-deploy-smoke`, triggered by push to `main` after `ci.yml`'s PR checks have already passed). `migrate` runs only when the push touched EF model/migration paths; `resolve-ci-run` finds the `ci.yml` run that already built and tested the merged PR's head commit and `deploy` reuses its `web-publish` artifact — no rebuild. The deploy job recycles the App Service via Kudu after the zip push, polls `/warmup`, then post-deploy smoke checks that `/` serves the PR-head build stamp. Pull-request tests are not rerun by this post-merge deploy workflow. Checks hit `https://www.queenzone.org` (`/warmup`, then `/health` plus key public routes); a failure fails the smoke job so GitHub Actions can notify watchers. Re-run the same checks locally:
 
 ```powershell
 powershell -File .\scripts\Smoke-LiveSite.ps1
 ```
 
-B1 App Service warmup / package settings (set by `deploy.yml` via Kudu, not by hand):
+B1 App Service warmup settings (portal / ARM Application Settings, not Kudu):
 
 ```text
-WEBSITE_RUN_FROM_PACKAGE=1
 WEBSITE_WARMUP_PATH=/warmup
 WEBSITE_WARMUP_STATUSES=200
 ```

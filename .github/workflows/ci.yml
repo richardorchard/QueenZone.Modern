@@ -65,7 +65,15 @@ jobs:
         run: dotnet restore QueenZone.sln
 
       - name: Build
-        run: dotnet build QueenZone.sln --configuration Release --no-restore
+        run: |
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          if [ -z "$HEAD_SHA" ]; then
+            HEAD_SHA="${{ github.sha }}"
+          fi
+          SHORT="${HEAD_SHA:0:7}"
+          echo "Stamping QueenZone.Web InformationalVersion=$SHORT"
+          dotnet build QueenZone.sln --configuration Release --no-restore \
+            /p:OverrideGitCommitShort="$SHORT"
 
       # Sharded test jobs download these outputs and run `dotnet test --no-build`
       # so we do not pay a second full compile on each matrix leg.

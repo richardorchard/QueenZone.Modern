@@ -9,6 +9,7 @@ BASE_URL="https://www.queenzone.org"
 WARMUP_ONLY=0
 MAX_ATTEMPTS=32
 SLEEP_SECONDS=15
+EXPECT_BUILD_VERSION=""
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -16,6 +17,7 @@ while [ "$#" -gt 0 ]; do
     --base-url) BASE_URL="${2:?}"; shift ;;
     --max-attempts) MAX_ATTEMPTS="${2:?}"; shift ;;
     --sleep-seconds) SLEEP_SECONDS="${2:?}"; shift ;;
+    --expect-build-version) EXPECT_BUILD_VERSION="${2:?}"; shift ;;
     *)
       echo "Unknown argument: $1" >&2
       exit 2
@@ -23,6 +25,10 @@ while [ "$#" -gt 0 ]; do
   esac
   shift
 done
+
+if [ -n "$EXPECT_BUILD_VERSION" ]; then
+  EXPECT_BUILD_VERSION="${EXPECT_BUILD_VERSION:0:7}"
+fi
 
 WARMUP_PATH="/warmup"
 PATHS=(
@@ -56,6 +62,13 @@ check_path() {
       return 1
     fi
   fi
+  if [ -n "$EXPECT_BUILD_VERSION" ] && [ "$path" = "/" ]; then
+    if ! grep -q "data-build-version=\"${EXPECT_BUILD_VERSION}\"" "$body_file"; then
+      echo "  ✗ $path → 200 but build stamp is not ${EXPECT_BUILD_VERSION} (deployed package did not become the running app)"
+      rm -f "$body_file"
+      return 1
+    fi
+  fi
   echo "  ✓ $path → HTTP $status"
   rm -f "$body_file"
   return 0
@@ -65,6 +78,9 @@ if [ "$WARMUP_ONLY" -eq 1 ]; then
   echo "Mode: warmup-only (deploy job). Content-route smoke is a separate job."
 else
   echo "Mode: full post-deploy smoke (warmup then content routes)."
+fi
+if [ -n "$EXPECT_BUILD_VERSION" ]; then
+  echo "Expecting data-build-version=${EXPECT_BUILD_VERSION} on /."
 fi
 echo "Waiting for warmup on ${BASE_URL}${WARMUP_PATH} (up to ~$(( MAX_ATTEMPTS * SLEEP_SECONDS / 60 )) minutes)."
 echo "/health is not sufficient readiness — App Service can answer liveness while pages still 500."
