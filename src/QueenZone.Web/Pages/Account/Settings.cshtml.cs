@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using QueenZone.Data;
 
 namespace QueenZone.Web.Pages.Account;
 
@@ -44,6 +45,8 @@ public sealed class SettingsModel(MemberAccountService memberAccountService) : P
     public LegacyAccountLinkState LegacyLink { get; private set; } = LegacyAccountLinkState.None();
 
     public string? StatusMessage { get; private set; }
+
+    public DateTime? ScheduledDeletionAt { get; private set; }
 
     public async Task<IActionResult> OnGetAsync(CancellationToken cancellationToken)
     {
@@ -247,6 +250,7 @@ public sealed class SettingsModel(MemberAccountService memberAccountService) : P
         HasAvatar = !string.IsNullOrWhiteSpace(account.AvatarUrl);
         LinkedProviders = await memberAccountService.ListExternalProvidersAsync(account.Id, cancellationToken);
         LegacyLink = await memberAccountService.GetLegacyLinkStateAsync(account, cancellationToken);
+        ScheduledDeletionAt = account.DeletionRequestedAt?.AddDays(MemberAccountDeletionPolicy.RetentionDays);
     }
 
     private async Task<Data.Entities.MemberAccount?> LoadCurrentAccountAsync(CancellationToken cancellationToken)

@@ -90,7 +90,11 @@ public sealed class MemberAccountService(
             var existingByEmail = await memberAccountRepository.FindByEmailAsync(email, cancellationToken);
             if (existingByEmail is not null)
             {
-                await memberAccountRepository.AddExternalLoginAsync(existingByEmail.Id, provider, providerKey, email, cancellationToken);
+                if (existingByEmail.DeletionRequestedAt is null)
+                {
+                    await memberAccountRepository.AddExternalLoginAsync(existingByEmail.Id, provider, providerKey, email, cancellationToken);
+                }
+
                 result = existingByEmail;
             }
             else
@@ -112,12 +116,16 @@ public sealed class MemberAccountService(
 
         // Existing accounts only: silent backfill for people who never claimed yet.
         // New accounts keep LinkedLegacyUserId null so Settings can offer an explicit claim.
-        if (!isNewAccount)
+        if (!isNewAccount && result.DeletionRequestedAt is null)
         {
             result = await TryBackfillLegacyLinkAsync(result, cancellationToken);
         }
 
-        await memberAccountRepository.RecordLoginAsync(result.Id, DateTime.UtcNow, cancellationToken);
+        if (!result.IsSuspended)
+        {
+            await memberAccountRepository.RecordLoginAsync(result.Id, DateTime.UtcNow, cancellationToken);
+        }
+
         return result;
     }
 
@@ -309,6 +317,12 @@ public sealed class MemberAccountService(
     /// </summary>
     public async Task<MemberAccountResult> UpdateDisplayNameAsync(Guid memberId, string displayName, CancellationToken cancellationToken = default)
     {
+        var account = await memberAccountRepository.FindByIdAsync(memberId, cancellationToken);
+        if (account?.DeletionRequestedAt is not null)
+        {
+            return MemberAccountResult.Failure(PendingDeletionEditError);
+        }
+
         var trimmed = displayName?.Trim() ?? string.Empty;
         if (trimmed.Length == 0)
         {
@@ -351,6 +365,11 @@ public sealed class MemberAccountService(
         if (account is null)
         {
             return MemberAccountResult.Failure("Account not found.");
+        }
+
+        if (account.DeletionRequestedAt is not null)
+        {
+            return MemberAccountResult.Failure(PendingDeletionEditError);
         }
 
         MemberAvatarImageProcessor.ProcessedAvatar processed;
@@ -459,6 +478,11 @@ public sealed class MemberAccountService(
             return MemberAccountResult.Failure("Account not found.");
         }
 
+        if (account.DeletionRequestedAt is not null)
+        {
+            return MemberAccountResult.Failure(PendingDeletionEditError);
+        }
+
         if (string.IsNullOrWhiteSpace(account.AvatarUrl))
         {
             return MemberAccountResult.Success(account);
@@ -477,6 +501,67 @@ public sealed class MemberAccountService(
             cancellationToken);
 
         return MemberAccountResult.Success(updated);
+    }
+
+    public async Task<MemberAccountResult> RequestDeletionAsync(
+        Guid memberId,
+        CancellationToken cancellationToken = default)
+    {
+        var requested = await memberAccountRepository.RequestDeletionAsync(
+            memberId,
+            DateTime.UtcNow,
+            cancellationToken);
+        if (requested is null)
+        {
+            return MemberAccountResult.Failure("Account not found.");
+        }
+
+        return MemberAccountResult.Success(requested.Account);
+    }
+
+    public async Task<MemberAccountResult> CancelDeletionAsync(
+        Guid memberId,
+        CancellationToken cancellationToken = default)
+    {
+        var account = await memberAccountRepository.CancelDeletionAsync(
+            memberId,
+            DateTime.UtcNow,
+            cancellationToken);
+        if (account is null)
+        {
+            return MemberAccountResult.Failure("Account not found.");
+        }
+
+        if (account.PersonalDataPurgedAt is not null)
+        {
+            return MemberAccountResult.Failure("Account deletion can no longer be cancelled.");
+        }
+
+        if (account.DeletionRequestedAt is not null)
+        {
+            return MemberAccountResult.Failure("The 30-day cooling-off period has ended.");
+        }
+
+        return MemberAccountResult.Success(account);
+    }
+
+    public async Task<int> PurgeDueDeletionsAsync(
+        DateTime utcNow,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await memberAccountRepository.PurgeDeletedAccountsAsync(
+            utcNow.AddDays(-MemberAccountDeletionPolicy.RetentionDays),
+            utcNow,
+            cancellationToken);
+        foreach (var avatarBlobPath in result.AvatarBlobPaths)
+        {
+            await SafeDeleteAsync(
+                avatarBlobPath,
+                MemberAvatarPaths.ToThumbBlobName(avatarBlobPath),
+                cancellationToken);
+        }
+
+        return result.PurgedCount;
     }
 
     private async Task SafeDeleteAsync(
@@ -512,6 +597,8 @@ public sealed class MemberAccountService(
     public const int MinDisplayNameLength = 2;
 
     public const int MaxDisplayNameLength = 100;
+
+    public const string PendingDeletionEditError = "Cancel account deletion before changing your public profile.";
 
     public const string SuspendedSignInError = "This account has been suspended.";
 }

@@ -27,6 +27,39 @@ public sealed class PrivateMessageServiceTests
     }
 
     [Fact]
+    public async Task PendingDeletion_AnonymisesAndBlocksMessages_AndCancellationRestoresThem()
+    {
+        var (service, members, _, alice, bob) = CreateSystem();
+        var created = await service.ComposeAsync(alice.Id, bob.Id, "Retained message");
+        var requestedAt = new DateTime(2026, 8, 12, 7, 0, 0, DateTimeKind.Utc);
+        await members.RequestDeletionAsync(alice.Id, requestedAt);
+
+        var detail = await service.GetConversationAsync(
+            created.ConversationId!.Value,
+            bob.Id,
+            markRead: false);
+        var reply = await service.ReplyAsync(created.ConversationId.Value, bob.Id, "Are you there?");
+        var recipientMatches = await service.SearchRecipientsAsync(bob.Id, "Alice");
+
+        Assert.NotNull(detail);
+        Assert.Equal(MemberAccountDeletionPolicy.DeletedDisplayName, detail.OtherParticipantDisplayName);
+        Assert.Equal(MemberAccountDeletionPolicy.DeletedDisplayName, Assert.Single(detail.Messages).SenderDisplayName);
+        Assert.False(reply.Succeeded);
+        Assert.Equal(PrivateMessageService.UnableToSendMessage, reply.ErrorMessage);
+        Assert.Empty(recipientMatches);
+
+        await members.CancelDeletionAsync(alice.Id, requestedAt.AddDays(2));
+        detail = await service.GetConversationAsync(created.ConversationId.Value, bob.Id, markRead: false);
+        reply = await service.ReplyAsync(created.ConversationId.Value, bob.Id, "Welcome back");
+        recipientMatches = await service.SearchRecipientsAsync(bob.Id, "Alice");
+
+        Assert.Equal("Alice", detail!.OtherParticipantDisplayName);
+        Assert.Equal("Alice", detail.Messages[0].SenderDisplayName);
+        Assert.True(reply.Succeeded);
+        Assert.Single(recipientMatches);
+    }
+
+    [Fact]
     public async Task Compose_RejectsEmptySelfAndMissingRecipient()
     {
         var (service, _, _, alice, bob) = CreateSystem();

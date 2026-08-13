@@ -37,4 +37,36 @@ public sealed class AdminAuthenticationSchemeTests
 
         Assert.Equal(TestAuthHandler.SchemeName, scheme);
     }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void SelectAuthoringAuthenticateScheme_with_member_cookie_uses_member_scheme(bool useAzureAd)
+    {
+        var scheme = QueenZoneAuthServiceCollectionExtensions.SelectAuthoringAuthenticateScheme(
+            useAzureAd,
+            hasMemberCookie: true);
+
+        Assert.Equal(MemberAuthenticationSchemes.MembersCookie, scheme);
+    }
+
+    [Fact]
+    public void SelectAuthoringAuthenticateScheme_without_member_cookie_uses_Entra_cookie()
+    {
+        var scheme = QueenZoneAuthServiceCollectionExtensions.SelectAuthoringAuthenticateScheme(
+            useAzureAd: true,
+            hasMemberCookie: false);
+
+        Assert.Equal(CookieAuthenticationDefaults.AuthenticationScheme, scheme);
+    }
+
+    [Fact]
+    public void SelectAuthoringAuthenticateScheme_without_member_cookie_or_Entra_uses_test_handler()
+    {
+        var scheme = QueenZoneAuthServiceCollectionExtensions.SelectAuthoringAuthenticateScheme(
+            useAzureAd: false,
+            hasMemberCookie: false);
+
+        Assert.Equal(TestAuthHandler.SchemeName, scheme);
+    }
 }

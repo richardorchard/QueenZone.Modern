@@ -14,7 +14,10 @@
       @if (Model.Detail is not null)
       {
         <text> · </text>
-        <a href="/members/@Model.Detail.OtherParticipantId">View profile</a>
+        @if (!string.Equals(Model.Detail.OtherParticipantDisplayName, "Deleted member", StringComparison.Ordinal))
+        {
+          <a href="/members/@Model.Detail.OtherParticipantId">View profile</a>
+        }
       }
     </p>
 
