@@ -1,0 +1,14 @@
+@page "/account/deletion-requested"
+@{
+  ViewData["Title"] = "Account deletion requested";
+}
+
+<partial name="_PageHero" model='@(("Members", "Account deletion scheduled", "Your 30-day cooling-off period has started.", ""))' />
+
+<section class="qz-section">
+  <div class="qz-container qz-prose">
+    <p>You have been signed out. Your public name is now <strong>Deleted member</strong>, your profile and avatar are hidden, and retained content has anonymised attribution.</p>
+    <p>You can <a href="/account/login?returnUrl=%2Faccount%2Fdelete">sign back in and cancel deletion</a> at any time during that period.</p>
+    <p>Cancelling within <strong>30 days</strong> restores your identity and attribution. After 30 days, your sign-in data and stored avatar are permanently removed.</p>
+  </div>
+</section>

@@ -71,6 +71,110 @@ public sealed partial class AccountSettingsPageTests : IClassFixture<WebApplicat
         Assert.Contains("Save display name", body);
         Assert.Contains("Legacy forum account", body);
         Assert.Contains("No legacy forum account is linked to this email.", body);
+        Assert.Contains("href=\"/account/delete\"", body);
+        Assert.Contains("Delete my account", body);
+    }
+
+    [Fact]
+    public async Task DeleteAccount_RequiresExactConfirmation()
+    {
+        var client = await CreateSignedInMemberClientAsync(
+            email: "delete-invalid@example.com",
+            displayName: "Delete Invalid",
+            subject: "google-delete-invalid",
+            options: new WebApplicationFactoryClientOptions
+            {
+                HandleCookies = true,
+                AllowAutoRedirect = false,
+            });
+        var page = await client.GetStringAsync("/account/delete");
+
+        var response = await client.PostAsync(
+            "/account/delete",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(page),
+                ["Confirmation"] = "delete",
+            }));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("Type DELETE to confirm", await response.Content.ReadAsStringAsync());
+        using var scope = factory.Services.CreateScope();
+        var member = await scope.ServiceProvider
+            .GetRequiredService<IMemberAccountRepository>()
+            .FindByEmailAsync("delete-invalid@example.com");
+        Assert.Null(member!.DeletionRequestedAt);
+    }
+
+    [Fact]
+    public async Task DeleteAccount_AnonymisesAndSignsOut_ButLoginAndCancellationRestoreIdentity()
+    {
+        const string email = "delete-valid@example.com";
+        var client = await CreateSignedInMemberClientAsync(
+            email,
+            displayName: "Delete Valid",
+            subject: "google-delete-valid",
+            options: new WebApplicationFactoryClientOptions
+            {
+                HandleCookies = true,
+                AllowAutoRedirect = false,
+            });
+        var page = await client.GetStringAsync("/account/delete");
+        Assert.Contains("30-day cooling-off period", page);
+        Assert.Contains("sign back in and cancel deletion", page);
+
+        var response = await client.PostAsync(
+            "/account/delete",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(page),
+                ["Confirmation"] = "DELETE",
+            }));
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal("/account/deletion-requested", response.Headers.Location!.OriginalString);
+        var settingsAfterDeletion = await client.GetAsync("/account/settings");
+        Assert.Equal(HttpStatusCode.Redirect, settingsAfterDeletion.StatusCode);
+        Assert.Contains("/account/login", settingsAfterDeletion.Headers.Location!.OriginalString);
+        using var scope = factory.Services.CreateScope();
+        var members = scope.ServiceProvider.GetRequiredService<IMemberAccountRepository>();
+        var deleted = await members.FindByEmailAsync(email);
+        Assert.NotNull(deleted);
+        Assert.False(deleted.IsSuspended);
+        Assert.NotNull(deleted.DeletionRequestedAt);
+        Assert.Equal(MemberAccountDeletionPolicy.DeletedDisplayName, deleted.DisplayName);
+        Assert.Equal("Delete Valid", deleted.DeletionRecoveryDisplayName);
+        Assert.Equal(["Google"], await members.ListExternalProvidersAsync(deleted.Id));
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/members/{deleted.Id}")).StatusCode);
+
+        var signedInAgain = await CreateSignedInMemberClientAsync(
+            email,
+            displayName: "Delete Valid",
+            subject: "google-delete-valid",
+            options: new WebApplicationFactoryClientOptions
+            {
+                HandleCookies = true,
+                AllowAutoRedirect = false,
+            });
+        var pendingPage = await signedInAgain.GetStringAsync("/account/delete");
+        Assert.Contains("Deletion scheduled", pendingPage);
+        Assert.Contains("Cancel account deletion", pendingPage);
+
+        var cancelResponse = await signedInAgain.PostAsync(
+            "/account/delete?handler=Cancel",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(pendingPage),
+            }));
+
+        Assert.Equal(HttpStatusCode.Redirect, cancelResponse.StatusCode);
+        Assert.Equal("/account/settings", cancelResponse.Headers.Location!.OriginalString);
+        var restored = await members.FindByEmailAsync(email);
+        Assert.Null(restored!.DeletionRequestedAt);
+        Assert.False(restored.IsSuspended);
+        Assert.Equal("Delete Valid", restored.DisplayName);
+        Assert.Null(restored.DeletionRecoveryDisplayName);
+        Assert.Equal(HttpStatusCode.OK, (await signedInAgain.GetAsync($"/members/{restored.Id}")).StatusCode);
     }
 
     [Fact]
