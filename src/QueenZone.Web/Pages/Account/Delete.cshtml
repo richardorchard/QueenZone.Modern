@@ -1,0 +1,54 @@
+@page "/account/delete"
+@model DeleteModel
+
+<partial name="_PageHero" model='@(("Members", "Delete account", "Schedule your account and personal sign-in data for deletion.", ""))' />
+
+<section class="qz-section">
+  <div class="qz-container qz-prose">
+    @if (Model.ScheduledDeletionAt is not null)
+    {
+      <h2>Deletion scheduled</h2>
+      <p>Your account is scheduled for permanent deletion on <strong>@Model.ScheduledDeletionAt.Value.ToString("d MMMM yyyy")</strong>.</p>
+      <p>Your public identity is anonymised during the 30-day cooling-off period. Sign-in remains available so you can cancel deletion below.</p>
+      <form method="post" asp-page-handler="Cancel" class="qz-account-form" data-busy-submit data-busy-label="Cancelling…">
+        @Html.AntiForgeryToken()
+        <div asp-validation-summary="ModelOnly" class="qz-account-form__errors" role="alert"></div>
+        <div class="qz-account-form__actions">
+          <button type="submit" class="qz-button">Cancel account deletion</button>
+          <a class="qz-button qz-button--outline" href="/account/settings">Back to settings</a>
+        </div>
+        <p class="qz-account-form__status" data-busy-status hidden role="status" aria-live="polite"></p>
+      </form>
+    }
+    else
+    {
+      <h2>What happens</h2>
+      <ul>
+        <li>You are signed out after requesting deletion.</li>
+        <li>Your public name changes immediately to <strong>Deleted member</strong>, your profile is hidden, and your avatar is hidden.</li>
+        <li>Your forum posts and private messages remain with anonymised attribution.</li>
+        <li>A <strong>30-day cooling-off period</strong> starts.</li>
+        <li>You can sign back in and cancel deletion before the scheduled date.</li>
+        <li>Cancelling restores your display name, avatar, profile, and content attribution.</li>
+        <li>After 30 days, your sign-in data and stored avatar are permanently removed.</li>
+        <li>Your existing legacy account link is retained.</li>
+      </ul>
+      <p>Deletion cannot be undone after the 30-day period ends.</p>
+
+      <form method="post" class="qz-account-form" data-busy-submit data-busy-label="Scheduling…">
+        @Html.AntiForgeryToken()
+        <div asp-validation-summary="ModelOnly" class="qz-account-form__errors" role="alert"></div>
+        <label class="qz-account-form__field">
+          <span>Type <strong>DELETE</strong> to schedule deletion of the account for @Model.Email</span>
+          <input asp-for="Confirmation" type="text" autocomplete="off" required />
+          <span asp-validation-for="Confirmation" class="qz-account-form__field-error"></span>
+        </label>
+        <div class="qz-account-form__actions">
+          <button type="submit" class="qz-button qz-button--danger">Schedule account deletion</button>
+          <a class="qz-button qz-button--outline" href="/account/settings">Cancel</a>
+        </div>
+        <p class="qz-account-form__status" data-busy-status hidden role="status" aria-live="polite"></p>
+      </form>
+    }
+  </div>
+</section>

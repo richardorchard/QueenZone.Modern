@@ -88,4 +88,30 @@ public interface IMemberAccountRepository
     /// Clears a suspension, restoring normal sign-in access.
     /// </summary>
     Task<MemberAccount?> ReinstateAsync(Guid memberId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Schedules deletion after the policy cooling-off period. The account remains usable and
+    /// unchanged until it is cancelled or <see cref="PurgeDeletedAccountsAsync"/> runs.
+    /// </summary>
+    Task<MemberAccountDeletionRequestResult?> RequestDeletionAsync(
+        Guid memberId,
+        DateTime requestedAt,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Cancels a pending deletion request before personal data has been purged.
+    /// </summary>
+    Task<MemberAccount?> CancelDeletionAsync(
+        Guid memberId,
+        DateTime cancelledAt,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Irreversibly removes personal and authentication data for deletion requests at or before
+    /// <paramref name="purgeBefore"/>. The member tombstone and linked legacy id are retained.
+    /// </summary>
+    Task<MemberAccountDeletionPurgeResult> PurgeDeletedAccountsAsync(
+        DateTime purgeBefore,
+        DateTime purgedAt,
+        CancellationToken cancellationToken = default);
 }

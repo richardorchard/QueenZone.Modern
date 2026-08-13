@@ -121,10 +121,23 @@ public sealed class AzureAdClientIdTests
         Assert.NotNull(testMemberScheme);
         Assert.Equal(typeof(TestMemberAuthHandler), testMemberScheme!.HandlerType);
 
+        Assert.NotNull(await schemeProvider.GetSchemeAsync(AdminAuthenticationSchemes.CompositeScheme));
+        Assert.NotNull(await schemeProvider.GetSchemeAsync(AdminAuthenticationSchemes.AuthoringCompositeScheme));
+
         var authorizationOptions = provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<Microsoft.AspNetCore.Authorization.AuthorizationOptions>>().Value;
+        var adminPolicy = authorizationOptions.GetPolicy("Admin");
+        Assert.NotNull(adminPolicy);
+        Assert.Equal([AdminAuthenticationSchemes.CompositeScheme], adminPolicy!.AuthenticationSchemes);
+
         var memberPolicy = authorizationOptions.GetPolicy(MemberAuthenticationSchemes.MemberPolicy);
         Assert.NotNull(memberPolicy);
         Assert.Contains(TestMemberAuthHandler.SchemeName, memberPolicy!.AuthenticationSchemes);
+
+        var authoringPolicy = authorizationOptions.GetPolicy("Authoring");
+        Assert.NotNull(authoringPolicy);
+        Assert.Contains(AdminAuthenticationSchemes.AuthoringCompositeScheme, authoringPolicy!.AuthenticationSchemes);
+        Assert.DoesNotContain(AdminAuthenticationSchemes.CompositeScheme, authoringPolicy.AuthenticationSchemes);
+        Assert.Contains(TestMemberAuthHandler.SchemeName, authoringPolicy.AuthenticationSchemes);
     }
 
     [Theory]
