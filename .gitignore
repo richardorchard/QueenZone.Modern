@@ -20,6 +20,7 @@ appsettings.Local.json
 *.local-backup
 *.PublishSettings
 *.pubxml
+sixlabors.lic
 
 smoke-app-local/
 smoke-*.log

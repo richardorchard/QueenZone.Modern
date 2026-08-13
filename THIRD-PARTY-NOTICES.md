@@ -6,14 +6,14 @@ them.
 
 ## SixLabors.ImageSharp
 
-QueenZone Modern directly depends on SixLabors.ImageSharp 3.1.12.
+QueenZone Modern directly depends on SixLabors.ImageSharp 4.0.0.
 
 ImageSharp is distributed under the Six Labors Split License, Version 1.0.
 QueenZone Modern consumes ImageSharp for use in software licensed under an open
 source licence and therefore uses ImageSharp under the Apache License, Version
 2.0, as provided by the Six Labors Split License.
 
-- [Six Labors Split License](https://github.com/SixLabors/ImageSharp/blob/v3.1.12/LICENSE)
+- [Six Labors Split License](https://github.com/SixLabors/ImageSharp/blob/v4.0.0/LICENSE)
 - [Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0)
 
 Copyright (c) Six Labors.

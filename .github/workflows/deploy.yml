@@ -12,6 +12,9 @@ permissions:
   actions: read
   pull-requests: read
 
+env:
+  SIXLABORS_LICENSE_KEY: ${{ secrets.SIXLABORS_LICENSE_KEY }}
+
 concurrency:
   group: deploy-${{ github.ref }}
   # Never cancel an in-flight run here — cancelling mid-migrate/deploy can

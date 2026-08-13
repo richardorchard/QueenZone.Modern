@@ -280,6 +280,20 @@ Rules for agents:
 - Project: **`Queenzone Development`** (`1c16fd2d-4bfb-4eb7-8357-b49400233490`).
 - **This Windows workstation:** `bws` lives at `%USERPROFILE%\bin\bws.exe` with `%USERPROFILE%\bin` on the User `Path`; token is User env `BWS_ACCESS_TOKEN`. Restart agent shells after Path changes.
 
+ImageSharp 4 builds require `SIXLABORS_LICENSE_KEY`. On an authorised Windows or
+macOS machine, import it from Bitwarden without displaying the value:
+
+```powershell
+. ./scripts/Import-SixLaborsLicense.ps1
+```
+
+Use `-PersistForUser` only on Windows when new IDE/agent processes need the value;
+restart them afterward. macOS agents import it into each new `pwsh` session.
+Hosted agents receive the key through their platform secret manager, never through
+a copied local Bitwarden machine token. External contributors must obtain their
+own Six Labors licence. See `docs/agent-bitwarden-secrets.md` for renewal and
+troubleshooting. Never commit `sixlabors.lic` or print the licence value.
+
 ```powershell
 $env:BWS_ACCESS_TOKEN = [Environment]::GetEnvironmentVariable("BWS_ACCESS_TOKEN", "User")
 bws secret list "1c16fd2d-4bfb-4eb7-8357-b49400233490"
@@ -301,7 +315,7 @@ For local SQL MCP access through Azure Data API Builder, see `docs/sql/data-api-
 
 News agent worker and admin review queue: see `docs/architecture/news-agent.md`. OpenRouter key goes in `src/QueenZone.NewsAgent.Worker/appsettings.Local.json`. Manual OpenRouter smoke test: `scripts/Smoke-NewsAgent.bat`. Admin review UI: `/admin/news-discovery` (requires `Admin:AllowedEmails` from App Service or `appsettings.Local.json` — committed `appsettings.json` ships an empty allowlist; member OAuth at `/account/login` is unrelated).
 
-Never log secrets (connection strings, client secrets, storage keys, OpenRouter keys) into issues, PR text, or application telemetry properties.
+Never log secrets (connection strings, client secrets, storage keys, OpenRouter keys, or Six Labors licence values) into issues, PR text, or application telemetry properties.
 
 ## Media Serving
 
@@ -330,6 +344,12 @@ Do not switch `SongFileUrl` back to `cdn.queenzone.org`. New forum uploads live 
 ## Cursor Cloud specific instructions
 
 Environment: .NET 10 SDK is preinstalled at `/usr/local/dotnet` and symlinked to `/usr/local/bin/dotnet` (already on `PATH`). The startup update script runs `dotnet restore QueenZone.sln` and `dotnet tool restore`; standard build/test/run commands live in `README.md` and above.
+
+Because the startup restore runs before normal task work, Cursor Cloud must inject
+`SIXLABORS_LICENSE_KEY` through its encrypted environment secrets before startup.
+Do not place a local `BWS_ACCESS_TOKEN` in Cursor Cloud. If the licence secret is
+absent, the ImageSharp 4 restore/build is expected to fail; ask the user to
+configure the environment rather than exposing the key in chat or repository files.
 
 No database is required for local development. When `ConnectionStrings:QueenZoneLegacy` is empty (the default), the app uses in-memory/sample data, so `dotnet run --project src/QueenZone.Web/QueenZone.Web.csproj` starts with zero external services (defaults to `Development` at `http://localhost:5146`). `dotnet run` builds `Debug` by default; do not pass `--no-build` unless you have already built the `Debug` configuration (the `--configuration Release` builds live under `bin/Release`).
 

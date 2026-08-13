@@ -25,6 +25,9 @@ on:
 permissions:
   contents: read
 
+env:
+  SIXLABORS_LICENSE_KEY: ${{ secrets.SIXLABORS_LICENSE_KEY }}
+
 concurrency:
   group: nightly-legacy-checks
   cancel-in-progress: false

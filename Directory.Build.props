@@ -1,5 +1,11 @@
 <Project>
 
+  <PropertyGroup>
+    <!-- ImageSharp 4 validates direct dependencies at build time. Supply the
+         complete sixlabors.lic contents through this environment variable. -->
+    <SixLaborsLicenseKey>$(SIXLABORS_LICENSE_KEY)</SixLaborsLicenseKey>
+  </PropertyGroup>
+
   <!--
     NuGet audit suppressions for known advisories with no available upgrade path.
     Review this list whenever HtmlSanitizer or EF Core SQLite release a new minor/patch version.
