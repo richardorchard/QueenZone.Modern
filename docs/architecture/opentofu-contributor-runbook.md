@@ -1,0 +1,89 @@
+# OpenTofu contributor runbook
+
+Issue: [#619](https://github.com/richardorchard/QueenZone.Modern/issues/619), step 3 of epic [#615](https://github.com/richardorchard/QueenZone.Modern/issues/615).
+
+## Foundation boundary
+
+The production root is [`infra/environments/production/`](../../infra/environments/production/). It pins OpenTofu **1.12.5**, AzureRM **5.0.1**, and Cloudflare **5.23.0**. The dependency lock file contains official checksums for Linux AMD64, Windows AMD64, macOS AMD64, and macOS ARM64.
+
+This issue declares no managed resource and performs no import. The three modules contain typed import contracts only:
+
+- `azure-web`: #622 owns web, telemetry, hostname, certificate, and ingress resources;
+- `azure-data`: #628 owns SQL, Storage, containers, and data-protection configuration;
+- `cloudflare-edge`: #626 owns zone, DNS, TLS, Worker, and route resources.
+
+## Local validation
+
+Install the version in `.opentofu-version`, then run:
+
+```powershell
+./scripts/Test-OpenTofu.ps1
+./scripts/Test-OpenTofu.ps1 -UseRemoteBackend
+```
+
+The default uses `-backend=false` and needs no cloud credentials. The remote check uses the Entra-authenticated backend from #616. Cloudflare credentials are not required until a configuration reads Cloudflare data or plans managed resources.
+
+The validation script runs formatting, credential-pattern checks, lifecycle checks, `init`, and `validate` for the production root and every module. Critical Azure/Cloudflare resources fail validation unless they set `lifecycle { prevent_destroy = true }`; broad `ignore_changes = all` is forbidden.
+
+## Provider upgrades
+
+Provider versions are exact, not floating. Upgrade one provider at a time in a separate PR:
+
+1. Read the official provider changelog and migration guide.
+2. Change the exact version in the production root and matching modules.
+3. Run `tofu init -upgrade` in the production root.
+4. Refresh cross-platform checksums:
+
+```powershell
+tofu -chdir=infra/environments/production providers lock `
+  -platform=linux_amd64 `
+  -platform=windows_amd64 `
+  -platform=darwin_amd64 `
+  -platform=darwin_arm64
+```
+
+5. Run local validation, then a refresh-only production plan with trusted credentials.
+6. Review state-upgrade and replacement risk before applying.
+
+Never hand-edit `.terraform.lock.hcl`.
+
+## Planning
+
+Use the committed backend configuration and environment-provided credentials:
+
+```powershell
+tofu -chdir=infra/environments/production init `
+  -reconfigure `
+  -backend-config=../../backend/production.backend.hcl
+tofu -chdir=infra/environments/production plan -out=$env:TEMP\queenzone-production.tfplan
+tofu -chdir=infra/environments/production show $env:TEMP\queenzone-production.tfplan
+```
+
+Plan files and state are sensitive and must remain outside the repository. Do not apply a plan containing an unexplained delete or replacement.
+
+## First import of a resource
+
+1. Re-probe the live resource immediately before declaring it.
+2. Match the live name, location, SKU, capacity, access controls, and provider defaults.
+3. Add `prevent_destroy = true` for every critical resource.
+4. Commit the resource block before import so its address is stable.
+5. Back up state using the #616 runbook.
+6. Import the exact existing ID. Never use `-allow-missing-config`.
+7. Run `plan -refresh-only`, followed by a normal plan.
+8. Stop if the normal plan proposes creation, replacement, or an unexplained update.
+
+Import commands belong in the relevant issue/PR evidence, not reusable scripts containing mutable IDs or credentials.
+
+## State moves and removals
+
+Prefer committed `moved` blocks. Use `tofu state mv` only when a declarative move is impossible, after a state backup and with all applies stopped. `tofu state rm` removes management without deleting the live resource, but it can cause a later plan to recreate it; require explicit review and document the intended ownership change.
+
+Lock recovery, backend restoration, credential rotation, and force-unlock controls remain in [`opentofu-state-and-identity.md`](opentofu-state-and-identity.md).
+
+## Production safeguards
+
+- AzureRM cannot auto-register resource providers; registration remains an operator/platform concern.
+- Azure resource-group deletion fails while the group contains resources.
+- Production variables pin the existing resource group, region, B1 SKU, single worker, Cloudflare zone, and `cdn2` Worker route.
+- Secret values come only from environment/Bitwarden flows. They never belong in HCL, `.tfvars`, plans, outputs, or state.
+- Application deployment and EF migrations stay in the existing workflows. OpenTofu changes the infrastructure control plane only.
