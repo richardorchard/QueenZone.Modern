@@ -70,9 +70,10 @@ jobs:
       # Sharded test jobs download these outputs and run `dotnet test --no-build`
       # so we do not pay a second full compile on each matrix leg.
       # WAF hosts need QueenZone.Web compressed static-web-asset intermediates
-      # (src/QueenZone.Web/obj/.../compressed/). Other obj trees and PDBs are
-      # omitted. Do not exclude *.xml — NewsAgent tests copy fixture XML into
-      # bin/Release and --no-build shards read those files from disk.
+      # (src/QueenZone.Web/obj/.../compressed/). Other obj trees are omitted.
+      # Keep PDBs: Coverlet maps executed lines from them, so a --no-build
+      # shard without symbols reports a few percent global coverage.
+      # Keep *.xml: NewsAgent tests copy fixture XML into bin/Release.
       - name: Upload build binaries
         uses: actions/upload-artifact@v7
         with:
@@ -81,7 +82,6 @@ jobs:
             src/**/bin/Release/
             tests/**/bin/Release/
             src/QueenZone.Web/obj/Release/
-            !**/*.pdb
           retention-days: 1
           if-no-files-found: error
 
