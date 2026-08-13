@@ -16,7 +16,7 @@ public sealed class StaticAssetCacheHeadersTests : IClassFixture<WebApplicationF
         productionFactory = factory.WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Production");
-            ResponseCompressionTests.ApplyProductionEntraTestSettings(builder);
+            ResponseCompressionTests.ApplyProductionHostTestSettings(builder);
         });
         developmentFactory = factory.WithWebHostBuilder(builder => builder.UseEnvironment("Development"));
     }

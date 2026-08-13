@@ -101,6 +101,70 @@ public sealed class QueenZoneWebCompositionTests
     }
 
     [Fact]
+    public void AddQueenZoneWebOptions_rejects_production_without_blob_or_member_oauth()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Admin:AllowedEmails:0"] = "admin@test.local",
+                ["Site:PublicBaseUrl"] = "https://www.queenzone.org",
+                ["Analytics:MeasurementId"] = "G-V2W56BZ3KZ",
+            })
+            .Build();
+
+        var environment = new FakeHostEnvironment("Production");
+        var services = new ServiceCollection();
+        services.AddSingleton<IConfiguration>(configuration);
+        services.AddSingleton<IHostEnvironment>(environment);
+        services.AddQueenZoneWebOptions(configuration);
+
+        using var provider = services.BuildServiceProvider(validateScopes: true);
+
+        var blobEx = Assert.Throws<OptionsValidationException>(
+            () => provider.GetRequiredService<IOptions<BlobUploadOptions>>().Value);
+        Assert.Contains("ConnectionStrings:BlobStorage", blobEx.Message);
+
+        var authEx = Assert.Throws<OptionsValidationException>(
+            () => provider.GetRequiredService<IOptions<MemberAuthenticationOptions>>().Value);
+        Assert.Contains("OAuth provider", authEx.Message);
+    }
+
+    [Fact]
+    public void AddQueenZoneWebOptions_accepts_complete_production_settings()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Admin:AllowedEmails:0"] = "admin@test.local",
+                ["Site:PublicBaseUrl"] = "https://www.queenzone.org",
+                ["Analytics:MeasurementId"] = "G-V2W56BZ3KZ",
+                ["Authentication:Google:ClientId"] = "google-client",
+                ["Authentication:Google:ClientSecret"] = "google-secret",
+                ["ConnectionStrings:BlobStorage"] =
+                    "DefaultEndpointsProtocol=https;AccountName=test;AccountKey=dGVzdA==;EndpointSuffix=core.windows.net",
+            })
+            .Build();
+
+        var environment = new FakeHostEnvironment("Production");
+        var services = new ServiceCollection();
+        services.AddSingleton<IConfiguration>(configuration);
+        services.AddSingleton<IHostEnvironment>(environment);
+        services.AddQueenZoneWebOptions(configuration);
+
+        using var provider = services.BuildServiceProvider(validateScopes: true);
+
+        Assert.Equal(
+            "G-V2W56BZ3KZ",
+            provider.GetRequiredService<IOptions<AnalyticsOptions>>().Value.MeasurementId);
+        Assert.Equal(
+            "google-client",
+            provider.GetRequiredService<IOptions<MemberAuthenticationOptions>>().Value.Google?.ClientId);
+        Assert.Equal(
+            10 * 1024 * 1024,
+            provider.GetRequiredService<IOptions<BlobUploadOptions>>().Value.DefaultMaxBytes);
+    }
+
+    [Fact]
     public void AddQueenZoneWebComposition_registers_upload_quota_service()
     {
         var configuration = new ConfigurationBuilder()
