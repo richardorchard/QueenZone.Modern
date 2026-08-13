@@ -398,3 +398,13 @@ Useful reference files belong in `docs/legacy`:
 - content inventory
 
 The old source is only copied or ported when a specific page or behavior needs to be understood.
+
+## License
+
+Source code authored for QueenZone Modern is licensed under the [MIT License](LICENSE).
+
+The MIT License does not cover archive content, database records, user submissions,
+photographs, audio, video, lyrics, editorial material, logos, trademarks, or
+third-party components. Those materials remain subject to their respective rights
+and licences. See [Third-Party Notices](THIRD-PARTY-NOTICES.md) for key bundled and
+direct dependencies.
