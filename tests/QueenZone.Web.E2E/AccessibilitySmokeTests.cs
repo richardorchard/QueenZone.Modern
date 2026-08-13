@@ -12,6 +12,25 @@ namespace QueenZone.Web.E2E;
 public class AccessibilitySmokeTests : E2EPageTest
 {
     [Test]
+    public async Task Homepage_SkipLink_MovesFocusToMainContent()
+    {
+        await Page.GotoAsync("/");
+        await Expect(Page.GetByText("Latest news")).ToBeVisibleAsync();
+
+        var skipLink = Page.GetByRole(AriaRole.Link, new() { Name = "Skip to content" });
+        await Expect(skipLink).ToBeAttachedAsync();
+
+        await Page.Keyboard.PressAsync("Tab");
+        await Expect(skipLink).ToBeFocusedAsync();
+
+        await skipLink.PressAsync("Enter");
+
+        var main = Page.GetByRole(AriaRole.Main);
+        await Expect(main).ToHaveAttributeAsync("id", "main-content");
+        await Expect(main).ToBeFocusedAsync();
+    }
+
+    [Test]
     public async Task Homepage_HasNoCriticalAxeViolations()
     {
         await Page.GotoAsync("/");
