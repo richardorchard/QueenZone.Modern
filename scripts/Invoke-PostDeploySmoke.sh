@@ -61,6 +61,11 @@ check_path() {
   return 0
 }
 
+if [ "$WARMUP_ONLY" -eq 1 ]; then
+  echo "Mode: warmup-only (deploy job). Content-route smoke is a separate job."
+else
+  echo "Mode: full post-deploy smoke (warmup then content routes)."
+fi
 echo "Waiting for warmup on ${BASE_URL}${WARMUP_PATH} (up to ~$(( MAX_ATTEMPTS * SLEEP_SECONDS / 60 )) minutes)."
 echo "/health is not sufficient readiness — App Service can answer liveness while pages still 500."
 
