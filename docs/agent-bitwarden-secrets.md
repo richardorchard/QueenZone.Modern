@@ -14,7 +14,7 @@ Shared local secret store for development agents on Richard’s machines. **This
 | Secrets Manager project name | `Queenzone Development` |
 | Project id | `1c16fd2d-4bfb-4eb7-8357-b49400233490` |
 | Auth | User-scoped environment variable **`BWS_ACCESS_TOKEN`** (machine account access token) |
-| Canonical secret keys | App Service names, e.g. `ConnectionStrings__QueenZoneLegacy`, `ConnectionStrings__BlobStorage`, `AzureAd__*`, `OPENROUTER_API_KEY` |
+| Canonical secret keys | App Service names plus build secrets, e.g. `ConnectionStrings__QueenZoneLegacy`, `ConnectionStrings__BlobStorage`, `AzureAd__*`, `OPENROUTER_API_KEY`, `SIXLABORS_LICENSE_KEY` |
 
 Do **not** commit the token, paste it into chat, or print secret **values**. Prefer reporting only key names and value **lengths** when verifying.
 
@@ -89,6 +89,69 @@ bws project list
 bws secret list "1c16fd2d-4bfb-4eb7-8357-b49400233490"
 ```
 
+## Six Labors build licence
+
+ImageSharp 4 requires the complete Six Labors licence string during restore and
+build. The canonical recovery copy is the `SIXLABORS_LICENSE_KEY` entry in the
+`Queenzone Development` project. Never print the value, save `sixlabors.lic` in a
+repository, or paste either credential into chat.
+
+### Authorised Windows and macOS agents
+
+This path is only for agents running on Richard-controlled machines whose
+platform-specific Bitwarden machine account already has access:
+
+```powershell
+# Run from the repository root in Windows PowerShell or macOS pwsh.
+# Dot-source the script so the environment value remains available to later commands.
+. ./scripts/Import-SixLaborsLicense.ps1
+dotnet restore QueenZone.sln
+dotnet build QueenZone.sln --configuration Release --no-restore
+```
+
+The script reports only the key name and value length. It fails if `bws`,
+`BWS_ACCESS_TOKEN`, project access, or the exact secret entry is missing.
+
+Windows agents may persist the value for new IDE and agent processes:
+
+```powershell
+. ./scripts/Import-SixLaborsLicense.ps1 -PersistForUser
+```
+
+Restart existing IDEs, terminals, and agents afterward. On macOS, import the
+licence into each new `pwsh` session. Do not write the licence value into
+`.zprofile`, `.zshrc`, repository files, logs, or command output.
+
+### Hosted agents and external contributors
+
+- Hosted or cloud agents must receive `SIXLABORS_LICENSE_KEY` through that
+  platform's encrypted secret manager before any automatic `dotnet restore`.
+  Do not copy `windows-codex`, `mac-codex`, or another local Bitwarden machine
+  token into a hosted environment.
+- GitHub Actions reads the repository secret `SIXLABORS_LICENSE_KEY`.
+- External contributors and untrusted forks are not authorised to use the
+  QueenZone community licence. They must obtain their own licence from
+  <https://licensing.sixlabors.com/> and configure it locally.
+- If an environment cannot securely inject the licence, it cannot restore or
+  build ImageSharp 4. Stop and ask the user to configure that environment.
+
+### Renewal
+
+Before the annual licence expires:
+
+1. Replace `SIXLABORS_LICENSE_KEY` in the `Queenzone Development` Bitwarden project.
+2. Replace the GitHub repository secret with the same name; GitHub secrets are a
+   separate store and do not update from Bitwarden automatically.
+3. Re-run `Import-SixLaborsLicense.ps1 -PersistForUser` on Windows machines that
+   keep a persistent user value. Session-only Windows/macOS agents receive the
+   new value on their next import.
+4. Update any hosted-development environment secrets separately.
+5. Verify by key name and value length only, then run restore and build. No Azure
+   App Service runtime setting is required because enforcement occurs at build time.
+
+Do not overwrite an existing secret blindly during renewal. Confirm the target
+project, key name, and intended expiry first.
+
 ### Load legacy SQL connection for tools (never print the value)
 
 ```powershell
@@ -159,6 +222,8 @@ Restart the IDE/agent terminal after changing User `Path`.
 | `bw status` unauthenticated | Wrong CLI — use **`bws`**, not password-manager **`bw`** |
 | Secret key not found | Wrong project id, or key renamed; re-list keys only (no values) |
 | Agent on Mac can’t use Windows token | Expected — use `mac-codex` token on Mac hosts |
+| ImageSharp reports a missing licence | Import `SIXLABORS_LICENSE_KEY` in the current process before restore/build; restart persistent Windows processes after renewal |
+| Hosted agent fails during automatic restore | Configure `SIXLABORS_LICENSE_KEY` in that platform's secret manager before startup; do not inject a local Bitwarden machine token |
 
 ## See also
 

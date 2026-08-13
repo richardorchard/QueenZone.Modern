@@ -51,18 +51,30 @@ dotnet test QueenZone.sln
 dotnet run --project src/QueenZone.Web/QueenZone.Web.csproj
 ```
 
-ImageSharp 4 requires a Six Labors licence at build time. Store the complete
-contents of the supplied `sixlabors.lic` file in the user environment variable
-`SIXLABORS_LICENSE_KEY`; do not commit the file or value. Restart terminals and
-development tools after setting a persistent environment variable.
+ImageSharp 4 requires a Six Labors licence at build time. Authorised development
+agents on Richard's Windows or macOS machines should import the shared licence
+from the `Queenzone Development` Bitwarden project without printing it:
 
 ```powershell
-$licenseValue = [IO.File]::ReadAllText("C:\path\to\sixlabors.lic")
-[Environment]::SetEnvironmentVariable("SIXLABORS_LICENSE_KEY", $licenseValue, "User")
+# Windows PowerShell or cross-platform pwsh, from the repository root
+. ./scripts/Import-SixLaborsLicense.ps1
+dotnet restore QueenZone.sln
+
+# Optional on Windows: also persist it for new IDE and agent processes
+. ./scripts/Import-SixLaborsLicense.ps1 -PersistForUser
 ```
 
+The import lasts for the current PowerShell process. Restart Windows IDEs and
+agents after using `-PersistForUser`. On macOS, run the import in each new `pwsh`
+session; do not write the licence value to a shell profile. Hosted agents must
+receive `SIXLABORS_LICENSE_KEY` through their platform secret manager before the
+automatic restore runs. Do not give cloud environments a local Bitwarden machine
+token.
+
 GitHub Actions uses a repository secret with the same name. External contributors
-must obtain their own licence from [Six Labors](https://licensing.sixlabors.com/).
+are not authorised to use the shared QueenZone licence and must obtain their own
+licence from [Six Labors](https://licensing.sixlabors.com/). Full setup, renewal,
+and troubleshooting guidance: [`docs/agent-bitwarden-secrets.md`](docs/agent-bitwarden-secrets.md#six-labors-build-licence).
 
 To generate a local code coverage report:
 
