@@ -20,6 +20,7 @@ public sealed class EfMemberAccountRepositoryTests : IAsyncDisposable
             .Options;
         dbContext = new QueenZoneDbContext(options);
         dbContext.Database.EnsureCreated();
+        CreateModernForumTables();
         repository = new EfMemberAccountRepository(dbContext);
     }
 
@@ -167,6 +168,194 @@ public sealed class EfMemberAccountRepositoryTests : IAsyncDisposable
         Assert.Null(result);
     }
 
+    [Fact]
+    public async Task RequestDeletionAsync_AnonymisesImmediately_CancelRestores_AndPurgeMakesPermanent()
+    {
+        var account = await SeedAccountAsync("delete-me@example.com", "Delete Me");
+        account.AvatarUrl = $"members/{account.Id:N}/avatar.webp";
+        await dbContext.SaveChangesAsync();
+        dbContext.ModernForumCategories.Add(new ModernForumCategoryEntity
+        {
+            Id = 1,
+            LegacyForumId = 1,
+            Name = "Deletion tests",
+            ImportedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+        });
+        var thread = new ModernForumThreadEntity
+        {
+            LegacyTopicId = 8001,
+            LegacyForumId = 1,
+            CategoryId = 1,
+            Title = "Delete test",
+            StartedByDisplayName = account.DisplayName,
+            ImportedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+        };
+        dbContext.ModernForumThreads.Add(thread);
+        dbContext.ModernForumPosts.Add(new ModernForumPostEntity
+        {
+            LegacyPostId = 9001,
+            LegacyThreadTopicId = thread.LegacyTopicId,
+            Thread = thread,
+            LegacyForumId = 1,
+            AuthorMemberId = account.Id,
+            AuthorDisplayName = account.DisplayName,
+            BodyHtml = "Retained body",
+            ImportedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+        });
+        dbContext.ArticleSubmissions.Add(new ArticleSubmissionEntity
+        {
+            Id = Guid.NewGuid(),
+            AuthorMemberId = account.Id,
+            Title = "Retained article",
+            Slug = "retained-article",
+            Body = "Retained article body",
+            Status = ArticleSubmissionStatus.Published,
+            PublishedAt = DateTimeOffset.UtcNow,
+        });
+        dbContext.SearchDocuments.Add(new SearchDocumentEntity
+        {
+            Id = Guid.NewGuid(),
+            SourceKey = "article:retained-article",
+            ContentType = "article",
+            Title = "Retained article",
+            Body = "Retained article body",
+            Url = "/articles/community/retained-article",
+            AuthorDisplayName = account.DisplayName,
+            IndexedAt = DateTimeOffset.UtcNow,
+        });
+        await dbContext.SaveChangesAsync();
+        var requestedAt = new DateTime(2026, 8, 12, 7, 0, 0, DateTimeKind.Utc);
+
+        var result = await repository.RequestDeletionAsync(account.Id, requestedAt);
+        var second = await repository.RequestDeletionAsync(account.Id, requestedAt.AddMinutes(1));
+
+        Assert.NotNull(result);
+        Assert.False(result.AlreadyRequested);
+        Assert.True(second!.AlreadyRequested);
+        var reloaded = await dbContext.MemberAccounts.AsNoTracking().SingleAsync(a => a.Id == account.Id);
+        Assert.False(reloaded.IsSuspended);
+        Assert.Equal(requestedAt, reloaded.DeletionRequestedAt);
+        Assert.Equal(MemberAccountDeletionPolicy.DeletedDisplayName, reloaded.DisplayName);
+        Assert.Null(reloaded.AvatarUrl);
+        Assert.Equal("Delete Me", reloaded.DeletionRecoveryDisplayName);
+        Assert.Equal($"members/{account.Id:N}/avatar.webp", reloaded.DeletionRecoveryAvatarUrl);
+        var post = await dbContext.ModernForumPosts.AsNoTracking().SingleAsync();
+        Assert.Equal(account.Id, post.AuthorMemberId);
+        Assert.Equal(MemberAccountDeletionPolicy.DeletedDisplayName, post.AuthorDisplayName);
+        Assert.Equal(MemberAccountDeletionPolicy.DeletedDisplayName, (await dbContext.ModernForumThreads.AsNoTracking().SingleAsync()).StartedByDisplayName);
+        Assert.Equal(MemberAccountDeletionPolicy.DeletedDisplayName, (await dbContext.SearchDocuments.AsNoTracking().SingleAsync()).AuthorDisplayName);
+        var audit = await dbContext.MemberAccountDeletionAuditLogs.AsNoTracking().SingleAsync();
+        Assert.Equal(MemberAccountDeletionPolicy.RequestedAuditAction, audit.Action);
+        Assert.Equal(account.Id, audit.MemberAccountId);
+
+        await repository.CancelDeletionAsync(account.Id, requestedAt.AddDays(2));
+
+        reloaded = await dbContext.MemberAccounts.AsNoTracking().SingleAsync(a => a.Id == account.Id);
+        Assert.Equal("Delete Me", reloaded.DisplayName);
+        Assert.Equal($"members/{account.Id:N}/avatar.webp", reloaded.AvatarUrl);
+        Assert.Null(reloaded.DeletionRecoveryDisplayName);
+        Assert.Null(reloaded.DeletionRecoveryAvatarUrl);
+        post = await dbContext.ModernForumPosts.AsNoTracking().SingleAsync();
+        Assert.Equal(account.Id, post.AuthorMemberId);
+        Assert.Equal("Delete Me", post.AuthorDisplayName);
+        Assert.Equal("Delete Me", (await dbContext.ModernForumThreads.AsNoTracking().SingleAsync()).StartedByDisplayName);
+        Assert.Equal("Delete Me", (await dbContext.SearchDocuments.AsNoTracking().SingleAsync()).AuthorDisplayName);
+
+        var secondRequestAt = requestedAt.AddDays(3);
+        await repository.RequestDeletionAsync(account.Id, secondRequestAt);
+        var purge = await repository.PurgeDeletedAccountsAsync(secondRequestAt, secondRequestAt.AddDays(30));
+
+        Assert.Equal(1, purge.PurgedCount);
+        Assert.Equal([$"members/{account.Id:N}/avatar.webp"], purge.AvatarBlobPaths);
+        post = await dbContext.ModernForumPosts.AsNoTracking().SingleAsync();
+        Assert.Null(post.AuthorMemberId);
+        Assert.Equal(MemberAccountDeletionPolicy.DeletedDisplayName, post.AuthorDisplayName);
+        Assert.Equal(
+            MemberAccountDeletionPolicy.DeletedDisplayName,
+            (await dbContext.ModernForumThreads.AsNoTracking().SingleAsync()).StartedByDisplayName);
+        Assert.Equal(
+            MemberAccountDeletionPolicy.DeletedDisplayName,
+            (await dbContext.SearchDocuments.AsNoTracking().SingleAsync()).AuthorDisplayName);
+    }
+
+    [Fact]
+    public async Task CancelDeletionAsync_ClearsPendingRequest_AndPreventsPurge()
+    {
+        var account = await SeedAccountAsync("changed-mind@example.com", "Changed Mind");
+        var requestedAt = new DateTime(2026, 8, 12, 7, 0, 0, DateTimeKind.Utc);
+        await repository.RequestDeletionAsync(account.Id, requestedAt);
+
+        var cancelled = await repository.CancelDeletionAsync(account.Id, requestedAt.AddDays(2));
+        var purge = await repository.PurgeDeletedAccountsAsync(requestedAt, requestedAt.AddDays(30));
+
+        Assert.NotNull(cancelled);
+        Assert.Null(cancelled.DeletionRequestedAt);
+        Assert.False(cancelled.IsSuspended);
+        Assert.Equal("Changed Mind", cancelled.DisplayName);
+        Assert.Null(cancelled.DeletionRecoveryDisplayName);
+        Assert.Null(cancelled.DeletionRecoveryAvatarUrl);
+        Assert.Equal(0, purge.PurgedCount);
+        Assert.Equal(
+            [MemberAccountDeletionPolicy.RequestedAuditAction, MemberAccountDeletionPolicy.CancelledAuditAction],
+            await dbContext.MemberAccountDeletionAuditLogs
+                .OrderBy(log => log.OccurredAt)
+                .Select(log => log.Action)
+                .ToListAsync());
+    }
+
+    [Fact]
+    public async Task CancelDeletionAsync_AtThirtyDayCutoff_KeepsRequestPending()
+    {
+        var account = await SeedAccountAsync("too-late@example.com", "Too Late");
+        var requestedAt = new DateTime(2026, 8, 12, 7, 0, 0, DateTimeKind.Utc);
+        await repository.RequestDeletionAsync(account.Id, requestedAt);
+
+        var result = await repository.CancelDeletionAsync(account.Id, requestedAt.AddDays(30));
+
+        Assert.Equal(requestedAt, result!.DeletionRequestedAt);
+        Assert.Equal(
+            [MemberAccountDeletionPolicy.RequestedAuditAction],
+            await dbContext.MemberAccountDeletionAuditLogs.Select(log => log.Action).ToListAsync());
+    }
+
+    [Fact]
+    public async Task PurgeDeletedAccountsAsync_AfterThirtyDays_RemovesCredentialsAndKeepsLegacyLink()
+    {
+        var account = await SeedAccountAsync("purge-me@example.com", "Purge Me");
+        account.PasswordHash = "hashed-secret";
+        account.LinkedLegacyUserId = 4242;
+        account.LastLoginAt = new DateTime(2026, 8, 1, 0, 0, 0, DateTimeKind.Utc);
+        await dbContext.SaveChangesAsync();
+        await repository.AddExternalLoginAsync(account.Id, "Google", "purge-provider-key", account.Email);
+        var requestedAt = new DateTime(2026, 7, 1, 0, 0, 0, DateTimeKind.Utc);
+        await repository.RequestDeletionAsync(account.Id, requestedAt);
+
+        var early = await repository.PurgeDeletedAccountsAsync(
+            requestedAt.AddTicks(-1),
+            requestedAt.AddDays(30));
+        var purgedAt = requestedAt.AddDays(30);
+        var purged = await repository.PurgeDeletedAccountsAsync(requestedAt, purgedAt);
+
+        Assert.Equal(0, early.PurgedCount);
+        Assert.Equal(1, purged.PurgedCount);
+        var reloaded = await dbContext.MemberAccounts.AsNoTracking().SingleAsync(a => a.Id == account.Id);
+        Assert.Equal(MemberAccountDeletionPolicy.CreateDeletedEmail(account.Id), reloaded.Email);
+        Assert.Null(reloaded.PasswordHash);
+        Assert.Null(reloaded.LastLoginAt);
+        Assert.Equal(4242, reloaded.LinkedLegacyUserId);
+        Assert.Equal(purgedAt, reloaded.PersonalDataPurgedAt);
+        Assert.Empty(await repository.ListExternalProvidersAsync(account.Id));
+        Assert.Equal(
+            [MemberAccountDeletionPolicy.RequestedAuditAction, MemberAccountDeletionPolicy.PurgedAuditAction],
+            await dbContext.MemberAccountDeletionAuditLogs
+                .OrderBy(log => log.OccurredAt)
+                .Select(log => log.Action)
+                .ToListAsync());
+    }
+
     private async Task<MemberAccount> SeedAccountAsync(string email, string displayName)
     {
         return await repository.CreateAsync(new MemberAccount
@@ -176,6 +365,77 @@ public sealed class EfMemberAccountRepositoryTests : IAsyncDisposable
             DisplayName = displayName,
             CreatedAt = DateTime.UtcNow,
         });
+    }
+
+    private void CreateModernForumTables()
+    {
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE ModernForumCategory
+            (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                LegacyForumId INTEGER NOT NULL UNIQUE,
+                Name TEXT NOT NULL,
+                Description TEXT NULL,
+                SortOrder INTEGER NOT NULL,
+                LegacyPostCount INTEGER NOT NULL,
+                LastActivityAt TEXT NULL,
+                IsSynthetic INTEGER NOT NULL DEFAULT 0,
+                ImportedAt TEXT NOT NULL,
+                UpdatedAt TEXT NOT NULL
+            );
+
+            CREATE TABLE ModernForumThread
+            (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                LegacyTopicId INTEGER NOT NULL UNIQUE,
+                LegacyForumId INTEGER NOT NULL,
+                CategoryId INTEGER NOT NULL,
+                Title TEXT NOT NULL,
+                StartedByLegacyUserId INTEGER NULL,
+                StartedByDisplayName TEXT NOT NULL,
+                StartedAt TEXT NULL,
+                LastActivityAt TEXT NULL,
+                ReplyCount INTEGER NOT NULL,
+                IsSticky INTEGER NOT NULL,
+                IsLegacyTopicStarter INTEGER NOT NULL,
+                LegacyDiscography INTEGER NOT NULL,
+                StartedByUserValidated INTEGER NULL,
+                StarterAttachment TEXT NULL,
+                StarterFileSize TEXT NULL,
+                StarterAttachCount INTEGER NOT NULL,
+                ImportedAt TEXT NOT NULL,
+                UpdatedAt TEXT NOT NULL,
+                FOREIGN KEY (CategoryId) REFERENCES ModernForumCategory (Id)
+            );
+
+            CREATE TABLE ModernForumPost
+            (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                LegacyPostId INTEGER NOT NULL UNIQUE,
+                LegacyThreadTopicId INTEGER NOT NULL,
+                ThreadId INTEGER NOT NULL,
+                LegacyForumId INTEGER NOT NULL,
+                AuthorLegacyUserId INTEGER NULL,
+                AuthorDisplayName TEXT NOT NULL,
+                AuthorPostCount INTEGER NULL,
+                AuthorJoinedAt TEXT NULL,
+                BodyHtml TEXT NOT NULL,
+                SignatureHtml TEXT NULL,
+                PostedAt TEXT NULL,
+                LegacyDiscography INTEGER NOT NULL,
+                AuthorUserValidated INTEGER NULL,
+                Attachment TEXT NULL,
+                FileSize TEXT NULL,
+                AttachCount INTEGER NOT NULL,
+                AuthorMemberId TEXT NULL,
+                EditedAt TEXT NULL,
+                EditCount INTEGER NOT NULL DEFAULT 0,
+                IsHidden INTEGER NOT NULL DEFAULT 0,
+                ImportedAt TEXT NOT NULL,
+                UpdatedAt TEXT NOT NULL,
+                FOREIGN KEY (ThreadId) REFERENCES ModernForumThread (Id)
+            );
+            """);
     }
 
     public async ValueTask DisposeAsync()

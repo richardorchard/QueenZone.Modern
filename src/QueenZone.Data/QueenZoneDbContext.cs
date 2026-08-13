@@ -18,6 +18,9 @@ public sealed class QueenZoneDbContext : DbContext
 
     public DbSet<MemberExternalLogin> MemberExternalLogins => Set<MemberExternalLogin>();
 
+    public DbSet<MemberAccountDeletionAuditLogEntity> MemberAccountDeletionAuditLogs =>
+        Set<MemberAccountDeletionAuditLogEntity>();
+
     public DbSet<ModernForumCategoryEntity> ModernForumCategories => Set<ModernForumCategoryEntity>();
 
     public DbSet<ModernForumThreadEntity> ModernForumThreads => Set<ModernForumThreadEntity>();
@@ -140,6 +143,10 @@ public sealed class QueenZoneDbContext : DbContext
             entity.Property(account => account.SuspendedAt);
             entity.Property(account => account.SuspendedReason).HasMaxLength(1000);
             entity.Property(account => account.SuspendedByAdminEmail).HasMaxLength(256);
+            entity.Property(account => account.DeletionRequestedAt);
+            entity.Property(account => account.DeletionRecoveryDisplayName).HasMaxLength(100);
+            entity.Property(account => account.DeletionRecoveryAvatarUrl).HasMaxLength(512);
+            entity.Property(account => account.PersonalDataPurgedAt);
 
             entity.HasIndex(account => account.NormalizedEmail)
                 .IsUnique()
@@ -147,6 +154,20 @@ public sealed class QueenZoneDbContext : DbContext
 
             entity.HasIndex(account => account.IsSuspended)
                 .HasDatabaseName("IX_MemberAccounts_IsSuspended");
+
+            entity.HasIndex(account => new { account.DeletionRequestedAt, account.PersonalDataPurgedAt })
+                .HasDatabaseName("IX_MemberAccounts_DeletionRequestedAt_PersonalDataPurgedAt");
+        });
+
+        modelBuilder.Entity<MemberAccountDeletionAuditLogEntity>(entity =>
+        {
+            entity.ToTable("MemberAccountDeletionAuditLog");
+            entity.HasKey(log => log.Id);
+            entity.Property(log => log.Action).HasMaxLength(50).IsRequired();
+            entity.Property(log => log.OccurredAt).IsRequired();
+            entity.HasIndex(log => new { log.MemberAccountId, log.OccurredAt })
+                .IsDescending(false, true)
+                .HasDatabaseName("IX_MemberAccountDeletionAuditLog_MemberAccountId_OccurredAt");
         });
 
         modelBuilder.Entity<MemberExternalLogin>(entity =>

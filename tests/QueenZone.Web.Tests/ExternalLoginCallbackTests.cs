@@ -72,7 +72,7 @@ public sealed class ExternalLoginCallbackTests : IClassFixture<WebApplicationFac
     }
 
     [Fact]
-    public async Task Callback_WithAllowedAdminEmail_GrantsAdminAccess()
+    public async Task Callback_WithAllowedAdminEmail_RequiresSeparateAdminAuthentication()
     {
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions
         {
@@ -88,6 +88,10 @@ public sealed class ExternalLoginCallbackTests : IClassFixture<WebApplicationFac
         Assert.Equal(HttpStatusCode.Redirect, callbackResponse.StatusCode);
 
         var adminResponse = await client.GetAsync("/admin/news");
+        Assert.Equal(HttpStatusCode.Unauthorized, adminResponse.StatusCode);
+
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserEmailHeader, AdminHttpTestHelpers.AdminEmail);
+        adminResponse = await client.GetAsync("/admin/news");
         Assert.Equal(HttpStatusCode.OK, adminResponse.StatusCode);
     }
 

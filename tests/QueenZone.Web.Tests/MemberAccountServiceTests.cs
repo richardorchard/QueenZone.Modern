@@ -558,6 +558,73 @@ public sealed class MemberAccountServiceTests
     }
 
     [Fact]
+    public async Task RequestDeletionAsync_AnonymisesImmediately_AndCancellationRestoresIdentity()
+    {
+        var backend = new InMemoryBlobStorageBackend();
+        var repository = new InMemoryMemberAccountRepository();
+        var service = CreateService(memberAccountRepository: repository, blobBackend: backend);
+        var registered = await service.RegisterAsync(
+            "delete-service@example.com",
+            "S3curePass!",
+            "Delete Service");
+        await using var png = await CreatePngAsync();
+        var uploaded = await service.UpdateAvatarAsync(registered.Account!.Id, png, "avatar.png");
+        var avatarPath = uploaded.Account!.AvatarUrl!;
+        var thumbPath = MemberAvatarPaths.ToThumbBlobName(avatarPath);
+
+        var result = await service.RequestDeletionAsync(registered.Account.Id);
+        var signIn = await service.SignInAsync("delete-service@example.com", "S3curePass!");
+        var rename = await service.UpdateDisplayNameAsync(registered.Account.Id, "Visible Again");
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(MemberAccountDeletionPolicy.DeletedDisplayName, result.Account!.DisplayName);
+        Assert.Equal("Delete Service", result.Account.DeletionRecoveryDisplayName);
+        Assert.Equal(avatarPath, result.Account.DeletionRecoveryAvatarUrl);
+        Assert.Null(result.Account.AvatarUrl);
+        Assert.NotNull(result.Account.DeletionRequestedAt);
+        Assert.False(result.Account.IsSuspended);
+        Assert.True(backend.Exists(MemberAvatarPaths.Container, avatarPath));
+        Assert.True(backend.Exists(MemberAvatarPaths.Container, thumbPath));
+        Assert.True(signIn.Succeeded);
+        Assert.False(rename.Succeeded);
+        Assert.Equal(MemberAccountService.PendingDeletionEditError, rename.Error);
+
+        var cancelled = await service.CancelDeletionAsync(registered.Account.Id);
+
+        Assert.True(cancelled.Succeeded);
+        Assert.Null(cancelled.Account!.DeletionRequestedAt);
+        Assert.Equal("Delete Service", cancelled.Account.DisplayName);
+        Assert.Equal(avatarPath, cancelled.Account.AvatarUrl);
+        Assert.Null(cancelled.Account.DeletionRecoveryDisplayName);
+        Assert.Null(cancelled.Account.DeletionRecoveryAvatarUrl);
+    }
+
+    [Fact]
+    public async Task PendingDeletion_ExistingExternalSignInRemainsAvailable_WithoutAddingProvider()
+    {
+        var repository = new InMemoryMemberAccountRepository();
+        var service = CreateService(memberAccountRepository: repository);
+        var account = await service.FindOrCreateFromExternalLoginAsync(
+            "Google",
+            "deleted-google-subject",
+            "deleted-external@example.com",
+            "External Delete");
+        await service.RequestDeletionAsync(account.Id);
+
+        var returned = await service.FindOrCreateFromExternalLoginAsync(
+            "GitHub",
+            "deleted-github-subject",
+            "deleted-external@example.com",
+            "External Delete");
+
+        Assert.Equal(account.Id, returned.Id);
+        Assert.False(returned.IsSuspended);
+        Assert.Equal(MemberAccountDeletionPolicy.DeletedDisplayName, returned.DisplayName);
+        Assert.NotNull(returned.LastLoginAt);
+        Assert.Equal(["Google"], await service.ListExternalProvidersAsync(account.Id));
+    }
+
+    [Fact]
     public async Task UpdateAvatarAsync_RejectsOversizedFile_BeforeUpload()
     {
         var backend = new InMemoryBlobStorageBackend();
@@ -692,5 +759,23 @@ public sealed class MemberAccountServiceTests
 
         public Task<MemberAccount?> ReinstateAsync(Guid memberId, CancellationToken cancellationToken = default) =>
             inner.ReinstateAsync(memberId, cancellationToken);
+
+        public Task<MemberAccountDeletionRequestResult?> RequestDeletionAsync(
+            Guid memberId,
+            DateTime requestedAt,
+            CancellationToken cancellationToken = default) =>
+            inner.RequestDeletionAsync(memberId, requestedAt, cancellationToken);
+
+        public Task<MemberAccount?> CancelDeletionAsync(
+            Guid memberId,
+            DateTime cancelledAt,
+            CancellationToken cancellationToken = default) =>
+            inner.CancelDeletionAsync(memberId, cancelledAt, cancellationToken);
+
+        public Task<MemberAccountDeletionPurgeResult> PurgeDeletedAccountsAsync(
+            DateTime purgeBefore,
+            DateTime purgedAt,
+            CancellationToken cancellationToken = default) =>
+            inner.PurgeDeletedAccountsAsync(purgeBefore, purgedAt, cancellationToken);
     }
 }

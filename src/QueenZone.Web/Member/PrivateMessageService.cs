@@ -70,7 +70,7 @@ public sealed class PrivateMessageService(
         }
 
         var recipient = await memberAccountRepository.FindByIdAsync(recipientMemberId, cancellationToken);
-        if (recipient is null)
+        if (recipient is null || recipient.DeletionRequestedAt is not null)
         {
             return new PrivateMessageSendResult(false, null, "Recipient was not found.");
         }
@@ -113,13 +113,17 @@ public sealed class PrivateMessageService(
             conversationId,
             senderMemberId,
             cancellationToken);
-        if (otherParticipantId is Guid other
-            && await privateMessageRepository.IsMessagingBlockedAsync(
-                senderMemberId,
-                other,
-                cancellationToken))
+        if (otherParticipantId is Guid other)
         {
-            return new PrivateMessageSendResult(false, null, UnableToSendMessage);
+            var otherParticipant = await memberAccountRepository.FindByIdAsync(other, cancellationToken);
+            if (otherParticipant?.DeletionRequestedAt is not null
+                || await privateMessageRepository.IsMessagingBlockedAsync(
+                    senderMemberId,
+                    other,
+                    cancellationToken))
+            {
+                return new PrivateMessageSendResult(false, null, UnableToSendMessage);
+            }
         }
 
         return await privateMessageRepository.ReplyAsync(
@@ -166,7 +170,7 @@ public sealed class PrivateMessageService(
         }
 
         var target = await memberAccountRepository.FindByIdAsync(blockedMemberId, cancellationToken);
-        if (target is null)
+        if (target is null || target.DeletionRequestedAt is not null)
         {
             return new PrivateMessageBlockResult(false, "Member was not found.");
         }
@@ -222,9 +226,11 @@ public sealed class PrivateMessageService(
             return false;
         }
 
-        return !await privateMessageRepository.IsMessagingBlockedAsync(
-            currentMemberId!.Value,
-            targetMemberId!.Value,
-            cancellationToken);
+        var target = await memberAccountRepository.FindByIdAsync(targetMemberId!.Value, cancellationToken);
+        return target?.DeletionRequestedAt is null
+            && !await privateMessageRepository.IsMessagingBlockedAsync(
+                currentMemberId!.Value,
+                targetMemberId.Value,
+                cancellationToken);
     }
 }
