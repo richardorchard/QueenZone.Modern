@@ -328,14 +328,15 @@ jobs:
           publish-profile: ${{ steps.bitwarden-secrets.outputs.AZURE_WEBAPP_PUBLISH_PROFILE }}
           package: publish
 
-      # Do not Kudu-recycle after the zip push. #665 added POST /api/app/restart
-      # because WEBSITE_RUN_FROM_PACKAGE was never an ARM setting and OneDeploy
-      # left the previous extracted wwwroot running (#664). configure-app-settings
-      # now writes that flag through ARM (#666), so the zip mount itself restarts
-      # the worker. A second recycle was returning in ~1s, /warmup went green on
-      # the still-draining process, and post-deploy smoke then waited ~3 minutes
-      # for data-build-version. If the stamp never flips, fail this job — do not
-      # restore the extra restart without measuring a double-recycle again.
+      # ARM WEBSITE_RUN_FROM_PACKAGE=1 does swap the zip (run 31812172927 served
+      # the new data-build-version) but does not leave a worker that can finish
+      # /warmup. Skipping this restart after #688 left /warmup on HTTP 500 empty
+      # and / flaking until the deploy job was cancelled. Keep the stamp check.
+      - name: Recycle App Service
+        env:
+          AZURE_WEBAPP_PUBLISH_PROFILE: ${{ steps.bitwarden-secrets.outputs.AZURE_WEBAPP_PUBLISH_PROFILE }}
+        run: python3 ./scripts/Invoke-AppServiceKudu.py --restart
+
       - name: Warm up custom domain
         run: |
           bash ./scripts/Invoke-PostDeploySmoke.sh \
