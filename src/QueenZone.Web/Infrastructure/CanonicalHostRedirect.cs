@@ -8,9 +8,15 @@ public static class CanonicalHostRedirect
         app.Use(async (context, next) =>
         {
             var siteOptions = context.RequestServices.GetRequiredService<IOptions<SiteOptions>>().Value;
-            if (TryBuildRedirectUrl(context.Request, siteOptions.PublicBaseUrl, out var redirectUrl))
+            if (TryBuildRedirectUrl(context.Request, siteOptions.PublicBaseUrl, out var redirectUrl)
+                && Uri.TryCreate(redirectUrl, UriKind.Absolute, out var redirectUri)
+                && Uri.TryCreate(siteOptions.PublicBaseUrl, UriKind.Absolute, out var canonicalBase)
+                && string.Equals(redirectUri.Scheme, canonicalBase.Scheme, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(redirectUri.Host, canonicalBase.Host, StringComparison.OrdinalIgnoreCase)
+                && redirectUri.Port == canonicalBase.Port)
             {
-                context.Response.Redirect(redirectUrl, permanent: true);
+                context.Response.StatusCode = StatusCodes.Status301MovedPermanently;
+                context.Response.Headers.Location = redirectUri.AbsoluteUri;
                 return;
             }
 
