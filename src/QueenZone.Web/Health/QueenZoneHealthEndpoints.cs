@@ -8,6 +8,9 @@ public static class QueenZoneHealthEndpoints
 {
     public const string ReadyTag = "ready";
     public const string ReadyPath = "/health/ready";
+
+    // App Service pings this on process start via WEBSITE_WARMUP_PATH, set
+    // through ARM Application Settings in deploy.yml (#666).
     public const string WarmupPath = "/warmup";
 
     public static bool IsProbePath(PathString path) =>
