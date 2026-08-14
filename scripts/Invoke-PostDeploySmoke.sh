@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # Public-domain smoke used by deploy.yml (and locally via bash).
 # Default: wait for /warmup, then require 200 on the content routes.
-# --warmup-only: only the /warmup gate (used in the deploy job so recycle
-# overlaps the zip push instead of waiting for a second runner).
-# /warmup itself is short-circuited before every other middleware in the app's
-# request pipeline as of #681, so this poll's only remaining ceiling is /warmup's
-# own dependency checks and cache priming (#674), not anything upstream of it.
+# --warmup-only: /warmup gate used in the deploy job so this runner overlaps
+# the zip-deploy worker restart instead of waiting for a second job. Pass
+# --expect-build-version as well so warmup-only does not return green on the
+# previous worker (/warmup is short-circuited and was ok in ~2s on the old
+# process in #664). /warmup's remaining ceiling is its own dependency checks
+# and cache priming (#674), not anything upstream of it (#681).
 set -euo pipefail
 
 BASE_URL="https://www.queenzone.org"
@@ -87,19 +88,34 @@ if [ -n "$EXPECT_BUILD_VERSION" ]; then
 fi
 echo "Waiting for warmup on ${BASE_URL}${WARMUP_PATH} (up to ~$(( MAX_ATTEMPTS * SLEEP_SECONDS / 60 )) minutes)."
 echo "/health is not sufficient readiness — App Service can answer liveness while pages still 500."
+if [ "$WARMUP_ONLY" -eq 1 ] && [ -n "$EXPECT_BUILD_VERSION" ]; then
+  echo "Warmup-only also requires / to serve data-build-version=${EXPECT_BUILD_VERSION} so a live old worker cannot pass."
+fi
 
 for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
   echo "Warmup attempt ${attempt}/${MAX_ATTEMPTS}..."
   if check_path "$WARMUP_PATH"; then
-    echo "Warmup passed on attempt ${attempt}."
-    if [ "$WARMUP_ONLY" -eq 1 ]; then
-      exit 0
+    if [ "$WARMUP_ONLY" -eq 1 ] && [ -n "$EXPECT_BUILD_VERSION" ]; then
+      if check_path "/"; then
+        echo "Warmup and build stamp passed on attempt ${attempt}."
+        exit 0
+      fi
+      echo "Warmup is up but / is not serving ${EXPECT_BUILD_VERSION} yet."
+    else
+      echo "Warmup passed on attempt ${attempt}."
+      if [ "$WARMUP_ONLY" -eq 1 ]; then
+        exit 0
+      fi
+      break
     fi
-    break
   fi
 
   if [ "$attempt" -eq "$MAX_ATTEMPTS" ]; then
-    echo "::error::Warmup failed against ${BASE_URL}${WARMUP_PATH} after ${MAX_ATTEMPTS} attempts. Check App Service logs."
+    if [ "$WARMUP_ONLY" -eq 1 ] && [ -n "$EXPECT_BUILD_VERSION" ]; then
+      echo "::error::Warmup or build stamp ${EXPECT_BUILD_VERSION} failed against ${BASE_URL} after ${MAX_ATTEMPTS} attempts. If / still serves the previous stamp, the zip mount did not become the running app."
+    else
+      echo "::error::Warmup failed against ${BASE_URL}${WARMUP_PATH} after ${MAX_ATTEMPTS} attempts. Check App Service logs."
+    fi
     exit 1
   fi
 

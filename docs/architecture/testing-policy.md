@@ -273,7 +273,7 @@ CI also collects coverage from the deterministic test suite (merged across Web.T
 
 | Piece | Role |
 | --- | --- |
-| `scripts/Get-WebTestShardFilter.ps1` | Discovers `*Tests` classes, assigns them with greedy weight balance (WAF weight 5, others 1), emits an xUnit `--filter` |
+| `scripts/Get-WebTestShardFilter.ps1` | Discovers `*Tests` classes, assigns them with greedy weight balance (case count × host kind: EF-WAF 20, Production WAF 10, other WAF 5, SQLite unit 2, unit 1), emits an xUnit `--filter` |
 | `scripts/Invoke-WebTestsShard.ps1` | Runs one shard's filtered Web.Tests (`-SmallProjectsOnly` runs just the Tools/Storage/NewsAgent projects instead) |
 | `.github/workflows/ci.yml` jobs `test` + `small-projects-tests` + `coverage` | Matrix `shard: [0, 1]` for Web.Tests, a separate parallel job for the small projects, then merge Cobertura and run the coverage gate |
 
@@ -284,6 +284,7 @@ The `build` job uploads `src/**/bin/Release`, `tests/**/bin/Release`, and `src/Q
 **Local development:** keep using `dotnet test QueenZone.sln` (full suite, no filter). Sharding is a CI wall-clock optimization, not a new project layout. To inspect or time shards locally:
 
 ```powershell
+powershell -File ./scripts/Get-WebTestShardFilter.ps1 -SelfTest
 powershell -File ./scripts/Get-WebTestShardFilter.ps1 -ShardCount 2 -List
 dotnet build QueenZone.sln --configuration Release
 powershell -File ./scripts/Invoke-WebTestsShard.ps1 -ShardIndex 0 -ShardCount 2 -NoBuild -NoRestore
@@ -291,7 +292,7 @@ powershell -File ./scripts/Invoke-WebTestsShard.ps1 -ShardIndex 1 -ShardCount 2 
 powershell -File ./scripts/Invoke-WebTestsShard.ps1 -SmallProjectsOnly -NoBuild -NoRestore
 ```
 
-(issue #496: the small projects used to ride along on shard 0, making it consistently slower than shard 1 even though the Web.Tests weight split itself was even. `-SmallProjectsOnly` now runs them as CI's own parallel `small-projects-tests` job instead.)
+(issue #496: the small projects used to ride along on shard 0, making it consistently slower than shard 1 even though the Web.Tests weight split itself was even. `-SmallProjectsOnly` now runs them as CI's own parallel `small-projects-tests` job instead. A later even class-weight split still parked every `Admin*EfRoutes` host on shard 1 because they all had weight 5 and sorted together; case-count × kind multipliers exist so those hosts spread.)
 
 When adding Web.Tests classes: no shard manifest to update — discovery is automatic. Prefer `QueenZoneWebApplicationFactory` for HTTP tests; keep true unit tests free of `WebApplicationFactory` so they stay cheap filler in every shard.
 
@@ -329,7 +330,7 @@ These gates are guardrails, not a replacement for useful assertions. New or chan
 | `smoke-test` | Published app, curl `/health`, `/`, `/news` (starts after `build`, overlaps shards/coverage) | Yes |
 | `e2e-test` | Playwright suite on a self-hosted `e2e` runner (Windows or macOS; starts after `build`, overlaps coverage) | Yes (required PR merge gate) |
 
-CI/CD uses two workflows. `.github/workflows/ci.yml` runs the pull-request build, deterministic tests, coverage gates, conditional `ef-migrations`, smoke test, and required e2e merge gate. After merge, `.github/workflows/deploy.yml` resolves the `ci.yml` run that built and tested the merged PR's head commit (via merge-commit second parent, or the commit→PR association for squash/rebase merges) and reuses its `web-publish` artifact (no rebuild), then runs `migrate` (only when EF paths changed) → `deploy` (zip-pushes, Kudu recycle, polls `/warmup`) → `post-deploy-smoke`. Skipping migrate must not skip smoke: `post-deploy-smoke` uses `if: always()` and requires `deploy` to have succeeded. Smoke also requires `data-build-version` on `/` to match the PR-head short SHA stamped at CI build (`OverrideGitCommitShort`). The PR `ef-migrations` job uses the same migration connection string as deploy so SQL Server failures are caught before merge.
+CI/CD uses two workflows. `.github/workflows/ci.yml` runs the pull-request build, deterministic tests, coverage gates, conditional `ef-migrations`, smoke test, and required e2e merge gate. After merge, `.github/workflows/deploy.yml` resolves the `ci.yml` run that built and tested the merged PR's head commit (via merge-commit second parent, or the commit→PR association for squash/rebase merges) and reuses its `web-publish` artifact (no rebuild), then runs `migrate` (only when EF paths changed) → `deploy` (zip-pushes, polls `/warmup` **and** the new `data-build-version` on `/`) → `post-deploy-smoke`. ARM already sets `WEBSITE_RUN_FROM_PACKAGE=1`, so the zip mount restarts the worker; do not add a second Kudu recycle unless a deploy proves the stamp never flips. Skipping migrate must not skip smoke: `post-deploy-smoke` uses `if: always()` and requires `deploy` to have succeeded. Smoke also requires `data-build-version` on `/` to match the PR-head short SHA stamped at CI build (`OverrideGitCommitShort`). The PR `ef-migrations` job uses the same migration connection string as deploy so SQL Server failures are caught before merge.
 
 Two further workflows run on a schedule only and never gate a PR merge or a deploy: `.github/workflows/nightly-legacy-checks.yml` (legacy read/write probes, then the real-data Playwright UI suite, then a residue check — see "Data Integration Tests" and "Nightly UI Regression (Real Data)" above) and `.github/workflows/livesite-readonly-sweep.yml` (the live-site read-only sweep). Both are continuous signal for catching drift, not merge gates; a failure there does not block or revert anything automatically.
 

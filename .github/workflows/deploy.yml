@@ -328,13 +328,19 @@ jobs:
           publish-profile: ${{ steps.bitwarden-secrets.outputs.AZURE_WEBAPP_PUBLISH_PROFILE }}
           package: publish
 
-      - name: Recycle App Service
-        env:
-          AZURE_WEBAPP_PUBLISH_PROFILE: ${{ steps.bitwarden-secrets.outputs.AZURE_WEBAPP_PUBLISH_PROFILE }}
-        run: python3 ./scripts/Invoke-AppServiceKudu.py --restart
-
+      # Do not Kudu-recycle after the zip push. #665 added POST /api/app/restart
+      # because WEBSITE_RUN_FROM_PACKAGE was never an ARM setting and OneDeploy
+      # left the previous extracted wwwroot running (#664). configure-app-settings
+      # now writes that flag through ARM (#666), so the zip mount itself restarts
+      # the worker. A second recycle was returning in ~1s, /warmup went green on
+      # the still-draining process, and post-deploy smoke then waited ~3 minutes
+      # for data-build-version. If the stamp never flips, fail this job — do not
+      # restore the extra restart without measuring a double-recycle again.
       - name: Warm up custom domain
-        run: bash ./scripts/Invoke-PostDeploySmoke.sh --warmup-only
+        run: |
+          bash ./scripts/Invoke-PostDeploySmoke.sh \
+            --warmup-only \
+            --expect-build-version "${{ needs.resolve-ci-run.outputs.head_sha }}"
 
   post-deploy-smoke:
     name: Post-deploy smoke
@@ -358,8 +364,9 @@ jobs:
 
       # Smoke the public custom domain (Site:PublicBaseUrl), not only the App Service hostname.
       # /health alone is liveness only — content pages can still 500 during recycle/warmup.
-      # The deploy job already polled /warmup; this job still starts with warmup
-      # then the content-route suite. A failure fails the job so watchers get mail.
+      # The deploy job already polled /warmup and the new build stamp; this job
+      # still starts with warmup then the content-route suite. A failure fails
+      # the job so watchers get mail.
       - name: Post-deploy smoke (custom domain)
         run: |
           bash ./scripts/Invoke-PostDeploySmoke.sh \

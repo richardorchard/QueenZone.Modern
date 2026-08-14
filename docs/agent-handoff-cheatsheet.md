@@ -138,7 +138,7 @@ Invoke-WebRequest -Uri https://www.queenzone.org/health -UseBasicParsing | Selec
 Invoke-WebRequest -Uri https://www.queenzone.org/warmup -UseBasicParsing | Select-Object StatusCode
 ```
 
-Post-deploy smoke (custom domain) is a separate job at the end of `.github/workflows/deploy.yml` (`resolve-ci-run` in parallel with `migrate` → `deploy` → `post-deploy-smoke`, triggered by push to `main` after `ci.yml`'s PR checks have already passed). `migrate` runs only when the push touched EF model/migration paths; `resolve-ci-run` finds the `ci.yml` run that already built and tested the merged PR's head commit and `deploy` reuses its `web-publish` artifact — no rebuild. The deploy job recycles the App Service via Kudu after the zip push, polls `/warmup`, then post-deploy smoke checks that `/` serves the PR-head build stamp. Pull-request tests are not rerun by this post-merge deploy workflow. Checks hit `https://www.queenzone.org` (`/warmup`, then `/health` plus key public routes); a failure fails the smoke job so GitHub Actions can notify watchers. Re-run the same checks locally:
+Post-deploy smoke (custom domain) is a separate job at the end of `.github/workflows/deploy.yml` (`resolve-ci-run` in parallel with `migrate` → `deploy` → `post-deploy-smoke`, triggered by push to `main` after `ci.yml`'s PR checks have already passed). `migrate` runs only when the push touched EF model/migration paths; `resolve-ci-run` finds the `ci.yml` run that already built and tested the merged PR's head commit and `deploy` reuses its `web-publish` artifact — no rebuild. The deploy job zip-pushes (ARM `WEBSITE_RUN_FROM_PACKAGE=1` restarts the worker; no extra Kudu recycle), polls `/warmup` and the PR-head build stamp on `/`, then post-deploy smoke repeats the stamp check on the content routes. Pull-request tests are not rerun by this post-merge deploy workflow. Checks hit `https://www.queenzone.org` (`/warmup`, then `/health` plus key public routes); a failure fails the smoke job so GitHub Actions can notify watchers. Re-run the same checks locally:
 
 ```powershell
 powershell -File .\scripts\Smoke-LiveSite.ps1
@@ -151,7 +151,7 @@ WEBSITE_WARMUP_PATH=/health
 WEBSITE_WARMUP_STATUSES=200
 ```
 
-`WEBSITE_WARMUP_PATH` is `/health`, not `/warmup` (#673). `/health` is the cheap platform liveness ping. `deploy.yml` still polls `/warmup` after recycle to run readiness checks and prime public query caches (SQL connect bounded at 15s; nine cache steps run concurrently at 8s each — see [`azure-hosting-plan.md`](architecture/azure-hosting-plan.md)). Enable Always On on the App Service when the active SKU supports it; it reduces idle cold starts.
+`WEBSITE_WARMUP_PATH` is `/health`, not `/warmup` (#673). `/health` is the cheap platform liveness ping. `deploy.yml` still polls `/warmup` (and the new build stamp on `/`) to run readiness checks and prime public query caches (SQL connect bounded at 15s; nine cache steps run concurrently at 8s each — see [`azure-hosting-plan.md`](architecture/azure-hosting-plan.md)). Enable Always On on the App Service when the active SKU supports it; it reduces idle cold starts.
 
 Application logging should be enabled at Information level on the filesystem. If the stream is quiet, hit the failing route to generate entries.
 
