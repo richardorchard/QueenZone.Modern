@@ -208,6 +208,15 @@ jobs:
             --settings WEBSITE_RUN_FROM_PACKAGE=1 WEBSITE_WARMUP_PATH=/warmup WEBSITE_WARMUP_STATUSES=200 \
             --output none
 
+      # Writing App Service settings restarts the SCM/Kudu container. The
+      # `deploy` job's zip push starting right after this hit that restart
+      # window and Kudu killed the in-flight OneDeploy: "Deployment has been
+      # stopped due to SCM container restart... Do not perform a management
+      # operation and a deployment operation in quick succession." (observed
+      # on the #666 rollout run). Azure's own fix is the delay it recommends.
+      - name: Wait for SCM container to settle after the settings write
+        run: sleep 90
+
   deploy:
     name: Deploy
     runs-on: ubuntu-latest
@@ -224,6 +233,10 @@ jobs:
     environment:
       name: dev
       url: https://www.queenzone.org
+    # A stuck azure/webapps-deploy poll (e.g. hitting the SCM-restart race
+    # this job now waits out) had no bound and hung for ~20 minutes before a
+    # manual cancel on the #666 rollout run. Fail loudly instead.
+    timeout-minutes: 10
 
     steps:
       - name: Checkout
