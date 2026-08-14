@@ -124,9 +124,11 @@ Use `/health` for App Service / CI pings. Point deeper monitors at `/health/read
 For the B1 App Service plan, keep deployment slots out of the critical path and configure App Service startup warmup:
 
 ```text
-WEBSITE_WARMUP_PATH=/warmup
+WEBSITE_WARMUP_PATH=/health
 WEBSITE_WARMUP_STATUSES=200
 ```
+
+`WEBSITE_WARMUP_PATH` points at `/health`, **not** `/warmup`, deliberately. Azure's own container startup probe must return within `WEBSITES_CONTAINER_START_TIME_LIMIT` (default 230s) or the platform kills the container and retries indefinitely. `/warmup` runs `SqlReadyHealthCheck` (no explicit timeout — rides `QueenZoneDbContext`'s `EnableRetryOnFailure` policy, which can itself take well over 100s on a cold first connection) followed by nine sequential public-cache-priming steps at up to 8s each. Pointing the platform probe at `/warmup` crash-looped `queenzone-dev` for over an hour on the first #666 rollout (`ContainerTimeout` every ~5 minutes). `/health` does no dependency I/O, so it can't blow the platform's tight budget. `deploy.yml`'s own "Warm up custom domain" step still polls `/warmup` directly after recycle, with its own ~8 minute retry budget — that is the right amount of patience for "are caches warm," not something to hand to the platform's liveness gate.
 
 Do **not** set `WEBSITE_RUN_FROM_PACKAGE` through Kudu `POST /api/settings`. That call returns 204 but does not persist an ARM application setting; after #660 OneDeploy reported success while the worker kept serving the previous extracted `wwwroot`.
 
