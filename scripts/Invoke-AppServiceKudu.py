@@ -4,6 +4,8 @@
 This talks to SCM/Kudu only. It cannot set ARM application settings such as
 WEBSITE_RUN_FROM_PACKAGE — that flag has to be an App Service app setting,
 and Kudu POST /api/settings does not persist it there (see #660 deploy).
+deploy.yml's configure-app-settings job owns those settings via az CLI /
+azure/login instead (#666); this script is restart/cleanup only.
 
 Supported actions:
   --delete-setting NAME   DELETE /api/settings/{NAME} (404 is success)
