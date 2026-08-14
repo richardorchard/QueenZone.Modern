@@ -1,87 +1,99 @@
 namespace QueenZone.Web;
 
+/// <summary>
+/// Primes process-local public query caches for <c>/warmup</c>.
+/// Each step runs in its own DI scope so EF repositories do not share a
+/// <c>QueenZoneDbContext</c> under <see cref="Task.WhenAll"/> (same pattern as
+/// <see cref="AdminDashboardService"/>; issues #322 / #335).
+/// </summary>
 public sealed class PublicWarmupService
 {
     internal static readonly TimeSpan DefaultStepTimeout = TimeSpan.FromSeconds(8);
 
-    private readonly PublicQueryCacheService publicQueryCache;
+    internal const int StepCount = 9;
+
+    private readonly IServiceScopeFactory scopeFactory;
     private readonly TimeProvider timeProvider;
     private readonly ILogger<PublicWarmupService> logger;
     private readonly TimeSpan stepTimeout;
 
     public PublicWarmupService(
-        PublicQueryCacheService publicQueryCache,
+        IServiceScopeFactory scopeFactory,
         TimeProvider timeProvider,
         ILogger<PublicWarmupService> logger)
-        : this(publicQueryCache, timeProvider, logger, DefaultStepTimeout)
+        : this(scopeFactory, timeProvider, logger, DefaultStepTimeout)
     {
     }
 
     internal PublicWarmupService(
-        PublicQueryCacheService publicQueryCache,
+        IServiceScopeFactory scopeFactory,
         TimeProvider timeProvider,
         ILogger<PublicWarmupService> logger,
         TimeSpan stepTimeout)
     {
-        this.publicQueryCache = publicQueryCache;
+        this.scopeFactory = scopeFactory;
         this.timeProvider = timeProvider;
         this.logger = logger;
         this.stepTimeout = stepTimeout;
     }
 
-    public async Task WarmPublicCachesAsync(CancellationToken cancellationToken = default)
+    public Task WarmPublicCachesAsync(CancellationToken cancellationToken = default)
     {
         var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
 
-        await WarmStepAsync(
-            "latest-news",
-            stepToken => publicQueryCache.GetLatestNewsAsync(5, stepToken),
-            cancellationToken);
-        await WarmStepAsync(
-            "news-count",
-            publicQueryCache.GetNewsPublishedCountAsync,
-            cancellationToken);
-        await WarmStepAsync(
-            "article-count",
-            publicQueryCache.GetArticlePublishedCountAsync,
-            cancellationToken);
-        await WarmStepAsync(
-            "forum-categories",
-            publicQueryCache.GetForumCategoriesAsync,
-            cancellationToken);
-        await WarmStepAsync(
-            "forum-thread-count",
-            publicQueryCache.GetForumThreadCountAsync,
-            cancellationToken);
-        await WarmStepAsync(
-            "forum-recent-threads",
-            stepToken => publicQueryCache.GetForumRecentThreadsAsync(ForumRoutes.RecentThreadsCount, stepToken),
-            cancellationToken);
-        await WarmStepAsync(
-            "on-this-day",
-            stepToken => publicQueryCache.GetOnThisDayAsync(today, 3, stepToken),
-            cancellationToken);
-        await WarmStepAsync(
-            "around-this-day",
-            stepToken => publicQueryCache.GetAroundThisDayAsync(today, 7, 3, stepToken),
-            cancellationToken);
-        await WarmStepAsync(
-            "photo-categories",
-            publicQueryCache.GetPhotoCategoriesAsync,
-            cancellationToken);
+        return Task.WhenAll(
+            WarmStepAsync(
+                "latest-news",
+                (cache, stepToken) => cache.GetLatestNewsAsync(5, stepToken),
+                cancellationToken),
+            WarmStepAsync(
+                "news-count",
+                (cache, stepToken) => cache.GetNewsPublishedCountAsync(stepToken),
+                cancellationToken),
+            WarmStepAsync(
+                "article-count",
+                (cache, stepToken) => cache.GetArticlePublishedCountAsync(stepToken),
+                cancellationToken),
+            WarmStepAsync(
+                "forum-categories",
+                (cache, stepToken) => cache.GetForumCategoriesAsync(stepToken),
+                cancellationToken),
+            WarmStepAsync(
+                "forum-thread-count",
+                (cache, stepToken) => cache.GetForumThreadCountAsync(stepToken),
+                cancellationToken),
+            WarmStepAsync(
+                "forum-recent-threads",
+                (cache, stepToken) => cache.GetForumRecentThreadsAsync(ForumRoutes.RecentThreadsCount, stepToken),
+                cancellationToken),
+            WarmStepAsync(
+                "on-this-day",
+                (cache, stepToken) => cache.GetOnThisDayAsync(today, 3, stepToken),
+                cancellationToken),
+            WarmStepAsync(
+                "around-this-day",
+                (cache, stepToken) => cache.GetAroundThisDayAsync(today, 7, 3, stepToken),
+                cancellationToken),
+            WarmStepAsync(
+                "photo-categories",
+                (cache, stepToken) => cache.GetPhotoCategoriesAsync(stepToken),
+                cancellationToken));
     }
 
-    private async Task WarmStepAsync<T>(
+    private async Task WarmStepAsync(
         string stepName,
-        Func<CancellationToken, Task<T>> warmStep,
+        Func<PublicQueryCacheService, CancellationToken, Task> warmStep,
         CancellationToken cancellationToken)
     {
+        await using var scope = scopeFactory.CreateAsyncScope();
+        var publicQueryCache = scope.ServiceProvider.GetRequiredService<PublicQueryCacheService>();
+
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(stepTimeout);
 
         try
         {
-            _ = await warmStep(timeout.Token);
+            await warmStep(publicQueryCache, timeout.Token);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {

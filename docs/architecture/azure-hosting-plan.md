@@ -128,7 +128,24 @@ WEBSITE_WARMUP_PATH=/health
 WEBSITE_WARMUP_STATUSES=200
 ```
 
-`WEBSITE_WARMUP_PATH` points at `/health`, **not** `/warmup`, deliberately. Azure's own container startup probe must return within `WEBSITES_CONTAINER_START_TIME_LIMIT` (default 230s) or the platform kills the container and retries indefinitely. `/warmup` runs `SqlReadyHealthCheck` (no explicit timeout — rides `QueenZoneDbContext`'s `EnableRetryOnFailure` policy, which can itself take well over 100s on a cold first connection) followed by nine sequential public-cache-priming steps at up to 8s each. Pointing the platform probe at `/warmup` crash-looped `queenzone-dev` for over an hour on the first #666 rollout (`ContainerTimeout` every ~5 minutes). `/health` does no dependency I/O, so it can't blow the platform's tight budget. `deploy.yml`'s own "Warm up custom domain" step still polls `/warmup` directly after recycle, with its own ~8 minute retry budget — that is the right amount of patience for "are caches warm," not something to hand to the platform's liveness gate.
+`WEBSITE_WARMUP_PATH` points at `/health`, **not** `/warmup`, deliberately. Azure's own container startup probe must return within `WEBSITES_CONTAINER_START_TIME_LIMIT` (default 230s) or the platform kills the container and retries indefinitely. Pointing the platform probe at `/warmup` crash-looped `queenzone-dev` for over an hour on the first #666 rollout (`ContainerTimeout` every ~5 minutes). `/health` does no dependency I/O, so it can't blow the platform's tight budget. `deploy.yml`'s own "Warm up custom domain" step still polls `/warmup` directly after recycle, with its own ~8 minute retry budget — that is the right amount of patience for "are caches warm," not something to hand to the platform's liveness gate.
+
+### `/warmup` duration budget
+
+Theoretical worst case when SQL and blob are configured. These are **timeout ceilings**, not live measurements. The #666 investigation could not produce a reliable empirical `/warmup` time (Azure recycle / traffic-swap, no per-request duration logs). `/warmup` now logs structured `WarmupDurationMs`, `WarmupReadinessMs`, `WarmupCacheMs`, `SqlDurationMs`, and `BlobDurationMs` so a later deploy can read real timings from App Service / Application Insights.
+
+| Phase | Bound | Notes |
+| --- | --- | --- |
+| Readiness — `SqlReadyHealthCheck` | **15s** | Explicit `CancelAfter` around `CanConnectAsync`, independent of EF `EnableRetryOnFailure` (5 retries, 20s max delay, 100s+ unbounded). Unconfigured SQL is immediate Healthy. |
+| Readiness — `BlobReadyHealthCheck` | **unbounded** | Still rides the Azure SDK call with no extra timeout. A hung blob probe can stall `/warmup`. Out of scope for #674. |
+| Cache priming — `PublicWarmupService` | **8s** | Nine independent public-query reads run concurrently (`Task.WhenAll`), each with an 8s `CancelAfter`. Each step uses its own DI scope so EF repositories do not share a `DbContext`. Worst case is the slowest step, not 9 × 8s. |
+| **SQL-healthy / blob-healthy total** | **~23s + overhead** | Readiness is `max(sql, blob)` (health checks run in parallel), then cache priming is `max(steps)`. |
+
+Local sample-data (no SQL/blob) on this change: **287ms** cold `/warmup`, **11ms** warm. That is a lower bound only — it does not include Azure SQL connect or real cache queries.
+
+Probe paths are answered by a short-circuit registered as the first middleware after `builder.Build()` (#681), and they also skip the authenticated branch (#677). A cold-container `/health` or `/warmup` must not wait on Entra OIDC metadata, static files, or anything else later in the pipeline.
+
+Do not point `WEBSITE_WARMUP_PATH` back at `/warmup` just because this budget is now bounded. The platform gate should stay cheap (#673).
 
 Do **not** set `WEBSITE_RUN_FROM_PACKAGE` through Kudu `POST /api/settings`. That call returns 204 but does not persist an ARM application setting; after #660 OneDeploy reported success while the worker kept serving the previous extracted `wwwroot`.
 

@@ -3,6 +3,9 @@
 # Default: wait for /warmup, then require 200 on the content routes.
 # --warmup-only: only the /warmup gate (used in the deploy job so recycle
 # overlaps the zip push instead of waiting for a second runner).
+# /warmup itself is short-circuited before every other middleware in the app's
+# request pipeline as of #681, so this poll's only remaining ceiling is /warmup's
+# own dependency checks and cache priming (#674), not anything upstream of it.
 set -euo pipefail
 
 BASE_URL="https://www.queenzone.org"
