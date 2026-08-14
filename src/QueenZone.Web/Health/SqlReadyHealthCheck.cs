@@ -25,6 +25,9 @@ public sealed class SqlReadyHealthCheck(IServiceScopeFactory scopeFactory) : IHe
 
         try
         {
+            // No explicit timeout here — rides QueenZoneDbContext's
+            // EnableRetryOnFailure policy, which can take well over 100s on
+            // a cold first connection. Tracked for a bounded timeout in #674.
             var canConnect = await dbContext.Database.CanConnectAsync(cancellationToken);
             return canConnect
                 ? HealthCheckResult.Healthy("SQL reachable.")
