@@ -23,6 +23,16 @@ public sealed class MemberAccountService(
     IBlobUploadService blobUploadService,
     MemberUploadQuotaService uploadQuota)
 {
+    /// <summary>
+    /// Bound for each avatar blob delete. <see cref="MemberAccountDeletionHostedService"/>
+    /// can invoke this on its first timer tick; Azure.Storage.Blobs often ignores
+    /// <see cref="CancellationToken"/> during a dead TCP or retry loop, so callers
+    /// use both <c>CancelAfter</c> and <c>WaitAsync</c>.
+    /// </summary>
+    internal static readonly TimeSpan DefaultBlobDeleteTimeout = TimeSpan.FromSeconds(20);
+
+    internal TimeSpan BlobDeleteTimeout { get; init; } = DefaultBlobDeleteTimeout;
+
     private readonly PasswordHasher<MemberAccount> passwordHasher = new();
 
     public async Task<MemberAccountResult> RegisterAsync(string email, string password, string displayName, CancellationToken cancellationToken = default)
@@ -571,26 +581,35 @@ public sealed class MemberAccountService(
     {
         if (!string.IsNullOrWhiteSpace(avatarBlobName))
         {
-            try
-            {
-                await blobUploadService.DeleteAsync(MemberAvatarPaths.Container, avatarBlobName, cancellationToken);
-            }
-            catch
-            {
-                // Best-effort cleanup; do not mask the original failure.
-            }
+            await DeleteBlobBestEffortAsync(avatarBlobName, cancellationToken);
         }
 
         if (!string.IsNullOrWhiteSpace(thumbBlobName))
         {
-            try
-            {
-                await blobUploadService.DeleteAsync(MemberAvatarPaths.Container, thumbBlobName, cancellationToken);
-            }
-            catch
-            {
-                // Best-effort cleanup.
-            }
+            await DeleteBlobBestEffortAsync(thumbBlobName, cancellationToken);
+        }
+    }
+
+    private async Task DeleteBlobBestEffortAsync(string blobName, CancellationToken cancellationToken)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(BlobDeleteTimeout);
+
+        try
+        {
+            // CancelAfter asks the SDK to stop; WaitAsync bounds this await even when
+            // the SDK ignores the token (cold first outbound call, dead TCP, retries).
+            await blobUploadService
+                .DeleteAsync(MemberAvatarPaths.Container, blobName, timeout.Token)
+                .WaitAsync(BlobDeleteTimeout, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch
+        {
+            // Timeout, SDK cancel, or storage failure: best-effort only.
         }
     }
 
