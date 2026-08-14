@@ -52,7 +52,7 @@ Use configuration keys like:
 - `APPLICATIONINSIGHTS_CONNECTION_STRING`
 - `Storage:PublicMediaBaseUrl`
 - `AzureAd:ClientId` / `AzureAd:TenantId` / related Entra settings (required outside Development)
-- `AllowedHosts` (production default: `www.queenzone.org;queenzone.org;*.azurewebsites.net`)
+- `QueenZoneHostFiltering:AllowedHosts` (production default: `www.queenzone.org;queenzone.org;*.azurewebsites.net`)
 - `FeatureFlags:ForumArchiveEnabled`
 - `FeatureFlags:LegacyRedirectsEnabled`
 
@@ -60,7 +60,7 @@ Use configuration keys like:
 
 - **Entra admin auth is mandatory** when `ASPNETCORE_ENVIRONMENT` is not `Development` or `Testing`. Placeholder values such as `YOUR_CLIENT_ID` do not count. The process throws at startup if admin Entra is not configured.
 - **Do not** enable header-based `X-Test-User-Email` admin auth on App Service. That path only exists for local Development and the automated Testing environment.
-- **AllowedHosts** is locked down in committed `appsettings.json`. Prefer App Service application settings to extend the host list when adding domains rather than shipping `AllowedHosts=*`.
+- **QueenZoneHostFiltering:AllowedHosts** is locked down in committed `appsettings.json`. ASP.NET Core's framework `AllowedHosts` is deliberately `*`: its automatic middleware runs before the visible application pipeline and rejected App Service's internal startup-probe Host before `/health` could answer (#684). QueenZone applies the same allowlist after the probe short-circuit and forwarded headers. Prefer App Service application settings to extend the QueenZone allowlist when adding domains.
 - **Admin allowlist:** committed `Admin:AllowedEmails` is **empty**. Production must set `Admin__AllowedEmails__0` (and further indexes) on App Service or via Key Vault. Startup validation fails in Production/Staging/Preview when the list is empty. See [`entra-admin-auth.md`](entra-admin-auth.md).
 - **Secrets in logs:** never log connection strings, client secrets, storage keys, or API keys. Prefer App Service setting name + length when auditing config; health endpoints must not echo exception text containing secrets.
 
@@ -125,10 +125,9 @@ For the B1 App Service plan, keep deployment slots out of the critical path and 
 
 ```text
 WEBSITE_WARMUP_PATH=/health
-WEBSITE_WARMUP_STATUSES=200
 ```
 
-`WEBSITE_WARMUP_PATH` points at `/health`, **not** `/warmup`, deliberately. Azure's own container startup probe must return within `WEBSITES_CONTAINER_START_TIME_LIMIT` (default 230s) or the platform kills the container and retries indefinitely. Pointing the platform probe at `/warmup` crash-looped `queenzone-dev` for over an hour on the first #666 rollout (`ContainerTimeout` every ~5 minutes). `/health` does no dependency I/O, so it can't blow the platform's tight budget. `deploy.yml`'s own "Warm up custom domain" step still polls `/warmup` directly after recycle, with its own ~8 minute retry budget — that is the right amount of patience for "are caches warm," not something to hand to the platform's liveness gate.
+`WEBSITE_WARMUP_PATH` points at `/health`, **not** `/warmup`, deliberately. `WEBSITE_WARMUP_STATUSES` stays unset, so any HTTP response proves the container is listening; requiring exactly 200 turned an internal-host 400 into a 230-second crash loop (#684). QueenZone short-circuits probe paths before its explicit host filter, so `/health` now returns 200 even when App Service uses a link-local Host header. `deploy.yml`'s own "Warm up custom domain" step remains the strict readiness gate: it polls `/warmup` directly after recycle, then checks representative public routes.
 
 ### `/warmup` duration budget
 
@@ -143,7 +142,7 @@ Theoretical worst case when SQL and blob are configured. These are **timeout cei
 
 Local sample-data (no SQL/blob) on this change: **287ms** cold `/warmup`, **11ms** warm. That is a lower bound only — it does not include Azure SQL connect or real cache queries.
 
-Probe paths are answered by a short-circuit registered as the first middleware after `builder.Build()` (#681), and they also skip the authenticated branch (#677). A cold-container `/health` or `/warmup` must not wait on Entra OIDC metadata, static files, or anything else later in the pipeline.
+Probe paths are answered by a short-circuit registered as the first middleware after `builder.Build()` (#681), before QueenZone's explicit host filter (#684), and they also skip the authenticated branch (#677). ASP.NET Core's automatic `AllowedHosts` filter is disabled because it runs outside that visible ordering. A cold-container `/health` or `/warmup` must not wait on host validation, Entra OIDC metadata, static files, or anything else later in the pipeline.
 
 Do not point `WEBSITE_WARMUP_PATH` back at `/warmup` just because this budget is now bounded. The platform gate should stay cheap (#673).
 

@@ -226,7 +226,7 @@ Production App Service Entra app, settings, and **client secret renewal** (renew
 
 **Allowed hosts**
 
-Committed `appsettings.json` sets production hosts (`www.queenzone.org;queenzone.org;*.azurewebsites.net`). Development and Testing override with `AllowedHosts: "*"`. Override further in App Service configuration if you add custom domains.
+Committed `appsettings.json` sets `QueenZoneHostFiltering:AllowedHosts` to the production hosts (`www.queenzone.org;queenzone.org;*.azurewebsites.net`). Development and Testing override it with `"*"`. ASP.NET Core's framework-level `AllowedHosts` stays `"*"` deliberately: QueenZone applies its own equivalent filter after the App Service probe short-circuit, because Azure startup pings use an internal Host header. Override `QueenZoneHostFiltering:AllowedHosts` in App Service when adding domains.
 
 If you already have `src/QueenZone.NewsAgent.Worker/appsettings.Local.json` configured with `ConnectionStrings:QueenZoneLegacy`, you can copy that value into the web app's local settings. Keep both files local-only.
 
