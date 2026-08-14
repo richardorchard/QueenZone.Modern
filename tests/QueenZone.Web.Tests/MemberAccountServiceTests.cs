@@ -15,17 +15,21 @@ public sealed class MemberAccountServiceTests
         ILegacyMemberLookupRepository? legacyMemberLookupRepository = null,
         IBlobUploadService? blobUploadService = null,
         InMemoryBlobStorageBackend? blobBackend = null,
-        MemberUploadQuotaService? uploadQuota = null)
+        MemberUploadQuotaService? uploadQuota = null,
+        TimeSpan? blobDeleteTimeout = null)
     {
         var backend = blobBackend ?? new InMemoryBlobStorageBackend();
         var blobs = blobUploadService
             ?? new AzureBlobUploadService(backend, Options.Create(new BlobUploadOptions()));
-        return new(
+        return new MemberAccountService(
             memberAccountRepository ?? new InMemoryMemberAccountRepository(),
             legacyMemberLookupRepository ?? new InMemoryLegacyMemberLookupRepository(
                 new Dictionary<string, LegacyMemberMatch>()),
             blobs,
-            uploadQuota ?? CreateDisabledUploadQuota());
+            uploadQuota ?? CreateDisabledUploadQuota())
+        {
+            BlobDeleteTimeout = blobDeleteTimeout ?? MemberAccountService.DefaultBlobDeleteTimeout,
+        };
     }
 
     private static MemberUploadQuotaService CreateDisabledUploadQuota() =>
@@ -660,6 +664,53 @@ public sealed class MemberAccountServiceTests
     }
 
     [Fact]
+    public async Task PurgeDueDeletionsAsync_DeletesAvatarBlobs_WhenRetentionHasElapsed()
+    {
+        var backend = new InMemoryBlobStorageBackend();
+        var repository = new InMemoryMemberAccountRepository();
+        var service = CreateService(memberAccountRepository: repository, blobBackend: backend);
+        var registered = await service.RegisterAsync("purge-ok@example.com", "S3curePass!", "Purge Fan");
+        await using var png = await CreatePngAsync();
+        var uploaded = await service.UpdateAvatarAsync(registered.Account!.Id, png, "avatar.png");
+        var avatarPath = uploaded.Account!.AvatarUrl!;
+        var thumbPath = MemberAvatarPaths.ToThumbBlobName(avatarPath);
+        await service.RequestDeletionAsync(registered.Account.Id);
+
+        var purged = await service.PurgeDueDeletionsAsync(
+            DateTime.UtcNow.AddDays(MemberAccountDeletionPolicy.RetentionDays + 1));
+
+        Assert.Equal(1, purged);
+        Assert.False(backend.Exists(MemberAvatarPaths.Container, avatarPath));
+        Assert.False(backend.Exists(MemberAvatarPaths.Container, thumbPath));
+        var reloaded = await repository.FindByIdAsync(registered.Account.Id);
+        Assert.NotNull(reloaded!.PersonalDataPurgedAt);
+    }
+
+    [Fact]
+    public async Task PurgeDueDeletionsAsync_Completes_WhenBlobDeleteIgnoresCancellation()
+    {
+        var repository = new InMemoryMemberAccountRepository();
+        var hanging = new HangForeverBlobUploadService();
+        var service = CreateService(
+            memberAccountRepository: repository,
+            blobUploadService: hanging,
+            blobDeleteTimeout: TimeSpan.FromMilliseconds(50));
+        var registered = await service.RegisterAsync("purge-hang@example.com", "S3curePass!", "Hang Fan");
+        await repository.UpdateAvatarUrlAsync(registered.Account!.Id, "members/hang/avatar.webp");
+        await repository.RequestDeletionAsync(
+            registered.Account.Id,
+            DateTime.UtcNow.AddDays(-MemberAccountDeletionPolicy.RetentionDays - 1));
+
+        var started = DateTime.UtcNow;
+        var purged = await service.PurgeDueDeletionsAsync(DateTime.UtcNow);
+        var elapsed = DateTime.UtcNow - started;
+
+        Assert.Equal(1, purged);
+        Assert.True(hanging.DeleteCalls >= 1);
+        Assert.True(elapsed < TimeSpan.FromSeconds(2), $"Purge waited {elapsed} for a hung blob delete.");
+    }
+
+    [Fact]
     public async Task UpdateAvatarAsync_CleansUpNewBlobs_WhenDbSaveFails_AndKeepsOldAvatar()
     {
         var backend = new InMemoryBlobStorageBackend();
@@ -683,6 +734,38 @@ public sealed class MemberAccountServiceTests
         Assert.True(backend.Exists(MemberAvatarPaths.Container, oldThumb));
         var reloaded = await realRepo.FindByIdAsync(registered.Account.Id);
         Assert.Equal(oldPath, reloaded!.AvatarUrl);
+    }
+
+    /// <summary>
+    /// Never completes <see cref="IBlobUploadService.DeleteAsync"/> and ignores the token,
+    /// matching an Azure SDK hang on a dead TCP / retry loop.
+    /// </summary>
+    private sealed class HangForeverBlobUploadService : IBlobUploadService
+    {
+        public int DeleteCalls;
+
+        public Task<BlobUploadResult> UploadAsync(
+            Stream content,
+            string originalFileName,
+            string containerName,
+            BlobUploadContext? context = null,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task DeleteAsync(
+            string containerName,
+            string blobName,
+            CancellationToken cancellationToken = default)
+        {
+            Interlocked.Increment(ref DeleteCalls);
+            return new TaskCompletionSource().Task;
+        }
+
+        public Task<BlobContent?> OpenReadAsync(
+            string containerName,
+            string blobName,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<BlobContent?>(null);
     }
 
     /// <summary>
