@@ -79,7 +79,7 @@ public sealed class NewsDraftQuotePolicyTests
     }
 
     [Fact]
-    public void Parse_includes_preserved_quotes_and_prompt_is_draft_v3()
+    public void Parse_includes_preserved_quotes_and_prompt_is_draft_v4()
     {
         var json = """
             {
@@ -108,7 +108,7 @@ public sealed class NewsDraftQuotePolicyTests
 
         var parsed = NewsDraftResultParser.Parse(json);
 
-        Assert.Equal("draft-v3", NewsDraftPrompt.Version);
+        Assert.Equal("draft-v4", NewsDraftPrompt.Version);
         Assert.Single(parsed.PreservedQuotes);
         Assert.Equal("Brian May", parsed.PreservedQuotes[0].Speaker);
         Assert.Equal("We love the fans", parsed.PreservedQuotes[0].ExactText);
