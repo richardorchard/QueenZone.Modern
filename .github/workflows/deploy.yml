@@ -178,6 +178,18 @@ jobs:
   # never through scripts/Invoke-AppServiceKudu.py. Uses a dedicated OIDC
   # identity scoped to Website Contributor on queenzone-dev only (#666) —
   # separate from the `dev` environment's Bitwarden publish-profile identity.
+  #
+  # WEBSITE_WARMUP_PATH points at /health, not /warmup. Azure's own container
+  # startup probe must succeed within WEBSITES_CONTAINER_START_TIME_LIMIT
+  # (default 230s) or the platform kills the container and retries — and
+  # /warmup runs SQL/blob dependency checks plus sequential public-cache
+  # priming with no bound on the SQL check, easily exceeding that on a cold
+  # connection. Pointing the platform probe at /warmup crash-looped
+  # queenzone-dev for over an hour on the first #666 rollout. /health stays
+  # cheap (no dependency I/O) so it can't blow the platform's tight budget.
+  # deploy.yml's own "Warm up custom domain" step still hits /warmup
+  # directly afterward, with its own ~8 minute retry budget — that is the
+  # right amount of patience for "are caches warm," not a platform gate.
   configure-app-settings:
     name: Configure ARM Application Settings
     runs-on: ubuntu-latest
@@ -200,13 +212,48 @@ jobs:
           tenant-id: ${{ vars.ARM_TENANT_ID }}
           subscription-id: ${{ vars.ARM_SUBSCRIPTION_ID }}
 
-      - name: Set run-from-package and warmup settings via ARM
+      # az webapp config appsettings set restarts the SCM/Kudu container on
+      # every call, whether or not the values actually changed — and this
+      # job runs on every code deploy, not just the first flip. Writing
+      # unconditionally would pay a 90s settle wait (see below) on every
+      # deploy forever, which is more than the ~39s extract time run-from-
+      # package was meant to save (#666). Only write, and only wait, when
+      # the live settings actually differ from the desired ones.
+      - name: Check and set run-from-package and warmup settings via ARM
+        id: apply-settings
         run: |
-          az webapp config appsettings set \
+          desired=$(printf '%s\n' \
+            "WEBSITE_RUN_FROM_PACKAGE=1" \
+            "WEBSITE_WARMUP_PATH=/health" \
+            "WEBSITE_WARMUP_STATUSES=200" | sort)
+
+          current=$(az webapp config appsettings list \
             --name queenzone-dev \
             --resource-group Queenzone-RG \
-            --settings WEBSITE_RUN_FROM_PACKAGE=1 WEBSITE_WARMUP_PATH=/warmup WEBSITE_WARMUP_STATUSES=200 \
-            --output none
+            --query "[?name=='WEBSITE_RUN_FROM_PACKAGE' || name=='WEBSITE_WARMUP_PATH' || name=='WEBSITE_WARMUP_STATUSES'].[join('=', [name, value])]" \
+            -o tsv | tr -d '\r' | sort)
+
+          if [ "$current" = "$desired" ]; then
+            echo "Settings already match; skipping write and restart wait."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            az webapp config appsettings set \
+              --name queenzone-dev \
+              --resource-group Queenzone-RG \
+              --settings WEBSITE_RUN_FROM_PACKAGE=1 WEBSITE_WARMUP_PATH=/health WEBSITE_WARMUP_STATUSES=200 \
+              --output none
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Only needed right after an actual settings write: Kudu killed the
+      # in-flight OneDeploy on the #666 rollout run when the zip push started
+      # ~25s after a settings write ("Deployment has been stopped due to SCM
+      # container restart... Do not perform a management operation and a
+      # deployment operation in quick succession"). Azure's own fix is the
+      # delay it recommends.
+      - name: Wait for SCM container to settle after the settings write
+        if: steps.apply-settings.outputs.changed == 'true'
+        run: sleep 90
 
   deploy:
     name: Deploy
@@ -224,6 +271,10 @@ jobs:
     environment:
       name: dev
       url: https://www.queenzone.org
+    # A stuck azure/webapps-deploy poll (e.g. hitting the SCM-restart race
+    # this job now waits out) had no bound and hung for ~20 minutes before a
+    # manual cancel on the #666 rollout run. Fail loudly instead.
+    timeout-minutes: 10
 
     steps:
       - name: Checkout
