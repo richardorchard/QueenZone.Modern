@@ -178,6 +178,18 @@ jobs:
   # never through scripts/Invoke-AppServiceKudu.py. Uses a dedicated OIDC
   # identity scoped to Website Contributor on queenzone-dev only (#666) —
   # separate from the `dev` environment's Bitwarden publish-profile identity.
+  #
+  # WEBSITE_WARMUP_PATH points at /health, not /warmup. Azure's own container
+  # startup probe must succeed within WEBSITES_CONTAINER_START_TIME_LIMIT
+  # (default 230s) or the platform kills the container and retries — and
+  # /warmup runs SQL/blob dependency checks plus sequential public-cache
+  # priming with no bound on the SQL check, easily exceeding that on a cold
+  # connection. Pointing the platform probe at /warmup crash-looped
+  # queenzone-dev for over an hour on the first #666 rollout. /health stays
+  # cheap (no dependency I/O) so it can't blow the platform's tight budget.
+  # deploy.yml's own "Warm up custom domain" step still hits /warmup
+  # directly afterward, with its own ~8 minute retry budget — that is the
+  # right amount of patience for "are caches warm," not a platform gate.
   configure-app-settings:
     name: Configure ARM Application Settings
     runs-on: ubuntu-latest
@@ -212,7 +224,7 @@ jobs:
         run: |
           desired=$(printf '%s\n' \
             "WEBSITE_RUN_FROM_PACKAGE=1" \
-            "WEBSITE_WARMUP_PATH=/warmup" \
+            "WEBSITE_WARMUP_PATH=/health" \
             "WEBSITE_WARMUP_STATUSES=200" | sort)
 
           current=$(az webapp config appsettings list \
@@ -228,7 +240,7 @@ jobs:
             az webapp config appsettings set \
               --name queenzone-dev \
               --resource-group Queenzone-RG \
-              --settings WEBSITE_RUN_FROM_PACKAGE=1 WEBSITE_WARMUP_PATH=/warmup WEBSITE_WARMUP_STATUSES=200 \
+              --settings WEBSITE_RUN_FROM_PACKAGE=1 WEBSITE_WARMUP_PATH=/health WEBSITE_WARMUP_STATUSES=200 \
               --output none
             echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
