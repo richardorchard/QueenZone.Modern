@@ -112,10 +112,12 @@ internal static class NewsAgentTestSupport
 
     public static NewsDraftGenerationService CreateDraftGenerationService(
         INewsDiscoveryRepository repository,
-        INewsAiClient aiClient) =>
+        INewsAiClient aiClient,
+        INewsDiscoveryHttpClient? httpClient = null) =>
         new(
             repository,
             CreateAiRunExecutor(repository, aiClient),
+            httpClient ?? new FakeNewsDiscoveryHttpClient(new Dictionary<string, string>()),
             Options.Create(new NewsDraftGenerationOptions()),
             NullLogger<NewsDraftGenerationService>.Instance);
 
