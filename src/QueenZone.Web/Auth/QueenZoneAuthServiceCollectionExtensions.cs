@@ -57,14 +57,20 @@ public static class QueenZoneAuthServiceCollectionExtensions
         }
         else
         {
-            // This sets the app-wide default authenticate scheme to OpenIdConnect, not just
-            // for /Admin — every request's UseAuthentication() resolves through it unless a
-            // more specific scheme is requested (as the member-cookie fallback and admin
-            // composite policy schemes below both do). Probe paths (/health, /health/ready,
-            // /warmup) are excluded from this middleware entirely in Program.cs so nothing
-            // in the authenticated pipeline can block Azure's cold-start probe (#666, #677).
+            // The app-wide default authenticate scheme is the cheap local cookie scheme that
+            // AddMicrosoftIdentityWebApp registers (the same one the admin composite scheme
+            // authenticates against below) — not the remote OpenIdConnect scheme, which exists
+            // only to drive the challenge/redirect-to-Entra flow and process the /signin-oidc
+            // callback. OpenIdConnect stays the default *challenge* scheme so admin sign-in is
+            // unaffected. Probe paths (/health, /health/ready, /warmup) are excluded from this
+            // middleware entirely in Program.cs so nothing in the authenticated pipeline can
+            // block Azure's cold-start probe (#666, #677).
             services
-                .AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
+                .AddAuthentication(options =>
+                {
+                    options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+                    options.DefaultChallengeScheme = OpenIdConnectDefaults.AuthenticationScheme;
+                })
                 .AddMicrosoftIdentityWebApp(configuration);
 
             services.AddAuthentication()
