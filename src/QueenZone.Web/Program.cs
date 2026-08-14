@@ -79,6 +79,28 @@ builder.Services.AddRazorPages(options =>
 
 var app = builder.Build();
 
+// Registered before literally everything else. Mapped endpoints only execute at the
+// position of the implicit UseEndpoints() — always the very end of the pipeline,
+// regardless of where Map* is called in source — so wrapping MapQueenZoneHealthEndpoints
+// in a UseWhen branch further down (as done for the authenticated pipeline) cannot make
+// probe paths skip earlier middleware like UseForwardedHeaders or UseStaticFiles. Only a
+// short-circuiting middleware here can. #666's second cold-start hang happened even after
+// probe paths were excluded from the authenticated pipeline, on requests that reached
+// "Now listening" and ran a background query fine, then went silent for the platform's
+// full startup-probe timeout — consistent with something earlier in the pipeline (a
+// leading static-file existence check against the newly read-only, zip-mounted wwwroot
+// under WEBSITE_RUN_FROM_PACKAGE is the leading suspect) blocking before the health
+// endpoint's own handler ever ran.
+app.Use(async (context, next) =>
+{
+    if (await QueenZoneHealthEndpoints.TryHandleProbeAsync(context))
+    {
+        return;
+    }
+
+    await next();
+});
+
 // Azure App Service (and CDN/proxy, e.g. Cloudflare) terminates TLS and forwards plain HTTP.
 // Without forwarded headers, OAuth redirect_uri values use the internal host/scheme.
 // KnownIPNetworks/Proxies are cleared (edge IP is not fixed). Trust boundary: App Service/

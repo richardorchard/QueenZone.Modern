@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace QueenZone.Web.Health;
@@ -83,6 +84,54 @@ public static class QueenZoneHealthEndpoints
         {
             return Results.Json(new { status = "unhealthy" }, statusCode: StatusCodes.Status503ServiceUnavailable);
         }
+    }
+
+    // Handles probe paths directly, bypassing routing/endpoint dispatch entirely. Mapped
+    // endpoints (MapQueenZoneHealthEndpoints below) only execute at the position of the
+    // implicit UseEndpoints() — always the very end of the middleware pipeline, regardless
+    // of where Map* is called in source — so nothing registered as endpoint routing could
+    // ever actually skip earlier middleware (forwarded headers, static files, and so on).
+    // Program.cs calls this from a short-circuiting middleware registered as literally the
+    // first thing in the pipeline, so probe paths never traverse anything else in this file.
+    // The MapQueenZoneHealthEndpoints registrations stay in place as a defense-in-depth
+    // fallback: if a path check here ever has a bug, the request still falls through to a
+    // correct (if slower, un-bypassed) response instead of a silent 404 (#666).
+    public static async Task<bool> TryHandleProbeAsync(HttpContext context)
+    {
+        var path = context.Request.Path;
+
+        if (string.Equals(path.Value, "/health", StringComparison.OrdinalIgnoreCase))
+        {
+            context.Response.StatusCode = StatusCodes.Status200OK;
+            context.Response.ContentType = "application/json; charset=utf-8";
+            await context.Response.WriteAsync("""{"status":"ok"}""");
+            return true;
+        }
+
+        if (string.Equals(path.Value, ReadyPath, StringComparison.OrdinalIgnoreCase))
+        {
+            var healthCheckService = context.RequestServices.GetRequiredService<HealthCheckService>();
+            var report = await healthCheckService.CheckHealthAsync(
+                registration => registration.Tags.Contains(ReadyTag),
+                context.RequestAborted);
+            context.Response.StatusCode = report.Status is HealthStatus.Unhealthy
+                ? StatusCodes.Status503ServiceUnavailable
+                : StatusCodes.Status200OK;
+            await WriteReadyResponseAsync(context, report);
+            return true;
+        }
+
+        if (string.Equals(path.Value, WarmupPath, StringComparison.OrdinalIgnoreCase))
+        {
+            var result = await RunWarmupAsync(
+                context.RequestServices.GetRequiredService<HealthCheckService>(),
+                context.RequestServices.GetRequiredService<PublicWarmupService>(),
+                context.RequestAborted);
+            await result.ExecuteAsync(context);
+            return true;
+        }
+
+        return false;
     }
 
     internal static async Task WriteReadyResponseAsync(HttpContext httpContext, HealthReport report)
