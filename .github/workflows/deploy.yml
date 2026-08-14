@@ -200,21 +200,47 @@ jobs:
           tenant-id: ${{ vars.ARM_TENANT_ID }}
           subscription-id: ${{ vars.ARM_SUBSCRIPTION_ID }}
 
-      - name: Set run-from-package and warmup settings via ARM
+      # az webapp config appsettings set restarts the SCM/Kudu container on
+      # every call, whether or not the values actually changed — and this
+      # job runs on every code deploy, not just the first flip. Writing
+      # unconditionally would pay a 90s settle wait (see below) on every
+      # deploy forever, which is more than the ~39s extract time run-from-
+      # package was meant to save (#666). Only write, and only wait, when
+      # the live settings actually differ from the desired ones.
+      - name: Check and set run-from-package and warmup settings via ARM
+        id: apply-settings
         run: |
-          az webapp config appsettings set \
+          desired=$(printf '%s\n' \
+            "WEBSITE_RUN_FROM_PACKAGE=1" \
+            "WEBSITE_WARMUP_PATH=/warmup" \
+            "WEBSITE_WARMUP_STATUSES=200" | sort)
+
+          current=$(az webapp config appsettings list \
             --name queenzone-dev \
             --resource-group Queenzone-RG \
-            --settings WEBSITE_RUN_FROM_PACKAGE=1 WEBSITE_WARMUP_PATH=/warmup WEBSITE_WARMUP_STATUSES=200 \
-            --output none
+            --query "[?name=='WEBSITE_RUN_FROM_PACKAGE' || name=='WEBSITE_WARMUP_PATH' || name=='WEBSITE_WARMUP_STATUSES'].[join('=', [name, value])]" \
+            -o tsv | tr -d '\r' | sort)
 
-      # Writing App Service settings restarts the SCM/Kudu container. The
-      # `deploy` job's zip push starting right after this hit that restart
-      # window and Kudu killed the in-flight OneDeploy: "Deployment has been
-      # stopped due to SCM container restart... Do not perform a management
-      # operation and a deployment operation in quick succession." (observed
-      # on the #666 rollout run). Azure's own fix is the delay it recommends.
+          if [ "$current" = "$desired" ]; then
+            echo "Settings already match; skipping write and restart wait."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            az webapp config appsettings set \
+              --name queenzone-dev \
+              --resource-group Queenzone-RG \
+              --settings WEBSITE_RUN_FROM_PACKAGE=1 WEBSITE_WARMUP_PATH=/warmup WEBSITE_WARMUP_STATUSES=200 \
+              --output none
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Only needed right after an actual settings write: Kudu killed the
+      # in-flight OneDeploy on the #666 rollout run when the zip push started
+      # ~25s after a settings write ("Deployment has been stopped due to SCM
+      # container restart... Do not perform a management operation and a
+      # deployment operation in quick succession"). Azure's own fix is the
+      # delay it recommends.
       - name: Wait for SCM container to settle after the settings write
+        if: steps.apply-settings.outputs.changed == 'true'
         run: sleep 90
 
   deploy:
