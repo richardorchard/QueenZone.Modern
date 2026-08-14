@@ -14,8 +14,9 @@ public static class NewsAgentServiceCollectionExtensions
 {
     /// <summary>
     /// Registers OpenRouter + draft generation used by admin review UI
-    /// (regenerate draft). Does <strong>not</strong> register outbound discovery
-    /// HTTP clients, source fetchers, triage, scheduler options, or
+    /// (regenerate draft), including the SSRF-safe HTTP client used to refresh
+    /// source evidence. Does <strong>not</strong> register source fetchers,
+    /// triage, scheduler options, or
     /// <see cref="DiscoverNewsWorker"/>.
     /// </summary>
     public static IServiceCollection AddQueenZoneNewsAgentWeb(
@@ -24,6 +25,7 @@ public static class NewsAgentServiceCollectionExtensions
     {
         RegisterOpenRouterOptions(services, configuration);
         RegisterDraftOptions(services, configuration);
+        RegisterDiscoveryHttpClient(services);
         RegisterOpenRouterAiClient(services);
         services.AddScoped<NewsAiBudgetGuard>();
         services.AddScoped<NewsAiRunExecutor>();
@@ -40,11 +42,10 @@ public static class NewsAgentServiceCollectionExtensions
         this IServiceCollection services,
         IConfiguration? configuration = null)
     {
-        RegisterDiscoveryFetch(services);
+        AddQueenZoneNewsAgentWeb(services, configuration);
+        RegisterDiscoveryPipeline(services);
         RegisterTriageOptions(services, configuration);
         RegisterSchedulerOptions(services, configuration);
-        // Editorial AI (shared with web admin regenerate).
-        AddQueenZoneNewsAgentWeb(services, configuration);
 
         services.AddScoped<NewsTriageDeterministicAnalyzer>();
         services.AddScoped<NewsTriageService>();
@@ -65,7 +66,7 @@ public static class NewsAgentServiceCollectionExtensions
         IConfiguration? configuration = null) =>
         AddQueenZoneNewsAgentWorker(services, configuration);
 
-    private static void RegisterDiscoveryFetch(IServiceCollection services)
+    private static void RegisterDiscoveryHttpClient(IServiceCollection services)
     {
         services.AddHttpClient<INewsDiscoveryHttpClient, NewsDiscoveryHttpClient>(client =>
         {
@@ -74,7 +75,10 @@ public static class NewsAgentServiceCollectionExtensions
         })
         // SSRF: block private/link-local/metadata destinations after DNS (and on redirects).
         .ConfigurePrimaryHttpMessageHandler(() => SsrfSafeSocketsHttpHandler.Create(maxAutomaticRedirections: 5));
+    }
 
+    private static void RegisterDiscoveryPipeline(IServiceCollection services)
+    {
         services.AddSingleton<NewsSourceFetcherRegistry>();
         services.AddSingleton<INewsSourceFetcher, RssAtomSourceFetcher>();
         services.AddSingleton<INewsSourceFetcher, SitemapSourceFetcher>();

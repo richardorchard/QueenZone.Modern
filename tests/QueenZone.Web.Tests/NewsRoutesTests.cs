@@ -286,9 +286,10 @@ public sealed class NewsRoutesTests : IClassFixture<QueenZoneWebApplicationFacto
 
         Assert.Contains("href=\"https://example.com/original-story\"", safeBody);
         Assert.Contains("rel=\"noopener noreferrer\"", safeBody);
-        Assert.Contains(">Source<", safeBody);
+        Assert.Contains(">https://example.com/original-story</a>", safeBody);
+        Assert.Contains("Source: <a", safeBody);
         Assert.DoesNotContain("javascript:", unsafeBody, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain(">Source</a>", unsafeBody);
+        Assert.DoesNotContain("class=\"article-source\"", unsafeBody);
     }
 
     [Fact]

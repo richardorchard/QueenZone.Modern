@@ -33,6 +33,63 @@ public sealed class NewsDraftGenerationServiceTests
     }
 
     [Fact]
+    public async Task GenerateDraftAsync_refreshes_source_media_links_before_calling_ai()
+    {
+        const string articleUrl =
+            "https://www.queenonline.com/news/i-see-you-now-roger-taylors-brand-new-single-and-video-out-now";
+        var repository = new InMemoryNewsDiscoveryRepository(new SharedNewsDiscoveryStore());
+        var candidateId = await NewsDiscoveryTestSeeder.SeedNeedsReviewCandidateAsync(
+            repository,
+            canonicalUrl: articleUrl,
+            title: "I See You Now: Roger Taylor's Brand New Single and Video");
+        var aiClient = new DraftGenerationFakeAiClient(NewsAgentTestSupport.SampleDraftJson);
+        var httpClient = new FakeNewsDiscoveryHttpClient(new Dictionary<string, string>
+        {
+            [articleUrl] = """
+                <html><head>
+                  <title>I See You Now: Roger Taylor's Brand New Single and Video</title>
+                  <meta name="description" content="Roger Taylor has released a new single and video." />
+                </head><body>
+                  <p>Listen to the single now @ <a href="https://rogertaylor.lnk.to/iseeyounow">Listen now</a></p>
+                  <iframe src="https://www.youtube.com/embed/KZivRNcsoJw?si=test" title="YouTube video player"></iframe>
+                </body></html>
+                """
+        });
+        var service = NewsAgentTestSupport.CreateDraftGenerationService(repository, aiClient, httpClient);
+
+        var result = await service.GenerateDraftAsync(
+            (await repository.GetCandidateByIdAsync(candidateId))!,
+            new NewsDraftRunOptions());
+
+        Assert.True(result.Succeeded);
+        Assert.NotNull(aiClient.LastRequest);
+        Assert.Contains(
+            aiClient.LastRequest.Messages,
+            message => message.Content.Contains(
+                "https://rogertaylor.lnk.to/iseeyounow",
+                StringComparison.Ordinal));
+        Assert.Contains(
+            aiClient.LastRequest.Messages,
+            message => message.Content.Contains(
+                "https://www.youtube.com/watch?v=KZivRNcsoJw",
+                StringComparison.Ordinal));
+
+        var evidence = await repository.GetCandidateEvidenceAsync(candidateId);
+        Assert.Contains(evidence, item =>
+            item.Excerpt?.Contains("https://rogertaylor.lnk.to/iseeyounow", StringComparison.Ordinal) == true);
+
+        var draft = await repository.GetDraftByCandidateIdAsync(candidateId);
+        Assert.Contains(
+            "<a href=\"https://rogertaylor.lnk.to/iseeyounow\">Listen to the song</a>",
+            draft!.ProposedBody,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "<a href=\"https://www.youtube.com/watch?v=KZivRNcsoJw\">Watch the video</a>",
+            draft.ProposedBody,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task GenerateDraftAsync_skips_when_draft_already_exists()
     {
         var repository = new InMemoryNewsDiscoveryRepository(new SharedNewsDiscoveryStore());
@@ -206,15 +263,20 @@ public sealed class NewsDraftGenerationServiceTests
     {
         public bool IsEnabled { get; } = enabled;
 
+        public NewsAiChatRequest? LastRequest { get; private set; }
+
         public Task<NewsAiChatCompletion> CompleteChatAsync(
           NewsAiChatRequest request,
-          CancellationToken cancellationToken = default) =>
-          Task.FromResult(new NewsAiChatCompletion(
-            content,
-            "openai/gpt-4.1-mini",
-            120,
-            240,
-            0.0025m,
-            DryRun: false));
+          CancellationToken cancellationToken = default)
+        {
+            LastRequest = request;
+            return Task.FromResult(new NewsAiChatCompletion(
+              content,
+              "openai/gpt-4.1-mini",
+              120,
+              240,
+              0.0025m,
+              DryRun: false));
+        }
     }
 }
