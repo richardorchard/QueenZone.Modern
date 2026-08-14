@@ -23,6 +23,12 @@ public sealed class MemberAccountService(
     IBlobUploadService blobUploadService,
     MemberUploadQuotaService uploadQuota)
 {
+    // MemberAccountDeletionHostedService runs this on its own timer, starting immediately
+    // on app startup with no initial delay. A blob delete with no bound here previously had
+    // no timeout at all — an unbounded hang on a cold container's first outbound Blob
+    // Storage call would block this background service indefinitely (#666 investigation).
+    private static readonly TimeSpan BlobDeleteTimeout = TimeSpan.FromSeconds(20);
+
     private readonly PasswordHasher<MemberAccount> passwordHasher = new();
 
     public async Task<MemberAccountResult> RegisterAsync(string email, string password, string displayName, CancellationToken cancellationToken = default)
@@ -573,7 +579,9 @@ public sealed class MemberAccountService(
         {
             try
             {
-                await blobUploadService.DeleteAsync(MemberAvatarPaths.Container, avatarBlobName, cancellationToken);
+                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                timeout.CancelAfter(BlobDeleteTimeout);
+                await blobUploadService.DeleteAsync(MemberAvatarPaths.Container, avatarBlobName, timeout.Token);
             }
             catch
             {
@@ -585,7 +593,9 @@ public sealed class MemberAccountService(
         {
             try
             {
-                await blobUploadService.DeleteAsync(MemberAvatarPaths.Container, thumbBlobName, cancellationToken);
+                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                timeout.CancelAfter(BlobDeleteTimeout);
+                await blobUploadService.DeleteAsync(MemberAvatarPaths.Container, thumbBlobName, timeout.Token);
             }
             catch
             {
