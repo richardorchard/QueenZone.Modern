@@ -8,9 +8,37 @@ namespace QueenZone.Web.Health;
 /// Readiness: SQL is reachable when a legacy connection string is configured.
 /// In-memory / sample-data mode (no DbContext) is treated as healthy "not configured".
 /// </summary>
-public sealed class SqlReadyHealthCheck(IServiceScopeFactory scopeFactory) : IHealthCheck
+public sealed class SqlReadyHealthCheck : IHealthCheck
 {
     public const string Name = "sql";
+
+    /// <summary>
+    /// Upper bound for <c>CanConnectAsync</c>. Independent of
+    /// <c>QueenZoneDbContext</c>'s <c>EnableRetryOnFailure</c> policy
+    /// (5 retries, 20s max delay), which can otherwise exceed 100s on a
+    /// cold first connection.
+    /// </summary>
+    internal static readonly TimeSpan DefaultConnectTimeout = TimeSpan.FromSeconds(15);
+
+    private readonly IServiceScopeFactory scopeFactory;
+    private readonly TimeSpan connectTimeout;
+    private readonly Func<QueenZoneDbContext, CancellationToken, Task<bool>> canConnectAsync;
+
+    public SqlReadyHealthCheck(IServiceScopeFactory scopeFactory)
+        : this(scopeFactory, DefaultConnectTimeout)
+    {
+    }
+
+    internal SqlReadyHealthCheck(
+        IServiceScopeFactory scopeFactory,
+        TimeSpan connectTimeout,
+        Func<QueenZoneDbContext, CancellationToken, Task<bool>>? canConnectAsync = null)
+    {
+        this.scopeFactory = scopeFactory;
+        this.connectTimeout = connectTimeout;
+        this.canConnectAsync = canConnectAsync
+            ?? ((dbContext, token) => dbContext.Database.CanConnectAsync(token));
+    }
 
     public async Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context,
@@ -23,15 +51,19 @@ public sealed class SqlReadyHealthCheck(IServiceScopeFactory scopeFactory) : IHe
             return HealthCheckResult.Healthy("SQL not configured (in-memory data).");
         }
 
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(connectTimeout);
+
         try
         {
-            // No explicit timeout here — rides QueenZoneDbContext's
-            // EnableRetryOnFailure policy, which can take well over 100s on
-            // a cold first connection. Tracked for a bounded timeout in #674.
-            var canConnect = await dbContext.Database.CanConnectAsync(cancellationToken);
+            var canConnect = await canConnectAsync(dbContext, timeout.Token);
             return canConnect
                 ? HealthCheckResult.Healthy("SQL reachable.")
                 : HealthCheckResult.Unhealthy("SQL cannot connect.");
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return HealthCheckResult.Unhealthy("SQL check timed out.");
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

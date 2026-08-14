@@ -147,11 +147,11 @@ powershell -File .\scripts\Smoke-LiveSite.ps1
 B1 App Service warmup settings (portal / ARM Application Settings, not Kudu):
 
 ```text
-WEBSITE_WARMUP_PATH=/warmup
+WEBSITE_WARMUP_PATH=/health
 WEBSITE_WARMUP_STATUSES=200
 ```
 
-Enable Always On on the App Service when the active SKU supports it; it reduces idle cold starts, while `/warmup` handles deployment/startup dependency checks and public query cache priming.
+`WEBSITE_WARMUP_PATH` is `/health`, not `/warmup` (#673). `/health` is the cheap platform liveness ping. `deploy.yml` still polls `/warmup` after recycle to run readiness checks and prime public query caches (SQL connect bounded at 15s; nine cache steps run concurrently at 8s each — see [`azure-hosting-plan.md`](architecture/azure-hosting-plan.md)). Enable Always On on the App Service when the active SKU supports it; it reduces idle cold starts.
 
 Application logging should be enabled at Information level on the filesystem. If the stream is quiet, hit the failing route to generate entries.
 

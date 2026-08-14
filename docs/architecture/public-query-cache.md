@@ -15,6 +15,8 @@ This cache is intentionally limited to shared public data:
 
 Admin, personalized, authenticated, preview, and edit workflows must not read from this cache.
 
+`/warmup` primes the homepage-shaped entries (latest news, published counts, forum stats, on-this-day, photo categories) after deploy. The nine reads run concurrently, each in its own DI scope so EF repositories do not share a `DbContext`. See [`azure-hosting-plan.md`](azure-hosting-plan.md) for the duration budget.
+
 ## Freshness
 
 Default durations are configured by `PublicQueryCacheOptions`:
