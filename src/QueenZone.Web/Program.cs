@@ -148,38 +148,59 @@ app.UseStaticFiles(new StaticFileOptions
     ContentTypeProvider = staticFileContentTypeProvider,
     OnPrepareResponse = ctx => StaticFileCacheControl.Apply(ctx.Context, app.Environment),
 });
-app.UseAuthentication();
-// Public pages use a non-member default scheme; without this, HttpContext.User stays
-// anonymous while the MembersCookie is present. Antiforgery tokens then fail on member-only
-// APIs (e.g. editor image upload) because generation and validation see different identities.
-app.Use(async (context, next) =>
-{
-    if (context.User.Identity?.IsAuthenticated != true)
+// Probe paths (/health, /health/ready, /warmup) skip authentication, authorization,
+// rate limiting, output caching, and antiforgery entirely. These are Azure's own
+// container startup gate and the deploy workflow's warmup poll — they must stay
+// genuinely cheap. Routing every request through the default OpenID Connect scheme's
+// AuthenticateAsync here, even for a liveness probe, risked a cold-container hang if
+// that handler touched Entra metadata retrieval on first use; a probe stuck behind it
+// blocked the platform's startup gate for its full timeout regardless of which probe
+// path was configured (#666).
+app.UseWhen(
+    context => !QueenZoneHealthEndpoints.IsProbePath(context.Request.Path),
+    branch =>
     {
-        var member = await context.AuthenticateAsync(MemberAuthenticationSchemes.MembersCookie);
-        if (member.Succeeded && member.Principal?.Identity?.IsAuthenticated == true)
+        // Diagnostic marker: proves at runtime which requests actually entered the
+        // full authenticated pipeline vs the probe fast-path (also exercised directly
+        // by HealthEndpointsTests to guard against #666 regressing).
+        branch.Use(async (context, next) =>
         {
-            context.User = member.Principal;
-        }
-    }
+            context.Response.Headers["X-QueenZone-Pipeline"] = "full";
+            await next();
+        });
+        branch.UseAuthentication();
+        // Public pages use a non-member default scheme; without this, HttpContext.User stays
+        // anonymous while the MembersCookie is present. Antiforgery tokens then fail on member-only
+        // APIs (e.g. editor image upload) because generation and validation see different identities.
+        branch.Use(async (context, next) =>
+        {
+            if (context.User.Identity?.IsAuthenticated != true)
+            {
+                var member = await context.AuthenticateAsync(MemberAuthenticationSchemes.MembersCookie);
+                if (member.Succeeded && member.Principal?.Identity?.IsAuthenticated == true)
+                {
+                    context.User = member.Principal;
+                }
+            }
 
-    await next();
-});
-app.UseAuthorization();
-// Short browser/CDN Cache-Control for anonymous public HTML (after auth so User is known).
-// OnStarting runs when the response starts so Content-Type and status are available.
-app.Use(async (context, next) =>
-{
-    context.Response.OnStarting(static state =>
-    {
-        PublicHtmlCacheControl.TryApply((HttpContext)state!);
-        return Task.CompletedTask;
-    }, context);
-    await next();
-});
-app.UseRateLimiter();
-app.UseOutputCache();
-app.UseAntiforgery();
+            await next();
+        });
+        branch.UseAuthorization();
+        // Short browser/CDN Cache-Control for anonymous public HTML (after auth so User is known).
+        // OnStarting runs when the response starts so Content-Type and status are available.
+        branch.Use(async (context, next) =>
+        {
+            context.Response.OnStarting(static state =>
+            {
+                PublicHtmlCacheControl.TryApply((HttpContext)state!);
+                return Task.CompletedTask;
+            }, context);
+            await next();
+        });
+        branch.UseRateLimiter();
+        branch.UseOutputCache();
+        branch.UseAntiforgery();
+    });
 
 // Liveness (/health) + readiness (/health/ready) — see QueenZoneHealthEndpoints.
 app.MapQueenZoneHealthEndpoints();
