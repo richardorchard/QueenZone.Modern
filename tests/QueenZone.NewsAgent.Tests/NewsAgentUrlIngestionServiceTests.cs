@@ -89,6 +89,43 @@ public sealed class NewsAgentUrlIngestionServiceTests
     }
 
     [Fact]
+    public async Task Ingest_adds_direct_song_and_video_links_to_drafting_evidence()
+    {
+        var store = new SharedNewsDiscoveryStore();
+        var repository = new InMemoryNewsDiscoveryRepository(store);
+        var service = CreateService(
+            repository,
+            new Dictionary<string, string>
+            {
+                [ArticleUrl] = """
+                    <html><head><title>Roger Taylor releases I See You Now</title>
+                    <meta name="description" content="Roger Taylor has released a new single and video." /></head>
+                    <body>
+                      <p>Listen to the single now @ <a href="https://rogertaylor.lnk.to/iseeyounow">Listen now</a></p>
+                      <iframe src="https://www.youtube.com/embed/KZivRNcsoJw?si=test" title="YouTube video player"></iframe>
+                    </body></html>
+                    """
+            },
+            triageJson: """
+                {
+                  "verdict": "relevant",
+                  "rationale": "Official Roger Taylor release.",
+                  "relevance_score": 0.95,
+                  "confidence_score": 0.9,
+                  "entities": ["Roger Taylor"],
+                  "review_notes": "Good candidate"
+                }
+                """);
+
+        var result = await service.IngestAsync(ArticleUrl, generateDraft: false);
+
+        var evidence = await repository.GetCandidateEvidenceAsync(result.CandidateId!.Value);
+        Assert.Single(evidence);
+        Assert.Contains("https://rogertaylor.lnk.to/iseeyounow", evidence[0].Excerpt, StringComparison.Ordinal);
+        Assert.Contains("https://www.youtube.com/watch?v=KZivRNcsoJw", evidence[0].Excerpt, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Ingest_reuses_duplicate_canonical_url()
     {
         var store = new SharedNewsDiscoveryStore();

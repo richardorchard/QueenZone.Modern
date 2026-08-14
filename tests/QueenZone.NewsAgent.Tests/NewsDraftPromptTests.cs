@@ -65,11 +65,15 @@ public sealed class NewsDraftPromptTests
 
         Assert.Equal(2, messages.Count);
         Assert.Contains("Queen announce 2026 tour", messages[1].Content, StringComparison.Ordinal);
-        Assert.Equal("draft-v3", NewsDraftPrompt.Version);
+        Assert.Equal("draft-v4", NewsDraftPrompt.Version);
         Assert.Contains("preserved_quotes", messages[1].Content, StringComparison.Ordinal);
         Assert.Contains("Quote policy", messages[0].Content, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("knowledgeable Queen fan", messages[0].Content, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Tony Iommi", messages[0].Content, StringComparison.Ordinal);
         Assert.Contains("comments made by other artists", messages[0].Content, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Media link policy", messages[0].Content, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Listen to the song", messages[0].Content, StringComparison.Ordinal);
+        Assert.Contains("Watch the video", messages[0].Content, StringComparison.Ordinal);
+        Assert.Contains("Never invent, guess, rewrite, or shorten a URL", messages[0].Content, StringComparison.Ordinal);
     }
 }

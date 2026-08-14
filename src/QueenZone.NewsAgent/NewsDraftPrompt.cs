@@ -4,7 +4,7 @@ namespace QueenZone.NewsAgent;
 
 public static class NewsDraftPrompt
 {
-    public const string Version = "draft-v3";
+    public const string Version = "draft-v4";
 
     public static IReadOnlyList<NewsAiChatMessage> BuildMessages(
         NewsCandidate candidate,
@@ -25,6 +25,9 @@ public static class NewsDraftPrompt
             Do not copy full articles, long passages, headlines, or copyrighted narrative from sources.
             Keep the body concise (roughly 2-5 short paragraphs).
             Preserve only short, newsworthy quotations.
+
+            Media link policy (mandatory):
+            When the evidence supplies a direct song, audio, streaming, or video URL relevant to the story, include it once in the body near the relevant sentence so readers can listen or watch. Use a short descriptive HTML link such as <a href="EXACT_EVIDENCE_URL">Listen to the song</a> or <a href="EXACT_EVIDENCE_URL">Watch the video</a>. Use only the exact http or https URL supplied in the evidence. Never invent, guess, rewrite, or shorten a URL. Do not emit iframe, script, audio, video, or embed markup. If the evidence supplies no direct media URL, do not add one.
 
             Quote policy (mandatory):
             Preserve short, newsworthy direct quotations about Queen or a Queen band member exactly as supplied in the evidence, including relevant comments made by other artists, collaborators, producers, friends, or interviewees. When such a quote is central to the story, prefer including at least one useful short quote rather than reducing every comment to paraphrase.
@@ -63,6 +66,8 @@ public static class NewsDraftPrompt
             title, slug, excerpt, body, related_entities, source_urls, source_names,
             attribution_text, confidence_notes, source_notes, suggested_publish_at,
             secondary_source_warning, preserved_quotes
+
+            The body may contain safe paragraph and anchor HTML only as required by the media link policy.
             """;
 
         return

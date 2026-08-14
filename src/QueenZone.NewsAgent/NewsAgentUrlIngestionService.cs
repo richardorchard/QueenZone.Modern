@@ -40,12 +40,13 @@ public class NewsAgentUrlIngestionService(
             }
 
             var parsed = NewsArticlePageParser.Parse(fetched.Body, finalNormalized);
+            var evidenceExcerpt = NewsArticlePageParser.BuildEvidenceExcerpt(parsed);
             var source = await EnsureManualSourceAsync(cancellationToken);
             var now = DateTime.UtcNow;
 
             var canonicalUrl = NewsCandidateDedupe.NormalizeCanonicalUrl(finalNormalized);
             var canonicalUrlHash = NewsCandidateDedupe.ComputeUrlHash(canonicalUrl);
-            var contentHash = NewsCandidateDedupe.ComputeContentHash(parsed.Title, parsed.Excerpt);
+            var contentHash = NewsCandidateDedupe.ComputeContentHash(parsed.Title, evidenceExcerpt);
 
             var existingByUrl = await discoveryRepository.GetCandidateByCanonicalUrlHashAsync(
                 canonicalUrlHash,
@@ -68,7 +69,7 @@ public class NewsAgentUrlIngestionService(
                         source.TrustTier,
                         parsed.Title,
                         null,
-                        parsed.Excerpt,
+                        evidenceExcerpt,
                         null,
                         now),
                     cancellationToken);
@@ -85,7 +86,7 @@ public class NewsAgentUrlIngestionService(
                         finalNormalized,
                         parsed.Title,
                         null,
-                        parsed.Excerpt,
+                        evidenceExcerpt,
                         now),
                     cancellationToken);
                 candidate = await discoveryRepository.GetCandidateByIdAsync(candidateId, cancellationToken)
