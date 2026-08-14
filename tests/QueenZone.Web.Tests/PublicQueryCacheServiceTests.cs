@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using QueenZone.Data;
@@ -285,8 +286,9 @@ public sealed class PublicQueryCacheServiceTests
         using var memoryCache = new MemoryCache(new MemoryCacheOptions());
         var newsRepository = new CancellationBlockingNewsRepository();
         var cache = CreateService(memoryCache, newsRepository: newsRepository);
+        await using var provider = CreateWarmupProvider(cache);
         var warmup = new PublicWarmupService(
-            cache,
+            provider.GetRequiredService<IServiceScopeFactory>(),
             TimeProvider.System,
             NullLogger<PublicWarmupService>.Instance,
             TimeSpan.FromMilliseconds(50));
@@ -295,6 +297,30 @@ public sealed class PublicQueryCacheServiceTests
             warmup.WarmPublicCachesAsync());
 
         await newsRepository.WaitUntilEnteredAsync();
+    }
+
+    [Fact]
+    public async Task PublicWarmupService_primes_cache_steps_concurrently()
+    {
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var gate = new ConcurrentEntryGate(PublicWarmupService.StepCount);
+        var cache = CreateService(
+            memoryCache,
+            newsRepository: new BarrierNewsRepository(gate),
+            articlesRepository: new BarrierArticlesRepository(gate),
+            forumRepository: new BarrierForumRepository(gate),
+            historyRepository: new BarrierQueenHistoryRepository(gate),
+            photoRepository: new BarrierPhotoRepository(gate));
+        await using var provider = CreateWarmupProvider(cache);
+        var warmup = new PublicWarmupService(
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            TimeProvider.System,
+            NullLogger<PublicWarmupService>.Instance,
+            TimeSpan.FromSeconds(2));
+
+        await warmup.WarmPublicCachesAsync();
+
+        Assert.Equal(PublicWarmupService.StepCount, gate.Entered);
     }
 
     [Fact]
@@ -346,6 +372,13 @@ public sealed class PublicQueryCacheServiceTests
 
         Assert.Equal(2, photoRepository.CategoriesCallCount);
         Assert.Equal(2, photoRepository.PageCallCount);
+    }
+
+    private static ServiceProvider CreateWarmupProvider(PublicQueryCacheService cache)
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(cache);
+        return services.BuildServiceProvider();
     }
 
     private static PublicQueryCacheService CreateService(
@@ -430,7 +463,7 @@ public sealed class PublicQueryCacheServiceTests
             return Task.FromResult<IReadOnlyList<NewsItem>>([item]);
         }
 
-        public Task<int> GetPublishedCountAsync(CancellationToken cancellationToken = default)
+        public virtual Task<int> GetPublishedCountAsync(CancellationToken cancellationToken = default)
         {
             PublishedCountCallCount++;
             return Task.FromResult(PublishedCountCallCount);
@@ -449,7 +482,7 @@ public sealed class PublicQueryCacheServiceTests
             Task.FromResult(new NewsSearchPage([], 0, page, pageSize));
     }
 
-    private sealed class CountingArticlesRepository : IArticlesRepository
+    private class CountingArticlesRepository : IArticlesRepository
     {
         private readonly ArticleItem item = new(
             1,
@@ -463,7 +496,7 @@ public sealed class PublicQueryCacheServiceTests
 
         public int PublishedCountCallCount { get; private set; }
 
-        public Task<int> GetPublishedCountAsync(CancellationToken cancellationToken = default)
+        public virtual Task<int> GetPublishedCountAsync(CancellationToken cancellationToken = default)
         {
             PublishedCountCallCount++;
             return Task.FromResult(1);
@@ -482,7 +515,7 @@ public sealed class PublicQueryCacheServiceTests
             Task.FromResult<IReadOnlyList<SitemapContentEntry>>([new SitemapContentEntry(item.Id, item.Title, item.PublishedAt)]);
     }
 
-    private sealed class CountingForumRepository : IForumRepository
+    private class CountingForumRepository : IForumRepository
     {
         private readonly ForumCategoryItem category = new(
             1,
@@ -499,19 +532,19 @@ public sealed class PublicQueryCacheServiceTests
 
         public int RecentThreadsCallCount { get; private set; }
 
-        public Task<IReadOnlyList<ForumCategoryItem>> GetCategoriesAsync(CancellationToken cancellationToken = default)
+        public virtual Task<IReadOnlyList<ForumCategoryItem>> GetCategoriesAsync(CancellationToken cancellationToken = default)
         {
             CategoriesCallCount++;
             return Task.FromResult<IReadOnlyList<ForumCategoryItem>>([category]);
         }
 
-        public Task<int> GetTotalThreadCountAsync(CancellationToken cancellationToken = default)
+        public virtual Task<int> GetTotalThreadCountAsync(CancellationToken cancellationToken = default)
         {
             ThreadCountCallCount++;
             return Task.FromResult(4);
         }
 
-        public Task<IReadOnlyList<ForumRecentThreadItem>> GetRecentThreadsAsync(
+        public virtual Task<IReadOnlyList<ForumRecentThreadItem>> GetRecentThreadsAsync(
             int count,
             CancellationToken cancellationToken = default)
         {
@@ -549,19 +582,19 @@ public sealed class PublicQueryCacheServiceTests
             throw new NotSupportedException();
     }
 
-    private sealed class CountingQueenHistoryRepository : IQueenHistoryRepository
+    private class CountingQueenHistoryRepository : IQueenHistoryRepository
     {
         public int OnThisDayCallCount { get; private set; }
 
         public int AroundThisDayCallCount { get; private set; }
 
-        public Task<IReadOnlyList<QueenHistoryEvent>> GetOnThisDayAsync(DateOnly date, int count, CancellationToken cancellationToken = default)
+        public virtual Task<IReadOnlyList<QueenHistoryEvent>> GetOnThisDayAsync(DateOnly date, int count, CancellationToken cancellationToken = default)
         {
             OnThisDayCallCount++;
             return Task.FromResult<IReadOnlyList<QueenHistoryEvent>>([CreateEvent($"on-this-day:{date:yyyy-MM-dd}:{count}")]);
         }
 
-        public Task<IReadOnlyList<QueenHistoryEvent>> GetAroundThisDayAsync(
+        public virtual Task<IReadOnlyList<QueenHistoryEvent>> GetAroundThisDayAsync(
             DateOnly date,
             int dayWindow,
             int count,
@@ -590,13 +623,13 @@ public sealed class PublicQueryCacheServiceTests
                 true);
     }
 
-    private sealed class CountingPhotoRepository : IPhotoRepository
+    private class CountingPhotoRepository : IPhotoRepository
     {
         public int CategoriesCallCount { get; private set; }
 
         public int PageCallCount { get; private set; }
 
-        public Task<IReadOnlyList<PhotoCategory>> GetCategoriesAsync(CancellationToken cancellationToken = default)
+        public virtual Task<IReadOnlyList<PhotoCategory>> GetCategoriesAsync(CancellationToken cancellationToken = default)
         {
             CategoriesCallCount++;
             return Task.FromResult<IReadOnlyList<PhotoCategory>>(
@@ -656,5 +689,105 @@ public sealed class PublicQueryCacheServiceTests
         public Task<IReadOnlyList<PhotoSitemapCategory>> GetPublishedSitemapCategoriesAsync(
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
+    }
+
+    private sealed class ConcurrentEntryGate(int expected)
+    {
+        private readonly TaskCompletionSource allEntered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int entered;
+
+        public int Entered => Volatile.Read(ref entered);
+
+        public async Task EnterAsync(CancellationToken cancellationToken)
+        {
+            if (Interlocked.Increment(ref entered) == expected)
+            {
+                allEntered.TrySetResult();
+            }
+
+            await allEntered.Task.WaitAsync(cancellationToken);
+        }
+    }
+
+    private sealed class BarrierNewsRepository(ConcurrentEntryGate gate) : CountingNewsRepository
+    {
+        public override async Task<IReadOnlyList<NewsItem>> GetLatestAsync(
+            int count,
+            CancellationToken cancellationToken = default)
+        {
+            await gate.EnterAsync(cancellationToken);
+            return await base.GetLatestAsync(count, cancellationToken);
+        }
+
+        public override async Task<int> GetPublishedCountAsync(CancellationToken cancellationToken = default)
+        {
+            await gate.EnterAsync(cancellationToken);
+            return await base.GetPublishedCountAsync(cancellationToken);
+        }
+    }
+
+    private sealed class BarrierArticlesRepository(ConcurrentEntryGate gate) : CountingArticlesRepository
+    {
+        public override async Task<int> GetPublishedCountAsync(CancellationToken cancellationToken = default)
+        {
+            await gate.EnterAsync(cancellationToken);
+            return await base.GetPublishedCountAsync(cancellationToken);
+        }
+    }
+
+    private sealed class BarrierForumRepository(ConcurrentEntryGate gate) : CountingForumRepository
+    {
+        public override async Task<IReadOnlyList<ForumCategoryItem>> GetCategoriesAsync(
+            CancellationToken cancellationToken = default)
+        {
+            await gate.EnterAsync(cancellationToken);
+            return await base.GetCategoriesAsync(cancellationToken);
+        }
+
+        public override async Task<int> GetTotalThreadCountAsync(CancellationToken cancellationToken = default)
+        {
+            await gate.EnterAsync(cancellationToken);
+            return await base.GetTotalThreadCountAsync(cancellationToken);
+        }
+
+        public override async Task<IReadOnlyList<ForumRecentThreadItem>> GetRecentThreadsAsync(
+            int count,
+            CancellationToken cancellationToken = default)
+        {
+            await gate.EnterAsync(cancellationToken);
+            return await base.GetRecentThreadsAsync(count, cancellationToken);
+        }
+    }
+
+    private sealed class BarrierQueenHistoryRepository(ConcurrentEntryGate gate) : CountingQueenHistoryRepository
+    {
+        public override async Task<IReadOnlyList<QueenHistoryEvent>> GetOnThisDayAsync(
+            DateOnly date,
+            int count,
+            CancellationToken cancellationToken = default)
+        {
+            await gate.EnterAsync(cancellationToken);
+            return await base.GetOnThisDayAsync(date, count, cancellationToken);
+        }
+
+        public override async Task<IReadOnlyList<QueenHistoryEvent>> GetAroundThisDayAsync(
+            DateOnly date,
+            int dayWindow,
+            int count,
+            CancellationToken cancellationToken = default)
+        {
+            await gate.EnterAsync(cancellationToken);
+            return await base.GetAroundThisDayAsync(date, dayWindow, count, cancellationToken);
+        }
+    }
+
+    private sealed class BarrierPhotoRepository(ConcurrentEntryGate gate) : CountingPhotoRepository
+    {
+        public override async Task<IReadOnlyList<PhotoCategory>> GetCategoriesAsync(
+            CancellationToken cancellationToken = default)
+        {
+            await gate.EnterAsync(cancellationToken);
+            return await base.GetCategoriesAsync(cancellationToken);
+        }
     }
 }

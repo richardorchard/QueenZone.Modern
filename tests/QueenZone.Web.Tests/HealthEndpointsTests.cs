@@ -1,7 +1,9 @@
+using System.Diagnostics;
 using System.Net;
 using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -147,6 +149,118 @@ public sealed class HealthEndpointsTests : IClassFixture<WebApplicationFactory<P
         var result = await check.CheckHealthAsync(new HealthCheckContext());
         Assert.Equal(HealthStatus.Healthy, result.Status);
         Assert.Contains("not configured", result.Description, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task SqlReadyHealthCheck_timeout_returns_unhealthy_without_waiting_for_retry_policy()
+    {
+        await using var provider = CreateSqlCheckProvider();
+        var check = new SqlReadyHealthCheck(
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            TimeSpan.FromMilliseconds(50),
+            async (_, cancellationToken) =>
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                return true;
+            });
+
+        var started = Stopwatch.StartNew();
+        var result = await check.CheckHealthAsync(new HealthCheckContext());
+        started.Stop();
+
+        Assert.Equal(HealthStatus.Unhealthy, result.Status);
+        Assert.Contains("timed out", result.Description, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Password=", result.Description, StringComparison.OrdinalIgnoreCase);
+        Assert.True(
+            started.Elapsed < TimeSpan.FromSeconds(2),
+            $"SQL check took {started.Elapsed} instead of failing at the 50ms bound.");
+    }
+
+    [Fact]
+    public async Task SqlReadyHealthCheck_default_connect_failure_is_unhealthy()
+    {
+        await using var provider = CreateSqlCheckProvider();
+        var check = new SqlReadyHealthCheck(provider.GetRequiredService<IServiceScopeFactory>());
+
+        var result = await check.CheckHealthAsync(new HealthCheckContext());
+
+        Assert.Equal(HealthStatus.Unhealthy, result.Status);
+        Assert.Equal("SQL check failed.", result.Description);
+    }
+
+    [Fact]
+    public async Task SqlReadyHealthCheck_reachable_database_is_healthy()
+    {
+        await using var provider = CreateSqlCheckProvider();
+        var check = new SqlReadyHealthCheck(
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            TimeSpan.FromSeconds(1),
+            (_, _) => Task.FromResult(true));
+
+        var result = await check.CheckHealthAsync(new HealthCheckContext());
+
+        Assert.Equal(HealthStatus.Healthy, result.Status);
+        Assert.Contains("reachable", result.Description, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task SqlReadyHealthCheck_unreachable_database_is_unhealthy()
+    {
+        await using var provider = CreateSqlCheckProvider();
+        var check = new SqlReadyHealthCheck(
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            TimeSpan.FromSeconds(1),
+            (_, _) => Task.FromResult(false));
+
+        var result = await check.CheckHealthAsync(new HealthCheckContext());
+
+        Assert.Equal(HealthStatus.Unhealthy, result.Status);
+        Assert.Contains("cannot connect", result.Description, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task SqlReadyHealthCheck_failure_does_not_leak_exception_text()
+    {
+        await using var provider = CreateSqlCheckProvider();
+        var check = new SqlReadyHealthCheck(
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            TimeSpan.FromSeconds(1),
+            (_, _) => throw new InvalidOperationException("Password=supersecret;Server=tcp:example"));
+
+        var result = await check.CheckHealthAsync(new HealthCheckContext());
+
+        Assert.Equal(HealthStatus.Unhealthy, result.Status);
+        Assert.Equal("SQL check failed.", result.Description);
+        Assert.DoesNotContain("Password=", result.Description, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("supersecret", result.Description, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task SqlReadyHealthCheck_request_cancellation_is_propagated()
+    {
+        await using var provider = CreateSqlCheckProvider();
+        var check = new SqlReadyHealthCheck(
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            TimeSpan.FromSeconds(5),
+            async (_, cancellationToken) =>
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                return true;
+            });
+
+        using var timeout = new CancellationTokenSource();
+        timeout.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            check.CheckHealthAsync(new HealthCheckContext(), timeout.Token));
+    }
+
+    private static ServiceProvider CreateSqlCheckProvider()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSingleton(new QueenZoneDbContext(new DbContextOptionsBuilder<QueenZoneDbContext>().Options));
+        return services.BuildServiceProvider();
     }
 
     [Fact]

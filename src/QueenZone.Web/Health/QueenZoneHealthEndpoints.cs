@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,8 +11,8 @@ public static class QueenZoneHealthEndpoints
     public const string ReadyTag = "ready";
     public const string ReadyPath = "/health/ready";
 
-    // App Service pings this on process start via WEBSITE_WARMUP_PATH, set
-    // through ARM Application Settings in deploy.yml (#666).
+    // Deploy.yml polls this after recycle to prime public caches.
+    // WEBSITE_WARMUP_PATH points at /health, not this path (#673 / #674).
     public const string WarmupPath = "/warmup";
 
     public static bool IsProbePath(PathString path) =>
@@ -61,27 +62,52 @@ public static class QueenZoneHealthEndpoints
     internal static async Task<IResult> RunWarmupAsync(
         HealthCheckService healthCheckService,
         PublicWarmupService publicWarmup,
+        ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
+        var logger = loggerFactory.CreateLogger("QueenZone.Web.Health.Warmup");
+        var started = Stopwatch.StartNew();
+
         var report = await healthCheckService.CheckHealthAsync(
             registration => registration.Tags.Contains(ReadyTag),
             cancellationToken);
+        var readinessMs = started.ElapsedMilliseconds;
         if (report.Status is HealthStatus.Unhealthy)
         {
+            logger.LogWarning(
+                "Warmup failed readiness checks in {WarmupDurationMs}ms (sql {SqlDurationMs}ms, blob {BlobDurationMs}ms).",
+                readinessMs,
+                GetDurationMs(report, SqlReadyHealthCheck.Name),
+                GetDurationMs(report, BlobReadyHealthCheck.Name));
             return Results.Json(new { status = "unhealthy" }, statusCode: StatusCodes.Status503ServiceUnavailable);
         }
 
         try
         {
             await publicWarmup.WarmPublicCachesAsync(cancellationToken);
+            logger.LogInformation(
+                "Warmup completed in {WarmupDurationMs}ms (readiness {WarmupReadinessMs}ms, cache {WarmupCacheMs}ms, sql {SqlDurationMs}ms, blob {BlobDurationMs}ms).",
+                started.ElapsedMilliseconds,
+                readinessMs,
+                started.ElapsedMilliseconds - readinessMs,
+                GetDurationMs(report, SqlReadyHealthCheck.Name),
+                GetDurationMs(report, BlobReadyHealthCheck.Name));
             return Results.Ok(new { status = "ok" });
         }
         catch (OperationCanceledException)
         {
+            logger.LogWarning(
+                "Warmup canceled after {WarmupDurationMs}ms (readiness {WarmupReadinessMs}ms).",
+                started.ElapsedMilliseconds,
+                readinessMs);
             throw;
         }
         catch
         {
+            logger.LogWarning(
+                "Warmup failed after {WarmupDurationMs}ms (readiness {WarmupReadinessMs}ms).",
+                started.ElapsedMilliseconds,
+                readinessMs);
             return Results.Json(new { status = "unhealthy" }, statusCode: StatusCodes.Status503ServiceUnavailable);
         }
     }
@@ -126,6 +152,7 @@ public static class QueenZoneHealthEndpoints
             var result = await RunWarmupAsync(
                 context.RequestServices.GetRequiredService<HealthCheckService>(),
                 context.RequestServices.GetRequiredService<PublicWarmupService>(),
+                context.RequestServices.GetRequiredService<ILoggerFactory>(),
                 context.RequestAborted);
             await result.ExecuteAsync(context);
             return true;
@@ -133,6 +160,11 @@ public static class QueenZoneHealthEndpoints
 
         return false;
     }
+
+    private static long? GetDurationMs(HealthReport report, string name) =>
+        report.Entries.TryGetValue(name, out var entry)
+            ? (long)entry.Duration.TotalMilliseconds
+            : null;
 
     internal static async Task WriteReadyResponseAsync(HttpContext httpContext, HealthReport report)
     {
