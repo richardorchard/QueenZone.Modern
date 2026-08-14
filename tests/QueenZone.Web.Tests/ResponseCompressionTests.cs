@@ -26,8 +26,8 @@ public sealed class ResponseCompressionTests : IClassFixture<WebApplicationFacto
 
     internal static void ApplyProductionHostTestSettings(IWebHostBuilder builder)
     {
-        // Host filtering uses AllowedHosts; WebApplicationFactory hits localhost.
-        builder.UseSetting("AllowedHosts", "localhost;127.0.0.1");
+        // QueenZone host filtering stays inside the visible pipeline; WebApplicationFactory hits localhost.
+        builder.UseSetting("QueenZoneHostFiltering:AllowedHosts", "localhost;127.0.0.1");
         builder.UseSetting("ConnectionStrings:QueenZoneLegacy", string.Empty);
         builder.UseSetting("ConnectionStrings:BlobStorage", ProductionBlobConnectionString);
         builder.UseSetting("AzureAd:Instance", "https://login.microsoftonline.com/");
@@ -44,7 +44,7 @@ public sealed class ResponseCompressionTests : IClassFixture<WebApplicationFacto
         {
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["AllowedHosts"] = "localhost;127.0.0.1",
+                ["QueenZoneHostFiltering:AllowedHosts"] = "localhost;127.0.0.1",
                 ["ConnectionStrings:QueenZoneLegacy"] = string.Empty,
                 ["ConnectionStrings:BlobStorage"] = ProductionBlobConnectionString,
                 ["AzureAd:Instance"] = "https://login.microsoftonline.com/",
@@ -123,6 +123,22 @@ public sealed class ResponseCompressionTests : IClassFixture<WebApplicationFacto
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
         Assert.Contains("\"status\":\"ok\"", body);
+    }
+
+    [Fact]
+    public async Task Production_health_probe_accepts_azure_internal_host_before_explicit_filter()
+    {
+        var client = new HttpClient(productionFactory.Server.CreateHandler())
+        {
+            BaseAddress = new Uri("https://localhost"),
+        };
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/health");
+        request.Headers.Host = "169.254.130.4:8080";
+
+        using var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("\"status\":\"ok\"", await response.Content.ReadAsStringAsync(), StringComparison.Ordinal);
     }
 
     private Task<HttpResponseMessage> SendProductionRequestAsync(string path, string acceptEncoding) =>

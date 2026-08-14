@@ -4,6 +4,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -126,6 +127,62 @@ public sealed class HealthEndpointsTests : IClassFixture<WebApplicationFactory<P
 
         Assert.True(response.Headers.TryGetValues("X-QueenZone-Pipeline", out var values));
         Assert.Equal("full", Assert.Single(values!));
+    }
+
+    [Fact]
+    public async Task Liveness_probe_bypasses_host_filter_for_azure_internal_host()
+    {
+        using var strictFactory = CreateStrictHostFactory();
+        var client = strictFactory.CreateClient();
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/health");
+        request.Headers.Host = "169.254.130.4:8080";
+
+        using var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("\"status\":\"ok\"", await response.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Non_probe_path_rejects_azure_internal_host()
+    {
+        using var strictFactory = CreateStrictHostFactory();
+        var client = strictFactory.CreateClient();
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/news");
+        request.Headers.Host = "169.254.130.4:8080";
+
+        using var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.False(response.Headers.Contains("X-QueenZone-Pipeline"));
+    }
+
+    [Fact]
+    public async Task Non_probe_path_accepts_configured_wildcard_host()
+    {
+        using var strictFactory = CreateStrictHostFactory();
+        var client = strictFactory.CreateClient();
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/news");
+        request.Headers.Host = "queenzone-dev.azurewebsites.net";
+
+        using var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("www.queenzone.org", true)]
+    [InlineData("WWW.QUEENZONE.ORG", true)]
+    [InlineData("queenzone-dev.azurewebsites.net", true)]
+    [InlineData("queenzone-dev.azurewebsites.net.", true)]
+    [InlineData("azurewebsites.net", false)]
+    [InlineData("evilazurewebsites.net", false)]
+    [InlineData("169.254.130.4", false)]
+    public void Host_filter_matches_exact_and_wildcard_hosts_without_suffix_bypass(string host, bool expected)
+    {
+        string[] allowedHosts = ["www.queenzone.org", "queenzone.org", "*.azurewebsites.net"];
+
+        Assert.Equal(expected, QueenZoneHostFilteringMiddleware.IsAllowed(host, allowedHosts));
     }
 
     [Theory]
@@ -262,6 +319,14 @@ public sealed class HealthEndpointsTests : IClassFixture<WebApplicationFactory<P
         services.AddSingleton(new QueenZoneDbContext(new DbContextOptionsBuilder<QueenZoneDbContext>().Options));
         return services.BuildServiceProvider();
     }
+
+    private WebApplicationFactory<Program> CreateStrictHostFactory() =>
+        factory.WithWebHostBuilder(builder => builder.ConfigureAppConfiguration((_, configuration) =>
+            configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["QueenZoneHostFiltering:AllowedHosts"] =
+                    "www.queenzone.org;queenzone.org;*.azurewebsites.net",
+            })));
 
     [Fact]
     public async Task BlobReadyHealthCheck_with_null_service_is_healthy()
