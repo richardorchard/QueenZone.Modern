@@ -7,6 +7,8 @@
 # previous worker (/warmup is short-circuited and was ok in ~2s on the old
 # process in #664). /warmup's remaining ceiling is its own dependency checks
 # and cache priming (#674), not anything upstream of it (#681).
+# Deploy still Kudu-recycles after the zip push: skipping that after #688 left
+# /warmup on HTTP 500 even though the new data-build-version was already live.
 set -euo pipefail
 
 BASE_URL="https://www.queenzone.org"
