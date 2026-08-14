@@ -128,9 +128,9 @@ WEBSITE_WARMUP_PATH=/warmup
 WEBSITE_WARMUP_STATUSES=200
 ```
 
-Do **not** set `WEBSITE_RUN_FROM_PACKAGE` through Kudu `POST /api/settings`. That call returns 204 but does not persist an ARM application setting; after #660 OneDeploy reported success while the worker kept serving the previous extracted `wwwroot`. Deploy extracts the zip, then recycles via Kudu `POST /api/app/restart`, then polls `/warmup`. Post-deploy smoke asserts `data-build-version` matches the PR-head short SHA baked into the CI publish artifact.
+Do **not** set `WEBSITE_RUN_FROM_PACKAGE` through Kudu `POST /api/settings`. That call returns 204 but does not persist an ARM application setting; after #660 OneDeploy reported success while the worker kept serving the previous extracted `wwwroot`.
 
-`WEBSITE_RUN_FROM_PACKAGE=1` remains a valid ARM/portal app setting for a later change, once there is an Azure login in the deploy workflow that can write Application Settings.
+`WEBSITE_RUN_FROM_PACKAGE`, `WEBSITE_WARMUP_PATH`, and `WEBSITE_WARMUP_STATUSES` are owned by ARM (#666): `deploy.yml`'s `configure-app-settings` job logs in via `azure/login` with a dedicated OIDC identity (GitHub environment `deploy`, Website Contributor scoped to the `queenzone-dev` site only — not the resource group, and separate from the `dev` environment's Bitwarden publish-profile identity), then runs `az webapp config appsettings set` before the zip deploy runs. With `WEBSITE_RUN_FROM_PACKAGE=1` set through ARM, OneDeploy mounts the zip read-only (`is_readonly: true`) instead of extracting it — deploy still recycles via Kudu `POST /api/app/restart` after the push and polls `/warmup` before post-deploy smoke asserts `data-build-version` matches the PR-head short SHA baked into the CI publish artifact. A standalone Kudu-side delete of the key does not clear the ARM setting; ARM is the only writer.
 
 Enable **Always On** for the App Service when available on the active SKU so the single B1 worker is not unloaded after idle periods. Always On prevents idle cold starts; `WEBSITE_WARMUP_PATH` controls the platform startup ping when the app process/container starts. Keep the GitHub Actions post-deploy smoke route suite in place after `/warmup` passes, because real public pages still prove routing, Razor rendering, and output-cache behavior on the custom domain.
 

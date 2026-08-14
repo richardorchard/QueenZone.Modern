@@ -171,10 +171,47 @@ jobs:
             --project src/QueenZone.Data/QueenZone.Data.csproj \
             --startup-project src/QueenZone.Web/QueenZone.Web.csproj
 
+  # Kudu POST /api/settings cannot persist WEBSITE_RUN_FROM_PACKAGE as an ARM
+  # Application Setting — it returns 204 but OneDeploy still extracts instead
+  # of mounting the zip, so the worker keeps serving the previous build
+  # (#660, #664). These keys must be written through ARM (az CLI / azure/login),
+  # never through scripts/Invoke-AppServiceKudu.py. Uses a dedicated OIDC
+  # identity scoped to Website Contributor on queenzone-dev only (#666) —
+  # separate from the `dev` environment's Bitwarden publish-profile identity.
+  configure-app-settings:
+    name: Configure ARM Application Settings
+    runs-on: ubuntu-latest
+    needs: [changes, resolve-ci-run]
+    if: |
+      always() &&
+      github.ref == 'refs/heads/main' &&
+      needs.changes.outputs.code == 'true' &&
+      needs.resolve-ci-run.result == 'success'
+    environment: deploy
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.ARM_CLIENT_ID }}
+          tenant-id: ${{ vars.ARM_TENANT_ID }}
+          subscription-id: ${{ vars.ARM_SUBSCRIPTION_ID }}
+
+      - name: Set run-from-package and warmup settings via ARM
+        run: |
+          az webapp config appsettings set \
+            --name queenzone-dev \
+            --resource-group Queenzone-RG \
+            --settings WEBSITE_RUN_FROM_PACKAGE=1 WEBSITE_WARMUP_PATH=/warmup WEBSITE_WARMUP_STATUSES=200 \
+            --output none
+
   deploy:
     name: Deploy
     runs-on: ubuntu-latest
-    needs: [changes, resolve-ci-run, migrate]
+    needs: [changes, resolve-ci-run, migrate, configure-app-settings]
     # migrate is skipped on non-EF pushes; treat skipped as success so the
     # zip deploy still runs (issue #659).
     if: |
@@ -182,6 +219,7 @@ jobs:
       github.ref == 'refs/heads/main' &&
       needs.changes.outputs.code == 'true' &&
       needs.resolve-ci-run.result == 'success' &&
+      needs.configure-app-settings.result == 'success' &&
       (needs.migrate.result == 'success' || needs.migrate.result == 'skipped')
     environment:
       name: dev
@@ -206,16 +244,6 @@ jobs:
         with:
           access_token: ${{ secrets.BITWARDEN_SECRETS_MANAGER_ACCESS_TOKEN }}
           secrets: ${{ vars.BITWARDEN_APP_SERVICE_DEPLOY_SECRETS }}
-
-      # Kudu POST /api/settings does not persist WEBSITE_RUN_FROM_PACKAGE as
-      # an ARM app setting and left the site serving the previous extract
-      # (#660). Clear that SCM key, zip-deploy as extract (the path that
-      # last actually swapped the running DLL), then recycle so the new
-      # binaries load.
-      - name: Clear broken Kudu run-from-package key
-        env:
-          AZURE_WEBAPP_PUBLISH_PROFILE: ${{ steps.bitwarden-secrets.outputs.AZURE_WEBAPP_PUBLISH_PROFILE }}
-        run: python3 ./scripts/Invoke-AppServiceKudu.py --delete-setting WEBSITE_RUN_FROM_PACKAGE
 
       - name: Deploy
         uses: azure/webapps-deploy@v3
