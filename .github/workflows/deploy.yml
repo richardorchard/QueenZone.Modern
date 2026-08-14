@@ -181,12 +181,18 @@ jobs:
   #
   # WEBSITE_WARMUP_PATH points at /health, not /warmup. Azure's own container
   # startup probe must succeed within WEBSITES_CONTAINER_START_TIME_LIMIT
-  # (default 230s) or the platform kills the container and retries — and
-  # /warmup runs SQL/blob dependency checks plus sequential public-cache
-  # priming with no bound on the SQL check, easily exceeding that on a cold
-  # connection. Pointing the platform probe at /warmup crash-looped
+  # (default 230s) or the platform kills the container and retries. /warmup
+  # runs dependency checks and primes public caches, so it is a deploy-time
+  # readiness gate rather than the platform's container-liveness gate.
+  # Pointing the platform probe at /warmup crash-looped
   # queenzone-dev for over an hour on the first #666 rollout. /health stays
   # cheap (no dependency I/O) so it can't blow the platform's tight budget.
+  # WEBSITE_WARMUP_STATUSES stays unset: App Service pings can carry an internal
+  # link-local Host header, and the old ASP.NET Core host filter rejected that
+  # before /health with 400. Requiring exactly 200 turned the rejection into a
+  # 230-second crash loop (#684). The app now bypasses host validation for probe
+  # paths, but accepting any HTTP response remains the safer platform liveness
+  # contract; the post-deploy /warmup + route smoke below is the strict gate.
   # deploy.yml's own "Warm up custom domain" step still hits /warmup
   # directly afterward, with its own ~8 minute retry budget — that is the
   # right amount of patience for "are caches warm," not a platform gate.
@@ -224,26 +230,45 @@ jobs:
         run: |
           desired=$(printf '%s\n' \
             "WEBSITE_RUN_FROM_PACKAGE=1" \
-            "WEBSITE_WARMUP_PATH=/health" \
-            "WEBSITE_WARMUP_STATUSES=200" | sort)
+            "WEBSITE_WARMUP_PATH=/health" | sort)
 
           current=$(az webapp config appsettings list \
             --name queenzone-dev \
             --resource-group Queenzone-RG \
-            --query "[?name=='WEBSITE_RUN_FROM_PACKAGE' || name=='WEBSITE_WARMUP_PATH' || name=='WEBSITE_WARMUP_STATUSES'].[join('=', [name, value])]" \
+            --query "[?name=='WEBSITE_RUN_FROM_PACKAGE' || name=='WEBSITE_WARMUP_PATH'].[join('=', [name, value])]" \
             -o tsv | tr -d '\r' | sort)
 
-          if [ "$current" = "$desired" ]; then
-            echo "Settings already match; skipping write and restart wait."
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          else
+          strict_warmup_status=$(az webapp config appsettings list \
+            --name queenzone-dev \
+            --resource-group Queenzone-RG \
+            --query "[?name=='WEBSITE_WARMUP_STATUSES'].value | [0]" \
+            -o tsv | tr -d '\r')
+
+          changed=false
+          if [ -n "$strict_warmup_status" ]; then
+            az webapp config appsettings delete \
+              --name queenzone-dev \
+              --resource-group Queenzone-RG \
+              --setting-names WEBSITE_WARMUP_STATUSES \
+              --output none
+            changed=true
+          fi
+
+          if [ "$current" != "$desired" ]; then
             az webapp config appsettings set \
               --name queenzone-dev \
               --resource-group Queenzone-RG \
-              --settings WEBSITE_RUN_FROM_PACKAGE=1 WEBSITE_WARMUP_PATH=/health WEBSITE_WARMUP_STATUSES=200 \
+              --settings WEBSITE_RUN_FROM_PACKAGE=1 WEBSITE_WARMUP_PATH=/health \
               --output none
-            echo "changed=true" >> "$GITHUB_OUTPUT"
+            changed=true
           fi
+
+          if [ "$changed" = "false" ]; then
+            echo "Settings already match; skipping write and restart wait."
+          else
+            echo "Settings updated; waiting for the resulting SCM restart before deploy."
+          fi
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
 
       # Only needed right after an actual settings write: Kudu killed the
       # in-flight OneDeploy on the #666 rollout run when the zip push started

@@ -26,6 +26,11 @@ public static class QueenZoneWebServiceCollectionExtensions
             .ValidateOnStart();
         services.AddSingleton<IValidateOptions<SiteOptions>, SiteOptionsValidator>();
 
+        services.AddOptions<QueenZoneHostFilteringOptions>()
+            .Bind(configuration.GetSection(QueenZoneHostFilteringOptions.SectionName))
+            .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<QueenZoneHostFilteringOptions>, QueenZoneHostFilteringOptionsValidator>();
+
         services.AddOptions<AnalyticsOptions>()
             .Bind(configuration.GetSection(AnalyticsOptions.SectionName))
             .ValidateOnStart();
