@@ -29,7 +29,7 @@ public sealed class NewsAgentServiceCollectionTests
         Assert.Null(sp.GetService<DiscoverNewsWorker>());
         Assert.Null(sp.GetService<NewsTriageService>());
         Assert.Null(sp.GetService<NewsTriageDeterministicAnalyzer>());
-        Assert.Null(sp.GetService<INewsDiscoveryHttpClient>());
+        Assert.NotNull(sp.GetRequiredService<INewsDiscoveryHttpClient>());
         Assert.Empty(sp.GetServices<INewsSourceFetcher>());
         // Options containers may resolve defaults; the worker-only services above are the surface check.
     }

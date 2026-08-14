@@ -113,6 +113,13 @@ var forwardedHeadersOptions = new ForwardedHeadersOptions
 forwardedHeadersOptions.KnownIPNetworks.Clear();
 forwardedHeadersOptions.KnownProxies.Clear();
 app.UseForwardedHeaders(forwardedHeadersOptions);
+// ASP.NET Core's automatic AllowedHosts filter runs outside this visible pipeline,
+// before the probe short-circuit above. App Service startup pings use an internal
+// link-local Host header, so that automatic filter returned 400 before /health could
+// answer and WEBSITE_WARMUP_STATUSES=200 crash-looped the container (#684). The
+// framework filter is deliberately disabled with AllowedHosts="*"; normal traffic is
+// validated here, after probe paths have returned and forwarded Host is restored.
+app.UseQueenZoneHostFiltering();
 // Azure Monitor uses client.address for request geolocation, then masks the raw IP by
 // default. The origin restriction makes Cloudflare's connecting-IP header trustworthy.
 app.UseClientAddressTelemetry();

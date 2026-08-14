@@ -19,7 +19,7 @@
 
   @if (NewsArticleContent.IsSafePublicUrl(Model.Item.SourceUrl))
   {
-    <p class="article-source"><a href="@Model.Item.SourceUrl" rel="noopener noreferrer">Source</a></p>
+    <p class="article-source">Source: <a href="@Model.Item.SourceUrl" rel="noopener noreferrer">@Model.Item.SourceUrl</a></p>
   }
 
   @if (!Model.Article.IsPublished)

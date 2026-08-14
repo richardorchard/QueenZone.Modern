@@ -7,6 +7,7 @@ namespace QueenZone.NewsAgent;
 public sealed class NewsDraftGenerationService(
     INewsDiscoveryRepository repository,
     NewsAiRunExecutor aiRunExecutor,
+    INewsDiscoveryHttpClient httpClient,
     IOptions<NewsDraftGenerationOptions> draftOptions,
     ILogger<NewsDraftGenerationService> logger)
 {
@@ -101,7 +102,7 @@ public sealed class NewsDraftGenerationService(
         var source = await repository.GetSourceByIdAsync(candidate.SourceId, cancellationToken)
             ?? throw new InvalidOperationException($"Discovery source {candidate.SourceId} was not found.");
 
-        var evidence = await repository.GetCandidateEvidenceAsync(candidate.Id, cancellationToken);
+        var evidence = await GetDraftEvidenceAsync(candidate, source, options.DryRun, cancellationToken);
         var messages = NewsDraftPrompt.BuildMessages(candidate, source, evidence);
         var execution = await aiRunExecutor.ExecuteAsync(
             candidate.Id,
@@ -119,8 +120,10 @@ public sealed class NewsDraftGenerationService(
             return new NewsDraftCandidateResult(candidate.Id, null, false, null);
         }
 
-        var structuredDraft = NewsDraftQuotePolicy.Enforce(
-            NewsDraftResultParser.Parse(execution.Completion.Content),
+        var structuredDraft = NewsDraftMediaLinkPolicy.Enforce(
+            NewsDraftQuotePolicy.Enforce(
+                NewsDraftResultParser.Parse(execution.Completion.Content),
+                evidence),
             evidence);
         var attribution = NewsDraftAttributionBuilder.Build(structuredDraft, candidate, source, evidence);
         var proposedSlug = NewsSlug.Slugify(
@@ -182,6 +185,86 @@ public sealed class NewsDraftGenerationService(
     {
         var minimum = draftOptions.Value.MinConfidenceScore(candidate.SourceTrustTier);
         return (candidate.ConfidenceScore ?? 0m) >= minimum;
+    }
+
+    private async Task<IReadOnlyList<NewsCandidateEvidence>> GetDraftEvidenceAsync(
+        NewsCandidate candidate,
+        NewsDiscoverySource source,
+        bool dryRun,
+        CancellationToken cancellationToken)
+    {
+        var evidence = await repository.GetCandidateEvidenceAsync(candidate.Id, cancellationToken);
+
+        try
+        {
+            var fetched = await httpClient.GetAsync(candidate.SourceUrl, cancellationToken);
+            if (!OutboundUrlSafety.TryValidatePublicHttpUrl(
+                    fetched.FinalUrl,
+                    out var finalUrlError,
+                    out var finalNormalized)
+                || string.IsNullOrWhiteSpace(finalNormalized))
+            {
+                throw new InvalidOperationException(finalUrlError);
+            }
+
+            var parsed = NewsArticlePageParser.Parse(fetched.Body, finalNormalized);
+            var evidenceExcerpt = NewsArticlePageParser.BuildEvidenceExcerpt(parsed);
+            if (string.IsNullOrWhiteSpace(evidenceExcerpt))
+            {
+                return evidence;
+            }
+
+            var canonicalUrl = NewsCandidateDedupe.NormalizeCanonicalUrl(finalNormalized);
+            var existing = evidence.FirstOrDefault(item =>
+                string.Equals(item.CanonicalUrl, canonicalUrl, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(item.Excerpt, evidenceExcerpt, StringComparison.Ordinal));
+            if (existing is not null)
+            {
+                return evidence;
+            }
+
+            var now = DateTime.UtcNow;
+            var refreshed = new NewsCandidateEvidence(
+                0,
+                candidate.Id,
+                finalNormalized,
+                canonicalUrl,
+                source.DisplayName,
+                source.TrustTier,
+                parsed.Title,
+                candidate.SourcePublishedAt,
+                evidenceExcerpt,
+                NewsCandidateDedupe.ComputeContentHash(parsed.Title, evidenceExcerpt),
+                now,
+                null,
+                now);
+
+            if (!dryRun)
+            {
+                await repository.AddCandidateEvidenceAsync(
+                    candidate.Id,
+                    new NewsCandidateEvidenceDraft(
+                        refreshed.SourceUrl,
+                        refreshed.SourceName,
+                        refreshed.SourceTrustTier,
+                        refreshed.FetchedTitle,
+                        refreshed.FetchedPublishedAt,
+                        refreshed.Excerpt,
+                        refreshed.Etag,
+                        refreshed.FetchedAt),
+                    cancellationToken);
+            }
+
+            return [.. evidence, refreshed];
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(
+                ex,
+                "Could not refresh source evidence for candidate {CandidateId}; drafting will use stored evidence.",
+                candidate.Id);
+            return evidence;
+        }
     }
 
     private static string AppendPreservedQuotes(

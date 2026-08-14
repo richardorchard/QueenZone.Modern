@@ -67,7 +67,8 @@ public sealed class AdminNewsRoutesTests : IClassFixture<QueenZoneWebApplication
                 ["title"] = "Admin created article",
                 ["excerpt"] = "Created from the admin workflow.",
                 ["body"] = "Plain text body for the new article.",
-                ["publishedAt"] = "2026-06-14"
+                ["publishedAt"] = "2026-06-14",
+                ["sourceUrl"] = "https://example.com/admin-source"
             });
 
         Assert.Equal(HttpStatusCode.Redirect, createResponse.StatusCode);
@@ -79,6 +80,8 @@ public sealed class AdminNewsRoutesTests : IClassFixture<QueenZoneWebApplication
         var previewBody = await client.GetStringAsync($"/admin/news/{articleId}/preview");
         Assert.Contains("Admin created article", previewBody);
         Assert.Contains("Plain text body for the new article.", previewBody);
+        Assert.Contains("Source: <a href=\"https://example.com/admin-source\"", previewBody);
+        Assert.Contains(">https://example.com/admin-source</a>", previewBody);
         Assert.Contains("This draft is hidden from the public archive.", previewBody);
 
         var publicBeforePublish = await client.GetAsync("/news");
