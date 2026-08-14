@@ -95,6 +95,37 @@ public sealed class HealthEndpointsTests : IClassFixture<WebApplicationFactory<P
         Assert.DoesNotContain("latest-news", body, StringComparison.OrdinalIgnoreCase);
     }
 
+    // Regression for #666: the middleware pipeline ran authentication, authorization,
+    // rate limiting, output caching, and antiforgery before dispatching to probe paths,
+    // so a slow/hung default authentication handler on a cold container blocked the
+    // platform's own startup gate regardless of which probe path it targeted. Program.cs
+    // now wraps that whole chain in a UseWhen branch that probe paths skip; the branch
+    // stamps a diagnostic header as its first step, so its absence proves the branch —
+    // and everything in it, including authentication — never ran for these paths.
+    [Theory]
+    [InlineData("/health")]
+    [InlineData("/health/ready")]
+    [InlineData("/warmup")]
+    public async Task Probe_paths_bypass_the_authenticated_pipeline(string path)
+    {
+        var client = factory.CreateClient();
+
+        using var response = await client.GetAsync(path);
+
+        Assert.False(response.Headers.Contains("X-QueenZone-Pipeline"));
+    }
+
+    [Fact]
+    public async Task Non_probe_paths_still_run_the_authenticated_pipeline()
+    {
+        var client = factory.CreateClient();
+
+        using var response = await client.GetAsync("/");
+
+        Assert.True(response.Headers.TryGetValues("X-QueenZone-Pipeline", out var values));
+        Assert.Equal("full", Assert.Single(values!));
+    }
+
     [Theory]
     [InlineData("/health", true)]
     [InlineData("/health/ready", true)]
