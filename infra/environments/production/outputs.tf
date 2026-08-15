@@ -25,3 +25,8 @@ output "module_import_contracts" {
     cloudflare_edge = module.cloudflare_edge.import_contract
   }
 }
+
+output "azure_web_identity_principal_id" {
+  description = "System-assigned identity principal ID; no direct role assignments were present at the 2026-08-15 audit."
+  value       = module.azure_web.managed_identity_principal_id
+}

@@ -137,6 +137,10 @@ Account id `f93121b2086286e79a7a9fdb8d03cb4c`. Zone id `079fc2f37095c82fb3a2b4da
 | Entra app registrations (Admin / member OAuth) | outside / defer | Documented in `entra-admin-auth.md`; not Azure RG resources |
 | SQL AAD admin | data | Login name known; do not put credentials in state |
 
+The 2026-08-15 #622 refresh found no direct role assignments for the App
+Service system-assigned identity. The identity remains managed as part of the
+site; no empty or speculative RBAC resources are declared.
+
 ## Storage containers (live)
 
 | Container | publicAccess | Product role | OpenTofu note |
@@ -229,7 +233,7 @@ Documented for [#622](https://github.com/richardorchard/QueenZone.Modern/issues/
 ## Follow-ups (non-blocking for #624)
 
 1. Optional: **Storage Blob Data Reader** on `queenzone` for private-container object audits without account keys.
-2. Confirm Azure App Service certificate renewal path (GeoTrust uploads expire **2026-12-29**) before #622 imports certs — not Cloudflare Origin CA.
+2. Confirm Azure App Service certificate renewal path (GeoTrust uploads expire **2026-12-29**). #622 preserves the SNI bindings and thumbprints but leaves the uploaded certificate resources outside state because AzureRM would require private PFX material.
 3. Product decision whether Worker should set `Content-Disposition` for audio downloads (capability exists; live script does not).
 4. [#618](https://github.com/richardorchard/QueenZone.Modern/issues/618) should classify the ARM-owned deploy keys separately from Bitwarden secrets before `infra/modules/azure-web` imports any settings.
 

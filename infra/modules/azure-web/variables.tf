@@ -22,6 +22,35 @@ variable "web_app_name" {
   default     = "queenzone-dev"
 }
 
+variable "log_analytics_workspace_name" {
+  description = "Existing Log Analytics workspace name."
+  type        = string
+  default     = "queenzone-dev-law"
+}
+
+variable "application_insights_name" {
+  description = "Existing workspace-linked Application Insights component name."
+  type        = string
+  default     = "queenzone-dev-ai"
+}
+
+variable "custom_hostnames" {
+  description = "Existing custom hostname bindings and their uploaded certificate thumbprints. Thumbprints are identifiers, not secrets."
+  type        = map(string)
+  default = {
+    "queenzone.org"     = "4B8832D7F69444E881F5BFF26AEC0578A415E275"
+    "www.queenzone.org" = "A45C7DDFDA8719399B772B1C6336F8B28BD80B24"
+  }
+
+  validation {
+    condition = (
+      length(setsubtract(toset(keys(var.custom_hostnames)), toset(["queenzone.org", "www.queenzone.org"]))) == 0 &&
+      length(setsubtract(toset(["queenzone.org", "www.queenzone.org"]), toset(keys(var.custom_hostnames)))) == 0
+    )
+    error_message = "Production must retain the apex and www custom hostnames."
+  }
+}
+
 variable "sku_name" {
   description = "Existing App Service SKU."
   type        = string

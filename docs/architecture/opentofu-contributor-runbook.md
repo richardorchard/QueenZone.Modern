@@ -6,11 +6,15 @@ Issue: [#619](https://github.com/richardorchard/QueenZone.Modern/issues/619), st
 
 The production root is [`infra/environments/production/`](../../infra/environments/production/). It pins OpenTofu **1.12.5**, AzureRM **5.0.1**, and Cloudflare **5.23.0**. The dependency lock file contains official checksums for Linux AMD64, Windows AMD64, macOS AMD64, and macOS ARM64.
 
-This issue declares no managed resource and performs no import. The three modules contain typed import contracts only:
+Issue #619 declared no managed resources. The current adoption state is:
 
-- `azure-web`: #622 owns web, telemetry, hostname, certificate, and ingress resources;
+- `azure-web`: #622 declares the resource group, web, telemetry, hostname, TLS binding, and ingress resources with declarative imports;
 - `azure-data`: #628 owns SQL, Storage, containers, and data-protection configuration;
 - `cloudflare-edge`: #626 owns zone, DNS, TLS, Worker, and route resources.
+
+Uploaded App Service certificates are the deliberate exception in #622. Their
+private PFX material and renewal path are outside state; the imported hostname
+bindings preserve the live SNI state and certificate thumbprints.
 
 ## Local validation
 

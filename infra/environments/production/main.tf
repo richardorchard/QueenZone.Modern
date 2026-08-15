@@ -13,11 +13,20 @@ check "production_scale_contract" {
   }
 }
 
+resource "azurerm_resource_group" "production" {
+  name     = var.azure_resource_group_name
+  location = var.azure_location
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
 module "azure_web" {
   source = "../../modules/azure-web"
 
-  resource_group_name = var.azure_resource_group_name
-  location            = var.azure_location
+  resource_group_name = azurerm_resource_group.production.name
+  location            = azurerm_resource_group.production.location
   sku_name            = var.app_service_sku
   worker_count        = var.app_service_worker_count
 }
@@ -37,6 +46,6 @@ module "cloudflare_edge" {
   zone_name  = var.cloudflare_zone_name
 }
 
-# These modules expose import contracts only in issue #619. Issues #622, #628,
-# and #626 will add resources and import existing IDs only after a reviewed,
-# non-destructive plan.
+# The Azure data and Cloudflare modules remain import contracts until issues
+# #628 and #626 add their resources. Azure web resources are imported by the
+# declarative blocks in imports.tf; an apply must never precede plan review.
