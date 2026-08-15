@@ -1359,6 +1359,10 @@ body.qz-menu-lock .qz-masthead {
   height: 100%;
   object-fit: cover;
   object-position: top center;
+  opacity: 0;
+}
+
+.qz-hero-archive__screenshot--active {
   opacity: 1;
 }
 

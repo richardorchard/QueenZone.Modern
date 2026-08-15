@@ -60,6 +60,9 @@ public sealed class SiteScriptDeliveryTests : IClassFixture<WebApplicationFactor
         Assert.Contains("qz-hero-archive", script);
         Assert.Contains("prefers-reduced-motion", script);
         Assert.Contains("visibilitychange", script);
+        Assert.Contains("qz-hero-archive__screenshot--active", script);
+        Assert.DoesNotContain(".src =", script);
+        Assert.DoesNotContain(".innerHTML", script);
         Assert.DoesNotContain("data-masthead", script);
     }
 
