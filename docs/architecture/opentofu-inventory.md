@@ -69,7 +69,7 @@ Treatments:
 | Certificates `queenzone.org`, `www.queenzone.org` | `…/Microsoft.Web/certificates/…` | import or defer | GeoTrust TLS RSA CA G1, expire **2026-12-29**; confirm renew path before encoding as managed vs uploaded |
 | Access restrictions (Cloudflare IPv4/IPv6 allow + deny all) | site `ipSecurityRestrictions` | import | Mis-order or drop = either open origin or lock out Cloudflare |
 | SCM access restrictions | site `scmIpSecurityRestrictions` | import | Currently **Allow all**; keep separate from main site rules (deploy path) |
-| App settings (names only) | site config | defer → #618 | Names re-listed 2026-08-15. Secret **values** stay in Azure/Bitwarden. `deploy.yml` already ARM-owns three non-secret deploy keys (see [App Service settings](#app-service-application-setting-names-values-not-recorded)). Never put secret values in state. |
+| App settings (names only) | site config | outside → [ADR 0008](../decisions/0008-app-service-settings-ownership.md) | Names re-listed 2026-08-15. Secret **values** stay in Azure/Bitwarden, never state. `deploy.yml` ARM-owns three non-secret deploy keys outside OpenTofu (see [App Service settings](#app-service-application-setting-names-values-not-recorded)). #622's site resource must omit/`ignore_changes` on `app_settings`/`connection_string` |
 | SQL server `queenzone-sql-server` | `…/Microsoft.Sql/servers/queenzone-sql-server` | import | Public network enabled; AAD admin present; SQL auth still used by app |
 | Firewall `AllowAllWindowsAzureIps` | `…/firewallRules/AllowAllWindowsAzureIps` | import | Required for App Service → SQL |
 | Firewall `ClientIPAddress_2026-6-11_20-28-58` | `…/firewallRules/ClientIPAddress_…` | defer | Operator workstation IP; likely keep outside or replace with named break-glass rule |
@@ -158,9 +158,20 @@ Present on `queenzone-dev` at the 2026-08-15 refresh (`az webapp config appsetti
 
 `APPLICATIONINSIGHTS_CONNECTION_STRING`, `Authentication__Discord__ClientId/Secret`, `Authentication__Facebook__ClientId/Secret`, `Authentication__GitHub__ClientId/Secret`, `Authentication__Google__ClientId/Secret`, `Authentication__Microsoft__ClientId/Secret`, `BlobUpload__PublicBaseUrl`, `ConnectionStrings__BlobStorage`, `ConnectionStrings__QueenZoneLegacy`, `DIAGNOSTICS_AZUREBLOBRETENTIONINDAYS`, `OPENROUTER_API_KEY`, `WEBSITE_HEALTHCHECK_MAXPINGFAILURES`, `WEBSITE_HTTPLOGGING_RETENTION_DAYS`, `Analytics__GoogleAnalyticsServiceAccountJson`, `Analytics__TrafficCacheMinutes`, `Analytics__GoogleAnalyticsPropertyId`, `AzureAd__Instance`, `AzureAd__TenantId`, `AzureAd__ClientId`, `AzureAd__ClientSecret`, `AzureAd__CallbackPath`, `Admin__AllowedEmails__0`, `Admin__AllowedEmails__1`, `SCM_DO_BUILD_DURING_DEPLOYMENT`, `ENABLE_ORYX_BUILD`, `WEBSITE_RUN_FROM_PACKAGE`, `WEBSITE_WARMUP_PATH`.
 
+Ownership of App Service settings is decided in [ADR 0008](../decisions/0008-app-service-settings-ownership.md)
+([#618](https://github.com/richardorchard/QueenZone.Modern/issues/618)): OpenTofu stays out of `app_settings`/
+`connection_string` entirely (Option A). This same name list (`infra/import/github-bitwarden.json`'s
+`appServiceSettingNames`) is checked nightly for missing names by `scripts/Test-AppServiceSettingNames.ps1` — see
+`.github/workflows/app-service-setting-names-check.yml`.
+
 ### ARM-owned non-secret deploy keys (#666)
 
-These are **not** Bitwarden secrets. `deploy.yml`'s `configure-app-settings` job writes them through ARM (`azure/login` on GitHub environment `deploy`). Do **not** write them through Kudu `POST /api/settings` (that was the #664 no-op). Do **not** import the whole App Service `app_settings` map into OpenTofu until [#618](https://github.com/richardorchard/QueenZone.Modern/issues/618) decides ownership — AzureRM can wipe unrelated secret settings.
+These are **not** Bitwarden secrets, and they are **not** OpenTofu-managed either — `deploy.yml`'s
+`configure-app-settings` job writes them directly through ARM (`azure/login` on GitHub environment `deploy`), a
+mechanism that predates and is unaffected by ADR 0008. Do **not** write them through Kudu `POST /api/settings`
+(that was the #664 no-op). ADR 0008 rejected importing any subset of the App Service `app_settings` map into
+OpenTofu (its "Option C") — AzureRM has no resource/API that safely manages a subset without risking the
+unmanaged remainder, so these three keys stay owned by `deploy.yml`'s targeted ARM writes, not by OpenTofu.
 
 | Name | Live value | Owner | Notes |
 | --- | --- | --- | --- |
@@ -168,7 +179,7 @@ These are **not** Bitwarden secrets. `deploy.yml`'s `configure-app-settings` job
 | `WEBSITE_WARMUP_PATH` | `/health` | ARM via `deploy.yml` | Platform container-start probe. Must stay on `/health`, **not** `/warmup` (#673). `/warmup` remains the deploy-time readiness gate. |
 | `WEBSITE_WARMUP_STATUSES` | **absent** | ARM via `deploy.yml` (deleted if present) | Must stay unset. Requiring `200` crash-looped the B1 worker when App Service used an internal Host header (#684). |
 
-Site health-check path remains `/health`. Remaining secret settings (SQL, Entra, member OAuth, blob, OpenRouter, Insights, admin emails) stay Bitwarden/operator-owned. [#618](https://github.com/richardorchard/QueenZone.Modern/issues/618) should treat the three rows above as the first Option C (split non-secret) candidates, not as something to import today.
+Site health-check path remains `/health`. Remaining secret settings (SQL, Entra, member OAuth, blob, OpenRouter, Insights, admin emails) stay Bitwarden/operator-owned.
 
 ## Resources that must never be recreated
 
@@ -195,7 +206,7 @@ Documented for [#622](https://github.com/richardorchard/QueenZone.Modern/issues/
 7. SQL server → firewall rules → database (import existing; never `create`).
 8. Storage account → blob service properties → containers → custom domain.
 9. Cloudflare zone/DNS → TLS → Worker/routes for **cdn2 only**.
-10. App settings strategy (#618) last — names/references only.
+10. App settings (#618 / ADR 0008): no import step — the site resource must omit/`ignore_changes` `app_settings` and `connection_string` so OpenTofu never manages them.
 
 **Outage risks during import:** hostname/TLS drift, IP restriction mistakes, storage public-access flips, Worker route removal on cdn2, SQL firewall removing `AllowAllWindowsAzureIps`.
 

@@ -1,0 +1,47 @@
+name: App Service setting names check
+
+on:
+  schedule:
+    # 07:00 UTC daily — offset from the other nightly Azure/DB jobs.
+    - cron: "0 7 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: app-service-setting-names-check
+  cancel-in-progress: false
+
+# Scope item 5 of #618 (ADR 0008, docs/decisions/0008-app-service-settings-ownership.md):
+# detect a missing required App Service setting *name* on queenzone-dev without
+# OpenTofu (or this workflow) ever reading or printing a value. The required
+# name list lives in infra/import/github-bitwarden.json's appServiceSettingNames
+# array, alongside the rest of the #624 sanitised inventory. Only names are
+# fetched (`az webapp config appsettings list --query "[].name"`) and only
+# names are compared — see scripts/Test-AppServiceSettingNames.ps1.
+#
+# Read-only: this workflow never calls `az webapp config appsettings set`.
+jobs:
+  check-setting-names:
+    name: Verify required setting names are present
+    runs-on: ubuntu-latest
+    environment: deploy
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.ARM_CLIENT_ID }}
+          tenant-id: ${{ vars.ARM_TENANT_ID }}
+          subscription-id: ${{ vars.ARM_SUBSCRIPTION_ID }}
+
+      - name: Check required App Service setting names are present
+        shell: pwsh
+        run: ./scripts/Test-AppServiceSettingNames.ps1

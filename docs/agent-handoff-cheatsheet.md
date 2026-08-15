@@ -86,7 +86,7 @@ $env:BWS_ACCESS_TOKEN = [Environment]::GetEnvironmentVariable("BWS_ACCESS_TOKEN"
 bws secret list "1c16fd2d-4bfb-4eb7-8357-b49400233490"
 ```
 
-Keep App Service setting names canonical in Bitwarden (`ConnectionStrings__QueenZoneLegacy`, `AzureAd__ClientSecret`, `OPENROUTER_API_KEY`, etc.). Do not print secret values. Bitwarden is a local/recovery mirror; Azure App Service settings and GitHub environment secrets still need explicit updates when credentials rotate.
+Keep App Service setting names canonical in Bitwarden (`ConnectionStrings__QueenZoneLegacy`, `AzureAd__ClientSecret`, `OPENROUTER_API_KEY`, etc.). Do not print secret values. Bitwarden is a local/recovery mirror; Azure App Service settings and GitHub environment secrets still need explicit updates when credentials rotate. OpenTofu stays out of `app_settings`/`connection_string` entirely — see [ADR 0008](decisions/0008-app-service-settings-ownership.md) — so nothing here changes as OpenTofu import work lands.
 
 ### Scale / cache (single instance — no Redis)
 
