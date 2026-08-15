@@ -30,13 +30,25 @@ public sealed class VersionedStaticImageTests : IClassFixture<WebApplicationFact
     }
 
     [Fact]
-    public async Task HomePageEmbedsVersionedEraMontageConfig()
+    public async Task HomePageRendersVersionedEraMontageImagesOutsideJsonConfig()
     {
         var body = await factory.CreateClient().GetStringAsync("/");
 
         Assert.Contains("id=\"qz-era-config\"", body);
         Assert.Contains("/assets/eras/queenzone-1999.png?v=", body);
         Assert.Contains("/assets/eras/queenzone-2020.png?v=", body);
+        Assert.Equal(5, System.Text.RegularExpressions.Regex.Matches(
+            body,
+            "class=\"qz-hero-archive__screenshot").Count);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(
+            body,
+            "class=\"qz-hero-archive__screenshot qz-hero-archive__screenshot--active\""));
+
+        var configMatch = System.Text.RegularExpressions.Regex.Match(
+            body,
+            "<script type=\"application/json\" id=\"qz-era-config\">(?<json>.*?)</script>");
+        Assert.True(configMatch.Success);
+        Assert.DoesNotContain("\"img\"", configMatch.Groups["json"].Value, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
