@@ -15,7 +15,7 @@ The production root declares imports for:
 - Application Insights component `queenzone-dev-ai`.
 
 No direct role assignment exists for the web app identity, so this module does
-not invent one. App settings remain outside OpenTofu pending #618. The narrow
+not invent one. ADR 0008 keeps App Service settings outside OpenTofu. The narrow
 `ignore_changes` entry prevents an incomplete settings map from deleting live
 secrets or the ARM-owned deployment settings.
 

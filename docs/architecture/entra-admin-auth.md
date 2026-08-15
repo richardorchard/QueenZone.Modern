@@ -42,7 +42,7 @@ This hobby-site configuration supports personal Microsoft accounts through the `
 
 ### Admin allowlist (not secrets, still not committed)
 
-Committed `appsettings.json` ships **`Admin:AllowedEmails` as an empty array**. Production must supply the allowlist via App Service (or Key Vault references), not git:
+Committed `appsettings.json` ships **`Admin:AllowedEmails` as an empty array**. Production must supply the allowlist via App Service settings, not git. ([ADR 0008](../decisions/0008-app-service-settings-ownership.md) keeps App Service settings outside OpenTofu for now; Key Vault references were considered as a later option but are not in use.)
 
 ```text
 Admin__AllowedEmails__0=you@example.com

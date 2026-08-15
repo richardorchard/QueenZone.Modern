@@ -86,6 +86,39 @@ which is configured separately in Azure App Service settings.
 `docs/architecture/testing-policy.md` ("Data Integration Tests") and the comment block at the top of
 `nightly-legacy-checks.yml`.
 
+## Rotation and break-glass (App Service settings)
+
+[ADR 0008](decisions/0008-app-service-settings-ownership.md) keeps App Service application settings outside
+OpenTofu (Option A of [#618](https://github.com/richardorchard/QueenZone.Modern/issues/618)), so rotation and
+break-glass for those settings stay entirely inside the Bitwarden/Azure/GitHub workflow described here — there is
+no OpenTofu apply/plan step to run or wait on.
+
+**Normal rotation** (Bitwarden reachable): follow AGENTS.md's Bitwarden section — update the value in Bitwarden
+first, then update the same key in Azure App Service configuration (portal or `az webapp config appsettings set`),
+then restart/verify. Bitwarden and the live App Service value are two separate stores; updating one never updates
+the other automatically. Verify by setting name and value length only, never by printing the value.
+
+**Break-glass** (Bitwarden Secrets Manager unreachable, or the `BWS_ACCESS_TOKEN` / `github-actions-queenzone`
+machine account is unavailable):
+
+1. An operator with Azure portal/CLI access to `Queenzone-RG` may set an App Service setting directly
+   (`az webapp config appsettings set --name queenzone-dev --resource-group Queenzone-RG --settings
+   KEY=VALUE`), bypassing Bitwarden for that one change. This is the same access path
+   `.github/workflows/deploy.yml`'s `configure-app-settings` job already uses via OIDC — no new credential to
+   provision.
+2. Restart the App Service (or let the next deploy's warmup do so) and confirm the app comes up healthy.
+3. As soon as Bitwarden access is restored, write the same value back into the `Queenzone Development` project so
+   Bitwarden remains the source of truth for automation/local recovery — a break-glass change that never gets
+   reconciled back into Bitwarden will silently drift on the next rotation.
+4. Record what changed (setting name and reason, never the value) in the PR or issue tracking the incident that
+   forced the break-glass path, so `docs/architecture/opentofu-inventory.md`'s setting-name inventory can be
+   updated if a name was added or removed. `scripts/Test-AppServiceSettingNames.ps1`
+   (`.github/workflows/app-service-setting-names-check.yml`) only checks that required names exist — it does not
+   detect drifted values, so a break-glass value change is otherwise invisible to automation.
+
+There is no multi-approver process for break-glass today — QueenZone has a single operator with both Bitwarden and
+Azure access. If that changes, revisit this section.
+
 ## Migration notes
 
 GitHub Actions secrets cannot be read back in plaintext after they have been saved. GitHub can list secret names and

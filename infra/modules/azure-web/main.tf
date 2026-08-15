@@ -148,9 +148,9 @@ resource "azurerm_linux_web_app" "production" {
   lifecycle {
     prevent_destroy = true
 
-    # #618 owns the split between ARM deploy settings and operator-managed
-    # secrets. Reading this map into state would expose values; managing an
-    # incomplete map would delete live settings. AzureRM also normalises the
+    # ADR 0008 keeps the split ARM/operator settings map outside OpenTofu.
+    # Reading this map into state would expose values; managing an incomplete
+    # map would delete live settings. AzureRM also normalises the
     # live explicit main-site deny-all and SCM allow-all rules to empty default
     # actions during import, then plans unsafe/default-only rewrites. Keep the
     # imported rules authoritative until the coordinated edge work in #626.

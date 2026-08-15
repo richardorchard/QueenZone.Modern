@@ -14,6 +14,9 @@ cannot describe them without the private PFX material, and their renewal path
 has not been confirmed. The hostname resources retain the current SNI state and
 certificate thumbprints without putting certificate secrets in state.
 
-App settings are explicitly ignored pending #618. This is a narrow exception:
-the map contains secrets and is split between ARM deployment automation and
-operators. OpenTofu must not read or replace those values.
+Every irreplaceable resource must include `lifecycle { prevent_destroy = true }`.
+Do not use broad `ignore_changes`; record each externally owned attribute and
+its reason. OpenTofu never manages `app_settings` or `connection_string` under
+[ADR 0008](../../../docs/decisions/0008-app-service-settings-ownership.md).
+The site therefore ignores `app_settings` and omits the unused
+`connection_string` collection.
