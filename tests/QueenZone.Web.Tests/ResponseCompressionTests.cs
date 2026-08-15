@@ -28,6 +28,7 @@ public sealed class ResponseCompressionTests : IClassFixture<WebApplicationFacto
     {
         // QueenZone host filtering stays inside the visible pipeline; WebApplicationFactory hits localhost.
         builder.UseSetting("QueenZoneHostFiltering:AllowedHosts", "localhost;127.0.0.1");
+        builder.UseSetting("DataProtection:KeysPath", ProductionDataProtectionKeysPath);
         builder.UseSetting("ConnectionStrings:QueenZoneLegacy", string.Empty);
         builder.UseSetting("ConnectionStrings:BlobStorage", ProductionBlobConnectionString);
         builder.UseSetting("AzureAd:Instance", "https://login.microsoftonline.com/");
@@ -45,6 +46,7 @@ public sealed class ResponseCompressionTests : IClassFixture<WebApplicationFacto
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["QueenZoneHostFiltering:AllowedHosts"] = "localhost;127.0.0.1",
+                ["DataProtection:KeysPath"] = ProductionDataProtectionKeysPath,
                 ["ConnectionStrings:QueenZoneLegacy"] = string.Empty,
                 ["ConnectionStrings:BlobStorage"] = ProductionBlobConnectionString,
                 ["AzureAd:Instance"] = "https://login.microsoftonline.com/",
@@ -62,6 +64,9 @@ public sealed class ResponseCompressionTests : IClassFixture<WebApplicationFacto
 
     internal const string ProductionBlobConnectionString =
         "DefaultEndpointsProtocol=https;AccountName=test;AccountKey=dGVzdA==;EndpointSuffix=core.windows.net";
+
+    private static readonly string ProductionDataProtectionKeysPath =
+        Path.Combine(Path.GetTempPath(), "QueenZone.Web.Tests", "data-protection-keys");
 
     [Fact]
     public async Task HtmlResponse_IsBrotliCompressedInProduction()
