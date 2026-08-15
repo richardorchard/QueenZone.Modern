@@ -27,17 +27,18 @@ if ($LASTEXITCODE -ne 0) {
     throw "bws could not read the Queenzone Development project. Check this host's machine account access."
 }
 
-$matches = @(
-    $json |
-        ConvertFrom-Json |
-        Where-Object { $_.key -eq $secretKey }
+$secrets = $json | ConvertFrom-Json
+$matchingSecrets = @(
+    # Pipe the parsed array separately. In current PowerShell, piping ConvertFrom-Json
+    # directly can pass the whole top-level JSON array to Where-Object as one item.
+    $secrets | Where-Object { $_.key -eq $secretKey }
 )
 
-if ($matches.Count -ne 1) {
-    throw "Expected exactly one $secretKey entry in the Queenzone Development project; found $($matches.Count)."
+if ($matchingSecrets.Count -ne 1) {
+    throw "Expected exactly one $secretKey entry in the Queenzone Development project; found $($matchingSecrets.Count)."
 }
 
-$licenseValue = [string] $matches[0].value
+$licenseValue = [string] $matchingSecrets[0].value
 if ([string]::IsNullOrWhiteSpace($licenseValue)) {
     throw "$secretKey exists but has no value."
 }
