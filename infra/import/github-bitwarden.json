@@ -1,18 +1,64 @@
 {
   "auditDate": "2026-08-12",
+  "refreshedDate": "2026-08-15",
   "issue": 624,
+  "refreshNotes": "Re-listed App Service setting names and GitHub environments after #666 ARM deploy-settings work. Secret values were not recorded. Azure/Cloudflare resource IDs were not re-probed.",
   "github": {
-    "environment": {
-      "name": "dev",
-      "protectionRules": [],
-      "opentofuTreatment": "outside",
-      "notes": "Used by deploy.yml; app deploy stays in GitHub Actions"
-    },
+    "environments": [
+      {
+        "name": "dev",
+        "protectionRules": [],
+        "opentofuTreatment": "outside",
+        "notes": "Used by deploy.yml for Bitwarden publish-profile zip deploy; app deploy stays in GitHub Actions"
+      },
+      {
+        "name": "deploy",
+        "protectionRules": ["branch_policy"],
+        "variableNames": [
+          "ARM_CLIENT_ID",
+          "ARM_SUBSCRIPTION_ID",
+          "ARM_TENANT_ID"
+        ],
+        "opentofuTreatment": "outside",
+        "notes": "OIDC identity QueenZone Deploy; Website Contributor on site queenzone-dev only. Writes WEBSITE_RUN_FROM_PACKAGE and WEBSITE_WARMUP_PATH via ARM. Sibling of OpenTofu plan/apply, not an OpenTofu principal."
+      },
+      {
+        "name": "opentofu-plan",
+        "protectionRules": ["branch_policy"],
+        "variableNames": [
+          "ARM_CLIENT_ID",
+          "ARM_SUBSCRIPTION_ID",
+          "ARM_TENANT_ID",
+          "TF_STATE_CONTAINER",
+          "TF_STATE_KEY",
+          "TF_STATE_RESOURCE_GROUP",
+          "TF_STATE_STORAGE_ACCOUNT"
+        ],
+        "opentofuTreatment": "outside",
+        "notes": "Reader on Queenzone-RG plus state-container data access"
+      },
+      {
+        "name": "opentofu-apply",
+        "protectionRules": ["required_reviewers", "branch_policy"],
+        "variableNames": [
+          "ARM_CLIENT_ID",
+          "ARM_SUBSCRIPTION_ID",
+          "ARM_TENANT_ID",
+          "TF_STATE_CONTAINER",
+          "TF_STATE_KEY",
+          "TF_STATE_RESOURCE_GROUP",
+          "TF_STATE_STORAGE_ACCOUNT"
+        ],
+        "opentofuTreatment": "outside",
+        "notes": "Contributor on Queenzone-RG; requires richardorchard approval. Do not reuse for routine zip deploys."
+      }
+    ],
     "repositorySecretNames": [
       "AZURE_WEBAPP_PUBLISH_PROFILE",
       "BITWARDEN_SECRETS_MANAGER_ACCESS_TOKEN",
       "CONNECTIONSTRINGS__QUEENZONELEGACY",
-      "QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING"
+      "QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING",
+      "SIXLABORS_LICENSE_KEY"
     ],
     "repositoryVariables": [
       "BITWARDEN_APP_SERVICE_DEPLOY_SECRETS"
@@ -23,6 +69,7 @@
       "deploy.yml",
       "livesite-readonly-sweep.yml",
       "nightly-legacy-checks.yml",
+      "opentofu-backend-smoke.yml",
       "pr-issue-link-check.yml",
       "prune-stale-pr-artifacts.yml",
       "test-migrations-against-mirror.yml"
@@ -71,7 +118,7 @@
     ],
     "cloudflareApiTokenKey": "CLOUDFLARE_API_TOKEN_READONLY",
     "opentofuTreatment": "outside",
-    "notes": "Values never recorded in repo or OpenTofu state. CLOUDFLARE_API_TOKEN_READONLY is inventory/ops read-only."
+    "notes": "Values never recorded in repo or OpenTofu state. CLOUDFLARE_API_TOKEN_READONLY is inventory/ops read-only. Bitwarden keys were not re-listed on 2026-08-15."
   },
   "appServiceSettingNames": [
     "APPLICATIONINSIGHTS_CONNECTION_STRING",
@@ -103,7 +150,30 @@
     "Admin__AllowedEmails__0",
     "Admin__AllowedEmails__1",
     "SCM_DO_BUILD_DURING_DEPLOYMENT",
-    "ENABLE_ORYX_BUILD"
+    "ENABLE_ORYX_BUILD",
+    "WEBSITE_RUN_FROM_PACKAGE",
+    "WEBSITE_WARMUP_PATH"
+  ],
+  "appServiceSettingsArmOwned": [
+    {
+      "name": "WEBSITE_RUN_FROM_PACKAGE",
+      "value": "1",
+      "owner": "deploy.yml configure-app-settings via ARM",
+      "notes": "Non-secret. Added after the 2026-08-12 audit."
+    },
+    {
+      "name": "WEBSITE_WARMUP_PATH",
+      "value": "/health",
+      "owner": "deploy.yml configure-app-settings via ARM",
+      "notes": "Non-secret. Must stay /health, not /warmup."
+    }
+  ],
+  "appServiceSettingsAbsentByDesign": [
+    {
+      "name": "WEBSITE_WARMUP_STATUSES",
+      "owner": "deploy.yml configure-app-settings via ARM (deleted if present)",
+      "notes": "Must stay unset. Requiring 200 crash-looped the B1 worker (#684)."
+    }
   ],
   "accessRestrictions": {
     "mainSite": ["Cloudflare-IPv4-1", "Cloudflare-IPv4-2", "Cloudflare-IPv6", "Deny all"],
