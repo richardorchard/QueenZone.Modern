@@ -1,8 +1,8 @@
 # QueenZone production OpenTofu root
 
-This root module is the only production entry point. The resource group and
-Azure web/telemetry estate use declarative import blocks from #622. Issues #628
-and #626 will add Azure data and Cloudflare edge resources.
+This root module is the only production entry point. The resource group,
+Azure web/telemetry estate, and Azure data estate use declarative import blocks
+from #622 and #628. Issue #626 will add Cloudflare edge resources.
 
 The first remote plan must show imports and no unexplained change, replacement,
 or deletion. Do not apply from a local operator session. The protected
