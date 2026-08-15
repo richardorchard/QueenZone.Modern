@@ -64,6 +64,32 @@ Use configuration keys like:
 - **Admin allowlist:** committed `Admin:AllowedEmails` is **empty**. Production must set `Admin__AllowedEmails__0` (and further indexes) on App Service or via Key Vault. Startup validation fails in Production/Staging/Preview when the list is empty. See [`entra-admin-auth.md`](entra-admin-auth.md).
 - **Secrets in logs:** never log connection strings, client secrets, storage keys, or API keys. Prefer App Service setting name + length when auditing config; health endpoints must not echo exception text containing secrets.
 
+### Data Protection keys
+
+Production, Staging, and Preview persist ASP.NET Core Data Protection keys to
+`/home/ASP.NET/DataProtection-Keys` on Linux App Service
+(`D:\home\ASP.NET\DataProtection-Keys` on Windows App Service). This is the
+[standard Azure Apps key-ring location](https://learn.microsoft.com/aspnet/core/security/data-protection/configuration/default-settings)
+on the App Service persistent home share, outside the read-only
+`/home/site/wwwroot` package mounted by `WEBSITE_RUN_FROM_PACKAGE=1`. Using the
+existing standard location avoids abandoning keys that the framework may already
+have written implicitly. Cookie authentication and antiforgery tokens therefore
+remain valid across app recycles and deployments on the current App Service.
+
+`DataProtection__KeysPath` may override the location, but it must be an absolute path
+outside `wwwroot`. Startup creates the directory and fails immediately if the mount or
+permissions are wrong. The framework's existing application discriminator is unchanged,
+so explicitly configuring the standard key-ring path does not itself invalidate existing
+protected payloads.
+
+This mechanism adds no secret or parallel configuration owner while the App Service
+configuration ownership decision in [#618](https://github.com/richardorchard/QueenZone.Modern/issues/618)
+remains open. App Service manages encryption at rest for the persistent disk, but the
+Data Protection key XML is not separately encrypted by the application. If the site
+later requires application-level key encryption or deployment-slot sharing, move the
+key ring to Blob Storage and protect it with Key Vault under that decision; do not
+commit storage credentials or Key Vault secrets.
+
 ### Forwarded headers trust boundary
 
 The app clears `KnownIPNetworks` / `KnownProxies` so `X-Forwarded-For`, `X-Forwarded-Proto`, and `X-Forwarded-Host` from **App Service / Cloudflare** are accepted (required for correct OAuth redirect URIs and scheme).

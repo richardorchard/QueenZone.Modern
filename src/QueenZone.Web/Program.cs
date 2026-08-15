@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.FileProviders;
@@ -37,11 +36,12 @@ else if (QueenZoneEnvironments.IsAutomatedTestHost(builder.Environment))
             });
         }
     }
-
-    // Avoid DPAPI-backed key persistence under the service profile, which is slow
-    // (and unnecessary for short-lived smoke test runs) on the self-hosted CI runner.
-    builder.Services.AddDataProtection().UseEphemeralDataProtectionProvider();
 }
+
+DataProtectionBootstrap.ConfigureServices(
+    builder.Services,
+    builder.Configuration,
+    builder.Environment);
 
 builder.Services.AddQueenZoneApplicationInsights(
     builder.Configuration,
