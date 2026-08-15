@@ -11,8 +11,12 @@
   const glowEl = document.getElementById("qz-era-glow");
   const labelEl = document.getElementById("qz-era-label");
   const yearEl = document.getElementById("qz-era-year");
-  const imgEl = document.getElementById("qz-era-img");
+  const imgEls = Array.from(hero.querySelectorAll(".qz-hero-archive__screenshot"));
   const btns = Array.from(hero.querySelectorAll(".qz-era-btn"));
+
+  if (imgEls.length !== ERAS.length) {
+    return;
+  }
 
   let current = 0;
   let timer = 0;
@@ -27,8 +31,10 @@
     glowEl.style.background = `radial-gradient(closest-side, ${era.glow}55, transparent 72%)`;
     labelEl.textContent = era.label;
     yearEl.textContent = era.year;
-    imgEl.src = era.img;
-    imgEl.alt = `Queenzone.com in ${era.year}`;
+
+    imgEls.forEach((img, n) => {
+      img.classList.toggle("qz-hero-archive__screenshot--active", n === index);
+    });
 
     btns.forEach((btn, n) => {
       const active = n === index;

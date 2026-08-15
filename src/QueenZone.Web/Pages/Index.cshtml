@@ -4,7 +4,8 @@
 @inject IFileVersionProvider FileVersionProvider
 @{
     var eraSlides = HomeEraMontage.GetSlides(FileVersionProvider, HttpContext.Request.PathBase);
-    var eraConfigJson = JsonSerializer.Serialize(eraSlides, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+    var eraConfig = eraSlides.Select(slide => new { slide.Year, slide.Label, slide.Glow });
+    var eraConfigJson = JsonSerializer.Serialize(eraConfig, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
 }
 
 <section class="qz-hero-archive" id="qz-hero-archive" aria-label="Homepage hero">
@@ -40,10 +41,19 @@
           <span class="qz-hero-archive__era-year" id="qz-era-year">1999</span>
         </div>
         <div class="qz-hero-archive__viewport">
-          <img class="qz-hero-archive__screenshot" id="qz-era-img"
-               src="@eraSlides[0].Img"
-               alt="Queenzone.com in @eraSlides[0].Year"
-               loading="eager" fetchpriority="high" width="787" height="518">
+          @for (var index = 0; index < eraSlides.Count; index++)
+          {
+            var slide = eraSlides[index];
+            var screenshotClass = index == 0
+                ? "qz-hero-archive__screenshot qz-hero-archive__screenshot--active"
+                : "qz-hero-archive__screenshot";
+            <img class="@screenshotClass"
+                 src="@slide.Img"
+                 alt="Queenzone.com in @slide.Year"
+                 loading="@(index == 0 ? "eager" : "lazy")"
+                 fetchpriority="@(index == 0 ? "high" : "auto")"
+                 width="787" height="518">
+          }
           <div class="qz-hero-archive__overlay"></div>
         </div>
       </div>

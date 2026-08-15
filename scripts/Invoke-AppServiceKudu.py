@@ -82,8 +82,6 @@ def main() -> int:
         return 1
 
     user, password, host = parse_msdeploy_profile(xml_text)
-    print(f"::add-mask::{user}")
-    print(f"::add-mask::{password}")
 
     for name in args.delete_setting:
         if not name or "/" in name or "\\" in name:
