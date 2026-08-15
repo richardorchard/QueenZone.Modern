@@ -5,7 +5,7 @@ azure-web,queenzone-dev,.../sites/queenzone-dev,import,yes,Linux DOTNETCORE 10 A
 azure-web,hostname www/apex,.../hostNameBindings/*,import,yes,SNI bindings
 azure-web,certs www/apex,.../certificates/*,import,yes,GeoTrust expire 2026-12-29
 azure-web,site access restrictions,site config Cloudflare allow+deny,import,yes,SCM allow-all separate
-azure-web,app setting values,App Service / Bitwarden,defer→#618,n/a,names inventoried only
+azure-web,app setting values,App Service / Bitwarden,outside→ADR 0008,n/a,names inventoried only; OpenTofu ignores app_settings/connection_string
 azure-sql,queenzone-sql-server,.../servers/queenzone-sql-server,import,yes,public + AAD admin
 azure-sql,queenzone-db,.../databases/queenzone-db,import,yes,Basic 5 DTU production data
 azure-sql,firewall AllowAllWindowsAzureIps,.../firewallRules/AllowAllWindowsAzureIps,import,no,0.0.0.0 Azure services
@@ -29,5 +29,5 @@ github,workflows ci/deploy,repo .github/workflows,outside,n/a,app delivery stays
 github,env dev,GitHub Environments,defer,n/a,no protection rules today
 github,secret values,GH secrets / Bitwarden,outside,n/a,names only
 bitwarden,Queenzone Development project,BWS project,outside,n/a,includes CLOUDFLARE_API_TOKEN_READONLY
-entra,admin/member app registrations,Entra,outside,n/a,settings strategy in #618
+entra,admin/member app registrations,Entra,outside,n/a,settings strategy decided in ADR 0008 (#618)
 registrar,queenzone.org domain,registrar,outside,n/a,not OpenTofu

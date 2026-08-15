@@ -68,7 +68,7 @@ Treatments:
 | Certificates `queenzone.org`, `www.queenzone.org` | `…/Microsoft.Web/certificates/…` | import or defer | GeoTrust TLS RSA CA G1, expire **2026-12-29**; confirm renew path before encoding as managed vs uploaded |
 | Access restrictions (Cloudflare IPv4/IPv6 allow + deny all) | site `ipSecurityRestrictions` | import | Mis-order or drop = either open origin or lock out Cloudflare |
 | SCM access restrictions | site `scmIpSecurityRestrictions` | import | Currently **Allow all**; keep separate from main site rules (deploy path) |
-| App settings (names only) | site config | defer → #618 | Names inventoried; **values** stay in Azure/Bitwarden, never state |
+| App settings (names only) | site config | outside → [ADR 0008](../decisions/0008-app-service-settings-ownership.md) | Names inventoried; **values** stay in Azure/Bitwarden, never state. #622's site resource must omit/`ignore_changes` on `app_settings`/`connection_string` |
 | SQL server `queenzone-sql-server` | `…/Microsoft.Sql/servers/queenzone-sql-server` | import | Public network enabled; AAD admin present; SQL auth still used by app |
 | Firewall `AllowAllWindowsAzureIps` | `…/firewallRules/AllowAllWindowsAzureIps` | import | Required for App Service → SQL |
 | Firewall `ClientIPAddress_2026-6-11_20-28-58` | `…/firewallRules/ClientIPAddress_…` | defer | Operator workstation IP; likely keep outside or replace with named break-glass rule |
@@ -152,7 +152,7 @@ Present on `queenzone-dev` at audit time:
 
 `APPLICATIONINSIGHTS_CONNECTION_STRING`, `Authentication__Discord__ClientId/Secret`, `Authentication__Facebook__ClientId/Secret`, `Authentication__GitHub__ClientId/Secret`, `Authentication__Google__ClientId/Secret`, `Authentication__Microsoft__ClientId/Secret`, `BlobUpload__PublicBaseUrl`, `ConnectionStrings__BlobStorage`, `ConnectionStrings__QueenZoneLegacy`, `DIAGNOSTICS_AZUREBLOBRETENTIONINDAYS`, `OPENROUTER_API_KEY`, `WEBSITE_HEALTHCHECK_MAXPINGFAILURES`, `WEBSITE_HTTPLOGGING_RETENTION_DAYS`, `Analytics__GoogleAnalyticsServiceAccountJson`, `Analytics__TrafficCacheMinutes`, `Analytics__GoogleAnalyticsPropertyId`, `AzureAd__Instance`, `AzureAd__TenantId`, `AzureAd__ClientId`, `AzureAd__ClientSecret`, `AzureAd__CallbackPath`, `Admin__AllowedEmails__0`, `Admin__AllowedEmails__1`, `SCM_DO_BUILD_DURING_DEPLOYMENT`, `ENABLE_ORYX_BUILD`.
 
-Notable absences vs docs: `WEBSITE_WARMUP_PATH` / `WEBSITE_WARMUP_STATUSES` were **not** in the setting name list (health check path `/health` is configured on the site). Ownership of settings is [#618](https://github.com/richardorchard/QueenZone.Modern/issues/618).
+Notable absences vs docs: `WEBSITE_WARMUP_PATH` / `WEBSITE_WARMUP_STATUSES` were **not** in the setting name list (health check path `/health` is configured on the site). Ownership of settings is decided in [ADR 0008](../decisions/0008-app-service-settings-ownership.md) ([#618](https://github.com/richardorchard/QueenZone.Modern/issues/618)): OpenTofu stays out of `app_settings`/`connection_string` entirely (Option A). This same name list (`infra/import/github-bitwarden.json`'s `appServiceSettingNames`) is checked nightly for missing names by `scripts/Test-AppServiceSettingNames.ps1` — see `.github/workflows/app-service-setting-names-check.yml`.
 
 ## Resources that must never be recreated
 
@@ -179,7 +179,7 @@ Documented for [#622](https://github.com/richardorchard/QueenZone.Modern/issues/
 7. SQL server → firewall rules → database (import existing; never `create`).
 8. Storage account → blob service properties → containers → custom domain.
 9. Cloudflare zone/DNS → TLS → Worker/routes for **cdn2 only**.
-10. App settings strategy (#618) last — names/references only.
+10. App settings (#618 / ADR 0008): no import step — the site resource must omit/`ignore_changes` `app_settings` and `connection_string` so OpenTofu never manages them.
 
 **Outage risks during import:** hostname/TLS drift, IP restriction mistakes, storage public-access flips, Worker route removal on cdn2, SQL firewall removing `AllowAllWindowsAzureIps`.
 
