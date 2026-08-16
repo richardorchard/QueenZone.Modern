@@ -34,6 +34,7 @@ module "azure_web" {
 module "azure_data" {
   source = "../../modules/azure-data"
 
+  resource_group_id   = azurerm_resource_group.production.id
   resource_group_name = var.azure_resource_group_name
   location            = var.azure_location
 }
@@ -46,6 +47,6 @@ module "cloudflare_edge" {
   zone_name  = var.cloudflare_zone_name
 }
 
-# The Azure data and Cloudflare modules remain import contracts until issues
-# #628 and #626 add their resources. Azure web resources are imported by the
-# declarative blocks in imports.tf; an apply must never precede plan review.
+# The Cloudflare module remains an import contract until #626 adds its
+# resources. Azure web and data resources use declarative imports in
+# imports.tf; an apply must never precede plan review.
