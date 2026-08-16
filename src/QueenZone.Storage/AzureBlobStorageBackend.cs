@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using Azure;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 
@@ -46,17 +47,21 @@ internal sealed class AzureBlobStorageBackend(BlobServiceClient blobServiceClien
     {
         var container = blobServiceClient.GetBlobContainerClient(containerName);
         var blob = container.GetBlobClient(blobName);
-        if (!await blob.ExistsAsync(cancellationToken))
+        try
+        {
+            var properties = await blob.GetPropertiesAsync(cancellationToken: cancellationToken);
+            // OpenReadAsync is seekable so app proxies can honour Range for audio.
+            var stream = await blob.OpenReadAsync(cancellationToken: cancellationToken);
+            return new BlobContent
+            {
+                Stream = stream,
+                ContentType = properties.Value.ContentType ?? "application/octet-stream",
+            };
+        }
+        catch (RequestFailedException ex) when (ex.Status == 404)
         {
             return null;
         }
-
-        var response = await blob.DownloadStreamingAsync(cancellationToken: cancellationToken);
-        return new BlobContent
-        {
-            Stream = response.Value.Content,
-            ContentType = response.Value.Details.ContentType ?? "application/octet-stream",
-        };
     }
 
     public Uri GetBlobUri(string containerName, string blobName) =>

@@ -41,7 +41,7 @@ public sealed class FanPerformanceRateLimitTests
         var first = await client.GetAsync("/fan-performances/187/audio");
         var second = await client.GetAsync("/fan-performances/187/audio");
 
-        Assert.Equal(HttpStatusCode.Redirect, first.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, first.StatusCode);
         Assert.Equal(HttpStatusCode.TooManyRequests, second.StatusCode);
     }
 

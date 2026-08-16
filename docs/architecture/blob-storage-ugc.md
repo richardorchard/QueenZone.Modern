@@ -58,11 +58,11 @@ Store **container + blob name** in the database. Treat any public/display URL as
 Two Cloudflare hostnames proxy the legacy Azure Blob containers. They behave differently and are not interchangeable:
 
 - **`cdn.queenzone.org`** — straight CDN proxy, no Worker. Azure Storage custom domain on account `queenzone` makes the proxied Host valid. Cannot set custom response headers. Used by `PhotoImageUrl` for photos and images.
-- **`cdn2.queenzone.org`** — Cloudflare Worker `pictures-queenzone-org` on `cdn2.queenzone.org/*`. Sets cache/CORS/nosniff headers today; **can** set `Content-Disposition` but the live script does not yet. Used by `SongFileUrl` for fan performance audio. Also used as the redirect target for **legacy forum attachments** after a member-auth check (`/forum/attachment/legacy/{postId}` → `https://cdn2.queenzone.org/attachments/{fileName}`).
+- **`cdn2.queenzone.org`** — Cloudflare Worker `pictures-queenzone-org` on `cdn2.queenzone.org/*`. Sets cache/CORS/nosniff headers. Used as the redirect target for **legacy forum attachments** after a member-auth check (`/forum/attachment/legacy/{postId}` → `https://cdn2.queenzone.org/attachments/{fileName}`). The Worker returns 404 for `/songfiles/*`.
 
-Do not route audio through `cdn.queenzone.org`; it silently breaks the download filename without any test failure.
+Fan-performance audio is **not** a public CDN object. The member-authenticated app proxy `GET /fan-performances/{id}/audio` streams from the private `songfiles` container and sets `Content-Disposition`. Do not emit `cdn2.queenzone.org/songfiles/…` or raw blob URLs in HTML.
 
-**Live ACL note (2026-08-12):** containers `songfiles` and `attachments` are **public blob** in Azure today, so direct `*.blob.core.windows.net` URLs work anonymously even when the app only links through `cdn2` / member gates. Intended lockdown: [#177](https://github.com/richardorchard/QueenZone.Modern/issues/177). Private modern UGC containers present: `ugc-avatars`, `ugc-forum` (`ugc-photos` / `ugc-articles` not created yet).
+**ACL note:** `songfiles` is private (#177). Legacy `attachments` remain public blob access; URL guessing still bypasses the app gate for those files. Private modern UGC containers present: `ugc-avatars`, `ugc-forum` (`ugc-photos` / `ugc-articles` not created yet).
 
 ### Forum attachments
 

@@ -26,7 +26,7 @@
     { "name": "queen-and-paul-rodgers", "publicAccess": "blob", "opentofuTreatment": "import" },
     { "name": "queen-memorabillia", "publicAccess": "blob", "opentofuTreatment": "import" },
     { "name": "roger-taylor", "publicAccess": "blob", "opentofuTreatment": "import" },
-    { "name": "songfiles", "publicAccess": "blob", "opentofuTreatment": "import", "notes": "Docs wanted private; live is public. Relates to #177" },
+    { "name": "songfiles", "publicAccess": "blob", "desiredPublicAccess": null, "opentofuTreatment": "import", "neverPublic": true, "notes": "Live 2026-08-12 was public blob. #177 desired: private. App streams via /fan-performances/{id}/audio." },
     { "name": "special-events", "publicAccess": "blob", "opentofuTreatment": "import" },
     { "name": "test", "publicAccess": "blob", "opentofuTreatment": "defer" },
     { "name": "ugc-avatars", "publicAccess": null, "opentofuTreatment": "import", "neverPublic": true, "relatedIssues": [583, 584] },
