@@ -30,6 +30,12 @@ export default {
       return new Response('Not Found', { status: 404 });
     }
 
+    // Fan-performance audio is member-gated and streamed by the app (#177).
+    // Do not anonymously proxy /songfiles/* even if the container ACL lags.
+    if (incomingUrl.pathname === '/songfiles' || incomingUrl.pathname.startsWith('/songfiles/')) {
+      return new Response('Not Found', { status: 404 });
+    }
+
     const originUrl = new URL(incomingUrl.pathname + incomingUrl.search, ORIGIN);
     const hasRange = request.headers.has('Range');
     const cache = caches.default;

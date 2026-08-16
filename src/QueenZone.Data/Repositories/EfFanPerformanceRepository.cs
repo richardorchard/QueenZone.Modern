@@ -141,7 +141,7 @@ public sealed class EfFanPerformanceRepository : IFanPerformanceRepository
         Title: row.TITLE,
         PerformedBy: row.PERFORMED_BY,
         Description: row.DESCRIPTION ?? string.Empty,
-        AudioUrl: SongFileUrl.Build(row.URL),
+        AudioFileName: row.URL?.Trim() ?? string.Empty,
         FileSizeBytes: ParseFileSize(row.thesize),
         DateAdded: row.DATE_ADDED);
 

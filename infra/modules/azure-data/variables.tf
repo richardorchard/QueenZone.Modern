@@ -58,7 +58,7 @@ variable "containers" {
     "queen-and-paul-rodgers"  = "Blob"
     "queen-memorabillia"      = "Blob"
     "roger-taylor"            = "Blob"
-    "songfiles"               = "Blob"
+    "songfiles"               = "None"
     "special-events"          = "Blob"
     "ugc-avatars"             = "None"
     "ugc-forum"               = "None"
@@ -71,7 +71,7 @@ variable "containers" {
   }
 
   validation {
-    condition     = var.containers["databasebackup"] == "None" && var.containers["ugc-avatars"] == "None" && var.containers["ugc-forum"] == "None"
-    error_message = "Backup and modern UGC containers must remain private."
+    condition     = var.containers["databasebackup"] == "None" && var.containers["ugc-avatars"] == "None" && var.containers["ugc-forum"] == "None" && var.containers["songfiles"] == "None"
+    error_message = "Backup, modern UGC, and songfiles containers must remain private."
   }
 }
