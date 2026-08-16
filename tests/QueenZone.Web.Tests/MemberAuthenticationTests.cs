@@ -60,7 +60,20 @@ public sealed class MemberAuthenticationTests : IClassFixture<QueenZoneWebApplic
         var body = await client.GetStringAsync("/");
 
         Assert.Contains("href=\"/account/login\"", body);
-        Assert.Contains(">Sign in<", body);
+        Assert.Contains(">Member sign in<", body);
+    }
+
+    [Fact]
+    public async Task AdminHeaderDistinguishesAdminAccessFromMemberSignIn()
+    {
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserEmailHeader, "admin@test.local");
+
+        var body = await client.GetStringAsync("/admin");
+
+        Assert.Contains("Admin access: admin@test.local", body);
+        Assert.Contains(">Member sign in<", body);
+        Assert.DoesNotContain("Signed in as admin", body);
     }
 
 }

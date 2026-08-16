@@ -155,7 +155,7 @@
       {
         <a class="qz-masthead__admin-link" href="/admin" aria-current="@(IsActive("/admin") ? "page" : null)">Admin</a>
         <span class="qz-masthead__admin-status" title="@adminEmail">
-          Signed in as admin@(adminEmail is not null ? $" ({adminEmail})" : "")
+          Admin access@(adminEmail is not null ? $": {adminEmail}" : "")
         </span>
       }
       @if (memberDisplayName is not null)
@@ -176,7 +176,7 @@
       }
       else
       {
-        <a class="qz-masthead__signin" href="/account/login">Sign in</a>
+        <a class="qz-masthead__signin" href="/account/login">Member sign in</a>
       }
       <button class="qz-menu-button" type="button" aria-label="Open navigation menu" aria-controls="qz-mobile-menu" aria-expanded="false" data-menu-open>
         <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -221,7 +221,7 @@
         }
         else
         {
-          <a class="qz-masthead__signin qz-masthead__signin--mobile" href="/account/login">Sign in</a>
+          <a class="qz-masthead__signin qz-masthead__signin--mobile" href="/account/login">Member sign in</a>
         }
       </div>
       <nav class="qz-mobile-nav" aria-label="Mobile primary navigation">
