@@ -38,15 +38,16 @@ absent. The first import deliberately avoids new storage cost or retention.
 
 The imported ACLs match live product behaviour:
 
-- `databasebackup`, `ugc-avatars`, and `ugc-forum` are private;
+- `databasebackup`, `ugc-avatars`, `ugc-forum`, and `songfiles` are private;
 - archive/media containers retain public blob access;
 - `css` retains public container access;
-- `songfiles` and `attachments` remain public blob access pending #177;
+- `attachments` remain public blob access (legacy forum files; out of scope for #177);
 - scratch `test` remains outside the stack;
 - missing `ugc-photos` and `ugc-articles` are not created.
 
-Changing the two legacy member-facing containers to private requires the
-application/CDN work in #177. It is not safe as import cleanup.
+The `songfiles` ACL flip is an in-place update. Apply it only after the
+member-authenticated audio proxy is deployed. `prevent_destroy` does not block
+container ACL changes.
 
 ## Verification contract
 
