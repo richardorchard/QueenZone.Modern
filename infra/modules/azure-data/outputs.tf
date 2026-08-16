@@ -5,5 +5,11 @@ output "import_contract" {
     sql_server      = var.sql_server_name
     sql_database    = var.sql_database_name
     storage_account = var.storage_account_name
+    containers      = sort(keys(var.containers))
   }
+}
+
+output "storage_account_id" {
+  description = "Managed Storage account resource ID without exporting account keys."
+  value       = azapi_resource.storage_account.id
 }

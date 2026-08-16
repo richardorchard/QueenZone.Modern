@@ -10,6 +10,7 @@ This repository is the modern QueenZone rebuild. The project is archive-first: i
 - `docs/decisions/0006-hybrid-ef-core-admin-writes.md` is the Dapper vs EF access matrix and contributor rules for SQL in `QueenZone.Data`.
 - `docs/architecture/blob-storage-ugc.md` is the UGC blob upload foundation (`QueenZone.Storage` / `IBlobUploadService`).
 - `docs/architecture/opentofu-inventory.md` is the live Azure/Cloudflare ownership inventory for OpenTofu adoption (`infra/import/` holds sanitised IDs).
+- `docs/architecture/opentofu-contributor-runbook.md` is the OpenTofu operating contract, including `prevent_destroy` on SQL, Storage, and other irreplaceable resources. OpenTofu does not manage blob objects or SQL rows, and it will not automatically refuse to destroy a data store unless that lifecycle flag is set.
 - `docs/decisions/0007-rich-text-editor-quill.md` is the shared Quill rich-text editor decision (partial + `/api/uploads/editor-image`).
 - `docs/backlog/migration-backlog.md` tracks migration work.
 - `docs/sql/data-api-builder-mcp.md` explains the local SQL MCP setup for read-only legacy database investigation.
