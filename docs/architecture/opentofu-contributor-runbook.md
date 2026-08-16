@@ -84,6 +84,39 @@ Prefer committed `moved` blocks. Use `tofu state mv` only when a declarative mov
 
 Lock recovery, backend restoration, credential rotation, and force-unlock controls remain in [`opentofu-state-and-identity.md`](opentofu-state-and-identity.md).
 
+## Destroy safety for live data
+
+OpenTofu does **not** automatically refuse to delete databases, storage
+accounts, or other live-data resources. A resource removed from configuration,
+or a `tofu destroy`, will delete the corresponding Azure object unless
+protection is opted in.
+
+This stack opts in. Irreplaceable production resources must set
+`lifecycle { prevent_destroy = true }`. `scripts/Test-OpenTofuSafety.ps1`
+fails if those resource types omit it. A production apply that would destroy or
+replace a protected resource fails instead of deleting it.
+
+`prevent_destroy` blocks **destroy and replacement** only. It does **not**
+block:
+
+- in-place updates (SKU, backup retention, container ACLs, soft-delete days)
+- Azure Portal / `az` deletion outside OpenTofu
+- application, EF, or operator writes to rows and blobs
+- a later PR that removes the lifecycle flag
+
+OpenTofu also does not manage SQL schema, table data, or blob objects. Removing
+a *container* or *database* resource from the module is still a destroy of that
+Azure object and every object inside it; `prevent_destroy` is what stops that
+apply.
+
+Never run `tofu destroy` against production. Do not apply a plan that deletes or
+replaces SQL, Storage, App Service, hostname bindings, or the `cdn2` Worker.
+To stop managing a resource without deleting it, use `tofu state rm` after
+review (see [State moves and removals](#state-moves-and-removals)).
+
+Resources that must never be recreated are listed in
+[`opentofu-inventory.md`](opentofu-inventory.md).
+
 ## Production safeguards
 
 - AzureRM cannot auto-register resource providers; registration remains an operator/platform concern.
