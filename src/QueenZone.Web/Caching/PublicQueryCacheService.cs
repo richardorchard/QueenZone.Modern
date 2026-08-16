@@ -54,6 +54,13 @@ public sealed class PublicQueryCacheService(
             () => articlesRepository.GetPublishedCountAsync(cancellationToken),
             cancellationToken);
 
+    public Task<IReadOnlyList<ArticleItem>> GetLatestArticlesAsync(int count, CancellationToken cancellationToken = default) =>
+        GetOrCreateAsync(
+            PublicQueryCacheKeys.LatestArticles(count),
+            options.Value.ArticleCountCacheDuration,
+            () => articlesRepository.GetLatestAsync(count, cancellationToken),
+            cancellationToken);
+
     public Task<IReadOnlyList<ForumCategoryItem>> GetForumCategoriesAsync(CancellationToken cancellationToken = default) =>
         GetOrCreateAsync(
             PublicQueryCacheKeys.ForumCategories,
@@ -159,6 +166,7 @@ public sealed class PublicQueryCacheService(
     public void InvalidateArticleCountCache()
     {
         cache.Remove(PublicQueryCacheKeys.ArticlePublishedCount);
+        cache.Remove(PublicQueryCacheKeys.LatestArticles(ArticlesRoutes.HomeFeaturedCount));
     }
 
     /// <summary>

@@ -10,7 +10,7 @@ public sealed class PublicWarmupService
 {
     internal static readonly TimeSpan DefaultStepTimeout = TimeSpan.FromSeconds(8);
 
-    internal const int StepCount = 9;
+    internal const int StepCount = 10;
 
     private readonly IServiceScopeFactory scopeFactory;
     private readonly TimeProvider timeProvider;
@@ -53,6 +53,10 @@ public sealed class PublicWarmupService
             WarmStepAsync(
                 "article-count",
                 (cache, stepToken) => cache.GetArticlePublishedCountAsync(stepToken),
+                cancellationToken),
+            WarmStepAsync(
+                "latest-articles",
+                (cache, stepToken) => cache.GetLatestArticlesAsync(ArticlesRoutes.HomeFeaturedCount, stepToken),
                 cancellationToken),
             WarmStepAsync(
                 "forum-categories",

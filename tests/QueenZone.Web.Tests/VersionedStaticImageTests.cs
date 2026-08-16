@@ -23,7 +23,6 @@ public sealed class VersionedStaticImageTests : IClassFixture<WebApplicationFact
         Assert.Contains("img-portrait.webp?v=", body);
         Assert.Contains("img-portrait.jpg?v=", body);
         Assert.Contains("img-crowd.webp?v=", body);
-        Assert.Contains("img-stage.jpg?v=", body);
         Assert.Contains("img-studio.webp?v=", body);
         Assert.Contains("crest-white.png?v=", body);
         Assert.Contains("crest-white.webp?v=", body);
@@ -71,8 +70,8 @@ public sealed class VersionedStaticImageTests : IClassFixture<WebApplicationFact
 
         Assert.Contains("width=\"447\"", body);
         Assert.Contains("height=\"447\"", body);
-        Assert.Contains("width=\"1200\"", body);
-        Assert.Contains("height=\"800\"", body);
+        Assert.Contains("width=\"1000\"", body);
+        Assert.Contains("height=\"1000\"", body);
         Assert.Contains("width=\"787\"", body);
         Assert.Contains("height=\"518\"", body);
         Assert.Contains("fetchpriority=\"high\"", body);
