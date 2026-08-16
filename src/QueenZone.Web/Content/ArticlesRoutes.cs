@@ -6,6 +6,9 @@ public static partial class ArticlesRoutes
 {
     public const int ArchivePageSize = 20;
 
+    /// <summary>Number of articles shown in the homepage "Featured" teaser section.</summary>
+    public const int HomeFeaturedCount = 3;
+
     /// <summary>Canonical RSS 2.0 feed for published archive + community articles.</summary>
     public const string FeedPath = "/articles/feed.rss";
 
