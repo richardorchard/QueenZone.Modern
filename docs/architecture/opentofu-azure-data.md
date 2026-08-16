@@ -45,9 +45,10 @@ The imported ACLs match live product behaviour:
 - scratch `test` remains outside the stack;
 - missing `ugc-photos` and `ugc-articles` are not created.
 
-The `songfiles` ACL flip is an in-place update. Apply it only after the
-member-authenticated audio proxy is deployed. `prevent_destroy` does not block
-container ACL changes.
+Live `songfiles` is already private (ARM apply 2026-08-16 after the #702
+app proxy shipped). The module desired state is `None`. The next reviewed
+OpenTofu apply should not change that ACL. `prevent_destroy` does not block
+container ACL changes; do not flip it back to public.
 
 ## Verification contract
 

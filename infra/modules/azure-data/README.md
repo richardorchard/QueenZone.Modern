@@ -18,13 +18,13 @@ Blob and container soft delete remain seven days. Versioning, change feed,
 point-in-time restore, and lifecycle rules remain disabled or absent. This is a
 cost-neutral first import, not a protection-policy expansion.
 
-Container ACLs match the live estate except `songfiles`, which #177 flips to
-private so fan audio is only readable through the member-authenticated app
-proxy. `databasebackup`, `ugc-avatars`, `ugc-forum`, and `songfiles` stay
-private. Legacy `attachments` remain public blob access (out of scope for
-#177). The scratch `test` container and missing future `ugc-photos` /
-`ugc-articles` containers are not managed.
+Container ACLs match the live estate. `databasebackup`, `ugc-avatars`,
+`ugc-forum`, and `songfiles` stay private. Fan audio is only readable through
+the member-authenticated app proxy (`/fan-performances/{id}/audio`). Legacy
+`attachments` remain public blob access (out of scope for #177). The scratch
+`test` container and missing future `ugc-photos` / `ugc-articles` containers
+are not managed.
 
-Apply the `songfiles` ACL change only after the app proxy
-(`/fan-performances/{id}/audio`) is deployed. Do not apply from a local
-operator session; use the protected OpenTofu workflow after plan review.
+`songfiles` was set to `None` on 2026-08-16 via ARM after #702 deployed. The
+OpenTofu apply workflow (#625) is not built yet; do not apply this stack from a
+local operator session. A later reviewed apply should leave the ACL unchanged.

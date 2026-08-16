@@ -214,10 +214,11 @@ Photos/images:  https://cdn.queenzone.org/{container}/{blob}
                 Azure Storage custom domain: cdn.queenzone.org on account queenzone
                 Origin: https://queenzone.blob.core.windows.net
 
-Audio/legacy attachments CDN:
+Legacy attachments CDN:
                 https://cdn2.queenzone.org/{container}/{blob}
-                Cloudflare Worker proxy (sets response headers)
+                Cloudflare Worker proxy (script name pictures-queenzone-org)
                 No Azure custom domain on cdn2 — Worker fetches the blob origin host
+                pictures.queenzone.org is not a DNS name
 ```
 
 ### `cdn.queenzone.org` (photos / images)
@@ -236,28 +237,28 @@ TTL: Auto
 
 ### `cdn2.queenzone.org` (legacy attachment redirect target)
 
-Worker script **`pictures-queenzone-org`** (historical name) on route **`cdn2.queenzone.org/*`**. Source snapshot: [`infra/import/workers/pictures-queenzone-org.js`](../../infra/import/workers/pictures-queenzone-org.js).
+DNS hostname is **`cdn2.queenzone.org`**. The Cloudflare Worker **script** is still named **`pictures-queenzone-org`** from when the public host was `pictures.queenzone.org`. That hostname is gone; there is no `pictures` DNS record. The only Worker route is **`cdn2.queenzone.org/*`**. Source snapshot: [`infra/import/workers/pictures-queenzone-org.js`](../../infra/import/workers/pictures-queenzone-org.js).
 
-Live Worker behaviour:
+Live Worker behaviour (published 2026-08-16):
 
 - Accepts `GET` / `HEAD` only; rewrites path to `https://queenzone.blob.core.windows.net`
 - Returns **404** for `/songfiles` and `/songfiles/*` (fan audio is app-proxied; #177)
 - Adds `Access-Control-Allow-Origin: *`
 - Adds `X-Content-Type-Options: nosniff`
 - Sets `Cache-Control: public, max-age=86400, s-maxage=2592000` on HTTP 200
-- Does **not** currently set `Content-Disposition` (the fan-performance app proxy sets it)
+- Does **not** set `Content-Disposition` (the fan-performance app proxy sets it)
 
-Used by legacy forum attachment redirects after member auth. Do not attach this Worker to `cdn`. The Worker is not yet an OpenTofu-managed resource (#626); deploy script updates separately after the app proxy is live.
+Used by legacy forum attachment redirects after member auth. Do not attach this Worker to `cdn`. The Worker is not yet an OpenTofu-managed resource (#626); live script updates go through the Cloudflare API using Bitwarden `CLOUDFLARE_WORKER_READWRITE`.
 
 ### Fan-performance audio (#177)
 
 Signed-in members play and download through `GET /fan-performances/{id}/audio`, which streams from the private `songfiles` container using `ConnectionStrings:BlobStorage` (same storage account as UGC). The modern app must not emit `cdn2.queenzone.org/songfiles/…` or raw blob URLs in HTML.
 
-Apply order after merge:
+Live as of 2026-08-16 (after #702 deployed):
 
-1. Deploy the web app so the audio endpoint streams instead of redirecting.
-2. Publish the Worker snapshot so anonymous `cdn2` `/songfiles/*` returns 404.
-3. Apply the OpenTofu `songfiles` container ACL change (`None`) via the protected workflow. Do not apply from a local operator session, and do not flip the ACL before step 1.
+1. The app streams audio; it no longer redirects to cdn2.
+2. Worker `pictures-queenzone-org` on `cdn2.queenzone.org/*` returns 404 for `/songfiles/*`.
+3. Azure container `songfiles` is `publicAccess=None`. Applied with ARM (`az rest`) because the OpenTofu apply workflow (#625) is not built yet. Desired state in `infra/modules/azure-data` already matches; the next reviewed apply should be a no-op on that ACL.
 
 ### Azure storage requirements
 
@@ -266,9 +267,7 @@ Apply order after merge:
 - `databasebackup`, `ugc-avatars`, `ugc-forum`, and `songfiles` are private.
 - Legacy `attachments` remain public blob access (out of scope for #177).
 
-### Post-deploy smoke (#177)
-
-After the app deploy, Worker publish, and OpenTofu apply:
+### Standing smoke (#177)
 
 ```powershell
 # Anonymous CDN and raw blob URLs must fail (403/404).
@@ -280,7 +279,7 @@ curl.exe -I https://queenzone.blob.core.windows.net/songfiles/2014417798057369.m
 # redirect to cdn2 or *.blob.core.windows.net.
 ```
 
-The nightly RealData suite asserts the anonymous CDN/blob denial in `LiveSiteMediaCdnTests`. Those checks fail until steps 2–3 above have been applied.
+The nightly RealData suite asserts the anonymous CDN/blob denial in `LiveSiteMediaCdnTests`.
 
 Do not add Azure CDN or Azure Front Door for these hostnames unless the architecture is deliberately changed. Keep the existing Azure Storage custom domain for `cdn.queenzone.org` — removing it breaks the non-Worker photo CDN.
 

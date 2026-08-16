@@ -114,11 +114,13 @@
       "OPENROUTER_API_KEY",
       "QUEENZONE_SQL_EXPRESS_PROBE_PASSWORD",
       "QUEENZONE_SQL_EXPRESS_PROBE_USERNAME",
-      "CLOUDFLARE_API_TOKEN_READONLY"
+      "CLOUDFLARE_API_TOKEN_READONLY",
+      "CLOUDFLARE_WORKER_READWRITE"
     ],
     "cloudflareApiTokenKey": "CLOUDFLARE_API_TOKEN_READONLY",
+    "cloudflareWorkerWriteTokenKey": "CLOUDFLARE_WORKER_READWRITE",
     "opentofuTreatment": "outside",
-    "notes": "Values never recorded in repo or OpenTofu state. CLOUDFLARE_API_TOKEN_READONLY is inventory/ops read-only. Bitwarden keys were not re-listed on 2026-08-15."
+    "notes": "Values never recorded in repo or OpenTofu state. CLOUDFLARE_API_TOKEN_READONLY is inventory/ops read-only. CLOUDFLARE_WORKER_READWRITE publishes Worker scripts (used 2026-08-16 for #177). Planned OpenTofu tokens CLOUDFLARE_API_TOKEN_TOFU_PLAN / _APPLY are not created yet."
   },
   "appServiceSettingNames": [
     "APPLICATIONINSIGHTS_CONNECTION_STRING",

@@ -67,7 +67,9 @@ Add only permissions required by an observed provider denial. Do not grant accou
 
 Store the values in the `Queenzone Development` Bitwarden Secrets Manager project as `CLOUDFLARE_API_TOKEN_TOFU_PLAN` and `CLOUDFLARE_API_TOKEN_TOFU_APPLY`. GitHub later retrieves them through its existing Bitwarden Secrets Manager action into the matching protected environment. OpenTofu reads `CLOUDFLARE_API_TOKEN` from the process environment; the value must never appear in HCL, `.tfvars`, workflow output, plans, or state.
 
-The bootstrap does not create these tokens. Create them immediately before the first Cloudflare plan in #626, then wire their Bitwarden output names during #625. This avoids leaving unused long-lived credentials while still fixing the required scope and rotation path now.
+Those two OpenTofu token names are **not created yet**. Live Worker publishes use `CLOUDFLARE_WORKER_READWRITE` (Workers Scripts Edit). Inventory/ops reads use `CLOUDFLARE_API_TOKEN_READONLY`. Do not reuse the Worker token as the future OpenTofu apply token unless its zone/DNS/settings scopes are reviewed.
+
+The bootstrap does not create the OpenTofu tokens. Create them immediately before the first Cloudflare plan in #626, then wire their Bitwarden output names during #625.
 
 Rotation sequence:
 
