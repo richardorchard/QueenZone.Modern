@@ -28,7 +28,7 @@ public static class SecurityHeaders
         "font-src 'self' data:; " +
         "style-src 'self'; " +
         $"script-src 'self' 'nonce-{nonce}' https://www.googletagmanager.com https://www.google-analytics.com; " +
-        "connect-src 'self' https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com; " +
+        "connect-src 'self' https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com https://www.google.com; " +
         "frame-src 'self' https://www.googletagmanager.com; " +
         "object-src 'none'";
 
