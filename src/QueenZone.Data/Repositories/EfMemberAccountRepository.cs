@@ -85,6 +85,23 @@ public sealed class EfMemberAccountRepository(QueenZoneDbContext dbContext) : IM
         return account;
     }
 
+    public async Task<MemberAccount?> UpdateMessagePrivacyAsync(
+        Guid memberId,
+        MemberMessagePrivacy messagePrivacy,
+        CancellationToken cancellationToken = default)
+    {
+        var account = await dbContext.MemberAccounts
+            .SingleOrDefaultAsync(a => a.Id == memberId, cancellationToken);
+        if (account is null)
+        {
+            return null;
+        }
+
+        account.MessagePrivacy = messagePrivacy;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return account;
+    }
+
     public async Task<MemberAccount?> FindByLinkedLegacyUserIdAsync(
         int legacyUserId,
         CancellationToken cancellationToken = default) =>

@@ -63,6 +63,7 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddScoped<IArticleRepository, EfArticleRepository>();
         services.AddScoped<INewsSuggestionRepository, EfNewsSuggestionRepository>();
         services.AddScoped<IPrivateMessageRepository, EfPrivateMessageRepository>();
+        services.AddScoped<IMemberFollowRepository, EfMemberFollowRepository>();
         services.AddScoped<IMemberPublicActivityRepository, EfMemberPublicActivityRepository>();
         services.AddScoped<ILinksRepository, EfLinksRepository>();
         services.AddScoped<IFreddieTributeRepository, EfFreddieTributeRepository>();
@@ -134,6 +135,7 @@ public static class QueenZoneDataServiceCollectionExtensions
             return new InMemoryPrivateMessageRepository(id =>
                 members.FindByIdAsync(id).GetAwaiter().GetResult());
         });
+        services.AddSingleton<IMemberFollowRepository, InMemoryMemberFollowRepository>();
 
         services.AddSingleton<IArticleSubmissionRepository>(sp =>
         {

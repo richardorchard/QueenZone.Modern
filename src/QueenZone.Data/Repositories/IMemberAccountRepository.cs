@@ -29,6 +29,14 @@ public interface IMemberAccountRepository
     Task<MemberAccount?> UpdateAvatarUrlAsync(Guid memberId, string? avatarBlobPath, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Updates who may start a new private conversation with this member.
+    /// </summary>
+    Task<MemberAccount?> UpdateMessagePrivacyAsync(
+        Guid memberId,
+        MemberMessagePrivacy messagePrivacy,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Returns the modern account already linked to the given legacy USERS_T id, if any.
     /// </summary>
     Task<MemberAccount?> FindByLinkedLegacyUserIdAsync(int legacyUserId, CancellationToken cancellationToken = default);

@@ -52,6 +52,7 @@ Use **EF Core as the single data-access library** in `QueenZone.Data`, while kee
 | News audit | `INewsAuditRepository` | `EfNewsAuditRepository` | EF Core | Modern audit table |
 | Member accounts | `IMemberAccountRepository` | `EfMemberAccountRepository` | EF Core | Modern tables |
 | Private messaging | `IPrivateMessageRepository` | `EfPrivateMessageRepository` | EF Core | Modern `PrivateConversations` / `PrivateMessages` tables (MVP 1:1) |
+| Member follows | `IMemberFollowRepository` | `EfMemberFollowRepository` | EF Core | Modern `MemberFollows` table; used by private-message privacy |
 | News discovery / agent drafts | `INewsDiscoveryRepository` | `EfNewsDiscoveryRepository` | EF Core | Modern workflow tables |
 | News agent run leases | `INewsAgentRunLeaseService` | `EfNewsAgentRunLeaseService` | EF Core (+ SQL for lease upsert) | Modern lease table |
 | Queen history / on-this-day | `IQueenHistoryRepository` | `EfQueenHistoryRepository` | EF Core | Modern table |

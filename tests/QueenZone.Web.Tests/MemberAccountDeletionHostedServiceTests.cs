@@ -148,6 +148,12 @@ public sealed class MemberAccountDeletionHostedServiceTests
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
+        public Task<MemberAccount?> UpdateMessagePrivacyAsync(
+            Guid memberId,
+            MemberMessagePrivacy messagePrivacy,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public Task<MemberAccount?> FindByLinkedLegacyUserIdAsync(
             int legacyUserId,
             CancellationToken cancellationToken = default) =>

@@ -73,6 +73,43 @@ public sealed partial class AccountSettingsPageTests : IClassFixture<WebApplicat
         Assert.Contains("No legacy forum account is linked to this email.", body);
         Assert.Contains("href=\"/account/delete\"", body);
         Assert.Contains("Delete my account", body);
+        Assert.Contains("Who can message me", body);
+        Assert.Contains("Signed-in members", body);
+        Assert.Contains("People I follow", body);
+        Assert.Contains("Nobody", body);
+        Assert.Contains("Save messaging privacy", body);
+    }
+
+    [Fact]
+    public async Task PostUpdateMessagePrivacy_SavesFollowedSetting()
+    {
+        var client = await CreateSignedInMemberClientAsync(
+            email: "settings-privacy@example.com",
+            displayName: "Privacy Fan",
+            subject: "google-settings-privacy",
+            options: new WebApplicationFactoryClientOptions
+            {
+                HandleCookies = true,
+                AllowAutoRedirect = false,
+            });
+
+        var formPage = await client.GetStringAsync("/account/settings");
+        var response = await client.PostAsync(
+            "/account/settings?handler=UpdateMessagePrivacy",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(formPage),
+                ["MessagePrivacy"] = nameof(MemberMessagePrivacy.Followed),
+            }));
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        var updated = await client.GetStringAsync("/account/settings");
+        Assert.Contains("Messaging privacy updated.", updated);
+        using var scope = factory.Services.CreateScope();
+        var member = await scope.ServiceProvider
+            .GetRequiredService<IMemberAccountRepository>()
+            .FindByEmailAsync("settings-privacy@example.com");
+        Assert.Equal(MemberMessagePrivacy.Followed, member!.MessagePrivacy);
     }
 
     [Fact]

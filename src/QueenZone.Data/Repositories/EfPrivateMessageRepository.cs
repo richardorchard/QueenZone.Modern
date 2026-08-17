@@ -821,6 +821,17 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
             : conversation.MemberLowId;
     }
 
+    public Task<bool> HasConversationBetweenAsync(
+        Guid memberA,
+        Guid memberB,
+        CancellationToken cancellationToken = default)
+    {
+        var (low, high) = OrderPair(memberA, memberB);
+        return dbContext.PrivateConversations
+            .AsNoTracking()
+            .AnyAsync(c => c.MemberLowId == low && c.MemberHighId == high, cancellationToken);
+    }
+
     public Task<bool> IsBlockedAsync(
         Guid blockerMemberId,
         Guid blockedMemberId,

@@ -109,6 +109,24 @@ public sealed class InMemoryMemberAccountRepository : IMemberAccountRepository
         }
     }
 
+    public Task<MemberAccount?> UpdateMessagePrivacyAsync(
+        Guid memberId,
+        MemberMessagePrivacy messagePrivacy,
+        CancellationToken cancellationToken = default)
+    {
+        lock (gate)
+        {
+            var account = accounts.FirstOrDefault(a => a.Id == memberId);
+            if (account is null)
+            {
+                return Task.FromResult<MemberAccount?>(null);
+            }
+
+            account.MessagePrivacy = messagePrivacy;
+            return Task.FromResult<MemberAccount?>(account);
+        }
+    }
+
     public Task<MemberAccount?> FindByLinkedLegacyUserIdAsync(
         int legacyUserId,
         CancellationToken cancellationToken = default)

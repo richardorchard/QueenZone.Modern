@@ -47,6 +47,7 @@ public sealed class EfLegacyProbeResidueTests
         Assert.False(string.IsNullOrWhiteSpace(PrivateConversationResidueQuery(dbContext).ToQueryString()));
         Assert.False(string.IsNullOrWhiteSpace(PrivateConversationParticipantResidueQuery(dbContext).ToQueryString()));
         Assert.False(string.IsNullOrWhiteSpace(MemberMessageBlockResidueQuery(dbContext).ToQueryString()));
+        Assert.False(string.IsNullOrWhiteSpace(MemberFollowResidueQuery(dbContext).ToQueryString()));
         Assert.False(string.IsNullOrWhiteSpace(ForumThreadResidueQuery(dbContext).ToQueryString()));
         Assert.False(string.IsNullOrWhiteSpace(ForumPostResidueQuery(dbContext).ToQueryString()));
         Assert.False(string.IsNullOrWhiteSpace(PhotoSubmissionResidueQuery(dbContext).ToQueryString()));
@@ -80,6 +81,7 @@ public sealed class EfLegacyProbeResidueTests
         Assert.True(await PrivateConversationResidueQuery(dbContext).AnyAsync());
         Assert.True(await PrivateConversationParticipantResidueQuery(dbContext).AnyAsync());
         Assert.True(await MemberMessageBlockResidueQuery(dbContext).AnyAsync());
+        Assert.True(await MemberFollowResidueQuery(dbContext).AnyAsync());
         Assert.True(await ForumThreadResidueQuery(dbContext).AnyAsync());
         Assert.True(await ForumPostResidueQuery(dbContext).AnyAsync());
         Assert.True(await PhotoSubmissionResidueQuery(dbContext).AnyAsync());
@@ -113,6 +115,7 @@ public sealed class EfLegacyProbeResidueTests
             await PrivateConversationParticipantResidueQuery(dbContext).AnyAsync(),
             "Residue found in PrivateConversationParticipants.");
         Assert.False(await MemberMessageBlockResidueQuery(dbContext).AnyAsync(), "Residue found in MemberMessageBlocks.");
+        Assert.False(await MemberFollowResidueQuery(dbContext).AnyAsync(), "Residue found in MemberFollows.");
         Assert.False(await ForumThreadResidueQuery(dbContext).AnyAsync(), "Residue found in ModernForumThread.");
         Assert.False(await ForumPostResidueQuery(dbContext).AnyAsync(), "Residue found in ModernForumPost.");
         Assert.False(await PhotoSubmissionResidueQuery(dbContext).AnyAsync(), "Residue found in PhotoSubmissions.");
@@ -231,6 +234,13 @@ public sealed class EfLegacyProbeResidueTests
             dbContext.MemberAccounts.Any(member =>
                 member.Email.Contains(UiTestMarker)
                 && (member.Id == block.BlockerMemberId || member.Id == block.BlockedMemberId)));
+
+    private static IQueryable<MemberFollowEntity> MemberFollowResidueQuery(
+        QueenZoneDbContext dbContext) =>
+        dbContext.MemberFollows.Where(follow =>
+            dbContext.MemberAccounts.Any(member =>
+                member.Email.Contains(UiTestMarker)
+                && (member.Id == follow.FollowerMemberId || member.Id == follow.FollowedMemberId)));
 
     private static IQueryable<ModernForumThreadEntity> ForumThreadResidueQuery(QueenZoneDbContext dbContext) =>
         dbContext.ModernForumThreads.Where(thread =>
@@ -394,6 +404,13 @@ public sealed class EfLegacyProbeResidueTests
             Id = Guid.NewGuid(),
             BlockerMemberId = markedMemberId,
             BlockedMemberId = otherMemberId,
+            CreatedAt = now,
+        });
+        dbContext.MemberFollows.Add(new MemberFollowEntity
+        {
+            Id = Guid.NewGuid(),
+            FollowerMemberId = markedMemberId,
+            FollowedMemberId = otherMemberId,
             CreatedAt = now,
         });
         dbContext.SearchDocuments.Add(new SearchDocumentEntity

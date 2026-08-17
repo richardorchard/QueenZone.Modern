@@ -26,6 +26,9 @@ public sealed class SettingsModel(MemberAccountService memberAccountService) : P
     public IFormFile? AvatarFile { get; set; }
 
     [BindProperty]
+    public MemberMessagePrivacy MessagePrivacy { get; set; } = MemberMessagePrivacy.Members;
+
+    [BindProperty]
     public bool AdoptLegacyDisplayName { get; set; } = true;
 
     /// <summary>
@@ -97,6 +100,45 @@ public sealed class SettingsModel(MemberAccountService memberAccountService) : P
         await ReissueMemberCookieAsync(result.Account);
 
         TempData[SuccessMessageKey] = "Display name updated.";
+        return RedirectToPage();
+    }
+
+    public async Task<IActionResult> OnPostUpdateMessagePrivacyAsync(CancellationToken cancellationToken)
+    {
+        var memberId = await GetCurrentMemberIdAsync();
+        if (memberId is null)
+        {
+            return Redirect("/account/login");
+        }
+
+        var account = await memberAccountService.FindByIdAsync(memberId.Value, cancellationToken);
+        if (account is null)
+        {
+            return Redirect("/account/login");
+        }
+
+        var submittedPrivacy = MessagePrivacy;
+        await PopulatePageAsync(account, cancellationToken);
+        MessagePrivacy = submittedPrivacy;
+        ViewData["Title"] = "Account settings";
+
+        if (!Enum.IsDefined(submittedPrivacy))
+        {
+            ModelState.AddModelError(nameof(MessagePrivacy), "Choose a valid messaging privacy option.");
+            return Page();
+        }
+
+        var result = await memberAccountService.UpdateMessagePrivacyAsync(
+            memberId.Value,
+            submittedPrivacy,
+            cancellationToken);
+        if (!result.Succeeded || result.Account is null)
+        {
+            ModelState.AddModelError(string.Empty, result.Error ?? "Could not update messaging privacy.");
+            return Page();
+        }
+
+        TempData[SuccessMessageKey] = "Messaging privacy updated.";
         return RedirectToPage();
     }
 
@@ -246,6 +288,7 @@ public sealed class SettingsModel(MemberAccountService memberAccountService) : P
     {
         MemberId = account.Id;
         DisplayName = account.DisplayName;
+        MessagePrivacy = account.MessagePrivacy;
         Email = account.Email;
         HasAvatar = !string.IsNullOrWhiteSpace(account.AvatarUrl);
         LinkedProviders = await memberAccountService.ListExternalProvidersAsync(account.Id, cancellationToken);

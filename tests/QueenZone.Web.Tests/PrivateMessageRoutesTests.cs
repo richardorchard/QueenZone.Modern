@@ -469,7 +469,64 @@ public sealed class PrivateMessageRoutesTests : IClassFixture<WebApplicationFact
 
         var html = await anon.GetStringAsync($"/members/{bob.Id}");
         Assert.Contains("Sign in to message", html);
+        Assert.Contains("Sign in to follow", html);
         Assert.Contains("/account/login", html);
+    }
+
+    [Fact]
+    public async Task MemberProfile_FollowAndUnfollow_UpdatesStatus()
+    {
+        var (aliceClient, _) = await CreateMemberAsync("follow-alice@example.com", "Follow Alice");
+        var (_, bob) = await CreateMemberAsync("follow-bob@example.com", "Follow Bob");
+
+        var profile = await aliceClient.GetStringAsync($"/members/{bob.Id}");
+        Assert.Contains(">Follow</", profile);
+        Assert.Contains($"/messages/compose?to={bob.Id}", profile);
+
+        var followResponse = await aliceClient.PostAsync(
+            $"/members/{bob.Id}?handler=Follow",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(profile),
+            }));
+        Assert.Equal(HttpStatusCode.Redirect, followResponse.StatusCode);
+
+        var afterFollow = await aliceClient.GetStringAsync($"/members/{bob.Id}");
+        Assert.Contains("You are now following this member.", afterFollow);
+        Assert.Contains(">Unfollow</", afterFollow);
+
+        var unfollowResponse = await aliceClient.PostAsync(
+            $"/members/{bob.Id}?handler=Unfollow",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(afterFollow),
+            }));
+        Assert.Equal(HttpStatusCode.Redirect, unfollowResponse.StatusCode);
+
+        var afterUnfollow = await aliceClient.GetStringAsync($"/members/{bob.Id}");
+        Assert.Contains("You unfollowed this member.", afterUnfollow);
+        Assert.Contains(">Follow</", afterUnfollow);
+    }
+
+    [Fact]
+    public async Task MemberProfile_HidesMessage_WhenRecipientAcceptsFollowedOnly()
+    {
+        var (aliceClient, alice) = await CreateMemberAsync("privacy-alice@example.com", "Privacy Alice");
+        var (_, bob) = await CreateMemberAsync("privacy-bob@example.com", "Privacy Bob");
+        var members = factory.Services.GetRequiredService<IMemberAccountRepository>();
+        await members.UpdateMessagePrivacyAsync(bob.Id, MemberMessagePrivacy.Followed);
+
+        var html = await aliceClient.GetStringAsync($"/members/{bob.Id}");
+        Assert.DoesNotContain($"/messages/compose?to={bob.Id}", html);
+        Assert.Contains(">Follow</", html);
+
+        var compose = await aliceClient.GetStringAsync($"/messages/compose?to={bob.Id}");
+        Assert.Contains(PrivateMessageService.UnableToSendMessage, compose);
+
+        var follows = factory.Services.GetRequiredService<IMemberFollowRepository>();
+        await follows.FollowAsync(bob.Id, alice.Id, DateTimeOffset.UtcNow);
+        var afterFollow = await aliceClient.GetStringAsync($"/members/{bob.Id}");
+        Assert.Contains($"/messages/compose?to={bob.Id}", afterFollow);
     }
 
     [Fact]

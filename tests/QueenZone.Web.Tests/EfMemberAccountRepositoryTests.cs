@@ -70,6 +70,18 @@ public sealed class EfMemberAccountRepositoryTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task UpdateMessagePrivacyAsync_PersistsSetting()
+    {
+        var account = await SeedAccountAsync("privacy-ef@example.com", "EF Privacy");
+
+        var updated = await repository.UpdateMessagePrivacyAsync(account.Id, MemberMessagePrivacy.Nobody);
+        Assert.Equal(MemberMessagePrivacy.Nobody, updated!.MessagePrivacy);
+
+        var reloaded = await repository.FindByIdAsync(account.Id);
+        Assert.Equal(MemberMessagePrivacy.Nobody, reloaded!.MessagePrivacy);
+    }
+
+    [Fact]
     public async Task UpdateAvatarUrlAsync_PersistsAndClearsPath()
     {
         var account = await SeedAccountAsync("avatar-ef@example.com", "EF Avatar");

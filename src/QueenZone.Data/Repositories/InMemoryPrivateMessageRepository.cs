@@ -437,6 +437,18 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
         }
     }
 
+    public Task<bool> HasConversationBetweenAsync(
+        Guid memberA,
+        Guid memberB,
+        CancellationToken cancellationToken = default)
+    {
+        lock (sync)
+        {
+            var (low, high) = OrderPair(memberA, memberB);
+            return Task.FromResult(conversations.Any(c => c.MemberLowId == low && c.MemberHighId == high));
+        }
+    }
+
     public Task<bool> IsBlockedAsync(
         Guid blockerMemberId,
         Guid blockedMemberId,

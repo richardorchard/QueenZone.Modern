@@ -102,6 +102,14 @@ public interface IPrivateMessageRepository
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// True when a 1:1 conversation already exists between the two members.
+    /// </summary>
+    Task<bool> HasConversationBetweenAsync(
+        Guid memberA,
+        Guid memberB,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// True when <paramref name="blockerMemberId"/> has blocked <paramref name="blockedMemberId"/>.
     /// </summary>
     Task<bool> IsBlockedAsync(

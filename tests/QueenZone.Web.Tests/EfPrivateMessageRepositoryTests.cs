@@ -70,6 +70,9 @@ public sealed class EfPrivateMessageRepositoryTests : IAsyncDisposable
 
         Assert.True(await repository.IsParticipantAsync(result.ConversationId.Value, aliceId));
         Assert.False(await repository.IsParticipantAsync(result.ConversationId.Value, carolId));
+        Assert.True(await repository.HasConversationBetweenAsync(aliceId, bobId));
+        Assert.True(await repository.HasConversationBetweenAsync(bobId, aliceId));
+        Assert.False(await repository.HasConversationBetweenAsync(aliceId, carolId));
     }
 
     [Fact]
