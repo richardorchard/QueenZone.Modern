@@ -12,7 +12,7 @@ azure-sql,firewall AllowAllWindowsAzureIps,.../firewallRules/AllowAllWindowsAzur
 azure-sql,firewall ClientIPAddress_2026-6-11,.../firewallRules/ClientIPAddress_*,defer,no,personal /32
 azure-sql,EF schema/data,inside database,outside,yes,GitHub migrate path
 azure-storage,queenzone,.../storageAccounts/queenzone,import,yes,Standard_LRS customDomain cdn
-azure-storage,containers,see storage-containers.json,import,yes,songfiles live public vs docs (#177)
+azure-storage,containers,see storage-containers.json,import,yes,songfiles private since 2026-08-16 (#177)
 azure-monitor,queenzone-dev-law,.../workspaces/queenzone-dev-law,import,no,0.1GB/day 30d
 azure-monitor,queenzone-dev-ai,.../components/queenzone-dev-ai,import,no,90d retention
 azure-monitor,alerts/webtest/action group,Queenzone-RG insights resources,import,no,webtest URL likely wrong under IP lock
@@ -22,12 +22,14 @@ cloudflare-dns,apex A proxied,record c22f8759158c7a3f06e290e5f51f5da8 → 52.237
 cloudflare-dns,www CNAME proxied,record fdd05b163df7c2941ae1e36986558228 → queenzone-dev.azurewebsites.net,import,yes,
 cloudflare-dns,cdn CNAME proxied,record c8989e49d2d624756ddf35a05e3ac153 → queenzone.blob.core.windows.net,import,yes,no Worker; Azure custom domain
 cloudflare-dns,cdn2 CNAME proxied,record 1af26073508a0494bc5d66f5b23df57f → queenzone.blob.core.windows.net,import,yes,Worker route attached
-cloudflare-worker,pictures-queenzone-org,script + route 0fd4ebdc9c3e4825a1d9e6527fbd4d24 (cdn2.queenzone.org/*),import,yes,historical name; cdn2 only
+cloudflare-worker,pictures-queenzone-org,script + route 0fd4ebdc9c3e4825a1d9e6527fbd4d24 (cdn2.queenzone.org/*),import,yes,script name only; public host is cdn2.queenzone.org
+cloudflare-dns,pictures CNAME proxied,record 4bc9968da3b9ec19d792fef11ef4d77a to cdn.queenzone.org,import,yes,retired media hostname compatibility
+cloudflare-worker,pictures-legacy-redirect,script + route 276e102a9ef8402c9b610c7bc60bbedb (pictures.queenzone.org/*),import,yes,robots 200; other paths redirect to cdn
 cloudflare-ssl,mode strict,zone setting,import,no,Universal SSL; min_tls 1.0 defer
 cloudflare-rules,page/custom WAF/transform,none,outside,n/a,managed Free defaults only
 github,workflows ci/deploy,repo .github/workflows,outside,n/a,app delivery stays GH Actions
 github,env dev,GitHub Environments,defer,n/a,no protection rules today
 github,secret values,GH secrets / Bitwarden,outside,n/a,names only
-bitwarden,Queenzone Development project,BWS project,outside,n/a,includes CLOUDFLARE_API_TOKEN_READONLY
+bitwarden,Queenzone Development project,BWS project,outside,n/a,includes CLOUDFLARE_API_TOKEN_READONLY and CLOUDFLARE_WORKER_READWRITE
 entra,admin/member app registrations,Entra,outside,n/a,settings strategy decided in ADR 0008 (#618)
 registrar,queenzone.org domain,registrar,outside,n/a,not OpenTofu

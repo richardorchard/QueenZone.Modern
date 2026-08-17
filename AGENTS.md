@@ -325,11 +325,11 @@ Two Cloudflare hostnames serve Azure Blob Storage content. They are **not interc
 | Hostname | Type | Can set response headers? | Use for |
 | --- | --- | --- | --- |
 | `cdn.queenzone.org` | Straight CDN proxy | No | Photos and images (`PhotoImageUrl`) |
-| `cdn2.queenzone.org` | Cloudflare Worker proxy (`pictures-queenzone-org` → `cdn2.queenzone.org/*`) | Yes (cache/CORS/nosniff) | Legacy forum attachment redirect target. Returns 404 for `/songfiles/*`. |
+| `cdn2.queenzone.org` | Cloudflare Worker proxy (script `pictures-queenzone-org` on `cdn2.queenzone.org/*`) | Yes (cache/CORS/nosniff) | Legacy forum attachment redirect target. Returns 404 for `/songfiles/*`. |
 
 Fan-performance audio is **not** a public CDN object. Signed-in members stream through `/fan-performances/{id}/audio`, which reads the private `songfiles` container and sets `Content-Disposition`. Do not emit `cdn2.queenzone.org/songfiles/…` or raw blob URLs in HTML.
 
-`cdn2.queenzone.org` goes through Worker `pictures-queenzone-org` (route `cdn2.queenzone.org/*`). Legacy forum attachments use that host after a member-auth gate (`/forum/attachment/legacy/{postId}`). New forum uploads live in private `ugc-forum` and download via `/forum/attachment/{postId}/{attachmentId}` (member-only, app-streamed).
+`pictures-queenzone-org` is the Worker **script name**, not a DNS hostname. The public host is `cdn2.queenzone.org`. Retired `pictures.queenzone.org` is a compatibility hostname only (Worker `pictures-legacy-redirect` → `cdn`); do not use it for new media URLs. Legacy forum attachments use `cdn2` after a member-auth gate (`/forum/attachment/legacy/{postId}`). New forum uploads live in private `ugc-forum` and download via `/forum/attachment/{postId}/{attachmentId}` (member-only, app-streamed).
 
 ## Migration Principles
 
