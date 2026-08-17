@@ -32,6 +32,8 @@
     </div>
 
     <article class="article-body">@Html.Raw(BiographyContent.FormatBody(chapter.Body))</article>
+
+    <partial name="_SocialShare" />
   </div>
 
   @if (nav.Previous is not null || nav.Next is not null)
