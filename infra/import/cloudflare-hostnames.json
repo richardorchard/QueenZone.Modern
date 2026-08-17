@@ -3,6 +3,7 @@
   "issue": 624,
   "cloudflareApiInventory": "complete",
   "bitwardenSecretKey": "CLOUDFLARE_API_TOKEN_READONLY",
+  "bitwardenWorkerWriteSecretKey": "CLOUDFLARE_WORKER_READWRITE",
   "account": {
     "id": "f93121b2086286e79a7a9fdb8d03cb4c",
     "name": "Me@richardorchard.com's Account",
@@ -171,14 +172,15 @@
       "behaviour": [
         "GET/HEAD only",
         "Rewrites path to https://queenzone.blob.core.windows.net",
+        "Returns 404 for /songfiles and /songfiles/*",
         "Sets Cache-Control public max-age=86400 s-maxage=2592000 on 200",
         "Sets Access-Control-Allow-Origin: *",
         "Sets X-Content-Type-Options: nosniff",
-        "Does not currently set Content-Disposition"
+        "Does not set Content-Disposition"
       ],
       "opentofuTreatment": "import",
       "neverRecreate": true,
-      "notes": "Historical name says pictures but live route is cdn2 only"
+      "notes": "Script name only. Public DNS hostname is cdn2.queenzone.org. Published 2026-08-16 for #177."
     },
     {
       "scriptName": "pictures-legacy-redirect",

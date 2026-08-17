@@ -4,8 +4,9 @@ Issue: [#624](https://github.com/richardorchard/QueenZone.Modern/issues/624) (Op
 
 **Audit date:** 2026-08-12  
 **Settings / GitHub refresh:** 2026-08-15 — re-listed live App Service setting *names* and GitHub environment *names* after the [#666](https://github.com/richardorchard/QueenZone.Modern/issues/666) ARM deploy-settings work. Azure/Cloudflare resource IDs, storage ACLs, and `cdn`/`cdn2` probes were not re-run.  
-**Method:** read-only Azure CLI/`az` against subscription `Base Subscription`, live HTTP/DNS probes of public hostnames, Cloudflare API (token `CLOUDFLARE_API_TOKEN_READONLY` from Bitwarden — value not recorded), GitHub API for environments/secret *names*, Bitwarden Secrets Manager key *names* only.  
-**Mutations performed:** none.
+**#177 live refresh:** 2026-08-16 — `songfiles` ACL set to `None` via ARM; Worker `pictures-queenzone-org` published on `cdn2.queenzone.org/*` (404 `/songfiles/*`).  
+**Method:** read-only Azure CLI/`az` against subscription `Base Subscription`, live HTTP/DNS probes of public hostnames, Cloudflare API (tokens `CLOUDFLARE_API_TOKEN_READONLY` and `CLOUDFLARE_WORKER_READWRITE` from Bitwarden — values not recorded), GitHub API for environments/secret *names*, Bitwarden Secrets Manager key *names* only.  
+**Mutations performed:** none during the 2026-08-12 audit. 2026-08-16 applied the #177 ACL and Worker publish outside OpenTofu.
 
 Sanitised machine-readable IDs and import hints live under [`infra/import/`](../../infra/import/).
 
@@ -43,7 +44,7 @@ Repository docs disagreed. Live behaviour (2026-08-12):
 | Hostname | Live routing | Evidence | Correct doc stance |
 | --- | --- | --- | --- |
 | `cdn.queenzone.org` | **Straight Cloudflare proxy** to Azure Blob. **No Worker header rewriting.** | Successful photo/CSS responses pass through Azure `x-ms-*` headers; Cloudflare `Cache-Control: max-age=14400`; **no** Worker-added `Access-Control-Allow-Origin` / `X-Content-Type-Options`. Azure Storage **custom domain** is registered as `cdn.queenzone.org`. | Matches `AGENTS.md`, `blob-storage-ugc.md`, `picture-library-plan.md`, `PhotoImageUrl.cs`. |
-| `cdn2.queenzone.org` | **Cloudflare Worker** `pictures-queenzone-org` on route `cdn2.queenzone.org/*`, fetching `https://queenzone.blob.core.windows.net`. | API route + script inventory; live responses add `Access-Control-Allow-Origin: *`, `X-Content-Type-Options: nosniff`, `Cache-Control: public, max-age=86400, s-maxage=2592000`. Script returns 404 for `/songfiles/*` (#177). No Azure custom domain for `cdn2`. | Legacy forum attachment redirect target. Fan audio is app-proxied. Worker *name* is historical (“pictures”) but route is **cdn2 only**. |
+| `cdn2.queenzone.org` | **Cloudflare Worker** script `pictures-queenzone-org` on route `cdn2.queenzone.org/*`, fetching `https://queenzone.blob.core.windows.net`. | DNS name is **cdn2**, not `pictures`. Script returns 404 for `/songfiles/*` (#177). Live responses add `Access-Control-Allow-Origin: *`, `X-Content-Type-Options: nosniff`, `Cache-Control` on 200. No Azure custom domain for `cdn2`. | Legacy forum attachment redirect target. Fan audio is app-proxied. Do not treat the script name as a hostname. |
 
 `docs/architecture/azure-hosting-plan.md` previously attributed Worker `pictures-queenzone-org` and route `cdn.queenzone.org/*` to **cdn**, and told operators not to add an Azure Storage custom domain. Both statements are **false against live state** and are corrected in that file as part of this issue.
 
@@ -112,7 +113,8 @@ Account id `f93121b2086286e79a7a9fdb8d03cb4c`. Zone id `079fc2f37095c82fb3a2b4da
 | Managed Free WAF / Normalization / DDoS L7 rulesets | outside | Provider defaults — do not copy rule bodies |
 | Account billing / members | outside | |
 | Domain registrar | outside | |
-| `CLOUDFLARE_API_TOKEN_READONLY` (Bitwarden) | outside | Inventory/ops only; never OpenTofu state |
+| `CLOUDFLARE_API_TOKEN_READONLY` (Bitwarden) | outside | Inventory/ops read-only; never OpenTofu state |
+| `CLOUDFLARE_WORKER_READWRITE` (Bitwarden) | outside | Worker script publish (#177); not the planned OpenTofu apply token |
 
 ### GitHub Actions / Bitwarden
 
@@ -149,7 +151,7 @@ site; no empty or speculative RBAC resources are declared.
 | --- | --- | --- | --- |
 | Photo/archive galleries (`queen`, `freddie-mercury`, …) | `blob` | Public photos via `cdn` | Keep public blob read |
 | `images`, `css`, `mp3`, `forum`, `avatars`, `album-or-single-covers`, … | `blob` or `container` (`css`) | Legacy public assets | Keep; `css` is listable |
-| `songfiles` | **`None` (private)** | Fan audio streamed by `/fan-performances/{id}/audio` | Desired state after [#177](https://github.com/richardorchard/QueenZone.Modern/issues/177). Apply only after the app proxy is deployed. |
+| `songfiles` | **`None` (private)** | Fan audio streamed by `/fan-performances/{id}/audio` | Live since 2026-08-16 (ARM). Module desired state already `None`. |
 | `attachments` | **`blob` (public)** | Legacy forum files; app redirects after auth | URL guessing bypasses app gate. Relates to #177 / media lockdown |
 | `databasebackup` | private | Backups | Keep private; **never** public |
 | `ugc-avatars`, `ugc-forum` | private | Modern UGC | Keep private; app proxy. Relates to [#583](https://github.com/richardorchard/QueenZone.Modern/issues/583), [#584](https://github.com/richardorchard/QueenZone.Modern/issues/584) |
