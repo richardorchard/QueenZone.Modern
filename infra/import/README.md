@@ -8,6 +8,7 @@ Read-only audit artefacts for [#624](https://github.com/richardorchard/QueenZone
 | `storage-containers.json` | Container public-access flags and related issues |
 | `cloudflare-hostnames.json` | Zone/account IDs, DNS, SSL, Worker route, rules treatment |
 | `workers/pictures-queenzone-org.js` | Live Worker source snapshot (no secrets) |
+| `workers/pictures-legacy-redirect.js` | Legacy `pictures.queenzone.org` compatibility Worker source snapshot (no secrets) |
 | `ownership-matrix.csv` | Compact treatment matrix (import / data / outside / defer) |
 | `github-bitwarden.json` | Environment/secret/setting *names* only; `appServiceSettingNames` is also the required-name list checked nightly by `scripts/Test-AppServiceSettingNames.ps1` (ADR 0008) |
 
