@@ -8,9 +8,9 @@ namespace QueenZone.Web.E2E;
 
 /// <summary>
 /// Live-site / real-data media host checks (#551). Anonymous public pages only — no admin or
-/// member routes. Fan-performance audio is member-gated on the page, so the CDN contract is
-/// asserted via <see cref="SongFileUrl"/> plus a ranged request to the public songfiles host.
-/// Photography images may resolve through <c>cdn.queenzone.org</c> (or follow redirects).
+/// member routes. Fan-performance audio is member-gated and app-proxied (#177); anonymous
+/// <c>cdn2</c> / raw blob <c>songfiles</c> URLs must fail. Photography images may resolve
+/// through <c>cdn.queenzone.org</c> (or follow redirects).
 /// </summary>
 [Parallelizable(ParallelScope.Self)]
 [TestFixture]
@@ -29,61 +29,42 @@ public class LiveSiteMediaCdnTests : RealDataPageTest
     /// <summary>
     /// Legacy sample songfile known to exist in the production songfiles container
     /// (same filename as <c>SampleFanPerformanceData</c> / historical Q_STAGE_T rows).
+    /// Used only to prove anonymous CDN/blob URLs are denied after #177.
     /// </summary>
-    private const string KnownSongfileName = "2014417798057369.mp3";
+    private const string KnownAnonymousSongfileCdnUrl =
+        "https://cdn2.queenzone.org/songfiles/2014417798057369.mp3";
+
+    private const string KnownAnonymousSongfileBlobUrl =
+        "https://queenzone.blob.core.windows.net/songfiles/2014417798057369.mp3";
 
     protected override bool AllowsWrites => false;
 
     [Test]
-    public void FanPerformanceAudioUrls_MustUseCdn2Host()
-    {
-        var url = SongFileUrl.Build(KnownSongfileName);
-        Assert.That(
-            url,
-            Does.StartWith("https://cdn2.queenzone.org/songfiles/"),
-            "Fan-performance audio must use cdn2.queenzone.org (Worker sets Content-Disposition). " +
-            "Using cdn.queenzone.org silently breaks download filenames — see AGENTS.md Media Serving.");
-    }
+    public void SongfilesContainerName_IsPrivateSongfiles() =>
+        Assert.That(SongFileUrl.ContainerName, Is.EqualTo("songfiles"));
 
     [Test]
-    public async Task KnownFanPerformanceSongfile_ResolvesThroughCdn2Async()
+    public async Task AnonymousCdn2SongfileUrl_IsDeniedAsync() =>
+        await AssertAnonymousSongfileDeniedAsync(KnownAnonymousSongfileCdnUrl);
+
+    [Test]
+    public async Task AnonymousRawBlobSongfileUrl_IsDeniedAsync() =>
+        await AssertAnonymousSongfileDeniedAsync(KnownAnonymousSongfileBlobUrl);
+
+    private async Task AssertAnonymousSongfileDeniedAsync(string url)
     {
-        var songUrl = SongFileUrl.Build(KnownSongfileName);
-        Assert.That(songUrl, Does.Contain("cdn2.queenzone.org"));
-
-        using var handler = new HttpClientHandler
-        {
-            AllowAutoRedirect = true,
-            // CDN may return a blob host after Worker processing; still assert the public URL we hit is cdn2.
-        };
-        using var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(30) };
-
-        using var request = new HttpRequestMessage(HttpMethod.Get, songUrl);
-        // Avoid downloading the whole track on the nightly B1 / CDN path.
+        using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
         request.Headers.Range = new RangeHeaderValue(0, 1023);
 
         using var response = await client.SendAsync(request);
 
-        // Request URL host must be cdn2 even if a Worker hop lands on blob storage.
         Assert.That(
-            new Uri(songUrl).Host,
-            Is.EqualTo("cdn2.queenzone.org"),
-            "SongFileUrl must target the cdn2 Worker host.");
-
-        Assert.That(
-            (int)response.StatusCode,
-            Is.LessThan(500),
+            new[] { HttpStatusCode.Unauthorized, HttpStatusCode.Forbidden, HttpStatusCode.NotFound },
+            Does.Contain(response.StatusCode),
             FailurePrefix() +
-            $"expected a non-5xx response from {songUrl}, got {(int)response.StatusCode} {response.StatusCode}. " +
-            "Fan-performance audio must resolve through cdn2.queenzone.org (see AGENTS.md Media Serving).");
-
-        if (response.StatusCode is not (HttpStatusCode.OK or HttpStatusCode.PartialContent))
-        {
-            // File may rotate out of the public container; host reachability is the hard check.
-            TestContext.Out.WriteLine(
-                $"SOFT: {songUrl} returned {(int)response.StatusCode} {response.StatusCode} " +
-                "(cdn2 host responded; object may be absent).");
-        }
+            $"anonymous GET {url} must fail after songfiles lockdown (#177); " +
+            $"got {(int)response.StatusCode} {response.StatusCode}.");
     }
 
     [Test]

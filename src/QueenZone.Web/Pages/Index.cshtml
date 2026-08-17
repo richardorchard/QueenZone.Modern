@@ -89,14 +89,19 @@
   <partial name="_PictureImage" model="@("/design-system/assets/crest-white.png", "", false, "qz-band-dark__crest")" />
   <div class="qz-container">
     <partial name="_SectionHeader" model="@(("Featured", "Articles from the archive", true, "/articles", "View all"))" />
-    <div class="qz-tag-row">
-      <span class="qz-tag qz-tag--active">All</span><span class="qz-tag qz-tag--dark">Live Aid</span><span class="qz-tag qz-tag--dark">Freddie Mercury</span><span class="qz-tag qz-tag--dark">Recordings</span>
-    </div>
-    <div class="qz-grid qz-grid--three">
-      <partial name="_ArticleCard" model="@("/design-system/assets/img-studio.jpg", "Recording", "Inside the Making of Bohemian Rhapsody", "Six weeks, three studios and a chorus recorded more than 180 times.", "Restored archive", "/articles/101/inside-the-making-of-bohemian-rhapsody", true)" />
-      <partial name="_ArticleCard" model="@("/design-system/assets/img-portrait.jpg", "In Memoriam", "Freddie: The Voice That Defined an Era", "A presence no stadium could contain, preserved through archive voices.", "9 min read", "/articles/102/freddie-the-voice-that-defined-an-era", true)" />
-      <partial name="_ArticleCard" model="@("/design-system/assets/img-crowd.jpg", "Live History", "The Magic Tour, Night by Night", "The 1986 run that became the final tour with all four members.", "15 min read", "/articles/103/the-magic-tour-night-by-night", true)" />
-    </div>
+    @if (Model.FeaturedArticles.Count == 0)
+    {
+      <p class="qz-on-dark">No published articles are available yet.</p>
+    }
+    else
+    {
+      <div class="qz-grid qz-grid--three">
+        @foreach (var article in Model.FeaturedArticles)
+        {
+          <partial name="_ArticleCard" model="@(article.Image, article.Category, article.Title, article.Excerpt, article.Meta, article.Href, true)" />
+        }
+      </div>
+    }
   </div>
 </section>
 
@@ -128,12 +133,24 @@
 <section class="qz-section qz-section--warm">
   <div class="qz-container">
     <partial name="_SectionHeader" model="@(("Featured Photography", "A visual archive in progress", false, "/photography", "Browse gallery"))" />
-    <div class="qz-gallery-grid">
-      <figure class="qz-gallery-tile qz-gallery-tile--tall"><partial name="_PictureImage" model="@("/design-system/assets/img-stage.jpg", "", true, (string?)null)" /><figcaption><span>Wembley Stadium</span><span>1986</span></figcaption></figure>
-      <figure class="qz-gallery-tile"><partial name="_PictureImage" model="@("/design-system/assets/img-portrait.jpg", "", true, (string?)null)" /><figcaption><span>Studio portrait</span><span>1974</span></figcaption></figure>
-      <figure class="qz-gallery-tile qz-gallery-tile--wide"><partial name="_PictureImage" model="@("/design-system/assets/img-crowd.jpg", "", true, (string?)null)" /><figcaption><span>Hyde Park</span><span>1976</span></figcaption></figure>
-      <figure class="qz-gallery-tile"><partial name="_PictureImage" model="@("/design-system/assets/img-studio.jpg", "", true, (string?)null)" /><figcaption><span>Mountain Studios</span><span>1978</span></figcaption></figure>
-    </div>
+    @if (Model.FeaturedGalleryCategories.Count == 0)
+    {
+      <p>No published photography collections are available yet.</p>
+    }
+    else
+    {
+      var galleryTileClasses = new[] { "qz-gallery-tile qz-gallery-tile--tall", "qz-gallery-tile", "qz-gallery-tile qz-gallery-tile--wide", "qz-gallery-tile" };
+      <div class="qz-gallery-grid">
+        @for (var index = 0; index < Model.FeaturedGalleryCategories.Count; index++)
+        {
+          var category = Model.FeaturedGalleryCategories[index];
+          <a class="@galleryTileClasses[index % galleryTileClasses.Length]" href="@PhotoRoutes.GetCategoryPath(category.Slug)">
+            <img src="@category.CoverThumbnailUrl" alt="" loading="lazy">
+            <span class="qz-gallery-tile__caption"><span>@category.Name</span><span>@category.ImageCount.ToString("N0") @(category.ImageCount == 1 ? "image" : "images")</span></span>
+          </a>
+        }
+      </div>
+    }
   </div>
 </section>
 

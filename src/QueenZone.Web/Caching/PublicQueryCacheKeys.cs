@@ -16,6 +16,8 @@ public static class PublicQueryCacheKeys
 
     public const string ArticlePublishedCount = Prefix + ":articles:published-count";
 
+    public const string LatestArticlesSegment = Prefix + ":articles:latest";
+
     public const string ForumCategories = Prefix + ":forum:categories";
 
     public const string ForumThreadCount = Prefix + ":forum:thread-count";
@@ -33,6 +35,9 @@ public static class PublicQueryCacheKeys
 
     public static string NewsPublishedCount(string version) =>
         $"{NewsPublishedCountSegment}:v{version}";
+
+    public static string LatestArticles(int count) =>
+        $"{LatestArticlesSegment}:{count}";
 
     public static string PhotoCategories(string version) =>
         $"{PhotoCategoriesSegment}:v{version}";

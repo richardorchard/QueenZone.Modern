@@ -14,7 +14,10 @@ public static class FanPerformanceRoutes
     public static string GetAudioPath(int id) => $"/fan-performances/{id}/audio";
 
     public static string GetAudioPath(int id, string title) =>
-        $"/fan-performances/{id}/audio/{ToUrlSafeFilename(title)}.mp3";
+        $"/fan-performances/{id}/audio/{GetDownloadFileName(title)}";
+
+    public static string GetDownloadFileName(string title) =>
+        $"{ToUrlSafeFilename(title)}.mp3";
 
     private static readonly Regex NonAlphanumericRun = new(@"[^a-zA-Z0-9]+", RegexOptions.Compiled);
 

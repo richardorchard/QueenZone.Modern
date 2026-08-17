@@ -5,6 +5,6 @@ public sealed record FanPerformance(
     string Title,
     string PerformedBy,
     string Description,
-    string AudioUrl,
+    string AudioFileName,
     long FileSizeBytes,
     DateTime DateAdded);

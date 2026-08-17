@@ -26,6 +26,10 @@ public sealed class FanPerformanceRoutesTests
     public void GetAudioPath_UsesPerformanceId() =>
         Assert.Equal("/fan-performances/187/audio", FanPerformanceRoutes.GetAudioPath(187));
 
+    [Fact]
+    public void GetDownloadFileName_SanitizesTitle() =>
+        Assert.Equal("Reaching-Out.mp3", FanPerformanceRoutes.GetDownloadFileName("Reaching Out"));
+
     [Theory]
     [InlineData("Bohemian Rhapsody", "Bohemian-Rhapsody")]
     [InlineData("Don't Stop Me Now!", "Don-t-Stop-Me-Now")]

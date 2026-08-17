@@ -234,26 +234,53 @@ Proxy status: Proxied
 TTL: Auto
 ```
 
-### `cdn2.queenzone.org` (fan audio / legacy attachment redirect target)
+### `cdn2.queenzone.org` (legacy attachment redirect target)
 
 Worker script **`pictures-queenzone-org`** (historical name) on route **`cdn2.queenzone.org/*`**. Source snapshot: [`infra/import/workers/pictures-queenzone-org.js`](../../infra/import/workers/pictures-queenzone-org.js).
 
 Live Worker behaviour:
 
 - Accepts `GET` / `HEAD` only; rewrites path to `https://queenzone.blob.core.windows.net`
+- Returns **404** for `/songfiles` and `/songfiles/*` (fan audio is app-proxied; #177)
 - Adds `Access-Control-Allow-Origin: *`
 - Adds `X-Content-Type-Options: nosniff`
 - Sets `Cache-Control: public, max-age=86400, s-maxage=2592000` on HTTP 200
-- Does **not** currently set `Content-Disposition` (capable of doing so later if product wants download filenames)
+- Does **not** currently set `Content-Disposition` (the fan-performance app proxy sets it)
 
-Used by `SongFileUrl` and legacy forum attachment redirects after member auth. Do not attach this Worker to `cdn`.
+Used by legacy forum attachment redirects after member auth. Do not attach this Worker to `cdn`. The Worker is not yet an OpenTofu-managed resource (#626); deploy script updates separately after the app proxy is live.
+
+### Fan-performance audio (#177)
+
+Signed-in members play and download through `GET /fan-performances/{id}/audio`, which streams from the private `songfiles` container using `ConnectionStrings:BlobStorage` (same storage account as UGC). The modern app must not emit `cdn2.queenzone.org/songfiles/…` or raw blob URLs in HTML.
+
+Apply order after merge:
+
+1. Deploy the web app so the audio endpoint streams instead of redirecting.
+2. Publish the Worker snapshot so anonymous `cdn2` `/songfiles/*` returns 404.
+3. Apply the OpenTofu `songfiles` container ACL change (`None`) via the protected workflow. Do not apply from a local operator session, and do not flip the ACL before step 1.
 
 ### Azure storage requirements
 
 - Account `queenzone` keeps blob public access enabled for legacy public gallery containers.
 - Public archive containers must remain public where visitor access is expected.
-- `databasebackup`, `ugc-avatars`, and `ugc-forum` are private.
-- **`songfiles` is currently public blob ACL in live Azure** even though product docs previously said it should stay private; locking it down is [#177](https://github.com/richardorchard/QueenZone.Modern/issues/177). Do not encode the old “private songfiles” assumption into OpenTofu until that issue is resolved.
+- `databasebackup`, `ugc-avatars`, `ugc-forum`, and `songfiles` are private.
+- Legacy `attachments` remain public blob access (out of scope for #177).
+
+### Post-deploy smoke (#177)
+
+After the app deploy, Worker publish, and OpenTofu apply:
+
+```powershell
+# Anonymous CDN and raw blob URLs must fail (403/404).
+curl.exe -I https://cdn2.queenzone.org/songfiles/2014417798057369.mp3
+curl.exe -I https://queenzone.blob.core.windows.net/songfiles/2014417798057369.mp3
+
+# Signed-in member playback: open /fan-performances, sign in, play a row.
+# Expect 200 from /fan-performances/{id}/audio with audio/mpeg and no Location
+# redirect to cdn2 or *.blob.core.windows.net.
+```
+
+The nightly RealData suite asserts the anonymous CDN/blob denial in `LiveSiteMediaCdnTests`. Those checks fail until steps 2–3 above have been applied.
 
 Do not add Azure CDN or Azure Front Door for these hostnames unless the architecture is deliberately changed. Keep the existing Azure Storage custom domain for `cdn.queenzone.org` — removing it breaks the non-Worker photo CDN.
 

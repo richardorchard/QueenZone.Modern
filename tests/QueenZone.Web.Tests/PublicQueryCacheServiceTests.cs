@@ -502,7 +502,7 @@ public sealed class PublicQueryCacheServiceTests
             return Task.FromResult(1);
         }
 
-        public Task<IReadOnlyList<ArticleItem>> GetLatestAsync(int count, CancellationToken cancellationToken = default) =>
+        public virtual Task<IReadOnlyList<ArticleItem>> GetLatestAsync(int count, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<ArticleItem>>([item]);
 
         public Task<IReadOnlyList<ArticleItem>> GetArchivePageAsync(int page, int pageSize, CancellationToken cancellationToken = default) =>
@@ -732,6 +732,12 @@ public sealed class PublicQueryCacheServiceTests
         {
             await gate.EnterAsync(cancellationToken);
             return await base.GetPublishedCountAsync(cancellationToken);
+        }
+
+        public override async Task<IReadOnlyList<ArticleItem>> GetLatestAsync(int count, CancellationToken cancellationToken = default)
+        {
+            await gate.EnterAsync(cancellationToken);
+            return await base.GetLatestAsync(count, cancellationToken);
         }
     }
 
