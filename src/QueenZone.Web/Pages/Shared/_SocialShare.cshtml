@@ -1,0 +1,46 @@
+@using Microsoft.Extensions.Options
+@using QueenZone.Web.Sitemap
+@inject IOptions<SiteOptions> SiteOptionsAccessor
+@{
+  var canonicalPath = ViewData["CanonicalPath"] as string;
+}
+@if (canonicalPath is not null)
+{
+  var shareUrl = SiteUrl.ToAbsolute(SiteOptionsAccessor.Value.PublicBaseUrl, canonicalPath);
+  var shareText = ViewData["Title"] as string ?? "QueenZone";
+  var encodedUrl = Uri.EscapeDataString(shareUrl);
+  var encodedText = Uri.EscapeDataString(shareText);
+  var twitterHref = $"https://twitter.com/intent/tweet?text={encodedText}&url={encodedUrl}";
+  var facebookHref = $"https://www.facebook.com/sharer/sharer.php?u={encodedUrl}";
+  var whatsappHref = $"https://api.whatsapp.com/send?text={Uri.EscapeDataString($"{shareText} {shareUrl}")}";
+  var emailHref = $"mailto:?subject={encodedText}&body={encodedUrl}";
+
+  <div class="qz-share">
+    <span class="qz-share__label">Share</span>
+    <ul class="qz-share__list">
+      <li>
+        <a class="qz-share__link" href="@twitterHref" target="_blank" rel="noopener noreferrer" aria-label="Share on X">
+          <span aria-hidden="true">X</span>
+        </a>
+      </li>
+      <li>
+        <a class="qz-share__link" href="@facebookHref" target="_blank" rel="noopener noreferrer" aria-label="Share on Facebook">
+          <span aria-hidden="true">f</span>
+        </a>
+      </li>
+      <li>
+        <a class="qz-share__link" href="@whatsappHref" target="_blank" rel="noopener noreferrer" aria-label="Share on WhatsApp">
+          <span aria-hidden="true">W</span>
+        </a>
+      </li>
+      <li>
+        <a class="qz-share__link" href="@emailHref" aria-label="Share by email">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+            <rect x="3" y="5" width="18" height="14" rx="2" />
+            <path d="m3 7 9 6 9-6" />
+          </svg>
+        </a>
+      </li>
+    </ul>
+  </div>
+}

@@ -89,7 +89,16 @@ $errPath = Join-Path $repoRoot "e2e-app.err.log"
 $appPidFile = Join-Path $repoRoot "e2e-app.pid"
 $cmdPidFile = Join-Path $repoRoot "e2e-app-cmd.pid"
 $playwrightScript = Join-Path $repoRoot "tests/QueenZone.Web.E2E/bin/$Configuration/net10.0/playwright.ps1"
-$artifactDir = "test-results/e2e"
+$artifactDirSetting = $env:E2E_ARTIFACT_DIR
+if ([string]::IsNullOrWhiteSpace($artifactDirSetting)) {
+    $artifactDirSetting = "test-results/e2e"
+}
+$artifactDir = if ([System.IO.Path]::IsPathRooted($artifactDirSetting)) {
+    $artifactDirSetting
+}
+else {
+    Join-Path $repoRoot $artifactDirSetting
+}
 $adminEmail = "admin@test.local"
 
 $script:StartedApp = $false
@@ -509,6 +518,7 @@ try {
     $env:E2E_BASE_URL = $BaseUrl
     $env:E2E_ADMIN_EMAIL = $adminEmail
     $env:E2E_ARTIFACT_DIR = $artifactDir
+    Write-Host "E2E artifact directory: $artifactDir"
 
     $testArgs = @(
         "test", $e2eProject,

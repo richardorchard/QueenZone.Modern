@@ -2177,6 +2177,59 @@ a.qz-forum-post__author-link:focus-visible {
   margin: 0.4rem 0.875rem 0 0;
 }
 
+.qz-share {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--hairline);
+}
+
+.qz-share__label {
+  font: var(--fw-medium) 0.8125rem/1 var(--font-body);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--qz-grey-700);
+}
+
+.qz-share__list {
+  display: flex;
+  gap: var(--space-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.qz-share__link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  background: var(--surface-muted, #f6f6f6);
+  color: var(--qz-charcoal);
+  text-decoration: none;
+  font: var(--fw-medium) 0.9375rem/1 var(--font-body);
+  transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+
+.qz-share__link:hover,
+.qz-share__link:focus-visible {
+  background: var(--qz-charcoal);
+  color: var(--qz-white);
+}
+
+.qz-lightbox .qz-share {
+  justify-content: center;
+  border-top-color: rgba(255, 255, 255, 0.2);
+}
+
+.qz-lightbox .qz-share__label {
+  color: rgba(255, 255, 255, 0.66);
+}
+
 .admin-shell {
   max-width: var(--container-max);
   margin: 0 auto;
