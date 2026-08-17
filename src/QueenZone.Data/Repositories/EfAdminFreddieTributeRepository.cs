@@ -115,9 +115,10 @@ public sealed class EfAdminFreddieTributeRepository : IAdminFreddieTributeReposi
         var visibilityParameter = (object?)visibility ?? DBNull.Value;
         var searchParameter = (object?)search ?? DBNull.Value;
 
-        var total = await dbContext.Database
+        var totals = await dbContext.Database
             .SqlQueryRaw<IntValueRow>(countSql, visibilityParameter, searchParameter, duplicatesOnly)
-            .SingleAsync(cancellationToken);
+            .ToListAsync(cancellationToken);
+        var total = totals.Single();
         var rows = await dbContext.Database
             .SqlQueryRaw<AdminFreddieTributeRow>(
                 pageSql,
