@@ -49,6 +49,8 @@ Repository docs disagreed. Live behaviour (2026-08-12):
 
 Both `cdn` and `cdn2` are proxied CNAMEs to `queenzone.blob.core.windows.net`. Direct `https://queenzone-dev.azurewebsites.net/health` returns **403 Ip Forbidden** from non-Cloudflare clients — App Service origin lock is effective for the main site.
 
+The retired `pictures.queenzone.org` hostname remains available for crawler and link compatibility. Worker `pictures-legacy-redirect` serves `/robots.txt` with `200` and `Disallow: /`; every other path redirects permanently to the equivalent `cdn.queenzone.org` URL. Its source snapshot is `infra/import/workers/pictures-legacy-redirect.js`.
+
 ## Ownership matrix
 
 Treatments:
