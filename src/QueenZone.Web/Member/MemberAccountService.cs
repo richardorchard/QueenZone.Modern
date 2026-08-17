@@ -359,6 +359,42 @@ public sealed class MemberAccountService(
     }
 
     /// <summary>
+    /// Updates who may start a new private conversation with this member.
+    /// </summary>
+    public async Task<MemberAccountResult> UpdateMessagePrivacyAsync(
+        Guid memberId,
+        MemberMessagePrivacy messagePrivacy,
+        CancellationToken cancellationToken = default)
+    {
+        var account = await memberAccountRepository.FindByIdAsync(memberId, cancellationToken);
+        if (account is null)
+        {
+            return MemberAccountResult.Failure("Account not found.");
+        }
+
+        if (account.DeletionRequestedAt is not null)
+        {
+            return MemberAccountResult.Failure(PendingDeletionEditError);
+        }
+
+        if (!Enum.IsDefined(messagePrivacy))
+        {
+            return MemberAccountResult.Failure("Choose a valid messaging privacy option.");
+        }
+
+        var updated = await memberAccountRepository.UpdateMessagePrivacyAsync(
+            memberId,
+            messagePrivacy,
+            cancellationToken);
+        if (updated is null)
+        {
+            return MemberAccountResult.Failure("Account not found.");
+        }
+
+        return MemberAccountResult.Success(updated);
+    }
+
+    /// <summary>
     /// Validates and processes an avatar upload, stores full + thumbnail WebP blobs, and
     /// updates <see cref="MemberAccount.AvatarUrl"/>. On DB failure the new blobs are deleted
     /// and the previous avatar is left in place.

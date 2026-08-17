@@ -328,6 +328,10 @@ public class PrivateMessagingWorkflowTests : RealDataPageTest
                 .Where(b => memberIds.Contains(b.BlockerMemberId) || memberIds.Contains(b.BlockedMemberId))
                 .ExecuteDeleteAsync();
 
+            await db.MemberFollows
+                .Where(f => memberIds.Contains(f.FollowerMemberId) || memberIds.Contains(f.FollowedMemberId))
+                .ExecuteDeleteAsync();
+
             await db.MemberAccounts
                 .Where(m => memberIds.Contains(m.Id))
                 .ExecuteDeleteAsync();

@@ -38,9 +38,15 @@ public sealed class ComposeModel(
             }
 
             var recipient = await memberAccountRepository.FindByIdAsync(recipientId, cancellationToken);
-            if (recipient is null)
+            if (recipient is null || recipient.DeletionRequestedAt is not null)
             {
                 ModelState.AddModelError(string.Empty, "Recipient was not found.");
+                return Page();
+            }
+
+            if (!await privateMessageService.CanMessageAsync(memberId.Value, recipient.Id, cancellationToken))
+            {
+                ModelState.AddModelError(string.Empty, PrivateMessageService.UnableToSendMessage);
                 return Page();
             }
 

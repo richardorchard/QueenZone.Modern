@@ -517,6 +517,53 @@ public sealed class MemberAccountServiceTests
     }
 
     [Fact]
+    public async Task UpdateMessagePrivacyAsync_PersistsValidSetting()
+    {
+        var service = CreateService();
+        var registered = await service.RegisterAsync("privacy@queenzone.org", "S3curePass!", "Privacy Fan");
+
+        var result = await service.UpdateMessagePrivacyAsync(
+            registered.Account!.Id,
+            MemberMessagePrivacy.Followed);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(MemberMessagePrivacy.Followed, result.Account!.MessagePrivacy);
+        var reloaded = await service.FindByIdAsync(registered.Account.Id);
+        Assert.Equal(MemberMessagePrivacy.Followed, reloaded!.MessagePrivacy);
+    }
+
+    [Fact]
+    public async Task UpdateMessagePrivacyAsync_RejectsUndefinedValue()
+    {
+        var service = CreateService();
+        var registered = await service.RegisterAsync("privacy-bad@queenzone.org", "S3curePass!", "Privacy Fan");
+
+        var result = await service.UpdateMessagePrivacyAsync(
+            registered.Account!.Id,
+            (MemberMessagePrivacy)99);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("valid", result.Error, StringComparison.OrdinalIgnoreCase);
+        var reloaded = await service.FindByIdAsync(registered.Account.Id);
+        Assert.Equal(MemberMessagePrivacy.Members, reloaded!.MessagePrivacy);
+    }
+
+    [Fact]
+    public async Task UpdateMessagePrivacyAsync_RejectsPendingDeletion()
+    {
+        var service = CreateService();
+        var registered = await service.RegisterAsync("privacy-delete@queenzone.org", "S3curePass!", "Privacy Fan");
+        await service.RequestDeletionAsync(registered.Account!.Id);
+
+        var result = await service.UpdateMessagePrivacyAsync(
+            registered.Account.Id,
+            MemberMessagePrivacy.Nobody);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(MemberAccountService.PendingDeletionEditError, result.Error);
+    }
+
+    [Fact]
     public async Task ListExternalProvidersAsync_ReturnsLinkedProviders()
     {
         var service = CreateService();
@@ -796,6 +843,12 @@ public sealed class MemberAccountServiceTests
 
         public Task<MemberAccount?> UpdateAvatarUrlAsync(Guid memberId, string? avatarBlobPath, CancellationToken cancellationToken = default) =>
             throw new InvalidOperationException("Simulated database failure.");
+
+        public Task<MemberAccount?> UpdateMessagePrivacyAsync(
+            Guid memberId,
+            MemberMessagePrivacy messagePrivacy,
+            CancellationToken cancellationToken = default) =>
+            inner.UpdateMessagePrivacyAsync(memberId, messagePrivacy, cancellationToken);
 
         public Task<MemberAccount?> FindByLinkedLegacyUserIdAsync(int legacyUserId, CancellationToken cancellationToken = default) =>
             inner.FindByLinkedLegacyUserIdAsync(legacyUserId, cancellationToken);

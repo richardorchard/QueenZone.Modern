@@ -71,6 +71,10 @@ public sealed record PrivateMessageBlockResult(
     bool Succeeded,
     string? ErrorMessage);
 
+public sealed record MemberFollowResult(
+    bool Succeeded,
+    string? ErrorMessage);
+
 public sealed record MemberRecipientMatch(
     Guid MemberId,
     string DisplayName);

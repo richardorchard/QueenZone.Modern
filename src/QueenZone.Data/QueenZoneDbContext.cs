@@ -74,6 +74,8 @@ public sealed class QueenZoneDbContext : DbContext
 
     public DbSet<MemberMessageBlockEntity> MemberMessageBlocks => Set<MemberMessageBlockEntity>();
 
+    public DbSet<MemberFollowEntity> MemberFollows => Set<MemberFollowEntity>();
+
     public DbSet<SearchDocumentEntity> SearchDocuments => Set<SearchDocumentEntity>();
 
     public DbSet<SearchReindexLeaseEntity> SearchReindexLeases => Set<SearchReindexLeaseEntity>();
@@ -139,6 +141,10 @@ public sealed class QueenZoneDbContext : DbContext
             entity.Property(account => account.PasswordHash).HasMaxLength(512);
             entity.Property(account => account.CreatedAt).IsRequired();
             entity.Property(account => account.LastLoginAt);
+            entity.Property(account => account.MessagePrivacy)
+                .HasConversion<byte>()
+                .IsRequired()
+                .HasDefaultValue(MemberMessagePrivacy.Members);
             entity.Property(account => account.IsSuspended).IsRequired().HasDefaultValue(false);
             entity.Property(account => account.SuspendedAt);
             entity.Property(account => account.SuspendedReason).HasMaxLength(1000);
@@ -845,6 +851,31 @@ public sealed class QueenZoneDbContext : DbContext
             entity.HasOne(block => block.Blocked)
                 .WithMany()
                 .HasForeignKey(block => block.BlockedMemberId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<MemberFollowEntity>(entity =>
+        {
+            entity.ToTable("MemberFollows");
+            entity.HasKey(follow => follow.Id);
+
+            entity.Property(follow => follow.CreatedAt).IsRequired();
+
+            entity.HasIndex(follow => new { follow.FollowerMemberId, follow.FollowedMemberId })
+                .IsUnique()
+                .HasDatabaseName("IX_MemberFollows_Follower_Followed");
+
+            entity.HasIndex(follow => follow.FollowedMemberId)
+                .HasDatabaseName("IX_MemberFollows_Followed");
+
+            entity.HasOne(follow => follow.Follower)
+                .WithMany()
+                .HasForeignKey(follow => follow.FollowerMemberId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(follow => follow.Followed)
+                .WithMany()
+                .HasForeignKey(follow => follow.FollowedMemberId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
     }

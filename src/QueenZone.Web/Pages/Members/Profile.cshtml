@@ -37,6 +37,18 @@
         @if (Model.IsSignedIn && Model.CurrentMemberId != Model.Member.Id)
         {
           <p class="qz-messages-toolbar">
+            @if (Model.IsFollowingMember)
+            {
+              <form method="post" asp-page-handler="Unfollow" class="qz-messages-toolbar__action">
+                <button class="qz-button qz-button--outline" type="submit">Unfollow</button>
+              </form>
+            }
+            else
+            {
+              <form method="post" asp-page-handler="Follow" class="qz-messages-toolbar__action">
+                <button class="qz-button qz-button--outline" type="submit">Follow</button>
+              </form>
+            }
             @if (Model.HasBlockedMember)
             {
               <form method="post" asp-page-handler="Unblock" class="qz-messages-toolbar__action">
@@ -49,6 +61,12 @@
                 <button class="qz-button qz-button--ghost" type="submit">Block</button>
               </form>
             }
+          </p>
+        }
+        else if (!Model.IsSignedIn)
+        {
+          <p>
+            <a class="qz-button qz-button--outline" href="/account/login?returnUrl=@Uri.EscapeDataString($"/members/{Model.Member.Id}")">Sign in to follow</a>
           </p>
         }
       </div>

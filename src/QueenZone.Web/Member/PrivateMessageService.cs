@@ -1,10 +1,12 @@
 using QueenZone.Data;
+using QueenZone.Data.Entities;
 
 namespace QueenZone.Web;
 
 public sealed class PrivateMessageService(
     IPrivateMessageRepository privateMessageRepository,
     IMemberAccountRepository memberAccountRepository,
+    IMemberFollowRepository memberFollowRepository,
     TimeProvider timeProvider)
 {
     public const string UnableToSendMessage = "Unable to send message.";
@@ -79,6 +81,16 @@ public sealed class PrivateMessageService(
                 senderMemberId,
                 recipientMemberId,
                 cancellationToken))
+        {
+            return new PrivateMessageSendResult(false, null, UnableToSendMessage);
+        }
+
+        var hasConversation = await privateMessageRepository.HasConversationBetweenAsync(
+            senderMemberId,
+            recipientMemberId,
+            cancellationToken);
+        if (!hasConversation
+            && !await CanStartNewConversationAsync(senderMemberId, recipient, cancellationToken))
         {
             return new PrivateMessageSendResult(false, null, UnableToSendMessage);
         }
@@ -227,10 +239,45 @@ public sealed class PrivateMessageService(
         }
 
         var target = await memberAccountRepository.FindByIdAsync(targetMemberId!.Value, cancellationToken);
-        return target?.DeletionRequestedAt is null
-            && !await privateMessageRepository.IsMessagingBlockedAsync(
+        if (target?.DeletionRequestedAt is not null)
+        {
+            return false;
+        }
+
+        if (await privateMessageRepository.IsMessagingBlockedAsync(
                 currentMemberId!.Value,
                 targetMemberId.Value,
-                cancellationToken);
+                cancellationToken))
+        {
+            return false;
+        }
+
+        if (await privateMessageRepository.HasConversationBetweenAsync(
+                currentMemberId.Value,
+                targetMemberId.Value,
+                cancellationToken))
+        {
+            return true;
+        }
+
+        return target is not null
+            && await CanStartNewConversationAsync(currentMemberId.Value, target, cancellationToken);
+    }
+
+    private async Task<bool> CanStartNewConversationAsync(
+        Guid senderMemberId,
+        MemberAccount recipient,
+        CancellationToken cancellationToken)
+    {
+        return recipient.MessagePrivacy switch
+        {
+            MemberMessagePrivacy.Members => true,
+            MemberMessagePrivacy.Nobody => false,
+            MemberMessagePrivacy.Followed => await memberFollowRepository.IsFollowingAsync(
+                recipient.Id,
+                senderMemberId,
+                cancellationToken),
+            _ => false,
+        };
     }
 }

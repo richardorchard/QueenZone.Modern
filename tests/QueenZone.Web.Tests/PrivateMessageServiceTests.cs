@@ -474,12 +474,91 @@ public sealed class PrivateMessageServiceTests
         Assert.True(restored.Succeeded);
     }
 
+    [Fact]
+    public async Task NobodyPrivacy_BlocksNewConversation_ButAllowsExistingThread()
+    {
+        var (service, members, _, alice, bob) = CreateSystem();
+        var created = await service.ComposeAsync(alice.Id, bob.Id, "Hello");
+        Assert.True(created.Succeeded);
+
+        await members.UpdateMessagePrivacyAsync(bob.Id, MemberMessagePrivacy.Nobody);
+
+        var carol = await members.CreateAsync(new MemberAccount
+        {
+            Id = Guid.NewGuid(),
+            Email = "carol-privacy@example.com",
+            DisplayName = "Carol",
+            CreatedAt = DateTime.UtcNow,
+        });
+        var carolCompose = await service.ComposeAsync(carol.Id, bob.Id, "New contact");
+        Assert.False(carolCompose.Succeeded);
+        Assert.Equal(PrivateMessageService.UnableToSendMessage, carolCompose.ErrorMessage);
+        Assert.False(await service.CanMessageAsync(carol.Id, bob.Id));
+
+        var continueThread = await service.ComposeAsync(alice.Id, bob.Id, "Still here");
+        Assert.True(continueThread.Succeeded);
+        Assert.Equal(created.ConversationId, continueThread.ConversationId);
+        Assert.True(await service.CanMessageAsync(alice.Id, bob.Id));
+
+        var reply = await service.ReplyAsync(created.ConversationId!.Value, alice.Id, "Reply still works");
+        Assert.True(reply.Succeeded);
+    }
+
+    [Fact]
+    public async Task FollowedPrivacy_RequiresRecipientFollowsSender()
+    {
+        var (service, members, _, follows, alice, bob) = CreateSystemWithFollows();
+        await members.UpdateMessagePrivacyAsync(bob.Id, MemberMessagePrivacy.Followed);
+
+        var denied = await service.ComposeAsync(alice.Id, bob.Id, "Not followed yet");
+        Assert.False(denied.Succeeded);
+        Assert.Equal(PrivateMessageService.UnableToSendMessage, denied.ErrorMessage);
+        Assert.False(await service.CanMessageAsync(alice.Id, bob.Id));
+
+        await follows.FollowAsync(bob.Id, alice.Id, DateTimeOffset.UtcNow);
+        Assert.True(await service.CanMessageAsync(alice.Id, bob.Id));
+
+        var allowed = await service.ComposeAsync(alice.Id, bob.Id, "Now followed");
+        Assert.True(allowed.Succeeded);
+
+        await follows.UnfollowAsync(bob.Id, alice.Id);
+        var continueExisting = await service.ComposeAsync(alice.Id, bob.Id, "Existing thread continues");
+        Assert.True(continueExisting.Succeeded);
+        Assert.True(await service.CanMessageAsync(alice.Id, bob.Id));
+    }
+
+    [Fact]
+    public async Task Block_WinsOverFollowedPrivacy()
+    {
+        var (service, members, _, follows, alice, bob) = CreateSystemWithFollows();
+        await members.UpdateMessagePrivacyAsync(bob.Id, MemberMessagePrivacy.Followed);
+        await follows.FollowAsync(bob.Id, alice.Id, DateTimeOffset.UtcNow);
+        Assert.True((await service.BlockAsync(bob.Id, alice.Id)).Succeeded);
+
+        var result = await service.ComposeAsync(alice.Id, bob.Id, "Blocked");
+        Assert.False(result.Succeeded);
+        Assert.Equal(PrivateMessageService.UnableToSendMessage, result.ErrorMessage);
+        Assert.False(await service.CanMessageAsync(alice.Id, bob.Id));
+    }
+
     private static (
         PrivateMessageService Service,
         IMemberAccountRepository Members,
         IPrivateMessageRepository Messages,
         MemberAccount Alice,
         MemberAccount Bob) CreateSystem()
+    {
+        var created = CreateSystemWithFollows();
+        return (created.Service, created.Members, created.Messages, created.Alice, created.Bob);
+    }
+
+    private static (
+        PrivateMessageService Service,
+        IMemberAccountRepository Members,
+        IPrivateMessageRepository Messages,
+        IMemberFollowRepository Follows,
+        MemberAccount Alice,
+        MemberAccount Bob) CreateSystemWithFollows()
     {
         var members = new InMemoryMemberAccountRepository();
         var alice = members.CreateAsync(new MemberAccount
@@ -499,7 +578,8 @@ public sealed class PrivateMessageServiceTests
 
         var messages = new InMemoryPrivateMessageRepository(id =>
             members.FindByIdAsync(id).GetAwaiter().GetResult());
-        var service = new PrivateMessageService(messages, members, TimeProvider.System);
-        return (service, members, messages, alice, bob);
+        var follows = new InMemoryMemberFollowRepository();
+        var service = new PrivateMessageService(messages, members, follows, TimeProvider.System);
+        return (service, members, messages, follows, alice, bob);
     }
 }

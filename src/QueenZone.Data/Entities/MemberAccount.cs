@@ -24,6 +24,12 @@ public sealed class MemberAccount
 
     public int? LinkedLegacyUserId { get; set; }
 
+    /// <summary>
+    /// Who may start a new private conversation with this member.
+    /// Replies in existing conversations are not gated by this setting.
+    /// </summary>
+    public MemberMessagePrivacy MessagePrivacy { get; set; }
+
     public bool IsSuspended { get; set; }
 
     public DateTime? SuspendedAt { get; set; }

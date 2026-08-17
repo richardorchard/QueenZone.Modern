@@ -9,7 +9,8 @@ namespace QueenZone.Web.Pages.Members;
 public sealed class ProfileModel(
     IMemberAccountRepository memberAccountRepository,
     IMemberPublicActivityRepository activityRepository,
-    PrivateMessageService privateMessageService) : PageModel
+    PrivateMessageService privateMessageService,
+    MemberFollowService memberFollowService) : PageModel
 {
     public const int ActivityPageSize = 20;
 
@@ -27,6 +28,8 @@ public sealed class ProfileModel(
     public bool IsSignedIn { get; private set; }
 
     public bool HasBlockedMember { get; private set; }
+
+    public bool IsFollowingMember { get; private set; }
 
     public string? StatusMessage { get; private set; }
 
@@ -56,6 +59,10 @@ public sealed class ProfileModel(
         if (CurrentMemberId is Guid current && current != Member.Id)
         {
             HasBlockedMember = await privateMessageService.HasBlockedAsync(
+                current,
+                Member.Id,
+                cancellationToken);
+            IsFollowingMember = await memberFollowService.IsFollowingAsync(
                 current,
                 Member.Id,
                 cancellationToken);
@@ -130,6 +137,52 @@ public sealed class ProfileModel(
 
         await privateMessageService.UnblockAsync(currentMemberId.Value, memberId, cancellationToken);
         TempData[StatusMessageKey] = "Member unblocked.";
+        return RedirectToPage(new { memberId });
+    }
+
+    public async Task<IActionResult> OnPostFollowAsync(Guid memberId, CancellationToken cancellationToken)
+    {
+        var currentMemberId = await GetCurrentMemberIdAsync();
+        if (currentMemberId is null)
+        {
+            return Challenge();
+        }
+
+        var result = await memberFollowService.FollowAsync(
+            currentMemberId.Value,
+            memberId,
+            cancellationToken);
+        if (!result.Succeeded)
+        {
+            if (string.Equals(result.ErrorMessage, "Member was not found.", StringComparison.Ordinal))
+            {
+                return NotFound();
+            }
+
+            TempData[StatusMessageKey] = result.ErrorMessage ?? MemberFollowService.UnableToFollow;
+            return RedirectToPage(new { memberId });
+        }
+
+        TempData[StatusMessageKey] = "You are now following this member.";
+        return RedirectToPage(new { memberId });
+    }
+
+    public async Task<IActionResult> OnPostUnfollowAsync(Guid memberId, CancellationToken cancellationToken)
+    {
+        var currentMemberId = await GetCurrentMemberIdAsync();
+        if (currentMemberId is null)
+        {
+            return Challenge();
+        }
+
+        var member = await memberAccountRepository.FindByIdAsync(memberId, cancellationToken);
+        if (member is null)
+        {
+            return NotFound();
+        }
+
+        await memberFollowService.UnfollowAsync(currentMemberId.Value, memberId, cancellationToken);
+        TempData[StatusMessageKey] = "You unfollowed this member.";
         return RedirectToPage(new { memberId });
     }
 
