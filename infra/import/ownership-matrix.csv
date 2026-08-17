@@ -23,6 +23,8 @@ cloudflare-dns,www CNAME proxied,record fdd05b163df7c2941ae1e36986558228 → que
 cloudflare-dns,cdn CNAME proxied,record c8989e49d2d624756ddf35a05e3ac153 → queenzone.blob.core.windows.net,import,yes,no Worker; Azure custom domain
 cloudflare-dns,cdn2 CNAME proxied,record 1af26073508a0494bc5d66f5b23df57f → queenzone.blob.core.windows.net,import,yes,Worker route attached
 cloudflare-worker,pictures-queenzone-org,script + route 0fd4ebdc9c3e4825a1d9e6527fbd4d24 (cdn2.queenzone.org/*),import,yes,script name only; public host is cdn2.queenzone.org
+cloudflare-dns,pictures CNAME proxied,record 4bc9968da3b9ec19d792fef11ef4d77a to cdn.queenzone.org,import,yes,retired media hostname compatibility
+cloudflare-worker,pictures-legacy-redirect,script + route 276e102a9ef8402c9b610c7bc60bbedb (pictures.queenzone.org/*),import,yes,robots 200; other paths redirect to cdn
 cloudflare-ssl,mode strict,zone setting,import,no,Universal SSL; min_tls 1.0 defer
 cloudflare-rules,page/custom WAF/transform,none,outside,n/a,managed Free defaults only
 github,workflows ci/deploy,repo .github/workflows,outside,n/a,app delivery stays GH Actions

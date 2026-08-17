@@ -101,6 +101,18 @@
       "neverRecreate": true
     },
     {
+      "id": "4bc9968da3b9ec19d792fef11ef4d77a",
+      "type": "CNAME",
+      "name": "pictures.queenzone.org",
+      "content": "cdn.queenzone.org",
+      "proxied": true,
+      "ttl": 1,
+      "worker": true,
+      "role": "Retired media hostname compatibility",
+      "opentofuTreatment": "import",
+      "neverRecreate": true
+    },
+    {
       "id": "9b996207c2701bd567962763ed653142",
       "type": "CNAME",
       "name": "asverify.cdn.queenzone.org",
@@ -168,7 +180,20 @@
       ],
       "opentofuTreatment": "import",
       "neverRecreate": true,
-      "notes": "Script name only. Public DNS hostname is cdn2.queenzone.org; pictures.queenzone.org has no record. Published 2026-08-16 for #177."
+      "notes": "Script name only. Public DNS hostname is cdn2.queenzone.org. Published 2026-08-16 for #177."
+    },
+    {
+      "scriptName": "pictures-legacy-redirect",
+      "createdOn": "2026-08-16T03:46:06.253408Z",
+      "modifiedOn": "2026-08-16T03:46:06.253408Z",
+      "sourcePath": "infra/import/workers/pictures-legacy-redirect.js",
+      "behaviour": [
+        "GET/HEAD only",
+        "Returns robots.txt with Disallow: /",
+        "Redirects other paths permanently to cdn.queenzone.org"
+      ],
+      "opentofuTreatment": "import",
+      "neverRecreate": true
     }
   ],
   "workerRoutes": [
@@ -176,6 +201,13 @@
       "id": "0fd4ebdc9c3e4825a1d9e6527fbd4d24",
       "pattern": "cdn2.queenzone.org/*",
       "script": "pictures-queenzone-org",
+      "opentofuTreatment": "import",
+      "neverRecreate": true
+    },
+    {
+      "id": "276e102a9ef8402c9b610c7bc60bbedb",
+      "pattern": "pictures.queenzone.org/*",
+      "script": "pictures-legacy-redirect",
       "opentofuTreatment": "import",
       "neverRecreate": true
     }

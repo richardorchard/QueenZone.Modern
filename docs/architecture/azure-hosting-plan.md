@@ -218,7 +218,7 @@ Legacy attachments CDN:
                 https://cdn2.queenzone.org/{container}/{blob}
                 Cloudflare Worker proxy (script name pictures-queenzone-org)
                 No Azure custom domain on cdn2 — Worker fetches the blob origin host
-                pictures.queenzone.org is not a DNS name
+                Retired pictures.queenzone.org is compatibility-only (redirects to cdn)
 ```
 
 ### `cdn.queenzone.org` (photos / images)
@@ -237,7 +237,7 @@ TTL: Auto
 
 ### `cdn2.queenzone.org` (legacy attachment redirect target)
 
-DNS hostname is **`cdn2.queenzone.org`**. The Cloudflare Worker **script** is still named **`pictures-queenzone-org`** from when the public host was `pictures.queenzone.org`. That hostname is gone; there is no `pictures` DNS record. The only Worker route is **`cdn2.queenzone.org/*`**. Source snapshot: [`infra/import/workers/pictures-queenzone-org.js`](../../infra/import/workers/pictures-queenzone-org.js).
+DNS hostname is **`cdn2.queenzone.org`**. The Cloudflare Worker **script** is still named **`pictures-queenzone-org`**. Do not treat that script name as a hostname. The cdn2 route is **`cdn2.queenzone.org/*`**. Retired `pictures.queenzone.org` is a separate compatibility Worker (`pictures-legacy-redirect` → `cdn`). Source snapshot: [`infra/import/workers/pictures-queenzone-org.js`](../../infra/import/workers/pictures-queenzone-org.js).
 
 Live Worker behaviour (published 2026-08-16):
 

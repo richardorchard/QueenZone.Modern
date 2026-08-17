@@ -329,7 +329,7 @@ Two Cloudflare hostnames serve Azure Blob Storage content. They are **not interc
 
 Fan-performance audio is **not** a public CDN object. Signed-in members stream through `/fan-performances/{id}/audio`, which reads the private `songfiles` container and sets `Content-Disposition`. Do not emit `cdn2.queenzone.org/songfiles/…` or raw blob URLs in HTML.
 
-`pictures-queenzone-org` is the Worker **script name**, not a DNS hostname. The public host is `cdn2.queenzone.org`. `pictures.queenzone.org` does not exist. Legacy forum attachments use `cdn2` after a member-auth gate (`/forum/attachment/legacy/{postId}`). New forum uploads live in private `ugc-forum` and download via `/forum/attachment/{postId}/{attachmentId}` (member-only, app-streamed).
+`pictures-queenzone-org` is the Worker **script name**, not a DNS hostname. The public host is `cdn2.queenzone.org`. Retired `pictures.queenzone.org` is a compatibility hostname only (Worker `pictures-legacy-redirect` → `cdn`); do not use it for new media URLs. Legacy forum attachments use `cdn2` after a member-auth gate (`/forum/attachment/legacy/{postId}`). New forum uploads live in private `ugc-forum` and download via `/forum/attachment/{postId}/{attachmentId}` (member-only, app-streamed).
 
 ## Migration Principles
 
