@@ -103,7 +103,8 @@ public sealed class SearchReindexBuilderTests
         await builder.ReindexForumAsync();
 
         var document = Assert.Single(
-            store.GetAll().Where(d => d.SourceKey == SearchReindexBuilder.ForumThreadSourceKey(created.TopicId)));
+            store.GetAll(),
+            d => d.SourceKey == SearchReindexBuilder.ForumThreadSourceKey(created.TopicId));
         Assert.Equal("Incremental search safety-net thread", document.Title);
         Assert.Equal(createdAt, document.PublishedAt);
     }

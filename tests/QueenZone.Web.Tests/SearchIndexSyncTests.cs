@@ -103,7 +103,7 @@ public sealed class SearchIndexSyncTests : IClassFixture<WebApplicationFactory<P
         var topicPath = await PostNewThreadAsync(client, title);
 
         var store = factory.Services.GetRequiredService<SharedSearchIndexStore>();
-        var document = Assert.Single(store.GetAll().Where(item => item.Title == title));
+        var document = Assert.Single(store.GetAll(), item => item.Title == title);
         document.PublishedAt = DateTimeOffset.UtcNow.AddDays(-2);
         var stalePublishedAt = document.PublishedAt;
 
@@ -116,7 +116,7 @@ public sealed class SearchIndexSyncTests : IClassFixture<WebApplicationFactory<P
         }));
         Assert.Equal(HttpStatusCode.Redirect, replyResponse.StatusCode);
 
-        var updated = Assert.Single(store.GetAll().Where(item => item.Title == title));
+        var updated = Assert.Single(store.GetAll(), item => item.Title == title);
         Assert.True(updated.PublishedAt > stalePublishedAt);
     }
 
