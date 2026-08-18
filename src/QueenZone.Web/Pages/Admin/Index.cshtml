@@ -87,6 +87,10 @@
         <span class="admin-dashboard__nav-link-title">Members</span>
         <span class="admin-dashboard__nav-link-desc">Search members and suspend accounts that spam the board</span>
       </a>
+      <a class="admin-dashboard__nav-link" href="/admin/help">
+        <span class="admin-dashboard__nav-link-title">Help requests</span>
+        <span class="admin-dashboard__nav-link-desc">Read visitor and member messages to the site admin</span>
+      </a>
     </nav>
   </section>
 
@@ -215,6 +219,17 @@
       <p class="admin-dashboard__empty">No logins recorded yet — login timestamps are tracked from this release onwards.</p>
     </section>
   }
+
+  <section class="admin-dashboard__section">
+    <h2 class="admin-dashboard__section-title">Support</h2>
+    <div class="admin-dashboard__queue-tiles">
+      <a class="admin-dashboard__queue-tile" href="/admin/help">
+        <span class="admin-dashboard__queue-tile-label">Help requests</span>
+        <span class="admin-dashboard__queue-tile-count">@Model.OpenHelpRequestCount</span>
+        <span class="admin-dashboard__queue-tile-sub">open or in progress</span>
+      </a>
+    </div>
+  </section>
 
   <section class="admin-dashboard__section">
     <h2 class="admin-dashboard__section-title">Submission queue</h2>

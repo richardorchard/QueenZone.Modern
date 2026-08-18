@@ -1,11 +1,17 @@
 using System.Net;
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using QueenZone.Data;
+using QueenZone.Data.Entities;
+using QueenZone.Web;
 
 namespace QueenZone.Web.Tests;
 
 /// <summary>
-/// Verifies admin publish/unpublish write paths immediately keep the unified search index in
+/// Verifies publish/create write paths immediately keep the unified search index in
 /// sync, rather than relying solely on the next scheduled batch reindex.
 /// </summary>
 [Collection(AdminNewsDeleteErrorCollection.Name)]
@@ -73,5 +79,122 @@ public sealed class SearchIndexSyncTests : IClassFixture<WebApplicationFactory<P
 
         var afterUnpublish = await client.GetStringAsync("/search?q=search+sync+unpublish");
         Assert.DoesNotContain("Search sync unpublish title", afterUnpublish);
+    }
+
+    [Fact]
+    public async Task CreatingForumThread_MakesItImmediatelySearchable()
+    {
+        var client = CreateMemberClient(factory, Guid.NewGuid());
+        const string title = "Search sync forum create title";
+        var topicPath = await PostNewThreadAsync(client, title);
+
+        Assert.StartsWith("/forum/topic/", topicPath, StringComparison.Ordinal);
+
+        var afterCreate = await client.GetStringAsync("/search?q=search+sync+forum+create");
+        Assert.Contains(title, afterCreate);
+        Assert.Contains(topicPath, afterCreate);
+    }
+
+    [Fact]
+    public async Task ReplyingToForumThread_UpdatesSearchLastActivity()
+    {
+        var client = CreateMemberClient(factory, Guid.NewGuid());
+        const string title = "Search sync forum reply activity title";
+        var topicPath = await PostNewThreadAsync(client, title);
+
+        var store = factory.Services.GetRequiredService<SharedSearchIndexStore>();
+        var document = Assert.Single(store.GetAll(), item => item.Title == title);
+        document.PublishedAt = DateTimeOffset.UtcNow.AddDays(-2);
+        var stalePublishedAt = document.PublishedAt;
+
+        var page = await client.GetStringAsync(topicPath);
+        var token = ExtractAntiforgeryToken(page);
+        var replyResponse = await client.PostAsync(topicPath, new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = token,
+            ["Body"] = "<p>Reply should bump search last activity.</p>",
+        }));
+        Assert.Equal(HttpStatusCode.Redirect, replyResponse.StatusCode);
+
+        var updated = Assert.Single(store.GetAll(), item => item.Title == title);
+        Assert.True(updated.PublishedAt > stalePublishedAt);
+    }
+
+    [Fact]
+    public async Task CreatingForumThread_StillSucceeds_WhenSearchIndexFails()
+    {
+        var failingFactory = factory.WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<ISearchIndexService>();
+                services.AddSingleton<ISearchIndexService>(new ThrowingSearchIndexService());
+            });
+        });
+        var client = CreateMemberClient(failingFactory, Guid.NewGuid());
+
+        var topicPath = await PostNewThreadAsync(client, "Search sync forum failure title");
+
+        Assert.StartsWith("/forum/topic/", topicPath, StringComparison.Ordinal);
+    }
+
+    private static async Task<string> PostNewThreadAsync(HttpClient client, string title)
+    {
+        var form = await client.GetStringAsync("/forum/c/the-music/new-thread");
+        var token = ExtractAntiforgeryToken(form);
+        var response = await client.PostAsync("/forum/c/the-music/new-thread", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = token,
+            ["Subject"] = title,
+            ["Body"] = "<p>Created to exercise forum search index sync.</p>",
+        }));
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        return response.Headers.Location!.OriginalString;
+    }
+
+    private static HttpClient CreateMemberClient(WebApplicationFactory<Program> sourceFactory, Guid memberId)
+    {
+        var client = sourceFactory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            HandleCookies = true,
+            AllowAutoRedirect = false,
+        });
+        client.DefaultRequestHeaders.Add(TestMemberAuthHandler.MemberIdHeader, memberId.ToString());
+        client.DefaultRequestHeaders.Add(TestMemberAuthHandler.DisplayNameHeader, "Forum Fan");
+        return client;
+    }
+
+    private static string ExtractAntiforgeryToken(string html)
+    {
+        var input = Regex.Match(
+            html,
+            """<input[^>]*name="__RequestVerificationToken"[^>]*>""",
+            RegexOptions.IgnoreCase);
+        Assert.True(input.Success, "Antiforgery token input was not found in the form.");
+
+        var value = Regex.Match(input.Value, "value=\"(?<token>[^\"]+)\"", RegexOptions.IgnoreCase);
+        Assert.True(value.Success, "Antiforgery token value was not found in the form.");
+        return value.Groups["token"].Value;
+    }
+
+    private sealed class ThrowingSearchIndexService : ISearchIndexService
+    {
+        public Task UpsertAsync(SearchDocumentEntity document, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("Simulated index failure.");
+
+        public Task RemoveAsync(string sourceKey, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("Simulated index failure.");
+
+        public Task ReplaceContentTypeAsync(
+            string contentType,
+            IReadOnlyList<SearchDocumentEntity> documents,
+            CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("Simulated index failure.");
+
+        public Task<IReadOnlyDictionary<string, int>> GetContentTypeCountsAsync(
+            CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("Simulated index failure.");
     }
 }

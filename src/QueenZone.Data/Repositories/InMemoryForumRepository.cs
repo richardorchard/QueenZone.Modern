@@ -91,14 +91,14 @@ public sealed class InMemoryForumRepository(
             await GetTotalThreadCountAsync(cancellationToken));
 
     public Task<int> GetTopicSitemapCountAsync(CancellationToken cancellationToken = default) =>
-        Task.FromResult(SampleForumData.CreateSeedTopicSitemapItems().Count);
+        Task.FromResult(GetTopicSitemapItems().Count);
 
     public Task<IReadOnlyList<ForumTopicSitemapItem>> GetTopicSitemapPageAsync(
         int offset,
         int pageSize,
         CancellationToken cancellationToken = default)
     {
-        var page = SampleForumData.CreateSeedTopicSitemapItems()
+        var page = GetTopicSitemapItems()
             .Skip(Math.Max(offset, 0))
             .Take(pageSize)
             .ToList();
@@ -134,6 +134,21 @@ public sealed class InMemoryForumRepository(
         var skip = Math.Max(page - 1, 0) * pageSize;
         var pageItems = allResults.Skip(skip).Take(pageSize).ToList();
         return Task.FromResult(new ForumSearchPage(pageItems, allResults.Count, page, pageSize));
+    }
+
+    private IReadOnlyList<ForumTopicSitemapItem> GetTopicSitemapItems()
+    {
+        var created = (writeRepository?.GetCreatedThreads() ?? [])
+            .Where(thread => !string.IsNullOrWhiteSpace(thread.Subject))
+            .Select(thread => new ForumTopicSitemapItem(
+                thread.TopicId,
+                thread.Subject,
+                thread.LastPostAt.UtcDateTime));
+
+        return SampleForumData.CreateSeedTopicSitemapItems()
+            .Concat(created)
+            .OrderBy(item => item.TopicId)
+            .ToList();
     }
 
     private IReadOnlyList<ForumTopicItem> GetCreatedTopics(int forumId) =>
