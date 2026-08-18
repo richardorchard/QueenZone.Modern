@@ -11,20 +11,24 @@ public static class SubmissionStatusPresentation
             PhotoSubmissionStatus.Pending
                 or NewsSuggestionStatus.Pending
                 or ArticleSubmissionStatus.Draft
-                or ArticleSubmissionStatus.Submitted => "pending",
+                or ArticleSubmissionStatus.Submitted
+                or HelpRequestStatus.Open => "pending",
             PhotoSubmissionStatus.UnderReview
                 or NewsSuggestionStatus.UnderReview
                 or ArticleSubmissionStatus.UnderReview
-                or ArticleSubmissionStatus.ApprovedForPublishing => "review",
+                or ArticleSubmissionStatus.ApprovedForPublishing
+                or HelpRequestStatus.InProgress => "review",
             PhotoSubmissionStatus.NeedsInfo
                 or ArticleSubmissionStatus.RequiresRevision => "attention",
             PhotoSubmissionStatus.Approved
                 or NewsSuggestionStatus.Promoted
-                or ArticleSubmissionStatus.Published => "success",
+                or ArticleSubmissionStatus.Published
+                or HelpRequestStatus.Resolved => "success",
             PhotoSubmissionStatus.Rejected
                 or NewsSuggestionStatus.Rejected
                 or NewsSuggestionStatus.Duplicate
-                or ArticleSubmissionStatus.Rejected => "danger",
+                or ArticleSubmissionStatus.Rejected
+                or HelpRequestStatus.Spam => "danger",
             _ => "neutral",
         };
 
@@ -34,6 +38,7 @@ public static class SubmissionStatusPresentation
             PhotoSubmissionStatus.UnderReview
                 or NewsSuggestionStatus.UnderReview
                 or ArticleSubmissionStatus.UnderReview => "Under review",
+            HelpRequestStatus.InProgress => "In progress",
             PhotoSubmissionStatus.NeedsInfo => "Needs info",
             ArticleSubmissionStatus.RequiresRevision => "Requires revision",
             ArticleSubmissionStatus.ApprovedForPublishing => "Approved for publishing",

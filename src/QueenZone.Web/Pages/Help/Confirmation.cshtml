@@ -1,0 +1,17 @@
+@page "/contact/confirmation"
+@model QueenZone.Web.Pages.Help.ConfirmationModel
+
+<partial name="_PageHero" model='@(("Contact", "Thank you", "Your message has been sent to the site admin.", ""))' />
+
+<section class="qz-section">
+  <div class="qz-container qz-prose">
+    <p class="qz-account-notice qz-account-notice--success" role="status">
+      Thanks — we have your message. The site admin will read it and reply by email if a response is needed.
+    </p>
+    <p>
+      <a href="/contact">Send another message</a>
+      ·
+      <a href="/">Back to the home page</a>
+    </p>
+  </div>
+</section>

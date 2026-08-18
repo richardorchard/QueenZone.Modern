@@ -38,6 +38,8 @@ public sealed class PublicOutputCachePoliciesTests
     [InlineData("/api/uploads/editor-image")]
     [InlineData("/ugc/forum/x.webp")]
     [InlineData("/submit/news")]
+    [InlineData("/help")]
+    [InlineData("/contact")]
     [InlineData("/error")]
     public void IsPublicReadOnlyRequest_excludes_non_html_surfaces(string path)
     {

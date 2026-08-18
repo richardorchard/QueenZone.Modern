@@ -16,6 +16,10 @@ public sealed class SubmissionStatusPresentationTests
     [InlineData(ArticleSubmissionStatus.Draft, "pending", "Draft")]
     [InlineData(ArticleSubmissionStatus.RequiresRevision, "attention", "Requires revision")]
     [InlineData(ArticleSubmissionStatus.Published, "success", "Published")]
+    [InlineData(HelpRequestStatus.Open, "pending", "Open")]
+    [InlineData(HelpRequestStatus.InProgress, "review", "In progress")]
+    [InlineData(HelpRequestStatus.Resolved, "success", "Resolved")]
+    [InlineData(HelpRequestStatus.Spam, "danger", "Spam")]
     public void GetModifierAndLabel_MapKnownStatuses(string status, string modifier, string label)
     {
         Assert.Equal(modifier, SubmissionStatusPresentation.GetModifier(status));
