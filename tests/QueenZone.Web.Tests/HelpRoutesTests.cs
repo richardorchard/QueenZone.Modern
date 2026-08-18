@@ -30,29 +30,42 @@ public sealed class HelpRoutesTests : IClassFixture<WebApplicationFactory<Progra
     }
 
     [Fact]
-    public async Task Get_Help_IsPublicAndAsksForContactDetails()
+    public async Task Get_Contact_IsPublicAndAsksForContactDetails()
     {
         var client = factory.CreateClient();
 
-        var body = await client.GetStringAsync("/help");
+        var body = await client.GetStringAsync("/contact");
 
-        Assert.Contains("Contact the site admin", body);
+        Assert.Contains("Contact us", body);
         Assert.Contains("Your name", body);
         Assert.Contains("Email address", body);
-        Assert.Contains("How can we help?", body);
+        Assert.Contains("Your message", body);
+        Assert.Contains(">Contact<", body);
     }
 
     [Fact]
-    public async Task FooterAndPrivacy_LinkToHelp()
+    public async Task Get_LegacyHelpPath_RedirectsToContact()
+    {
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        var response = await client.GetAsync("/help");
+
+        Assert.Equal(HttpStatusCode.MovedPermanently, response.StatusCode);
+        Assert.Equal("/contact", response.Headers.Location!.OriginalString);
+    }
+
+    [Fact]
+    public async Task FooterAndPrivacy_LinkToContact()
     {
         var client = factory.CreateClient();
 
         var home = await client.GetStringAsync("/");
-        Assert.Contains("href=\"/help\"", home);
+        Assert.Contains("href=\"/contact\"", home);
+        Assert.Contains(">Contact<", home);
 
         var privacy = await client.GetStringAsync("/privacy");
-        Assert.Contains("If you send a help request", privacy);
-        Assert.Contains("href=\"/help\"", privacy);
+        Assert.Contains("If you send a message from the", privacy);
+        Assert.Contains("href=\"/contact\"", privacy);
     }
 
     [Fact]
@@ -64,19 +77,19 @@ public sealed class HelpRoutesTests : IClassFixture<WebApplicationFactory<Progra
             HandleCookies = true,
         });
 
-        var formPage = await client.GetStringAsync("/help");
+        var formPage = await client.GetStringAsync("/contact");
         using var content = new FormUrlEncodedContent(ValidGuestFields(formPage));
 
-        var response = await client.PostAsync("/help", content);
+        var response = await client.PostAsync("/contact", content);
         var responseBody = await response.Content.ReadAsStringAsync();
 
         Assert.True(
             response.StatusCode == HttpStatusCode.Redirect,
             $"Expected redirect, got {response.StatusCode}. Body: {responseBody[..Math.Min(responseBody.Length, 800)]}");
-        Assert.Equal("/help/confirmation", response.Headers.Location!.OriginalString);
+        Assert.Equal("/contact/confirmation", response.Headers.Location!.OriginalString);
 
-        var confirmation = await client.GetStringAsync("/help/confirmation");
-        Assert.Contains("we have your help request", confirmation, StringComparison.OrdinalIgnoreCase);
+        var confirmation = await client.GetStringAsync("/contact/confirmation");
+        Assert.Contains("we have your message", confirmation, StringComparison.OrdinalIgnoreCase);
 
         var repository = factory.Services.GetRequiredService<IHelpRequestRepository>();
         var list = await repository.ListAsync(HelpRequestStatus.Open, 1, 20);
@@ -90,12 +103,12 @@ public sealed class HelpRoutesTests : IClassFixture<WebApplicationFactory<Progra
     public async Task Post_AnonymousMissingNameAndEmail_ShowsValidationErrors()
     {
         var client = factory.CreateClient();
-        var formPage = await client.GetStringAsync("/help");
+        var formPage = await client.GetStringAsync("/contact");
         var fields = ValidGuestFields(formPage);
         fields["Name"] = "";
         fields["Email"] = "";
 
-        var response = await client.PostAsync("/help", new FormUrlEncodedContent(fields));
+        var response = await client.PostAsync("/contact", new FormUrlEncodedContent(fields));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -110,14 +123,14 @@ public sealed class HelpRoutesTests : IClassFixture<WebApplicationFactory<Progra
     public async Task Post_Honeypot_RedirectsWithoutStoring()
     {
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-        var formPage = await client.GetStringAsync("/help");
+        var formPage = await client.GetStringAsync("/contact");
         var fields = ValidGuestFields(formPage, "Honeypot spam subject");
         fields["Website"] = "https://spam.example";
 
-        var response = await client.PostAsync("/help", new FormUrlEncodedContent(fields));
+        var response = await client.PostAsync("/contact", new FormUrlEncodedContent(fields));
 
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
-        Assert.Equal("/help/confirmation", response.Headers.Location!.OriginalString);
+        Assert.Equal("/contact/confirmation", response.Headers.Location!.OriginalString);
         var list = await factory.Services.GetRequiredService<IHelpRequestRepository>()
             .ListAsync("all", 1, 50);
         Assert.DoesNotContain(list.Items, item => item.Subject == "Honeypot spam subject");
@@ -138,7 +151,7 @@ public sealed class HelpRoutesTests : IClassFixture<WebApplicationFactory<Progra
             ["Email"] = "alex-help@example.com",
         };
 
-        var response = await client.PostAsync("/help", new FormUrlEncodedContent(fields));
+        var response = await client.PostAsync("/contact", new FormUrlEncodedContent(fields));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -151,7 +164,7 @@ public sealed class HelpRoutesTests : IClassFixture<WebApplicationFactory<Progra
             "Help Member",
             "google-help-member");
 
-        var formPage = await client.GetStringAsync("/help");
+        var formPage = await client.GetStringAsync("/contact");
         Assert.DoesNotContain("Your name", formPage);
         Assert.DoesNotContain("Email address", formPage);
         Assert.Contains("Signed in as", formPage);
@@ -165,7 +178,7 @@ public sealed class HelpRoutesTests : IClassFixture<WebApplicationFactory<Progra
             ["Message"] = "I changed my display name by mistake and would like the previous one back.",
         };
 
-        var response = await client.PostAsync("/help", new FormUrlEncodedContent(fields));
+        var response = await client.PostAsync("/contact", new FormUrlEncodedContent(fields));
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
 
         var members = factory.Services.GetRequiredService<IMemberAccountRepository>();

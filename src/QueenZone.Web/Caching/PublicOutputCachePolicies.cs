@@ -35,6 +35,7 @@ public static class PublicOutputCachePolicies
         "/error",
         "/submit",
         "/help",
+        "/contact",
         "/forum/attachment",
     ];
 

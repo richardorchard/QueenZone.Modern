@@ -23,7 +23,7 @@ public class SitemapPublicRouteSweepTests : RealDataPageTest
     private static readonly string[] StaticExtraRoutes =
     [
         "/about",
-        "/help",
+        "/contact",
         "/privacy",
         "/terms",
         "/data-deletion",

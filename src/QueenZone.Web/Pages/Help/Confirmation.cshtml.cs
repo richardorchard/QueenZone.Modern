@@ -6,7 +6,7 @@ public sealed class ConfirmationModel : PageModel
 {
     public void OnGet()
     {
-        ViewData["Title"] = "Help request sent — Queenzone";
-        ViewData["CanonicalPath"] = "/help/confirmation";
+        ViewData["Title"] = "Message sent — Queenzone";
+        ViewData["CanonicalPath"] = "/contact/confirmation";
     }
 }

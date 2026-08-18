@@ -23,7 +23,7 @@ public sealed class IndexModel(HelpRequestService helpRequestService) : PageMode
     [BindProperty]
     [Required(ErrorMessage = "Message is required.")]
     [StringLength(HelpRequestService.MaxMessageLength, MinimumLength = HelpRequestService.MinMessageLength)]
-    [Display(Name = "How can we help?")]
+    [Display(Name = "Your message")]
     public string Message { get; set; } = string.Empty;
 
     [BindProperty]
@@ -61,17 +61,17 @@ public sealed class IndexModel(HelpRequestService helpRequestService) : PageMode
     {
         await PopulateSignedInStateAsync();
         FormStamp = helpRequestService.IssueFormStamp();
-        ViewData["Title"] = "Help — Queenzone";
+        ViewData["Title"] = "Contact — Queenzone";
         ViewData["Description"] = "Contact the Queenzone site admin if you have a problem with your account or the archive.";
-        ViewData["CanonicalPath"] = "/help";
+        ViewData["CanonicalPath"] = "/contact";
     }
 
     public async Task<IActionResult> OnPostAsync(CancellationToken cancellationToken)
     {
         var memberId = await PopulateSignedInStateAsync();
-        ViewData["Title"] = "Help — Queenzone";
+        ViewData["Title"] = "Contact — Queenzone";
         ViewData["Description"] = "Contact the Queenzone site admin if you have a problem with your account or the archive.";
-        ViewData["CanonicalPath"] = "/help";
+        ViewData["CanonicalPath"] = "/contact";
 
         if (!IsSignedIn)
         {
@@ -106,10 +106,10 @@ public sealed class IndexModel(HelpRequestService helpRequestService) : PageMode
 
         if (result.SilentlyDropped || result.Succeeded)
         {
-            return Redirect("/help/confirmation");
+            return Redirect("/contact/confirmation");
         }
 
-        ModelState.AddModelError(string.Empty, result.Error ?? "Could not send your help request.");
+        ModelState.AddModelError(string.Empty, result.Error ?? "Could not send your message.");
         FormStamp = helpRequestService.IssueFormStamp();
         return Page();
     }

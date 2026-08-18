@@ -46,7 +46,7 @@ public sealed class HelpRequestService(
             return new SubmitResult(
                 false,
                 null,
-                "Too many help requests from this network. Please try again later.",
+                "Too many messages from this network. Please try again later.",
                 false);
         }
 
@@ -88,7 +88,7 @@ public sealed class HelpRequestService(
             var account = await memberAccountRepository.FindByIdAsync(signedInId, cancellationToken);
             if (account is null)
             {
-                return new SubmitResult(false, null, "Sign in again and retry your help request.", false);
+                return new SubmitResult(false, null, "Sign in again and retry your message.", false);
             }
 
             snapshotName = account.DisplayName.Trim();
@@ -132,7 +132,7 @@ public sealed class HelpRequestService(
                 return new SubmitResult(
                     false,
                     null,
-                    $"You can send up to {maxPerMember} help requests per day. Please try again tomorrow.",
+                    $"You can send up to {maxPerMember} messages per day. Please try again tomorrow.",
                     false);
             }
         }
@@ -148,7 +148,7 @@ public sealed class HelpRequestService(
                 return new SubmitResult(
                     false,
                     null,
-                    $"You can send up to {maxPerEmail} help requests per day from this email address. Please try again tomorrow.",
+                    $"You can send up to {maxPerEmail} messages per day from this email address. Please try again tomorrow.",
                     false);
             }
         }

@@ -1,7 +1,7 @@
-@page "/help"
+@page "/contact"
 @model QueenZone.Web.Pages.Help.IndexModel
 
-<partial name="_PageHero" model='@(("Help", "Contact the site admin", "Having trouble with your account or the archive? Send a private message to the Queenzone admin.", ""))' />
+<partial name="_PageHero" model='@(("Contact", "Contact us", "Having trouble with your account or the archive? Send a private message to the Queenzone admin.", ""))' />
 
 <section class="qz-section">
   <div class="qz-container qz-prose">
@@ -65,13 +65,13 @@
       }
 
       <label class="qz-account-form__field">
-        <span>How can we help?</span>
+        <span>Your message</span>
         <textarea asp-for="Message" rows="8" maxlength="4000"></textarea>
         <span asp-validation-for="Message" class="qz-account-form__field-error"></span>
         <span class="qz-account-form__help">Plain text is fine — include account names, page addresses, or error messages if they help.</span>
       </label>
 
-      <button type="submit" class="qz-button">Send help request</button>
+      <button type="submit" class="qz-button">Send message</button>
     </form>
   </div>
 </section>
