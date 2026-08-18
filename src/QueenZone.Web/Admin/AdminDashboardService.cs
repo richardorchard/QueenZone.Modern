@@ -36,6 +36,9 @@ public sealed class AdminDashboardService(IServiceScopeFactory scopeFactory)
         var articleCountsTask = RunAsync(
             sp => sp.GetRequiredService<IArticleSubmissionRepository>()
                 .GetDashboardCountsAsync(utcNowOffset, cancellationToken));
+        var openHelpRequestsTask = RunAsync(
+            sp => sp.GetRequiredService<IHelpRequestRepository>()
+                .CountOpenAsync(cancellationToken));
 
         var photoContributorsTask = RunAsync(
             sp => sp.GetRequiredService<IPhotoSubmissionRepository>()
@@ -58,6 +61,7 @@ public sealed class AdminDashboardService(IServiceScopeFactory scopeFactory)
             photoCountsTask,
             newsCountsTask,
             articleCountsTask,
+            openHelpRequestsTask,
             photoContributorsTask,
             newsContributorsTask,
             articleContributorsTask,
@@ -78,6 +82,7 @@ public sealed class AdminDashboardService(IServiceScopeFactory scopeFactory)
             await recentLoginsTask.ConfigureAwait(false),
             await dailyRegistrationsTask.ConfigureAwait(false),
             submissionQueue,
+            await openHelpRequestsTask.ConfigureAwait(false),
             await trafficTask.ConfigureAwait(false));
     }
 
@@ -111,4 +116,5 @@ public sealed record AdminDashboardSnapshot(
     IReadOnlyList<RecentLogin> RecentLogins,
     IReadOnlyList<DailyRegistration> DailyRegistrations,
     SubmissionQueueStats SubmissionQueue,
+    int OpenHelpRequestCount,
     GoogleAnalyticsTrafficSnapshot Traffic);

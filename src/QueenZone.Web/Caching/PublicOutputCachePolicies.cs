@@ -34,6 +34,7 @@ public static class PublicOutputCachePolicies
         "/ugc",
         "/error",
         "/submit",
+        "/help",
         "/forum/attachment",
     ];
 
