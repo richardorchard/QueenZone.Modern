@@ -113,6 +113,27 @@ public sealed class PhotoSubmissionPromotionServiceTests
         Assert.Equal(galleryPhotoBlobService.Uploaded, galleryPhotoBlobService.Deleted);
     }
 
+    [Fact]
+    public async Task PromoteAsync_StillThrowsOriginalError_WhenCompensatingDeleteAlsoFails()
+    {
+        var submissionRepository = new FailingOnPromoteSubmissionRepository();
+        var store = new SharedPhotoStore(SamplePhotoData.CreateSeedCategories());
+        var adminPhotoRepository = new InMemoryAdminPhotoRepository(store);
+        var blobUploadService = new FakeBlobUploadService();
+        var galleryPhotoBlobService = new RecordingGalleryPhotoBlobService { FailDeletes = true };
+        var service = CreateService(
+            submissionRepository, adminPhotoRepository, blobUploadService, galleryPhotoBlobService);
+
+        var submission = await CreateApprovableSubmissionAsync(submissionRepository, blobUploadService, "Queen");
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.PromoteAsync(submission, "Queen", "admin@test.local", "Looks great"));
+
+        Assert.Equal("Simulated DB write failure after blob upload.", ex.Message);
+        Assert.Equal(2, galleryPhotoBlobService.Uploaded.Count);
+        Assert.Equal(2, galleryPhotoBlobService.FailedDeleteAttempts);
+    }
+
     private static PhotoSubmissionPromotionService CreateService(
         IPhotoSubmissionRepository submissionRepository,
         IAdminPhotoRepository adminPhotoRepository,
@@ -203,6 +224,10 @@ public sealed class PhotoSubmissionPromotionServiceTests
 
         public List<(string Container, string BlobName)> Deleted { get; } = [];
 
+        public bool FailDeletes { get; init; }
+
+        public int FailedDeleteAttempts { get; private set; }
+
         public bool IsConfigured => true;
 
         public Task UploadAsync(
@@ -224,6 +249,12 @@ public sealed class PhotoSubmissionPromotionServiceTests
 
         public Task DeleteAsync(string containerName, string blobName, CancellationToken cancellationToken = default)
         {
+            if (FailDeletes)
+            {
+                FailedDeleteAttempts++;
+                throw new InvalidOperationException("Simulated blob delete failure.");
+            }
+
             Deleted.Add((containerName, blobName));
             return Task.CompletedTask;
         }
