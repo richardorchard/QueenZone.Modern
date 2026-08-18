@@ -276,3 +276,51 @@
     el.style.setProperty("--qz-avatar-bg", el.dataset.avatarBg);
   });
 })();
+
+// Progressive enhancement: use the OS share sheet on touch browsers that
+// expose navigator.share. Static platform links stay the no-JS / desktop
+// fallback — desktop Chrome also has share(), but the explicit X / Facebook
+// / WhatsApp / email links are the better option there.
+(() => {
+  if (typeof navigator.share !== "function") {
+    return;
+  }
+
+  if (!window.matchMedia("(pointer: coarse)").matches) {
+    return;
+  }
+
+  const roots = document.querySelectorAll("[data-share]");
+  if (roots.length === 0) {
+    return;
+  }
+
+  roots.forEach((root) => {
+    const title = root.getAttribute("data-share-title") || document.title;
+    const url = root.getAttribute("data-share-url") || window.location.href;
+    const payload = { title, url };
+
+    if (typeof navigator.canShare === "function" && !navigator.canShare(payload)) {
+      return;
+    }
+
+    const nativeButton = root.querySelector("[data-share-native]");
+    const fallback = root.querySelector("[data-share-fallback]");
+    if (!(nativeButton instanceof HTMLButtonElement) || !fallback) {
+      return;
+    }
+
+    nativeButton.hidden = false;
+    fallback.hidden = true;
+
+    nativeButton.addEventListener("click", () => {
+      navigator.share(payload).catch((error) => {
+        if (error && error.name === "AbortError") {
+          return;
+        }
+
+        fallback.hidden = false;
+      });
+    });
+  });
+})();
