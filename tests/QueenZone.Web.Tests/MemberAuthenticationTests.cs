@@ -1,6 +1,9 @@
 using System.Net;
+using AspNet.Security.OAuth.Apple;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace QueenZone.Web.Tests;
 
@@ -50,6 +53,60 @@ public sealed class MemberAuthenticationTests : IClassFixture<QueenZoneWebApplic
 
         Assert.Contains("Sign in", body);
         Assert.Contains("Sign in to QueenZone", body);
+        Assert.DoesNotContain("Continue with Apple", body);
+    }
+
+    [Fact]
+    public async Task LoginPageShowsAppleOnlyWhenFullyConfigured()
+    {
+        using var configuredFactory = factory.WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("Authentication:Apple:ClientId", "org.queenzone.web");
+            builder.UseSetting("Authentication:Apple:TeamId", "TEAM123456");
+            builder.UseSetting("Authentication:Apple:KeyId", "KEY1234567");
+            builder.UseSetting("Authentication:Apple:PrivateKey", "test-private-key");
+        });
+        var client = configuredFactory.CreateClient();
+
+        var body = await client.GetStringAsync("/account/login");
+
+        Assert.Contains("Continue with Apple", body);
+        Assert.Contains("provider=Apple", body);
+    }
+
+    [Fact]
+    public async Task AppleLoginStartsAppleAuthorizationFlow()
+    {
+        using var configuredFactory = factory.WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("Authentication:Apple:ClientId", "org.queenzone.web");
+            builder.UseSetting("Authentication:Apple:TeamId", "TEAM123456");
+            builder.UseSetting("Authentication:Apple:KeyId", "KEY1234567");
+            builder.UseSetting("Authentication:Apple:PrivateKey", "test-private-key");
+            builder.ConfigureTestServices(services =>
+            {
+                services.AddAuthentication().AddApple(MemberAuthenticationSchemes.Apple, options =>
+                {
+                    options.ClientId = "org.queenzone.web";
+                    options.TeamId = "TEAM123456";
+                    options.KeyId = "KEY1234567";
+                    options.GenerateClientSecret = true;
+                    options.PrivateKey = (_, _) =>
+                        Task.FromResult<ReadOnlyMemory<char>>("test-private-key".AsMemory());
+                });
+            });
+        });
+        var client = configuredFactory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false,
+        });
+
+        var response = await client.GetAsync("/account/external-login?provider=Apple&returnUrl=%2Fforum");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal("appleid.apple.com", response.Headers.Location?.Host);
+        Assert.Contains("response_mode=form_post", response.Headers.Location?.Query);
+        Assert.DoesNotContain("prompt=", response.Headers.Location?.Query);
     }
 
     [Fact]

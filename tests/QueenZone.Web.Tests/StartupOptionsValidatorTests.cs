@@ -281,6 +281,41 @@ public sealed class StartupOptionsValidatorTests
     }
 
     [Fact]
+    public void MemberAuthenticationOptionsValidator_accepts_complete_apple_provider()
+    {
+        var result = new MemberAuthenticationOptionsValidator(new FakeHostEnvironment("Production"))
+            .Validate(null, new MemberAuthenticationOptions
+            {
+                Apple = new MemberAuthenticationOptions.AppleCredentials
+                {
+                    ClientId = "org.queenzone.web",
+                    TeamId = "TEAM123456",
+                    KeyId = "KEY1234567",
+                    PrivateKey = "private-key",
+                },
+            });
+
+        Assert.False(result.Failed);
+    }
+
+    [Fact]
+    public void MemberAuthenticationOptionsValidator_rejects_partial_apple_provider()
+    {
+        var result = new MemberAuthenticationOptionsValidator(new FakeHostEnvironment("Development"))
+            .Validate(null, new MemberAuthenticationOptions
+            {
+                Apple = new MemberAuthenticationOptions.AppleCredentials
+                {
+                    ClientId = "org.queenzone.web",
+                    TeamId = "TEAM123456",
+                },
+            });
+
+        Assert.True(result.Failed);
+        Assert.Contains("ClientId, TeamId, KeyId and PrivateKey", result.FailureMessage);
+    }
+
+    [Fact]
     public void MemberAuthenticationOptionsValidator_rejects_placeholder_credentials()
     {
         var result = new MemberAuthenticationOptionsValidator(new FakeHostEnvironment("Production"))

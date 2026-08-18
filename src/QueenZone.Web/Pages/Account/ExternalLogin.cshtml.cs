@@ -13,6 +13,7 @@ public sealed class ExternalLoginModel : PageModel
         MemberAuthenticationSchemes.Microsoft,
         MemberAuthenticationSchemes.Discord,
         MemberAuthenticationSchemes.GitHub,
+        MemberAuthenticationSchemes.Apple,
     };
 
     public IActionResult OnGet(string provider, string? returnUrl)
@@ -28,7 +29,11 @@ public sealed class ExternalLoginModel : PageModel
             pageHandler: null,
             values: new { returnUrl = safeReturnUrl })!;
         var properties = new AuthenticationProperties { RedirectUri = callbackUrl };
-        properties.SetParameter("prompt", "select_account");
+        if (!string.Equals(provider, MemberAuthenticationSchemes.Apple, StringComparison.OrdinalIgnoreCase))
+        {
+            properties.SetParameter("prompt", "select_account");
+        }
+
         return Challenge(properties, provider);
     }
 }

@@ -360,11 +360,37 @@ dotnet ef database update --project src/QueenZone.Data/QueenZone.Data.csproj --s
 
 Public and admin SQL access uses EF Core (`QueenZoneDbContext`). Hot paths keep stored procedures, invoked via EF (`SqlQuery` / `SqlQueryRaw` / EF-managed proc calls). See ADR 0006.
 
+### Member authentication
+
+Member sign-in at `/account/login` supports Google, Microsoft, Discord, GitHub and Apple. A provider appears only when its complete configuration is present. Member OAuth is separate from the Microsoft Entra sign-in used for admin access.
+
+The standard providers require `Authentication__{Provider}__ClientId` and `Authentication__{Provider}__ClientSecret`. Their callback paths are `/signin-google`, `/signin-microsoft`, `/signin-discord` and `/signin-github`.
+
+Apple uses a generated client-secret JWT instead of a stored, long-lived client secret. Configure these App Service settings and matching Bitwarden secret names:
+
+```text
+Authentication__Apple__ClientId
+Authentication__Apple__TeamId
+Authentication__Apple__KeyId
+Authentication__Apple__PrivateKey
+```
+
+`ClientId` is the Apple Services ID. `PrivateKey` is the full `.p8` PEM value; either real newlines or escaped `\n` separators are accepted. Never commit or log the private key. The app signs and caches Apple client-secret JWTs from this key, bounded by Apple's six-month limit.
+
+Apple Developer setup:
+
+1. Enable Sign in with Apple on a primary App ID.
+2. Create and link a Services ID for the website.
+3. Register the production domain and exact HTTPS return URL `https://www.queenzone.org/signin-apple`. Register any Azure hostname used for pre-production testing separately. Apple does not accept `localhost` return URLs.
+4. Create a Sign in with Apple private key. Record its Key ID and the developer Team ID, then store the `.p8` value in Bitwarden and App Service.
+5. If QueenZone sends mail to Apple relay addresses, register and authenticate its outbound email domain with Apple.
+
+Apple may provide the member's name only on their first authorization. The callback saves that first name payload when creating an account, then relies on Apple's stable subject for later sign-ins. Hide My Email relay addresses are supported; account lookup uses the provider subject before email linking.
+
 ### Admin authentication
 
 Admin routes require a signed-in user whose email address is listed in `Admin:AllowedEmails`.
-The signed-in identity may come from the site OAuth member login (Google, Microsoft, or Facebook)
-or from the dedicated Microsoft Entra ID admin sign-in when Entra is configured.
+In production, the identity must come from the dedicated Microsoft Entra ID admin sign-in. A member login does not grant admin access, even when both identities use the same email address.
 
 Committed `appsettings.json` ships an **empty** allowlist on purpose. Production must set the list on App Service (or Key Vault); Development uses git-ignored `appsettings.Local.json`. See `docs/architecture/entra-admin-auth.md`.
 
@@ -387,7 +413,7 @@ Do not log secrets (connection strings, client secrets, storage keys, API keys) 
 
 For automated admin tests, send `X-Test-User-Email` with an allowed admin email address. The member OAuth callback test double only creates a member session and must not grant admin access, even when its email is allowlisted.
 
-Member sign-in at `/account/login` (Google, Microsoft, Facebook OAuth) is separate from admin access. Stripping member OAuth does not remove the admin requirement: admins still need Entra sign-in in production, or the test-header fallback locally as described above.
+Member sign-in is separate from admin access. Removing a member provider does not remove the admin requirement: admins still need Entra sign-in in production, or the test-header fallback locally as described above.
 
 Admin editorial surfaces:
 

@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using AspNet.Security.OAuth.Apple;
 using AspNet.Security.OAuth.Discord;
 using AspNet.Security.OAuth.GitHub;
 using Microsoft.AspNetCore.Authentication;
@@ -241,6 +242,37 @@ public static class QueenZoneAuthServiceCollectionExtensions
                 options.ClientSecret = memberAuth.GitHub.ClientSecret!;
                 options.SignInScheme = MemberAuthenticationSchemes.ExternalCookie;
                 options.Scope.Add("user:email");
+            });
+        }
+
+        if (memberAuth?.Apple?.IsConfigured == true)
+        {
+            var apple = memberAuth.Apple;
+            var privateKey = AppleAuthenticationSupport.NormalizePrivateKey(apple.PrivateKey!);
+            authenticationBuilder.AddApple(MemberAuthenticationSchemes.Apple, options =>
+            {
+                options.ClientId = apple.ClientId!;
+                options.TeamId = apple.TeamId!;
+                options.KeyId = apple.KeyId!;
+                options.SignInScheme = MemberAuthenticationSchemes.ExternalCookie;
+                options.GenerateClientSecret = true;
+                options.PrivateKey = (_, _) =>
+                    Task.FromResult<ReadOnlyMemory<char>>(privateKey.AsMemory());
+                options.Events.OnCreatingTicket = async context =>
+                {
+                    if (!context.Request.HasFormContentType)
+                    {
+                        return;
+                    }
+
+                    var form = await context.Request.ReadFormAsync(context.HttpContext.RequestAborted);
+                    if (context.Principal?.Identity is ClaimsIdentity identity)
+                    {
+                        AppleAuthenticationSupport.AddNameClaim(
+                            identity,
+                            form["user"].FirstOrDefault());
+                    }
+                };
             });
         }
     }
