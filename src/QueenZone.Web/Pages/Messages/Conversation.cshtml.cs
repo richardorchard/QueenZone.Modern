@@ -25,6 +25,8 @@ public sealed class ConversationModel(PrivateMessageService privateMessageServic
 
     public bool HasBlockedOtherParticipant { get; private set; }
 
+    public bool CanSendReply { get; private set; }
+
     public string? StatusMessage { get; private set; }
 
     [BindProperty]
@@ -49,14 +51,8 @@ public sealed class ConversationModel(PrivateMessageService privateMessageServic
             return NotFound();
         }
 
-        PageNumber = Detail.Page;
-        Pagination = BuildPagination(Detail);
-        HasBlockedOtherParticipant = await privateMessageService.HasBlockedAsync(
-            memberId.Value,
-            Detail.OtherParticipantId,
-            cancellationToken);
+        await PopulateConversationChromeAsync(memberId.Value, cancellationToken);
         StatusMessage = TempData[IndexModel.SuccessMessageKey] as string;
-        ViewData["Title"] = $"Message {Detail.OtherParticipantDisplayName}";
         return Page();
     }
 
@@ -81,13 +77,7 @@ public sealed class ConversationModel(PrivateMessageService privateMessageServic
                 return NotFound();
             }
 
-            PageNumber = Detail.Page;
-            Pagination = BuildPagination(Detail);
-            HasBlockedOtherParticipant = await privateMessageService.HasBlockedAsync(
-                memberId.Value,
-                Detail.OtherParticipantId,
-                cancellationToken);
-            ViewData["Title"] = $"Message {Detail.OtherParticipantDisplayName}";
+            await PopulateConversationChromeAsync(memberId.Value, cancellationToken);
             return Page();
         }
 
@@ -119,13 +109,7 @@ public sealed class ConversationModel(PrivateMessageService privateMessageServic
                 return NotFound();
             }
 
-            PageNumber = Detail.Page;
-            Pagination = BuildPagination(Detail);
-            HasBlockedOtherParticipant = await privateMessageService.HasBlockedAsync(
-                memberId.Value,
-                Detail.OtherParticipantId,
-                cancellationToken);
-            ViewData["Title"] = $"Message {Detail.OtherParticipantDisplayName}";
+            await PopulateConversationChromeAsync(memberId.Value, cancellationToken);
             return Page();
         }
 
@@ -234,6 +218,31 @@ public sealed class ConversationModel(PrivateMessageService privateMessageServic
             cancellationToken);
         TempData[IndexModel.SuccessMessageKey] = "Member unblocked.";
         return RedirectToPage(new { conversationId = ConversationId, pageNumber = PageNumber });
+    }
+
+    private async Task PopulateConversationChromeAsync(Guid memberId, CancellationToken cancellationToken)
+    {
+        if (Detail is null)
+        {
+            return;
+        }
+
+        PageNumber = Detail.Page;
+        Pagination = BuildPagination(Detail);
+        HasBlockedOtherParticipant = await privateMessageService.HasBlockedAsync(
+            memberId,
+            Detail.OtherParticipantId,
+            cancellationToken);
+        var messagingBlocked = await privateMessageService.IsMessagingBlockedAsync(
+            memberId,
+            Detail.OtherParticipantId,
+            cancellationToken);
+        var otherIsDeleted = string.Equals(
+            Detail.OtherParticipantDisplayName,
+            MemberAccountDeletionPolicy.DeletedDisplayName,
+            StringComparison.Ordinal);
+        CanSendReply = !messagingBlocked && !otherIsDeleted;
+        ViewData["Title"] = $"Message {Detail.OtherParticipantDisplayName}";
     }
 
     private ArchivePaginationViewModel? BuildPagination(PrivateConversationDetail detail) =>

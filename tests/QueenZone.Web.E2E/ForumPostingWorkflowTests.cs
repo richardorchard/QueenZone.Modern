@@ -45,7 +45,7 @@ public class ForumPostingWorkflowTests : E2EPageTest
         await Expect(Page).ToHaveURLAsync(NewTopicUrl);
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = subject, Level = 1 })).ToBeVisibleAsync();
         await Expect(Page.Locator(".qz-forum-post").Filter(new() { HasText = firstBody })).ToBeVisibleAsync();
-        await Expect(Page.GetByText(TestMemberName)).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Link, new() { Name = TestMemberName, Exact = true })).ToBeVisibleAsync();
 
         await FillRichTextEditorAsync(replyBody);
         await Page.GetByRole(AriaRole.Button, new() { Name = "Reply" }).ClickAsync();

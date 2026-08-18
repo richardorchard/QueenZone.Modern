@@ -5,11 +5,10 @@
   bool IsActive(string route) => route == "/" ? path == "/" : path.StartsWith(route, StringComparison.OrdinalIgnoreCase);
   var mastheadDark = ViewData["MastheadDark"] is bool dark ? dark : true;
 
-  // Authenticates against the member cookie explicitly rather than relying on the ambient
-  // User/HttpContext.User, since the site's default authentication scheme is the Admin one.
-  // This is just an in-process cookie validation â€” no DB or network call â€” so it's cheap to
-  // do on every request even though _SiteHeader renders on every page.
-  var memberAuthResult = await Context.AuthenticateAsync(MemberAuthenticationSchemes.MembersCookie);
+  // Authenticate the member cookie first, then the test-member scheme on Testing/E2E hosts.
+  // Do not use the ambient User — the default authenticate scheme is Admin, so a signed-in
+  // member would otherwise look anonymous here. Cookie validation is in-process.
+  var memberAuthResult = await Context.AuthenticateMemberAsync();
   var memberDisplayName = memberAuthResult.Succeeded
     ? memberAuthResult.Principal?.FindFirstValue(ClaimTypes.Name)
     : null;
@@ -151,6 +150,22 @@
           <path d="m21 21-4.35-4.35" />
         </svg>
       </a>
+      @if (memberDisplayName is not null)
+      {
+        var messagesIconLabel = unreadMessageCount > 0
+          ? $"Messages, {unreadMessageCount} unread conversations"
+          : "Messages";
+        <a class="qz-icon-button qz-masthead__messages-icon" href="/messages" aria-label="@messagesIconLabel" aria-current="@(IsActive("/messages") ? "page" : null)">
+          <svg width="19" height="19" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <rect x="3" y="5" width="18" height="14" rx="2" />
+            <path d="m3 7 9 6 9-6" />
+          </svg>
+          @if (unreadMessageCount > 0)
+          {
+            <span class="qz-masthead__unread" aria-hidden="true">@unreadMessageCount</span>
+          }
+        </a>
+      }
       @if (showAdminNav)
       {
         <a class="qz-masthead__admin-link" href="/admin" aria-current="@(IsActive("/admin") ? "page" : null)">Admin</a>
