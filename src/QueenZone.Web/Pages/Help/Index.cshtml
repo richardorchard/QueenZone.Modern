@@ -1,0 +1,77 @@
+@page "/contact"
+@model QueenZone.Web.Pages.Help.IndexModel
+
+<partial name="_PageHero" model='@(("Contact", "Contact us", "Having trouble with your account or the archive? Send a private message to the Queenzone admin.", ""))' />
+
+<section class="qz-section">
+  <div class="qz-container qz-prose">
+    <p>
+      This form reaches the site admin. It is not a public forum post.
+      You will get a reply by email if we need more information or have an update.
+    </p>
+
+    @if (Model.IsSignedIn)
+    {
+      <p class="qz-account-form__help">
+        Signed in as <strong>@(Model.SignedInDisplayName ?? "member")</strong>.
+        We will use the name and email on your account.
+      </p>
+    }
+
+    <div asp-validation-summary="All" class="qz-account-notice qz-account-notice--error"></div>
+
+    <form method="post" class="qz-account-form">
+      @Html.AntiForgeryToken()
+      <input type="hidden" asp-for="FormStamp" />
+
+      <div class="qz-honeypot" aria-hidden="true">
+        <label>
+          Website
+          <input asp-for="Website" tabindex="-1" autocomplete="off" />
+        </label>
+      </div>
+
+      <label class="qz-account-form__field">
+        <span>Topic</span>
+        <select asp-for="Topic">
+          @foreach (var topic in Model.Topics)
+          {
+            <option value="@topic.Value">@topic.Label</option>
+          }
+        </select>
+        <span asp-validation-for="Topic" class="qz-account-form__field-error"></span>
+      </label>
+
+      <label class="qz-account-form__field">
+        <span>Subject</span>
+        <input asp-for="Subject" maxlength="200" />
+        <span asp-validation-for="Subject" class="qz-account-form__field-error"></span>
+      </label>
+
+      @if (!Model.IsSignedIn)
+      {
+        <label class="qz-account-form__field">
+          <span>Your name</span>
+          <input asp-for="Name" maxlength="100" autocomplete="name" />
+          <span asp-validation-for="Name" class="qz-account-form__field-error"></span>
+        </label>
+
+        <label class="qz-account-form__field">
+          <span>Email address</span>
+          <input asp-for="Email" type="email" inputmode="email" maxlength="256" autocomplete="email" />
+          <span asp-validation-for="Email" class="qz-account-form__field-error"></span>
+          <span class="qz-account-form__help">We only use this to reply to your request.</span>
+        </label>
+      }
+
+      <label class="qz-account-form__field">
+        <span>Your message</span>
+        <textarea asp-for="Message" rows="8" maxlength="4000"></textarea>
+        <span asp-validation-for="Message" class="qz-account-form__field-error"></span>
+        <span class="qz-account-form__help">Plain text is fine — include account names, page addresses, or error messages if they help.</span>
+      </label>
+
+      <button type="submit" class="qz-button">Send message</button>
+    </form>
+  </div>
+</section>

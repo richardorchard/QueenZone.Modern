@@ -547,6 +547,7 @@
 }
 
 .qz-account-form {
+  position: relative;
   display: grid;
   gap: var(--space-4);
 }
@@ -558,7 +559,8 @@
   color: var(--qz-charcoal);
 }
 
-.qz-account-form__field input {
+.qz-account-form__field input,
+.qz-account-form__field select {
   width: 100%;
   max-width: 28rem;
   min-height: 2.75rem;
@@ -570,7 +572,21 @@
   font: var(--fw-regular, 400) 1rem/1.4 var(--font-body);
 }
 
-.qz-account-form__field input:focus {
+.qz-honeypot {
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.qz-account-form__field input:focus,
+.qz-account-form__field select:focus {
   outline: 2px solid var(--qz-blue, #2b5ea7);
   outline-offset: 1px;
 }

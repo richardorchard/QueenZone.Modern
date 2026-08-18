@@ -79,6 +79,9 @@ public static class QueenZoneWebServiceCollectionExtensions
         services.AddOptions<NewsSuggestionOptions>()
             .Bind(configuration.GetSection(NewsSuggestionOptions.SectionName));
 
+        services.AddOptions<HelpRequestOptions>()
+            .Bind(configuration.GetSection(HelpRequestOptions.SectionName));
+
         return services;
     }
 
@@ -223,6 +226,9 @@ public static class QueenZoneWebServiceCollectionExtensions
         services.AddScoped<AdminPhotoService>();
         services.AddScoped<PhotoSubmissionPromotionService>();
         services.AddScoped<NewsSuggestionService>();
+        services.AddSingleton<HelpRequestFormStamp>();
+        services.AddSingleton<HelpRequestRateLimiter>();
+        services.AddScoped<HelpRequestService>();
         services.AddScoped<PublicWarmupService>();
         services.AddScoped<UgcHtml>();
         services.AddScoped<ForumPostRateLimiter>();

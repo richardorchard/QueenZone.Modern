@@ -52,6 +52,7 @@ public sealed class QueenZoneWebCompositionTests
             Assert.NotNull(scope.ServiceProvider.GetRequiredService<PublicWarmupService>());
             Assert.NotNull(scope.ServiceProvider.GetRequiredService<MemberAccountService>());
             Assert.NotNull(scope.ServiceProvider.GetRequiredService<ILinksRepository>());
+            Assert.NotNull(scope.ServiceProvider.GetRequiredService<IHelpRequestRepository>());
         }
 
         Assert.Equal(["admin@test.local"], provider.GetRequiredService<IOptions<AdminOptions>>().Value.AllowedEmails);

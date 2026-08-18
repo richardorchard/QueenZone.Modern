@@ -17,6 +17,7 @@ public sealed class CoreSitemapBuilder(
             [
                 new("/"),
                 new("/about"),
+                new("/contact"),
                 new("/links")
             ]);
 

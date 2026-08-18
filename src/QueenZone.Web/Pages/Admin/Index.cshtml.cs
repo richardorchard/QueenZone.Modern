@@ -11,6 +11,7 @@ public sealed class IndexModel(AdminDashboardService dashboardService) : PageMod
     public IReadOnlyList<RecentLogin> RecentLogins { get; private set; } = [];
     public IReadOnlyList<DailyRegistration> DailyRegistrations { get; private set; } = [];
     public SubmissionQueueStats SubmissionQueue { get; private set; } = SubmissionQueueStats.Empty;
+    public int OpenHelpRequestCount { get; private set; }
     public GoogleAnalyticsTrafficSnapshot Traffic { get; private set; } =
         GoogleAnalyticsTrafficSnapshot.Unavailable("Google Analytics traffic has not loaded.");
 
@@ -27,6 +28,7 @@ public sealed class IndexModel(AdminDashboardService dashboardService) : PageMod
         RecentLogins = snapshot.RecentLogins;
         DailyRegistrations = snapshot.DailyRegistrations;
         SubmissionQueue = snapshot.SubmissionQueue;
+        OpenHelpRequestCount = snapshot.OpenHelpRequestCount;
         Traffic = snapshot.Traffic;
         return Page();
     }
