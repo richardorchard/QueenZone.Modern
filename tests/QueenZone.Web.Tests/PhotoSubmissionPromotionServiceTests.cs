@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using QueenZone.Data;
 using QueenZone.Storage;
 using QueenZone.Web;
@@ -92,6 +93,26 @@ public sealed class PhotoSubmissionPromotionServiceTests
         Assert.Contains("missing from storage", ex.Message);
     }
 
+    [Fact]
+    public async Task PromoteAsync_DeletesUploadedBlobs_WhenDbWriteFailsAfterUpload()
+    {
+        var submissionRepository = new FailingOnPromoteSubmissionRepository();
+        var store = new SharedPhotoStore(SamplePhotoData.CreateSeedCategories());
+        var adminPhotoRepository = new InMemoryAdminPhotoRepository(store);
+        var blobUploadService = new FakeBlobUploadService();
+        var galleryPhotoBlobService = new RecordingGalleryPhotoBlobService();
+        var service = CreateService(
+            submissionRepository, adminPhotoRepository, blobUploadService, galleryPhotoBlobService);
+
+        var submission = await CreateApprovableSubmissionAsync(submissionRepository, blobUploadService, "Queen");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.PromoteAsync(submission, "Queen", "admin@test.local", "Looks great"));
+
+        Assert.Equal(2, galleryPhotoBlobService.Uploaded.Count);
+        Assert.Equal(galleryPhotoBlobService.Uploaded, galleryPhotoBlobService.Deleted);
+    }
+
     private static PhotoSubmissionPromotionService CreateService(
         IPhotoSubmissionRepository submissionRepository,
         IAdminPhotoRepository adminPhotoRepository,
@@ -102,7 +123,8 @@ public sealed class PhotoSubmissionPromotionServiceTests
             adminPhotoRepository,
             blobUploadService,
             galleryPhotoBlobService,
-            new ServiceCollection().BuildServiceProvider());
+            new ServiceCollection().BuildServiceProvider(),
+            NullLogger<PhotoSubmissionPromotionService>.Instance);
 
     private async Task<PhotoSubmission> CreateApprovableSubmissionAsync(
         IPhotoSubmissionRepository submissionRepository,
@@ -173,5 +195,83 @@ public sealed class PhotoSubmissionPromotionServiceTests
         }
 
         private static string Key(string containerName, string blobName) => $"{containerName}/{blobName}";
+    }
+
+    private sealed class RecordingGalleryPhotoBlobService : IGalleryPhotoBlobService
+    {
+        public List<(string Container, string BlobName)> Uploaded { get; } = [];
+
+        public List<(string Container, string BlobName)> Deleted { get; } = [];
+
+        public bool IsConfigured => true;
+
+        public Task UploadAsync(
+            string containerName,
+            string blobName,
+            Stream content,
+            string contentType,
+            CancellationToken cancellationToken = default)
+        {
+            Uploaded.Add((containerName, blobName));
+            return Task.CompletedTask;
+        }
+
+        public Task<Stream?> OpenReadAsync(
+            string containerName,
+            string blobName,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<Stream?>(null);
+
+        public Task DeleteAsync(string containerName, string blobName, CancellationToken cancellationToken = default)
+        {
+            Deleted.Add((containerName, blobName));
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FailingOnPromoteSubmissionRepository : IPhotoSubmissionRepository
+    {
+        private readonly InMemoryPhotoSubmissionRepository inner = new();
+
+        public Task<PhotoSubmission> CreateAsync(NewPhotoSubmission submission, CancellationToken cancellationToken = default) =>
+            inner.CreateAsync(submission, cancellationToken);
+
+        public Task<IReadOnlyList<PhotoSubmissionListItem>> GetPendingAsync(
+            int page, int pageSize, CancellationToken cancellationToken = default) =>
+            inner.GetPendingAsync(page, pageSize, cancellationToken);
+
+        public Task<PhotoSubmission?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+            inner.GetByIdAsync(id, cancellationToken);
+
+        public Task<SubmissionListPage<PhotoSubmission>> GetBySubmitterAsync(
+            Guid submitterMemberId, int page = 1, int pageSize = 10, CancellationToken cancellationToken = default) =>
+            inner.GetBySubmitterAsync(submitterMemberId, page, pageSize, cancellationToken);
+
+        public Task<PhotoSubmission?> UpdateStatusAsync(
+            Guid id,
+            string status,
+            string? reviewerEmail,
+            string? reviewNotes,
+            string? rejectionReason,
+            string? approvedCategory = null,
+            CancellationToken cancellationToken = default) =>
+            inner.UpdateStatusAsync(id, status, reviewerEmail, reviewNotes, rejectionReason, approvedCategory, cancellationToken);
+
+        public Task<PhotoSubmission?> PromoteAsync(
+            Guid id,
+            int promotedPicId,
+            string approvedCategory,
+            string reviewerEmail,
+            string? reviewNotes,
+            CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("Simulated DB write failure after blob upload.");
+
+        public Task<SubmissionTypeCounts> GetDashboardCountsAsync(
+            DateTimeOffset utcNow, CancellationToken cancellationToken = default) =>
+            inner.GetDashboardCountsAsync(utcNow, cancellationToken);
+
+        public Task<IReadOnlyList<SubmissionContributor>> GetTopContributorsThisMonthAsync(
+            DateTimeOffset monthStart, int maxCount, CancellationToken cancellationToken = default) =>
+            inner.GetTopContributorsThisMonthAsync(monthStart, maxCount, cancellationToken);
     }
 }
