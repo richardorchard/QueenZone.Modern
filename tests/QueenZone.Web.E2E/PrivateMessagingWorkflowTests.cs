@@ -123,11 +123,10 @@ public class PrivateMessagingWorkflowTests : RealDataPageTest
         await Page.GotoAsync($"/members/{memberB.Id}");
         await Expect(Page.GetByRole(AriaRole.Link, new() { Name = "Message" })).ToHaveCountAsync(0);
 
-        // ...and a reply attempt on the existing conversation is rejected.
+        // ...and the conversation view shows that sending is no longer available.
         await Page.GotoAsync(conversationUrl);
-        await Page.GetByLabel("Reply").FillAsync($"{memberA.Marker} reply after block");
-        await Page.GetByRole(AriaRole.Button, new() { Name = "Send reply" }).ClickAsync();
         await Expect(Page.GetByText("Unable to send message.")).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Send reply" })).ToHaveCountAsync(0);
     }
 
     [Test]

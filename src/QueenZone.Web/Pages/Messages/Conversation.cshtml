@@ -8,8 +8,8 @@
 <partial name="_PageHero" model='@(("Community", other, "Private conversation", ""))' />
 
 <section class="qz-section">
-  <div class="qz-container qz-prose">
-    <p>
+  <div class="qz-container qz-prose qz-messages">
+    <p class="qz-messages-nav">
       <a href="/messages">Back to inbox</a>
       @if (Model.Detail is not null)
       {
@@ -28,7 +28,7 @@
         <p class="qz-account-notice qz-account-notice--success" role="status">@Model.StatusMessage</p>
       }
 
-      <p class="qz-messages-toolbar">
+      <div class="qz-messages-toolbar">
         <form method="post" asp-page-handler="Archive" class="qz-messages-toolbar__action">
           <button class="qz-button qz-button--ghost" type="submit">Archive conversation</button>
         </form>
@@ -47,7 +47,7 @@
             <button class="qz-button qz-button--ghost" type="submit">Block @Model.Detail.OtherParticipantDisplayName</button>
           </form>
         }
-      </p>
+      </div>
 
       <partial name="_ArchivePagination" model="Model.Pagination" />
 
@@ -68,17 +68,31 @@
 
       <partial name="_ArchivePagination" model="Model.Pagination" />
 
-      <form method="post" class="qz-account-form qz-messages-reply">
-        <div asp-validation-summary="ModelOnly" class="qz-account-form__errors"></div>
-        <div class="qz-account-form__field">
-          <label asp-for="Input.Body"></label>
-          <textarea asp-for="Input.Body" rows="5" maxlength="4000"></textarea>
-          <span asp-validation-for="Input.Body" class="qz-account-form__field-error"></span>
-        </div>
-        <div class="qz-account-form__actions">
-          <button class="qz-button qz-button--cta" type="submit">Send reply</button>
-        </div>
-      </form>
+      @if (Model.HasBlockedOtherParticipant)
+      {
+        <p class="qz-account-notice qz-account-notice--error" role="status">
+          You have blocked this member. They can no longer send you private messages.
+        </p>
+      }
+      else if (!Model.CanSendReply)
+      {
+        <p class="qz-account-notice qz-account-notice--error" role="status">@PrivateMessageService.UnableToSendMessage</p>
+      }
+
+      @if (Model.CanSendReply)
+      {
+        <form method="post" class="qz-account-form qz-messages-reply">
+          <div asp-validation-summary="ModelOnly" class="qz-account-form__errors" role="alert"></div>
+          <div class="qz-account-form__field">
+            <label asp-for="Input.Body"></label>
+            <textarea asp-for="Input.Body" rows="5" maxlength="4000" enterkeyhint="send" autocapitalize="sentences"></textarea>
+            <span asp-validation-for="Input.Body" class="qz-account-form__field-error"></span>
+          </div>
+          <div class="qz-account-form__actions">
+            <button class="qz-button qz-button--cta" type="submit">Send reply</button>
+          </div>
+        </form>
+      }
     }
   </div>
 </section>

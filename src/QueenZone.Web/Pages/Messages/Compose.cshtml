@@ -4,15 +4,15 @@
 <partial name="_PageHero" model='@(("Community", "New message", "Send a private message to another member.", ""))' />
 
 <section class="qz-section">
-  <div class="qz-container qz-prose">
-    <p><a href="/messages">Back to inbox</a></p>
+  <div class="qz-container qz-prose qz-messages">
+    <p class="qz-messages-nav"><a href="/messages">Back to inbox</a></p>
 
     @if (Model.Input.RecipientMemberId is null || string.IsNullOrWhiteSpace(Model.SelectedRecipientDisplayName))
     {
       <form method="get" action="/messages/compose" class="qz-account-form">
         <div class="qz-account-form__field">
           <label for="recipient-query">To</label>
-          <input id="recipient-query" name="q" value="@Model.Input.RecipientQuery" autocomplete="off" />
+          <input id="recipient-query" name="q" value="@Model.Input.RecipientQuery" autocomplete="off" enterkeyhint="search" autocapitalize="none" spellcheck="false" />
           <span class="qz-account-form__field-error">@Html.ValidationMessage("Input.RecipientQuery")</span>
           <p class="qz-account-form__help">Search by display name, then select a match if more than one member shares the name.</p>
         </div>
@@ -35,7 +35,7 @@
     }
 
     <form method="post" class="qz-account-form qz-messages-compose">
-      <div asp-validation-summary="ModelOnly" class="qz-account-form__errors"></div>
+      <div asp-validation-summary="ModelOnly" class="qz-account-form__errors" role="alert"></div>
 
       @if (Model.Input.RecipientMemberId is Guid selectedId && !string.IsNullOrWhiteSpace(Model.SelectedRecipientDisplayName))
       {
@@ -50,7 +50,7 @@
 
         <div class="qz-account-form__field">
           <label asp-for="Input.Body"></label>
-          <textarea asp-for="Input.Body" rows="8" maxlength="4000"></textarea>
+          <textarea asp-for="Input.Body" rows="8" maxlength="4000" enterkeyhint="send" autocapitalize="sentences"></textarea>
           <span asp-validation-for="Input.Body" class="qz-account-form__field-error"></span>
         </div>
 
