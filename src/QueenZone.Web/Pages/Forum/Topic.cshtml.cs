@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Extensions.Options;
 using QueenZone.Data;
 using QueenZone.Storage;
+using QueenZone.Web.Search;
 
 namespace QueenZone.Web.Pages.Forum;
 
@@ -20,6 +21,7 @@ public sealed class TopicModel : ForumTopicPageModel
     private readonly ForumPostRateLimiter rateLimiter;
     private readonly ForumAttachmentValidator attachmentValidator;
     private readonly ForumAttachmentUploadService attachmentUploadService;
+    private readonly ForumSearchIndexSynchronizer forumSearchIndex;
     private readonly AdminOptions adminOptions;
     private readonly TimeProvider timeProvider;
 
@@ -33,6 +35,7 @@ public sealed class TopicModel : ForumTopicPageModel
         ForumPostRateLimiter rateLimiter,
         ForumAttachmentValidator attachmentValidator,
         ForumAttachmentUploadService attachmentUploadService,
+        ForumSearchIndexSynchronizer forumSearchIndex,
         IOptions<AdminOptions> adminOptions,
         IOptions<ForumOptions> forumOptions,
         TimeProvider timeProvider)
@@ -47,6 +50,7 @@ public sealed class TopicModel : ForumTopicPageModel
         this.rateLimiter = rateLimiter;
         this.attachmentValidator = attachmentValidator;
         this.attachmentUploadService = attachmentUploadService;
+        this.forumSearchIndex = forumSearchIndex;
         this.adminOptions = adminOptions.Value;
         this.timeProvider = timeProvider;
     }
@@ -126,6 +130,7 @@ public sealed class TopicModel : ForumTopicPageModel
         }
 
         var authorDisplayName = await ResolveAuthorDisplayNameAsync(memberId.Value, cancellationToken);
+        var createdAt = timeProvider.GetUtcNow();
         int postId;
         try
         {
@@ -135,8 +140,10 @@ public sealed class TopicModel : ForumTopicPageModel
                     memberId.Value,
                     authorDisplayName,
                     sanitizedBody,
-                    timeProvider.GetUtcNow()),
+                    createdAt),
                 cancellationToken);
+            var threadTitle = Header?.Title ?? slug;
+            await forumSearchIndex.UpsertThreadAsync(topicId, threadTitle, createdAt, cancellationToken);
 
             if (attachmentValidation.AcceptedFiles.Count > 0)
             {

@@ -252,6 +252,82 @@ namespace QueenZone.Data.Migrations
                     b.ToTable("ForumPostAttachments", (string)null);
                 });
 
+            modelBuilder.Entity("QueenZone.Data.Entities.HelpRequestEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<Guid?>("MemberId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("NormalizedEmail")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("ReviewNotes")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTimeOffset?>("ReviewedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ReviewerEmail")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTimeOffset>("SubmittedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Topic")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MemberId", "SubmittedAt")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("IX_HelpRequests_Member_SubmittedAt")
+                        .HasFilter("[MemberId] IS NOT NULL");
+
+                    b.HasIndex("NormalizedEmail", "SubmittedAt")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("IX_HelpRequests_NormalizedEmail_SubmittedAt");
+
+                    b.HasIndex("Status", "SubmittedAt")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("IX_HelpRequests_Status_SubmittedAt");
+
+                    b.ToTable("HelpRequests", (string)null);
+                });
+
             modelBuilder.Entity("QueenZone.Data.Entities.MemberAccount", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1963,6 +2039,16 @@ namespace QueenZone.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Post");
+                });
+
+            modelBuilder.Entity("QueenZone.Data.Entities.HelpRequestEntity", b =>
+                {
+                    b.HasOne("QueenZone.Data.Entities.MemberAccount", "Member")
+                        .WithMany()
+                        .HasForeignKey("MemberId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Member");
                 });
 
             modelBuilder.Entity("QueenZone.Data.Entities.MemberExternalLogin", b =>

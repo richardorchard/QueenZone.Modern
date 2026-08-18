@@ -1,0 +1,71 @@
+@page "/admin/help"
+@model QueenZone.Web.Pages.Admin.HelpRequests.IndexModel
+@using QueenZone.Data
+
+<div class="admin-shell">
+  <h1>Help requests</h1>
+  <p>
+    <a href="/admin">Back to admin</a>
+  </p>
+
+  <form method="get" class="admin-search-form">
+    <label>
+      Status
+      <select name="status">
+        @if (string.Equals(Model.StatusFilter, "all", StringComparison.OrdinalIgnoreCase))
+        {
+          <option value="all" selected>All</option>
+        }
+        else
+        {
+          <option value="all">All</option>
+        }
+        @foreach (var status in HelpRequestStatus.All)
+        {
+          if (string.Equals(Model.StatusFilter, status, StringComparison.Ordinal))
+          {
+            <option value="@status" selected>@HelpRequestStatus.DisplayName(status)</option>
+          }
+          else
+          {
+            <option value="@status">@HelpRequestStatus.DisplayName(status)</option>
+          }
+        }
+      </select>
+    </label>
+    <button type="submit" class="qz-button">Filter</button>
+  </form>
+
+  @if (Model.List.Items.Count == 0)
+  {
+    <p>No help requests in this view.</p>
+  }
+  else
+  {
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Subject</th>
+          <th>Topic</th>
+          <th>From</th>
+          <th>Submitted</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @foreach (var item in Model.List.Items)
+        {
+          <tr>
+            <td>@item.Subject</td>
+            <td>@HelpRequestTopic.DisplayName(item.Topic)</td>
+            <td>@item.Name (@item.Email)</td>
+            <td>@item.SubmittedAt.ToString("u")</td>
+            <td><partial name="_SubmissionStatusBadge" model="item.Status" /></td>
+            <td><a href="/admin/help/@item.Id">Open</a></td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+</div>

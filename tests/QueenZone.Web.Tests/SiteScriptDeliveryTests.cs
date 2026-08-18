@@ -75,4 +75,16 @@ public sealed class SiteScriptDeliveryTests : IClassFixture<WebApplicationFactor
         Assert.DoesNotContain("qz-era-config", script);
         Assert.DoesNotContain("qz-hero-archive", script);
     }
+
+    [Fact]
+    public async Task SiteJs_ProgressivelyEnhancesSocialShare()
+    {
+        var script = await factory.CreateClient().GetStringAsync("/js/site.js");
+
+        Assert.Contains("navigator.share", script);
+        Assert.Contains("data-share-native", script);
+        Assert.Contains("data-share-fallback", script);
+        Assert.Contains("pointer: coarse", script);
+        Assert.Contains("AbortError", script);
+    }
 }

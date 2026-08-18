@@ -70,6 +70,7 @@ public class E2ECategoryGuardTests
             nameof(SelectorConventionGuardTests),
             nameof(SitemapRouteParserTests),
             nameof(SmokeTests),
+            nameof(SocialShareTests),
         };
 
         Assert.That(deterministic, Is.EqualTo(expected));

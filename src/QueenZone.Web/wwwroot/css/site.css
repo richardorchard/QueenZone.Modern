@@ -547,6 +547,7 @@
 }
 
 .qz-account-form {
+  position: relative;
   display: grid;
   gap: var(--space-4);
 }
@@ -558,7 +559,8 @@
   color: var(--qz-charcoal);
 }
 
-.qz-account-form__field input {
+.qz-account-form__field input,
+.qz-account-form__field select {
   width: 100%;
   max-width: 28rem;
   min-height: 2.75rem;
@@ -570,7 +572,21 @@
   font: var(--fw-regular, 400) 1rem/1.4 var(--font-body);
 }
 
-.qz-account-form__field input:focus {
+.qz-honeypot {
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.qz-account-form__field input:focus,
+.qz-account-form__field select:focus {
   outline: 2px solid var(--qz-blue, #2b5ea7);
   outline-offset: 1px;
 }
@@ -2186,11 +2202,46 @@ a.qz-forum-post__author-link:focus-visible {
   border-top: 1px solid var(--hairline);
 }
 
+.qz-share__fallback:not([hidden]) {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.qz-share__native[hidden],
+.qz-share__fallback[hidden] {
+  display: none !important;
+}
+
 .qz-share__label {
   font: var(--fw-medium) 0.8125rem/1 var(--font-body);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--qz-grey-700);
+}
+
+.qz-share__native:not([hidden]) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 2.25rem;
+  padding: 0 0.9rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--surface-muted, #f6f6f6);
+  color: var(--qz-charcoal);
+  font: var(--fw-medium) 0.8125rem/1 var(--font-body);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+
+.qz-share__native:hover,
+.qz-share__native:focus-visible {
+  background: var(--qz-charcoal);
+  color: var(--qz-white);
 }
 
 .qz-share__list {
@@ -2228,6 +2279,17 @@ a.qz-forum-post__author-link:focus-visible {
 
 .qz-lightbox .qz-share__label {
   color: rgba(255, 255, 255, 0.66);
+}
+
+.qz-lightbox .qz-share__native {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--qz-white);
+}
+
+.qz-lightbox .qz-share__native:hover,
+.qz-lightbox .qz-share__native:focus-visible {
+  background: var(--qz-white);
+  color: var(--qz-charcoal);
 }
 
 .admin-shell {

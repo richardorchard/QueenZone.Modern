@@ -63,6 +63,8 @@ public sealed class QueenZoneDbContext : DbContext
 
     public DbSet<NewsSuggestionEntity> NewsSuggestions => Set<NewsSuggestionEntity>();
 
+    public DbSet<HelpRequestEntity> HelpRequests => Set<HelpRequestEntity>();
+
     public DbSet<QueenLinkCheckEntity> QueenLinkChecks => Set<QueenLinkCheckEntity>();
 
     public DbSet<PrivateConversationEntity> PrivateConversations => Set<PrivateConversationEntity>();
@@ -877,6 +879,41 @@ public sealed class QueenZoneDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(follow => follow.FollowedMemberId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<HelpRequestEntity>(entity =>
+        {
+            entity.ToTable("HelpRequests");
+            entity.HasKey(request => request.Id);
+
+            entity.Property(request => request.Topic).HasMaxLength(50).IsRequired();
+            entity.Property(request => request.Subject).HasMaxLength(200).IsRequired();
+            entity.Property(request => request.Message).HasMaxLength(4000).IsRequired();
+            entity.Property(request => request.Name).HasMaxLength(100).IsRequired();
+            entity.Property(request => request.Email).HasMaxLength(256).IsRequired();
+            entity.Property(request => request.NormalizedEmail).HasMaxLength(256).IsRequired();
+            entity.Property(request => request.Status).HasMaxLength(50).IsRequired();
+            entity.Property(request => request.SubmittedAt).IsRequired();
+            entity.Property(request => request.ReviewerEmail).HasMaxLength(256);
+            entity.Property(request => request.ReviewNotes).HasMaxLength(500);
+
+            entity.HasIndex(request => new { request.Status, request.SubmittedAt })
+                .IsDescending(false, true)
+                .HasDatabaseName("IX_HelpRequests_Status_SubmittedAt");
+
+            entity.HasIndex(request => new { request.NormalizedEmail, request.SubmittedAt })
+                .IsDescending(false, true)
+                .HasDatabaseName("IX_HelpRequests_NormalizedEmail_SubmittedAt");
+
+            entity.HasIndex(request => new { request.MemberId, request.SubmittedAt })
+                .IsDescending(false, true)
+                .HasFilter("[MemberId] IS NOT NULL")
+                .HasDatabaseName("IX_HelpRequests_Member_SubmittedAt");
+
+            entity.HasOne(request => request.Member)
+                .WithMany()
+                .HasForeignKey(request => request.MemberId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
     }
 }

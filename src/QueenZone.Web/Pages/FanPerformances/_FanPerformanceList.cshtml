@@ -15,7 +15,7 @@ else
         <p class="qz-meta">Performed by @performance.PerformedBy</p>
         @if (performance.AudioPlayPath is not null)
         {
-          <audio controls preload="none" src="@performance.AudioPlayPath">
+          <audio controls preload="metadata" src="@performance.AudioPlayPath">
             <a href="@performance.AudioPlayPath">Download @performance.Title</a>
           </audio>
         }

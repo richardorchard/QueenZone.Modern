@@ -60,6 +60,7 @@ public sealed class AbsoluteCanonicalUrlTests : IClassFixture<WebApplicationFact
     [Theory]
     [InlineData("/", "https://preview.queenzone.test/")]
     [InlineData("/about", "https://preview.queenzone.test/about")]
+    [InlineData("/contact", "https://preview.queenzone.test/contact")]
     [InlineData("/forum", "https://preview.queenzone.test/forum")]
     [InlineData("/biography", "https://preview.queenzone.test/biography")]
     [InlineData("/photography", "https://preview.queenzone.test/photography")]

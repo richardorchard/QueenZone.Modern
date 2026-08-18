@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using QueenZone.Data;
 using QueenZone.Storage;
 
@@ -14,7 +15,8 @@ public sealed class PhotoSubmissionPromotionService(
     IAdminPhotoRepository adminPhotoRepository,
     IBlobUploadService blobUploadService,
     IGalleryPhotoBlobService galleryPhotoBlobService,
-    IServiceProvider serviceProvider)
+    IServiceProvider serviceProvider,
+    ILogger<PhotoSubmissionPromotionService> logger)
 {
     public async Task<int> PromoteAsync(
         PhotoSubmission submission,
@@ -52,7 +54,15 @@ public sealed class PhotoSubmissionPromotionService(
         await galleryPhotoBlobService.UploadAsync(
             container, thumbFileName, thumbnail.Stream, PhotoWebpDerivatives.WebpContentType, cancellationToken);
 
-        return await ExecutePromotionAsync(cancellationToken);
+        try
+        {
+            return await ExecutePromotionAsync(cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            await CompensateUploadedBlobsAsync(container, originalFileName, thumbFileName, submission.Id, cancellationToken);
+            throw;
+        }
 
         async Task<int> ExecutePromotionAsync(CancellationToken ct)
         {
@@ -95,6 +105,31 @@ public sealed class PhotoSubmissionPromotionService(
                 ?? throw new InvalidOperationException("Promotion failed while updating the submission.");
 
             return picId;
+        }
+    }
+
+    private async Task CompensateUploadedBlobsAsync(
+        string container,
+        string originalFileName,
+        string thumbFileName,
+        Guid submissionId,
+        CancellationToken cancellationToken)
+    {
+        foreach (var blobName in new[] { originalFileName, thumbFileName })
+        {
+            try
+            {
+                await galleryPhotoBlobService.DeleteAsync(container, blobName, cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogWarning(
+                    ex,
+                    "Orphan gallery blob cleanup failed for submission {SubmissionId} ({Container}/{BlobName})",
+                    submissionId,
+                    container,
+                    blobName);
+            }
         }
     }
 }
