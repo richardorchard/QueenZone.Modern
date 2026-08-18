@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using QueenZone.Data;
 using QueenZone.Storage;
+using QueenZone.Web.Search;
 
 namespace QueenZone.Web.Pages.Forum;
 
@@ -19,6 +20,7 @@ public sealed class NewThreadModel(
     ForumPostRateLimiter rateLimiter,
     ForumAttachmentValidator attachmentValidator,
     ForumAttachmentUploadService attachmentUploadService,
+    ForumSearchIndexSynchronizer forumSearchIndex,
     TimeProvider timeProvider) : PageModel
 {
     [BindProperty]
@@ -100,6 +102,7 @@ public sealed class NewThreadModel(
         }
 
         var authorDisplayName = await ResolveAuthorDisplayNameAsync(memberId.Value, cancellationToken);
+        var createdAt = timeProvider.GetUtcNow();
         ForumThreadCreateResult created;
         try
         {
@@ -110,9 +113,10 @@ public sealed class NewThreadModel(
                     authorDisplayName,
                     Subject,
                     sanitizedBody,
-                    timeProvider.GetUtcNow(),
+                    createdAt,
                     newPoll),
                 cancellationToken);
+            await forumSearchIndex.UpsertThreadAsync(created.TopicId, Subject, createdAt, cancellationToken);
 
             if (attachmentValidation.AcceptedFiles.Count > 0)
             {

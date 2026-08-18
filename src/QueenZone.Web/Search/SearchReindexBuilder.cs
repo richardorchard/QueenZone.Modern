@@ -226,6 +226,9 @@ public sealed class SearchReindexBuilder(
             AuthorDisplayName = performance.PerformedBy,
         };
 
+    /// <summary>Stable search index identity for a modern forum thread, e.g. <c>forum-thread:4521</c>.</summary>
+    public static string ForumThreadSourceKey(int topicId) => $"forum-thread:{topicId}";
+
     /// <summary>
     /// Maps one published news item to its <see cref="SearchDocumentEntity"/> shape. Exposed so
     /// admin publish/unpublish handlers can upsert a single document immediately rather than
@@ -247,10 +250,15 @@ public sealed class SearchReindexBuilder(
         };
     }
 
-    private static SearchDocumentEntity MapForumThread(ForumTopicSitemapItem item) =>
+    /// <summary>
+    /// Maps one public forum thread to its title-oriented <see cref="SearchDocumentEntity"/> shape.
+    /// Exposed so create/reply handlers can upsert a single document immediately rather than
+    /// waiting for the next full reindex — see <see cref="ForumSearchIndexSynchronizer"/>.
+    /// </summary>
+    public static SearchDocumentEntity MapForumThread(ForumTopicSitemapItem item) =>
         new()
         {
-            SourceKey = $"forum-thread:{item.TopicId}",
+            SourceKey = ForumThreadSourceKey(item.TopicId),
             ContentType = SiteSearchContentType.Forum,
             Title = item.Title,
             // Sitemap projection only carries the thread title, not post bodies — full post
