@@ -70,6 +70,45 @@ public sealed class SearchReindexBuilderTests
     }
 
     [Fact]
+    public async Task ReindexForumAsync_KeepsThreadsCreatedAfterSeed()
+    {
+        var store = new SharedSearchIndexStore();
+        var indexService = new InMemorySearchIndexService(store);
+        var forumWriteRepository = new InMemoryForumWriteRepository();
+        var forumRepository = new InMemoryForumRepository(
+            SampleForumData.CreateSeedCategories(),
+            SampleForumData.CreateSeedStats(),
+            forumWriteRepository,
+            new InMemoryForumAttachmentRepository());
+        var createdAt = new DateTimeOffset(2026, 8, 18, 15, 30, 0, TimeSpan.Zero);
+        var created = await forumWriteRepository.CreateThreadAsync(new NewForumThread(
+            1,
+            Guid.NewGuid(),
+            "Forum Fan",
+            "Incremental search safety-net thread",
+            "<p>Body</p>",
+            createdAt));
+
+        var builder = new SearchReindexBuilder(
+            indexService,
+            new InMemoryNewsRepository(new SharedNewsStore(SampleNewsData.CreateSeedArticles())),
+            forumRepository,
+            new InMemoryArticleRepository(new InMemoryArticleSubmissionRepository()),
+            new InMemoryArticlesRepository(SampleArticlesData.CreateSeedArticles()),
+            new InMemoryBiographyRepository(SampleBiographyData.CreateSeedChapters()),
+            new InMemoryDiscographyRepository(SampleDiscographyData.CreateSeedAlbums()),
+            new InMemoryQueenHistoryRepository(SampleQueenHistoryData.CreateSeedEvents()),
+            new InMemoryFanPerformanceRepository(SampleFanPerformanceData.CreateSeedPerformances()));
+
+        await builder.ReindexForumAsync();
+
+        var document = Assert.Single(
+            store.GetAll().Where(d => d.SourceKey == SearchReindexBuilder.ForumThreadSourceKey(created.TopicId)));
+        Assert.Equal("Incremental search safety-net thread", document.Title);
+        Assert.Equal(createdAt, document.PublishedAt);
+    }
+
+    [Fact]
     public async Task ReindexArticlesAsync_IndexesOnlyPublishedArticles()
     {
         var store = new SharedSearchIndexStore();
