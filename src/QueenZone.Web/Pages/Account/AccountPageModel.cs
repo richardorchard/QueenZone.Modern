@@ -14,5 +14,7 @@ public abstract class AccountPageModel(IOptions<MemberAuthenticationOptions> mem
 
     public bool GitHubEnabled => memberAuthenticationOptions.Value.GitHub?.ClientId is { Length: > 0 };
 
+    public bool AppleEnabled => memberAuthenticationOptions.Value.Apple?.IsConfigured == true;
+
     protected static string ResolveReturnUrl(string? returnUrl) => LocalReturnUrl.Resolve(returnUrl);
 }

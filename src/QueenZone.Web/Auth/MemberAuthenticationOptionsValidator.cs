@@ -27,6 +27,7 @@ public sealed class MemberAuthenticationOptionsValidator(IHostEnvironment enviro
             failures,
             $"{MemberAuthenticationOptions.SectionName}:GitHub",
             options.GitHub);
+        configuredProviders += ValidateApple(failures, options.Apple);
 
         if (configuredProviders == 0 && QueenZoneEnvironments.IsProductionLike(environment))
         {
@@ -51,6 +52,29 @@ public sealed class MemberAuthenticationOptionsValidator(IHostEnvironment enviro
         }
 
         failures.Add($"{name} ClientId and ClientSecret must both be set, or both left empty.");
+        return 0;
+    }
+
+    private static int ValidateApple(
+        ICollection<string> failures,
+        MemberAuthenticationOptions.AppleCredentials? apple)
+    {
+        var values = new[]
+        {
+            apple?.ClientId,
+            apple?.TeamId,
+            apple?.KeyId,
+            apple?.PrivateKey,
+        };
+        var configuredValues = values.Count(OptionsValidation.LooksConfigured);
+        if (configuredValues is 0 or 4)
+        {
+            return configuredValues == 4 ? 1 : 0;
+        }
+
+        failures.Add(
+            $"{MemberAuthenticationOptions.SectionName}:Apple ClientId, TeamId, KeyId and PrivateKey " +
+            "must all be set, or all left empty.");
         return 0;
     }
 }

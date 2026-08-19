@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using QueenZone.Data;
 
 namespace QueenZone.Web.Tests;
 
@@ -69,6 +70,31 @@ public sealed class ExternalLoginCallbackTests : IClassFixture<WebApplicationFac
         // MembersCookie is now stored in the cookie jar; member-probe should be accessible.
         var probeResponse = await client.GetAsync("/account/member-probe");
         Assert.Equal(HttpStatusCode.OK, probeResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task Callback_WithAppleSubject_CreatesAppleExternalLogin()
+    {
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            HandleCookies = true,
+            AllowAutoRedirect = false,
+        });
+        client.DefaultRequestHeaders.Add(ExternalCookieTestHandler.ProviderHeader, MemberAuthenticationSchemes.Apple);
+        client.DefaultRequestHeaders.Add(ExternalCookieTestHandler.SubjectHeader, "apple-subject-42");
+        client.DefaultRequestHeaders.Add(ExternalCookieTestHandler.EmailHeader, "applefan@privaterelay.appleid.com");
+        client.DefaultRequestHeaders.Add(ExternalCookieTestHandler.NameHeader, "Apple Fan");
+
+        var response = await client.GetAsync("/account/external-login-callback");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        using var scope = factory.Services.CreateScope();
+        var repository = scope.ServiceProvider.GetRequiredService<IMemberAccountRepository>();
+        var account = await repository.FindByExternalLoginAsync(
+            MemberAuthenticationSchemes.Apple,
+            "apple-subject-42");
+        Assert.NotNull(account);
+        Assert.Equal("Apple Fan", account.DisplayName);
     }
 
     [Fact]
