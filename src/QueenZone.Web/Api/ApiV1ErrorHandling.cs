@@ -17,11 +17,31 @@ public static class ApiV1ErrorHandling
         return app;
     }
 
+    /// <summary>
+    /// Register immediately after <c>UseStatusCodePagesWithReExecute</c> on the main pipeline.
+    /// Do not put the HTML re-execute handler inside <c>UseWhen</c>: that breaks re-execution and
+    /// turns antiforgery 400s, 403s, and 429s into 404s.
+    /// </summary>
     public static IApplicationBuilder UseApiV1StatusCodePages(this IApplicationBuilder app)
     {
-        app.UseWhen(
-            static context => ApiV1.IsApiPath(context.Request.Path),
-            branch => branch.Use(WriteProblemDetailsForEmptyErrorsAsync));
+        app.Use(async (context, next) =>
+        {
+            if (ApiV1.IsApiPath(context.Request.Path))
+            {
+                var statusCodePages = context.Features.Get<IStatusCodePagesFeature>();
+                if (statusCodePages is not null)
+                {
+                    statusCodePages.Enabled = false;
+                }
+            }
+
+            await next();
+
+            if (ApiV1.IsApiPath(context.Request.Path))
+            {
+                await WriteStatusCodeProblemAsync(context);
+            }
+        });
         return app;
     }
 

@@ -172,10 +172,8 @@ app.Use(async (context, next) =>
     await next();
 });
 
+app.UseStatusCodePagesWithReExecute("/error/{0}");
 app.UseApiV1StatusCodePages();
-app.UseWhen(
-    static context => !ApiV1.IsApiPath(context.Request.Path),
-    branch => branch.UseStatusCodePagesWithReExecute("/error/{0}"));
 var staticFileContentTypeProvider = new FileExtensionContentTypeProvider();
 staticFileContentTypeProvider.Mappings[".webmanifest"] = "application/manifest+json";
 app.UseStaticFiles(new StaticFileOptions

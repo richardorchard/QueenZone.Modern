@@ -100,6 +100,16 @@ public sealed class ApiV1RoutesTests : IClassFixture<QueenZoneWebApplicationFact
     }
 
     [Fact]
+    public async Task Site_post_without_antiforgery_still_returns_bad_request_not_not_found()
+    {
+        using var client = factory.CreateAnonymousClient(allowAutoRedirect: false);
+        using var response = await client.PostAsync("/contact", new FormUrlEncodedContent([]));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.NotEqual("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
     public async Task Existing_html_not_found_page_is_unchanged()
     {
         using var client = factory.CreateAnonymousClient();
