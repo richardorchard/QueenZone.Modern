@@ -12,6 +12,7 @@ This repository is the modern QueenZone rebuild. The project is archive-first: i
 - `docs/architecture/opentofu-inventory.md` is the live Azure/Cloudflare ownership inventory for OpenTofu adoption (`infra/import/` holds sanitised IDs).
 - `docs/architecture/opentofu-contributor-runbook.md` is the OpenTofu operating contract, including `prevent_destroy` on SQL, Storage, and other irreplaceable resources. OpenTofu does not manage blob objects or SQL rows, and it will not automatically refuse to destroy a data store unless that lifecycle flag is set.
 - `docs/decisions/0007-rich-text-editor-quill.md` is the shared Quill rich-text editor decision (partial + `/api/uploads/editor-image`).
+- `docs/architecture/json-api-v1.md` is the versioned `/api/v1` JSON API contract (pagination, Problem Details, OpenAPI).
 - `docs/backlog/migration-backlog.md` tracks migration work.
 - `docs/sql/data-api-builder-mcp.md` explains the local SQL MCP setup for read-only legacy database investigation.
 - `docs/agent-bitwarden-secrets.md` is the multi-machine Bitwarden Secrets Manager (`bws`) setup for local agents (Windows vs macOS).
@@ -22,7 +23,7 @@ Keep durable workflow guidance in this file and keep user-facing setup guidance 
 
 `QueenZone.Web` uses ASP.NET Core Razor Pages for server-rendered pages. Public archive pages, news pages, and admin editorial screens should live under `src/QueenZone.Web/Pages` as `.cshtml` files with page models.
 
-Do not build visitor-facing or admin pages by streaming inline HTML from minimal route handlers. Minimal endpoints are appropriate for small non-page responses such as `/health` or future JSON APIs.
+Do not build visitor-facing or admin pages by streaming inline HTML from minimal route handlers. Minimal endpoints are appropriate for small non-page responses such as `/health` or the versioned JSON API under `/api/v1` (`src/QueenZone.Web/Api/`). Existing narrow endpoints in `src/QueenZone.Web/Endpoints/` (RSS, uploads, streaming) stay outside that contract. See `docs/architecture/json-api-v1.md`.
 
 ## Branch And Pull Request Policy
 

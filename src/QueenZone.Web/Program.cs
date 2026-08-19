@@ -130,9 +130,12 @@ if (ResponseCompressionBootstrap.IsEnabled(app.Environment))
     app.UseResponseCompression();
 }
 
+app.UseApiV1ExceptionHandler();
 if (!app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler("/error");
+    app.UseWhen(
+        static context => !ApiV1.IsApiPath(context.Request.Path),
+        branch => branch.UseExceptionHandler("/error"));
 }
 
 // PhysicalFileProvider excludes dot-prefixed files/folders by default, so the generic
@@ -169,7 +172,10 @@ app.Use(async (context, next) =>
     await next();
 });
 
-app.UseStatusCodePagesWithReExecute("/error/{0}");
+app.UseApiV1StatusCodePages();
+app.UseWhen(
+    static context => !ApiV1.IsApiPath(context.Request.Path),
+    branch => branch.UseStatusCodePagesWithReExecute("/error/{0}"));
 var staticFileContentTypeProvider = new FileExtensionContentTypeProvider();
 staticFileContentTypeProvider.Mappings[".webmanifest"] = "application/manifest+json";
 app.UseStaticFiles(new StaticFileOptions
@@ -247,6 +253,7 @@ app.MapUgcProxyEndpoints();
 app.MapSitemapEndpoints();
 app.MapArticleAutosaveEndpoint();
 app.MapArticlesFeedEndpoint();
+app.MapQueenZoneApiV1();
 app.MapMobileAuthEndpoints();
 // Anonymous public HTML is output-cached (short TTL); policy no-ops for authenticated users
 // and for the Testing environment so integration suites stay deterministic.
