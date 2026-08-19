@@ -15,5 +15,7 @@ public static class MemberAuthenticationSchemes
 
     public const string GitHub = "GitHub";
 
+    public const string Apple = "Apple";
+
     public const string MemberPolicy = "Member";
 }
