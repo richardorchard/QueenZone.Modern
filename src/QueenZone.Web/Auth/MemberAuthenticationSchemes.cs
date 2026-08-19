@@ -18,4 +18,37 @@ public static class MemberAuthenticationSchemes
     public const string Apple = "Apple";
 
     public const string MemberPolicy = "Member";
+
+    /// <summary>JWT bearer scheme issued to the mobile client. Not the default web scheme.</summary>
+    public const string MembersBearer = "MembersBearer";
+
+    /// <summary>Member API access via a mobile access token. Does not accept the web cookie.</summary>
+    public const string MobileMemberPolicy = "MobileMember";
+
+    public static readonly string[] ExternalProviders =
+    [
+        Google,
+        Microsoft,
+        Discord,
+        GitHub,
+        Apple,
+    ];
+
+    public static string? NormalizeExternalProvider(string? provider)
+    {
+        if (string.IsNullOrWhiteSpace(provider))
+        {
+            return null;
+        }
+
+        foreach (var name in ExternalProviders)
+        {
+            if (string.Equals(name, provider, StringComparison.OrdinalIgnoreCase))
+            {
+                return name;
+            }
+        }
+
+        return null;
+    }
 }

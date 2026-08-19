@@ -85,6 +85,11 @@ public static class QueenZoneWebServiceCollectionExtensions
         services.AddOptions<PrivateMessageRateLimitOptions>()
             .Bind(configuration.GetSection(PrivateMessageRateLimitOptions.SectionName));
 
+        services.AddOptions<MobileAuthOptions>()
+            .Bind(configuration.GetSection(MobileAuthOptions.SectionName))
+            .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<MobileAuthOptions>, MobileAuthOptionsValidator>();
+
         return services;
     }
 
@@ -242,6 +247,9 @@ public static class QueenZoneWebServiceCollectionExtensions
         services.AddSingleton<IGoogleAnalyticsDataClient, GoogleAnalyticsDataClient>();
         services.AddScoped<IGoogleAnalyticsTrafficService, GoogleAnalyticsTrafficService>();
         services.AddScoped<AdminDashboardService>();
+        services.AddSingleton<MobileAuthAuthorizationSessionStore>();
+        services.AddSingleton<MobileAuthTokenIssuer>();
+        services.AddScoped<MobileAuthService>();
         // Header name used by the rich-text editor fetch() upload helper.
         services.AddAntiforgery(options =>
         {

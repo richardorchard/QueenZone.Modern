@@ -84,6 +84,11 @@ public sealed class QueenZoneDbContext : DbContext
 
     public DbSet<SearchReindexRunRequestEntity> SearchReindexRunRequests => Set<SearchReindexRunRequestEntity>();
 
+    public DbSet<MobileAuthAuthorizationCodeEntity> MobileAuthAuthorizationCodes =>
+        Set<MobileAuthAuthorizationCodeEntity>();
+
+    public DbSet<MobileAuthRefreshTokenEntity> MobileAuthRefreshTokens => Set<MobileAuthRefreshTokenEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<NewsTableRow>(entity =>
@@ -916,6 +921,51 @@ public sealed class QueenZoneDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(request => request.MemberId)
                 .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<MobileAuthAuthorizationCodeEntity>(entity =>
+        {
+            entity.ToTable("MobileAuthAuthorizationCodes");
+            entity.HasKey(code => code.Id);
+
+            entity.Property(code => code.CodeHash).HasMaxLength(64).IsRequired();
+            entity.Property(code => code.ClientId).HasMaxLength(100).IsRequired();
+            entity.Property(code => code.RedirectUri).HasMaxLength(500).IsRequired();
+            entity.Property(code => code.CodeChallenge).HasMaxLength(128).IsRequired();
+            entity.Property(code => code.ExpiresAt).IsRequired();
+            entity.Property(code => code.CreatedAt).IsRequired();
+
+            entity.HasIndex(code => code.CodeHash)
+                .IsUnique()
+                .HasDatabaseName("IX_MobileAuthAuthorizationCodes_CodeHash");
+
+            entity.HasOne(code => code.MemberAccount)
+                .WithMany()
+                .HasForeignKey(code => code.MemberAccountId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<MobileAuthRefreshTokenEntity>(entity =>
+        {
+            entity.ToTable("MobileAuthRefreshTokens");
+            entity.HasKey(token => token.Id);
+
+            entity.Property(token => token.TokenHash).HasMaxLength(64).IsRequired();
+            entity.Property(token => token.ClientId).HasMaxLength(100).IsRequired();
+            entity.Property(token => token.ExpiresAt).IsRequired();
+            entity.Property(token => token.CreatedAt).IsRequired();
+
+            entity.HasIndex(token => token.TokenHash)
+                .IsUnique()
+                .HasDatabaseName("IX_MobileAuthRefreshTokens_TokenHash");
+
+            entity.HasIndex(token => new { token.MemberAccountId, token.RevokedAt })
+                .HasDatabaseName("IX_MobileAuthRefreshTokens_Member_Revoked");
+
+            entity.HasOne(token => token.MemberAccount)
+                .WithMany()
+                .HasForeignKey(token => token.MemberAccountId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }
