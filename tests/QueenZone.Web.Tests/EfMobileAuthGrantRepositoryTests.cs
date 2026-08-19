@@ -71,6 +71,68 @@ public sealed class EfMobileAuthGrantRepositoryTests : IAsyncDisposable
         Assert.Null(stored.RevokedAt);
     }
 
+    [Fact]
+    public async Task TryRevokeRefreshToken_ThenFind_ShowsRevoked()
+    {
+        var member = await SeedMemberAsync();
+        var now = new DateTime(2026, 8, 19, 12, 0, 0, DateTimeKind.Utc);
+        await repository.StoreRefreshTokenAsync(new MobileAuthRefreshTokenEntity
+        {
+            Id = Guid.NewGuid(),
+            TokenHash = "ef-revoke",
+            MemberAccountId = member.Id,
+            ClientId = MobileAuthOptions.DefaultClientId,
+            CreatedAt = now,
+            ExpiresAt = now.AddDays(30),
+        });
+
+        Assert.True(await repository.TryRevokeRefreshTokenAsync("ef-revoke", now));
+        Assert.False(await repository.TryRevokeRefreshTokenAsync("ef-revoke", now));
+        var stored = await repository.FindRefreshTokenByHashAsync("ef-revoke");
+        Assert.Equal(now, stored!.RevokedAt);
+    }
+
+    [Fact]
+    public async Task RevokeAllRefreshTokensForMember_RevokesOnlyThatMember()
+    {
+        var member = await SeedMemberAsync();
+        var other = new MemberAccount
+        {
+            Id = Guid.NewGuid(),
+            Email = "other-ef@example.com",
+            NormalizedEmail = "OTHER-EF@EXAMPLE.COM",
+            DisplayName = "Other EF",
+            CreatedAt = DateTime.UtcNow,
+        };
+        dbContext.MemberAccounts.Add(other);
+        await dbContext.SaveChangesAsync();
+        var now = new DateTime(2026, 8, 19, 12, 0, 0, DateTimeKind.Utc);
+        await repository.StoreRefreshTokenAsync(new MobileAuthRefreshTokenEntity
+        {
+            Id = Guid.NewGuid(),
+            TokenHash = "ef-alice",
+            MemberAccountId = member.Id,
+            ClientId = MobileAuthOptions.DefaultClientId,
+            CreatedAt = now,
+            ExpiresAt = now.AddDays(30),
+        });
+        await repository.StoreRefreshTokenAsync(new MobileAuthRefreshTokenEntity
+        {
+            Id = Guid.NewGuid(),
+            TokenHash = "ef-bob",
+            MemberAccountId = other.Id,
+            ClientId = MobileAuthOptions.DefaultClientId,
+            CreatedAt = now,
+            ExpiresAt = now.AddDays(30),
+        });
+
+        var revoked = await repository.RevokeAllRefreshTokensForMemberAsync(member.Id, now);
+
+        Assert.Equal(1, revoked);
+        Assert.NotNull((await repository.FindRefreshTokenByHashAsync("ef-alice"))!.RevokedAt);
+        Assert.Null((await repository.FindRefreshTokenByHashAsync("ef-bob"))!.RevokedAt);
+    }
+
     private async Task<MemberAccount> SeedMemberAsync()
     {
         var account = new MemberAccount

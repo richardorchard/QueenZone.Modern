@@ -41,4 +41,35 @@ public sealed class EfMobileAuthGrantRepository(QueenZoneDbContext dbContext) : 
         dbContext.MobileAuthRefreshTokens.Add(token);
         await dbContext.SaveChangesAsync(cancellationToken);
     }
+
+    public async Task<MobileAuthRefreshTokenEntity?> FindRefreshTokenByHashAsync(
+        string tokenHash,
+        CancellationToken cancellationToken = default) =>
+        await dbContext.MobileAuthRefreshTokens
+            .AsNoTracking()
+            .SingleOrDefaultAsync(token => token.TokenHash == tokenHash, cancellationToken);
+
+    public async Task<bool> TryRevokeRefreshTokenAsync(
+        string tokenHash,
+        DateTime utcNow,
+        CancellationToken cancellationToken = default)
+    {
+        var updated = await dbContext.MobileAuthRefreshTokens
+            .Where(token => token.TokenHash == tokenHash && token.RevokedAt == null && token.ExpiresAt > utcNow)
+            .ExecuteUpdateAsync(
+                setters => setters.SetProperty(token => token.RevokedAt, utcNow),
+                cancellationToken);
+
+        return updated == 1;
+    }
+
+    public async Task<int> RevokeAllRefreshTokensForMemberAsync(
+        Guid memberAccountId,
+        DateTime utcNow,
+        CancellationToken cancellationToken = default) =>
+        await dbContext.MobileAuthRefreshTokens
+            .Where(token => token.MemberAccountId == memberAccountId && token.RevokedAt == null)
+            .ExecuteUpdateAsync(
+                setters => setters.SetProperty(token => token.RevokedAt, utcNow),
+                cancellationToken);
 }

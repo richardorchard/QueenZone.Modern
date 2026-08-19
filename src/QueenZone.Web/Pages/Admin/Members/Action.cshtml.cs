@@ -5,7 +5,8 @@ namespace QueenZone.Web.Pages.Admin.Members;
 
 public sealed class ActionModel(
     IMemberAccountRepository memberAccountRepository,
-    IForumWriteRepository forumWriteRepository) : AdminMembersPageModel
+    IForumWriteRepository forumWriteRepository,
+    IMobileAuthGrantRepository mobileAuthGrantRepository) : AdminMembersPageModel
 {
     [BindProperty]
     public string? Reason { get; set; }
@@ -25,6 +26,7 @@ public sealed class ActionModel(
         }
 
         await forumWriteRepository.HidePostsByMemberAsync(id, cancellationToken);
+        await mobileAuthGrantRepository.RevokeAllRefreshTokensForMemberAsync(id, DateTime.UtcNow, cancellationToken);
 
         return RedirectWithMessage(
             id,

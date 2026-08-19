@@ -36,6 +36,8 @@ public sealed class MobileAuthTokenIssuerTests
         Assert.Equal(issuer.Issuer, validated.Issuer);
         Assert.True(issuer.AccessTokenLifetimeSeconds is >= 60 and <= 120 * 60);
         Assert.True(issuer.CanIssueTokens);
+        Assert.True(validated.ValidTo <= DateTime.UtcNow.AddMinutes(15).AddSeconds(30));
+        Assert.True(validated.ValidTo > DateTime.UtcNow.AddMinutes(10));
     }
 
     [Fact]
@@ -88,5 +90,29 @@ public sealed class MobileAuthTokenIssuerTests
             new MobileAuthOptions { SigningKey = "production-mobile-auth-signing-key!!" },
             new FakeHostEnvironment("Production"));
         Assert.Equal("production-mobile-auth-signing-key!!", key);
+    }
+
+    [Fact]
+    public void CreateValidationParameters_RejectsExpiredAccessToken()
+    {
+        var parameters = MobileAuthTokenIssuer.CreateValidationParameters(
+            "https://www.queenzone.org",
+            MobileAuthOptions.DefaultClientId,
+            MobileAuthOptions.DevelopmentSigningKey);
+        parameters.ClockSkew = TimeSpan.Zero;
+        var now = DateTime.UtcNow;
+        var key = new SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(MobileAuthOptions.DevelopmentSigningKey));
+        var expired = new JwtSecurityToken(
+            issuer: "https://www.queenzone.org",
+            audience: MobileAuthOptions.DefaultClientId,
+            claims: [new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString())],
+            notBefore: now.AddHours(-2),
+            expires: now.AddMinutes(-1),
+            signingCredentials: new SigningCredentials(key, SecurityAlgorithms.HmacSha256));
+        var jwt = new JwtSecurityTokenHandler().WriteToken(expired);
+
+        var ex = Assert.Throws<SecurityTokenExpiredException>(() =>
+            new JwtSecurityTokenHandler().ValidateToken(jwt, parameters, out _));
+        Assert.DoesNotContain("refresh", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 }
