@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using QueenZone.Data;
 using QueenZone.Data.Entities;
 using QueenZone.Web;
@@ -75,6 +77,99 @@ public sealed class PrivateMessageServiceTests
         var missing = await service.ComposeAsync(alice.Id, Guid.NewGuid(), "hi");
         Assert.False(missing.Succeeded);
         Assert.Contains("not found", missing.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Compose_And_Reply_RejectSuspendedSender()
+    {
+        var (service, members, _, alice, bob) = CreateSystem();
+        await members.SuspendAsync(alice.Id, "Spam reports", "admin@example.com", DateTime.UtcNow);
+
+        var compose = await service.ComposeAsync(alice.Id, bob.Id, "Hi");
+        Assert.False(compose.Succeeded);
+        Assert.Equal(PrivateMessageService.UnableToSendMessage, compose.ErrorMessage);
+
+        var created = await service.ComposeAsync(bob.Id, alice.Id, "Hi Alice");
+        var reply = await service.ReplyAsync(created.ConversationId!.Value, alice.Id, "Reply");
+        Assert.False(reply.Succeeded);
+        Assert.Equal(PrivateMessageService.UnableToSendMessage, reply.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task Compose_IsRateLimited_WhenMessageVolumeExceedsWindow()
+    {
+        var tightOptions = new PrivateMessageRateLimitOptions
+        {
+            MaxMessagesPerWindow = 2,
+            NewAccountMaxMessagesPerWindow = 2,
+        };
+        var (service, _, _, alice, bob) = CreateSystem(tightOptions);
+
+        Assert.True((await service.ComposeAsync(alice.Id, bob.Id, "Msg 1")).Succeeded);
+        var created = await service.ComposeAsync(alice.Id, bob.Id, "Msg 2");
+        Assert.True(created.Succeeded);
+
+        var third = await service.ReplyAsync(created.ConversationId!.Value, alice.Id, "Msg 3");
+        Assert.False(third.Succeeded);
+        Assert.Equal(PrivateMessageService.RateLimitedMessage, third.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task Compose_IsRateLimited_WhenTooManyNewRecipients()
+    {
+        var tightOptions = new PrivateMessageRateLimitOptions
+        {
+            MaxNewRecipientsPerWindow = 1,
+            NewAccountMaxNewRecipientsPerWindow = 1,
+        };
+        var (service, members, _, alice, bob) = CreateSystem(tightOptions);
+        var carol = await members.CreateAsync(new MemberAccount
+        {
+            Id = Guid.NewGuid(),
+            Email = "carol-fanout@example.com",
+            DisplayName = "Carol",
+            CreatedAt = DateTime.UtcNow,
+        });
+
+        Assert.True((await service.ComposeAsync(alice.Id, bob.Id, "Hi Bob")).Succeeded);
+        var second = await service.ComposeAsync(alice.Id, carol.Id, "Hi Carol");
+
+        Assert.False(second.Succeeded);
+        Assert.Equal(PrivateMessageService.RateLimitedMessage, second.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task Reply_IsNotRateLimited_ByNewRecipientFanOut()
+    {
+        var tightOptions = new PrivateMessageRateLimitOptions
+        {
+            MaxNewRecipientsPerWindow = 1,
+            NewAccountMaxNewRecipientsPerWindow = 1,
+        };
+        var (service, _, _, alice, bob) = CreateSystem(tightOptions);
+        var created = await service.ComposeAsync(alice.Id, bob.Id, "Hi Bob");
+
+        // The fan-out limit already used its one allowance on the compose above; replying in the
+        // same (already-existing) conversation must not be blocked by the recipient fan-out check.
+        var reply = await service.ReplyAsync(created.ConversationId!.Value, alice.Id, "Following up");
+
+        Assert.True(reply.Succeeded);
+    }
+
+    [Fact]
+    public async Task Compose_IsRateLimited_WhenSameMessageRepeatedTooOften()
+    {
+        var tightOptions = new PrivateMessageRateLimitOptions { MaxDuplicateMessagesPerWindow = 2 };
+        var (service, _, _, alice, bob) = CreateSystem(tightOptions);
+        var created = await service.ComposeAsync(alice.Id, bob.Id, "Buy my product");
+        Assert.True(created.Succeeded);
+
+        var secondIdentical = await service.ReplyAsync(created.ConversationId!.Value, alice.Id, "Buy my product");
+        Assert.True(secondIdentical.Succeeded);
+
+        var thirdIdentical = await service.ReplyAsync(created.ConversationId.Value, alice.Id, "Buy my product");
+        Assert.False(thirdIdentical.Succeeded);
+        Assert.Equal(PrivateMessageService.RateLimitedMessage, thirdIdentical.ErrorMessage);
     }
 
     [Fact]
@@ -546,9 +641,9 @@ public sealed class PrivateMessageServiceTests
         IMemberAccountRepository Members,
         IPrivateMessageRepository Messages,
         MemberAccount Alice,
-        MemberAccount Bob) CreateSystem()
+        MemberAccount Bob) CreateSystem(PrivateMessageRateLimitOptions? rateLimitOptions = null)
     {
-        var created = CreateSystemWithFollows();
+        var created = CreateSystemWithFollows(rateLimitOptions);
         return (created.Service, created.Members, created.Messages, created.Alice, created.Bob);
     }
 
@@ -558,7 +653,7 @@ public sealed class PrivateMessageServiceTests
         IPrivateMessageRepository Messages,
         IMemberFollowRepository Follows,
         MemberAccount Alice,
-        MemberAccount Bob) CreateSystemWithFollows()
+        MemberAccount Bob) CreateSystemWithFollows(PrivateMessageRateLimitOptions? rateLimitOptions = null)
     {
         var members = new InMemoryMemberAccountRepository();
         var alice = members.CreateAsync(new MemberAccount
@@ -579,7 +674,27 @@ public sealed class PrivateMessageServiceTests
         var messages = new InMemoryPrivateMessageRepository(id =>
             members.FindByIdAsync(id).GetAwaiter().GetResult());
         var follows = new InMemoryMemberFollowRepository();
-        var service = new PrivateMessageService(messages, members, follows, TimeProvider.System);
+        var rateLimiter = new PrivateMessageRateLimiter(
+            messages,
+            TimeProvider.System,
+            Options.Create(rateLimitOptions ?? PermissiveRateLimitOptions()),
+            NullLogger<PrivateMessageRateLimiter>.Instance);
+        var service = new PrivateMessageService(messages, members, follows, rateLimiter, TimeProvider.System);
         return (service, members, messages, follows, alice, bob);
     }
+
+    /// <summary>
+    /// Effectively unlimited thresholds so tests unrelated to rate limiting are unaffected,
+    /// regardless of whether the test member accounts are treated as "new".
+    /// </summary>
+    private static PrivateMessageRateLimitOptions PermissiveRateLimitOptions() => new()
+    {
+        WindowMinutes = 10,
+        MaxMessagesPerWindow = 1000,
+        MaxNewRecipientsPerWindow = 1000,
+        MaxDuplicateMessagesPerWindow = 1000,
+        NewAccountAgeDays = 3,
+        NewAccountMaxMessagesPerWindow = 1000,
+        NewAccountMaxNewRecipientsPerWindow = 1000,
+    };
 }

@@ -142,4 +142,35 @@ public interface IPrivateMessageRepository
         Guid blockerMemberId,
         Guid blockedMemberId,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Counts messages sent by <paramref name="senderMemberId"/> (across any conversation)
+    /// since <paramref name="sinceUtc"/>. Used for private-message rate limiting.
+    /// </summary>
+    Task<int> CountMessagesBySenderSinceAsync(
+        Guid senderMemberId,
+        DateTimeOffset sinceUtc,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Counts messages sent by <paramref name="senderMemberId"/> with an exact <paramref name="body"/>
+    /// match (across any conversation) since <paramref name="sinceUtc"/>. Used for private-message
+    /// rate limiting to detect repeated identical sends.
+    /// </summary>
+    Task<int> CountIdenticalMessagesBySenderSinceAsync(
+        Guid senderMemberId,
+        string body,
+        DateTimeOffset sinceUtc,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Counts distinct conversations <paramref name="senderMemberId"/> has sent a message in,
+    /// restricted to conversations that were themselves created since <paramref name="sinceUtc"/>
+    /// (i.e. new conversations, not replies in older ones). Used for private-message rate
+    /// limiting to detect excessive recipient targeting.
+    /// </summary>
+    Task<int> CountDistinctNewRecipientsSinceAsync(
+        Guid senderMemberId,
+        DateTimeOffset sinceUtc,
+        CancellationToken cancellationToken = default);
 }

@@ -511,6 +511,58 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
         }
     }
 
+    public Task<int> CountMessagesBySenderSinceAsync(
+        Guid senderMemberId,
+        DateTimeOffset sinceUtc,
+        CancellationToken cancellationToken = default)
+    {
+        lock (sync)
+        {
+            var count = messages.Count(
+                m => m.SenderMemberId == senderMemberId && m.CreatedAt >= sinceUtc);
+            return Task.FromResult(count);
+        }
+    }
+
+    public Task<int> CountIdenticalMessagesBySenderSinceAsync(
+        Guid senderMemberId,
+        string body,
+        DateTimeOffset sinceUtc,
+        CancellationToken cancellationToken = default)
+    {
+        lock (sync)
+        {
+            var count = messages.Count(
+                m => m.SenderMemberId == senderMemberId
+                    && m.CreatedAt >= sinceUtc
+                    && string.Equals(m.Body, body, StringComparison.Ordinal));
+            return Task.FromResult(count);
+        }
+    }
+
+    public Task<int> CountDistinctNewRecipientsSinceAsync(
+        Guid senderMemberId,
+        DateTimeOffset sinceUtc,
+        CancellationToken cancellationToken = default)
+    {
+        lock (sync)
+        {
+            var newConversationIds = conversations
+                .Where(c => c.CreatedAt >= sinceUtc)
+                .Select(c => c.Id)
+                .ToHashSet();
+
+            var count = messages
+                .Where(m => m.SenderMemberId == senderMemberId
+                    && m.CreatedAt >= sinceUtc
+                    && newConversationIds.Contains(m.ConversationId))
+                .Select(m => m.ConversationId)
+                .Distinct()
+                .Count();
+            return Task.FromResult(count);
+        }
+    }
+
     private PrivateConversationListItem ToListItem(PrivateConversationEntity conversation, Guid memberId)
     {
         var otherId = conversation.MemberLowId == memberId

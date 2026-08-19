@@ -296,6 +296,72 @@ public sealed class InMemoryPrivateMessageRepositoryTests
         Assert.Single((await repo.GetInboxAsync(alice.Id)).Items);
     }
 
+    [Fact]
+    public async Task CountMessagesBySenderSinceAsync_CountsOnlyMessagesInWindow()
+    {
+        var members = new InMemoryMemberAccountRepository();
+        var alice = await members.CreateAsync(NewMember("a-count@example.com", "Alice"));
+        var bob = await members.CreateAsync(NewMember("b-count@example.com", "Bob"));
+        var repo = new InMemoryPrivateMessageRepository(id =>
+            members.FindByIdAsync(id).GetAwaiter().GetResult());
+
+        var since = DateTimeOffset.Parse("2026-08-01T10:00:00Z");
+        var created = await repo.SendNewOrExistingAsync(
+            alice.Id,
+            bob.Id,
+            "Before window",
+            since.AddMinutes(-5));
+        await repo.ReplyAsync(created.ConversationId!.Value, alice.Id, "Inside window", since.AddMinutes(1));
+        await repo.ReplyAsync(created.ConversationId.Value, alice.Id, "Also inside window", since.AddMinutes(2));
+
+        Assert.Equal(2, await repo.CountMessagesBySenderSinceAsync(alice.Id, since));
+        Assert.Equal(0, await repo.CountMessagesBySenderSinceAsync(bob.Id, since));
+    }
+
+    [Fact]
+    public async Task CountIdenticalMessagesBySenderSinceAsync_MatchesExactBodyOnly()
+    {
+        var members = new InMemoryMemberAccountRepository();
+        var alice = await members.CreateAsync(NewMember("a-dup@example.com", "Alice"));
+        var bob = await members.CreateAsync(NewMember("b-dup@example.com", "Bob"));
+        var repo = new InMemoryPrivateMessageRepository(id =>
+            members.FindByIdAsync(id).GetAwaiter().GetResult());
+
+        var since = DateTimeOffset.Parse("2026-08-01T10:00:00Z");
+        var created = await repo.SendNewOrExistingAsync(alice.Id, bob.Id, "Repeat me", since);
+        await repo.ReplyAsync(created.ConversationId!.Value, alice.Id, "Repeat me", since.AddMinutes(1));
+        await repo.ReplyAsync(created.ConversationId.Value, alice.Id, "Different", since.AddMinutes(2));
+
+        Assert.Equal(2, await repo.CountIdenticalMessagesBySenderSinceAsync(alice.Id, "Repeat me", since));
+        Assert.Equal(1, await repo.CountIdenticalMessagesBySenderSinceAsync(alice.Id, "Different", since));
+    }
+
+    [Fact]
+    public async Task CountDistinctNewRecipientsSinceAsync_ExcludesRepliesInOlderConversations()
+    {
+        var members = new InMemoryMemberAccountRepository();
+        var alice = await members.CreateAsync(NewMember("a-fanout@example.com", "Alice"));
+        var bob = await members.CreateAsync(NewMember("b-fanout@example.com", "Bob"));
+        var carol = await members.CreateAsync(NewMember("c-fanout@example.com", "Carol"));
+        var repo = new InMemoryPrivateMessageRepository(id =>
+            members.FindByIdAsync(id).GetAwaiter().GetResult());
+
+        var since = DateTimeOffset.Parse("2026-08-01T10:00:00Z");
+
+        // Existing conversation, started before the window: a reply here should not count.
+        var oldConversation = await repo.SendNewOrExistingAsync(
+            alice.Id,
+            bob.Id,
+            "Old conversation",
+            since.AddMinutes(-30));
+        await repo.ReplyAsync(oldConversation.ConversationId!.Value, alice.Id, "Reply in old thread", since.AddMinutes(1));
+
+        // New conversation, started inside the window: this should count.
+        await repo.SendNewOrExistingAsync(alice.Id, carol.Id, "New conversation", since.AddMinutes(2));
+
+        Assert.Equal(1, await repo.CountDistinctNewRecipientsSinceAsync(alice.Id, since));
+    }
+
     private static MemberAccount NewMember(string email, string name) =>
         new()
         {

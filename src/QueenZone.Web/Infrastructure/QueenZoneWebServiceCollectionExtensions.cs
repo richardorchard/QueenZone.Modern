@@ -82,6 +82,9 @@ public static class QueenZoneWebServiceCollectionExtensions
         services.AddOptions<HelpRequestOptions>()
             .Bind(configuration.GetSection(HelpRequestOptions.SectionName));
 
+        services.AddOptions<PrivateMessageRateLimitOptions>()
+            .Bind(configuration.GetSection(PrivateMessageRateLimitOptions.SectionName));
+
         return services;
     }
 
@@ -220,6 +223,7 @@ public static class QueenZoneWebServiceCollectionExtensions
     {
         services.AddScoped<MemberAccountService>();
         services.AddHostedService<MemberAccountDeletionHostedService>();
+        services.AddScoped<PrivateMessageRateLimiter>();
         services.AddScoped<PrivateMessageService>();
         services.AddScoped<MemberFollowService>();
         services.AddScoped<PhotoSubmissionService>();
