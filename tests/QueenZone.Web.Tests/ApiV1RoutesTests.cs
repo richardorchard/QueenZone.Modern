@@ -187,6 +187,37 @@ public sealed class ApiPaginationTests
 
 public sealed class ApiV1ErrorHandlingTests
 {
+    [Theory]
+    [InlineData("GET", "GET")]
+    [InlineData("get", "GET")]
+    [InlineData("POST", "POST")]
+    [InlineData("PUT", "PUT")]
+    [InlineData("DELETE", "DELETE")]
+    [InlineData("PATCH", "PATCH")]
+    [InlineData("HEAD", "HEAD")]
+    [InlineData("OPTIONS", "OPTIONS")]
+    [InlineData("TRACE", "OTHER")]
+    [InlineData("GET\nSet-Cookie: injected", "OTHER")]
+    [InlineData("", "OTHER")]
+    public void SanitizeHttpMethodForLog_maps_known_verbs_only(string method, string expected)
+    {
+        Assert.Equal(expected, ApiV1ErrorHandling.SanitizeHttpMethodForLog(method));
+    }
+
+    [Fact]
+    public void SanitizeForLog_strips_line_breaks_and_truncates()
+    {
+        Assert.Equal("OTHER", ApiV1ErrorHandling.SanitizeHttpMethodForLog(null));
+        Assert.Equal("/api/v1/news", ApiV1ErrorHandling.SanitizeForLog("/api/v1/news"));
+        Assert.Equal("/api/v1/x injected", ApiV1ErrorHandling.SanitizeForLog("/api/v1/x\r\n injected"));
+        Assert.Equal(string.Empty, ApiV1ErrorHandling.SanitizeForLog(null));
+
+        var longPath = "/api/v1/" + new string('a', 400);
+        var sanitized = ApiV1ErrorHandling.SanitizeForLog(longPath);
+        Assert.Equal(256, sanitized.Length);
+        Assert.StartsWith("/api/v1/", sanitized, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task Unhandled_exception_writer_returns_generic_problem_details()
     {

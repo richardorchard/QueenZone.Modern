@@ -32,7 +32,11 @@ public static class ApiV1ErrorHandling
         var error = context.Features.Get<IExceptionHandlerFeature>()?.Error;
         if (error is not null)
         {
-            logger.LogError(error, "Unhandled exception on {Method} {Path}", context.Request.Method, context.Request.Path);
+            logger.LogError(
+                error,
+                "Unhandled exception on {Method} {Path}",
+                SanitizeHttpMethodForLog(context.Request.Method),
+                SanitizeForLog(context.Request.Path.Value));
         }
 
         await Results.Problem(
@@ -61,5 +65,76 @@ public static class ApiV1ErrorHandling
                 statusCode: http.Response.StatusCode,
                 title: ReasonPhrases.GetReasonPhrase(http.Response.StatusCode))
             .ExecuteAsync(http);
+    }
+
+    /// <summary>
+    /// Maps the request method to a known HTTP verb so attacker-controlled tokens are never logged.
+    /// </summary>
+    internal static string SanitizeHttpMethodForLog(string? method)
+    {
+        if (string.IsNullOrEmpty(method))
+        {
+            return "OTHER";
+        }
+
+        if (HttpMethods.IsGet(method))
+        {
+            return HttpMethods.Get;
+        }
+
+        if (HttpMethods.IsPost(method))
+        {
+            return HttpMethods.Post;
+        }
+
+        if (HttpMethods.IsPut(method))
+        {
+            return HttpMethods.Put;
+        }
+
+        if (HttpMethods.IsDelete(method))
+        {
+            return HttpMethods.Delete;
+        }
+
+        if (HttpMethods.IsPatch(method))
+        {
+            return HttpMethods.Patch;
+        }
+
+        if (HttpMethods.IsHead(method))
+        {
+            return HttpMethods.Head;
+        }
+
+        if (HttpMethods.IsOptions(method))
+        {
+            return HttpMethods.Options;
+        }
+
+        return "OTHER";
+    }
+
+    /// <summary>
+    /// Strips CR/LF from user-controlled path text before it is written to logs, and caps length.
+    /// </summary>
+    internal static string SanitizeForLog(string? value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return string.Empty;
+        }
+
+        var sanitized = value
+            .Replace("\r", string.Empty, StringComparison.Ordinal)
+            .Replace("\n", string.Empty, StringComparison.Ordinal);
+
+        const int maxLength = 256;
+        if (sanitized.Length > maxLength)
+        {
+            sanitized = sanitized[..maxLength];
+        }
+
+        return sanitized;
     }
 }
