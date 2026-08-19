@@ -16,6 +16,10 @@ public static class MobileAuthEndpoints
 
     public const string TokenPath = "/api/v1/auth/token";
 
+    public const string RevokePath = "/api/v1/auth/revoke";
+
+    public const string LogoutPath = "/api/v1/auth/logout";
+
     public const string SessionPath = "/api/v1/auth/session";
 
     public static void MapMobileAuthEndpoints(this WebApplication app)
@@ -27,6 +31,9 @@ public static class MobileAuthEndpoints
         group.MapGet("/authorize", AuthorizeAsync);
         group.MapGet("/callback", CallbackAsync);
         group.MapPost("/token", TokenAsync);
+        group.MapPost("/revoke", RevokeAsync);
+        group.MapPost("/logout", LogoutAsync)
+            .RequireAuthorization(MemberAuthenticationSchemes.MobileMemberPolicy);
         group.MapGet("/session", Session)
             .RequireAuthorization(MemberAuthenticationSchemes.MobileMemberPolicy);
     }
@@ -163,13 +170,19 @@ public static class MobileAuthEndpoints
             return ErrorJson("invalid_request", "Token requests must be application/x-www-form-urlencoded.");
         }
 
-        var exchanged = await mobileAuth.ExchangeAuthorizationCodeAsync(
-            form["grant_type"].ToString(),
-            form["client_id"].ToString(),
-            form["redirect_uri"].ToString(),
-            form["code"].ToString(),
-            form["code_verifier"].ToString(),
-            cancellationToken);
+        var grantType = form["grant_type"].ToString();
+        var exchanged = string.Equals(grantType, "refresh_token", StringComparison.Ordinal)
+            ? await mobileAuth.ExchangeRefreshTokenAsync(
+                form["client_id"].ToString(),
+                form["refresh_token"].ToString(),
+                cancellationToken)
+            : await mobileAuth.ExchangeAuthorizationCodeAsync(
+                grantType,
+                form["client_id"].ToString(),
+                form["redirect_uri"].ToString(),
+                form["code"].ToString(),
+                form["code_verifier"].ToString(),
+                cancellationToken);
 
         if (!exchanged.Success)
         {
@@ -183,6 +196,45 @@ public static class MobileAuthEndpoints
             token_type = "Bearer",
             expires_in = exchanged.ExpiresIn,
         });
+    }
+
+    internal static async Task<IResult> RevokeAsync(
+        HttpContext httpContext,
+        MobileAuthService mobileAuth,
+        CancellationToken cancellationToken)
+    {
+        IFormCollection form;
+        try
+        {
+            form = await httpContext.Request.ReadFormAsync(cancellationToken);
+        }
+        catch (InvalidOperationException)
+        {
+            return Results.Ok();
+        }
+        catch (InvalidDataException)
+        {
+            return Results.Ok();
+        }
+
+        // RFC 7009: always 200, never echo the presented token.
+        await mobileAuth.RevokeRefreshTokenAsync(form["token"].ToString(), cancellationToken);
+        return Results.Ok();
+    }
+
+    internal static async Task<IResult> LogoutAsync(
+        ClaimsPrincipal user,
+        MobileAuthService mobileAuth,
+        CancellationToken cancellationToken)
+    {
+        var memberIdValue = user.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!Guid.TryParse(memberIdValue, out var memberId))
+        {
+            return Results.Unauthorized();
+        }
+
+        await mobileAuth.RevokeAllRefreshTokensForMemberAsync(memberId, cancellationToken);
+        return Results.NoContent();
     }
 
     internal static IResult Session(ClaimsPrincipal user)

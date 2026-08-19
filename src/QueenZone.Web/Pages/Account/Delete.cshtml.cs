@@ -8,7 +8,9 @@ using QueenZone.Data;
 namespace QueenZone.Web.Pages.Account;
 
 [Authorize(Policy = MemberAuthenticationSchemes.MemberPolicy, AuthenticationSchemes = MemberAuthenticationSchemes.MembersCookie)]
-public sealed class DeleteModel(MemberAccountService memberAccountService) : PageModel
+public sealed class DeleteModel(
+    MemberAccountService memberAccountService,
+    IMobileAuthGrantRepository mobileAuthGrantRepository) : PageModel
 {
     [BindProperty]
     public string Confirmation { get; set; } = string.Empty;
@@ -53,6 +55,10 @@ public sealed class DeleteModel(MemberAccountService memberAccountService) : Pag
             return Page();
         }
 
+        await mobileAuthGrantRepository.RevokeAllRefreshTokensForMemberAsync(
+            account.Id,
+            DateTime.UtcNow,
+            cancellationToken);
         await HttpContext.SignOutAsync(MemberAuthenticationSchemes.MembersCookie);
         return RedirectToPage("/Account/DeletionRequested");
     }

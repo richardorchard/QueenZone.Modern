@@ -20,4 +20,22 @@ public interface IMobileAuthGrantRepository
     Task StoreRefreshTokenAsync(
         MobileAuthRefreshTokenEntity token,
         CancellationToken cancellationToken = default);
+
+    Task<MobileAuthRefreshTokenEntity?> FindRefreshTokenByHashAsync(
+        string tokenHash,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Marks a still-valid refresh token revoked. Returns false when the hash is unknown,
+    /// already revoked, or expired.
+    /// </summary>
+    Task<bool> TryRevokeRefreshTokenAsync(
+        string tokenHash,
+        DateTime utcNow,
+        CancellationToken cancellationToken = default);
+
+    Task<int> RevokeAllRefreshTokensForMemberAsync(
+        Guid memberAccountId,
+        DateTime utcNow,
+        CancellationToken cancellationToken = default);
 }

@@ -249,7 +249,7 @@ public sealed class MobileAuthServiceTests
     public async Task ExchangeAuthorizationCode_RejectsUnsupportedGrantType()
     {
         var result = await CreateService().ExchangeAuthorizationCodeAsync(
-            "refresh_token",
+            "password",
             MobileAuthOptions.DefaultClientId,
             MobileAuthPkceTestData.RedirectUri,
             "code",
@@ -258,6 +258,115 @@ public sealed class MobileAuthServiceTests
 
         Assert.False(result.Success);
         Assert.Equal("unsupported_grant_type", result.Error);
+    }
+
+    [Fact]
+    public async Task ExchangeRefreshToken_RotatesAndRejectsReuse()
+    {
+        var issued = await IssueTokensAsync();
+
+        var refreshed = await issued.Service.ExchangeRefreshTokenAsync(
+            MobileAuthOptions.DefaultClientId,
+            issued.RefreshToken,
+            CancellationToken.None);
+
+        Assert.True(refreshed.Success);
+        Assert.False(string.IsNullOrWhiteSpace(refreshed.AccessToken));
+        Assert.False(string.IsNullOrWhiteSpace(refreshed.RefreshToken));
+        Assert.NotEqual(issued.RefreshToken, refreshed.RefreshToken);
+        Assert.DoesNotContain(issued.RefreshToken!, refreshed.ErrorDescription ?? string.Empty);
+
+        var reused = await issued.Service.ExchangeRefreshTokenAsync(
+            MobileAuthOptions.DefaultClientId,
+            issued.RefreshToken,
+            CancellationToken.None);
+
+        Assert.False(reused.Success);
+        Assert.Equal("invalid_grant", reused.Error);
+        Assert.Null(reused.RefreshToken);
+        Assert.DoesNotContain(issued.RefreshToken!, reused.ErrorDescription ?? string.Empty);
+        Assert.DoesNotContain(issued.RefreshToken!, reused.Error ?? string.Empty);
+    }
+
+    [Fact]
+    public async Task ExchangeRefreshToken_RejectsRevokedToken()
+    {
+        var issued = await IssueTokensAsync();
+        await issued.Service.RevokeRefreshTokenAsync(issued.RefreshToken, CancellationToken.None);
+
+        var refreshed = await issued.Service.ExchangeRefreshTokenAsync(
+            MobileAuthOptions.DefaultClientId,
+            issued.RefreshToken,
+            CancellationToken.None);
+
+        Assert.False(refreshed.Success);
+        Assert.Equal("invalid_grant", refreshed.Error);
+        Assert.DoesNotContain(issued.RefreshToken!, refreshed.ErrorDescription ?? string.Empty);
+    }
+
+    [Fact]
+    public async Task ExchangeRefreshToken_RejectsExpiredToken()
+    {
+        var time = new ManualTimeProvider(new DateTimeOffset(2026, 8, 19, 12, 0, 0, TimeSpan.Zero));
+        var service = CreateService(timeProvider: time);
+        var pair = MobileAuthPkceTestData.CreatePair();
+        var started = service.StartAuthorization(
+            "code",
+            MobileAuthOptions.DefaultClientId,
+            MobileAuthPkceTestData.RedirectUri,
+            pair.Challenge,
+            MobileAuthPkce.MethodS256,
+            "csrf-state",
+            MemberAuthenticationSchemes.Google);
+        var completed = await service.CompleteExternalLoginAsync(
+            started.Session!.RequestId,
+            MemberAuthenticationSchemes.Google,
+            "expired-refresh-subject",
+            "expired-refresh@example.com",
+            "Expired Refresh",
+            CancellationToken.None);
+        var issued = await service.ExchangeAuthorizationCodeAsync(
+            "authorization_code",
+            MobileAuthOptions.DefaultClientId,
+            MobileAuthPkceTestData.RedirectUri,
+            completed.Code,
+            pair.Verifier,
+            CancellationToken.None);
+        Assert.True(issued.Success);
+
+        time.Advance(TimeSpan.FromDays(31));
+        var refreshed = await service.ExchangeRefreshTokenAsync(
+            MobileAuthOptions.DefaultClientId,
+            issued.RefreshToken,
+            CancellationToken.None);
+
+        Assert.False(refreshed.Success);
+        Assert.Equal("invalid_grant", refreshed.Error);
+        Assert.DoesNotContain(issued.RefreshToken!, refreshed.ErrorDescription ?? string.Empty);
+    }
+
+    [Fact]
+    public async Task RevokeAllRefreshTokensForMember_InvalidatesActiveRefresh()
+    {
+        var issued = await IssueTokensAsync();
+        var session = await issued.Service.ExchangeRefreshTokenAsync(
+            MobileAuthOptions.DefaultClientId,
+            issued.RefreshToken,
+            CancellationToken.None);
+        Assert.True(session.Success);
+
+        var memberId = Guid.Parse(
+            new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler()
+                .ReadJwtToken(session.AccessToken).Subject);
+        await issued.Service.RevokeAllRefreshTokensForMemberAsync(memberId, CancellationToken.None);
+
+        var afterRevoke = await issued.Service.ExchangeRefreshTokenAsync(
+            MobileAuthOptions.DefaultClientId,
+            session.RefreshToken,
+            CancellationToken.None);
+
+        Assert.False(afterRevoke.Success);
+        Assert.Equal("invalid_grant", afterRevoke.Error);
     }
 
     [Fact]
@@ -322,10 +431,55 @@ public sealed class MobileAuthServiceTests
         Assert.Null(result.AccessToken);
     }
 
+    [Fact]
+    public async Task ExchangeRefreshToken_FailsClosed_WhenProductionSigningKeyMissing()
+    {
+        var result = await CreateService(environmentName: "Production").ExchangeRefreshTokenAsync(
+            MobileAuthOptions.DefaultClientId,
+            "unused-refresh-token",
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal("temporarily_unavailable", result.Error);
+        Assert.Null(result.RefreshToken);
+    }
+
+    private static async Task<(MobileAuthService Service, string RefreshToken)> IssueTokensAsync()
+    {
+        var pair = MobileAuthPkceTestData.CreatePair();
+        var service = CreateService();
+        var started = service.StartAuthorization(
+            "code",
+            MobileAuthOptions.DefaultClientId,
+            MobileAuthPkceTestData.RedirectUri,
+            pair.Challenge,
+            MobileAuthPkce.MethodS256,
+            "csrf-state",
+            MemberAuthenticationSchemes.Google);
+        var completed = await service.CompleteExternalLoginAsync(
+            started.Session!.RequestId,
+            MemberAuthenticationSchemes.Google,
+            "refresh-subject-1",
+            "refresh@example.com",
+            "Refresh Fan",
+            CancellationToken.None);
+        var tokens = await service.ExchangeAuthorizationCodeAsync(
+            "authorization_code",
+            MobileAuthOptions.DefaultClientId,
+            MobileAuthPkceTestData.RedirectUri,
+            completed.Code,
+            pair.Verifier,
+            CancellationToken.None);
+        Assert.True(tokens.Success);
+        return (service, tokens.RefreshToken!);
+    }
+
     private static MobileAuthService CreateService(
         InMemoryMemberAccountRepository? accounts = null,
-        string environmentName = "Testing")
+        string environmentName = "Testing",
+        TimeProvider? timeProvider = null)
     {
+        var clock = timeProvider ?? TimeProvider.System;
         var options = Options.Create(new MobileAuthOptions());
         var site = Options.Create(new SiteOptions());
         var environment = new FakeHostEnvironment(environmentName);
@@ -336,15 +490,24 @@ public sealed class MobileAuthServiceTests
             new MemberUploadQuotaService(
                 new Microsoft.Extensions.Caching.Memory.MemoryCache(
                     new Microsoft.Extensions.Caching.Memory.MemoryCacheOptions()),
-                TimeProvider.System,
+                clock,
                 Options.Create(new UploadQuotaOptions { Enabled = false })));
 
         return new MobileAuthService(
-            new MobileAuthAuthorizationSessionStore(TimeProvider.System),
+            new MobileAuthAuthorizationSessionStore(clock),
             new InMemoryMobileAuthGrantRepository(new SharedMobileAuthGrantStore()),
-            new MobileAuthTokenIssuer(options, site, environment, TimeProvider.System),
+            new MobileAuthTokenIssuer(options, site, environment, clock),
             members,
             options,
-            TimeProvider.System);
+            clock);
+    }
+
+    private sealed class ManualTimeProvider(DateTimeOffset start) : TimeProvider
+    {
+        private DateTimeOffset now = start;
+
+        public override DateTimeOffset GetUtcNow() => now;
+
+        public void Advance(TimeSpan delta) => now += delta;
     }
 }

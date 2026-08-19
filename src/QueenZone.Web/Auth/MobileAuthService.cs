@@ -191,6 +191,85 @@ public sealed class MobileAuthService(
             return MobileAuthTokenResult.Failed("invalid_grant", "The authorization code grant is invalid.");
         }
 
+        return await IssueTokenPairAsync(account, now, cancellationToken);
+    }
+
+    public async Task<MobileAuthTokenResult> ExchangeRefreshTokenAsync(
+        string? clientId,
+        string? refreshToken,
+        CancellationToken cancellationToken)
+    {
+        var mobile = options.Value;
+        if (!string.Equals(clientId, mobile.ClientId, StringComparison.Ordinal)
+            || string.IsNullOrWhiteSpace(refreshToken))
+        {
+            return MobileAuthTokenResult.Failed("invalid_grant", "The refresh token grant is invalid.");
+        }
+
+        if (!tokens.CanIssueTokens)
+        {
+            return MobileAuthTokenResult.Failed("temporarily_unavailable", "Mobile auth is not configured.");
+        }
+
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+        var tokenHash = MobileAuthPkce.Sha256Hex(refreshToken);
+        var stored = await grants.FindRefreshTokenByHashAsync(tokenHash, cancellationToken);
+        if (stored is null)
+        {
+            return MobileAuthTokenResult.Failed("invalid_grant", "The refresh token grant is invalid.");
+        }
+
+        if (stored.RevokedAt is not null)
+        {
+            await grants.RevokeAllRefreshTokensForMemberAsync(stored.MemberAccountId, now, cancellationToken);
+            return MobileAuthTokenResult.Failed("invalid_grant", "The refresh token grant is invalid.");
+        }
+
+        if (stored.ExpiresAt <= now
+            || !string.Equals(stored.ClientId, clientId, StringComparison.Ordinal)
+            || !await grants.TryRevokeRefreshTokenAsync(tokenHash, now, cancellationToken))
+        {
+            return MobileAuthTokenResult.Failed("invalid_grant", "The refresh token grant is invalid.");
+        }
+
+        var account = await memberAccountService.FindByIdAsync(stored.MemberAccountId, cancellationToken);
+        if (account is null || account.IsSuspended)
+        {
+            await grants.RevokeAllRefreshTokensForMemberAsync(stored.MemberAccountId, now, cancellationToken);
+            return MobileAuthTokenResult.Failed("invalid_grant", "The refresh token grant is invalid.");
+        }
+
+        return await IssueTokenPairAsync(account, now, cancellationToken);
+    }
+
+    public async Task RevokeRefreshTokenAsync(string? refreshToken, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(refreshToken))
+        {
+            return;
+        }
+
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+        await grants.TryRevokeRefreshTokenAsync(
+            MobileAuthPkce.Sha256Hex(refreshToken),
+            now,
+            cancellationToken);
+    }
+
+    public Task<int> RevokeAllRefreshTokensForMemberAsync(
+        Guid memberAccountId,
+        CancellationToken cancellationToken) =>
+        grants.RevokeAllRefreshTokensForMemberAsync(
+            memberAccountId,
+            timeProvider.GetUtcNow().UtcDateTime,
+            cancellationToken);
+
+    private async Task<MobileAuthTokenResult> IssueTokenPairAsync(
+        MemberAccount account,
+        DateTime utcNow,
+        CancellationToken cancellationToken)
+    {
+        var mobile = options.Value;
         var accessToken = tokens.IssueAccessToken(account.Id, account.Email, account.DisplayName);
         var refreshToken = MobileAuthPkce.CreateOpaqueToken();
         await grants.StoreRefreshTokenAsync(
@@ -200,8 +279,8 @@ public sealed class MobileAuthService(
                 TokenHash = MobileAuthPkce.Sha256Hex(refreshToken),
                 MemberAccountId = account.Id,
                 ClientId = mobile.ClientId,
-                CreatedAt = now,
-                ExpiresAt = now.AddDays(mobile.RefreshTokenLifetimeDays),
+                CreatedAt = utcNow,
+                ExpiresAt = utcNow.AddDays(mobile.RefreshTokenLifetimeDays),
             },
             cancellationToken);
 

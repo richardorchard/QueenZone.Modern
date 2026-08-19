@@ -47,6 +47,58 @@ public sealed class InMemoryMobileAuthGrantRepository(SharedMobileAuthGrantStore
         return Task.CompletedTask;
     }
 
+    public Task<MobileAuthRefreshTokenEntity?> FindRefreshTokenByHashAsync(
+        string tokenHash,
+        CancellationToken cancellationToken = default)
+    {
+        lock (store.Gate)
+        {
+            var token = store.RefreshTokens.FirstOrDefault(item => item.TokenHash == tokenHash);
+            return Task.FromResult(token is null ? null : CloneRefresh(token));
+        }
+    }
+
+    public Task<bool> TryRevokeRefreshTokenAsync(
+        string tokenHash,
+        DateTime utcNow,
+        CancellationToken cancellationToken = default)
+    {
+        lock (store.Gate)
+        {
+            var token = store.RefreshTokens.FirstOrDefault(item => item.TokenHash == tokenHash);
+            if (token is null || token.RevokedAt is not null || token.ExpiresAt <= utcNow)
+            {
+                return Task.FromResult(false);
+            }
+
+            token.RevokedAt = utcNow;
+            return Task.FromResult(true);
+        }
+    }
+
+    public Task<int> RevokeAllRefreshTokensForMemberAsync(
+        Guid memberAccountId,
+        DateTime utcNow,
+        CancellationToken cancellationToken = default)
+    {
+        lock (store.Gate)
+        {
+            var count = 0;
+            foreach (var token in store.RefreshTokens)
+            {
+                if (token.MemberAccountId != memberAccountId || token.RevokedAt is not null)
+                {
+                    continue;
+                }
+
+                token.RevokedAt = utcNow;
+                count++;
+            }
+
+            return Task.FromResult(count);
+        }
+    }
+
     private static MobileAuthAuthorizationCodeEntity CloneCode(MobileAuthAuthorizationCodeEntity code) =>
         new()
         {

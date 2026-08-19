@@ -72,6 +72,61 @@ public sealed class MobileAuthGrantRepositoryTests
         }
     }
 
+    [Fact]
+    public async Task TryRevokeRefreshToken_IsSingleUse()
+    {
+        var repository = new InMemoryMobileAuthGrantRepository(new SharedMobileAuthGrantStore());
+        var now = new DateTime(2026, 8, 19, 12, 0, 0, DateTimeKind.Utc);
+        var memberId = Guid.NewGuid();
+        await repository.StoreRefreshTokenAsync(new MobileAuthRefreshTokenEntity
+        {
+            Id = Guid.NewGuid(),
+            TokenHash = "to-revoke",
+            MemberAccountId = memberId,
+            ClientId = MobileAuthOptions.DefaultClientId,
+            CreatedAt = now,
+            ExpiresAt = now.AddDays(30),
+        });
+
+        Assert.True(await repository.TryRevokeRefreshTokenAsync("to-revoke", now));
+        Assert.False(await repository.TryRevokeRefreshTokenAsync("to-revoke", now));
+        var stored = await repository.FindRefreshTokenByHashAsync("to-revoke");
+        Assert.Equal(now, stored!.RevokedAt);
+    }
+
+    [Fact]
+    public async Task RevokeAllRefreshTokensForMember_LeavesOtherMembersAlone()
+    {
+        var repository = new InMemoryMobileAuthGrantRepository(new SharedMobileAuthGrantStore());
+        var now = new DateTime(2026, 8, 19, 12, 0, 0, DateTimeKind.Utc);
+        var alice = Guid.NewGuid();
+        var bob = Guid.NewGuid();
+        await repository.StoreRefreshTokenAsync(new MobileAuthRefreshTokenEntity
+        {
+            Id = Guid.NewGuid(),
+            TokenHash = "alice-1",
+            MemberAccountId = alice,
+            ClientId = MobileAuthOptions.DefaultClientId,
+            CreatedAt = now,
+            ExpiresAt = now.AddDays(30),
+        });
+        await repository.StoreRefreshTokenAsync(new MobileAuthRefreshTokenEntity
+        {
+            Id = Guid.NewGuid(),
+            TokenHash = "bob-1",
+            MemberAccountId = bob,
+            ClientId = MobileAuthOptions.DefaultClientId,
+            CreatedAt = now,
+            ExpiresAt = now.AddDays(30),
+        });
+
+        var revoked = await repository.RevokeAllRefreshTokensForMemberAsync(alice, now);
+
+        Assert.Equal(1, revoked);
+        Assert.NotNull((await repository.FindRefreshTokenByHashAsync("alice-1"))!.RevokedAt);
+        Assert.Null((await repository.FindRefreshTokenByHashAsync("bob-1"))!.RevokedAt);
+    }
+
     private static MobileAuthAuthorizationCodeEntity CreateCode(string hash, DateTime expiresAt, DateTime createdAt) =>
         new()
         {
