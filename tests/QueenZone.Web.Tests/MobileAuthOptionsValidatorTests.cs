@@ -5,24 +5,23 @@ public sealed class MobileAuthOptionsValidatorTests
     [Fact]
     public void AllowsDefaultOptions_InTesting()
     {
-        var result = new MobileAuthOptionsValidator(new FakeHostEnvironment("Testing"))
+        var result = new MobileAuthOptionsValidator()
             .Validate(null, new MobileAuthOptions());
         Assert.False(result.Failed);
     }
 
     [Fact]
-    public void RequiresSigningKey_InProduction()
+    public void AllowsMissingSigningKey_InProduction()
     {
-        var result = new MobileAuthOptionsValidator(new FakeHostEnvironment("Production"))
+        var result = new MobileAuthOptionsValidator()
             .Validate(null, new MobileAuthOptions());
-        Assert.True(result.Failed);
-        Assert.Contains("SigningKey", result.FailureMessage, StringComparison.Ordinal);
+        Assert.False(result.Failed);
     }
 
     [Fact]
     public void AcceptsConfiguredSigningKey_InProduction()
     {
-        var result = new MobileAuthOptionsValidator(new FakeHostEnvironment("Production"))
+        var result = new MobileAuthOptionsValidator()
             .Validate(null, new MobileAuthOptions
             {
                 SigningKey = "production-mobile-auth-signing-key!!",
@@ -33,7 +32,7 @@ public sealed class MobileAuthOptionsValidatorTests
     [Fact]
     public void RejectsShortSigningKey()
     {
-        var result = new MobileAuthOptionsValidator(new FakeHostEnvironment("Testing"))
+        var result = new MobileAuthOptionsValidator()
             .Validate(null, new MobileAuthOptions { SigningKey = "too-short" });
         Assert.True(result.Failed);
         Assert.Contains("32", result.FailureMessage, StringComparison.Ordinal);
@@ -42,7 +41,7 @@ public sealed class MobileAuthOptionsValidatorTests
     [Fact]
     public void RejectsJavascriptRedirectUri()
     {
-        var result = new MobileAuthOptionsValidator(new FakeHostEnvironment("Testing"))
+        var result = new MobileAuthOptionsValidator()
             .Validate(null, new MobileAuthOptions
             {
                 RedirectUris = ["javascript:alert(1)"],
@@ -54,7 +53,7 @@ public sealed class MobileAuthOptionsValidatorTests
     [Fact]
     public void RejectsBlankClientId()
     {
-        var result = new MobileAuthOptionsValidator(new FakeHostEnvironment("Testing"))
+        var result = new MobileAuthOptionsValidator()
             .Validate(null, new MobileAuthOptions { ClientId = " " });
         Assert.True(result.Failed);
         Assert.Contains("ClientId", result.FailureMessage, StringComparison.Ordinal);

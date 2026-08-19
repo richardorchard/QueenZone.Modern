@@ -6,7 +6,8 @@ public sealed class MobileAuthOptions
 
     /// <summary>
     /// Fallback HMAC key used only in Development/Testing/E2E when <see cref="SigningKey"/>
-    /// is blank. Production-like hosts must supply a real key.
+    /// is blank. Production-like hosts must supply a real key before issuing tokens, but a
+    /// missing key must not prevent the public site from starting.
     /// </summary>
     public const string DevelopmentSigningKey = "queenzone-dev-mobile-auth-signing-key!";
 

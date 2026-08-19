@@ -287,11 +287,48 @@ public sealed class MobileAuthServiceTests
         Assert.Null(completed.Code);
     }
 
-    private static MobileAuthService CreateService(InMemoryMemberAccountRepository? accounts = null)
+    [Fact]
+    public void StartAuthorization_FailsClosed_WhenProductionSigningKeyMissing()
+    {
+        var pair = MobileAuthPkceTestData.CreatePair();
+        var result = CreateService(environmentName: "Production").StartAuthorization(
+            "code",
+            MobileAuthOptions.DefaultClientId,
+            MobileAuthPkceTestData.RedirectUri,
+            pair.Challenge,
+            MobileAuthPkce.MethodS256,
+            "state-1",
+            MemberAuthenticationSchemes.Google);
+
+        Assert.False(result.Success);
+        Assert.Equal("temporarily_unavailable", result.Error);
+        Assert.Null(result.Session);
+    }
+
+    [Fact]
+    public async Task ExchangeAuthorizationCode_FailsClosed_WhenProductionSigningKeyMissing()
+    {
+        var pair = MobileAuthPkceTestData.CreatePair();
+        var result = await CreateService(environmentName: "Production").ExchangeAuthorizationCodeAsync(
+            "authorization_code",
+            MobileAuthOptions.DefaultClientId,
+            MobileAuthPkceTestData.RedirectUri,
+            "unused-code",
+            pair.Verifier,
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal("temporarily_unavailable", result.Error);
+        Assert.Null(result.AccessToken);
+    }
+
+    private static MobileAuthService CreateService(
+        InMemoryMemberAccountRepository? accounts = null,
+        string environmentName = "Testing")
     {
         var options = Options.Create(new MobileAuthOptions());
         var site = Options.Create(new SiteOptions());
-        var environment = new FakeHostEnvironment("Testing");
+        var environment = new FakeHostEnvironment(environmentName);
         var members = new MemberAccountService(
             accounts ?? new InMemoryMemberAccountRepository(),
             new InMemoryLegacyMemberLookupRepository(new Dictionary<string, LegacyMemberMatch>()),
