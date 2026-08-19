@@ -55,6 +55,15 @@ public sealed class MobileAuthService(
                 state);
         }
 
+        if (!tokens.CanIssueTokens)
+        {
+            return MobileAuthStartResult.Failed(
+                "temporarily_unavailable",
+                "Mobile auth is not configured.",
+                redirectUri,
+                state);
+        }
+
         var normalizedProvider = MemberAuthenticationSchemes.NormalizeExternalProvider(provider);
         if (normalizedProvider is null)
         {
@@ -155,6 +164,11 @@ public sealed class MobileAuthService(
             || !MobileAuthPkce.IsValidCodeVerifier(codeVerifier))
         {
             return MobileAuthTokenResult.Failed("invalid_grant", "The authorization code grant is invalid.");
+        }
+
+        if (!tokens.CanIssueTokens)
+        {
+            return MobileAuthTokenResult.Failed("temporarily_unavailable", "Mobile auth is not configured.");
         }
 
         var now = timeProvider.GetUtcNow().UtcDateTime;

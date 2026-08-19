@@ -2,8 +2,7 @@ using Microsoft.Extensions.Options;
 
 namespace QueenZone.Web;
 
-public sealed class MobileAuthOptionsValidator(IHostEnvironment environment)
-    : IValidateOptions<MobileAuthOptions>
+public sealed class MobileAuthOptionsValidator : IValidateOptions<MobileAuthOptions>
 {
     public ValidateOptionsResult Validate(string? name, MobileAuthOptions options)
     {
@@ -51,15 +50,11 @@ public sealed class MobileAuthOptionsValidator(IHostEnvironment environment)
             options.RefreshTokenLifetimeDays,
             maximum: 90);
 
-        if (QueenZoneEnvironments.IsProductionLike(environment)
-            && !OptionsValidation.LooksConfigured(options.SigningKey))
-        {
-            failures.Add(
-                $"{prefix}:SigningKey must be set to at least 32 characters in {environment.EnvironmentName}. " +
-                "Configure MobileAuth__SigningKey via App Service application settings or Key Vault — " +
-                "do not commit a production signing key.");
-        }
-        else if (OptionsValidation.LooksConfigured(options.SigningKey) && options.SigningKey.Trim().Length < 32)
+        // Do not fail production startup when SigningKey is blank. Mobile PKCE is unused until
+        // a client exists; requiring MobileAuth__SigningKey at ValidateOnStart took
+        // www.queenzone.org down after #774 because the App Service setting had not been added.
+        // Token issuance still fails closed via MobileAuthTokenIssuer when the key is missing.
+        if (OptionsValidation.LooksConfigured(options.SigningKey) && options.SigningKey.Trim().Length < 32)
         {
             failures.Add($"{prefix}:SigningKey must be at least 32 characters.");
         }

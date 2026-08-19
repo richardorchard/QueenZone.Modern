@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Options;
@@ -20,10 +21,19 @@ public sealed class MobileAuthTokenIssuer(
     public int AccessTokenLifetimeSeconds =>
         Math.Max(1, options.Value.AccessTokenLifetimeMinutes) * 60;
 
+    public bool CanIssueTokens =>
+        !string.IsNullOrEmpty(options.Value.ResolveSigningKey(QueenZoneEnvironments.IsProductionLike(environment)));
+
     public string IssueAccessToken(Guid memberId, string email, string displayName)
     {
         var now = timeProvider.GetUtcNow().UtcDateTime;
         var signingKey = options.Value.ResolveSigningKey(QueenZoneEnvironments.IsProductionLike(environment));
+        if (string.IsNullOrEmpty(signingKey))
+        {
+            throw new InvalidOperationException(
+                "MobileAuth:SigningKey is not configured. Set MobileAuth__SigningKey on the host before issuing mobile tokens.");
+        }
+
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(signingKey));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
         var claims = new[]
@@ -54,11 +64,6 @@ public sealed class MobileAuthTokenIssuer(
             ?? new MobileAuthOptions();
         var site = configuration.GetSection(SiteOptions.SectionName).Get<SiteOptions>()
             ?? new SiteOptions();
-        var signingKey = mobile.ResolveSigningKey(QueenZoneEnvironments.IsProductionLike(environment));
-        if (string.IsNullOrEmpty(signingKey))
-        {
-            signingKey = MobileAuthOptions.DevelopmentSigningKey;
-        }
 
         jwt.MapInboundClaims = true;
         jwt.TokenValidationParameters = CreateValidationParameters(
@@ -66,7 +71,7 @@ public sealed class MobileAuthTokenIssuer(
             audience: string.IsNullOrWhiteSpace(mobile.ClientId)
                 ? MobileAuthOptions.DefaultClientId
                 : mobile.ClientId,
-            signingKey: signingKey);
+            signingKey: ResolveJwtValidationSigningKey(mobile, environment));
         jwt.Events = new JwtBearerEvents
         {
             OnChallenge = context =>
@@ -97,4 +102,22 @@ public sealed class MobileAuthTokenIssuer(
             NameClaimType = ClaimTypes.Name,
             RoleClaimType = ClaimTypes.Role,
         };
+
+    internal static string ResolveJwtValidationSigningKey(MobileAuthOptions mobile, IHostEnvironment environment)
+    {
+        var configured = mobile.ResolveSigningKey(QueenZoneEnvironments.IsProductionLike(environment));
+        if (!string.IsNullOrEmpty(configured))
+        {
+            return configured;
+        }
+
+        if (!QueenZoneEnvironments.IsProductionLike(environment))
+        {
+            return MobileAuthOptions.DevelopmentSigningKey;
+        }
+
+        // Per-process unusable key: a missing App Service setting must not take the public
+        // site down, and the committed development key must not validate production JWTs.
+        return Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+    }
 }

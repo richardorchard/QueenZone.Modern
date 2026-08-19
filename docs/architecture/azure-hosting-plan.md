@@ -52,6 +52,7 @@ Use configuration keys like:
 - `APPLICATIONINSIGHTS_CONNECTION_STRING`
 - `Storage:PublicMediaBaseUrl`
 - `AzureAd:ClientId` / `AzureAd:TenantId` / related Entra settings (required outside Development)
+- `MobileAuth__SigningKey` (optional at startup; required before `/api/v1/auth/token` can issue JWTs. A missing value must not take the public site down.)
 - `QueenZoneHostFiltering:AllowedHosts` (production default: `www.queenzone.org;queenzone.org;*.azurewebsites.net`)
 - `FeatureFlags:ForumArchiveEnabled`
 - `FeatureFlags:LegacyRedirectsEnabled`

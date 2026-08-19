@@ -130,6 +130,14 @@ public sealed class QueenZoneWebCompositionTests
         var authEx = Assert.Throws<OptionsValidationException>(
             () => provider.GetRequiredService<IOptions<MemberAuthenticationOptions>>().Value);
         Assert.Contains("OAuth provider", authEx.Message);
+
+        // Mobile PKCE signing is optional at startup. A missing App Service
+        // MobileAuth__SigningKey must not prevent the public site from booting.
+        Assert.Equal(
+            MobileAuthOptions.DefaultClientId,
+            provider.GetRequiredService<IOptions<MobileAuthOptions>>().Value.ClientId);
+        Assert.True(string.IsNullOrWhiteSpace(
+            provider.GetRequiredService<IOptions<MobileAuthOptions>>().Value.SigningKey));
     }
 
     [Fact]
