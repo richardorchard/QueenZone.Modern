@@ -7,18 +7,9 @@ namespace QueenZone.Web.Pages.Account;
 
 public sealed class ExternalLoginModel : PageModel
 {
-    private static readonly HashSet<string> SupportedProviders = new(StringComparer.OrdinalIgnoreCase)
-    {
-        MemberAuthenticationSchemes.Google,
-        MemberAuthenticationSchemes.Microsoft,
-        MemberAuthenticationSchemes.Discord,
-        MemberAuthenticationSchemes.GitHub,
-        MemberAuthenticationSchemes.Apple,
-    };
-
     public IActionResult OnGet(string provider, string? returnUrl)
     {
-        if (!SupportedProviders.Contains(provider))
+        if (MemberAuthenticationSchemes.NormalizeExternalProvider(provider) is null)
         {
             return NotFound();
         }

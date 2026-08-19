@@ -1,0 +1,234 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication;
+
+namespace QueenZone.Web;
+
+/// <summary>
+/// OAuth2 authorization-code + PKCE endpoints for the mobile public client.
+/// QueenZone remains the confidential client toward Google/Microsoft/Discord/GitHub/Apple;
+/// the React Native app never sees a provider secret or password.
+/// </summary>
+public static class MobileAuthEndpoints
+{
+    public const string AuthorizePath = "/api/v1/auth/authorize";
+
+    public const string CallbackPath = "/api/v1/auth/callback";
+
+    public const string TokenPath = "/api/v1/auth/token";
+
+    public const string SessionPath = "/api/v1/auth/session";
+
+    public static void MapMobileAuthEndpoints(this WebApplication app)
+    {
+        var group = app.MapGroup("/api/v1/auth")
+            .RequireRateLimiting(QueenZoneRateLimitPolicies.Auth)
+            .DisableAntiforgery();
+
+        group.MapGet("/authorize", AuthorizeAsync);
+        group.MapGet("/callback", CallbackAsync);
+        group.MapPost("/token", TokenAsync);
+        group.MapGet("/session", Session)
+            .RequireAuthorization(MemberAuthenticationSchemes.MobileMemberPolicy);
+    }
+
+    internal static async Task<IResult> AuthorizeAsync(
+        HttpContext httpContext,
+        MobileAuthService mobileAuth,
+        IAuthenticationSchemeProvider schemes,
+        string? response_type,
+        string? client_id,
+        string? redirect_uri,
+        string? code_challenge,
+        string? code_challenge_method,
+        string? state,
+        string? provider)
+    {
+        var started = mobileAuth.StartAuthorization(
+            response_type,
+            client_id,
+            redirect_uri,
+            code_challenge,
+            code_challenge_method,
+            state,
+            provider);
+
+        if (!started.Success)
+        {
+            return started.RedirectSafe
+                ? RedirectToApp(httpContext, started.RedirectUri!, started.State, error: started.Error, description: started.ErrorDescription)
+                : ErrorJson(started.Error!, started.ErrorDescription!, StatusCodes.Status400BadRequest);
+        }
+
+        var session = started.Session!;
+        var registered = await schemes.GetSchemeAsync(session.Provider);
+        if (registered is null)
+        {
+            return RedirectToApp(
+                httpContext,
+                session.RedirectUri,
+                session.State,
+                error: "temporarily_unavailable",
+                description: "That sign-in provider is not configured.");
+        }
+
+        var properties = new AuthenticationProperties
+        {
+            RedirectUri = $"{CallbackPath}?rid={Uri.EscapeDataString(session.RequestId)}",
+        };
+        if (!string.Equals(session.Provider, MemberAuthenticationSchemes.Apple, StringComparison.OrdinalIgnoreCase))
+        {
+            properties.SetParameter("prompt", "select_account");
+        }
+
+        return Results.Challenge(properties, [session.Provider]);
+    }
+
+    internal static async Task<IResult> CallbackAsync(
+        HttpContext httpContext,
+        MobileAuthService mobileAuth,
+        IAuthenticationSchemeProvider schemes,
+        string? rid,
+        CancellationToken cancellationToken)
+    {
+        if (await schemes.GetSchemeAsync(MemberAuthenticationSchemes.ExternalCookie) is null)
+        {
+            return ErrorJson("access_denied", "External sign-in was cancelled.", StatusCodes.Status400BadRequest);
+        }
+
+        var external = await httpContext.AuthenticateAsync(MemberAuthenticationSchemes.ExternalCookie);
+        if (!external.Succeeded || external.Principal is null)
+        {
+            return ErrorJson("access_denied", "External sign-in was cancelled.", StatusCodes.Status400BadRequest);
+        }
+
+        var provider = external.Principal.Identities.FirstOrDefault()?.AuthenticationType;
+        var providerKey = external.Principal.FindFirstValue(ClaimTypes.NameIdentifier);
+        var email = external.Principal.FindFirstValue(ClaimTypes.Email);
+        var displayName = external.Principal.FindFirstValue(ClaimTypes.Name) ?? email;
+
+        if (string.IsNullOrWhiteSpace(provider)
+            || string.IsNullOrWhiteSpace(providerKey)
+            || string.IsNullOrWhiteSpace(email)
+            || string.IsNullOrWhiteSpace(displayName))
+        {
+            await httpContext.SignOutAsync(MemberAuthenticationSchemes.ExternalCookie);
+            return ErrorJson("server_error", "The identity provider did not return the required profile.", StatusCodes.Status400BadRequest);
+        }
+
+        var completed = await mobileAuth.CompleteExternalLoginAsync(
+            rid,
+            provider,
+            providerKey,
+            email,
+            displayName,
+            cancellationToken);
+
+        await httpContext.SignOutAsync(MemberAuthenticationSchemes.ExternalCookie);
+
+        if (!completed.Success || completed.RedirectUri is null)
+        {
+            return completed.RedirectUri is null
+                ? ErrorJson(completed.Error!, completed.ErrorDescription!, StatusCodes.Status400BadRequest)
+                : RedirectToApp(
+                    httpContext,
+                    completed.RedirectUri,
+                    completed.State,
+                    error: completed.Error,
+                    description: completed.ErrorDescription);
+        }
+
+        return RedirectToApp(
+            httpContext,
+            completed.RedirectUri,
+            completed.State,
+            code: completed.Code);
+    }
+
+    internal static async Task<IResult> TokenAsync(
+        HttpContext httpContext,
+        MobileAuthService mobileAuth,
+        CancellationToken cancellationToken)
+    {
+        IFormCollection form;
+        try
+        {
+            form = await httpContext.Request.ReadFormAsync(cancellationToken);
+        }
+        catch (InvalidOperationException)
+        {
+            return ErrorJson("invalid_request", "Token requests must be application/x-www-form-urlencoded.");
+        }
+        catch (InvalidDataException)
+        {
+            return ErrorJson("invalid_request", "Token requests must be application/x-www-form-urlencoded.");
+        }
+
+        var exchanged = await mobileAuth.ExchangeAuthorizationCodeAsync(
+            form["grant_type"].ToString(),
+            form["client_id"].ToString(),
+            form["redirect_uri"].ToString(),
+            form["code"].ToString(),
+            form["code_verifier"].ToString(),
+            cancellationToken);
+
+        if (!exchanged.Success)
+        {
+            return ErrorJson(exchanged.Error!, exchanged.ErrorDescription!);
+        }
+
+        return Results.Json(new
+        {
+            access_token = exchanged.AccessToken,
+            refresh_token = exchanged.RefreshToken,
+            token_type = "Bearer",
+            expires_in = exchanged.ExpiresIn,
+        });
+    }
+
+    internal static IResult Session(ClaimsPrincipal user)
+    {
+        var memberId = user.FindFirstValue(ClaimTypes.NameIdentifier);
+        return Results.Json(new
+        {
+            memberId,
+            email = user.FindFirstValue(ClaimTypes.Email),
+            displayName = user.FindFirstValue(ClaimTypes.Name),
+        });
+    }
+
+    private static IResult RedirectToApp(
+        HttpContext httpContext,
+        string redirectUri,
+        string? state,
+        string? code = null,
+        string? error = null,
+        string? description = null)
+    {
+        var separator = redirectUri.Contains('?', StringComparison.Ordinal) ? '&' : '?';
+        var location = redirectUri + separator;
+        if (!string.IsNullOrEmpty(error))
+        {
+            location += "error=" + Uri.EscapeDataString(error);
+            if (!string.IsNullOrEmpty(description))
+            {
+                location += "&error_description=" + Uri.EscapeDataString(description);
+            }
+        }
+        else
+        {
+            location += "code=" + Uri.EscapeDataString(code ?? string.Empty);
+        }
+
+        if (!string.IsNullOrEmpty(state))
+        {
+            location += "&state=" + Uri.EscapeDataString(state);
+        }
+
+        // Response.Redirect accepts custom app schemes (queenzone://); Results.Redirect does not.
+        httpContext.Response.Redirect(location);
+        return Results.Empty;
+    }
+
+    private static IResult ErrorJson(string error, string description, int statusCode = StatusCodes.Status400BadRequest) =>
+        Results.Json(new { error, error_description = description }, statusCode: statusCode);
+}

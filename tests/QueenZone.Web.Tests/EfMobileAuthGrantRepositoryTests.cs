@@ -1,0 +1,94 @@
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
+using QueenZone.Data;
+using QueenZone.Data.Entities;
+
+namespace QueenZone.Web.Tests;
+
+public sealed class EfMobileAuthGrantRepositoryTests : IAsyncDisposable
+{
+    private readonly SqliteConnection connection;
+    private readonly QueenZoneDbContext dbContext;
+    private readonly EfMobileAuthGrantRepository repository;
+
+    public EfMobileAuthGrantRepositoryTests()
+    {
+        connection = new SqliteConnection("Data Source=:memory:");
+        connection.Open();
+        var options = new DbContextOptionsBuilder<QueenZoneDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        dbContext = new QueenZoneDbContext(options);
+        dbContext.Database.EnsureCreated();
+        repository = new EfMobileAuthGrantRepository(dbContext);
+    }
+
+    [Fact]
+    public async Task RedeemAuthorizationCode_IsSingleUse()
+    {
+        var member = await SeedMemberAsync();
+        var now = new DateTime(2026, 8, 19, 12, 0, 0, DateTimeKind.Utc);
+        await repository.StoreAuthorizationCodeAsync(new MobileAuthAuthorizationCodeEntity
+        {
+            Id = Guid.NewGuid(),
+            CodeHash = "ef-hash-1",
+            MemberAccountId = member.Id,
+            ClientId = MobileAuthOptions.DefaultClientId,
+            RedirectUri = MobileAuthPkceTestData.RedirectUri,
+            CodeChallenge = "challenge",
+            CreatedAt = now,
+            ExpiresAt = now.AddMinutes(5),
+        });
+
+        var first = await repository.RedeemAuthorizationCodeAsync("ef-hash-1", now);
+        var second = await repository.RedeemAuthorizationCodeAsync("ef-hash-1", now);
+
+        Assert.NotNull(first);
+        Assert.Equal(member.Id, first.MemberAccountId);
+        Assert.Equal(now, first.RedeemedAt);
+        Assert.Null(second);
+    }
+
+    [Fact]
+    public async Task StoreRefreshToken_PersistsHashedToken()
+    {
+        var member = await SeedMemberAsync();
+        var now = new DateTime(2026, 8, 19, 12, 0, 0, DateTimeKind.Utc);
+
+        await repository.StoreRefreshTokenAsync(new MobileAuthRefreshTokenEntity
+        {
+            Id = Guid.NewGuid(),
+            TokenHash = "ef-refresh-hash",
+            MemberAccountId = member.Id,
+            ClientId = MobileAuthOptions.DefaultClientId,
+            CreatedAt = now,
+            ExpiresAt = now.AddDays(30),
+        });
+
+        var stored = await dbContext.MobileAuthRefreshTokens.AsNoTracking()
+            .SingleAsync(token => token.TokenHash == "ef-refresh-hash");
+        Assert.Equal(member.Id, stored.MemberAccountId);
+        Assert.Null(stored.RevokedAt);
+    }
+
+    private async Task<MemberAccount> SeedMemberAsync()
+    {
+        var account = new MemberAccount
+        {
+            Id = Guid.NewGuid(),
+            Email = "mobile-ef@example.com",
+            NormalizedEmail = "MOBILE-EF@EXAMPLE.COM",
+            DisplayName = "Mobile EF",
+            CreatedAt = DateTime.UtcNow,
+        };
+        dbContext.MemberAccounts.Add(account);
+        await dbContext.SaveChangesAsync();
+        return account;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await dbContext.DisposeAsync();
+        await connection.DisposeAsync();
+    }
+}

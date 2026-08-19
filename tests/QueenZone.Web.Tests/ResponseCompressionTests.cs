@@ -41,6 +41,7 @@ public sealed class ResponseCompressionTests : IClassFixture<WebApplicationFacto
         builder.UseSetting("Authentication:Google:ClientId", "test-google-client-id");
         builder.UseSetting("Authentication:Google:ClientSecret", "test-google-client-secret");
         builder.UseSetting("Analytics:MeasurementId", "G-V2W56BZ3KZ");
+        builder.UseSetting("MobileAuth:SigningKey", "testing-mobile-auth-signing-key-32b!");
         builder.ConfigureAppConfiguration((_, config) =>
         {
             config.AddInMemoryCollection(new Dictionary<string, string?>
@@ -58,6 +59,7 @@ public sealed class ResponseCompressionTests : IClassFixture<WebApplicationFacto
                 ["Authentication:Google:ClientId"] = "test-google-client-id",
                 ["Authentication:Google:ClientSecret"] = "test-google-client-secret",
                 ["Analytics:MeasurementId"] = "G-V2W56BZ3KZ",
+                ["MobileAuth:SigningKey"] = "testing-mobile-auth-signing-key-32b!",
             });
         });
     }

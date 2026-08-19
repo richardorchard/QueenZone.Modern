@@ -41,6 +41,7 @@ public static class QueenZoneAuthServiceCollectionExtensions
                     options.LogoutPath = "/account/logout";
                     options.Events = MemberCookieEvents;
                 });
+            ConfigureMobileBearer(configuration, environment, services.AddAuthentication());
             return services;
         }
 
@@ -84,7 +85,7 @@ public static class QueenZoneAuthServiceCollectionExtensions
         // A second AddAuthentication() call doesn't reset the default scheme set above; it just
         // returns a plain AuthenticationBuilder bound to the same AuthenticationOptions so the
         // member schemes can be chained on without fighting Microsoft.Identity.Web's own builder type.
-        ConfigureMemberAuthentication(configuration, services.AddAuthentication());
+        ConfigureMemberAuthentication(configuration, environment, services.AddAuthentication());
         return services;
     }
 
@@ -125,6 +126,12 @@ public static class QueenZoneAuthServiceCollectionExtensions
                     policy.AddAuthenticationSchemes(TestMemberAuthHandler.SchemeName);
                 }
 
+                policy.RequireAuthenticatedUser();
+            });
+
+            options.AddPolicy(MemberAuthenticationSchemes.MobileMemberPolicy, policy =>
+            {
+                policy.AddAuthenticationSchemes(MemberAuthenticationSchemes.MembersBearer);
                 policy.RequireAuthenticatedUser();
             });
         });
@@ -176,6 +183,7 @@ public static class QueenZoneAuthServiceCollectionExtensions
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     private static void ConfigureMemberAuthentication(
         IConfiguration configuration,
+        IHostEnvironment environment,
         AuthenticationBuilder authenticationBuilder)
     {
         authenticationBuilder.AddCookie(MemberAuthenticationSchemes.MembersCookie, options =>
@@ -275,6 +283,17 @@ public static class QueenZoneAuthServiceCollectionExtensions
                 };
             });
         }
+
+        ConfigureMobileBearer(configuration, environment, authenticationBuilder);
+    }
+
+    private static void ConfigureMobileBearer(
+        IConfiguration configuration,
+        IHostEnvironment environment,
+        AuthenticationBuilder authenticationBuilder)
+    {
+        authenticationBuilder.AddJwtBearer(MemberAuthenticationSchemes.MembersBearer, options =>
+            MobileAuthTokenIssuer.ConfigureJwtBearer(options, configuration, environment));
     }
 
     /// <summary>
