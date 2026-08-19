@@ -895,6 +895,111 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
         return deleted > 0;
     }
 
+    public Task<int> CountMessagesBySenderSinceAsync(
+        Guid senderMemberId,
+        DateTimeOffset sinceUtc,
+        CancellationToken cancellationToken = default) =>
+        IsSqliteDatabase()
+            ? CountMessagesBySenderSinceInMemoryAsync(senderMemberId, sinceUtc, cancellationToken)
+            : dbContext.PrivateMessages
+                .AsNoTracking()
+                .CountAsync(
+                    message => message.SenderMemberId == senderMemberId && message.CreatedAt >= sinceUtc,
+                    cancellationToken);
+
+    public Task<int> CountIdenticalMessagesBySenderSinceAsync(
+        Guid senderMemberId,
+        string body,
+        DateTimeOffset sinceUtc,
+        CancellationToken cancellationToken = default) =>
+        IsSqliteDatabase()
+            ? CountIdenticalMessagesBySenderSinceInMemoryAsync(senderMemberId, body, sinceUtc, cancellationToken)
+            : dbContext.PrivateMessages
+                .AsNoTracking()
+                .CountAsync(
+                    message => message.SenderMemberId == senderMemberId
+                        && message.CreatedAt >= sinceUtc
+                        && message.Body == body,
+                    cancellationToken);
+
+    public Task<int> CountDistinctNewRecipientsSinceAsync(
+        Guid senderMemberId,
+        DateTimeOffset sinceUtc,
+        CancellationToken cancellationToken = default) =>
+        IsSqliteDatabase()
+            ? CountDistinctNewRecipientsSinceInMemoryAsync(senderMemberId, sinceUtc, cancellationToken)
+            : dbContext.PrivateMessages
+                .AsNoTracking()
+                .Where(message => message.SenderMemberId == senderMemberId && message.CreatedAt >= sinceUtc)
+                .Join(
+                    dbContext.PrivateConversations.AsNoTracking().Where(c => c.CreatedAt >= sinceUtc),
+                    message => message.ConversationId,
+                    conversation => conversation.Id,
+                    (message, conversation) => message.ConversationId)
+                .Distinct()
+                .CountAsync(cancellationToken);
+
+    // SQLite fallback (also exercised in tests): the provider cannot translate DateTimeOffset
+    // range comparisons, so materialise the sender's messages then filter by CreatedAt in
+    // memory. Production always targets SQL Server; the efficient path above is covered by
+    // tests/QueenZone.SqlServerTests (see docs/architecture/testing-policy.md).
+    private async Task<int> CountMessagesBySenderSinceInMemoryAsync(
+        Guid senderMemberId,
+        DateTimeOffset sinceUtc,
+        CancellationToken cancellationToken)
+    {
+        var createdAtValues = await dbContext.PrivateMessages
+            .AsNoTracking()
+            .Where(message => message.SenderMemberId == senderMemberId)
+            .Select(message => message.CreatedAt)
+            .ToListAsync(cancellationToken);
+        return createdAtValues.Count(createdAt => createdAt >= sinceUtc);
+    }
+
+    private async Task<int> CountIdenticalMessagesBySenderSinceInMemoryAsync(
+        Guid senderMemberId,
+        string body,
+        DateTimeOffset sinceUtc,
+        CancellationToken cancellationToken)
+    {
+        var rows = await dbContext.PrivateMessages
+            .AsNoTracking()
+            .Where(message => message.SenderMemberId == senderMemberId && message.Body == body)
+            .Select(message => message.CreatedAt)
+            .ToListAsync(cancellationToken);
+        return rows.Count(createdAt => createdAt >= sinceUtc);
+    }
+
+    private async Task<int> CountDistinctNewRecipientsSinceInMemoryAsync(
+        Guid senderMemberId,
+        DateTimeOffset sinceUtc,
+        CancellationToken cancellationToken)
+    {
+        var senderRows = await dbContext.PrivateMessages
+            .AsNoTracking()
+            .Where(message => message.SenderMemberId == senderMemberId)
+            .Select(message => new { message.ConversationId, message.CreatedAt })
+            .ToListAsync(cancellationToken);
+
+        var recentConversationIds = senderRows
+            .Where(row => row.CreatedAt >= sinceUtc)
+            .Select(row => row.ConversationId)
+            .Distinct()
+            .ToList();
+        if (recentConversationIds.Count == 0)
+        {
+            return 0;
+        }
+
+        var conversationCreatedAtValues = await dbContext.PrivateConversations
+            .AsNoTracking()
+            .Where(conversation => recentConversationIds.Contains(conversation.Id))
+            .Select(conversation => new { conversation.Id, conversation.CreatedAt })
+            .ToListAsync(cancellationToken);
+
+        return conversationCreatedAtValues.Count(row => row.CreatedAt >= sinceUtc);
+    }
+
     private bool IsSqliteDatabase() =>
         string.Equals(
             dbContext.Database.ProviderName,

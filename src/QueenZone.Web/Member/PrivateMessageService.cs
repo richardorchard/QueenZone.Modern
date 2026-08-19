@@ -7,9 +7,13 @@ public sealed class PrivateMessageService(
     IPrivateMessageRepository privateMessageRepository,
     IMemberAccountRepository memberAccountRepository,
     IMemberFollowRepository memberFollowRepository,
+    PrivateMessageRateLimiter privateMessageRateLimiter,
     TimeProvider timeProvider)
 {
     public const string UnableToSendMessage = "Unable to send message.";
+
+    public const string RateLimitedMessage =
+        "You're sending messages too quickly. Please wait a bit and try again.";
 
     public Task<PrivateInboxPage> GetInboxAsync(
         Guid memberId,
@@ -71,6 +75,12 @@ public sealed class PrivateMessageService(
             return new PrivateMessageSendResult(false, null, "You cannot message yourself.");
         }
 
+        var sender = await memberAccountRepository.FindByIdAsync(senderMemberId, cancellationToken);
+        if (sender is null || sender.IsSuspended)
+        {
+            return new PrivateMessageSendResult(false, null, UnableToSendMessage);
+        }
+
         var recipient = await memberAccountRepository.FindByIdAsync(recipientMemberId, cancellationToken);
         if (recipient is null || recipient.DeletionRequestedAt is not null)
         {
@@ -93,6 +103,16 @@ public sealed class PrivateMessageService(
             && !await CanStartNewConversationAsync(senderMemberId, recipient, cancellationToken))
         {
             return new PrivateMessageSendResult(false, null, UnableToSendMessage);
+        }
+
+        if (!await privateMessageRateLimiter.IsSendAllowedAsync(
+                senderMemberId,
+                sender.CreatedAt,
+                body ?? string.Empty,
+                isNewConversation: !hasConversation,
+                cancellationToken))
+        {
+            return new PrivateMessageSendResult(false, null, RateLimitedMessage);
         }
 
         return await privateMessageRepository.SendNewOrExistingAsync(
@@ -121,6 +141,12 @@ public sealed class PrivateMessageService(
                 "You are not a participant in this conversation.");
         }
 
+        var sender = await memberAccountRepository.FindByIdAsync(senderMemberId, cancellationToken);
+        if (sender is null || sender.IsSuspended)
+        {
+            return new PrivateMessageSendResult(false, null, UnableToSendMessage);
+        }
+
         var otherParticipantId = await privateMessageRepository.GetOtherParticipantIdAsync(
             conversationId,
             senderMemberId,
@@ -136,6 +162,16 @@ public sealed class PrivateMessageService(
             {
                 return new PrivateMessageSendResult(false, null, UnableToSendMessage);
             }
+        }
+
+        if (!await privateMessageRateLimiter.IsSendAllowedAsync(
+                senderMemberId,
+                sender.CreatedAt,
+                body ?? string.Empty,
+                isNewConversation: false,
+                cancellationToken))
+        {
+            return new PrivateMessageSendResult(false, null, RateLimitedMessage);
         }
 
         return await privateMessageRepository.ReplyAsync(

@@ -759,6 +759,53 @@ public sealed class EfPrivateMessageRepositoryTests : IAsyncDisposable
         Assert.Equal(detail.Messages.Count(m => !m.IsMine && m.SortKey > midpoint.SortKey), item.UnreadCount);
     }
 
+    [Fact]
+    public async Task CountMessagesBySenderSinceAsync_CountsOnlyMessagesInWindow()
+    {
+        var since = DateTimeOffset.Parse("2026-08-06T10:00:00Z");
+        var created = await repository.SendNewOrExistingAsync(aliceId, bobId, "Before window", since.AddMinutes(-5));
+        await repository.ReplyAsync(created.ConversationId!.Value, aliceId, "Inside window", since.AddMinutes(1));
+        await repository.ReplyAsync(created.ConversationId.Value, aliceId, "Also inside window", since.AddMinutes(2));
+
+        Assert.Equal(2, await repository.CountMessagesBySenderSinceAsync(aliceId, since));
+        Assert.Equal(0, await repository.CountMessagesBySenderSinceAsync(bobId, since));
+    }
+
+    [Fact]
+    public async Task CountIdenticalMessagesBySenderSinceAsync_MatchesExactBodyOnly()
+    {
+        var since = DateTimeOffset.Parse("2026-08-06T10:00:00Z");
+        var created = await repository.SendNewOrExistingAsync(aliceId, bobId, "Repeat me", since);
+        await repository.ReplyAsync(created.ConversationId!.Value, aliceId, "Repeat me", since.AddMinutes(1));
+        await repository.ReplyAsync(created.ConversationId.Value, aliceId, "Different", since.AddMinutes(2));
+
+        Assert.Equal(2, await repository.CountIdenticalMessagesBySenderSinceAsync(aliceId, "Repeat me", since));
+        Assert.Equal(1, await repository.CountIdenticalMessagesBySenderSinceAsync(aliceId, "Different", since));
+    }
+
+    [Fact]
+    public async Task CountDistinctNewRecipientsSinceAsync_ExcludesRepliesInOlderConversations()
+    {
+        var since = DateTimeOffset.Parse("2026-08-06T10:00:00Z");
+
+        // Existing conversation, started before the window: a reply here should not count.
+        var oldConversation = await repository.SendNewOrExistingAsync(
+            aliceId,
+            bobId,
+            "Old conversation",
+            since.AddMinutes(-30));
+        await repository.ReplyAsync(
+            oldConversation.ConversationId!.Value,
+            aliceId,
+            "Reply in old thread",
+            since.AddMinutes(1));
+
+        // New conversation, started inside the window: this should count.
+        await repository.SendNewOrExistingAsync(aliceId, carolId, "New conversation", since.AddMinutes(2));
+
+        Assert.Equal(1, await repository.CountDistinctNewRecipientsSinceAsync(aliceId, since));
+    }
+
     private static QueenZoneDbContext CreateContext(string connectionString)
     {
         var options = new DbContextOptionsBuilder<QueenZoneDbContext>()

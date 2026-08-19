@@ -819,6 +819,8 @@ public sealed class QueenZoneDbContext : DbContext
                 .HasDatabaseName("IX_PrivateMessages_Conversation_CreatedAt");
             entity.HasIndex(message => new { message.ConversationId, message.SortKey })
                 .HasDatabaseName("IX_PrivateMessages_Conversation_SortKey");
+            entity.HasIndex(message => new { message.SenderMemberId, message.CreatedAt })
+                .HasDatabaseName("IX_PrivateMessages_Sender_CreatedAt");
 
             entity.HasOne(message => message.Conversation)
                 .WithMany(conversation => conversation.Messages)
