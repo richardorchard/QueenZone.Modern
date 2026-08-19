@@ -143,6 +143,7 @@ public sealed class QueenZoneWebCompositionTests
                 ["Analytics:MeasurementId"] = "G-V2W56BZ3KZ",
                 ["Authentication:Google:ClientId"] = "google-client",
                 ["Authentication:Google:ClientSecret"] = "google-secret",
+                ["MobileAuth:SigningKey"] = "testing-mobile-auth-signing-key-32b!",
                 ["ConnectionStrings:BlobStorage"] =
                     "DefaultEndpointsProtocol=https;AccountName=test;AccountKey=dGVzdA==;EndpointSuffix=core.windows.net",
             })
@@ -165,6 +166,9 @@ public sealed class QueenZoneWebCompositionTests
         Assert.Equal(
             10 * 1024 * 1024,
             provider.GetRequiredService<IOptions<BlobUploadOptions>>().Value.DefaultMaxBytes);
+        Assert.Equal(
+            "testing-mobile-auth-signing-key-32b!",
+            provider.GetRequiredService<IOptions<MobileAuthOptions>>().Value.SigningKey);
     }
 
     [Fact]

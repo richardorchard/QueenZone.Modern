@@ -149,15 +149,14 @@ public static class MobileAuthEndpoints
         MobileAuthService mobileAuth,
         CancellationToken cancellationToken)
     {
-        if (!httpContext.Request.HasFormContentType)
-        {
-            return ErrorJson("invalid_request", "Token requests must be application/x-www-form-urlencoded.");
-        }
-
         IFormCollection form;
         try
         {
             form = await httpContext.Request.ReadFormAsync(cancellationToken);
+        }
+        catch (InvalidOperationException)
+        {
+            return ErrorJson("invalid_request", "Token requests must be application/x-www-form-urlencoded.");
         }
         catch (InvalidDataException)
         {
