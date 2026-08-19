@@ -41,6 +41,7 @@ public sealed class PrivateMessageRoutesTests : IClassFixture<WebApplicationFact
         Assert.Contains("You have no private messages yet", html);
         Assert.Contains("/messages/compose", html);
         Assert.Contains(">Messages<", html);
+        Assert.Contains("aria-label=\"Messages\"", html);
     }
 
     [Fact]
@@ -66,6 +67,10 @@ public sealed class PrivateMessageRoutesTests : IClassFixture<WebApplicationFact
         Assert.Contains("PM Alice", bobInbox);
         Assert.Contains("Hello from Alice", bobInbox);
         Assert.Contains("unread", bobInbox, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("aria-label=\"Messages, 1 unread conversations\"", bobInbox);
+        Assert.Contains("New message", bobInbox);
+        Assert.Contains("Archive", bobInbox);
+        Assert.Contains("Remove", bobInbox);
 
         var bobConversation = await bobClient.GetStringAsync(conversationPath);
         Assert.Contains("Hello from Alice", bobConversation);
@@ -443,10 +448,14 @@ public sealed class PrivateMessageRoutesTests : IClassFixture<WebApplicationFact
         var aliceConversationAfter = await aliceClient.GetStringAsync($"/messages/{conversationId}");
         Assert.Contains("Hello there", aliceConversationAfter);
         Assert.Contains("Member blocked", aliceConversationAfter);
+        Assert.Contains("You have blocked this member", aliceConversationAfter);
         Assert.Contains("Unblock Block Conv Bob", aliceConversationAfter);
+        Assert.DoesNotContain("Send reply", aliceConversationAfter);
 
         var bobConversation = await bobClient.GetStringAsync($"/messages/{conversationId}");
         Assert.Contains("Hello there", bobConversation);
+        Assert.Contains(PrivateMessageService.UnableToSendMessage, bobConversation);
+        Assert.DoesNotContain("Send reply", bobConversation);
 
         var replyResponse = await bobClient.PostAsync(
             $"/messages/{conversationId}",
@@ -459,6 +468,39 @@ public sealed class PrivateMessageRoutesTests : IClassFixture<WebApplicationFact
         var replyHtml = await replyResponse.Content.ReadAsStringAsync();
         Assert.Contains(PrivateMessageService.UnableToSendMessage, replyHtml);
         Assert.DoesNotContain("blocked", replyHtml, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Compose_MissingBody_ShowsValidationError()
+    {
+        var (aliceClient, _) = await CreateMemberAsync("pm-validate-alice@example.com", "Validate Alice");
+        var (_, bob) = await CreateMemberAsync("pm-validate-bob@example.com", "Validate Bob");
+
+        var composePage = await aliceClient.GetStringAsync($"/messages/compose?to={bob.Id}");
+        var response = await aliceClient.PostAsync("/messages/compose", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = ExtractAntiforgeryToken(composePage),
+            ["Input.RecipientMemberId"] = bob.Id.ToString(),
+            ["Input.Body"] = "",
+        }));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+        Assert.Contains("Message body is required.", html);
+    }
+
+    [Fact]
+    public async Task Conversation_WrapsLongMessageBodies()
+    {
+        var (aliceClient, alice) = await CreateMemberAsync("pm-wrap-alice@example.com", "Wrap Alice");
+        var (_, bob) = await CreateMemberAsync("pm-wrap-bob@example.com", "Wrap Bob");
+        var service = factory.Services.GetRequiredService<PrivateMessageService>();
+        var longBody = "https://example.com/" + new string('a', 180);
+        var created = await service.ComposeAsync(alice.Id, bob.Id, longBody);
+
+        var html = await aliceClient.GetStringAsync($"/messages/{created.ConversationId}");
+        Assert.Contains(longBody, html);
+        Assert.Contains("Send reply", html);
     }
 
     [Fact]
