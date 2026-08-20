@@ -19,7 +19,7 @@ Candidates considered:
 
 ## Decision
 
-Build the native mobile app in **React Native**, with Android and iOS as equal supported platforms, per [`mobile-app-epics.md`](../backlog/mobile-app-epics.md). [ADR 0011](0011-mobile-project-location-and-build-tooling.md) records the project location, Expo development-build approach, application identifier, and build system.
+Build the native mobile app in **React Native**, with Android and iOS as equal supported platforms, per [`mobile-app-epics.md`](../backlog/mobile-app-epics.md). [ADR 0011](0011-mobile-project-location-and-build-tooling.md) records the project location, Expo development-build approach, application identifier, and build system. [ADR 0012](0012-react-navigation-app-shell.md) records the React Navigation app shell and the public vs member tab boundary.
 
 Use the supported local toolchain in the [mobile development environment guide](../mobile-development-environment.md) when scaffolding or building the client.
 

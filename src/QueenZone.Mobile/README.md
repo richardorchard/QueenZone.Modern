@@ -4,7 +4,8 @@ Expo development-build client for QueenZone. Android and iOS are equal
 supported platforms. This project is not part of `QueenZone.sln`.
 
 Decisions: [ADR 0009](../../docs/decisions/0009-react-native-for-mobile-app.md),
-[ADR 0011](../../docs/decisions/0011-mobile-project-location-and-build-tooling.md).
+[ADR 0011](../../docs/decisions/0011-mobile-project-location-and-build-tooling.md),
+[ADR 0012](../../docs/decisions/0012-react-navigation-app-shell.md).
 Host toolchain: [mobile development environment](../../docs/mobile-development-environment.md).
 
 ## Pinned versions
@@ -58,6 +59,7 @@ cd src/QueenZone.Mobile
 node --version   # v24.x
 npm ci
 npm run typecheck
+npm test
 ```
 
 Generate native projects from committed Expo config (Continuous Native
@@ -94,11 +96,30 @@ This generates `ios/`, installs CocoaPods, compiles a Simulator development
 client, and starts Metro. The same `--clean` prebuild rule as Android applies
 when native configuration changes.
 
+## Navigation shell
+
+React Navigation provides the app shell ([ADR 0012](../../docs/decisions/0012-react-navigation-app-shell.md)).
+
+Signed-out tabs: **Today · News · Photos · Forum · You**.
+
+Signed-in tabs add **Messages** (member-only, matching the website header).
+
+Placeholder screens exist for Epics 1–6. You → **Sign in (development)** toggles
+the local session until the Epic 0 token client is wired. Member-only routes
+also render a sign-in gate so they stay closed while signed out.
+
+Rebuild the development client after this native dependency set changes
+(`react-native-screens`, `react-native-safe-area-context`, `react-native-svg`):
+
+```powershell
+npx expo prebuild --clean
+npx expo run:android
+```
+
 ## What this scaffold does not include
 
 Later Epic 0.5 stories own:
 
-- Navigation and app shell — #791
 - Design-token theme — #792
 - Per-environment API base URL — #793
 - GitHub Actions Android/iOS compile pipeline — #794

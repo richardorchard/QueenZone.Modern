@@ -1,33 +1,32 @@
+import { DarkTheme, NavigationContainer } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { RootNavigator } from './src/navigation/RootNavigator';
+import { SessionProvider } from './src/session/SessionContext';
+import { shellColors } from './src/ui/shell';
+
+const navigationTheme = {
+  ...DarkTheme,
+  colors: {
+    ...DarkTheme.colors,
+    primary: shellColors.accent,
+    background: shellColors.page,
+    card: shellColors.page,
+    text: shellColors.text,
+    border: shellColors.hairline,
+    notification: shellColors.accent,
+  },
+};
 
 export default function App() {
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>QueenZone</Text>
-      <Text style={styles.subtitle}>Development build scaffold</Text>
-      <StatusBar style="light" />
-    </View>
+    <SafeAreaProvider>
+      <SessionProvider>
+        <NavigationContainer theme={navigationTheme}>
+          <StatusBar style="light" />
+          <RootNavigator />
+        </NavigationContainer>
+      </SessionProvider>
+    </SafeAreaProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#111111',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-  },
-  title: {
-    color: '#FFFFFF',
-    fontSize: 28,
-    fontWeight: '600',
-  },
-  subtitle: {
-    color: '#E8E8E8',
-    fontSize: 16,
-    marginTop: 8,
-    textAlign: 'center',
-  },
-});
