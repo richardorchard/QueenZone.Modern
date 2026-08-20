@@ -28,6 +28,17 @@ public sealed class InMemoryAdminPhotoRepository(SharedPhotoStore store) : IAdmi
     public Task<AdminPhotoCategory?> GetCategoryByIdAsync(int catId, CancellationToken cancellationToken = default) =>
         Task.FromResult(store.GetCategory(catId));
 
+    public Task<IReadOnlyList<string>> GetReferencedBlobNamesAsync(int catId, CancellationToken cancellationToken = default)
+    {
+        var photos = store.GetPhotos(new AdminPhotoListFilter(CatId: catId));
+        IReadOnlyList<string> names = photos
+            .SelectMany(photo => new[] { photo.LegacyUrl, photo.LegacyThumbUrl })
+            .Select(url => url.Split('/').Last())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        return Task.FromResult(names);
+    }
+
     public Task<int> CreateAsync(
         AdminPhotoCreateRequest request,
         string editorEmail,

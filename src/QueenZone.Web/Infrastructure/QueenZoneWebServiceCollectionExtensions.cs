@@ -90,6 +90,11 @@ public static class QueenZoneWebServiceCollectionExtensions
             .ValidateOnStart();
         services.AddSingleton<IValidateOptions<MobileAuthOptions>, MobileAuthOptionsValidator>();
 
+        services.AddOptions<GalleryOrphanSweepOptions>()
+            .Bind(configuration.GetSection(GalleryOrphanSweepOptions.SectionName))
+            .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<GalleryOrphanSweepOptions>, GalleryOrphanSweepOptionsValidator>();
+
         return services;
     }
 
@@ -246,6 +251,8 @@ public static class QueenZoneWebServiceCollectionExtensions
         services.AddScoped<PhotoSubmissionService>();
         services.AddScoped<AdminPhotoService>();
         services.AddScoped<PhotoSubmissionPromotionService>();
+        services.AddScoped<GalleryOrphanSweepService>();
+        services.AddHostedService<GalleryOrphanSweepHostedService>();
         services.AddScoped<NewsSuggestionService>();
         services.AddSingleton<HelpRequestFormStamp>();
         services.AddSingleton<HelpRequestRateLimiter>();

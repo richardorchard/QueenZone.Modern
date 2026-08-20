@@ -161,6 +161,34 @@ public sealed class EfAdminPhotoRepository(QueenZoneDbContext dbContext) : IAdmi
         return row is null ? null : new AdminPhotoCategory(row.CatId, row.Name, NewsSlug.Slugify(row.Name));
     }
 
+    public async Task<IReadOnlyList<string>> GetReferencedBlobNamesAsync(
+        int catId,
+        CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+            SELECT p.Url AS LegacyUrl, p.Thumb_URL AS LegacyThumbUrl
+            FROM dbo.PIC_FILES_T p
+            WHERE p.Cat_ID = @CatId
+            """;
+
+        var rows = await EfSql.QuerySqlAsync<LegacyUrlRow>(
+            dbContext,
+            sql,
+            command => command.Parameters.Add(EfSql.Input("@CatId", catId)),
+            cancellationToken: cancellationToken);
+
+        return rows
+            .SelectMany(row => new[] { row.LegacyUrl, row.LegacyThumbUrl })
+            .Select(BlobNameFromLegacyUrl)
+            .Where(name => name is not null)
+            .Select(name => name!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static string? BlobNameFromLegacyUrl(string? legacyUrl) =>
+        string.IsNullOrWhiteSpace(legacyUrl) ? null : legacyUrl.Split('/').Last();
+
     public async Task<int> CreateAsync(
         AdminPhotoCreateRequest request,
         string editorEmail,
@@ -469,5 +497,12 @@ public sealed class EfAdminPhotoRepository(QueenZoneDbContext dbContext) : IAdmi
         public int CatId { get; set; }
 
         public string Name { get; set; } = string.Empty;
+    }
+
+    private sealed class LegacyUrlRow
+    {
+        public string? LegacyUrl { get; set; }
+
+        public string? LegacyThumbUrl { get; set; }
     }
 }
