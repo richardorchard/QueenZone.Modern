@@ -1,0 +1,171 @@
+# React Native Mobile Development Environment
+
+## Purpose
+
+This guide defines the local toolchain for the planned QueenZone React Native
+client. Use the same major versions on Windows and macOS. Patch versions may
+differ when a newer compatible patch is available.
+
+The project targets iOS first and Android second, but the Android toolchain is
+installed on both development machines so the shared client can be tested on
+both platforms.
+
+## Supported Baseline
+
+| Component | Required version | Notes |
+| --- | --- | --- |
+| Node.js | **24 LTS** | React Native requires Node 22.11 or newer. Use the same LTS major on both machines. |
+| npm | Bundled with Node.js | Do not pin a separate global npm unless the client project later requires it. |
+| JDK | **17** | Use Eclipse Temurin 17. Higher JDK majors can be incompatible with the Gradle version used by React Native. |
+| Android Studio | Latest stable | Install the native build for the host architecture. |
+| Android SDK Platform | **Android 16 / API 36** | Set `compileSdk` and `targetSdk` to 36 unless the client project documents a later level. |
+| Android SDK Build-Tools | **36.0.0** | Install through Android Studio's SDK Manager. |
+| Android SDK Command-line Tools | Latest | Provides `sdkmanager` and `avdmanager`. |
+| Android SDK Platform-Tools | Latest | Provides `adb`. |
+| Android Emulator | Latest | Keep current through Android Studio. |
+| Emulator system image | **API 36, Google APIs** | Use `arm64-v8a` on Apple Silicon and `x86_64` on Windows x64. |
+| Git | Latest stable | Xcode Command Line Tools Git or Homebrew Git is sufficient on macOS. |
+| Watchman | Latest stable | Recommended on macOS. It is not required on Windows. |
+
+The established Windows reference currently uses Node 24, Temurin 17, Android
+SDK Platform 36, and Build-Tools 36.0.0. Match those compatibility versions on
+macOS rather than copying Windows-specific paths or emulator architecture.
+
+## macOS Setup
+
+These steps assume an Apple Silicon Mac and the default `zsh` shell.
+
+### 1. Install the base tools
+
+Install [Homebrew](https://brew.sh/) if it is not already available, then run:
+
+```bash
+brew install node@24
+brew install watchman
+brew install --cask temurin@17
+brew install --cask android-studio
+```
+
+Install the Apple Silicon edition of Android Studio. Do not run the Intel build
+through Rosetta unless the machine is an Intel Mac.
+
+### 2. Install Android SDK components
+
+Open **Android Studio > Settings > Languages & Frameworks > Android SDK**.
+
+Under **SDK Platforms**, enable **Show Package Details** and install:
+
+- Android SDK Platform 36;
+- Google APIs ARM 64 v8a System Image, API 36; and
+- Sources for Android 36 (recommended, but not required to build).
+
+Under **SDK Tools**, install:
+
+- Android SDK Build-Tools 36.0.0;
+- Android SDK Command-line Tools (latest);
+- Android SDK Platform-Tools; and
+- Android Emulator.
+
+Do not install the Intel `x86_64` emulator image on Apple Silicon. Use the
+`arm64-v8a` image so the emulator runs natively.
+
+### 3. Configure the shell
+
+Add the following to `~/.zprofile`:
+
+```bash
+export JAVA_HOME=$(/usr/libexec/java_home -v 17)
+export ANDROID_HOME="$HOME/Library/Android/sdk"
+
+export PATH="/opt/homebrew/opt/node@24/bin:$PATH"
+export PATH="$PATH:$ANDROID_HOME/emulator"
+export PATH="$PATH:$ANDROID_HOME/platform-tools"
+export PATH="$PATH:$ANDROID_HOME/cmdline-tools/latest/bin"
+```
+
+Reload the profile:
+
+```bash
+source ~/.zprofile
+```
+
+For an Intel Mac, Homebrew normally uses `/usr/local` instead of
+`/opt/homebrew`. Adjust the Node path accordingly.
+
+### 4. Create an Android virtual device
+
+Open **Android Studio > Tools > Device Manager > Create Device** and use:
+
+- hardware profile: Pixel 8 or a comparable current phone;
+- system image: Google APIs ARM 64 v8a, API 36; and
+- name: `Pixel_8_API_36`.
+
+Use a Google Play image instead if the app feature under test specifically
+requires the Play Store. The Google APIs image is the leaner default for normal
+development.
+
+### 5. Verify the installation
+
+Run:
+
+```bash
+java -version
+node --version
+npm --version
+git --version
+adb version
+emulator -version
+sdkmanager --version
+emulator -list-avds
+```
+
+Expected results:
+
+- Java reports major version 17;
+- Node reports major version 24;
+- `adb`, `emulator`, and `sdkmanager` are found on `PATH`; and
+- `Pixel_8_API_36` appears in the AVD list.
+
+## Windows Equivalents
+
+The Windows user environment uses:
+
+```text
+ANDROID_HOME=%LOCALAPPDATA%\Android\Sdk
+JAVA_HOME=C:\Program Files\Eclipse Adoptium\<Temurin 17 directory>
+```
+
+Add these directories to the user `Path`:
+
+```text
+%LOCALAPPDATA%\Android\Sdk\platform-tools
+%LOCALAPPDATA%\Android\Sdk\emulator
+%LOCALAPPDATA%\Android\Sdk\cmdline-tools\latest\bin
+```
+
+Use the Google APIs Intel `x86_64` API 36 emulator image on a Windows x64 host.
+
+## Optional Components
+
+Do not install these as baseline dependencies:
+
+- Android NDK;
+- CMake; or
+- a global React Native CLI.
+
+Install NDK or CMake only when the client or a native dependency specifies a
+version. Run React Native commands through the project's local tooling, normally
+with `npx`, rather than maintaining a global CLI.
+
+Developing or signing the iOS target also requires the current supported Xcode
+release and CocoaPods. Those versions should be defined when the React Native
+client is scaffolded because they depend on the selected React Native release.
+
+## References
+
+- [React Native: Set Up Your Environment](https://reactnative.dev/docs/next/set-up-your-environment)
+- [Android Studio installation](https://developer.android.com/studio/install)
+- [Android 16 SDK setup](https://developer.android.com/about/versions/16/setup-sdk)
+- [Android Virtual Device management](https://developer.android.com/studio/run/managing-avds)
+- [Homebrew Temurin 17 cask](https://formulae.brew.sh/cask/temurin@17)
+- [Homebrew Node 24 formula](https://formulae.brew.sh/formula/node@24)
