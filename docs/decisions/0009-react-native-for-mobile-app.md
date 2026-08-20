@@ -19,7 +19,7 @@ Candidates considered:
 
 ## Decision
 
-Build the native mobile app in **React Native**, targeting iOS first and Android second, per [`mobile-app-epics.md`](../backlog/mobile-app-epics.md).
+Build the native mobile app in **React Native**, with Android and iOS as equal supported platforms, per [`mobile-app-epics.md`](../backlog/mobile-app-epics.md). [ADR 0011](0011-mobile-project-location-and-build-tooling.md) records the project location, Expo development-build approach, application identifier, and build system.
 
 Use the supported local toolchain in the [mobile development environment guide](../mobile-development-environment.md) when scaffolding or building the client.
 

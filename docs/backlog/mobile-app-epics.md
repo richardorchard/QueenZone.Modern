@@ -1,10 +1,10 @@
 # Mobile app epics and user stories
 
-Speculative backlog for a native iPhone (later Android) app, following on from [`mobile-app-feasibility.md`](../architecture/mobile-app-feasibility.md). This is planning scope only — nothing here is accepted work. Per [`migration-backlog.md`](migration-backlog.md)'s rule, open a GitHub epic/issue before starting any of it, and re-check the PWA's real usage first, since the feasibility doc's recommendation was PWA-first and native work is only justified if that sees traction.
+Speculative backlog for a native Android and iOS app, following on from [`mobile-app-feasibility.md`](../architecture/mobile-app-feasibility.md). This is planning scope only — nothing here is accepted work. Per [`migration-backlog.md`](migration-backlog.md)'s rule, open a GitHub epic/issue before starting any of it, and re-check the PWA's real usage first, since the feasibility doc's recommendation was PWA-first and native work is only justified if that sees traction.
 
 Ordering below is dependency order, not priority: Epic 0 is a hard prerequisite for every other epic, since none of the app's core content is currently available as an API.
 
-Tech choice: **React Native** for both iOS and Android — see [ADR 0009](../decisions/0009-react-native-for-mobile-app.md).
+Tech choice: **React Native** with equal Android and iOS support — see [ADR 0009](../decisions/0009-react-native-for-mobile-app.md) and [ADR 0011](../decisions/0011-mobile-project-location-and-build-tooling.md).
 
 ## Epic 0 — Mobile API & token auth foundation
 
@@ -95,9 +95,9 @@ Cross-cutting infrastructure epic that most of the above stories depend on. If p
 - As a compliance reviewer, I want the App Store's required "Sign in with Apple" consideration addressed if the app offers other third-party logins (Google/Microsoft/Discord/GitHub), per Apple's guideline 4.8.
 - As the product owner, I want crash reporting and basic usage analytics in the shipped app so post-launch issues surface quickly on a solo-maintained project.
 
-## Epic 10 — Android port
+## Epic 10 — Android store release
 
-Deliberately last: the user's stated priority is iPhone first, Android later, and most of Epics 0–8 are platform-agnostic once the API/auth foundation exists. Per [ADR 0009](../decisions/0009-react-native-for-mobile-app.md), React Native was chosen specifically so this epic is largely a build-and-release exercise rather than a second app.
+This is the Android packaging and store-release track, not a later port. Android and iOS have equal architectural status under [ADR 0011](../decisions/0011-mobile-project-location-and-build-tooling.md), although their public release dates may differ. Most of Epics 0–8 remain shared, platform-agnostic work once the API/auth foundation exists.
 
 - As an Android user, I want feature parity with the iOS app for all the epics above, delivered from the same React Native codebase rather than a rewrite.
 - As the product owner, I want any iOS-only native modules used in Epics 4/5/7 (camera, background audio, push) audited for Android equivalents early, so Epic 10 isn't blocked by a module with no Android support.
