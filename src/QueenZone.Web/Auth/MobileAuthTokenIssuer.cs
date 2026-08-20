@@ -74,13 +74,34 @@ public sealed class MobileAuthTokenIssuer(
             signingKey: ResolveJwtValidationSigningKey(mobile, environment));
         jwt.Events = new JwtBearerEvents
         {
-            OnChallenge = context =>
+            OnChallenge = async context =>
             {
                 // JSON APIs should not redirect to /account/login.
                 context.HandleResponse();
+                if (context.Response.HasStarted)
+                {
+                    return;
+                }
+
                 context.Response.StatusCode = StatusCodes.Status401Unauthorized;
                 context.Response.Headers.WWWAuthenticate = "Bearer";
-                return Task.CompletedTask;
+                await Results.Problem(
+                        statusCode: StatusCodes.Status401Unauthorized,
+                        title: "Unauthorized")
+                    .ExecuteAsync(context.HttpContext);
+            },
+            OnForbidden = async context =>
+            {
+                if (context.Response.HasStarted)
+                {
+                    return;
+                }
+
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                await Results.Problem(
+                        statusCode: StatusCodes.Status403Forbidden,
+                        title: "Forbidden")
+                    .ExecuteAsync(context.HttpContext);
             },
         };
     }

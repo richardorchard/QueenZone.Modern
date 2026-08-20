@@ -25,6 +25,8 @@ public static class MobileAuthEndpoints
     public static void MapMobileAuthEndpoints(this WebApplication app)
     {
         var group = app.MapGroup("/api/v1/auth")
+            .WithGroupName(ApiV1.OpenApiDocumentName)
+            .WithTags("Auth")
             .RequireRateLimiting(QueenZoneRateLimitPolicies.Auth)
             .DisableAntiforgery();
 
