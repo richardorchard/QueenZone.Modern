@@ -268,7 +268,9 @@ public class AdminModerationWorkflowTests : RealDataPageTest
         Assert.That(response?.Status, Is.EqualTo(200));
         await Expect(adminPage.GetByRole(AriaRole.Heading, new() { Name = "Dashboard", Level = 1 })).ToBeVisibleAsync();
         await Expect(adminPage.Locator(".admin-dashboard__stat-value").First).ToBeVisibleAsync();
-        await Expect(adminPage.Locator(".admin-dashboard__queue-tile")).ToHaveCountAsync(3);
+        await Expect(adminPage.Locator(".admin-dashboard__queue-tile")).ToHaveCountAsync(4);
+        await Expect(adminPage.Locator(".admin-dashboard__queue-tile-label")).ToHaveTextAsync(
+            ["Help requests", "Photos", "News suggestions", "Articles"]);
         await Expect(adminPage.Locator(".admin-dashboard__queue-tile-count").First).ToBeVisibleAsync();
     }
 
@@ -370,7 +372,7 @@ public class AdminModerationWorkflowTests : RealDataPageTest
     {
         await Page.GotoAsync("/submit/photo");
         await Page.GetByLabel("Title").FillAsync(title);
-        await Page.GetByLabel("Photo").SetInputFilesAsync(new FilePayload
+        await Page.Locator("#PhotoFile").SetInputFilesAsync(new FilePayload
         {
             Name = "e2e-photo.png",
             MimeType = "image/png",

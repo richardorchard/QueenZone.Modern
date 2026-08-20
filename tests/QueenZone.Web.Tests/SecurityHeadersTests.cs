@@ -58,6 +58,7 @@ public sealed class SecurityHeadersTests : IClassFixture<WebApplicationFactory<P
     [InlineData("/")]
     [InlineData("/news")]
     [InlineData("/account/login")]
+    [InlineData("/contact")]
     public async Task Response_HasEnforcingContentSecurityPolicy(string path)
     {
         var response = await factory.CreateClient().GetAsync(path);
