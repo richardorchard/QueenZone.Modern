@@ -1,5 +1,9 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace QueenZone.Web.Tests;
 
@@ -68,5 +72,25 @@ public sealed class AdminAuthenticationSchemeTests
             hasMemberCookie: false);
 
         Assert.Equal(TestAuthHandler.SchemeName, scheme);
+    }
+
+    [Fact]
+    public void Admin_policy_does_not_accept_member_cookie_or_mobile_bearer()
+    {
+        var configuration = new ConfigurationBuilder().Build();
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddQueenZoneAuthorization(configuration, new FakeHostEnvironment("Testing"));
+
+        using var provider = services.BuildServiceProvider();
+        var policy = provider.GetRequiredService<IOptions<AuthorizationOptions>>()
+            .Value
+            .GetPolicy(AdminAuthenticationSchemes.Policy);
+
+        Assert.NotNull(policy);
+        Assert.Equal([AdminAuthenticationSchemes.CompositeScheme], policy!.AuthenticationSchemes);
+        Assert.DoesNotContain(MemberAuthenticationSchemes.MembersBearer, policy.AuthenticationSchemes);
+        Assert.DoesNotContain(MemberAuthenticationSchemes.MembersCookie, policy.AuthenticationSchemes);
+        Assert.DoesNotContain(TestMemberAuthHandler.SchemeName, policy.AuthenticationSchemes);
     }
 }

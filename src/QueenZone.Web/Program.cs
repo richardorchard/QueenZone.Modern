@@ -52,7 +52,7 @@ builder.Services.AddQueenZoneWebComposition(builder.Configuration, builder.Envir
 
 builder.Services.AddRazorPages(options =>
 {
-    options.Conventions.AuthorizeFolder("/Admin", "Admin");
+    options.Conventions.AuthorizeFolder("/Admin", AdminAuthenticationSchemes.Policy);
     // Abuse-sensitive public/member surfaces (process-local rate limits; single B1 instance).
     // EnableRateLimitingAttribute is endpoint metadata, not an MVC filter.
     options.Conventions.AddFolderApplicationModelConvention(
@@ -252,6 +252,7 @@ app.MapSitemapEndpoints();
 app.MapArticleAutosaveEndpoint();
 app.MapArticlesFeedEndpoint();
 app.MapQueenZoneApiV1();
+app.MapAdminApiEndpoints();
 app.MapMobileAuthEndpoints();
 // Anonymous public HTML is output-cached (short TTL); policy no-ops for authenticated users
 // and for the Testing environment so integration suites stay deterministic.
