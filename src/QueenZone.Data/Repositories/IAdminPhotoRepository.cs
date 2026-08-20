@@ -14,6 +14,12 @@ public interface IAdminPhotoRepository
 
     Task<AdminPhotoCategory?> GetCategoryByIdAsync(int catId, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Returns the blob file names (original and thumbnail) referenced by <c>PIC_FILES_T</c>
+    /// rows in the given category, used to identify orphaned gallery blobs.
+    /// </summary>
+    Task<IReadOnlyList<string>> GetReferencedBlobNamesAsync(int catId, CancellationToken cancellationToken = default);
+
     Task<int> CreateAsync(AdminPhotoCreateRequest request, string editorEmail, CancellationToken cancellationToken = default);
 
     Task UpdateAsync(int picId, AdminPhotoUpdateRequest request, string editorEmail, CancellationToken cancellationToken = default);
