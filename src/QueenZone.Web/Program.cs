@@ -14,11 +14,20 @@ builder.Logging.AddConsole();
 // Local secrets only in Development. Loading them for Production/Staging would let a
 // developer machine's empty AzureAd:ClientId override App Service settings when
 // ASPNETCORE_ENVIRONMENT is mis-set, and would break production-shaped integration tests.
-if (builder.Environment.IsDevelopment())
+// Development WebApplicationFactory hosts (testhost) skip Local.json so a workstation's
+// optional Analytics secrets cannot fail-closed an unrelated test.
+if (QueenZoneDevelopmentHost.ShouldLoadLocalSettings(
+        builder.Environment,
+        builder.Configuration,
+        QueenZoneDevelopmentHost.GetEntryAssemblyName()))
 {
     builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
     // Keep environment variables above Local.json so CI/shell overrides still win.
     builder.Configuration.AddEnvironmentVariables();
+}
+else if (builder.Environment.IsDevelopment())
+{
+    QueenZoneDevelopmentHost.NeutralizeIncompleteAnalytics(builder.Configuration);
 }
 else if (QueenZoneEnvironments.IsAutomatedTestHost(builder.Environment))
 {
