@@ -334,6 +334,7 @@ public static class QueenZoneWebServiceCollectionExtensions
         services.AddQueenZoneNewsAgentWeb(configuration);
         services.AddQueenZoneAuth(configuration, environment);
         services.AddQueenZoneAuthorization(configuration, environment);
+        services.AddQueenZoneJsonApi();
 
         return services;
     }
