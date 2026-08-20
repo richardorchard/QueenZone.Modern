@@ -9,6 +9,7 @@ public sealed class MobileAuthService(
     IMobileAuthGrantRepository grants,
     MobileAuthTokenIssuer tokens,
     MemberAccountService memberAccountService,
+    MobileAuthAccountRateLimiter accountRateLimiter,
     IOptions<MobileAuthOptions> options,
     TimeProvider timeProvider)
 {
@@ -125,6 +126,15 @@ public sealed class MobileAuthService(
                 session.State);
         }
 
+        if (!accountRateLimiter.IsAllowed(account.Id))
+        {
+            return MobileAuthCallbackResult.Failed(
+                "temporarily_unavailable",
+                MobileAuthAccountRateLimiter.ClientMessage,
+                session.RedirectUri,
+                session.State);
+        }
+
         var rawCode = MobileAuthPkce.CreateOpaqueToken();
         var now = timeProvider.GetUtcNow().UtcDateTime;
         await grants.StoreAuthorizationCodeAsync(
@@ -226,8 +236,17 @@ public sealed class MobileAuthService(
         }
 
         if (stored.ExpiresAt <= now
-            || !string.Equals(stored.ClientId, clientId, StringComparison.Ordinal)
-            || !await grants.TryRevokeRefreshTokenAsync(tokenHash, now, cancellationToken))
+            || !string.Equals(stored.ClientId, clientId, StringComparison.Ordinal))
+        {
+            return MobileAuthTokenResult.Failed("invalid_grant", "The refresh token grant is invalid.");
+        }
+
+        if (!accountRateLimiter.IsAllowed(stored.MemberAccountId))
+        {
+            return MobileAuthTokenResult.RateLimited();
+        }
+
+        if (!await grants.TryRevokeRefreshTokenAsync(tokenHash, now, cancellationToken))
         {
             return MobileAuthTokenResult.Failed("invalid_grant", "The refresh token grant is invalid.");
         }
@@ -350,11 +369,22 @@ public sealed record MobileAuthTokenResult(
     string? ErrorDescription,
     string? AccessToken,
     string? RefreshToken,
-    int ExpiresIn)
+    int ExpiresIn,
+    int StatusCode)
 {
     public static MobileAuthTokenResult Succeeded(string accessToken, string refreshToken, int expiresIn) =>
-        new(true, null, null, accessToken, refreshToken, expiresIn);
+        new(true, null, null, accessToken, refreshToken, expiresIn, StatusCodes.Status200OK);
 
     public static MobileAuthTokenResult Failed(string error, string description) =>
-        new(false, error, description, null, null, 0);
+        new(false, error, description, null, null, 0, StatusCodes.Status400BadRequest);
+
+    public static MobileAuthTokenResult RateLimited() =>
+        new(
+            false,
+            "temporarily_unavailable",
+            MobileAuthAccountRateLimiter.ClientMessage,
+            null,
+            null,
+            0,
+            StatusCodes.Status429TooManyRequests);
 }

@@ -29,13 +29,26 @@ public interface IGalleryPhotoBlobService
         string blobName,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Lists blobs in the container along with their last-modified time. Returns an empty
+    /// list if the container does not exist.
+    /// </summary>
+    Task<IReadOnlyList<GalleryBlobDescriptor>> ListBlobsAsync(
+        string containerName,
+        CancellationToken cancellationToken = default);
+
     bool IsConfigured { get; }
 }
+
+public sealed record GalleryBlobDescriptor(string BlobName, DateTimeOffset LastModified);
 
 public sealed class NullGalleryPhotoBlobService : IGalleryPhotoBlobService
 {
     private readonly Dictionary<string, byte[]> blobs = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, DateTimeOffset> lastModified = new(StringComparer.OrdinalIgnoreCase);
     private readonly object sync = new();
+
+    public TimeProvider TimeProvider { get; init; } = TimeProvider.System;
 
     public bool IsConfigured => true;
 
@@ -50,7 +63,9 @@ public sealed class NullGalleryPhotoBlobService : IGalleryPhotoBlobService
         content.CopyTo(buffer);
         lock (sync)
         {
-            blobs[Key(containerName, blobName)] = buffer.ToArray();
+            var key = Key(containerName, blobName);
+            blobs[key] = buffer.ToArray();
+            lastModified[key] = TimeProvider.GetUtcNow();
         }
 
         return Task.CompletedTask;
@@ -79,10 +94,27 @@ public sealed class NullGalleryPhotoBlobService : IGalleryPhotoBlobService
     {
         lock (sync)
         {
-            blobs.Remove(Key(containerName, blobName));
+            var key = Key(containerName, blobName);
+            blobs.Remove(key);
+            lastModified.Remove(key);
         }
 
         return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<GalleryBlobDescriptor>> ListBlobsAsync(
+        string containerName,
+        CancellationToken cancellationToken = default)
+    {
+        var prefix = containerName + "/";
+        lock (sync)
+        {
+            IReadOnlyList<GalleryBlobDescriptor> result = blobs.Keys
+                .Where(key => key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                .Select(key => new GalleryBlobDescriptor(key[prefix.Length..], lastModified[key]))
+                .ToList();
+            return Task.FromResult(result);
+        }
     }
 
     private static string Key(string containerName, string blobName) =>
@@ -128,6 +160,25 @@ public sealed class AzureGalleryPhotoBlobService(BlobServiceClient blobServiceCl
     {
         var blob = blobServiceClient.GetBlobContainerClient(containerName).GetBlobClient(blobName);
         await blob.DeleteIfExistsAsync(cancellationToken: cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<GalleryBlobDescriptor>> ListBlobsAsync(
+        string containerName,
+        CancellationToken cancellationToken = default)
+    {
+        var container = blobServiceClient.GetBlobContainerClient(containerName);
+        if (!await container.ExistsAsync(cancellationToken))
+        {
+            return [];
+        }
+
+        var results = new List<GalleryBlobDescriptor>();
+        await foreach (var blob in container.GetBlobsAsync(cancellationToken: cancellationToken))
+        {
+            results.Add(new GalleryBlobDescriptor(blob.Name, blob.Properties.LastModified ?? DateTimeOffset.MinValue));
+        }
+
+        return results;
     }
 }
 
