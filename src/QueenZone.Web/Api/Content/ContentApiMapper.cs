@@ -8,6 +8,27 @@ namespace QueenZone.Web;
 /// </summary>
 public static class ContentApiMapper
 {
+    public static NewsListItemDto ToNewsListItem(NewsItem item) =>
+        new(
+            item.Id,
+            item.Title,
+            item.Excerpt,
+            item.PublishedAt,
+            NewsRoutes.GetNewsDetailPath(item.Id, item.Title, item.Slug));
+
+    public static IReadOnlyList<NewsListItemDto> ToNewsListItems(IEnumerable<NewsItem> items) =>
+        items.Select(ToNewsListItem).ToList();
+
+    public static NewsDetailDto ToNewsDetail(NewsItem item) =>
+        new(
+            item.Id,
+            item.Title,
+            item.Excerpt,
+            item.Body,
+            item.PublishedAt,
+            item.SourceUrl,
+            NewsRoutes.GetNewsDetailPath(item.Id, item.Title, item.Slug));
+
     public static BiographyChapterListItemDto ToBiographyChapterListItem(BiographyChapterItem chapter) =>
         new(
             chapter.Id,

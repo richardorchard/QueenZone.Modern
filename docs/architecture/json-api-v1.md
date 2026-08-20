@@ -12,7 +12,7 @@ Decision record: [`docs/decisions/0010-versioned-json-api-conventions.md`](../de
 | `/openapi/v1.json` | Generated OpenAPI 3.1 document (runtime, kept in sync with mapped `/api/v1` endpoints) |
 | `/api/v1/auth/*` | Mobile OAuth2 PKCE + tokens (see issues #720 / #721) |
 | `/api/v1/admin` | Admin status probe; future admin JSON must use the same `Admin` policy (#723) |
-| `/api/v1/content/*` | Public, read-only archive content for the mobile app (biography today; news, discography, timeline, Freddie Tribute follow — #726). No authentication required. |
+| `/api/v1/content/*` | Public, read-only archive content for the mobile app (news, biography today; discography, timeline, Freddie Tribute follow — #726). No authentication required. |
 | `/api/v1/{resource}` | Later epics (forum, messages, galleries, …) |
 
 Later endpoints should be mapped on a `MapGroup("/api/v1")` (or a sub-group) with `.WithGroupName("v1")` so they appear in the OpenAPI document. Do not add mobile/app JSON routes under `src/QueenZone.Web/Endpoints/`.
