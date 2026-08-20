@@ -2,13 +2,15 @@
 
 ## Purpose
 
-This guide defines the local toolchain for the planned QueenZone React Native
-client. Use the same major versions on Windows and macOS. Patch versions may
-differ when a newer compatible patch is available.
+This guide defines the local toolchain for the QueenZone React Native client at
+[`src/QueenZone.Mobile`](../src/QueenZone.Mobile/README.md). Use the same major
+versions on Windows and macOS. Patch versions may differ when a newer compatible
+patch is available.
 
-The project targets iOS first and Android second, but the Android toolchain is
-installed on both development machines so the shared client can be tested on
-both platforms.
+Android and iOS are equal supported platforms ([ADR 0011](decisions/0011-mobile-project-location-and-build-tooling.md)).
+The Android toolchain is installed on both development machines so the shared
+client can be built on either host. iOS compilation still requires macOS and
+Xcode.
 
 ## Supported Baseline
 
@@ -26,6 +28,9 @@ both platforms.
 | Emulator system image | **API 36, Google APIs** | Use `arm64-v8a` on Apple Silicon and `x86_64` on Windows x64. |
 | Git | Latest stable | Xcode Command Line Tools Git or Homebrew Git is sufficient on macOS. |
 | Watchman | Latest stable | Recommended on macOS. It is not required on Windows. |
+| Expo SDK | **57** | Pinned in `src/QueenZone.Mobile/package.json`. Development builds only; Expo Go is not supported. |
+| Xcode | **26.4+** | Required on macOS to compile the iOS target for Expo SDK 57. |
+| CocoaPods | Bundled via Expo prebuild | Installed during `npx expo run:ios`; do not maintain a separate global copy unless prebuild asks for one. |
 
 The established Windows reference currently uses Node 24, Temurin 17, Android
 SDK Platform 36, and Build-Tools 36.0.0. Match those compatibility versions on
@@ -154,12 +159,15 @@ Do not install these as baseline dependencies:
 - a global React Native CLI.
 
 Install NDK or CMake only when the client or a native dependency specifies a
-version. Run React Native commands through the project's local tooling, normally
-with `npx`, rather than maintaining a global CLI.
+version. The first `npx expo run:android` / Gradle build may download NDK
+27.1.12297006 and CMake 3.22.1 through `sdkmanager` because Expo SDK 57's
+generated Android project requests them; that is expected and is not a manual
+baseline install. Run React Native commands through the project's local
+tooling, normally with `npx`, rather than maintaining a global CLI.
 
-Developing or signing the iOS target also requires the current supported Xcode
-release and CocoaPods. Those versions should be defined when the React Native
-client is scaffolded because they depend on the selected React Native release.
+Developing or signing the iOS target requires Xcode 26.4 or newer (Expo SDK 57)
+and CocoaPods. Clean-checkout commands live in
+[`src/QueenZone.Mobile/README.md`](../src/QueenZone.Mobile/README.md).
 
 ## References
 

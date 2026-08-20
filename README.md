@@ -21,6 +21,7 @@ The goal is to restart QueenZone as a clean, modern public site that fully expos
     QueenZone.Web/
       Auth/ Caching/ Content/ Endpoints/ Admin/ Member/ Forum/ Infrastructure/
       Pages/ Health/ Sitemap/ wwwroot/
+    QueenZone.Mobile/            # Expo React Native client (not in QueenZone.sln)
   tests/
     QueenZone.Storage.Tests/
     QueenZone.Tools.Tests/
@@ -39,6 +40,11 @@ The goal is to restart QueenZone as a clean, modern public site that fully expos
 ```
 
 C# namespaces remain `QueenZone.Data` / `QueenZone.Web` (folders are for navigation only).
+
+The native mobile client lives at `src/QueenZone.Mobile/` and uses its own Node
+toolchain (Expo SDK 57, development builds). It is not part of `QueenZone.sln`.
+Local setup for Android and iOS: [`src/QueenZone.Mobile/README.md`](src/QueenZone.Mobile/README.md).
+Decisions: [`docs/decisions/0011-mobile-project-location-and-build-tooling.md`](docs/decisions/0011-mobile-project-location-and-build-tooling.md).
 
 ## Local Development
 

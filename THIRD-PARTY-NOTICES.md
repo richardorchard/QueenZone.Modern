@@ -27,6 +27,14 @@ The full licence notice is retained at
 Copyright (c) 2017-2024, Slab; copyright (c) 2014, Jason Chen; copyright (c)
 2013, salesforce.com.
 
+## Expo / React Native (QueenZone.Mobile)
+
+`src/QueenZone.Mobile` is generated from the Expo blank TypeScript template and
+depends on Expo SDK 57, React Native, and `expo-dev-client`. Those packages
+remain subject to their own licences (MIT for the Expo template and Expo
+packages unless a given package states otherwise). The template licence notice
+is retained at `src/QueenZone.Mobile/LICENSE`.
+
 ## Other dependencies
 
 Other NuGet, test, and build dependencies remain subject to their respective

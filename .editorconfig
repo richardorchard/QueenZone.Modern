@@ -10,6 +10,10 @@ indent_size = 4
 [*.{json,yml,yaml,md}]
 indent_size = 2
 
+[src/QueenZone.Mobile/**.{js,jsx,ts,tsx,json}]
+indent_size = 2
+end_of_line = lf
+
 [*.cs]
 dotnet_sort_system_directives_first = true
 dotnet_style_qualification_for_field = false:suggestion
