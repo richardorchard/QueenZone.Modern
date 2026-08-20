@@ -1,3 +1,6 @@
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using QueenZone.Data;
 using QueenZone.Storage;
@@ -444,10 +447,89 @@ public sealed class MobileAuthServiceTests
         Assert.Null(result.RefreshToken);
     }
 
-    private static async Task<(MobileAuthService Service, string RefreshToken)> IssueTokensAsync()
+    [Fact]
+    public async Task CompleteExternalLogin_RateLimitsRepeatedSignInForSameAccount()
+    {
+        var logger = new RecordingAuthLogger();
+        var service = CreateService(
+            authLimits: new AuthRateLimitingOptions { AccountPermitLimit = 1, AccountWindowMinutes = 60 },
+            logger: logger);
+        var first = await CompleteGoogleSignInAsync(service, "rate-subject", "rate@example.com");
+        var secondStart = service.StartAuthorization(
+            "code",
+            MobileAuthOptions.DefaultClientId,
+            MobileAuthPkceTestData.RedirectUri,
+            MobileAuthPkceTestData.CreatePair().Challenge,
+            MobileAuthPkce.MethodS256,
+            "csrf-state-2",
+            MemberAuthenticationSchemes.Google);
+        var second = await service.CompleteExternalLoginAsync(
+            secondStart.Session!.RequestId,
+            MemberAuthenticationSchemes.Google,
+            "rate-subject",
+            "rate@example.com",
+            "Rate Fan",
+            CancellationToken.None);
+
+        Assert.True(first.Success);
+        Assert.False(second.Success);
+        Assert.Equal("temporarily_unavailable", second.Error);
+        Assert.Equal(MobileAuthAccountRateLimiter.ClientMessage, second.ErrorDescription);
+        Assert.Contains(logger.Messages, message => message.Contains("account partition", StringComparison.Ordinal));
+        Assert.DoesNotContain(logger.Messages, message => message.Contains("rate@example.com", StringComparison.Ordinal));
+        Assert.All(logger.Messages, message => Assert.DoesNotContain("token", message, StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task ExchangeRefreshToken_RateLimitsWithoutConsumingRefreshToken()
+    {
+        var tight = new AuthRateLimitingOptions { AccountPermitLimit = 1, AccountWindowMinutes = 60 };
+        var issued = await IssueTokensAsync(tight);
+        var first = await issued.Service.ExchangeRefreshTokenAsync(
+            MobileAuthOptions.DefaultClientId,
+            issued.RefreshToken,
+            CancellationToken.None);
+        var retry = await issued.Service.ExchangeRefreshTokenAsync(
+            MobileAuthOptions.DefaultClientId,
+            issued.RefreshToken,
+            CancellationToken.None);
+
+        Assert.False(first.Success);
+        Assert.Equal(StatusCodes.Status429TooManyRequests, first.StatusCode);
+        Assert.Equal("temporarily_unavailable", first.Error);
+        Assert.DoesNotContain(issued.RefreshToken, first.ErrorDescription ?? string.Empty);
+        Assert.False(retry.Success);
+        Assert.Equal(StatusCodes.Status429TooManyRequests, retry.StatusCode);
+        Assert.DoesNotContain(issued.RefreshToken, retry.ErrorDescription ?? string.Empty);
+    }
+
+    private static async Task<MobileAuthCallbackResult> CompleteGoogleSignInAsync(
+        MobileAuthService service,
+        string subject,
+        string email)
+    {
+        var started = service.StartAuthorization(
+            "code",
+            MobileAuthOptions.DefaultClientId,
+            MobileAuthPkceTestData.RedirectUri,
+            MobileAuthPkceTestData.CreatePair().Challenge,
+            MobileAuthPkce.MethodS256,
+            "csrf-state",
+            MemberAuthenticationSchemes.Google);
+        return await service.CompleteExternalLoginAsync(
+            started.Session!.RequestId,
+            MemberAuthenticationSchemes.Google,
+            subject,
+            email,
+            "Rate Fan",
+            CancellationToken.None);
+    }
+
+    private static async Task<(MobileAuthService Service, string RefreshToken)> IssueTokensAsync(
+        AuthRateLimitingOptions? authLimits = null)
     {
         var pair = MobileAuthPkceTestData.CreatePair();
-        var service = CreateService();
+        var service = CreateService(authLimits: authLimits);
         var started = service.StartAuthorization(
             "code",
             MobileAuthOptions.DefaultClientId,
@@ -477,7 +559,9 @@ public sealed class MobileAuthServiceTests
     private static MobileAuthService CreateService(
         InMemoryMemberAccountRepository? accounts = null,
         string environmentName = "Testing",
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        AuthRateLimitingOptions? authLimits = null,
+        ILogger<MobileAuthAccountRateLimiter>? logger = null)
     {
         var clock = timeProvider ?? TimeProvider.System;
         var options = Options.Create(new MobileAuthOptions());
@@ -498,6 +582,12 @@ public sealed class MobileAuthServiceTests
             new InMemoryMobileAuthGrantRepository(new SharedMobileAuthGrantStore()),
             new MobileAuthTokenIssuer(options, site, environment, clock),
             members,
+            new MobileAuthAccountRateLimiter(
+                new Microsoft.Extensions.Caching.Memory.MemoryCache(
+                    new Microsoft.Extensions.Caching.Memory.MemoryCacheOptions()),
+                clock,
+                Options.Create(authLimits ?? new AuthRateLimitingOptions()),
+                logger ?? NullLogger<MobileAuthAccountRateLimiter>.Instance),
             options,
             clock);
     }
@@ -509,5 +599,26 @@ public sealed class MobileAuthServiceTests
         public override DateTimeOffset GetUtcNow() => now;
 
         public void Advance(TimeSpan delta) => now += delta;
+    }
+
+    private sealed class RecordingAuthLogger : ILogger<MobileAuthAccountRateLimiter>
+    {
+        public List<string> Messages { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state)
+            where TState : notnull =>
+            null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            Messages.Add(formatter(state, exception));
+        }
     }
 }

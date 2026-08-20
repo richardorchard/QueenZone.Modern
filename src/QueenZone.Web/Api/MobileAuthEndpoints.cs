@@ -188,7 +188,7 @@ public static class MobileAuthEndpoints
 
         if (!exchanged.Success)
         {
-            return ErrorJson(exchanged.Error!, exchanged.ErrorDescription!);
+            return ErrorJson(exchanged.Error!, exchanged.ErrorDescription!, exchanged.StatusCode);
         }
 
         return Results.Json(new
