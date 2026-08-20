@@ -44,6 +44,10 @@ C# namespaces remain `QueenZone.Data` / `QueenZone.Web` (folders are for navigat
 
 The app targets .NET 10.
 
+The planned React Native client uses Node 24 LTS, JDK 17, and Android API 36.
+See the [mobile development environment guide](docs/mobile-development-environment.md)
+for the Windows and macOS toolchain.
+
 ```powershell
 dotnet restore QueenZone.sln
 dotnet build QueenZone.sln
