@@ -119,4 +119,16 @@ public static class ContentApiMapper
         songs
             .Select(song => new AlbumSongDto(song.SongId, song.Title, song.IsSingle, song.Lyrics, song.Notes))
             .ToList();
+
+    public static FreddieTributeDto ToFreddieTributeDto(FreddieTribute tribute) =>
+        new(
+            tribute.Id,
+            tribute.Name,
+            tribute.Thought,
+            tribute.Country,
+            tribute.DateText,
+            tribute.TimeText);
+
+    public static IReadOnlyList<FreddieTributeDto> ToFreddieTributeDtos(IEnumerable<FreddieTribute> tributes) =>
+        tributes.Select(ToFreddieTributeDto).ToList();
 }

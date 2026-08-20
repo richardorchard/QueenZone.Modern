@@ -54,6 +54,11 @@ public static class ContentApiEndpoints
             .WithSummary("A single studio album, with its track list.")
             .Produces<AlbumDetailDto>()
             .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapGet("/freddietribute", GetFreddieTributesAsync)
+            .WithName("GetContentFreddieTributes")
+            .WithSummary("Paged list of Freddie Mercury tributes.")
+            .Produces<ApiPagedResponse<FreddieTributeDto>>();
     }
 
     internal static async Task<IResult> GetNewsListAsync(
@@ -198,5 +203,23 @@ public static class ContentApiEndpoints
         }
 
         return Results.Ok(ContentApiMapper.ToAlbumDetail(album));
+    }
+
+    internal static async Task<IResult> GetFreddieTributesAsync(
+        IFreddieTributeRepository tributeRepository,
+        int? page,
+        int? pageSize,
+        CancellationToken cancellationToken)
+    {
+        var request = ApiPagination.Normalize(page, pageSize);
+        var tributePage = await tributeRepository.GetPageAsync(request.Page, request.PageSize, cancellationToken);
+
+        var response = ApiPagedResponse<FreddieTributeDto>.Create(
+            ContentApiMapper.ToFreddieTributeDtos(tributePage.Items),
+            request.Page,
+            request.PageSize,
+            tributePage.TotalCount);
+
+        return Results.Ok(response);
     }
 }

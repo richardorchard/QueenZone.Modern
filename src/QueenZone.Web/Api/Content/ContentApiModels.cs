@@ -94,3 +94,15 @@ public sealed record AlbumDetailDto(
 /// A single track within an <see cref="AlbumDetailDto"/>.
 /// </summary>
 public sealed record AlbumSongDto(int SongId, string Title, bool IsSingle, string? Lyrics, string? Notes);
+
+/// <summary>
+/// List-card shape for <c>/api/v1/content/freddietribute</c>. No detail endpoint: the
+/// website has no single-tribute page, only the paged tribute archive.
+/// </summary>
+public sealed record FreddieTributeDto(
+    int Id,
+    string Name,
+    string Thought,
+    string? Country,
+    string DateText,
+    string? TimeText);
