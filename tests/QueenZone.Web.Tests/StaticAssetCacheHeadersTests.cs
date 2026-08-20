@@ -18,7 +18,13 @@ public sealed class StaticAssetCacheHeadersTests : IClassFixture<WebApplicationF
             builder.UseEnvironment("Production");
             ResponseCompressionTests.ApplyProductionHostTestSettings(builder);
         });
-        developmentFactory = factory.WithWebHostBuilder(builder => builder.UseEnvironment("Development"));
+        developmentFactory = factory.WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Development");
+            // testhost already skips Local.json; pin the flag so a runner that is not named
+            // testhost still cannot inherit a half-configured Analytics pair.
+            builder.UseSetting(QueenZoneDevelopmentHost.SkipLocalSettingsKey, "true");
+        });
     }
 
     [Fact]
