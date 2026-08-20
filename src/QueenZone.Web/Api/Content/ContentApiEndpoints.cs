@@ -17,6 +17,17 @@ public static class ContentApiEndpoints
             .WithTags("Content")
             .DisableAntiforgery();
 
+        group.MapGet("/news", GetNewsListAsync)
+            .WithName("GetContentNewsList")
+            .WithSummary("Paged list of published news articles.")
+            .Produces<ApiPagedResponse<NewsListItemDto>>();
+
+        group.MapGet("/news/{id:int}", GetNewsDetailAsync)
+            .WithName("GetContentNewsDetail")
+            .WithSummary("A single published news article.")
+            .Produces<NewsDetailDto>()
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
         group.MapGet("/discography", GetAlbumsAsync)
             .WithName("GetContentDiscographyAlbums")
             .WithSummary("Paged list of studio albums.")
@@ -27,6 +38,42 @@ public static class ContentApiEndpoints
             .WithSummary("A single studio album, with its track list.")
             .Produces<AlbumDetailDto>()
             .ProducesProblem(StatusCodes.Status404NotFound);
+    }
+
+    internal static async Task<IResult> GetNewsListAsync(
+        INewsRepository newsRepository,
+        int? page,
+        int? pageSize,
+        CancellationToken cancellationToken)
+    {
+        var request = ApiPagination.Normalize(page, pageSize);
+        var items = await newsRepository.GetArchivePageAsync(request.Page, request.PageSize, cancellationToken);
+        var totalCount = await newsRepository.GetPublishedCountAsync(cancellationToken);
+
+        var response = ApiPagedResponse<NewsListItemDto>.Create(
+            ContentApiMapper.ToNewsListItems(items),
+            request.Page,
+            request.PageSize,
+            totalCount);
+
+        return Results.Ok(response);
+    }
+
+    internal static async Task<IResult> GetNewsDetailAsync(
+        INewsRepository newsRepository,
+        int id,
+        CancellationToken cancellationToken)
+    {
+        var item = await newsRepository.GetByIdAsync(id, cancellationToken);
+        if (item is null)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status404NotFound,
+                title: "Not Found",
+                detail: $"No published news article with id '{id}'.");
+        }
+
+        return Results.Ok(ContentApiMapper.ToNewsDetail(item));
     }
 
     internal static async Task<IResult> GetAlbumsAsync(
