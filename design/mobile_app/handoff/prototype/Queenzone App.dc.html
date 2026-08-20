@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/queenzone-design-system-6c12e8ec-2c2c-448b-858b-dbeb24fd8c3c/tokens/fonts.css">
+<link rel="stylesheet" href="_ds/queenzone-design-system-6c12e8ec-2c2c-448b-858b-dbeb24fd8c3c/tokens/colors.css">
+<link rel="stylesheet" href="_ds/queenzone-design-system-6c12e8ec-2c2c-448b-858b-dbeb24fd8c3c/tokens/typography.css">
+<link rel="stylesheet" href="_ds/queenzone-design-system-6c12e8ec-2c2c-448b-858b-dbeb24fd8c3c/tokens/spacing.css">
+<link rel="stylesheet" href="_ds/queenzone-design-system-6c12e8ec-2c2c-448b-858b-dbeb24fd8c3c/tokens/base.css">
+<link rel="stylesheet" href="_ds/queenzone-design-system-6c12e8ec-2c2c-448b-858b-dbeb24fd8c3c/styles.css">
+<script src="_ds/queenzone-design-system-6c12e8ec-2c2c-448b-858b-dbeb24fd8c3c/_ds_bundle.js"></script>
+<style>
+html,body{margin:0;padding:0;background:#0B0B0B}
+a{color:#B89A4A;text-decoration:none}
+a:hover{color:#D3B868}
+*{-webkit-font-smoothing:antialiased}
+.qz-scroll{overflow-y:auto;scrollbar-width:none}
+.qz-scroll::-webkit-scrollbar{display:none}
+@keyframes qzFade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes qzSheet{from{transform:translateY(100%)}to{transform:none}}
+</style>
+</helmet>
+<div style="min-height:100vh;background:#0B0B0B;color:#fff;font-family:var(--font-body);display:flex;flex-direction:column;align-items:center;padding:36px 24px 64px;box-sizing:border-box">
+
+  <div style="width:100%;max-width:960px;display:flex;flex-direction:column;gap:22px">
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:16px">
+        <img src="assets/crest-white.png" alt="Queen crest" style="height:46px;width:auto;opacity:.92">
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <span style="font-family:var(--font-titling);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:#B89A4A">Queenzone.org · Native app</span>
+          <span style="font-family:var(--font-display);font-size:30px;font-weight:500;letter-spacing:-.015em;line-height:1">The archive, in your pocket</span>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;padding:4px;border:1px solid rgba(255,255,255,.16);border-radius:3px">
+        <button onClick="{{ setIos }}" style="{{ iosBtnStyle }}">iOS</button>
+        <button onClick="{{ setAndroid }}" style="{{ androidBtnStyle }}">Android</button>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-wrap:wrap;gap:8px;padding-bottom:20px;border-bottom:1px solid rgba(255,255,255,.14)">
+      <sc-for list="{{ jumps }}" as="j" hint-placeholder-count="9">
+        <button onClick="{{ j.go }}" style="{{ j.style }}">{{ j.label }}</button>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:52px;align-items:flex-start;margin-top:38px;flex-wrap:wrap;justify-content:center">
+
+    <!-- DEVICE -->
+    <div style="flex:none;display:flex;flex-direction:column;gap:14px;align-items:center">
+      <div style="position:relative;width:412px;height:866px;padding:11px;box-sizing:border-box;background:linear-gradient(160deg,#3a3a3a,#141414);border-radius:{{ shellRadius }};box-shadow:0 40px 90px rgba(0,0,0,.7),0 0 0 1px rgba(255,255,255,.08)">
+        <div style="position:relative;width:390px;height:844px;overflow:hidden;background:#111111;border-radius:{{ screenRadius }};display:flex;flex-direction:column">
+
+          <!-- STATUS BAR -->
+          <sc-if value="{{ ios }}" hint-placeholder-val="{{ true }}">
+            <div style="flex:none;height:47px;padding:0 26px;display:flex;align-items:center;justify-content:space-between;font-size:14px;font-weight:600;color:#fff;position:relative;z-index:6">
+              <span style="letter-spacing:.01em">9:41</span>
+              <div style="position:absolute;left:50%;top:9px;transform:translateX(-50%);width:112px;height:30px;background:#000;border-radius:16px"></div>
+              <div style="display:flex;align-items:center;gap:6px">
+                <span style="font-size:11px;letter-spacing:.06em">▮▮▮</span>
+                <span style="font-size:11px">WiFi</span>
+                <span style="display:inline-block;width:22px;height:11px;border:1px solid rgba(255,255,255,.6);border-radius:3px;position:relative"><span style="position:absolute;inset:1.5px;right:5px;background:#fff;border-radius:1.5px;display:block"></span></span>
+              </div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ android }}" hint-placeholder-val="{{ true }}">
+            <div style="flex:none;height:32px;padding:0 18px;display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:500;color:#fff;position:relative;z-index:6">
+              <span>9:41</span>
+              <div style="display:flex;align-items:center;gap:7px;font-size:11px;letter-spacing:.04em">
+                <span>▮▮▮</span><span>WiFi</span>
+                <span style="display:inline-block;width:20px;height:10px;border:1px solid rgba(255,255,255,.6);border-radius:2px"></span>
+              </div>
+            </div>
+          </sc-if>
+
+          <!-- APP BAR -->
+          <sc-if value="{{ showBarIos }}" hint-placeholder-val="{{ true }}">
+            <div style="flex:none;height:44px;padding:0 8px;display:flex;align-items:center;background:rgba(17,17,17,.86);backdrop-filter:blur(12px);border-bottom:1px solid rgba(255,255,255,.12);position:relative;z-index:5">
+              <div style="width:96px;display:flex;align-items:center">
+                <sc-if value="{{ showBack }}" hint-placeholder-val="{{ true }}">
+                  <button onClick="{{ back }}" style="background:none;border:0;padding:6px 8px;color:#B89A4A;font:500 16px var(--font-body);display:flex;align-items:center;gap:3px;cursor:pointer">
+                    <svg width="11" height="18" viewBox="0 0 11 18" fill="none" stroke="#B89A4A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 1 2 9l7 8"></path></svg>
+                    Back
+                  </button>
+                </sc-if>
+              </div>
+              <span style="flex:1;text-align:center;font:600 17px var(--font-body);letter-spacing:-.01em;color:#fff">{{ barTitle }}</span>
+              <div style="width:96px;display:flex;align-items:center;justify-content:flex-end;gap:2px">
+                <sc-if value="{{ showSearchAction }}" hint-placeholder-val="{{ true }}">
+                  <button onClick="{{ goSearch }}" style="background:none;border:0;padding:8px;cursor:pointer;line-height:0">
+                    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4.2-4.2"></path></svg>
+                  </button>
+                </sc-if>
+                <sc-if value="{{ showCompose }}" hint-placeholder-val="{{ true }}">
+                  <button onClick="{{ openSheet }}" style="background:none;border:0;padding:6px 8px;color:#B89A4A;font:500 16px var(--font-body);cursor:pointer">New</button>
+                </sc-if>
+                <sc-if value="{{ showReadActions }}" hint-placeholder-val="{{ true }}">
+                  <button onClick="{{ toggleSave }}" style="background:none;border:0;padding:8px;cursor:pointer;line-height:0">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="{{ saveFill }}" stroke="#B89A4A" stroke-width="1.5" stroke-linejoin="round"><path d="M6 3h12v18l-6-4.5L6 21z"></path></svg>
+                  </button>
+                </sc-if>
+                <sc-if value="{{ showReadActions }}" hint-placeholder-val="{{ true }}">
+                  <button onClick="{{ openSheet }}" style="background:none;border:0;padding:8px;cursor:pointer;line-height:0">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v11"></path><path d="M8 7l4-4 4 4"></path><path d="M5 14v6h14v-6"></path></svg>
+                  </button>
+                </sc-if>
+              </div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ showBarAndroid }}" hint-placeholder-val="{{ true }}">
+            <div style="flex:none;height:56px;padding:0 6px 0 4px;display:flex;align-items:center;gap:4px;background:rgba(17,17,17,.9);backdrop-filter:blur(12px);border-bottom:1px solid rgba(255,255,255,.12);position:relative;z-index:5">
+              <sc-if value="{{ showBack }}" hint-placeholder-val="{{ true }}">
+                <button onClick="{{ back }}" style="background:none;border:0;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:22px;cursor:pointer" style-hover="background:rgba(255,255,255,.08)">
+                  <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12H4"></path><path d="M10 6l-6 6 6 6"></path></svg>
+                </button>
+              </sc-if>
+              <span style="flex:1;padding-left:{{ androidTitlePad }};font:500 20px var(--font-body);letter-spacing:.005em;color:#fff">{{ barTitle }}</span>
+              <sc-if value="{{ showSearchAction }}" hint-placeholder-val="{{ true }}">
+                <button onClick="{{ goSearch }}" style="background:none;border:0;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:22px;cursor:pointer" style-hover="background:rgba(255,255,255,.08)">
+                  <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4.2-4.2"></path></svg>
+                </button>
+              </sc-if>
+              <sc-if value="{{ showReadActions }}" hint-placeholder-val="{{ true }}">
+                <button onClick="{{ toggleSave }}" style="background:none;border:0;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:22px;cursor:pointer" style-hover="background:rgba(255,255,255,.08)">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="{{ saveFill }}" stroke="#B89A4A" stroke-width="1.5" stroke-linejoin="round"><path d="M6 3h12v18l-6-4.5L6 21z"></path></svg>
+                </button>
+              </sc-if>
+              <sc-if value="{{ showReadActions }}" hint-placeholder-val="{{ true }}">
+                <button onClick="{{ openSheet }}" style="background:none;border:0;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:22px;cursor:pointer" style-hover="background:rgba(255,255,255,.08)">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v11"></path><path d="M8 7l4-4 4 4"></path><path d="M5 14v6h14v-6"></path></svg>
+                </button>
+              </sc-if>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ isStory }}" hint-placeholder-val="{{ true }}">
+            <div style="flex:none;height:2px;background:rgba(255,255,255,.1);position:relative;z-index:5"><div style="height:2px;width:{{ readProgress }};background:#B89A4A"></div></div>
+          </sc-if>
+
+          <!-- SCREEN BODY -->
+          <div class="qz-scroll" onScroll="{{ onScroll }}" style="flex:1;position:relative;overflow-x:hidden">
+
+            <!-- TODAY -->
+            <sc-if value="{{ isToday }}" hint-placeholder-val="{{ true }}">
+              <div style="animation:qzFade .32s cubic-bezier(.22,.61,.36,1)">
+                <div onClick="{{ openStory }}" style="position:relative;height:468px;cursor:pointer">
+                  <img src="assets/img-hero.jpg" alt="Queen at Live Aid" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:grayscale(1) contrast(1.06)">
+                  <div style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(17,17,17,.55) 0%,rgba(17,17,17,0) 32%,rgba(17,17,17,.82) 74%,#111111 100%)"></div>
+                  <div style="position:absolute;left:24px;right:24px;bottom:28px;display:flex;flex-direction:column;gap:12px">
+                    <span style="font-family:var(--font-titling);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:#B89A4A">Hero feature</span>
+                    <h1 style="margin:0;font-family:var(--font-display);font-weight:500;font-size:38px;line-height:1.06;letter-spacing:-.015em;color:#fff;text-wrap:pretty">The day Queen stole Live Aid</h1>
+                    <p style="margin:0;font-size:15px;line-height:1.55;color:rgba(255,255,255,.72);text-wrap:pretty">Twenty-one minutes on a July afternoon in 1985 that rewrote the rules of the stadium show.</p>
+                    <span style="font-size:11px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.55)">13 July 1985 · 8 min read</span>
+                  </div>
+                </div>
+
+                <div style="padding:34px 24px 8px;display:flex;flex-direction:column;gap:18px">
+                  <div style="display:flex;align-items:baseline;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.14);padding-bottom:12px">
+                    <span style="font-family:var(--font-titling);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:#fff">From the vaults</span>
+                    <button onClick="{{ goNews }}" style="background:none;border:0;padding:0;font:500 12px var(--font-body);letter-spacing:.06em;text-transform:uppercase;color:#B89A4A;cursor:pointer">All</button>
+                  </div>
+                </div>
+                <div class="qz-scroll" style="display:flex;gap:14px;padding:14px 24px 4px;overflow-x:auto">
+                  <sc-for list="{{ vault }}" as="v" hint-placeholder-count="3">
+                    <div onClick="{{ v.open }}" style="flex:none;width:216px;cursor:pointer;display:flex;flex-direction:column;gap:11px">
+                      <img src="{{ v.img }}" alt="{{ v.title }}" style="width:216px;height:150px;object-fit:cover;border-radius:2px;filter:grayscale(1) contrast(1.04)">
+                      <span style="font-family:var(--font-titling);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:#B89A4A">{{ v.kicker }}</span>
+                      <span style="font-family:var(--font-display);font-size:21px;font-weight:500;line-height:1.16;letter-spacing:-.01em;color:#fff;text-wrap:pretty">{{ v.title }}</span>
+                      <span style="font-size:10.5px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.5)">{{ v.meta }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+
+                <div style="margin:34px 24px 0;padding:26px 22px;background:#181614;border:1px solid rgba(184,154,74,.34);border-radius:3px;position:relative;overflow:hidden">
+                  <img src="assets/crest-white.png" alt="" style="position:absolute;right:-30px;bottom:-34px;height:150px;opacity:.06">
+                  <div style="position:relative;display:flex;flex-direction:column;gap:12px">
+                    <span style="font-family:var(--font-titling);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:#B89A4A">This day in Queen history</span>
+                    <span style="font-family:var(--font-titling);font-size:26px;letter-spacing:.06em;color:#fff">MCMLXXV</span>
+                    <p style="margin:0;font-size:15px;line-height:1.6;color:rgba(255,255,255,.78);text-wrap:pretty">20 August 1975 — the band begin sessions at Rockfield Studios for the album that would become <em>A Night at the Opera</em>.</p>
+                    <button onClick="{{ openStory }}" style="align-self:flex-start;margin-top:4px;background:none;border:1px solid rgba(184,154,74,.5);border-radius:2px;padding:10px 16px;font:500 12px var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:#B89A4A;cursor:pointer" style-hover="background:rgba(184,154,74,.12)">Read the entry</button>
+                  </div>
+                </div>
+
+                <div style="padding:34px 24px 0;display:flex;flex-direction:column;gap:14px">
+                  <div style="display:flex;align-items:baseline;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.14);padding-bottom:12px">
+                    <span style="font-family:var(--font-titling);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:#fff">Popular discussions</span>
+                    <button onClick="{{ goForum }}" style="background:none;border:0;padding:0;font:500 12px var(--font-body);letter-spacing:.06em;text-transform:uppercase;color:#B89A4A;cursor:pointer">Forum</button>
+                  </div>
+                  <sc-for list="{{ threadsShort }}" as="t" hint-placeholder-count="3">
+                    <div onClick="{{ t.open }}" style="padding:14px 0;border-bottom:1px solid rgba(255,255,255,.1);display:flex;flex-direction:column;gap:7px;cursor:pointer">
+                      <span style="font-size:15.5px;font-weight:500;line-height:1.4;color:#fff;text-wrap:pretty">{{ t.title }}</span>
+                      <span style="font-size:10.5px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.5)">{{ t.meta }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+
+                <div style="padding:40px 24px 44px;display:flex;flex-direction:column;align-items:center;gap:12px">
+                  <img src="assets/crest-white.png" alt="Queen crest" style="height:38px;opacity:.34">
+                  <span style="font-size:11px;line-height:1.6;text-align:center;color:rgba(255,255,255,.42);max-width:250px">An independent fan archive. Not affiliated with Queen or its representatives.</span>
+                </div>
+              </div>
+            </sc-if>
+
+            <!-- NEWS -->
+            <sc-if value="{{ isNews }}" hint-placeholder-val="{{ true }}">
+              <div style="animation:qzFade .32s cubic-bezier(.22,.61,.36,1)">
+                <div style="padding:22px 24px 16px;display:flex;flex-direction:column;gap:8px">
+                  <span style="font-family:var(--font-titling);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:#B89A4A">The archive</span>
+                  <h1 style="margin:0;font-family:var(--font-display);font-weight:500;font-size:34px;line-height:1.06;letter-spacing:-.015em;color:#fff">News</h1>
+                  <span style="font-size:12.5px;color:rgba(255,255,255,.58)">4,127 articles · restored from Queenzone.com</span>
+                </div>
+                <div class="qz-scroll" style="display:flex;gap:8px;padding:6px 24px 18px;overflow-x:auto">
+                  <sc-for list="{{ years }}" as="y" hint-placeholder-count="5">
+                    <button onClick="{{ y.pick }}" style="{{ y.style }}">{{ y.label }}</button>
+                  </sc-for>
+                </div>
+                <sc-for list="{{ news }}" as="n" hint-placeholder-count="6">
+                  <div onClick="{{ n.open }}" style="display:flex;gap:15px;padding:16px 24px;border-top:1px solid rgba(255,255,255,.1);cursor:pointer" style-hover="background:rgba(255,255,255,.04)">
+                    <img src="{{ n.img }}" alt="{{ n.title }}" style="flex:none;width:92px;height:92px;object-fit:cover;border-radius:2px;filter:grayscale(1) contrast(1.04)">
+                    <div style="display:flex;flex-direction:column;gap:7px;min-width:0">
+                      <span style="font-family:var(--font-titling);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:{{ n.kickerColor }}">{{ n.kicker }}</span>
+                      <span style="font-family:var(--font-display);font-size:20px;font-weight:500;line-height:1.18;letter-spacing:-.01em;color:#fff;text-wrap:pretty">{{ n.title }}</span>
+                      <span style="font-size:10.5px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.5)">{{ n.meta }}</span>
+                    </div>
+                  </div>
+                </sc-for>
+                <div style="padding:26px 24px 40px;border-top:1px solid rgba(255,255,255,.1)">
+                  <button style="width:100%;background:none;border:1px solid rgba(255,255,255,.24);border-radius:2px;padding:14px;font:500 12px var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:#fff;cursor:pointer" style-hover="background:rgba(255,255,255,.06)">Load older articles</button>
+                </div>
+              </div>
+            </sc-if>
+
+            <!-- STORY -->
+            <sc-if value="{{ isStory }}" hint-placeholder-val="{{ true }}">
+              <div style="animation:qzFade .32s cubic-bezier(.22,.61,.36,1)">
+                <div style="position:relative;height:300px">
+                  <img src="assets/img-stage.jpg" alt="Queen on stage, Wembley 1985" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:grayscale(1) contrast(1.06)">
+                  <div style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(17,17,17,.2),rgba(17,17,17,.9) 82%,#111111)"></div>
+                </div>
+                <div style="padding:0 26px;margin-top:-58px;position:relative;display:flex;flex-direction:column;gap:14px">
+                  <span style="font-family:var(--font-titling);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:#B89A4A">Featured story</span>
+                  <h1 style="margin:0;font-family:var(--font-display);font-weight:500;font-size:36px;line-height:1.07;letter-spacing:-.015em;color:#fff;text-wrap:pretty">The day Queen stole Live Aid</h1>
+                  <p style="margin:0;font:400 18px/1.6 var(--font-body);color:rgba(255,255,255,.76);text-wrap:pretty">Twenty-one minutes on a July afternoon in 1985 that rewrote the rules of the stadium show.</p>
+                  <div style="display:flex;align-items:center;gap:10px;padding:14px 0;border-top:1px solid rgba(255,255,255,.14);border-bottom:1px solid rgba(255,255,255,.14);font-size:10.5px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.55)">
+                    <span>13 July 1985</span><span>·</span><span>8 min read</span><span>·</span><span>Archive feature</span>
+                  </div>
+                </div>
+                <div style="padding:22px 26px 0;font:400 18px/1.75 var(--font-body);color:rgba(255,255,255,.84)">
+                  <p style="margin:0 0 20px;text-wrap:pretty"><span style="float:left;font-family:var(--font-display);font-size:62px;line-height:.82;font-weight:500;color:#fff;margin:6px 12px 0 0">W</span>embley Stadium was already three hours into the longest day in the history of popular music when Queen walked out to a piano, a drum riser and seventy-two thousand people who had come to see somebody else.</p>
+                  <p style="margin:0 0 20px;text-wrap:pretty">What followed has been described, endlessly and not inaccurately, as the finest live performance the band ever gave. The set was cut to the bone — six songs, no indulgence, every chorus a hook the stadium already knew.</p>
+                  <blockquote style="margin:28px 0;padding:0 0 0 20px;border-left:2px solid #B89A4A;font-family:var(--font-display);font-size:26px;line-height:1.28;font-weight:500;color:#fff;text-wrap:pretty">"They understood the assignment. Nobody else that day did."</blockquote>
+                  <p style="margin:0 0 20px;text-wrap:pretty">Rehearsals had been unusually disciplined. The band spent three days at the Shaw Theatre in London reducing twelve years of material to a twenty-one minute argument for their own greatness, timed to the second.</p>
+                </div>
+                <div style="margin:14px 26px 0;padding:20px;background:#171717;border:1px solid rgba(255,255,255,.14);border-radius:3px;display:flex;flex-direction:column;gap:10px">
+                  <span style="font-family:var(--font-titling);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:#B89A4A">From the same day</span>
+                  <span style="font-family:var(--font-display);font-size:22px;font-weight:500;line-height:1.18;color:#fff">Fourteen photographs, newly restored</span>
+                  <button onClick="{{ goPhotos }}" style="align-self:flex-start;margin-top:4px;background:none;border:1px solid rgba(255,255,255,.26);border-radius:2px;padding:10px 15px;font:500 11.5px var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:#fff;cursor:pointer" style-hover="background:rgba(255,255,255,.07)">Open gallery</button>
+                </div>
+                <div style="padding:34px 26px 44px;display:flex;flex-direction:column;align-items:center;gap:10px">
+                  <img src="assets/crest-white.png" alt="Queen crest" style="height:32px;opacity:.3">
+                  <span style="font-family:var(--font-titling);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.4)">The Queenzone.com archive</span>
+                </div>
+              </div>
+            </sc-if>
+
+            <!-- PHOTOGRAPHY -->
+            <sc-if value="{{ isPhotos }}" hint-placeholder-val="{{ true }}">
+              <div style="animation:qzFade .32s cubic-bezier(.22,.61,.36,1)">
+                <div style="padding:22px 24px 16px;display:flex;flex-direction:column;gap:8px">
+                  <span style="font-family:var(--font-titling);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:#B89A4A">The archive</span>
+                  <h1 style="margin:0;font-family:var(--font-display);font-weight:500;font-size:34px;line-height:1.06;letter-spacing:-.015em;color:#fff">Photography</h1>
+                  <span style="font-size:12.5px;color:rgba(255,255,255,.58)">Tens of thousands of frames · 1,240 restored</span>
+                </div>
+                <div class="qz-scroll" style="display:flex;gap:8px;padding:6px 24px 16px;overflow-x:auto">
+                  <sc-for list="{{ cats }}" as="c" hint-placeholder-count="5">
+                    <button onClick="{{ c.pick }}" style="{{ c.style }}">{{ c.label }}</button>
+                  </sc-for>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px;padding:0 3px">
+                  <sc-for list="{{ photos }}" as="p" hint-placeholder-count="12">
+                    <div onClick="{{ p.open }}" style="position:relative;aspect-ratio:1;cursor:pointer;overflow:hidden">
+                      <img src="{{ p.img }}" alt="{{ p.cap }}" style="width:100%;height:100%;object-fit:cover;filter:grayscale(1) contrast(1.04)">
+                    </div>
+                  </sc-for>
+                </div>
+                <div style="padding:26px 24px 40px;display:flex;justify-content:center">
+                  <span style="font-family:var(--font-titling);font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.45)">Page 1 of 104</span>
+                </div>
+              </div>
+            </sc-if>
+
+            <!-- PHOTO VIEWER -->
+            <sc-if value="{{ isPhoto }}" hint-placeholder-val="{{ true }}">
+              <div style="position:absolute;inset:0;background:#000;display:flex;flex-direction:column;animation:qzFade .28s cubic-bezier(.22,.61,.36,1)">
+                <div style="flex:none;padding:14px 10px;display:flex;align-items:center;justify-content:space-between">
+                  <button onClick="{{ back }}" style="background:none;border:0;width:44px;height:44px;display:flex;align-items:center;justify-content:center;cursor:pointer">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round"><path d="M5 5l14 14M19 5L5 19"></path></svg>
+                  </button>
+                  <span style="font-family:var(--font-titling);font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.6)">{{ photoIndexLabel }}</span>
+                  <div style="display:flex">
+                    <button onClick="{{ toggleSave }}" style="background:none;border:0;width:44px;height:44px;display:flex;align-items:center;justify-content:center;cursor:pointer">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="{{ saveFill }}" stroke="#B89A4A" stroke-width="1.5" stroke-linejoin="round"><path d="M6 3h12v18l-6-4.5L6 21z"></path></svg>
+                    </button>
+                    <button onClick="{{ openSheet }}" style="background:none;border:0;width:44px;height:44px;display:flex;align-items:center;justify-content:center;cursor:pointer">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v11"></path><path d="M8 7l4-4 4 4"></path><path d="M5 14v6h14v-6"></path></svg>
+                    </button>
+                  </div>
+                </div>
+                <div style="flex:1;display:flex;align-items:center;justify-content:center;position:relative">
+                  <img src="{{ photoImg }}" alt="{{ photoCap }}" style="width:100%;max-height:100%;object-fit:contain;filter:grayscale(1) contrast(1.05)">
+                  <button onClick="{{ prevPhoto }}" style="position:absolute;left:6px;top:50%;transform:translateY(-50%);width:44px;height:44px;border-radius:22px;background:rgba(0,0,0,.4);border:0;display:flex;align-items:center;justify-content:center;cursor:pointer">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4l-8 8 8 8"></path></svg>
+                  </button>
+                  <button onClick="{{ nextPhoto }}" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);width:44px;height:44px;border-radius:22px;background:rgba(0,0,0,.4);border:0;display:flex;align-items:center;justify-content:center;cursor:pointer">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4l8 8-8 8"></path></svg>
+                  </button>
+                </div>
+                <div style="flex:none;padding:20px 24px 34px;display:flex;flex-direction:column;gap:8px">
+                  <span style="font-family:var(--font-display);font-size:21px;font-weight:500;line-height:1.24;color:#fff;text-wrap:pretty">{{ photoCap }}</span>
+                  <span style="font-size:10.5px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.5)">{{ photoMeta }}</span>
+                </div>
+              </div>
+            </sc-if>
+
+            <!-- FORUM -->
+            <sc-if value="{{ isForum }}" hint-placeholder-val="{{ true }}">
+              <div style="animation:qzFade .32s cubic-bezier(.22,.61,.36,1)">
+                <div style="padding:22px 24px 18px;display:flex;flex-direction:column;gap:8px;border-bottom:1px solid rgba(255,255,255,.14)">
+                  <span style="font-family:var(--font-titling);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:#B89A4A">Community</span>
+                  <h1 style="margin:0;font-family:var(--font-display);font-weight:500;font-size:34px;line-height:1.06;letter-spacing:-.015em;color:#fff">Forum</h1>
+                  <div style="display:flex;gap:22px;margin-top:6px">
+                    <div style="display:flex;flex-direction:column;gap:3px"><span style="font-family:var(--font-display);font-size:22px;color:#fff">104,882</span><span style="font-size:9.5px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.5)">Posts</span></div>
+                    <div style="display:flex;flex-direction:column;gap:3px"><span style="font-family:var(--font-display);font-size:22px;color:#fff">6,410</span><span style="font-size:9.5px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.5)">Members</span></div>
+                    <div style="display:flex;flex-direction:column;gap:3px"><span style="font-family:var(--font-display);font-size:22px;color:#fff">18</span><span style="font-size:9.5px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.5)">Boards</span></div>
+                  </div>
+                </div>
+                <div style="padding:18px 24px 8px"><span style="font-family:var(--font-titling);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,.62)">Recent threads</span></div>
+                <sc-for list="{{ threads }}" as="t" hint-placeholder-count="6">
+                  <div onClick="{{ t.open }}" style="display:flex;gap:13px;padding:16px 24px;border-top:1px solid rgba(255,255,255,.1);cursor:pointer;align-items:flex-start" style-hover="background:rgba(255,255,255,.04)">
+                    <div style="flex:none;width:36px;height:36px;border-radius:18px;background:#232323;border:1px solid rgba(255,255,255,.16);display:flex;align-items:center;justify-content:center;font:500 13px var(--font-body);color:rgba(255,255,255,.8)">{{ t.initial }}</div>
+                    <div style="display:flex;flex-direction:column;gap:6px;min-width:0;flex:1">
+                      <span style="font-size:15.5px;font-weight:500;line-height:1.38;color:#fff;text-wrap:pretty">{{ t.title }}</span>
+                      <span style="font-size:10.5px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.5)">{{ t.meta }}</span>
+                    </div>
+                    <span style="flex:none;font-size:11px;font-weight:500;color:rgba(255,255,255,.6);padding-top:2px">{{ t.replies }}</span>
+                  </div>
+                </sc-for>
+                <div style="height:46px"></div>
+              </div>
+            </sc-if>
+
+            <!-- THREAD -->
+            <sc-if value="{{ isThread }}" hint-placeholder-val="{{ true }}">
+              <div style="animation:qzFade .32s cubic-bezier(.22,.61,.36,1)">
+                <div style="padding:22px 24px 18px;border-bottom:1px solid rgba(255,255,255,.14);display:flex;flex-direction:column;gap:10px">
+                  <span style="font-family:var(--font-titling);font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;color:#B89A4A">Live performances</span>
+                  <h1 style="margin:0;font-family:var(--font-display);font-weight:500;font-size:28px;line-height:1.12;letter-spacing:-.012em;color:#fff;text-wrap:pretty">Which 1986 Magic Tour night is the definitive one?</h1>
+                  <span style="font-size:10.5px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.5)">148 replies · Last post 2 hours ago</span>
+                </div>
+                <sc-for list="{{ posts }}" as="p" hint-placeholder-count="3">
+                  <div style="padding:20px 24px;border-bottom:1px solid rgba(255,255,255,.1);display:flex;flex-direction:column;gap:11px">
+                    <div style="display:flex;align-items:center;gap:11px">
+                      <div style="flex:none;width:34px;height:34px;border-radius:17px;background:#232323;border:1px solid rgba(255,255,255,.16);display:flex;align-items:center;justify-content:center;font:500 12.5px var(--font-body);color:rgba(255,255,255,.8)">{{ p.initial }}</div>
+                      <div style="display:flex;flex-direction:column;gap:3px">
+                        <span style="font-size:13.5px;font-weight:500;color:#fff">{{ p.author }}</span>
+                        <span style="font-size:9.5px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.45)">{{ p.when }}</span>
+                      </div>
+                    </div>
+                    <p style="margin:0;font:400 15.5px/1.68 var(--font-body);color:rgba(255,255,255,.82);text-wrap:pretty">{{ p.body }}</p>
+                  </div>
+                </sc-for>
+                <div style="height:96px"></div>
+              </div>
+            </sc-if>
+
+            <!-- SEARCH -->
+            <sc-if value="{{ isSearch }}" hint-placeholder-val="{{ true }}">
+              <div style="animation:qzFade .28s cubic-bezier(.22,.61,.36,1)">
+                <div style="padding:16px 20px 14px;border-bottom:1px solid rgba(255,255,255,.14)">
+                  <div style="display:flex;align-items:center;gap:10px;background:#1D1D1D;border:1px solid rgba(255,255,255,.16);border-radius:{{ searchRadius }};padding:0 14px;height:44px">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.6)" stroke-width="1.5" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4.2-4.2"></path></svg>
+                    <input value="{{ query }}" onChange="{{ onQuery }}" placeholder="Search 4,000+ articles and photographs" style="flex:1;background:none;border:0;outline:none;font:400 15px var(--font-body);color:#fff">
+                  </div>
+                </div>
+                <div style="padding:20px 24px 8px"><span style="font-family:var(--font-titling);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,.6)">{{ searchLabel }}</span></div>
+                <sc-for list="{{ results }}" as="r" hint-placeholder-count="5">
+                  <div onClick="{{ r.open }}" style="display:flex;align-items:center;gap:13px;padding:14px 24px;border-top:1px solid rgba(255,255,255,.1);cursor:pointer" style-hover="background:rgba(255,255,255,.04)">
+                    <div style="display:flex;flex-direction:column;gap:6px;flex:1;min-width:0">
+                      <span style="font-size:15px;font-weight:500;line-height:1.4;color:#fff;text-wrap:pretty">{{ r.title }}</span>
+                      <span style="font-size:10px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:{{ r.tagColor }}">{{ r.tag }}</span>
+                    </div>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.4)" stroke-width="1.5" stroke-linecap="round"><path d="M9 5l7 7-7 7"></path></svg>
+                  </div>
+                </sc-for>
+                <div style="height:40px"></div>
+              </div>
+            </sc-if>
+
+            <!-- PROFILE -->
+            <sc-if value="{{ isYou }}" hint-placeholder-val="{{ true }}">
+              <div style="animation:qzFade .32s cubic-bezier(.22,.61,.36,1)">
+                <div style="padding:26px 24px 24px;display:flex;align-items:center;gap:16px;border-bottom:1px solid rgba(255,255,255,.14)">
+                  <div style="flex:none;width:62px;height:62px;border-radius:31px;background:#232323;border:1px solid rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:24px;color:#fff">RO</div>
+                  <div style="display:flex;flex-direction:column;gap:6px">
+                    <span style="font-family:var(--font-display);font-size:25px;font-weight:500;line-height:1.1;color:#fff">Roger_O</span>
+                    <span style="font-size:10.5px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#B89A4A">Member since 2004 · 1,208 posts</span>
+                  </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:rgba(255,255,255,.12)">
+                  <div style="background:#111111;padding:20px 22px;display:flex;flex-direction:column;gap:5px"><span style="font-family:var(--font-display);font-size:26px;color:#fff">34</span><span style="font-size:9.5px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.5)">Saved articles</span></div>
+                  <div style="background:#111111;padding:20px 22px;display:flex;flex-direction:column;gap:5px"><span style="font-family:var(--font-display);font-size:26px;color:#fff">212</span><span style="font-size:9.5px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.5)">Saved photographs</span></div>
+                </div>
+                <div style="padding:24px 24px 8px"><span style="font-family:var(--font-titling);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,.6)">Library</span></div>
+                <sc-for list="{{ libraryRows }}" as="row" hint-placeholder-count="3">
+                  <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-top:1px solid rgba(255,255,255,.1);cursor:pointer" style-hover="background:rgba(255,255,255,.04)">
+                    <span style="font-size:15px;color:#fff">{{ row }}</span>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.4)" stroke-width="1.5" stroke-linecap="round"><path d="M9 5l7 7-7 7"></path></svg>
+                  </div>
+                </sc-for>
+                <div style="padding:24px 24px 8px"><span style="font-family:var(--font-titling);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,.6)">Settings</span></div>
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-top:1px solid rgba(255,255,255,.1)">
+                  <div style="display:flex;flex-direction:column;gap:4px">
+                    <span style="font-size:15px;color:#fff">On This Day notification</span>
+                    <span style="font-size:12px;color:rgba(255,255,255,.5)">One entry each morning</span>
+                  </div>
+                  <button onClick="{{ toggleNotify }}" style="{{ switchTrackStyle }}"><span style="{{ switchKnobStyle }}"></span></button>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-top:1px solid rgba(255,255,255,.1)">
+                  <div style="display:flex;flex-direction:column;gap:4px">
+                    <span style="font-size:15px;color:#fff">Appearance</span>
+                    <span style="font-size:12px;color:rgba(255,255,255,.5)">Dark · follows system</span>
+                  </div>
+                  <span style="font-size:12.5px;color:#B89A4A">Change</span>
+                </div>
+                <sc-for list="{{ settingsRows }}" as="row" hint-placeholder-count="4">
+                  <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-top:1px solid rgba(255,255,255,.1);cursor:pointer" style-hover="background:rgba(255,255,255,.04)">
+                    <span style="font-size:15px;color:#fff">{{ row }}</span>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.4)" stroke-width="1.5" stroke-linecap="round"><path d="M9 5l7 7-7 7"></path></svg>
+                  </div>
+                </sc-for>
+                <div style="padding:32px 24px 44px;display:flex;flex-direction:column;align-items:center;gap:10px;border-top:1px solid rgba(255,255,255,.1)">
+                  <img src="assets/crest-white.png" alt="Queen crest" style="height:30px;opacity:.28">
+                  <span style="font-size:10.5px;text-align:center;line-height:1.6;color:rgba(255,255,255,.4);max-width:240px">An independent fan archive. Not affiliated with Queen or its representatives.</span>
+                </div>
+              </div>
+            </sc-if>
+
+            <!-- ANDROID FAB (forum) -->
+            <sc-if value="{{ showFab }}" hint-placeholder-val="{{ true }}">
+              <button onClick="{{ openSheet }}" style="position:absolute;right:18px;bottom:20px;width:58px;height:58px;border-radius:18px;background:#B89A4A;border:0;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 20px rgba(0,0,0,.5);cursor:pointer">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+              </button>
+            </sc-if>
+          </div>
+
+          <!-- TAB BAR -->
+          <sc-if value="{{ showTabsIos }}" hint-placeholder-val="{{ true }}">
+            <div style="flex:none;height:83px;padding:8px 0 0;background:rgba(17,17,17,.94);backdrop-filter:blur(18px);border-top:1px solid rgba(255,255,255,.14);display:flex">
+              <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="5">
+                <button onClick="{{ t.press }}" style="flex:1;background:none;border:0;padding:4px 0 0;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer">
+                  <svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="{{ t.color }}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="{{ t.d }}"></path></svg>
+                  <span style="font-size:10px;font-weight:500;letter-spacing:.01em;color:{{ t.color }}">{{ t.label }}</span>
+                </button>
+              </sc-for>
+            </div>
+          </sc-if>
+          <sc-if value="{{ showTabsAndroid }}" hint-placeholder-val="{{ true }}">
+            <div style="flex:none;height:80px;padding:12px 4px 0;background:#161616;border-top:1px solid rgba(255,255,255,.12);display:flex">
+              <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="5">
+                <button onClick="{{ t.press }}" style="flex:1;background:none;border:0;padding:0;display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer">
+                  <span style="{{ t.pillStyle }}">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="{{ t.color }}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="{{ t.d }}"></path></svg>
+                  </span>
+                  <span style="font-size:11.5px;font-weight:500;color:{{ t.color }}">{{ t.label }}</span>
+                </button>
+              </sc-for>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ ios }}" hint-placeholder-val="{{ true }}">
+            <div style="flex:none;height:0;position:relative"><div style="position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:134px;height:5px;border-radius:3px;background:rgba(255,255,255,.5)"></div></div>
+          </sc-if>
+
+          <!-- SHARE SHEET -->
+          <sc-if value="{{ sheetOpen }}" hint-placeholder-val="{{ true }}">
+            <div onClick="{{ closeSheet }}" style="position:absolute;inset:0;z-index:20;background:rgba(0,0,0,.5);backdrop-filter:blur(2px);display:flex;flex-direction:column;justify-content:flex-end;padding:{{ sheetPad }}">
+              <div style="background:{{ sheetBg }};border-radius:{{ sheetRadius }};overflow:hidden;animation:qzSheet .28s cubic-bezier(.22,.61,.36,1);border:1px solid rgba(255,255,255,.14)">
+                <sc-if value="{{ android }}" hint-placeholder-val="{{ true }}">
+                  <div style="display:flex;justify-content:center;padding:12px 0 4px"><span style="width:32px;height:4px;border-radius:2px;background:rgba(255,255,255,.3)"></span></div>
+                </sc-if>
+                <div style="padding:{{ sheetHeadPad }};text-align:{{ sheetAlign }}">
+                  <span style="font-family:var(--font-titling);font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.55)">{{ sheetTitle }}</span>
+                </div>
+                <sc-for list="{{ sheetItems }}" as="s" hint-placeholder-count="4">
+                  <button onClick="{{ closeSheet }}" style="{{ s.style }}">{{ s.label }}</button>
+                </sc-for>
+              </div>
+              <sc-if value="{{ ios }}" hint-placeholder-val="{{ true }}">
+                <button onClick="{{ closeSheet }}" style="margin-top:8px;width:100%;background:#1E1E1E;border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:16px;font:600 17px var(--font-body);color:#B89A4A;cursor:pointer">Cancel</button>
+              </sc-if>
+            </div>
+          </sc-if>
+
+        </div>
+      </div>
+      <span style="font-family:var(--font-titling);font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.45)">{{ frameCaption }}</span>
+    </div>
+
+    <!-- NOTES -->
+    <div style="flex:none;width:330px;display:flex;flex-direction:column;gap:26px;padding-top:6px">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <span style="font-family:var(--font-titling);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:#B89A4A">Platform notes</span>
+        <sc-for list="{{ notes }}" as="n" hint-placeholder-count="5">
+          <div style="padding:13px 0;border-top:1px solid rgba(255,255,255,.14);display:flex;flex-direction:column;gap:5px">
+            <span style="font-size:12.5px;font-weight:600;color:#fff">{{ n.k }}</span>
+            <span style="font-size:12.5px;line-height:1.55;color:rgba(255,255,255,.6);text-wrap:pretty">{{ n.v }}</span>
+          </div>
+        </sc-for>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <span style="font-family:var(--font-titling);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:#B89A4A">Handoff</span>
+        <p style="margin:0;font-size:12.5px;line-height:1.6;color:rgba(255,255,255,.6)">The React Native spec for this app — tokens, component contracts, screen build notes and accessibility — is in <code style="color:#B89A4A">handoff/QUEENZONE_APP_SPEC.md</code> with a ready <code style="color:#B89A4A">handoff/theme.ts</code>.</p>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;platform&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;ios&quot;,&quot;android&quot;],&quot;default&quot;:&quot;ios&quot;,&quot;tsType&quot;:&quot;'ios' | 'android'&quot;},&quot;accent&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;options&quot;:[&quot;#B89A4A&quot;,&quot;#5D3A8A&quot;,&quot;#6B1F33&quot;,&quot;#244A8F&quot;],&quot;default&quot;:&quot;#B89A4A&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  state = {
+    platform: null, screen: 'today', tab: 'today', stack: [],
+    saved: false, notify: true, sheet: false, photo: 0, year: 'ALL', cat: 'ALL',
+    query: '', progress: 0
+  };
+
+  get platform() { return this.state.platform || this.props.platform || 'ios'; }
+
+  go(screen, opts) {
+    const push = opts && opts.push;
+    this.setState(s => ({
+      screen,
+      stack: push ? s.stack.concat([s.screen]) : [],
+      tab: push ? s.tab : (opts && opts.tab) || s.tab,
+      sheet: false, progress: 0
+    }));
+  }
+  back() {
+    this.setState(s => {
+      if (!s.stack.length) return { screen: s.tab, sheet: false };
+      const stack = s.stack.slice();
+      return { screen: stack.pop(), stack, sheet: false };
+    });
+  }
+
+  chip(active, label) {
+    return `flex:none;background:${active ? '#B89A4A' : 'transparent'};border:1px solid ${active ? '#B89A4A' : 'rgba(255,255,255,.24)'};border-radius:999px;padding:8px 15px;font:500 11px var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:${active ? '#111111' : 'rgba(255,255,255,.72)'};cursor:pointer`;
+  }
+
+  renderVals() {
+    const s = this.state, p = this.platform, ios = p === 'ios', android = !ios;
+    const screen = s.screen;
+    const detail = ['story', 'photo', 'thread', 'search'].includes(screen);
+    const accent = this.props.accent || '#B89A4A';
+
+    const photos = [
+      { img: 'assets/img-stage.jpg', cap: 'Wembley Stadium, Live Aid', meta: '13 July 1985 · Restored 2024' },
+      { img: 'assets/img-crowd.jpg', cap: 'Seventy-two thousand, waiting', meta: '13 July 1985' },
+      { img: 'assets/img-portrait.jpg', cap: 'Backstage portrait, unpublished', meta: 'c. 1984' },
+      { img: 'assets/img-studio.jpg', cap: 'Rockfield Studios, Monmouthshire', meta: 'August 1975' },
+      { img: 'assets/img-hero.jpg', cap: 'The piano, before the set', meta: '13 July 1985' },
+      { img: 'assets/img-crowd.jpg', cap: 'Magic Tour, Budapest', meta: '27 July 1986' },
+      { img: 'assets/img-portrait.jpg', cap: 'Contact sheet 04, frame 11', meta: 'c. 1977' },
+      { img: 'assets/img-studio.jpg', cap: 'Mixing desk, Mountain Studios', meta: 'c. 1979' },
+      { img: 'assets/img-stage.jpg', cap: 'News of the World tour', meta: 'November 1977' },
+      { img: 'assets/img-hero.jpg', cap: 'Soundcheck, Wembley', meta: '11 July 1986' },
+      { img: 'assets/img-crowd.jpg', cap: 'Knebworth, the final night', meta: '9 August 1986' },
+      { img: 'assets/img-portrait.jpg', cap: 'Studio portrait, unpublished', meta: 'c. 1975' }
+    ];
+
+    const openStory = () => this.go('story', { push: true });
+    const openThread = () => this.go('thread', { push: true });
+
+    const vault = [
+      { kicker: 'From the vaults', title: 'Inside the making of Bohemian Rhapsody', meta: '1975 · 12 min read', img: 'assets/img-studio.jpg', open: openStory },
+      { kicker: 'Feature', title: 'The night Freddie played Budapest', meta: '1986 · 9 min read', img: 'assets/img-crowd.jpg', open: openStory },
+      { kicker: 'Restored', title: 'A Kind of Magic, forty years on', meta: '1986 · 6 min read', img: 'assets/img-portrait.jpg', open: openStory }
+    ];
+
+    const news = [
+      { kicker: 'Restored', kickerColor: accent, title: 'Live Aid: the full twenty-one minutes, remastered', meta: '13 July 1985 · News', img: 'assets/img-stage.jpg', open: openStory },
+      { kicker: 'Archive', kickerColor: 'rgba(255,255,255,.6)', title: 'Rockfield sessions: the tapes that became A Night at the Opera', meta: '20 August 1975 · Feature', img: 'assets/img-studio.jpg', open: openStory },
+      { kicker: 'Community', kickerColor: 'rgba(255,255,255,.6)', title: 'Queenzone.com returns: what we preserved, and how', meta: 'August 2026 · Notice', img: 'assets/img-portrait.jpg', open: openStory },
+      { kicker: 'Anniversary', kickerColor: accent, title: 'Forty years since the Magic Tour closed at Knebworth', meta: '9 August 1986 · News', img: 'assets/img-crowd.jpg', open: openStory },
+      { kicker: 'Archive', kickerColor: 'rgba(255,255,255,.6)', title: 'The Wembley soundcheck tape, catalogued at last', meta: '11 July 1986 · News', img: 'assets/img-hero.jpg', open: openStory }
+    ];
+
+    const threads = [
+      { initial: 'B', title: 'Which 1986 Magic Tour night is the definitive one?', meta: 'Brian_77 · Live performances', replies: '148', open: openThread },
+      { initial: 'M', title: 'Cataloguing the unreleased Mountain Studios reels', meta: 'MontreuxMike · The vaults', replies: '92', open: openThread },
+      { initial: 'D', title: 'John Deacon interviews — a complete index', meta: 'DeaconField · Members', replies: '211', open: openThread },
+      { initial: 'S', title: 'Restoring the 1977 contact sheets: a method', meta: 'SilverSalt · Photography', replies: '37', open: openThread },
+      { initial: 'A', title: 'Original Queenzone.com members — sign in here', meta: 'AdminQZ · Community', replies: '604', open: openThread },
+      { initial: 'R', title: 'On the mix of A Night at the Opera', meta: 'RogerTaylorFan · Recordings', replies: '58', open: openThread }
+    ];
+
+    const posts = [
+      { initial: 'B', author: 'Brian_77', when: '2 hours ago', body: 'Budapest gets the votes because of the film, but the Wembley second night is the tighter performance — the band are audibly enjoying themselves and the tempos never run away.' },
+      { initial: 'M', author: 'MontreuxMike', when: 'Yesterday', body: 'Agreed on Wembley. Knebworth is the emotional answer rather than the musical one, and knowing what came after makes it hard to judge on its own terms.' },
+      { initial: 'S', author: 'SilverSalt', when: '2 days ago', body: 'Whichever night you pick, the archive now has the full soundcheck for all three. Worth an hour of anyone\u2019s afternoon.' }
+    ];
+
+    const results = [
+      { title: 'The day Queen stole Live Aid', tag: 'Story · 8 min read', tagColor: accent, open: openStory },
+      { title: 'Live Aid, Wembley Stadium — 14 photographs', tag: 'Gallery', tagColor: 'rgba(255,255,255,.55)', open: () => this.go('photos', { tab: 'photos' }) },
+      { title: 'Live Aid: the full twenty-one minutes, remastered', tag: 'News · 13 July 1985', tagColor: 'rgba(255,255,255,.55)', open: openStory },
+      { title: 'Was Live Aid really the best live set of all time?', tag: 'Forum · 312 replies', tagColor: 'rgba(255,255,255,.55)', open: openThread },
+      { title: 'Rehearsals at the Shaw Theatre, July 1985', tag: 'Story · 5 min read', tagColor: accent, open: openStory }
+    ];
+
+    const tabDefs = [
+      { key: 'today', label: 'Today', d: 'M3 11.4 12 4l9 7.4V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z' },
+      { key: 'news', label: 'News', d: 'M4 5h12v14H4zM16 9h4v8a2 2 0 0 1-2 2H4M7 9h6M7 13h6' },
+      { key: 'photos', label: 'Photos', d: 'M3 8h3.2L8 5h8l1.8 3H21v11H3zM12 16.5a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4' },
+      { key: 'forum', label: 'Forum', d: 'M4 4h16v11H9l-5 4zM8 8h8M8 11h5' },
+      { key: 'you', label: 'You', d: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8M4 20.5c0-3.6 3.6-5.5 8-5.5s8 1.9 8 5.5' }
+    ];
+    const tabs = tabDefs.map(t => {
+      const active = s.tab === t.key;
+      return {
+        key: t.key, label: t.label, d: t.d,
+        color: active ? accent : 'rgba(255,255,255,.5)',
+        pillStyle: `display:flex;align-items:center;justify-content:center;width:64px;height:32px;border-radius:16px;background:${active ? 'rgba(184,154,74,.20)' : 'transparent'};transition:background .18s`,
+        press: () => this.setState({ screen: t.key, tab: t.key, stack: [], sheet: false })
+      };
+    });
+
+    const years = ['ALL', '1970s', '1980s', '1990s', '2000s'].map(y => ({
+      label: y, style: this.chip(s.year === y), pick: () => this.setState({ year: y })
+    }));
+    const cats = ['ALL', 'LIVE', 'STUDIO', 'PORTRAITS', 'BACKSTAGE'].map(c => ({
+      label: c, style: this.chip(s.cat === c), pick: () => this.setState({ cat: c })
+    }));
+
+    const jumpDefs = [
+      ['today', 'Today'], ['news', 'News index'], ['story', 'Story reader'],
+      ['photos', 'Photography'], ['photo', 'Photo viewer'], ['forum', 'Forum'],
+      ['thread', 'Thread'], ['search', 'Search'], ['you', 'Profile & settings']
+    ];
+    const jumps = jumpDefs.map(([k, label]) => ({
+      label,
+      style: `background:${screen === k ? '#fff' : 'transparent'};border:1px solid ${screen === k ? '#fff' : 'rgba(255,255,255,.22)'};border-radius:2px;padding:9px 14px;font:500 11px var(--font-body);letter-spacing:.09em;text-transform:uppercase;color:${screen === k ? '#111' : 'rgba(255,255,255,.7)'};cursor:pointer`,
+      go: () => {
+        const tab = ['story', 'photo', 'thread', 'search'].includes(k)
+          ? ({ story: 'news', photo: 'photos', thread: 'forum', search: 'today' })[k] : k;
+        this.setState({ screen: k, tab, stack: [], sheet: false });
+      }
+    }));
+
+    const barTitles = { news: 'News', photos: 'Photography', forum: 'Forum', you: 'Profile', story: 'Story', thread: 'Live performances', search: 'Search' };
+
+    const sheetIsIos = ios;
+    const sheetRow = (label, last, danger) => `display:block;width:100%;background:none;border:0;border-top:1px solid rgba(255,255,255,.12);padding:${sheetIsIos ? '17px' : '16px 22px'};font:${sheetIsIos ? '400 17px' : '400 16px'} var(--font-body);color:${danger ? '#D98A8A' : '#fff'};text-align:${sheetIsIos ? 'center' : 'left'};cursor:pointer`;
+    const sheetLabels = screen === 'forum'
+      ? ['New thread', 'Ask the archive', 'Post a photograph']
+      : ['Share link', 'Copy link', 'Save to library', 'Report a correction'];
+    const sheetItems = sheetLabels.map((l, i) => ({ label: l, style: sheetRow(l, i === sheetLabels.length - 1) }));
+
+    const notes = ios ? [
+      { k: 'Status & safe area', v: 'Dynamic Island cutout, 47pt top inset, 34pt home-indicator inset. SafeAreaView on every screen.' },
+      { k: 'Navigation bar', v: '44pt bar, centred 17pt semibold title, "Back" chevron with the previous title. Translucent blur over content.' },
+      { k: 'Tab bar', v: '83pt including the home-indicator inset. 25pt icons above 10pt labels; gold tint marks the active tab.' },
+      { k: 'Sheets', v: 'Action sheet — rounded card floating above a separate Cancel button, centred rows.' },
+      { k: 'Gestures', v: 'Edge-swipe back on every pushed screen; pull to refresh on Today and News.' }
+    ] : [
+      { k: 'Status & insets', v: '32dp status bar, edge-to-edge with gesture-nav inset at the bottom. No notch cutout.' },
+      { k: 'Top app bar', v: '56dp bar, left-aligned 20dp title, back arrow (not chevron), actions right. Elevates on scroll.' },
+      { k: 'Navigation bar', v: 'Material 3 — 80dp, gold-tinted active pill behind the icon, 11.5dp labels always visible.' },
+      { k: 'FAB & sheets', v: 'Forum composes from a 58dp FAB; sheets are edge-to-edge with a drag handle, no Cancel button.' },
+      { k: 'Feedback', v: 'Android ripple on all pressables; system back button mapped to the nav stack.' }
+    ];
+
+    const photo = photos[s.photo % photos.length];
+
+    return {
+      ios, android,
+      shellRadius: ios ? '58px' : '40px',
+      screenRadius: ios ? '47px' : '30px',
+      searchRadius: ios ? '10px' : '999px',
+      androidTitlePad: s.stack.length || detail ? '4px' : '16px',
+      setIos: () => this.setState({ platform: 'ios' }),
+      setAndroid: () => this.setState({ platform: 'android' }),
+      iosBtnStyle: `background:${ios ? '#fff' : 'transparent'};border:0;border-radius:2px;padding:9px 18px;font:600 11.5px var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:${ios ? '#111' : 'rgba(255,255,255,.66)'};cursor:pointer`,
+      androidBtnStyle: `background:${android ? '#fff' : 'transparent'};border:0;border-radius:2px;padding:9px 18px;font:600 11.5px var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:${android ? '#111' : 'rgba(255,255,255,.66)'};cursor:pointer`,
+      frameCaption: (ios ? 'iOS · iPhone 15 · 390 × 844 pt' : 'Android · 411 × 891 dp · Material 3') + ' · dark theme',
+      jumps, tabs, notes,
+      barTitle: barTitles[screen] || '',
+      showBarIos: ios && screen !== 'today' && screen !== 'photo',
+      showBarAndroid: android && screen !== 'today' && screen !== 'photo',
+      showBack: detail,
+      showSearchAction: ['news', 'photos', 'forum'].includes(screen),
+      showCompose: ios && screen === 'forum',
+      showReadActions: ['story', 'thread'].includes(screen),
+      showFab: android && screen === 'forum',
+      showTabsIos: ios && !detail,
+      showTabsAndroid: android && !detail,
+      isToday: screen === 'today', isNews: screen === 'news', isStory: screen === 'story',
+      isPhotos: screen === 'photos', isPhoto: screen === 'photo', isForum: screen === 'forum',
+      isThread: screen === 'thread', isSearch: screen === 'search', isYou: screen === 'you',
+      vault, news, threads, threadsShort: threads.slice(0, 3), posts, results, years, cats,
+      photos: photos.map((ph, i) => ({ ...ph, open: () => this.setState({ screen: 'photo', photo: i, stack: ['photos'], sheet: false }) })),
+      photoImg: photo.img, photoCap: photo.cap, photoMeta: photo.meta,
+      photoIndexLabel: `${(s.photo % photos.length) + 1} of 1,240`,
+      libraryRows: ['Saved articles', 'Saved photographs', 'Downloaded for offline', 'Reading history'],
+      settingsRows: ['Text size', 'Notifications', 'Account & privacy', 'About the archive'],
+      query: s.query,
+      onQuery: e => this.setState({ query: e.target.value }),
+      searchLabel: s.query ? 'Results' : 'Suggested',
+      readProgress: `${Math.round(s.progress * 100)}%`,
+      onScroll: e => {
+        if (screen !== 'story') return;
+        const el = e.target, max = el.scrollHeight - el.clientHeight;
+        this.setState({ progress: max > 0 ? Math.min(1, el.scrollTop / max) : 0 });
+      },
+      saveFill: s.saved ? '#B89A4A' : 'none',
+      toggleSave: () => this.setState(st => ({ saved: !st.saved })),
+      toggleNotify: () => this.setState(st => ({ notify: !st.notify })),
+      switchTrackStyle: `position:relative;width:${ios ? 51 : 52}px;height:${ios ? 31 : 32}px;border-radius:16px;border:${s.notify ? '0' : '1px solid rgba(255,255,255,.3)'};background:${s.notify ? '#B89A4A' : 'transparent'};cursor:pointer;transition:background .18s;padding:0`,
+      switchKnobStyle: `position:absolute;top:${ios ? 2 : 6}px;left:${s.notify ? (ios ? 22 : 26) : (ios ? 2 : 6)}px;width:${ios ? 27 : 20}px;height:${ios ? 27 : 20}px;border-radius:50%;background:${s.notify ? (ios ? '#fff' : '#111111') : 'rgba(255,255,255,.6)'};display:block;transition:left .18s cubic-bezier(.22,.61,.36,1)`,
+      sheetOpen: s.sheet,
+      openSheet: () => this.setState({ sheet: true }),
+      closeSheet: () => this.setState({ sheet: false }),
+      sheetItems,
+      sheetTitle: screen === 'forum' ? 'Post to the community' : 'Share this story',
+      sheetBg: '#1E1E1E',
+      sheetPad: ios ? '0 10px 14px' : '0',
+      sheetRadius: ios ? '14px' : '20px 20px 0 0',
+      sheetHeadPad: ios ? '16px 18px 12px' : '10px 22px 12px',
+      sheetAlign: ios ? 'center' : 'left',
+      goSearch: () => this.go('search', { push: true }),
+      goNews: () => this.setState({ screen: 'news', tab: 'news', stack: [] }),
+      goForum: () => this.setState({ screen: 'forum', tab: 'forum', stack: [] }),
+      goPhotos: () => this.setState({ screen: 'photos', tab: 'photos', stack: [] }),
+      openStory,
+      prevPhoto: () => this.setState(st => ({ photo: (st.photo + photos.length - 1) % photos.length })),
+      nextPhoto: () => this.setState(st => ({ photo: (st.photo + 1) % photos.length })),
+      back: () => this.back()
+    };
+  }
+}
+</script>
+</body>
+</html>
