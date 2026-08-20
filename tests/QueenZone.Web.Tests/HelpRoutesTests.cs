@@ -41,6 +41,7 @@ public sealed class HelpRoutesTests : IClassFixture<WebApplicationFactory<Progra
         Assert.Contains("Email address", body);
         Assert.Contains("Your message", body);
         Assert.Contains(">Contact<", body);
+        Assert.DoesNotContain("style=", body, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -114,6 +115,7 @@ public sealed class HelpRoutesTests : IClassFixture<WebApplicationFactory<Progra
         var body = await response.Content.ReadAsStringAsync();
         Assert.Contains("Name is required", body);
         Assert.Contains("Email address is required", body);
+        Assert.DoesNotContain("style=", body, StringComparison.OrdinalIgnoreCase);
         var stored = await factory.Services.GetRequiredService<IHelpRequestRepository>()
             .ListAsync("all", 1, 50);
         Assert.DoesNotContain(stored.Items, item => item.Subject == "Cannot open a forum topic" && item.Name == "Alex Fan" && item.Email == "");

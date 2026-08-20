@@ -42,7 +42,7 @@ public class PrivateMessagingWorkflowTests : RealDataPageTest
         // Compose via the "Message" affordance on B's Members/Profile.
         var firstBody = $"{memberA.Marker} first message to B";
         await Page.GotoAsync($"/members/{memberB.Id}");
-        await Page.GetByRole(AriaRole.Link, new() { Name = "Message" }).ClickAsync();
+        await Page.GetByRole(AriaRole.Link, new() { Name = "Message", Exact = true }).ClickAsync();
         await Expect(Page).ToHaveURLAsync(new Regex(".*/messages/compose\\?to=.*"));
 
         await Page.GetByLabel("Message").FillAsync(firstBody);
@@ -121,7 +121,7 @@ public class PrivateMessagingWorkflowTests : RealDataPageTest
 
         // A can no longer message B: the "Message" affordance disappears from B's profile...
         await Page.GotoAsync($"/members/{memberB.Id}");
-        await Expect(Page.GetByRole(AriaRole.Link, new() { Name = "Message" })).ToHaveCountAsync(0);
+        await Expect(Page.GetByRole(AriaRole.Link, new() { Name = "Message", Exact = true })).ToHaveCountAsync(0);
 
         // ...and the conversation view shows that sending is no longer available.
         await Page.GotoAsync(conversationUrl);
