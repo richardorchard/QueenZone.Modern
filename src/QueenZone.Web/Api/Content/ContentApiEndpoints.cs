@@ -28,6 +28,11 @@ public static class ContentApiEndpoints
             .Produces<NewsDetailDto>()
             .ProducesProblem(StatusCodes.Status404NotFound);
 
+        group.MapGet("/timeline", GetTimelineEventsAsync)
+            .WithName("GetContentTimelineEvents")
+            .WithSummary("Paged list of published history timeline events, in date order.")
+            .Produces<ApiPagedResponse<TimelineEventDto>>();
+
         group.MapGet("/biography", GetBiographyChaptersAsync)
             .WithName("GetContentBiographyChapters")
             .WithSummary("Paged list of biography chapters, in reading order.")
@@ -85,6 +90,32 @@ public static class ContentApiEndpoints
         }
 
         return Results.Ok(ContentApiMapper.ToNewsDetail(item));
+    }
+
+    internal static async Task<IResult> GetTimelineEventsAsync(
+        IQueenHistoryRepository historyRepository,
+        int? page,
+        int? pageSize,
+        CancellationToken cancellationToken)
+    {
+        var request = ApiPagination.Normalize(page, pageSize);
+        var events = (await historyRepository.GetAllPublishedAsync(cancellationToken))
+            .OrderBy(e => e.EventDate)
+            .ThenByDescending(e => e.Importance)
+            .ToList();
+
+        var pageItems = events
+            .Skip((request.Page - 1) * request.PageSize)
+            .Take(request.PageSize)
+            .ToList();
+
+        var response = ApiPagedResponse<TimelineEventDto>.Create(
+            ContentApiMapper.ToTimelineEvents(pageItems),
+            request.Page,
+            request.PageSize,
+            events.Count);
+
+        return Results.Ok(response);
     }
 
     internal static async Task<IResult> GetBiographyChaptersAsync(
