@@ -1,5 +1,9 @@
 @page "/contact"
 @model QueenZone.Web.Pages.Help.IndexModel
+@{
+    // Avoid asp-validation-summary's <li style="display:none"> placeholder (style-src 'self').
+    ViewContext.ClientValidationEnabled = false;
+}
 
 <partial name="_PageHero" model='@(("Contact", "Contact us", "Having trouble with your account or the archive? Send a private message to the Queenzone admin.", ""))' />
 
@@ -18,7 +22,10 @@
       </p>
     }
 
-    <div asp-validation-summary="All" class="qz-account-notice qz-account-notice--error"></div>
+    @if (!ViewData.ModelState.IsValid)
+    {
+      <div asp-validation-summary="All" class="qz-account-notice qz-account-notice--error"></div>
+    }
 
     <form method="post" class="qz-account-form">
       @Html.AntiForgeryToken()

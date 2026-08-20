@@ -40,7 +40,7 @@ public class CommunitySubmissionWorkflowTests : RealDataPageTest
         await Page.GetByLabel("Title").FillAsync(title);
         await Page.GetByLabel("Description").FillAsync("Disposable E2E photo submission.");
         await Page.GetByLabel("Suggested category").FillAsync("Live");
-        await Page.GetByLabel("Photo").SetInputFilesAsync(new FilePayload
+        await Page.Locator("#PhotoFile").SetInputFilesAsync(new FilePayload
         {
             Name = "e2e-photo.png",
             MimeType = "image/png",
@@ -140,7 +140,7 @@ public class CommunitySubmissionWorkflowTests : RealDataPageTest
         var photoTitle = $"{member.Marker} attribution photo";
         await Page.GotoAsync("/submit/photo");
         await Page.GetByLabel("Title").FillAsync(photoTitle);
-        await Page.GetByLabel("Photo").SetInputFilesAsync(new FilePayload
+        await Page.Locator("#PhotoFile").SetInputFilesAsync(new FilePayload
         {
             Name = "e2e-photo.png",
             MimeType = "image/png",
@@ -163,7 +163,7 @@ public class CommunitySubmissionWorkflowTests : RealDataPageTest
         await CreateMemberAsync("photo-validate-required");
         await Page.GotoAsync("/submit/photo");
         await Page.GetByLabel("Title").FillAsync(" ");
-        await Page.GetByLabel("Photo").SetInputFilesAsync(new FilePayload
+        await Page.Locator("#PhotoFile").SetInputFilesAsync(new FilePayload
         {
             Name = "e2e-photo.png",
             MimeType = "image/png",
@@ -183,7 +183,7 @@ public class CommunitySubmissionWorkflowTests : RealDataPageTest
 
         await Page.GotoAsync("/submit/photo");
         await Page.GetByLabel("Title").FillAsync(title);
-        await Page.GetByLabel("Photo").SetInputFilesAsync(new FilePayload
+        await Page.Locator("#PhotoFile").SetInputFilesAsync(new FilePayload
         {
             Name = "e2e-not-an-image.txt",
             MimeType = "text/plain",
