@@ -472,6 +472,40 @@ public sealed class StartupOptionsValidatorTests
         Assert.False(result.Failed);
     }
 
+    [Fact]
+    public void AuthRateLimitingOptionsValidator_accepts_defaults()
+    {
+        var result = new AuthRateLimitingOptionsValidator()
+            .Validate(null, new AuthRateLimitingOptions());
+        Assert.False(result.Failed);
+    }
+
+    [Theory]
+    [InlineData(0, 1, 10, 1)]
+    [InlineData(30, 0, 10, 1)]
+    [InlineData(30, 1, 0, 1)]
+    [InlineData(30, 1, 10, 0)]
+    [InlineData(AuthRateLimitingOptionsValidator.MaxPermitLimit + 1, 1, 10, 1)]
+    [InlineData(30, AuthRateLimitingOptionsValidator.MaxWindowMinutes + 1, 10, 1)]
+    public void AuthRateLimitingOptionsValidator_rejects_non_positive_or_oversized_limits(
+        int ipPermit,
+        int ipWindow,
+        int accountPermit,
+        int accountWindow)
+    {
+        var result = new AuthRateLimitingOptionsValidator().Validate(
+            null,
+            new AuthRateLimitingOptions
+            {
+                IpPermitLimit = ipPermit,
+                IpWindowMinutes = ipWindow,
+                AccountPermitLimit = accountPermit,
+                AccountWindowMinutes = accountWindow,
+            });
+        Assert.True(result.Failed);
+        Assert.Contains("RateLimiting:Auth", result.FailureMessage);
+    }
+
     [Theory]
     [InlineData(0, 300, 60, 60)]
     [InlineData(10, 0, 60, 60)]

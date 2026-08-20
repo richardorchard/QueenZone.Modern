@@ -55,6 +55,7 @@ public sealed class QueenZoneWebCompositionTests
             Assert.NotNull(scope.ServiceProvider.GetRequiredService<IHelpRequestRepository>());
             Assert.NotNull(scope.ServiceProvider.GetRequiredService<IMobileAuthGrantRepository>());
             Assert.NotNull(scope.ServiceProvider.GetRequiredService<MobileAuthService>());
+            Assert.NotNull(scope.ServiceProvider.GetRequiredService<MobileAuthAccountRateLimiter>());
         }
 
         Assert.Equal(["admin@test.local"], provider.GetRequiredService<IOptions<AdminOptions>>().Value.AllowedEmails);
@@ -66,6 +67,8 @@ public sealed class QueenZoneWebCompositionTests
         Assert.Equal(60, provider.GetRequiredService<IOptions<AnalyticsOptions>>().Value.TrafficCacheMinutes);
         Assert.Null(provider.GetRequiredService<IOptions<MemberAuthenticationOptions>>().Value.Google?.ClientId);
         Assert.Equal(10, provider.GetRequiredService<IOptions<FanPerformanceRateLimitingOptions>>().Value.AudioPermitLimit);
+        Assert.Equal(30, provider.GetRequiredService<IOptions<AuthRateLimitingOptions>>().Value.IpPermitLimit);
+        Assert.Equal(10, provider.GetRequiredService<IOptions<AuthRateLimitingOptions>>().Value.AccountPermitLimit);
         Assert.Equal(10 * 1024 * 1024, provider.GetRequiredService<IOptions<BlobUploadOptions>>().Value.DefaultMaxBytes);
 
         // #336: web composition uses editorial AI surface only (not discovery worker pipeline).
