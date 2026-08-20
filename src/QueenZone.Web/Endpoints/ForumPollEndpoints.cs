@@ -152,17 +152,6 @@ public static class ForumPollEndpoints
         }
     }
 
-    internal static bool IsAdmin(ClaimsPrincipal user, AdminOptions adminOptions)
-    {
-        var email = user.FindFirstValue(ClaimTypes.Email)
-            ?? user.FindFirstValue("preferred_username")
-            ?? user.Identity?.Name;
-        if (string.IsNullOrWhiteSpace(email))
-        {
-            return false;
-        }
-
-        return adminOptions.AllowedEmails.Any(allowed =>
-            string.Equals(allowed, email, StringComparison.OrdinalIgnoreCase));
-    }
+    internal static bool IsAdmin(ClaimsPrincipal user, AdminOptions adminOptions) =>
+        AdminAllowlist.IsAllowed(user, adminOptions);
 }

@@ -11,6 +11,7 @@ Decision record: [`docs/decisions/0010-versioned-json-api-conventions.md`](../de
 | `/api/v1` | Discovery document (version, OpenAPI URL, conventions) |
 | `/openapi/v1.json` | Generated OpenAPI 3.1 document (runtime, kept in sync with mapped `/api/v1` endpoints) |
 | `/api/v1/auth/*` | Mobile OAuth2 PKCE + tokens (see issues #720 / #721) |
+| `/api/v1/admin` | Admin status probe; future admin JSON must use the same `Admin` policy (#723) |
 | `/api/v1/{resource}` | Later epics (news, forum, messages, galleries, …) |
 
 Later endpoints should be mapped on a `MapGroup("/api/v1")` (or a sub-group) with `.WithGroupName("v1")` so they appear in the OpenAPI document. Do not add mobile/app JSON routes under `src/QueenZone.Web/Endpoints/`.
@@ -72,7 +73,7 @@ Response:
 
 ## Authentication
 
-Member routes use the existing mobile JWT bearer scheme (`MemberAuthenticationSchemes.MobileMemberPolicy`). Admin-capable API routes (later, #723) must keep `Admin:AllowedEmails` and the admin scheme separate from member tokens.
+Member routes use the existing mobile JWT bearer scheme (`MemberAuthenticationSchemes.MobileMemberPolicy`). Admin-capable API routes live under `/api/v1/admin` and must be mapped with `MapAdminApiGroup()` so they use the same `Admin` authorization policy as `/admin` Razor pages: the Entra/test admin composite scheme plus `Admin:AllowedEmails`. A member mobile access token is never treated as admin, even when its email is on the allowlist. Failed admin-API authorization returns Problem Details `401`/`403` rather than an Entra redirect.
 
 `/api/v1` is cookie-antiforgery-free (`DisableAntiforgery` on the API groups). Do not require `__RequestVerificationToken` on JSON API calls.
 
