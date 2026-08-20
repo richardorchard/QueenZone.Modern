@@ -5,6 +5,7 @@ using AspNet.Security.OAuth.GitHub;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.Identity.Web;
 using QueenZone.Data;
 
@@ -96,10 +97,12 @@ public static class QueenZoneAuthServiceCollectionExtensions
     {
         services.AddAuthorization(options =>
         {
-            options.AddPolicy("Admin", policy =>
+            options.AddPolicy(AdminAuthenticationSchemes.Policy, policy =>
                 policy.AddAuthenticationSchemes(AdminAuthenticationSchemes.CompositeScheme)
                     .RequireAuthenticatedUser()
-                    .RequireAssertion(context => IsAdminEmail(context.User, configuration)));
+                    .RequireAssertion(context => AdminAllowlist.IsAllowed(
+                        context.User,
+                        configuration.GetSection(AdminOptions.SectionName).Get<AdminOptions>())));
 
             options.AddPolicy(MemberAuthenticationSchemes.MemberPolicy, policy =>
             {
@@ -135,6 +138,8 @@ public static class QueenZoneAuthServiceCollectionExtensions
                 policy.RequireAuthenticatedUser();
             });
         });
+
+        services.AddSingleton<IAuthorizationMiddlewareResultHandler, AdminApiAuthorizationResultHandler>();
 
         return services;
     }
@@ -321,19 +326,4 @@ public static class QueenZoneAuthServiceCollectionExtensions
         },
     };
 
-    private static bool IsAdminEmail(ClaimsPrincipal user, IConfiguration configuration)
-    {
-        var email = user.FindFirstValue(ClaimTypes.Email)
-            ?? user.FindFirstValue("preferred_username")
-            ?? user.Identity?.Name;
-
-        if (string.IsNullOrWhiteSpace(email))
-        {
-            return false;
-        }
-
-        var allowedEmails = configuration.GetSection(AdminOptions.SectionName).Get<AdminOptions>()?.AllowedEmails ?? [];
-        return allowedEmails.Any(allowed =>
-            string.Equals(allowed, email, StringComparison.OrdinalIgnoreCase));
-    }
 }
