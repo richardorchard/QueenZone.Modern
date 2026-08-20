@@ -4,6 +4,8 @@ Speculative backlog for a native iPhone (later Android) app, following on from [
 
 Ordering below is dependency order, not priority: Epic 0 is a hard prerequisite for every other epic, since none of the app's core content is currently available as an API.
 
+Tech choice: **React Native** for both iOS and Android — see [ADR 0009](../decisions/0009-react-native-for-mobile-app.md).
+
 ## Epic 0 — Mobile API & token auth foundation
 
 The site is 100% server-rendered Razor Pages with cookie session auth today ([`mobile-app-feasibility.md`](../architecture/mobile-app-feasibility.md)). Nothing else in this backlog can start until there's a JSON API and a token auth flow a native app can use.
@@ -85,8 +87,8 @@ Cross-cutting infrastructure epic that most of the above stories depend on. If p
 
 ## Epic 10 — Android port
 
-Deliberately last: the user's stated priority is iPhone first, Android later, and most of Epics 0–8 are platform-agnostic once the API/auth foundation exists.
+Deliberately last: the user's stated priority is iPhone first, Android later, and most of Epics 0–8 are platform-agnostic once the API/auth foundation exists. Per [ADR 0009](../decisions/0009-react-native-for-mobile-app.md), React Native was chosen specifically so this epic is largely a build-and-release exercise rather than a second app.
 
-- As an Android user, I want feature parity with the iOS app for all the epics above.
-- As the product owner, I want to decide the Android tech approach (shared cross-platform codebase vs. separate native Kotlin app) informed by how the iOS app was actually built (native Swift vs. Capacitor/React Native), rather than assuming a shared codebase up front.
+- As an Android user, I want feature parity with the iOS app for all the epics above, delivered from the same React Native codebase rather than a rewrite.
+- As the product owner, I want any iOS-only native modules used in Epics 4/5/7 (camera, background audio, push) audited for Android equivalents early, so Epic 10 isn't blocked by a module with no Android support.
 - As the product owner, I want a Google Play Store listing and compliance pass (Play's own minimum-functionality and data-safety requirements) completed before submission, distinct from Apple's requirements.
