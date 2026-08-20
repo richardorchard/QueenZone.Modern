@@ -28,4 +28,38 @@ public static class ContentApiMapper
             item.PublishedAt,
             item.SourceUrl,
             NewsRoutes.GetNewsDetailPath(item.Id, item.Title, item.Slug));
+
+    public static TimelineEventDto ToTimelineEvent(QueenHistoryEvent historyEvent) =>
+        new(
+            historyEvent.Id,
+            historyEvent.Title,
+            historyEvent.Summary,
+            historyEvent.EventDate,
+            historyEvent.FormattedDate,
+            ToTimelineCategory(historyEvent.Category),
+            ToTimelineCategoryLabel(historyEvent.Category),
+            historyEvent.SourceUrl);
+
+    public static IReadOnlyList<TimelineEventDto> ToTimelineEvents(IEnumerable<QueenHistoryEvent> events) =>
+        events.Select(ToTimelineEvent).ToList();
+
+    private static string ToTimelineCategory(QueenHistoryEventCategory category) => category switch
+    {
+        QueenHistoryEventCategory.Concert => "live",
+        QueenHistoryEventCategory.Release or QueenHistoryEventCategory.Recording => "music",
+        QueenHistoryEventCategory.Award or QueenHistoryEventCategory.Birthday or QueenHistoryEventCategory.SiteHistory => "milestone",
+        _ => "other",
+    };
+
+    private static string ToTimelineCategoryLabel(QueenHistoryEventCategory category) => category switch
+    {
+        QueenHistoryEventCategory.Concert => "Live",
+        QueenHistoryEventCategory.Release => "Release",
+        QueenHistoryEventCategory.Recording => "Recording",
+        QueenHistoryEventCategory.Award => "Award",
+        QueenHistoryEventCategory.Birthday => "Birthday",
+        QueenHistoryEventCategory.TVRadio => "TV / Radio",
+        QueenHistoryEventCategory.SiteHistory => "Archive",
+        _ => "Other",
+    };
 }

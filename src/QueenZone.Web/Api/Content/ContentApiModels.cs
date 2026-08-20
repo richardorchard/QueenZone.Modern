@@ -23,3 +23,17 @@ public sealed record NewsDetailDto(
     DateTime PublishedAt,
     string? SourceUrl,
     string DetailPath);
+
+/// <summary>
+/// List-card shape for <c>/api/v1/content/timeline</c>. No detail endpoint: the website
+/// has no single-event page, only the one continuous timeline list.
+/// </summary>
+public sealed record TimelineEventDto(
+    int Id,
+    string Title,
+    string Summary,
+    DateTime EventDate,
+    string FormattedDate,
+    string Category,
+    string CategoryLabel,
+    string? SourceUrl);
