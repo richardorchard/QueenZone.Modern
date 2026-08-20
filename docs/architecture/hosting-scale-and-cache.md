@@ -28,6 +28,7 @@ Public performance work already relies on **process-local** mechanisms that are 
 | ASP.NET Core output cache (sitemaps + anonymous HTML) | In-process store on the one worker |
 | News / sitemap / HTML cache invalidation after admin publish | Bumps local version + evicts local output-cache tags |
 | Forum post rate limiter (memory + DB probe) | Counts are consistent for the single process |
+| Mobile `/api/v1/auth` (IP + per-member in-process) | Same as website login IP policy, plus a per-account cap on sign-in completion and refresh |
 | Per-member daily upload quotas (`MemberUploadQuotaService` / `IMemoryCache`) | Count + byte caps per principal per UTC day on the one worker |
 
 Those designs become **incorrect or leaky** only if instance count &gt; 1 (stale HTML/news on another worker, rate-limit bypass, invalidation that does not reach every node).

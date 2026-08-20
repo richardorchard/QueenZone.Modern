@@ -6,7 +6,7 @@ namespace QueenZone.Web;
 /// </summary>
 public static class QueenZoneRateLimitPolicies
 {
-    /// <summary>OAuth start / login challenges — IP partition.</summary>
+    /// <summary>OAuth start / login challenges and mobile <c>/api/v1/auth</c> — IP partition.</summary>
     public const string Auth = "qz-auth";
 
     /// <summary>Member content submissions (news/photo/article forms).</summary>

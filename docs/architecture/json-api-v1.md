@@ -48,7 +48,9 @@ Unhandled `/api/v1` failures and empty error statuses use RFC 7807 Problem Detai
 
 HTML `/error` pages are not used for `/api/v1`. Unknown `/api/v1/...` paths return Problem Details `404`, not the public Not Found Razor page.
 
-**Auth exception:** `/api/v1/auth/token`, `/authorize`, and `/callback` error objects stay RFC 6749 `{ "error", "error_description" }` (and redirects for the browser hop). Do not convert those to Problem Details.
+**Auth exception:** `/api/v1/auth/token`, `/authorize`, and `/callback` error objects stay RFC 6749 `{ "error", "error_description" }` (and redirects for the browser hop). Do not convert those to Problem Details. Rate-limit rejections on those paths use `429` with `error: temporarily_unavailable` (never Problem Details, and never echo tokens).
+
+Sign-in and token routes are process-local rate limited: per client IP (same `RateLimiting:Auth` policy as website `/account/login`) plus a per-member cap on callback completion and refresh grants. See [`hosting-scale-and-cache.md`](hosting-scale-and-cache.md).
 
 ## Pagination
 

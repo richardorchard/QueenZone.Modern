@@ -106,10 +106,16 @@ public static class QueenZoneWebServiceCollectionExtensions
             .Bind(configuration.GetSection(FanPerformanceRateLimitingOptions.SectionName))
             .ValidateOnStart();
         services.AddSingleton<IValidateOptions<FanPerformanceRateLimitingOptions>, FanPerformanceRateLimitingOptionsValidator>();
+        services.AddOptions<AuthRateLimitingOptions>()
+            .Bind(configuration.GetSection(AuthRateLimitingOptions.SectionName))
+            .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<AuthRateLimitingOptions>, AuthRateLimitingOptionsValidator>();
+        services.AddSingleton<MobileAuthAccountRateLimiter>();
 
         services.AddRateLimiter(limiter =>
         {
             limiter.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+            limiter.OnRejected = AuthRateLimitRejection.WriteAsync;
 
             limiter.AddPolicy(FanPerformanceRateLimitingOptions.AudioPolicy, context =>
             {
@@ -140,16 +146,22 @@ public static class QueenZoneWebServiceCollectionExtensions
                     });
             });
 
-            // Auth challenges (OAuth start) — IP only; soft trust in X-Forwarded-For behind Cloudflare.
+            // Auth challenges (OAuth start + /api/v1/auth) — IP only; per-member mobile
+            // caps live in MobileAuthAccountRateLimiter. Soft trust in X-Forwarded-For
+            // behind Cloudflare. Process-local; correct on a single B1 worker.
             limiter.AddPolicy(QueenZoneRateLimitPolicies.Auth, context =>
-                RateLimitPartition.GetFixedWindowLimiter(
+            {
+                var opts = context.RequestServices
+                    .GetRequiredService<IOptions<AuthRateLimitingOptions>>().Value;
+                return RateLimitPartition.GetFixedWindowLimiter(
                     GetClientIpPartition(context),
                     _ => new FixedWindowRateLimiterOptions
                     {
-                        PermitLimit = 30,
-                        Window = TimeSpan.FromMinutes(1),
+                        PermitLimit = opts.IpPermitLimit,
+                        Window = TimeSpan.FromMinutes(opts.IpWindowMinutes),
                         QueueLimit = 0,
-                    }));
+                    });
+            });
 
             // Member submissions — prefer member id, fall back to IP.
             limiter.AddPolicy(QueenZoneRateLimitPolicies.MemberWrite, context =>
