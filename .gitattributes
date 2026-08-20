@@ -7,6 +7,17 @@
 # Shell scripts must stay LF for execution on Linux runners/containers.
 *.sh text eol=lf
 
+# Expo / Node sources stay LF so Metro, npm, and Linux mobile CI match
+# Expo defaults. Binary rules below still apply to images under this tree.
+src/QueenZone.Mobile/**/*.js text eol=lf
+src/QueenZone.Mobile/**/*.ts text eol=lf
+src/QueenZone.Mobile/**/*.tsx text eol=lf
+src/QueenZone.Mobile/**/*.json text eol=lf
+src/QueenZone.Mobile/**/*.md text eol=lf
+src/QueenZone.Mobile/**/.gitignore text eol=lf
+src/QueenZone.Mobile/**/.nvmrc text eol=lf
+src/QueenZone.Mobile/**/.node-version text eol=lf
+
 # Common binary types (do not convert line endings).
 *.png binary
 *.jpg binary

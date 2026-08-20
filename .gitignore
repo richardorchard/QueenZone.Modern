@@ -38,6 +38,10 @@ appservice-logs.zip
 
 appservice-logs/
 
+# Node / Expo (QueenZone.Mobile). The project also has its own .gitignore.
+node_modules/
+.expo/
+
 # OpenTofu local/generated files. Remote state is never committed.
 **/.terraform/*
 .terraform.tfstate.lock.info

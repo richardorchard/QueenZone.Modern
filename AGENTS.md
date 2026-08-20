@@ -13,6 +13,8 @@ This repository is the modern QueenZone rebuild. The project is archive-first: i
 - `docs/architecture/opentofu-contributor-runbook.md` is the OpenTofu operating contract, including `prevent_destroy` on SQL, Storage, and other irreplaceable resources. OpenTofu does not manage blob objects or SQL rows, and it will not automatically refuse to destroy a data store unless that lifecycle flag is set.
 - `docs/decisions/0007-rich-text-editor-quill.md` is the shared Quill rich-text editor decision (partial + `/api/uploads/editor-image`).
 - `docs/architecture/json-api-v1.md` is the versioned `/api/v1` JSON API contract (pagination, Problem Details, OpenAPI).
+- `docs/decisions/0009-react-native-for-mobile-app.md` and `docs/decisions/0011-mobile-project-location-and-build-tooling.md` are the mobile client tech and project-location decisions.
+- `docs/mobile-development-environment.md` is the shared Windows/macOS native toolchain (Node 24, JDK 17, Android SDK 36).
 - `docs/backlog/migration-backlog.md` tracks migration work.
 - `docs/sql/data-api-builder-mcp.md` explains the local SQL MCP setup for read-only legacy database investigation.
 - `docs/agent-bitwarden-secrets.md` is the multi-machine Bitwarden Secrets Manager (`bws`) setup for local agents (Windows vs macOS).
@@ -24,6 +26,8 @@ Keep durable workflow guidance in this file and keep user-facing setup guidance 
 `QueenZone.Web` uses ASP.NET Core Razor Pages for server-rendered pages. Public archive pages, news pages, and admin editorial screens should live under `src/QueenZone.Web/Pages` as `.cshtml` files with page models.
 
 Do not build visitor-facing or admin pages by streaming inline HTML from minimal route handlers. Minimal endpoints are appropriate for small non-page responses such as `/health` or the versioned JSON API under `/api/v1` (`src/QueenZone.Web/Api/`). Existing narrow endpoints in `src/QueenZone.Web/Endpoints/` (RSS, uploads, streaming) stay outside that contract. See `docs/architecture/json-api-v1.md`.
+
+The React Native client lives at `src/QueenZone.Mobile/` as an Expo development-build project (TypeScript, `expo-dev-client`, Continuous Native Generation). Keep it out of `QueenZone.sln`. Expo Go is not a supported runtime. Native `ios/` and `android/` output is generated at build time and is not committed. See `src/QueenZone.Mobile/README.md`.
 
 ## Branch And Pull Request Policy
 
