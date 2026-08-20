@@ -23,3 +23,15 @@ public sealed record NewsDetailDto(
     DateTime PublishedAt,
     string? SourceUrl,
     string DetailPath);
+
+/// <summary>
+/// List-card shape for <c>/api/v1/content/freddietribute</c>. No detail endpoint: the
+/// website has no single-tribute page, only the paged tribute archive.
+/// </summary>
+public sealed record FreddieTributeDto(
+    int Id,
+    string Name,
+    string Thought,
+    string? Country,
+    string DateText,
+    string? TimeText);

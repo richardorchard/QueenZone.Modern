@@ -28,4 +28,16 @@ public static class ContentApiMapper
             item.PublishedAt,
             item.SourceUrl,
             NewsRoutes.GetNewsDetailPath(item.Id, item.Title, item.Slug));
+
+    public static FreddieTributeDto ToFreddieTributeDto(FreddieTribute tribute) =>
+        new(
+            tribute.Id,
+            tribute.Name,
+            tribute.Thought,
+            tribute.Country,
+            tribute.DateText,
+            tribute.TimeText);
+
+    public static IReadOnlyList<FreddieTributeDto> ToFreddieTributeDtos(IEnumerable<FreddieTribute> tributes) =>
+        tributes.Select(ToFreddieTributeDto).ToList();
 }
