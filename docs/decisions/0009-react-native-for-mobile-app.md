@@ -21,6 +21,8 @@ Candidates considered:
 
 Build the native mobile app in **React Native**, targeting iOS first and Android second, per [`mobile-app-epics.md`](../backlog/mobile-app-epics.md).
 
+Use the supported local toolchain in the [mobile development environment guide](../mobile-development-environment.md) when scaffolding or building the client.
+
 - Epic 0 (JSON API + token auth) is a hard prerequisite and must land before any screen work starts.
 - The existing PWA stays live and maintained independently; React Native is additive, not a replacement for the web experience.
 - Native-module choices (push notifications, camera/photo picker, background audio for fan performances) should prefer well-maintained community or Expo modules over hand-rolled native bridges where one exists, to keep the app maintainable by a solo developer.
