@@ -206,8 +206,9 @@ select `main`. The workflow intentionally rejects other branches and targets
 the self-hosted Mac runner through `[self-hosted, macOS, ARM64, ios-signing]`.
 The runner service does not load an interactive shell profile, so the workflow
 puts Homebrew (`/opt/homebrew/bin` or `/usr/local/bin`) on `PATH`, installs
-CocoaPods if `pod` is missing, runs `expo prebuild --no-install`, then
-`pod install` before archiving. Expo's own CocoaPods auto-install is skipped
+CocoaPods if `pod` is missing, runs `expo prebuild --no-install` with
+`IOS_BUILD_NUMBER` set to the workflow run number (so `CFBundleVersion` is unique
+for App Store Connect), then `pod install` before archiving. Expo's own CocoaPods auto-install is skipped
 because a missing CLI is only a warning and otherwise continues without an
 `.xcworkspace`. It then imports signing material into a temporary Keychain,
 produces and verifies a signed `.ipa`, retains that IPA as a seven-day

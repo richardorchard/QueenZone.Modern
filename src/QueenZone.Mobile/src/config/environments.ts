@@ -13,6 +13,7 @@ const impl = require('../../apiEnvironments.cjs') as {
   resolveAppEnvironment: (raw: string | undefined | null) => AppEnvironment;
   resolveApiBaseUrl: (input: ResolveApiBaseUrlInput) => string;
   normalizeApiBaseUrl: (raw: string) => string;
+  resolveIosBuildNumber: (input?: ResolveIosBuildNumberInput) => string;
   rewriteLoopbackForAndroid: (apiBaseUrl: string, platform: string) => string;
 };
 
@@ -23,8 +24,15 @@ export type ResolveApiBaseUrlInput = {
   override?: string | undefined | null;
 };
 
+export type ResolveIosBuildNumberInput = {
+  override?: string | undefined | null;
+  githubRunNumber?: string | undefined | null;
+  fallback?: string | undefined | null;
+};
+
 export const defaultApiBaseUrls = impl.defaultApiBaseUrls;
 export const resolveAppEnvironment = impl.resolveAppEnvironment;
 export const resolveApiBaseUrl = impl.resolveApiBaseUrl;
 export const normalizeApiBaseUrl = impl.normalizeApiBaseUrl;
+export const resolveIosBuildNumber = impl.resolveIosBuildNumber;
 export const rewriteLoopbackForAndroid = impl.rewriteLoopbackForAndroid;

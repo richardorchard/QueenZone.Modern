@@ -30,7 +30,7 @@ Xcode.
 | Watchman | Latest stable | Recommended on macOS. It is not required on Windows. |
 | Expo SDK | **57** | Pinned in `src/QueenZone.Mobile/package.json`. Development builds only; Expo Go is not supported. |
 | Xcode | **26.4+** | Required on macOS to compile the iOS target for Expo SDK 57. |
-| CocoaPods | Homebrew `cocoapods` on the signing Mac; Expo prebuild on GitHub-hosted CI | Interactive `npx expo run:ios` can install pods itself. The self-hosted TestFlight runner service does not load `~/.zprofile`, so [publish-ios-testflight.yml](../.github/workflows/publish-ios-testflight.yml) adds Homebrew to `PATH` and runs `pod install` explicitly. |
+| CocoaPods | Homebrew `cocoapods` on the signing Mac; Expo prebuild on GitHub-hosted CI | Interactive `npx expo run:ios` can install pods itself. The self-hosted TestFlight runner service does not load `~/.zprofile`, so [publish-ios-testflight.yml](../.github/workflows/publish-ios-testflight.yml) adds Homebrew to `PATH`, sets `IOS_BUILD_NUMBER` from the workflow run number before prebuild (App Store Connect requires a unique `CFBundleVersion`), and runs `pod install` explicitly. |
 
 The established Windows reference currently uses Node 24, Temurin 17, Android
 SDK Platform 36, and Build-Tools 36.0.0. Match those compatibility versions on
