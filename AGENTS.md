@@ -206,6 +206,8 @@ GitHub Actions workflow `.github/workflows/ci.yml` blocks merge when these fail:
 | **EF migrations (Azure SQL)** | When migration-related paths change: `has-pending-model-changes` + `database update` against the deploy SQL Server | Yes (job runs only for those PRs) |
 | **Playwright e2e** | Self-hosted runner selected by the `e2e` label (Windows or macOS) | Yes (required PR merge gate; not rerun by deploy) |
 | **Mobile JS** | `npm ci`, `typecheck`, and `npm test` in `src/QueenZone.Mobile` when that tree changes | Runs when mobile files change; skipped otherwise (non-matrix skip is treated as passing) |
+| **Mobile Android build** | Unsigned debug APK via `expo prebuild` + `gradlew assembleDebug`, uploaded as a 1-day workflow artifact | Runs when mobile files change (or `workflow_dispatch`) |
+| **Mobile iOS build** | Unsigned Simulator build via `expo prebuild` + `xcodebuild` on a macOS runner, zipped and uploaded as a 1-day workflow artifact | Runs when mobile files change (or `workflow_dispatch`) |
 
 PRs that only change `src/QueenZone.Mobile/` (or docs/infra/design) skip the .NET build, tests, coverage, smoke, e2e, and the App Service deploy. Mixed web + mobile PRs run both. See `scripts/classify-pipeline-changes.sh` and `docs/architecture/testing-policy.md`.
 

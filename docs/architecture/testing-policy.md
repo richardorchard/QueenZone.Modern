@@ -340,7 +340,7 @@ Pull requests that do not change the website skip `build` / `test` / coverage / 
 - **Non-web** when **every** changed file is under `docs/`, `infra/`, `design/`, `.github/` (except `.github/workflows/ci.yml`), a root `*.md`, `LICENSE`, `THIRD-PARTY-NOTICES.md`, or `src/QueenZone.Mobile/`.
 - Changing `ci.yml` itself still runs the full .NET suite.
 - `src/` (except the mobile client), `tests/`, `scripts/`, project files, and `wwwroot` stay on the full web path.
-- A mobile-only PR still runs `mobile-js` (Node typecheck + unit tests). Native Android/iOS compile is issue #794.
+- A mobile-only PR still runs `mobile-js` (Node typecheck + unit tests), plus `mobile-android` and `mobile-ios` native compile builds (unsigned debug APK / Simulator build, uploaded as 1-day workflow artifacts).
 - Mixed mobile + web PRs run both pipelines.
 - Deploy uses the same classifier so an infra-only or mobile-only merge does not zip-deploy unchanged website binaries.
 
