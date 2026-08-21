@@ -329,14 +329,22 @@ These gates are guardrails, not a replacement for useful assertions. New or chan
 | `ef-migrations` | When migration-related paths change: snapshot check + `database update` on Azure SQL | Yes (same-repo PRs only; skipped otherwise) |
 | `smoke-test` | Published app, curl `/health`, `/`, `/news` (starts after `build`, overlaps shards/coverage) | Yes |
 | `e2e-test` | Playwright suite on a self-hosted `e2e` runner (Windows or macOS; starts after `build`, overlaps coverage) | Yes (required PR merge gate) |
+| `mobile-js` | Node typecheck + unit tests in `src/QueenZone.Mobile` | When that tree changes |
 
 CI/CD uses two workflows. `.github/workflows/ci.yml` runs the pull-request build, deterministic tests, coverage gates, conditional `ef-migrations`, smoke test, and required e2e merge gate. After merge, `.github/workflows/deploy.yml` resolves the `ci.yml` run that built and tested the merged PR's head commit (via merge-commit second parent, or the commit→PR association for squash/rebase merges) and reuses its `web-publish` artifact (no rebuild), then runs `migrate` (only when EF paths changed) → `deploy` (zip-pushes, Kudu recycle, polls `/warmup` **and** the new `data-build-version` on `/`) → `post-deploy-smoke`. ARM `WEBSITE_RUN_FROM_PACKAGE=1` does swap the zip, but #688 showed that skipping the extra Kudu recycle leaves `/warmup` on HTTP 500; keep the restart. Skipping migrate must not skip smoke: `post-deploy-smoke` uses `if: always()` and requires `deploy` to have succeeded. Smoke also requires `data-build-version` on `/` to match the PR-head short SHA stamped at CI build (`OverrideGitCommitShort`). The PR `ef-migrations` job uses the same migration connection string as deploy so SQL Server failures are caught before merge.
 
 Two further workflows run on a schedule only and never gate a PR merge or a deploy: `.github/workflows/nightly-legacy-checks.yml` (legacy read/write probes, then the real-data Playwright UI suite, then a residue check — see "Data Integration Tests" and "Nightly UI Regression (Real Data)" above) and `.github/workflows/livesite-readonly-sweep.yml` (the live-site read-only sweep). Both are continuous signal for catching drift, not merge gates; a failure there does not block or revert anything automatically.
 
-Non-code pull requests skip `build` / `test` / coverage / smoke / e2e. Classification lives in `scripts/classify-pipeline-changes.sh`: a PR is non-code when **every** changed file is under `docs/`, `infra/`, `design/`, `.github/` (except `.github/workflows/ci.yml`), a root `*.md`, `LICENSE`, or `THIRD-PARTY-NOTICES.md`. Changing `ci.yml` itself still runs the full suite. `src/`, `tests/`, `scripts/`, project files, and `wwwroot` stay on the full path. Deploy uses the same classifier so an infra-only merge does not zip-deploy unchanged binaries.
+Pull requests that do not change the website skip `build` / `test` / coverage / smoke / e2e. Classification lives in `scripts/classify-pipeline-changes.sh`:
 
-Skipped non-matrix jobs still report under their required check names, which GitHub treats as satisfied. The `test` matrix is different: skipping it entirely would report a single `test` check and never create the required `test (0)` / `test (1)` checks, leaving the PR blocked forever. `ci.yml` therefore runs a lightweight `test-docs-ok` matrix on non-code PRs that emits success for those exact names without running the suite.
+- **Non-web** when **every** changed file is under `docs/`, `infra/`, `design/`, `.github/` (except `.github/workflows/ci.yml`), a root `*.md`, `LICENSE`, `THIRD-PARTY-NOTICES.md`, or `src/QueenZone.Mobile/`.
+- Changing `ci.yml` itself still runs the full .NET suite.
+- `src/` (except the mobile client), `tests/`, `scripts/`, project files, and `wwwroot` stay on the full web path.
+- A mobile-only PR still runs `mobile-js` (Node typecheck + unit tests). Native Android/iOS compile is issue #794.
+- Mixed mobile + web PRs run both pipelines.
+- Deploy uses the same classifier so an infra-only or mobile-only merge does not zip-deploy unchanged website binaries.
+
+Skipped non-matrix jobs still report under their required check names, which GitHub treats as satisfied. The `test` matrix is different: skipping it entirely would report a single `test` check and never create the required `test (0)` / `test (1)` checks, leaving the PR blocked forever. `ci.yml` therefore runs a lightweight `test-docs-ok` matrix on non-web PRs that emits success for those exact names without running the .NET suite.
 
 ### EF migration consistency
 

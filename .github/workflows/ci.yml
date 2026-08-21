@@ -20,22 +20,57 @@ jobs:
     outputs:
       code: ${{ steps.check.outputs.code }}
       migrations: ${{ steps.check.outputs.migrations }}
+      mobile: ${{ steps.check.outputs.mobile }}
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+      - name: Self-test change classifier
+        run: bash ./scripts/classify-pipeline-changes.sh --self-test
       - name: Check for code changes
         id: check
         run: |
           if [ "${{ github.event_name }}" != "pull_request" ]; then
             echo "code=true" >> $GITHUB_OUTPUT
             echo "migrations=true" >> $GITHUB_OUTPUT
+            echo "mobile=true" >> $GITHUB_OUTPUT
             exit 0
           fi
 
           git diff --name-only origin/main...HEAD \
             | bash ./scripts/classify-pipeline-changes.sh \
             >> "$GITHUB_OUTPUT"
+
+  # JS typecheck + unit tests for src/QueenZone.Mobile. Native Android/iOS
+  # compile remains issue #794. Mixed web+mobile PRs run this alongside the
+  # .NET suite; mobile-only PRs skip the website path entirely.
+  mobile-js:
+    name: Mobile typecheck and unit tests
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.mobile == 'true'
+    defaults:
+      run:
+        working-directory: src/QueenZone.Mobile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: src/QueenZone.Mobile/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
 
   # Builds and publishes the Linux app once per PR run ("build once, test many").
   # Deterministic tests run in the `test` matrix (mixed Web.Tests shards — see
@@ -273,12 +308,13 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
-  # Non-code PRs (docs / infra / design / .github except ci.yml) skip the real
-  # `test` matrix above. When a matrix job is skipped entirely, GitHub reports
-  # a single check named `test` — not `test (0)` / `test (1)`. Those matrix
-  # names are required status checks on `main`, so skipped PRs would stay
-  # blocked forever waiting for checks that never start. Emit matching
-  # success checks instead. See docs/architecture/testing-policy.md.
+  # PRs that skip the web suite (docs / infra / design / .github except
+  # ci.yml / mobile-only) skip the real `test` matrix above. When a matrix
+  # job is skipped entirely, GitHub reports a single check named `test` —
+  # not `test (0)` / `test (1)`. Those matrix names are required status
+  # checks on `main`, so skipped PRs would stay blocked forever waiting for
+  # checks that never start. Emit matching success checks instead. See
+  # docs/architecture/testing-policy.md.
   test-docs-ok:
     name: test (${{ matrix.shard }})
     runs-on: ubuntu-latest
@@ -288,8 +324,8 @@ jobs:
       matrix:
         shard: [0, 1]
     steps:
-      - name: Non-code PR — required check satisfied
-        run: echo "Non-code PR — marking test (${{ matrix.shard }}) as satisfied without running the suite."
+      - name: No web-app changes — required check satisfied
+        run: echo "No web-app changes — marking test (${{ matrix.shard }}) as satisfied without running the .NET suite."
 
   # Runs the modern-schema query paths that only SQL Server can execute (EF Core's SQLite
   # provider used by the `test` job above cannot translate DateTimeOffset comparisons at all).
