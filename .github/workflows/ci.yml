@@ -134,7 +134,7 @@ jobs:
   # real device signing/TestFlight credentials to a separate release story.
   mobile-ios:
     name: Mobile iOS build
-    runs-on: macos-15
+    runs-on: macos-26
     needs: changes
     if: needs.changes.outputs.mobile == 'true'
     defaults:
