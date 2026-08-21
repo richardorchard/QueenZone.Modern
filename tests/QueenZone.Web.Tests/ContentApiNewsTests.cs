@@ -58,6 +58,30 @@ public sealed class ContentApiNewsTests : IClassFixture<QueenZoneWebApplicationF
         Assert.Equal(1003, item!.Id);
         Assert.Equal("QueenZone modernisation begins", item.Title);
         Assert.False(string.IsNullOrWhiteSpace(item.Body));
+        // Sanitized HTML parity with the website (#728): formatting, links, UGC images.
+        Assert.Contains("<strong>ASP.NET Core</strong>", item.Body);
+        Assert.Contains("href=\"https://www.queenzone.org/news\"", item.Body);
+        Assert.Contains("src=\"/ugc/news/sample-crest.jpg\"", item.Body);
+        Assert.DoesNotContain("<script", item.Body, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void ToNewsDetail_sanitizes_body_like_website_FormatBody()
+    {
+        var item = new QueenZone.Data.NewsItem(
+            42,
+            "Title",
+            "Excerpt",
+            "<script>alert(1)</script><p>Hello <em>world</em></p><iframe src=\"https://evil.example\"></iframe>",
+            new DateTime(2026, 6, 11, 9, 0, 0, DateTimeKind.Utc),
+            null,
+            true);
+
+        var dto = ContentApiMapper.ToNewsDetail(item);
+
+        Assert.DoesNotContain("script", dto.Body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("iframe", dto.Body, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("<em>world</em>", dto.Body);
     }
 
     [Fact]
