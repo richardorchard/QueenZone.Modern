@@ -126,7 +126,7 @@ writes `extra.appEnv` and `extra.apiBaseUrl`; runtime code reads them via
 | `EXPO_PUBLIC_APP_ENV` | Default API origin |
 | --- | --- |
 | `development` (default) | `http://localhost:5146` (local `QueenZone.Web`) |
-| `staging` | `https://queenzone-dev.azurewebsites.net` |
+| `staging` | `https://www.queenzone.org` |
 | `production` | `https://www.queenzone.org` |
 
 Override the origin for any environment without code changes:
