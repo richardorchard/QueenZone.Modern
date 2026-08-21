@@ -2,7 +2,9 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { dark } from '../theme';
 import { TodayScreen } from '../screens/archive/TodayScreen';
 import { BiographyScreen } from '../screens/archive/BiographyScreen';
+import { BiographyChapterScreen } from '../screens/archive/BiographyChapterScreen';
 import { DiscographyScreen } from '../screens/archive/DiscographyScreen';
+import { AlbumScreen } from '../screens/archive/AlbumScreen';
 import { TimelineScreen } from '../screens/archive/TimelineScreen';
 import { FreddieTributeScreen } from '../screens/archive/FreddieTributeScreen';
 import { FanPerformancesScreen } from '../screens/archive/FanPerformancesScreen';
@@ -55,7 +57,9 @@ export function ArchiveStack() {
     <Archive.Navigator screenOptions={stackScreenOptions}>
       <Archive.Screen name="Today" component={TodayScreen} options={{ headerShown: false }} />
       <Archive.Screen name="Biography" component={BiographyScreen} />
+      <Archive.Screen name="BiographyChapter" component={BiographyChapterScreen} options={{ title: 'Chapter' }} />
       <Archive.Screen name="Discography" component={DiscographyScreen} />
+      <Archive.Screen name="Album" component={AlbumScreen} options={{ title: 'Album' }} />
       <Archive.Screen name="Timeline" component={TimelineScreen} />
       <Archive.Screen name="FreddieTribute" component={FreddieTributeScreen} options={{ title: 'Freddie Tribute' }} />
       <Archive.Screen name="FanPerformances" component={FanPerformancesScreen} options={{ title: 'Fan performances' }} />
