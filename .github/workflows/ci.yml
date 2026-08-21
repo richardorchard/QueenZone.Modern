@@ -144,6 +144,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      # Expo SDK 57 requires Xcode 26.4+ (docs/mobile-development-environment.md);
+      # the runner's default DEVELOPER_DIR can be an older Xcode also installed
+      # on the image. Select the newest one actually present rather than
+      # hardcoding a version that may not match what GitHub ships on this
+      # runner generation.
+      - name: Select latest available Xcode
+        run: |
+          ls /Applications | grep -i Xcode
+          LATEST=$(ls -d /Applications/Xcode_*.app 2>/dev/null | sort -V | tail -n 1)
+          if [ -z "$LATEST" ]; then
+            echo "::error::No /Applications/Xcode_*.app found on this runner."
+            exit 1
+          fi
+          echo "Selecting $LATEST"
+          sudo xcode-select -s "$LATEST/Contents/Developer"
+          xcodebuild -version
+
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
