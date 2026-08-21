@@ -89,6 +89,25 @@ bws project list
 bws secret list "1c16fd2d-4bfb-4eb7-8357-b49400233490"
 ```
 
+## Android test-build signing
+
+The stable test signing material used by
+`.github/workflows/publish-mobile-test-build.yml` is stored in this project:
+
+- `ANDROID_TEST_KEYSTORE_BASE64`
+- `ANDROID_TEST_KEYSTORE_PASSWORD`
+- `ANDROID_TEST_KEY_PASSWORD`
+
+The repository variable `BITWARDEN_MOBILE_BUILD_SECRETS` maps those Bitwarden
+secret IDs to workflow output names. GitHub Actions fetches them at runtime with
+the existing `BITWARDEN_SECRETS_MANAGER_ACCESS_TOKEN`; do not copy the signing
+values into separate GitHub secrets.
+
+Do not rotate or recreate the key as routine maintenance. Android accepts an
+in-place update only when the package identifier and signing key match the
+installed app. If this key is lost or changed, uninstall the existing QueenZone
+test app before installing the next APK.
+
 ## Six Labors build licence
 
 ImageSharp 4 requires the complete Six Labors licence string during restore and

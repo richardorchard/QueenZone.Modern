@@ -1,33 +1,67 @@
+import { DarkTheme, DefaultTheme, NavigationContainer } from '@react-navigation/native';
+import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { useEffect } from 'react';
+import { View } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { RootNavigator } from './src/navigation/RootNavigator';
+import { SessionProvider } from './src/session/SessionContext';
+import { ThemeProvider, dark, useQueenzoneFonts, useTheme } from './src/theme';
 
-export default function App() {
+SplashScreen.preventAutoHideAsync().catch(() => {
+  /* already prevented or unavailable in tests */
+});
+
+function AppNavigation() {
+  const { c, mode } = useTheme();
+  const base = mode === 'light' ? DefaultTheme : DarkTheme;
+
+  const navigationTheme = {
+    ...base,
+    colors: {
+      ...base.colors,
+      primary: c.accentPrimary,
+      background: c.surfacePage,
+      card: c.surfacePage,
+      text: c.textPrimary,
+      border: c.hairline,
+      notification: c.accentPrimary,
+    },
+  };
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>QueenZone</Text>
-      <Text style={styles.subtitle}>Development build scaffold</Text>
-      <StatusBar style="light" />
-    </View>
+    <NavigationContainer theme={navigationTheme}>
+      <StatusBar style={mode === 'light' ? 'dark' : 'light'} />
+      <RootNavigator />
+    </NavigationContainer>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#111111',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-  },
-  title: {
-    color: '#FFFFFF',
-    fontSize: 28,
-    fontWeight: '600',
-  },
-  subtitle: {
-    color: '#E8E8E8',
-    fontSize: 16,
-    marginTop: 8,
-    textAlign: 'center',
-  },
-});
+export default function App() {
+  const [fontsLoaded, fontError] = useQueenzoneFonts();
+
+  useEffect(() => {
+    if (fontsLoaded || fontError) {
+      SplashScreen.hideAsync().catch(() => {
+        /* splash already hidden */
+      });
+    }
+  }, [fontsLoaded, fontError]);
+
+  if (!fontsLoaded && !fontError) {
+    return <View style={{ flex: 1, backgroundColor: dark.surfacePage }} />;
+  }
+
+  return (
+    <SafeAreaProvider>
+      <ThemeProvider preference="dark">
+        <SessionProvider>
+          <AppNavigation />
+        </SessionProvider>
+      </ThemeProvider>
+    </SafeAreaProvider>
+  );
+}
+
+/** Dark-first page colour for any pre-provider splash / native chrome. */
+export const bootstrapBackground = dark.surfacePage;

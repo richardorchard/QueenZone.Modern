@@ -28,7 +28,9 @@
       "predictiveBackGestureEnabled": false
     },
     "plugins": [
-      "expo-dev-client"
+      "expo-dev-client",
+      "expo-font",
+      "expo-splash-screen"
     ]
   }
 }

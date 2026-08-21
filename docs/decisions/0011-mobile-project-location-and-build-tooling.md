@@ -69,6 +69,8 @@ Use **GitHub Actions** as the primary CI build system:
 - Build iOS on a GitHub-hosted macOS runner.
 - Run mobile jobs only when mobile code, shared mobile contracts, or the mobile
   workflow changes.
+- Skip the website .NET suite and App Service deploy when a change is
+  mobile-only (`src/QueenZone.Mobile/`). Mixed web + mobile PRs still run both.
 - Build unsigned development or simulator targets for pull-request validation.
 - Upload useful build outputs and diagnostics as short-lived workflow artifacts.
 - Add signing credentials and store submission as a separate release concern;

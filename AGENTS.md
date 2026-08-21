@@ -13,7 +13,7 @@ This repository is the modern QueenZone rebuild. The project is archive-first: i
 - `docs/architecture/opentofu-contributor-runbook.md` is the OpenTofu operating contract, including `prevent_destroy` on SQL, Storage, and other irreplaceable resources. OpenTofu does not manage blob objects or SQL rows, and it will not automatically refuse to destroy a data store unless that lifecycle flag is set.
 - `docs/decisions/0007-rich-text-editor-quill.md` is the shared Quill rich-text editor decision (partial + `/api/uploads/editor-image`).
 - `docs/architecture/json-api-v1.md` is the versioned `/api/v1` JSON API contract (pagination, Problem Details, OpenAPI).
-- `docs/decisions/0009-react-native-for-mobile-app.md` and `docs/decisions/0011-mobile-project-location-and-build-tooling.md` are the mobile client tech and project-location decisions.
+- `docs/decisions/0009-react-native-for-mobile-app.md` and `docs/decisions/0011-mobile-project-location-and-build-tooling.md` are the mobile client tech and project-location decisions. `docs/decisions/0012-react-navigation-app-shell.md` is the React Navigation shell and public vs member tab boundary.
 - `docs/mobile-development-environment.md` is the shared Windows/macOS native toolchain (Node 24, JDK 17, Android SDK 36).
 - `docs/backlog/migration-backlog.md` tracks migration work.
 - `docs/sql/data-api-builder-mcp.md` explains the local SQL MCP setup for read-only legacy database investigation.
@@ -27,7 +27,7 @@ Keep durable workflow guidance in this file and keep user-facing setup guidance 
 
 Do not build visitor-facing or admin pages by streaming inline HTML from minimal route handlers. Minimal endpoints are appropriate for small non-page responses such as `/health` or the versioned JSON API under `/api/v1` (`src/QueenZone.Web/Api/`). Existing narrow endpoints in `src/QueenZone.Web/Endpoints/` (RSS, uploads, streaming) stay outside that contract. See `docs/architecture/json-api-v1.md`.
 
-The React Native client lives at `src/QueenZone.Mobile/` as an Expo development-build project (TypeScript, `expo-dev-client`, Continuous Native Generation). Keep it out of `QueenZone.sln`. Expo Go is not a supported runtime. Native `ios/` and `android/` output is generated at build time and is not committed. See `src/QueenZone.Mobile/README.md`.
+The React Native client lives at `src/QueenZone.Mobile/` as an Expo development-build project (TypeScript, `expo-dev-client`, Continuous Native Generation). Keep it out of `QueenZone.sln`. Expo Go is not a supported runtime. Native `ios/` and `android/` output is generated at build time and is not committed. Navigation is React Navigation (bottom tabs + native stacks per tab); signed-out vs signed-in surfaces follow ADR 0012. See `src/QueenZone.Mobile/README.md`.
 
 ## Branch And Pull Request Policy
 
@@ -205,6 +205,11 @@ GitHub Actions workflow `.github/workflows/ci.yml` blocks merge when these fail:
 | **Smoke test** | Published app responds on `/health`, `/`, `/news` (starts after `build`, overlaps coverage) | Yes |
 | **EF migrations (Azure SQL)** | When migration-related paths change: `has-pending-model-changes` + `database update` against the deploy SQL Server | Yes (job runs only for those PRs) |
 | **Playwright e2e** | Self-hosted runner selected by the `e2e` label (Windows or macOS) | Yes (required PR merge gate; not rerun by deploy) |
+| **Mobile JS** | `npm ci`, `typecheck`, and `npm test` in `src/QueenZone.Mobile` when that tree changes | Runs when mobile files change; skipped otherwise (non-matrix skip is treated as passing) |
+| **Mobile Android build** | Unsigned debug APK via `expo prebuild` + `gradlew assembleDebug`, uploaded as a 1-day workflow artifact | Runs when mobile files change (or `workflow_dispatch`) |
+| **Mobile iOS build** | Unsigned Simulator build via `expo prebuild` + `xcodebuild` on a macOS runner, zipped and uploaded as a 1-day workflow artifact | Runs when mobile files change (or `workflow_dispatch`) |
+
+PRs that only change `src/QueenZone.Mobile/` (or docs/infra/design) skip the .NET build, tests, coverage, smoke, e2e, and the App Service deploy. Mixed web + mobile PRs run both. See `scripts/classify-pipeline-changes.sh` and `docs/architecture/testing-policy.md`.
 
 Coverage exclusions are configured in `coverlet.runsettings`. EF Core files under `**/Migrations/**/*.cs` are excluded from coverage metrics.
 

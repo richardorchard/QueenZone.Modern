@@ -22,6 +22,7 @@ output "module_import_contracts" {
   value = {
     azure_web       = module.azure_web.import_contract
     azure_data      = module.azure_data.import_contract
+    mobile_builds   = module.azure_mobile_builds.import_contract
     cloudflare_edge = module.cloudflare_edge.import_contract
   }
 }
