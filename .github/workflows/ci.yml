@@ -170,7 +170,7 @@ jobs:
       - name: Build for iOS Simulator
         working-directory: src/QueenZone.Mobile/ios
         run: |
-          WORKSPACE=$(ls *.xcworkspace | head -n 1)
+          WORKSPACE=$(ls -d *.xcworkspace | head -n 1)
           # First non-"Tests" scheme listed after the "Schemes:" header.
           SCHEME=$(xcodebuild -list -workspace "$WORKSPACE" \
             | awk '/Schemes:/{flag=1; next} flag && NF{print; exit}' \
