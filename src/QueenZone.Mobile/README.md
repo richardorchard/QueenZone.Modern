@@ -96,6 +96,27 @@ This generates `ios/`, installs CocoaPods, compiles a Simulator development
 client, and starts Metro. The same `--clean` prebuild rule as Android applies
 when native configuration changes.
 
+## Theme
+
+Design tokens live in `src/theme/` (#792). Palette hex values match
+`wwwroot/design-system/tokens/colors.css`; type, space, radius, and motion
+follow the same CSS foundation plus the mobile handoff at
+`design/Queenzone mobile app design/handoff/` (`STYLE_GUIDE.md`, `theme.ts`).
+
+The app is **dark-first** (`#111111` page, Antique Gold `#B89A4A` as
+`accentPrimary`). Import via `useTheme()` — do not hard-code colours already
+named in the theme.
+
+**Fonts:** Cormorant Garamond, Inter, and Cinzel load at startup through
+`useQueenzoneFonts()` (`@expo-google-fonts/*` TTFs, same families as the web
+WOFF2s). Family names live in `theme.fonts`. After adding `expo-font` /
+`expo-splash-screen`, rebuild the development client:
+
+```powershell
+npx expo prebuild --clean
+npx expo run:android
+```
+
 ## Navigation shell
 
 React Navigation provides the app shell ([ADR 0012](../../docs/decisions/0012-react-navigation-app-shell.md)).
@@ -120,6 +141,5 @@ npx expo run:android
 
 Later Epic 0.5 stories own:
 
-- Design-token theme — #792
 - Per-environment API base URL — #793
 - GitHub Actions Android/iOS compile pipeline — #794

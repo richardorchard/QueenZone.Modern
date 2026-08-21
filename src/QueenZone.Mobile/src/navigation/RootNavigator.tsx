@@ -9,19 +9,14 @@ import {
   User,
   type LucideIcon,
 } from 'lucide-react-native';
+import { Platform } from 'react-native';
 import { useSession } from '../session/SessionContext';
-import { shellColors } from '../ui/shell';
+import { useTheme, type ColorScheme } from '../theme';
 import { ArchiveStack, ForumStack, MessagesStack, NewsStack, PhotosStack, YouStack } from './stacks';
 import type { RootTabParamList } from './types';
 import { shouldHideTabBar } from './visibility';
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
-
-const tabBarBaseStyle = {
-  backgroundColor: shellColors.page,
-  borderTopColor: shellColors.hairline,
-  borderTopWidth: 1,
-};
 
 function tabIcon(Icon: LucideIcon) {
   return function TabIcon({ color, size }: { color: string; size: number }) {
@@ -29,13 +24,25 @@ function tabIcon(Icon: LucideIcon) {
   };
 }
 
+function tabBarStyleFor(c: ColorScheme, hide: boolean) {
+  if (hide) {
+    return { display: 'none' as const };
+  }
+  return {
+    backgroundColor: c.surfacePage,
+    borderTopColor: c.hairline,
+    borderTopWidth: 1,
+  };
+}
+
 function hideTabBarIfDetail(
+  c: ColorScheme,
   route: RouteProp<RootTabParamList, keyof RootTabParamList>,
   initialRouteName: string,
 ) {
   const focused = getFocusedRouteNameFromRoute(route) ?? initialRouteName;
   return {
-    tabBarStyle: shouldHideTabBar(focused) ? { display: 'none' as const } : tabBarBaseStyle,
+    tabBarStyle: tabBarStyleFor(c, shouldHideTabBar(focused)),
   };
 }
 
@@ -43,7 +50,10 @@ function reselectRoot(tabName: keyof RootTabParamList, screen: string) {
   return ({
     navigation,
   }: {
-    navigation: { isFocused: () => boolean; navigate: (name: keyof RootTabParamList, params: { screen: string }) => void };
+    navigation: {
+      isFocused: () => boolean;
+      navigate: (name: keyof RootTabParamList, params: { screen: string }) => void;
+    };
   }) => ({
     tabPress: () => {
       if (navigation.isFocused()) {
@@ -55,16 +65,18 @@ function reselectRoot(tabName: keyof RootTabParamList, screen: string) {
 
 export function RootNavigator() {
   const { isSignedIn } = useSession();
+  const { c, chrome } = useTheme();
+  const platformChrome = Platform.OS === 'android' ? chrome.android : chrome.ios;
 
   return (
     <Tab.Navigator
       key={isSignedIn ? 'signed-in' : 'signed-out'}
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: shellColors.accent,
-        tabBarInactiveTintColor: shellColors.textMuted,
-        tabBarStyle: tabBarBaseStyle,
-        tabBarLabelStyle: { fontSize: 10, letterSpacing: 0.4 },
+        tabBarActiveTintColor: c.accentPrimary,
+        tabBarInactiveTintColor: c.textMuted,
+        tabBarStyle: tabBarStyleFor(c, false),
+        tabBarLabelStyle: { fontSize: platformChrome.tabLabel, letterSpacing: 0.4 },
         tabBarHideOnKeyboard: true,
       }}
     >
@@ -75,7 +87,7 @@ export function RootNavigator() {
           title: 'Today',
           tabBarAccessibilityLabel: 'Today',
           tabBarIcon: tabIcon(BookOpen),
-          ...hideTabBarIfDetail(route, 'Today'),
+          ...hideTabBarIfDetail(c, route, 'Today'),
         })}
         listeners={reselectRoot('TodayTab', 'Today')}
       />
@@ -86,7 +98,7 @@ export function RootNavigator() {
           title: 'News',
           tabBarAccessibilityLabel: 'News',
           tabBarIcon: tabIcon(Newspaper),
-          ...hideTabBarIfDetail(route, 'NewsIndex'),
+          ...hideTabBarIfDetail(c, route, 'NewsIndex'),
         })}
         listeners={reselectRoot('NewsTab', 'NewsIndex')}
       />
@@ -97,7 +109,7 @@ export function RootNavigator() {
           title: 'Photos',
           tabBarAccessibilityLabel: 'Photos',
           tabBarIcon: tabIcon(Image),
-          ...hideTabBarIfDetail(route, 'PhotoIndex'),
+          ...hideTabBarIfDetail(c, route, 'PhotoIndex'),
         })}
         listeners={reselectRoot('PhotosTab', 'PhotoIndex')}
       />
@@ -108,7 +120,7 @@ export function RootNavigator() {
           title: 'Forum',
           tabBarAccessibilityLabel: 'Forum',
           tabBarIcon: tabIcon(MessagesSquare),
-          ...hideTabBarIfDetail(route, 'ForumIndex'),
+          ...hideTabBarIfDetail(c, route, 'ForumIndex'),
         })}
         listeners={reselectRoot('ForumTab', 'ForumIndex')}
       />
@@ -120,7 +132,7 @@ export function RootNavigator() {
             title: 'Messages',
             tabBarAccessibilityLabel: 'Messages',
             tabBarIcon: tabIcon(Mail),
-            ...hideTabBarIfDetail(route, 'Inbox'),
+            ...hideTabBarIfDetail(c, route, 'Inbox'),
           })}
           listeners={reselectRoot('MessagesTab', 'Inbox')}
         />
@@ -132,7 +144,7 @@ export function RootNavigator() {
           title: 'You',
           tabBarAccessibilityLabel: 'You',
           tabBarIcon: tabIcon(User),
-          ...hideTabBarIfDetail(route, 'Account'),
+          ...hideTabBarIfDetail(c, route, 'Account'),
         })}
         listeners={reselectRoot('YouTab', 'Account')}
       />

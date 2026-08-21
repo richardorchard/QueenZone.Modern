@@ -1,6 +1,6 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { archiveDisclaimer, shellColors } from './shell';
+import { archiveDisclaimer, radius, space, type, useTheme } from '../theme';
 
 export type PlaceholderAction = {
   label: string;
@@ -17,6 +17,10 @@ type Props = {
   headerShown?: boolean;
 };
 
+/**
+ * Themed placeholder used by the Epic 1–6 shell until real screens land.
+ * Follows STYLE_GUIDE §2 anatomy: Eyebrow → Title → Meta → Body → actions.
+ */
 export function PlaceholderScreen({
   title,
   epic,
@@ -26,51 +30,70 @@ export function PlaceholderScreen({
   headerShown = true,
 }: Props) {
   const insets = useSafeAreaInsets();
+  const { c } = useTheme();
 
   return (
     <ScrollView
-      style={styles.scroll}
+      style={[styles.scroll, { backgroundColor: c.surfacePage }]}
       contentContainerStyle={[
         styles.content,
-        { paddingTop: headerShown ? 24 : insets.top + 24, paddingBottom: insets.bottom + 32 },
+        {
+          paddingTop: headerShown ? space.xl : insets.top + space.xl,
+          paddingBottom: insets.bottom + space.xxl,
+        },
       ]}
     >
-      <Text style={styles.eyebrow}>{epic}</Text>
-      <Text style={styles.title}>{title}</Text>
-      <Text style={styles.access}>{access === 'public' ? 'Public' : 'Members'}</Text>
-      <Text style={styles.description}>{description}</Text>
+      <Text style={[type.eyebrow, { color: c.accentPrimary }]}>{epic}</Text>
+      <Text
+        style={[type.pageTitle, { color: c.textPrimary }]}
+        maxFontSizeMultiplier={1.4}
+        allowFontScaling
+      >
+        {title}
+      </Text>
+      <Text style={[type.meta, { color: c.textMuted }]}>
+        {access === 'public' ? 'Public' : 'Members'}
+      </Text>
+      <Text style={[type.body, { color: c.textSecondary, marginTop: space.sm }]} allowFontScaling>
+        {description}
+      </Text>
       {actions.length > 0 ? (
         <View style={styles.actions}>
-          {actions.map((action) => (
-            <Pressable
-              key={action.label}
-              accessibilityRole="button"
-              accessibilityLabel={action.label}
-              onPress={action.onPress}
-              style={({ pressed }) => [
-                styles.button,
-                action.variant === 'outline' || action.variant === 'ghost'
-                  ? styles.buttonOutline
-                  : styles.buttonPrimary,
-                action.variant === 'ghost' ? styles.buttonGhost : null,
-                pressed ? styles.buttonPressed : null,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.buttonLabel,
-                  action.variant === 'outline' || action.variant === 'ghost'
-                    ? styles.buttonLabelOnDark
-                    : styles.buttonLabelOnAccent,
+          {actions.map((action) => {
+            const isOutline = action.variant === 'outline' || action.variant === 'ghost';
+            const isGhost = action.variant === 'ghost';
+            return (
+              <Pressable
+                key={action.label}
+                accessibilityRole="button"
+                accessibilityLabel={action.label}
+                onPress={action.onPress}
+                style={({ pressed }) => [
+                  styles.button,
+                  {
+                    backgroundColor: isOutline ? 'transparent' : c.accentPrimary,
+                    borderColor: c.border,
+                    borderWidth: isGhost ? 0 : isOutline ? 1 : 0,
+                  },
+                  pressed ? styles.buttonPressed : null,
                 ]}
               >
-                {action.label}
-              </Text>
-            </Pressable>
-          ))}
+                <Text
+                  style={[
+                    type.button,
+                    { color: isOutline ? c.accentPrimary : c.textOnAccent },
+                  ]}
+                >
+                  {action.label}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
       ) : null}
-      <Text style={styles.disclaimer}>{archiveDisclaimer}</Text>
+      <Text style={[type.caption, { color: c.textMuted, marginTop: space.xxl }]}>
+        {archiveDisclaimer}
+      </Text>
     </ScrollView>
   );
 }
@@ -78,78 +101,24 @@ export function PlaceholderScreen({
 const styles = StyleSheet.create({
   scroll: {
     flex: 1,
-    backgroundColor: shellColors.page,
   },
   content: {
-    paddingHorizontal: 24,
-    gap: 12,
-  },
-  eyebrow: {
-    color: shellColors.accent,
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 2.2,
-    textTransform: 'uppercase',
-  },
-  title: {
-    color: shellColors.text,
-    fontSize: 32,
-    fontWeight: '600',
-  },
-  access: {
-    color: shellColors.textMuted,
-    fontSize: 11,
-    letterSpacing: 0.85,
-    textTransform: 'uppercase',
-  },
-  description: {
-    color: shellColors.textSecondary,
-    fontSize: 16,
-    lineHeight: 24,
-    marginTop: 8,
+    paddingHorizontal: space.xl,
+    gap: space.md,
   },
   actions: {
     gap: 10,
-    marginTop: 16,
+    marginTop: space.base,
   },
   button: {
     minHeight: 48,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    borderRadius: 2,
-  },
-  buttonPrimary: {
-    backgroundColor: shellColors.accent,
-  },
-  buttonOutline: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: shellColors.border,
-  },
-  buttonGhost: {
-    borderWidth: 0,
+    paddingHorizontal: space.base,
+    borderRadius: radius.xs,
   },
   buttonPressed: {
     opacity: 0.85,
     transform: [{ translateY: 1 }],
-  },
-  buttonLabel: {
-    fontSize: 12,
-    fontWeight: '500',
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
-  },
-  buttonLabelOnAccent: {
-    color: shellColors.onAccent,
-  },
-  buttonLabelOnDark: {
-    color: shellColors.accent,
-  },
-  disclaimer: {
-    color: shellColors.textMuted,
-    fontSize: 12,
-    lineHeight: 18,
-    marginTop: 28,
   },
 });
