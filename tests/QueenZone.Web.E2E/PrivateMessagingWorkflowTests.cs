@@ -45,7 +45,9 @@ public class PrivateMessagingWorkflowTests : RealDataPageTest
         await Page.GetByRole(AriaRole.Link, new() { Name = "Message", Exact = true }).ClickAsync();
         await Expect(Page).ToHaveURLAsync(new Regex(".*/messages/compose\\?to=.*"));
 
-        await Page.GetByLabel("Message").FillAsync(firstBody);
+        // Textbox role, not GetByLabel("Message"): Playwright substring-matches the masthead
+        // aria-label="Messages" (and "Messages, N unread conversations") on every signed-in page.
+        await Page.GetByRole(AriaRole.Textbox, new() { Name = "Message", Exact = true }).FillAsync(firstBody);
         await Page.GetByRole(AriaRole.Button, new() { Name = "Send message" }).ClickAsync();
 
         await Expect(Page).ToHaveURLAsync(new Regex(".*/messages/[0-9a-fA-F-]{36}$"));
@@ -68,7 +70,7 @@ public class PrivateMessagingWorkflowTests : RealDataPageTest
         await Expect(pageB.Locator(".qz-message-thread__item").Filter(new() { HasText = firstBody })).ToBeVisibleAsync();
 
         var replyBody = $"{memberB.Marker} reply to A";
-        await pageB.GetByLabel("Reply").FillAsync(replyBody);
+        await pageB.GetByRole(AriaRole.Textbox, new() { Name = "Reply", Exact = true }).FillAsync(replyBody);
         await pageB.GetByRole(AriaRole.Button, new() { Name = "Send reply" }).ClickAsync();
         await Expect(pageB.Locator(".qz-message-thread__item").Filter(new() { HasText = replyBody })).ToBeVisibleAsync();
 

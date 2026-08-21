@@ -118,6 +118,8 @@ The `ui-e2e-realdata` job uploads `test-results/e2e/`, `e2e-app.log`, and `e2e-a
 3. Read `e2e-app.log` / `e2e-app.err.log` from the artifact for server-side errors (stack traces, SQL exceptions) that happened around the same timestamp as the test failure.
 4. To re-run the same test against a fresh local mirror instead of just replaying the trace, sync a mirror copy (`scripts/Sync-LegacyDbToSqlExpress.ps1`, or reuse an existing one) and run `Run-E2E.ps1 -Mode RealData -CategoryFilter "<TestClassName>"` to scope the run to the failing fixture. Mirror data drifts daily, so a failure that reproduces against a same-day sync is a code issue; one that only reproduced against the original (now-stale) nightly mirror may just be transient real-data shape drift.
 
+Locator-only RealData fixes are not covered by the PR-gate Deterministic suite (in-memory Testing has no compose recipient, so the Message textarea never sits next to the masthead **Messages** icon). After merging such a change, dispatch **Nightly legacy DB checks** with `skip_sync=true` and `category_filter` set to the fixture name instead of waiting for the 03:00 UTC schedule. Playwright accessible-name matching is substring-based unless `Exact = true` — see `docs/architecture/testing-policy.md` ("Selector conventions").
+
 ## Troubleshooting
 
 - **Job stuck in "Waiting for a runner to pick up this job"**: neither matching runner is available. Confirm each runner is online in **Settings > Actions > Runners**, has the `e2e` label, and has its service running (`.\svc.cmd status` on Windows or `./svc.sh status` on macOS).
