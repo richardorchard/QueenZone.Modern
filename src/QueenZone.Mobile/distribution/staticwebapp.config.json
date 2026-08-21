@@ -5,15 +5,5 @@
     "Referrer-Policy": "no-referrer",
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY"
-  },
-  "routes": [
-    {
-      "route": "/queenzone-latest.apk",
-      "headers": {
-        "Cache-Control": "no-cache",
-        "Content-Disposition": "attachment; filename=queenzone-latest.apk",
-        "Content-Type": "application/vnd.android.package-archive"
-      }
-    }
-  ]
+  }
 }

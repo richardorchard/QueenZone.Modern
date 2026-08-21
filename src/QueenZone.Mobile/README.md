@@ -207,7 +207,9 @@ from this page will update one another normally.
 
 The APK is a pre-release build connected to the staging API. It and its download
 page are public to anyone who knows the URL, although the page asks search
-engines not to index it. The publishing design is recorded in
+engines not to index it. The page is hosted by Azure Static Web Apps; the APK is
+served from a separate, throwaway-build-only Azure Storage account so it cannot
+affect production media or UGC. The publishing design is recorded in
 [ADR 0013](../../docs/decisions/0013-static-web-app-mobile-test-distribution.md).
 
 The separate `publish-mobile-test-build.yml` workflow publishes after mobile

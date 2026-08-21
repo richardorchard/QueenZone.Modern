@@ -5,6 +5,7 @@ locals {
   log_analytics_base_id   = "${local.azure_resource_group_id}/providers/Microsoft.OperationalInsights"
   azure_sql_base_id       = "${local.azure_resource_group_id}/providers/Microsoft.Sql"
   azure_storage_base_id   = "${local.azure_resource_group_id}/providers/Microsoft.Storage"
+  mobile_build_storage_id = "${local.azure_storage_base_id}/storageAccounts/queenzonemobilebuilds"
   azure_data_containers = toset([
     "album-or-single-covers", "attachments", "avatars", "brian-may",
     "css", "databasebackup", "fan-art", "fan-pics", "forum",
@@ -14,6 +15,26 @@ locals {
     "queen-memorabillia", "roger-taylor", "songfiles", "special-events",
     "ugc-avatars", "ugc-forum", "us-convention-2001",
   ])
+}
+
+import {
+  to = module.azure_mobile_builds.azapi_resource.storage_account
+  id = local.mobile_build_storage_id
+}
+
+import {
+  to = module.azure_mobile_builds.azapi_resource.blob_service
+  id = "${local.mobile_build_storage_id}/blobServices/default"
+}
+
+import {
+  to = module.azure_mobile_builds.azapi_resource.builds_container
+  id = "${local.mobile_build_storage_id}/blobServices/default/containers/builds"
+}
+
+import {
+  to = module.azure_mobile_builds.azurerm_role_assignment.mobile_publisher
+  id = "${local.mobile_build_storage_id}/providers/Microsoft.Authorization/roleAssignments/9b23875e-46d9-4393-9ee7-1fec8a74fd7c"
 }
 
 import {

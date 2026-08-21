@@ -5,7 +5,7 @@ on:
     branches:
       - main
       # Temporary pre-merge end-to-end validation for issue #809. Remove after
-      # the first successful deployment from this branch.
+      # the first successful Blob Storage-backed deployment from this branch.
       - codex/issue-809-mobile-download
     paths:
       - "src/QueenZone.Mobile/**"
@@ -24,6 +24,7 @@ jobs:
   publish-android:
     name: Build and publish Android APK
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     environment: deploy
     defaults:
       run:
@@ -52,6 +53,16 @@ jobs:
         env:
           EXPO_PUBLIC_APP_ENV: staging
         run: npx expo prebuild --platform android --clean --no-install
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('src/QueenZone.Mobile/android/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
 
       - name: Fetch Android signing secrets from Bitwarden
         id: bitwarden-secrets
@@ -90,6 +101,24 @@ jobs:
             -Pandroid.injected.signing.key.alias=queenzone-test \
             -Pandroid.injected.signing.key.password="$ANDROID_TEST_KEY_PASSWORD"
 
+      - name: Verify APK signature
+        env:
+          ANDROID_TEST_KEYSTORE_PASSWORD: ${{ steps.bitwarden-secrets.outputs.ANDROID_TEST_KEYSTORE_PASSWORD }}
+        run: |
+          apk=android/app/build/outputs/apk/release/app-release.apk
+          apksigner="$ANDROID_HOME/build-tools/36.0.0/apksigner"
+          "$apksigner" verify "$apk"
+          expected=$(keytool -exportcert \
+            -keystore "$RUNNER_TEMP/queenzone-signing/queenzone-test.jks" \
+            -storepass "$ANDROID_TEST_KEYSTORE_PASSWORD" \
+            -alias queenzone-test | sha256sum | cut -d' ' -f1)
+          actual=$("$apksigner" verify --print-certs "$apk" \
+            | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')
+          if [ -z "$actual" ] || [ "$actual" != "$expected" ]; then
+            echo "::error::The APK was not signed by the configured QueenZone test key."
+            exit 1
+          fi
+
       - name: Prepare download site
         shell: pwsh
         run: |
@@ -102,7 +131,6 @@ jobs:
           New-Item -ItemType Directory -Path $site -Force | Out-Null
           Copy-Item distribution/index.html $site/index.html
           Copy-Item distribution/staticwebapp.config.json $site/staticwebapp.config.json
-          Copy-Item $apk.FullName $site/queenzone-latest.apk
 
           $perth = [System.TimeZoneInfo]::FindSystemTimeZoneById("Australia/Perth")
           $builtAt = [System.TimeZoneInfo]::ConvertTime([DateTimeOffset]::UtcNow, $perth)
@@ -110,7 +138,7 @@ jobs:
             builtAt = $builtAt.ToString("yyyy-MM-dd'T'HH:mm:sszzz")
             builtAtDisplay = $builtAt.ToString("d MMMM yyyy 'at' h:mm tt") + " AWST"
             commit = "${{ github.sha }}".Substring(0, 7)
-            downloadUrl = "/queenzone-latest.apk"
+            downloadUrl = "https://queenzonemobilebuilds.blob.core.windows.net/builds/queenzone-latest.apk"
             sizeBytes = $apk.Length
           }
           $metadata | ConvertTo-Json | Set-Content (Join-Path $site "build.json") -Encoding utf8NoBOM
@@ -137,6 +165,20 @@ jobs:
           echo "::add-mask::$token"
           echo "AZURE_STATIC_WEB_APPS_API_TOKEN=$token" >> "$GITHUB_ENV"
 
+      - name: Publish latest APK to dedicated Blob Storage
+        run: |
+          az storage blob upload \
+            --auth-mode login \
+            --account-name queenzonemobilebuilds \
+            --container-name builds \
+            --name queenzone-latest.apk \
+            --file android/app/build/outputs/apk/release/app-release.apk \
+            --overwrite true \
+            --content-type application/vnd.android.package-archive \
+            --content-disposition 'attachment; filename=queenzone-latest.apk' \
+            --content-cache-control no-cache \
+            --output none
+
       - name: Publish download site
         uses: Azure/static-web-apps-deploy@v1
         with:
@@ -153,7 +195,9 @@ jobs:
           for attempt in {1..12}; do
             if curl --fail --silent --show-error https://dev.queenzone.org/build.json \
               | jq -e --arg commit "${GITHUB_SHA:0:7}" '.commit == $commit' >/dev/null; then
-              curl --fail --silent --show-error --range 0-0 https://dev.queenzone.org/queenzone-latest.apk >/dev/null
+              curl --fail --silent --show-error \
+                https://queenzonemobilebuilds.blob.core.windows.net/builds/queenzone-latest.apk \
+                --output /dev/null
               exit 0
             fi
             sleep 10

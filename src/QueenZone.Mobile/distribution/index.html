@@ -25,7 +25,7 @@
       <div class="build" aria-live="polite">
         <p id="build-details">Loading build details…</p>
       </div>
-      <p><a class="download" href="/queenzone-latest.apk">Download latest APK</a></p>
+      <p><a id="download" class="download" href="https://queenzonemobilebuilds.blob.core.windows.net/builds/queenzone-latest.apk">Download latest APK</a></p>
       <small>This test-signed build is public by URL and is not listed by search engines.</small>
     </main>
     <script>
@@ -36,6 +36,7 @@
         })
         .then(build => {
           const size = (build.sizeBytes / 1024 / 1024).toFixed(1);
+          document.querySelector('#download').href = build.downloadUrl;
           document.querySelector('#build-details').textContent =
             `Built ${build.builtAtDisplay} · ${size} MB · revision ${build.commit}`;
         })
