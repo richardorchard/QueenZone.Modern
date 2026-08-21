@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { ApiError, fetchNewsDetail, formatPublishedDate, toPlainText, type NewsDetail } from '../../api';
+import { ApiError, fetchNewsDetail, formatPublishedDate, type NewsDetail } from '../../api';
 import type { NewsStackParamList } from '../../navigation/types';
+import { RichHtmlBody } from '../../ui/RichHtmlBody';
 import { ErrorBlock, LoadingBlock } from '../../ui/ScreenStates';
 import { space, type, useTheme } from '../../theme';
 
@@ -50,7 +51,6 @@ export function NewsStoryScreen({ navigation, route }: Props) {
     return <ErrorBlock message={error ?? 'Article not found.'} onRetry={retry} />;
   }
 
-  const body = toPlainText(article.body);
   const published = formatPublishedDate(article.publishedAt);
 
   return (
@@ -74,7 +74,9 @@ export function NewsStoryScreen({ navigation, route }: Props) {
           {article.excerpt}
         </Text>
       ) : null}
-      <Text style={[type.longform, { color: c.textPrimary, marginTop: space.xl }]}>{body}</Text>
+      <View style={styles.body}>
+        <RichHtmlBody html={article.body} horizontalInset={26} />
+      </View>
       {article.sourceUrl ? (
         <Pressable
           accessibilityRole="link"
@@ -96,6 +98,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 26,
     paddingTop: space.xl,
     paddingBottom: space.section,
+  },
+  body: {
+    marginTop: space.xl,
   },
   source: {
     marginTop: space.xxl,

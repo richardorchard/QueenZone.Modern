@@ -1,4 +1,4 @@
-/** Strip simple HTML tags for plain-text readers until rich content lands (#728). */
+/** Strip simple HTML tags for plain-text fallbacks (e.g. RichHtmlBody error path). */
 export function toPlainText(value: string | null | undefined): string {
   if (!value) {
     return '';

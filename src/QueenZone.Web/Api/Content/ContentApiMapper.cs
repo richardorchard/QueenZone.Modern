@@ -24,7 +24,8 @@ public static class ContentApiMapper
             item.Id,
             item.Title,
             item.Excerpt,
-            item.Body,
+            // Same sanitization / plain-text autolink path as the website news detail page.
+            NewsArticleContent.FormatBody(item.Body),
             item.PublishedAt,
             item.SourceUrl,
             NewsRoutes.GetNewsDetailPath(item.Id, item.Title, item.Slug));
