@@ -79,6 +79,17 @@
       "neverRecreate": true
     },
     {
+      "id": "299da79a473f1c6bc03dc8a2f735269a",
+      "type": "CNAME",
+      "name": "dev.queenzone.org",
+      "content": "lively-mushroom-017550800.7.azurestaticapps.net",
+      "proxied": false,
+      "ttl": 1,
+      "role": "Azure Static Web App mobile test-build downloads (#809)",
+      "opentofuTreatment": "import",
+      "neverRecreate": true
+    },
+    {
       "id": "c8989e49d2d624756ddf35a05e3ac153",
       "type": "CNAME",
       "name": "cdn.queenzone.org",
@@ -266,6 +277,14 @@
       "proxied": true,
       "dnsRecordId": "fdd05b163df7c2941ae1e36986558228",
       "opentofuTreatment": "import"
+    },
+    {
+      "hostname": "dev.queenzone.org",
+      "proxied": false,
+      "azureStaticWebAppCustomDomain": true,
+      "dnsRecordId": "299da79a473f1c6bc03dc8a2f735269a",
+      "opentofuTreatment": "import",
+      "neverRecreate": true
     },
     {
       "hostname": "queenzone.org",

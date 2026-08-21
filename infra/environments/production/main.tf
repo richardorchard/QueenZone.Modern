@@ -39,6 +39,13 @@ module "azure_data" {
   location            = var.azure_location
 }
 
+module "azure_mobile_builds" {
+  source = "../../modules/azure-mobile-builds"
+
+  resource_group_id = azurerm_resource_group.production.id
+  location          = azurerm_resource_group.production.location
+}
+
 module "cloudflare_edge" {
   source = "../../modules/cloudflare-edge"
 

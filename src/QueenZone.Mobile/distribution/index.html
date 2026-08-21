@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>QueenZone Android test build</title>
+    <style>
+      :root { color-scheme: dark; font-family: Inter, system-ui, sans-serif; }
+      body { margin: 0; background: #111; color: #f4efe5; }
+      main { box-sizing: border-box; max-width: 42rem; min-height: 100vh; margin: auto; padding: 4rem 1.5rem; display: grid; align-content: center; gap: 1.25rem; }
+      h1 { margin: 0; font-family: Georgia, serif; font-size: clamp(2rem, 8vw, 3.5rem); font-weight: 500; }
+      p { margin: 0; color: #c9c1b3; line-height: 1.6; }
+      .build { padding: 1rem; border: 1px solid #39342c; border-radius: .75rem; background: #191714; }
+      .download { display: inline-block; padding: .9rem 1.2rem; border-radius: .5rem; background: #b89a4a; color: #111; font-weight: 700; text-decoration: none; }
+      .download:hover, .download:focus-visible { background: #d0b667; }
+      small { color: #91887a; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <small>QueenZone pre-release</small>
+      <h1>Android test build</h1>
+      <p>Download the latest automated build directly to your Android phone.</p>
+      <div class="build" aria-live="polite">
+        <p id="build-details">Loading build details…</p>
+      </div>
+      <p><a id="download" class="download" href="https://queenzonemobilebuilds.blob.core.windows.net/builds/queenzone-latest.apk">Download latest APK</a></p>
+      <small>This test-signed build is public by URL and is not listed by search engines.</small>
+    </main>
+    <script>
+      fetch('/build.json', { cache: 'no-store' })
+        .then(response => {
+          if (!response.ok) throw new Error('Build details unavailable');
+          return response.json();
+        })
+        .then(build => {
+          const size = (build.sizeBytes / 1024 / 1024).toFixed(1);
+          document.querySelector('#download').href = build.downloadUrl;
+          document.querySelector('#build-details').textContent =
+            `Built ${build.builtAtDisplay} · ${size} MB · revision ${build.commit}`;
+        })
+        .catch(() => {
+          document.querySelector('#build-details').textContent = 'Latest build';
+        });
+    </script>
+  </body>
+</html>
