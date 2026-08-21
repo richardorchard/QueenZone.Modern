@@ -188,10 +188,13 @@ jobs:
         working-directory: src/QueenZone.Mobile/ios
         run: |
           WORKSPACE=$(ls -d *.xcworkspace | head -n 1)
-          # First non-"Tests" scheme listed after the "Schemes:" header.
-          SCHEME=$(xcodebuild -list -workspace "$WORKSPACE" \
-            | awk '/Schemes:/{flag=1; next} flag && NF{print; exit}' \
-            | xargs)
+          # Expo CNG names the app scheme after the workspace itself
+          # (QueenZone.xcworkspace -> scheme QueenZone). Do not pick from
+          # `xcodebuild -list`'s scheme list: a workspace lists every Pods
+          # library scheme too (e.g. "EXConstants"), sorted alphabetically
+          # ahead of the app's own scheme, and building one of those directly
+          # breaks its dependency ordering.
+          SCHEME=$(basename "$WORKSPACE" .xcworkspace)
           echo "Building scheme: $SCHEME"
           xcodebuild \
             -workspace "$WORKSPACE" \
