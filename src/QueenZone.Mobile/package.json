@@ -13,12 +13,13 @@
     "prebuild": "expo prebuild",
     "prebuild:clean": "expo prebuild --clean",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test src/navigation/visibility.test.ts src/theme/tokens.test.ts src/config/environments.test.ts src/api/text.test.ts src/ui/html/prepareNewsHtml.test.ts src/ui/html/resolveContentUrl.test.ts"
+    "test": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test src/navigation/visibility.test.ts src/theme/tokens.test.ts src/config/environments.test.ts src/api/text.test.ts src/cache/contentCache.test.ts src/ui/html/prepareNewsHtml.test.ts src/ui/html/resolveContentUrl.test.ts"
   },
   "dependencies": {
     "@expo-google-fonts/cinzel": "^0.4.2",
     "@expo-google-fonts/cormorant-garamond": "^0.4.1",
     "@expo-google-fonts/inter": "^0.4.2",
+    "@react-native-async-storage/async-storage": "2.2.0",
     "@react-navigation/bottom-tabs": "^7.18.17",
     "@react-navigation/native": "^7.3.17",
     "@react-navigation/native-stack": "^7.18.9",
