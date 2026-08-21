@@ -1,5 +1,5 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { shellColors } from '../ui/shell';
+import { dark } from '../theme';
 import { TodayScreen } from '../screens/archive/TodayScreen';
 import { BiographyScreen } from '../screens/archive/BiographyScreen';
 import { DiscographyScreen } from '../screens/archive/DiscographyScreen';
@@ -34,12 +34,13 @@ import type {
   YouStackParamList,
 } from './types';
 
+/** Dark-first stack chrome (matches ThemeProvider default until light mode is user-facing). */
 const stackScreenOptions = {
-  headerStyle: { backgroundColor: shellColors.page },
-  headerTintColor: shellColors.accent,
-  headerTitleStyle: { color: shellColors.text, fontWeight: '600' as const },
+  headerStyle: { backgroundColor: dark.surfacePage },
+  headerTintColor: dark.accentPrimary,
+  headerTitleStyle: { color: dark.textPrimary, fontWeight: '600' as const },
   headerShadowVisible: false,
-  contentStyle: { backgroundColor: shellColors.page },
+  contentStyle: { backgroundColor: dark.surfacePage },
 };
 
 const Archive = createNativeStackNavigator<ArchiveStackParamList>();

@@ -13,10 +13,10 @@ export function TodayScreen({ navigation }: Props) {
   return (
     <PlaceholderScreen
       title="Today"
-      epic="Epic 1 — Archive"
+      epic="Explore the archive"
       access="public"
       headerShown={false}
-      description="Home for the public archive. Later this becomes the designed Today feed. Biography, discography, timeline, the Freddie Tribute, and fan performances attach here; News and photography have their own tabs."
+      description="Home for the public archive. Monochrome page, Antique Gold only on the active tab and primary actions — the same 90/10 restraint as the website design system."
       actions={[
         { label: 'News', onPress: () => navigation.navigate('NewsTab', { screen: 'NewsIndex' }), variant: 'outline' },
         { label: 'Biography', onPress: () => navigation.navigate('Biography'), variant: 'outline' },

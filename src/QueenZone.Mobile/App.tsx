@@ -1,32 +1,67 @@
-import { DarkTheme, NavigationContainer } from '@react-navigation/native';
+import { DarkTheme, DefaultTheme, NavigationContainer } from '@react-navigation/native';
+import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
+import { View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { SessionProvider } from './src/session/SessionContext';
-import { shellColors } from './src/ui/shell';
+import { ThemeProvider, dark, useQueenzoneFonts, useTheme } from './src/theme';
 
-const navigationTheme = {
-  ...DarkTheme,
-  colors: {
-    ...DarkTheme.colors,
-    primary: shellColors.accent,
-    background: shellColors.page,
-    card: shellColors.page,
-    text: shellColors.text,
-    border: shellColors.hairline,
-    notification: shellColors.accent,
-  },
-};
+SplashScreen.preventAutoHideAsync().catch(() => {
+  /* already prevented or unavailable in tests */
+});
+
+function AppNavigation() {
+  const { c, mode } = useTheme();
+  const base = mode === 'light' ? DefaultTheme : DarkTheme;
+
+  const navigationTheme = {
+    ...base,
+    colors: {
+      ...base.colors,
+      primary: c.accentPrimary,
+      background: c.surfacePage,
+      card: c.surfacePage,
+      text: c.textPrimary,
+      border: c.hairline,
+      notification: c.accentPrimary,
+    },
+  };
+
+  return (
+    <NavigationContainer theme={navigationTheme}>
+      <StatusBar style={mode === 'light' ? 'dark' : 'light'} />
+      <RootNavigator />
+    </NavigationContainer>
+  );
+}
 
 export default function App() {
+  const [fontsLoaded, fontError] = useQueenzoneFonts();
+
+  useEffect(() => {
+    if (fontsLoaded || fontError) {
+      SplashScreen.hideAsync().catch(() => {
+        /* splash already hidden */
+      });
+    }
+  }, [fontsLoaded, fontError]);
+
+  if (!fontsLoaded && !fontError) {
+    return <View style={{ flex: 1, backgroundColor: dark.surfacePage }} />;
+  }
+
   return (
     <SafeAreaProvider>
-      <SessionProvider>
-        <NavigationContainer theme={navigationTheme}>
-          <StatusBar style="light" />
-          <RootNavigator />
-        </NavigationContainer>
-      </SessionProvider>
+      <ThemeProvider preference="dark">
+        <SessionProvider>
+          <AppNavigation />
+        </SessionProvider>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }
+
+/** Dark-first page colour for any pre-provider splash / native chrome. */
+export const bootstrapBackground = dark.surfacePage;
