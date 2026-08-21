@@ -3,18 +3,20 @@ import type { NavigatorScreenParams } from '@react-navigation/native';
 export type ArchiveStackParamList = {
   Today: undefined;
   Biography: undefined;
+  BiographyChapter: { id: number };
   Discography: undefined;
+  Album: { id: number };
   Timeline: undefined;
   FreddieTribute: undefined;
   FanPerformances: undefined;
   FanPerformanceDetail: { id: string };
-  Story: { id: string };
+  Story: { id: number };
   Search: undefined;
 };
 
 export type NewsStackParamList = {
   NewsIndex: undefined;
-  Story: { id: string };
+  Story: { id: number };
 };
 
 export type PhotosStackParamList = {

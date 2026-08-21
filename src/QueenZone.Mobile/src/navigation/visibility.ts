@@ -23,7 +23,9 @@ export type TabName = PublicTabName | SignedInOnlyTabName;
 export const publicScreenNames = [
   'Today',
   'Biography',
+  'BiographyChapter',
   'Discography',
+  'Album',
   'Timeline',
   'FreddieTribute',
   'FanPerformances',
@@ -73,6 +75,8 @@ export function isMemberOnlyScreen(name: string): boolean {
 
 export const detailScreenNames = [
   'Story',
+  'BiographyChapter',
+  'Album',
   'Search',
   'PhotoViewer',
   'PhotoSubmit',

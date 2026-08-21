@@ -48,9 +48,12 @@ describe('member-only screens', () => {
 describe('shouldHideTabBar', () => {
   it('hides the tab bar on pushed detail routes', () => {
     assert.equal(shouldHideTabBar('Story'), true);
+    assert.equal(shouldHideTabBar('BiographyChapter'), true);
+    assert.equal(shouldHideTabBar('Album'), true);
     assert.equal(shouldHideTabBar('Thread'), true);
     assert.equal(shouldHideTabBar('PhotoViewer'), true);
     assert.equal(shouldHideTabBar('Today'), false);
     assert.equal(shouldHideTabBar('NewsIndex'), false);
+    assert.equal(shouldHideTabBar('Biography'), false);
   });
 });
