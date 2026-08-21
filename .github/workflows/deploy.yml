@@ -26,11 +26,12 @@ concurrency:
 # merge was allowed (see branch protection on main), so none of that re-runs
 # here. This workflow no longer rebuilds — it reuses the exact binaries
 # ci.yml already built and tested on the PR, resolved below by PR head SHA.
-# Docs/infra/design/workflow-only merges skip migrate/deploy/post-deploy-smoke
-# (see `changes`) since ci.yml never produced a binary to reuse for those.
+# Docs/infra/design/workflow-only and mobile-only merges skip
+# migrate/deploy/post-deploy-smoke (see `changes`) since ci.yml never
+# produced a website binary to reuse for those.
 # post-deploy-smoke is the safety net after the real deploy.
 jobs:
-  # Mirrors ci.yml's non-code bypass (scripts/classify-pipeline-changes.sh).
+  # Mirrors ci.yml's non-web bypass (scripts/classify-pipeline-changes.sh).
   # ci.yml skips `build` (no web-publish artifact) for those PRs, so deploy
   # has nothing to download — and there's genuinely nothing to redeploy.
   # Without this gate, resolve-ci-run still finds the successful-but-skipped
@@ -42,16 +43,20 @@ jobs:
     outputs:
       code: ${{ steps.check.outputs.code }}
       migrations: ${{ steps.check.outputs.migrations }}
+      mobile: ${{ steps.check.outputs.mobile }}
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+      - name: Self-test change classifier
+        run: bash ./scripts/classify-pipeline-changes.sh --self-test
       - name: Check for code changes
         id: check
         run: |
           if [ "${{ github.event_name }}" != "push" ] || [ -z "${{ github.event.before }}" ]; then
             echo "code=true" >> "$GITHUB_OUTPUT"
             echo "migrations=true" >> "$GITHUB_OUTPUT"
+            echo "mobile=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
