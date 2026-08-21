@@ -185,5 +185,31 @@ credentials are used. Both jobs upload their build as a workflow artifact
 (`mobile-android-<run-id>` / `mobile-ios-<run-id>`), downloadable from the
 run's summary page for one day.
 
-Signing, TestFlight, and store submission are a separate future release
-concern (ADR 0011), not covered by this pipeline.
+Production signing, TestFlight, and store submission remain separate release
+concerns (ADR 0011). The installable Android build below uses a test-only key.
+
+## Install the latest Android test build
+
+Open [dev.queenzone.org](https://dev.queenzone.org) on an Android phone and tap
+**Download latest APK**. The page shows the build date and time in Western
+Australian time, file size, and source revision. No GitHub login or computer is
+required.
+
+Android may ask the first time whether the browser can install unknown apps.
+Allow that browser, return to the download, and confirm the installation. Later
+builds install as updates because the package identifier and test signing key
+stay stable.
+
+If a locally built or earlier CI debug version is already installed, Android may
+report a package conflict because that copy used a different signing key.
+Uninstall it once, then install the downloaded test build. Builds downloaded
+from this page will update one another normally.
+
+The APK is a pre-release build connected to the staging API. It and its download
+page are public to anyone who knows the URL, although the page asks search
+engines not to index it. The publishing design is recorded in
+[ADR 0013](../../docs/decisions/0013-static-web-app-mobile-test-distribution.md).
+
+The separate `publish-mobile-test-build.yml` workflow publishes after mobile
+changes merge to `main`, and can also be run manually. A signed,
+device-installable iOS build remains follow-up work under #808.
