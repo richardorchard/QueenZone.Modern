@@ -5,7 +5,7 @@
  */
 const defaultApiBaseUrls = {
   development: 'http://localhost:5146',
-  staging: 'https://queenzone-dev.azurewebsites.net',
+  staging: 'https://www.queenzone.org',
   production: 'https://www.queenzone.org',
 };
 
