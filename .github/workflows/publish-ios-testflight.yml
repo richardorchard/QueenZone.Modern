@@ -59,10 +59,68 @@ jobs:
       - name: Install JavaScript dependencies
         run: npm ci
 
+      - name: Ensure CocoaPods CLI
+        run: |
+          set -euo pipefail
+          # The GitHub Actions runner service does not load ~/.zprofile, so
+          # Homebrew (and a brew-installed `pod`) are often missing from PATH
+          # even when they work in an interactive shell on this Mac.
+          for brew_prefix in /opt/homebrew /usr/local; do
+            if [ -x "$brew_prefix/bin/brew" ]; then
+              echo "$brew_prefix/bin" >> "$GITHUB_PATH"
+              eval "$("$brew_prefix/bin/brew" shellenv)"
+              break
+            fi
+          done
+
+          if ! command -v pod >/dev/null 2>&1; then
+            if command -v brew >/dev/null 2>&1; then
+              brew list cocoapods >/dev/null 2>&1 || brew install cocoapods
+            else
+              gem_bin="$(ruby -e 'puts Gem.user_dir')/bin"
+              echo "$gem_bin" >> "$GITHUB_PATH"
+              export PATH="$gem_bin:$PATH"
+              gem install cocoapods --user-install --no-document
+            fi
+          fi
+
+          if ! command -v pod >/dev/null 2>&1; then
+            echo "::error::CocoaPods CLI is not available on this runner after Homebrew/gem install."
+            echo "Install CocoaPods on the ios-signing Mac (brew install cocoapods) and add /opt/homebrew/bin to the runner service PATH."
+            exit 1
+          fi
+
+          echo "Using $(command -v pod) ($(pod --version))"
+
       - name: Generate iOS project
         env:
           EXPO_PUBLIC_APP_ENV: staging
-        run: npx expo prebuild --platform ios --clean
+        run: npx expo prebuild --platform ios --clean --no-install
+
+      - name: Cache CocoaPods
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/CocoaPods
+            src/QueenZone.Mobile/ios/Pods
+          key: pods-testflight-${{ runner.os }}-${{ hashFiles('src/QueenZone.Mobile/ios/Podfile', 'src/QueenZone.Mobile/package-lock.json') }}
+          restore-keys: |
+            pods-testflight-${{ runner.os }}-
+
+      - name: Install CocoaPods dependencies
+        working-directory: src/QueenZone.Mobile/ios
+        run: |
+          set -euo pipefail
+          export LANG=en_US.UTF-8
+          export LC_ALL=en_US.UTF-8
+          pod install
+          workspace=$(find . -maxdepth 1 -name '*.xcworkspace' -print -quit)
+          if [ -z "$workspace" ]; then
+            echo "::error::pod install did not produce an .xcworkspace."
+            ls -la
+            exit 1
+          fi
+          echo "Using workspace $workspace"
 
       - name: Install signing identity and provisioning profile
         env:
@@ -136,6 +194,11 @@ jobs:
           EXPO_PUBLIC_APP_ENV: staging
         run: |
           workspace=$(find . -maxdepth 1 -name '*.xcworkspace' -print -quit)
+          if [ -z "$workspace" ]; then
+            echo "::error::No .xcworkspace found in ios/. CocoaPods install is required before archiving."
+            ls -la
+            exit 1
+          fi
           scheme=$(basename "$workspace" .xcworkspace)
           archive_path="$RUNNER_TEMP/QueenZone.xcarchive"
 
