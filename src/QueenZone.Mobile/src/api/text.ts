@@ -3,16 +3,28 @@ export function toPlainText(value: string | null | undefined): string {
   if (!value) {
     return '';
   }
-  return value
+
+  let text = value
     .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/p>/gi, '\n\n')
-    .replace(/<[^>]+>/g, '')
+    .replace(/<\/p>/gi, '\n\n');
+
+  // Repeat until stable so nested markup cannot reappear after one pass
+  // (CodeQL js/incomplete-multi-character-sanitization).
+  let previous: string;
+  do {
+    previous = text;
+    text = text.replace(/<[^>]*>/g, '');
+  } while (text !== previous);
+  text = text.replace(/[<>]/g, '');
+
+  // Decode safe entities only. Leave &lt;/&gt; encoded so angle brackets are
+  // never reintroduced. Decode &amp; last to avoid double-unescaping
+  // (CodeQL js/double-escaping).
+  return text
     .replace(/&nbsp;/gi, ' ')
-    .replace(/&amp;/gi, '&')
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
     .replace(/&quot;/gi, '"')
     .replace(/&#39;/gi, "'")
+    .replace(/&amp;/gi, '&')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }

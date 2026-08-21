@@ -19,6 +19,18 @@ describe('toPlainText', () => {
   it('turns breaks into newlines', () => {
     assert.equal(toPlainText('Line one<br/>Line two'), 'Line one\nLine two');
   });
+
+  it('does not double-unescape ampersand entities', () => {
+    assert.equal(toPlainText('&amp;lt;script&amp;gt;'), '&lt;script&gt;');
+    assert.equal(toPlainText('A &amp;amp; B'), 'A &amp; B');
+  });
+
+  it('leaves angle-bracket entities encoded and strips nested markup', () => {
+    assert.equal(toPlainText('&lt;script&gt;alert(1)&lt;/script&gt;'), '&lt;script&gt;alert(1)&lt;/script&gt;');
+    assert.equal(toPlainText('<scr<script>ipt>'), 'ipt');
+    // Bare angle brackets are treated as markup and removed.
+    assert.equal(toPlainText('A < B and C > D'), 'A  D');
+  });
 });
 
 describe('formatPublishedDate', () => {
