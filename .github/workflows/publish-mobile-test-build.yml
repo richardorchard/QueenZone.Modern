@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - main
-      # Temporary pre-merge end-to-end validation for issue #809. Remove after
-      # the first successful Blob Storage-backed deployment from this branch.
-      - codex/issue-809-mobile-download
     paths:
       - "src/QueenZone.Mobile/**"
       - ".github/workflows/publish-mobile-test-build.yml"
