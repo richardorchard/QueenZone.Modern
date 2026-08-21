@@ -173,8 +173,17 @@ npx expo prebuild --clean
 npx expo run:android
 ```
 
-## What this scaffold does not include
+## CI build pipeline
 
-Later Epic 0.5 stories own:
+`mobile-js` (typecheck + unit tests), `mobile-android`, and `mobile-ios`
+(native compile) in [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)
+run whenever `src/QueenZone.Mobile/` changes, or on demand via
+`workflow_dispatch`. `mobile-android` builds an unsigned debug APK on a
+GitHub-hosted Linux runner; `mobile-ios` builds an unsigned Simulator `.app`
+(zipped) on a GitHub-hosted macOS runner — no Apple account or signing
+credentials are used. Both jobs upload their build as a workflow artifact
+(`mobile-android-<run-id>` / `mobile-ios-<run-id>`), downloadable from the
+run's summary page for one day.
 
-- GitHub Actions Android/iOS compile pipeline — #794
+Signing, TestFlight, and store submission are a separate future release
+concern (ADR 0011), not covered by this pipeline.
