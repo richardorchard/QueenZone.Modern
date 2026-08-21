@@ -117,6 +117,42 @@ npx expo prebuild --clean
 npx expo run:android
 ```
 
+## API base URL (environments)
+
+Per-environment API origins live in `src/config/` (#793). `app.config.ts`
+writes `extra.appEnv` and `extra.apiBaseUrl`; runtime code reads them via
+`getAppConfig()` / `apiV1Url()`.
+
+| `EXPO_PUBLIC_APP_ENV` | Default API origin |
+| --- | --- |
+| `development` (default) | `http://localhost:5146` (local `QueenZone.Web`) |
+| `staging` | `https://queenzone-dev.azurewebsites.net` |
+| `production` | `https://www.queenzone.org` |
+
+Override the origin for any environment without code changes:
+
+```powershell
+# Point a local build at the HTTPS launch profile
+$env:EXPO_PUBLIC_API_BASE_URL = "https://localhost:7162"
+npx expo start --dev-client
+```
+
+```powershell
+# Staging defaults
+$env:EXPO_PUBLIC_APP_ENV = "staging"
+npx expo start --dev-client
+```
+
+Copy `.env.example` to `.env` (git-ignored) for a sticky local override. Restart
+Metro after changing env vars.
+
+Android emulators rewrite `localhost` / `127.0.0.1` to `10.0.2.2` automatically.
+Physical devices need your machine's LAN IP in `EXPO_PUBLIC_API_BASE_URL`.
+The You tab shows the active `appEnv` and resolved origin for a quick check.
+
+Call sites should use `apiV1Url('/content/news')` (or `getAppConfig().apiBaseUrl`)
+rather than hard-coding hosts.
+
 ## Navigation shell
 
 React Navigation provides the app shell ([ADR 0012](../../docs/decisions/0012-react-navigation-app-shell.md)).
@@ -141,5 +177,4 @@ npx expo run:android
 
 Later Epic 0.5 stories own:
 
-- Per-environment API base URL — #793
 - GitHub Actions Android/iOS compile pipeline — #794

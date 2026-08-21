@@ -1,0 +1,56 @@
+/**
+ * Runtime app configuration from Expo Constants (#793).
+ * Values are baked into `extra` by `app.config.ts` at bundle/start time.
+ */
+import Constants from 'expo-constants';
+import { Platform } from 'react-native';
+import {
+  resolveApiBaseUrl,
+  resolveAppEnvironment,
+  rewriteLoopbackForAndroid,
+  type AppEnvironment,
+} from './environments';
+
+export type AppConfig = {
+  appEnv: AppEnvironment;
+  /** Origin for `/api/v1` calls (platform-adjusted on Android emulators). */
+  apiBaseUrl: string;
+};
+
+type ExpoExtra = {
+  appEnv?: string;
+  apiBaseUrl?: string;
+};
+
+function readExtra(): ExpoExtra {
+  const extra = (Constants.expoConfig?.extra ?? Constants.manifest2?.extra ?? {}) as ExpoExtra;
+  return extra;
+}
+
+/**
+ * Resolved environment + API origin for the running build.
+ * Prefer this over reading process.env in UI code — Metro inlines EXPO_PUBLIC_*
+ * at bundle time, but `extra` is the single committed contract from app.config.
+ */
+export function getAppConfig(): AppConfig {
+  const extra = readExtra();
+  const appEnv = resolveAppEnvironment(
+    extra.appEnv ?? process.env.EXPO_PUBLIC_APP_ENV ?? process.env.APP_ENV,
+  );
+  const configured = resolveApiBaseUrl({
+    appEnv,
+    override: extra.apiBaseUrl ?? process.env.EXPO_PUBLIC_API_BASE_URL,
+  });
+
+  return {
+    appEnv,
+    apiBaseUrl: rewriteLoopbackForAndroid(configured, Platform.OS),
+  };
+}
+
+/** Convenience: absolute URL under `/api/v1`. */
+export function apiV1Url(path: string): string {
+  const { apiBaseUrl } = getAppConfig();
+  const suffix = path.startsWith('/') ? path : `/${path}`;
+  return `${apiBaseUrl}/api/v1${suffix === '/' ? '' : suffix}`;
+}
