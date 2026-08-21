@@ -21,7 +21,7 @@ The site is 100% server-rendered Razor Pages with cookie session auth today ([`m
 Added after review: none of the epics below actually cover creating the React Native client project itself — they all assume screens "in the app" exist. Sibling to Epic 0, not a renumbering of what follows; can proceed in parallel with Epic 0's later stories once auth token shapes are known, and should land before meaningful screen work in Epic 1 onward.
 
 - As a mobile developer, I want the React Native project's location and initialization approach (new repo vs. monorepo folder; Expo vs. bare RN, given Epic 5 and Epic 7's likely native-module needs) decided and set up, so later epics have somewhere to add code.
-- As a mobile developer, I want a navigation library and base app shell mapped to Epics 1–6's feature areas, with signed-out vs. signed-in screens structurally separated from the start.
+- As a mobile developer, I want a navigation library and base app shell mapped to Epics 1–6's feature areas, with signed-out vs. signed-in screens structurally separated from the start. Recorded in [ADR 0012](../decisions/0012-react-navigation-app-shell.md); implemented in `src/QueenZone.Mobile`.
 - As a member, I want the app to visually match QueenZone's existing brand, so it doesn't feel like a disconnected product — port the site's design tokens (`wwwroot/design-system/tokens/*.css`) into a React Native theme.
 - As a mobile developer, I want per-environment API base URL configuration (dev/staging/prod), so the app can point at the right backend without code changes.
 - As a solo maintainer, I want a CI build pipeline producing installable/testable builds, so I'm not building locally for every test cycle, and so Epic 9's TestFlight story has something to distribute.
