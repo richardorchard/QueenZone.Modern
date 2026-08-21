@@ -204,10 +204,15 @@ The one-time Apple setup for `org.queenzone.mobile` consists of:
 Run **Publish iOS to TestFlight** from the repository's **Actions** tab and
 select `main`. The workflow intentionally rejects other branches and targets
 the self-hosted Mac runner through `[self-hosted, macOS, ARM64, ios-signing]`.
-It imports signing material into a temporary Keychain, produces and verifies a
-signed `.ipa`, retains that IPA as a seven-day workflow artifact, uploads it to
-App Store Connect, and deletes the temporary Keychain and provisioning profile
-even when a step fails.
+The runner service does not load an interactive shell profile, so the workflow
+puts Homebrew (`/opt/homebrew/bin` or `/usr/local/bin`) on `PATH`, installs
+CocoaPods if `pod` is missing, runs `expo prebuild --no-install`, then
+`pod install` before archiving. Expo's own CocoaPods auto-install is skipped
+because a missing CLI is only a warning and otherwise continues without an
+`.xcworkspace`. It then imports signing material into a temporary Keychain,
+produces and verifies a signed `.ipa`, retains that IPA as a seven-day
+workflow artifact, uploads it to App Store Connect, and deletes the temporary
+Keychain and provisioning profile even when a step fails.
 
 Install Apple's TestFlight app on the iPhone and accept the QueenZone internal
 tester invitation. After Apple finishes processing an uploaded build, install
