@@ -8,6 +8,7 @@ const {
   normalizeApiBaseUrl,
   resolveApiBaseUrl,
   resolveAppEnvironment,
+  resolveIosBuildNumber,
   rewriteLoopbackForAndroid,
 } = require('../../apiEnvironments.cjs') as typeof import('../../apiEnvironments.cjs');
 
@@ -89,5 +90,38 @@ describe('rewriteLoopbackForAndroid', () => {
       rewriteLoopbackForAndroid('https://www.queenzone.org', 'android'),
       'https://www.queenzone.org',
     );
+  });
+});
+
+describe('resolveIosBuildNumber', () => {
+  it('defaults to 1 when nothing is provided', () => {
+    assert.equal(resolveIosBuildNumber(), '1');
+    assert.equal(resolveIosBuildNumber({}), '1');
+  });
+
+  it('prefers IOS_BUILD_NUMBER override, then GITHUB_RUN_NUMBER, then fallback', () => {
+    assert.equal(
+      resolveIosBuildNumber({
+        override: '42',
+        githubRunNumber: '3',
+        fallback: '9',
+      }),
+      '42',
+    );
+    assert.equal(
+      resolveIosBuildNumber({
+        githubRunNumber: '3',
+        fallback: '9',
+      }),
+      '3',
+    );
+    assert.equal(resolveIosBuildNumber({ fallback: '9' }), '9');
+  });
+
+  it('normalizes leading zeros and rejects non-positive values', () => {
+    assert.equal(resolveIosBuildNumber({ override: '007' }), '7');
+    assert.throws(() => resolveIosBuildNumber({ override: '0' }), /positive integer/);
+    assert.throws(() => resolveIosBuildNumber({ override: '1.5' }), /positive integer/);
+    assert.throws(() => resolveIosBuildNumber({ override: 'abc' }), /positive integer/);
   });
 });

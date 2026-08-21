@@ -21,6 +21,7 @@ jobs:
         working-directory: src/QueenZone.Mobile
     env:
       APP_BUNDLE_ID: org.queenzone.mobile
+      IOS_BUILD_NUMBER: ${{ github.run_number }}
       APPLE_TEAM_ID: X28Z75P69M
       PROVISIONING_PROFILE_NAME: QueenZone App Store
     steps:
@@ -95,7 +96,27 @@ jobs:
       - name: Generate iOS project
         env:
           EXPO_PUBLIC_APP_ENV: staging
-        run: npx expo prebuild --platform ios --clean --no-install
+          # Expo writes ios.buildNumber literally into Info.plist at prebuild.
+          # xcodebuild CURRENT_PROJECT_VERSION alone cannot override that literal,
+          # so App Store Connect rejected re-uploads with CFBundleVersion=1.
+          IOS_BUILD_NUMBER: ${{ github.run_number }}
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          echo "Using iOS build number ${IOS_BUILD_NUMBER}"
+          npx expo prebuild --platform ios --clean --no-install
+          info_plist=$(find ios -path '*/Info.plist' -not -path '*/Pods/*' -print -quit)
+          if [ -z "$info_plist" ]; then
+            echo "::error::prebuild did not produce an app Info.plist."
+            exit 1
+          fi
+          bundle_version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$info_plist")
+          echo "Info.plist CFBundleVersion=${bundle_version} (from ${info_plist})"
+          if [ "$bundle_version" != "$IOS_BUILD_NUMBER" ]; then
+            echo "::error::CFBundleVersion is ${bundle_version}, expected ${IOS_BUILD_NUMBER}."
+            echo "Ensure app.config.ts maps IOS_BUILD_NUMBER to ios.buildNumber before prebuild."
+            exit 1
+          fi
 
       - name: Cache CocoaPods
         uses: actions/cache@v4
@@ -284,6 +305,15 @@ jobs:
             "$verify_dir/embedded-profile.plist")
           if [ "$application_id" != "$APPLE_TEAM_ID.$APP_BUNDLE_ID" ]; then
             echo "::error::Exported IPA has the wrong application identifier."
+            exit 1
+          fi
+
+          expected_build="${IOS_BUILD_NUMBER}"
+          bundle_version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$app_path/Info.plist")
+          echo "IPA CFBundleVersion=${bundle_version} (expected ${expected_build})"
+          if [ "$bundle_version" != "$expected_build" ]; then
+            echo "::error::IPA CFBundleVersion is ${bundle_version}, expected ${expected_build}."
+            echo "App Store Connect rejects duplicate/non-increasing CFBundleVersion values."
             exit 1
           fi
 

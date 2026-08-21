@@ -5,6 +5,7 @@ import type { ConfigContext, ExpoConfig } from 'expo/config';
 const {
   resolveApiBaseUrl,
   resolveAppEnvironment,
+  resolveIosBuildNumber,
 } = require('./apiEnvironments.cjs') as typeof import('./apiEnvironments.cjs');
 
 /**
@@ -14,6 +15,7 @@ const {
  * Override at start/build time:
  *   EXPO_PUBLIC_APP_ENV=staging|production|development
  *   EXPO_PUBLIC_API_BASE_URL=https://localhost:7162
+ *   IOS_BUILD_NUMBER=<positive integer> (TestFlight CFBundleVersion; see GITHUB_RUN_NUMBER)
  */
 export default ({ config }: ConfigContext): ExpoConfig => {
   const appEnv = resolveAppEnvironment(
@@ -23,11 +25,20 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     appEnv,
     override: process.env.EXPO_PUBLIC_API_BASE_URL,
   });
+  const iosBuildNumber = resolveIosBuildNumber({
+    override: process.env.IOS_BUILD_NUMBER,
+    githubRunNumber: process.env.GITHUB_RUN_NUMBER,
+    fallback: config.ios?.buildNumber,
+  });
 
   return {
     ...config,
     name: config.name ?? 'QueenZone',
     slug: config.slug ?? 'queenzone-mobile',
+    ios: {
+      ...(typeof config.ios === 'object' && config.ios !== null ? config.ios : {}),
+      buildNumber: iosBuildNumber,
+    },
     extra: {
       ...(typeof config.extra === 'object' && config.extra !== null ? config.extra : {}),
       appEnv,
