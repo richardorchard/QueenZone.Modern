@@ -134,6 +134,9 @@ public sealed class NewsRoutesTests : IClassFixture<QueenZoneWebApplicationFacto
         var body = await client.GetStringAsync("/news/1003/queenzone-modernisation-begins");
 
         Assert.Contains("The first local vertical slice", body);
+        Assert.Contains("<strong>ASP.NET Core</strong>", body);
+        Assert.Contains("src=\"/ugc/news/sample-crest.jpg\"", body);
+        Assert.Contains("alt=\"QueenZone crest\"", body);
         Assert.Contains("qz-breadcrumbs", body);
         Assert.Contains(">News<", body);
         Assert.Contains("aria-current=\"page\">QueenZone modernisation begins</span>", body);
