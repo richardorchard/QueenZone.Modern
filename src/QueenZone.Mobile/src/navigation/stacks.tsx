@@ -26,6 +26,7 @@ import { SearchRouteScreen } from '../screens/archive/SearchScreen';
 import { NewsIndexScreen } from '../screens/news/NewsIndexScreen';
 import { NewsStoryScreen } from '../screens/news/NewsStoryScreen';
 import { PhotosScreen } from '../screens/photos/PhotosScreen';
+import { PhotoCategoryScreen } from '../screens/photos/PhotoCategoryScreen';
 import { PhotoViewerScreen } from '../screens/photos/PhotoViewerScreen';
 import { PhotoSubmitScreen } from '../screens/photos/PhotoSubmitScreen';
 import { ForumScreen } from '../screens/forum/ForumScreen';
@@ -100,6 +101,7 @@ export function PhotosStack() {
           headerRight: () => <SearchHeaderButton onPress={() => navigation.navigate('Search')} />,
         })}
       />
+      <Photos.Screen name="PhotoCategory" component={PhotoCategoryScreen} options={{ title: 'Collection' }} />
       <Photos.Screen
         name="PhotoViewer"
         component={PhotoViewerScreen}

@@ -8,14 +8,22 @@ type Props = {
   style: StyleProp<ImageStyle>;
   recyclingKey?: string;
   contentFit?: 'cover' | 'contain';
+  priority?: 'low' | 'normal' | 'high';
 };
 
 /**
  * Every archival photograph goes through this component.
- * Placeholder assets are already monochrome; remote photography should use the
- * same greyscale pipeline once the CDN derivatives exist (SPEC §7.3).
+ * Remote gallery URIs must already be `cdn.queenzone.org` (never App Service).
+ * expo-image lazy-decodes off-screen cells; grids should pass `priority="low"`.
  */
-export function ArchiveImage({ source, label, style, recyclingKey, contentFit = 'cover' }: Props) {
+export function ArchiveImage({
+  source,
+  label,
+  style,
+  recyclingKey,
+  contentFit = 'cover',
+  priority = 'normal',
+}: Props) {
   const key = recyclingKey ?? (typeof source === 'number' ? String(source) : source.uri);
   return (
     <Image
@@ -24,6 +32,8 @@ export function ArchiveImage({ source, label, style, recyclingKey, contentFit = 
       contentFit={contentFit}
       transition={motion.slow}
       recyclingKey={key}
+      cachePolicy="memory-disk"
+      priority={priority}
       accessibilityLabel={label}
     />
   );

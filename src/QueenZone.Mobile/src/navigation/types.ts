@@ -21,7 +21,8 @@ export type NewsStackParamList = {
 
 export type PhotosStackParamList = {
   PhotoIndex: undefined;
-  PhotoViewer: { id: string };
+  PhotoCategory: { slug: string; name?: string };
+  PhotoViewer: { slug: string; picId: number; size?: string };
   PhotoSubmit: undefined;
   Search: undefined;
 };

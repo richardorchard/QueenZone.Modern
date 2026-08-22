@@ -9,6 +9,9 @@ import type {
   FreddieTribute,
   NewsDetail,
   NewsListItem,
+  PhotoCategoryListItem,
+  PhotoDetail,
+  PhotoListItem,
   TimelineEvent,
 } from './types';
 
@@ -78,4 +81,42 @@ export function fetchFreddieTributePage(
   query: PageQuery = {},
 ): Promise<ApiPagedResponse<FreddieTribute>> {
   return fetchJson('/content/freddietribute', { query: pageParams(query), signal: query.signal });
+}
+
+export type PhotoPageQuery = PageQuery & {
+  size?: string;
+};
+
+export function fetchPhotoCategories(
+  query: PageQuery = {},
+): Promise<ApiPagedResponse<PhotoCategoryListItem>> {
+  return fetchJson('/content/photos/categories', { query: pageParams(query), signal: query.signal });
+}
+
+export function fetchPhotoCategory(
+  slug: string,
+  signal?: AbortSignal,
+): Promise<PhotoCategoryListItem> {
+  return fetchJson(`/content/photos/categories/${encodeURIComponent(slug)}`, { signal });
+}
+
+export function fetchPhotoCategoryItems(
+  slug: string,
+  query: PhotoPageQuery = {},
+): Promise<ApiPagedResponse<PhotoListItem>> {
+  return fetchJson(`/content/photos/categories/${encodeURIComponent(slug)}/items`, {
+    query: { ...pageParams(query), size: query.size },
+    signal: query.signal,
+  });
+}
+
+export function fetchPhotoDetail(
+  slug: string,
+  picId: number,
+  query: { size?: string; signal?: AbortSignal } = {},
+): Promise<PhotoDetail> {
+  return fetchJson(`/content/photos/categories/${encodeURIComponent(slug)}/items/${picId}`, {
+    query: { size: query.size },
+    signal: query.signal,
+  });
 }

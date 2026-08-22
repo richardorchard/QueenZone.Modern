@@ -19,6 +19,7 @@ public class LiveSiteContentApiTests : RealDataPageTest
 {
     private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(30);
     private const int SamplePageSize = 1;
+    private const string PhotoCdnOrigin = "https://cdn.queenzone.org/";
 
     private static readonly string[] RequiredOpenApiPaths =
     [
@@ -30,6 +31,10 @@ public class LiveSiteContentApiTests : RealDataPageTest
         "/api/v1/content/discography/{id}",
         "/api/v1/content/timeline",
         "/api/v1/content/freddietribute",
+        "/api/v1/content/photos/categories",
+        "/api/v1/content/photos/categories/{slug}",
+        "/api/v1/content/photos/categories/{slug}/items",
+        "/api/v1/content/photos/categories/{slug}/items/{picId}",
         "/api/v1/forum/categories",
         "/api/v1/forum/categories/{id}",
         "/api/v1/forum/categories/{id}/topics",
@@ -217,6 +222,113 @@ public class LiveSiteContentApiTests : RealDataPageTest
             failures,
             Is.Empty,
             FailurePrefix() + "Content API sweep failures:" + Environment.NewLine +
+            string.Join(Environment.NewLine, failures));
+    }
+
+    [Test]
+    public async Task PhotoGalleries_MeetShapeAssertionsAsync()
+    {
+        using var client = CreateHttpClient();
+        var failures = new List<string>();
+
+        var listPath = $"/api/v1/content/photos/categories?page=1&pageSize={SamplePageSize}";
+        var list = await TryGetJsonAsync(client, listPath, failures);
+        if (list is null)
+        {
+            Assert.That(
+                failures,
+                Is.Empty,
+                FailurePrefix() + "Photo gallery sweep could not read categories:" + Environment.NewLine +
+                string.Join(Environment.NewLine, failures));
+            return;
+        }
+
+        AssertPagedEnvelope(list.Value, listPath, failures);
+        if (!list.Value.TryGetProperty("items", out var items)
+            || items.ValueKind != JsonValueKind.Array
+            || items.GetArrayLength() == 0)
+        {
+            failures.Add($"{listPath}: expected at least one public photo category.");
+            Assert.That(
+                failures,
+                Is.Empty,
+                FailurePrefix() + "Photo gallery sweep failures:" + Environment.NewLine +
+                string.Join(Environment.NewLine, failures));
+            return;
+        }
+
+        AssertRequiredStrings(items[0], ["name", "slug", "detailPath"], listPath, failures);
+        AssertOptionalCdnUrl(items[0], "coverThumbnailUrl", listPath, failures);
+
+        var slug = items[0].TryGetProperty("slug", out var slugProperty)
+            && slugProperty.ValueKind == JsonValueKind.String
+            ? slugProperty.GetString()
+            : null;
+        if (string.IsNullOrWhiteSpace(slug))
+        {
+            failures.Add($"{listPath}: first category is missing a slug.");
+            Assert.That(
+                failures,
+                Is.Empty,
+                FailurePrefix() + "Photo gallery sweep failures:" + Environment.NewLine +
+                string.Join(Environment.NewLine, failures));
+            return;
+        }
+
+        var categoryPath = $"/api/v1/content/photos/categories/{slug}";
+        var category = await TryGetJsonAsync(client, categoryPath, failures);
+        if (category is { } categoryDoc)
+        {
+            AssertRequiredStrings(categoryDoc, ["name", "slug", "detailPath"], categoryPath, failures);
+            AssertOptionalCdnUrl(categoryDoc, "coverThumbnailUrl", categoryPath, failures);
+        }
+
+        var itemsPath = $"/api/v1/content/photos/categories/{slug}/items?page=1&pageSize={SamplePageSize}";
+        var photos = await TryGetJsonAsync(client, itemsPath, failures);
+        if (photos is { } photosDoc)
+        {
+            AssertPagedEnvelope(photosDoc, itemsPath, failures);
+            if (photosDoc.TryGetProperty("items", out var photoItems)
+                && photoItems.ValueKind == JsonValueKind.Array
+                && photoItems.GetArrayLength() > 0)
+            {
+                AssertRequiredStrings(
+                    photoItems[0],
+                    ["title", "thumbnailUrl", "categorySlug", "detailPath", "categoryPath"],
+                    itemsPath,
+                    failures);
+                AssertCdnUrl(photoItems[0], "thumbnailUrl", itemsPath, failures);
+                if (photoItems[0].TryGetProperty("imageUrl", out _))
+                {
+                    failures.Add($"{itemsPath}: list items must not include full 'imageUrl'.");
+                }
+
+                if (TryGetPositiveInt(photoItems[0], "picId", out var picId))
+                {
+                    var detailPath = $"/api/v1/content/photos/categories/{slug}/items/{picId}";
+                    var detail = await TryGetJsonAsync(client, detailPath, failures);
+                    if (detail is { } detailDoc)
+                    {
+                        AssertRequiredStrings(
+                            detailDoc,
+                            ["title", "imageUrl", "thumbnailUrl", "detailPath", "categoryPath"],
+                            detailPath,
+                            failures);
+                        AssertCdnUrl(detailDoc, "imageUrl", detailPath, failures);
+                        AssertCdnUrl(detailDoc, "thumbnailUrl", detailPath, failures);
+                        if (!TryGetPositiveInt(detailDoc, "picId", out var detailId) || detailId != picId)
+                        {
+                            failures.Add($"{detailPath}: 'picId' must equal list id {picId}.");
+                        }
+                    }
+                }
+            }
+        }
+
+        Assert.That(
+            failures,
+            Is.Empty,
+            FailurePrefix() + "Photo gallery sweep failures:" + Environment.NewLine +
             string.Join(Environment.NewLine, failures));
     }
 
@@ -447,6 +559,46 @@ public class LiveSiteContentApiTests : RealDataPageTest
             || totalPages.ValueKind != JsonValueKind.Number)
         {
             failures.Add($"{path}: 'totalPages' must be a number.");
+        }
+    }
+
+    private static void AssertCdnUrl(JsonElement obj, string name, string path, List<string> failures)
+    {
+        if (!obj.TryGetProperty(name, out var value) || value.ValueKind != JsonValueKind.String)
+        {
+            failures.Add($"{path}: '{name}' must be a CDN URL.");
+            return;
+        }
+
+        var url = value.GetString();
+        if (string.IsNullOrWhiteSpace(url) || !url.StartsWith(PhotoCdnOrigin, StringComparison.OrdinalIgnoreCase))
+        {
+            failures.Add($"{path}: '{name}' must start with {PhotoCdnOrigin}.");
+        }
+    }
+
+    private static void AssertOptionalCdnUrl(JsonElement obj, string name, string path, List<string> failures)
+    {
+        if (!obj.TryGetProperty(name, out var value) || value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+        {
+            return;
+        }
+
+        if (value.ValueKind != JsonValueKind.String)
+        {
+            failures.Add($"{path}: '{name}' must be a string or null.");
+            return;
+        }
+
+        var url = value.GetString();
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            return;
+        }
+
+        if (!url.StartsWith(PhotoCdnOrigin, StringComparison.OrdinalIgnoreCase))
+        {
+            failures.Add($"{path}: '{name}' must start with {PhotoCdnOrigin} when present.");
         }
     }
 
