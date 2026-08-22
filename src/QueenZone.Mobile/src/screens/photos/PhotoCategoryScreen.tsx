@@ -29,6 +29,7 @@ import {
   photoRangeLabel,
   photoSizePresets,
   photoThumbMeta,
+  photoViewerParams,
   type PhotoSizeQuery,
 } from './photoGalleryMeta';
 
@@ -169,7 +170,7 @@ export function PhotoCategoryScreen({ navigation, route }: Props) {
             accessibilityRole="button"
             accessibilityLabel={item.title}
             onPress={() =>
-              navigation.navigate('PhotoViewer', { slug: item.categorySlug, picId: item.picId })
+              navigation.navigate('PhotoViewer', photoViewerParams(item.categorySlug, item.picId, size))
             }
             style={{ width: tile, marginBottom: GAP }}
           >

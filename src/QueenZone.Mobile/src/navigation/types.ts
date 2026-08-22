@@ -22,7 +22,7 @@ export type NewsStackParamList = {
 export type PhotosStackParamList = {
   PhotoIndex: undefined;
   PhotoCategory: { slug: string; name?: string };
-  PhotoViewer: { slug: string; picId: number };
+  PhotoViewer: { slug: string; picId: number; size?: string };
   PhotoSubmit: undefined;
   Search: undefined;
 };

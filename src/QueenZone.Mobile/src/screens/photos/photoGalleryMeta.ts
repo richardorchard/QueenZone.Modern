@@ -73,3 +73,13 @@ export function photoDetailMeta(photo: {
 export function photoCounterLabel(index: number, count: number): string {
   return `${index + 1} / ${count}`;
 }
+
+/** Carries website `?size=` through Viewer prev/next. Empty means all sizes. */
+export function photoViewerParams(
+  slug: string,
+  picId: number,
+  size?: string | null,
+): { slug: string; picId: number; size?: string } {
+  const query = size?.trim() ?? '';
+  return query.length > 0 ? { slug, picId, size: query } : { slug, picId };
+}

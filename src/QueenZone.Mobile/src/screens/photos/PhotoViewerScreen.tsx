@@ -10,14 +10,14 @@ import { ArchiveImage } from '../../ui/ArchiveImage';
 import { IconButton } from '../../ui/IconButton';
 import { MetaLine } from '../../ui/MetaLine';
 import { ErrorBlock, LoadingBlock } from '../../ui/ScreenStates';
-import { photoCdnSource, photoCounterLabel, photoDetailMeta } from './photoGalleryMeta';
+import { photoCdnSource, photoCounterLabel, photoDetailMeta, photoViewerParams } from './photoGalleryMeta';
 
 type Props = NativeStackScreenProps<PhotosStackParamList, 'PhotoViewer'>;
 
 export function PhotoViewerScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
-  const { slug, picId } = route.params;
+  const { slug, picId, size } = route.params;
   const [chromeVisible, setChromeVisible] = useState(true);
   const [photo, setPhoto] = useState<PhotoDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -28,7 +28,7 @@ export function PhotoViewerScreen({ navigation, route }: Props) {
     const controller = new AbortController();
     setLoading(true);
     setError(null);
-    fetchPhotoDetail(slug, picId, { signal: controller.signal })
+    fetchPhotoDetail(slug, picId, { size, signal: controller.signal })
       .then((detail) => {
         setPhoto(detail);
         setLoading(false);
@@ -42,15 +42,15 @@ export function PhotoViewerScreen({ navigation, route }: Props) {
         setLoading(false);
       });
     return () => controller.abort();
-  }, [slug, picId, reloadToken]);
+  }, [slug, picId, size, reloadToken]);
 
   const retry = useCallback(() => setReloadToken((n) => n + 1), []);
 
   const goTo = useCallback(
     (neighborPicId: number) => {
-      navigation.replace('PhotoViewer', { slug, picId: neighborPicId });
+      navigation.replace('PhotoViewer', photoViewerParams(slug, neighborPicId, size));
     },
-    [navigation, slug],
+    [navigation, slug, size],
   );
 
   if (loading) {

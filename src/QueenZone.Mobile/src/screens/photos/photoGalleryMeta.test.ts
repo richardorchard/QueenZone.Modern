@@ -9,6 +9,7 @@ import {
   photoDetailMeta,
   photoRangeLabel,
   photoThumbMeta,
+  photoViewerParams,
 } from './photoGalleryMeta.ts';
 
 describe('photo gallery meta', () => {
@@ -55,5 +56,16 @@ describe('photo gallery meta', () => {
       ['1986', 'Brian May', '1920 x 1080', 'Submitted by QueenFan86'],
     );
     assert.equal(photoCounterLabel(0, 3), '1 / 3');
+  });
+
+  it('keeps a size filter on viewer prev/next params', () => {
+    assert.deepEqual(photoViewerParams('brian-may', 101, 'desktop'), {
+      slug: 'brian-may',
+      picId: 101,
+      size: 'desktop',
+    });
+    assert.deepEqual(photoViewerParams('queen', 201, ''), { slug: 'queen', picId: 201 });
+    assert.deepEqual(photoViewerParams('queen', 201, '   '), { slug: 'queen', picId: 201 });
+    assert.deepEqual(photoViewerParams('queen', 201), { slug: 'queen', picId: 201 });
   });
 });
