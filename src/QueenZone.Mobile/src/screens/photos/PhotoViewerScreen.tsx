@@ -1,7 +1,7 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react-native';
-import { useCallback, useEffect, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { PanResponder, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ApiError, fetchPhotoDetail, type PhotoDetail } from '../../api';
 import type { PhotosStackParamList } from '../../navigation/types';
@@ -15,6 +15,7 @@ import {
   photoCounterLabel,
   photoDetailMeta,
   photoSizeFromPath,
+  photoSwipeDirection,
   photoViewerParams,
   resolvedPhotoSize,
 } from './photoGalleryMeta';
@@ -30,11 +31,13 @@ export function PhotoViewerScreen({ navigation, route }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [reloadToken, setReloadToken] = useState(0);
+  const photoRef = useRef<PhotoDetail | null>(null);
+  photoRef.current = photo;
 
   useEffect(() => {
     const controller = new AbortController();
-    setLoading(true);
     setError(null);
+    setLoading(photoRef.current == null);
     fetchPhotoDetail(slug, picId, { size, signal: controller.signal })
       .then((detail) => {
         setPhoto(detail);
@@ -52,21 +55,51 @@ export function PhotoViewerScreen({ navigation, route }: Props) {
         setLoading(false);
       });
     return () => controller.abort();
-  }, [slug, picId, size, reloadToken]);
+  }, [slug, picId, size, reloadToken, navigation]);
 
   const retry = useCallback(() => setReloadToken((n) => n + 1), []);
 
   const goTo = useCallback(
     (neighborPicId: number) => {
-      navigation.replace(
-        'PhotoViewer',
-        photoViewerParams(slug, neighborPicId, photoSizeFromPath(photo?.detailPath) ?? size),
+      if (photoRef.current == null || photoRef.current.picId !== picId) {
+        return;
+      }
+
+      navigation.setParams(
+        photoViewerParams(slug, neighborPicId, photoSizeFromPath(photoRef.current.detailPath) ?? size),
       );
     },
-    [navigation, photo?.detailPath, size, slug],
+    [navigation, picId, size, slug],
   );
 
-  if (loading) {
+  const previousPicId = photo?.previous?.picId ?? null;
+  const nextPicId = photo?.next?.picId ?? null;
+
+  const swipeResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (event, gesture) => {
+          const startedAt = event.nativeEvent.pageX - gesture.dx;
+          if (startedAt < 24) {
+            return false;
+          }
+          return Math.abs(gesture.dx) > 16 && Math.abs(gesture.dx) > Math.abs(gesture.dy);
+        },
+        onPanResponderRelease: (_, gesture) => {
+          const direction = photoSwipeDirection(gesture.dx, gesture.dy);
+          if (direction === 'previous' && previousPicId != null) {
+            goTo(previousPicId);
+            return;
+          }
+          if (direction === 'next' && nextPicId != null) {
+            goTo(nextPicId);
+          }
+        },
+      }),
+    [goTo, nextPicId, previousPicId],
+  );
+
+  if (loading && !photo) {
     return <LoadingBlock label="Loading photograph…" />;
   }
 
@@ -78,7 +111,13 @@ export function PhotoViewerScreen({ navigation, route }: Props) {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#000' }}>
-      <Pressable style={{ flex: 1 }} onPress={() => setChromeVisible((value) => !value)}>
+      <Pressable
+        style={{ flex: 1 }}
+        collapsable={false}
+        accessibilityHint="Swipe left or right to change photograph"
+        onPress={() => setChromeVisible((value) => !value)}
+        {...swipeResponder.panHandlers}
+      >
         {image ? (
           <ArchiveImage
             source={image}
