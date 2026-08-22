@@ -23,6 +23,7 @@ import { usePagedContent } from '../../hooks/usePagedContent';
 import type { ForumStackParamList } from '../../navigation/types';
 import { useSession } from '../../session/SessionContext';
 import { RichHtmlBody } from '../../ui/RichHtmlBody';
+import { Button } from '../../ui/Button';
 import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from '../../ui/ScreenStates';
 import { resolveContentUrl } from '../../ui/html/resolveContentUrl';
 import { radius, space, type, useTheme } from '../../theme';
@@ -32,6 +33,7 @@ import {
   formatPostTimestamp,
   forumPostsPageSize,
   imagePreviewUrl,
+  parseTopicId,
 } from './forumThreadMeta';
 
 type Props = NativeStackScreenProps<ForumStackParamList, 'Thread'>;
@@ -50,17 +52,31 @@ function openResolvedUrl(href: string): void {
 export function ThreadScreen({ navigation, route }: Props) {
   const { c } = useTheme();
   const { isSignedIn } = useSession();
-  const { id, title } = route.params;
+  const { id: rawId, title } = route.params;
+  const id = parseTopicId(rawId);
   const [topic, setTopic] = useState<ForumTopicDetail | null>(null);
   const [topicError, setTopicError] = useState<string | null>(null);
   const [topicReloadToken, setTopicReloadToken] = useState(0);
 
   const paged = usePagedContent<ForumPost>(
-    useCallback((page, signal) => fetchForumTopicPosts(id, { page, pageSize: forumPostsPageSize, signal }), [id]),
+    useCallback(
+      (page, signal) => {
+        if (id === null) {
+          return Promise.resolve({ items: [], page: 1, pageSize: forumPostsPageSize, totalCount: 0, totalPages: 0 });
+        }
+        return fetchForumTopicPosts(id, { page, pageSize: forumPostsPageSize, signal });
+      },
+      [id],
+    ),
     forumPostsPageSize,
   );
 
   useEffect(() => {
+    if (id === null) {
+      setTopic(null);
+      setTopicError('This discussion is not available in the archive yet.');
+      return;
+    }
     const controller = new AbortController();
     setTopicError(null);
     fetchForumTopic(id, controller.signal)
@@ -93,6 +109,12 @@ export function ThreadScreen({ navigation, route }: Props) {
     retryTopic();
     paged.refresh();
   }, [retryTopic, paged]);
+
+  if (id === null) {
+    return (
+      <ErrorBlock message={topicError ?? 'This discussion is not available in the archive yet.'} />
+    );
+  }
 
   const topicPending = !topic && !topicError;
   if ((paged.loading && paged.items.length === 0) || topicPending) {
@@ -128,24 +150,13 @@ export function ThreadScreen({ navigation, route }: Props) {
   );
 
   const footer = (
-    <View>
+    <View style={styles.reply}>
       <ListFooterLoading visible={paged.loadingMore} />
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={isSignedIn ? 'Reply' : 'Sign in to reply'}
+      <Button
+        label={isSignedIn ? 'Reply' : 'Sign in to reply'}
+        variant="outline"
         onPress={() => navigation.navigate('Composer', { threadId: String(id) })}
-        style={({ pressed }) => [
-          styles.reply,
-          {
-            borderColor: c.border,
-            opacity: pressed ? 0.85 : 1,
-          },
-        ]}
-      >
-        <Text style={[type.button, { color: c.accentPrimary }]}>
-          {isSignedIn ? 'Reply' : 'Sign in to reply'}
-        </Text>
-      </Pressable>
+      />
     </View>
   );
 
@@ -272,10 +283,5 @@ const styles = StyleSheet.create({
     marginHorizontal: space.xl,
     marginTop: space.base,
     marginBottom: space.section,
-    minHeight: 48,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: radius.xs,
   },
 });

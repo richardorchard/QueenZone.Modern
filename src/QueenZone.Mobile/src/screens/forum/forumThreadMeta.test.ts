@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { attachmentMeta, formatMemberSince, formatPostTimestamp, imagePreviewUrl } from './forumThreadMeta.ts';
+import {
+  attachmentMeta,
+  formatMemberSince,
+  formatPostTimestamp,
+  imagePreviewUrl,
+  parseTopicId,
+} from './forumThreadMeta.ts';
 
 describe('forum thread meta', () => {
   it('formats a post timestamp with the calendar year', () => {
@@ -26,6 +32,13 @@ describe('forum thread meta', () => {
       'JPG · 278.0 KB · Members only',
     );
     assert.equal(attachmentMeta({ extension: 'PDF', formattedSize: '' }), 'PDF · Members only');
+  });
+
+  it('parses numeric topic ids and rejects prototype slugs', () => {
+    assert.equal(parseTopicId(1002), 1002);
+    assert.equal(parseTopicId('1002'), 1002);
+    assert.equal(parseTopicId('magic-tour'), null);
+    assert.equal(parseTopicId(0), null);
   });
 
   it('uses thumbnails for image previews and skips non-images', () => {

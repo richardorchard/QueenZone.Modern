@@ -12,6 +12,15 @@ export type AttachmentPreviewInput = {
 /** Website topic pages use 15 posts per page (`ForumRoutes.PostsPageSize`). */
 export const forumPostsPageSize = 15;
 
+/** Category lists pass numeric ids; home prototype cards may still use strings. */
+export function parseTopicId(id: number | string): number | null {
+  const value = typeof id === 'number' ? id : Number.parseInt(id, 10);
+  if (!Number.isFinite(value) || value <= 0 || !Number.isInteger(value)) {
+    return null;
+  }
+  return value;
+}
+
 export function formatPostTimestamp(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) {
