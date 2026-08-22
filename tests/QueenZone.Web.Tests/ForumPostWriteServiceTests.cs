@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace QueenZone.Web.Tests;
@@ -51,6 +52,32 @@ public sealed class ForumPostWriteServiceTests : IClassFixture<QueenZoneWebAppli
         Assert.Equal("<p>Hello from unit test</p>", outcome.SanitizedBody);
         Assert.True(outcome.TopicId > 0);
         Assert.True(outcome.PostId > 0);
+    }
+
+    [Fact]
+    public async Task CreateTopic_rejects_disallowed_attachment_types()
+    {
+        using var stream = new MemoryStream("not-an-image"u8.ToArray());
+        IFormFile file = new FormFile(stream, 0, stream.Length, "attachments", "malware.exe")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "application/x-msdownload",
+        };
+
+        using var scope = factory.Services.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<ForumPostWriteService>();
+        var outcome = await service.CreateTopicAsync(
+            Guid.NewGuid(),
+            "Service Tester",
+            1,
+            "Attachment rejection thread",
+            "Body with a bad attachment",
+            [file],
+            poll: null);
+
+        Assert.Equal(ForumWriteStatus.ValidationFailed, outcome.Status);
+        Assert.Contains(outcome.FieldErrors, error =>
+            error.Field == "Attachments" && error.Message.Contains("not allowed", StringComparison.OrdinalIgnoreCase));
     }
 
     private async Task<ForumWriteOutcome> CreateTopicAsync(
