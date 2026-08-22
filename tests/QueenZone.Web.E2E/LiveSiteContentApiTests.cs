@@ -6,7 +6,7 @@ using System.Text.Json;
 namespace QueenZone.Web.E2E;
 
 /// <summary>
-/// HTTP shape sweep of the public mobile JSON API (<c>/api/v1</c>, issues #726 / #731 / #732) for the
+/// HTTP shape sweep of the public mobile JSON API (<c>/api/v1</c>, issues #726 / #731 / #732 / #734) for the
 /// live-site job and the nightly RealData suite. Anonymous read-only routes only —
 /// no <c>/api/v1/auth</c> (rate-limited writes) and no <c>/api/v1/admin</c> (Entra).
 /// Discovers detail ids from list responses instead of hardcoding archive records.
@@ -35,6 +35,9 @@ public class LiveSiteContentApiTests : RealDataPageTest
         "/api/v1/forum/categories/{id}/topics",
         "/api/v1/forum/topics/{id}",
         "/api/v1/forum/topics/{id}/posts",
+        "/api/v1/forum/topics/{id}/poll",
+        "/api/v1/forum/topics/{id}/poll/vote",
+        "/api/v1/forum/topics/{id}/poll/close",
     ];
 
     private static readonly ContentListSpec[] ContentLists =
@@ -264,6 +267,26 @@ public class LiveSiteContentApiTests : RealDataPageTest
                             ["title", "forumName", "categoryPath", "detailPath"],
                             topicPath,
                             failures);
+
+                        if (topicDoc.TryGetProperty("hasPoll", out var hasPoll)
+                            && hasPoll.ValueKind is JsonValueKind.True)
+                        {
+                            var pollPath = $"/api/v1/forum/topics/{topicId}/poll";
+                            var poll = await TryGetJsonAsync(client, pollPath, failures);
+                            if (poll is { } pollDoc)
+                            {
+                                AssertRequiredStrings(
+                                    pollDoc,
+                                    ["pollId", "question"],
+                                    pollPath,
+                                    failures);
+                                if (!pollDoc.TryGetProperty("options", out var options)
+                                    || options.ValueKind != JsonValueKind.Array)
+                                {
+                                    failures.Add($"{pollPath}: 'options' must be a JSON array.");
+                                }
+                            }
+                        }
                     }
 
                     var postsPath = $"/api/v1/forum/topics/{topicId}/posts?page=1&pageSize={SamplePageSize}";

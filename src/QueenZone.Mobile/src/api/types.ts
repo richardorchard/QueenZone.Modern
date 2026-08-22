@@ -17,6 +17,7 @@ export type ProblemDetails = {
   status?: number;
   detail?: string;
   instance?: string;
+  code?: string;
 };
 
 export type NewsListItem = {
@@ -175,4 +176,31 @@ export type ForumPostCreated = {
   id: number;
   topicId: number;
   detailPath: string;
+};
+
+export type ForumPollOption = {
+  optionId: string;
+  optionText: string;
+  displayOrder: number;
+  voteCount: number;
+  percentage: number;
+  selectedByViewer: boolean;
+};
+
+export type ForumPoll = {
+  pollId: string;
+  topicId: number;
+  question: string;
+  isMultiChoice: boolean;
+  maxChoices: number | null;
+  closesAt: string | null;
+  closedAt: string | null;
+  createdAt: string;
+  totalVotes: number;
+  distinctVoters: number;
+  viewerHasVoted: boolean;
+  isClosed: boolean;
+  canViewerVote: boolean;
+  canViewerClose: boolean;
+  options: ForumPollOption[];
 };

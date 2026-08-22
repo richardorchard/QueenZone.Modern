@@ -234,6 +234,36 @@ public sealed class ForumApiTests : IClassFixture<QueenZoneWebApplicationFactory
         Assert.Equal(postDto.Id, mappedPosts[0].Id);
         Assert.Equal(postDto.Body, mappedPosts[0].Body);
         Assert.Equal(postDto.Attachments[0], mappedPosts[0].Attachments[0]);
+
+        var optionId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        var pollId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+        var createdAt = new DateTimeOffset(2024, 6, 12, 14, 0, 0, TimeSpan.Zero);
+        var poll = new ForumPollResults(
+            pollId,
+            1002,
+            "Best Queen album?",
+            false,
+            null,
+            null,
+            null,
+            createdAt,
+            Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc"),
+            3,
+            2,
+            true,
+            true,
+            false,
+            false,
+            [
+                new ForumPollOptionResult(optionId, "A Night at the Opera", 0, 2, 66.7, true),
+            ]);
+        var pollDto = ForumApiMapper.ToPoll(poll);
+        Assert.Equal(pollId, pollDto.PollId);
+        Assert.Equal(1002, pollDto.TopicId);
+        Assert.Equal("Best Queen album?", pollDto.Question);
+        Assert.Equal(66.7, pollDto.Options[0].Percentage);
+        Assert.True(pollDto.Options[0].SelectedByViewer);
+        Assert.Equal(ForumApiMapper.ToPollOption(poll.Options[0]), pollDto.Options[0]);
     }
 
     [Fact]

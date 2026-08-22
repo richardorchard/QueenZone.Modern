@@ -11,13 +11,16 @@ export {
   fetchTimelinePage,
 } from './content';
 export {
+  closeForumTopicPoll,
   createForumReply,
   createForumTopic,
   fetchForumCategories,
   fetchForumCategory,
   fetchForumCategoryTopics,
   fetchForumTopic,
+  fetchForumTopicPoll,
   fetchForumTopicPosts,
+  voteForumTopicPoll,
 } from './forum';
 export type { PageQuery } from './content';
 export type * from './types';
