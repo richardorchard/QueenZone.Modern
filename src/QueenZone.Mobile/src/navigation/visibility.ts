@@ -35,6 +35,7 @@ export const publicScreenNames = [
   'PhotoIndex',
   'PhotoViewer',
   'ForumIndex',
+  'Category',
   'Thread',
   'Account',
   'Help',
