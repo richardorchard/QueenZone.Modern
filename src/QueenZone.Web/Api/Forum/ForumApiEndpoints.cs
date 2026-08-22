@@ -10,10 +10,13 @@ namespace QueenZone.Web;
 /// Reads require no authentication: the website forum index, category, and topic
 /// pages are public. Visibility is the same <see cref="IForumRepository"/> path
 /// used by Razor Pages — synthetic boards and unvalidated topic starters stay
-/// hidden. Writes require <see cref="MemberAuthenticationSchemes.MobileMemberPolicy"/>
-/// and reuse <see cref="ForumPostWriteService"/> (sanitization, attachments,
-/// <see cref="ForumPostRateLimiter"/>). Attachments reuse the existing
-/// member-gated <c>/forum/attachment/...</c> paths. Polls are #734.
+/// hidden. Topic posts default and clamp <c>pageSize</c> to
+/// <see cref="ForumRoutes.PostsPageSize"/>. Writes require
+/// <see cref="MemberAuthenticationSchemes.MobileMemberPolicy"/> and reuse
+/// <see cref="ForumPostWriteService"/> (sanitization, attachments,
+/// <see cref="ForumPostRateLimiter"/>). Attachment metadata includes the
+/// existing member-gated <c>/forum/attachment/...</c> paths; the mobile client
+/// does not open those URLs. Polls are #734.
 /// </summary>
 public static class ForumApiEndpoints
 {
@@ -63,7 +66,7 @@ public static class ForumApiEndpoints
 
         group.MapGet("/topics/{id:int}/posts", GetTopicPostsAsync)
             .WithName("GetForumTopicPosts")
-            .WithSummary("Paged public posts in a topic, chronological, matching website pages.")
+            .WithSummary("Paged public posts in a topic, chronological, matching website pages (pageSize defaults to 15).")
             .Produces<ApiPagedResponse<ForumPostDto>>()
             .ProducesProblem(StatusCodes.Status404NotFound);
 
@@ -174,7 +177,11 @@ public static class ForumApiEndpoints
         int? pageSize,
         CancellationToken cancellationToken)
     {
-        var request = ApiPagination.Normalize(page, pageSize);
+        var request = ApiPagination.Normalize(
+            page,
+            pageSize,
+            ForumRoutes.PostsPageSize,
+            ForumRoutes.PostsPageSize);
         var topicPage = await forumRepository.GetTopicPostsPageAsync(
             id,
             request.Page,

@@ -9,7 +9,7 @@ export type AttachmentPreviewInput = {
   url: string;
 };
 
-/** Website topic pages use 15 posts per page (`ForumRoutes.PostsPageSize`). */
+/** Matches website topic pages and `/api/v1/forum/topics/{id}/posts` (`ForumRoutes.PostsPageSize`). */
 export const forumPostsPageSize = 15;
 
 /** Category lists pass numeric ids; home prototype cards may still use strings. */

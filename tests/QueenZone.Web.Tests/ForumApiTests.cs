@@ -331,19 +331,30 @@ public sealed class ForumApiTests : IClassFixture<QueenZoneWebApplicationFactory
     }
 
     [Fact]
-    public async Task Topic_posts_clamp_invalid_paging_query_values()
+    public async Task Topic_posts_default_and_clamp_to_website_page_size()
     {
         using var client = factory.CreateAnonymousClient();
 
-        using var response = await client.GetAsync(
-            $"{ForumApiEndpoints.RootPath}/topics/1002/posts?page=0&pageSize=1000");
+        using var omitted = await client.GetAsync($"{ForumApiEndpoints.RootPath}/topics/1002/posts");
+        Assert.Equal(HttpStatusCode.OK, omitted.StatusCode);
+        var omittedPage = await omitted.Content.ReadFromJsonAsync<ApiPagedResponse<ForumPostDto>>();
+        Assert.NotNull(omittedPage);
+        Assert.Equal(1, omittedPage!.Page);
+        Assert.Equal(ForumRoutes.PostsPageSize, omittedPage.PageSize);
+        Assert.Equal(ForumRoutes.PostsPageSize, omittedPage.Items.Count);
+        Assert.Equal(2, omittedPage.TotalPages);
+        Assert.DoesNotContain(
+            omittedPage.Items,
+            item => item.Body.Contains("Archive reply 1125", StringComparison.Ordinal));
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var payload = await response.Content.ReadFromJsonAsync<ApiPagedResponse<ForumPostDto>>();
-        Assert.NotNull(payload);
-        Assert.Equal(1, payload!.Page);
-        Assert.Equal(ApiPagination.MaxPageSize, payload.PageSize);
-        Assert.Equal(26, payload.Items.Count);
+        using var clamped = await client.GetAsync(
+            $"{ForumApiEndpoints.RootPath}/topics/1002/posts?page=0&pageSize=1000");
+        Assert.Equal(HttpStatusCode.OK, clamped.StatusCode);
+        var clampedPage = await clamped.Content.ReadFromJsonAsync<ApiPagedResponse<ForumPostDto>>();
+        Assert.NotNull(clampedPage);
+        Assert.Equal(1, clampedPage!.Page);
+        Assert.Equal(ForumRoutes.PostsPageSize, clampedPage.PageSize);
+        Assert.Equal(ForumRoutes.PostsPageSize, clampedPage.Items.Count);
     }
 
     [Fact]

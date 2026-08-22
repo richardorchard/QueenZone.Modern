@@ -157,6 +157,24 @@ public sealed class ApiPaginationTests
         Assert.Equal(expectedPageSize, request.PageSize);
     }
 
+    [Theory]
+    [InlineData(null, null, 15, 15, 1, 15)]
+    [InlineData(0, 0, 15, 15, 1, 15)]
+    [InlineData(2, 1000, 15, 15, 2, 15)]
+    [InlineData(1, 10, 15, 15, 1, 10)]
+    public void Normalize_honours_per_endpoint_default_and_max(
+        int? page,
+        int? pageSize,
+        int defaultPageSize,
+        int maxPageSize,
+        int expectedPage,
+        int expectedPageSize)
+    {
+        var request = ApiPagination.Normalize(page, pageSize, defaultPageSize, maxPageSize);
+        Assert.Equal(expectedPage, request.Page);
+        Assert.Equal(expectedPageSize, request.PageSize);
+    }
+
     [Fact]
     public void Paged_response_computes_total_pages()
     {
