@@ -1,0 +1,28 @@
+namespace QueenZone.Web;
+
+/// <summary>
+/// Multipart fields for <c>POST /api/v1/member/photo-submissions</c>.
+/// Same names as <c>/submit/photo</c>; the photo part is <c>photo</c> or <c>PhotoFile</c>.
+/// </summary>
+public sealed record PhotoSubmissionRequestDto
+{
+    public string? Title { get; init; }
+
+    public string? Description { get; init; }
+
+    public string? SuggestedCategory { get; init; }
+
+    public int? ApproximateYear { get; init; }
+
+    public DateOnly? ApproximateDate { get; init; }
+}
+
+/// <summary>
+/// Result of <c>POST /api/v1/member/photo-submissions</c>.
+/// <see cref="Status"/> is <c>Pending</c> so a later list/status API can reuse this shape.
+/// </summary>
+public sealed record PhotoSubmissionCreatedDto(
+    Guid Id,
+    string Status,
+    string Title,
+    DateTimeOffset SubmittedAt);
