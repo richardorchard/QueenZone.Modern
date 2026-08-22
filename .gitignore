@@ -58,3 +58,5 @@ override.tf.json
 *_override.tf.json
 crash.log
 crash.*.log
+
+.worktrees/
