@@ -13,6 +13,12 @@ public static class FanPerformanceRoutes
 
     public static string GetAudioPath(int id) => $"/fan-performances/{id}/audio";
 
+    public static string GetApiListPath() => "/api/v1/content/fan-performances";
+
+    public static string GetApiDetailPath(int id) => $"{GetApiListPath()}/{id}";
+
+    public static string GetApiAudioPath(int id) => $"{GetApiDetailPath(id)}/audio";
+
     public static string GetAudioPath(int id, string title) =>
         $"/fan-performances/{id}/audio/{GetDownloadFileName(title)}";
 

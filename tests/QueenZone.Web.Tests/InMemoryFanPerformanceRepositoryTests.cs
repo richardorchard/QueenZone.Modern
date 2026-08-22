@@ -13,6 +13,7 @@ public sealed class InMemoryFanPerformanceRepositoryTests
 
         Assert.NotNull(performance);
         Assert.Equal("Reaching Out", performance.Title);
+        Assert.Equal(320, performance.DurationSeconds);
     }
 
     [Fact]

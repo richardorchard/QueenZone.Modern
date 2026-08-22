@@ -27,6 +27,14 @@ public sealed class FanPerformanceRoutesTests
         Assert.Equal("/fan-performances/187/audio", FanPerformanceRoutes.GetAudioPath(187));
 
     [Fact]
+    public void GetApiPaths_UseContentV1Prefix()
+    {
+        Assert.Equal("/api/v1/content/fan-performances", FanPerformanceRoutes.GetApiListPath());
+        Assert.Equal("/api/v1/content/fan-performances/187", FanPerformanceRoutes.GetApiDetailPath(187));
+        Assert.Equal("/api/v1/content/fan-performances/187/audio", FanPerformanceRoutes.GetApiAudioPath(187));
+    }
+
+    [Fact]
     public void GetDownloadFileName_SanitizesTitle() =>
         Assert.Equal("Reaching-Out.mp3", FanPerformanceRoutes.GetDownloadFileName("Reaching Out"));
 

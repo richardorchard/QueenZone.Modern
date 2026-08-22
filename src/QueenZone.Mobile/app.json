@@ -31,7 +31,16 @@
       "expo-dev-client",
       "expo-font",
       "expo-splash-screen",
-      "expo-image"
+      "expo-image",
+      [
+        "expo-audio",
+        {
+          "enableBackgroundPlayback": true,
+          "enableBackgroundRecording": false,
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ]
     ]
   }
 }

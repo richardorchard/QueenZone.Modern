@@ -176,3 +176,19 @@ public sealed record PhotoDetailDto(
 /// Minimal reference to an adjacent photo for prev/next navigation.
 /// </summary>
 public sealed record PhotoNavDto(int PicId, string DetailPath);
+
+/// <summary>
+/// List and detail shape for <c>/api/v1/content/fan-performances</c>.
+/// <c>AudioPath</c> is the member-gated stream; the listing itself is public,
+/// matching <c>/fan-performances</c>. Duration is MPEG metadata when the
+/// songfile is readable, otherwise the optional domain value (sample data).
+/// </summary>
+public sealed record FanPerformanceDto(
+    int Id,
+    string Title,
+    string PerformedBy,
+    string Description,
+    DateTime DateAdded,
+    int? DurationSeconds,
+    string DetailPath,
+    string AudioPath);
