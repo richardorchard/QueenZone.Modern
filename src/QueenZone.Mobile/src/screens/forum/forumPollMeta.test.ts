@@ -91,6 +91,6 @@ describe('forum poll meta', () => {
       ),
       'You have already voted in this poll. Votes cannot be changed.',
     );
-    assert.equal(pollActionErrorMessage(new Error('nope')), 'Something went wrong.');
+    assert.equal(pollActionErrorMessage('nope'), 'Something went wrong.');
   });
 });

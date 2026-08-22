@@ -1,5 +1,16 @@
-import { ApiError } from '../../api';
-import type { ForumPoll } from '../../api';
+export type PollVoteVisibility = {
+  canViewerVote: boolean;
+  viewerHasVoted: boolean;
+  isClosed: boolean;
+};
+
+export type PollStatusInput = {
+  isClosed: boolean;
+  closesAt: string | null;
+  distinctVoters: number;
+  isMultiChoice: boolean;
+  maxChoices: number | null;
+};
 
 const utcMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -9,12 +20,12 @@ export function shouldLoadPoll(hasPoll: boolean | null | undefined): boolean {
 }
 
 /** Website `_ForumPoll.cshtml` shows results whenever the viewer cannot vote. */
-export function shouldShowPollResults(poll: Pick<ForumPoll, 'canViewerVote'>): boolean {
+export function shouldShowPollResults(poll: Pick<PollVoteVisibility, 'canViewerVote'>): boolean {
   return !poll.canViewerVote;
 }
 
 export function shouldShowSignInToVote(
-  poll: Pick<ForumPoll, 'canViewerVote' | 'viewerHasVoted' | 'isClosed'>,
+  poll: Pick<PollVoteVisibility, 'canViewerVote' | 'viewerHasVoted' | 'isClosed'>,
 ): boolean {
   return !poll.canViewerVote && !poll.viewerHasVoted && !poll.isClosed;
 }
@@ -45,7 +56,7 @@ export function formatPollClosesAt(iso: string | null | undefined): string | nul
   return `${day} ${month} ${year} ${hours}:${minutes} UTC`;
 }
 
-export function formatPollStatus(poll: Pick<ForumPoll, 'isClosed' | 'closesAt' | 'distinctVoters' | 'isMultiChoice' | 'maxChoices'>): string {
+export function formatPollStatus(poll: PollStatusInput): string {
   const voterLabel =
     poll.distinctVoters === 1 ? '1 voter' : `${poll.distinctVoters.toLocaleString('en-US')} voters`;
 
@@ -71,7 +82,7 @@ export function formatPollResultMeta(voteCount: number, percentage: number): str
 }
 
 export function pollActionErrorMessage(err: unknown): string {
-  if (err instanceof ApiError) {
+  if (err instanceof Error && err.message.trim()) {
     return err.message;
   }
   return 'Something went wrong.';
