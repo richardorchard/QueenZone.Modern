@@ -7,6 +7,7 @@ export { ApiError } from './errors';
 export type FetchJsonOptions = {
   signal?: AbortSignal;
   query?: Record<string, string | number | undefined | null>;
+  /** Optional Bearer — poll GET fills viewer flags; writes require it. */
   accessToken?: string | null;
 };
 
