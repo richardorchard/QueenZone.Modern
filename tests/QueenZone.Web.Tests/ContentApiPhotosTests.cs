@@ -238,6 +238,31 @@ public sealed class ContentApiPhotosTests : IClassFixture<QueenZoneWebApplicatio
     }
 
     [Fact]
+    public async Task Photo_detail_returns_problem_details_for_unknown_category()
+    {
+        using var client = factory.CreateAnonymousClient();
+
+        using var response = await client.GetAsync($"{PhotosRoot}/categories/does-not-exist/items/101");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Contains("does-not-exist", problem.GetProperty("detail").GetString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Photo_detail_returns_problem_details_when_filtered_photo_is_missing()
+    {
+        using var client = factory.CreateAnonymousClient();
+
+        using var response = await client.GetAsync(
+            $"{PhotosRoot}/categories/{BrianMaySlug}/items/424242?size=desktop");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
     public void ToPhotoListItem_uses_thumbnail_cdn_url_and_website_detail_path()
     {
         var item = new PhotoItem(
