@@ -37,7 +37,10 @@ public static class ForumApiMapper
         IEnumerable<ForumTopicItem> topics) =>
         topics.Select(ToTopicListItem).ToList();
 
-    public static ForumTopicDetailDto ToTopicDetail(ForumTopicHeader header, int postCount)
+    public static ForumTopicDetailDto ToTopicDetail(
+        ForumTopicHeader header,
+        int postCount,
+        bool isLocked = false)
     {
         var view = PublicContentMapper.ToForumThreadHeader(header);
         return new ForumTopicDetailDto(
@@ -48,7 +51,8 @@ public static class ForumApiMapper
             view.CategoryPath,
             view.DetailPath,
             postCount,
-            view.HasPoll);
+            view.HasPoll,
+            isLocked);
     }
 
     public static ForumPostDto ToPost(ForumPostItem post, UgcHtml ugcHtml)

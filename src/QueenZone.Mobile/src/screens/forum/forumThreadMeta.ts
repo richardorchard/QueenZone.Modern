@@ -13,6 +13,11 @@ export type AttachmentPreviewInput = {
 export const forumPostsPageSize = 15;
 
 /** Category lists pass numeric ids; home prototype cards may still use strings. */
+/** Reply is hidden when the topic header reports a lock (write API returns 403). */
+export function topicReplyAllowed(topic: { isLocked: boolean } | null | undefined): boolean {
+  return topic?.isLocked !== true;
+}
+
 export function parseTopicId(id: number | string): number | null {
   const value = typeof id === 'number' ? id : Number.parseInt(id, 10);
   if (!Number.isFinite(value) || value <= 0 || !Number.isInteger(value)) {

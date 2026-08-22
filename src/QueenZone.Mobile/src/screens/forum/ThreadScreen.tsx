@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { FlatList, Image, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
@@ -25,6 +25,7 @@ import {
   forumPostsPageSize,
   imagePreviewUrl,
   parseTopicId,
+  topicReplyAllowed,
 } from './forumThreadMeta';
 
 type Props = NativeStackScreenProps<ForumStackParamList, 'Thread'>;
@@ -94,6 +95,17 @@ export function ThreadScreen({ navigation, route }: Props) {
     paged.refresh();
   }, [retryTopic, paged]);
 
+  const skipFocusRefresh = useRef(true);
+  useEffect(() => {
+    return navigation.addListener('focus', () => {
+      if (skipFocusRefresh.current) {
+        skipFocusRefresh.current = false;
+        return;
+      }
+      refresh();
+    });
+  }, [navigation, refresh]);
+
   if (id === null) {
     return (
       <ErrorBlock message={topicError ?? 'This discussion is not available in the archive yet.'} />
@@ -133,14 +145,26 @@ export function ThreadScreen({ navigation, route }: Props) {
     </View>
   );
 
+  const canReply = topicReplyAllowed(topic);
+
   const footer = (
     <View style={styles.reply}>
       <ListFooterLoading visible={paged.loadingMore} />
-      <Button
-        label={isSignedIn ? 'Reply' : 'Sign in to reply'}
-        variant="outline"
-        onPress={() => navigation.navigate('Composer', { threadId: String(id) })}
-      />
+      {canReply ? (
+        <Button
+          label={isSignedIn ? 'Reply' : 'Sign in to reply'}
+          variant="outline"
+          onPress={() =>
+            navigation.navigate('Composer', {
+              threadId: id,
+              threadTitle: topic?.title ?? title,
+              isLocked: topic?.isLocked,
+            })
+          }
+        />
+      ) : (
+        <Text style={[type.caption, { color: c.textMuted }]}>This topic is locked.</Text>
+      )}
     </View>
   );
 

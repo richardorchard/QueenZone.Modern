@@ -1,0 +1,325 @@
+using QueenZone.Data;
+using QueenZone.Storage;
+using QueenZone.Web.Search;
+
+namespace QueenZone.Web;
+
+public enum ForumWriteStatus
+{
+    Success,
+    CategoryNotFound,
+    TopicNotFound,
+    TopicLocked,
+    ValidationFailed,
+    RateLimited,
+    AttachmentFailed,
+    MemberSuspended,
+}
+
+public sealed record ForumWriteFieldError(string Field, string Message);
+
+public sealed class ForumWriteOutcome
+{
+    public bool Succeeded => Status == ForumWriteStatus.Success;
+
+    public ForumWriteStatus Status { get; init; }
+
+    public int TopicId { get; init; }
+
+    public int PostId { get; init; }
+
+    public string Title { get; init; } = string.Empty;
+
+    public string SanitizedBody { get; init; } = string.Empty;
+
+    public IReadOnlyList<ForumWriteFieldError> FieldErrors { get; init; } = [];
+
+    public static ForumWriteOutcome Fail(ForumWriteStatus status, string sanitizedBody = "") =>
+        new() { Status = status, SanitizedBody = sanitizedBody };
+
+    public static ForumWriteOutcome Validation(
+        string sanitizedBody,
+        IReadOnlyList<ForumWriteFieldError> errors) =>
+        new()
+        {
+            Status = ForumWriteStatus.ValidationFailed,
+            SanitizedBody = sanitizedBody,
+            FieldErrors = errors,
+        };
+
+    public static ForumWriteOutcome AttachmentFailed(string sanitizedBody, string message) =>
+        new()
+        {
+            Status = ForumWriteStatus.AttachmentFailed,
+            SanitizedBody = sanitizedBody,
+            FieldErrors = [new ForumWriteFieldError("Attachments", message)],
+        };
+
+    public static ForumWriteOutcome Created(
+        int topicId,
+        int postId,
+        string sanitizedBody,
+        string title) =>
+        new()
+        {
+            Status = ForumWriteStatus.Success,
+            TopicId = topicId,
+            PostId = postId,
+            SanitizedBody = sanitizedBody,
+            Title = title,
+        };
+}
+
+/// <summary>
+/// Shared create-topic and reply pipeline used by Razor Pages and
+/// <c>/api/v1/forum</c> writes so mobile posts hit the same sanitization,
+/// attachment rules, and <see cref="ForumPostRateLimiter"/> as the website.
+/// </summary>
+public sealed class ForumPostWriteService(
+    IForumRepository forumRepository,
+    IForumWriteRepository forumWriteRepository,
+    MemberAccountService memberAccountService,
+    PublicQueryCacheService publicQueryCache,
+    UgcHtml ugcHtml,
+    ForumPostRateLimiter rateLimiter,
+    ForumAttachmentValidator attachmentValidator,
+    ForumAttachmentUploadService attachmentUploadService,
+    ForumSearchIndexSynchronizer forumSearchIndex,
+    TimeProvider timeProvider)
+{
+    public const int SubjectMinLength = 5;
+
+    public const int SubjectMaxLength = 200;
+
+    public const string BodyRequiredMessage = "Body is required.";
+
+    public const string SubjectLengthMessage = "Title must be between 5 and 200 characters.";
+
+    public const string TopicLockedMessage = "This topic is locked.";
+
+    public const string RateLimitedMessage =
+        "You're posting too quickly. Please wait a bit and try again.";
+
+    public const string SuspendedMessage = "This account cannot post.";
+
+    public async Task<ForumWriteOutcome> CreateTopicAsync(
+        Guid memberId,
+        string? identityName,
+        int categoryId,
+        string? subject,
+        string? body,
+        IReadOnlyList<IFormFile>? attachments,
+        NewForumPoll? poll,
+        CancellationToken cancellationToken = default)
+    {
+        var category = await forumRepository.GetCategoryByIdAsync(categoryId, cancellationToken);
+        if (category is null)
+        {
+            return ForumWriteOutcome.Fail(ForumWriteStatus.CategoryNotFound);
+        }
+
+        var author = await ResolveAuthorAsync(memberId, identityName, cancellationToken);
+        if (author.Status != ForumWriteStatus.Success)
+        {
+            return ForumWriteOutcome.Fail(author.Status);
+        }
+
+        var trimmedSubject = subject?.Trim() ?? string.Empty;
+        var fieldErrors = new List<ForumWriteFieldError>();
+        if (trimmedSubject.Length < SubjectMinLength || trimmedSubject.Length > SubjectMaxLength)
+        {
+            fieldErrors.Add(new ForumWriteFieldError("Subject", SubjectLengthMessage));
+        }
+
+        var sanitizedBody = ugcHtml.NormalizeForStorage(body);
+        if (string.IsNullOrWhiteSpace(sanitizedBody))
+        {
+            fieldErrors.Add(new ForumWriteFieldError("Body", BodyRequiredMessage));
+        }
+
+        var attachmentValidation = attachmentValidator.Validate(SelectFiles(attachments));
+        foreach (var error in attachmentValidation.Errors)
+        {
+            fieldErrors.Add(new ForumWriteFieldError("Attachments", error));
+        }
+
+        if (fieldErrors.Count > 0)
+        {
+            return ForumWriteOutcome.Validation(sanitizedBody, fieldErrors);
+        }
+
+        if (!await rateLimiter.IsAllowedAsync(memberId, cancellationToken))
+        {
+            return ForumWriteOutcome.Fail(ForumWriteStatus.RateLimited, sanitizedBody);
+        }
+
+        try
+        {
+            var createdAt = timeProvider.GetUtcNow();
+            var created = await forumWriteRepository.CreateThreadAsync(
+                new NewForumThread(
+                    category.Id,
+                    memberId,
+                    author.DisplayName,
+                    trimmedSubject,
+                    sanitizedBody,
+                    createdAt,
+                    poll),
+                cancellationToken);
+            await forumSearchIndex.UpsertThreadAsync(
+                created.TopicId,
+                trimmedSubject,
+                createdAt,
+                cancellationToken);
+            await UploadAttachmentsAsync(
+                created.StarterPostId,
+                memberId,
+                attachmentValidation.AcceptedFiles,
+                cancellationToken);
+            publicQueryCache.InvalidateForumStatsCache();
+            return ForumWriteOutcome.Created(
+                created.TopicId,
+                created.StarterPostId,
+                sanitizedBody,
+                trimmedSubject);
+        }
+        catch (NotSupportedException ex)
+        {
+            return ForumWriteOutcome.AttachmentFailed(sanitizedBody, ex.Message);
+        }
+        catch (BlobUploadException ex)
+        {
+            return ForumWriteOutcome.AttachmentFailed(sanitizedBody, ex.Message);
+        }
+        catch (InvalidOperationException)
+        {
+            return ForumWriteOutcome.Fail(ForumWriteStatus.CategoryNotFound, sanitizedBody);
+        }
+    }
+
+    public async Task<ForumWriteOutcome> CreateReplyAsync(
+        Guid memberId,
+        string? identityName,
+        int topicId,
+        string? body,
+        IReadOnlyList<IFormFile>? attachments,
+        CancellationToken cancellationToken = default)
+    {
+        var publicTopic = await forumRepository.GetTopicPostsPageAsync(topicId, 1, 1, cancellationToken);
+        if (publicTopic is null)
+        {
+            return ForumWriteOutcome.Fail(ForumWriteStatus.TopicNotFound);
+        }
+
+        var thread = await forumWriteRepository.GetThreadAsync(topicId, cancellationToken);
+        if (thread is null)
+        {
+            return ForumWriteOutcome.Fail(ForumWriteStatus.TopicNotFound);
+        }
+
+        if (thread.IsLocked)
+        {
+            return ForumWriteOutcome.Fail(ForumWriteStatus.TopicLocked);
+        }
+
+        var author = await ResolveAuthorAsync(memberId, identityName, cancellationToken);
+        if (author.Status != ForumWriteStatus.Success)
+        {
+            return ForumWriteOutcome.Fail(author.Status);
+        }
+
+        var fieldErrors = new List<ForumWriteFieldError>();
+        var sanitizedBody = ugcHtml.NormalizeForStorage(body);
+        if (string.IsNullOrWhiteSpace(sanitizedBody))
+        {
+            fieldErrors.Add(new ForumWriteFieldError("Body", BodyRequiredMessage));
+        }
+
+        var attachmentValidation = attachmentValidator.Validate(SelectFiles(attachments));
+        foreach (var error in attachmentValidation.Errors)
+        {
+            fieldErrors.Add(new ForumWriteFieldError("Attachments", error));
+        }
+
+        if (fieldErrors.Count > 0)
+        {
+            return ForumWriteOutcome.Validation(sanitizedBody, fieldErrors);
+        }
+
+        if (!await rateLimiter.IsAllowedAsync(memberId, cancellationToken))
+        {
+            return ForumWriteOutcome.Fail(ForumWriteStatus.RateLimited, sanitizedBody);
+        }
+
+        var title = publicTopic.Header.Title;
+        try
+        {
+            var createdAt = timeProvider.GetUtcNow();
+            var postId = await forumWriteRepository.CreatePostAsync(
+                new NewForumPost(
+                    topicId,
+                    memberId,
+                    author.DisplayName,
+                    sanitizedBody,
+                    createdAt),
+                cancellationToken);
+            await forumSearchIndex.UpsertThreadAsync(topicId, title, createdAt, cancellationToken);
+            await UploadAttachmentsAsync(
+                postId,
+                memberId,
+                attachmentValidation.AcceptedFiles,
+                cancellationToken);
+            publicQueryCache.InvalidateForumStatsCache();
+            return ForumWriteOutcome.Created(topicId, postId, sanitizedBody, title);
+        }
+        catch (NotSupportedException ex)
+        {
+            return ForumWriteOutcome.AttachmentFailed(sanitizedBody, ex.Message);
+        }
+        catch (BlobUploadException ex)
+        {
+            return ForumWriteOutcome.AttachmentFailed(sanitizedBody, ex.Message);
+        }
+        catch (InvalidOperationException)
+        {
+            return ForumWriteOutcome.Fail(ForumWriteStatus.TopicNotFound, sanitizedBody);
+        }
+    }
+
+    private async Task<(ForumWriteStatus Status, string DisplayName)> ResolveAuthorAsync(
+        Guid memberId,
+        string? identityName,
+        CancellationToken cancellationToken)
+    {
+        var account = await memberAccountService.FindByIdAsync(memberId, cancellationToken);
+        if (account?.IsSuspended == true)
+        {
+            return (ForumWriteStatus.MemberSuspended, string.Empty);
+        }
+
+        if (!string.IsNullOrWhiteSpace(account?.DisplayName))
+        {
+            return (ForumWriteStatus.Success, account.DisplayName);
+        }
+
+        var fallback = string.IsNullOrWhiteSpace(identityName) ? "Member" : identityName;
+        return (ForumWriteStatus.Success, fallback);
+    }
+
+    private async Task UploadAttachmentsAsync(
+        int postId,
+        Guid memberId,
+        IReadOnlyList<IFormFile> files,
+        CancellationToken cancellationToken)
+    {
+        if (files.Count == 0)
+        {
+            return;
+        }
+
+        await attachmentUploadService.UploadAndSaveAsync(postId, memberId, files, cancellationToken);
+    }
+
+    private static IReadOnlyList<IFormFile> SelectFiles(IReadOnlyList<IFormFile>? attachments) =>
+        attachments?.Where(file => file is { Length: > 0 }).ToList() ?? [];
+}

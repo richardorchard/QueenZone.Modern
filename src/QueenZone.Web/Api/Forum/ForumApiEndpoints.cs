@@ -1,16 +1,22 @@
+using System.Security.Claims;
+using System.Text.Json;
 using QueenZone.Data;
 
 namespace QueenZone.Web;
 
 /// <summary>
-/// Public, read-only <c>/api/v1/forum/*</c> routes for browsing boards, topics,
-/// and topic threads (issues #731 / #732). No authentication required: the
-/// website forum index, category, and topic pages are public. Visibility is the
-/// same <see cref="IForumRepository"/> path used by Razor Pages — synthetic
-/// boards and unvalidated topic starters stay hidden. Attachment metadata
-/// includes the existing member-gated <c>/forum/attachment/...</c> paths; the
-/// mobile client does not open those URLs. A Bearer-authenticated download API
-/// is a follow-up before #733 uploads rely on opening attachments.
+/// <c>/api/v1/forum/*</c> routes for browsing boards, topics, and topic threads
+/// (issues #731 / #732) plus authenticated create-topic and reply writes (#733).
+/// Reads require no authentication: the website forum index, category, and topic
+/// pages are public. Visibility is the same <see cref="IForumRepository"/> path
+/// used by Razor Pages — synthetic boards and unvalidated topic starters stay
+/// hidden. Topic posts default and clamp <c>pageSize</c> to
+/// <see cref="ForumRoutes.PostsPageSize"/>. Writes require
+/// <see cref="MemberAuthenticationSchemes.MobileMemberPolicy"/> and reuse
+/// <see cref="ForumPostWriteService"/> (sanitization, attachments,
+/// <see cref="ForumPostRateLimiter"/>). Attachment metadata includes the
+/// existing member-gated <c>/forum/attachment/...</c> paths; the mobile client
+/// does not open those URLs. Polls are #734.
 /// </summary>
 public static class ForumApiEndpoints
 {
@@ -40,6 +46,18 @@ public static class ForumApiEndpoints
             .Produces<ApiPagedResponse<ForumTopicListItemDto>>()
             .ProducesProblem(StatusCodes.Status404NotFound);
 
+        group.MapPost("/categories/{id:int}/topics", CreateTopicAsync)
+            .WithName("CreateForumTopic")
+            .WithSummary("Create a topic in a public board. Same validation and rate limit as /forum/c/{slug}/new-thread.")
+            .RequireAuthorization(MemberAuthenticationSchemes.MobileMemberPolicy)
+            .Accepts<ForumWriteRequestDto>("application/json", "multipart/form-data")
+            .Produces<ForumTopicCreatedDto>(StatusCodes.Status201Created)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
         group.MapGet("/topics/{id:int}", GetTopicAsync)
             .WithName("GetForumTopic")
             .WithSummary("A single public forum topic header.")
@@ -51,6 +69,18 @@ public static class ForumApiEndpoints
             .WithSummary("Paged public posts in a topic, chronological, matching website pages (pageSize defaults to 15).")
             .Produces<ApiPagedResponse<ForumPostDto>>()
             .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapPost("/topics/{id:int}/posts", CreateReplyAsync)
+            .WithName("CreateForumReply")
+            .WithSummary("Reply to a public topic. Same validation and rate limit as the website topic form.")
+            .RequireAuthorization(MemberAuthenticationSchemes.MobileMemberPolicy)
+            .Accepts<ForumWriteRequestDto>("application/json", "multipart/form-data")
+            .Produces<ForumPostCreatedDto>(StatusCodes.Status201Created)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
     }
 
     internal static async Task<IResult> GetCategoriesAsync(
@@ -127,6 +157,7 @@ public static class ForumApiEndpoints
 
     internal static async Task<IResult> GetTopicAsync(
         IForumRepository forumRepository,
+        IForumWriteRepository forumWriteRepository,
         int id,
         CancellationToken cancellationToken)
     {
@@ -136,7 +167,11 @@ public static class ForumApiEndpoints
             return TopicNotFound(id);
         }
 
-        return Results.Ok(ForumApiMapper.ToTopicDetail(topicPage.Header, topicPage.TotalCount));
+        var thread = await forumWriteRepository.GetThreadAsync(id, cancellationToken);
+        return Results.Ok(ForumApiMapper.ToTopicDetail(
+            topicPage.Header,
+            topicPage.TotalCount,
+            thread?.IsLocked == true));
     }
 
     internal static async Task<IResult> GetTopicPostsAsync(
@@ -169,6 +204,156 @@ public static class ForumApiEndpoints
             topicPage.TotalCount);
 
         return Results.Ok(response);
+    }
+
+    internal static async Task<IResult> CreateTopicAsync(
+        HttpRequest request,
+        ClaimsPrincipal user,
+        int id,
+        ForumPostWriteService writeService,
+        CancellationToken cancellationToken)
+    {
+        var memberId = ForumMember.GetMemberId(user);
+        if (memberId is null)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status401Unauthorized,
+                title: "Unauthorized");
+        }
+
+        var (title, body, files) = await ReadWriteRequestAsync(request, cancellationToken);
+        var outcome = await writeService.CreateTopicAsync(
+            memberId.Value,
+            user.Identity?.Name,
+            id,
+            title,
+            body,
+            files,
+            poll: null,
+            cancellationToken);
+
+        if (outcome.Succeeded)
+        {
+            var dto = new ForumTopicCreatedDto(
+                outcome.TopicId,
+                outcome.PostId,
+                outcome.Title,
+                ForumRoutes.GetTopicCanonicalPath(outcome.TopicId, outcome.Title));
+            return Results.Created($"{RootPath}/topics/{outcome.TopicId}", dto);
+        }
+
+        return MapWriteFailure(outcome, categoryId: id, topicId: null);
+    }
+
+    internal static async Task<IResult> CreateReplyAsync(
+        HttpRequest request,
+        ClaimsPrincipal user,
+        int id,
+        ForumPostWriteService writeService,
+        CancellationToken cancellationToken)
+    {
+        var memberId = ForumMember.GetMemberId(user);
+        if (memberId is null)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status401Unauthorized,
+                title: "Unauthorized");
+        }
+
+        var (_, body, files) = await ReadWriteRequestAsync(request, cancellationToken);
+        var outcome = await writeService.CreateReplyAsync(
+            memberId.Value,
+            user.Identity?.Name,
+            id,
+            body,
+            files,
+            cancellationToken);
+
+        if (outcome.Succeeded)
+        {
+            var detailPath = ForumRoutes.GetTopicCanonicalPath(outcome.TopicId, outcome.Title)
+                + $"#post-{outcome.PostId}";
+            var dto = new ForumPostCreatedDto(
+                outcome.PostId,
+                outcome.TopicId,
+                detailPath);
+            return Results.Created(detailPath, dto);
+        }
+
+        return MapWriteFailure(outcome, categoryId: null, topicId: id);
+    }
+
+    private static IResult MapWriteFailure(ForumWriteOutcome outcome, int? categoryId, int? topicId)
+    {
+        return outcome.Status switch
+        {
+            ForumWriteStatus.CategoryNotFound => Results.Problem(
+                statusCode: StatusCodes.Status404NotFound,
+                title: "Not Found",
+                detail: $"No public forum board with id '{categoryId}'."),
+            ForumWriteStatus.TopicNotFound => TopicNotFound(topicId ?? 0),
+            ForumWriteStatus.TopicLocked => Results.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "Forbidden",
+                detail: ForumPostWriteService.TopicLockedMessage),
+            ForumWriteStatus.MemberSuspended => Results.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "Forbidden",
+                detail: ForumPostWriteService.SuspendedMessage),
+            ForumWriteStatus.RateLimited => Results.Problem(
+                statusCode: StatusCodes.Status429TooManyRequests,
+                title: "Too Many Requests",
+                detail: ForumPostWriteService.RateLimitedMessage),
+            ForumWriteStatus.ValidationFailed or ForumWriteStatus.AttachmentFailed => Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Bad Request",
+                detail: string.Join(' ', outcome.FieldErrors.Select(error => error.Message))),
+            _ => Results.Problem(
+                statusCode: StatusCodes.Status500InternalServerError,
+                title: "Server Error",
+                detail: "Unable to save this post."),
+        };
+    }
+
+    private static async Task<(string? Title, string? Body, IReadOnlyList<IFormFile> Files)> ReadWriteRequestAsync(
+        HttpRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (request.HasFormContentType)
+        {
+            var form = await request.ReadFormAsync(cancellationToken);
+            var title = FirstNonEmpty(
+                form["title"].ToString(),
+                form["Title"].ToString(),
+                form["subject"].ToString(),
+                form["Subject"].ToString());
+            var body = FirstNonEmpty(form["body"].ToString(), form["Body"].ToString());
+            var files = form.Files.Where(file => file is { Length: > 0 }).ToList();
+            return (title, body, files);
+        }
+
+        try
+        {
+            var json = await request.ReadFromJsonAsync<ForumWriteRequestDto>(cancellationToken);
+            return (json?.ResolvedTitle, json?.Body, []);
+        }
+        catch (JsonException)
+        {
+            return (null, null, []);
+        }
+    }
+
+    private static string? FirstNonEmpty(params string?[] values)
+    {
+        foreach (var value in values)
+        {
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                return value;
+            }
+        }
+
+        return null;
     }
 
     private static IResult TopicNotFound(int id) =>

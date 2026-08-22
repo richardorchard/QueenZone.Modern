@@ -1,5 +1,5 @@
-export { ApiError, fetchJson, formatPublishedDate, toPlainText } from './client';
-export type { FetchJsonOptions } from './client';
+export { ApiError, fetchJson, formatPublishedDate, sendJson, toPlainText } from './client';
+export type { FetchJsonOptions, SendJsonOptions } from './client';
 export {
   fetchAlbumDetail,
   fetchBiographyChapter,
@@ -11,6 +11,8 @@ export {
   fetchTimelinePage,
 } from './content';
 export {
+  createForumReply,
+  createForumTopic,
   fetchForumCategories,
   fetchForumCategory,
   fetchForumCategoryTopics,

@@ -9,6 +9,7 @@ import {
   type ForumTopicListItem,
 } from '../../api';
 import { usePagedContent } from '../../hooks/usePagedContent';
+import { ComposeHeaderButton } from '../../navigation/headerButtons';
 import type { ForumStackParamList } from '../../navigation/types';
 import { ArticleRow } from '../../ui/ArticleRow';
 import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from '../../ui/ScreenStates';
@@ -58,8 +59,21 @@ export function CategoryScreen({ navigation, route }: Props) {
   }, [id, categoryReloadToken]);
 
   useLayoutEffect(() => {
-    navigation.setOptions({ title: category?.name ?? name ?? 'Board' });
-  }, [navigation, category?.name, name]);
+    const boardName = category?.name ?? name;
+    navigation.setOptions({
+      title: boardName ?? 'Board',
+      headerRight: () => (
+        <ComposeHeaderButton
+          onPress={() =>
+            navigation.navigate('Composer', {
+              categoryId: id,
+              categoryName: boardName,
+            })
+          }
+        />
+      ),
+    });
+  }, [category?.name, id, name, navigation]);
 
   const retryCategory = useCallback(() => setCategoryReloadToken((n) => n + 1), []);
 

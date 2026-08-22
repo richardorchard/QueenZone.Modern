@@ -263,6 +263,7 @@ public static class QueenZoneWebServiceCollectionExtensions
         services.AddSingleton<MemberUploadQuotaService>();
         services.AddScoped<ForumAttachmentValidator>();
         services.AddScoped<ForumAttachmentUploadService>();
+        services.AddScoped<ForumPostWriteService>();
         services.AddSingleton<IGoogleAnalyticsDataClient, GoogleAnalyticsDataClient>();
         services.AddScoped<IGoogleAnalyticsTrafficService, GoogleAnalyticsTrafficService>();
         services.AddScoped<AdminDashboardService>();
