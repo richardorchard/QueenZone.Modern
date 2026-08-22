@@ -148,7 +148,7 @@ Metro after changing env vars.
 
 Android emulators rewrite `localhost` / `127.0.0.1` to `10.0.2.2` automatically.
 Physical devices need your machine's LAN IP in `EXPO_PUBLIC_API_BASE_URL`.
-The You tab shows the active `appEnv` and resolved origin for a quick check.
+The Profile screen (Home masthead avatar) shows the active `appEnv` and resolved origin for a quick check.
 
 Call sites should use `apiV1Url('/content/news')` (or `getAppConfig().apiBaseUrl`)
 rather than hard-coding hosts.
@@ -156,17 +156,22 @@ rather than hard-coding hosts.
 ## Navigation shell
 
 React Navigation provides the app shell ([ADR 0012](../../docs/decisions/0012-react-navigation-app-shell.md)).
+The v2 design handoff lives at
+[`design/Queenzone mobile app design/handoff/`](../../design/Queenzone%20mobile%20app%20design/handoff/).
 
-Signed-out tabs: **Today · News · Photos · Forum · You**.
+Five tabs, signed-in and signed-out: **Home · News · Photography · Archive · Forum**.
+Profile, settings, and private messages sit behind the Home masthead avatar —
+never a sixth tab. New archive sections become rows on the Archive hub.
 
-Signed-in tabs add **Messages** (member-only, matching the website header).
-
-Placeholder screens exist for Epics 1–6. You → **Sign in (development)** toggles
-the local session until the Epic 0 token client is wired. Member-only routes
-also render a sign-in gate so they stay closed while signed out.
+Home, Archive hub, Photography, Forum, Search, and Profile follow the approved
+screen contracts in `QUEENZONE_APP_SPEC.md`. News lists live articles from `/api/v1`.
+Home → avatar → **Sign in** toggles the local session until the Epic 0 token
+client is wired. Member-only routes also render a sign-in gate so they stay
+closed while signed out.
 
 Rebuild the development client after this native dependency set changes
-(`react-native-screens`, `react-native-safe-area-context`, `react-native-svg`):
+(`react-native-screens`, `react-native-safe-area-context`, `react-native-svg`,
+`expo-image`, `expo-linear-gradient`):
 
 ```powershell
 npx expo prebuild --clean
@@ -222,8 +227,8 @@ Keychain and provisioning profile even when a step fails.
 The exported IPA verification checks the build number, exempt-encryption
 declaration, timestamp, and source revision before upload. The app shows the
 version, native build number, localised build date/time, and short revision at
-the bottom of the **You** page, using the same subdued build-stamp treatment as
-the website.
+the bottom of the **Profile** screen (Home masthead avatar), using the same
+subdued build-stamp treatment as the website.
 
 Install Apple's TestFlight app on the iPhone and accept the QueenZone internal
 tester invitation. After Apple finishes processing an uploaded build, install

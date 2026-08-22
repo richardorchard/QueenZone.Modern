@@ -27,6 +27,8 @@
     "expo-constants": "~57.0.13",
     "expo-dev-client": "~57.0.14",
     "expo-font": "~57.0.1",
+    "expo-image": "~57.0.3",
+    "expo-linear-gradient": "~57.0.1",
     "expo-splash-screen": "~57.0.7",
     "expo-status-bar": "~57.0.1",
     "lucide-react-native": "^1.33.0",

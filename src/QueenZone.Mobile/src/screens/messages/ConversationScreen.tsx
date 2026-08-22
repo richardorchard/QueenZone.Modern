@@ -1,9 +1,9 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { PlaceholderScreen } from '../../ui/PlaceholderScreen';
 import { MemberGate } from '../../session/MemberGate';
-import type { MessagesStackParamList } from '../../navigation/types';
+import type { HomeStackParamList } from '../../navigation/types';
 
-type Props = NativeStackScreenProps<MessagesStackParamList, 'Conversation'>;
+type Props = NativeStackScreenProps<HomeStackParamList, 'Conversation'>;
 
 export function ConversationScreen({ route }: Props) {
   return (

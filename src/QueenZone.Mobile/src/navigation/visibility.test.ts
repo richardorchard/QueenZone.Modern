@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { ARCHIVE_HUB_IDS } from '../content/archiveHub.ts';
 import {
   getVisibleTabNames,
   isMemberOnlyScreen,
@@ -9,18 +10,12 @@ import {
 } from './visibility.ts';
 
 describe('getVisibleTabNames', () => {
-  it('shows only public tabs when signed out', () => {
-    assert.deepEqual([...getVisibleTabNames(false)], [...publicTabNames]);
-    assert.equal(getVisibleTabNames(false).includes('MessagesTab'), false);
-  });
-
-  it('unlocks the messages tab when signed in, before You', () => {
-    const tabs = getVisibleTabNames(true);
-    assert.deepEqual(
-      [...tabs],
-      ['TodayTab', 'NewsTab', 'PhotosTab', 'ForumTab', 'MessagesTab', 'YouTab'],
-    );
-    assert.equal(tabs.includes(signedInOnlyTabNames[0]), true);
+  it('keeps the five website-mirroring tabs whether signed in or out', () => {
+    const expected = ['HomeTab', 'NewsTab', 'PhotosTab', 'ArchiveTab', 'ForumTab'];
+    assert.deepEqual([...publicTabNames], expected);
+    assert.deepEqual([...getVisibleTabNames(false)], expected);
+    assert.deepEqual([...getVisibleTabNames(true)], expected);
+    assert.equal(signedInOnlyTabNames.length, 0);
   });
 });
 
@@ -32,10 +27,12 @@ describe('member-only screens', () => {
     assert.equal(isMemberOnlyScreen('Composer'), true);
     assert.equal(isMemberOnlyScreen('Settings'), true);
     assert.equal(isMemberOnlyScreen('PhotoSubmit'), true);
+    assert.equal(isMemberOnlyScreen('SavedList'), true);
   });
 
-  it('keeps archive, photos, forum browse, and help public', () => {
-    assert.equal(isMemberOnlyScreen('Today'), false);
+  it('keeps archive, photos, forum browse, profile, and help public', () => {
+    assert.equal(isMemberOnlyScreen('Home'), false);
+    assert.equal(isMemberOnlyScreen('ArchiveHub'), false);
     assert.equal(isMemberOnlyScreen('NewsIndex'), false);
     assert.equal(isMemberOnlyScreen('PhotoIndex'), false);
     assert.equal(isMemberOnlyScreen('ForumIndex'), false);
@@ -43,7 +40,7 @@ describe('member-only screens', () => {
     assert.equal(isMemberOnlyScreen('Thread'), false);
     assert.equal(isMemberOnlyScreen('FanPerformances'), false);
     assert.equal(isMemberOnlyScreen('Help'), false);
-    assert.equal(isMemberOnlyScreen('Account'), false);
+    assert.equal(isMemberOnlyScreen('Profile'), false);
   });
 });
 
@@ -54,9 +51,30 @@ describe('shouldHideTabBar', () => {
     assert.equal(shouldHideTabBar('Album'), true);
     assert.equal(shouldHideTabBar('Thread'), true);
     assert.equal(shouldHideTabBar('PhotoViewer'), true);
-    assert.equal(shouldHideTabBar('Today'), false);
+    assert.equal(shouldHideTabBar('Profile'), true);
+    assert.equal(shouldHideTabBar('Search'), true);
+    assert.equal(shouldHideTabBar('Home'), false);
     assert.equal(shouldHideTabBar('NewsIndex'), false);
-    assert.equal(shouldHideTabBar('Biography'), false);
+    assert.equal(shouldHideTabBar('ArchiveHub'), false);
+    assert.equal(shouldHideTabBar('PhotoIndex'), false);
+    assert.equal(shouldHideTabBar('ForumIndex'), false);
+    assert.equal(shouldHideTabBar('Biography'), true);
     assert.equal(shouldHideTabBar('Category'), false);
+  });
+});
+
+describe('archive hub destinations', () => {
+  it('lists the eight approved archive rows', () => {
+    assert.deepEqual([...ARCHIVE_HUB_IDS], [
+      'stories',
+      'timeline',
+      'biography',
+      'discography',
+      'tribute',
+      'fan-performances',
+      'recently-restored',
+      'about',
+    ]);
+    assert.equal(ARCHIVE_HUB_IDS.length, 8);
   });
 });
