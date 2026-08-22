@@ -187,6 +187,7 @@ public sealed class ContentApiPhotosTests : IClassFixture<QueenZoneWebApplicatio
         Assert.Equal($"/photography/{BrianMaySlug}/103", photo.Next.DetailPath);
         Assert.Equal("RedSpecial", photo.SubmittedByDisplayName);
         Assert.Equal("1600 x 1200", photo.PictureDimensionsLabel);
+        Assert.Equal($"/photography/{BrianMaySlug}", photo.CategoryPath);
     }
 
     [Fact]
