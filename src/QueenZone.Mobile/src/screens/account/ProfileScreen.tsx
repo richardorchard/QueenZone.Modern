@@ -6,6 +6,7 @@ import type { HomeStackParamList } from '../../navigation/types';
 import { useSession } from '../../session/SessionContext';
 import { archiveDisclaimer, fonts, space, type, useTheme } from '../../theme';
 import { ArchiveFooter } from '../../ui/ArchiveFooter';
+import { BuildStamp } from '../../ui/BuildStamp';
 import { Button } from '../../ui/Button';
 import { CrestSeal } from '../../ui/CrestSeal';
 import { Eyebrow } from '../../ui/Eyebrow';
@@ -58,6 +59,7 @@ export function ProfileScreen({ navigation }: Props) {
           API {appEnv} → {apiBaseUrl}
         </Text>
         <Text style={[type.caption, { color: c.textMuted, textAlign: 'center' }]}>{archiveDisclaimer}</Text>
+        <BuildStamp />
       </ScrollView>
     );
   }
@@ -152,6 +154,9 @@ export function ProfileScreen({ navigation }: Props) {
         </Text>
       </View>
       <ArchiveFooter />
+      <View style={{ paddingHorizontal: space.xl, paddingBottom: space.xl }}>
+        <BuildStamp />
+      </View>
     </ScrollView>
   );
 }
