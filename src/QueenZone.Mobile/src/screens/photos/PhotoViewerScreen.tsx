@@ -39,9 +39,8 @@ export function PhotoViewerScreen({ navigation, route }: Props) {
       .then((detail) => {
         setPhoto(detail);
         setLoading(false);
-        const applied = resolvedPhotoSize(size, detail.detailPath);
-        if ((size || undefined) !== applied) {
-          navigation.setParams({ size: applied });
+        if (size && resolvedPhotoSize(size, detail.detailPath) !== size) {
+          navigation.setParams({ size: '' });
         }
       })
       .catch((err: unknown) => {
