@@ -108,3 +108,69 @@ public sealed record FreddieTributeDto(
     string? Country,
     string DateText,
     string? TimeText);
+
+/// <summary>
+/// Category card for <c>/api/v1/content/photos/categories</c> and
+/// <c>/api/v1/content/photos/categories/{slug}</c>. Cover URLs are CDN
+/// (<c>cdn.queenzone.org</c>) via <see cref="QueenZone.Data.PhotoImageUrl"/>.
+/// </summary>
+public sealed record PhotoCategoryListItemDto(
+    int CatId,
+    string Name,
+    string Slug,
+    int ImageCount,
+    string? CoverThumbnailUrl,
+    string DetailPath);
+
+/// <summary>
+/// Thumbnail-grid card for <c>/api/v1/content/photos/categories/{slug}/items</c>.
+/// Includes the CDN thumbnail only — full <c>ImageUrl</c> is reserved for detail
+/// so clients do not load originals in a gallery grid.
+/// </summary>
+public sealed record PhotoListItemDto(
+    int PicId,
+    int CatId,
+    string CategoryName,
+    string CategorySlug,
+    string Title,
+    string ThumbnailUrl,
+    int ThumbWidth,
+    int ThumbHeight,
+    int PictureWidth,
+    int PictureHeight,
+    string? PictureDimensionsLabel,
+    int Year,
+    DateTime DateTime,
+    string DetailPath);
+
+/// <summary>
+/// Detail shape for <c>/api/v1/content/photos/categories/{slug}/items/{picId}</c>,
+/// including prev/next neighbors (same order as the website lightbox).
+/// <c>ImageUrl</c> is the CDN original from <see cref="QueenZone.Data.PhotoImageUrl"/>.
+/// </summary>
+public sealed record PhotoDetailDto(
+    int PicId,
+    int CatId,
+    string CategoryName,
+    string CategorySlug,
+    string Title,
+    string ImageUrl,
+    string ThumbnailUrl,
+    int ThumbWidth,
+    int ThumbHeight,
+    int PictureWidth,
+    int PictureHeight,
+    string? PictureDimensionsLabel,
+    int Year,
+    DateTime DateTime,
+    string? SubmittedByDisplayName,
+    string DetailPath,
+    int Index,
+    int Count,
+    PhotoNavDto? Previous,
+    PhotoNavDto? Next);
+
+/// <summary>
+/// Minimal reference to an adjacent photo for prev/next navigation.
+/// </summary>
+public sealed record PhotoNavDto(int PicId, string DetailPath);

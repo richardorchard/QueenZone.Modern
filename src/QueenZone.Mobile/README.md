@@ -164,7 +164,8 @@ Profile, settings, and private messages sit behind the Home masthead avatar —
 never a sixth tab. New archive sections become rows on the Archive hub.
 
 Home, Archive hub, Photography, Forum, Search, and Profile follow the approved
-screen contracts in `QUEENZONE_APP_SPEC.md`. News lists live articles from `/api/v1`.
+screen contracts in `QUEENZONE_APP_SPEC.md`. News and photography browse live
+content from `/api/v1` (photo image URIs are `cdn.queenzone.org`, never App Service).
 Home → avatar → **Sign in** toggles the local session until the Epic 0 token
 client is wired. Member-only routes also render a sign-in gate so they stay
 closed while signed out.

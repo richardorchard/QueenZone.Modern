@@ -8,6 +8,10 @@ export {
   fetchFreddieTributePage,
   fetchNewsDetail,
   fetchNewsPage,
+  fetchPhotoCategories,
+  fetchPhotoCategory,
+  fetchPhotoCategoryItems,
+  fetchPhotoDetail,
   fetchTimelinePage,
 } from './content';
 export {
@@ -22,5 +26,5 @@ export {
   fetchForumTopicPosts,
   voteForumTopicPoll,
 } from './forum';
-export type { PageQuery } from './content';
+export type { PageQuery, PhotoPageQuery } from './content';
 export type * from './types';

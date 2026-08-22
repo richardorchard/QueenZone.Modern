@@ -3,8 +3,11 @@ using QueenZone.Data;
 namespace QueenZone.Web;
 
 /// <summary>
-/// Public, read-only <c>/api/v1/content/*</c> routes for the mobile app (issue #726).
-/// No authentication required: this content is public on the website today.
+/// Public, read-only <c>/api/v1/content/*</c> routes for the mobile app
+/// (issues #726 / #743). No authentication required: this content is public
+/// on the website today. Photo gallery pages reuse <see cref="IPhotoRepository"/>
+/// and CDN URLs from <see cref="PhotoImageUrl"/>; category items default and
+/// clamp <c>pageSize</c> to <see cref="PhotoRoutes.CategoryPageSize"/>.
 /// </summary>
 public static class ContentApiEndpoints
 {
@@ -59,6 +62,29 @@ public static class ContentApiEndpoints
             .WithName("GetContentFreddieTributes")
             .WithSummary("Paged list of Freddie Mercury tributes.")
             .Produces<ApiPagedResponse<FreddieTributeDto>>();
+
+        group.MapGet("/photos/categories", GetPhotoCategoriesAsync)
+            .WithName("GetContentPhotoCategories")
+            .WithSummary("Paged list of public photo gallery categories.")
+            .Produces<ApiPagedResponse<PhotoCategoryListItemDto>>();
+
+        group.MapGet("/photos/categories/{slug}", GetPhotoCategoryAsync)
+            .WithName("GetContentPhotoCategory")
+            .WithSummary("A single public photo gallery category.")
+            .Produces<PhotoCategoryListItemDto>()
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapGet("/photos/categories/{slug}/items", GetPhotoCategoryItemsAsync)
+            .WithName("GetContentPhotoCategoryItems")
+            .WithSummary("Paged photos in a gallery. pageSize defaults and clamps to 24, matching /photography/{slug}.")
+            .Produces<ApiPagedResponse<PhotoListItemDto>>()
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapGet("/photos/categories/{slug}/items/{picId:int}", GetPhotoDetailAsync)
+            .WithName("GetContentPhotoDetail")
+            .WithSummary("A single public photo, with prev/next neighbors matching the website lightbox.")
+            .Produces<PhotoDetailDto>()
+            .ProducesProblem(StatusCodes.Status404NotFound);
     }
 
     internal static async Task<IResult> GetNewsListAsync(
@@ -222,4 +248,135 @@ public static class ContentApiEndpoints
 
         return Results.Ok(response);
     }
+
+    internal static async Task<IResult> GetPhotoCategoriesAsync(
+        IPhotoRepository photoRepository,
+        int? page,
+        int? pageSize,
+        CancellationToken cancellationToken)
+    {
+        var request = ApiPagination.Normalize(page, pageSize);
+        var categories = await photoRepository.GetCategoriesAsync(cancellationToken);
+
+        var pageItems = categories
+            .Skip((request.Page - 1) * request.PageSize)
+            .Take(request.PageSize)
+            .ToList();
+
+        var response = ApiPagedResponse<PhotoCategoryListItemDto>.Create(
+            ContentApiMapper.ToPhotoCategoryListItems(pageItems),
+            request.Page,
+            request.PageSize,
+            categories.Count);
+
+        return Results.Ok(response);
+    }
+
+    internal static async Task<IResult> GetPhotoCategoryAsync(
+        IPhotoRepository photoRepository,
+        string slug,
+        CancellationToken cancellationToken)
+    {
+        var category = await photoRepository.GetCategoryBySlugAsync(slug, cancellationToken);
+        if (category is null)
+        {
+            return PhotoCategoryNotFound(slug);
+        }
+
+        return Results.Ok(ContentApiMapper.ToPhotoCategoryListItem(category));
+    }
+
+    internal static async Task<IResult> GetPhotoCategoryItemsAsync(
+        IPhotoRepository photoRepository,
+        string slug,
+        int? page,
+        int? pageSize,
+        string? size,
+        CancellationToken cancellationToken)
+    {
+        var category = await photoRepository.GetCategoryBySlugAsync(slug, cancellationToken);
+        if (category is null)
+        {
+            return PhotoCategoryNotFound(slug);
+        }
+
+        var request = ApiPagination.Normalize(
+            page,
+            pageSize,
+            PhotoRoutes.CategoryPageSize,
+            PhotoRoutes.CategoryPageSize);
+        var filter = PhotoListFilter.Parse(size);
+        var result = await photoRepository.GetCategoryPageAsync(
+            category.CatId,
+            request.Page,
+            request.PageSize,
+            filter,
+            cancellationToken);
+
+        var response = ApiPagedResponse<PhotoListItemDto>.Create(
+            ContentApiMapper.ToPhotoListItems(result.Items, filter),
+            request.Page,
+            request.PageSize,
+            result.TotalCount);
+
+        return Results.Ok(response);
+    }
+
+    internal static async Task<IResult> GetPhotoDetailAsync(
+        IPhotoRepository photoRepository,
+        string slug,
+        int picId,
+        string? size,
+        CancellationToken cancellationToken)
+    {
+        var category = await photoRepository.GetCategoryBySlugAsync(slug, cancellationToken);
+        if (category is null)
+        {
+            return PhotoCategoryNotFound(slug);
+        }
+
+        var filter = PhotoListFilter.Parse(size);
+        var navigation = await photoRepository.GetDetailNavigationAsync(
+            category.CatId,
+            picId,
+            filter,
+            cancellationToken);
+        if (navigation is null)
+        {
+            // Active filter that excludes this photo: fall back to unfiltered navigation
+            // so deep links work, matching Photography/Detail.cshtml.cs.
+            if (filter.IsActive)
+            {
+                navigation = await photoRepository.GetDetailNavigationAsync(
+                    category.CatId,
+                    picId,
+                    PhotoListFilter.None,
+                    cancellationToken);
+                if (navigation is null)
+                {
+                    return PhotoNotFound(slug, picId);
+                }
+
+                filter = PhotoListFilter.None;
+            }
+            else
+            {
+                return PhotoNotFound(slug, picId);
+            }
+        }
+
+        return Results.Ok(ContentApiMapper.ToPhotoDetail(category, navigation, filter));
+    }
+
+    private static IResult PhotoCategoryNotFound(string slug) =>
+        Results.Problem(
+            statusCode: StatusCodes.Status404NotFound,
+            title: "Not Found",
+            detail: $"No public photo category with slug '{slug}'.");
+
+    private static IResult PhotoNotFound(string slug, int picId) =>
+        Results.Problem(
+            statusCode: StatusCodes.Status404NotFound,
+            title: "Not Found",
+            detail: $"No public photo '{picId}' in category '{slug}'.");
 }

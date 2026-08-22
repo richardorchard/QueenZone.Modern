@@ -1,38 +1,85 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { Bookmark, BookmarkCheck, Share2, X } from 'lucide-react-native';
-import { useMemo, useState } from 'react';
+import { ChevronLeft, ChevronRight, X } from 'lucide-react-native';
+import { useCallback, useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { samplePhotos } from '../../content/sample';
+import { ApiError, fetchPhotoDetail, type PhotoDetail } from '../../api';
 import type { PhotosStackParamList } from '../../navigation/types';
 import { type, useTheme } from '../../theme';
 import { ArchiveImage } from '../../ui/ArchiveImage';
 import { IconButton } from '../../ui/IconButton';
 import { MetaLine } from '../../ui/MetaLine';
+import { ErrorBlock, LoadingBlock } from '../../ui/ScreenStates';
+import { photoCdnSource, photoCounterLabel, photoDetailMeta } from './photoGalleryMeta';
 
 type Props = NativeStackScreenProps<PhotosStackParamList, 'PhotoViewer'>;
 
 export function PhotoViewerScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
+  const { slug, picId } = route.params;
   const [chromeVisible, setChromeVisible] = useState(true);
-  const [saved, setSaved] = useState(false);
-  const index = Math.max(
-    0,
-    samplePhotos.findIndex((photo) => photo.id === route.params.id),
+  const [photo, setPhoto] = useState<PhotoDetail | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [reloadToken, setReloadToken] = useState(0);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true);
+    setError(null);
+    fetchPhotoDetail(slug, picId, { signal: controller.signal })
+      .then((detail) => {
+        setPhoto(detail);
+        setLoading(false);
+      })
+      .catch((err: unknown) => {
+        if (err instanceof Error && err.name === 'AbortError') {
+          return;
+        }
+        setPhoto(null);
+        setError(err instanceof ApiError ? err.message : 'Something went wrong.');
+        setLoading(false);
+      });
+    return () => controller.abort();
+  }, [slug, picId, reloadToken]);
+
+  const retry = useCallback(() => setReloadToken((n) => n + 1), []);
+
+  const goTo = useCallback(
+    (neighborPicId: number) => {
+      navigation.replace('PhotoViewer', { slug, picId: neighborPicId });
+    },
+    [navigation, slug],
   );
-  const photo = samplePhotos[index] ?? samplePhotos[0];
-  const label = useMemo(() => `${index + 1} of ${samplePhotos.length}`, [index]);
+
+  if (loading) {
+    return <LoadingBlock label="Loading photograph…" />;
+  }
+
+  if (error || !photo) {
+    return <ErrorBlock message={error ?? 'Photograph not found.'} onRetry={retry} />;
+  }
+
+  const image = photoCdnSource(photo.imageUrl);
 
   return (
     <View style={{ flex: 1, backgroundColor: '#000' }}>
       <Pressable style={{ flex: 1 }} onPress={() => setChromeVisible((value) => !value)}>
-        <ArchiveImage
-          source={photo.image}
-          label={photo.caption}
-          contentFit="contain"
-          style={{ flex: 1, width: '100%' }}
-        />
+        {image ? (
+          <ArchiveImage
+            source={image}
+            label={photo.title}
+            contentFit="contain"
+            recyclingKey={`photo-full-${photo.picId}`}
+            priority="high"
+            style={{ flex: 1, width: '100%' }}
+          />
+        ) : (
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <Text style={[type.body, { color: c.textSecondary }]}>Image unavailable</Text>
+          </View>
+        )}
       </Pressable>
       {chromeVisible ? (
         <>
@@ -48,17 +95,29 @@ export function PhotoViewerScreen({ navigation, route }: Props) {
             }}
           >
             <IconButton icon={X} accessibilityLabel="Close" onPress={() => navigation.goBack()} />
-            <Text style={[type.eyebrow, { color: c.textMuted }]}>{label}</Text>
-            <View style={{ flexDirection: 'row' }}>
-              <IconButton
-                icon={saved ? BookmarkCheck : Bookmark}
-                accessibilityLabel={saved ? 'Saved' : 'Not saved'}
-                active={saved}
-                onPress={() => setSaved((value) => !value)}
-              />
-              <IconButton icon={Share2} accessibilityLabel="Share" onPress={() => undefined} />
-            </View>
+            <Text style={[type.eyebrow, { color: c.textMuted }]}>
+              {photoCounterLabel(photo.index, photo.count)}
+            </Text>
+            <View style={{ width: 44 }} />
           </View>
+          {photo.previous ? (
+            <View style={{ position: 'absolute', left: 4, top: '45%' }}>
+              <IconButton
+                icon={ChevronLeft}
+                accessibilityLabel="Previous image"
+                onPress={() => goTo(photo.previous!.picId)}
+              />
+            </View>
+          ) : null}
+          {photo.next ? (
+            <View style={{ position: 'absolute', right: 4, top: '45%' }}>
+              <IconButton
+                icon={ChevronRight}
+                accessibilityLabel="Next image"
+                onPress={() => goTo(photo.next!.picId)}
+              />
+            </View>
+          ) : null}
           <View
             style={{
               position: 'absolute',
@@ -68,8 +127,8 @@ export function PhotoViewerScreen({ navigation, route }: Props) {
               gap: 8,
             }}
           >
-            <Text style={[type.cardTitle, { color: c.textPrimary }]}>{photo.caption}</Text>
-            <MetaLine parts={photo.meta} />
+            <Text style={[type.cardTitle, { color: c.textPrimary }]}>{photo.title}</Text>
+            <MetaLine parts={photoDetailMeta(photo)} />
           </View>
         </>
       ) : null}
