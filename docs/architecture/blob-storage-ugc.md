@@ -18,6 +18,8 @@ Shared upload infrastructure lives in `QueenZone.Storage`. Web (and future worke
 
 Per-member quotas (`MemberUploadQuotaService`) apply to editor images, forum attachments, avatars, and photo submissions. They are **process-local** (`IMemoryCache`) and fit single-instance B1 hosting; container MIME/size allowlists remain enforced separately. Antivirus scanning of uploads is **not planned**.
 
+Mobile photo submit (`POST /api/v1/member/photo-submissions`) reuses `PhotoSubmissionService.SubmitAsync` — the same `IBlobUploadService` / `ugc-photos` path and quota consume as website `/submit/photo`. Do not add a second mobile-only limit.
+
 Register in DI:
 
 ```csharp
