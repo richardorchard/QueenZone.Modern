@@ -46,7 +46,12 @@ export type ForumStackParamList = {
   ForumIndex: undefined;
   Category: { id: number; name?: string };
   Thread: { id: number | string; title?: string };
-  Composer: { threadId?: string };
+  Composer: {
+    threadId?: number;
+    threadTitle?: string;
+    categoryId?: number;
+    categoryName?: string;
+  };
   Search: undefined;
 };
 

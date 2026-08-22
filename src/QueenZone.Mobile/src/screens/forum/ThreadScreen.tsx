@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   FlatList,
   Image,
@@ -110,6 +110,17 @@ export function ThreadScreen({ navigation, route }: Props) {
     paged.refresh();
   }, [retryTopic, paged]);
 
+  const skipFocusRefresh = useRef(true);
+  useEffect(() => {
+    return navigation.addListener('focus', () => {
+      if (skipFocusRefresh.current) {
+        skipFocusRefresh.current = false;
+        return;
+      }
+      refresh();
+    });
+  }, [navigation, refresh]);
+
   if (id === null) {
     return (
       <ErrorBlock message={topicError ?? 'This discussion is not available in the archive yet.'} />
@@ -155,7 +166,12 @@ export function ThreadScreen({ navigation, route }: Props) {
       <Button
         label={isSignedIn ? 'Reply' : 'Sign in to reply'}
         variant="outline"
-        onPress={() => navigation.navigate('Composer', { threadId: String(id) })}
+        onPress={() =>
+          navigation.navigate('Composer', {
+            threadId: id,
+            threadTitle: topic?.title ?? title,
+          })
+        }
       />
     </View>
   );

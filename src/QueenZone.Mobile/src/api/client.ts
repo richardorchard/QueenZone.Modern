@@ -9,6 +9,12 @@ export type FetchJsonOptions = {
   query?: Record<string, string | number | undefined | null>;
 };
 
+export type SendJsonOptions = FetchJsonOptions & {
+  method?: 'POST' | 'PATCH' | 'PUT' | 'DELETE';
+  body?: unknown;
+  accessToken?: string | null;
+};
+
 function buildUrl(path: string, query?: FetchJsonOptions['query']): string {
   const url = apiV1Url(path);
   if (!query) {
@@ -89,6 +95,64 @@ export async function fetchJson<T>(path: string, options: FetchJsonOptions = {})
   }
 
   return (await response.json()) as T;
+}
+
+/**
+ * JSON write to `/api/v1{path}`. Sends `Authorization: Bearer` when
+ * `accessToken` is present. Throws {@link ApiError} for non-2xx responses.
+ */
+export async function sendJson<T>(path: string, options: SendJsonOptions = {}): Promise<T> {
+  const url = buildUrl(path, options.query);
+  const headers: Record<string, string> = { Accept: 'application/json' };
+  if (options.body !== undefined) {
+    headers['Content-Type'] = 'application/json';
+  }
+  if (options.accessToken) {
+    headers.Authorization = `Bearer ${options.accessToken}`;
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: options.method ?? 'POST',
+      headers,
+      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+      signal: options.signal,
+    });
+  } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw err;
+    }
+    throw new ApiError(0, 'Unable to reach QueenZone. Check your connection and try again.');
+  }
+
+  if (!response.ok) {
+    const problem = await readProblem(response);
+    throw new ApiError(
+      response.status,
+      messageFromProblem(response.status, problem, messageForWriteStatus(response.status)),
+      problem,
+    );
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  return (await response.json()) as T;
+}
+
+function messageForWriteStatus(status: number): string {
+  if (status === 401) {
+    return 'Sign in to post.';
+  }
+  if (status === 403) {
+    return 'You cannot post to this topic.';
+  }
+  if (status === 429) {
+    return "You're posting too quickly. Please wait a bit and try again.";
+  }
+  return `Request failed (${status}).`;
 }
 
 export { formatPublishedDate, toPlainText } from './text';

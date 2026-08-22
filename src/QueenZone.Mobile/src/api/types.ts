@@ -162,3 +162,16 @@ export type ForumPost = {
   editCount: number;
   attachments: ForumAttachment[];
 };
+
+export type ForumTopicCreated = {
+  id: number;
+  starterPostId: number;
+  title: string;
+  detailPath: string;
+};
+
+export type ForumPostCreated = {
+  id: number;
+  topicId: number;
+  detailPath: string;
+};

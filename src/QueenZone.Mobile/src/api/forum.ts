@@ -1,8 +1,10 @@
-import { fetchJson } from './client';
+import { fetchJson, sendJson } from './client';
 import type {
   ApiPagedResponse,
   ForumCategoryListItem,
   ForumPost,
+  ForumPostCreated,
+  ForumTopicCreated,
   ForumTopicDetail,
   ForumTopicListItem,
 } from './types';
@@ -49,5 +51,33 @@ export function fetchForumTopicPosts(
   return fetchJson(`/forum/topics/${topicId}/posts`, {
     query: pageParams(query),
     signal: query.signal,
+  });
+}
+
+export function createForumTopic(
+  categoryId: number,
+  input: { title: string; body: string },
+  accessToken: string,
+  signal?: AbortSignal,
+): Promise<ForumTopicCreated> {
+  return sendJson(`/forum/categories/${categoryId}/topics`, {
+    method: 'POST',
+    body: { title: input.title, body: input.body },
+    accessToken,
+    signal,
+  });
+}
+
+export function createForumReply(
+  topicId: number,
+  input: { body: string },
+  accessToken: string,
+  signal?: AbortSignal,
+): Promise<ForumPostCreated> {
+  return sendJson(`/forum/topics/${topicId}/posts`, {
+    method: 'POST',
+    body: { body: input.body },
+    accessToken,
+    signal,
   });
 }
