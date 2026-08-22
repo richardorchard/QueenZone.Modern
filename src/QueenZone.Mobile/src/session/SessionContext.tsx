@@ -3,16 +3,18 @@ import { createContext, useContext, useMemo, useState, type ReactNode } from 're
 export type Session = {
   isSignedIn: boolean;
   displayName: string | null;
+  accessToken: string | null;
 };
 
 type SessionContextValue = Session & {
   signIn: () => void;
   signOut: () => void;
+  setAccessToken: (accessToken: string | null) => void;
 };
 
 const SessionContext = createContext<SessionContextValue | undefined>(undefined);
 
-const signedOut: Session = { isSignedIn: false, displayName: null };
+const signedOut: Session = { isSignedIn: false, displayName: null, accessToken: null };
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session>(signedOut);
@@ -20,8 +22,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const value = useMemo<SessionContextValue>(
     () => ({
       ...session,
-      signIn: () => setSession({ isSignedIn: true, displayName: 'Dev member' }),
+      signIn: () => setSession((current) => ({
+        ...current,
+        isSignedIn: true,
+        displayName: current.displayName ?? 'Roger_O',
+      })),
       signOut: () => setSession(signedOut),
+      setAccessToken: (accessToken) =>
+        setSession((current) => ({
+          ...current,
+          isSignedIn: current.isSignedIn || Boolean(accessToken),
+          accessToken,
+        })),
     }),
     [session],
   );

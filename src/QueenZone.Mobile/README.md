@@ -126,7 +126,7 @@ writes `extra.appEnv` and `extra.apiBaseUrl`; runtime code reads them via
 | `EXPO_PUBLIC_APP_ENV` | Default API origin |
 | --- | --- |
 | `development` (default) | `http://localhost:5146` (local `QueenZone.Web`) |
-| `staging` | `https://queenzone-dev.azurewebsites.net` |
+| `staging` | `https://www.queenzone.org` |
 | `production` | `https://www.queenzone.org` |
 
 Override the origin for any environment without code changes:
@@ -148,7 +148,7 @@ Metro after changing env vars.
 
 Android emulators rewrite `localhost` / `127.0.0.1` to `10.0.2.2` automatically.
 Physical devices need your machine's LAN IP in `EXPO_PUBLIC_API_BASE_URL`.
-The You tab shows the active `appEnv` and resolved origin for a quick check.
+The Profile screen (Home masthead avatar) shows the active `appEnv` and resolved origin for a quick check.
 
 Call sites should use `apiV1Url('/content/news')` (or `getAppConfig().apiBaseUrl`)
 rather than hard-coding hosts.
@@ -156,17 +156,23 @@ rather than hard-coding hosts.
 ## Navigation shell
 
 React Navigation provides the app shell ([ADR 0012](../../docs/decisions/0012-react-navigation-app-shell.md)).
+The v2 design handoff lives at
+[`design/Queenzone mobile app design/handoff/`](../../design/Queenzone%20mobile%20app%20design/handoff/).
 
-Signed-out tabs: **Today · News · Photos · Forum · You**.
+Five tabs, signed-in and signed-out: **Home · News · Photography · Archive · Forum**.
+Profile, settings, and private messages sit behind the Home masthead avatar —
+never a sixth tab. New archive sections become rows on the Archive hub.
 
-Signed-in tabs add **Messages** (member-only, matching the website header).
-
-Placeholder screens exist for Epics 1–6. You → **Sign in (development)** toggles
-the local session until the Epic 0 token client is wired. Member-only routes
-also render a sign-in gate so they stay closed while signed out.
+Home, Archive hub, Photography, Forum, Search, and Profile follow the approved
+screen contracts in `QUEENZONE_APP_SPEC.md`. News and photography browse live
+content from `/api/v1` (photo image URIs are `cdn.queenzone.org`, never App Service).
+Home → avatar → **Sign in** toggles the local session until the Epic 0 token
+client is wired. Member-only routes also render a sign-in gate so they stay
+closed while signed out.
 
 Rebuild the development client after this native dependency set changes
-(`react-native-screens`, `react-native-safe-area-context`, `react-native-svg`):
+(`react-native-screens`, `react-native-safe-area-context`, `react-native-svg`,
+`expo-image`, `expo-linear-gradient`):
 
 ```powershell
 npx expo prebuild --clean
@@ -185,8 +191,67 @@ credentials are used. Both jobs upload their build as a workflow artifact
 (`mobile-android-<run-id>` / `mobile-ios-<run-id>`), downloadable from the
 run's summary page for one day.
 
-Production signing, TestFlight, and store submission remain separate release
-concerns (ADR 0011). The installable Android build below uses a test-only key.
+The unsigned jobs are PR compile checks only. A separate manual workflow,
+[`publish-ios-testflight.yml`](../../.github/workflows/publish-ios-testflight.yml),
+archives and signs the iOS app on the dedicated self-hosted Mac runner and
+uploads it to TestFlight. The installable Android build below uses a test-only
+key.
+
+## Install the latest iOS TestFlight build
+
+The one-time Apple setup for `org.queenzone.mobile` consists of:
+
+- Apple Developer team `X28Z75P69M`;
+- an Apple Distribution certificate;
+- the `QueenZone App Store` App Store Connect provisioning profile;
+- the QueenZone App Store Connect record (Apple ID `6803889011`); and
+- a Developer-role App Store Connect API key dedicated to GitHub uploads.
+
+Run **Publish iOS to TestFlight** from the repository's **Actions** tab and
+select `main`. The workflow intentionally rejects other branches and targets
+the self-hosted Mac runner through `[self-hosted, macOS, ARM64, ios-signing]`.
+The runner service does not load an interactive shell profile, so the workflow
+puts Homebrew (`/opt/homebrew/bin` or `/usr/local/bin`) on `PATH`, installs
+CocoaPods if `pod` is missing, runs `expo prebuild --no-install` with
+`IOS_BUILD_NUMBER` set to the workflow run number (so `CFBundleVersion` is unique
+for App Store Connect), records the UTC build time and source revision for the
+in-app build stamp, then runs `pod install` before archiving. Expo also writes
+`ITSAppUsesNonExemptEncryption=false` because the app uses only exempt platform
+HTTPS; this prevents each TestFlight build pausing for the same export-compliance
+questionnaire. Expo's own CocoaPods auto-install is skipped
+because a missing CLI is only a warning and otherwise continues without an
+`.xcworkspace`. It then imports signing material into a temporary Keychain,
+produces and verifies a signed `.ipa`, retains that IPA as a seven-day
+workflow artifact, uploads it to App Store Connect, and deletes the temporary
+Keychain and provisioning profile even when a step fails.
+
+The exported IPA verification checks the build number, exempt-encryption
+declaration, timestamp, and source revision before upload. The app shows the
+version, native build number, localised build date/time, and short revision at
+the bottom of the **Profile** screen (Home masthead avatar), using the same
+subdued build-stamp treatment as the website.
+
+Install Apple's TestFlight app on the iPhone and accept the QueenZone internal
+tester invitation. After Apple finishes processing an uploaded build, install
+or update QueenZone from TestFlight; the phone does not need to connect to this
+Mac. Each TestFlight build remains testable for 90 days.
+
+The workflow uses these encrypted GitHub Actions secrets (names only; never
+commit their values):
+
+| Secret | Purpose |
+| --- | --- |
+| `IOS_DISTRIBUTION_CERTIFICATE_BASE64` | Base64-encoded password-protected Apple Distribution `.p12` |
+| `IOS_DISTRIBUTION_CERTIFICATE_PASSWORD` | Password for the distribution `.p12` |
+| `IOS_PROVISIONING_PROFILE_BASE64` | Base64-encoded `QueenZone App Store` `.mobileprovision` |
+| `APP_STORE_CONNECT_KEY_ID` | App Store Connect API key identifier |
+| `APP_STORE_CONNECT_ISSUER_ID` | App Store Connect API issuer identifier |
+| `APP_STORE_CONNECT_PRIVATE_KEY` | One-time-downloaded App Store Connect `.p8` private key |
+
+Rotate the distribution certificate/profile before their shared expiry and
+replace the corresponding secrets together. Revoke and replace the API key if
+its private key is ever exposed. Signing material must never be copied into the
+repository, workflow artifacts, logs, or issue/PR text.
 
 ## Install the latest Android test build
 
@@ -212,6 +277,7 @@ served from a separate, throwaway-build-only Azure Storage account so it cannot
 affect production media or UGC. The publishing design is recorded in
 [ADR 0013](../../docs/decisions/0013-static-web-app-mobile-test-distribution.md).
 
-The separate `publish-mobile-test-build.yml` workflow publishes after mobile
-changes merge to `main`, and can also be run manually. A signed,
-device-installable iOS build remains follow-up work under #808.
+The separate `publish-mobile-test-build.yml` workflow publishes Android after
+mobile changes merge to `main`, and can also be run manually. iOS remains an
+explicit manual TestFlight release so signing and upload never run merely
+because a pull request was opened or merged.

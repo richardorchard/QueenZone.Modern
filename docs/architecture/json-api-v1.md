@@ -12,9 +12,10 @@ Decision record: [`docs/decisions/0010-versioned-json-api-conventions.md`](../de
 | `/openapi/v1.json` | Generated OpenAPI 3.1 document (runtime, kept in sync with mapped `/api/v1` endpoints) |
 | `/api/v1/auth/*` | Mobile OAuth2 PKCE + tokens (see issues #720 / #721) |
 | `/api/v1/admin` | Admin status probe; future admin JSON must use the same `Admin` policy (#723) |
-| `/api/v1/content/*` | Public, read-only archive content for the mobile app: news, biography, discography, timeline, and Freddie Tribute (#726). No authentication required. |
+| `/api/v1/content/*` | Public, read-only archive content for the mobile app: news, biography, discography, timeline, Freddie Tribute (#726), and photo galleries (#743). No authentication required. Photo image URLs are `cdn.queenzone.org` via `PhotoImageUrl` (not App Service). Category list/detail/items reuse `PublicQueryCacheService` photo helpers (same as Razor). Category items default and clamp `pageSize` to `PhotoRoutes.CategoryPageSize` (24) so pages match `/photography/{slug}`. Photo items include `detailPath` and `categoryPath`. |
+| `/api/v1/forum/*` | Public forum browse for the mobile app: category list, category detail, paged topic lists (#731), topic headers plus paged posts (#732), and topic polls (#734). Same `IForumRepository` visibility as `/forum` Razor Pages. Reads require no authentication. Topic posts default and clamp `pageSize` to `ForumRoutes.PostsPageSize` (15) so pages match the website. Topic headers include `isLocked` (same source as write 403 TopicLocked). Authenticated writes (#733): `POST /api/v1/forum/categories/{id}/topics` and `POST /api/v1/forum/topics/{id}/posts` require `MobileMemberPolicy` and reuse `ForumPostWriteService` (the same sanitization, attachment rules, and `ForumPostRateLimiter` as the website). Reply 201 Location matches `detailPath` (website topic URL + `#post-{id}`), not the posts collection. `GET /api/v1/forum/topics/{id}/poll` is public; an optional Bearer token fills viewer flags (`canViewerVote`, `viewerHasVoted`, `selectedByViewer`). Authenticated vote/close (`POST .../poll/vote`, `POST .../poll/close`) require `MobileMemberPolicy` and reuse `IForumPollRepository` plus `ForumPollVoteMapper` (same one-vote-per-member and closed rules as `/forum/poll/{id}/vote`). Attachment metadata includes `/forum/attachment/*` paths; those remain cookie-gated and are not opened from the app. |
 | `/api/v1/contact` | Public contact form for the mobile app (#755). Same admin inbox as website `/contact`. Optional mobile JWT; guests send name and email. |
-| `/api/v1/{resource}` | Later epics (forum, messages, galleries, …) |
+| `/api/v1/{resource}` | Later epics (messages, member submissions, …) |
 
 Later endpoints should be mapped on a `MapGroup("/api/v1")` (or a sub-group) with `.WithGroupName("v1")` so they appear in the OpenAPI document. Do not add mobile/app JSON routes under `src/QueenZone.Web/Endpoints/`.
 
@@ -61,7 +62,7 @@ Use `ApiPagination.Normalize` and return `ApiPagedResponse<T>` from list endpoin
 | Query | Default | Rules |
 | --- | --- | --- |
 | `page` | `1` | Values below 1 clamp to 1 |
-| `pageSize` | `20` | Values below 1 clamp to 20; values above 100 clamp to 100 |
+| `pageSize` | `20` | Values below 1 clamp to 20; values above 100 clamp to 100. **Exceptions:** `GET /api/v1/forum/topics/{id}/posts` defaults and clamps to `ForumRoutes.PostsPageSize` (15) so pages match `/forum/topic/...`. `GET /api/v1/content/photos/categories/{slug}/items` defaults and clamps to `PhotoRoutes.CategoryPageSize` (24) so pages match `/photography/{slug}`. |
 
 Response:
 
@@ -86,3 +87,7 @@ Member routes use the existing mobile JWT bearer scheme (`MemberAuthenticationSc
 `GET /openapi/v1.json` is generated from endpoint metadata at runtime. Only endpoints with group name `v1` are included, so Razor Pages, `/health`, and `/api/uploads/editor-image` stay out of the spec.
 
 The discovery document (`GET /api/v1`) points at that URL so the React Native client and backend share one contract.
+
+## Production and nightly checks
+
+Public, unauthenticated `/api/v1` routes are included in the live-site read-only sweep (`LiveSiteContentApiTests`): discovery, OpenAPI, content and forum list/detail *shape*, photo category / items / detail plus CDN image hosts, optional poll GET when `hasPoll` is true, and Problem Details 404. That fixture is `RealData` + `ReadOnly`, so it also runs against the SQL Express mirror in the nightly RealData suite. `/api/v1/auth` and `/api/v1/admin` are not part of the sweep (token grants / rate limits, and Entra). Post-deploy smoke hits `GET /api/v1` and `GET /api/v1/content/news?pageSize=1`. In-memory contract tests live in `QueenZone.Web.Tests` (`ApiV1RoutesTests`, `ContentApi*Tests`, `ForumApiTests`, `ForumApiPollTests`).

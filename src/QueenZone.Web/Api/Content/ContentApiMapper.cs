@@ -24,7 +24,8 @@ public static class ContentApiMapper
             item.Id,
             item.Title,
             item.Excerpt,
-            item.Body,
+            // Same sanitization / plain-text autolink path as the website news detail page.
+            NewsArticleContent.FormatBody(item.Body),
             item.PublishedAt,
             item.SourceUrl,
             NewsRoutes.GetNewsDetailPath(item.Id, item.Title, item.Slug));
@@ -131,4 +132,75 @@ public static class ContentApiMapper
 
     public static IReadOnlyList<FreddieTributeDto> ToFreddieTributeDtos(IEnumerable<FreddieTribute> tributes) =>
         tributes.Select(ToFreddieTributeDto).ToList();
+
+    public static PhotoCategoryListItemDto ToPhotoCategoryListItem(PhotoCategory category) =>
+        new(
+            category.CatId,
+            category.Name,
+            category.Slug,
+            category.ImageCount,
+            category.CoverThumbnailUrl,
+            PhotoRoutes.GetCategoryPath(category.Slug));
+
+    public static IReadOnlyList<PhotoCategoryListItemDto> ToPhotoCategoryListItems(
+        IEnumerable<PhotoCategory> categories) =>
+        categories.Select(ToPhotoCategoryListItem).ToList();
+
+    public static PhotoListItemDto ToPhotoListItem(PhotoItem item, PhotoListFilter? filter = null) =>
+        new(
+            item.PicId,
+            item.CatId,
+            item.CategoryName,
+            item.CategorySlug,
+            item.Title,
+            item.ThumbnailUrl,
+            item.ThumbWidth,
+            item.ThumbHeight,
+            item.PictureWidth,
+            item.PictureHeight,
+            item.PictureDimensionsLabel,
+            item.Year,
+            item.DateTime,
+            PhotoRoutes.GetDetailPath(item.CategorySlug, item.PicId, filter),
+            PhotoRoutes.GetCategoryPath(item.CategorySlug, filter));
+
+    public static IReadOnlyList<PhotoListItemDto> ToPhotoListItems(
+        IEnumerable<PhotoItem> items,
+        PhotoListFilter? filter = null) =>
+        items.Select(item => ToPhotoListItem(item, filter)).ToList();
+
+    public static PhotoDetailDto ToPhotoDetail(
+        PhotoCategory category,
+        PhotoDetailNavigation navigation,
+        PhotoListFilter? filter = null)
+    {
+        var photo = navigation.Photo;
+        return new PhotoDetailDto(
+            photo.PicId,
+            photo.CatId,
+            category.Name,
+            category.Slug,
+            photo.Title,
+            photo.ImageUrl,
+            photo.ThumbnailUrl,
+            photo.ThumbWidth,
+            photo.ThumbHeight,
+            photo.PictureWidth,
+            photo.PictureHeight,
+            photo.PictureDimensionsLabel,
+            photo.Year,
+            photo.DateTime,
+            photo.SubmittedByDisplayName,
+            PhotoRoutes.GetDetailPath(category.Slug, photo.PicId, filter),
+            PhotoRoutes.GetCategoryPath(category.Slug, filter),
+            navigation.Index,
+            navigation.Count,
+            ToPhotoNavDto(category.Slug, navigation.PreviousPicId, filter),
+            ToPhotoNavDto(category.Slug, navigation.NextPicId, filter));
+    }
+
+    private static PhotoNavDto? ToPhotoNavDto(string slug, int? picId, PhotoListFilter? filter) =>
+        picId is int id
+            ? new PhotoNavDto(id, PhotoRoutes.GetDetailPath(slug, id, filter))
+            : null;
 }

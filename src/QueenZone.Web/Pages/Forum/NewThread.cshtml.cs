@@ -3,8 +3,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using QueenZone.Data;
-using QueenZone.Storage;
-using QueenZone.Web.Search;
 
 namespace QueenZone.Web.Pages.Forum;
 
@@ -13,19 +11,11 @@ namespace QueenZone.Web.Pages.Forum;
 [RequestSizeLimit(55 * 1024 * 1024)]
 public sealed class NewThreadModel(
     IForumRepository forumRepository,
-    IForumWriteRepository forumWriteRepository,
-    MemberAccountService memberAccountService,
-    PublicQueryCacheService publicQueryCache,
-    UgcHtml ugcHtml,
-    ForumPostRateLimiter rateLimiter,
-    ForumAttachmentValidator attachmentValidator,
-    ForumAttachmentUploadService attachmentUploadService,
-    ForumSearchIndexSynchronizer forumSearchIndex,
-    TimeProvider timeProvider) : PageModel
+    ForumPostWriteService forumPostWrite) : PageModel
 {
     [BindProperty]
     [Required]
-    [StringLength(200, MinimumLength = 5)]
+    [StringLength(ForumPostWriteService.SubjectMaxLength, MinimumLength = ForumPostWriteService.SubjectMinLength)]
     public string Subject { get; set; } = string.Empty;
 
     [BindProperty]
@@ -70,19 +60,6 @@ public sealed class NewThreadModel(
             return Challenge();
         }
 
-        var sanitizedBody = ugcHtml.Sanitize(Body);
-        if (string.IsNullOrWhiteSpace(sanitizedBody))
-        {
-            ModelState.AddModelError(nameof(Body), "Body is required.");
-        }
-
-        var selectedFiles = Attachments?.Where(file => file is { Length: > 0 }).ToList() ?? [];
-        var attachmentValidation = attachmentValidator.Validate(selectedFiles);
-        foreach (var error in attachmentValidation.Errors)
-        {
-            ModelState.AddModelError(nameof(Attachments), error);
-        }
-
         var pollErrors = new List<string>();
         var newPoll = (Poll ?? new ForumPollForm()).ToNewPoll(memberId.Value, pollErrors);
         foreach (var error in pollErrors)
@@ -92,56 +69,46 @@ public sealed class NewThreadModel(
 
         if (!ModelState.IsValid)
         {
-            Body = sanitizedBody;
             return Page();
         }
 
-        if (!await rateLimiter.IsAllowedAsync(memberId.Value, cancellationToken))
-        {
-            return StatusCode(StatusCodes.Status429TooManyRequests);
-        }
+        var outcome = await forumPostWrite.CreateTopicAsync(
+            memberId.Value,
+            User.Identity?.Name,
+            category.Id,
+            Subject,
+            Body,
+            Attachments,
+            newPoll,
+            cancellationToken);
 
-        var authorDisplayName = await ResolveAuthorDisplayNameAsync(memberId.Value, cancellationToken);
-        var createdAt = timeProvider.GetUtcNow();
-        ForumThreadCreateResult created;
-        try
-        {
-            created = await forumWriteRepository.CreateThreadAsync(
-                new NewForumThread(
-                    category.Id,
-                    memberId.Value,
-                    authorDisplayName,
-                    Subject,
-                    sanitizedBody,
-                    createdAt,
-                    newPoll),
-                cancellationToken);
-            await forumSearchIndex.UpsertThreadAsync(created.TopicId, Subject, createdAt, cancellationToken);
+        return MapOutcome(outcome);
+    }
 
-            if (attachmentValidation.AcceptedFiles.Count > 0)
-            {
-                await attachmentUploadService.UploadAndSaveAsync(
-                    created.StarterPostId,
-                    memberId.Value,
-                    attachmentValidation.AcceptedFiles,
-                    cancellationToken);
-            }
-        }
-        catch (NotSupportedException ex)
+    private IActionResult MapOutcome(ForumWriteOutcome outcome)
+    {
+        Body = outcome.SanitizedBody;
+        switch (outcome.Status)
         {
-            ModelState.AddModelError(nameof(Attachments), ex.Message);
-            Body = sanitizedBody;
-            return Page();
-        }
-        catch (BlobUploadException ex)
-        {
-            ModelState.AddModelError(nameof(Attachments), ex.Message);
-            Body = sanitizedBody;
-            return Page();
-        }
+            case ForumWriteStatus.Success:
+                return Redirect(ForumRoutes.GetTopicCanonicalPath(outcome.TopicId, outcome.Title));
+            case ForumWriteStatus.CategoryNotFound:
+                return NotFound();
+            case ForumWriteStatus.RateLimited:
+                return StatusCode(StatusCodes.Status429TooManyRequests);
+            case ForumWriteStatus.MemberSuspended:
+                return Challenge();
+            case ForumWriteStatus.ValidationFailed:
+            case ForumWriteStatus.AttachmentFailed:
+                foreach (var error in outcome.FieldErrors)
+                {
+                    ModelState.AddModelError(error.Field, error.Message);
+                }
 
-        publicQueryCache.InvalidateForumStatsCache();
-        return Redirect(ForumRoutes.GetTopicCanonicalPath(created.TopicId, Subject));
+                return Page();
+            default:
+                return Page();
+        }
     }
 
     private async Task<ForumCategorySummary?> ResolveCategoryAsync(string categorySlug, CancellationToken cancellationToken)
@@ -150,17 +117,6 @@ public sealed class NewThreadModel(
         var category = categories.FirstOrDefault(item =>
             string.Equals(NewsSlug.Slugify(item.Name), categorySlug, StringComparison.OrdinalIgnoreCase));
         return category is null ? null : PublicContentMapper.ToForumCategorySummary(category);
-    }
-
-    private async Task<string> ResolveAuthorDisplayNameAsync(Guid memberId, CancellationToken cancellationToken)
-    {
-        var account = await memberAccountService.FindByIdAsync(memberId, cancellationToken);
-        if (!string.IsNullOrWhiteSpace(account?.DisplayName))
-        {
-            return account.DisplayName;
-        }
-
-        return string.IsNullOrWhiteSpace(User.Identity?.Name) ? "Member" : User.Identity.Name;
     }
 
     private void PopulatePage(ForumCategorySummary category)

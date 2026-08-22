@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { archiveDisclaimer, radius, space, type, useTheme } from '../theme';
@@ -15,6 +16,7 @@ type Props = {
   description: string;
   actions?: PlaceholderAction[];
   headerShown?: boolean;
+  footer?: ReactNode;
 };
 
 /**
@@ -28,6 +30,7 @@ export function PlaceholderScreen({
   description,
   actions = [],
   headerShown = true,
+  footer,
 }: Props) {
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
@@ -94,6 +97,7 @@ export function PlaceholderScreen({
       <Text style={[type.caption, { color: c.textMuted, marginTop: space.xxl }]}>
         {archiveDisclaimer}
       </Text>
+      {footer}
     </ScrollView>
   );
 }

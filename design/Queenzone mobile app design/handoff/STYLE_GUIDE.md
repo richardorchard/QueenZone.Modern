@@ -1,5 +1,7 @@
 # Queenzone — Style Guide
 
+*Version 2 · 22 August 2026.*
+
 **This is the document to read before writing any new screen or section.** It is not a list of
 tokens (that's `theme.ts`); it is the set of rules and recipes that make a *new* piece of the app
 look like it was always there.
@@ -9,7 +11,7 @@ build the tenth.
 
 ---
 
-## 1. The five rules
+## 1. The six rules
 
 Everything else in this document follows from these. If a new section breaks one, it is wrong even
 if it looks nice.
@@ -27,7 +29,13 @@ if it looks nice.
 4. **Photography is monochrome, large, and alone.** One strong image per section, never a mosaic
    of small colour thumbs. Never place competing elements over an image except the scrim + title
    block.
-5. **Quiet motion, quiet surfaces.** 180/320/620ms, one easing curve, fades and 6px rises. No
+5. **One icon set: Lucide, outline, 1.5 stroke.** Never hand-draw a glyph, never use a filled or
+   duotone variant, never use unicode or emoji as an icon. If Lucide has no suitable glyph, the
+   answer is a text label, not a bespoke drawing. Tab glyphs are fixed: `house`, `newspaper`,
+   `camera`, `archive`, `message-square`. Active state is a colour change on the pressable
+   (`currentColor`), plus a distinct glyph where the state is binary (`bookmark` →
+   `bookmark-check`) — never a filled version of the same glyph.
+6. **Quiet motion, quiet surfaces.** 180/320/620ms, one easing curve, fades and 6px rises. No
    bounce, no parallax, no looping, no decorative gradients, no heavy shadows, no emoji — ever.
 
 ---
@@ -72,6 +80,11 @@ Six shapes cover everything this app needs. Pick one; do not invent a seventh wi
 | **Feature block** | A single editorial statement (On This Day, an appeal, an anniversary) | `surfaceRaised` panel `#181614`, 1px `rgba(184,154,74,0.34)`, crest watermark at 6%, Eyebrow → Cinzel numeral or Cormorant title → 15/24 body → outline Button. Max **one per screen**. |
 | **Grid** | Photography only | 3-up, 3px gaps, `aspectRatio: 1`, no captions in the grid. |
 | **Stat row** | Archive scale, member counts | 2–3 columns, Cormorant 22–26 figure over a Cinzel-cased 9.5 label. Numbers stated plainly: `104,882`, `4,000+`. |
+
+**Where new sections live.** The five tabs mirror the website nav (Home · News · Photography ·
+Archive · Forum) and are **fixed** — do not add a sixth tab. A new archive section (a tribute, a
+tour book, fan performances) becomes a row on the Archive hub and a screen in `ArchiveStack`.
+A new piece of curation becomes a section on Home. Nothing else creates top-level navigation.
 
 **Rule of one:** at most one Hero, one Feature block and one Grid per screen. A screen that needs
 two Feature blocks actually needs a new screen.
@@ -176,10 +189,13 @@ Press feedback: `chrome.pressFeedback` — iOS opacity 0.85 + 1px depress, Andro
 The reasoning, so the next one can be done without asking.
 
 1. **Meaning:** peer items, image-led, browsable → **Rail** (§3).
-2. **Placement:** after "From the vaults", before the On This Day block — Today already has one
+2. **Placement:** after "Featured stories", before the On This Day block — Home already has one
    Feature block, so no second one.
 3. **Header:** Eyebrow `RECENTLY RESTORED` (Cinzel 11, `textPrimary`) + ghost link `ALL` → Photos,
    hairline under, 34 above.
+   *If the new thing is a whole archive section rather than a rail, it does not go on Home at all —
+   it becomes a row on the **Archive hub** (spec §4.3b) plus its own screen, and Home links to it
+   through the "Explore the archive" rows.*
 4. **Items:** `FeatureCard` 216 wide; kicker uses `Badge role="restored"` → gold, because
    restoration is one of the four accent meanings.
 5. **Copy:** titles sentence case; meta `RESTORED AUGUST 2026 · 14 FRAMES`.

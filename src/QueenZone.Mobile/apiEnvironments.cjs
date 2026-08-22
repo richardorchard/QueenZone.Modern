@@ -5,7 +5,7 @@
  */
 const defaultApiBaseUrls = {
   development: 'http://localhost:5146',
-  staging: 'https://queenzone-dev.azurewebsites.net',
+  staging: 'https://www.queenzone.org',
   production: 'https://www.queenzone.org',
 };
 
@@ -85,10 +85,41 @@ function rewriteLoopbackForAndroid(apiBaseUrl, platform) {
   return url.origin;
 }
 
+/**
+ * iOS CFBundleVersion / Expo `ios.buildNumber`.
+ *
+ * App Store Connect rejects uploads when CFBundleVersion is not greater than
+ * the previously uploaded build. Expo writes a literal build number into
+ * Info.plist at prebuild time, so CI must set IOS_BUILD_NUMBER (or
+ * GITHUB_RUN_NUMBER) before `expo prebuild` — passing CURRENT_PROJECT_VERSION
+ * to xcodebuild alone does not change a hardcoded Info.plist value.
+ *
+ * @param {{ override?: string | null, githubRunNumber?: string | null, fallback?: string | null }} [input]
+ * @returns {string}
+ */
+function resolveIosBuildNumber(input = {}) {
+  const candidates = [input.override, input.githubRunNumber, input.fallback, '1'];
+  for (const raw of candidates) {
+    const value = (raw ?? '').trim();
+    if (!value) {
+      continue;
+    }
+    if (!/^[0-9]+$/.test(value) || Number(value) < 1) {
+      throw new Error(
+        `iOS build number must be a positive integer (got "${raw}").`,
+      );
+    }
+    // Normalize leading zeros (Apple accepts numeric strings; keep canonical form).
+    return String(Number(value));
+  }
+  return '1';
+}
+
 module.exports = {
   defaultApiBaseUrls,
   normalizeApiBaseUrl,
   resolveApiBaseUrl,
   resolveAppEnvironment,
+  resolveIosBuildNumber,
   rewriteLoopbackForAndroid,
 };

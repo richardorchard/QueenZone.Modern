@@ -42,4 +42,28 @@ public sealed class ForumUgcHtmlTests
 
         Assert.Contains("ugc.queenzone.org/ugc-forum/", result);
     }
+
+    [Fact]
+    public void WrapPlainText_EscapesMarkupAndSplitsParagraphs()
+    {
+        var html = UgcHtml.WrapPlainText("Hello <em>fans</em>\nsecond line\n\nNext paragraph");
+
+        Assert.Equal(
+            "<p>Hello &lt;em&gt;fans&lt;/em&gt;<br>second line</p><p>Next paragraph</p>",
+            html);
+    }
+
+    [Fact]
+    public void NormalizeForStorage_WrapsPlainTextAndSanitizesHtml()
+    {
+        var sanitizer = Create();
+
+        var wrapped = sanitizer.NormalizeForStorage("Hello from the app");
+        Assert.Equal("<p>Hello from the app</p>", wrapped);
+
+        var sanitized = sanitizer.NormalizeForStorage("<p>Hi<script>alert(1)</script></p>");
+        Assert.Equal("<p>Hi</p>", sanitized);
+
+        Assert.Equal(string.Empty, sanitizer.NormalizeForStorage("   "));
+    }
 }

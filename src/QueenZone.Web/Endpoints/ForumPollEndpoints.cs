@@ -63,36 +63,17 @@ public static class ForumPollEndpoints
             return Results.BadRequest(new { error = "Invalid antiforgery token." });
         }
 
-        var optionIds = form["optionIds"]
-            .SelectMany(value => (value ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-            .Concat(form["optionId"].Where(value => !string.IsNullOrWhiteSpace(value)))
-            .Select(value => Guid.TryParse(value, out var id) ? id : Guid.Empty)
-            .Where(id => id != Guid.Empty)
-            .Distinct()
-            .ToArray();
-
-        var returnUrl = form["returnUrl"].ToString();
-        if (string.IsNullOrWhiteSpace(returnUrl) || !returnUrl.StartsWith("/forum/", StringComparison.Ordinal))
-        {
-            returnUrl = "/forum";
-        }
+        var optionIds = ForumPollVoteMapper.ParseOptionIds(form);
+        var returnUrl = ResolveReturnUrl(form);
 
         try
         {
             await pollRepository.CastVoteAsync(pollId, memberId.Value, optionIds, cancellationToken);
             return Results.Redirect(returnUrl + "#poll");
         }
-        catch (ForumPollVoteException ex) when (ex.Code is ForumPollVoteException.AlreadyVoted)
-        {
-            return Results.Conflict(new { error = ex.Message, code = ex.Code });
-        }
-        catch (ForumPollVoteException ex) when (ex.Code is ForumPollVoteException.NotFound)
-        {
-            return Results.NotFound(new { error = ex.Message, code = ex.Code });
-        }
         catch (ForumPollVoteException ex)
         {
-            return Results.BadRequest(new { error = ex.Message, code = ex.Code });
+            return ForumPollVoteMapper.ToFormResult(ex);
         }
     }
 
@@ -125,12 +106,7 @@ public static class ForumPollEndpoints
             return Results.BadRequest(new { error = "Invalid antiforgery token." });
         }
 
-        var returnUrl = form["returnUrl"].ToString();
-        if (string.IsNullOrWhiteSpace(returnUrl) || !returnUrl.StartsWith("/forum/", StringComparison.Ordinal))
-        {
-            returnUrl = "/forum";
-        }
-
+        var returnUrl = ResolveReturnUrl(form);
         var isAdmin = IsAdmin(httpContext.User, adminOptions);
 
         try
@@ -138,20 +114,20 @@ public static class ForumPollEndpoints
             await pollRepository.ClosePollAsync(pollId, memberId.Value, isAdmin, cancellationToken);
             return Results.Redirect(returnUrl + "#poll");
         }
-        catch (ForumPollVoteException ex) when (ex.Code is ForumPollVoteException.Forbidden)
-        {
-            return Results.Forbid();
-        }
-        catch (ForumPollVoteException ex) when (ex.Code is ForumPollVoteException.NotFound)
-        {
-            return Results.NotFound(new { error = ex.Message, code = ex.Code });
-        }
         catch (ForumPollVoteException ex)
         {
-            return Results.BadRequest(new { error = ex.Message, code = ex.Code });
+            return ForumPollVoteMapper.ToFormResult(ex);
         }
     }
 
     internal static bool IsAdmin(ClaimsPrincipal user, AdminOptions adminOptions) =>
         AdminAllowlist.IsAllowed(user, adminOptions);
+
+    private static string ResolveReturnUrl(IFormCollection form)
+    {
+        var returnUrl = form["returnUrl"].ToString();
+        return string.IsNullOrWhiteSpace(returnUrl) || !returnUrl.StartsWith("/forum/", StringComparison.Ordinal)
+            ? "/forum"
+            : returnUrl;
+    }
 }

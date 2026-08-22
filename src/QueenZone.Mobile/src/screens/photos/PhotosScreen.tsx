@@ -1,30 +1,124 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { PlaceholderScreen } from '../../ui/PlaceholderScreen';
-import { useSession } from '../../session/SessionContext';
+import { useCallback } from 'react';
+import { FlatList, Pressable, RefreshControl, Text, useWindowDimensions, View } from 'react-native';
+import { fetchPhotoCategories, type PhotoCategoryListItem } from '../../api';
+import { usePagedContent } from '../../hooks/usePagedContent';
 import type { PhotosStackParamList } from '../../navigation/types';
+import { useSession } from '../../session/SessionContext';
+import { radius, space, type, useTheme } from '../../theme';
+import { ArchiveImage } from '../../ui/ArchiveImage';
+import { Button } from '../../ui/Button';
+import { PageTitleBlock } from '../../ui/PageTitleBlock';
+import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from '../../ui/ScreenStates';
+import { photoCdnSource, photoCountLabel } from './photoGalleryMeta';
 
 type Props = NativeStackScreenProps<PhotosStackParamList, 'PhotoIndex'>;
 
+const GAP = 12;
+const COLS = 2;
+
 export function PhotosScreen({ navigation }: Props) {
+  const { c } = useTheme();
   const { isSignedIn } = useSession();
+  const width = useWindowDimensions().width;
+  const tile = (width - space.xl * 2 - GAP) / COLS;
+  const paged = usePagedContent<PhotoCategoryListItem>(
+    useCallback((page, signal) => fetchPhotoCategories({ page, pageSize: 20, signal }), []),
+    20,
+  );
+
+  if (paged.loading && paged.items.length === 0) {
+    return <LoadingBlock label="Loading photography…" />;
+  }
+
+  if (paged.error && paged.items.length === 0) {
+    return <ErrorBlock message={paged.error} onRetry={paged.reload} />;
+  }
 
   return (
-    <PlaceholderScreen
-      title="Photography"
-      epic="Epic 4 — Photo galleries"
-      access="public"
-      headerShown={false}
-      description="Public gallery browse, matching /photography. Submitting a photo is a member action, the same as the website."
-      actions={[
-        {
-          label: 'Open a photograph',
-          onPress: () => navigation.navigate('PhotoViewer', { id: 'sample' }),
-          variant: 'outline',
-        },
-        isSignedIn
-          ? { label: 'Submit a photo', onPress: () => navigation.navigate('PhotoSubmit') }
-          : { label: 'Sign in to submit', onPress: () => navigation.navigate('PhotoSubmit'), variant: 'ghost' },
-      ]}
+    <FlatList
+      style={{ flex: 1, backgroundColor: c.surfacePage }}
+      data={paged.items}
+      keyExtractor={(item) => item.slug}
+      numColumns={COLS}
+      ListHeaderComponent={
+        <PageTitleBlock
+          eyebrow="The photographic archive"
+          title="Photography"
+          subtitle="Restored photographs, contact sheets and archive image collections, organised by collection."
+        />
+      }
+      columnWrapperStyle={{ gap: GAP, paddingHorizontal: space.xl }}
+      contentContainerStyle={{ paddingBottom: space.section }}
+      ListEmptyComponent={<EmptyBlock message="No photo collections are available yet." />}
+      ListFooterComponent={
+        <View style={{ paddingTop: 26, alignItems: 'center', gap: space.md }}>
+          <ListFooterLoading visible={paged.loadingMore} />
+          {isSignedIn ? (
+            <Button
+              label="Submit a photo"
+              variant="ghost"
+              size="sm"
+              onPress={() => navigation.navigate('PhotoSubmit')}
+            />
+          ) : (
+            <Button
+              label="Sign in to submit"
+              variant="ghost"
+              size="sm"
+              onPress={() => navigation.navigate('PhotoSubmit')}
+            />
+          )}
+        </View>
+      }
+      refreshControl={
+        <RefreshControl
+          refreshing={paged.refreshing}
+          onRefresh={paged.refresh}
+          tintColor={c.accentPrimary}
+        />
+      }
+      onEndReached={paged.loadMore}
+      onEndReachedThreshold={0.4}
+      renderItem={({ item }) => {
+        const cover = photoCdnSource(item.coverThumbnailUrl);
+        return (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${item.name}, ${photoCountLabel(item.imageCount)}`}
+            onPress={() => navigation.navigate('PhotoCategory', { slug: item.slug, name: item.name })}
+            style={{ width: tile, marginBottom: GAP }}
+          >
+            <View
+              style={{
+                height: tile * 0.78,
+                borderRadius: radius.sm,
+                overflow: 'hidden',
+                backgroundColor: c.surfaceCard,
+              }}
+            >
+              {cover ? (
+                <ArchiveImage
+                  source={cover}
+                  label={item.name}
+                  recyclingKey={item.slug}
+                  priority="low"
+                  style={{ width: '100%', height: '100%' }}
+                />
+              ) : null}
+            </View>
+            <Text
+              style={[type.listTitle, { color: c.textPrimary, marginTop: space.sm }]}
+              numberOfLines={2}
+            >
+              {item.name}
+            </Text>
+            <Text style={[type.meta, { color: c.textMuted, marginTop: 2 }]}>
+              {photoCountLabel(item.imageCount)}
+            </Text>
+          </Pressable>
+        );
+      }}
     />
   );
 }

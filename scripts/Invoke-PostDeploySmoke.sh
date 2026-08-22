@@ -48,6 +48,8 @@ PATHS=(
   "/biography"
   "/photography"
   "/search"
+  "/api/v1"
+  "/api/v1/content/news?pageSize=1"
 )
 
 check_path() {
@@ -64,6 +66,20 @@ check_path() {
   if [ "$path" = "/health" ] || [ "$path" = "$WARMUP_PATH" ]; then
     if ! grep -q '"status":"ok"' "$body_file"; then
       echo "  ✗ $path → 200 but body missing \"status\":\"ok\""
+      rm -f "$body_file"
+      return 1
+    fi
+  fi
+  if [ "$path" = "/api/v1" ]; then
+    if ! grep -q '"version":"v1"' "$body_file"; then
+      echo "  ✗ $path → 200 but body missing \"version\":\"v1\""
+      rm -f "$body_file"
+      return 1
+    fi
+  fi
+  if [ "$path" = "/api/v1/content/news?pageSize=1" ]; then
+    if ! grep -q '"items"' "$body_file"; then
+      echo "  ✗ $path → 200 but body missing items array"
       rm -f "$body_file"
       return 1
     fi

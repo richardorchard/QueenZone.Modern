@@ -63,7 +63,9 @@ $paths = @(
     "/articles",
     "/biography",
     "/photography",
-    "/search"
+    "/search",
+    "/api/v1",
+    "/api/v1/content/news?pageSize=1"
 )
 
 $failed = 0
@@ -78,6 +80,16 @@ foreach ($path in $paths) {
         }
         if ($path -eq "/health" -and $response.Content -notmatch '"status"\s*:\s*"ok"') {
             Write-Host "FAIL  $url -> 200 but body missing status=ok"
+            $failed++
+            continue
+        }
+        if ($path -eq "/api/v1" -and $response.Content -notmatch '"version"\s*:\s*"v1"') {
+            Write-Host "FAIL  $url -> 200 but body missing version=v1"
+            $failed++
+            continue
+        }
+        if ($path -like "/api/v1/content/*" -and $response.Content -notmatch '"items"') {
+            Write-Host "FAIL  $url -> 200 but body missing items array"
             $failed++
             continue
         }
