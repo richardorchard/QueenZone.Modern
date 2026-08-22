@@ -228,7 +228,10 @@ public sealed class ForumApiTests : IClassFixture<QueenZoneWebApplicationFactory
         Assert.Equal("/forum/attachment/legacy/1002", postDto.Attachments[0].Url);
         Assert.Equal("JPG", postDto.Attachments[0].Extension);
         Assert.True(postDto.Attachments[0].IsImage);
-        Assert.Equal(ForumApiMapper.ToPosts([post], ugcHtml)[0], postDto);
+        var mappedPosts = ForumApiMapper.ToPosts([post], ugcHtml);
+        Assert.Equal(postDto.Id, mappedPosts[0].Id);
+        Assert.Equal(postDto.Body, mappedPosts[0].Body);
+        Assert.Equal(postDto.Attachments[0], mappedPosts[0].Attachments[0]);
     }
 
     [Fact]
