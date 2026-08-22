@@ -1,76 +1,59 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useMemo, useState } from 'react';
-import { Dimensions, FlatList, Pressable, ScrollView, Text, View } from 'react-native';
-import { photoCategories, samplePhotos } from '../../content/sample';
+import { useCallback } from 'react';
+import { FlatList, Pressable, RefreshControl, Text, useWindowDimensions, View } from 'react-native';
+import { fetchPhotoCategories, type PhotoCategoryListItem } from '../../api';
+import { usePagedContent } from '../../hooks/usePagedContent';
 import type { PhotosStackParamList } from '../../navigation/types';
 import { useSession } from '../../session/SessionContext';
-import { space, type, useTheme } from '../../theme';
+import { radius, space, type, useTheme } from '../../theme';
 import { ArchiveImage } from '../../ui/ArchiveImage';
 import { Button } from '../../ui/Button';
-import { Chip } from '../../ui/Chip';
 import { PageTitleBlock } from '../../ui/PageTitleBlock';
+import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from '../../ui/ScreenStates';
+import { photoCdnSource, photoCountLabel } from './photoGalleryMeta';
 
 type Props = NativeStackScreenProps<PhotosStackParamList, 'PhotoIndex'>;
 
-const GAP = 3;
-const COLS = 3;
+const GAP = 12;
+const COLS = 2;
 
 export function PhotosScreen({ navigation }: Props) {
   const { c } = useTheme();
   const { isSignedIn } = useSession();
-  const [category, setCategory] = useState<(typeof photoCategories)[number]>('ALL');
-  const width = Dimensions.get('window').width;
-  const tile = (width - GAP * (COLS - 1) - GAP * 2) / COLS;
-
-  const photos = useMemo(
-    () => (category === 'ALL' ? samplePhotos : samplePhotos.filter((photo) => photo.category === category)),
-    [category],
+  const width = useWindowDimensions().width;
+  const tile = (width - space.xl * 2 - GAP) / COLS;
+  const paged = usePagedContent<PhotoCategoryListItem>(
+    useCallback((page, signal) => fetchPhotoCategories({ page, pageSize: 20, signal }), []),
+    20,
   );
+
+  if (paged.loading && paged.items.length === 0) {
+    return <LoadingBlock label="Loading photography…" />;
+  }
+
+  if (paged.error && paged.items.length === 0) {
+    return <ErrorBlock message={paged.error} onRetry={paged.reload} />;
+  }
 
   return (
     <FlatList
       style={{ flex: 1, backgroundColor: c.surfacePage }}
-      data={photos}
-      keyExtractor={(item) => item.id}
+      data={paged.items}
+      keyExtractor={(item) => item.slug}
       numColumns={COLS}
       ListHeaderComponent={
-        <View>
-          <PageTitleBlock
-            eyebrow="The archive"
-            title="Photography"
-            subtitle="Tens of thousands of frames · 1,240 restored"
-          />
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: space.xl, gap: 8, paddingBottom: 16 }}
-          >
-            {photoCategories.map((item) => (
-              <Chip key={item} label={item} active={category === item} onPress={() => setCategory(item)} />
-            ))}
-          </ScrollView>
-        </View>
+        <PageTitleBlock
+          eyebrow="The photographic archive"
+          title="Photography"
+          subtitle="Restored photographs, contact sheets and archive image collections, organised by collection."
+        />
       }
-      columnWrapperStyle={{ gap: GAP, paddingHorizontal: GAP }}
+      columnWrapperStyle={{ gap: GAP, paddingHorizontal: space.xl }}
       contentContainerStyle={{ paddingBottom: space.section }}
-      renderItem={({ item }) => (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={item.caption}
-          onPress={() => navigation.navigate('PhotoViewer', { id: item.id })}
-          style={{ width: tile, marginBottom: GAP }}
-        >
-          <ArchiveImage
-            source={item.image}
-            label={item.caption}
-            recyclingKey={item.id}
-            style={{ width: tile, height: tile }}
-          />
-        </Pressable>
-      )}
+      ListEmptyComponent={<EmptyBlock message="No photo collections are available yet." />}
       ListFooterComponent={
         <View style={{ paddingTop: 26, alignItems: 'center', gap: space.md }}>
-          <Text style={[type.eyebrow, { color: c.textMuted }]}>Page 1 of 104</Text>
+          <ListFooterLoading visible={paged.loadingMore} />
           {isSignedIn ? (
             <Button
               label="Submit a photo"
@@ -88,6 +71,54 @@ export function PhotosScreen({ navigation }: Props) {
           )}
         </View>
       }
+      refreshControl={
+        <RefreshControl
+          refreshing={paged.refreshing}
+          onRefresh={paged.refresh}
+          tintColor={c.accentPrimary}
+        />
+      }
+      onEndReached={paged.loadMore}
+      onEndReachedThreshold={0.4}
+      renderItem={({ item }) => {
+        const cover = photoCdnSource(item.coverThumbnailUrl);
+        return (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${item.name}, ${photoCountLabel(item.imageCount)}`}
+            onPress={() => navigation.navigate('PhotoCategory', { slug: item.slug, name: item.name })}
+            style={{ width: tile, marginBottom: GAP }}
+          >
+            <View
+              style={{
+                height: tile * 0.78,
+                borderRadius: radius.sm,
+                overflow: 'hidden',
+                backgroundColor: c.surfaceCard,
+              }}
+            >
+              {cover ? (
+                <ArchiveImage
+                  source={cover}
+                  label={item.name}
+                  recyclingKey={item.slug}
+                  priority="low"
+                  style={{ width: '100%', height: '100%' }}
+                />
+              ) : null}
+            </View>
+            <Text
+              style={[type.listTitle, { color: c.textPrimary, marginTop: space.sm }]}
+              numberOfLines={2}
+            >
+              {item.name}
+            </Text>
+            <Text style={[type.meta, { color: c.textMuted, marginTop: 2 }]}>
+              {photoCountLabel(item.imageCount)}
+            </Text>
+          </Pressable>
+        );
+      }}
     />
   );
 }

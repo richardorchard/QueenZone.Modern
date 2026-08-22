@@ -22,7 +22,11 @@ type PagedState<T> = {
 /**
  * Loads a paged `/api/v1` collection with pull-to-refresh and infinite scroll.
  */
-export function usePagedContent<T>(fetcher: Fetcher<T>, pageSize = 20): PagedState<T> {
+export function usePagedContent<T>(
+  fetcher: Fetcher<T>,
+  pageSize = 20,
+  resetKey: string | number = 0,
+): PagedState<T> {
   const [items, setItems] = useState<T[]>([]);
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
@@ -66,7 +70,7 @@ export function usePagedContent<T>(fetcher: Fetcher<T>, pageSize = 20): PagedSta
       });
 
     return () => controller.abort();
-  }, [reloadToken, pageSize]);
+  }, [reloadToken, pageSize, resetKey]);
 
   const refresh = useCallback(() => {
     const controller = new AbortController();

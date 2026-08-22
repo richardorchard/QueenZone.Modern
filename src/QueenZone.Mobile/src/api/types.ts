@@ -110,6 +110,62 @@ export type FreddieTribute = {
   timeText: string | null;
 };
 
+export type PhotoCategoryListItem = {
+  catId: number;
+  name: string;
+  slug: string;
+  imageCount: number;
+  coverThumbnailUrl: string | null;
+  detailPath: string;
+};
+
+export type PhotoListItem = {
+  picId: number;
+  catId: number;
+  categoryName: string;
+  categorySlug: string;
+  title: string;
+  thumbnailUrl: string;
+  thumbWidth: number;
+  thumbHeight: number;
+  pictureWidth: number;
+  pictureHeight: number;
+  pictureDimensionsLabel: string | null;
+  year: number;
+  dateTime: string;
+  detailPath: string;
+  categoryPath: string;
+};
+
+export type PhotoNav = {
+  picId: number;
+  detailPath: string;
+};
+
+export type PhotoDetail = {
+  picId: number;
+  catId: number;
+  categoryName: string;
+  categorySlug: string;
+  title: string;
+  imageUrl: string;
+  thumbnailUrl: string;
+  thumbWidth: number;
+  thumbHeight: number;
+  pictureWidth: number;
+  pictureHeight: number;
+  pictureDimensionsLabel: string | null;
+  year: number;
+  dateTime: string;
+  submittedByDisplayName: string | null;
+  detailPath: string;
+  categoryPath: string;
+  index: number;
+  count: number;
+  previous: PhotoNav | null;
+  next: PhotoNav | null;
+};
+
 export type ForumCategoryListItem = {
   id: number;
   name: string;

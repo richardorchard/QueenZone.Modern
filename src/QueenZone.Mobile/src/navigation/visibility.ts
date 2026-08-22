@@ -38,6 +38,7 @@ export const publicScreenNames = [
   'Search',
   'NewsIndex',
   'PhotoIndex',
+  'PhotoCategory',
   'PhotoViewer',
   'ForumIndex',
   'Category',
