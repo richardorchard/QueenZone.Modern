@@ -1,5 +1,8 @@
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using QueenZone.Data;
 using QueenZone.Data.Entities;
@@ -211,6 +214,19 @@ public sealed class HelpRequestServiceTests
 
         Assert.False(result.Succeeded);
         Assert.Contains("Too many", result.Error, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void ResolveClientIp_UsesRemoteAddressThenAutomatedTestFallback()
+    {
+        var withIp = new DefaultHttpContext();
+        withIp.Connection.RemoteIpAddress = System.Net.IPAddress.Parse("203.0.113.40");
+        Assert.Equal("203.0.113.40", HelpRequestService.ResolveClientIp(withIp));
+
+        var services = new ServiceCollection();
+        services.AddSingleton<IHostEnvironment>(new FakeHostEnvironment(QueenZoneEnvironments.Testing));
+        var testing = new DefaultHttpContext { RequestServices = services.BuildServiceProvider() };
+        Assert.Equal("test", HelpRequestService.ResolveClientIp(testing));
     }
 
     private static async Task<MemberAccount> CreateMemberAsync(

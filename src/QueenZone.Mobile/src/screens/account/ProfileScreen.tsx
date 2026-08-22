@@ -52,8 +52,8 @@ export function ProfileScreen({ navigation }: Props) {
           <Button label="Sign in" onPress={signIn} />
           <Button label="Create an account" variant="ghost" onPress={signIn} />
         </View>
-        <Pressable accessibilityRole="button" onPress={() => navigation.navigate('Help')}>
-          <Text style={[type.button, { color: c.accentPrimary }]}>Help</Text>
+        <Pressable accessibilityRole="button" onPress={() => navigation.navigate('Contact')}>
+          <Text style={[type.button, { color: c.accentPrimary }]}>Contact</Text>
         </Pressable>
         <Text style={[type.caption, { color: c.textMuted, textAlign: 'center' }]}>
           API {appEnv} → {apiBaseUrl}
@@ -146,7 +146,7 @@ export function ProfileScreen({ navigation }: Props) {
       <SettingsRow title="Notifications" onPress={() => navigation.navigate('Settings')} />
       <SettingsRow title="Account & privacy" onPress={() => navigation.navigate('Settings')} />
       <SettingsRow title="About the archive" onPress={() => navigation.getParent()?.navigate('ArchiveTab', { screen: 'AboutArchive' })} />
-      <SettingsRow title="Help" onPress={() => navigation.navigate('Help')} />
+      <SettingsRow title="Contact" onPress={() => navigation.navigate('Contact')} />
       <View style={{ paddingHorizontal: space.xl, paddingTop: space.xl }}>
         <Button label="Sign out (development)" variant="outline" onPress={signOut} />
         <Text style={[type.caption, { color: c.textMuted, marginTop: space.md, fontFamily: fonts.body }]}>

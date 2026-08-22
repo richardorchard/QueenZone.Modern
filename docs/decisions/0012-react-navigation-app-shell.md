@@ -23,7 +23,7 @@ Auth-gated vs public *content* still matches the website, not a mobile-only
 policy:
 
 - Public: archive (news, biography, discography, timeline, Freddie Tribute),
-  photography browse, forum browse, fan-performance listings, Help, account
+  photography browse, forum browse, fan-performance listings, Contact, account
   sign-in, profile (signed-out variant).
 - Members: private messages, forum compose/reply, photo submit, fan-performance
   audio, settings and saved library.

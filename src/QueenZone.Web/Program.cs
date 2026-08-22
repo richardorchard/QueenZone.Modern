@@ -265,6 +265,7 @@ app.MapAdminApiEndpoints();
 app.MapMobileAuthEndpoints();
 app.MapContentApiEndpoints();
 app.MapForumApiEndpoints();
+app.MapContactApiEndpoints();
 // Anonymous public HTML is output-cached (short TTL); policy no-ops for authenticated users
 // and for the Testing environment so integration suites stay deterministic.
 app.MapRazorPages().CacheOutput(PublicOutputCachePolicies.PublicHtml);

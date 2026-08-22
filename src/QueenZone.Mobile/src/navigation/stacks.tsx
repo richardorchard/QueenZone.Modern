@@ -5,7 +5,7 @@ import { HomeScreen } from '../screens/home/HomeScreen';
 import { ProfileScreen } from '../screens/account/ProfileScreen';
 import { SettingsScreen } from '../screens/account/SettingsScreen';
 import { SignInScreen } from '../screens/account/SignInScreen';
-import { HelpScreen } from '../screens/account/HelpScreen';
+import { ContactScreen } from '../screens/account/ContactScreen';
 import { SavedListScreen } from '../screens/account/SavedListScreen';
 import { InboxScreen } from '../screens/messages/InboxScreen';
 import { ConversationScreen } from '../screens/messages/ConversationScreen';
@@ -64,7 +64,7 @@ export function HomeStack() {
       <Home.Screen name="Profile" component={ProfileScreen} />
       <Home.Screen name="Settings" component={SettingsScreen} />
       <Home.Screen name="SignIn" component={SignInScreen} options={{ title: 'Sign in' }} />
-      <Home.Screen name="Help" component={HelpScreen} />
+      <Home.Screen name="Contact" component={ContactScreen} options={{ title: 'Contact' }} />
       <Home.Screen name="Inbox" component={InboxScreen} options={{ title: 'Messages' }} />
       <Home.Screen name="Conversation" component={ConversationScreen} />
       <Home.Screen name="ComposeMessage" component={ComposeMessageScreen} options={{ title: 'New message' }} />
