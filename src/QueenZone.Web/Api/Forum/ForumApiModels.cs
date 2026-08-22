@@ -59,8 +59,8 @@ public sealed record ForumPostDto(
 
 /// <summary>
 /// Attachment card for a forum post. <see cref="Url"/> is the existing
-/// member-gated download path (<c>/forum/attachment/...</c>), not a parallel
-/// API stream.
+/// cookie-gated download path (<c>/forum/attachment/...</c>). Mobile clients
+/// must not open it; a Bearer download API is a follow-up before #733.
 /// </summary>
 public sealed record ForumAttachmentDto(
     string FileName,

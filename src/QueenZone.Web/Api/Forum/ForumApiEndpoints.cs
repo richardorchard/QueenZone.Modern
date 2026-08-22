@@ -7,8 +7,10 @@ namespace QueenZone.Web;
 /// and topic threads (issues #731 / #732). No authentication required: the
 /// website forum index, category, and topic pages are public. Visibility is the
 /// same <see cref="IForumRepository"/> path used by Razor Pages — synthetic
-/// boards and unvalidated topic starters stay hidden. Attachments reuse the
-/// existing member-gated <c>/forum/attachment/...</c> paths.
+/// boards and unvalidated topic starters stay hidden. Attachment metadata
+/// includes the existing member-gated <c>/forum/attachment/...</c> paths; the
+/// mobile client does not open those URLs. A Bearer-authenticated download API
+/// is a follow-up before #733 uploads rely on opening attachments.
 /// </summary>
 public static class ForumApiEndpoints
 {
@@ -46,7 +48,7 @@ public static class ForumApiEndpoints
 
         group.MapGet("/topics/{id:int}/posts", GetTopicPostsAsync)
             .WithName("GetForumTopicPosts")
-            .WithSummary("Paged public posts in a topic, chronological, matching website pages.")
+            .WithSummary("Paged public posts in a topic, chronological, matching website pages (pageSize defaults to 15).")
             .Produces<ApiPagedResponse<ForumPostDto>>()
             .ProducesProblem(StatusCodes.Status404NotFound);
     }
@@ -145,7 +147,11 @@ public static class ForumApiEndpoints
         int? pageSize,
         CancellationToken cancellationToken)
     {
-        var request = ApiPagination.Normalize(page, pageSize);
+        var request = ApiPagination.Normalize(
+            page,
+            pageSize,
+            ForumRoutes.PostsPageSize,
+            ForumRoutes.PostsPageSize);
         var topicPage = await forumRepository.GetTopicPostsPageAsync(
             id,
             request.Page,

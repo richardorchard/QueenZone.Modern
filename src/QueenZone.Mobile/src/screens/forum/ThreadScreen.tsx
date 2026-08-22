@@ -1,14 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
-import {
-  FlatList,
-  Image,
-  Linking,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { FlatList, Image, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   ApiError,
@@ -25,7 +16,7 @@ import { useSession } from '../../session/SessionContext';
 import { RichHtmlBody } from '../../ui/RichHtmlBody';
 import { Button } from '../../ui/Button';
 import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from '../../ui/ScreenStates';
-import { isHttpUrl, resolveContentUrl } from '../../ui/html/resolveContentUrl';
+import { resolveContentUrl } from '../../ui/html/resolveContentUrl';
 import { radius, space, type, useTheme } from '../../theme';
 import {
   attachmentMeta,
@@ -40,13 +31,6 @@ type Props = NativeStackScreenProps<ForumStackParamList, 'Thread'>;
 
 function messageFromUnknownError(err: unknown): string {
   return err instanceof ApiError ? err.message : 'Something went wrong.';
-}
-
-function openResolvedUrl(href: string): void {
-  const resolved = resolveContentUrl(href, getAppConfig().apiBaseUrl);
-  if (resolved && isHttpUrl(resolved)) {
-    void Linking.openURL(resolved);
-  }
 }
 
 export function ThreadScreen({ navigation, route }: Props) {
@@ -217,29 +201,24 @@ function ForumAttachmentList({ attachments }: { attachments: ForumAttachment[] }
         return (
           <View key={`${attachment.url}-${attachment.fileName}`} style={styles.attachment}>
             {previewUri ? (
-              <Pressable
-                accessibilityRole="imagebutton"
-                accessibilityLabel={`Open image ${attachment.fileName}`}
-                onPress={() => openResolvedUrl(attachment.url)}
-              >
-                <Image
-                  source={{ uri: previewUri }}
-                  style={[styles.thumb, { backgroundColor: c.surfaceCard, borderColor: c.hairline }]}
-                  resizeMode="cover"
-                />
-              </Pressable>
+              <Image
+                source={{ uri: previewUri }}
+                style={[styles.thumb, { backgroundColor: c.surfaceCard, borderColor: c.hairline }]}
+                resizeMode="cover"
+                accessibilityLabel={attachment.fileName}
+              />
             ) : null}
-            <Pressable
-              accessibilityRole="link"
-              accessibilityLabel={`Download ${attachment.fileName}`}
-              onPress={() => openResolvedUrl(attachment.url)}
-              style={styles.attachmentLink}
-            >
-              <Text style={[type.listTitle, { color: c.accentPrimary }]}>{attachment.fileName}</Text>
+            {/*
+              Do not Linking.openURL cookie-gated /forum/attachment/... from the app.
+              A Bearer-authenticated download API is a follow-up before #733 uploads
+              rely on opening attachments.
+            */}
+            <View style={styles.attachmentMeta} accessibilityLabel={`${attachment.fileName}. ${caption}`}>
+              <Text style={[type.listTitle, { color: c.textPrimary }]}>{attachment.fileName}</Text>
               {caption ? (
                 <Text style={[type.meta, { color: c.textMuted, marginTop: space.xs }]}>{caption}</Text>
               ) : null}
-            </Pressable>
+            </View>
           </View>
         );
       })}
@@ -275,7 +254,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.xs,
     borderWidth: StyleSheet.hairlineWidth,
   },
-  attachmentLink: {
+  attachmentMeta: {
     minHeight: 48,
     justifyContent: 'center',
   },
