@@ -29,7 +29,7 @@ describe('member-only screens', () => {
     assert.equal(isMemberOnlyScreen('SavedList'), true);
   });
 
-  it('keeps archive, photos, forum browse, profile, and help public', () => {
+  it('keeps archive, photos, forum browse, profile, and contact public', () => {
     assert.equal(isMemberOnlyScreen('Home'), false);
     assert.equal(isMemberOnlyScreen('ArchiveHub'), false);
     assert.equal(isMemberOnlyScreen('NewsIndex'), false);
@@ -40,7 +40,7 @@ describe('member-only screens', () => {
     assert.equal(isMemberOnlyScreen('Thread'), false);
     assert.equal(isMemberOnlyScreen('FanPerformances'), false);
     assert.equal(isMemberOnlyScreen('FanPerformanceDetail'), false);
-    assert.equal(isMemberOnlyScreen('Help'), false);
+    assert.equal(isMemberOnlyScreen('Contact'), false);
     assert.equal(isMemberOnlyScreen('Profile'), false);
   });
 });
@@ -53,6 +53,7 @@ describe('shouldHideTabBar', () => {
     assert.equal(shouldHideTabBar('Thread'), true);
     assert.equal(shouldHideTabBar('PhotoViewer'), true);
     assert.equal(shouldHideTabBar('Profile'), true);
+    assert.equal(shouldHideTabBar('Contact'), true);
     assert.equal(shouldHideTabBar('Search'), true);
     assert.equal(shouldHideTabBar('Home'), false);
     assert.equal(shouldHideTabBar('NewsIndex'), false);

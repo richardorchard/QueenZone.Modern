@@ -6,7 +6,7 @@ export type HomeStackParamList = {
   Profile: undefined;
   Settings: undefined;
   SignIn: undefined;
-  Help: undefined;
+  Contact: undefined;
   Inbox: undefined;
   Conversation: { id: string };
   ComposeMessage: undefined;
