@@ -69,3 +69,32 @@ public sealed record ForumAttachmentDto(
     string FormattedSize,
     bool IsImage,
     string? ThumbnailUrl);
+
+/// <summary>
+/// Create-topic or reply body. Plain text is wrapped as HTML before the same
+/// <see cref="UgcHtml"/> sanitizer the website uses. Polls are not accepted (#734).
+/// </summary>
+public sealed record ForumWriteRequestDto
+{
+    public string? Title { get; init; }
+
+    public string? Subject { get; init; }
+
+    public string? Body { get; init; }
+
+    public string? ResolvedTitle =>
+        string.IsNullOrWhiteSpace(Title) ? Subject : Title;
+}
+
+/// <summary>Result of <c>POST /api/v1/forum/categories/{id}/topics</c>.</summary>
+public sealed record ForumTopicCreatedDto(
+    int Id,
+    int StarterPostId,
+    string Title,
+    string DetailPath);
+
+/// <summary>Result of <c>POST /api/v1/forum/topics/{id}/posts</c>.</summary>
+public sealed record ForumPostCreatedDto(
+    int Id,
+    int TopicId,
+    string DetailPath);
