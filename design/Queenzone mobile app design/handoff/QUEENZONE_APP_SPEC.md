@@ -1,5 +1,7 @@
 # Queenzone — React Native app build spec
 
+*Version 2 · 22 August 2026.*
+
 Hand this file (plus `theme.ts`) to a coding agent. It is the complete style, component and
 screen contract for the Queenzone iOS + Android apps. Visual reference: `Queenzone App.dc.html`
 (interactive prototype — toggle iOS/Android in the header).
@@ -21,7 +23,7 @@ mark historical entries.
 |---|---|
 | Platform parity | Brand-first, near-identical UI. Only OS *chrome* differs (status bar, nav bar, tab bar, sheets, press feedback, back). |
 | Theme | **Dark-first.** `#111111` is the default page surface. Light theme exists for `system` preference. |
-| Navigation | Bottom tab bar, 5 tabs, on **both** platforms: Today · News · Photos · Forum · You. |
+| Navigation | Bottom tab bar, 5 tabs, on **both** platforms: **Home · News · Photography · Archive · Forum** — mirroring the website nav. Profile sits behind the avatar in the Home masthead, not in the tab bar. |
 | Accounts | Real accounts. Read, save, and full forum posting. |
 | Accent on dark | **Antique Gold `#B89A4A`** takes the link/active/CTA role (Royal Blue fails contrast on `#111`). On light, Royal Blue `#244A8F` resumes that role. |
 
@@ -40,7 +42,10 @@ mark historical entries.
   Inter, Cinzel. Never fall back to system serif — the layout is tuned to Cormorant's metrics.
 - **State:** React Query (or RTK Query) for archive fetches; Zustand/Context for session, theme,
   saved-items and text-size preferences. Persist with MMKV or AsyncStorage.
-- **Icons:** `lucide-react-native`, stroke width **1.5**, outline only. No filled/duotone glyphs,
+- **Icons:** `lucide-react-native`, stroke width **1.5**, outline only. The prototype inlines the same
+  Lucide v0.446 geometry as React-owned SVG, so the glyphs match one-for-one: `house`, `newspaper`, `camera`, `archive`,
+  `message-square` (tabs); `search`, `bookmark`, `share`, `chevron-left/right`, `arrow-left`,
+  `x`, `plus`. No filled/duotone glyphs,
   no unicode-as-icon. Icon sizes: 18–20 inline, 24–25 tab bar, 28 section features.
 - The crest is **not an icon** — it is a brand asset (`crest-white.png` on dark,
   `crest-black.png` on light, `crest-silver.png` for premium hero moments).
@@ -188,24 +193,40 @@ Navigator shape:
 
 ```
 RootTabs
-├── TodayStack     → Today, Story, Search, PhotoViewer
+├── HomeStack      → Home, Story, Search, Profile, SavedList, Settings, Auth(modal)
 ├── NewsStack      → NewsIndex, Story
 ├── PhotosStack    → PhotoIndex, PhotoViewer
-├── ForumStack     → ForumIndex, Thread, Composer(modal)
-└── YouStack       → Profile, SavedList, Settings, Auth(modal)
+├── ArchiveStack   → ArchiveHub → Stories · Timeline · Biography · Discography
+│                                 · Tribute · FanPerformances · RecentlyRestored · AboutTheArchive
+└── ForumStack     → ForumIndex, Thread, Composer(modal)
 ```
-Detail screens (`Story`, `PhotoViewer`, `Thread`, `Search`) **hide the tab bar**
+
+**Why these five.** The tab bar mirrors the website's own nav (News · Stories · Photography ·
+Forum · Timeline) rather than inventing an app-only IA. Stories and Timeline are two of eight
+archive destinations, so they live under **Archive** — a hub screen, not a dead end — which also
+carries the Biography, Discography, the Freddie Mercury tribute, Fan performances, Recently
+restored and About the archive. **Home** is the curated front page (the site's homepage), not a
+personalised feed; it is called Home, never "Today". **Profile & settings** is reached from the
+avatar in the Home masthead: it is a destination users visit rarely and does not deserve a
+permanent fifth of the tab bar.
+Detail screens (`Story`, `PhotoViewer`, `Thread`, `Search`, `Profile`) **hide the tab bar**
 (`tabBarStyle: { display: 'none' }` on those routes). Every stack resets to its root on tab
 re-press (`navigation.popToTop()`).
 
-### 4.1 Today (tab 1) — no app bar, hero starts under the status bar
+### 4.1 Home (tab 1) — no app bar, hero starts under the status bar
 Sections, in order:
+0. **Floating masthead** over the hero: crest + `QUEENZONE` wordmark (Cinzel 13, tracking 0.18em)
+   left; search icon + 32px avatar right. The avatar pushes Profile. No solid bar — it sits on the
+   hero scrim, respecting the safe-area inset.
 1. `HeroFeature` (468) — the day's lead. Taps → Story.
-2. **From the vaults** — section header (Cinzel 11 + ghost "All" → News) then `FeatureCard` rail.
+2. **Featured stories** — section header (Cinzel 11 + ghost "All" → News) then `FeatureCard` rail.
 3. **This day in Queen history** — `surfaceRaised` block (`#181614`), 1px `rgba(184,154,74,0.34)`
    border, crest watermark, Cinzel Roman numeral, 15/24 body, outline Button "Read the entry".
-4. **Popular discussions** — 3 `ThreadRow`s, ghost "Forum" link.
-5. Footer — `CrestSeal` (h 38, opacity 0.34) + disclaimer: *"An independent fan archive. Not
+4. **Explore the archive** — 4 chevron rows (Cormorant 20 title + count meta) linking into the
+   Archive hub, ghost "All" → Archive. This is how Timeline, Biography, Discography and the
+   Tribute surface on the front page.
+5. **Popular discussions** — 3 `ThreadRow`s, ghost "Forum" link.
+6. Footer — `CrestSeal` (h 38, opacity 0.34) + disclaimer: *"An independent fan archive. Not
    affiliated with Queen or its representatives."*
 
 Pull-to-refresh refetches the lead + On This Day. Status-bar content is always `light-content`
@@ -218,7 +239,7 @@ Queenzone.com"), sticky decade `Chip` row (ALL / 1970s / 1980s / 1990s / 2000s),
 the fallback when auto-paging is off. Empty state: crest seal + "No articles for this decade yet."
 
 ### 4.3 Story reader (pushed)
-- App bar: back + save (`Bookmark`, fills `accentPrimary` when saved) + share. iOS bar is
+- App bar: back + save (Lucide `bookmark`, fills `accentPrimary` when saved) + share. iOS bar is
   translucent-blur; Android elevates on scroll.
 - **2px reading-progress bar** directly under the app bar, width = scroll fraction, `accentPrimary`.
 - 300px monochrome hero → scrim → title block pulled up 58px over it: Eyebrow, Cormorant 36,
@@ -232,6 +253,33 @@ the fallback when auto-paging is off. Empty state: crest seal + "No articles for
 - Footer seal + `THE QUEENZONE.COM ARCHIVE` eyebrow.
 - Respect a user text-size setting (S/M/L/XL → multiplies `type.longform` only); cap
   `allowFontScaling` growth at 1.4 for titles.
+
+### 4.3b Archive hub (tab 4)
+The screen that makes the whole archive reachable — and the one to extend when a new archive
+section is commissioned.
+
+Title block: Eyebrow `THE QUEENZONE.COM ARCHIVE`, Cormorant 34 "Explore the archive", one
+sentence of scale copy. Then eight `ArticleRow`-shaped destination rows (84px monochrome thumb,
+Badge kicker, Cormorant 23 title, count meta, chevron):
+
+| Destination | Kicker / role | Meta | Pushes |
+|---|---|---|---|
+| Stories | `LONG-FORM` / gold | 104 features · Editorial | StoriesIndex → Story |
+| Timeline | `HISTORY` / purple | 1970 — 1991 · 480 entries | Timeline (decade scroller) |
+| Biography | `THE BAND` / muted | Nine chapters | Biography → Chapter |
+| Discography | `RECORDS` / muted | 15 studio albums · Sleeves & tracklists | Discography → Album |
+| Freddie Mercury — a tribute | `IN MEMORIAM` / rose | 1946 — 1991 · Members' memories | Tribute |
+| Fan performances | `COMMUNITY` / muted | 212 submissions · Video & audio | FanPerformances |
+| Recently restored | `PRESERVED` / gold | 1,240 photographs · 340 articles | Photos tab |
+| Queenzone.com, preserved | `THE OLD SITE` / muted | How the archive was rebuilt | Story |
+
+Footer: crest seal + disclaimer. Search action in the app bar.
+
+**The destination screens themselves are not yet designed.** Timeline, Biography, Discography and
+the Gallery have existing web templates in the design system
+(`templates/biography`, `templates/discography`, `templates/gallery`) — port those layouts to
+the mobile shapes in `STYLE_GUIDE.md` §3 rather than inventing new ones. Tribute and Fan
+performances are new and need design before build.
 
 ### 4.4 Photography (tab 3)
 Title block + category `Chip`s (ALL / LIVE / STUDIO / PORTRAITS / BACKSTAGE) + 3-up `PhotoTile`
@@ -265,7 +313,7 @@ Result rows show title + typed tag (`Story · 8 min read`, `Gallery`, `News · 1
 `Forum · 312 replies`) with a chevron; tag colour is `accentPrimary` for editorial types,
 `textMuted` otherwise. Debounce 250ms. Empty: "Nothing in the archive matches that — yet."
 
-### 4.9 Profile & settings (tab 5)
+### 4.9 Profile & settings (pushed from the Home masthead avatar)
 Avatar (62, Cormorant initials) + handle + `MEMBER SINCE 2004 · 1,208 POSTS` in
 `accentPrimary`. Two-up stat grid (saved articles / saved photographs) split by 1px hairlines.
 **Library** rows: Saved articles · Saved photographs · Downloaded for offline · Reading history.
@@ -286,6 +334,7 @@ Everything not in this table is identical on both platforms.
 | Nav bar | 44pt, **centred** 17pt semibold title | 56dp, **left-aligned** 20dp title |
 | Back | Chevron + "Back" label, `accentPrimary`; edge-swipe gesture | Arrow glyph only, `textPrimary`; hardware/gesture back |
 | Tab bar | 83pt (incl. 34pt home indicator), 25pt icon + 10pt label, active = gold tint | 80dp, 24dp icon inside a **gold-tinted 64×32 pill**, 11.5dp label |
+| Long tab labels | "Photography" truncates — allow 2 lines or abbreviate to "Photos" at ≤375pt width | same rule at ≤360dp |
 | Home affordance | 134×5 indicator pill drawn at the bottom | none (gesture inset only) |
 | Sheets | Action sheet: floating card + separate Cancel, centred rows | Bottom sheet: edge-to-edge, drag handle, left rows, no Cancel |
 | Compose | Nav-bar "New" text button | 58dp FAB |

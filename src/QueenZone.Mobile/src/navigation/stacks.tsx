@@ -1,6 +1,17 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { dark } from '../theme';
-import { TodayScreen } from '../screens/archive/TodayScreen';
+import { HomeScreen } from '../screens/home/HomeScreen';
+
+import { ProfileScreen } from '../screens/account/ProfileScreen';
+import { SettingsScreen } from '../screens/account/SettingsScreen';
+import { SignInScreen } from '../screens/account/SignInScreen';
+import { HelpScreen } from '../screens/account/HelpScreen';
+import { SavedListScreen } from '../screens/account/SavedListScreen';
+import { InboxScreen } from '../screens/messages/InboxScreen';
+import { ConversationScreen } from '../screens/messages/ConversationScreen';
+import { ComposeMessageScreen } from '../screens/messages/ComposeMessageScreen';
+import { ArchiveHubScreen } from '../screens/archive/ArchiveHubScreen';
+import { StoriesIndexScreen } from '../screens/archive/StoriesIndexScreen';
 import { BiographyScreen } from '../screens/archive/BiographyScreen';
 import { BiographyChapterScreen } from '../screens/archive/BiographyChapterScreen';
 import { DiscographyScreen } from '../screens/archive/DiscographyScreen';
@@ -10,7 +21,8 @@ import { FreddieTributeScreen } from '../screens/archive/FreddieTributeScreen';
 import { FanPerformancesScreen } from '../screens/archive/FanPerformancesScreen';
 import { FanPerformanceDetailScreen } from '../screens/archive/FanPerformanceDetailScreen';
 import { StoryScreen } from '../screens/archive/StoryScreen';
-import { SearchScreen } from '../screens/archive/SearchScreen';
+import { AboutArchiveScreen } from '../screens/archive/AboutArchiveScreen';
+import { SearchRouteScreen } from '../screens/archive/SearchScreen';
 import { NewsIndexScreen } from '../screens/news/NewsIndexScreen';
 import { NewsStoryScreen } from '../screens/news/NewsStoryScreen';
 import { PhotosScreen } from '../screens/photos/PhotosScreen';
@@ -19,24 +31,15 @@ import { PhotoSubmitScreen } from '../screens/photos/PhotoSubmitScreen';
 import { ForumScreen } from '../screens/forum/ForumScreen';
 import { ThreadScreen } from '../screens/forum/ThreadScreen';
 import { ComposerScreen } from '../screens/forum/ComposerScreen';
-import { InboxScreen } from '../screens/messages/InboxScreen';
-import { ConversationScreen } from '../screens/messages/ConversationScreen';
-import { ComposeMessageScreen } from '../screens/messages/ComposeMessageScreen';
-import { AccountScreen } from '../screens/account/AccountScreen';
-import { HelpScreen } from '../screens/account/HelpScreen';
-import { SignInScreen } from '../screens/account/SignInScreen';
-import { ProfileScreen } from '../screens/account/ProfileScreen';
-import { SettingsScreen } from '../screens/account/SettingsScreen';
+import { ForumHeaderRight, SearchHeaderButton } from './headerButtons';
 import type {
   ArchiveStackParamList,
   ForumStackParamList,
-  MessagesStackParamList,
+  HomeStackParamList,
   NewsStackParamList,
   PhotosStackParamList,
-  YouStackParamList,
 } from './types';
 
-/** Dark-first stack chrome (matches ThemeProvider default until light mode is user-facing). */
 const stackScreenOptions = {
   headerStyle: { backgroundColor: dark.surfacePage },
   headerTintColor: dark.accentPrimary,
@@ -45,40 +48,42 @@ const stackScreenOptions = {
   contentStyle: { backgroundColor: dark.surfacePage },
 };
 
-const Archive = createNativeStackNavigator<ArchiveStackParamList>();
+const Home = createNativeStackNavigator<HomeStackParamList>();
 const News = createNativeStackNavigator<NewsStackParamList>();
 const Photos = createNativeStackNavigator<PhotosStackParamList>();
+const Archive = createNativeStackNavigator<ArchiveStackParamList>();
 const Forum = createNativeStackNavigator<ForumStackParamList>();
-const Messages = createNativeStackNavigator<MessagesStackParamList>();
-const You = createNativeStackNavigator<YouStackParamList>();
 
-export function ArchiveStack() {
+export function HomeStack() {
   return (
-    <Archive.Navigator screenOptions={stackScreenOptions}>
-      <Archive.Screen name="Today" component={TodayScreen} options={{ headerShown: false }} />
-      <Archive.Screen name="Biography" component={BiographyScreen} />
-      <Archive.Screen name="BiographyChapter" component={BiographyChapterScreen} options={{ title: 'Chapter' }} />
-      <Archive.Screen name="Discography" component={DiscographyScreen} />
-      <Archive.Screen name="Album" component={AlbumScreen} options={{ title: 'Album' }} />
-      <Archive.Screen name="Timeline" component={TimelineScreen} />
-      <Archive.Screen name="FreddieTribute" component={FreddieTributeScreen} options={{ title: 'Freddie Tribute' }} />
-      <Archive.Screen name="FanPerformances" component={FanPerformancesScreen} options={{ title: 'Fan performances' }} />
-      <Archive.Screen
-        name="FanPerformanceDetail"
-        component={FanPerformanceDetailScreen}
-        options={{ title: 'Fan performance' }}
-      />
-      <Archive.Screen name="Story" component={StoryScreen} />
-      <Archive.Screen name="Search" component={SearchScreen} />
-    </Archive.Navigator>
+    <Home.Navigator screenOptions={stackScreenOptions}>
+      <Home.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
+      <Home.Screen name="Search" component={SearchRouteScreen} />
+      <Home.Screen name="Profile" component={ProfileScreen} />
+      <Home.Screen name="Settings" component={SettingsScreen} />
+      <Home.Screen name="SignIn" component={SignInScreen} options={{ title: 'Sign in' }} />
+      <Home.Screen name="Help" component={HelpScreen} />
+      <Home.Screen name="Inbox" component={InboxScreen} options={{ title: 'Messages' }} />
+      <Home.Screen name="Conversation" component={ConversationScreen} />
+      <Home.Screen name="ComposeMessage" component={ComposeMessageScreen} options={{ title: 'New message' }} />
+      <Home.Screen name="SavedList" component={SavedListScreen} options={{ title: 'Library' }} />
+    </Home.Navigator>
   );
 }
 
 export function NewsStack() {
   return (
     <News.Navigator screenOptions={stackScreenOptions}>
-      <News.Screen name="NewsIndex" component={NewsIndexScreen} options={{ title: 'News', headerShown: false }} />
+      <News.Screen
+        name="NewsIndex"
+        component={NewsIndexScreen}
+        options={({ navigation }) => ({
+          title: 'News',
+          headerRight: () => <SearchHeaderButton onPress={() => navigation.navigate('Search')} />,
+        })}
+      />
       <News.Screen name="Story" component={NewsStoryScreen} />
+      <News.Screen name="Search" component={SearchRouteScreen} />
     </News.Navigator>
   );
 }
@@ -86,41 +91,87 @@ export function NewsStack() {
 export function PhotosStack() {
   return (
     <Photos.Navigator screenOptions={stackScreenOptions}>
-      <Photos.Screen name="PhotoIndex" component={PhotosScreen} options={{ title: 'Photos', headerShown: false }} />
-      <Photos.Screen name="PhotoViewer" component={PhotoViewerScreen} options={{ title: 'Photograph' }} />
+      <Photos.Screen
+        name="PhotoIndex"
+        component={PhotosScreen}
+        options={({ navigation }) => ({
+          title: 'Photography',
+          headerRight: () => <SearchHeaderButton onPress={() => navigation.navigate('Search')} />,
+        })}
+      />
+      <Photos.Screen
+        name="PhotoViewer"
+        component={PhotoViewerScreen}
+        options={{ headerShown: false, title: 'Photograph' }}
+      />
       <Photos.Screen name="PhotoSubmit" component={PhotoSubmitScreen} options={{ title: 'Submit a photo' }} />
+      <Photos.Screen name="Search" component={SearchRouteScreen} />
     </Photos.Navigator>
+  );
+}
+
+export function ArchiveStack() {
+  return (
+    <Archive.Navigator screenOptions={stackScreenOptions}>
+      <Archive.Screen
+        name="ArchiveHub"
+        component={ArchiveHubScreen}
+        options={({ navigation }) => ({
+          title: 'Archive',
+          headerRight: () => <SearchHeaderButton onPress={() => navigation.navigate('Search')} />,
+        })}
+      />
+      <Archive.Screen name="Stories" component={StoriesIndexScreen} />
+      <Archive.Screen name="Biography" component={BiographyScreen} />
+      <Archive.Screen name="BiographyChapter" component={BiographyChapterScreen} options={{ title: 'Chapter' }} />
+      <Archive.Screen name="Discography" component={DiscographyScreen} />
+      <Archive.Screen name="Album" component={AlbumScreen} options={{ title: 'Album' }} />
+      <Archive.Screen name="Timeline" component={TimelineScreen} />
+      <Archive.Screen
+        name="FreddieTribute"
+        component={FreddieTributeScreen}
+        options={{ title: 'Freddie Tribute' }}
+      />
+      <Archive.Screen
+        name="FanPerformances"
+        component={FanPerformancesScreen}
+        options={{ title: 'Fan performances' }}
+      />
+      <Archive.Screen
+        name="FanPerformanceDetail"
+        component={FanPerformanceDetailScreen}
+        options={{ title: 'Fan performance' }}
+      />
+      <Archive.Screen name="Story" component={StoryScreen} />
+      <Archive.Screen
+        name="AboutArchive"
+        component={AboutArchiveScreen}
+        options={{ title: 'The archive' }}
+      />
+      <Archive.Screen name="Search" component={SearchRouteScreen} />
+    </Archive.Navigator>
   );
 }
 
 export function ForumStack() {
   return (
     <Forum.Navigator screenOptions={stackScreenOptions}>
-      <Forum.Screen name="ForumIndex" component={ForumScreen} options={{ title: 'Forum', headerShown: false }} />
+      <Forum.Screen
+        name="ForumIndex"
+        component={ForumScreen}
+        options={({ navigation }) => ({
+          title: 'Forum',
+          headerRight: () => (
+            <ForumHeaderRight
+              onSearch={() => navigation.navigate('Search')}
+              onCompose={() => navigation.navigate('Composer', {})}
+            />
+          ),
+        })}
+      />
       <Forum.Screen name="Thread" component={ThreadScreen} />
       <Forum.Screen name="Composer" component={ComposerScreen} options={{ title: 'Compose', presentation: 'modal' }} />
+      <Forum.Screen name="Search" component={SearchRouteScreen} />
     </Forum.Navigator>
-  );
-}
-
-export function MessagesStack() {
-  return (
-    <Messages.Navigator screenOptions={stackScreenOptions}>
-      <Messages.Screen name="Inbox" component={InboxScreen} options={{ title: 'Messages', headerShown: false }} />
-      <Messages.Screen name="Conversation" component={ConversationScreen} />
-      <Messages.Screen name="ComposeMessage" component={ComposeMessageScreen} options={{ title: 'New message' }} />
-    </Messages.Navigator>
-  );
-}
-
-export function YouStack() {
-  return (
-    <You.Navigator screenOptions={stackScreenOptions}>
-      <You.Screen name="Account" component={AccountScreen} options={{ headerShown: false }} />
-      <You.Screen name="Help" component={HelpScreen} />
-      <You.Screen name="SignIn" component={SignInScreen} options={{ title: 'Sign in' }} />
-      <You.Screen name="Profile" component={ProfileScreen} />
-      <You.Screen name="Settings" component={SettingsScreen} />
-    </You.Navigator>
   );
 }
