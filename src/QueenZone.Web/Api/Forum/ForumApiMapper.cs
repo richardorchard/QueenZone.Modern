@@ -1,0 +1,39 @@
+using QueenZone.Data;
+
+namespace QueenZone.Web;
+
+/// <summary>
+/// Maps repository DTOs to <c>/api/v1/forum</c> JSON shapes.
+/// Paths reuse <see cref="ForumRoutes"/> so mobile links match the website.
+/// </summary>
+public static class ForumApiMapper
+{
+    public static ForumCategoryListItemDto ToCategoryListItem(ForumCategoryItem category) =>
+        new(
+            category.Id,
+            category.Name,
+            category.Description,
+            category.PostCount,
+            category.LastActivityAt,
+            category.LatestThreadTitle,
+            ForumRoutes.GetCategoryCanonicalPath(category.Id, category.Name));
+
+    public static IReadOnlyList<ForumCategoryListItemDto> ToCategoryListItems(
+        IEnumerable<ForumCategoryItem> categories) =>
+        categories.Select(ToCategoryListItem).ToList();
+
+    public static ForumTopicListItemDto ToTopicListItem(ForumTopicItem topic) =>
+        new(
+            topic.Id,
+            topic.Title,
+            topic.LastActivityAt,
+            topic.AuthorUsername,
+            topic.ReplyCount,
+            topic.LastPostUsername,
+            topic.IsSticky,
+            ForumRoutes.GetTopicCanonicalPath(topic.Id, topic.Title));
+
+    public static IReadOnlyList<ForumTopicListItemDto> ToTopicListItems(
+        IEnumerable<ForumTopicItem> topics) =>
+        topics.Select(ToTopicListItem).ToList();
+}

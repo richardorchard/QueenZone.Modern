@@ -6,7 +6,7 @@ using System.Text.Json;
 namespace QueenZone.Web.E2E;
 
 /// <summary>
-/// HTTP shape sweep of the public mobile JSON API (<c>/api/v1</c>, issue #726) for the
+/// HTTP shape sweep of the public mobile JSON API (<c>/api/v1</c>, issues #726 / #731) for the
 /// live-site job and the nightly RealData suite. Anonymous read-only routes only —
 /// no <c>/api/v1/auth</c> (rate-limited writes) and no <c>/api/v1/admin</c> (Entra).
 /// Discovers detail ids from list responses instead of hardcoding archive records.
@@ -30,6 +30,9 @@ public class LiveSiteContentApiTests : RealDataPageTest
         "/api/v1/content/discography/{id}",
         "/api/v1/content/timeline",
         "/api/v1/content/freddietribute",
+        "/api/v1/forum/categories",
+        "/api/v1/forum/categories/{id}",
+        "/api/v1/forum/categories/{id}/topics",
     ];
 
     private static readonly ContentListSpec[] ContentLists =
@@ -64,6 +67,12 @@ public class LiveSiteContentApiTests : RealDataPageTest
             IdProperty: "id",
             RequiredItemStrings: ["name", "thought", "dateText"],
             RequiredDetailStrings: []),
+        new(
+            ListPath: "/api/v1/forum/categories",
+            DetailPathTemplate: "/api/v1/forum/categories/{0}",
+            IdProperty: "id",
+            RequiredItemStrings: ["name", "detailPath"],
+            RequiredDetailStrings: ["name", "detailPath"]),
     ];
 
     protected override bool AllowsWrites => false;
@@ -203,6 +212,51 @@ public class LiveSiteContentApiTests : RealDataPageTest
             failures,
             Is.Empty,
             FailurePrefix() + "Content API sweep failures:" + Environment.NewLine +
+            string.Join(Environment.NewLine, failures));
+    }
+
+    [Test]
+    public async Task ForumCategoryTopics_MeetShapeAssertionsAsync()
+    {
+        using var client = CreateHttpClient();
+        var failures = new List<string>();
+
+        var list = await TryGetJsonAsync(client, "/api/v1/forum/categories?page=1&pageSize=1", failures);
+        if (list is null
+            || !list.Value.TryGetProperty("items", out var items)
+            || items.ValueKind != JsonValueKind.Array
+            || items.GetArrayLength() == 0
+            || !TryGetPositiveInt(items[0], "id", out var categoryId))
+        {
+            Assert.That(
+                failures,
+                Is.Empty,
+                FailurePrefix() + "Forum topics sweep could not read a public category:" + Environment.NewLine +
+                string.Join(Environment.NewLine, failures));
+            return;
+        }
+
+        var topicsPath = $"/api/v1/forum/categories/{categoryId}/topics?page=1&pageSize={SamplePageSize}";
+        var topics = await TryGetJsonAsync(client, topicsPath, failures);
+        if (topics is { } topicsDoc)
+        {
+            AssertPagedEnvelope(topicsDoc, topicsPath, failures);
+            if (topicsDoc.TryGetProperty("items", out var topicItems)
+                && topicItems.ValueKind == JsonValueKind.Array
+                && topicItems.GetArrayLength() > 0)
+            {
+                AssertRequiredStrings(
+                    topicItems[0],
+                    ["title", "authorUsername", "lastActivityAt", "detailPath"],
+                    topicsPath,
+                    failures);
+            }
+        }
+
+        Assert.That(
+            failures,
+            Is.Empty,
+            FailurePrefix() + "Forum topics sweep failures:" + Environment.NewLine +
             string.Join(Environment.NewLine, failures));
     }
 

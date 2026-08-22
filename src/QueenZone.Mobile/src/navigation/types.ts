@@ -44,6 +44,7 @@ export type ArchiveStackParamList = {
 
 export type ForumStackParamList = {
   ForumIndex: undefined;
+  Category: { id: number; name?: string };
   Thread: { id: string };
   Composer: { threadId?: string };
   Search: undefined;

@@ -36,6 +36,7 @@ describe('member-only screens', () => {
     assert.equal(isMemberOnlyScreen('NewsIndex'), false);
     assert.equal(isMemberOnlyScreen('PhotoIndex'), false);
     assert.equal(isMemberOnlyScreen('ForumIndex'), false);
+    assert.equal(isMemberOnlyScreen('Category'), false);
     assert.equal(isMemberOnlyScreen('FanPerformances'), false);
     assert.equal(isMemberOnlyScreen('Help'), false);
     assert.equal(isMemberOnlyScreen('Profile'), false);
@@ -56,6 +57,8 @@ describe('shouldHideTabBar', () => {
     assert.equal(shouldHideTabBar('ArchiveHub'), false);
     assert.equal(shouldHideTabBar('PhotoIndex'), false);
     assert.equal(shouldHideTabBar('ForumIndex'), false);
+    assert.equal(shouldHideTabBar('Biography'), true);
+    assert.equal(shouldHideTabBar('Category'), false);
   });
 });
 
