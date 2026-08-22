@@ -37,7 +37,8 @@ public sealed class ForumApiTests : IClassFixture<QueenZoneWebApplicationFactory
         var html = await client.GetStringAsync("/forum");
         Assert.All(payload.Items, item =>
         {
-            Assert.Contains(item.Name, html, StringComparison.Ordinal);
+            // Razor HTML-encodes board names (`Live & Tours` → `Live &amp; Tours`).
+            Assert.Contains(WebUtility.HtmlEncode(item.Name), html, StringComparison.Ordinal);
             Assert.Contains(item.DetailPath, html, StringComparison.Ordinal);
         });
     }
