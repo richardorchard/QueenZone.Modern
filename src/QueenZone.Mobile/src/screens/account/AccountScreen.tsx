@@ -3,6 +3,7 @@ import type { CompositeScreenProps } from '@react-navigation/native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { getAppConfig } from '../../config/appConfig';
 import { PlaceholderScreen } from '../../ui/PlaceholderScreen';
+import { BuildStamp } from '../../ui/BuildStamp';
 import { useSession } from '../../session/SessionContext';
 import type { RootTabParamList, YouStackParamList } from '../../navigation/types';
 
@@ -24,6 +25,7 @@ export function AccountScreen({ navigation }: Props) {
         access="member"
         headerShown={false}
         description={`Signed-in account hub. Profile, settings, and sign-out live here. Private messages have their own tab once you are signed in. ${apiLine}`}
+        footer={<BuildStamp />}
         actions={[
           { label: 'Profile', onPress: () => navigation.navigate('Profile'), variant: 'outline' },
           { label: 'Settings', onPress: () => navigation.navigate('Settings'), variant: 'outline' },
@@ -41,6 +43,7 @@ export function AccountScreen({ navigation }: Props) {
       access="public"
       headerShown={false}
       description={`Signed-out account tab. Visitors can sign in or send a Help request. Member profile and settings stay behind sign-in. ${apiLine}`}
+      footer={<BuildStamp />}
       actions={[
         { label: 'Sign in (development)', onPress: signIn },
         { label: 'Help', onPress: () => navigation.navigate('Help'), variant: 'outline' },
