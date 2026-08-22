@@ -17,6 +17,7 @@ import { PhotosScreen } from '../screens/photos/PhotosScreen';
 import { PhotoViewerScreen } from '../screens/photos/PhotoViewerScreen';
 import { PhotoSubmitScreen } from '../screens/photos/PhotoSubmitScreen';
 import { ForumScreen } from '../screens/forum/ForumScreen';
+import { CategoryScreen } from '../screens/forum/CategoryScreen';
 import { ThreadScreen } from '../screens/forum/ThreadScreen';
 import { ComposerScreen } from '../screens/forum/ComposerScreen';
 import { InboxScreen } from '../screens/messages/InboxScreen';
@@ -97,6 +98,7 @@ export function ForumStack() {
   return (
     <Forum.Navigator screenOptions={stackScreenOptions}>
       <Forum.Screen name="ForumIndex" component={ForumScreen} options={{ title: 'Forum', headerShown: false }} />
+      <Forum.Screen name="Category" component={CategoryScreen} options={{ title: 'Board' }} />
       <Forum.Screen name="Thread" component={ThreadScreen} />
       <Forum.Screen name="Composer" component={ComposerScreen} options={{ title: 'Compose', presentation: 'modal' }} />
     </Forum.Navigator>

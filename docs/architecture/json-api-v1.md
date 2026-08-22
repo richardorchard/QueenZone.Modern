@@ -13,7 +13,8 @@ Decision record: [`docs/decisions/0010-versioned-json-api-conventions.md`](../de
 | `/api/v1/auth/*` | Mobile OAuth2 PKCE + tokens (see issues #720 / #721) |
 | `/api/v1/admin` | Admin status probe; future admin JSON must use the same `Admin` policy (#723) |
 | `/api/v1/content/*` | Public, read-only archive content for the mobile app: news, biography, discography, timeline, and Freddie Tribute (#726). No authentication required. |
-| `/api/v1/{resource}` | Later epics (forum, messages, galleries, …) |
+| `/api/v1/forum/*` | Public, read-only forum browse for the mobile app: category list, category detail, and paged topic lists (#731). Same `IForumRepository` visibility as `/forum` Razor Pages. No authentication required. Topic posts and writes are later stories. |
+| `/api/v1/{resource}` | Later epics (messages, galleries, …) |
 
 Later endpoints should be mapped on a `MapGroup("/api/v1")` (or a sub-group) with `.WithGroupName("v1")` so they appear in the OpenAPI document. Do not add mobile/app JSON routes under `src/QueenZone.Web/Endpoints/`.
 
@@ -88,4 +89,4 @@ The discovery document (`GET /api/v1`) points at that URL so the React Native cl
 
 ## Production and nightly checks
 
-Public, unauthenticated `/api/v1` routes are included in the live-site read-only sweep (`LiveSiteContentApiTests`): discovery, OpenAPI, content list/detail *shape*, and Problem Details 404. That fixture is `RealData` + `ReadOnly`, so it also runs against the SQL Express mirror in the nightly RealData suite. `/api/v1/auth` and `/api/v1/admin` are not part of the sweep (token grants / rate limits, and Entra). Post-deploy smoke hits `GET /api/v1` and `GET /api/v1/content/news?pageSize=1`. In-memory contract tests live in `QueenZone.Web.Tests` (`ApiV1RoutesTests`, `ContentApi*Tests`).
+Public, unauthenticated `/api/v1` routes are included in the live-site read-only sweep (`LiveSiteContentApiTests`): discovery, OpenAPI, content and forum list/detail *shape*, and Problem Details 404. That fixture is `RealData` + `ReadOnly`, so it also runs against the SQL Express mirror in the nightly RealData suite. `/api/v1/auth` and `/api/v1/admin` are not part of the sweep (token grants / rate limits, and Entra). Post-deploy smoke hits `GET /api/v1` and `GET /api/v1/content/news?pageSize=1`. In-memory contract tests live in `QueenZone.Web.Tests` (`ApiV1RoutesTests`, `ContentApi*Tests`, `ForumApiTests`).

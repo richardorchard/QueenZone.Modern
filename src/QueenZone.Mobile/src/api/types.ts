@@ -108,3 +108,24 @@ export type FreddieTribute = {
   dateText: string;
   timeText: string | null;
 };
+
+export type ForumCategoryListItem = {
+  id: number;
+  name: string;
+  description: string | null;
+  postCount: number;
+  lastActivityAt: string | null;
+  latestThreadTitle: string | null;
+  detailPath: string;
+};
+
+export type ForumTopicListItem = {
+  id: number;
+  title: string;
+  lastActivityAt: string;
+  authorUsername: string;
+  replyCount: number;
+  lastPostUsername: string | null;
+  isSticky: boolean;
+  detailPath: string;
+};
