@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
+  ApiError,
   fetchForumCategory,
   fetchForumCategoryTopics,
   type ForumCategoryListItem,
@@ -19,10 +20,16 @@ type Props = NativeStackScreenProps<ForumStackParamList, 'Category'>;
 /** Matches the website category page (`ForumRoutes.TopicsPageSize`). */
 const topicPageSize = 25;
 
+function messageFromUnknownError(err: unknown): string {
+  return err instanceof ApiError ? err.message : 'Something went wrong.';
+}
+
 export function CategoryScreen({ navigation, route }: Props) {
   const { c } = useTheme();
   const { id, name } = route.params;
   const [category, setCategory] = useState<ForumCategoryListItem | null>(null);
+  const [categoryError, setCategoryError] = useState<string | null>(null);
+  const [categoryReloadToken, setCategoryReloadToken] = useState(0);
 
   const paged = usePagedContent<ForumTopicListItem>(
     useCallback(
@@ -34,19 +41,37 @@ export function CategoryScreen({ navigation, route }: Props) {
 
   useEffect(() => {
     const controller = new AbortController();
+    setCategoryError(null);
     fetchForumCategory(id, controller.signal)
-      .then(setCategory)
+      .then((item) => {
+        setCategory(item);
+        setCategoryError(null);
+      })
       .catch((err: unknown) => {
         if (err instanceof Error && err.name === 'AbortError') {
           return;
         }
+        setCategory(null);
+        setCategoryError(messageFromUnknownError(err));
       });
     return () => controller.abort();
-  }, [id]);
+  }, [id, categoryReloadToken]);
 
   useLayoutEffect(() => {
     navigation.setOptions({ title: category?.name ?? name ?? 'Board' });
   }, [navigation, category?.name, name]);
+
+  const retryCategory = useCallback(() => setCategoryReloadToken((n) => n + 1), []);
+
+  const retry = useCallback(() => {
+    retryCategory();
+    paged.reload();
+  }, [retryCategory, paged]);
+
+  const refresh = useCallback(() => {
+    retryCategory();
+    paged.refresh();
+  }, [retryCategory, paged]);
 
   const stats = [
     paged.totalCount > 0 ? `${formatForumCount(paged.totalCount)} threads` : null,
@@ -64,12 +89,17 @@ export function CategoryScreen({ navigation, route }: Props) {
     </View>
   );
 
-  if (paged.loading && paged.items.length === 0) {
+  const categoryPending = !category && !categoryError;
+  if ((paged.loading && paged.items.length === 0) || categoryPending) {
     return <LoadingBlock label="Loading topics…" />;
   }
 
+  if (categoryError) {
+    return <ErrorBlock message={categoryError} onRetry={retry} />;
+  }
+
   if (paged.error && paged.items.length === 0) {
-    return <ErrorBlock message={paged.error} onRetry={paged.reload} />;
+    return <ErrorBlock message={paged.error} onRetry={retry} />;
   }
 
   return (
@@ -83,7 +113,7 @@ export function CategoryScreen({ navigation, route }: Props) {
       refreshControl={
         <RefreshControl
           refreshing={paged.refreshing}
-          onRefresh={paged.refresh}
+          onRefresh={refresh}
           tintColor={c.accentPrimary}
         />
       }
