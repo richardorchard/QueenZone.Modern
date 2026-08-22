@@ -105,7 +105,7 @@ public sealed class MemberPhotoSubmissionApiTests : IClassFixture<QueenZoneWebAp
     }
 
     [Fact]
-    public async Task Submit_returns_bad_request_for_json_body()
+    public async Task Submit_does_not_advertise_or_accept_json_bodies()
     {
         using var client = CreateBearerClient(factory, Guid.NewGuid());
 
@@ -113,9 +113,8 @@ public sealed class MemberPhotoSubmissionApiTests : IClassFixture<QueenZoneWebAp
             MemberApiEndpoints.PhotoSubmissionsPath,
             new { title = "Not multipart" });
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        var problem = await response.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Contains("multipart/form-data", problem.GetProperty("detail").GetString(), StringComparison.Ordinal);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
     }
 
     [Fact]
