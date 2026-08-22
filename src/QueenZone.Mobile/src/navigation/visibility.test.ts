@@ -21,7 +21,6 @@ describe('getVisibleTabNames', () => {
 
 describe('member-only screens', () => {
   it('gates private messages, compose, and account settings', () => {
-    assert.equal(isMemberOnlyScreen('FanPerformanceDetail'), true);
     assert.equal(isMemberOnlyScreen('Inbox'), true);
     assert.equal(isMemberOnlyScreen('Conversation'), true);
     assert.equal(isMemberOnlyScreen('Composer'), true);
@@ -41,6 +40,7 @@ describe('member-only screens', () => {
     assert.equal(isMemberOnlyScreen('Category'), false);
     assert.equal(isMemberOnlyScreen('Thread'), false);
     assert.equal(isMemberOnlyScreen('FanPerformances'), false);
+    assert.equal(isMemberOnlyScreen('FanPerformanceDetail'), false);
     assert.equal(isMemberOnlyScreen('Contact'), false);
     assert.equal(isMemberOnlyScreen('Profile'), false);
   });

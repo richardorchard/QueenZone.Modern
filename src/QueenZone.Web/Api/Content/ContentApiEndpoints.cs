@@ -1,11 +1,18 @@
 using QueenZone.Data;
+using QueenZone.Storage;
 
 namespace QueenZone.Web;
 
 /// <summary>
 /// Public, read-only <c>/api/v1/content/*</c> routes for the mobile app
-/// (issues #726 / #743). No authentication required: this content is public
-/// on the website today. Photo gallery pages reuse <see cref="IPhotoRepository"/>
+/// (issues #726 / #743 / #747). News, biography, discography, timeline,
+/// Freddie Tribute, photo galleries, and fan-performance listings require
+/// no authentication: that content is public on the website today.
+/// Fan-performance audio at <c>/api/v1/content/fan-performances/{id}/audio</c>
+/// requires <see cref="MemberAuthenticationSchemes.MobileMemberPolicy"/> and
+/// reuses <see cref="FanPerformanceEndpoints.ServeAudioAsync"/> — the same
+/// private <c>songfiles</c> blob stream as the website, including HTTP range
+/// processing. Photo gallery pages reuse <see cref="IPhotoRepository"/>
 /// and CDN URLs from <see cref="PhotoImageUrl"/>. Category list/detail/items
 /// use <see cref="PublicQueryCacheService"/> (same helpers as Razor photography
 /// pages); detail neighbors still come from <see cref="IPhotoRepository"/>.
@@ -87,6 +94,26 @@ public static class ContentApiEndpoints
             .WithName("GetContentPhotoDetail")
             .WithSummary("A single public photo, with prev/next neighbors matching the website lightbox.")
             .Produces<PhotoDetailDto>()
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapGet("/fan-performances", GetFanPerformancesAsync)
+            .WithName("GetContentFanPerformances")
+            .WithSummary("Paged list of public fan-stage recordings. Duration is MPEG metadata when available.")
+            .Produces<ApiPagedResponse<FanPerformanceDto>>();
+
+        group.MapGet("/fan-performances/{id:int}", GetFanPerformanceDetailAsync)
+            .WithName("GetContentFanPerformanceDetail")
+            .WithSummary("A single public fan-stage recording, including duration and the member-gated audio path.")
+            .Produces<FanPerformanceDto>()
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapGet("/fan-performances/{id:int}/audio", GetFanPerformanceAudioAsync)
+            .WithName("GetContentFanPerformanceAudio")
+            .WithSummary("Member-gated audio stream. Same blob and range support as /fan-performances/{id}/audio.")
+            .RequireAuthorization(MemberAuthenticationSchemes.MobileMemberPolicy)
+            .RequireRateLimiting(FanPerformanceRateLimitingOptions.AudioPolicy)
+            .Produces(StatusCodes.Status200OK, contentType: "audio/mpeg")
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status404NotFound);
     }
 
@@ -371,6 +398,57 @@ public static class ContentApiEndpoints
 
         return Results.Ok(ContentApiMapper.ToPhotoDetail(category, navigation, filter));
     }
+
+    internal static async Task<IResult> GetFanPerformancesAsync(
+        IFanPerformanceRepository fanPerformanceRepository,
+        FanPerformanceDurationResolver durationResolver,
+        int? page,
+        int? pageSize,
+        CancellationToken cancellationToken)
+    {
+        var request = ApiPagination.Normalize(page, pageSize);
+        var items = await fanPerformanceRepository.GetPageAsync(request.Page, request.PageSize, cancellationToken);
+        var totalCount = await fanPerformanceRepository.GetVisibleCountAsync(cancellationToken);
+        var durations = await durationResolver.ResolveManyAsync(items, cancellationToken);
+
+        var response = ApiPagedResponse<FanPerformanceDto>.Create(
+            ContentApiMapper.ToFanPerformanceDtos(items, durations),
+            request.Page,
+            request.PageSize,
+            totalCount);
+
+        return Results.Ok(response);
+    }
+
+    internal static async Task<IResult> GetFanPerformanceDetailAsync(
+        IFanPerformanceRepository fanPerformanceRepository,
+        FanPerformanceDurationResolver durationResolver,
+        int id,
+        CancellationToken cancellationToken)
+    {
+        var performance = await fanPerformanceRepository.GetByIdAsync(id, cancellationToken);
+        if (performance is null)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status404NotFound,
+                title: "Not Found",
+                detail: $"No public fan performance with id '{id}'.");
+        }
+
+        var duration = await durationResolver.ResolveAsync(performance, cancellationToken);
+        return Results.Ok(ContentApiMapper.ToFanPerformanceDto(performance, duration));
+    }
+
+    internal static Task<IResult> GetFanPerformanceAudioAsync(
+        int id,
+        IFanPerformanceRepository fanPerformanceRepository,
+        IBlobUploadService blobUploadService,
+        CancellationToken cancellationToken) =>
+        FanPerformanceEndpoints.ServeAudioAsync(
+            id,
+            fanPerformanceRepository,
+            blobUploadService,
+            cancellationToken);
 
     private static IResult PhotoCategoryNotFound(string slug) =>
         Results.Problem(

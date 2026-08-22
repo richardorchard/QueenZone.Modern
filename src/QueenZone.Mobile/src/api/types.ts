@@ -166,6 +166,17 @@ export type PhotoDetail = {
   next: PhotoNav | null;
 };
 
+export type FanPerformance = {
+  id: number;
+  title: string;
+  performedBy: string;
+  description: string;
+  dateAdded: string;
+  durationSeconds: number | null;
+  detailPath: string;
+  audioPath: string;
+};
+
 export type ForumCategoryListItem = {
   id: number;
   name: string;

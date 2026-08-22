@@ -34,6 +34,7 @@ export const publicScreenNames = [
   'Timeline',
   'FreddieTribute',
   'FanPerformances',
+  'FanPerformanceDetail',
   'Story',
   'Search',
   'NewsIndex',
@@ -49,7 +50,6 @@ export const publicScreenNames = [
 ] as const;
 
 export const memberOnlyScreenNames = [
-  'FanPerformanceDetail',
   'Inbox',
   'Conversation',
   'ComposeMessage',

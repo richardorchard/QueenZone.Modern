@@ -166,13 +166,17 @@ never a sixth tab. New archive sections become rows on the Archive hub.
 Home, Archive hub, Photography, Forum, Search, and Profile follow the approved
 screen contracts in `QUEENZONE_APP_SPEC.md`. News and photography browse live
 content from `/api/v1` (photo image URIs are `cdn.queenzone.org`, never App Service).
+Fan performances list from `/api/v1/content/fan-performances`; streaming uses
+`GET /api/v1/content/fan-performances/{id}/audio` with the member Bearer token
+(same private `songfiles` blob as the website). Background playback and lock-screen
+controls come from `expo-audio`.
 Home → avatar → **Sign in** toggles the local session until the Epic 0 token
 client is wired. Member-only routes also render a sign-in gate so they stay
 closed while signed out.
 
 Rebuild the development client after this native dependency set changes
 (`react-native-screens`, `react-native-safe-area-context`, `react-native-svg`,
-`expo-image`, `expo-linear-gradient`):
+`expo-image`, `expo-linear-gradient`, `expo-audio`):
 
 ```powershell
 npx expo prebuild --clean
