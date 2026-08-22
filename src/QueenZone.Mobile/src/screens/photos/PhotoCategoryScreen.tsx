@@ -27,9 +27,11 @@ import {
   photoCdnSource,
   photoCountLabel,
   photoRangeLabel,
+  photoSizeFromPath,
   photoSizePresets,
   photoThumbMeta,
   photoViewerParams,
+  resolvedPhotoSize,
   type PhotoSizeQuery,
 } from './photoGalleryMeta';
 
@@ -89,6 +91,16 @@ export function PhotoCategoryScreen({ navigation, route }: Props) {
     navigation.setOptions({ title: category?.name ?? name ?? 'Collection' });
   }, [category?.name, name, navigation]);
 
+  useEffect(() => {
+    if (!size || paged.loading || paged.items.length === 0) {
+      return;
+    }
+
+    if (resolvedPhotoSize(size, paged.items[0].detailPath) !== size) {
+      setSize('');
+    }
+  }, [size, paged.loading, paged.items]);
+
   const retry = useCallback(() => {
     setCategoryReloadToken((n) => n + 1);
     paged.reload();
@@ -98,8 +110,12 @@ export function PhotoCategoryScreen({ navigation, route }: Props) {
     return <LoadingBlock label="Loading collection…" />;
   }
 
-  if ((categoryError || paged.error) && paged.items.length === 0 && !category) {
-    return <ErrorBlock message={categoryError ?? paged.error ?? 'Collection not found.'} onRetry={retry} />;
+  if (paged.error && paged.items.length === 0) {
+    return <ErrorBlock message={paged.error} onRetry={retry} />;
+  }
+
+  if (categoryError && !category && paged.items.length === 0) {
+    return <ErrorBlock message={categoryError} onRetry={retry} />;
   }
 
   return (
@@ -170,7 +186,10 @@ export function PhotoCategoryScreen({ navigation, route }: Props) {
             accessibilityRole="button"
             accessibilityLabel={item.title}
             onPress={() =>
-              navigation.navigate('PhotoViewer', photoViewerParams(item.categorySlug, item.picId, size))
+              navigation.navigate(
+                'PhotoViewer',
+                photoViewerParams(item.categorySlug, item.picId, photoSizeFromPath(item.detailPath) ?? size),
+              )
             }
             style={{ width: tile, marginBottom: GAP }}
           >

@@ -83,3 +83,34 @@ export function photoViewerParams(
   const query = size?.trim() ?? '';
   return query.length > 0 ? { slug, picId, size: query } : { slug, picId };
 }
+
+/** Reads the website `?size=` query from a detail/category path. */
+export function photoSizeFromPath(path: string | null | undefined): string | undefined {
+  if (!path) {
+    return undefined;
+  }
+
+  const queryIndex = path.indexOf('?');
+  if (queryIndex < 0) {
+    return undefined;
+  }
+
+  const value = new URLSearchParams(path.slice(queryIndex + 1)).get('size')?.trim() ?? '';
+  return value.length > 0 ? value : undefined;
+}
+
+/**
+ * If the API dropped the requested filter (fallback / ignored `?size=`),
+ * return undefined so chips and prev/next match the unfiltered set.
+ */
+export function resolvedPhotoSize(
+  requested: string | null | undefined,
+  path: string | null | undefined,
+): string | undefined {
+  const sent = requested?.trim() || undefined;
+  if (!sent) {
+    return undefined;
+  }
+
+  return photoSizeFromPath(path);
+}

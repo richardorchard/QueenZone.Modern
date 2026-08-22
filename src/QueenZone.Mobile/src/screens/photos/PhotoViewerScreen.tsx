@@ -10,7 +10,14 @@ import { ArchiveImage } from '../../ui/ArchiveImage';
 import { IconButton } from '../../ui/IconButton';
 import { MetaLine } from '../../ui/MetaLine';
 import { ErrorBlock, LoadingBlock } from '../../ui/ScreenStates';
-import { photoCdnSource, photoCounterLabel, photoDetailMeta, photoViewerParams } from './photoGalleryMeta';
+import {
+  photoCdnSource,
+  photoCounterLabel,
+  photoDetailMeta,
+  photoSizeFromPath,
+  photoViewerParams,
+  resolvedPhotoSize,
+} from './photoGalleryMeta';
 
 type Props = NativeStackScreenProps<PhotosStackParamList, 'PhotoViewer'>;
 
@@ -32,6 +39,10 @@ export function PhotoViewerScreen({ navigation, route }: Props) {
       .then((detail) => {
         setPhoto(detail);
         setLoading(false);
+        const applied = resolvedPhotoSize(size, detail.detailPath);
+        if ((size || undefined) !== applied) {
+          navigation.setParams({ size: applied });
+        }
       })
       .catch((err: unknown) => {
         if (err instanceof Error && err.name === 'AbortError') {
@@ -48,9 +59,12 @@ export function PhotoViewerScreen({ navigation, route }: Props) {
 
   const goTo = useCallback(
     (neighborPicId: number) => {
-      navigation.replace('PhotoViewer', photoViewerParams(slug, neighborPicId, size));
+      navigation.replace(
+        'PhotoViewer',
+        photoViewerParams(slug, neighborPicId, photoSizeFromPath(photo?.detailPath) ?? size),
+      );
     },
-    [navigation, slug, size],
+    [navigation, photo?.detailPath, size, slug],
   );
 
   if (loading) {

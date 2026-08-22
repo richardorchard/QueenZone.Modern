@@ -8,8 +8,10 @@ import {
   photoCounterLabel,
   photoDetailMeta,
   photoRangeLabel,
+  photoSizeFromPath,
   photoThumbMeta,
   photoViewerParams,
+  resolvedPhotoSize,
 } from './photoGalleryMeta.ts';
 
 describe('photo gallery meta', () => {
@@ -67,5 +69,17 @@ describe('photo gallery meta', () => {
     assert.deepEqual(photoViewerParams('queen', 201, ''), { slug: 'queen', picId: 201 });
     assert.deepEqual(photoViewerParams('queen', 201, '   '), { slug: 'queen', picId: 201 });
     assert.deepEqual(photoViewerParams('queen', 201), { slug: 'queen', picId: 201 });
+  });
+
+  it('clears a requested size when the API path dropped the filter', () => {
+    assert.equal(photoSizeFromPath('/photography/brian-may/103?size=desktop'), 'desktop');
+    assert.equal(photoSizeFromPath('/photography/brian-may/103'), undefined);
+    assert.equal(photoSizeFromPath(null), undefined);
+    assert.equal(
+      resolvedPhotoSize('desktop', '/photography/brian-may/101?size=desktop'),
+      'desktop',
+    );
+    assert.equal(resolvedPhotoSize('desktop', '/photography/brian-may/103'), undefined);
+    assert.equal(resolvedPhotoSize('', '/photography/brian-may/101?size=desktop'), undefined);
   });
 });
