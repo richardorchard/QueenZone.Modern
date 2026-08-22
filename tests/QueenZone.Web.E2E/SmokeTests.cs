@@ -104,7 +104,9 @@ public class SmokeTests : E2EPageTest
         })).ToBeVisibleAsync();
 
         await Expect(Page.Locator("article.article-body")).ToBeVisibleAsync();
-        await Expect(Page.Locator("article.article-body")).ToContainTextAsync("placeholder item");
+        await Expect(Page.Locator("article.article-body")).ToContainTextAsync("ASP.NET Core");
+        await Expect(Page.Locator("article.article-body")).ToContainTextAsync("news archive");
+        await Expect(Page.GetByRole(AriaRole.Img, new() { Name = "QueenZone crest" })).ToBeVisibleAsync();
 
         var canonical = Page.Locator("link[rel='canonical']");
         await Expect(canonical).ToHaveCountAsync(1);

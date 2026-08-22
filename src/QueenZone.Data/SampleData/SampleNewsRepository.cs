@@ -60,7 +60,11 @@ public sealed class SampleNewsRepository : INewsRepository
                 1003,
                 "QueenZone modernisation begins",
                 "The first local vertical slice is now running from the new ASP.NET Core application.",
-                "This placeholder item keeps the local site useful until a restored legacy SQL Server connection is configured.",
+                """
+                <p>The first local vertical slice is now running from the new <strong>ASP.NET Core</strong> application.</p>
+                <p>See the <a href="https://www.queenzone.org/news">news archive</a> for updates, and the crest below.</p>
+                <p><img src="/ugc/news/sample-crest.jpg" alt="QueenZone crest" loading="lazy"></p>
+                """,
                 new DateTime(2026, 6, 11, 9, 0, 0, DateTimeKind.Utc),
                 null,
                 true),

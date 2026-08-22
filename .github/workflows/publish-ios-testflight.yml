@@ -21,11 +21,18 @@ jobs:
         working-directory: src/QueenZone.Mobile
     env:
       APP_BUNDLE_ID: org.queenzone.mobile
+      IOS_BUILD_NUMBER: ${{ github.run_number }}
       APPLE_TEAM_ID: X28Z75P69M
       PROVISIONING_PROFILE_NAME: QueenZone App Store
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+
+      - name: Record build metadata
+        run: |
+          set -euo pipefail
+          echo "BUILD_TIMESTAMP_UTC=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_ENV"
+          echo "BUILD_REVISION=${GITHUB_SHA:0:7}" >> "$GITHUB_ENV"
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
@@ -59,10 +66,94 @@ jobs:
       - name: Install JavaScript dependencies
         run: npm ci
 
+      - name: Ensure CocoaPods CLI
+        run: |
+          set -euo pipefail
+          # The GitHub Actions runner service does not load ~/.zprofile, so
+          # Homebrew (and a brew-installed `pod`) are often missing from PATH
+          # even when they work in an interactive shell on this Mac.
+          for brew_prefix in /opt/homebrew /usr/local; do
+            if [ -x "$brew_prefix/bin/brew" ]; then
+              echo "$brew_prefix/bin" >> "$GITHUB_PATH"
+              eval "$("$brew_prefix/bin/brew" shellenv)"
+              break
+            fi
+          done
+
+          if ! command -v pod >/dev/null 2>&1; then
+            if command -v brew >/dev/null 2>&1; then
+              brew list cocoapods >/dev/null 2>&1 || brew install cocoapods
+            else
+              gem_bin="$(ruby -e 'puts Gem.user_dir')/bin"
+              echo "$gem_bin" >> "$GITHUB_PATH"
+              export PATH="$gem_bin:$PATH"
+              gem install cocoapods --user-install --no-document
+            fi
+          fi
+
+          if ! command -v pod >/dev/null 2>&1; then
+            echo "::error::CocoaPods CLI is not available on this runner after Homebrew/gem install."
+            echo "Install CocoaPods on the ios-signing Mac (brew install cocoapods) and add /opt/homebrew/bin to the runner service PATH."
+            exit 1
+          fi
+
+          echo "Using $(command -v pod) ($(pod --version))"
+
       - name: Generate iOS project
         env:
           EXPO_PUBLIC_APP_ENV: staging
-        run: npx expo prebuild --platform ios --clean
+          # Expo writes ios.buildNumber literally into Info.plist at prebuild.
+          # xcodebuild CURRENT_PROJECT_VERSION alone cannot override that literal,
+          # so App Store Connect rejected re-uploads with CFBundleVersion=1.
+          IOS_BUILD_NUMBER: ${{ github.run_number }}
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          echo "Using iOS build number ${IOS_BUILD_NUMBER}"
+          npx expo prebuild --platform ios --clean --no-install
+          info_plist=$(find ios -path '*/Info.plist' -not -path '*/Pods/*' -print -quit)
+          if [ -z "$info_plist" ]; then
+            echo "::error::prebuild did not produce an app Info.plist."
+            exit 1
+          fi
+          bundle_version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$info_plist")
+          echo "Info.plist CFBundleVersion=${bundle_version} (from ${info_plist})"
+          if [ "$bundle_version" != "$IOS_BUILD_NUMBER" ]; then
+            echo "::error::CFBundleVersion is ${bundle_version}, expected ${IOS_BUILD_NUMBER}."
+            echo "Ensure app.config.ts maps IOS_BUILD_NUMBER to ios.buildNumber before prebuild."
+            exit 1
+          fi
+          encryption=$(/usr/libexec/PlistBuddy -c 'Print :ITSAppUsesNonExemptEncryption' "$info_plist")
+          echo "Info.plist ITSAppUsesNonExemptEncryption=${encryption}"
+          if [ "$encryption" != "false" ]; then
+            echo "::error::ITSAppUsesNonExemptEncryption must be false."
+            exit 1
+          fi
+
+      - name: Cache CocoaPods
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/CocoaPods
+            src/QueenZone.Mobile/ios/Pods
+          key: pods-testflight-${{ runner.os }}-${{ hashFiles('src/QueenZone.Mobile/ios/Podfile', 'src/QueenZone.Mobile/package-lock.json') }}
+          restore-keys: |
+            pods-testflight-${{ runner.os }}-
+
+      - name: Install CocoaPods dependencies
+        working-directory: src/QueenZone.Mobile/ios
+        run: |
+          set -euo pipefail
+          export LANG=en_US.UTF-8
+          export LC_ALL=en_US.UTF-8
+          pod install
+          workspace=$(find . -maxdepth 1 -name '*.xcworkspace' -print -quit)
+          if [ -z "$workspace" ]; then
+            echo "::error::pod install did not produce an .xcworkspace."
+            ls -la
+            exit 1
+          fi
+          echo "Using workspace $workspace"
 
       - name: Install signing identity and provisioning profile
         env:
@@ -136,6 +227,11 @@ jobs:
           EXPO_PUBLIC_APP_ENV: staging
         run: |
           workspace=$(find . -maxdepth 1 -name '*.xcworkspace' -print -quit)
+          if [ -z "$workspace" ]; then
+            echo "::error::No .xcworkspace found in ios/. CocoaPods install is required before archiving."
+            ls -la
+            exit 1
+          fi
           scheme=$(basename "$workspace" .xcworkspace)
           archive_path="$RUNNER_TEMP/QueenZone.xcarchive"
 
@@ -221,6 +317,32 @@ jobs:
             "$verify_dir/embedded-profile.plist")
           if [ "$application_id" != "$APPLE_TEAM_ID.$APP_BUNDLE_ID" ]; then
             echo "::error::Exported IPA has the wrong application identifier."
+            exit 1
+          fi
+
+          expected_build="${IOS_BUILD_NUMBER}"
+          bundle_version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$app_path/Info.plist")
+          echo "IPA CFBundleVersion=${bundle_version} (expected ${expected_build})"
+          if [ "$bundle_version" != "$expected_build" ]; then
+            echo "::error::IPA CFBundleVersion is ${bundle_version}, expected ${expected_build}."
+            echo "App Store Connect rejects duplicate/non-increasing CFBundleVersion values."
+            exit 1
+          fi
+
+          encryption=$(/usr/libexec/PlistBuddy -c 'Print :ITSAppUsesNonExemptEncryption' "$app_path/Info.plist")
+          echo "IPA ITSAppUsesNonExemptEncryption=${encryption}"
+          if [ "$encryption" != "false" ]; then
+            echo "::error::Exported IPA is missing the exempt-encryption declaration."
+            exit 1
+          fi
+
+          constants_config="$app_path/EXConstants.bundle/app.config"
+          if ! grep -Fq "$BUILD_TIMESTAMP_UTC" "$constants_config"; then
+            echo "::error::Exported IPA is missing build timestamp ${BUILD_TIMESTAMP_UTC}."
+            exit 1
+          fi
+          if ! grep -Fq "$BUILD_REVISION" "$constants_config"; then
+            echo "::error::Exported IPA is missing build revision ${BUILD_REVISION}."
             exit 1
           fi
 

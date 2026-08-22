@@ -126,7 +126,7 @@ writes `extra.appEnv` and `extra.apiBaseUrl`; runtime code reads them via
 | `EXPO_PUBLIC_APP_ENV` | Default API origin |
 | --- | --- |
 | `development` (default) | `http://localhost:5146` (local `QueenZone.Web`) |
-| `staging` | `https://queenzone-dev.azurewebsites.net` |
+| `staging` | `https://www.queenzone.org` |
 | `production` | `https://www.queenzone.org` |
 
 Override the origin for any environment without code changes:
@@ -204,10 +204,26 @@ The one-time Apple setup for `org.queenzone.mobile` consists of:
 Run **Publish iOS to TestFlight** from the repository's **Actions** tab and
 select `main`. The workflow intentionally rejects other branches and targets
 the self-hosted Mac runner through `[self-hosted, macOS, ARM64, ios-signing]`.
-It imports signing material into a temporary Keychain, produces and verifies a
-signed `.ipa`, retains that IPA as a seven-day workflow artifact, uploads it to
-App Store Connect, and deletes the temporary Keychain and provisioning profile
-even when a step fails.
+The runner service does not load an interactive shell profile, so the workflow
+puts Homebrew (`/opt/homebrew/bin` or `/usr/local/bin`) on `PATH`, installs
+CocoaPods if `pod` is missing, runs `expo prebuild --no-install` with
+`IOS_BUILD_NUMBER` set to the workflow run number (so `CFBundleVersion` is unique
+for App Store Connect), records the UTC build time and source revision for the
+in-app build stamp, then runs `pod install` before archiving. Expo also writes
+`ITSAppUsesNonExemptEncryption=false` because the app uses only exempt platform
+HTTPS; this prevents each TestFlight build pausing for the same export-compliance
+questionnaire. Expo's own CocoaPods auto-install is skipped
+because a missing CLI is only a warning and otherwise continues without an
+`.xcworkspace`. It then imports signing material into a temporary Keychain,
+produces and verifies a signed `.ipa`, retains that IPA as a seven-day
+workflow artifact, uploads it to App Store Connect, and deletes the temporary
+Keychain and provisioning profile even when a step fails.
+
+The exported IPA verification checks the build number, exempt-encryption
+declaration, timestamp, and source revision before upload. The app shows the
+version, native build number, localised build date/time, and short revision at
+the bottom of the **You** page, using the same subdued build-stamp treatment as
+the website.
 
 Install Apple's TestFlight app on the iPhone and accept the QueenZone internal
 tester invitation. After Apple finishes processing an uploaded build, install

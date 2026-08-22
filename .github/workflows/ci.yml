@@ -171,18 +171,19 @@ jobs:
       - name: Install
         run: npm ci
 
-      - name: Prebuild iOS project
-        run: npx expo prebuild --platform ios
-
+      # Cache only CocoaPods downloads, never generated ios/Pods. Restoring
+      # ios/Pods after `expo prebuild` (especially via restore-keys) overwrites
+      # Manifest.lock and fails Check Pods Manifest.lock.
       - name: Cache CocoaPods
         uses: actions/cache@v4
         with:
-          path: |
-            ~/Library/Caches/CocoaPods
-            src/QueenZone.Mobile/ios/Pods
-          key: pods-${{ runner.os }}-${{ hashFiles('src/QueenZone.Mobile/ios/Podfile.lock') }}
+          path: ~/Library/Caches/CocoaPods
+          key: cocoapods-${{ runner.os }}-${{ hashFiles('src/QueenZone.Mobile/package-lock.json') }}
           restore-keys: |
-            pods-${{ runner.os }}-
+            cocoapods-${{ runner.os }}-
+
+      - name: Prebuild iOS project
+        run: npx expo prebuild --platform ios --clean
 
       - name: Build for iOS Simulator
         working-directory: src/QueenZone.Mobile/ios

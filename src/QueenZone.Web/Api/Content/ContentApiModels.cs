@@ -14,6 +14,9 @@ public sealed record NewsListItemDto(
 
 /// <summary>
 /// Detail shape for <c>/api/v1/content/news/{id}</c>.
+/// <c>Body</c> is sanitized HTML suitable for display (same allowlist as
+/// <see cref="NewsArticleContent.FormatBody"/>): basic formatting, links, and UGC images.
+/// Plain-text legacy bodies are HTML-encoded with line breaks and auto-linked URLs.
 /// </summary>
 public sealed record NewsDetailDto(
     int Id,
@@ -23,7 +26,6 @@ public sealed record NewsDetailDto(
     DateTime PublishedAt,
     string? SourceUrl,
     string DetailPath);
-
 /// <summary>
 /// List-card shape for <c>/api/v1/content/timeline</c>. No detail endpoint: the website
 /// has no single-event page, only the one continuous timeline list.
