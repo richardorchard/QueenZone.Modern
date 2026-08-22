@@ -25,7 +25,7 @@ import { useSession } from '../../session/SessionContext';
 import { RichHtmlBody } from '../../ui/RichHtmlBody';
 import { Button } from '../../ui/Button';
 import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from '../../ui/ScreenStates';
-import { resolveContentUrl } from '../../ui/html/resolveContentUrl';
+import { isHttpUrl, resolveContentUrl } from '../../ui/html/resolveContentUrl';
 import { radius, space, type, useTheme } from '../../theme';
 import {
   attachmentMeta,
@@ -44,7 +44,7 @@ function messageFromUnknownError(err: unknown): string {
 
 function openResolvedUrl(href: string): void {
   const resolved = resolveContentUrl(href, getAppConfig().apiBaseUrl);
-  if (resolved) {
+  if (resolved && isHttpUrl(resolved)) {
     void Linking.openURL(resolved);
   }
 }

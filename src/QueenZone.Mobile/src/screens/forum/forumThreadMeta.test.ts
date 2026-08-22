@@ -41,7 +41,7 @@ describe('forum thread meta', () => {
     assert.equal(parseTopicId(0), null);
   });
 
-  it('uses thumbnails for image previews and skips non-images', () => {
+  it('inlines images only when a thumbnail URL is present', () => {
     assert.equal(
       imagePreviewUrl({
         isImage: true,
@@ -56,12 +56,20 @@ describe('forum thread meta', () => {
         thumbnailUrl: null,
         url: '/forum/attachment/legacy/1002',
       }),
-      '/forum/attachment/legacy/1002',
+      null,
+    );
+    assert.equal(
+      imagePreviewUrl({
+        isImage: true,
+        thumbnailUrl: '   ',
+        url: '/forum/attachment/legacy/1002',
+      }),
+      null,
     );
     assert.equal(
       imagePreviewUrl({
         isImage: false,
-        thumbnailUrl: null,
+        thumbnailUrl: '/ugc/forum/a-thumb.webp',
         url: '/forum/attachment/legacy/9',
       }),
       null,

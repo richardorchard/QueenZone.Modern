@@ -56,11 +56,15 @@ export function attachmentMeta(item: AttachmentMetaInput): string {
   return parts.join(' · ');
 }
 
-/** Image attachments render inline; prefer the stored thumb, else the download URL. */
+/**
+ * Inline only when the website would: `isImage` plus a stored thumbnail.
+ * Do not fall back to `/forum/attachment/...` — that path is member-gated and
+ * React Native Image would hit it without auth.
+ */
 export function imagePreviewUrl(item: AttachmentPreviewInput): string | null {
   if (!item.isImage) {
     return null;
   }
-  const preview = item.thumbnailUrl?.trim() || item.url.trim();
-  return preview.length > 0 ? preview : null;
+  const thumb = item.thumbnailUrl?.trim() ?? '';
+  return thumb.length > 0 ? thumb : null;
 }
