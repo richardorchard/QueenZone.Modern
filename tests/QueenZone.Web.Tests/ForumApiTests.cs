@@ -2,7 +2,9 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Options;
 using QueenZone.Data;
+using QueenZone.Storage;
 
 namespace QueenZone.Web.Tests;
 
@@ -196,5 +198,188 @@ public sealed class ForumApiTests : IClassFixture<QueenZoneWebApplicationFactory
         Assert.Equal("/forum/topic/1002/ranking-every-studio-album", topicDto.DetailPath);
         Assert.Equal(ForumApiMapper.ToCategoryListItems([category])[0], categoryDto);
         Assert.Equal(ForumApiMapper.ToTopicListItems([topic])[0], topicDto);
+
+        var header = new ForumTopicHeader(1002, " Ranking every studio album ", 1, " The Music ");
+        var topicDetail = ForumApiMapper.ToTopicDetail(header, postCount: 26);
+        Assert.Equal(1002, topicDetail.Id);
+        Assert.Equal("Ranking every studio album", topicDetail.Title);
+        Assert.Equal("/forum/1/the-music", topicDetail.CategoryPath);
+        Assert.Equal("/forum/topic/1002/ranking-every-studio-album", topicDetail.DetailPath);
+        Assert.Equal(26, topicDetail.PostCount);
+
+        var post = new ForumPostItem(
+            1002,
+            "Where would you put <strong>A Night at the Opera</strong> in the ranking?",
+            new DateTime(2024, 6, 1, 10, 0, 0, DateTimeKind.Utc),
+            "brightonrock",
+            "Queen collector since 1989.",
+            4812,
+            new DateTime(2004, 3, 12, 0, 0, 0, DateTimeKind.Utc),
+            [new ForumPostAttachment(
+                "anoto-setlist-scan.jpg",
+                284_712,
+                ForumAttachmentPaths.LegacyDownloadPath(1002))]);
+        var ugcHtml = new UgcHtml(Options.Create(new BlobUploadOptions()));
+        var postDto = ForumApiMapper.ToPost(post, ugcHtml);
+        Assert.Contains("<strong>A Night at the Opera</strong>", postDto.Body, StringComparison.Ordinal);
+        Assert.Equal("brightonrock", postDto.AuthorUsername);
+        Assert.Single(postDto.Attachments);
+        Assert.Equal("anoto-setlist-scan.jpg", postDto.Attachments[0].FileName);
+        Assert.Equal("/forum/attachment/legacy/1002", postDto.Attachments[0].Url);
+        Assert.Equal("JPG", postDto.Attachments[0].Extension);
+        Assert.True(postDto.Attachments[0].IsImage);
+        var mappedPosts = ForumApiMapper.ToPosts([post], ugcHtml);
+        Assert.Equal(postDto.Id, mappedPosts[0].Id);
+        Assert.Equal(postDto.Body, mappedPosts[0].Body);
+        Assert.Equal(postDto.Attachments[0], mappedPosts[0].Attachments[0]);
+    }
+
+    [Fact]
+    public async Task Topic_detail_requires_no_auth_and_matches_website_header()
+    {
+        using var client = factory.CreateAnonymousClient();
+
+        using var response = await client.GetAsync($"{ForumApiEndpoints.RootPath}/topics/1002");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var topic = await response.Content.ReadFromJsonAsync<ForumTopicDetailDto>();
+        Assert.NotNull(topic);
+        Assert.Equal(1002, topic!.Id);
+        Assert.Equal("Ranking every studio album", topic.Title);
+        Assert.Equal(1, topic.ForumId);
+        Assert.Equal("The Music", topic.ForumName);
+        Assert.Equal("/forum/1/the-music", topic.CategoryPath);
+        Assert.Equal("/forum/topic/1002/ranking-every-studio-album", topic.DetailPath);
+        Assert.Equal(26, topic.PostCount);
+
+        var html = await client.GetStringAsync(topic.DetailPath);
+        Assert.Contains(WebUtility.HtmlEncode(topic.Title), html, StringComparison.Ordinal);
+        Assert.Contains(WebUtility.HtmlEncode(topic.ForumName), html, StringComparison.Ordinal);
+        Assert.Contains("<strong>26</strong> posts", html, StringComparison.Ordinal);
+        Assert.Contains(topic.DetailPath, html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Topic_detail_returns_problem_details_for_missing_thread()
+    {
+        using var client = factory.CreateAnonymousClient();
+
+        using var response = await client.GetAsync($"{ForumApiEndpoints.RootPath}/topics/9999");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(StatusCodes.Status404NotFound, problem.GetProperty("status").GetInt32());
+        Assert.Contains("9999", problem.GetProperty("detail").GetString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Topic_posts_match_website_order_paging_and_attachments()
+    {
+        using var client = factory.CreateAnonymousClient();
+
+        using var firstPageResponse = await client.GetAsync(
+            $"{ForumApiEndpoints.RootPath}/topics/1002/posts?page=1&pageSize={ForumRoutes.PostsPageSize}");
+        Assert.Equal(HttpStatusCode.OK, firstPageResponse.StatusCode);
+        var firstPage = await firstPageResponse.Content.ReadFromJsonAsync<ApiPagedResponse<ForumPostDto>>();
+        Assert.NotNull(firstPage);
+        Assert.Equal(1, firstPage!.Page);
+        Assert.Equal(ForumRoutes.PostsPageSize, firstPage.PageSize);
+        Assert.Equal(26, firstPage.TotalCount);
+        Assert.Equal(2, firstPage.TotalPages);
+        Assert.Equal(ForumRoutes.PostsPageSize, firstPage.Items.Count);
+        Assert.Equal(1002, firstPage.Items[0].Id);
+        Assert.Equal("brightonrock", firstPage.Items[0].AuthorUsername);
+        Assert.Contains("A Night at the Opera", firstPage.Items[0].Body, StringComparison.Ordinal);
+        Assert.Single(firstPage.Items[0].Attachments);
+        Assert.Equal("anoto-setlist-scan.jpg", firstPage.Items[0].Attachments[0].FileName);
+        Assert.Equal("/forum/attachment/legacy/1002", firstPage.Items[0].Attachments[0].Url);
+        Assert.Equal("JPG", firstPage.Items[0].Attachments[0].Extension);
+        Assert.Equal("278.0 KB", firstPage.Items[0].Attachments[0].FormattedSize);
+        Assert.True(firstPage.Items[0].Attachments[0].IsImage);
+        Assert.DoesNotContain(firstPage.Items, item => item.Body.Contains("Archive reply 1125", StringComparison.Ordinal));
+        var notes = firstPage.Items.Single(item => item.Id == 1101);
+        Assert.Single(notes.Attachments);
+        Assert.Equal("opera-side-two-notes.pdf", notes.Attachments[0].FileName);
+        Assert.Equal("/forum/attachment/legacy/1101", notes.Attachments[0].Url);
+        Assert.Equal("PDF", notes.Attachments[0].Extension);
+        Assert.False(notes.Attachments[0].IsImage);
+
+        var html = await client.GetStringAsync("/forum/topic/1002/ranking-every-studio-album");
+        Assert.Contains(WebUtility.HtmlEncode(firstPage.Items[0].AuthorUsername), html, StringComparison.Ordinal);
+        Assert.Contains("A Night at the Opera", html, StringComparison.Ordinal);
+        Assert.Contains("/forum/attachment/legacy/1002", html, StringComparison.Ordinal);
+        Assert.Contains("anoto-setlist-scan.jpg", html, StringComparison.Ordinal);
+        Assert.Contains("278.0 KB", html, StringComparison.Ordinal);
+        Assert.Contains("opera-side-two-notes.pdf", html, StringComparison.Ordinal);
+        Assert.Contains("/forum/attachment/legacy/1101", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("Archive reply 1125", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("cdn.queenzone.org/attachments/", html, StringComparison.Ordinal);
+
+        using var secondPageResponse = await client.GetAsync(
+            $"{ForumApiEndpoints.RootPath}/topics/1002/posts?page=2&pageSize={ForumRoutes.PostsPageSize}");
+        var secondPage = await secondPageResponse.Content.ReadFromJsonAsync<ApiPagedResponse<ForumPostDto>>();
+        Assert.NotNull(secondPage);
+        Assert.Equal(2, secondPage!.Page);
+        Assert.Contains(secondPage.Items, item => item.Body.Contains("Archive reply 1125", StringComparison.Ordinal));
+
+        var pageTwoHtml = await client.GetStringAsync("/forum/topic/1002/ranking-every-studio-album/page/2");
+        Assert.Contains("Archive reply 1125", pageTwoHtml, StringComparison.Ordinal);
+        Assert.All(
+            secondPage.Items,
+            item => Assert.Contains(WebUtility.HtmlEncode(item.AuthorUsername), pageTwoHtml, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Topic_posts_default_and_clamp_to_website_page_size()
+    {
+        using var client = factory.CreateAnonymousClient();
+
+        using var omitted = await client.GetAsync($"{ForumApiEndpoints.RootPath}/topics/1002/posts");
+        Assert.Equal(HttpStatusCode.OK, omitted.StatusCode);
+        var omittedPage = await omitted.Content.ReadFromJsonAsync<ApiPagedResponse<ForumPostDto>>();
+        Assert.NotNull(omittedPage);
+        Assert.Equal(1, omittedPage!.Page);
+        Assert.Equal(ForumRoutes.PostsPageSize, omittedPage.PageSize);
+        Assert.Equal(ForumRoutes.PostsPageSize, omittedPage.Items.Count);
+        Assert.Equal(2, omittedPage.TotalPages);
+        Assert.DoesNotContain(
+            omittedPage.Items,
+            item => item.Body.Contains("Archive reply 1125", StringComparison.Ordinal));
+
+        using var clamped = await client.GetAsync(
+            $"{ForumApiEndpoints.RootPath}/topics/1002/posts?page=0&pageSize=1000");
+        Assert.Equal(HttpStatusCode.OK, clamped.StatusCode);
+        var clampedPage = await clamped.Content.ReadFromJsonAsync<ApiPagedResponse<ForumPostDto>>();
+        Assert.NotNull(clampedPage);
+        Assert.Equal(1, clampedPage!.Page);
+        Assert.Equal(ForumRoutes.PostsPageSize, clampedPage.PageSize);
+        Assert.Equal(ForumRoutes.PostsPageSize, clampedPage.Items.Count);
+    }
+
+    [Fact]
+    public async Task Topic_posts_return_empty_page_for_thread_with_no_posts()
+    {
+        using var client = factory.CreateAnonymousClient();
+
+        using var response = await client.GetAsync($"{ForumApiEndpoints.RootPath}/topics/1003/posts");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<ApiPagedResponse<ForumPostDto>>();
+        Assert.NotNull(payload);
+        Assert.Empty(payload!.Items);
+        Assert.Equal(0, payload.TotalCount);
+        Assert.Equal(0, payload.TotalPages);
+    }
+
+    [Fact]
+    public async Task Topic_posts_return_problem_details_for_missing_thread()
+    {
+        using var client = factory.CreateAnonymousClient();
+
+        using var response = await client.GetAsync($"{ForumApiEndpoints.RootPath}/topics/9999/posts");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
     }
 }

@@ -129,3 +129,36 @@ export type ForumTopicListItem = {
   isSticky: boolean;
   detailPath: string;
 };
+
+export type ForumTopicDetail = {
+  id: number;
+  title: string;
+  forumId: number;
+  forumName: string;
+  categoryPath: string;
+  detailPath: string;
+  postCount: number;
+  hasPoll: boolean | null;
+};
+
+export type ForumAttachment = {
+  fileName: string;
+  url: string;
+  extension: string;
+  formattedSize: string;
+  isImage: boolean;
+  thumbnailUrl: string | null;
+};
+
+export type ForumPost = {
+  id: number;
+  body: string;
+  postedAt: string;
+  authorUsername: string;
+  signature: string | null;
+  authorMemberSince: string | null;
+  authorMemberId: string | null;
+  editedAt: string | null;
+  editCount: number;
+  attachments: ForumAttachment[];
+};

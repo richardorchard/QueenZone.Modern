@@ -6,7 +6,7 @@ using System.Text.Json;
 namespace QueenZone.Web.E2E;
 
 /// <summary>
-/// HTTP shape sweep of the public mobile JSON API (<c>/api/v1</c>, issues #726 / #731) for the
+/// HTTP shape sweep of the public mobile JSON API (<c>/api/v1</c>, issues #726 / #731 / #732) for the
 /// live-site job and the nightly RealData suite. Anonymous read-only routes only —
 /// no <c>/api/v1/auth</c> (rate-limited writes) and no <c>/api/v1/admin</c> (Entra).
 /// Discovers detail ids from list responses instead of hardcoding archive records.
@@ -33,6 +33,8 @@ public class LiveSiteContentApiTests : RealDataPageTest
         "/api/v1/forum/categories",
         "/api/v1/forum/categories/{id}",
         "/api/v1/forum/categories/{id}/topics",
+        "/api/v1/forum/topics/{id}",
+        "/api/v1/forum/topics/{id}/posts",
     ];
 
     private static readonly ContentListSpec[] ContentLists =
@@ -250,6 +252,42 @@ public class LiveSiteContentApiTests : RealDataPageTest
                     ["title", "authorUsername", "lastActivityAt", "detailPath"],
                     topicsPath,
                     failures);
+
+                if (TryGetPositiveInt(topicItems[0], "id", out var topicId))
+                {
+                    var topicPath = $"/api/v1/forum/topics/{topicId}";
+                    var topic = await TryGetJsonAsync(client, topicPath, failures);
+                    if (topic is { } topicDoc)
+                    {
+                        AssertRequiredStrings(
+                            topicDoc,
+                            ["title", "forumName", "categoryPath", "detailPath"],
+                            topicPath,
+                            failures);
+                    }
+
+                    var postsPath = $"/api/v1/forum/topics/{topicId}/posts?page=1&pageSize={SamplePageSize}";
+                    var posts = await TryGetJsonAsync(client, postsPath, failures);
+                    if (posts is { } postsDoc)
+                    {
+                        AssertPagedEnvelope(postsDoc, postsPath, failures);
+                        if (postsDoc.TryGetProperty("items", out var postItems)
+                            && postItems.ValueKind == JsonValueKind.Array
+                            && postItems.GetArrayLength() > 0)
+                        {
+                            AssertRequiredStrings(
+                                postItems[0],
+                                ["body", "authorUsername", "postedAt"],
+                                postsPath,
+                                failures);
+                            if (!postItems[0].TryGetProperty("attachments", out var attachments)
+                                || attachments.ValueKind != JsonValueKind.Array)
+                            {
+                                failures.Add($"{postsPath}: first post 'attachments' must be a JSON array.");
+                            }
+                        }
+                    }
+                }
             }
         }
 

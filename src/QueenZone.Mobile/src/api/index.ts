@@ -10,6 +10,12 @@ export {
   fetchNewsPage,
   fetchTimelinePage,
 } from './content';
-export { fetchForumCategories, fetchForumCategory, fetchForumCategoryTopics } from './forum';
+export {
+  fetchForumCategories,
+  fetchForumCategory,
+  fetchForumCategoryTopics,
+  fetchForumTopic,
+  fetchForumTopicPosts,
+} from './forum';
 export type { PageQuery } from './content';
 export type * from './types';

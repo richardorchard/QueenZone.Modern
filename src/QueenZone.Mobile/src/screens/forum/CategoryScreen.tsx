@@ -124,7 +124,7 @@ export function CategoryScreen({ navigation, route }: Props) {
           title={item.title}
           subtitle={item.authorUsername}
           meta={topicMeta(item)}
-          onPress={() => navigation.navigate('Thread', { id: String(item.id) })}
+          onPress={() => navigation.navigate('Thread', { id: item.id, title: item.title })}
           accessibilityLabel={`Open thread ${item.title}`}
         />
       )}

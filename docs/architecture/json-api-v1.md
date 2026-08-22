@@ -13,7 +13,7 @@ Decision record: [`docs/decisions/0010-versioned-json-api-conventions.md`](../de
 | `/api/v1/auth/*` | Mobile OAuth2 PKCE + tokens (see issues #720 / #721) |
 | `/api/v1/admin` | Admin status probe; future admin JSON must use the same `Admin` policy (#723) |
 | `/api/v1/content/*` | Public, read-only archive content for the mobile app: news, biography, discography, timeline, and Freddie Tribute (#726). No authentication required. |
-| `/api/v1/forum/*` | Public, read-only forum browse for the mobile app: category list, category detail, and paged topic lists (#731). Same `IForumRepository` visibility as `/forum` Razor Pages. No authentication required. Topic posts and writes are later stories. |
+| `/api/v1/forum/*` | Public, read-only forum browse for the mobile app: category list, category detail, paged topic lists (#731), and topic headers plus paged posts (#732). Same `IForumRepository` visibility as `/forum` Razor Pages. No authentication required. Topic posts default and clamp `pageSize` to `ForumRoutes.PostsPageSize` (15) so pages match the website. Attachment metadata includes `/forum/attachment/*` paths; those remain cookie-gated and are not opened from the app. A Bearer download API is a follow-up. Writes are a later story. |
 | `/api/v1/{resource}` | Later epics (messages, galleries, …) |
 
 Later endpoints should be mapped on a `MapGroup("/api/v1")` (or a sub-group) with `.WithGroupName("v1")` so they appear in the OpenAPI document. Do not add mobile/app JSON routes under `src/QueenZone.Web/Endpoints/`.
@@ -61,7 +61,7 @@ Use `ApiPagination.Normalize` and return `ApiPagedResponse<T>` from list endpoin
 | Query | Default | Rules |
 | --- | --- | --- |
 | `page` | `1` | Values below 1 clamp to 1 |
-| `pageSize` | `20` | Values below 1 clamp to 20; values above 100 clamp to 100 |
+| `pageSize` | `20` | Values below 1 clamp to 20; values above 100 clamp to 100. **Exception:** `GET /api/v1/forum/topics/{id}/posts` defaults and clamps to `ForumRoutes.PostsPageSize` (15) so pages match `/forum/topic/...`. |
 
 Response:
 

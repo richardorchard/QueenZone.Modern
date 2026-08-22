@@ -92,6 +92,8 @@ public sealed class ApiV1RoutesTests : IClassFixture<QueenZoneWebApplicationFact
         Assert.True(paths.TryGetProperty("/api/v1/forum/categories", out _));
         Assert.True(paths.TryGetProperty("/api/v1/forum/categories/{id}", out _));
         Assert.True(paths.TryGetProperty("/api/v1/forum/categories/{id}/topics", out _));
+        Assert.True(paths.TryGetProperty("/api/v1/forum/topics/{id}", out _));
+        Assert.True(paths.TryGetProperty("/api/v1/forum/topics/{id}/posts", out _));
         Assert.True(paths.TryGetProperty("/api/v1/admin/", out _) || paths.TryGetProperty("/api/v1/admin", out _));
         Assert.False(paths.TryGetProperty("/health", out _));
         Assert.False(paths.TryGetProperty("/api/uploads/editor-image", out _));
@@ -149,6 +151,24 @@ public sealed class ApiPaginationTests
     public void Normalize_clamps_page_and_page_size(int? page, int? pageSize, int expectedPage, int expectedPageSize)
     {
         var request = ApiPagination.Normalize(page, pageSize);
+        Assert.Equal(expectedPage, request.Page);
+        Assert.Equal(expectedPageSize, request.PageSize);
+    }
+
+    [Theory]
+    [InlineData(null, null, 15, 15, 1, 15)]
+    [InlineData(0, 0, 15, 15, 1, 15)]
+    [InlineData(2, 1000, 15, 15, 2, 15)]
+    [InlineData(1, 10, 15, 15, 1, 10)]
+    public void Normalize_honours_per_endpoint_default_and_max(
+        int? page,
+        int? pageSize,
+        int defaultPageSize,
+        int maxPageSize,
+        int expectedPage,
+        int expectedPageSize)
+    {
+        var request = ApiPagination.Normalize(page, pageSize, defaultPageSize, maxPageSize);
         Assert.Equal(expectedPage, request.Page);
         Assert.Equal(expectedPageSize, request.PageSize);
     }
