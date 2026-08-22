@@ -163,7 +163,7 @@ export function ForumPollCard({
       ) : null}
 
       {prompt === 'signIn' ? (
-        <Button label="Open sign-in" variant="outline" onPress={onSignIn} />
+        <Button label="Sign in (development)" variant="outline" onPress={onSignIn} />
       ) : null}
 
       {poll.canViewerClose && hasAccessToken ? (

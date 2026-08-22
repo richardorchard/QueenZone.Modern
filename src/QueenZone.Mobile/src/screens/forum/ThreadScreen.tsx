@@ -23,7 +23,12 @@ import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from '../../u
 import { resolveContentUrl } from '../../ui/html/resolveContentUrl';
 import { radius, space, type, useTheme } from '../../theme';
 import { ForumPollCard } from './ForumPollCard';
-import { pollActionErrorMessage, pollTokenRequiredMessage, shouldLoadPoll } from './forumPollMeta';
+import {
+  pollActionErrorMessage,
+  pollTokenRequiredMessage,
+  shouldLoadPoll,
+  shouldShowPollLoadError,
+} from './forumPollMeta';
 import {
   attachmentMeta,
   formatMemberSince,
@@ -42,7 +47,7 @@ function messageFromUnknownError(err: unknown): string {
 
 export function ThreadScreen({ navigation, route }: Props) {
   const { c } = useTheme();
-  const { isSignedIn, accessToken } = useSession();
+  const { isSignedIn, accessToken, signIn } = useSession();
   const { id: rawId, title } = route.params;
   const id = parseTopicId(rawId);
   const [topic, setTopic] = useState<ForumTopicDetail | null>(null);
@@ -223,8 +228,12 @@ export function ThreadScreen({ navigation, route }: Props) {
             error={pollError}
             onVote={votePoll}
             onClose={closePoll}
-            onSignIn={() => navigation.getParent()?.navigate('HomeTab', { screen: 'SignIn' })}
+            onSignIn={signIn}
           />
+        </View>
+      ) : shouldShowPollLoadError(poll, pollError) ? (
+        <View style={styles.poll}>
+          <ErrorBlock message={pollError ?? 'Unable to load this poll.'} onRetry={retryTopic} />
         </View>
       ) : null}
     </View>

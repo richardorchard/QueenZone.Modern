@@ -11,6 +11,7 @@ import {
   pollAuthPrompt,
   pollTokenRequiredMessage,
   shouldLoadPoll,
+  shouldShowPollLoadError,
   shouldShowPollResults,
 } from './forumPollMeta.ts';
 
@@ -118,6 +119,13 @@ describe('forum poll meta', () => {
       }),
       'Closes 22 Aug 2026 06:43 UTC · 3 voters · Multi-choice',
     );
+  });
+
+  it('shows a poll load error when GET failed and no poll card can mount', () => {
+    assert.equal(shouldShowPollLoadError(null, 'Poll request failed.'), true);
+    assert.equal(shouldShowPollLoadError(undefined, 'Poll request failed.'), true);
+    assert.equal(shouldShowPollLoadError(null, null), false);
+    assert.equal(shouldShowPollLoadError({ pollId: '1' }, 'You have already voted.'), false);
   });
 
   it('surfaces API vote errors', () => {

@@ -66,6 +66,14 @@ export function pollAuthPrompt(input: PollAuthInput): PollAuthPrompt {
 export const pollTokenRequiredMessage =
   'Voting requires a mobile Bearer token. The development sign-in toggle cannot vote.';
 
+/** GET `/poll` failures set pollError with poll null, so the vote card never mounts. */
+export function shouldShowPollLoadError(
+  poll: object | null | undefined,
+  pollError: string | null | undefined,
+): boolean {
+  return poll == null && Boolean(pollError);
+}
+
 /** Matches website `option.Percentage.ToString("0.#")`. */
 export function formatPollPercentage(value: number): string {
   if (!Number.isFinite(value)) {
