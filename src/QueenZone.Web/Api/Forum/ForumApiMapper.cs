@@ -36,4 +36,48 @@ public static class ForumApiMapper
     public static IReadOnlyList<ForumTopicListItemDto> ToTopicListItems(
         IEnumerable<ForumTopicItem> topics) =>
         topics.Select(ToTopicListItem).ToList();
+
+    public static ForumTopicDetailDto ToTopicDetail(ForumTopicHeader header, int postCount)
+    {
+        var view = PublicContentMapper.ToForumThreadHeader(header);
+        return new ForumTopicDetailDto(
+            view.TopicId,
+            view.Title,
+            view.ForumId,
+            view.ForumName,
+            view.CategoryPath,
+            view.DetailPath,
+            postCount,
+            view.HasPoll);
+    }
+
+    public static ForumPostDto ToPost(ForumPostItem post, UgcHtml ugcHtml)
+    {
+        var attachments = PublicContentMapper.ToForumPostViewModel(post).Attachments
+            .Select(attachment => new ForumAttachmentDto(
+                attachment.FileName,
+                attachment.Url,
+                attachment.Extension,
+                attachment.FormattedSize,
+                attachment.IsImage,
+                attachment.ThumbnailUrl))
+            .ToList();
+
+        return new ForumPostDto(
+            post.Id,
+            ugcHtml.FormatForDisplay(post.Body),
+            post.PostedAt,
+            post.AuthorUsername,
+            post.Signature,
+            post.AuthorMemberSince,
+            post.AuthorMemberId,
+            post.EditedAt,
+            post.EditCount,
+            attachments);
+    }
+
+    public static IReadOnlyList<ForumPostDto> ToPosts(
+        IEnumerable<ForumPostItem> posts,
+        UgcHtml ugcHtml) =>
+        posts.Select(post => ToPost(post, ugcHtml)).ToList();
 }

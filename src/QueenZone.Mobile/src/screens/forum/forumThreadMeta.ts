@@ -1,0 +1,57 @@
+export type AttachmentMetaInput = {
+  extension: string;
+  formattedSize: string;
+};
+
+export type AttachmentPreviewInput = {
+  isImage: boolean;
+  thumbnailUrl: string | null;
+  url: string;
+};
+
+/** Website topic pages use 15 posts per page (`ForumRoutes.PostsPageSize`). */
+export const forumPostsPageSize = 15;
+
+export function formatPostTimestamp(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+  return date.toLocaleString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+export function formatMemberSince(iso: string | null | undefined): string | null {
+  if (!iso) {
+    return null;
+  }
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  return date.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'long',
+  });
+}
+
+export function attachmentMeta(item: AttachmentMetaInput): string {
+  const parts = [item.extension, item.formattedSize, 'Members only'].filter(
+    (part) => part.trim().length > 0,
+  );
+  return parts.join(' · ');
+}
+
+/** Image attachments render inline; prefer the stored thumb, else the download URL. */
+export function imagePreviewUrl(item: AttachmentPreviewInput): string | null {
+  if (!item.isImage) {
+    return null;
+  }
+  const preview = item.thumbnailUrl?.trim() || item.url.trim();
+  return preview.length > 0 ? preview : null;
+}

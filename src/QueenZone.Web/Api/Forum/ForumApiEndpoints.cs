@@ -3,10 +3,12 @@ using QueenZone.Data;
 namespace QueenZone.Web;
 
 /// <summary>
-/// Public, read-only <c>/api/v1/forum/*</c> routes for browsing boards and topics
-/// (issue #731). No authentication required: the website forum index and category
-/// pages are public. Visibility is the same <see cref="IForumRepository"/> path
-/// used by Razor Pages — synthetic boards and unvalidated topic starters stay hidden.
+/// Public, read-only <c>/api/v1/forum/*</c> routes for browsing boards, topics,
+/// and topic threads (issues #731 / #732). No authentication required: the
+/// website forum index, category, and topic pages are public. Visibility is the
+/// same <see cref="IForumRepository"/> path used by Razor Pages — synthetic
+/// boards and unvalidated topic starters stay hidden. Attachments reuse the
+/// existing member-gated <c>/forum/attachment/...</c> paths.
 /// </summary>
 public static class ForumApiEndpoints
 {
@@ -34,6 +36,18 @@ public static class ForumApiEndpoints
             .WithName("GetForumCategoryTopics")
             .WithSummary("Paged public topics in a board. Sticky threads first, then last activity.")
             .Produces<ApiPagedResponse<ForumTopicListItemDto>>()
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapGet("/topics/{id:int}", GetTopicAsync)
+            .WithName("GetForumTopic")
+            .WithSummary("A single public forum topic header.")
+            .Produces<ForumTopicDetailDto>()
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapGet("/topics/{id:int}/posts", GetTopicPostsAsync)
+            .WithName("GetForumTopicPosts")
+            .WithSummary("Paged public posts in a topic, chronological, matching website pages.")
+            .Produces<ApiPagedResponse<ForumPostDto>>()
             .ProducesProblem(StatusCodes.Status404NotFound);
     }
 
@@ -108,4 +122,52 @@ public static class ForumApiEndpoints
 
         return Results.Ok(response);
     }
+
+    internal static async Task<IResult> GetTopicAsync(
+        IForumRepository forumRepository,
+        int id,
+        CancellationToken cancellationToken)
+    {
+        var topicPage = await forumRepository.GetTopicPostsPageAsync(id, 1, 1, cancellationToken);
+        if (topicPage is null)
+        {
+            return TopicNotFound(id);
+        }
+
+        return Results.Ok(ForumApiMapper.ToTopicDetail(topicPage.Header, topicPage.TotalCount));
+    }
+
+    internal static async Task<IResult> GetTopicPostsAsync(
+        IForumRepository forumRepository,
+        UgcHtml ugcHtml,
+        int id,
+        int? page,
+        int? pageSize,
+        CancellationToken cancellationToken)
+    {
+        var request = ApiPagination.Normalize(page, pageSize);
+        var topicPage = await forumRepository.GetTopicPostsPageAsync(
+            id,
+            request.Page,
+            request.PageSize,
+            cancellationToken);
+        if (topicPage is null)
+        {
+            return TopicNotFound(id);
+        }
+
+        var response = ApiPagedResponse<ForumPostDto>.Create(
+            ForumApiMapper.ToPosts(topicPage.Posts, ugcHtml),
+            request.Page,
+            request.PageSize,
+            topicPage.TotalCount);
+
+        return Results.Ok(response);
+    }
+
+    private static IResult TopicNotFound(int id) =>
+        Results.Problem(
+            statusCode: StatusCodes.Status404NotFound,
+            title: "Not Found",
+            detail: $"No public forum topic with id '{id}'.");
 }

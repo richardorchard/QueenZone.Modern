@@ -28,7 +28,7 @@ export type PhotosStackParamList = {
 export type ForumStackParamList = {
   ForumIndex: undefined;
   Category: { id: number; name?: string };
-  Thread: { id: string };
+  Thread: { id: number; title?: string };
   Composer: { threadId?: string };
 };
 

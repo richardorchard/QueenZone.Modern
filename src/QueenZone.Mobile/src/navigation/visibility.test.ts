@@ -40,6 +40,7 @@ describe('member-only screens', () => {
     assert.equal(isMemberOnlyScreen('PhotoIndex'), false);
     assert.equal(isMemberOnlyScreen('ForumIndex'), false);
     assert.equal(isMemberOnlyScreen('Category'), false);
+    assert.equal(isMemberOnlyScreen('Thread'), false);
     assert.equal(isMemberOnlyScreen('FanPerformances'), false);
     assert.equal(isMemberOnlyScreen('Help'), false);
     assert.equal(isMemberOnlyScreen('Account'), false);
