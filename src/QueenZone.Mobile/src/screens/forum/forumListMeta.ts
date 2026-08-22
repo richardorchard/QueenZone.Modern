@@ -1,22 +1,44 @@
-import { formatPublishedDate } from '../../api';
-import type { ForumCategoryListItem, ForumTopicListItem } from '../../api';
+export type CategoryMetaInput = {
+  latestThreadTitle: string | null;
+  lastActivityAt: string | null;
+  postCount: number;
+};
+
+export type TopicMetaInput = {
+  lastActivityAt: string;
+  replyCount: number;
+  lastPostUsername: string | null;
+  isSticky: boolean;
+};
 
 export function formatForumCount(value: number): string {
   return value.toLocaleString();
 }
 
-export function categoryMeta(item: ForumCategoryListItem): string {
+function formatListDate(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+  return date.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+export function categoryMeta(item: CategoryMetaInput): string {
   if (item.latestThreadTitle) {
     return `Latest: ${item.latestThreadTitle}`;
   }
   if (item.lastActivityAt) {
-    const date = formatPublishedDate(item.lastActivityAt);
+    const date = formatListDate(item.lastActivityAt);
     return date ? `Last activity ${date}` : `${formatForumCount(item.postCount)} posts`;
   }
   return `${formatForumCount(item.postCount)} posts`;
 }
 
-export function topicMeta(item: ForumTopicListItem): string {
+export function topicMeta(item: TopicMetaInput): string {
   const parts: string[] = [];
   if (item.isSticky) {
     parts.push('Pinned');
@@ -25,7 +47,7 @@ export function topicMeta(item: ForumTopicListItem): string {
   if (item.lastPostUsername) {
     parts.push(item.lastPostUsername);
   }
-  const date = formatPublishedDate(item.lastActivityAt);
+  const date = formatListDate(item.lastActivityAt);
   if (date) {
     parts.push(date);
   }
