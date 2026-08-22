@@ -26,6 +26,10 @@ public sealed class PhotoDetailDimensionsRoutesTests : IClassFixture<WebApplicat
         Assert.Contains("height=\"1080\"", body, StringComparison.Ordinal);
         Assert.Contains("Submitted by QueenFan86", body, StringComparison.Ordinal);
         Assert.DoesNotContain("0 x 0", body, StringComparison.Ordinal);
+        Assert.Contains("data-prev-href", body, StringComparison.Ordinal);
+        Assert.Contains("data-next-href", body, StringComparison.Ordinal);
+        Assert.Contains("touchend", body, StringComparison.Ordinal);
+        Assert.Contains("ArrowLeft", body, StringComparison.Ordinal);
     }
 
     [Fact]

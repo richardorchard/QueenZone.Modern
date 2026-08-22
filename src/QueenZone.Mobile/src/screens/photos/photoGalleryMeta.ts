@@ -114,3 +114,32 @@ export function resolvedPhotoSize(
 
   return photoSizeFromPath(path);
 }
+
+/** Horizontal travel needed before a swipe changes photograph. */
+export const photoSwipeThresholdPx = 56;
+
+/** Ignore the gesture when vertical travel is larger than this. */
+export const photoSwipeMaxOffAxisPx = 72;
+
+export type PhotoSwipeDirection = 'previous' | 'next';
+
+/**
+ * Maps a drag vector to gallery navigation. Swipe right (positive `dx`) goes
+ * to the previous image; swipe left goes to the next — same as the arrows.
+ */
+export function photoSwipeDirection(
+  dx: number,
+  dy: number,
+  threshold = photoSwipeThresholdPx,
+  maxOffAxis = photoSwipeMaxOffAxisPx,
+): PhotoSwipeDirection | null {
+  if (!Number.isFinite(dx) || !Number.isFinite(dy)) {
+    return null;
+  }
+
+  if (Math.abs(dx) < threshold || Math.abs(dy) > maxOffAxis || Math.abs(dx) <= Math.abs(dy)) {
+    return null;
+  }
+
+  return dx > 0 ? 'previous' : 'next';
+}

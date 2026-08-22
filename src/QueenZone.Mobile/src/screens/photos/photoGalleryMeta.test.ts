@@ -9,6 +9,9 @@ import {
   photoDetailMeta,
   photoRangeLabel,
   photoSizeFromPath,
+  photoSwipeDirection,
+  photoSwipeMaxOffAxisPx,
+  photoSwipeThresholdPx,
   photoThumbMeta,
   photoViewerParams,
   resolvedPhotoSize,
@@ -81,5 +84,14 @@ describe('photo gallery meta', () => {
     );
     assert.equal(resolvedPhotoSize('desktop', '/photography/brian-may/103'), undefined);
     assert.equal(resolvedPhotoSize('', '/photography/brian-may/101?size=desktop'), undefined);
+  });
+
+  it('maps a horizontal swipe onto previous and next', () => {
+    assert.equal(photoSwipeDirection(photoSwipeThresholdPx, 0), 'previous');
+    assert.equal(photoSwipeDirection(-photoSwipeThresholdPx, 8), 'next');
+    assert.equal(photoSwipeDirection(photoSwipeThresholdPx - 1, 0), null);
+    assert.equal(photoSwipeDirection(80, photoSwipeMaxOffAxisPx + 1), null);
+    assert.equal(photoSwipeDirection(40, 50), null);
+    assert.equal(photoSwipeDirection(Number.NaN, 0), null);
   });
 });
