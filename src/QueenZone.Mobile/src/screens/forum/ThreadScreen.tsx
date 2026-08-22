@@ -23,12 +23,7 @@ import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from '../../u
 import { resolveContentUrl } from '../../ui/html/resolveContentUrl';
 import { radius, space, type, useTheme } from '../../theme';
 import { ForumPollCard } from './ForumPollCard';
-import {
-  pollActionErrorMessage,
-  pollTokenRequiredMessage,
-  shouldLoadPoll,
-  shouldShowPollLoadError,
-} from './forumPollMeta';
+import { pollActionErrorMessage, pollTokenRequiredMessage, shouldLoadPoll } from './forumPollMeta';
 import {
   attachmentMeta,
   formatMemberSince,
@@ -231,10 +226,9 @@ export function ThreadScreen({ navigation, route }: Props) {
             onSignIn={signIn}
           />
         </View>
-      ) : shouldShowPollLoadError(poll, pollError) ? (
-        <View style={styles.poll}>
-          <ErrorBlock message={pollError ?? 'Unable to load this poll.'} onRetry={retryTopic} />
-        </View>
+      ) : null}
+      {pollError && !poll ? (
+        <ErrorBlock message={pollError} onRetry={retry} />
       ) : null}
     </View>
   );
