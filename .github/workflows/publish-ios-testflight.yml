@@ -28,6 +28,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Record build metadata
+        run: |
+          set -euo pipefail
+          echo "BUILD_TIMESTAMP_UTC=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_ENV"
+          echo "BUILD_REVISION=${GITHUB_SHA:0:7}" >> "$GITHUB_ENV"
+
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
@@ -115,6 +121,12 @@ jobs:
           if [ "$bundle_version" != "$IOS_BUILD_NUMBER" ]; then
             echo "::error::CFBundleVersion is ${bundle_version}, expected ${IOS_BUILD_NUMBER}."
             echo "Ensure app.config.ts maps IOS_BUILD_NUMBER to ios.buildNumber before prebuild."
+            exit 1
+          fi
+          encryption=$(/usr/libexec/PlistBuddy -c 'Print :ITSAppUsesNonExemptEncryption' "$info_plist")
+          echo "Info.plist ITSAppUsesNonExemptEncryption=${encryption}"
+          if [ "$encryption" != "false" ]; then
+            echo "::error::ITSAppUsesNonExemptEncryption must be false."
             exit 1
           fi
 
@@ -314,6 +326,23 @@ jobs:
           if [ "$bundle_version" != "$expected_build" ]; then
             echo "::error::IPA CFBundleVersion is ${bundle_version}, expected ${expected_build}."
             echo "App Store Connect rejects duplicate/non-increasing CFBundleVersion values."
+            exit 1
+          fi
+
+          encryption=$(/usr/libexec/PlistBuddy -c 'Print :ITSAppUsesNonExemptEncryption' "$app_path/Info.plist")
+          echo "IPA ITSAppUsesNonExemptEncryption=${encryption}"
+          if [ "$encryption" != "false" ]; then
+            echo "::error::Exported IPA is missing the exempt-encryption declaration."
+            exit 1
+          fi
+
+          constants_config="$app_path/EXConstants.bundle/app.config"
+          if ! grep -Fq "$BUILD_TIMESTAMP_UTC" "$constants_config"; then
+            echo "::error::Exported IPA is missing build timestamp ${BUILD_TIMESTAMP_UTC}."
+            exit 1
+          fi
+          if ! grep -Fq "$BUILD_REVISION" "$constants_config"; then
+            echo "::error::Exported IPA is missing build revision ${BUILD_REVISION}."
             exit 1
           fi
 
