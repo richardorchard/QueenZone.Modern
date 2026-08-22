@@ -141,6 +141,32 @@ Restart existing IDEs, terminals, and agents afterward. On macOS, import the
 licence into each new `pwsh` session. Do not write the licence value into
 `.zprofile`, `.zshrc`, repository files, logs, or command output.
 
+### Restricted macOS agent sessions
+
+Some local agent sandboxes deny outbound DNS or local socket creation. In that
+environment, `dotnet restore` can appear to hang while NuGet quietly retries
+`api.nuget.org`, and parallel MSBuild/test workers can fail with
+`System.Net.Sockets.SocketException (13): Permission denied` while creating a
+named pipe. This is an agent execution-policy restriction, not a damaged .NET
+installation or stale MSBuild server.
+
+On the authorised Mac, agents should request the normal out-of-sandbox command
+approval for restore/build/test, then import the licence and run the commands in
+the same `pwsh` process:
+
+```powershell
+. ./scripts/Import-SixLaborsLicense.ps1
+dotnet restore QueenZone.sln
+dotnet build QueenZone.sln --configuration Release --no-restore
+dotnet test QueenZone.sln --configuration Release --no-build
+```
+
+Do not weaken macOS security settings, persist the licence in a shell profile,
+or treat repeated silent retries as a reason to delete NuGet caches. Confirm the
+diagnosis first with a short network check such as
+`curl -I https://api.nuget.org/v3/index.json`; a sandbox-only DNS failure should
+be rerun with the agent's approved network access.
+
 ### Hosted agents and external contributors
 
 - Hosted or cloud agents must receive `SIXLABORS_LICENSE_KEY` through that
@@ -242,6 +268,8 @@ Restart the IDE/agent terminal after changing User `Path`.
 | Secret key not found | Wrong project id, or key renamed; re-list keys only (no values) |
 | Agent on Mac can’t use Windows token | Expected — use `mac-codex` token on Mac hosts |
 | ImageSharp reports a missing licence | Import `SIXLABORS_LICENSE_KEY` in the current process before restore/build; restart persistent Windows processes after renewal |
+| macOS agent restore is silent after solution validation | Check access to `api.nuget.org`; restricted agent DNS causes quiet NuGet retry delays, so rerun with approved network access rather than clearing caches |
+| macOS agent test reports `SocketException (13)` from `NamedPipeServerStream` | The sandbox denied MSBuild's local worker socket; rerun the test with approved out-of-sandbox execution |
 | Hosted agent fails during automatic restore | Configure `SIXLABORS_LICENSE_KEY` in that platform's secret manager before startup; do not inject a local Bitwarden machine token |
 
 ## See also

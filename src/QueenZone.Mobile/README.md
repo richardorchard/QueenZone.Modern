@@ -185,8 +185,51 @@ credentials are used. Both jobs upload their build as a workflow artifact
 (`mobile-android-<run-id>` / `mobile-ios-<run-id>`), downloadable from the
 run's summary page for one day.
 
-Production signing, TestFlight, and store submission remain separate release
-concerns (ADR 0011). The installable Android build below uses a test-only key.
+The unsigned jobs are PR compile checks only. A separate manual workflow,
+[`publish-ios-testflight.yml`](../../.github/workflows/publish-ios-testflight.yml),
+archives and signs the iOS app on the dedicated self-hosted Mac runner and
+uploads it to TestFlight. The installable Android build below uses a test-only
+key.
+
+## Install the latest iOS TestFlight build
+
+The one-time Apple setup for `org.queenzone.mobile` consists of:
+
+- Apple Developer team `X28Z75P69M`;
+- an Apple Distribution certificate;
+- the `QueenZone App Store` App Store Connect provisioning profile;
+- the QueenZone App Store Connect record (Apple ID `6803889011`); and
+- a Developer-role App Store Connect API key dedicated to GitHub uploads.
+
+Run **Publish iOS to TestFlight** from the repository's **Actions** tab and
+select `main`. The workflow intentionally rejects other branches and targets
+the self-hosted Mac runner through `[self-hosted, macOS, ARM64, ios-signing]`.
+It imports signing material into a temporary Keychain, produces and verifies a
+signed `.ipa`, retains that IPA as a seven-day workflow artifact, uploads it to
+App Store Connect, and deletes the temporary Keychain and provisioning profile
+even when a step fails.
+
+Install Apple's TestFlight app on the iPhone and accept the QueenZone internal
+tester invitation. After Apple finishes processing an uploaded build, install
+or update QueenZone from TestFlight; the phone does not need to connect to this
+Mac. Each TestFlight build remains testable for 90 days.
+
+The workflow uses these encrypted GitHub Actions secrets (names only; never
+commit their values):
+
+| Secret | Purpose |
+| --- | --- |
+| `IOS_DISTRIBUTION_CERTIFICATE_BASE64` | Base64-encoded password-protected Apple Distribution `.p12` |
+| `IOS_DISTRIBUTION_CERTIFICATE_PASSWORD` | Password for the distribution `.p12` |
+| `IOS_PROVISIONING_PROFILE_BASE64` | Base64-encoded `QueenZone App Store` `.mobileprovision` |
+| `APP_STORE_CONNECT_KEY_ID` | App Store Connect API key identifier |
+| `APP_STORE_CONNECT_ISSUER_ID` | App Store Connect API issuer identifier |
+| `APP_STORE_CONNECT_PRIVATE_KEY` | One-time-downloaded App Store Connect `.p8` private key |
+
+Rotate the distribution certificate/profile before their shared expiry and
+replace the corresponding secrets together. Revoke and replace the API key if
+its private key is ever exposed. Signing material must never be copied into the
+repository, workflow artifacts, logs, or issue/PR text.
 
 ## Install the latest Android test build
 
@@ -212,6 +255,7 @@ served from a separate, throwaway-build-only Azure Storage account so it cannot
 affect production media or UGC. The publishing design is recorded in
 [ADR 0013](../../docs/decisions/0013-static-web-app-mobile-test-distribution.md).
 
-The separate `publish-mobile-test-build.yml` workflow publishes after mobile
-changes merge to `main`, and can also be run manually. A signed,
-device-installable iOS build remains follow-up work under #808.
+The separate `publish-mobile-test-build.yml` workflow publishes Android after
+mobile changes merge to `main`, and can also be run manually. iOS remains an
+explicit manual TestFlight release so signing and upload never run merely
+because a pull request was opened or merged.
