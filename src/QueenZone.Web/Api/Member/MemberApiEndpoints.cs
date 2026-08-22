@@ -27,7 +27,7 @@ public static class MemberApiEndpoints
             .WithName("CreateMemberPhotoSubmission")
             .WithSummary("Submit a photo for review. Same PhotoSubmissionService and daily quota as /submit/photo.")
             .RequireAuthorization(MemberAuthenticationSchemes.MobileMemberPolicy)
-            .Accepts<PhotoSubmissionRequestDto>("multipart/form-data")
+            .Accepts<PhotoSubmissionRequestDto>("multipart/form-data", "application/json")
             .Produces<PhotoSubmissionCreatedDto>(StatusCodes.Status201Created)
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status401Unauthorized)

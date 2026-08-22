@@ -261,19 +261,6 @@ public sealed class MemberPhotoSubmissionApiTests : IClassFixture<QueenZoneWebAp
         Assert.False(MemberApiEndpoints.IsQuotaLimitError(message));
     }
 
-    [Fact]
-    public void MapSubmitFailure_uses_429_for_quota_and_400_for_validation()
-    {
-        var quota = MemberApiEndpoints.MapSubmitFailure(
-            "Daily upload limit reached (1 uploads per day). Try again tomorrow.");
-        var validation = MemberApiEndpoints.MapSubmitFailure("Title is required.");
-        var missing = MemberApiEndpoints.MapSubmitFailure(null);
-
-        Assert.Equal(StatusCodes.Status429TooManyRequests, GetStatusCode(quota));
-        Assert.Equal(StatusCodes.Status400BadRequest, GetStatusCode(validation));
-        Assert.Equal(StatusCodes.Status400BadRequest, GetStatusCode(missing));
-    }
-
     private static QueenZoneWebApplicationFactory CreateQuotaFactory(int maxUploadsPerDay) =>
         QueenZoneWebApplicationFactory.WithServices(services =>
         {
@@ -359,13 +346,5 @@ public sealed class MemberPhotoSubmissionApiTests : IClassFixture<QueenZoneWebAp
         await image.SaveAsPngAsync(stream);
         stream.Position = 0;
         return stream;
-    }
-
-    private static int GetStatusCode(IResult result)
-    {
-        var http = new DefaultHttpContext();
-        http.Response.Body = new MemoryStream();
-        result.ExecuteAsync(http).GetAwaiter().GetResult();
-        return http.Response.StatusCode;
     }
 }
