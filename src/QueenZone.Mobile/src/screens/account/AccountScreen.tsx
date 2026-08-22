@@ -27,7 +27,7 @@ export function AccountScreen({ navigation }: Props) {
         actions={[
           { label: 'Profile', onPress: () => navigation.navigate('Profile'), variant: 'outline' },
           { label: 'Settings', onPress: () => navigation.navigate('Settings'), variant: 'outline' },
-          { label: 'Help', onPress: () => navigation.navigate('Help'), variant: 'ghost' },
+          { label: 'Contact', onPress: () => navigation.navigate('Contact'), variant: 'ghost' },
           { label: 'Sign out (development)', onPress: signOut, variant: 'outline' },
         ]}
       />
@@ -40,10 +40,10 @@ export function AccountScreen({ navigation }: Props) {
       epic="Epic 6 — Account"
       access="public"
       headerShown={false}
-      description={`Signed-out account tab. Visitors can sign in or send a Help request. Member profile and settings stay behind sign-in. ${apiLine}`}
+      description={`Signed-out account tab. Visitors can sign in or send a Contact request. Member profile and settings stay behind sign-in. ${apiLine}`}
       actions={[
         { label: 'Sign in (development)', onPress: signIn },
-        { label: 'Help', onPress: () => navigation.navigate('Help'), variant: 'outline' },
+        { label: 'Contact', onPress: () => navigation.navigate('Contact'), variant: 'outline' },
       ]}
     />
   );

@@ -37,7 +37,7 @@ export type MessagesStackParamList = {
 
 export type YouStackParamList = {
   Account: undefined;
-  Help: undefined;
+  Contact: undefined;
   SignIn: undefined;
   Profile: undefined;
   Settings: undefined;

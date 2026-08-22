@@ -34,13 +34,13 @@ describe('member-only screens', () => {
     assert.equal(isMemberOnlyScreen('PhotoSubmit'), true);
   });
 
-  it('keeps archive, photos, forum browse, and help public', () => {
+  it('keeps archive, photos, forum browse, and contact public', () => {
     assert.equal(isMemberOnlyScreen('Today'), false);
     assert.equal(isMemberOnlyScreen('NewsIndex'), false);
     assert.equal(isMemberOnlyScreen('PhotoIndex'), false);
     assert.equal(isMemberOnlyScreen('ForumIndex'), false);
     assert.equal(isMemberOnlyScreen('FanPerformances'), false);
-    assert.equal(isMemberOnlyScreen('Help'), false);
+    assert.equal(isMemberOnlyScreen('Contact'), false);
     assert.equal(isMemberOnlyScreen('Account'), false);
   });
 });

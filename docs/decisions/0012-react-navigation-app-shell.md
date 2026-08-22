@@ -16,7 +16,7 @@ native stack per tab.
 Auth-gated vs public structure must match the website, not a mobile-only policy:
 
 - Public: archive (news, biography, discography, timeline, Freddie Tribute),
-  photography browse, forum browse, fan-performance listings, Help, account
+  photography browse, forum browse, fan-performance listings, Contact, account
   sign-in.
 - Members: private messages, forum compose/reply, photo submit, fan-performance
   audio, profile and settings.

@@ -21,7 +21,7 @@ import { InboxScreen } from '../screens/messages/InboxScreen';
 import { ConversationScreen } from '../screens/messages/ConversationScreen';
 import { ComposeMessageScreen } from '../screens/messages/ComposeMessageScreen';
 import { AccountScreen } from '../screens/account/AccountScreen';
-import { HelpScreen } from '../screens/account/HelpScreen';
+import { ContactScreen } from '../screens/account/ContactScreen';
 import { SignInScreen } from '../screens/account/SignInScreen';
 import { ProfileScreen } from '../screens/account/ProfileScreen';
 import { SettingsScreen } from '../screens/account/SettingsScreen';
@@ -113,7 +113,7 @@ export function YouStack() {
   return (
     <You.Navigator screenOptions={stackScreenOptions}>
       <You.Screen name="Account" component={AccountScreen} options={{ headerShown: false }} />
-      <You.Screen name="Help" component={HelpScreen} />
+      <You.Screen name="Contact" component={ContactScreen} options={{ title: 'Contact' }} />
       <You.Screen name="SignIn" component={SignInScreen} options={{ title: 'Sign in' }} />
       <You.Screen name="Profile" component={ProfileScreen} />
       <You.Screen name="Settings" component={SettingsScreen} />

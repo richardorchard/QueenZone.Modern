@@ -35,7 +35,7 @@ export const publicScreenNames = [
   'ForumIndex',
   'Thread',
   'Account',
-  'Help',
+  'Contact',
   'SignIn',
 ] as const;
 
@@ -81,7 +81,7 @@ export const detailScreenNames = [
   'Conversation',
   'ComposeMessage',
   'FanPerformanceDetail',
-  'Help',
+  'Contact',
   'Settings',
   'Profile',
   'SignIn',
