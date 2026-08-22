@@ -206,6 +206,8 @@ public sealed class ForumApiTests : IClassFixture<QueenZoneWebApplicationFactory
         Assert.Equal("/forum/1/the-music", topicDetail.CategoryPath);
         Assert.Equal("/forum/topic/1002/ranking-every-studio-album", topicDetail.DetailPath);
         Assert.Equal(26, topicDetail.PostCount);
+        Assert.False(topicDetail.IsLocked);
+        Assert.True(ForumApiMapper.ToTopicDetail(header, postCount: 26, isLocked: true).IsLocked);
 
         var post = new ForumPostItem(
             1002,
@@ -251,6 +253,7 @@ public sealed class ForumApiTests : IClassFixture<QueenZoneWebApplicationFactory
         Assert.Equal("/forum/1/the-music", topic.CategoryPath);
         Assert.Equal("/forum/topic/1002/ranking-every-studio-album", topic.DetailPath);
         Assert.Equal(26, topic.PostCount);
+        Assert.False(topic.IsLocked);
 
         var html = await client.GetStringAsync(topic.DetailPath);
         Assert.Contains(WebUtility.HtmlEncode(topic.Title), html, StringComparison.Ordinal);

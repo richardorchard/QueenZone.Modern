@@ -6,6 +6,7 @@ import {
   formatPostTimestamp,
   imagePreviewUrl,
   parseTopicId,
+  topicReplyAllowed,
 } from './forumThreadMeta.ts';
 
 describe('forum thread meta', () => {
@@ -32,6 +33,12 @@ describe('forum thread meta', () => {
       'JPG · 278.0 KB · Members only',
     );
     assert.equal(attachmentMeta({ extension: 'PDF', formattedSize: '' }), 'PDF · Members only');
+  });
+
+  it('hides reply when the topic is locked', () => {
+    assert.equal(topicReplyAllowed({ isLocked: false }), true);
+    assert.equal(topicReplyAllowed({ isLocked: true }), false);
+    assert.equal(topicReplyAllowed(null), true);
   });
 
   it('parses numeric topic ids and rejects prototype slugs', () => {

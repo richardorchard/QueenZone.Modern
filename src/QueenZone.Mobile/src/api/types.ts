@@ -139,6 +139,7 @@ export type ForumTopicDetail = {
   detailPath: string;
   postCount: number;
   hasPoll: boolean | null;
+  isLocked: boolean;
 };
 
 export type ForumAttachment = {

@@ -79,6 +79,7 @@ public sealed class ForumApiWriteTests : IClassFixture<QueenZoneWebApplicationFa
         Assert.NotNull(reply);
         Assert.Equal(created.Id, reply!.TopicId);
         Assert.Contains($"#post-{reply.Id}", reply.DetailPath, StringComparison.Ordinal);
+        Assert.Equal(reply.DetailPath, replyResponse.Headers.Location?.OriginalString);
 
         using var postsResponse = await client.GetAsync($"{ForumApiEndpoints.RootPath}/topics/{created.Id}/posts");
         var posts = await postsResponse.Content.ReadFromJsonAsync<ApiPagedResponse<ForumPostDto>>(JsonOptions);
@@ -147,6 +148,24 @@ public sealed class ForumApiWriteTests : IClassFixture<QueenZoneWebApplicationFa
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         var problem = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Contains("9999", problem.GetProperty("detail").GetString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Topic_detail_includes_isLocked_when_thread_is_locked()
+    {
+        using var lockedFactory = QueenZoneWebApplicationFactory.WithServices(services =>
+        {
+            services.RemoveAll<IForumWriteRepository>();
+            services.AddSingleton<IForumWriteRepository>(new LockedForumWriteRepository());
+        });
+        using var client = lockedFactory.CreateAnonymousClient();
+
+        using var response = await client.GetAsync($"{ForumApiEndpoints.RootPath}/topics/1002");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var topic = await response.Content.ReadFromJsonAsync<ForumTopicDetailDto>(JsonOptions);
+        Assert.NotNull(topic);
+        Assert.True(topic!.IsLocked);
     }
 
     [Fact]

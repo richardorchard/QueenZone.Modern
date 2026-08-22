@@ -38,6 +38,10 @@ describe('validateComposer', () => {
       'Write a post before publishing.',
     );
     assert.equal(validateComposer({ mode: 'reply', title: '', body: 'A reply' }), null);
+    assert.equal(
+      validateComposer({ mode: 'reply', title: '', body: 'A reply', isLocked: true }),
+      'This topic is locked.',
+    );
   });
 });
 

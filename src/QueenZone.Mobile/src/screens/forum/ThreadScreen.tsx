@@ -25,6 +25,7 @@ import {
   forumPostsPageSize,
   imagePreviewUrl,
   parseTopicId,
+  topicReplyAllowed,
 } from './forumThreadMeta';
 
 type Props = NativeStackScreenProps<ForumStackParamList, 'Thread'>;
@@ -144,19 +145,26 @@ export function ThreadScreen({ navigation, route }: Props) {
     </View>
   );
 
+  const canReply = topicReplyAllowed(topic);
+
   const footer = (
     <View style={styles.reply}>
       <ListFooterLoading visible={paged.loadingMore} />
-      <Button
-        label={isSignedIn ? 'Reply' : 'Sign in to reply'}
-        variant="outline"
-        onPress={() =>
-          navigation.navigate('Composer', {
-            threadId: id,
-            threadTitle: topic?.title ?? title,
-          })
-        }
-      />
+      {canReply ? (
+        <Button
+          label={isSignedIn ? 'Reply' : 'Sign in to reply'}
+          variant="outline"
+          onPress={() =>
+            navigation.navigate('Composer', {
+              threadId: id,
+              threadTitle: topic?.title ?? title,
+              isLocked: topic?.isLocked,
+            })
+          }
+        />
+      ) : (
+        <Text style={[type.caption, { color: c.textMuted }]}>This topic is locked.</Text>
+      )}
     </View>
   );
 

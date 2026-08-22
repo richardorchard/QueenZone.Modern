@@ -51,6 +51,7 @@ function ComposerForm({ navigation, route }: Props) {
   const [boards, setBoards] = useState<ForumCategoryListItem[]>([]);
   const [boardsError, setBoardsError] = useState<string | null>(null);
   const [boardsLoading, setBoardsLoading] = useState(mode === 'newTopic' && categoryId == null);
+  const [boardsReloadToken, setBoardsReloadToken] = useState(0);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -80,10 +81,22 @@ function ComposerForm({ navigation, route }: Props) {
       .finally(() => setBoardsLoading(false));
 
     return () => controller.abort();
-  }, [categoryId, mode]);
+  }, [boardsReloadToken, categoryId, mode]);
+
+  const retryBoards = useCallback(() => {
+    setBoardsLoading(true);
+    setBoardsError(null);
+    setBoardsReloadToken((n) => n + 1);
+  }, []);
 
   const submit = useCallback(async () => {
-    const validation = validateComposer({ mode, title, body, categoryId });
+    const validation = validateComposer({
+      mode,
+      title,
+      body,
+      categoryId,
+      isLocked: route.params?.isLocked,
+    });
     if (validation) {
       setSubmitError(validation);
       return;
@@ -118,7 +131,7 @@ function ComposerForm({ navigation, route }: Props) {
     } finally {
       setSubmitting(false);
     }
-  }, [accessToken, body, categoryId, mode, navigation, route.params?.threadId, title]);
+  }, [accessToken, body, categoryId, mode, navigation, route.params?.isLocked, route.params?.threadId, title]);
 
   const context =
     mode === 'reply'
@@ -129,8 +142,12 @@ function ComposerForm({ navigation, route }: Props) {
     return <LoadingBlock label="Loading boards…" />;
   }
 
+  if (mode === 'reply' && route.params?.isLocked) {
+    return <ErrorBlock message="This topic is locked." />;
+  }
+
   if (boardsError) {
-    return <ErrorBlock message={boardsError} />;
+    return <ErrorBlock message={boardsError} onRetry={retryBoards} />;
   }
 
   return (

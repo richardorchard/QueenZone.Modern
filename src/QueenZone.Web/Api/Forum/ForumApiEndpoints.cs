@@ -157,6 +157,7 @@ public static class ForumApiEndpoints
 
     internal static async Task<IResult> GetTopicAsync(
         IForumRepository forumRepository,
+        IForumWriteRepository forumWriteRepository,
         int id,
         CancellationToken cancellationToken)
     {
@@ -166,7 +167,11 @@ public static class ForumApiEndpoints
             return TopicNotFound(id);
         }
 
-        return Results.Ok(ForumApiMapper.ToTopicDetail(topicPage.Header, topicPage.TotalCount));
+        var thread = await forumWriteRepository.GetThreadAsync(id, cancellationToken);
+        return Results.Ok(ForumApiMapper.ToTopicDetail(
+            topicPage.Header,
+            topicPage.TotalCount,
+            thread?.IsLocked == true));
     }
 
     internal static async Task<IResult> GetTopicPostsAsync(
@@ -266,11 +271,13 @@ public static class ForumApiEndpoints
 
         if (outcome.Succeeded)
         {
+            var detailPath = ForumRoutes.GetTopicCanonicalPath(outcome.TopicId, outcome.Title)
+                + $"#post-{outcome.PostId}";
             var dto = new ForumPostCreatedDto(
                 outcome.PostId,
                 outcome.TopicId,
-                ForumRoutes.GetTopicCanonicalPath(outcome.TopicId, outcome.Title) + $"#post-{outcome.PostId}");
-            return Results.Created($"{RootPath}/topics/{outcome.TopicId}/posts", dto);
+                detailPath);
+            return Results.Created(detailPath, dto);
         }
 
         return MapWriteFailure(outcome, categoryId: null, topicId: id);

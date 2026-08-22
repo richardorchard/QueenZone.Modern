@@ -51,6 +51,7 @@ export type ForumStackParamList = {
     threadTitle?: string;
     categoryId?: number;
     categoryName?: string;
+    isLocked?: boolean;
   };
   Search: undefined;
 };

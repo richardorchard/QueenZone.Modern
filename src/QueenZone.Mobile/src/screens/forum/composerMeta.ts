@@ -8,6 +8,7 @@ export type ComposerParams = {
   threadTitle?: string;
   categoryId?: number;
   categoryName?: string;
+  isLocked?: boolean;
 };
 
 export function composerMode(params: ComposerParams | undefined): ComposerMode {
@@ -19,7 +20,12 @@ export function validateComposer(input: {
   title: string;
   body: string;
   categoryId?: number;
+  isLocked?: boolean;
 }): string | null {
+  if (input.mode === 'reply' && input.isLocked) {
+    return 'This topic is locked.';
+  }
+
   if (!input.body.trim()) {
     return 'Write a post before publishing.';
   }
