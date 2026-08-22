@@ -27,6 +27,10 @@
       },
       "predictiveBackGestureEnabled": false
     },
+    "notification": {
+      "icon": "./assets/ic-notification.png",
+      "color": "#B89A4A"
+    },
     "plugins": [
       "expo-dev-client",
       "expo-font",
