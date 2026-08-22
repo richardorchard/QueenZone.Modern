@@ -21,7 +21,7 @@ export function FanPerformanceDetailScreen({ navigation, route }: Props) {
 function FanPerformancePlayerPanel({ navigation, route }: Props) {
   const { c } = useTheme();
   const { id } = route.params;
-  const { accessToken, signIn } = useSession();
+  const { accessToken } = useSession();
   const player = useFanPerformancePlayer();
   const [track, setTrack] = useState<FanPerformance | null>(null);
   const [queue, setQueue] = useState<FanPerformance[]>([]);
@@ -172,10 +172,13 @@ function FanPerformancePlayerPanel({ navigation, route }: Props) {
         <View style={styles.player}>
           <Text style={[type.body, { color: c.textSecondary }]}>
             Sign in to play this recording. Streaming uses the same member-gated audio path as the
-            website; the development toggle alone cannot open the private stream.
+            website.
           </Text>
           <View style={{ marginTop: space.base }}>
-            <Button label="Sign in" onPress={signIn} />
+            <Button
+              label="Sign in"
+              onPress={() => navigation.getParent()?.navigate('HomeTab', { screen: 'SignIn' })}
+            />
           </View>
         </View>
       )}

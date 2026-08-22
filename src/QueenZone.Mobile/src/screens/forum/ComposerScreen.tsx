@@ -102,7 +102,7 @@ function ComposerForm({ navigation, route }: Props) {
       return;
     }
     if (!accessToken) {
-      setSubmitError('Sign in with a mobile session to publish. The development toggle cannot post.');
+      setSubmitError('Sign in to publish.');
       return;
     }
 
@@ -234,8 +234,7 @@ function ComposerForm({ navigation, route }: Props) {
 
         {!accessToken ? (
           <Text style={[type.caption, { color: c.textSecondary }]}>
-            Publishing uses your mobile sign-in token. The development toggle cannot post to the
-            site.
+            Sign in to publish to the site.
           </Text>
         ) : null}
 
