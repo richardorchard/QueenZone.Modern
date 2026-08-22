@@ -1,21 +1,24 @@
-import { useCallback } from 'react';
-import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useMemo } from 'react';
+import { FlatList, Platform, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { Plus } from 'lucide-react-native';
 import { fetchForumCategories, type ForumCategoryListItem } from '../../api';
 import { usePagedContent } from '../../hooks/usePagedContent';
 import type { ForumStackParamList } from '../../navigation/types';
+import { shadow, space, type, useTheme } from '../../theme';
 import { ArticleRow } from '../../ui/ArticleRow';
-import { ListScreenHeader } from '../../ui/ListScreenHeader';
 import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from '../../ui/ScreenStates';
-import { space, type, useTheme } from '../../theme';
-import { categoryMeta } from './forumListMeta';
+import { PageTitleBlock } from '../../ui/PageTitleBlock';
+import { SectionHeader } from '../../ui/SectionHeader';
+import { categoryMeta, formatForumCount } from './forumListMeta';
 
 type Props = NativeStackScreenProps<ForumStackParamList, 'ForumIndex'>;
 
 const categoryPageSize = 50;
 
 export function ForumScreen({ navigation }: Props) {
-  const { c } = useTheme();
+  const { c, chrome } = useTheme();
+  const fabSize = chrome.android.fabSize ?? 58;
   const paged = usePagedContent<ForumCategoryListItem>(
     useCallback(
       (page, signal) => fetchForumCategories({ page, pageSize: categoryPageSize, signal }),
@@ -24,62 +27,107 @@ export function ForumScreen({ navigation }: Props) {
     categoryPageSize,
   );
 
+  const stats = useMemo(() => {
+    const postCount = paged.items.reduce((sum, item) => sum + item.postCount, 0);
+    return [
+      { value: formatForumCount(postCount), label: 'Posts' },
+      { value: formatForumCount(paged.totalCount), label: 'Boards' },
+    ];
+  }, [paged.items, paged.totalCount]);
+
+  const compose = () => {
+    navigation.navigate('Composer', {});
+  };
+
   const header = (
     <View>
-      <ListScreenHeader eyebrow="Community archive" title="Forum" headerShown={false} />
-      <Text
-        style={[type.caption, { color: c.textSecondary, paddingHorizontal: space.xl, paddingBottom: space.base }]}
+      <PageTitleBlock eyebrow="Community" title="Forum" />
+      <View
+        style={{
+          flexDirection: 'row',
+          paddingHorizontal: space.xl,
+          paddingBottom: space.xl,
+          gap: space.xl,
+        }}
       >
-        Public boards from the website. Starting a thread or posting a reply needs a signed-in member.
-      </Text>
+        {stats.map((stat) => (
+          <View key={stat.label} style={{ flex: 1, gap: 6 }}>
+            <Text style={[type.pageTitle, { fontSize: 22, lineHeight: 26, color: c.textPrimary }]}>
+              {stat.value}
+            </Text>
+            <Text style={[type.eyebrow, { fontSize: 9.5, color: c.textMuted }]}>{stat.label}</Text>
+          </View>
+        ))}
+      </View>
+      <SectionHeader title="Boards" />
     </View>
   );
 
-  if (paged.loading && paged.items.length === 0) {
-    return (
+  const body =
+    paged.loading && paged.items.length === 0 ? (
       <>
         {header}
         <LoadingBlock label="Loading forum boards…" />
       </>
-    );
-  }
-
-  if (paged.error && paged.items.length === 0) {
-    return (
+    ) : paged.error && paged.items.length === 0 ? (
       <>
         {header}
         <ErrorBlock message={paged.error} onRetry={paged.reload} />
       </>
+    ) : (
+      <FlatList
+        style={[styles.list, { backgroundColor: c.surfacePage }]}
+        data={paged.items}
+        keyExtractor={(item) => String(item.id)}
+        ListHeaderComponent={header}
+        ListEmptyComponent={<EmptyBlock message="No forum boards are available yet." />}
+        ListFooterComponent={<ListFooterLoading visible={paged.loadingMore} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={paged.refreshing}
+            onRefresh={paged.refresh}
+            tintColor={c.accentPrimary}
+          />
+        }
+        onEndReached={paged.loadMore}
+        onEndReachedThreshold={0.4}
+        renderItem={({ item }) => (
+          <ArticleRow
+            title={item.name}
+            subtitle={item.description ?? undefined}
+            meta={categoryMeta(item)}
+            onPress={() => navigation.navigate('Category', { id: item.id, name: item.name })}
+            accessibilityLabel={`Open board ${item.name}`}
+          />
+        )}
+      />
     );
-  }
 
   return (
-    <FlatList
-      style={[styles.list, { backgroundColor: c.surfacePage }]}
-      data={paged.items}
-      keyExtractor={(item) => String(item.id)}
-      ListHeaderComponent={header}
-      ListEmptyComponent={<EmptyBlock message="No forum boards are available yet." />}
-      ListFooterComponent={<ListFooterLoading visible={paged.loadingMore} />}
-      refreshControl={
-        <RefreshControl
-          refreshing={paged.refreshing}
-          onRefresh={paged.refresh}
-          tintColor={c.accentPrimary}
-        />
-      }
-      onEndReached={paged.loadMore}
-      onEndReachedThreshold={0.4}
-      renderItem={({ item }) => (
-        <ArticleRow
-          title={item.name}
-          subtitle={item.description ?? undefined}
-          meta={categoryMeta(item)}
-          onPress={() => navigation.navigate('Category', { id: item.id, name: item.name })}
-          accessibilityLabel={`Open board ${item.name}`}
-        />
-      )}
-    />
+    <View style={{ flex: 1, backgroundColor: c.surfacePage }}>
+      {body}
+      {Platform.OS === 'android' ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="New thread"
+          onPress={compose}
+          style={{
+            position: 'absolute',
+            right: space.xl,
+            bottom: space.xl,
+            width: fabSize,
+            height: fabSize,
+            borderRadius: 18,
+            backgroundColor: c.accentPrimary,
+            alignItems: 'center',
+            justifyContent: 'center',
+            ...shadow.fab,
+          }}
+        >
+          <Plus size={24} color={c.textOnAccent} strokeWidth={1.5} />
+        </Pressable>
+      ) : null}
+    </View>
   );
 }
 

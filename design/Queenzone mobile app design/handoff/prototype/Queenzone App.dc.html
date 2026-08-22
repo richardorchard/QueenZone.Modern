@@ -85,7 +85,7 @@ a:hover{color:#D3B868}
               <div style="width:96px;display:flex;align-items:center">
                 <sc-if value="{{ showBack }}" hint-placeholder-val="{{ true }}">
                   <button onClick="{{ back }}" style="background:none;border:0;padding:6px 8px;color:#B89A4A;font:500 16px var(--font-body);display:flex;align-items:center;gap:3px;cursor:pointer">
-                    <svg width="11" height="18" viewBox="0 0 11 18" fill="none" stroke="#B89A4A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 1 2 9l7 8"></path></svg>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="m15 18-6-6 6-6"></path></svg>
                     Back
                   </button>
                 </sc-if>
@@ -94,20 +94,25 @@ a:hover{color:#D3B868}
               <div style="width:96px;display:flex;align-items:center;justify-content:flex-end;gap:2px">
                 <sc-if value="{{ showSearchAction }}" hint-placeholder-val="{{ true }}">
                   <button onClick="{{ goSearch }}" style="background:none;border:0;padding:8px;cursor:pointer;line-height:0">
-                    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4.2-4.2"></path></svg>
+                    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:block"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
                   </button>
                 </sc-if>
                 <sc-if value="{{ showCompose }}" hint-placeholder-val="{{ true }}">
                   <button onClick="{{ openSheet }}" style="background:none;border:0;padding:6px 8px;color:#B89A4A;font:500 16px var(--font-body);cursor:pointer">New</button>
                 </sc-if>
                 <sc-if value="{{ showReadActions }}" hint-placeholder-val="{{ true }}">
-                  <button onClick="{{ toggleSave }}" style="background:none;border:0;padding:8px;cursor:pointer;line-height:0">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="{{ saveFill }}" stroke="#B89A4A" stroke-width="1.5" stroke-linejoin="round"><path d="M6 3h12v18l-6-4.5L6 21z"></path></svg>
+                  <button onClick="{{ toggleSave }}" style="{{ saveBtnStyle }}">
+                    <sc-if value="{{ saved }}" hint-placeholder-val="{{ false }}">
+                      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z"></path><path d="m9 10 2 2 4-4"></path></svg>
+                    </sc-if>
+                    <sc-if value="{{ notSaved }}" hint-placeholder-val="{{ true }}">
+                      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"></path></svg>
+                    </sc-if>
                   </button>
                 </sc-if>
                 <sc-if value="{{ showReadActions }}" hint-placeholder-val="{{ true }}">
                   <button onClick="{{ openSheet }}" style="background:none;border:0;padding:8px;cursor:pointer;line-height:0">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v11"></path><path d="M8 7l4-4 4 4"></path><path d="M5 14v6h14v-6"></path></svg>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" x2="12" y1="2" y2="15"></line></svg>
                   </button>
                 </sc-if>
               </div>
@@ -117,23 +122,28 @@ a:hover{color:#D3B868}
             <div style="flex:none;height:56px;padding:0 6px 0 4px;display:flex;align-items:center;gap:4px;background:rgba(17,17,17,.9);backdrop-filter:blur(12px);border-bottom:1px solid rgba(255,255,255,.12);position:relative;z-index:5">
               <sc-if value="{{ showBack }}" hint-placeholder-val="{{ true }}">
                 <button onClick="{{ back }}" style="background:none;border:0;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:22px;cursor:pointer" style-hover="background:rgba(255,255,255,.08)">
-                  <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12H4"></path><path d="M10 6l-6 6 6 6"></path></svg>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>
                 </button>
               </sc-if>
               <span style="flex:1;padding-left:{{ androidTitlePad }};font:500 20px var(--font-body);letter-spacing:.005em;color:#fff">{{ barTitle }}</span>
               <sc-if value="{{ showSearchAction }}" hint-placeholder-val="{{ true }}">
                 <button onClick="{{ goSearch }}" style="background:none;border:0;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:22px;cursor:pointer" style-hover="background:rgba(255,255,255,.08)">
-                  <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4.2-4.2"></path></svg>
+                  <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:block"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
                 </button>
               </sc-if>
               <sc-if value="{{ showReadActions }}" hint-placeholder-val="{{ true }}">
-                <button onClick="{{ toggleSave }}" style="background:none;border:0;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:22px;cursor:pointer" style-hover="background:rgba(255,255,255,.08)">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="{{ saveFill }}" stroke="#B89A4A" stroke-width="1.5" stroke-linejoin="round"><path d="M6 3h12v18l-6-4.5L6 21z"></path></svg>
+                <button onClick="{{ toggleSave }}" style="{{ saveBtnStyleAndroid }}" style-hover="background:rgba(255,255,255,.08)">
+                  <sc-if value="{{ saved }}" hint-placeholder-val="{{ false }}">
+                    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z"></path><path d="m9 10 2 2 4-4"></path></svg>
+                  </sc-if>
+                  <sc-if value="{{ notSaved }}" hint-placeholder-val="{{ true }}">
+                    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"></path></svg>
+                  </sc-if>
                 </button>
               </sc-if>
               <sc-if value="{{ showReadActions }}" hint-placeholder-val="{{ true }}">
                 <button onClick="{{ openSheet }}" style="background:none;border:0;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:22px;cursor:pointer" style-hover="background:rgba(255,255,255,.08)">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v11"></path><path d="M8 7l4-4 4 4"></path><path d="M5 14v6h14v-6"></path></svg>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" x2="12" y1="2" y2="15"></line></svg>
                 </button>
               </sc-if>
             </div>
@@ -147,11 +157,25 @@ a:hover{color:#D3B868}
           <div class="qz-scroll" onScroll="{{ onScroll }}" style="flex:1;position:relative;overflow-x:hidden">
 
             <!-- TODAY -->
-            <sc-if value="{{ isToday }}" hint-placeholder-val="{{ true }}">
+            <sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
               <div style="animation:qzFade .32s cubic-bezier(.22,.61,.36,1)">
                 <div onClick="{{ openStory }}" style="position:relative;height:468px;cursor:pointer">
                   <img src="assets/img-hero.jpg" alt="Queen at Live Aid" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:grayscale(1) contrast(1.06)">
                   <div style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(17,17,17,.55) 0%,rgba(17,17,17,0) 32%,rgba(17,17,17,.82) 74%,#111111 100%)"></div>
+                  <div style="position:absolute;top:12px;left:20px;right:12px;display:flex;align-items:center;justify-content:space-between">
+                    <div style="display:flex;align-items:center;gap:9px">
+                      <img src="assets/crest-white.png" alt="Queen crest" style="height:26px;width:auto">
+                      <span style="font-family:var(--font-titling);font-size:13px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:#fff">Queenzone</span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:2px">
+                      <button onClick="{{ goSearch }}" style="background:none;border:0;width:44px;height:44px;display:flex;align-items:center;justify-content:center;cursor:pointer">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:block"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+                      </button>
+                      <button onClick="{{ goYou }}" aria-label="Profile" style="background:none;border:0;width:44px;height:44px;display:flex;align-items:center;justify-content:center;cursor:pointer">
+                        <span style="width:32px;height:32px;border-radius:16px;background:rgba(17,17,17,.55);border:1px solid rgba(255,255,255,.4);display:flex;align-items:center;justify-content:center;font:500 12px var(--font-body);color:#fff">RO</span>
+                      </button>
+                    </div>
+                  </div>
                   <div style="position:absolute;left:24px;right:24px;bottom:28px;display:flex;flex-direction:column;gap:12px">
                     <span style="font-family:var(--font-titling);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:#B89A4A">Hero feature</span>
                     <h1 style="margin:0;font-family:var(--font-display);font-weight:500;font-size:38px;line-height:1.06;letter-spacing:-.015em;color:#fff;text-wrap:pretty">The day Queen stole Live Aid</h1>
@@ -162,7 +186,7 @@ a:hover{color:#D3B868}
 
                 <div style="padding:34px 24px 8px;display:flex;flex-direction:column;gap:18px">
                   <div style="display:flex;align-items:baseline;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.14);padding-bottom:12px">
-                    <span style="font-family:var(--font-titling);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:#fff">From the vaults</span>
+                    <span style="font-family:var(--font-titling);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:#fff">Featured stories</span>
                     <button onClick="{{ goNews }}" style="background:none;border:0;padding:0;font:500 12px var(--font-body);letter-spacing:.06em;text-transform:uppercase;color:#B89A4A;cursor:pointer">All</button>
                   </div>
                 </div>
@@ -185,6 +209,22 @@ a:hover{color:#D3B868}
                     <p style="margin:0;font-size:15px;line-height:1.6;color:rgba(255,255,255,.78);text-wrap:pretty">20 August 1975 — the band begin sessions at Rockfield Studios for the album that would become <em>A Night at the Opera</em>.</p>
                     <button onClick="{{ openStory }}" style="align-self:flex-start;margin-top:4px;background:none;border:1px solid rgba(184,154,74,.5);border-radius:2px;padding:10px 16px;font:500 12px var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:#B89A4A;cursor:pointer" style-hover="background:rgba(184,154,74,.12)">Read the entry</button>
                   </div>
+                </div>
+
+                <div style="padding:34px 24px 0;display:flex;flex-direction:column;gap:14px">
+                  <div style="display:flex;align-items:baseline;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.14);padding-bottom:12px">
+                    <span style="font-family:var(--font-titling);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:#fff">Explore the archive</span>
+                    <button onClick="{{ goArchive }}" style="background:none;border:0;padding:0;font:500 12px var(--font-body);letter-spacing:.06em;text-transform:uppercase;color:#B89A4A;cursor:pointer">All</button>
+                  </div>
+                  <sc-for list="{{ archiveShort }}" as="a" hint-placeholder-count="4">
+                    <div onClick="{{ a.open }}" style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 0;border-bottom:1px solid rgba(255,255,255,.1);cursor:pointer">
+                      <div style="display:flex;flex-direction:column;gap:5px;min-width:0">
+                        <span style="font-family:var(--font-display);font-size:20px;font-weight:500;line-height:1.16;color:#fff">{{ a.title }}</span>
+                        <span style="font-size:10.5px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.5)">{{ a.meta }}</span>
+                      </div>
+                      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="m9 18 6-6-6-6"></path></svg>
+                    </div>
+                  </sc-for>
                 </div>
 
                 <div style="padding:34px 24px 0;display:flex;flex-direction:column;gap:14px">
@@ -269,6 +309,32 @@ a:hover{color:#D3B868}
               </div>
             </sc-if>
 
+            <!-- ARCHIVE HUB -->
+            <sc-if value="{{ isArchive }}" hint-placeholder-val="{{ true }}">
+              <div style="animation:qzFade .32s cubic-bezier(.22,.61,.36,1)">
+                <div style="padding:22px 24px 20px;display:flex;flex-direction:column;gap:8px">
+                  <span style="font-family:var(--font-titling);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:#B89A4A">The Queenzone.com archive</span>
+                  <h1 style="margin:0;font-family:var(--font-display);font-weight:500;font-size:34px;line-height:1.06;letter-spacing:-.015em;color:#fff">Explore the archive</h1>
+                  <p style="margin:2px 0 0;font-size:14.5px;line-height:1.6;color:rgba(255,255,255,.62);text-wrap:pretty">Four thousand articles, a hundred long-form features, tens of thousands of photographs and the community's own history — preserved and catalogued.</p>
+                </div>
+                <sc-for list="{{ archiveRows }}" as="a" hint-placeholder-count="8">
+                  <div onClick="{{ a.open }}" style="display:flex;gap:15px;align-items:center;padding:16px 24px;border-top:1px solid rgba(255,255,255,.1);cursor:pointer" style-hover="background:rgba(255,255,255,.04)">
+                    <img src="{{ a.img }}" alt="{{ a.title }}" style="flex:none;width:84px;height:84px;object-fit:cover;border-radius:2px;filter:grayscale(1) contrast(1.04)">
+                    <div style="display:flex;flex-direction:column;gap:7px;min-width:0;flex:1">
+                      <span style="font-family:var(--font-titling);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:{{ a.kickerColor }}">{{ a.kicker }}</span>
+                      <span style="font-family:var(--font-display);font-size:23px;font-weight:500;line-height:1.14;letter-spacing:-.012em;color:#fff;text-wrap:pretty">{{ a.title }}</span>
+                      <span style="font-size:10.5px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.5)">{{ a.meta }}</span>
+                    </div>
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="m9 18 6-6-6-6"></path></svg>
+                  </div>
+                </sc-for>
+                <div style="padding:34px 24px 44px;display:flex;flex-direction:column;align-items:center;gap:10px;border-top:1px solid rgba(255,255,255,.1)">
+                  <img src="assets/crest-white.png" alt="Queen crest" style="height:32px;opacity:.3">
+                  <span style="font-size:11px;line-height:1.6;text-align:center;color:rgba(255,255,255,.42);max-width:250px">An independent fan archive. Not affiliated with Queen or its representatives.</span>
+                </div>
+              </div>
+            </sc-if>
+
             <!-- PHOTOGRAPHY -->
             <sc-if value="{{ isPhotos }}" hint-placeholder-val="{{ true }}">
               <div style="animation:qzFade .32s cubic-bezier(.22,.61,.36,1)">
@@ -300,25 +366,30 @@ a:hover{color:#D3B868}
               <div style="position:absolute;inset:0;background:#000;display:flex;flex-direction:column;animation:qzFade .28s cubic-bezier(.22,.61,.36,1)">
                 <div style="flex:none;padding:14px 10px;display:flex;align-items:center;justify-content:space-between">
                   <button onClick="{{ back }}" style="background:none;border:0;width:44px;height:44px;display:flex;align-items:center;justify-content:center;cursor:pointer">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round"><path d="M5 5l14 14M19 5L5 19"></path></svg>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
                   </button>
                   <span style="font-family:var(--font-titling);font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.6)">{{ photoIndexLabel }}</span>
                   <div style="display:flex">
-                    <button onClick="{{ toggleSave }}" style="background:none;border:0;width:44px;height:44px;display:flex;align-items:center;justify-content:center;cursor:pointer">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="{{ saveFill }}" stroke="#B89A4A" stroke-width="1.5" stroke-linejoin="round"><path d="M6 3h12v18l-6-4.5L6 21z"></path></svg>
+                    <button onClick="{{ toggleSave }}" style="{{ saveBtnStyleAndroid }}">
+                      <sc-if value="{{ saved }}" hint-placeholder-val="{{ false }}">
+                        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z"></path><path d="m9 10 2 2 4-4"></path></svg>
+                      </sc-if>
+                      <sc-if value="{{ notSaved }}" hint-placeholder-val="{{ true }}">
+                        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"></path></svg>
+                      </sc-if>
                     </button>
                     <button onClick="{{ openSheet }}" style="background:none;border:0;width:44px;height:44px;display:flex;align-items:center;justify-content:center;cursor:pointer">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v11"></path><path d="M8 7l4-4 4 4"></path><path d="M5 14v6h14v-6"></path></svg>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" x2="12" y1="2" y2="15"></line></svg>
                     </button>
                   </div>
                 </div>
                 <div style="flex:1;display:flex;align-items:center;justify-content:center;position:relative">
                   <img src="{{ photoImg }}" alt="{{ photoCap }}" style="width:100%;max-height:100%;object-fit:contain;filter:grayscale(1) contrast(1.05)">
                   <button onClick="{{ prevPhoto }}" style="position:absolute;left:6px;top:50%;transform:translateY(-50%);width:44px;height:44px;border-radius:22px;background:rgba(0,0,0,.4);border:0;display:flex;align-items:center;justify-content:center;cursor:pointer">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4l-8 8 8 8"></path></svg>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="m15 18-6-6 6-6"></path></svg>
                   </button>
                   <button onClick="{{ nextPhoto }}" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);width:44px;height:44px;border-radius:22px;background:rgba(0,0,0,.4);border:0;display:flex;align-items:center;justify-content:center;cursor:pointer">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4l8 8-8 8"></path></svg>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="m9 18 6-6-6-6"></path></svg>
                   </button>
                 </div>
                 <div style="flex:none;padding:20px 24px 34px;display:flex;flex-direction:column;gap:8px">
@@ -384,7 +455,7 @@ a:hover{color:#D3B868}
               <div style="animation:qzFade .28s cubic-bezier(.22,.61,.36,1)">
                 <div style="padding:16px 20px 14px;border-bottom:1px solid rgba(255,255,255,.14)">
                   <div style="display:flex;align-items:center;gap:10px;background:#1D1D1D;border:1px solid rgba(255,255,255,.16);border-radius:{{ searchRadius }};padding:0 14px;height:44px">
-                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.6)" stroke-width="1.5" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4.2-4.2"></path></svg>
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:block"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
                     <input value="{{ query }}" onChange="{{ onQuery }}" placeholder="Search 4,000+ articles and photographs" style="flex:1;background:none;border:0;outline:none;font:400 15px var(--font-body);color:#fff">
                   </div>
                 </div>
@@ -395,7 +466,7 @@ a:hover{color:#D3B868}
                       <span style="font-size:15px;font-weight:500;line-height:1.4;color:#fff;text-wrap:pretty">{{ r.title }}</span>
                       <span style="font-size:10px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:{{ r.tagColor }}">{{ r.tag }}</span>
                     </div>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.4)" stroke-width="1.5" stroke-linecap="round"><path d="M9 5l7 7-7 7"></path></svg>
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="m9 18 6-6-6-6"></path></svg>
                   </div>
                 </sc-for>
                 <div style="height:40px"></div>
@@ -420,7 +491,7 @@ a:hover{color:#D3B868}
                 <sc-for list="{{ libraryRows }}" as="row" hint-placeholder-count="3">
                   <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-top:1px solid rgba(255,255,255,.1);cursor:pointer" style-hover="background:rgba(255,255,255,.04)">
                     <span style="font-size:15px;color:#fff">{{ row }}</span>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.4)" stroke-width="1.5" stroke-linecap="round"><path d="M9 5l7 7-7 7"></path></svg>
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="m9 18 6-6-6-6"></path></svg>
                   </div>
                 </sc-for>
                 <div style="padding:24px 24px 8px"><span style="font-family:var(--font-titling);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,.6)">Settings</span></div>
@@ -441,7 +512,7 @@ a:hover{color:#D3B868}
                 <sc-for list="{{ settingsRows }}" as="row" hint-placeholder-count="4">
                   <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-top:1px solid rgba(255,255,255,.1);cursor:pointer" style-hover="background:rgba(255,255,255,.04)">
                     <span style="font-size:15px;color:#fff">{{ row }}</span>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.4)" stroke-width="1.5" stroke-linecap="round"><path d="M9 5l7 7-7 7"></path></svg>
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="m9 18 6-6-6-6"></path></svg>
                   </div>
                 </sc-for>
                 <div style="padding:32px 24px 44px;display:flex;flex-direction:column;align-items:center;gap:10px;border-top:1px solid rgba(255,255,255,.1)">
@@ -454,7 +525,7 @@ a:hover{color:#D3B868}
             <!-- ANDROID FAB (forum) -->
             <sc-if value="{{ showFab }}" hint-placeholder-val="{{ true }}">
               <button onClick="{{ openSheet }}" style="position:absolute;right:18px;bottom:20px;width:58px;height:58px;border-radius:18px;background:#B89A4A;border:0;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 20px rgba(0,0,0,.5);cursor:pointer">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>
               </button>
             </sc-if>
           </div>
@@ -463,9 +534,13 @@ a:hover{color:#D3B868}
           <sc-if value="{{ showTabsIos }}" hint-placeholder-val="{{ true }}">
             <div style="flex:none;height:83px;padding:8px 0 0;background:rgba(17,17,17,.94);backdrop-filter:blur(18px);border-top:1px solid rgba(255,255,255,.14);display:flex">
               <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="5">
-                <button onClick="{{ t.press }}" style="flex:1;background:none;border:0;padding:4px 0 0;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer">
-                  <svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="{{ t.color }}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="{{ t.d }}"></path></svg>
-                  <span style="font-size:10px;font-weight:500;letter-spacing:.01em;color:{{ t.color }}">{{ t.label }}</span>
+                <button onClick="{{ t.press }}" style="{{ t.btnStyle }}">
+                  <sc-if value="{{ t.isHome }}" hint-placeholder-val="{{ false }}"><svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"></path><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg></sc-if>
+                  <sc-if value="{{ t.isNews }}" hint-placeholder-val="{{ false }}"><svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"></path><path d="M18 14h-8"></path><path d="M15 18h-5"></path><path d="M10 6h8v4h-8V6Z"></path></svg></sc-if>
+                  <sc-if value="{{ t.isPhotos }}" hint-placeholder-val="{{ false }}"><svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"></path><circle cx="12" cy="13" r="3"></circle></svg></sc-if>
+                  <sc-if value="{{ t.isArchive }}" hint-placeholder-val="{{ false }}"><svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:block"><rect width="20" height="5" x="2" y="3" rx="1"></rect><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"></path><path d="M10 12h4"></path></svg></sc-if>
+                  <sc-if value="{{ t.isForum }}" hint-placeholder-val="{{ false }}"><svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg></sc-if>
+                  <span style="font-size:10px;font-weight:500;letter-spacing:.01em">{{ t.label }}</span>
                 </button>
               </sc-for>
             </div>
@@ -473,11 +548,15 @@ a:hover{color:#D3B868}
           <sc-if value="{{ showTabsAndroid }}" hint-placeholder-val="{{ true }}">
             <div style="flex:none;height:80px;padding:12px 4px 0;background:#161616;border-top:1px solid rgba(255,255,255,.12);display:flex">
               <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="5">
-                <button onClick="{{ t.press }}" style="flex:1;background:none;border:0;padding:0;display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer">
+                <button onClick="{{ t.press }}" style="{{ t.btnStyleAndroid }}">
                   <span style="{{ t.pillStyle }}">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="{{ t.color }}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="{{ t.d }}"></path></svg>
+                    <sc-if value="{{ t.isHome }}" hint-placeholder-val="{{ false }}"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"></path><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg></sc-if>
+                    <sc-if value="{{ t.isNews }}" hint-placeholder-val="{{ false }}"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"></path><path d="M18 14h-8"></path><path d="M15 18h-5"></path><path d="M10 6h8v4h-8V6Z"></path></svg></sc-if>
+                    <sc-if value="{{ t.isPhotos }}" hint-placeholder-val="{{ false }}"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"></path><circle cx="12" cy="13" r="3"></circle></svg></sc-if>
+                    <sc-if value="{{ t.isArchive }}" hint-placeholder-val="{{ false }}"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:block"><rect width="20" height="5" x="2" y="3" rx="1"></rect><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"></path><path d="M10 12h4"></path></svg></sc-if>
+                    <sc-if value="{{ t.isForum }}" hint-placeholder-val="{{ false }}"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg></sc-if>
                   </span>
-                  <span style="font-size:11.5px;font-weight:500;color:{{ t.color }}">{{ t.label }}</span>
+                  <span style="font-size:11.5px;font-weight:500">{{ t.label }}</span>
                 </button>
               </sc-for>
             </div>
@@ -534,12 +613,16 @@ a:hover{color:#D3B868}
 <script type="text/x-dc" data-dc-script data-props="{&quot;platform&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;ios&quot;,&quot;android&quot;],&quot;default&quot;:&quot;ios&quot;,&quot;tsType&quot;:&quot;'ios' | 'android'&quot;},&quot;accent&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;options&quot;:[&quot;#B89A4A&quot;,&quot;#5D3A8A&quot;,&quot;#6B1F33&quot;,&quot;#244A8F&quot;],&quot;default&quot;:&quot;#B89A4A&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
 class Component extends DCLogic {
   state = {
-    platform: null, screen: 'today', tab: 'today', stack: [],
+    platform: null, screen: 'home', tab: 'home', stack: [],
     saved: false, notify: true, sheet: false, photo: 0, year: 'ALL', cat: 'ALL',
     query: '', progress: 0
   };
 
   get platform() { return this.state.platform || this.props.platform || 'ios'; }
+
+  // Icons are Lucide geometry (v0.446) inlined as React-owned SVG — identical glyphs to
+  // lucide-react-native, no runtime DOM mutation, painted with the first stream.
+  // stroke="currentColor", so colour inherits from the pressable and state changes just work.
 
   go(screen, opts) {
     const push = opts && opts.push;
@@ -565,7 +648,7 @@ class Component extends DCLogic {
   renderVals() {
     const s = this.state, p = this.platform, ios = p === 'ios', android = !ios;
     const screen = s.screen;
-    const detail = ['story', 'photo', 'thread', 'search'].includes(screen);
+    const detail = ['story', 'photo', 'thread', 'search', 'you'].includes(screen);
     const accent = this.props.accent || '#B89A4A';
 
     const photos = [
@@ -624,17 +707,22 @@ class Component extends DCLogic {
     ];
 
     const tabDefs = [
-      { key: 'today', label: 'Today', d: 'M3 11.4 12 4l9 7.4V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z' },
-      { key: 'news', label: 'News', d: 'M4 5h12v14H4zM16 9h4v8a2 2 0 0 1-2 2H4M7 9h6M7 13h6' },
-      { key: 'photos', label: 'Photos', d: 'M3 8h3.2L8 5h8l1.8 3H21v11H3zM12 16.5a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4' },
-      { key: 'forum', label: 'Forum', d: 'M4 4h16v11H9l-5 4zM8 8h8M8 11h5' },
-      { key: 'you', label: 'You', d: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8M4 20.5c0-3.6 3.6-5.5 8-5.5s8 1.9 8 5.5' }
+      { key: 'home', label: 'Home', icon: 'house' },
+      { key: 'news', label: 'News', icon: 'newspaper' },
+      { key: 'photos', label: 'Photography', icon: 'camera' },
+      { key: 'archive', label: 'Archive', icon: 'archive' },
+      { key: 'forum', label: 'Forum', icon: 'message-square' }
     ];
     const tabs = tabDefs.map(t => {
       const active = s.tab === t.key;
+      const size = ios ? 25 : 24;
       return {
-        key: t.key, label: t.label, d: t.d,
+        key: t.key, label: t.label,
+        isHome: t.key === 'home', isNews: t.key === 'news', isPhotos: t.key === 'photos',
+        isArchive: t.key === 'archive', isForum: t.key === 'forum',
         color: active ? accent : 'rgba(255,255,255,.5)',
+        btnStyle: `flex:1;background:none;border:0;padding:4px 0 0;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;color:${active ? accent : 'rgba(255,255,255,.5)'}`,
+        btnStyleAndroid: `flex:1;background:none;border:0;padding:0;display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer;color:${active ? accent : 'rgba(255,255,255,.5)'}`,
         pillStyle: `display:flex;align-items:center;justify-content:center;width:64px;height:32px;border-radius:16px;background:${active ? 'rgba(184,154,74,.20)' : 'transparent'};transition:background .18s`,
         press: () => this.setState({ screen: t.key, tab: t.key, stack: [], sheet: false })
       };
@@ -648,21 +736,32 @@ class Component extends DCLogic {
     }));
 
     const jumpDefs = [
-      ['today', 'Today'], ['news', 'News index'], ['story', 'Story reader'],
-      ['photos', 'Photography'], ['photo', 'Photo viewer'], ['forum', 'Forum'],
-      ['thread', 'Thread'], ['search', 'Search'], ['you', 'Profile & settings']
+      ['home', 'Home'], ['news', 'News index'], ['story', 'Story reader'],
+      ['photos', 'Photography'], ['photo', 'Photo viewer'], ['archive', 'Archive hub'],
+      ['forum', 'Forum'], ['thread', 'Thread'], ['search', 'Search'], ['you', 'Profile & settings']
     ];
     const jumps = jumpDefs.map(([k, label]) => ({
       label,
       style: `background:${screen === k ? '#fff' : 'transparent'};border:1px solid ${screen === k ? '#fff' : 'rgba(255,255,255,.22)'};border-radius:2px;padding:9px 14px;font:500 11px var(--font-body);letter-spacing:.09em;text-transform:uppercase;color:${screen === k ? '#111' : 'rgba(255,255,255,.7)'};cursor:pointer`,
       go: () => {
-        const tab = ['story', 'photo', 'thread', 'search'].includes(k)
-          ? ({ story: 'news', photo: 'photos', thread: 'forum', search: 'today' })[k] : k;
+        const tab = ['story', 'photo', 'thread', 'search', 'you'].includes(k)
+          ? ({ story: 'news', photo: 'photos', thread: 'forum', search: 'home', you: 'home' })[k] : k;
         this.setState({ screen: k, tab, stack: [], sheet: false });
       }
     }));
 
-    const barTitles = { news: 'News', photos: 'Photography', forum: 'Forum', you: 'Profile', story: 'Story', thread: 'Live performances', search: 'Search' };
+    const barTitles = { news: 'News', photos: 'Photography', archive: 'Archive', forum: 'Forum', you: 'Profile', story: 'Story', thread: 'Live performances', search: 'Search' };
+
+    const archiveRows = [
+      { kicker: 'Long-form', kickerColor: accent, title: 'Stories', meta: '104 features · Editorial', img: 'assets/img-portrait.jpg', open: openStory },
+      { kicker: 'History', kickerColor: '#9B7BC4', title: 'Timeline', meta: '1970 — 1991 · 480 entries', img: 'assets/img-stage.jpg', open: openStory },
+      { kicker: 'The band', kickerColor: 'rgba(255,255,255,.6)', title: 'Biography', meta: 'Nine chapters', img: 'assets/img-studio.jpg', open: openStory },
+      { kicker: 'Records', kickerColor: 'rgba(255,255,255,.6)', title: 'Discography', meta: '15 studio albums · Sleeves & tracklists', img: 'assets/img-studio.jpg', open: openStory },
+      { kicker: 'In memoriam', kickerColor: '#C08497', title: 'Freddie Mercury — a tribute', meta: '1946 — 1991 · Members\u2019 memories', img: 'assets/img-portrait.jpg', open: openStory },
+      { kicker: 'Community', kickerColor: 'rgba(255,255,255,.6)', title: 'Fan performances', meta: '212 submissions · Video & audio', img: 'assets/img-crowd.jpg', open: openStory },
+      { kicker: 'Preserved', kickerColor: accent, title: 'Recently restored', meta: '1,240 photographs · 340 articles', img: 'assets/img-hero.jpg', open: () => this.setState({ screen: 'photos', tab: 'photos', stack: [] }) },
+      { kicker: 'The old site', kickerColor: 'rgba(255,255,255,.6)', title: 'Queenzone.com, preserved', meta: 'How the archive was rebuilt', img: 'assets/img-crowd.jpg', open: openStory }
+    ];
 
     const sheetIsIos = ios;
     const sheetRow = (label, last, danger) => `display:block;width:100%;background:none;border:0;border-top:1px solid rgba(255,255,255,.12);padding:${sheetIsIos ? '17px' : '16px 22px'};font:${sheetIsIos ? '400 17px' : '400 16px'} var(--font-body);color:${danger ? '#D98A8A' : '#fff'};text-align:${sheetIsIos ? 'center' : 'left'};cursor:pointer`;
@@ -673,16 +772,18 @@ class Component extends DCLogic {
 
     const notes = ios ? [
       { k: 'Status & safe area', v: 'Dynamic Island cutout, 47pt top inset, 34pt home-indicator inset. SafeAreaView on every screen.' },
-      { k: 'Navigation bar', v: '44pt bar, centred 17pt semibold title, "Back" chevron with the previous title. Translucent blur over content.' },
-      { k: 'Tab bar', v: '83pt including the home-indicator inset. 25pt icons above 10pt labels; gold tint marks the active tab.' },
+      { k: 'Navigation bar', v: '44pt bar, centred 17pt semibold title, chevron + literal "Back" label. Translucent blur over content.' },
+      { k: 'Tab bar', v: '83pt including the home-indicator inset. 25pt icons above 10pt labels; gold tint marks the active tab. Five tabs mirror the site nav.' },
       { k: 'Sheets', v: 'Action sheet — rounded card floating above a separate Cancel button, centred rows.' },
-      { k: 'Gestures', v: 'Edge-swipe back on every pushed screen; pull to refresh on Today and News.' }
+      { k: 'Gestures', v: 'Edge-swipe back on every pushed screen; pull to refresh on Home and News.' },
+      { k: 'Icons', v: 'Lucide outline set, 1.5 stroke — 25pt in the tab bar, 18\u201320pt inline. No filled glyphs.' }
     ] : [
       { k: 'Status & insets', v: '32dp status bar, edge-to-edge with gesture-nav inset at the bottom. No notch cutout.' },
       { k: 'Top app bar', v: '56dp bar, left-aligned 20dp title, back arrow (not chevron), actions right. Elevates on scroll.' },
       { k: 'Navigation bar', v: 'Material 3 — 80dp, gold-tinted active pill behind the icon, 11.5dp labels always visible.' },
       { k: 'FAB & sheets', v: 'Forum composes from a 58dp FAB; sheets are edge-to-edge with a drag handle, no Cancel button.' },
-      { k: 'Feedback', v: 'Android ripple on all pressables; system back button mapped to the nav stack.' }
+      { k: 'Feedback', v: 'Android ripple on all pressables; system back button mapped to the nav stack. Pull to refresh on Home and News.' },
+      { k: 'Icons', v: 'Lucide outline set, 1.5 stroke \u2014 24dp in the navigation bar, 18\u201320dp inline. No filled glyphs.' }
     ];
 
     const photo = photos[s.photo % photos.length];
@@ -700,16 +801,19 @@ class Component extends DCLogic {
       frameCaption: (ios ? 'iOS · iPhone 15 · 390 × 844 pt' : 'Android · 411 × 891 dp · Material 3') + ' · dark theme',
       jumps, tabs, notes,
       barTitle: barTitles[screen] || '',
-      showBarIos: ios && screen !== 'today' && screen !== 'photo',
-      showBarAndroid: android && screen !== 'today' && screen !== 'photo',
+      showBarIos: ios && screen !== 'home' && screen !== 'photo',
+      showBarAndroid: android && screen !== 'home' && screen !== 'photo',
       showBack: detail,
-      showSearchAction: ['news', 'photos', 'forum'].includes(screen),
+      showSearchAction: ['news', 'photos', 'forum', 'archive'].includes(screen),
       showCompose: ios && screen === 'forum',
       showReadActions: ['story', 'thread'].includes(screen),
       showFab: android && screen === 'forum',
       showTabsIos: ios && !detail,
       showTabsAndroid: android && !detail,
-      isToday: screen === 'today', isNews: screen === 'news', isStory: screen === 'story',
+      isHome: screen === 'home', isArchive: screen === 'archive', archiveRows,
+      archiveShort: archiveRows.slice(0, 4),
+      goYou: () => this.go('you', { push: true }),
+      isNews: screen === 'news', isStory: screen === 'story',
       isPhotos: screen === 'photos', isPhoto: screen === 'photo', isForum: screen === 'forum',
       isThread: screen === 'thread', isSearch: screen === 'search', isYou: screen === 'you',
       vault, news, threads, threadsShort: threads.slice(0, 3), posts, results, years, cats,
@@ -727,7 +831,9 @@ class Component extends DCLogic {
         const el = e.target, max = el.scrollHeight - el.clientHeight;
         this.setState({ progress: max > 0 ? Math.min(1, el.scrollTop / max) : 0 });
       },
-      saveFill: s.saved ? '#B89A4A' : 'none',
+      saved: s.saved, notSaved: !s.saved,
+      saveBtnStyleAndroid: `background:none;border:0;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:22px;cursor:pointer;color:${s.saved ? '#B89A4A' : '#fff'}`,
+      saveBtnStyle: `background:none;border:0;padding:8px;cursor:pointer;line-height:0;display:flex;align-items:center;justify-content:center;width:44px;height:44px;color:${s.saved ? '#B89A4A' : '#fff'}`,
       toggleSave: () => this.setState(st => ({ saved: !st.saved })),
       toggleNotify: () => this.setState(st => ({ notify: !st.notify })),
       switchTrackStyle: `position:relative;width:${ios ? 51 : 52}px;height:${ios ? 31 : 32}px;border-radius:16px;border:${s.notify ? '0' : '1px solid rgba(255,255,255,.3)'};background:${s.notify ? '#B89A4A' : 'transparent'};cursor:pointer;transition:background .18s;padding:0`,
@@ -744,6 +850,7 @@ class Component extends DCLogic {
       sheetAlign: ios ? 'center' : 'left',
       goSearch: () => this.go('search', { push: true }),
       goNews: () => this.setState({ screen: 'news', tab: 'news', stack: [] }),
+      goArchive: () => this.setState({ screen: 'archive', tab: 'archive', stack: [] }),
       goForum: () => this.setState({ screen: 'forum', tab: 'forum', stack: [] }),
       goPhotos: () => this.setState({ screen: 'photos', tab: 'photos', stack: [] }),
       openStory,

@@ -20,7 +20,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const value = useMemo<SessionContextValue>(
     () => ({
       ...session,
-      signIn: () => setSession({ isSignedIn: true, displayName: 'Dev member' }),
+      signIn: () => setSession({ isSignedIn: true, displayName: 'Roger_O' }),
       signOut: () => setSession(signedOut),
     }),
     [session],

@@ -1,26 +1,50 @@
 import { getFocusedRouteNameFromRoute, type RouteProp } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import {
-  BookOpen,
-  Image,
-  Mail,
-  MessagesSquare,
-  Newspaper,
-  User,
-  type LucideIcon,
-} from 'lucide-react-native';
-import { Platform } from 'react-native';
-import { useSession } from '../session/SessionContext';
+import { Archive, Camera, House, MessageSquare, Newspaper, type LucideIcon } from 'lucide-react-native';
+import { Platform, View } from 'react-native';
 import { useTheme, type ColorScheme } from '../theme';
-import { ArchiveStack, ForumStack, MessagesStack, NewsStack, PhotosStack, YouStack } from './stacks';
+import { ArchiveStack, ForumStack, HomeStack, NewsStack, PhotosStack } from './stacks';
 import type { RootTabParamList } from './types';
 import { shouldHideTabBar } from './visibility';
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
 
+function TabGlyph({
+  Icon,
+  color,
+  focused,
+}: {
+  Icon: LucideIcon;
+  color: string;
+  focused: boolean;
+}) {
+  const { c, chrome } = useTheme();
+  const platform = Platform.OS === 'android' ? chrome.android : chrome.ios;
+  const icon = <Icon color={color} size={platform.tabIcon} strokeWidth={1.5} />;
+
+  if (platform.tabActiveStyle !== 'pill') {
+    return icon;
+  }
+
+  return (
+    <View
+      style={{
+        width: 64,
+        height: 32,
+        borderRadius: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: focused ? c.accentTintWeak : 'transparent',
+      }}
+    >
+      {icon}
+    </View>
+  );
+}
+
 function tabIcon(Icon: LucideIcon) {
-  return function TabIcon({ color, size }: { color: string; size: number }) {
-    return <Icon color={color} size={size} strokeWidth={1.5} />;
+  return function TabIcon({ color, focused }: { color: string; focused: boolean }) {
+    return <TabGlyph Icon={Icon} color={color} focused={focused} />;
   };
 }
 
@@ -64,32 +88,33 @@ function reselectRoot(tabName: keyof RootTabParamList, screen: string) {
 }
 
 export function RootNavigator() {
-  const { isSignedIn } = useSession();
   const { c, chrome } = useTheme();
   const platformChrome = Platform.OS === 'android' ? chrome.android : chrome.ios;
 
   return (
     <Tab.Navigator
-      key={isSignedIn ? 'signed-in' : 'signed-out'}
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: c.accentPrimary,
         tabBarInactiveTintColor: c.textMuted,
         tabBarStyle: tabBarStyleFor(c, false),
-        tabBarLabelStyle: { fontSize: platformChrome.tabLabel, letterSpacing: 0.4 },
+        tabBarLabelStyle: {
+          fontSize: platformChrome.tabLabel,
+          letterSpacing: 0.4,
+        },
         tabBarHideOnKeyboard: true,
       }}
     >
       <Tab.Screen
-        name="TodayTab"
-        component={ArchiveStack}
+        name="HomeTab"
+        component={HomeStack}
         options={({ route }) => ({
-          title: 'Today',
-          tabBarAccessibilityLabel: 'Today',
-          tabBarIcon: tabIcon(BookOpen),
-          ...hideTabBarIfDetail(c, route, 'Today'),
+          title: 'Home',
+          tabBarAccessibilityLabel: 'Home',
+          tabBarIcon: tabIcon(House),
+          ...hideTabBarIfDetail(c, route, 'Home'),
         })}
-        listeners={reselectRoot('TodayTab', 'Today')}
+        listeners={reselectRoot('HomeTab', 'Home')}
       />
       <Tab.Screen
         name="NewsTab"
@@ -106,12 +131,27 @@ export function RootNavigator() {
         name="PhotosTab"
         component={PhotosStack}
         options={({ route }) => ({
-          title: 'Photos',
-          tabBarAccessibilityLabel: 'Photos',
-          tabBarIcon: tabIcon(Image),
+          title: 'Photography',
+          tabBarAccessibilityLabel: 'Photography',
+          tabBarIcon: tabIcon(Camera),
+          tabBarLabelStyle: {
+            fontSize: platformChrome.tabLabel,
+            letterSpacing: 0.2,
+          },
           ...hideTabBarIfDetail(c, route, 'PhotoIndex'),
         })}
         listeners={reselectRoot('PhotosTab', 'PhotoIndex')}
+      />
+      <Tab.Screen
+        name="ArchiveTab"
+        component={ArchiveStack}
+        options={({ route }) => ({
+          title: 'Archive',
+          tabBarAccessibilityLabel: 'Archive',
+          tabBarIcon: tabIcon(Archive),
+          ...hideTabBarIfDetail(c, route, 'ArchiveHub'),
+        })}
+        listeners={reselectRoot('ArchiveTab', 'ArchiveHub')}
       />
       <Tab.Screen
         name="ForumTab"
@@ -119,34 +159,10 @@ export function RootNavigator() {
         options={({ route }) => ({
           title: 'Forum',
           tabBarAccessibilityLabel: 'Forum',
-          tabBarIcon: tabIcon(MessagesSquare),
+          tabBarIcon: tabIcon(MessageSquare),
           ...hideTabBarIfDetail(c, route, 'ForumIndex'),
         })}
         listeners={reselectRoot('ForumTab', 'ForumIndex')}
-      />
-      {isSignedIn ? (
-        <Tab.Screen
-          name="MessagesTab"
-          component={MessagesStack}
-          options={({ route }) => ({
-            title: 'Messages',
-            tabBarAccessibilityLabel: 'Messages',
-            tabBarIcon: tabIcon(Mail),
-            ...hideTabBarIfDetail(c, route, 'Inbox'),
-          })}
-          listeners={reselectRoot('MessagesTab', 'Inbox')}
-        />
-      ) : null}
-      <Tab.Screen
-        name="YouTab"
-        component={YouStack}
-        options={({ route }) => ({
-          title: 'You',
-          tabBarAccessibilityLabel: 'You',
-          tabBarIcon: tabIcon(User),
-          ...hideTabBarIfDetail(c, route, 'Account'),
-        })}
-        listeners={reselectRoot('YouTab', 'Account')}
       />
     </Tab.Navigator>
   );

@@ -390,10 +390,10 @@ export function FeatureBlock({
 }
 
 /* ------------------------------------------------------------------ *
- * Example screen — how the pieces assemble (STYLE_GUIDE §9)
+ * Example screen — Home. How the pieces assemble (STYLE_GUIDE §9)
  * ------------------------------------------------------------------ */
 
-export function TodayScreenExample({
+export function HomeScreenExample({
   lead, vault, onOpenStory, onOpenNews, crest,
 }: {
   lead: Parameters<typeof HeroFeature>[0]['item'];
@@ -410,7 +410,7 @@ export function TodayScreenExample({
       ListHeaderComponent={
         <>
           <HeroFeature item={lead} onPress={() => onOpenStory()} />
-          <SectionHeader title="From the vaults" actionLabel="All" onAction={onOpenNews} />
+          <SectionHeader title="Featured stories" actionLabel="All" onAction={onOpenNews} />
           <FeatureRail items={vault} onOpen={onOpenStory} />
           <FeatureBlock
             eyebrow="This day in Queen history"

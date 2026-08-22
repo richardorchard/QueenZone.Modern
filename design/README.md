@@ -163,6 +163,13 @@ In `assets/`:
 
 ---
 
+## Mobile app
+
+The native iOS + Android handoff (v2, 22 August 2026) lives in
+[`Queenzone mobile app design/handoff/`](Queenzone%20mobile%20app%20design/handoff/).
+Five tabs mirror the website nav: Home · News · Photography · Archive · Forum.
+Read `STYLE_GUIDE.md` then `QUEENZONE_APP_SPEC.md` before adding screens.
+
 ## Files in this bundle
 - `README.md` — this implementation brief.
 - `DESIGN_GUIDE.md` — the full design-system guide (foundations, content fundamentals, visual foundations, iconography).
