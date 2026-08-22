@@ -25,6 +25,7 @@ describe('member-only screens', () => {
     assert.equal(isMemberOnlyScreen('Conversation'), true);
     assert.equal(isMemberOnlyScreen('Composer'), true);
     assert.equal(isMemberOnlyScreen('Settings'), true);
+    assert.equal(isMemberOnlyScreen('DeleteAccount'), true);
     assert.equal(isMemberOnlyScreen('PhotoSubmit'), true);
     assert.equal(isMemberOnlyScreen('SavedList'), true);
   });
@@ -53,6 +54,7 @@ describe('shouldHideTabBar', () => {
     assert.equal(shouldHideTabBar('Thread'), true);
     assert.equal(shouldHideTabBar('PhotoViewer'), true);
     assert.equal(shouldHideTabBar('Profile'), true);
+    assert.equal(shouldHideTabBar('DeleteAccount'), true);
     assert.equal(shouldHideTabBar('Contact'), true);
     assert.equal(shouldHideTabBar('Search'), true);
     assert.equal(shouldHideTabBar('Home'), false);

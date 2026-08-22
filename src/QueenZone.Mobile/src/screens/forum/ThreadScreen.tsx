@@ -42,7 +42,7 @@ function messageFromUnknownError(err: unknown): string {
 
 export function ThreadScreen({ navigation, route }: Props) {
   const { c } = useTheme();
-  const { isSignedIn, accessToken, signIn } = useSession();
+  const { isSignedIn, accessToken } = useSession();
   const { id: rawId, title } = route.params;
   const id = parseTopicId(rawId);
   const [topic, setTopic] = useState<ForumTopicDetail | null>(null);
@@ -223,7 +223,7 @@ export function ThreadScreen({ navigation, route }: Props) {
             error={pollError}
             onVote={votePoll}
             onClose={closePoll}
-            onSignIn={signIn}
+            onSignIn={() => navigation.getParent()?.navigate('HomeTab', { screen: 'SignIn' })}
           />
         </View>
       ) : null}

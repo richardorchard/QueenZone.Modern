@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.Extensions.Options;
 
 namespace QueenZone.Web;
 
@@ -22,6 +23,8 @@ public static class MobileAuthEndpoints
 
     public const string SessionPath = "/api/v1/auth/session";
 
+    public const string ProvidersPath = "/api/v1/auth/providers";
+
     public static void MapMobileAuthEndpoints(this WebApplication app)
     {
         var group = app.MapGroup("/api/v1/auth")
@@ -34,6 +37,10 @@ public static class MobileAuthEndpoints
         group.MapGet("/callback", CallbackAsync);
         group.MapPost("/token", TokenAsync);
         group.MapPost("/revoke", RevokeAsync);
+        group.MapGet("/providers", GetProviders)
+            .WithName("GetMobileAuthProviders")
+            .WithSummary("Sign-in providers configured on this host, matching website /account/login.")
+            .Produces<MobileAuthProvidersResponse>();
         group.MapPost("/logout", LogoutAsync)
             .RequireAuthorization(MemberAuthenticationSchemes.MobileMemberPolicy);
         group.MapGet("/session", Session)
@@ -239,6 +246,38 @@ public static class MobileAuthEndpoints
         return Results.NoContent();
     }
 
+    internal static IResult GetProviders(IOptions<MemberAuthenticationOptions> options)
+    {
+        var auth = options.Value;
+        var providers = new List<MobileAuthProviderDto>();
+        if (auth.Google?.ClientId is { Length: > 0 })
+        {
+            providers.Add(new MobileAuthProviderDto(MemberAuthenticationSchemes.Google, "Continue with Google"));
+        }
+
+        if (auth.Microsoft?.ClientId is { Length: > 0 })
+        {
+            providers.Add(new MobileAuthProviderDto(MemberAuthenticationSchemes.Microsoft, "Continue with Microsoft"));
+        }
+
+        if (auth.Discord?.ClientId is { Length: > 0 })
+        {
+            providers.Add(new MobileAuthProviderDto(MemberAuthenticationSchemes.Discord, "Continue with Discord"));
+        }
+
+        if (auth.GitHub?.ClientId is { Length: > 0 })
+        {
+            providers.Add(new MobileAuthProviderDto(MemberAuthenticationSchemes.GitHub, "Continue with GitHub"));
+        }
+
+        if (auth.Apple?.IsConfigured == true)
+        {
+            providers.Add(new MobileAuthProviderDto(MemberAuthenticationSchemes.Apple, "Continue with Apple"));
+        }
+
+        return Results.Json(new MobileAuthProvidersResponse(providers));
+    }
+
     internal static IResult Session(ClaimsPrincipal user)
     {
         var memberId = user.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -286,3 +325,7 @@ public static class MobileAuthEndpoints
     private static IResult ErrorJson(string error, string description, int statusCode = StatusCodes.Status400BadRequest) =>
         Results.Json(new { error, error_description = description }, statusCode: statusCode);
 }
+
+public sealed record MobileAuthProviderDto(string Id, string Label);
+
+public sealed record MobileAuthProvidersResponse(IReadOnlyList<MobileAuthProviderDto> Providers);
