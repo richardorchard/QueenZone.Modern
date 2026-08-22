@@ -7,9 +7,11 @@ import {
   formatPollResultMeta,
   formatPollStatus,
   pollActionErrorMessage,
+  canCastPollVote,
+  pollAuthPrompt,
+  pollTokenRequiredMessage,
   shouldLoadPoll,
   shouldShowPollResults,
-  shouldShowSignInToVote,
 } from './forumPollMeta.ts';
 
 describe('forum poll meta', () => {
@@ -20,25 +22,59 @@ describe('forum poll meta', () => {
     assert.equal(shouldLoadPoll(false), false);
   });
 
-  it('shows results and sign-in the same way as the website card', () => {
+  it('shows website results whenever the GET viewer cannot vote', () => {
     assert.equal(shouldShowPollResults({ canViewerVote: true }), false);
     assert.equal(shouldShowPollResults({ canViewerVote: false }), true);
+  });
+
+  it('only allows a vote when the GET flag and a Bearer token are both present', () => {
+    assert.equal(canCastPollVote({ canViewerVote: true, hasAccessToken: true }), true);
+    assert.equal(canCastPollVote({ canViewerVote: true, hasAccessToken: false }), false);
+    assert.equal(canCastPollVote({ canViewerVote: false, hasAccessToken: true }), false);
+  });
+
+  it('does not present the development toggle as able to vote', () => {
+    const openPoll = { canViewerVote: false, viewerHasVoted: false, isClosed: false };
     assert.equal(
-      shouldShowSignInToVote({ canViewerVote: false, viewerHasVoted: false, isClosed: false }),
-      true,
+      pollAuthPrompt({ ...openPoll, isSignedIn: false, hasAccessToken: false }),
+      'signIn',
     );
     assert.equal(
-      shouldShowSignInToVote({ canViewerVote: true, viewerHasVoted: false, isClosed: false }),
-      false,
+      pollAuthPrompt({ ...openPoll, isSignedIn: true, hasAccessToken: false }),
+      'needsToken',
     );
     assert.equal(
-      shouldShowSignInToVote({ canViewerVote: false, viewerHasVoted: true, isClosed: false }),
-      false,
+      pollAuthPrompt({
+        canViewerVote: true,
+        viewerHasVoted: false,
+        isClosed: false,
+        isSignedIn: true,
+        hasAccessToken: true,
+      }),
+      'none',
     );
     assert.equal(
-      shouldShowSignInToVote({ canViewerVote: false, viewerHasVoted: false, isClosed: true }),
-      false,
+      pollAuthPrompt({
+        canViewerVote: false,
+        viewerHasVoted: true,
+        isClosed: false,
+        isSignedIn: false,
+        hasAccessToken: false,
+      }),
+      'none',
     );
+    assert.equal(
+      pollAuthPrompt({
+        canViewerVote: false,
+        viewerHasVoted: false,
+        isClosed: true,
+        isSignedIn: false,
+        hasAccessToken: false,
+      }),
+      'none',
+    );
+    assert.match(pollTokenRequiredMessage, /Bearer token/);
+    assert.match(pollTokenRequiredMessage, /development sign-in toggle cannot vote/);
   });
 
   it('formats percentages like website 0.#', () => {

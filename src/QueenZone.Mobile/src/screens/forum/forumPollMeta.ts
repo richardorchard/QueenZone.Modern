@@ -24,11 +24,47 @@ export function shouldShowPollResults(poll: Pick<PollVoteVisibility, 'canViewerV
   return !poll.canViewerVote;
 }
 
-export function shouldShowSignInToVote(
-  poll: Pick<PollVoteVisibility, 'canViewerVote' | 'viewerHasVoted' | 'isClosed'>,
-): boolean {
-  return !poll.canViewerVote && !poll.viewerHasVoted && !poll.isClosed;
+export type PollAuthPrompt = 'none' | 'signIn' | 'needsToken';
+
+export type PollAuthInput = PollVoteVisibility & {
+  isSignedIn: boolean;
+  hasAccessToken: boolean;
+};
+
+/** Vote submit needs both the GET viewer flag and a stored mobile Bearer token. */
+export function canCastPollVote(input: {
+  canViewerVote: boolean;
+  hasAccessToken: boolean;
+}): boolean {
+  return input.canViewerVote && input.hasAccessToken;
 }
+
+/**
+ * Honest mobile prompt: the development sign-in toggle is not a mobile session.
+ * Do not treat `isSignedIn` alone as enough to vote.
+ */
+export function pollAuthPrompt(input: PollAuthInput): PollAuthPrompt {
+  if (canCastPollVote(input)) {
+    return 'none';
+  }
+
+  if (input.viewerHasVoted || input.isClosed) {
+    return 'none';
+  }
+
+  if (input.isSignedIn && !input.hasAccessToken) {
+    return 'needsToken';
+  }
+
+  if (!input.hasAccessToken) {
+    return 'signIn';
+  }
+
+  return 'none';
+}
+
+export const pollTokenRequiredMessage =
+  'Voting requires a mobile Bearer token. The development sign-in toggle cannot vote.';
 
 /** Matches website `option.Percentage.ToString("0.#")`. */
 export function formatPollPercentage(value: number): string {

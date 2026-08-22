@@ -4,10 +4,11 @@ import type { ForumPoll } from '../../api';
 import { radius, space, type, useTheme } from '../../theme';
 import { Button } from '../../ui/Button';
 import {
+  canCastPollVote,
   formatPollResultMeta,
   formatPollStatus,
-  shouldShowPollResults,
-  shouldShowSignInToVote,
+  pollAuthPrompt,
+  pollTokenRequiredMessage,
 } from './forumPollMeta';
 
 type Props = {
@@ -33,8 +34,14 @@ export function ForumPollCard({
 }: Props) {
   const { c } = useTheme();
   const [selected, setSelected] = useState<string[]>([]);
-  const showResults = shouldShowPollResults(poll);
-  const showSignIn = shouldShowSignInToVote(poll);
+  const canVote = canCastPollVote({ canViewerVote: poll.canViewerVote, hasAccessToken });
+  const prompt = pollAuthPrompt({
+    canViewerVote: poll.canViewerVote,
+    viewerHasVoted: poll.viewerHasVoted,
+    isClosed: poll.isClosed,
+    isSignedIn,
+    hasAccessToken,
+  });
   const maxChoices = poll.isMultiChoice
     ? poll.maxChoices != null && poll.maxChoices > 0
       ? poll.maxChoices
@@ -59,7 +66,7 @@ export function ForumPollCard({
     [maxChoices, poll.isMultiChoice],
   );
 
-  const voteDisabled = busy || selected.length === 0 || (isSignedIn && !hasAccessToken);
+  const voteDisabled = busy || selected.length === 0 || !canVote;
   const status = useMemo(() => formatPollStatus(poll), [poll]);
 
   return (
@@ -77,7 +84,7 @@ export function ForumPollCard({
       </Text>
       <Text style={[type.meta, { color: c.textMuted, marginTop: space.sm }]}>{status}</Text>
 
-      {showResults ? (
+      {!canVote ? (
         <View style={styles.list}>
           {poll.options.map((option) => (
             <View key={option.optionId} style={styles.result}>
@@ -142,11 +149,6 @@ export function ForumPollCard({
           <Text style={[type.caption, { color: c.textMuted }]}>
             Votes are final and cannot be changed.
           </Text>
-          {isSignedIn && !hasAccessToken ? (
-            <Text style={[type.caption, { color: c.textSecondary }]}>
-              Voting uses your mobile sign-in token. The development toggle cannot vote.
-            </Text>
-          ) : null}
           <Button
             label="Vote"
             onPress={() => onVote(selected)}
@@ -156,11 +158,15 @@ export function ForumPollCard({
         </View>
       )}
 
-      {showSignIn ? (
-        <Button label="Sign in to vote" variant="outline" onPress={onSignIn} />
+      {prompt !== 'none' ? (
+        <Text style={[type.caption, { color: c.textSecondary }]}>{pollTokenRequiredMessage}</Text>
       ) : null}
 
-      {poll.canViewerClose ? (
+      {prompt === 'signIn' ? (
+        <Button label="Open sign-in" variant="outline" onPress={onSignIn} />
+      ) : null}
+
+      {poll.canViewerClose && hasAccessToken ? (
         <Button label="Close poll" variant="ghost" onPress={onClose} loading={busy} disabled={busy} />
       ) : null}
 

@@ -23,7 +23,7 @@ import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from '../../u
 import { resolveContentUrl } from '../../ui/html/resolveContentUrl';
 import { radius, space, type, useTheme } from '../../theme';
 import { ForumPollCard } from './ForumPollCard';
-import { pollActionErrorMessage, shouldLoadPoll } from './forumPollMeta';
+import { pollActionErrorMessage, pollTokenRequiredMessage, shouldLoadPoll } from './forumPollMeta';
 import {
   attachmentMeta,
   formatMemberSince,
@@ -160,7 +160,7 @@ export function ThreadScreen({ navigation, route }: Props) {
         setPollError(
           accessToken
             ? 'Something went wrong.'
-            : 'Sign in with a mobile session to vote. The development toggle cannot vote.',
+            : pollTokenRequiredMessage,
         );
         return;
       }
@@ -171,7 +171,7 @@ export function ThreadScreen({ navigation, route }: Props) {
 
   const closePoll = useCallback(() => {
     if (id === null || !accessToken) {
-      setPollError('Sign in with a mobile session to close this poll.');
+      setPollError('Closing a poll requires a mobile Bearer token.');
       return;
     }
     void runPollAction(() => closeForumTopicPoll(id, accessToken));
@@ -223,7 +223,7 @@ export function ThreadScreen({ navigation, route }: Props) {
             error={pollError}
             onVote={votePoll}
             onClose={closePoll}
-            onSignIn={() => navigation.navigate('Composer', { threadId: String(id) })}
+            onSignIn={() => navigation.getParent()?.navigate('HomeTab', { screen: 'SignIn' })}
           />
         </View>
       ) : null}
