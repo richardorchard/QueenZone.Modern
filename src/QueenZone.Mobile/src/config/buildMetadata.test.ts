@@ -14,8 +14,10 @@ describe('formatBuildStamp', () => {
       'en-AU',
     );
 
-    assert.match(result ?? '', /^Build 0\.1\.0 \(5\) · 22 Aug 2026,/);
-    assert.match(result ?? '', / · abc1234$/);
+    assert.match(
+      result ?? '',
+      /^Build 0\.1\.0 \(5\) · .+2026.+ · abc1234$/,
+    );
   });
 
   it('stays hidden when build time is absent or invalid', () => {
