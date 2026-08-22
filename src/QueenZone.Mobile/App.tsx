@@ -6,6 +6,7 @@ import { View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { SessionProvider } from './src/session/SessionContext';
+import { FanPerformancePlayerProvider } from './src/audio/FanPerformancePlayer';
 import { ThemeProvider, dark, useQueenzoneFonts, useTheme } from './src/theme';
 
 SplashScreen.preventAutoHideAsync().catch(() => {
@@ -56,7 +57,9 @@ export default function App() {
     <SafeAreaProvider>
       <ThemeProvider preference="dark">
         <SessionProvider>
-          <AppNavigation />
+          <FanPerformancePlayerProvider>
+            <AppNavigation />
+          </FanPerformancePlayerProvider>
         </SessionProvider>
       </ThemeProvider>
     </SafeAreaProvider>

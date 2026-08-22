@@ -203,4 +203,29 @@ public static class ContentApiMapper
         picId is int id
             ? new PhotoNavDto(id, PhotoRoutes.GetDetailPath(slug, id, filter))
             : null;
+
+    public static FanPerformanceDto ToFanPerformanceDto(FanPerformance performance, int? durationSeconds) =>
+        new(
+            performance.Id,
+            performance.Title,
+            performance.PerformedBy,
+            performance.Description,
+            performance.DateAdded,
+            durationSeconds,
+            FanPerformanceRoutes.GetIndexPath(),
+            FanPerformanceRoutes.GetApiAudioPath(performance.Id));
+
+    public static IReadOnlyList<FanPerformanceDto> ToFanPerformanceDtos(
+        IReadOnlyList<FanPerformance> items,
+        IReadOnlyList<int?> durations)
+    {
+        var mapped = new FanPerformanceDto[items.Count];
+        for (var i = 0; i < items.Count; i++)
+        {
+            var duration = i < durations.Count ? durations[i] : items[i].DurationSeconds;
+            mapped[i] = ToFanPerformanceDto(items[i], duration);
+        }
+
+        return mapped;
+    }
 }

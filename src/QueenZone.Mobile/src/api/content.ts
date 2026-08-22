@@ -12,6 +12,7 @@ import type {
   PhotoCategoryListItem,
   PhotoDetail,
   PhotoListItem,
+  FanPerformance,
   TimelineEvent,
 } from './types';
 
@@ -81,6 +82,19 @@ export function fetchFreddieTributePage(
   query: PageQuery = {},
 ): Promise<ApiPagedResponse<FreddieTribute>> {
   return fetchJson('/content/freddietribute', { query: pageParams(query), signal: query.signal });
+}
+
+export function fetchFanPerformancesPage(
+  query: PageQuery = {},
+): Promise<ApiPagedResponse<FanPerformance>> {
+  return fetchJson('/content/fan-performances', { query: pageParams(query), signal: query.signal });
+}
+
+export function fetchFanPerformanceDetail(
+  id: number,
+  signal?: AbortSignal,
+): Promise<FanPerformance> {
+  return fetchJson(`/content/fan-performances/${id}`, { signal });
 }
 
 export type PhotoPageQuery = PageQuery & {

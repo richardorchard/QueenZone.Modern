@@ -35,6 +35,9 @@ public class LiveSiteContentApiTests : RealDataPageTest
         "/api/v1/content/photos/categories/{slug}",
         "/api/v1/content/photos/categories/{slug}/items",
         "/api/v1/content/photos/categories/{slug}/items/{picId}",
+        "/api/v1/content/fan-performances",
+        "/api/v1/content/fan-performances/{id}",
+        "/api/v1/content/fan-performances/{id}/audio",
         "/api/v1/forum/categories",
         "/api/v1/forum/categories/{id}",
         "/api/v1/forum/categories/{id}/topics",
@@ -77,6 +80,12 @@ public class LiveSiteContentApiTests : RealDataPageTest
             IdProperty: "id",
             RequiredItemStrings: ["name", "thought", "dateText"],
             RequiredDetailStrings: []),
+        new(
+            ListPath: "/api/v1/content/fan-performances",
+            DetailPathTemplate: "/api/v1/content/fan-performances/{0}",
+            IdProperty: "id",
+            RequiredItemStrings: ["title", "performedBy", "dateAdded", "detailPath", "audioPath"],
+            RequiredDetailStrings: ["title", "performedBy", "dateAdded", "detailPath", "audioPath"]),
         new(
             ListPath: "/api/v1/forum/categories",
             DetailPathTemplate: "/api/v1/forum/categories/{0}",

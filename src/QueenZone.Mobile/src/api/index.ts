@@ -5,6 +5,8 @@ export {
   fetchBiographyChapter,
   fetchBiographyPage,
   fetchDiscographyPage,
+  fetchFanPerformanceDetail,
+  fetchFanPerformancesPage,
   fetchFreddieTributePage,
   fetchNewsDetail,
   fetchNewsPage,
