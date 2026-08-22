@@ -11,6 +11,7 @@ export type HomeStackParamList = {
   Conversation: { id: string };
   ComposeMessage: undefined;
   SavedList: { kind: 'articles' | 'photographs' | 'offline' | 'history' };
+  DeleteAccount: undefined;
 };
 
 export type NewsStackParamList = {

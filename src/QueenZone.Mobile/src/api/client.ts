@@ -148,6 +148,52 @@ export async function sendJson<T>(path: string, options: SendJsonOptions = {}): 
   return (await response.json()) as T;
 }
 
+/**
+ * Multipart write to `/api/v1{path}` (avatar upload). Do not set Content-Type;
+ * fetch supplies the multipart boundary.
+ */
+export async function sendMultipart<T>(
+  path: string,
+  formData: FormData,
+  options: FetchJsonOptions = {},
+): Promise<T> {
+  const url = buildUrl(path, options.query);
+  const headers: Record<string, string> = { Accept: 'application/json' };
+  if (options.accessToken) {
+    headers.Authorization = `Bearer ${options.accessToken}`;
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: formData,
+      signal: options.signal,
+    });
+  } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw err;
+    }
+    throw new ApiError(0, 'Unable to reach QueenZone. Check your connection and try again.');
+  }
+
+  if (!response.ok) {
+    const problem = await readProblem(response);
+    throw new ApiError(
+      response.status,
+      messageFromProblem(response.status, problem, messageForWriteStatus(response.status)),
+      problem,
+    );
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  return (await response.json()) as T;
+}
+
 function messageForWriteStatus(status: number): string {
   if (status === 401) {
     return 'Sign in to continue.';

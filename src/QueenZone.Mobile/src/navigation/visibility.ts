@@ -57,6 +57,7 @@ export const memberOnlyScreenNames = [
   'PhotoSubmit',
   'Settings',
   'SavedList',
+  'DeleteAccount',
 ] as const;
 
 export type MemberOnlyScreenName = (typeof memberOnlyScreenNames)[number];
@@ -94,6 +95,7 @@ export const detailScreenNames = [
   'SignIn',
   'Inbox',
   'SavedList',
+  'DeleteAccount',
 ] as const;
 
 export function shouldHideTabBar(routeName: string | undefined): boolean {

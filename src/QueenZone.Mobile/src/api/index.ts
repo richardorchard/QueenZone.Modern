@@ -1,4 +1,4 @@
-export { ApiError, fetchJson, formatPublishedDate, sendJson, toPlainText } from './client';
+export { ApiError, fetchJson, formatPublishedDate, sendJson, sendMultipart, toPlainText } from './client';
 export type { FetchJsonOptions, SendJsonOptions } from './client';
 export {
   fetchAlbumDetail,

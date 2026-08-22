@@ -44,8 +44,9 @@ Use **React Navigation** (`@react-navigation/native`) in
 - New archive sections become rows on the Archive hub, never a sixth tab.
 - Member-only screens use an in-tree `MemberGate` so deep links cannot skip
   the boundary.
-- Session state is a local development toggle until the Epic 0 token client is
-  wired.
+- Session state is the Epic 0 OAuth2 PKCE client: system-browser authorize,
+  `queenzone://auth/callback`, Bearer + refresh tokens in the device secret
+  store, and `GET /api/v1/me` for the signed-in profile.
 
 Do not introduce Expo Router for this shell. The project is already an Expo
 development build; adding a second routing model would conflict with the
@@ -69,4 +70,6 @@ Tradeoffs:
 - Messages is no longer a first-class tab (it was in the v1 shell). Members
   open it from Profile. That is a deliberate v2 design decision, not an
   omission of Epic 3.
-- The development sign-in toggle is not the production PKCE flow.
+- Production sign-in is OAuth2 PKCE through `/api/v1/auth/*`; a missing
+  provider configuration on the API host leaves the Sign in screen without
+  working buttons.

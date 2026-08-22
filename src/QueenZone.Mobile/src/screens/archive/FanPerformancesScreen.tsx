@@ -6,7 +6,7 @@ import type { ArchiveStackParamList } from '../../navigation/types';
 type Props = NativeStackScreenProps<ArchiveStackParamList, 'FanPerformances'>;
 
 export function FanPerformancesScreen({ navigation }: Props) {
-  const { isSignedIn, signIn } = useSession();
+  const { isSignedIn } = useSession();
 
   return (
     <PlaceholderScreen
@@ -22,7 +22,12 @@ export function FanPerformancesScreen({ navigation }: Props) {
         },
         ...(isSignedIn
           ? []
-          : [{ label: 'Sign in to stream audio', onPress: signIn }]),
+          : [
+              {
+                label: 'Sign in to stream audio',
+                onPress: () => navigation.getParent()?.navigate('HomeTab', { screen: 'SignIn' }),
+              },
+            ]),
       ]}
     />
   );
