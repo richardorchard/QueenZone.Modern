@@ -294,7 +294,7 @@ public class LiveSiteContentApiTests : RealDataPageTest
             {
                 AssertRequiredStrings(
                     photoItems[0],
-                    ["title", "thumbnailUrl", "categorySlug", "detailPath"],
+                    ["title", "thumbnailUrl", "categorySlug", "detailPath", "categoryPath"],
                     itemsPath,
                     failures);
                 AssertCdnUrl(photoItems[0], "thumbnailUrl", itemsPath, failures);
@@ -311,7 +311,7 @@ public class LiveSiteContentApiTests : RealDataPageTest
                     {
                         AssertRequiredStrings(
                             detailDoc,
-                            ["title", "imageUrl", "thumbnailUrl", "detailPath"],
+                            ["title", "imageUrl", "thumbnailUrl", "detailPath", "categoryPath"],
                             detailPath,
                             failures);
                         AssertCdnUrl(detailDoc, "imageUrl", detailPath, failures);

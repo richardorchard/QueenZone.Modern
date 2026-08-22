@@ -134,6 +134,7 @@ export type PhotoListItem = {
   year: number;
   dateTime: string;
   detailPath: string;
+  categoryPath: string;
 };
 
 export type PhotoNav = {
@@ -158,6 +159,7 @@ export type PhotoDetail = {
   dateTime: string;
   submittedByDisplayName: string | null;
   detailPath: string;
+  categoryPath: string;
   index: number;
   count: number;
   previous: PhotoNav | null;

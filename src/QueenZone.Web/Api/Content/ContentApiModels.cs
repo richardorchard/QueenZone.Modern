@@ -141,7 +141,8 @@ public sealed record PhotoListItemDto(
     string? PictureDimensionsLabel,
     int Year,
     DateTime DateTime,
-    string DetailPath);
+    string DetailPath,
+    string CategoryPath);
 
 /// <summary>
 /// Detail shape for <c>/api/v1/content/photos/categories/{slug}/items/{picId}</c>,
@@ -165,6 +166,7 @@ public sealed record PhotoDetailDto(
     DateTime DateTime,
     string? SubmittedByDisplayName,
     string DetailPath,
+    string CategoryPath,
     int Index,
     int Count,
     PhotoNavDto? Previous,

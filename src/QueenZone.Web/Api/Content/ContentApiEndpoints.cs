@@ -6,8 +6,11 @@ namespace QueenZone.Web;
 /// Public, read-only <c>/api/v1/content/*</c> routes for the mobile app
 /// (issues #726 / #743). No authentication required: this content is public
 /// on the website today. Photo gallery pages reuse <see cref="IPhotoRepository"/>
-/// and CDN URLs from <see cref="PhotoImageUrl"/>; category items default and
-/// clamp <c>pageSize</c> to <see cref="PhotoRoutes.CategoryPageSize"/>.
+/// and CDN URLs from <see cref="PhotoImageUrl"/>. Category list/detail/items
+/// use <see cref="PublicQueryCacheService"/> (same helpers as Razor photography
+/// pages); detail neighbors still come from <see cref="IPhotoRepository"/>.
+/// Category items default and clamp <c>pageSize</c> to
+/// <see cref="PhotoRoutes.CategoryPageSize"/>.
 /// </summary>
 public static class ContentApiEndpoints
 {
@@ -250,13 +253,13 @@ public static class ContentApiEndpoints
     }
 
     internal static async Task<IResult> GetPhotoCategoriesAsync(
-        IPhotoRepository photoRepository,
+        PublicQueryCacheService publicQueryCache,
         int? page,
         int? pageSize,
         CancellationToken cancellationToken)
     {
         var request = ApiPagination.Normalize(page, pageSize);
-        var categories = await photoRepository.GetCategoriesAsync(cancellationToken);
+        var categories = await publicQueryCache.GetPhotoCategoriesAsync(cancellationToken);
 
         var pageItems = categories
             .Skip((request.Page - 1) * request.PageSize)
@@ -273,11 +276,11 @@ public static class ContentApiEndpoints
     }
 
     internal static async Task<IResult> GetPhotoCategoryAsync(
-        IPhotoRepository photoRepository,
+        PublicQueryCacheService publicQueryCache,
         string slug,
         CancellationToken cancellationToken)
     {
-        var category = await photoRepository.GetCategoryBySlugAsync(slug, cancellationToken);
+        var category = await publicQueryCache.GetPhotoCategoryBySlugAsync(slug, cancellationToken);
         if (category is null)
         {
             return PhotoCategoryNotFound(slug);
@@ -287,14 +290,14 @@ public static class ContentApiEndpoints
     }
 
     internal static async Task<IResult> GetPhotoCategoryItemsAsync(
-        IPhotoRepository photoRepository,
+        PublicQueryCacheService publicQueryCache,
         string slug,
         int? page,
         int? pageSize,
         string? size,
         CancellationToken cancellationToken)
     {
-        var category = await photoRepository.GetCategoryBySlugAsync(slug, cancellationToken);
+        var category = await publicQueryCache.GetPhotoCategoryBySlugAsync(slug, cancellationToken);
         if (category is null)
         {
             return PhotoCategoryNotFound(slug);
@@ -306,7 +309,7 @@ public static class ContentApiEndpoints
             PhotoRoutes.CategoryPageSize,
             PhotoRoutes.CategoryPageSize);
         var filter = PhotoListFilter.Parse(size);
-        var result = await photoRepository.GetCategoryPageAsync(
+        var result = await publicQueryCache.GetPhotoCategoryPageAsync(
             category.CatId,
             request.Page,
             request.PageSize,
@@ -323,13 +326,14 @@ public static class ContentApiEndpoints
     }
 
     internal static async Task<IResult> GetPhotoDetailAsync(
+        PublicQueryCacheService publicQueryCache,
         IPhotoRepository photoRepository,
         string slug,
         int picId,
         string? size,
         CancellationToken cancellationToken)
     {
-        var category = await photoRepository.GetCategoryBySlugAsync(slug, cancellationToken);
+        var category = await publicQueryCache.GetPhotoCategoryBySlugAsync(slug, cancellationToken);
         if (category is null)
         {
             return PhotoCategoryNotFound(slug);

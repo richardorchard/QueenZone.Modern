@@ -128,6 +128,7 @@ public sealed class ContentApiPhotosTests : IClassFixture<QueenZoneWebApplicatio
         Assert.Equal("Brian in action with his guitar", item.GetProperty("title").GetString());
         Assert.Equal($"{PhotoCdnOrigin}brian-may/img-101-t.jpg", item.GetProperty("thumbnailUrl").GetString());
         Assert.Equal($"/photography/{BrianMaySlug}/101", item.GetProperty("detailPath").GetString());
+        Assert.Equal($"/photography/{BrianMaySlug}", item.GetProperty("categoryPath").GetString());
         Assert.False(item.TryGetProperty("imageUrl", out _));
     }
 
@@ -285,6 +286,7 @@ public sealed class ContentApiPhotosTests : IClassFixture<QueenZoneWebApplicatio
 
         Assert.Equal("https://cdn.queenzone.org/brian-may/img-101-t.jpg", dto.ThumbnailUrl);
         Assert.Equal($"/photography/{BrianMaySlug}/101", dto.DetailPath);
+        Assert.Equal($"/photography/{BrianMaySlug}", dto.CategoryPath);
         Assert.Equal("1920 x 1080", dto.PictureDimensionsLabel);
     }
 
@@ -312,6 +314,7 @@ public sealed class ContentApiPhotosTests : IClassFixture<QueenZoneWebApplicatio
         var dto = ContentApiMapper.ToPhotoDetail(category, navigation);
 
         Assert.Equal("https://cdn.queenzone.org/brian-may/img-102.jpg", dto.ImageUrl);
+        Assert.Equal($"/photography/{BrianMaySlug}", dto.CategoryPath);
         Assert.Equal(101, dto.Previous!.PicId);
         Assert.Equal($"/photography/{BrianMaySlug}/101", dto.Previous.DetailPath);
         Assert.Equal(103, dto.Next!.PicId);

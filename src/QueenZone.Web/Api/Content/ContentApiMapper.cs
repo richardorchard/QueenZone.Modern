@@ -161,7 +161,8 @@ public static class ContentApiMapper
             item.PictureDimensionsLabel,
             item.Year,
             item.DateTime,
-            PhotoRoutes.GetDetailPath(item.CategorySlug, item.PicId, filter));
+            PhotoRoutes.GetDetailPath(item.CategorySlug, item.PicId, filter),
+            PhotoRoutes.GetCategoryPath(item.CategorySlug, filter));
 
     public static IReadOnlyList<PhotoListItemDto> ToPhotoListItems(
         IEnumerable<PhotoItem> items,
@@ -191,6 +192,7 @@ public static class ContentApiMapper
             photo.DateTime,
             photo.SubmittedByDisplayName,
             PhotoRoutes.GetDetailPath(category.Slug, photo.PicId, filter),
+            PhotoRoutes.GetCategoryPath(category.Slug, filter),
             navigation.Index,
             navigation.Count,
             ToPhotoNavDto(category.Slug, navigation.PreviousPicId, filter),
