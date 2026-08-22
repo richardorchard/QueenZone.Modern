@@ -7,6 +7,8 @@ export { ApiError } from './errors';
 export type FetchJsonOptions = {
   signal?: AbortSignal;
   query?: Record<string, string | number | undefined | null>;
+  /** Optional Bearer — poll GET fills viewer flags; writes require it. */
+  accessToken?: string | null;
 };
 
 export type SendJsonOptions = FetchJsonOptions & {
@@ -67,11 +69,15 @@ async function readProblem(response: Response): Promise<ProblemDetails | null> {
  */
 export async function fetchJson<T>(path: string, options: FetchJsonOptions = {}): Promise<T> {
   const url = buildUrl(path, options.query);
+  const headers: Record<string, string> = { Accept: 'application/json' };
+  if (options.accessToken) {
+    headers.Authorization = `Bearer ${options.accessToken}`;
+  }
   let response: Response;
   try {
     response = await fetch(url, {
       method: 'GET',
-      headers: { Accept: 'application/json' },
+      headers,
       signal: options.signal,
     });
   } catch (err) {
@@ -144,10 +150,10 @@ export async function sendJson<T>(path: string, options: SendJsonOptions = {}): 
 
 function messageForWriteStatus(status: number): string {
   if (status === 401) {
-    return 'Sign in to post.';
+    return 'Sign in to continue.';
   }
   if (status === 403) {
-    return 'You cannot post to this topic.';
+    return 'You cannot do that.';
   }
   if (status === 429) {
     return "You're posting too quickly. Please wait a bit and try again.";

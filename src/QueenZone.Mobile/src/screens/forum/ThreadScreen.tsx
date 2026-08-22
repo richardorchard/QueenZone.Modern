@@ -3,9 +3,13 @@ import { FlatList, Image, RefreshControl, StyleSheet, Text, View } from 'react-n
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   ApiError,
+  closeForumTopicPoll,
   fetchForumTopic,
+  fetchForumTopicPoll,
   fetchForumTopicPosts,
+  voteForumTopicPoll,
   type ForumAttachment,
+  type ForumPoll,
   type ForumPost,
   type ForumTopicDetail,
 } from '../../api';
@@ -18,6 +22,8 @@ import { Button } from '../../ui/Button';
 import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from '../../ui/ScreenStates';
 import { resolveContentUrl } from '../../ui/html/resolveContentUrl';
 import { radius, space, type, useTheme } from '../../theme';
+import { ForumPollCard } from './ForumPollCard';
+import { pollActionErrorMessage, pollTokenRequiredMessage, shouldLoadPoll } from './forumPollMeta';
 import {
   attachmentMeta,
   formatMemberSince,
@@ -36,12 +42,15 @@ function messageFromUnknownError(err: unknown): string {
 
 export function ThreadScreen({ navigation, route }: Props) {
   const { c } = useTheme();
-  const { isSignedIn } = useSession();
+  const { isSignedIn, accessToken, signIn } = useSession();
   const { id: rawId, title } = route.params;
   const id = parseTopicId(rawId);
   const [topic, setTopic] = useState<ForumTopicDetail | null>(null);
   const [topicError, setTopicError] = useState<string | null>(null);
   const [topicReloadToken, setTopicReloadToken] = useState(0);
+  const [poll, setPoll] = useState<ForumPoll | null>(null);
+  const [pollBusy, setPollBusy] = useState(false);
+  const [pollError, setPollError] = useState<string | null>(null);
 
   const paged = usePagedContent<ForumPost>(
     useCallback(
@@ -59,25 +68,46 @@ export function ThreadScreen({ navigation, route }: Props) {
   useEffect(() => {
     if (id === null) {
       setTopic(null);
+      setPoll(null);
       setTopicError('This discussion is not available in the archive yet.');
       return;
     }
     const controller = new AbortController();
     setTopicError(null);
     fetchForumTopic(id, controller.signal)
-      .then((item) => {
+      .then(async (item) => {
         setTopic(item);
-        setTopicError(null);
+        if (!shouldLoadPoll(item.hasPoll)) {
+          setPoll(null);
+          setPollError(null);
+          return;
+        }
+        try {
+          const nextPoll = await fetchForumTopicPoll(id, accessToken, controller.signal);
+          setPoll(nextPoll);
+          setPollError(null);
+        } catch (err: unknown) {
+          if (err instanceof Error && err.name === 'AbortError') {
+            return;
+          }
+          setPoll(null);
+          if (err instanceof ApiError && err.status === 404) {
+            setPollError(null);
+            return;
+          }
+          setPollError(messageFromUnknownError(err));
+        }
       })
       .catch((err: unknown) => {
         if (err instanceof Error && err.name === 'AbortError') {
           return;
         }
         setTopic(null);
+        setPoll(null);
         setTopicError(messageFromUnknownError(err));
       });
     return () => controller.abort();
-  }, [id, topicReloadToken]);
+  }, [accessToken, id, topicReloadToken]);
 
   useLayoutEffect(() => {
     navigation.setOptions({ title: topic?.title ?? title ?? 'Thread' });
@@ -105,6 +135,47 @@ export function ThreadScreen({ navigation, route }: Props) {
       refresh();
     });
   }, [navigation, refresh]);
+
+  const runPollAction = useCallback(
+    async (action: () => Promise<ForumPoll>) => {
+      if (id === null) {
+        return;
+      }
+      setPollBusy(true);
+      setPollError(null);
+      try {
+        setPoll(await action());
+      } catch (err: unknown) {
+        setPollError(pollActionErrorMessage(err));
+      } finally {
+        setPollBusy(false);
+      }
+    },
+    [id],
+  );
+
+  const votePoll = useCallback(
+    (optionIds: string[]) => {
+      if (id === null || !accessToken) {
+        setPollError(
+          accessToken
+            ? 'Something went wrong.'
+            : pollTokenRequiredMessage,
+        );
+        return;
+      }
+      void runPollAction(() => voteForumTopicPoll(id, optionIds, accessToken));
+    },
+    [accessToken, id, runPollAction],
+  );
+
+  const closePoll = useCallback(() => {
+    if (id === null || !accessToken) {
+      setPollError('Closing a poll requires a mobile Bearer token.');
+      return;
+    }
+    void runPollAction(() => closeForumTopicPoll(id, accessToken));
+  }, [accessToken, id, runPollAction]);
 
   if (id === null) {
     return (
@@ -141,6 +212,23 @@ export function ThreadScreen({ navigation, route }: Props) {
       </Text>
       {stats ? (
         <Text style={[type.meta, { color: c.textMuted, marginTop: space.md }]}>{stats}</Text>
+      ) : null}
+      {poll ? (
+        <View style={styles.poll}>
+          <ForumPollCard
+            poll={poll}
+            isSignedIn={isSignedIn}
+            hasAccessToken={Boolean(accessToken)}
+            busy={pollBusy}
+            error={pollError}
+            onVote={votePoll}
+            onClose={closePoll}
+            onSignIn={signIn}
+          />
+        </View>
+      ) : null}
+      {pollError && !poll ? (
+        <ErrorBlock message={pollError} onRetry={retry} />
       ) : null}
     </View>
   );
@@ -256,6 +344,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.xl,
     paddingTop: space.xl,
     paddingBottom: space.base,
+  },
+  poll: {
+    marginHorizontal: -space.xl,
+    marginTop: space.lg,
   },
   post: {
     paddingHorizontal: space.xl,

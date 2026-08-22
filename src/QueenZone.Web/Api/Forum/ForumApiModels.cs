@@ -74,7 +74,8 @@ public sealed record ForumAttachmentDto(
 
 /// <summary>
 /// Create-topic or reply body. Plain text is wrapped as HTML before the same
-/// <see cref="UgcHtml"/> sanitizer the website uses. Polls are not accepted (#734).
+/// <see cref="UgcHtml"/> sanitizer the website uses. Polls are not accepted on
+/// these write routes (#734).
 /// </summary>
 public sealed record ForumWriteRequestDto
 {
@@ -104,3 +105,44 @@ public sealed record ForumPostCreatedDto(
     int Id,
     int TopicId,
     string DetailPath);
+
+/// <summary>
+/// Poll card for <c>/api/v1/forum/topics/{id}/poll</c>. Same fields the website
+/// renders in <c>_ForumPoll.cshtml</c> (question, close state, vote vs results).
+/// </summary>
+public sealed record ForumPollDto(
+    Guid PollId,
+    int TopicId,
+    string Question,
+    bool IsMultiChoice,
+    int? MaxChoices,
+    DateTimeOffset? ClosesAt,
+    DateTimeOffset? ClosedAt,
+    DateTimeOffset CreatedAt,
+    int TotalVotes,
+    int DistinctVoters,
+    bool ViewerHasVoted,
+    bool IsClosed,
+    bool CanViewerVote,
+    bool CanViewerClose,
+    IReadOnlyList<ForumPollOptionDto> Options);
+
+public sealed record ForumPollOptionDto(
+    Guid OptionId,
+    string OptionText,
+    int DisplayOrder,
+    int VoteCount,
+    double Percentage,
+    bool SelectedByViewer);
+
+/// <summary>
+/// Vote body for <c>POST /api/v1/forum/topics/{id}/poll/vote</c>. Accepts the
+/// same single-choice <see cref="OptionId"/> or multi-choice <see cref="OptionIds"/>
+/// the website form posts.
+/// </summary>
+public sealed record ForumPollVoteRequestDto
+{
+    public IReadOnlyList<Guid>? OptionIds { get; init; }
+
+    public Guid? OptionId { get; init; }
+}

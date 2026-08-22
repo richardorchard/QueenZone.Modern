@@ -84,4 +84,31 @@ public static class ForumApiMapper
         IEnumerable<ForumPostItem> posts,
         UgcHtml ugcHtml) =>
         posts.Select(post => ToPost(post, ugcHtml)).ToList();
+
+    public static ForumPollDto ToPoll(ForumPollResults poll) =>
+        new(
+            poll.PollId,
+            poll.LegacyTopicId,
+            poll.Question,
+            poll.IsMultiChoice,
+            poll.MaxChoices,
+            poll.ClosesAt,
+            poll.ClosedAt,
+            poll.CreatedAt,
+            poll.TotalVotes,
+            poll.DistinctVoters,
+            poll.ViewerHasVoted,
+            poll.IsClosed,
+            poll.CanViewerVote,
+            poll.CanViewerClose,
+            poll.Options.Select(ToPollOption).ToList());
+
+    public static ForumPollOptionDto ToPollOption(ForumPollOptionResult option) =>
+        new(
+            option.OptionId,
+            option.OptionText,
+            option.DisplayOrder,
+            option.VoteCount,
+            option.Percentage,
+            option.SelectedByViewer);
 }

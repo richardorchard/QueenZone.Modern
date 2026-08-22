@@ -2,6 +2,7 @@ import { fetchJson, sendJson } from './client';
 import type {
   ApiPagedResponse,
   ForumCategoryListItem,
+  ForumPoll,
   ForumPost,
   ForumPostCreated,
   ForumTopicCreated,
@@ -77,6 +78,40 @@ export function createForumReply(
   return sendJson(`/forum/topics/${topicId}/posts`, {
     method: 'POST',
     body: { body: input.body },
+    accessToken,
+    signal,
+  });
+}
+
+export function fetchForumTopicPoll(
+  topicId: number,
+  accessToken?: string | null,
+  signal?: AbortSignal,
+): Promise<ForumPoll> {
+  return fetchJson(`/forum/topics/${topicId}/poll`, { accessToken, signal });
+}
+
+export function voteForumTopicPoll(
+  topicId: number,
+  optionIds: string[],
+  accessToken: string,
+  signal?: AbortSignal,
+): Promise<ForumPoll> {
+  return sendJson(`/forum/topics/${topicId}/poll/vote`, {
+    method: 'POST',
+    body: optionIds.length === 1 ? { optionId: optionIds[0] } : { optionIds },
+    accessToken,
+    signal,
+  });
+}
+
+export function closeForumTopicPoll(
+  topicId: number,
+  accessToken: string,
+  signal?: AbortSignal,
+): Promise<ForumPoll> {
+  return sendJson(`/forum/topics/${topicId}/poll/close`, {
+    method: 'POST',
     accessToken,
     signal,
   });
