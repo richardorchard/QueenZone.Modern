@@ -149,8 +149,8 @@ export async function sendJson<T>(path: string, options: SendJsonOptions = {}): 
 }
 
 /**
- * Multipart write to `/api/v1{path}` (avatar upload). Do not set Content-Type;
- * fetch supplies the multipart boundary.
+ * Multipart write to `/api/v1{path}` (avatar upload, photo submissions).
+ * Do not set Content-Type; fetch supplies the multipart boundary.
  */
 export async function sendMultipart<T>(
   path: string,
