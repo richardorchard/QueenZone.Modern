@@ -75,7 +75,7 @@ Builds on the mobile-usability work already done for this feature on the web (PR
 
 ## Epic 7 — Push notifications
 
-Cross-cutting infrastructure epic that most of the above stories depend on. If pursued via the PWA-first path instead, this becomes Web Push rather than APNs — see the feasibility doc.
+Cross-cutting infrastructure epic that most of the above stories depend on. If pursued via the PWA-first path instead, this becomes Web Push rather than APNs — see the feasibility doc. Transport (direct APNs/FCM, no EAS) and dispatch model (synchronous, best-effort, no retry) are recorded in [ADR 0014](../decisions/0014-push-notification-transport-and-dispatch.md).
 
 - As a backend maintainer, I want a device-token/subscription registration endpoint and per-member storage, so we know where to deliver notifications.
 - As a member, I want granular notification preferences (forum replies, private messages, news) so I control what interrupts me.
