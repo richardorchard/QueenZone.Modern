@@ -63,6 +63,34 @@ jobs:
             fi
           done
 
+      # Sentry upload runs in the Xcode archive phase. Missing org/project/token
+      # fails the archive with "organization ID or slug is required" (see #857).
+      # Fail fast here — lengths only, never print secret values.
+      - name: Check Sentry config
+        env:
+          SENTRY_DSN: ${{ vars.SENTRY_DSN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        run: |
+          set -euo pipefail
+          missing=0
+          for name in SENTRY_DSN SENTRY_ORG SENTRY_PROJECT SENTRY_AUTH_TOKEN; do
+            eval "value=\${$name-}"
+            if [ -z "$value" ]; then
+              echo "::error::$name is not set (Settings → Secrets and variables → Actions)."
+              missing=1
+            else
+              echo "$name is set (length ${#value})"
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+          if [ "$SENTRY_ORG" != "self-0tb" ] || [ "$SENTRY_PROJECT" != "queenzone-mobile" ]; then
+            echo "::warning::Unexpected Sentry target org='$SENTRY_ORG' project='$SENTRY_PROJECT' (expected self-0tb / queenzone-mobile)."
+          fi
+
       - name: Install JavaScript dependencies
         run: npm ci
 
@@ -228,10 +256,10 @@ jobs:
         working-directory: src/QueenZone.Mobile/ios
         env:
           EXPO_PUBLIC_APP_ENV: staging
-          # Optional: the Sentry Xcode build phase uploads dSYMs/source maps
-          # when this is set (once #855 configures Sentry). Not validated
-          # like the signing secrets — the build must still succeed before
-          # Sentry is set up.
+          # Also set org/project here (not only at prebuild) so sentry-cli does
+          # not depend solely on the generated sentry.properties file.
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
         run: |
           workspace=$(find . -maxdepth 1 -name '*.xcworkspace' -print -quit)
