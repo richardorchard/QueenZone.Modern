@@ -62,10 +62,12 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         // SENTRY_AUTH_TOKEN from the build environment directly (Gradle /
         // Xcode build phase), so it never lands in the generated,
         // gitignored sentry.properties file. See publish-*.yml workflows.
+        // CI unsigned builds set SENTRY_DISABLE_AUTO_UPLOAD=true so missing
+        // org/token does not fail the Bundle RN script (#857).
         '@sentry/react-native',
         {
-          organization: process.env.SENTRY_ORG,
-          project: process.env.SENTRY_PROJECT,
+          ...(process.env.SENTRY_ORG ? { organization: process.env.SENTRY_ORG } : {}),
+          ...(process.env.SENTRY_PROJECT ? { project: process.env.SENTRY_PROJECT } : {}),
         },
       ],
     ],
