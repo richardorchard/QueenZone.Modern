@@ -99,6 +99,7 @@
       "Authentication__GoogleAnalytics__GoogleAnalyticsPropertyId",
       "Authentication__Microsoft__ClientId",
       "Authentication__Microsoft__ClientSecret",
+      "MobileAuth__SigningKey",
       "AZURE_WEBAPP_PUBLISH_PROFILE",
       "AzureAd__CallbackPath",
       "AzureAd__ClientId",
@@ -134,6 +135,7 @@
     "Authentication__Google__ClientSecret",
     "Authentication__Microsoft__ClientId",
     "Authentication__Microsoft__ClientSecret",
+    "MobileAuth__SigningKey",
     "BlobUpload__PublicBaseUrl",
     "ConnectionStrings__BlobStorage",
     "ConnectionStrings__QueenZoneLegacy",
@@ -157,6 +159,11 @@
     "WEBSITE_WARMUP_PATH"
   ],
   "appServiceSettingsArmOwned": [
+    {
+      "name": "MobileAuth__SigningKey",
+      "owner": "Bitwarden; deploy.yml configure-app-settings reconciles via ARM",
+      "notes": "Secret value is never recorded. Required for mobile PKCE token issuance."
+    },
     {
       "name": "WEBSITE_RUN_FROM_PACKAGE",
       "value": "1",

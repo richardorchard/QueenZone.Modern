@@ -73,6 +73,7 @@ Used by `.github/workflows/deploy.yml` (`migrate` and `deploy` jobs), `.github/w
 743274c8-1837-4abd-b223-b4980080709f > AZURE_WEBAPP_PUBLISH_PROFILE
 d631aa7c-4e7e-4d2d-b3ea-b494002d1b83 > QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING
 51484e1f-4393-41e9-8435-b49a00381ec2 > QUEENZONE_SQL_EXPRESS_PROBE_PASSWORD
+b6a94e02-3243-411f-8e32-b4af00ce2522 > MOBILE_AUTH_SIGNING_KEY
 ```
 
 `QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING` maps to the same underlying Bitwarden secret as the
@@ -86,6 +87,10 @@ which is configured separately in Azure App Service settings.
 `docs/architecture/testing-policy.md` ("Data Integration Tests") and the comment block at the top of
 `nightly-legacy-checks.yml`.
 
+`MOBILE_AUTH_SIGNING_KEY` maps to the `MobileAuth__SigningKey` secret. The deploy workflow reconciles it
+to the same-named App Service setting before every web deployment, including rotations, and fails before
+deployment if the mapped value is missing or shorter than 32 characters.
+
 ## Rotation and break-glass (App Service settings)
 
 [ADR 0008](decisions/0008-app-service-settings-ownership.md) keeps App Service application settings outside
@@ -96,7 +101,9 @@ no OpenTofu apply/plan step to run or wait on.
 **Normal rotation** (Bitwarden reachable): follow AGENTS.md's Bitwarden section — update the value in Bitwarden
 first, then update the same key in Azure App Service configuration (portal or `az webapp config appsettings set`),
 then restart/verify. Bitwarden and the live App Service value are two separate stores; updating one never updates
-the other automatically. Verify by setting name and value length only, never by printing the value.
+the other automatically, except for `MobileAuth__SigningKey`: the next web deployment reconciles that key from
+Bitwarden before deploying. Apply it to App Service directly when the rotation must take effect immediately.
+Verify by setting name and value length only, never by printing the value.
 
 **Break-glass** (Bitwarden Secrets Manager unreachable, or the `BWS_ACCESS_TOKEN` / `github-actions-queenzone`
 machine account is unavailable):

@@ -164,7 +164,7 @@ No storage lifecycle policy exists. Soft delete is 7 days for blobs and containe
 
 Present on `queenzone-dev` at the 2026-08-15 refresh (`az webapp config appsettings list`, names only except the two non-secret deploy keys below):
 
-`APPLICATIONINSIGHTS_CONNECTION_STRING`, `Authentication__Discord__ClientId/Secret`, `Authentication__Facebook__ClientId/Secret`, `Authentication__GitHub__ClientId/Secret`, `Authentication__Google__ClientId/Secret`, `Authentication__Microsoft__ClientId/Secret`, `BlobUpload__PublicBaseUrl`, `ConnectionStrings__BlobStorage`, `ConnectionStrings__QueenZoneLegacy`, `DIAGNOSTICS_AZUREBLOBRETENTIONINDAYS`, `OPENROUTER_API_KEY`, `WEBSITE_HEALTHCHECK_MAXPINGFAILURES`, `WEBSITE_HTTPLOGGING_RETENTION_DAYS`, `Analytics__GoogleAnalyticsServiceAccountJson`, `Analytics__TrafficCacheMinutes`, `Analytics__GoogleAnalyticsPropertyId`, `AzureAd__Instance`, `AzureAd__TenantId`, `AzureAd__ClientId`, `AzureAd__ClientSecret`, `AzureAd__CallbackPath`, `Admin__AllowedEmails__0`, `Admin__AllowedEmails__1`, `SCM_DO_BUILD_DURING_DEPLOYMENT`, `ENABLE_ORYX_BUILD`, `WEBSITE_RUN_FROM_PACKAGE`, `WEBSITE_WARMUP_PATH`.
+`APPLICATIONINSIGHTS_CONNECTION_STRING`, `Authentication__Discord__ClientId/Secret`, `Authentication__Facebook__ClientId/Secret`, `Authentication__GitHub__ClientId/Secret`, `Authentication__Google__ClientId/Secret`, `Authentication__Microsoft__ClientId/Secret`, `MobileAuth__SigningKey`, `BlobUpload__PublicBaseUrl`, `ConnectionStrings__BlobStorage`, `ConnectionStrings__QueenZoneLegacy`, `DIAGNOSTICS_AZUREBLOBRETENTIONINDAYS`, `OPENROUTER_API_KEY`, `WEBSITE_HEALTHCHECK_MAXPINGFAILURES`, `WEBSITE_HTTPLOGGING_RETENTION_DAYS`, `Analytics__GoogleAnalyticsServiceAccountJson`, `Analytics__TrafficCacheMinutes`, `Analytics__GoogleAnalyticsPropertyId`, `AzureAd__Instance`, `AzureAd__TenantId`, `AzureAd__ClientId`, `AzureAd__ClientSecret`, `AzureAd__CallbackPath`, `Admin__AllowedEmails__0`, `Admin__AllowedEmails__1`, `SCM_DO_BUILD_DURING_DEPLOYMENT`, `ENABLE_ORYX_BUILD`, `WEBSITE_RUN_FROM_PACKAGE`, `WEBSITE_WARMUP_PATH`.
 
 Ownership of App Service settings is decided in [ADR 0008](../decisions/0008-app-service-settings-ownership.md)
 ([#618](https://github.com/richardorchard/QueenZone.Modern/issues/618)): OpenTofu stays out of `app_settings`/
@@ -180,6 +180,9 @@ mechanism that predates and is unaffected by ADR 0008. Do **not** write them thr
 (that was the #664 no-op). ADR 0008 rejected importing any subset of the App Service `app_settings` map into
 OpenTofu (its "Option C") — AzureRM has no resource/API that safely manages a subset without risking the
 unmanaged remainder, so these three keys stay owned by `deploy.yml`'s targeted ARM writes, not by OpenTofu.
+
+The same targeted ARM job also reconciles the secret `MobileAuth__SigningKey` from Bitwarden. Its value is never
+recorded in this inventory or OpenTofu state.
 
 | Name | Live value | Owner | Notes |
 | --- | --- | --- | --- |
