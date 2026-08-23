@@ -4,11 +4,11 @@ using QueenZone.Data;
 namespace QueenZone.Web;
 
 /// <summary>
-/// Signed-in member inbox and conversation replies for the mobile app
-/// (issues #737 / #738). Reuses <see cref="PrivateMessageService"/> so unread
-/// counts and SortKey assignment match website <c>/messages</c>. Opening a
-/// conversation marks it read the same way as <c>GET /messages/{id}</c>.
-/// Reply POST uses <see cref="PrivateMessageService.ReplyAsync"/>. Requires
+/// Signed-in member inbox, replies, and compose for the mobile app
+/// (issues #737 / #738 / #739). Reuses <see cref="PrivateMessageService"/> so
+/// unread counts, SortKey assignment, recipient search, and privacy/block
+/// rules match website <c>/messages</c>. Opening a conversation marks it
+/// read the same way as <c>GET /messages/{id}</c>. Requires
 /// <see cref="MemberAuthenticationSchemes.MobileMemberPolicy"/>.
 /// </summary>
 public static class MessagesApiEndpoints
@@ -16,6 +16,8 @@ public static class MessagesApiEndpoints
     public const string Path = "/api/v1/me/messages";
 
     public const string UnreadCountPath = $"{Path}/unread-count";
+
+    public const string RecipientsPath = $"{Path}/recipients";
 
     public static string ConversationPath(Guid conversationId) => $"{Path}/{conversationId:D}";
 
@@ -38,6 +40,22 @@ public static class MessagesApiEndpoints
             .WithSummary("Unread conversation count matching the website messages header badge.")
             .Produces<UnreadConversationsDto>()
             .ProducesProblem(StatusCodes.Status401Unauthorized);
+
+        group.MapGet("/messages/recipients", SearchRecipientsAsync)
+            .WithName("SearchMemberMessageRecipients")
+            .WithSummary("Display-name recipient search matching GET /messages/compose?q=.")
+            .Produces<MessageRecipientsDto>()
+            .ProducesProblem(StatusCodes.Status401Unauthorized);
+
+        group.MapPost("/messages", ComposeAsync)
+            .WithName("ComposeMemberMessage")
+            .WithSummary("Start or continue a conversation matching POST /messages/compose.")
+            .Accepts<ComposeMessageRequest>("application/json")
+            .Produces<ConversationDetailDto>(StatusCodes.Status201Created)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
 
         group.MapGet("/messages/{conversationId:guid}", GetConversationAsync)
             .WithName("GetMemberConversation")
@@ -146,6 +164,83 @@ public static class MessagesApiEndpoints
 
         httpContext.Response.Headers.CacheControl = "no-store";
         return Results.Ok(mapped);
+    }
+
+    internal static async Task<IResult> SearchRecipientsAsync(
+        HttpContext httpContext,
+        ClaimsPrincipal user,
+        PrivateMessageService privateMessageService,
+        string? q,
+        CancellationToken cancellationToken)
+    {
+        var memberId = RequireMemberId(user, out var unauthorized);
+        if (unauthorized is not null)
+        {
+            return unauthorized;
+        }
+
+        var matches = await privateMessageService.SearchRecipientsAsync(
+            memberId,
+            q,
+            cancellationToken);
+        httpContext.Response.Headers.CacheControl = "no-store";
+        return Results.Ok(MessagesApiMapper.ToRecipients(matches));
+    }
+
+    internal static async Task<IResult> ComposeAsync(
+        HttpContext httpContext,
+        ClaimsPrincipal user,
+        PrivateMessageService privateMessageService,
+        ComposeMessageRequest? request,
+        CancellationToken cancellationToken)
+    {
+        var memberId = RequireMemberId(user, out var unauthorized);
+        if (unauthorized is not null)
+        {
+            return unauthorized;
+        }
+
+        if (request is null)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Bad Request",
+                detail: "A JSON body is required.");
+        }
+
+        if (request.RecipientMemberId is null || request.RecipientMemberId == Guid.Empty)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Bad Request",
+                detail: "Choose a recipient.");
+        }
+
+        var result = await privateMessageService.ComposeAsync(
+            memberId,
+            request.RecipientMemberId.Value,
+            request.Body,
+            cancellationToken);
+        if (!result.Succeeded || result.ConversationId is null)
+        {
+            return MapSendFailure(result);
+        }
+
+        var mapped = await MapConversationAsync(
+            privateMessageService,
+            result.ConversationId.Value,
+            memberId,
+            markRead: true,
+            page: null,
+            pageSize: PrivateMessageLimits.ConversationPageSize,
+            cancellationToken);
+        if (mapped is null)
+        {
+            return ConversationNotFound();
+        }
+
+        httpContext.Response.Headers.CacheControl = "no-store";
+        return Results.Created(mapped.DetailPath, mapped);
     }
 
     internal static async Task<IResult> CreateReplyAsync(

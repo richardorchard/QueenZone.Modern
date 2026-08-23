@@ -405,6 +405,207 @@ public sealed class MessagesApiTests : IClassFixture<QueenZoneWebApplicationFact
     }
 
     [Fact]
+    public async Task Recipients_RequiresMobileBearer_NotCookie()
+    {
+        using var anonymous = factory.CreateAnonymousClient(allowAutoRedirect: false);
+        using var cookieOnly = factory.CreateAnonymousClient(allowAutoRedirect: false);
+        cookieOnly.DefaultRequestHeaders.Add(TestMemberAuthHandler.MemberIdHeader, Guid.NewGuid().ToString());
+        cookieOnly.DefaultRequestHeaders.Add(TestMemberAuthHandler.DisplayNameHeader, "Cookie Fan");
+
+        foreach (var client in new[] { anonymous, cookieOnly })
+        {
+            using var response = await client.GetAsync($"{MessagesApiEndpoints.RecipientsPath}?q=Fan");
+            Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+            Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        }
+    }
+
+    [Fact]
+    public async Task Recipients_MatchesWebsiteComposeSearch_AndExcludesSelf()
+    {
+        var (aliceId, bobId) = await SeedConversationPairAsync(
+            "api-search-alice@example.com",
+            "API Search Alice",
+            "api-search-bob@example.com",
+            "API Search Bob");
+        var carolId = Guid.NewGuid();
+        await SeedMemberAsync(carolId, "API Search Carol", "api-search-carol@example.com");
+
+        using var aliceApi = CreateBearerClient(aliceId, "API Search Alice", "api-search-alice@example.com");
+        using var empty = await aliceApi.GetAsync($"{MessagesApiEndpoints.RecipientsPath}?q=");
+        Assert.Equal(HttpStatusCode.OK, empty.StatusCode);
+        Assert.Contains("no-store", empty.Headers.CacheControl?.ToString() ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        var emptyPayload = await empty.Content.ReadFromJsonAsync<MessageRecipientsDto>(JsonOptions);
+        Assert.Empty(emptyPayload!.Items);
+
+        using var search = await aliceApi.GetAsync($"{MessagesApiEndpoints.RecipientsPath}?q=API%20Search");
+        var matches = await search.Content.ReadFromJsonAsync<MessageRecipientsDto>(JsonOptions);
+        Assert.Equal(2, matches!.Items.Count);
+        Assert.DoesNotContain(matches.Items, item => item.MemberId == aliceId);
+        Assert.Contains(matches.Items, item => item.MemberId == bobId && item.DisplayName == "API Search Bob");
+        Assert.Contains(matches.Items, item => item.MemberId == carolId && item.DisplayName == "API Search Carol");
+
+        using var aliceWeb = CreateCookieClient(aliceId, "API Search Alice", "api-search-alice@example.com");
+        var html = await aliceWeb.GetStringAsync("/messages/compose?q=API%20Search");
+        Assert.Contains("API Search Bob", html, StringComparison.Ordinal);
+        Assert.Contains("API Search Carol", html, StringComparison.Ordinal);
+        Assert.DoesNotContain($"/messages/compose?to={aliceId:D}", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Compose_RequiresMobileBearer_NotCookie()
+    {
+        using var anonymous = factory.CreateAnonymousClient(allowAutoRedirect: false);
+        using var cookieOnly = factory.CreateAnonymousClient(allowAutoRedirect: false);
+        cookieOnly.DefaultRequestHeaders.Add(TestMemberAuthHandler.MemberIdHeader, Guid.NewGuid().ToString());
+        cookieOnly.DefaultRequestHeaders.Add(TestMemberAuthHandler.DisplayNameHeader, "Cookie Fan");
+
+        foreach (var client in new[] { anonymous, cookieOnly })
+        {
+            using var response = await client.PostAsJsonAsync(
+                MessagesApiEndpoints.Path,
+                new { recipientMemberId = Guid.NewGuid(), body = "Hello" });
+            Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+            Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        }
+    }
+
+    [Fact]
+    public async Task Compose_CreatesConversation_MatchingWebsiteCompose()
+    {
+        var (aliceId, bobId) = await SeedConversationPairAsync(
+            "api-compose-alice@example.com",
+            "API Compose Alice",
+            "api-compose-bob@example.com",
+            "API Compose Bob");
+
+        using var aliceApi = CreateBearerClient(aliceId, "API Compose Alice", "api-compose-alice@example.com");
+        using var created = await aliceApi.PostAsJsonAsync(
+            MessagesApiEndpoints.Path,
+            new { recipientMemberId = bobId, body = "Hello from app compose" });
+
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        Assert.Contains("no-store", created.Headers.CacheControl?.ToString() ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        var detail = await created.Content.ReadFromJsonAsync<ConversationDetailDto>(JsonOptions);
+        Assert.NotNull(detail);
+        Assert.Equal(bobId, detail!.OtherParticipantId);
+        Assert.Equal("API Compose Bob", detail.OtherParticipantDisplayName);
+        Assert.Equal($"/messages/{detail.ConversationId:D}", detail.DetailPath);
+        Assert.Equal(created.Headers.Location?.OriginalString, detail.DetailPath);
+        Assert.True(detail.CanSendReply);
+        var message = Assert.Single(detail.Messages);
+        Assert.Equal("Hello from app compose", message.Body);
+        Assert.True(message.IsMine);
+        Assert.Equal(aliceId, message.SenderMemberId);
+
+        using var bobApi = CreateBearerClient(bobId, "API Compose Bob", "api-compose-bob@example.com");
+        using var inboxResponse = await bobApi.GetAsync(MessagesApiEndpoints.Path);
+        var inbox = await inboxResponse.Content.ReadFromJsonAsync<ApiPagedResponse<InboxConversationDto>>(JsonOptions);
+        var row = Assert.Single(inbox!.Items);
+        Assert.Equal(detail.ConversationId, row.ConversationId);
+        Assert.True(row.HasUnread);
+        Assert.Equal(1, row.UnreadCount);
+
+        using var aliceWeb = CreateCookieClient(aliceId, "API Compose Alice", "api-compose-alice@example.com");
+        var html = await aliceWeb.GetStringAsync($"/messages/{detail.ConversationId:D}");
+        Assert.Contains("Hello from app compose", html, StringComparison.Ordinal);
+        Assert.Contains("API Compose Bob", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Compose_RejectsMissingRecipient_Self_AndInvalidBodies()
+    {
+        var (aliceId, bobId) = await SeedConversationPairAsync(
+            "api-compose-body-alice@example.com",
+            "API Compose Body Alice",
+            "api-compose-body-bob@example.com",
+            "API Compose Body Bob");
+        using var alice = CreateBearerClient(aliceId, "API Compose Body Alice", "api-compose-body-alice@example.com");
+
+        using var noRecipient = await alice.PostAsJsonAsync(
+            MessagesApiEndpoints.Path,
+            new { body = "Hello" });
+        Assert.Equal(HttpStatusCode.BadRequest, noRecipient.StatusCode);
+        var noRecipientProblem = await noRecipient.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("Choose a recipient.", noRecipientProblem.GetProperty("detail").GetString());
+
+        using var self = await alice.PostAsJsonAsync(
+            MessagesApiEndpoints.Path,
+            new { recipientMemberId = aliceId, body = "Hello me" });
+        Assert.Equal(HttpStatusCode.BadRequest, self.StatusCode);
+        var selfProblem = await self.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("You cannot message yourself.", selfProblem.GetProperty("detail").GetString());
+
+        using var empty = await alice.PostAsJsonAsync(
+            MessagesApiEndpoints.Path,
+            new { recipientMemberId = bobId, body = "   " });
+        Assert.Equal(HttpStatusCode.BadRequest, empty.StatusCode);
+        var emptyProblem = await empty.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("Message body is required.", emptyProblem.GetProperty("detail").GetString());
+
+        using var tooLong = await alice.PostAsJsonAsync(
+            MessagesApiEndpoints.Path,
+            new { recipientMemberId = bobId, body = new string('a', PrivateMessageLimits.MaxBodyLength + 1) });
+        Assert.Equal(HttpStatusCode.BadRequest, tooLong.StatusCode);
+
+        using var missing = await alice.PostAsJsonAsync(
+            MessagesApiEndpoints.Path,
+            new { recipientMemberId = Guid.NewGuid(), body = "Hello" });
+        Assert.Equal(HttpStatusCode.BadRequest, missing.StatusCode);
+        var missingProblem = await missing.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("Recipient was not found.", missingProblem.GetProperty("detail").GetString());
+
+        using var noJson = await alice.PostAsync(
+            MessagesApiEndpoints.Path,
+            new StringContent(string.Empty, Encoding.UTF8, "application/json"));
+        Assert.Equal(HttpStatusCode.BadRequest, noJson.StatusCode);
+        var noJsonProblem = await noJson.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("A JSON body is required.", noJsonProblem.GetProperty("detail").GetString());
+    }
+
+    [Fact]
+    public async Task Compose_ReturnsForbidden_WhenBlockedOrPrivacyDisallows()
+    {
+        var (aliceId, bobId) = await SeedConversationPairAsync(
+            "api-compose-block-alice@example.com",
+            "API Compose Block Alice",
+            "api-compose-block-bob@example.com",
+            "API Compose Block Bob");
+        var service = factory.Services.GetRequiredService<PrivateMessageService>();
+        Assert.True((await service.BlockAsync(bobId, aliceId)).Succeeded);
+
+        using var alice = CreateBearerClient(aliceId, "API Compose Block Alice", "api-compose-block-alice@example.com");
+        using var blocked = await alice.PostAsJsonAsync(
+            MessagesApiEndpoints.Path,
+            new { recipientMemberId = bobId, body = "Should fail" });
+        Assert.Equal(HttpStatusCode.Forbidden, blocked.StatusCode);
+        var blockedProblem = await blocked.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(PrivateMessageService.UnableToSendMessage, blockedProblem.GetProperty("detail").GetString());
+
+        var (carolId, daveId) = await SeedConversationPairAsync(
+            "api-compose-privacy-carol@example.com",
+            "API Compose Privacy Carol",
+            "api-compose-privacy-dave@example.com",
+            "API Compose Privacy Dave");
+        using (var scope = factory.Services.CreateScope())
+        {
+            var members = scope.ServiceProvider.GetRequiredService<IMemberAccountRepository>();
+            await members.UpdateMessagePrivacyAsync(daveId, MemberMessagePrivacy.Nobody);
+        }
+
+        using var carol = CreateBearerClient(
+            carolId,
+            "API Compose Privacy Carol",
+            "api-compose-privacy-carol@example.com");
+        using var privacy = await carol.PostAsJsonAsync(
+            MessagesApiEndpoints.Path,
+            new { recipientMemberId = daveId, body = "Should fail privacy" });
+        Assert.Equal(HttpStatusCode.Forbidden, privacy.StatusCode);
+        var privacyProblem = await privacy.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(PrivateMessageService.UnableToSendMessage, privacyProblem.GetProperty("detail").GetString());
+    }
+
+    [Fact]
     public void Mapper_CopiesInboxAndConversationFields()
     {
         var conversationId = Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
@@ -468,6 +669,13 @@ public sealed class MessagesApiTests : IClassFixture<QueenZoneWebApplicationFact
                 PageSize: 50),
             canSendReply: false);
         Assert.False(blocked.CanSendReply);
+
+        var recipientId = Guid.Parse("99999999-8888-7777-6666-555555555555");
+        var recipients = MessagesApiMapper.ToRecipients(
+            [new MemberRecipientMatch(recipientId, "Brian")]);
+        var recipient = Assert.Single(recipients.Items);
+        Assert.Equal(recipientId, recipient.MemberId);
+        Assert.Equal("Brian", recipient.DisplayName);
     }
 
     [Fact]

@@ -50,4 +50,10 @@ public static class MessagesApiMapper
             detail.TotalPages,
             ConversationDetailPath(detail.ConversationId),
             canSendReply);
+
+    public static MessageRecipientDto ToRecipient(MemberRecipientMatch match) =>
+        new(match.MemberId, match.DisplayName);
+
+    public static MessageRecipientsDto ToRecipients(IEnumerable<MemberRecipientMatch> matches) =>
+        new(matches.Select(ToRecipient).ToList());
 }
