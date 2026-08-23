@@ -38,7 +38,9 @@ public sealed class MobileAuthPkceTests
     public void VerifyS256_RejectsWrongVerifier()
     {
         var pair = MobileAuthPkceTestData.CreatePair();
-        Assert.False(MobileAuthPkce.VerifyS256(pair.Verifier[..^1] + "A", pair.Challenge));
+        var lastChar = pair.Verifier[^1];
+        var replacement = lastChar == 'A' ? 'B' : 'A';
+        Assert.False(MobileAuthPkce.VerifyS256(pair.Verifier[..^1] + replacement, pair.Challenge));
     }
 
     [Fact]
