@@ -153,6 +153,33 @@ The Profile screen (Home masthead avatar) shows the active `appEnv` and resolved
 Call sites should use `apiV1Url('/content/news')` (or `getAppConfig().apiBaseUrl`)
 rather than hard-coding hosts.
 
+## Crash and error monitoring
+
+[Sentry](https://sentry.io) (`@sentry/react-native`) reports JS exceptions and
+native crashes. Configured in the `self-0tb` org, project `queenzone-mobile`
+(#855). It stays a no-op — `initSentry()` in `src/config/sentry.ts` returns
+immediately — until `EXPO_PUBLIC_SENTRY_DSN` is set, so builds and local dev
+work fine without it (e.g. a fresh clone before copying `.env.example`).
+
+| Variable | Where | Purpose |
+| --- | --- | --- |
+| `EXPO_PUBLIC_SENTRY_DSN` | `.env` locally; `vars.SENTRY_DSN` repo variable in CI | Enables reporting. DSNs are not secret. |
+| `SENTRY_ORG` / `SENTRY_PROJECT` | CI repo `vars` | `self-0tb` / `queenzone-mobile` — target org/project for source map and dSYM upload at build time. |
+| `SENTRY_AUTH_TOKEN` | Bitwarden `Queenzone Development` project (Android) / `secrets.SENTRY_AUTH_TOKEN` repo secret (iOS) | Lets `sentry-cli` upload symbols during the native build. Never committed — read directly from the build environment, not from Expo config. |
+| `SENTRY_DISABLE_AUTO_UPLOAD` | CI unsigned mobile jobs (`ci.yml`); optional locally | Skips source-map / dSYM upload when org/token are unset. Required for simulator/debug CI builds once the Sentry Expo plugin is registered — otherwise Xcode fails with "organization ID or slug is required". |
+
+Unsigned CI Android/iOS jobs set `SENTRY_DISABLE_AUTO_UPLOAD=true`. Publish workflows
+(`publish-mobile-test-build.yml`, `publish-ios-testflight.yml`) set org/project/token
+and upload symbols. For a local native build without Sentry credentials, export the
+same disable flag (or set org/project/token as in `.env.example`).
+
+To rotate the auth token or point at a different Sentry org/project: create an
+org token (Sentry → Settings → Auth Tokens → Create New Organization Token;
+the default scopes — Source Map Upload, Release Creation, Code Mappings — are
+sufficient), then update the `SENTRY_AUTH_TOKEN` secret in Bitwarden and
+GitHub, and the `SENTRY_DSN`/`SENTRY_ORG`/`SENTRY_PROJECT` repo variables if
+the org/project changed.
+
 ## Navigation shell
 
 React Navigation provides the app shell ([ADR 0012](../../docs/decisions/0012-react-navigation-app-shell.md)).
