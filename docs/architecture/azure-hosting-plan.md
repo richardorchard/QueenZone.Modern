@@ -52,7 +52,7 @@ Use configuration keys like:
 - `APPLICATIONINSIGHTS_CONNECTION_STRING`
 - `Storage:PublicMediaBaseUrl`
 - `AzureAd:ClientId` / `AzureAd:TenantId` / related Entra settings (required outside Development)
-- `MobileAuth__SigningKey` (optional at startup; required before `/api/v1/auth/token` can issue JWTs. A missing value must not take the public site down.)
+- `MobileAuth__SigningKey` (optional at startup so a missing value cannot take the public site down; required for mobile login. Bitwarden owns the value and `deploy.yml` reconciles it to App Service before each web deployment.)
 - `QueenZoneHostFiltering:AllowedHosts` (production default: `www.queenzone.org;queenzone.org;*.azurewebsites.net`)
 - `FeatureFlags:ForumArchiveEnabled`
 - `FeatureFlags:LegacyRedirectsEnabled`

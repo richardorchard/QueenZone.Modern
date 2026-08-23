@@ -216,6 +216,13 @@ jobs:
       contents: read
 
     steps:
+      - name: Fetch Bitwarden runtime secrets
+        id: bitwarden-secrets
+        uses: bitwarden/sm-action@v3.0.1
+        with:
+          access_token: ${{ secrets.BITWARDEN_SECRETS_MANAGER_ACCESS_TOKEN }}
+          secrets: ${{ vars.BITWARDEN_APP_SERVICE_DEPLOY_SECRETS }}
+
       - name: Azure login (OIDC)
         uses: azure/login@v3
         with:
@@ -230,9 +237,16 @@ jobs:
       # deploy forever, which is more than the ~39s extract time run-from-
       # package was meant to save (#666). Only write, and only wait, when
       # the live settings actually differ from the desired ones.
-      - name: Check and set run-from-package and warmup settings via ARM
+      - name: Check and set required application settings via ARM
         id: apply-settings
+        env:
+          MOBILE_AUTH_SIGNING_KEY: ${{ steps.bitwarden-secrets.outputs.MOBILE_AUTH_SIGNING_KEY }}
         run: |
+          if [ "${#MOBILE_AUTH_SIGNING_KEY}" -lt 32 ]; then
+            echo "::error::MOBILE_AUTH_SIGNING_KEY must map to a Bitwarden secret of at least 32 characters."
+            exit 1
+          fi
+
           desired=$(printf '%s\n' \
             "WEBSITE_RUN_FROM_PACKAGE=1" \
             "WEBSITE_WARMUP_PATH=/health" | sort)
@@ -247,6 +261,12 @@ jobs:
             --name queenzone-dev \
             --resource-group Queenzone-RG \
             --query "[?name=='WEBSITE_WARMUP_STATUSES'].value | [0]" \
+            -o tsv | tr -d '\r')
+
+          current_mobile_auth_signing_key=$(az webapp config appsettings list \
+            --name queenzone-dev \
+            --resource-group Queenzone-RG \
+            --query "[?name=='MobileAuth__SigningKey'].value | [0]" \
             -o tsv | tr -d '\r')
 
           changed=false
@@ -264,6 +284,15 @@ jobs:
               --name queenzone-dev \
               --resource-group Queenzone-RG \
               --settings WEBSITE_RUN_FROM_PACKAGE=1 WEBSITE_WARMUP_PATH=/health \
+              --output none
+            changed=true
+          fi
+
+          if [ "$current_mobile_auth_signing_key" != "$MOBILE_AUTH_SIGNING_KEY" ]; then
+            az webapp config appsettings set \
+              --name queenzone-dev \
+              --resource-group Queenzone-RG \
+              --settings "MobileAuth__SigningKey=$MOBILE_AUTH_SIGNING_KEY" \
               --output none
             changed=true
           fi
