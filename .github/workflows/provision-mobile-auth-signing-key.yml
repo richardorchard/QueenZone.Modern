@@ -1,0 +1,41 @@
+name: Provision MobileAuth signing key
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: provision-mobile-auth-signing-key
+  cancel-in-progress: false
+
+# One-shot / idempotent: creates MobileAuth__SigningKey on queenzone-dev when the
+# App Service setting name is missing. Mobile PKCE (#720) is deployed, but token
+# issuance fails closed until this HMAC key exists. Does not print the value.
+# After a create, mirror the value into Bitwarden (Queenzone Development) manually.
+
+jobs:
+  ensure-signing-key:
+    name: Ensure MobileAuth__SigningKey
+    runs-on: ubuntu-latest
+    environment: deploy
+    permissions:
+      id-token: write
+      contents: read
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v3
+        with:
+          client-id: ${{ vars.ARM_CLIENT_ID }}
+          tenant-id: ${{ vars.ARM_TENANT_ID }}
+          subscription-id: ${{ vars.ARM_SUBSCRIPTION_ID }}
+
+      - name: Ensure MobileAuth__SigningKey (idempotent)
+        shell: pwsh
+        run: ./scripts/Ensure-MobileAuthSigningKey.ps1

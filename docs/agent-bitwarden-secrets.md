@@ -14,7 +14,7 @@ Shared local secret store for development agents on Richard’s machines. **This
 | Secrets Manager project name | `Queenzone Development` |
 | Project id | `1c16fd2d-4bfb-4eb7-8357-b49400233490` |
 | Auth | User-scoped environment variable **`BWS_ACCESS_TOKEN`** (machine account access token) |
-| Canonical secret keys | App Service names plus build secrets, e.g. `ConnectionStrings__QueenZoneLegacy`, `ConnectionStrings__BlobStorage`, `AzureAd__*`, `OPENROUTER_API_KEY`, `SIXLABORS_LICENSE_KEY` |
+| Canonical secret keys | App Service names plus build secrets, e.g. `ConnectionStrings__QueenZoneLegacy`, `ConnectionStrings__BlobStorage`, `AzureAd__*`, `OPENROUTER_API_KEY`, `MobileAuth__SigningKey`, `SIXLABORS_LICENSE_KEY` |
 
 Do **not** commit the token, paste it into chat, or print secret **values**. Prefer reporting only key names and value **lengths** when verifying.
 

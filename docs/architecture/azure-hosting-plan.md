@@ -52,7 +52,7 @@ Use configuration keys like:
 - `APPLICATIONINSIGHTS_CONNECTION_STRING`
 - `Storage:PublicMediaBaseUrl`
 - `AzureAd:ClientId` / `AzureAd:TenantId` / related Entra settings (required outside Development)
-- `MobileAuth__SigningKey` (optional at startup; required before `/api/v1/auth/token` can issue JWTs. A missing value must not take the public site down.)
+- `MobileAuth__SigningKey` (optional at **startup** so a missing value cannot take the public site down; **required** for mobile login — without it `/api/v1/auth/authorize` returns `temporarily_unavailable` / "Mobile auth is not configured.". Provision with `scripts/Ensure-MobileAuthSigningKey.ps1` or the `Provision MobileAuth signing key` workflow; keep the same value in Bitwarden.)
 - `QueenZoneHostFiltering:AllowedHosts` (production default: `www.queenzone.org;queenzone.org;*.azurewebsites.net`)
 - `FeatureFlags:ForumArchiveEnabled`
 - `FeatureFlags:LegacyRedirectsEnabled`

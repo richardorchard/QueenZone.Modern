@@ -135,6 +135,7 @@
     "Authentication__Microsoft__ClientId",
     "Authentication__Microsoft__ClientSecret",
     "BlobUpload__PublicBaseUrl",
+    "MobileAuth__SigningKey",
     "ConnectionStrings__BlobStorage",
     "ConnectionStrings__QueenZoneLegacy",
     "DIAGNOSTICS_AZUREBLOBRETENTIONINDAYS",
