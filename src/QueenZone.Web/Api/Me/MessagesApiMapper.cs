@@ -36,7 +36,9 @@ public static class MessagesApiMapper
             message.IsMine,
             message.SortKey);
 
-    public static ConversationDetailDto ToConversation(PrivateConversationDetail detail) =>
+    public static ConversationDetailDto ToConversation(
+        PrivateConversationDetail detail,
+        bool canSendReply) =>
         new(
             detail.ConversationId,
             detail.OtherParticipantId,
@@ -46,5 +48,6 @@ public static class MessagesApiMapper
             detail.PageSize,
             detail.TotalCount,
             detail.TotalPages,
-            ConversationDetailPath(detail.ConversationId));
+            ConversationDetailPath(detail.ConversationId),
+            canSendReply);
 }

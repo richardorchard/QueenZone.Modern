@@ -4,10 +4,11 @@ using QueenZone.Data;
 namespace QueenZone.Web;
 
 /// <summary>
-/// Signed-in member inbox for the mobile app (issue #737). Reuses
-/// <see cref="PrivateMessageService"/> so unread counts match website
-/// <c>/messages</c> and the masthead badge. Opening a conversation marks it
-/// read the same way as <c>GET /messages/{id}</c>. Requires
+/// Signed-in member inbox and conversation replies for the mobile app
+/// (issues #737 / #738). Reuses <see cref="PrivateMessageService"/> so unread
+/// counts and SortKey assignment match website <c>/messages</c>. Opening a
+/// conversation marks it read the same way as <c>GET /messages/{id}</c>.
+/// Reply POST uses <see cref="PrivateMessageService.ReplyAsync"/>. Requires
 /// <see cref="MemberAuthenticationSchemes.MobileMemberPolicy"/>.
 /// </summary>
 public static class MessagesApiEndpoints
@@ -44,6 +45,17 @@ public static class MessagesApiEndpoints
             .Produces<ConversationDetailDto>()
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapPost("/messages/{conversationId:guid}", CreateReplyAsync)
+            .WithName("ReplyToMemberConversation")
+            .WithSummary("Send a reply with the same SortKey rules as POST /messages/{id}.")
+            .Accepts<ConversationReplyRequest>("application/json")
+            .Produces<ConversationDetailDto>(StatusCodes.Status201Created)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
     }
 
     internal static async Task<IResult> GetInboxAsync(
@@ -119,24 +131,139 @@ public static class MessagesApiEndpoints
             PrivateMessageLimits.ConversationPageSize,
             PrivateMessageLimits.MaxConversationPageSize).PageSize;
         int? resolvedPage = page is null or < 1 ? null : page;
-        var detail = await privateMessageService.GetConversationAsync(
+        var mapped = await MapConversationAsync(
+            privateMessageService,
             conversationId,
             memberId,
             markRead: true,
-            page: resolvedPage,
-            pageSize: size,
-            cancellationToken: cancellationToken);
-        if (detail is null)
+            resolvedPage,
+            size,
+            cancellationToken);
+        if (mapped is null)
         {
-            return Results.Problem(
-                statusCode: StatusCodes.Status404NotFound,
-                title: "Not Found",
-                detail: "Conversation was not found.");
+            return ConversationNotFound();
         }
 
         httpContext.Response.Headers.CacheControl = "no-store";
-        return Results.Ok(MessagesApiMapper.ToConversation(detail));
+        return Results.Ok(mapped);
     }
+
+    internal static async Task<IResult> CreateReplyAsync(
+        HttpContext httpContext,
+        ClaimsPrincipal user,
+        PrivateMessageService privateMessageService,
+        Guid conversationId,
+        ConversationReplyRequest? request,
+        CancellationToken cancellationToken)
+    {
+        var memberId = RequireMemberId(user, out var unauthorized);
+        if (unauthorized is not null)
+        {
+            return unauthorized;
+        }
+
+        if (request is null)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Bad Request",
+                detail: "A JSON body is required.");
+        }
+
+        var result = await privateMessageService.ReplyAsync(
+            conversationId,
+            memberId,
+            request.Body,
+            cancellationToken);
+        if (!result.Succeeded)
+        {
+            return MapSendFailure(result);
+        }
+
+        var mapped = await MapConversationAsync(
+            privateMessageService,
+            conversationId,
+            memberId,
+            markRead: true,
+            page: null,
+            pageSize: PrivateMessageLimits.ConversationPageSize,
+            cancellationToken);
+        if (mapped is null)
+        {
+            return ConversationNotFound();
+        }
+
+        httpContext.Response.Headers.CacheControl = "no-store";
+        return Results.Created(mapped.DetailPath, mapped);
+    }
+
+    private static async Task<ConversationDetailDto?> MapConversationAsync(
+        PrivateMessageService privateMessageService,
+        Guid conversationId,
+        Guid memberId,
+        bool markRead,
+        int? page,
+        int pageSize,
+        CancellationToken cancellationToken)
+    {
+        var detail = await privateMessageService.GetConversationAsync(
+            conversationId,
+            memberId,
+            markRead,
+            page,
+            pageSize,
+            cancellationToken);
+        if (detail is null)
+        {
+            return null;
+        }
+
+        var canSendReply = await privateMessageService.CanSendReplyAsync(
+            memberId,
+            detail,
+            cancellationToken);
+        return MessagesApiMapper.ToConversation(detail, canSendReply);
+    }
+
+    private static IResult MapSendFailure(PrivateMessageSendResult result)
+    {
+        var message = result.ErrorMessage ?? PrivateMessageService.UnableToSendMessage;
+        if (IsConversationMissing(message))
+        {
+            return ConversationNotFound();
+        }
+
+        if (string.Equals(message, PrivateMessageService.RateLimitedMessage, StringComparison.Ordinal))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status429TooManyRequests,
+                title: "Too Many Requests",
+                detail: message);
+        }
+
+        if (string.Equals(message, PrivateMessageService.UnableToSendMessage, StringComparison.Ordinal))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "Forbidden",
+                detail: message);
+        }
+
+        return Results.Problem(
+            statusCode: StatusCodes.Status400BadRequest,
+            title: "Bad Request",
+            detail: message);
+    }
+
+    private static bool IsConversationMissing(string message) =>
+        string.Equals(message, "You are not a participant in this conversation.", StringComparison.Ordinal)
+        || string.Equals(message, "Conversation not found.", StringComparison.Ordinal);
+
+    private static IResult ConversationNotFound() =>
+        Results.Problem(
+            statusCode: StatusCodes.Status404NotFound,
+            title: "Not Found",
+            detail: "Conversation was not found.");
 
     private static Guid RequireMemberId(ClaimsPrincipal user, out IResult? failure)
     {

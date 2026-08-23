@@ -1,4 +1,4 @@
-import { fetchJson } from './client';
+import { fetchJson, sendJson } from './client';
 import type { ApiPagedResponse } from './types';
 import type { PageQuery } from './content';
 import {
@@ -40,6 +40,7 @@ export type ConversationDetail = {
   totalCount: number;
   totalPages: number;
   detailPath: string;
+  canSendReply: boolean;
 };
 
 function pageParams({ page, pageSize }: PageQuery) {
@@ -77,5 +78,19 @@ export function fetchConversation(
     query: pageParams(query),
     signal: query.signal,
     accessToken,
+  });
+}
+
+export function replyToConversation(
+  accessToken: string,
+  conversationId: string,
+  body: string,
+  signal?: AbortSignal,
+): Promise<ConversationDetail> {
+  return sendJson(messagesConversationPath(conversationId), {
+    method: 'POST',
+    body: { body },
+    accessToken,
+    signal,
   });
 }

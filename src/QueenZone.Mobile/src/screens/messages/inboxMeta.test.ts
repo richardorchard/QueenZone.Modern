@@ -8,6 +8,11 @@ import {
   parseConversationId,
   profileA11yLabel,
   unreadBadgeLabel,
+  conversationBodyMaxLength,
+  replyRequiredMessage,
+  replyTooLongMessage,
+  unableToSendMessage,
+  validateReplyBody,
 } from './inboxMeta.ts';
 
 describe('inboxMeta', () => {
@@ -43,5 +48,13 @@ describe('inboxMeta', () => {
   it('formats timestamps when the date is valid', () => {
     assert.equal(formatMessageTimestamp('not-a-date'), '');
     assert.match(formatMessageTimestamp('2026-08-19T12:00:00Z'), /2026/);
+  });
+
+  it('validates reply bodies the same way as the website', () => {
+    assert.equal(validateReplyBody('   '), replyRequiredMessage);
+    assert.equal(validateReplyBody('a'.repeat(4001)), replyTooLongMessage);
+    assert.equal(validateReplyBody('Hello back'), null);
+    assert.equal(conversationBodyMaxLength, 4000);
+    assert.equal(unableToSendMessage, 'Unable to send message.');
   });
 });

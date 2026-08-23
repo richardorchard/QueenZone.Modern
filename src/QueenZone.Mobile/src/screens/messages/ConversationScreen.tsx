@@ -1,16 +1,43 @@
-import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
-import { FlatList, RefreshControl, Text, View } from 'react-native';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import {
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ApiError } from '../../api/client';
-import { fetchConversation, type ConversationDetail, type ConversationMessage } from '../../api/messages';
+import {
+  fetchConversation,
+  replyToConversation,
+  type ConversationDetail,
+  type ConversationMessage,
+} from '../../api/messages';
 import type { HomeStackParamList } from '../../navigation/types';
 import { MemberGate } from '../../session/MemberGate';
 import { useSession } from '../../session/SessionContext';
-import { space, type, useTheme } from '../../theme';
+import { fonts, radius, space, type, useTheme } from '../../theme';
+import { Button } from '../../ui/Button';
 import { ErrorBlock, LoadingBlock } from '../../ui/ScreenStates';
-import { conversationPageSize, formatMessageTimestamp, parseConversationId } from './inboxMeta';
+import {
+  conversationBodyMaxLength,
+  conversationPageSize,
+  formatMessageTimestamp,
+  parseConversationId,
+  unableToSendMessage,
+  validateReplyBody,
+} from './inboxMeta';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'Conversation'>;
+
+function messageFromUnknownError(err: unknown): string {
+  return err instanceof ApiError ? err.message : 'Something went wrong.';
+}
 
 export function ConversationScreen({ navigation, route }: Props) {
   return (
@@ -22,13 +49,18 @@ export function ConversationScreen({ navigation, route }: Props) {
 
 function ConversationThread({ navigation, route }: Props) {
   const { c } = useTheme();
+  const insets = useSafeAreaInsets();
   const { accessToken } = useSession();
+  const listRef = useRef<FlatList<ConversationMessage>>(null);
   const conversationId = parseConversationId(route.params.id);
   const [detail, setDetail] = useState<ConversationDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
+  const [draft, setDraft] = useState('');
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -67,7 +99,7 @@ function ConversationThread({ navigation, route }: Props) {
           return;
         }
         setDetail(null);
-        setError(err instanceof ApiError ? err.message : 'Something went wrong.');
+        setError(messageFromUnknownError(err));
       } finally {
         if (!signal.aborted) {
           setLoading(false);
@@ -84,6 +116,31 @@ function ConversationThread({ navigation, route }: Props) {
     return () => controller.abort();
   }, [load, reloadToken]);
 
+  const submit = useCallback(async () => {
+    const validation = validateReplyBody(draft);
+    if (validation) {
+      setSubmitError(validation);
+      return;
+    }
+    if (!accessToken || !conversationId) {
+      setSubmitError('Sign in to continue.');
+      return;
+    }
+
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      const next = await replyToConversation(accessToken, conversationId, draft.trim());
+      setDetail(next);
+      setDraft('');
+      requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
+    } catch (err: unknown) {
+      setSubmitError(messageFromUnknownError(err));
+    } finally {
+      setSubmitting(false);
+    }
+  }, [accessToken, conversationId, draft]);
+
   if (loading && !detail) {
     return <LoadingBlock label="Loading conversation…" />;
   }
@@ -92,24 +149,89 @@ function ConversationThread({ navigation, route }: Props) {
     return <ErrorBlock message={error} onRetry={() => setReloadToken((n) => n + 1)} />;
   }
 
+  const canSendReply = detail?.canSendReply === true;
+
   return (
-    <FlatList
-      style={{ flex: 1, backgroundColor: c.surfacePage }}
-      data={detail?.messages ?? []}
-      keyExtractor={(item) => item.id}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={() => {
-            const controller = new AbortController();
-            void load(controller.signal, 'refresh');
-          }}
-          tintColor={c.accentPrimary}
-        />
-      }
-      contentContainerStyle={{ paddingBottom: space.section }}
-      renderItem={({ item }) => <MessageBubble item={item} />}
-    />
+    <KeyboardAvoidingView
+      style={[styles.flex, { backgroundColor: c.surfacePage }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <FlatList
+        ref={listRef}
+        style={styles.flex}
+        data={detail?.messages ?? []}
+        keyExtractor={(item) => item.id}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              const controller = new AbortController();
+              void load(controller.signal, 'refresh');
+            }}
+            tintColor={c.accentPrimary}
+          />
+        }
+        contentContainerStyle={styles.thread}
+        renderItem={({ item }) => <MessageBubble item={item} />}
+      />
+      {canSendReply ? (
+        <View
+          style={[
+            styles.composer,
+            {
+              borderTopColor: c.hairline,
+              backgroundColor: c.surfacePage,
+              paddingBottom: Math.max(insets.bottom, space.md),
+            },
+          ]}
+        >
+          <TextInput
+            value={draft}
+            onChangeText={setDraft}
+            placeholder="Write a reply"
+            placeholderTextColor={c.textMuted}
+            accessibilityLabel="Reply"
+            multiline
+            textAlignVertical="top"
+            enterKeyHint="send"
+            autoCapitalize="sentences"
+            maxLength={conversationBodyMaxLength}
+            editable={!submitting}
+            style={[
+              styles.field,
+              {
+                color: c.textPrimary,
+                borderColor: c.border,
+                backgroundColor: c.surfaceCard,
+              },
+            ]}
+          />
+          {submitError ? (
+            <Text style={[type.caption, { color: c.textSecondary }]}>{submitError}</Text>
+          ) : null}
+          <Button
+            label="Send reply"
+            onPress={() => {
+              void submit();
+            }}
+            loading={submitting}
+            disabled={!accessToken}
+          />
+        </View>
+      ) : detail ? (
+        <View
+          style={[
+            styles.notice,
+            {
+              borderTopColor: c.hairline,
+              paddingBottom: Math.max(insets.bottom, space.md),
+            },
+          ]}
+        >
+          <Text style={[type.body, { color: c.textSecondary }]}>{unableToSendMessage}</Text>
+        </View>
+      ) : null}
+    </KeyboardAvoidingView>
   );
 }
 
@@ -145,3 +267,28 @@ function MessageBubble({ item }: { item: ConversationMessage }) {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  flex: { flex: 1 },
+  thread: { paddingBottom: space.sm },
+  composer: {
+    paddingHorizontal: space.xl,
+    paddingTop: space.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    gap: space.sm,
+  },
+  notice: {
+    paddingHorizontal: space.xl,
+    paddingTop: space.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  field: {
+    minHeight: 88,
+    borderWidth: 1,
+    borderRadius: radius.xs,
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    fontFamily: fonts.body,
+    fontSize: 16,
+  },
+});
