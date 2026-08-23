@@ -166,6 +166,14 @@ export type PhotoDetail = {
   next: PhotoNav | null;
 };
 
+/** Result of `POST /api/v1/member/photo-submissions` (`PhotoSubmissionCreatedDto`). */
+export type PhotoSubmissionCreated = {
+  id: string;
+  status: string;
+  title: string;
+  submittedAt: string;
+};
+
 export type FanPerformance = {
   id: number;
   title: string;
