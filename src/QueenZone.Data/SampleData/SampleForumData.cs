@@ -114,7 +114,12 @@ public static class SampleForumData
                     "jazzfanz",
                     null,
                     921,
-                    new DateTime(2011, 8, 2, 0, 0, 0, DateTimeKind.Utc)),
+                    new DateTime(2011, 8, 2, 0, 0, 0, DateTimeKind.Utc),
+                    [new ForumPostAttachment(
+                        "opera-side-two-notes.pdf",
+                        48_128,
+                        ForumAttachmentPaths.LegacyDownloadPath(1101),
+                        "application/pdf")]),
                 new(
                     1102,
                     "I still prefer <em>Sheer Heart Attack</em> for raw energy.",

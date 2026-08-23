@@ -29,7 +29,7 @@ Public performance work already relies on **process-local** mechanisms that are 
 | News / sitemap / HTML cache invalidation after admin publish | Bumps local version + evicts local output-cache tags |
 | Forum post rate limiter (memory + DB probe) | Counts are consistent for the single process |
 | Mobile `/api/v1/auth` (IP + per-member in-process) | Same as website login IP policy, plus a per-account cap on sign-in completion and refresh |
-| Per-member daily upload quotas (`MemberUploadQuotaService` / `IMemoryCache`) | Count + byte caps per principal per UTC day on the one worker |
+| Per-member daily upload quotas (`MemberUploadQuotaService` / `IMemoryCache`) | Count + byte caps per principal per UTC day on the one worker. Website `/submit/photo` and mobile `POST /api/v1/member/photo-submissions` both call `PhotoSubmissionService.SubmitAsync`, which keys the same `member:{guid}` bucket via `PrincipalKeyFromMemberId`. Web and mobile share one cap because they hit this single worker — not because of Redis, and not via a photo-only counter (forum attachments, editor images, and avatars use the same service). |
 
 Those designs become **incorrect or leaky** only if instance count &gt; 1 (stale HTML/news on another worker, rate-limit bypass, invalidation that does not reach every node).
 

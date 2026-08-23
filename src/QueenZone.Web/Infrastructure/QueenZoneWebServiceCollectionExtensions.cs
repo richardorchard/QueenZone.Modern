@@ -259,10 +259,12 @@ public static class QueenZoneWebServiceCollectionExtensions
         services.AddScoped<HelpRequestService>();
         services.AddScoped<PublicWarmupService>();
         services.AddScoped<UgcHtml>();
+        services.AddScoped<FanPerformanceDurationResolver>();
         services.AddScoped<ForumPostRateLimiter>();
         services.AddSingleton<MemberUploadQuotaService>();
         services.AddScoped<ForumAttachmentValidator>();
         services.AddScoped<ForumAttachmentUploadService>();
+        services.AddScoped<ForumPostWriteService>();
         services.AddSingleton<IGoogleAnalyticsDataClient, GoogleAnalyticsDataClient>();
         services.AddScoped<IGoogleAnalyticsTrafficService, GoogleAnalyticsTrafficService>();
         services.AddScoped<AdminDashboardService>();

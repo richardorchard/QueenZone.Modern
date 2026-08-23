@@ -2,7 +2,6 @@ using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using Microsoft.Extensions.DependencyInjection;
 using QueenZone.Data;
 
 namespace QueenZone.Web.Pages.Help;
@@ -101,7 +100,7 @@ public sealed class IndexModel(HelpRequestService helpRequestService) : PageMode
             Email,
             Website,
             FormStamp,
-            ResolveClientIp(),
+            HelpRequestService.ResolveClientIp(HttpContext),
             cancellationToken);
 
         if (result.SilentlyDropped || result.Succeeded)
@@ -112,20 +111,6 @@ public sealed class IndexModel(HelpRequestService helpRequestService) : PageMode
         ModelState.AddModelError(string.Empty, result.Error ?? "Could not send your message.");
         FormStamp = helpRequestService.IssueFormStamp();
         return Page();
-    }
-
-    private string? ResolveClientIp()
-    {
-        var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
-        if (!string.IsNullOrWhiteSpace(ip))
-        {
-            return ip;
-        }
-
-        var environment = HttpContext.RequestServices.GetService<IHostEnvironment>();
-        return environment is not null && QueenZoneEnvironments.IsAutomatedTestHost(environment)
-            ? "test"
-            : null;
     }
 
     private async Task<Guid?> PopulateSignedInStateAsync()

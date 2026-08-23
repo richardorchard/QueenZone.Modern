@@ -3,8 +3,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Extensions.Options;
 using QueenZone.Data;
-using QueenZone.Storage;
-using QueenZone.Web.Search;
 
 namespace QueenZone.Web.Pages.Forum;
 
@@ -13,46 +11,23 @@ namespace QueenZone.Web.Pages.Forum;
 public sealed class TopicModel : ForumTopicPageModel
 {
     private readonly IForumRepository forumRepository;
-    private readonly IForumWriteRepository forumWriteRepository;
     private readonly IForumPollRepository forumPollRepository;
-    private readonly MemberAccountService memberAccountService;
-    private readonly PublicQueryCacheService publicQueryCache;
-    private readonly UgcHtml ugcHtml;
-    private readonly ForumPostRateLimiter rateLimiter;
-    private readonly ForumAttachmentValidator attachmentValidator;
-    private readonly ForumAttachmentUploadService attachmentUploadService;
-    private readonly ForumSearchIndexSynchronizer forumSearchIndex;
+    private readonly ForumPostWriteService forumPostWrite;
     private readonly AdminOptions adminOptions;
-    private readonly TimeProvider timeProvider;
 
     public TopicModel(
         IForumRepository forumRepository,
-        IForumWriteRepository forumWriteRepository,
         IForumPollRepository forumPollRepository,
-        MemberAccountService memberAccountService,
-        PublicQueryCacheService publicQueryCache,
-        UgcHtml ugcHtml,
-        ForumPostRateLimiter rateLimiter,
-        ForumAttachmentValidator attachmentValidator,
-        ForumAttachmentUploadService attachmentUploadService,
-        ForumSearchIndexSynchronizer forumSearchIndex,
+        ForumPostWriteService forumPostWrite,
         IOptions<AdminOptions> adminOptions,
         IOptions<ForumOptions> forumOptions,
         TimeProvider timeProvider)
         : base(forumRepository, forumOptions, adminOptions, timeProvider)
     {
         this.forumRepository = forumRepository;
-        this.forumWriteRepository = forumWriteRepository;
         this.forumPollRepository = forumPollRepository;
-        this.memberAccountService = memberAccountService;
-        this.publicQueryCache = publicQueryCache;
-        this.ugcHtml = ugcHtml;
-        this.rateLimiter = rateLimiter;
-        this.attachmentValidator = attachmentValidator;
-        this.attachmentUploadService = attachmentUploadService;
-        this.forumSearchIndex = forumSearchIndex;
+        this.forumPostWrite = forumPostWrite;
         this.adminOptions = adminOptions.Value;
-        this.timeProvider = timeProvider;
     }
 
     [BindProperty]
@@ -94,100 +69,54 @@ public sealed class TopicModel : ForumTopicPageModel
         CanReply = true;
         await LoadPollAsync(topicId, cancellationToken);
 
-        var thread = await forumWriteRepository.GetThreadAsync(topicId, cancellationToken);
-        if (thread is null)
-        {
-            return NotFound();
-        }
+        var outcome = await forumPostWrite.CreateReplyAsync(
+            memberId.Value,
+            User.Identity?.Name,
+            topicId,
+            Body,
+            Attachments,
+            cancellationToken);
 
-        if (thread.IsLocked)
-        {
-            return Forbid();
-        }
-
-        var sanitizedBody = ugcHtml.Sanitize(Body);
-        if (string.IsNullOrWhiteSpace(sanitizedBody))
-        {
-            ModelState.AddModelError(nameof(Body), "Body is required.");
-        }
-
-        var selectedFiles = Attachments?.Where(file => file is { Length: > 0 }).ToList() ?? [];
-        var attachmentValidation = attachmentValidator.Validate(selectedFiles);
-        foreach (var error in attachmentValidation.Errors)
-        {
-            ModelState.AddModelError(nameof(Attachments), error);
-        }
-
-        if (!ModelState.IsValid)
-        {
-            Body = sanitizedBody;
-            return Page();
-        }
-
-        if (!await rateLimiter.IsAllowedAsync(memberId.Value, cancellationToken))
-        {
-            return StatusCode(StatusCodes.Status429TooManyRequests);
-        }
-
-        var authorDisplayName = await ResolveAuthorDisplayNameAsync(memberId.Value, cancellationToken);
-        var createdAt = timeProvider.GetUtcNow();
-        int postId;
-        try
-        {
-            postId = await forumWriteRepository.CreatePostAsync(
-                new NewForumPost(
-                    topicId,
-                    memberId.Value,
-                    authorDisplayName,
-                    sanitizedBody,
-                    createdAt),
-                cancellationToken);
-            var threadTitle = Header?.Title ?? slug;
-            await forumSearchIndex.UpsertThreadAsync(topicId, threadTitle, createdAt, cancellationToken);
-
-            if (attachmentValidation.AcceptedFiles.Count > 0)
-            {
-                await attachmentUploadService.UploadAndSaveAsync(
-                    postId,
-                    memberId.Value,
-                    attachmentValidation.AcceptedFiles,
-                    cancellationToken);
-            }
-        }
-        catch (NotSupportedException ex)
-        {
-            ModelState.AddModelError(nameof(Attachments), ex.Message);
-            Body = sanitizedBody;
-            return Page();
-        }
-        catch (BlobUploadException ex)
-        {
-            ModelState.AddModelError(nameof(Attachments), ex.Message);
-            Body = sanitizedBody;
-            return Page();
-        }
-
-        publicQueryCache.InvalidateForumStatsCache();
-        var updatedPage = await forumRepository.GetTopicPostsPageAsync(topicId, 1, 1, cancellationToken);
-        var lastPage = updatedPage is null
-            ? 1
-            : Math.Max(1, ForumRoutes.GetPostsTotalPages(updatedPage.TotalCount, ForumRoutes.PostsPageSize));
-        var redirectPath = Header is null
-            ? ForumRoutes.GetTopicCanonicalPath(topicId, slug, lastPage)
-            : ForumRoutes.GetTopicCanonicalPath(Header, lastPage);
-
-        return Redirect(redirectPath + $"#post-{postId}");
+        return await MapOutcomeAsync(outcome, topicId, slug, cancellationToken);
     }
 
-    private async Task<string> ResolveAuthorDisplayNameAsync(Guid memberId, CancellationToken cancellationToken)
+    private async Task<IActionResult> MapOutcomeAsync(
+        ForumWriteOutcome outcome,
+        int topicId,
+        string slug,
+        CancellationToken cancellationToken)
     {
-        var account = await memberAccountService.FindByIdAsync(memberId, cancellationToken);
-        if (!string.IsNullOrWhiteSpace(account?.DisplayName))
+        Body = outcome.SanitizedBody;
+        switch (outcome.Status)
         {
-            return account.DisplayName;
-        }
+            case ForumWriteStatus.Success:
+                var updatedPage = await forumRepository.GetTopicPostsPageAsync(topicId, 1, 1, cancellationToken);
+                var lastPage = updatedPage is null
+                    ? 1
+                    : Math.Max(1, ForumRoutes.GetPostsTotalPages(updatedPage.TotalCount, ForumRoutes.PostsPageSize));
+                var redirectPath = Header is null
+                    ? ForumRoutes.GetTopicCanonicalPath(topicId, slug, lastPage)
+                    : ForumRoutes.GetTopicCanonicalPath(Header, lastPage);
+                return Redirect(redirectPath + $"#post-{outcome.PostId}");
+            case ForumWriteStatus.TopicNotFound:
+                return NotFound();
+            case ForumWriteStatus.TopicLocked:
+                return Forbid();
+            case ForumWriteStatus.RateLimited:
+                return StatusCode(StatusCodes.Status429TooManyRequests);
+            case ForumWriteStatus.MemberSuspended:
+                return Challenge(MemberAuthenticationSchemes.MembersCookie);
+            case ForumWriteStatus.ValidationFailed:
+            case ForumWriteStatus.AttachmentFailed:
+                foreach (var error in outcome.FieldErrors)
+                {
+                    ModelState.AddModelError(error.Field, error.Message);
+                }
 
-        return string.IsNullOrWhiteSpace(User.Identity?.Name) ? "Member" : User.Identity.Name;
+                return Page();
+            default:
+                return Page();
+        }
     }
 
     private async Task LoadPollAsync(int topicId, CancellationToken cancellationToken)

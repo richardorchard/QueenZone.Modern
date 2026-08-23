@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.Extensions.DependencyInjection;
 using QueenZone.Data;
 using QueenZone.Web;
@@ -134,5 +135,51 @@ public sealed class ForumPollFormAndEndpointUnitTests
         Assert.False(results.CanViewerVote);
         Assert.Equal(66.7, results.Options[0].Percentage);
         Assert.True(results.Options[0].SelectedByViewer);
+    }
+
+    [Fact]
+    public void ParseOptionIds_DedupesFormAndJsonShapes()
+    {
+        var first = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        var second = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+
+        var fromForm = ForumPollVoteMapper.ParseOptionIds(
+            [$"{first},{second}", first.ToString()],
+            [second.ToString(), "not-a-guid", ""]);
+        Assert.Equal([first, second], fromForm);
+
+        var fromJson = ForumPollVoteMapper.ParseOptionIds([first, first, Guid.Empty], second);
+        Assert.Equal([first, second], fromJson);
+
+        Assert.Empty(ForumPollVoteMapper.ParseOptionIds((IReadOnlyList<Guid>?)null, (Guid?)null));
+    }
+
+    [Fact]
+    public void VoteMapper_MapsWebsiteAndApiStatusesTheSameWay()
+    {
+        var already = new ForumPollVoteException(
+            ForumPollVoteException.AlreadyVoted,
+            "You have already voted in this poll. Votes cannot be changed.");
+        Assert.Equal(StatusCodes.Status409Conflict, ForumPollVoteMapper.StatusCode(already));
+        Assert.Equal(
+            StatusCodes.Status409Conflict,
+            Assert.IsAssignableFrom<IStatusCodeHttpResult>(ForumPollVoteMapper.ToFormResult(already)).StatusCode);
+        var problem = Assert.IsType<ProblemHttpResult>(ForumPollVoteMapper.ToProblemResult(already));
+        Assert.Equal(StatusCodes.Status409Conflict, problem.StatusCode);
+        Assert.Equal(ForumPollVoteException.AlreadyVoted, problem.ProblemDetails.Extensions["code"]);
+
+        var missing = new ForumPollVoteException(ForumPollVoteException.NotFound, "Poll was not found.");
+        Assert.Equal(StatusCodes.Status404NotFound, ForumPollVoteMapper.StatusCode(missing));
+
+        var forbidden = new ForumPollVoteException(ForumPollVoteException.Forbidden, "Only the thread author or an admin can close this poll.");
+        Assert.Equal(StatusCodes.Status403Forbidden, ForumPollVoteMapper.StatusCode(forbidden));
+        Assert.IsType<ForbidHttpResult>(ForumPollVoteMapper.ToFormResult(forbidden));
+
+        var closed = new ForumPollVoteException(ForumPollVoteException.Closed, "This poll is closed.");
+        Assert.Equal(StatusCodes.Status400BadRequest, ForumPollVoteMapper.StatusCode(closed));
+        Assert.Equal("Conflict", ForumPollVoteMapper.Title(StatusCodes.Status409Conflict));
+        Assert.Equal("Not Found", ForumPollVoteMapper.Title(StatusCodes.Status404NotFound));
+        Assert.Equal("Forbidden", ForumPollVoteMapper.Title(StatusCodes.Status403Forbidden));
+        Assert.Equal("Bad Request", ForumPollVoteMapper.Title(StatusCodes.Status400BadRequest));
     }
 }

@@ -3336,6 +3336,7 @@ a.qz-forum-post__author-link:focus-visible {
   justify-content: center;
   gap: var(--space-5);
   min-height: 0;
+  touch-action: pan-y;
 }
 
 .qz-lightbox__image {

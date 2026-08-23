@@ -78,7 +78,8 @@ jobs:
           **Result:** passed against ``$baseUrl``.
 
           This workflow does not use the SQL Express mirror. A green result means the
-          public production surface (shape + sampled media CDN hosts) is healthy.
+          public production surface (HTML shape, sampled media CDN hosts, and
+          public `/api/v1` JSON) is healthy.
           "@ | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           }
           else {

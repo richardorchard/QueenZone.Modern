@@ -1,71 +1,70 @@
 /**
  * Public vs member navigation contract.
  *
- * Matches the website's content boundary, not a mobile-only policy:
- * visitors can read archive, photography, forum threads, and fan-performance
- * listings; private messages and member write/settings surfaces require sign-in.
+ * Tab IA follows the v2 mobile handoff: five tabs on both platforms
+ * (Home · News · Photography · Archive · Forum). Profile, settings, and
+ * private messages sit behind the Home masthead avatar — never a sixth tab.
+ *
+ * Member-only *screens* still match the website's content boundary.
  */
 
 export const publicTabNames = [
-  'TodayTab',
+  'HomeTab',
   'NewsTab',
   'PhotosTab',
+  'ArchiveTab',
   'ForumTab',
-  'YouTab',
 ] as const;
 
-export const signedInOnlyTabNames = ['MessagesTab'] as const;
+export const signedInOnlyTabNames = [] as const;
 
 export type PublicTabName = (typeof publicTabNames)[number];
 export type SignedInOnlyTabName = (typeof signedInOnlyTabNames)[number];
 export type TabName = PublicTabName | SignedInOnlyTabName;
 
 export const publicScreenNames = [
-  'Today',
+  'Home',
+  'ArchiveHub',
+  'Stories',
+  'AboutArchive',
   'Biography',
+  'BiographyChapter',
   'Discography',
+  'Album',
   'Timeline',
   'FreddieTribute',
   'FanPerformances',
+  'FanPerformanceDetail',
   'Story',
   'Search',
   'NewsIndex',
   'PhotoIndex',
+  'PhotoCategory',
   'PhotoViewer',
   'ForumIndex',
+  'Category',
   'Thread',
-  'Account',
-  'Help',
+  'Profile',
+  'Contact',
   'SignIn',
 ] as const;
 
 export const memberOnlyScreenNames = [
-  'FanPerformanceDetail',
   'Inbox',
   'Conversation',
   'ComposeMessage',
   'Composer',
   'PhotoSubmit',
   'MySubmissions',
-  'Profile',
   'Settings',
+  'SavedList',
+  'DeleteAccount',
 ] as const;
 
 export type MemberOnlyScreenName = (typeof memberOnlyScreenNames)[number];
 
-export function getVisibleTabNames(isSignedIn: boolean): readonly TabName[] {
-  if (!isSignedIn) {
-    return publicTabNames;
-  }
-
-  return [
-    'TodayTab',
-    'NewsTab',
-    'PhotosTab',
-    'ForumTab',
-    'MessagesTab',
-    'YouTab',
-  ];
+export function getVisibleTabNames(_isSignedIn: boolean): readonly TabName[] {
+  return publicTabNames;
 }
 
 export function isMemberOnlyScreen(name: string): boolean {
@@ -74,6 +73,15 @@ export function isMemberOnlyScreen(name: string): boolean {
 
 export const detailScreenNames = [
   'Story',
+  'Stories',
+  'Biography',
+  'BiographyChapter',
+  'Discography',
+  'Album',
+  'Timeline',
+  'FreddieTribute',
+  'FanPerformances',
+  'AboutArchive',
   'Search',
   'PhotoViewer',
   'PhotoSubmit',
@@ -82,11 +90,14 @@ export const detailScreenNames = [
   'Conversation',
   'ComposeMessage',
   'FanPerformanceDetail',
-  'Help',
   'MySubmissions',
+  'Contact',
   'Settings',
   'Profile',
   'SignIn',
+  'Inbox',
+  'SavedList',
+  'DeleteAccount',
 ] as const;
 
 export function shouldHideTabBar(routeName: string | undefined): boolean {

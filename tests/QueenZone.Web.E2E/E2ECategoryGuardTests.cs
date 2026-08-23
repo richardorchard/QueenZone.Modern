@@ -80,7 +80,7 @@ public class E2ECategoryGuardTests
     public void RealDataFixturesArePresent()
     {
         // Keep this list in sync as RealData fixtures land. LiveSite filter is
-        // TestCategory=RealData&TestCategory=ReadOnly (sitemap + media CDN only).
+        // TestCategory=RealData&TestCategory=ReadOnly (sitemap + media CDN + public JSON API).
         var assembly = typeof(E2EPageTest).Assembly;
         var realData = assembly.GetTypes()
             .Where(t => t is { IsClass: true, IsAbstract: false, IsPublic: true })
@@ -94,6 +94,7 @@ public class E2ECategoryGuardTests
         {
             nameof(AdminModerationWorkflowTests),
             nameof(CommunitySubmissionWorkflowTests),
+            nameof(LiveSiteContentApiTests),
             nameof(LiveSiteMediaCdnTests),
             nameof(PrivateMessagingWorkflowTests),
             nameof(SitemapPublicRouteSweepTests),
@@ -117,6 +118,7 @@ public class E2ECategoryGuardTests
 
         var expected = new[]
         {
+            nameof(LiveSiteContentApiTests),
             nameof(LiveSiteMediaCdnTests),
             nameof(SitemapPublicRouteSweepTests),
         };

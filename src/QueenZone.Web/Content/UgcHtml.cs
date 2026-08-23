@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
+using System.Text;
 using System.Text.RegularExpressions;
 using AngleSharp.Dom;
 using Ganss.Xss;
@@ -31,6 +32,43 @@ public sealed partial class UgcHtml(IOptions<BlobUploadOptions> blobUploadOption
         }
 
         return CreateSanitizer(forDisplay: false).Sanitize(html);
+    }
+
+    /// <summary>
+    /// Prepares a member-authored body for the same storage path as website Quill posts:
+    /// plain text becomes escaped <c>&lt;p&gt;</c> paragraphs, then the UGC allowlist runs.
+    /// </summary>
+    public string NormalizeForStorage(string? body)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            return string.Empty;
+        }
+
+        var source = LooksLikeHtml(body) ? body : WrapPlainText(body);
+        return Sanitize(source);
+    }
+
+    public static string WrapPlainText(string text)
+    {
+        var normalized = text.Replace("\r\n", "\n", StringComparison.Ordinal).Trim();
+        if (normalized.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        var paragraphs = normalized.Split(
+            "\n\n",
+            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var html = new StringBuilder();
+        foreach (var paragraph in paragraphs)
+        {
+            html.Append("<p>");
+            html.Append(WebUtility.HtmlEncode(paragraph).Replace("\n", "<br>", StringComparison.Ordinal));
+            html.Append("</p>");
+        }
+
+        return html.ToString();
     }
 
     /// <summary>

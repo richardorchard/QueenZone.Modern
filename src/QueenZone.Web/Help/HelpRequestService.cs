@@ -202,4 +202,20 @@ public sealed class HelpRequestService(
 
         return null;
     }
+
+    public static string? ResolveClientIp(HttpContext httpContext)
+    {
+        ArgumentNullException.ThrowIfNull(httpContext);
+
+        var ip = httpContext.Connection.RemoteIpAddress?.ToString();
+        if (!string.IsNullOrWhiteSpace(ip))
+        {
+            return ip;
+        }
+
+        var environment = httpContext.RequestServices.GetService<IHostEnvironment>();
+        return environment is not null && QueenZoneEnvironments.IsAutomatedTestHost(environment)
+            ? "test"
+            : null;
+    }
 }

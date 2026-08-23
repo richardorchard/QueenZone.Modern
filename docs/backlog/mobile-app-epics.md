@@ -71,11 +71,11 @@ Builds on the mobile-usability work already done for this feature on the web (PR
 - As a member, I want to view and edit my profile (matching `Pages/Members/`) from the app.
 - As a member, I want to manage my avatar, including uploading a new one from my camera or photo library.
 - As a member, I want to sign out, and to request account data deletion, matching the existing privacy/data-deletion pages under `Pages/Account/`.
-- As a visitor, I want to submit a Help request from the app, matching the public `Help/` form and its admin inbox review (PR #711).
+- As a visitor, I want to submit a Contact request from the app, matching the public `/contact` form and its admin inbox review (PR #711).
 
 ## Epic 7 — Push notifications
 
-Cross-cutting infrastructure epic that most of the above stories depend on. If pursued via the PWA-first path instead, this becomes Web Push rather than APNs — see the feasibility doc.
+Cross-cutting infrastructure epic that most of the above stories depend on. If pursued via the PWA-first path instead, this becomes Web Push rather than APNs — see the feasibility doc. Transport (direct APNs/FCM, no EAS) and dispatch model (synchronous, best-effort, no retry) are recorded in [ADR 0014](../decisions/0014-push-notification-transport-and-dispatch.md).
 
 - As a backend maintainer, I want a device-token/subscription registration endpoint and per-member storage, so we know where to deliver notifications.
 - As a member, I want granular notification preferences (forum replies, private messages, news) so I control what interrupts me.

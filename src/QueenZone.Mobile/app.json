@@ -30,7 +30,26 @@
     "plugins": [
       "expo-dev-client",
       "expo-font",
-      "expo-splash-screen"
+      "expo-splash-screen",
+      "expo-image",
+      "expo-secure-store",
+      "expo-web-browser",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow QueenZone to use your photos for gallery submissions and your member avatar.",
+          "cameraPermission": "Allow QueenZone to use the camera for gallery submissions and your member avatar."
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "enableBackgroundPlayback": true,
+          "enableBackgroundRecording": false,
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ]
     ]
   }
 }

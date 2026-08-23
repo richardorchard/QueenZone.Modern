@@ -1,10 +1,23 @@
 using QueenZone.Data;
+using QueenZone.Storage;
 
 namespace QueenZone.Web;
 
 /// <summary>
-/// Public, read-only <c>/api/v1/content/*</c> routes for the mobile app (issue #726).
-/// No authentication required: this content is public on the website today.
+/// Public, read-only <c>/api/v1/content/*</c> routes for the mobile app
+/// (issues #726 / #743 / #747). News, biography, discography, timeline,
+/// Freddie Tribute, photo galleries, and fan-performance listings require
+/// no authentication: that content is public on the website today.
+/// Fan-performance audio at <c>/api/v1/content/fan-performances/{id}/audio</c>
+/// requires <see cref="MemberAuthenticationSchemes.MobileMemberPolicy"/> and
+/// reuses <see cref="FanPerformanceEndpoints.ServeAudioAsync"/> — the same
+/// private <c>songfiles</c> blob stream as the website, including HTTP range
+/// processing. Photo gallery pages reuse <see cref="IPhotoRepository"/>
+/// and CDN URLs from <see cref="PhotoImageUrl"/>. Category list/detail/items
+/// use <see cref="PublicQueryCacheService"/> (same helpers as Razor photography
+/// pages); detail neighbors still come from <see cref="IPhotoRepository"/>.
+/// Category items default and clamp <c>pageSize</c> to
+/// <see cref="PhotoRoutes.CategoryPageSize"/>.
 /// </summary>
 public static class ContentApiEndpoints
 {
@@ -59,6 +72,49 @@ public static class ContentApiEndpoints
             .WithName("GetContentFreddieTributes")
             .WithSummary("Paged list of Freddie Mercury tributes.")
             .Produces<ApiPagedResponse<FreddieTributeDto>>();
+
+        group.MapGet("/photos/categories", GetPhotoCategoriesAsync)
+            .WithName("GetContentPhotoCategories")
+            .WithSummary("Paged list of public photo gallery categories.")
+            .Produces<ApiPagedResponse<PhotoCategoryListItemDto>>();
+
+        group.MapGet("/photos/categories/{slug}", GetPhotoCategoryAsync)
+            .WithName("GetContentPhotoCategory")
+            .WithSummary("A single public photo gallery category.")
+            .Produces<PhotoCategoryListItemDto>()
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapGet("/photos/categories/{slug}/items", GetPhotoCategoryItemsAsync)
+            .WithName("GetContentPhotoCategoryItems")
+            .WithSummary("Paged photos in a gallery. pageSize defaults and clamps to 24, matching /photography/{slug}.")
+            .Produces<ApiPagedResponse<PhotoListItemDto>>()
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapGet("/photos/categories/{slug}/items/{picId:int}", GetPhotoDetailAsync)
+            .WithName("GetContentPhotoDetail")
+            .WithSummary("A single public photo, with prev/next neighbors matching the website lightbox.")
+            .Produces<PhotoDetailDto>()
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapGet("/fan-performances", GetFanPerformancesAsync)
+            .WithName("GetContentFanPerformances")
+            .WithSummary("Paged list of public fan-stage recordings. Duration is MPEG metadata when available.")
+            .Produces<ApiPagedResponse<FanPerformanceDto>>();
+
+        group.MapGet("/fan-performances/{id:int}", GetFanPerformanceDetailAsync)
+            .WithName("GetContentFanPerformanceDetail")
+            .WithSummary("A single public fan-stage recording, including duration and the member-gated audio path.")
+            .Produces<FanPerformanceDto>()
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapGet("/fan-performances/{id:int}/audio", GetFanPerformanceAudioAsync)
+            .WithName("GetContentFanPerformanceAudio")
+            .WithSummary("Member-gated audio stream. Same blob and range support as /fan-performances/{id}/audio.")
+            .RequireAuthorization(MemberAuthenticationSchemes.MobileMemberPolicy)
+            .RequireRateLimiting(FanPerformanceRateLimitingOptions.AudioPolicy)
+            .Produces(StatusCodes.Status200OK, contentType: "audio/mpeg")
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status404NotFound);
     }
 
     internal static async Task<IResult> GetNewsListAsync(
@@ -222,4 +278,187 @@ public static class ContentApiEndpoints
 
         return Results.Ok(response);
     }
+
+    internal static async Task<IResult> GetPhotoCategoriesAsync(
+        PublicQueryCacheService publicQueryCache,
+        int? page,
+        int? pageSize,
+        CancellationToken cancellationToken)
+    {
+        var request = ApiPagination.Normalize(page, pageSize);
+        var categories = await publicQueryCache.GetPhotoCategoriesAsync(cancellationToken);
+
+        var pageItems = categories
+            .Skip((request.Page - 1) * request.PageSize)
+            .Take(request.PageSize)
+            .ToList();
+
+        var response = ApiPagedResponse<PhotoCategoryListItemDto>.Create(
+            ContentApiMapper.ToPhotoCategoryListItems(pageItems),
+            request.Page,
+            request.PageSize,
+            categories.Count);
+
+        return Results.Ok(response);
+    }
+
+    internal static async Task<IResult> GetPhotoCategoryAsync(
+        PublicQueryCacheService publicQueryCache,
+        string slug,
+        CancellationToken cancellationToken)
+    {
+        var category = await publicQueryCache.GetPhotoCategoryBySlugAsync(slug, cancellationToken);
+        if (category is null)
+        {
+            return PhotoCategoryNotFound(slug);
+        }
+
+        return Results.Ok(ContentApiMapper.ToPhotoCategoryListItem(category));
+    }
+
+    internal static async Task<IResult> GetPhotoCategoryItemsAsync(
+        PublicQueryCacheService publicQueryCache,
+        string slug,
+        int? page,
+        int? pageSize,
+        string? size,
+        CancellationToken cancellationToken)
+    {
+        var category = await publicQueryCache.GetPhotoCategoryBySlugAsync(slug, cancellationToken);
+        if (category is null)
+        {
+            return PhotoCategoryNotFound(slug);
+        }
+
+        var request = ApiPagination.Normalize(
+            page,
+            pageSize,
+            PhotoRoutes.CategoryPageSize,
+            PhotoRoutes.CategoryPageSize);
+        var filter = PhotoListFilter.Parse(size);
+        var result = await publicQueryCache.GetPhotoCategoryPageAsync(
+            category.CatId,
+            request.Page,
+            request.PageSize,
+            filter,
+            cancellationToken);
+
+        var response = ApiPagedResponse<PhotoListItemDto>.Create(
+            ContentApiMapper.ToPhotoListItems(result.Items, filter),
+            request.Page,
+            request.PageSize,
+            result.TotalCount);
+
+        return Results.Ok(response);
+    }
+
+    internal static async Task<IResult> GetPhotoDetailAsync(
+        PublicQueryCacheService publicQueryCache,
+        IPhotoRepository photoRepository,
+        string slug,
+        int picId,
+        string? size,
+        CancellationToken cancellationToken)
+    {
+        var category = await publicQueryCache.GetPhotoCategoryBySlugAsync(slug, cancellationToken);
+        if (category is null)
+        {
+            return PhotoCategoryNotFound(slug);
+        }
+
+        var filter = PhotoListFilter.Parse(size);
+        var navigation = await photoRepository.GetDetailNavigationAsync(
+            category.CatId,
+            picId,
+            filter,
+            cancellationToken);
+        if (navigation is null)
+        {
+            // Active filter that excludes this photo: fall back to unfiltered navigation
+            // so deep links work, matching Photography/Detail.cshtml.cs.
+            if (filter.IsActive)
+            {
+                navigation = await photoRepository.GetDetailNavigationAsync(
+                    category.CatId,
+                    picId,
+                    PhotoListFilter.None,
+                    cancellationToken);
+                if (navigation is null)
+                {
+                    return PhotoNotFound(slug, picId);
+                }
+
+                filter = PhotoListFilter.None;
+            }
+            else
+            {
+                return PhotoNotFound(slug, picId);
+            }
+        }
+
+        return Results.Ok(ContentApiMapper.ToPhotoDetail(category, navigation, filter));
+    }
+
+    internal static async Task<IResult> GetFanPerformancesAsync(
+        IFanPerformanceRepository fanPerformanceRepository,
+        FanPerformanceDurationResolver durationResolver,
+        int? page,
+        int? pageSize,
+        CancellationToken cancellationToken)
+    {
+        var request = ApiPagination.Normalize(page, pageSize);
+        var items = await fanPerformanceRepository.GetPageAsync(request.Page, request.PageSize, cancellationToken);
+        var totalCount = await fanPerformanceRepository.GetVisibleCountAsync(cancellationToken);
+        var durations = await durationResolver.ResolveManyAsync(items, cancellationToken);
+
+        var response = ApiPagedResponse<FanPerformanceDto>.Create(
+            ContentApiMapper.ToFanPerformanceDtos(items, durations),
+            request.Page,
+            request.PageSize,
+            totalCount);
+
+        return Results.Ok(response);
+    }
+
+    internal static async Task<IResult> GetFanPerformanceDetailAsync(
+        IFanPerformanceRepository fanPerformanceRepository,
+        FanPerformanceDurationResolver durationResolver,
+        int id,
+        CancellationToken cancellationToken)
+    {
+        var performance = await fanPerformanceRepository.GetByIdAsync(id, cancellationToken);
+        if (performance is null)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status404NotFound,
+                title: "Not Found",
+                detail: $"No public fan performance with id '{id}'.");
+        }
+
+        var duration = await durationResolver.ResolveAsync(performance, cancellationToken);
+        return Results.Ok(ContentApiMapper.ToFanPerformanceDto(performance, duration));
+    }
+
+    internal static Task<IResult> GetFanPerformanceAudioAsync(
+        int id,
+        IFanPerformanceRepository fanPerformanceRepository,
+        IBlobUploadService blobUploadService,
+        CancellationToken cancellationToken) =>
+        FanPerformanceEndpoints.ServeAudioAsync(
+            id,
+            fanPerformanceRepository,
+            blobUploadService,
+            cancellationToken);
+
+    private static IResult PhotoCategoryNotFound(string slug) =>
+        Results.Problem(
+            statusCode: StatusCodes.Status404NotFound,
+            title: "Not Found",
+            detail: $"No public photo category with slug '{slug}'.");
+
+    private static IResult PhotoNotFound(string slug, int picId) =>
+        Results.Problem(
+            statusCode: StatusCodes.Status404NotFound,
+            title: "Not Found",
+            detail: $"No public photo '{picId}' in category '{slug}'.");
 }

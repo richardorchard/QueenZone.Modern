@@ -15,11 +15,18 @@ export type AppConfig = {
   appEnv: AppEnvironment;
   /** Origin for `/api/v1` calls (platform-adjusted on Android emulators). */
   apiBaseUrl: string;
+  version: string;
+  buildNumber?: string;
+  buildTimestampUtc?: string;
+  buildRevision?: string;
 };
 
 type ExpoExtra = {
   appEnv?: string;
   apiBaseUrl?: string;
+  buildNumber?: string;
+  buildTimestampUtc?: string;
+  buildRevision?: string;
 };
 
 function readExtra(): ExpoExtra {
@@ -45,6 +52,10 @@ export function getAppConfig(): AppConfig {
   return {
     appEnv,
     apiBaseUrl: rewriteLoopbackForAndroid(configured, Platform.OS),
+    version: Constants.expoConfig?.version ?? '0.1.0',
+    buildNumber: extra.buildNumber,
+    buildTimestampUtc: extra.buildTimestampUtc,
+    buildRevision: extra.buildRevision,
   };
 }
 

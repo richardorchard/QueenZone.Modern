@@ -7,4 +7,5 @@ public sealed record FanPerformance(
     string Description,
     string AudioFileName,
     long FileSizeBytes,
-    DateTime DateAdded);
+    DateTime DateAdded,
+    int? DurationSeconds = null);
