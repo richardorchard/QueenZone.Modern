@@ -1,9 +1,11 @@
+import type { CompositeScreenProps } from '@react-navigation/native';
+import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useCallback } from 'react';
 import { FlatList, Pressable, RefreshControl, Text, useWindowDimensions, View } from 'react-native';
 import { fetchPhotoCategories, type PhotoCategoryListItem } from '../../api';
 import { usePagedContent } from '../../hooks/usePagedContent';
-import type { PhotosStackParamList } from '../../navigation/types';
+import type { PhotosStackParamList, RootTabParamList } from '../../navigation/types';
 import { useSession } from '../../session/SessionContext';
 import { radius, space, type, useTheme } from '../../theme';
 import { ArchiveImage } from '../../ui/ArchiveImage';
@@ -12,7 +14,10 @@ import { PageTitleBlock } from '../../ui/PageTitleBlock';
 import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from '../../ui/ScreenStates';
 import { photoCdnSource, photoCountLabel } from './photoGalleryMeta';
 
-type Props = NativeStackScreenProps<PhotosStackParamList, 'PhotoIndex'>;
+type Props = CompositeScreenProps<
+  NativeStackScreenProps<PhotosStackParamList, 'PhotoIndex'>,
+  BottomTabScreenProps<RootTabParamList>
+>;
 
 const GAP = 12;
 const COLS = 2;
@@ -55,12 +60,20 @@ export function PhotosScreen({ navigation }: Props) {
         <View style={{ paddingTop: 26, alignItems: 'center', gap: space.md }}>
           <ListFooterLoading visible={paged.loadingMore} />
           {isSignedIn ? (
-            <Button
-              label="Submit a photo"
-              variant="ghost"
-              size="sm"
-              onPress={() => navigation.navigate('PhotoSubmit')}
-            />
+            <>
+              <Button
+                label="Submit a photo"
+                variant="ghost"
+                size="sm"
+                onPress={() => navigation.navigate('PhotoSubmit')}
+              />
+              <Button
+                label="My submissions"
+                variant="ghost"
+                size="sm"
+                onPress={() => navigation.navigate('HomeTab', { screen: 'MySubmissions' })}
+              />
+            </>
           ) : (
             <Button
               label="Sign in to submit"

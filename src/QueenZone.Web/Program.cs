@@ -267,6 +267,8 @@ app.MapContentApiEndpoints();
 app.MapForumApiEndpoints();
 app.MapContactApiEndpoints();
 app.MapMeApiEndpoints();
+app.MapMessagesApiEndpoints();
+app.MapSubmissionsApiEndpoints();
 app.MapMemberApiEndpoints();
 // Anonymous public HTML is output-cached (short TTL); policy no-ops for authenticated users
 // and for the Testing environment so integration suites stay deterministic.

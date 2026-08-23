@@ -12,6 +12,7 @@ export type HomeStackParamList = {
   ComposeMessage: undefined;
   SavedList: { kind: 'articles' | 'photographs' | 'offline' | 'history' };
   DeleteAccount: undefined;
+  MySubmissions: undefined;
 };
 
 export type NewsStackParamList = {
