@@ -1,7 +1,11 @@
 @page "/photography/{slug}/{picId:int}"
 @model DetailModel
 
-<section class="qz-lightbox">
+<section class="qz-lightbox"
+         data-photo-lightbox
+         data-back-href="@Model.BackToGridHref"
+         data-prev-href="@Model.PreviousHref"
+         data-next-href="@Model.NextHref">
   <div class="qz-breadcrumbs-on-dark">
     <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
   </div>
@@ -27,11 +31,12 @@
            src="@Model.Photo.ImageUrl"
            alt="@Model.Photo.Title"
            width="@Model.Photo.PictureWidth"
-           height="@Model.Photo.PictureHeight">
+           height="@Model.Photo.PictureHeight"
+           draggable="false">
     }
     else
     {
-      <img class="qz-lightbox__image" src="@Model.Photo.ImageUrl" alt="@Model.Photo.Title">
+      <img class="qz-lightbox__image" src="@Model.Photo.ImageUrl" alt="@Model.Photo.Title" draggable="false">
     }
 
     @if (Model.NextHref is null)
@@ -60,54 +65,3 @@
     <partial name="_SocialShare" />
   </figcaption>
 </section>
-
-<script nonce="@HttpContext.GetCspNonce()" data-back-href="@Model.BackToGridHref" data-prev-href="@Model.PreviousHref" data-next-href="@Model.NextHref">
-  (function () {
-    var script = document.currentScript;
-    var swipeThreshold = 56;
-    var swipeMaxOffAxis = 72;
-    var startX = 0;
-    var startY = 0;
-
-    function go(href) {
-      if (href) {
-        window.location.href = href;
-      }
-    }
-
-    document.addEventListener('keydown', function (event) {
-      if (event.key === 'Escape') {
-        go(script.dataset.backHref);
-      } else if (event.key === 'ArrowLeft') {
-        go(script.dataset.prevHref);
-      } else if (event.key === 'ArrowRight') {
-        go(script.dataset.nextHref);
-      }
-    });
-
-    var body = document.querySelector('.qz-lightbox__body');
-    if (!body) {
-      return;
-    }
-
-    body.addEventListener('touchstart', function (event) {
-      if (event.changedTouches.length !== 1) {
-        return;
-      }
-      startX = event.changedTouches[0].clientX;
-      startY = event.changedTouches[0].clientY;
-    }, { passive: true });
-
-    body.addEventListener('touchend', function (event) {
-      if (event.changedTouches.length !== 1) {
-        return;
-      }
-      var dx = event.changedTouches[0].clientX - startX;
-      var dy = event.changedTouches[0].clientY - startY;
-      if (Math.abs(dx) < swipeThreshold || Math.abs(dy) > swipeMaxOffAxis || Math.abs(dx) <= Math.abs(dy)) {
-        return;
-      }
-      go(dx > 0 ? script.dataset.prevHref : script.dataset.nextHref);
-    }, { passive: true });
-  })();
-</script>

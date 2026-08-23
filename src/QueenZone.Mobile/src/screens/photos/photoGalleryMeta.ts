@@ -121,6 +121,15 @@ export const photoSwipeThresholdPx = 56;
 /** Ignore the gesture when vertical travel is larger than this. */
 export const photoSwipeMaxOffAxisPx = 72;
 
+/** Leave the iOS back-edge gesture to the native stack. */
+export const photoSwipeEdgeGuardPx = 24;
+
+/** Horizontal travel before the viewer captures the pan from the image. */
+export const photoSwipeCapturePx = 16;
+
+/** Movement below this is treated as a tap to toggle viewer chrome. */
+export const photoSwipeTapSlopPx = 10;
+
 export type PhotoSwipeDirection = 'previous' | 'next';
 
 /**
@@ -142,4 +151,47 @@ export function photoSwipeDirection(
   }
 
   return dx > 0 ? 'previous' : 'next';
+}
+
+/**
+ * Whether the photo viewer should take over a pan. Left-edge starts stay with
+ * the native back gesture; otherwise a mostly-horizontal move wins over the image.
+ */
+export function photoSwipeShouldCapture(
+  dx: number,
+  dy: number,
+  startPageX: number,
+  edgeGuardPx = photoSwipeEdgeGuardPx,
+  capturePx = photoSwipeCapturePx,
+): boolean {
+  if (!Number.isFinite(dx) || !Number.isFinite(dy) || !Number.isFinite(startPageX)) {
+    return false;
+  }
+
+  if (startPageX < edgeGuardPx) {
+    return false;
+  }
+
+  return Math.abs(dx) > capturePx && Math.abs(dx) > Math.abs(dy);
+}
+
+/** Claim the photo surface except along the iOS back-edge. */
+export function photoSwipeShouldStart(
+  startPageX: number,
+  edgeGuardPx = photoSwipeEdgeGuardPx,
+): boolean {
+  return Number.isFinite(startPageX) && startPageX >= edgeGuardPx;
+}
+
+/** A press that did not travel far enough to be a gallery swipe. */
+export function photoSwipeIsTap(
+  dx: number,
+  dy: number,
+  slopPx = photoSwipeTapSlopPx,
+): boolean {
+  if (!Number.isFinite(dx) || !Number.isFinite(dy)) {
+    return false;
+  }
+
+  return Math.abs(dx) <= slopPx && Math.abs(dy) <= slopPx;
 }

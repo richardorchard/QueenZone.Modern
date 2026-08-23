@@ -109,7 +109,12 @@ export function PhotosStack() {
       <Photos.Screen
         name="PhotoViewer"
         component={PhotoViewerScreen}
-        options={{ headerShown: false, title: 'Photograph' }}
+        options={{
+          headerShown: false,
+          title: 'Photograph',
+          gestureEnabled: true,
+          fullScreenGestureEnabled: false,
+        }}
       />
       <Photos.Screen name="PhotoSubmit" component={PhotoSubmitScreen} options={{ title: 'Submit a photo' }} />
       <Photos.Screen name="Search" component={SearchRouteScreen} />

@@ -3254,6 +3254,7 @@ a.qz-forum-post__author-link:focus-visible {
   display: flex;
   flex-direction: column;
   padding: var(--space-5);
+  overscroll-behavior-x: none;
 }
 
 .qz-breadcrumbs {
@@ -3336,7 +3337,8 @@ a.qz-forum-post__author-link:focus-visible {
   justify-content: center;
   gap: var(--space-5);
   min-height: 0;
-  touch-action: pan-y;
+  touch-action: none;
+  overscroll-behavior-x: none;
 }
 
 .qz-lightbox__image {
@@ -3345,6 +3347,10 @@ a.qz-forum-post__author-link:focus-visible {
   max-height: 72vh;
   object-fit: contain;
   border-radius: var(--radius-sm);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-drag: none;
+  -webkit-touch-callout: none;
 }
 
 .qz-lightbox__arrow {
@@ -3384,6 +3390,38 @@ a.qz-forum-post__author-link:focus-visible {
 
   .qz-freddie-tribute__intro {
     grid-template-columns: 1fr;
+  }
+
+  .qz-lightbox__body {
+    position: relative;
+    gap: 0;
+  }
+
+  .qz-lightbox__image {
+    max-width: 100%;
+    pointer-events: none;
+  }
+
+  .qz-lightbox__arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 1;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
+  }
+
+  .qz-lightbox__body > :first-child {
+    left: 0;
+  }
+
+  .qz-lightbox__body > :last-child {
+    right: 0;
+  }
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .qz-lightbox__image {
+    pointer-events: none;
   }
 }
 
