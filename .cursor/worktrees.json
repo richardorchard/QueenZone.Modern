@@ -1,0 +1,10 @@
+{
+  "setup-worktree-windows": [
+    "dotnet restore QueenZone.sln",
+    "dotnet tool restore"
+  ],
+  "setup-worktree-unix": [
+    "dotnet restore QueenZone.sln",
+    "dotnet tool restore"
+  ]
+}
