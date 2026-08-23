@@ -8,6 +8,7 @@ import { SignInScreen } from '../screens/account/SignInScreen';
 import { ContactScreen } from '../screens/account/ContactScreen';
 import { DeleteAccountScreen } from '../screens/account/DeleteAccountScreen';
 import { SavedListScreen } from '../screens/account/SavedListScreen';
+import { MySubmissionsScreen } from '../screens/account/MySubmissionsScreen';
 import { InboxScreen } from '../screens/messages/InboxScreen';
 import { ConversationScreen } from '../screens/messages/ConversationScreen';
 import { ComposeMessageScreen } from '../screens/messages/ComposeMessageScreen';
@@ -71,6 +72,7 @@ export function HomeStack() {
       <Home.Screen name="Conversation" component={ConversationScreen} />
       <Home.Screen name="ComposeMessage" component={ComposeMessageScreen} options={{ title: 'New message' }} />
       <Home.Screen name="SavedList" component={SavedListScreen} options={{ title: 'Library' }} />
+      <Home.Screen name="MySubmissions" component={MySubmissionsScreen} options={{ title: 'My submissions' }} />
     </Home.Navigator>
   );
 }

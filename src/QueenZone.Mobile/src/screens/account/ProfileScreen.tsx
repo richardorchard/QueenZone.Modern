@@ -133,6 +133,7 @@ export function ProfileScreen({ navigation }: Props) {
         accessibilityLabel={messagesA11yLabel(unreadCount)}
         onPress={() => navigation.navigate('Inbox')}
       />
+      <SettingsRow title="My submissions" onPress={() => navigation.navigate('MySubmissions')} />
       <SettingsRow title="Contact" onPress={() => navigation.navigate('Contact')} />
       <View style={{ paddingHorizontal: space.xl, paddingTop: space.xl, paddingBottom: space.xl, gap: 10 }}>
         <Button label="Sign out" variant="outline" loading={busy} onPress={() => void onSignOut()} />
