@@ -1,7 +1,7 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { PanResponder, Pressable, Text, View } from 'react-native';
+import { PanResponder, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ApiError, fetchPhotoDetail, type PhotoDetail } from '../../api';
 import type { PhotosStackParamList } from '../../navigation/types';
@@ -16,6 +16,9 @@ import {
   photoDetailMeta,
   photoSizeFromPath,
   photoSwipeDirection,
+  photoSwipeIsTap,
+  photoSwipeShouldCapture,
+  photoSwipeShouldStart,
   photoViewerParams,
   resolvedPhotoSize,
 } from './photoGalleryMeta';
@@ -78,13 +81,12 @@ export function PhotoViewerScreen({ navigation, route }: Props) {
   const swipeResponder = useMemo(
     () =>
       PanResponder.create({
-        onMoveShouldSetPanResponder: (event, gesture) => {
-          const startedAt = event.nativeEvent.pageX - gesture.dx;
-          if (startedAt < 24) {
-            return false;
-          }
-          return Math.abs(gesture.dx) > 16 && Math.abs(gesture.dx) > Math.abs(gesture.dy);
-        },
+        onStartShouldSetPanResponder: (event) => photoSwipeShouldStart(event.nativeEvent.pageX),
+        onMoveShouldSetPanResponder: (event, gesture) =>
+          photoSwipeShouldCapture(gesture.dx, gesture.dy, event.nativeEvent.pageX - gesture.dx),
+        onMoveShouldSetPanResponderCapture: (event, gesture) =>
+          photoSwipeShouldCapture(gesture.dx, gesture.dy, event.nativeEvent.pageX - gesture.dx),
+        onPanResponderTerminationRequest: () => false,
         onPanResponderRelease: (_, gesture) => {
           const direction = photoSwipeDirection(gesture.dx, gesture.dy);
           if (direction === 'previous' && previousPicId != null) {
@@ -93,6 +95,10 @@ export function PhotoViewerScreen({ navigation, route }: Props) {
           }
           if (direction === 'next' && nextPicId != null) {
             goTo(nextPicId);
+            return;
+          }
+          if (photoSwipeIsTap(gesture.dx, gesture.dy)) {
+            setChromeVisible((value) => !value);
           }
         },
       }),
@@ -111,30 +117,31 @@ export function PhotoViewerScreen({ navigation, route }: Props) {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#000' }}>
-      <Pressable
+      <View
         style={{ flex: 1 }}
         collapsable={false}
         accessibilityHint="Swipe left or right to change photograph"
-        onPress={() => setChromeVisible((value) => !value)}
         {...swipeResponder.panHandlers}
       >
         {image ? (
-          <ArchiveImage
-            source={image}
-            label={photo.title}
-            contentFit="contain"
-            recyclingKey={`photo-full-${photo.picId}`}
-            priority="high"
-            style={{ flex: 1, width: '100%' }}
-          />
+          <View pointerEvents="none" style={{ flex: 1, width: '100%' }}>
+            <ArchiveImage
+              source={image}
+              label={photo.title}
+              contentFit="contain"
+              recyclingKey={`photo-full-${photo.picId}`}
+              priority="high"
+              style={{ flex: 1, width: '100%' }}
+            />
+          </View>
         ) : (
           <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
             <Text style={[type.body, { color: c.textSecondary }]}>Image unavailable</Text>
           </View>
         )}
-      </Pressable>
+      </View>
       {chromeVisible ? (
-        <>
+        <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
           <View
             style={{
               position: 'absolute',
@@ -182,7 +189,7 @@ export function PhotoViewerScreen({ navigation, route }: Props) {
             <Text style={[type.cardTitle, { color: c.textPrimary }]}>{photo.title}</Text>
             <MetaLine parts={photoDetailMeta(photo)} />
           </View>
-        </>
+        </View>
       ) : null}
     </View>
   );

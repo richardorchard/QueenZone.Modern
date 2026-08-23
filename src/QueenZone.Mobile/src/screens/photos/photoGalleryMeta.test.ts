@@ -9,8 +9,14 @@ import {
   photoDetailMeta,
   photoRangeLabel,
   photoSizeFromPath,
+  photoSwipeCapturePx,
   photoSwipeDirection,
+  photoSwipeEdgeGuardPx,
   photoSwipeMaxOffAxisPx,
+  photoSwipeIsTap,
+  photoSwipeShouldCapture,
+  photoSwipeShouldStart,
+  photoSwipeTapSlopPx,
   photoSwipeThresholdPx,
   photoThumbMeta,
   photoViewerParams,
@@ -93,5 +99,27 @@ describe('photo gallery meta', () => {
     assert.equal(photoSwipeDirection(80, photoSwipeMaxOffAxisPx + 1), null);
     assert.equal(photoSwipeDirection(40, 50), null);
     assert.equal(photoSwipeDirection(Number.NaN, 0), null);
+  });
+
+  it('captures horizontal pans except from the iOS back edge', () => {
+    assert.equal(photoSwipeShouldCapture(photoSwipeCapturePx + 1, 0, photoSwipeEdgeGuardPx), true);
+    assert.equal(photoSwipeShouldCapture(40, 10, 80), true);
+    assert.equal(photoSwipeShouldCapture(40, 10, photoSwipeEdgeGuardPx - 1), false);
+    assert.equal(photoSwipeShouldCapture(photoSwipeCapturePx, 0, 80), false);
+    assert.equal(photoSwipeShouldCapture(20, 30, 80), false);
+    assert.equal(photoSwipeShouldCapture(Number.NaN, 0, 80), false);
+  });
+
+  it('starts a viewer gesture except from the iOS back edge', () => {
+    assert.equal(photoSwipeShouldStart(photoSwipeEdgeGuardPx), true);
+    assert.equal(photoSwipeShouldStart(photoSwipeEdgeGuardPx - 1), false);
+    assert.equal(photoSwipeShouldStart(Number.NaN), false);
+  });
+
+  it('treats a short press as a chrome toggle tap', () => {
+    assert.equal(photoSwipeIsTap(0, 0), true);
+    assert.equal(photoSwipeIsTap(photoSwipeTapSlopPx, photoSwipeTapSlopPx), true);
+    assert.equal(photoSwipeIsTap(photoSwipeTapSlopPx + 1, 0), false);
+    assert.equal(photoSwipeIsTap(Number.NaN, 0), false);
   });
 });

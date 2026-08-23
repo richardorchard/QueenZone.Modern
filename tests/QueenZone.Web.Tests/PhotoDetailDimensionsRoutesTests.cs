@@ -26,10 +26,24 @@ public sealed class PhotoDetailDimensionsRoutesTests : IClassFixture<WebApplicat
         Assert.Contains("height=\"1080\"", body, StringComparison.Ordinal);
         Assert.Contains("Submitted by QueenFan86", body, StringComparison.Ordinal);
         Assert.DoesNotContain("0 x 0", body, StringComparison.Ordinal);
+        Assert.Contains("data-photo-lightbox", body, StringComparison.Ordinal);
         Assert.Contains("data-prev-href", body, StringComparison.Ordinal);
         Assert.Contains("data-next-href", body, StringComparison.Ordinal);
-        Assert.Contains("touchend", body, StringComparison.Ordinal);
-        Assert.Contains("ArrowLeft", body, StringComparison.Ordinal);
+        Assert.Contains("draggable=\"false\"", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task PhotoDetail_ExposesNeighborHrefsForLightboxSwipe()
+    {
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var response = await client.GetAsync("/photography/brian-may/102");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("data-photo-lightbox", body, StringComparison.Ordinal);
+        Assert.Contains("data-prev-href=\"/photography/brian-may/101\"", body, StringComparison.Ordinal);
+        Assert.Contains("data-next-href=\"/photography/brian-may/103\"", body, StringComparison.Ordinal);
+        Assert.Contains("draggable=\"false\"", body, StringComparison.Ordinal);
     }
 
     [Fact]

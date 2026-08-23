@@ -324,3 +324,107 @@
     });
   });
 })();
+
+// Photo lightbox: swipe / arrows / keyboard. Touch handling lives here rather
+// than an inline script so iOS Safari cannot drop document.currentScript, and
+// so horizontal pans can preventDefault (non-passive) instead of becoming a
+// scroll, image-drag, or history swipe.
+(() => {
+  const root = document.querySelector("[data-photo-lightbox]");
+  if (!(root instanceof HTMLElement)) {
+    return;
+  }
+
+  const swipeThreshold = 56;
+  const swipeMaxOffAxis = 72;
+  const href = (name) => {
+    const value = root.getAttribute(name);
+    return value && value.trim() ? value : "";
+  };
+  const go = (url) => {
+    if (url) {
+      window.location.href = url;
+    }
+  };
+
+  document.addEventListener("keydown", (event) => {
+    if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) {
+      return;
+    }
+
+    if (event.key === "Escape") {
+      go(href("data-back-href"));
+    } else if (event.key === "ArrowLeft") {
+      go(href("data-prev-href"));
+    } else if (event.key === "ArrowRight") {
+      go(href("data-next-href"));
+    }
+  });
+
+  const surface = root.querySelector(".qz-lightbox__body") || root;
+  let startX = 0;
+  let startY = 0;
+  let tracking = false;
+
+  const touchPoint = (event) => {
+    if (!event.changedTouches || event.changedTouches.length !== 1) {
+      return null;
+    }
+
+    return event.changedTouches[0];
+  };
+
+  surface.addEventListener("touchstart", (event) => {
+    const touch = touchPoint(event);
+    if (!touch) {
+      tracking = false;
+      return;
+    }
+
+    tracking = true;
+    startX = touch.clientX;
+    startY = touch.clientY;
+  }, { passive: true });
+
+  surface.addEventListener("touchmove", (event) => {
+    if (!tracking) {
+      return;
+    }
+
+    const touch = touchPoint(event);
+    if (!touch) {
+      return;
+    }
+
+    const dx = touch.clientX - startX;
+    const dy = touch.clientY - startY;
+    if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) {
+      event.preventDefault();
+    }
+  }, { passive: false });
+
+  const finish = (event) => {
+    if (!tracking) {
+      return;
+    }
+
+    tracking = false;
+    const touch = touchPoint(event);
+    if (!touch) {
+      return;
+    }
+
+    const dx = touch.clientX - startX;
+    const dy = touch.clientY - startY;
+    if (Math.abs(dx) < swipeThreshold || Math.abs(dy) > swipeMaxOffAxis || Math.abs(dx) <= Math.abs(dy)) {
+      return;
+    }
+
+    go(dx > 0 ? href("data-prev-href") : href("data-next-href"));
+  };
+
+  surface.addEventListener("touchend", finish, { passive: true });
+  surface.addEventListener("touchcancel", () => {
+    tracking = false;
+  }, { passive: true });
+})();
