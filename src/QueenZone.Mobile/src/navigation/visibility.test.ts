@@ -32,6 +32,7 @@ describe('member-only screens', () => {
     assert.equal(isMemberOnlyScreen('Composer'), true);
     assert.equal(isMemberOnlyScreen('Settings'), true);
     assert.equal(isMemberOnlyScreen('PhotoSubmit'), true);
+    assert.equal(isMemberOnlyScreen('MySubmissions'), true);
   });
 
   it('keeps archive, photos, forum browse, and help public', () => {

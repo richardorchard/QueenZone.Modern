@@ -38,6 +38,7 @@ export type MessagesStackParamList = {
 export type YouStackParamList = {
   Account: undefined;
   Help: undefined;
+  MySubmissions: undefined;
   SignIn: undefined;
   Profile: undefined;
   Settings: undefined;

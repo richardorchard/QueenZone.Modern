@@ -46,6 +46,7 @@ export const memberOnlyScreenNames = [
   'ComposeMessage',
   'Composer',
   'PhotoSubmit',
+  'MySubmissions',
   'Profile',
   'Settings',
 ] as const;
@@ -82,6 +83,7 @@ export const detailScreenNames = [
   'ComposeMessage',
   'FanPerformanceDetail',
   'Help',
+  'MySubmissions',
   'Settings',
   'Profile',
   'SignIn',

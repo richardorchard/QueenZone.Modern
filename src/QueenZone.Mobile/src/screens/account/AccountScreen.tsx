@@ -26,6 +26,7 @@ export function AccountScreen({ navigation }: Props) {
         description={`Signed-in account hub. Profile, settings, and sign-out live here. Private messages have their own tab once you are signed in. ${apiLine}`}
         actions={[
           { label: 'Profile', onPress: () => navigation.navigate('Profile'), variant: 'outline' },
+          { label: 'My submissions', onPress: () => navigation.navigate('MySubmissions'), variant: 'outline' },
           { label: 'Settings', onPress: () => navigation.navigate('Settings'), variant: 'outline' },
           { label: 'Help', onPress: () => navigation.navigate('Help'), variant: 'ghost' },
           { label: 'Sign out (development)', onPress: signOut, variant: 'outline' },
