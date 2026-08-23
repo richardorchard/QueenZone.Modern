@@ -49,6 +49,9 @@ jobs:
       - name: Generate Android project
         env:
           EXPO_PUBLIC_APP_ENV: staging
+          EXPO_PUBLIC_SENTRY_DSN: ${{ vars.SENTRY_DSN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
         run: npx expo prebuild --platform android --clean --no-install
 
       - name: Cache Gradle
@@ -85,6 +88,11 @@ jobs:
           EXPO_PUBLIC_APP_ENV: staging
           ANDROID_TEST_KEYSTORE_PASSWORD: ${{ steps.bitwarden-secrets.outputs.ANDROID_TEST_KEYSTORE_PASSWORD }}
           ANDROID_TEST_KEY_PASSWORD: ${{ steps.bitwarden-secrets.outputs.ANDROID_TEST_KEY_PASSWORD }}
+          # Optional: the Sentry Gradle hook uploads source maps/mapping files
+          # when this is set (via Bitwarden, once #855 configures Sentry). It
+          # is not validated like the signing secrets above because the build
+          # must still succeed before Sentry is set up.
+          SENTRY_AUTH_TOKEN: ${{ steps.bitwarden-secrets.outputs.SENTRY_AUTH_TOKEN }}
         run: |
           if [ -z "$ANDROID_TEST_KEYSTORE_PASSWORD" ] || [ -z "$ANDROID_TEST_KEY_PASSWORD" ]; then
             echo "::error::Android test signing passwords are not configured in the deploy environment."

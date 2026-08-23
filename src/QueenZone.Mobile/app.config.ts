@@ -55,5 +55,19 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       buildTimestampUtc: process.env.BUILD_TIMESTAMP_UTC,
       buildRevision: process.env.BUILD_REVISION,
     },
+    plugins: [
+      ...(config.plugins ?? []),
+      [
+        // Auth token is deliberately NOT passed here — sentry-cli picks up
+        // SENTRY_AUTH_TOKEN from the build environment directly (Gradle /
+        // Xcode build phase), so it never lands in the generated,
+        // gitignored sentry.properties file. See publish-*.yml workflows.
+        '@sentry/react-native',
+        {
+          organization: process.env.SENTRY_ORG,
+          project: process.env.SENTRY_PROJECT,
+        },
+      ],
+    ],
   };
 };

@@ -107,6 +107,9 @@ jobs:
           # so App Store Connect rejected re-uploads with CFBundleVersion=1.
           IOS_BUILD_NUMBER: ${{ github.run_number }}
           GITHUB_RUN_NUMBER: ${{ github.run_number }}
+          EXPO_PUBLIC_SENTRY_DSN: ${{ vars.SENTRY_DSN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
         run: |
           set -euo pipefail
           echo "Using iOS build number ${IOS_BUILD_NUMBER}"
@@ -225,6 +228,11 @@ jobs:
         working-directory: src/QueenZone.Mobile/ios
         env:
           EXPO_PUBLIC_APP_ENV: staging
+          # Optional: the Sentry Xcode build phase uploads dSYMs/source maps
+          # when this is set (once #855 configures Sentry). Not validated
+          # like the signing secrets — the build must still succeed before
+          # Sentry is set up.
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
         run: |
           workspace=$(find . -maxdepth 1 -name '*.xcworkspace' -print -quit)
           if [ -z "$workspace" ]; then
