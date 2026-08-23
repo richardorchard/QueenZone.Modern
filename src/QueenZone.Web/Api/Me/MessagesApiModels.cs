@@ -34,9 +34,11 @@ public sealed record ConversationMessageDto(
     long SortKey);
 
 /// <summary>
-/// Conversation thread for <c>GET /api/v1/me/messages/{conversationId}</c>.
-/// Opening this resource marks the conversation read the same way as
-/// website <c>GET /messages/{id}</c>. Omit <c>page</c> for the latest page.
+/// Conversation thread for <c>GET /api/v1/me/messages/{conversationId}</c>
+/// and the 201 body of a successful reply POST.
+/// Opening GET marks the conversation read the same way as website
+/// <c>GET /messages/{id}</c>. Omit <c>page</c> for the latest page.
+/// <see cref="CanSendReply"/> matches the website reply composer visibility.
 /// </summary>
 public sealed record ConversationDetailDto(
     Guid ConversationId,
@@ -47,4 +49,11 @@ public sealed record ConversationDetailDto(
     int PageSize,
     int TotalCount,
     int TotalPages,
-    string DetailPath);
+    string DetailPath,
+    bool CanSendReply);
+
+/// <summary>
+/// JSON body for <c>POST /api/v1/me/messages/{conversationId}</c>.
+/// Same required/plain-text body as website <c>POST /messages/{id}</c>.
+/// </summary>
+public sealed record ConversationReplyRequest(string? Body);

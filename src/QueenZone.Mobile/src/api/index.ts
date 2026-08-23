@@ -33,6 +33,7 @@ export {
   fetchConversation,
   fetchInbox,
   fetchUnreadConversationCount,
+  replyToConversation,
 } from './messages';
 export type { ConversationDetail, ConversationMessage, InboxConversation } from './messages';
 export {

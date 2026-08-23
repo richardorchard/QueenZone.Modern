@@ -233,15 +233,10 @@ public sealed class ConversationModel(PrivateMessageService privateMessageServic
             memberId,
             Detail.OtherParticipantId,
             cancellationToken);
-        var messagingBlocked = await privateMessageService.IsMessagingBlockedAsync(
+        CanSendReply = await privateMessageService.CanSendReplyAsync(
             memberId,
-            Detail.OtherParticipantId,
+            Detail,
             cancellationToken);
-        var otherIsDeleted = string.Equals(
-            Detail.OtherParticipantDisplayName,
-            MemberAccountDeletionPolicy.DeletedDisplayName,
-            StringComparison.Ordinal);
-        CanSendReply = !messagingBlocked && !otherIsDeleted;
         ViewData["Title"] = $"Message {Detail.OtherParticipantDisplayName}";
     }
 

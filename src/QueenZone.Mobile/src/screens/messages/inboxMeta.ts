@@ -4,6 +4,16 @@ export const inboxPageSize = 50;
 /** Matches website conversation pages (`PrivateMessageLimits.ConversationPageSize`). */
 export const conversationPageSize = 50;
 
+/** Matches `PrivateMessageLimits.MaxBodyLength` / website reply textarea. */
+export const conversationBodyMaxLength = 4000;
+
+export const replyRequiredMessage = 'Message body is required.';
+
+export const replyTooLongMessage = `Message body must be ${conversationBodyMaxLength} characters or fewer.`;
+
+/** Matches `PrivateMessageService.UnableToSendMessage`. */
+export const unableToSendMessage = 'Unable to send message.';
+
 const guidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -55,4 +65,14 @@ export function formatMessageTimestamp(iso: string): string {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+export function validateReplyBody(body: string): string | null {
+  if (!body.trim()) {
+    return replyRequiredMessage;
+  }
+  if (body.trim().length > conversationBodyMaxLength) {
+    return replyTooLongMessage;
+  }
+  return null;
 }

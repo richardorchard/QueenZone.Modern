@@ -46,6 +46,7 @@ public sealed class PrivateMessageServiceTests
         Assert.NotNull(detail);
         Assert.Equal(MemberAccountDeletionPolicy.DeletedDisplayName, detail.OtherParticipantDisplayName);
         Assert.Equal(MemberAccountDeletionPolicy.DeletedDisplayName, Assert.Single(detail.Messages).SenderDisplayName);
+        Assert.False(await service.CanSendReplyAsync(bob.Id, detail));
         Assert.False(reply.Succeeded);
         Assert.Equal(PrivateMessageService.UnableToSendMessage, reply.ErrorMessage);
         Assert.Empty(recipientMatches);
@@ -57,6 +58,7 @@ public sealed class PrivateMessageServiceTests
 
         Assert.Equal("Alice", detail!.OtherParticipantDisplayName);
         Assert.Equal("Alice", detail.Messages[0].SenderDisplayName);
+        Assert.True(await service.CanSendReplyAsync(bob.Id, detail));
         Assert.True(reply.Succeeded);
         Assert.Single(recipientMatches);
     }
@@ -205,6 +207,7 @@ public sealed class PrivateMessageServiceTests
 
         var aliceView = await service.GetConversationAsync(conversationId, alice.Id, markRead: true);
         Assert.Equal(["Hello", "Hi Alice"], aliceView!.Messages.Select(m => m.Body).ToArray());
+        Assert.True(aliceView.Messages[0].SortKey < aliceView.Messages[1].SortKey);
         Assert.Equal(0, await service.CountUnreadConversationsAsync(alice.Id));
     }
 
@@ -548,6 +551,11 @@ public sealed class PrivateMessageServiceTests
         var bobReply = await service.ReplyAsync(conversationId, bob.Id, "Blocked reply");
         Assert.False(bobReply.Succeeded);
         Assert.Equal(PrivateMessageService.UnableToSendMessage, bobReply.ErrorMessage);
+
+        var aliceDetail = await service.GetConversationAsync(conversationId, alice.Id, markRead: false);
+        var bobDetail = await service.GetConversationAsync(conversationId, bob.Id, markRead: false);
+        Assert.False(await service.CanSendReplyAsync(alice.Id, aliceDetail!));
+        Assert.False(await service.CanSendReplyAsync(bob.Id, bobDetail!));
 
         // Existing conversation remains visible for both participants.
         Assert.Single((await service.GetInboxAsync(alice.Id)).Items);

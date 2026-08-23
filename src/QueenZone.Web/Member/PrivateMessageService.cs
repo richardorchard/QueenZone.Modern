@@ -64,6 +64,30 @@ public sealed class PrivateMessageService(
         return detail;
     }
 
+    /// <summary>
+    /// Same sendability rules as website <c>/messages/{id}</c>: blocked or
+    /// deleted counterparts cannot receive a reply.
+    /// </summary>
+    public async Task<bool> CanSendReplyAsync(
+        Guid memberId,
+        PrivateConversationDetail detail,
+        CancellationToken cancellationToken = default)
+    {
+        var otherIsDeleted = string.Equals(
+            detail.OtherParticipantDisplayName,
+            MemberAccountDeletionPolicy.DeletedDisplayName,
+            StringComparison.Ordinal);
+        if (otherIsDeleted)
+        {
+            return false;
+        }
+
+        return !await IsMessagingBlockedAsync(
+            memberId,
+            detail.OtherParticipantId,
+            cancellationToken);
+    }
+
     public async Task<PrivateMessageSendResult> ComposeAsync(
         Guid senderMemberId,
         Guid recipientMemberId,
