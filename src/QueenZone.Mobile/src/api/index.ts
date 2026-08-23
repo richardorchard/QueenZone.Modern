@@ -30,6 +30,12 @@ export {
 } from './forum';
 export { createPhotoSubmission } from './photoSubmissions';
 export {
+  fetchConversation,
+  fetchInbox,
+  fetchUnreadConversationCount,
+} from './messages';
+export type { ConversationDetail, ConversationMessage, InboxConversation } from './messages';
+export {
   parsePhotoSubmissionCreated,
   photoSubmissionFieldEntries,
   photoSubmissionsPath,

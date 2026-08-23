@@ -10,9 +10,18 @@ type Props = {
   onPress?: () => void;
   switchValue?: boolean;
   onSwitch?: (value: boolean) => void;
+  accessibilityLabel?: string;
 };
 
-export function SettingsRow({ title, subtitle, value, onPress, switchValue, onSwitch }: Props) {
+export function SettingsRow({
+  title,
+  subtitle,
+  value,
+  onPress,
+  switchValue,
+  onSwitch,
+  accessibilityLabel,
+}: Props) {
   const { c } = useTheme();
   const press = usePressProps();
   const content = (
@@ -55,7 +64,7 @@ export function SettingsRow({ title, subtitle, value, onPress, switchValue, onSw
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={title}
+      accessibilityLabel={accessibilityLabel ?? title}
       onPress={onPress}
       {...press}
       style={({ pressed }) => (Platform.OS === 'ios' && pressed ? { backgroundColor: 'rgba(255,255,255,0.04)' } : null)}

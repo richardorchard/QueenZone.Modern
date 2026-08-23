@@ -7,6 +7,8 @@ import { avatarUrl, formatMemberSince, type MemberProfile } from '../../api/me';
 import type { HomeStackParamList } from '../../navigation/types';
 import { useSession } from '../../session/SessionContext';
 import { space, type, useTheme } from '../../theme';
+import { messagesA11yLabel } from '../messages/inboxMeta';
+import { useUnreadConversationCount } from '../messages/useUnreadConversationCount';
 import { ArchiveFooter } from '../../ui/ArchiveFooter';
 import { Button } from '../../ui/Button';
 import { CrestSeal } from '../../ui/CrestSeal';
@@ -29,6 +31,7 @@ function initials(name: string | null): string {
 export function ProfileScreen({ navigation }: Props) {
   const { c } = useTheme();
   const { isSignedIn, isRestoring, displayName, profile, refreshProfile, signOut } = useSession();
+  const unreadCount = useUnreadConversationCount();
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -124,7 +127,12 @@ export function ProfileScreen({ navigation }: Props) {
         <Eyebrow tone="muted">Account</Eyebrow>
       </View>
       <SettingsRow title="Account settings" onPress={() => navigation.navigate('Settings')} />
-      <SettingsRow title="Messages" onPress={() => navigation.navigate('Inbox')} />
+      <SettingsRow
+        title="Messages"
+        value={unreadCount > 0 ? String(unreadCount) : undefined}
+        accessibilityLabel={messagesA11yLabel(unreadCount)}
+        onPress={() => navigation.navigate('Inbox')}
+      />
       <SettingsRow title="Contact" onPress={() => navigation.navigate('Contact')} />
       <View style={{ paddingHorizontal: space.xl, paddingTop: space.xl, paddingBottom: space.xl, gap: 10 }}>
         <Button label="Sign out" variant="outline" loading={busy} onPress={() => void onSignOut()} />

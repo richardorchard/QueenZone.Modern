@@ -27,6 +27,8 @@ import { IconButton } from '../../ui/IconButton';
 import { MetaLine } from '../../ui/MetaLine';
 import { SectionHeader } from '../../ui/SectionHeader';
 import { ChevronRight } from 'lucide-react-native';
+import { profileA11yLabel } from '../messages/inboxMeta';
+import { useUnreadConversationCount } from '../messages/useUnreadConversationCount';
 
 type Props = CompositeScreenProps<
   NativeStackScreenProps<HomeStackParamList, 'Home'>,
@@ -48,6 +50,7 @@ export function HomeScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
   const { isSignedIn, displayName } = useSession();
+  const unreadCount = useUnreadConversationCount();
   const avatar = isSignedIn ? initials(displayName) : '';
 
   const openStory = useCallback(() => {
@@ -134,7 +137,7 @@ export function HomeScreen({ navigation }: Props) {
                 />
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="Profile"
+                  accessibilityLabel={profileA11yLabel(isSignedIn ? unreadCount : 0)}
                   onPress={() => navigation.navigate('Profile')}
                   style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
                 >
@@ -154,6 +157,35 @@ export function HomeScreen({ navigation }: Props) {
                       {avatar || '·'}
                     </Text>
                   </View>
+                  {isSignedIn && unreadCount > 0 ? (
+                    <View
+                      style={{
+                        position: 'absolute',
+                        top: 2,
+                        right: 2,
+                        minWidth: 16,
+                        height: 16,
+                        borderRadius: 8,
+                        paddingHorizontal: 4,
+                        backgroundColor: c.accentPrimary,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                      importantForAccessibility="no"
+                      accessibilityElementsHidden
+                    >
+                      <Text
+                        style={{
+                          fontFamily: fonts.bodyMedium,
+                          fontSize: 9,
+                          lineHeight: 11,
+                          color: c.textOnAccent,
+                        }}
+                      >
+                        {unreadCount > 99 ? '99+' : unreadCount}
+                      </Text>
+                    </View>
+                  ) : null}
                 </Pressable>
               </View>
             </View>
