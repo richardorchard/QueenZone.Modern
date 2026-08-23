@@ -151,5 +151,5 @@ if (-not (Test-SettingNamePresent)) {
     throw "Post-write verify failed: $settingName name missing on ${SiteName}."
 }
 
-Write-Output "$settingName is configured on ${SiteName} (len=$keyLength)."
-Write-Output "Mirror the same value into Bitwarden secret '$settingName' (Queenzone Development). Do not paste the value into chat or git."
+Write-Output "$settingName is configured on ${SiteName} (generated len=$keyLength)."
+Write-Output "Recovery mirror: copy the live App Service value into Bitwarden secret '$settingName' (Queenzone Development). Do not paste the value into chat or git."
