@@ -28,5 +28,13 @@ export {
   fetchForumTopicPosts,
   voteForumTopicPoll,
 } from './forum';
+export { createPhotoSubmission } from './photoSubmissions';
+export {
+  parsePhotoSubmissionCreated,
+  photoSubmissionFieldEntries,
+  photoSubmissionsPath,
+} from './photoSubmissionForm';
+export type { PhotoSubmissionFields, PhotoUploadFile } from './photoSubmissionForm';
+export type { PhotoSubmissionInput } from './photoSubmissions';
 export type { PageQuery, PhotoPageQuery } from './content';
 export type * from './types';
