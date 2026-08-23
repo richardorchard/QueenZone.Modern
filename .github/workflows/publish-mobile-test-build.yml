@@ -88,14 +88,27 @@ jobs:
           EXPO_PUBLIC_APP_ENV: staging
           ANDROID_TEST_KEYSTORE_PASSWORD: ${{ steps.bitwarden-secrets.outputs.ANDROID_TEST_KEYSTORE_PASSWORD }}
           ANDROID_TEST_KEY_PASSWORD: ${{ steps.bitwarden-secrets.outputs.ANDROID_TEST_KEY_PASSWORD }}
-          # Optional: the Sentry Gradle hook uploads source maps/mapping files
-          # when this is set (via Bitwarden, once #855 configures Sentry). It
-          # is not validated like the signing secrets above because the build
-          # must still succeed before Sentry is set up.
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
           SENTRY_AUTH_TOKEN: ${{ steps.bitwarden-secrets.outputs.SENTRY_AUTH_TOKEN }}
         run: |
           if [ -z "$ANDROID_TEST_KEYSTORE_PASSWORD" ] || [ -z "$ANDROID_TEST_KEY_PASSWORD" ]; then
             echo "::error::Android test signing passwords are not configured in the deploy environment."
+            exit 1
+          fi
+          # Sentry upload runs during the Gradle assemble. Fail fast with a
+          # clear message rather than a late sentry-cli org/auth error (#857).
+          missing=0
+          for name in SENTRY_ORG SENTRY_PROJECT SENTRY_AUTH_TOKEN; do
+            eval "value=\${$name-}"
+            if [ -z "$value" ]; then
+              echo "::error::$name is not set for the Android publish build (repo vars + Bitwarden SENTRY_AUTH_TOKEN)."
+              missing=1
+            else
+              echo "$name is set (length ${#value})"
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
             exit 1
           fi
           ./gradlew assembleRelease \
