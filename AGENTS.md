@@ -18,6 +18,7 @@ This repository is the modern QueenZone rebuild. The project is archive-first: i
 - `docs/backlog/migration-backlog.md` tracks migration work.
 - `docs/sql/data-api-builder-mcp.md` explains the local SQL MCP setup for read-only legacy database investigation.
 - `docs/agent-bitwarden-secrets.md` is the multi-machine Bitwarden Secrets Manager (`bws`) setup for local agents (Windows vs macOS).
+- `.cursor/agents/` and `.cursor/skills/orchestrate-epic/` are the Cursor epic orchestrator (planner / implementer / verifier). Pin the skill as a Custom Mode.
 
 Keep durable workflow guidance in this file and keep user-facing setup guidance in `README.md`.
 
@@ -52,6 +53,7 @@ Examples:
 | Claude Code     | `claude/`   | `claude/seo-foundation`       | `agent:claude` |
 | Codex           | `codex/`    | `codex/legacy-news-dedup`       | `agent:codex`  |
 | Cursor Composer | `composer/` | `composer/health-smoke-tests` | `agent:composer` |
+| Cursor Agent    | `cursor/`   | `cursor/news-pagination`      | `agent:cursor` |
 | New tool        | `{name}/`   | `my-tool/forum-archive-review`| `agent:{name}` |
 
 GitHub Actions applies the matching `agent:*` label from the branch prefix via `.github/workflows/agent-pr-label.yml`.
@@ -93,6 +95,12 @@ For multi-session work, use `docs/agent-handoff-cheatsheet.md`.
 ### Linking issues so merge auto-closes them
 
 Fill in the template's `## Issues` section with a real GitHub closing keyword — `Closes #123`, `Fixes #123`, or `Resolves #123` — for every issue the PR fully resolves. GitHub only auto-closes an issue on merge when one of those keywords appears; a prose mention like "Implements #123" or a bare `[#123](...)` link anywhere else in the PR body (including `## Summary`) does not trigger it and leaves the issue open after merge. Use `Relates to #123` for issues the PR only touches without resolving. The `pr-issue-link-check` CI job fails the PR if it references an issue number without a recognized closing or relating keyword, so use the correct keyword up front rather than fixing it after the check fails.
+
+## Cursor epic orchestration
+
+Cursor custom subagents are markdown files in `.cursor/agents/` (`planner`, `implementer`, `verifier`, `orchestrator`). The spawn protocol lives in `.cursor/skills/orchestrate-epic/SKILL.md`. Pin that skill as a Custom Mode (`/orchestrate-epic`, then Alt+Enter on Windows or Option+Enter on Mac), or invoke `/orchestrator`. Child implementers use the `cursor/` branch prefix unless the prompt names another agent.
+
+Grok 4.6 effort: parent high/xhigh, planner high, implementer medium, verifier high. Isolated child checkouts restore via `.cursor/worktrees.json`.
 
 ## Testing Expectations
 
