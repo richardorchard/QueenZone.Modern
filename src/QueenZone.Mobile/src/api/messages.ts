@@ -4,10 +4,16 @@ import type { PageQuery } from './content';
 import {
   messagesApiPath,
   messagesConversationPath,
+  messagesRecipientsPath,
   messagesUnreadCountPath,
 } from './messagesPaths';
 
-export { messagesApiPath, messagesConversationPath, messagesUnreadCountPath } from './messagesPaths';
+export {
+  messagesApiPath,
+  messagesConversationPath,
+  messagesRecipientsPath,
+  messagesUnreadCountPath,
+} from './messagesPaths';
 
 export type InboxConversation = {
   conversationId: string;
@@ -43,6 +49,11 @@ export type ConversationDetail = {
   canSendReply: boolean;
 };
 
+export type MessageRecipient = {
+  memberId: string;
+  displayName: string;
+};
+
 function pageParams({ page, pageSize }: PageQuery) {
   return { page, pageSize };
 }
@@ -69,6 +80,18 @@ export function fetchUnreadConversationCount(accessToken: string, signal?: Abort
   );
 }
 
+export function searchRecipients(
+  accessToken: string,
+  query: string,
+  signal?: AbortSignal,
+): Promise<MessageRecipient[]> {
+  return fetchJson<{ items: MessageRecipient[] }>(messagesRecipientsPath, {
+    query: { q: query },
+    accessToken,
+    signal,
+  }).then((payload) => (Array.isArray(payload.items) ? payload.items : []));
+}
+
 export function fetchConversation(
   accessToken: string,
   conversationId: string,
@@ -90,6 +113,20 @@ export function replyToConversation(
   return sendJson(messagesConversationPath(conversationId), {
     method: 'POST',
     body: { body },
+    accessToken,
+    signal,
+  });
+}
+
+export function composeMessage(
+  accessToken: string,
+  recipientMemberId: string,
+  body: string,
+  signal?: AbortSignal,
+): Promise<ConversationDetail> {
+  return sendJson(messagesApiPath, {
+    method: 'POST',
+    body: { recipientMemberId, body },
     accessToken,
     signal,
   });

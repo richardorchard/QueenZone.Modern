@@ -57,3 +57,21 @@ public sealed record ConversationDetailDto(
 /// Same required/plain-text body as website <c>POST /messages/{id}</c>.
 /// </summary>
 public sealed record ConversationReplyRequest(string? Body);
+
+/// <summary>
+/// One match from <c>GET /api/v1/me/messages/recipients?q=</c>.
+/// Same fields as website compose recipient search (<see cref="MemberRecipientMatch"/>).
+/// </summary>
+public sealed record MessageRecipientDto(Guid MemberId, string DisplayName);
+
+/// <summary>
+/// Recipient search results for <c>GET /api/v1/me/messages/recipients?q=</c>.
+/// Cap matches website <see cref="PrivateMessageLimits.MaxRecipientSearchResults"/>.
+/// </summary>
+public sealed record MessageRecipientsDto(IReadOnlyList<MessageRecipientDto> Items);
+
+/// <summary>
+/// JSON body for <c>POST /api/v1/me/messages</c> (new conversation / compose).
+/// Same recipient + body rules as website <c>POST /messages/compose</c>.
+/// </summary>
+public sealed record ComposeMessageRequest(Guid? RecipientMemberId, string? Body);
