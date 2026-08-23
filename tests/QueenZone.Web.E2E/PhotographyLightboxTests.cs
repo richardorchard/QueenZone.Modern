@@ -65,7 +65,6 @@ public class PhotographyLightboxTests : E2EPageTest
             }
             """);
 
-        await page.WaitForURLAsync("**/photography/brian-may/103");
         await Expect(page.GetByRole(AriaRole.Heading, new() { Name = "Red Special close-up", Level = 1 }))
             .ToBeVisibleAsync();
     }
@@ -75,6 +74,7 @@ public class PhotographyLightboxTests : E2EPageTest
     {
         await Page.GotoAsync("/photography/brian-may/102");
         await Page.Keyboard.PressAsync("ArrowRight");
-        await Page.WaitForURLAsync("**/photography/brian-may/103");
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Red Special close-up", Level = 1 }))
+            .ToBeVisibleAsync();
     }
 }
