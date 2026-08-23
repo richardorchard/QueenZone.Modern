@@ -117,8 +117,12 @@ jobs:
           restore-keys: |
             gradle-${{ runner.os }}-
 
+      # Unsigned CI builds must not call sentry-cli upload (no org/token here).
+      # Publish workflows set SENTRY_ORG/PROJECT/AUTH_TOKEN and upload for real.
       - name: Assemble debug APK
         working-directory: src/QueenZone.Mobile/android
+        env:
+          SENTRY_DISABLE_AUTO_UPLOAD: "true"
         run: ./gradlew assembleDebug
 
       - name: Upload APK
@@ -185,8 +189,14 @@ jobs:
       - name: Prebuild iOS project
         run: npx expo prebuild --platform ios --clean
 
+      # Unsigned CI builds must not call sentry-cli upload (no org/token here).
+      # Without this, Bundle RN / Upload Debug Symbols fails with
+      # "An organization ID or slug is required" once the Sentry Expo plugin
+      # is registered (#855 / #857). Publish workflows set credentials and upload.
       - name: Build for iOS Simulator
         working-directory: src/QueenZone.Mobile/ios
+        env:
+          SENTRY_DISABLE_AUTO_UPLOAD: "true"
         run: |
           WORKSPACE=$(ls -d *.xcworkspace | head -n 1)
           # Expo CNG names the app scheme after the workspace itself
