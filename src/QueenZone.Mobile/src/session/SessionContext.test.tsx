@@ -1,0 +1,163 @@
+import { Text } from 'react-native';
+import { screen, waitFor, userEvent } from '@testing-library/react-native';
+import { fetchJson } from '../api/client';
+import { authTokensFixture, memberProfilePayload } from '../test/fixtures';
+import { renderWithProviders } from '../test/render';
+import { SessionProvider, useSession } from './SessionContext';
+import * as oauth from './oauth';
+import * as tokenStore from './tokenStore';
+
+jest.mock('../config/appConfig', () => ({
+  getAppConfig: () => ({ apiBaseUrl: 'http://qz.test', appEnv: 'development', version: '0.1.0' }),
+}));
+
+jest.mock('../api/client', () => ({
+  fetchJson: jest.fn(),
+}));
+
+jest.mock('./oauth', () => ({
+  signInWithProvider: jest.fn(),
+  refreshAccessToken: jest.fn(),
+  revokeRefreshToken: jest.fn(),
+  logoutRemote: jest.fn(),
+}));
+
+jest.mock('./tokenStore', () => ({
+  readStoredSession: jest.fn(),
+  writeStoredSession: jest.fn(async (tokens: { accessToken: string; refreshToken: string; expiresIn: number }) => ({
+    ...tokens,
+    expiresAt: Date.now() + 60_000,
+  })),
+  clearStoredSession: jest.fn(async () => {}),
+}));
+
+const fetchJsonMock = fetchJson as jest.MockedFunction<typeof fetchJson>;
+const readStored = tokenStore.readStoredSession as jest.MockedFunction<typeof tokenStore.readStoredSession>;
+const clearStored = tokenStore.clearStoredSession as jest.MockedFunction<typeof tokenStore.clearStoredSession>;
+const signInWithProvider = oauth.signInWithProvider as jest.MockedFunction<typeof oauth.signInWithProvider>;
+const refreshAccessToken = oauth.refreshAccessToken as jest.MockedFunction<typeof oauth.refreshAccessToken>;
+const logoutRemote = oauth.logoutRemote as jest.MockedFunction<typeof oauth.logoutRemote>;
+const revokeRefreshToken = oauth.revokeRefreshToken as jest.MockedFunction<typeof oauth.revokeRefreshToken>;
+
+function Probe() {
+  const session = useSession();
+  return (
+    <>
+      <Text>{session.isRestoring ? 'restoring' : session.isSignedIn ? 'signed-in' : 'signed-out'}</Text>
+      <Text>{session.displayName ?? 'anonymous'}</Text>
+      <Text
+        onPress={() => {
+          void session.signIn('Google').catch(() => {});
+        }}
+      >
+        do-sign-in
+      </Text>
+      <Text onPress={() => void session.signOut()}>do-sign-out</Text>
+    </>
+  );
+}
+
+function renderSession() {
+  return renderWithProviders(
+    <SessionProvider>
+      <Probe />
+    </SessionProvider>,
+    { navigation: false },
+  );
+}
+
+beforeEach(() => {
+  fetchJsonMock.mockReset();
+  readStored.mockReset();
+  clearStored.mockReset();
+  signInWithProvider.mockReset();
+  refreshAccessToken.mockReset();
+  logoutRemote.mockReset();
+  revokeRefreshToken.mockReset();
+  fetchJsonMock.mockResolvedValue(memberProfilePayload());
+  logoutRemote.mockResolvedValue(undefined);
+  revokeRefreshToken.mockResolvedValue(undefined);
+});
+
+describe('SessionProvider', () => {
+  it('finishes restore with no stored session as signed out', async () => {
+    readStored.mockResolvedValue(null);
+    renderSession();
+    await waitFor(() => expect(screen.getByText('signed-out')).toBeOnTheScreen());
+  });
+
+  it('restores a valid stored access token and profile', async () => {
+    readStored.mockResolvedValue({
+      ...authTokensFixture(),
+      expiresAt: Date.now() + 60_000,
+    });
+    renderSession();
+    await waitFor(() => expect(screen.getByText('signed-in')).toBeOnTheScreen());
+    expect(screen.getByText('Freddie')).toBeOnTheScreen();
+    expect(refreshAccessToken).not.toHaveBeenCalled();
+  });
+
+  it('refreshes an expired stored token', async () => {
+    readStored.mockResolvedValue({
+      ...authTokensFixture(),
+      expiresAt: Date.now() - 1_000,
+    });
+    refreshAccessToken.mockResolvedValue(authTokensFixture({ accessToken: 'next' }));
+    renderSession();
+    await waitFor(() => expect(screen.getByText('signed-in')).toBeOnTheScreen());
+    expect(refreshAccessToken).toHaveBeenCalledWith('http://qz.test', 'refresh-token');
+  });
+
+  it('clears local state when refresh fails', async () => {
+    readStored.mockResolvedValue({
+      ...authTokensFixture(),
+      expiresAt: Date.now() - 1_000,
+    });
+    refreshAccessToken.mockRejectedValue(new Error('expired'));
+    renderSession();
+    await waitFor(() => expect(screen.getByText('signed-out')).toBeOnTheScreen());
+    expect(clearStored).toHaveBeenCalled();
+  });
+
+  it('signs in through the provider hop and can sign out', async () => {
+    const user = userEvent.setup();
+    readStored.mockResolvedValue(null);
+    signInWithProvider.mockResolvedValue(authTokensFixture());
+    renderSession();
+    await waitFor(() => expect(screen.getByText('signed-out')).toBeOnTheScreen());
+
+    await user.press(screen.getByText('do-sign-in'));
+    await waitFor(() => expect(screen.getByText('signed-in')).toBeOnTheScreen());
+    expect(signInWithProvider).toHaveBeenCalledWith('http://qz.test', 'Google');
+
+    await user.press(screen.getByText('do-sign-out'));
+    await waitFor(() => expect(screen.getByText('signed-out')).toBeOnTheScreen());
+    expect(logoutRemote).toHaveBeenCalled();
+    expect(revokeRefreshToken).toHaveBeenCalled();
+    expect(clearStored).toHaveBeenCalled();
+  });
+
+  it('stays signed out when the provider hop is cancelled', async () => {
+    const user = userEvent.setup();
+    readStored.mockResolvedValue(null);
+    signInWithProvider.mockRejectedValue(new Error('Sign-in was cancelled.'));
+    renderSession();
+    await waitFor(() => expect(screen.getByText('signed-out')).toBeOnTheScreen());
+
+    await user.press(screen.getByText('do-sign-in'));
+    expect(signInWithProvider).toHaveBeenCalledWith('http://qz.test', 'Google');
+    expect(screen.getByText('signed-out')).toBeOnTheScreen();
+    expect(clearStored).not.toHaveBeenCalled();
+  });
+
+  it('stays signed in when profile load fails', async () => {
+    readStored.mockResolvedValue({
+      ...authTokensFixture(),
+      expiresAt: Date.now() + 60_000,
+    });
+    fetchJsonMock.mockRejectedValue(new Error('offline'));
+    renderSession();
+    await waitFor(() => expect(screen.getByText('signed-in')).toBeOnTheScreen());
+    expect(screen.getByText('anonymous')).toBeOnTheScreen();
+  });
+});
