@@ -58,9 +58,18 @@ From the repository root:
 cd src/QueenZone.Mobile
 node --version   # v24.x
 npm ci
-npm run typecheck
-npm test
+npm run preflight
 ```
+
+`npm run preflight` runs typecheck, the unit tests, and the lockfile-pinned
+Expo Doctor check (`npm run doctor`). Doctor must pass all checks after a
+clean `npm ci`. A required CI/publish Doctor gate is tracked in #870; run
+the same `npm run doctor` command locally before opening a mobile PR.
+
+SDK 57 always uses React Native's New Architecture, so `app.json` does not
+set `newArchEnabled` (the field is no longer in the config schema). Splash
+is configured through the `expo-splash-screen` plugin, not a top-level
+`splash` object.
 
 Generate native projects from committed Expo config (Continuous Native
 Generation). Do not commit the resulting `android/` or `ios/` directories.
@@ -220,7 +229,9 @@ npx expo run:android
 `mobile-js` (typecheck + unit tests), `mobile-android`, and `mobile-ios`
 (native compile) in [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)
 run whenever `src/QueenZone.Mobile/` changes, or on demand via
-`workflow_dispatch`. `mobile-android` builds an unsigned debug APK on a
+`workflow_dispatch`. Local preflight is `npm run preflight` (typecheck, unit
+tests, and lockfile-pinned `npm run doctor`). Making Doctor a required
+`mobile-js` / publish check is #870. `mobile-android` builds an unsigned debug APK on a
 GitHub-hosted Linux runner; `mobile-ios` builds an unsigned Simulator `.app`
 (zipped) on a GitHub-hosted macOS runner — no Apple account or signing
 credentials are used. Both jobs upload their build as a workflow artifact

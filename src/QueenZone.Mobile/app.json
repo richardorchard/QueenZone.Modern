@@ -7,12 +7,6 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#111111"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "org.queenzone.mobile"
@@ -30,7 +24,18 @@
     "plugins": [
       "expo-dev-client",
       "expo-font",
-      "expo-splash-screen",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#111111",
+          "dark": {
+            "backgroundColor": "#111111"
+          },
+          "imageWidth": 200
+        }
+      ],
       "expo-image",
       "expo-secure-store",
       "expo-web-browser",
