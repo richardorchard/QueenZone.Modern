@@ -43,6 +43,9 @@ yarn-error.*
 src/discovery-probe-*.test.ts
 src/.discovery-probe-*.test.ts
 
+# Local / CI coverage output (#871). Never commit generated reports.
+/coverage
+
 # Written by the Testing contract host (scripts/run-mobile-api-contracts.sh
 # and scripts/run-mobile-device-smoke.sh).
 contracts/host.json

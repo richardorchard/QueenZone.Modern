@@ -264,6 +264,7 @@ app.MapQueenZoneApiV1();
 app.MapAdminApiEndpoints();
 app.MapMobileAuthEndpoints();
 app.MapContentApiEndpoints();
+app.MapSearchApiEndpoints();
 app.MapForumApiEndpoints();
 app.MapContactApiEndpoints();
 app.MapMeApiEndpoints();

@@ -9,6 +9,7 @@ obj/
 TestResults*/
 test-results/
 coverage-report/
+src/QueenZone.Mobile/coverage/
 *.trx
 *.coverage
 *.coveragexml

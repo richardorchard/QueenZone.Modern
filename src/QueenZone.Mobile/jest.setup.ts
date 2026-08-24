@@ -28,6 +28,7 @@ jest.mock('react-native-gesture-handler', () => require('./jest.gesture-handler.
 jest.mock('expo-web-browser', () => ({
   maybeCompleteAuthSession: jest.fn(),
   openAuthSessionAsync: jest.fn(),
+  openBrowserAsync: jest.fn(async () => ({ type: 'dismiss' })),
   dismissAuthSession: jest.fn(),
   dismissBrowser: jest.fn(),
   warmUpAsync: jest.fn(async () => {}),

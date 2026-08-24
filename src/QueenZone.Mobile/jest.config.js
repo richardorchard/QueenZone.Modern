@@ -7,4 +7,15 @@ module.exports = {
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   clearMocks: true,
   restoreMocks: true,
+  // Coverage floors live in scripts/mobile-coverage-floors.json (enforced by
+  // scripts/Test-MobileCoverageGate.mjs). Do not put thresholds here — this
+  // runner is only one of two suites (#871 Option A).
+  collectCoverageFrom: [
+    '**/src/**/*.{ts,tsx}',
+    '!**/src/**/*.test.{ts,tsx}',
+    '!**/src/**/*.d.ts',
+    '!**/src/test/**',
+  ],
+  coverageDirectory: 'coverage/jest',
+  coverageReporters: ['json', 'json-summary', 'lcov', 'text-summary', 'cobertura'],
 };

@@ -347,10 +347,14 @@ public sealed class HealthEndpointsTests : IClassFixture<WebApplicationFactory<P
         public Task<IReadOnlyList<NewsItem>> GetLatestAsync(int count, CancellationToken cancellationToken = default) =>
             throw new InvalidOperationException("simulated repository failure");
 
-        public Task<IReadOnlyList<NewsItem>> GetArchivePageAsync(int page, int pageSize, CancellationToken cancellationToken = default) =>
+        public Task<IReadOnlyList<NewsItem>> GetArchivePageAsync(
+            int page,
+            int pageSize,
+            NewsArchiveFilter filter = default,
+            CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<NewsItem>>([]);
 
-        public Task<int> GetPublishedCountAsync(CancellationToken cancellationToken = default) =>
+        public Task<int> GetPublishedCountAsync(NewsArchiveFilter filter = default, CancellationToken cancellationToken = default) =>
             Task.FromResult(0);
 
         public Task<NewsItem?> GetByIdAsync(int id, CancellationToken cancellationToken = default) =>

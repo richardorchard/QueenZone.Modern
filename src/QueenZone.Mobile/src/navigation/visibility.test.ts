@@ -48,25 +48,45 @@ describe('member-only screens', () => {
 });
 
 describe('shouldHideTabBar', () => {
-  it('hides the tab bar on pushed detail routes', () => {
-    assert.equal(shouldHideTabBar('Story'), true);
-    assert.equal(shouldHideTabBar('BiographyChapter'), true);
-    assert.equal(shouldHideTabBar('Album'), true);
-    assert.equal(shouldHideTabBar('Thread'), true);
-    assert.equal(shouldHideTabBar('PhotoViewer'), true);
-    assert.equal(shouldHideTabBar('Profile'), true);
-    assert.equal(shouldHideTabBar('DeleteAccount'), true);
-    assert.equal(shouldHideTabBar('Contact'), true);
-    assert.equal(shouldHideTabBar('MySubmissions'), true);
-    assert.equal(shouldHideTabBar('Search'), true);
-    assert.equal(shouldHideTabBar('Home'), false);
-    assert.equal(shouldHideTabBar('NewsIndex'), false);
-    assert.equal(shouldHideTabBar('ArchiveHub'), false);
-    assert.equal(shouldHideTabBar('PhotoIndex'), false);
-    assert.equal(shouldHideTabBar('PhotoCategory'), false);
-    assert.equal(shouldHideTabBar('ForumIndex'), false);
-    assert.equal(shouldHideTabBar('Biography'), true);
-    assert.equal(shouldHideTabBar('Category'), false);
+  it('hides the tab bar on immersive and pushed-detail routes', () => {
+    for (const name of [
+      'Story',
+      'BiographyChapter',
+      'Album',
+      'Thread',
+      'PhotoViewer',
+      'Profile',
+      'DeleteAccount',
+      'Contact',
+      'MySubmissions',
+      'Search',
+      'FanPerformanceDetail',
+      'Conversation',
+      'Composer',
+    ]) {
+      assert.equal(shouldHideTabBar(name), true, name);
+    }
+  });
+
+  it('keeps the tab bar on tab roots and archive section lists', () => {
+    for (const name of [
+      'Home',
+      'NewsIndex',
+      'ArchiveHub',
+      'PhotoIndex',
+      'PhotoCategory',
+      'ForumIndex',
+      'Category',
+      'Stories',
+      'Biography',
+      'Discography',
+      'Timeline',
+      'FreddieTribute',
+      'FanPerformances',
+      'AboutArchive',
+    ]) {
+      assert.equal(shouldHideTabBar(name), false, name);
+    }
   });
 });
 
