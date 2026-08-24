@@ -1,5 +1,6 @@
 -- Source of truth for dbo.SearchDocument_Search (unified whole-site search).
--- Applied by EF migration: 20260804000000_AddSearchDocumentFullTextSearch
+-- Applied by EF migrations: 20260804113500_AddSearchDocumentFullTextSearch
+-- (proc body) and 20260824120000_AddSearchDocumentSearchSourceKey (SourceKey column).
 -- See docs/sql/README.md for contributor conventions.
 --
 -- Unlike the per-content-type NEWS_T_SearchPublished / ModernForum_SearchThreads procs, this
@@ -23,6 +24,7 @@ BEGIN
     )
     SELECT
         d.ContentType,
+        d.SourceKey,
         d.Title,
         d.Summary,
         d.Url,

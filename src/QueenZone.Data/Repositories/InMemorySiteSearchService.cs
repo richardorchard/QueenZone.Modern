@@ -51,9 +51,10 @@ public sealed class InMemorySiteSearchService(SharedSearchIndexStore store) : IS
         return Task.FromResult(new SiteSearchPage(pageItems, totalCount, normalizedPage, take));
     }
 
-    private static SiteSearchResult Map(Entities.SearchDocumentEntity document) =>
+    internal static SiteSearchResult Map(Entities.SearchDocumentEntity document) =>
         new(
             document.ContentType,
+            document.SourceKey,
             document.Title,
             document.Summary ?? string.Empty,
             document.Url,
