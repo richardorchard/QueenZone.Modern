@@ -16,9 +16,10 @@ type Props = {
   };
   onPress: () => void;
   height?: number;
+  priority?: 'low' | 'normal' | 'high';
 };
 
-export function HeroFeature({ item, onPress, height = 468 }: Props) {
+export function HeroFeature({ item, onPress, height = 468, priority = 'normal' }: Props) {
   const { c } = useTheme();
   const press = usePressProps();
 
@@ -31,7 +32,12 @@ export function HeroFeature({ item, onPress, height = 468 }: Props) {
       style={{ height }}
       {...press}
     >
-      <ArchiveImage source={item.image} label={item.title} style={StyleSheet.absoluteFill} />
+      <ArchiveImage
+        source={item.image}
+        label={item.title}
+        style={StyleSheet.absoluteFill}
+        priority={priority}
+      />
       <LinearGradient
         colors={imagery.scrimBottom as unknown as [string, string, ...string[]]}
         locations={imagery.scrimStops as unknown as [number, number, ...number[]]}

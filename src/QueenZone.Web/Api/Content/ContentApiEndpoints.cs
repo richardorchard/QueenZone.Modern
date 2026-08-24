@@ -46,6 +46,16 @@ public static class ContentApiEndpoints
             .WithSummary("Paged list of published history timeline events, in date order.")
             .Produces<ApiPagedResponse<TimelineEventDto>>();
 
+        group.MapGet("/on-this-day", GetOnThisDayAsync)
+            .WithName("GetContentOnThisDay")
+            .WithSummary("The single most notable published history event for today's date, with a +/-7 day fallback when none. Matches the website home page.")
+            .Produces<TimelineEventDto?>();
+
+        group.MapGet("/live-activity", GetLiveActivityAsync)
+            .WithName("GetContentLiveActivity")
+            .WithSummary("Count of new forum replies posted today. No presence/reading tracking exists; this is the only honest live signal available.")
+            .Produces<LiveActivitySummaryDto>();
+
         group.MapGet("/biography", GetBiographyChaptersAsync)
             .WithName("GetContentBiographyChapters")
             .WithSummary("Paged list of biography chapters, in reading order.")
@@ -177,6 +187,29 @@ public static class ContentApiEndpoints
             events.Count);
 
         return Results.Ok(response);
+    }
+
+    internal static async Task<IResult> GetOnThisDayAsync(
+        PublicQueryCacheService publicQueryCache,
+        TimeProvider timeProvider,
+        CancellationToken cancellationToken)
+    {
+        var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
+        var events = await publicQueryCache.GetOnThisDayAsync(today, 1, cancellationToken);
+        if (events.Count == 0)
+        {
+            events = await publicQueryCache.GetAroundThisDayAsync(today, 7, 1, cancellationToken);
+        }
+
+        return Results.Ok(events.Count > 0 ? ContentApiMapper.ToTimelineEvent(events[0]) : null);
+    }
+
+    internal static async Task<IResult> GetLiveActivityAsync(
+        PublicQueryCacheService publicQueryCache,
+        CancellationToken cancellationToken)
+    {
+        var count = await publicQueryCache.GetLiveActivityNewForumRepliesTodayAsync(cancellationToken);
+        return Results.Ok(new LiveActivitySummaryDto(count));
     }
 
     internal static async Task<IResult> GetBiographyChaptersAsync(

@@ -374,6 +374,22 @@ public sealed class PublicQueryCacheServiceTests
         Assert.Equal(2, photoRepository.PageCallCount);
     }
 
+    [Fact]
+    public async Task LiveActivityCountIsCachedForTheConfiguredDuration()
+    {
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var liveActivityQuery = new CountingLiveActivityQueryService { NextResult = 2 };
+        var service = CreateService(memoryCache, liveActivityQuery: liveActivityQuery);
+
+        var first = await service.GetLiveActivityNewForumRepliesTodayAsync();
+        liveActivityQuery.NextResult = 5;
+        var second = await service.GetLiveActivityNewForumRepliesTodayAsync();
+
+        Assert.Equal(2, first);
+        Assert.Equal(2, second);
+        Assert.Equal(1, liveActivityQuery.CallCount);
+    }
+
     private static ServiceProvider CreateWarmupProvider(PublicQueryCacheService cache)
     {
         var services = new ServiceCollection();
@@ -387,15 +403,31 @@ public sealed class PublicQueryCacheServiceTests
         IArticlesRepository? articlesRepository = null,
         IForumRepository? forumRepository = null,
         IQueenHistoryRepository? historyRepository = null,
-        IPhotoRepository? photoRepository = null) =>
+        IPhotoRepository? photoRepository = null,
+        ILiveActivityQueryService? liveActivityQuery = null,
+        PublicQueryCacheOptions? options = null) =>
         new(
             memoryCache,
-            Options.Create(new PublicQueryCacheOptions()),
+            Options.Create(options ?? new PublicQueryCacheOptions()),
             newsRepository ?? new CountingNewsRepository(),
             articlesRepository ?? new CountingArticlesRepository(),
             forumRepository ?? new CountingForumRepository(),
             historyRepository ?? new CountingQueenHistoryRepository(),
-            photoRepository ?? new CountingPhotoRepository());
+            photoRepository ?? new CountingPhotoRepository(),
+            liveActivityQuery ?? new CountingLiveActivityQueryService());
+
+    private class CountingLiveActivityQueryService : ILiveActivityQueryService
+    {
+        public int CallCount { get; private set; }
+
+        public int NextResult { get; set; } = 7;
+
+        public Task<int> GetNewForumRepliesTodayAsync(CancellationToken cancellationToken = default)
+        {
+            CallCount++;
+            return Task.FromResult(NextResult);
+        }
+    }
 
     private sealed class SlowCountingNewsRepository(TimeSpan delay) : CountingNewsRepository
     {
