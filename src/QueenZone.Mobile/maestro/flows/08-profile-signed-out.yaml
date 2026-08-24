@@ -9,6 +9,12 @@ appId: org.queenzone.mobile
       id: profile-signed-out
     timeout: 15000
 - assertVisible: Join the archive
+# Profile hides the tab bar (shouldHideTabBar('Profile')).
+- back
+- extendedWaitUntil:
+    visible:
+      id: home-screen
+    timeout: 15000
 - tapOn:
     id: tab-forum
 - extendedWaitUntil:
@@ -17,8 +23,14 @@ appId: org.queenzone.mobile
     timeout: 15000
 - tapOn:
     id: forum-new-thread
+# #880 openSignIn is a root fullScreenModal — MemberGate never mounts here.
 - extendedWaitUntil:
-    visible:
-      id: member-gate
+    visible: Sign in
     timeout: 15000
 - assertVisible: Sign in
+# Leave SignIn before 09. A leftover modal auto-completes to Composer.
+- back
+- extendedWaitUntil:
+    visible:
+      id: forum-screen
+    timeout: 15000
