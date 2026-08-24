@@ -41,10 +41,11 @@ jobs:
             | bash ./scripts/classify-pipeline-changes.sh \
             >> "$GITHUB_OUTPUT"
 
-  # JS typecheck + unit tests for src/QueenZone.Mobile. Native Android/iOS
+  # JS preflight for src/QueenZone.Mobile: npm ci + npm run preflight
+  # (typecheck, discovered unit tests, pinned Expo Doctor). Native Android/iOS
   # compile builds run in mobile-android/mobile-ios below. Mixed web+mobile
   # PRs run this alongside the .NET suite; mobile-only PRs skip the website
-  # path entirely.
+  # path entirely. Required on main after #870 — see mobile-js-ok stubs.
   mobile-js:
     name: Mobile typecheck and unit tests
     runs-on: ubuntu-latest
@@ -67,11 +68,8 @@ jobs:
       - name: Install
         run: npm ci
 
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Unit tests
-        run: npm test
+      - name: Preflight
+        run: npm run preflight
 
   # Unsigned Android debug APK from CNG-generated native project (issue #794).
   # No keystore secrets: Gradle's default debug signing config is fine for a
@@ -230,6 +228,37 @@ jobs:
           path: mobile-ios-simulator.zip
           retention-days: 1
           if-no-files-found: error
+
+  # Required on main after #870. Non-mobile PRs must still report these exact
+  # check names as success; otherwise GitHub leaves the required checks pending.
+  # Same idea as test-docs-ok. Stubs run on ubuntu even for the iOS name so a
+  # docs-only PR does not consume a macOS runner.
+  mobile-js-ok:
+    name: Mobile typecheck and unit tests
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.mobile != 'true'
+    steps:
+      - name: No mobile changes — required check satisfied
+        run: echo "No mobile changes — marking Mobile typecheck and unit tests as satisfied without running the mobile suite."
+
+  mobile-android-ok:
+    name: Mobile Android build
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.mobile != 'true'
+    steps:
+      - name: No mobile changes — required check satisfied
+        run: echo "No mobile changes — marking Mobile Android build as satisfied without compiling Android."
+
+  mobile-ios-ok:
+    name: Mobile iOS build
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.mobile != 'true'
+    steps:
+      - name: No mobile changes — required check satisfied
+        run: echo "No mobile changes — marking Mobile iOS build as satisfied without compiling iOS."
 
   # Builds and publishes the Linux app once per PR run ("build once, test many").
   # Deterministic tests run in the `test` matrix (mixed Web.Tests shards — see

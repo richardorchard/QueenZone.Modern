@@ -13,7 +13,7 @@
     "prebuild": "expo prebuild",
     "prebuild:clean": "expo prebuild --clean",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test src/navigation/visibility.test.ts src/theme/tokens.test.ts src/config/environments.test.ts src/config/buildMetadata.test.ts src/api/text.test.ts src/api/contact.test.ts src/api/me.test.ts src/api/auth.test.ts src/api/photoSubmissions.test.ts src/api/submissions.test.ts src/api/messages.test.ts src/cache/contentCache.test.ts src/ui/html/prepareNewsHtml.test.ts src/ui/html/resolveContentUrl.test.ts src/screens/forum/forumListMeta.test.ts src/screens/forum/forumThreadMeta.test.ts src/screens/forum/composerMeta.test.ts src/screens/forum/forumPollMeta.test.ts src/screens/photos/photoGalleryMeta.test.ts src/screens/photos/photoSubmitMeta.test.ts src/screens/messages/inboxMeta.test.ts src/screens/home/homeMeta.test.ts src/audio/formatDuration.test.ts",
+    "test": "node scripts/run-tests.mjs",
     "doctor": "expo-doctor",
     "preflight": "npm run typecheck && npm test && npm run doctor"
   },

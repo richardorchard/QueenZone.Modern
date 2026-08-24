@@ -11,9 +11,36 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  preflight:
+    name: Mobile preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: src/QueenZone.Mobile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: src/QueenZone.Mobile/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Preflight
+        run: npm run preflight
+
   publish-ios:
     name: Sign and upload iOS build
-    if: github.ref == 'refs/heads/main'
+    needs: preflight
+    if: always() && github.ref == 'refs/heads/main' && needs.preflight.result == 'success'
     runs-on: [self-hosted, macOS, ARM64, ios-signing]
     timeout-minutes: 45
     defaults:
@@ -27,6 +54,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
 
       - name: Record build metadata
         run: |
