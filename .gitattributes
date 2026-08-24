@@ -7,6 +7,13 @@
 # Shell scripts must stay LF for execution on Linux runners/containers.
 *.sh text eol=lf
 
+# Cloudflare Worker source snapshots must match the live published script
+# byte-for-byte (a live #626 plan confirmed the exact line endings each
+# script was actually published with) so `content = file(...)` imports
+# with zero diff on any OS. pictures-queenzone-org.js already matches the
+# repo default (eol=crlf); pictures-legacy-redirect.js needs LF instead.
+infra/import/workers/pictures-legacy-redirect.js text eol=lf
+
 # Expo / Node sources stay LF so Metro, npm, and Linux mobile CI match
 # Expo defaults. Binary rules below still apply to images under this tree.
 src/QueenZone.Mobile/**/*.js text eol=lf

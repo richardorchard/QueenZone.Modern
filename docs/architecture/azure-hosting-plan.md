@@ -249,7 +249,7 @@ Live Worker behaviour (published 2026-08-16):
 - Sets `Cache-Control: public, max-age=86400, s-maxage=2592000` on HTTP 200
 - Does **not** set `Content-Disposition` (the fan-performance app proxy sets it)
 
-Used by legacy forum attachment redirects after member auth. Do not attach this Worker to `cdn`. The Worker is not yet an OpenTofu-managed resource (#626); live script updates go through the Cloudflare API using Bitwarden `CLOUDFLARE_WORKER_READWRITE`.
+Used by legacy forum attachment redirects after member auth. Do not attach this Worker to `cdn`. #626 declared this Worker in OpenTofu with a source snapshot (`infra/import/workers/pictures-queenzone-org.js`); live script updates still go through the Cloudflare API using Bitwarden `CLOUDFLARE_WORKER_READWRITE`, and the snapshot must be kept in sync with any published change.
 
 ### Fan-performance audio (#177)
 
