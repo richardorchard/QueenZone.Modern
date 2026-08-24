@@ -89,6 +89,8 @@ public sealed class QueenZoneDbContext : DbContext
 
     public DbSet<MobileAuthRefreshTokenEntity> MobileAuthRefreshTokens => Set<MobileAuthRefreshTokenEntity>();
 
+    public DbSet<DeviceTokenEntity> DeviceTokens => Set<DeviceTokenEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<NewsTableRow>(entity =>
@@ -961,6 +963,30 @@ public sealed class QueenZoneDbContext : DbContext
 
             entity.HasIndex(token => new { token.MemberAccountId, token.RevokedAt })
                 .HasDatabaseName("IX_MobileAuthRefreshTokens_Member_Revoked");
+
+            entity.HasOne(token => token.MemberAccount)
+                .WithMany()
+                .HasForeignKey(token => token.MemberAccountId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<DeviceTokenEntity>(entity =>
+        {
+            entity.ToTable("DeviceTokens");
+            entity.HasKey(token => token.Id);
+
+            entity.Property(token => token.DeviceId).HasMaxLength(200).IsRequired();
+            entity.Property(token => token.Platform).HasConversion<string>().HasMaxLength(20).IsRequired();
+            entity.Property(token => token.Token).HasMaxLength(4000).IsRequired();
+            entity.Property(token => token.CreatedAt).IsRequired();
+            entity.Property(token => token.UpdatedAt).IsRequired();
+
+            entity.HasIndex(token => token.DeviceId)
+                .IsUnique()
+                .HasDatabaseName("IX_DeviceTokens_DeviceId");
+
+            entity.HasIndex(token => token.MemberAccountId)
+                .HasDatabaseName("IX_DeviceTokens_MemberAccountId");
 
             entity.HasOne(token => token.MemberAccount)
                 .WithMany()

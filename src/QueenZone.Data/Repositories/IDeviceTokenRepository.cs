@@ -1,0 +1,25 @@
+using QueenZone.Data.Entities;
+
+namespace QueenZone.Data;
+
+public interface IDeviceTokenRepository
+{
+    /// <summary>
+    /// Inserts a new device token, or updates the existing row for
+    /// <see cref="DeviceTokenEntity.DeviceId"/> (owner, platform, token, timestamp) when one
+    /// already exists. Returns the stored entity.
+    /// </summary>
+    Task<DeviceTokenEntity> UpsertAsync(
+        DeviceTokenEntity token,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Removes the device token for <paramref name="deviceId"/> when it is owned by
+    /// <paramref name="memberAccountId"/>. Returns false when no such row exists (unknown
+    /// device, or owned by a different member).
+    /// </summary>
+    Task<bool> DeleteByDeviceIdAsync(
+        Guid memberAccountId,
+        string deviceId,
+        CancellationToken cancellationToken = default);
+}

@@ -74,6 +74,7 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddScoped<ISearchReindexRunLeaseService, EfSearchReindexRunLeaseService>();
         services.AddScoped<ISearchReindexRunRequestRepository, EfSearchReindexRunRequestRepository>();
         services.AddScoped<IMobileAuthGrantRepository, EfMobileAuthGrantRepository>();
+        services.AddScoped<IDeviceTokenRepository, EfDeviceTokenRepository>();
         services.AddScoped<ILiveActivityQueryService, EfLiveActivityQueryService>();
 
         return services;
@@ -164,6 +165,8 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddSingleton<ISearchReindexRunRequestRepository, InMemorySearchReindexRunRequestRepository>();
         services.AddSingleton<SharedMobileAuthGrantStore>();
         services.AddSingleton<IMobileAuthGrantRepository, InMemoryMobileAuthGrantRepository>();
+        services.AddSingleton<SharedDeviceTokenStore>();
+        services.AddSingleton<IDeviceTokenRepository, InMemoryDeviceTokenRepository>();
 
         return services;
     }
