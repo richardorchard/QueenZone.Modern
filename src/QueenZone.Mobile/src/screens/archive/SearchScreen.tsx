@@ -2,7 +2,7 @@ import { useNavigation } from '@react-navigation/native';
 import * as WebBrowser from 'expo-web-browser';
 import { Search } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
-import { FlatList, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { FlatList, Platform, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
 import { fetchSearchPage, formatPublishedDate } from '../../api';
 import type { SearchResult } from '../../api/types';
 import { getAppConfig } from '../../config/appConfig';
@@ -20,7 +20,7 @@ import {
   searchTypeLabel,
   type SearchTypeFilter,
 } from './searchMeta';
-import { applySearchTarget, targetForSearchResult, type SearchOpenTarget } from './searchNavigation';
+import { applySearchTarget, targetForSearchResult, websiteUrl, type SearchOpenTarget } from './searchNavigation';
 
 type Props = {
   onOpen?: (target: SearchOpenTarget, item: SearchResult) => void;
@@ -28,20 +28,21 @@ type Props = {
 
 function SearchResults({
   query,
-  type,
+  typeFilter,
   onOpen,
 }: {
   query: string;
-  type: SearchTypeFilter;
+  typeFilter: SearchTypeFilter;
   onOpen?: Props['onOpen'];
 }) {
+  const { c } = useTheme();
   const paged = usePagedContent<SearchResult>(
     useCallback(
-      (page, signal) => fetchSearchPage({ q: query, type, page, pageSize: 20, signal }),
-      [query, type],
+      (page, signal) => fetchSearchPage({ q: query, type: typeFilter, page, pageSize: 20, signal }),
+      [query, typeFilter],
     ),
     20,
-    `${query}|${type ?? ''}`,
+    `${query}|${typeFilter ?? ''}`,
   );
 
   if (paged.loading && paged.items.length === 0) {
@@ -64,6 +65,7 @@ function SearchResults({
       data={paged.items}
       keyExtractor={(item) => item.sourceKey}
       keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
       ListHeaderComponent={
         <View style={{ paddingHorizontal: space.xl, paddingBottom: space.md }}>
           <Eyebrow tone="muted">{paged.totalCount > 0 ? countLine : 'Results'}</Eyebrow>
@@ -78,7 +80,13 @@ function SearchResults({
           <ArchiveFooter />
         </>
       }
-      refreshControl={undefined}
+      refreshControl={
+        <RefreshControl
+          refreshing={paged.refreshing}
+          onRefresh={paged.refresh}
+          tintColor={c.accentPrimary}
+        />
+      }
       onEndReached={paged.loadMore}
       onEndReachedThreshold={0.4}
       renderItem={({ item }) => (
@@ -121,7 +129,7 @@ export function SearchScreen({ onOpen }: Props) {
           style={{
             height: 44,
             borderRadius: fieldRadius,
-            backgroundColor: '#1D1D1D',
+            backgroundColor: c.surfaceRaised,
             borderWidth: 1,
             borderColor: c.border,
             flexDirection: 'row',
@@ -174,7 +182,7 @@ export function SearchScreen({ onOpen }: Props) {
       )}
 
       {shouldSearch ? (
-        <SearchResults query={committedQuery} type={typeFilter} onOpen={onOpen} />
+        <SearchResults query={committedQuery} typeFilter={typeFilter} onOpen={onOpen} />
       ) : (
         <View style={{ flex: 1 }}>
           {searchQueryPresets.map((preset) => (
@@ -204,10 +212,20 @@ export function SearchRouteScreen() {
   const navigation = useNavigation();
   return (
     <SearchScreen
-      onOpen={(target) => {
+      onOpen={(target, item) => {
         applySearchTarget(
           target,
-          (tab, params) => navigation.getParent()?.navigate(tab, params),
+          (tab, params) => {
+            const parent = navigation.getParent();
+            if (parent) {
+              parent.navigate(tab, params);
+              return;
+            }
+            const url = websiteUrl(getAppConfig().apiBaseUrl, item.url);
+            if (url) {
+              void WebBrowser.openBrowserAsync(url);
+            }
+          },
           (url) => {
             void WebBrowser.openBrowserAsync(url);
           },

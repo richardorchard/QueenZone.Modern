@@ -1,6 +1,6 @@
 import type { SearchResult } from '../../api/types';
 
-function websiteUrl(apiBaseUrl: string, path: string): string | null {
+export function websiteUrl(apiBaseUrl: string, path: string): string | null {
   if (!path) {
     return null;
   }
@@ -16,7 +16,7 @@ export type SearchTabTarget =
   | { kind: 'tab'; tab: 'ForumTab'; screen: 'Thread'; params: { id: number } }
   | { kind: 'tab'; tab: 'ArchiveTab'; screen: 'BiographyChapter'; params: { id: number } }
   | { kind: 'tab'; tab: 'ArchiveTab'; screen: 'Album'; params: { id: number } }
-  | { kind: 'tab'; tab: 'ArchiveTab'; screen: 'Timeline' }
+  | { kind: 'tab'; tab: 'ArchiveTab'; screen: 'Timeline'; params?: { focusId: number } }
   | { kind: 'tab'; tab: 'ArchiveTab'; screen: 'FanPerformanceDetail'; params: { id: number } };
 
 export type SearchOpenTarget = SearchTabTarget | { kind: 'web'; url: string } | { kind: 'unsupported' };
@@ -28,51 +28,69 @@ function positiveId(value: number | null | undefined): number | null {
   return value;
 }
 
-/** Maps a live search hit to a native reader, or the website URL for article types. */
+function tabOrWeb(item: SearchResult, apiBaseUrl: string, tab: SearchTabTarget | null): SearchOpenTarget {
+  if (tab) {
+    return tab;
+  }
+  const url = websiteUrl(apiBaseUrl, item.url);
+  return url ? { kind: 'web', url } : { kind: 'unsupported' };
+}
+
+/** Maps a live search hit to a native reader, or the website URL when no reader exists. */
 export function targetForSearchResult(item: SearchResult, apiBaseUrl: string): SearchOpenTarget {
   const contentType = item.contentType.trim().toLowerCase();
+  const id = positiveId(item.id);
 
   if (contentType === 'news') {
-    const id = positiveId(item.id);
-    return id ? { kind: 'tab', tab: 'NewsTab', screen: 'Story', params: { id } } : { kind: 'unsupported' };
+    return tabOrWeb(
+      item,
+      apiBaseUrl,
+      id ? { kind: 'tab', tab: 'NewsTab', screen: 'Story', params: { id } } : null,
+    );
   }
 
   if (contentType === 'forum') {
-    const id = positiveId(item.id);
-    return id
-      ? { kind: 'tab', tab: 'ForumTab', screen: 'Thread', params: { id } }
-      : { kind: 'unsupported' };
+    return tabOrWeb(
+      item,
+      apiBaseUrl,
+      id ? { kind: 'tab', tab: 'ForumTab', screen: 'Thread', params: { id } } : null,
+    );
   }
 
   if (contentType === 'biography') {
-    const id = positiveId(item.id);
-    return id
-      ? { kind: 'tab', tab: 'ArchiveTab', screen: 'BiographyChapter', params: { id } }
-      : { kind: 'unsupported' };
+    return tabOrWeb(
+      item,
+      apiBaseUrl,
+      id ? { kind: 'tab', tab: 'ArchiveTab', screen: 'BiographyChapter', params: { id } } : null,
+    );
   }
 
   if (contentType === 'discography') {
-    const id = positiveId(item.id);
-    return id ? { kind: 'tab', tab: 'ArchiveTab', screen: 'Album', params: { id } } : { kind: 'unsupported' };
+    return tabOrWeb(
+      item,
+      apiBaseUrl,
+      id ? { kind: 'tab', tab: 'ArchiveTab', screen: 'Album', params: { id } } : null,
+    );
   }
 
   if (contentType === 'timeline') {
-    return { kind: 'tab', tab: 'ArchiveTab', screen: 'Timeline' };
+    return {
+      kind: 'tab',
+      tab: 'ArchiveTab',
+      screen: 'Timeline',
+      params: id ? { focusId: id } : undefined,
+    };
   }
 
   if (contentType === 'fan-performance') {
-    const id = positiveId(item.id);
-    return id
-      ? { kind: 'tab', tab: 'ArchiveTab', screen: 'FanPerformanceDetail', params: { id } }
-      : { kind: 'unsupported' };
+    return tabOrWeb(
+      item,
+      apiBaseUrl,
+      id ? { kind: 'tab', tab: 'ArchiveTab', screen: 'FanPerformanceDetail', params: { id } } : null,
+    );
   }
 
-  if (contentType === 'article' || contentType === 'legacy-article') {
-    const url = websiteUrl(apiBaseUrl, item.url);
-    return url ? { kind: 'web', url } : { kind: 'unsupported' };
-  }
-
-  return { kind: 'unsupported' };
+  return tabOrWeb(item, apiBaseUrl, null);
 }
 
 type TabNavigate = (tab: SearchTabTarget['tab'], params: { screen: string; params?: object }) => void;
@@ -90,9 +108,8 @@ export function applySearchTarget(
     openUrl(target.url);
     return;
   }
-  if (target.screen === 'Timeline') {
-    navigate(target.tab, { screen: target.screen });
-    return;
-  }
-  navigate(target.tab, { screen: target.screen, params: target.params });
+  navigate(
+    target.tab,
+    target.params ? { screen: target.screen, params: target.params } : { screen: target.screen },
+  );
 }

@@ -78,14 +78,14 @@ describe('targetForSearchResult', () => {
     );
   });
 
-  it('opens the timeline list rather than a missing event screen', () => {
+  it('opens the timeline list focused on the matched event', () => {
     assert.deepEqual(
       targetForSearchResult(hit({ contentType: 'timeline', sourceKey: 'timeline:12', id: 12 }), origin),
-      { kind: 'tab', tab: 'ArchiveTab', screen: 'Timeline' },
+      { kind: 'tab', tab: 'ArchiveTab', screen: 'Timeline', params: { focusId: 12 } },
     );
   });
 
-  it('opens articles in the in-app browser and rejects placeholder ids', () => {
+  it('opens articles in the in-app browser and falls back to the website URL', () => {
     assert.deepEqual(
       targetForSearchResult(
         hit({
@@ -99,18 +99,24 @@ describe('targetForSearchResult', () => {
       { kind: 'web', url: 'https://www.queenzone.org/articles/some-slug' },
     );
 
-    assert.deepEqual(targetForSearchResult(hit({ id: 0, sourceKey: 'news:0' }), origin), {
-      kind: 'unsupported',
-    });
+    assert.deepEqual(
+      targetForSearchResult(hit({ id: 0, sourceKey: 'news:0', url: '/news/0/placeholder' }), origin),
+      { kind: 'web', url: 'https://www.queenzone.org/news/0/placeholder' },
+    );
     assert.deepEqual(
       targetForSearchResult(
         hit({
           contentType: 'forum',
           sourceKey: 'forum-thread:magic-tour',
+          url: '/forum/topic/1002/ranking',
           id: null,
         }),
         origin,
       ),
+      { kind: 'web', url: 'https://www.queenzone.org/forum/topic/1002/ranking' },
+    );
+    assert.deepEqual(
+      targetForSearchResult(hit({ contentType: 'unknown', url: '', id: null }), origin),
       { kind: 'unsupported' },
     );
   });
@@ -127,6 +133,13 @@ describe('targetForSearchResult', () => {
         opened.push(url);
       },
     );
+    applySearchTarget(
+      { kind: 'tab', tab: 'ArchiveTab', screen: 'Timeline', params: { focusId: 12 } },
+      (tab, params) => {
+        navigated.push([tab, params]);
+      },
+      () => {},
+    );
     applySearchTarget({ kind: 'tab', tab: 'ArchiveTab', screen: 'Timeline' }, (tab, params) => {
       navigated.push([tab, params]);
     }, () => {});
@@ -138,8 +151,9 @@ describe('targetForSearchResult', () => {
     }, () => {});
 
     assert.deepEqual(navigated[0], ['NewsTab', { screen: 'Story', params: { id: 1003 } }]);
-    assert.deepEqual(navigated[1], ['ArchiveTab', { screen: 'Timeline' }]);
+    assert.deepEqual(navigated[1], ['ArchiveTab', { screen: 'Timeline', params: { focusId: 12 } }]);
+    assert.deepEqual(navigated[2], ['ArchiveTab', { screen: 'Timeline' }]);
     assert.deepEqual(opened, ['https://www.queenzone.org/articles/x']);
-    assert.equal(navigated.length, 2);
+    assert.equal(navigated.length, 3);
   });
 });
