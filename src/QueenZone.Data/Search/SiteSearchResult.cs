@@ -7,6 +7,7 @@ namespace QueenZone.Data;
 /// </summary>
 public sealed record SiteSearchResult(
     string ContentType,
+    string SourceKey,
     string Title,
     string Summary,
     string Url,

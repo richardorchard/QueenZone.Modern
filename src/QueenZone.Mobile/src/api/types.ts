@@ -278,6 +278,20 @@ export type LiveActivitySummary = {
   newForumRepliesToday: number;
 };
 
+/** One hit from `GET /api/v1/search`. `id` is parsed from numeric source keys. */
+export type SearchResult = {
+  contentType: string;
+  sourceKey: string;
+  title: string;
+  summary: string;
+  url: string;
+  publishedAt: string | null;
+  imageUrl: string | null;
+  category: string | null;
+  authorDisplayName: string | null;
+  id: number | null;
+};
+
 export type ForumPoll = {
   pollId: string;
   topicId: number;

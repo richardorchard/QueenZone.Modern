@@ -1,9 +1,13 @@
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useCallback, useMemo, useState } from 'react';
 import { FlatList, Linking, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { fetchTimelinePage, type TimelineEvent } from '../../api';
 import { usePagedContent } from '../../hooks/usePagedContent';
+import type { ArchiveStackParamList } from '../../navigation/types';
 import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from '../../ui/ScreenStates';
 import { space, type, useTheme } from '../../theme';
+
+type Props = NativeStackScreenProps<ArchiveStackParamList, 'Timeline'>;
 
 type DecadeSection = {
   decade: string;
@@ -19,9 +23,9 @@ function decadeLabel(iso: string): string {
   return `${start}s`;
 }
 
-export function TimelineScreen() {
+export function TimelineScreen({ route }: Props) {
   const { c } = useTheme();
-  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [expandedId, setExpandedId] = useState<number | null>(route.params?.focusId ?? null);
   const paged = usePagedContent<TimelineEvent>(
     useCallback((page, signal) => fetchTimelinePage({ page, pageSize: 100, signal }), []),
     100,

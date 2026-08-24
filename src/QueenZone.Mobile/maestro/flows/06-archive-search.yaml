@@ -16,11 +16,15 @@ appId: org.queenzone.mobile
     timeout: 15000
 - tapOn:
     id: search-input
-- inputText: Live Aid
+- inputText: modernisation
 - hideKeyboard
-- tapOn:
-    id: search-result-live-aid-wembley-stadium-14-photographs
 - extendedWaitUntil:
     visible:
-      id: photos-screen
+      id: search-result-news-1003
+    timeout: 20000
+- tapOn:
+    id: search-result-news-1003
+- extendedWaitUntil:
+    visible:
+      id: news-story-screen
     timeout: 20000
