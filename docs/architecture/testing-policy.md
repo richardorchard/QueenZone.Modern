@@ -335,20 +335,43 @@ These gates are guardrails, not a replacement for useful assertions. New or chan
 | `mobile-js` | `npm ci` + `npm run preflight` in `src/QueenZone.Mobile` (typecheck, discovered unit tests, pinned Expo Doctor) | Yes — required on `main` after #870; skip-success stub when that tree is unchanged |
 | `mobile-android` | Unsigned debug APK compile (GitHub-hosted Linux) | Yes — required on `main` after #870; skip-success stub when that tree is unchanged |
 | `mobile-ios` | Unsigned Simulator compile (GitHub-hosted macOS) | Yes — required on `main` after #870; skip-success stub when that tree is unchanged |
+| `mobile-api-contracts` | Testing-host consumer contracts: real `/api/v1` responses through the mobile `fetchJson` / domain clients plus runtime zod schemas (#869 Option A) | Independent of native jobs; skip-success stub when contract paths are unchanged |
 
 Local mobile validation from `src/QueenZone.Mobile` is a clean `npm ci` then `npm run preflight`. `npm test` discovers every `src/**/*.test.ts` and `src/**/*.test.tsx` file (no package.json path list) and self-checks that unlisted Node and Jest probes still run. Pure `*.test.ts` files use Node's test runner; `*.test.tsx` files use Jest + `jest-expo` + React Native Testing Library (no devices, Metro, or production services). `npm run preflight` is typecheck + those tests + `npm run doctor` (lockfile-pinned `expo-doctor`). Device E2E remains a separate track (#872).
 
-These three **GitHub check names** (the job `name:` values in `ci.yml`) must be required contexts on protected `main`. A workflow file cannot enable branch protection; a human with repo admin access has to add them after this change merges:
+These four **GitHub check names** (the job `name:` values in `ci.yml`) must be required contexts on protected `main`. A workflow file cannot enable branch protection; a human with repo admin access has to add them after this change merges:
 
 - `Mobile typecheck and unit tests`
 - `Mobile Android build`
 - `Mobile iOS build`
+- `Mobile API consumer contracts`
 
 **Live `main` required contexts** (queried 2026-08-24; mobile names are **not** in this list yet): `build`, `test (0)`, `test (1)`, `sql-server-tests`, `coverage`, `smoke-test`, `e2e-test`, `Verify formatting`, `Small test projects (Tools/Storage/NewsAgent)`. Do not treat YAML as proof that mobile checks are required. After merge, add the three mobile names above and re-query Settings → Branches → `main` → Status checks to confirm.
 
-Android and iOS are equal: a mobile PR cannot treat either native compile as optional. Non-mobile PRs are not left pending: `ci.yml` emits skip-success stubs (`mobile-js-ok`, `mobile-android-ok`, `mobile-ios-ok`) with those exact check names, the same idea as `test-docs-ok`.
+Android and iOS are equal: a mobile PR cannot treat either native compile as optional. Non-mobile PRs are not left pending: `ci.yml` emits skip-success stubs (`mobile-js-ok`, `mobile-android-ok`, `mobile-ios-ok`) with those exact check names, the same idea as `test-docs-ok`. `mobile-api-contracts-ok` is the matching stub for `Mobile API consumer contracts`.
 
-**Layers (do not collapse these):** Node + Jest tests (`npm test`, fast, no native toolchain) are not a substitute for `mobile-android` / `mobile-ios` compile, and those unsigned CI compiles are not device/E2E coverage. Device E2E is a separate track.
+**Layers (do not collapse these):**
+
+```text
+unit (npm test / Web.Tests)
+  ≠ consumer contracts (Testing host + real mobile parsers)
+  ≠ native compile (mobile-android / mobile-ios)
+  ≠ device smoke (#872)
+```
+
+Node + Jest tests (`npm test`, fast, no native toolchain) are not a substitute for `mobile-android` / `mobile-ios` compile, and those unsigned CI compiles are not device/E2E coverage. Static TypeScript and generated OpenAPI → TS types are not a substitute for the consumer-contract suite: `src/api/client.ts` uses `fetch` plus `as T`, so a renamed JSON field still typechecks. Device E2E is a separate track (#872).
+
+Local consumer contracts (no secrets, no real database; run twice to prove determinism):
+
+```powershell
+# Linux / macOS / GitHub Actions
+bash ./scripts/run-mobile-api-contracts.sh
+
+# After a Release web build already exists:
+bash ./scripts/run-mobile-api-contracts.sh --no-build
+```
+
+The script starts `QueenZone.Web` with `ASPNETCORE_ENVIRONMENT=Testing` and `QUEENZONE_MOBILE_CONTRACT_HOST=1` on a loopback ephemeral port, then runs `npm run test:api-contracts` in `src/QueenZone.Mobile`. Failures name the endpoint and expected field or status.
 
 **Publish preflight:** `.github/workflows/publish-mobile-test-build.yml` and `.github/workflows/publish-ios-testflight.yml` run `npm ci` + `npm run preflight` against `github.sha` in a job with no signing secrets. The signing/upload job `needs` that preflight and runs only when `needs.preflight.result == 'success'`. A failed or cancelled preflight skips publication.
 
@@ -362,10 +385,11 @@ Pull requests that do not change the website skip `build` / `test` / coverage / 
 - Changing `ci.yml` itself still runs the full .NET suite.
 - `src/` (except the mobile client), `tests/`, `scripts/`, project files, and `wwwroot` stay on the full web path.
 - A mobile-only PR still runs `mobile-js` (`npm run preflight`: typecheck, discovered unit tests, pinned Expo Doctor), plus `mobile-android` and `mobile-ios` native compile builds (unsigned debug APK / Simulator build, uploaded as 1-day workflow artifacts). Those three check names are intended to be required on `main` (#870); a human must enable them in branch protection after merge. Non-mobile PRs get skip-success stubs so they are not left pending.
-- Mixed mobile + web PRs run both pipelines.
+- `mobile_api_contracts=true` is **independent of** `mobile=true`. Server-only `/api/v1` changes (and json-api docs, mobile `src/api` / config / session helpers, the contract host/scripts, or `ci.yml`) run `mobile-api-contracts` without Android/iOS native compilation. A UI-only mobile change still compiles native jobs and does **not** start the contract host.
+- Mixed mobile + web PRs run both pipelines. Mixed API + mobile client PRs run contracts **and** native jobs.
 - Deploy uses the same classifier so an infra-only or mobile-only merge does not zip-deploy unchanged website binaries. Mixed web+mobile merges still deploy the website; `resolve-ci-run` must not wait for Mobile iOS/Android to finish the overall `ci.yml` conclusion (see `scripts/Resolve-CiPublishRun.sh`).
 
-Skipped non-matrix jobs still report under their required check names, which GitHub treats as satisfied. The `test` matrix is different: skipping it entirely would report a single `test` check and never create the required `test (0)` / `test (1)` checks, leaving the PR blocked forever. `ci.yml` therefore runs a lightweight `test-docs-ok` matrix on non-web PRs that emits success for those exact names without running the .NET suite. The three mobile jobs similarly emit skip-success stubs (`mobile-js-ok`, `mobile-android-ok`, `mobile-ios-ok`) on non-mobile PRs so required mobile contexts are not left pending.
+Skipped non-matrix jobs still report under their required check names, which GitHub treats as satisfied. The `test` matrix is different: skipping it entirely would report a single `test` check and never create the required `test (0)` / `test (1)` checks, leaving the PR blocked forever. `ci.yml` therefore runs a lightweight `test-docs-ok` matrix on non-web PRs that emits success for those exact names without running the .NET suite. The three mobile jobs similarly emit skip-success stubs (`mobile-js-ok`, `mobile-android-ok`, `mobile-ios-ok`) on non-mobile PRs so required mobile contexts are not left pending. `mobile-api-contracts-ok` does the same for the `Mobile API consumer contracts` check name when contract paths are unchanged.
 
 ### EF migration consistency
 

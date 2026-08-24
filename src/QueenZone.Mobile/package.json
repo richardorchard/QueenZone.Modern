@@ -14,6 +14,7 @@
     "prebuild:clean": "expo prebuild --clean",
     "typecheck": "tsc --noEmit",
     "test": "node scripts/run-tests.mjs",
+    "test:api-contracts": "node scripts/run-api-contracts.mjs",
     "doctor": "expo-doctor",
     "preflight": "npm run typecheck && npm test && npm run doctor"
   },
@@ -46,7 +47,8 @@
     "react-native-render-html": "^6.3.4",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
-    "react-native-svg": "15.15.4"
+    "react-native-svg": "15.15.4",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@testing-library/react-native": "^13.3.3",
