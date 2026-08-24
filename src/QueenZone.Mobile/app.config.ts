@@ -35,6 +35,12 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     ...config,
     name: config.name ?? 'QueenZone',
     slug: config.slug ?? 'queenzone-mobile',
+    android: {
+      ...(typeof config.android === 'object' && config.android !== null
+        ? config.android
+        : {}),
+      googleServicesFile: './google-services.json',
+    },
     ios: {
       ...(typeof config.ios === 'object' && config.ios !== null ? config.ios : {}),
       buildNumber: iosBuildNumber,
