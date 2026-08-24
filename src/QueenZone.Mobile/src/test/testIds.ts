@@ -30,6 +30,9 @@ export const testIds = {
   profileSignedOut: 'profile-signed-out',
   profileSignedIn: 'profile-signed-in',
   profileDisplayName: 'profile-display-name',
+  profileBack: 'profile-back',
+
+  signInClose: 'sign-in-close',
 
   memberGate: 'member-gate',
   inboxScreen: 'inbox-screen',

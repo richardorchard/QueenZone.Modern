@@ -9,8 +9,10 @@ appId: org.queenzone.mobile
       id: profile-signed-out
     timeout: 15000
 - assertVisible: Join the archive
-# Profile hides the tab bar (shouldHideTabBar('Profile')).
-- back
+# Profile hides the tab bar. Maestro - back is Android/Web only — tap the
+# shared header control so iOS and Android leave the same way.
+- tapOn:
+    id: profile-back
 - extendedWaitUntil:
     visible:
       id: home-screen
@@ -29,7 +31,8 @@ appId: org.queenzone.mobile
     timeout: 15000
 - assertVisible: Sign in
 # Leave SignIn before 09. A leftover modal auto-completes to Composer.
-- back
+- tapOn:
+    id: sign-in-close
 - extendedWaitUntil:
     visible:
       id: forum-screen

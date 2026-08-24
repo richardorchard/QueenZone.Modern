@@ -6,6 +6,7 @@ import { Platform, View } from 'react-native';
 import { SignInScreen } from '../screens/account/SignInScreen';
 import { testIds } from '../test/testIds';
 import { useTheme, type ColorScheme } from '../theme';
+import { HeaderCloseButton } from './headerButtons';
 import { ArchiveStack, ForumStack, HomeStack, NewsStack, PhotosStack, stackScreenOptions } from './stacks';
 import type { RootStackParamList, RootTabParamList } from './types';
 import { shouldHideTabBar } from './visibility';
@@ -184,12 +185,15 @@ export function RootNavigator() {
       <RootStack.Screen
         name="SignIn"
         component={SignInScreen}
-        options={{
+        options={({ navigation }) => ({
           ...stackScreenOptions,
           headerShown: true,
           title: 'Sign in',
           presentation: 'fullScreenModal',
-        }}
+          headerLeft: () => (
+            <HeaderCloseButton testID={testIds.signInClose} onPress={() => navigation.goBack()} />
+          ),
+        })}
       />
     </RootStack.Navigator>
   );
