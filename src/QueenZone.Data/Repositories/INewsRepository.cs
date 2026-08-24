@@ -13,9 +13,13 @@ public interface INewsRepository
 {
     Task<IReadOnlyList<NewsItem>> GetLatestAsync(int count, CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<NewsItem>> GetArchivePageAsync(int page, int pageSize, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<NewsItem>> GetArchivePageAsync(
+        int page,
+        int pageSize,
+        NewsArchiveFilter filter = default,
+        CancellationToken cancellationToken = default);
 
-    Task<int> GetPublishedCountAsync(CancellationToken cancellationToken = default);
+    Task<int> GetPublishedCountAsync(NewsArchiveFilter filter = default, CancellationToken cancellationToken = default);
 
     Task<NewsItem?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
 

@@ -623,6 +623,10 @@ public sealed class EfPublicReadRepositoryTests : IAsyncDisposable
         Assert.DoesNotContain("ARTICLE", news.ArchivePage, StringComparison.Ordinal);
         Assert.DoesNotContain("ARTICLE", news.Sitemap, StringComparison.Ordinal);
         Assert.DoesNotContain("ARTICLE", news.Count, StringComparison.Ordinal);
+        Assert.DoesNotContain("ARTICLE", news.ArchivePageByDecade, StringComparison.Ordinal);
+        Assert.DoesNotContain("ARTICLE", news.CountByDecade, StringComparison.Ordinal);
+        Assert.Contains("PublishedAt >= {0} AND PublishedAt < {1}", news.ArchivePageByDecade, StringComparison.Ordinal);
+        Assert.Contains("PublishedAt >= {0} AND PublishedAt < {1}", news.CountByDecade, StringComparison.Ordinal);
 
         // Detail still projects the real ARTICLE body.
         Assert.Contains("ISNULL(ARTICLE, '') AS Body", news.ById, StringComparison.Ordinal);
@@ -722,4 +726,68 @@ public sealed class EfPublicReadRepositoryTests : IAsyncDisposable
         Assert.Equal(2, (await repository.GetPublishedSitemapEntriesAsync()).Count);
     }
 
+    [Fact]
+    public async Task News_decade_filter_pushes_the_date_bound_into_sql_instead_of_filtering_a_loaded_page()
+    {
+        dbContext.Database.ExecuteSqlRaw(
+            """
+            CREATE TABLE IF NOT EXISTS NewsRows (
+                Id INTEGER NOT NULL,
+                Title TEXT NOT NULL,
+                Excerpt TEXT NOT NULL,
+                Body TEXT NOT NULL,
+                PublishedAt TEXT NOT NULL,
+                SourceUrl TEXT,
+                IsPublished INTEGER NOT NULL,
+                Slug TEXT
+            );
+            """);
+
+        // 20 recent (2020s) rows plus one 2008 row — an unfiltered first page (default size 20)
+        // never reaches the 2008 row, so filtering must happen in SQL, not over a loaded page.
+        for (var i = 1; i <= 20; i++)
+        {
+            dbContext.Database.ExecuteSqlRaw(
+                "INSERT INTO NewsRows (Id, Title, Excerpt, Body, PublishedAt, IsPublished) VALUES ({0}, {1}, 'Ex', 'Body', {2}, 1)",
+                i, $"Recent article {i}", $"2020-06-{i:D2}");
+        }
+
+        dbContext.Database.ExecuteSqlRaw(
+            "INSERT INTO NewsRows (Id, Title, Excerpt, Body, PublishedAt, IsPublished) VALUES (9999, 'Old article', 'Ex', 'Body', '2008-03-04', 1)");
+
+        const string listSelect = """
+            SELECT Id, Title, Excerpt, CAST('' AS TEXT) AS Body, PublishedAt, SourceUrl, IsPublished, Slug
+            FROM NewsRows
+            WHERE IsPublished = 1
+            """;
+
+        var repository = new EfNewsRepository(
+            dbContext,
+            latestSql: listSelect + " ORDER BY PublishedAt DESC, Id DESC LIMIT {0}",
+            countSql: "SELECT COUNT(*) AS Value FROM NewsRows WHERE IsPublished = 1",
+            archivePageSql: listSelect + " ORDER BY PublishedAt DESC, Id DESC LIMIT {1} OFFSET {0}",
+            byIdSql: listSelect + " AND Id = {0}",
+            sitemapSql: "SELECT Id, Title, PublishedAt, Slug FROM NewsRows WHERE IsPublished = 1",
+            archivePageByDecadeSql: listSelect +
+                " AND date(PublishedAt) >= date({0}) AND date(PublishedAt) < date({1})" +
+                " ORDER BY PublishedAt DESC, Id DESC LIMIT {3} OFFSET {2}",
+            countByDecadeSql: "SELECT COUNT(*) AS Value FROM NewsRows WHERE IsPublished = 1" +
+                " AND date(PublishedAt) >= date({0}) AND date(PublishedAt) < date({1})");
+
+        // Unfiltered default page never contains the 2008 row.
+        var unfilteredFirstPage = await repository.GetArchivePageAsync(1, 20);
+        Assert.DoesNotContain(unfilteredFirstPage, item => item.Id == 9999);
+
+        var filter = new NewsArchiveFilter(2000);
+        var filteredCount = await repository.GetPublishedCountAsync(filter);
+        var filteredPage = await repository.GetArchivePageAsync(1, 20, filter);
+
+        Assert.Equal(1, filteredCount);
+        Assert.Single(filteredPage);
+        Assert.Equal(9999, filteredPage[0].Id);
+
+        var emptyDecade = new NewsArchiveFilter(1980);
+        Assert.Equal(0, await repository.GetPublishedCountAsync(emptyDecade));
+        Assert.Empty(await repository.GetArchivePageAsync(1, 20, emptyDecade));
+    }
 }
