@@ -106,6 +106,10 @@ resource "cloudflare_zone_setting" "development_mode" {
 
 # --- DNS records (infra/import/cloudflare-hostnames.json, #624 audit) ---
 
+# comment/comment_modified_on are ignored on every record below: adding a
+# comment is a real, safe in-place update (confirmed by a live #626 plan
+# against CLOUDFLARE_API_TOKEN_READONLY), but this module's job is a no-op
+# import, not editing dashboard-authored notes.
 resource "cloudflare_dns_record" "apex" {
   zone_id = var.zone_id
   name    = "queenzone.org"
@@ -117,6 +121,7 @@ resource "cloudflare_dns_record" "apex" {
 
   lifecycle {
     prevent_destroy = true
+    ignore_changes  = [comment]
   }
 }
 
@@ -130,6 +135,7 @@ resource "cloudflare_dns_record" "www" {
 
   lifecycle {
     prevent_destroy = true
+    ignore_changes  = [comment]
   }
 }
 
@@ -144,6 +150,7 @@ resource "cloudflare_dns_record" "dev" {
 
   lifecycle {
     prevent_destroy = true
+    ignore_changes  = [comment]
   }
 }
 
@@ -158,6 +165,7 @@ resource "cloudflare_dns_record" "cdn" {
 
   lifecycle {
     prevent_destroy = true
+    ignore_changes  = [comment]
   }
 }
 
@@ -172,6 +180,7 @@ resource "cloudflare_dns_record" "cdn2" {
 
   lifecycle {
     prevent_destroy = true
+    ignore_changes  = [comment]
   }
 }
 
@@ -186,6 +195,7 @@ resource "cloudflare_dns_record" "pictures_legacy" {
 
   lifecycle {
     prevent_destroy = true
+    ignore_changes  = [comment]
   }
 }
 
@@ -200,24 +210,24 @@ resource "cloudflare_dns_record" "asverify_cdn" {
 
   lifecycle {
     prevent_destroy = true
+    ignore_changes  = [comment]
   }
 }
 
-# Verification TXT records: the #624 audit recorded that these exist and are
-# non-secret, but did not capture their content values. Import reads the live
-# content; ignore_changes keeps this module from ever proposing to overwrite
-# an unrecorded verification token.
+# Verification TXT records. Content values were confirmed live during the
+# #626 plan (public DNS is not secret) and match byte-for-byte, quotes
+# included, as returned by the Cloudflare API.
 resource "cloudflare_dns_record" "asuid_apex" {
   zone_id = var.zone_id
   name    = "asuid.queenzone.org"
   type    = "TXT"
-  content = "imported"
+  content = "\"0740A9DBFCBF1CE22090C2574D9867A086204B58D7CE4676D90FEB5E85B3A068\""
   ttl     = 1
   comment = "App Service custom domain verification"
 
   lifecycle {
     prevent_destroy = true
-    ignore_changes  = [content]
+    ignore_changes  = [comment]
   }
 }
 
@@ -225,13 +235,13 @@ resource "cloudflare_dns_record" "asuid_www" {
   zone_id = var.zone_id
   name    = "asuid.www.queenzone.org"
   type    = "TXT"
-  content = "imported"
+  content = "\"0740A9DBFCBF1CE22090C2574D9867A086204B58D7CE4676D90FEB5E85B3A068\""
   ttl     = 1
   comment = "App Service custom domain verification"
 
   lifecycle {
     prevent_destroy = true
-    ignore_changes  = [content]
+    ignore_changes  = [comment]
   }
 }
 
@@ -239,13 +249,13 @@ resource "cloudflare_dns_record" "google_site_verification" {
   zone_id = var.zone_id
   name    = "queenzone.org"
   type    = "TXT"
-  content = "imported"
-  ttl     = 1
+  content = "\"google-site-verification=gDSLwU-DDTXw-Z3VYtqy0xZrLPcqqfdX4VZkA-9Ttbg\""
+  ttl     = 3600
   comment = "Google site verification"
 
   lifecycle {
     prevent_destroy = true
-    ignore_changes  = [content]
+    ignore_changes  = [comment]
   }
 }
 
@@ -260,6 +270,7 @@ resource "cloudflare_dns_record" "bing_verification_1" {
 
   lifecycle {
     prevent_destroy = true
+    ignore_changes  = [comment]
   }
 }
 
@@ -274,6 +285,7 @@ resource "cloudflare_dns_record" "bing_verification_2" {
 
   lifecycle {
     prevent_destroy = true
+    ignore_changes  = [comment]
   }
 }
 
@@ -282,16 +294,19 @@ resource "cloudflare_dns_record" "bing_verification_2" {
 resource "cloudflare_workers_script" "pictures_queenzone_org" {
   account_id  = var.account_id
   script_name = var.worker_name
-  content     = file("${path.module}/../../import/workers/pictures-queenzone-org.js")
+  # The checked-in snapshot already carries a leading UTF-8 BOM byte,
+  # matching the live script (confirmed by a live #626 plan).
+  content            = file("${path.module}/../../import/workers/pictures-queenzone-org.js")
+  compatibility_date = "2026-06-25"
 
   lifecycle {
     prevent_destroy = true
 
-    # Runtime knobs (compatibility date/flags, usage model, bindings) were not
-    # captured during the #624 audit. Ignoring them keeps this module from
-    # guessing at values that could change published Worker behaviour.
+    # Remaining runtime knobs (flags, usage model, bindings) were not
+    # captured during the #624 audit and showed no drift in that same plan.
+    # Ignoring them keeps this module from guessing at values that could
+    # change published Worker behaviour.
     ignore_changes = [
-      compatibility_date,
       compatibility_flags,
       usage_model,
       bindings,
@@ -305,15 +320,15 @@ resource "cloudflare_workers_script" "pictures_queenzone_org" {
 }
 
 resource "cloudflare_workers_script" "pictures_legacy_redirect" {
-  account_id  = var.account_id
-  script_name = var.legacy_redirect_worker_name
-  content     = file("${path.module}/../../import/workers/pictures-legacy-redirect.js")
+  account_id         = var.account_id
+  script_name        = var.legacy_redirect_worker_name
+  content            = file("${path.module}/../../import/workers/pictures-legacy-redirect.js")
+  compatibility_date = "2026-08-16"
 
   lifecycle {
     prevent_destroy = true
 
     ignore_changes = [
-      compatibility_date,
       compatibility_flags,
       usage_model,
       bindings,
