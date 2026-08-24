@@ -71,18 +71,17 @@ export function isMemberOnlyScreen(name: string): boolean {
   return (memberOnlyScreenNames as readonly string[]).includes(name);
 }
 
+/**
+ * Screens that hide the bottom tab bar.
+ *
+ * Section lists (Biography, FanPerformances, Timeline, …) stay visible so users
+ * can switch tabs while browsing. Immersive / pushed-detail routes hide the bar
+ * per the mobile handoff (Story, PhotoViewer, Thread, Profile, …).
+ */
 export const detailScreenNames = [
   'Story',
-  'Stories',
-  'Biography',
   'BiographyChapter',
-  'Discography',
   'Album',
-  'Timeline',
-  'FreddieTribute',
-  'FanPerformances',
-  'AboutArchive',
-  'Search',
   'PhotoViewer',
   'PhotoSubmit',
   'Thread',
@@ -98,6 +97,7 @@ export const detailScreenNames = [
   'Inbox',
   'SavedList',
   'DeleteAccount',
+  'Search',
 ] as const;
 
 export function shouldHideTabBar(routeName: string | undefined): boolean {
