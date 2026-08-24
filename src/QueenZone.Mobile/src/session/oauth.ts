@@ -1,5 +1,6 @@
 import * as Crypto from 'expo-crypto';
 import * as WebBrowser from 'expo-web-browser';
+import { Linking } from 'react-native';
 import {
   buildAuthorizeUrl,
   mobileClientId,
@@ -26,12 +27,8 @@ export async function signInWithProvider(apiBaseUrl: string, provider: string): 
     codeChallenge: challenge,
   });
 
-  const result = await WebBrowser.openAuthSessionAsync(authorizeUrl, mobileRedirectUri);
-  if (result.type !== 'success' || !('url' in result) || !result.url) {
-    throw new Error(result.type === 'cancel' || result.type === 'dismiss' ? 'Sign-in was cancelled.' : 'Sign-in did not complete.');
-  }
-
-  const callback = parseAuthCallback(result.url);
+  const callbackUrl = await collectAuthCallback(authorizeUrl);
+  const callback = parseAuthCallback(callbackUrl);
   if (callback.error) {
     throw new Error(callback.errorDescription ?? callback.error);
   }
@@ -76,6 +73,120 @@ export async function logoutRemote(apiBaseUrl: string, accessToken: string): Pro
   } catch {
     // Local sign-out still proceeds.
   }
+}
+
+type AuthHop =
+  | { type: 'url'; url: string }
+  | { type: 'cancelled' }
+  | { type: 'failed' };
+
+async function collectAuthCallback(authorizeUrl: string): Promise<string> {
+  const pending = watchAuthCallbackUrl();
+  try {
+    if (typeof WebBrowser.warmUpAsync === 'function') {
+      await WebBrowser.warmUpAsync();
+    }
+
+    const hop = await Promise.race([
+      WebBrowser.openAuthSessionAsync(authorizeUrl, mobileRedirectUri).then((result): AuthHop => {
+        if (result.type === 'success' && 'url' in result && result.url) {
+          return { type: 'url', url: result.url };
+        }
+        if (result.type === 'cancel' || result.type === 'dismiss') {
+          return { type: 'cancelled' };
+        }
+        return { type: 'failed' };
+      }),
+      pending.promise.then((url): AuthHop => ({ type: 'url', url })),
+    ]);
+
+    if (hop.type === 'url') {
+      dismissAuthBrowser();
+      return hop.url;
+    }
+
+    const late = await waitForPendingUrl(pending, 400);
+    if (late) {
+      dismissAuthBrowser();
+      return late;
+    }
+
+    throw new Error(hop.type === 'cancelled' ? 'Sign-in was cancelled.' : 'Sign-in did not complete.');
+  } finally {
+    pending.cancel();
+    if (typeof WebBrowser.coolDownAsync === 'function') {
+      await WebBrowser.coolDownAsync();
+    }
+  }
+}
+
+function watchAuthCallbackUrl(): {
+  promise: Promise<string>;
+  cancel: () => void;
+  url: () => string | null;
+} {
+  let settled = false;
+  let captured: string | null = null;
+  let subscription: { remove: () => void } | undefined;
+  let resolvePromise: (url: string) => void = () => {};
+  const promise = new Promise<string>((resolve) => {
+    resolvePromise = resolve;
+  });
+
+  const onUrl = (url: string) => {
+    if (settled || !isAuthCallbackUrl(url)) {
+      return;
+    }
+    settled = true;
+    captured = url;
+    subscription?.remove();
+    dismissAuthBrowser();
+    resolvePromise(url);
+  };
+
+  subscription = Linking.addEventListener('url', ({ url }) => onUrl(url));
+
+  return {
+    promise,
+    cancel: () => {
+      settled = true;
+      subscription?.remove();
+    },
+    url: () => captured,
+  };
+}
+
+async function waitForPendingUrl(
+  pending: { promise: Promise<string>; url: () => string | null },
+  ms: number,
+): Promise<string | null> {
+  const existing = pending.url();
+  if (existing) {
+    return existing;
+  }
+
+  return Promise.race([
+    pending.promise,
+    new Promise<null>((resolve) => {
+      setTimeout(() => resolve(null), ms);
+    }),
+  ]);
+}
+
+function dismissAuthBrowser() {
+  try {
+    WebBrowser.dismissAuthSession();
+  } catch {
+    try {
+      void WebBrowser.dismissBrowser();
+    } catch {
+      // Best-effort: the custom tab may already be gone.
+    }
+  }
+}
+
+function isAuthCallbackUrl(url: string): boolean {
+  return url.startsWith(mobileRedirectUri) || /:\/\/auth\/callback(?:\?|$)/.test(url);
 }
 
 async function exchangeAuthorizationCode(

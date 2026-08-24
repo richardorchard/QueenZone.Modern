@@ -1,11 +1,15 @@
 import * as Crypto from 'expo-crypto';
 import * as WebBrowser from 'expo-web-browser';
+import { waitFor } from '@testing-library/react-native';
+import { Linking } from 'react-native';
 import { logoutRemote, refreshAccessToken, revokeRefreshToken, signInWithProvider } from './oauth';
 import { jsonResponse } from '../test/fixtures';
 
 jest.mock('expo-web-browser', () => ({
   maybeCompleteAuthSession: jest.fn(),
   openAuthSessionAsync: jest.fn(),
+  dismissAuthSession: jest.fn(),
+  dismissBrowser: jest.fn(),
 }));
 
 jest.mock('expo-crypto', () => ({
@@ -20,10 +24,21 @@ const openAuth = WebBrowser.openAuthSessionAsync as jest.MockedFunction<
 >;
 const fetchMock = jest.fn<Promise<Response>, [RequestInfo | URL, RequestInit?]>();
 
+const linkingHandlers: Array<(event: { url: string }) => void> = [];
+
 beforeEach(() => {
   fetchMock.mockReset();
   global.fetch = fetchMock as unknown as typeof fetch;
   (Crypto.getRandomBytesAsync as jest.Mock).mockClear();
+  linkingHandlers.length = 0;
+  jest.spyOn(Linking, 'addEventListener').mockImplementation((_type, handler) => {
+    linkingHandlers.push(handler as (event: { url: string }) => void);
+    return { remove: jest.fn() } as ReturnType<typeof Linking.addEventListener>;
+  });
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
 });
 
 function authorizeState(url: string) {
@@ -68,6 +83,29 @@ describe('signInWithProvider', () => {
       url: 'queenzone://auth/callback?error=access_denied&error_description=Nope',
     });
     await expect(signInWithProvider('http://qz.test', 'Google')).rejects.toThrow('Nope');
+  });
+
+  it('completes sign-in from a deep link when the browser hop stays open', async () => {
+    openAuth.mockImplementation(
+      () =>
+        new Promise(() => {
+          /* custom tab never reports success */
+        }),
+    );
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ access_token: 'a', refresh_token: 'r', expires_in: 900 }),
+    );
+
+    const pending = signInWithProvider('http://qz.test', 'Google');
+    await waitFor(() => expect(openAuth).toHaveBeenCalled());
+    await waitFor(() => expect(linkingHandlers.length).toBeGreaterThan(0));
+    const authorizeUrl = String(openAuth.mock.calls[0]?.[0]);
+    linkingHandlers[0]?.({
+      url: `queenzone://auth/callback?code=auth-code&state=${authorizeState(authorizeUrl)}`,
+    });
+
+    await expect(pending).resolves.toEqual({ accessToken: 'a', refreshToken: 'r', expiresIn: 900 });
+    expect(WebBrowser.dismissAuthSession).toHaveBeenCalled();
   });
 });
 

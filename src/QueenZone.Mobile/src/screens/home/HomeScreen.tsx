@@ -21,6 +21,7 @@ import { media } from '../../content/media';
 import { useHomeSection } from '../../hooks/useHomeSection';
 import type { HomeStackParamList, RootTabParamList } from '../../navigation/types';
 import { useSession } from '../../session/SessionContext';
+import { openSignIn } from '../../session/signInNavigation';
 import { fonts, radius, space, type, useTheme } from '../../theme';
 import { ArchiveFooter } from '../../ui/ArchiveFooter';
 import { ArchiveImage } from '../../ui/ArchiveImage';
@@ -558,7 +559,7 @@ export function HomeScreen({ navigation }: Props) {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Member sign in"
-              onPress={() => navigation.navigate('SignIn')}
+              onPress={() => openSignIn(navigation, { tab: 'HomeTab', screen: 'Profile' })}
               style={{
                 marginTop: space.xxl,
                 backgroundColor: c.surfaceRaised,

@@ -4,7 +4,6 @@ import { HomeScreen } from '../screens/home/HomeScreen';
 
 import { ProfileScreen } from '../screens/account/ProfileScreen';
 import { SettingsScreen } from '../screens/account/SettingsScreen';
-import { SignInScreen } from '../screens/account/SignInScreen';
 import { ContactScreen } from '../screens/account/ContactScreen';
 import { DeleteAccountScreen } from '../screens/account/DeleteAccountScreen';
 import { SavedListScreen } from '../screens/account/SavedListScreen';
@@ -35,7 +34,7 @@ import { ForumScreen } from '../screens/forum/ForumScreen';
 import { CategoryScreen } from '../screens/forum/CategoryScreen';
 import { ThreadScreen } from '../screens/forum/ThreadScreen';
 import { ComposerScreen } from '../screens/forum/ComposerScreen';
-import { ForumHeaderRight, SearchHeaderButton } from './headerButtons';
+import { ForumIndexHeaderRight, SearchHeaderButton } from './headerButtons';
 import type {
   ArchiveStackParamList,
   ForumStackParamList,
@@ -44,7 +43,7 @@ import type {
   PhotosStackParamList,
 } from './types';
 
-const stackScreenOptions = {
+export const stackScreenOptions = {
   headerStyle: { backgroundColor: dark.surfacePage },
   headerTintColor: dark.accentPrimary,
   headerTitleStyle: { color: dark.textPrimary, fontWeight: '600' as const },
@@ -65,7 +64,6 @@ export function HomeStack() {
       <Home.Screen name="Search" component={SearchRouteScreen} />
       <Home.Screen name="Profile" component={ProfileScreen} />
       <Home.Screen name="Settings" component={SettingsScreen} />
-      <Home.Screen name="SignIn" component={SignInScreen} options={{ title: 'Sign in' }} />
       <Home.Screen name="Contact" component={ContactScreen} options={{ title: 'Contact' }} />
       <Home.Screen name="DeleteAccount" component={DeleteAccountScreen} options={{ title: 'Delete account' }} />
       <Home.Screen name="Inbox" component={InboxScreen} options={{ title: 'Messages' }} />
@@ -173,12 +171,7 @@ export function ForumStack() {
         component={ForumScreen}
         options={({ navigation }) => ({
           title: 'Forum',
-          headerRight: () => (
-            <ForumHeaderRight
-              onSearch={() => navigation.navigate('Search')}
-              onCompose={() => navigation.navigate('Composer', {})}
-            />
-          ),
+          headerRight: () => <ForumIndexHeaderRight navigation={navigation} />,
         })}
       />
       <Forum.Screen name="Category" component={CategoryScreen} options={{ title: 'Board' }} />

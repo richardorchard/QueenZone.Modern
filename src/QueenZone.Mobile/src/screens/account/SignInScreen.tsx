@@ -1,18 +1,24 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { getAppConfig } from '../../config/appConfig';
 import { authProvidersUrl, fallbackAuthProviders, parseAuthProviders, type AuthProvider } from '../../api/auth';
+import type { RootStackParamList } from '../../navigation/types';
 import { useSession } from '../../session/SessionContext';
+import { completeSignInNavigation } from '../../session/signInNavigation';
 import { space, type, useTheme } from '../../theme';
 import { Button } from '../../ui/Button';
 import { CrestSeal } from '../../ui/CrestSeal';
 
-export function SignInScreen() {
+type Props = NativeStackScreenProps<RootStackParamList, 'SignIn'>;
+
+export function SignInScreen({ navigation, route }: Props) {
   const { c } = useTheme();
-  const { signIn } = useSession();
+  const { isSignedIn, signIn } = useSession();
   const [providers, setProviders] = useState<AuthProvider[]>(fallbackAuthProviders);
   const [busyProvider, setBusyProvider] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const finished = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -36,6 +42,20 @@ export function SignInScreen() {
     };
   }, []);
 
+  const leaveAfterSignIn = useCallback(() => {
+    if (finished.current) {
+      return;
+    }
+    finished.current = true;
+    completeSignInNavigation(navigation as never, route.params?.returnTo);
+  }, [navigation, route.params?.returnTo]);
+
+  useEffect(() => {
+    if (isSignedIn) {
+      leaveAfterSignIn();
+    }
+  }, [isSignedIn, leaveAfterSignIn]);
+
   const onProvider = useCallback(
     async (provider: AuthProvider) => {
       if (busyProvider) {
@@ -46,13 +66,14 @@ export function SignInScreen() {
       setBusyProvider(provider.id);
       try {
         await signIn(provider.id);
+        leaveAfterSignIn();
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Could not sign in.');
       } finally {
         setBusyProvider(null);
       }
     },
-    [busyProvider, signIn],
+    [busyProvider, leaveAfterSignIn, signIn],
   );
 
   return (

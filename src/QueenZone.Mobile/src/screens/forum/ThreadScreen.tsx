@@ -17,6 +17,7 @@ import { getAppConfig } from '../../config';
 import { usePagedContent } from '../../hooks/usePagedContent';
 import type { ForumStackParamList } from '../../navigation/types';
 import { useSession } from '../../session/SessionContext';
+import { openForumComposer, openSignIn } from '../../session/signInNavigation';
 import { RichHtmlBody } from '../../ui/RichHtmlBody';
 import { Button } from '../../ui/Button';
 import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from '../../ui/ScreenStates';
@@ -223,7 +224,7 @@ export function ThreadScreen({ navigation, route }: Props) {
             error={pollError}
             onVote={votePoll}
             onClose={closePoll}
-            onSignIn={() => navigation.getParent()?.navigate('HomeTab', { screen: 'SignIn' })}
+            onSignIn={() => openSignIn(navigation)}
           />
         </View>
       ) : null}
@@ -243,8 +244,8 @@ export function ThreadScreen({ navigation, route }: Props) {
           label={isSignedIn ? 'Reply' : 'Sign in to reply'}
           variant="outline"
           onPress={() =>
-            navigation.navigate('Composer', {
-              threadId: id,
+            openForumComposer(navigation, isSignedIn, {
+              threadId: id ?? undefined,
               threadTitle: topic?.title ?? title,
               isLocked: topic?.isLocked,
             })
