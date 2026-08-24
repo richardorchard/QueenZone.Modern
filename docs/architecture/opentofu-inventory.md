@@ -3,7 +3,8 @@
 Issue: [#624](https://github.com/richardorchard/QueenZone.Modern/issues/624) (OpenTofu 1/8 under epic [#615](https://github.com/richardorchard/QueenZone.Modern/issues/615)).
 
 **Audit date:** 2026-08-12  
-**Settings / GitHub refresh:** 2026-08-15 — re-listed live App Service setting *names* and GitHub environment *names* after the [#666](https://github.com/richardorchard/QueenZone.Modern/issues/666) ARM deploy-settings work. Azure/Cloudflare resource IDs, storage ACLs, and `cdn`/`cdn2` probes were not re-run.  
+**Settings / GitHub refresh:** 2026-08-24 — re-listed live App Service setting *names* after adding the Android FCM credential for [#847](https://github.com/richardorchard/QueenZone.Modern/issues/847). GitHub environment names, Azure/Cloudflare resource IDs, storage ACLs, and `cdn`/`cdn2` probes were not re-run.
+
 **#177 live refresh:** 2026-08-16 — `songfiles` ACL set to `None` via ARM; Worker `pictures-queenzone-org` published on `cdn2.queenzone.org/*` (404 `/songfiles/*`).  
 **Method:** read-only Azure CLI/`az` against subscription `Base Subscription`, live HTTP/DNS probes of public hostnames, Cloudflare API (tokens `CLOUDFLARE_API_TOKEN_READONLY` and `CLOUDFLARE_WORKER_READWRITE` from Bitwarden — values not recorded), GitHub API for environments/secret *names*, Bitwarden Secrets Manager key *names* only.  
 **Mutations performed:** none during the 2026-08-12 audit. 2026-08-16 applied the #177 ACL and Worker publish outside OpenTofu.
@@ -72,7 +73,7 @@ Treatments:
 | Certificates `queenzone.org`, `www.queenzone.org` | `…/Microsoft.Web/certificates/…` | import or defer | GeoTrust TLS RSA CA G1, expire **2026-12-29**; confirm renew path before encoding as managed vs uploaded |
 | Access restrictions (Cloudflare IPv4/IPv6 allow + deny all) | site `ipSecurityRestrictions` | import | Mis-order or drop = either open origin or lock out Cloudflare |
 | SCM access restrictions | site `scmIpSecurityRestrictions` | import | Currently **Allow all**; keep separate from main site rules (deploy path) |
-| App settings (names only) | site config | outside → [ADR 0008](../decisions/0008-app-service-settings-ownership.md) | Names re-listed 2026-08-15. Secret **values** stay in Azure/Bitwarden, never state. `deploy.yml` ARM-owns three non-secret deploy keys outside OpenTofu (see [App Service settings](#app-service-application-setting-names-values-not-recorded)). #622's site resource must omit/`ignore_changes` on `app_settings`/`connection_string` |
+| App settings (names only) | site config | outside → [ADR 0008](../decisions/0008-app-service-settings-ownership.md) | Names re-listed 2026-08-24. Secret **values** stay in Azure/Bitwarden, never state. `deploy.yml` ARM-owns three non-secret deploy keys outside OpenTofu (see [App Service settings](#app-service-application-setting-names-values-not-recorded)). #622's site resource must omit/`ignore_changes` on `app_settings`/`connection_string` |
 | SQL server `queenzone-sql-server` | `…/Microsoft.Sql/servers/queenzone-sql-server` | import | Public network enabled; AAD admin present; SQL auth still used by app |
 | Firewall `AllowAllWindowsAzureIps` | `…/firewallRules/AllowAllWindowsAzureIps` | import | Required for App Service → SQL |
 | Firewall `ClientIPAddress_2026-6-11_20-28-58` | `…/firewallRules/ClientIPAddress_…` | defer | Operator workstation IP; likely keep outside or replace with named break-glass rule |
@@ -162,9 +163,9 @@ No storage lifecycle policy exists. Soft delete is 7 days for blobs and containe
 
 ## App Service application setting names (values not recorded)
 
-Present on `queenzone-dev` at the 2026-08-15 refresh (`az webapp config appsettings list`, names only except the two non-secret deploy keys below):
+Present on `queenzone-dev` at the 2026-08-24 refresh (`az webapp config appsettings list`, names only except the two non-secret deploy keys below):
 
-`APPLICATIONINSIGHTS_CONNECTION_STRING`, `Authentication__Discord__ClientId/Secret`, `Authentication__Facebook__ClientId/Secret`, `Authentication__GitHub__ClientId/Secret`, `Authentication__Google__ClientId/Secret`, `Authentication__Microsoft__ClientId/Secret`, `MobileAuth__SigningKey`, `BlobUpload__PublicBaseUrl`, `ConnectionStrings__BlobStorage`, `ConnectionStrings__QueenZoneLegacy`, `DIAGNOSTICS_AZUREBLOBRETENTIONINDAYS`, `OPENROUTER_API_KEY`, `WEBSITE_HEALTHCHECK_MAXPINGFAILURES`, `WEBSITE_HTTPLOGGING_RETENTION_DAYS`, `Analytics__GoogleAnalyticsServiceAccountJson`, `Analytics__TrafficCacheMinutes`, `Analytics__GoogleAnalyticsPropertyId`, `AzureAd__Instance`, `AzureAd__TenantId`, `AzureAd__ClientId`, `AzureAd__ClientSecret`, `AzureAd__CallbackPath`, `Admin__AllowedEmails__0`, `Admin__AllowedEmails__1`, `SCM_DO_BUILD_DURING_DEPLOYMENT`, `ENABLE_ORYX_BUILD`, `WEBSITE_RUN_FROM_PACKAGE`, `WEBSITE_WARMUP_PATH`.
+`APPLICATIONINSIGHTS_CONNECTION_STRING`, `Authentication__Discord__ClientId/Secret`, `Authentication__Facebook__ClientId/Secret`, `Authentication__GitHub__ClientId/Secret`, `Authentication__Google__ClientId/Secret`, `Authentication__Microsoft__ClientId/Secret`, `MobileAuth__SigningKey`, `PushNotifications__Fcm__ProjectId`, `PushNotifications__Fcm__ServiceAccountJson`, `BlobUpload__PublicBaseUrl`, `ConnectionStrings__BlobStorage`, `ConnectionStrings__QueenZoneLegacy`, `DIAGNOSTICS_AZUREBLOBRETENTIONINDAYS`, `OPENROUTER_API_KEY`, `WEBSITE_HEALTHCHECK_MAXPINGFAILURES`, `WEBSITE_HTTPLOGGING_RETENTION_DAYS`, `Analytics__GoogleAnalyticsServiceAccountJson`, `Analytics__TrafficCacheMinutes`, `Analytics__GoogleAnalyticsPropertyId`, `AzureAd__Instance`, `AzureAd__TenantId`, `AzureAd__ClientId`, `AzureAd__ClientSecret`, `AzureAd__CallbackPath`, `Admin__AllowedEmails__0`, `Admin__AllowedEmails__1`, `SCM_DO_BUILD_DURING_DEPLOYMENT`, `ENABLE_ORYX_BUILD`, `WEBSITE_RUN_FROM_PACKAGE`, `WEBSITE_WARMUP_PATH`.
 
 Ownership of App Service settings is decided in [ADR 0008](../decisions/0008-app-service-settings-ownership.md)
 ([#618](https://github.com/richardorchard/QueenZone.Modern/issues/618)): OpenTofu stays out of `app_settings`/
@@ -190,7 +191,7 @@ recorded in this inventory or OpenTofu state.
 | `WEBSITE_WARMUP_PATH` | `/health` | ARM via `deploy.yml` | Platform container-start probe. Must stay on `/health`, **not** `/warmup` (#673). `/warmup` remains the deploy-time readiness gate. |
 | `WEBSITE_WARMUP_STATUSES` | **absent** | ARM via `deploy.yml` (deleted if present) | Must stay unset. Requiring `200` crash-looped the B1 worker when App Service used an internal Host header (#684). |
 
-Site health-check path remains `/health`. Remaining secret settings (SQL, Entra, member OAuth, blob, OpenRouter, Insights, admin emails) stay Bitwarden/operator-owned.
+Site health-check path remains `/health`. Remaining secret settings (SQL, Entra, member OAuth, mobile push, blob, OpenRouter, Insights, admin emails) stay Bitwarden/operator-owned.
 
 ## Resources that must never be recreated
 

@@ -91,6 +91,26 @@ which is configured separately in Azure App Service settings.
 to the same-named App Service setting before every web deployment, including rotations, and fails before
 deployment if the mapped value is missing or shorter than 32 characters.
 
+## Android FCM push credential
+
+Android push uses Firebase project `queenzone-mobile` and its registered Android app
+`org.queenzone.mobile`. The committed `src/QueenZone.Mobile/google-services.json` contains Firebase project/app
+identifiers used by the Android client; Firebase documents this file and its API key as non-secret client
+configuration. It must not be confused with the private service-account JSON below.
+
+The backend FCM HTTP v1 sender is the dedicated Google Cloud service account
+`queenzone-fcm-sender@queenzone-mobile.iam.gserviceaccount.com`. It has only the **Firebase Cloud Messaging API
+Admin** role. Its private key is stored under these matching Bitwarden and Azure App Service names:
+
+- `PushNotifications__Fcm__ProjectId`: `queenzone-mobile` (identifier, not a credential).
+- `PushNotifications__Fcm__ServiceAccountJson`: the complete private service-account JSON. Never print, commit,
+  or paste this value into an issue or pull request.
+
+To rotate the credential, create a new JSON key on the same dedicated service account. Update Bitwarden first,
+then update both matching App Service settings and restart/verify the site. Confirm an authenticated FCM HTTP v1
+send succeeds before permanently deleting the previous key in Google Cloud. Verify values only by exact in-memory
+comparison or value length; never emit the JSON or its private key.
+
 ## Rotation and break-glass (App Service settings)
 
 [ADR 0008](decisions/0008-app-service-settings-ownership.md) keeps App Service application settings outside
