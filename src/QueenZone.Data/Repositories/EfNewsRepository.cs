@@ -18,6 +18,8 @@ public sealed class EfNewsRepository : INewsRepository
     private readonly string archivePageSql;
     private readonly string byIdSql;
     private readonly string sitemapSql;
+    private readonly string archivePageByDecadeSql;
+    private readonly string countByDecadeSql;
 
     // SQLite-only: LIKE-based fallback for deterministic tests.
     // On SQL Server the SearchAsync path uses dbo.NEWS_T_SearchPublished instead.
@@ -38,7 +40,7 @@ public sealed class EfNewsRepository : INewsRepository
         // List/count/sitemap omit ARTICLE; detail still projects full body.
         var listCte = PublishedNewsQuery.BuildPublishedNewsCte(includeSlug, includeBody: false);
         var detailCte = PublishedNewsQuery.BuildPublishedNewsCte(includeSlug, includeBody: true);
-        (latestSql, countSql, archivePageSql, byIdSql, sitemapSql) =
+        (latestSql, countSql, archivePageSql, byIdSql, sitemapSql, archivePageByDecadeSql, countByDecadeSql) =
             EfProductionSql.CreateNewsQueries(listCte, detailCte);
         // SQLite fallback: body-inclusive CTE for LIKE matching (not used on SQL Server).
         var searchCte = PublishedNewsQuery.BuildPublishedNewsCte(includeSlug, includeBody: true);
@@ -59,7 +61,9 @@ public sealed class EfNewsRepository : INewsRepository
         string sitemapSql,
         string sqliteLikeSearchSql = "",
         string sqliteLikeSearchCountSql = "",
-        INewsSuggestionRepository? newsSuggestionRepository = null)
+        INewsSuggestionRepository? newsSuggestionRepository = null,
+        string archivePageByDecadeSql = "",
+        string countByDecadeSql = "")
     {
         this.dbContext = dbContext;
         this.latestSql = latestSql;
@@ -70,6 +74,8 @@ public sealed class EfNewsRepository : INewsRepository
         this.sqliteLikeSearchSql = sqliteLikeSearchSql;
         this.sqliteLikeSearchCountSql = sqliteLikeSearchCountSql;
         this.newsSuggestionRepository = newsSuggestionRepository;
+        this.archivePageByDecadeSql = archivePageByDecadeSql;
+        this.countByDecadeSql = countByDecadeSql;
     }
 
     public async Task<IReadOnlyList<NewsItem>> GetLatestAsync(int count, CancellationToken cancellationToken = default)
@@ -81,26 +87,54 @@ public sealed class EfNewsRepository : INewsRepository
         return await AddSubmissionAttributionAsync(rows.Select(Map).ToList(), cancellationToken);
     }
 
-    public async Task<int> GetPublishedCountAsync(CancellationToken cancellationToken = default)
+    public async Task<int> GetPublishedCountAsync(
+        NewsArchiveFilter filter = default,
+        CancellationToken cancellationToken = default)
     {
         // CTE SQL is non-composable; materialize fully instead of FirstAsync (which tries to compose).
-        var values = await dbContext.Database
-            .SqlQueryRaw<int>(countSql)
-            .ToListAsync(cancellationToken);
+        List<int> values;
+        if (filter.IsActive)
+        {
+            var (start, end) = filter.GetDecadeBounds();
+            values = await dbContext.Database
+                .SqlQueryRaw<int>(countByDecadeSql, start, end)
+                .ToListAsync(cancellationToken);
+        }
+        else
+        {
+            values = await dbContext.Database
+                .SqlQueryRaw<int>(countSql)
+                .ToListAsync(cancellationToken);
+        }
+
         return values.FirstOrDefault();
     }
 
     public async Task<IReadOnlyList<NewsItem>> GetArchivePageAsync(
         int page,
         int pageSize,
+        NewsArchiveFilter filter = default,
         CancellationToken cancellationToken = default)
     {
         var normalizedPage = Math.Max(page, 1);
         var take = Math.Clamp(pageSize, 1, MaxPageSize);
         var offset = (normalizedPage - 1) * take;
-        var rows = await dbContext.Database
-            .SqlQueryRaw<NewsRow>(archivePageSql, offset, take)
-            .ToListAsync(cancellationToken);
+
+        List<NewsRow> rows;
+        if (filter.IsActive)
+        {
+            var (start, end) = filter.GetDecadeBounds();
+            rows = await dbContext.Database
+                .SqlQueryRaw<NewsRow>(archivePageByDecadeSql, start, end, offset, take)
+                .ToListAsync(cancellationToken);
+        }
+        else
+        {
+            rows = await dbContext.Database
+                .SqlQueryRaw<NewsRow>(archivePageSql, offset, take)
+                .ToListAsync(cancellationToken);
+        }
+
         return await AddSubmissionAttributionAsync(rows.Select(Map).ToList(), cancellationToken);
     }
 

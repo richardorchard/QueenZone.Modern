@@ -98,7 +98,9 @@ internal static class EfProductionSql
         string Count,
         string ArchivePage,
         string ById,
-        string Sitemap)
+        string Sitemap,
+        string ArchivePageByDecade,
+        string CountByDecade)
         CreateNewsQueries(string listCte, string detailCte) =>
         (
             // $$ raw strings: {{expr}} interpolates; single {0} stays a literal EF parameter placeholder.
@@ -164,6 +166,32 @@ internal static class EfProductionSql
                 FROM PublishedNews
                 WHERE {{PublishedNewsQuery.LatestRowFilter}}
                 ORDER BY PublishedAt DESC, Id DESC
+                """,
+            // Decade filter: {0} = inclusive start (UTC datetime), {1} = exclusive end, {2} = OFFSET, {3} = FETCH.
+            listCte + $$"""
+
+                SELECT
+                    Id,
+                    Title,
+                    Excerpt,
+                    Body,
+                    PublishedAt,
+                    SourceUrl,
+                    IsPublished,
+                    Slug
+                FROM PublishedNews
+                WHERE {{PublishedNewsQuery.LatestRowFilter}}
+                  AND PublishedAt >= {0} AND PublishedAt < {1}
+                ORDER BY PublishedAt DESC, Id DESC
+                OFFSET {2} ROWS FETCH NEXT {3} ROWS ONLY
+                """,
+            // Decade filter: {0} = inclusive start (UTC datetime), {1} = exclusive end.
+            listCte + $$"""
+
+                SELECT COUNT(*) AS Value
+                FROM PublishedNews
+                WHERE {{PublishedNewsQuery.LatestRowFilter}}
+                  AND PublishedAt >= {0} AND PublishedAt < {1}
                 """);
 
     /// <summary>
