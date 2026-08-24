@@ -43,11 +43,12 @@ jobs:
             | bash ./scripts/classify-pipeline-changes.sh \
             >> "$GITHUB_OUTPUT"
 
-  # JS preflight for src/QueenZone.Mobile: npm ci + npm run preflight
-  # (typecheck, discovered unit tests, pinned Expo Doctor). Native Android/iOS
-  # compile builds run in mobile-android/mobile-ios below. Mixed web+mobile
-  # PRs run this alongside the .NET suite; mobile-only PRs skip the website
-  # path entirely. Required on main after #870 — see mobile-js-ok stubs.
+  # JS preflight + coverage gate for src/QueenZone.Mobile (#871 Option A).
+  # typecheck, discovered unit tests with coverage, pinned Expo Doctor, then
+  # the documented mobile coverage floors. Native Android/iOS compile builds
+  # run in mobile-android/mobile-ios below. Mixed web+mobile PRs run this
+  # alongside the .NET suite; mobile-only PRs skip the website path entirely.
+  # Required on main after #870 — see mobile-js-ok stubs.
   mobile-js:
     name: Mobile typecheck and unit tests
     runs-on: ubuntu-latest
@@ -59,6 +60,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Self-test mobile coverage gate
+        working-directory: ${{ github.workspace }}
+        run: node scripts/Test-MobileCoverageGate.mjs --self-test
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
@@ -70,8 +77,41 @@ jobs:
       - name: Install
         run: npm ci
 
-      - name: Preflight
-        run: npm run preflight
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests with coverage
+        id: mobile-coverage-collect
+        run: npm run test:coverage
+
+      - name: Enforce mobile coverage gate
+        working-directory: ${{ github.workspace }}
+        run: node scripts/Test-MobileCoverageGate.mjs
+
+      - name: Expo Doctor
+        run: npm run doctor
+
+      - name: Upload mobile coverage (machine-readable)
+        if: always() && steps.mobile-coverage-collect.outcome == 'success'
+        uses: actions/upload-artifact@v7
+        with:
+          name: mobile-coverage-${{ github.run_id }}
+          path: |
+            src/QueenZone.Mobile/coverage/merged/coverage.cobertura.xml
+            src/QueenZone.Mobile/coverage/merged/summary.json
+            src/QueenZone.Mobile/coverage/jest/coverage-summary.json
+            src/QueenZone.Mobile/coverage/node/lcov.info
+          retention-days: 3
+          if-no-files-found: error
+
+      - name: Upload mobile coverage HTML
+        if: always() && steps.mobile-coverage-collect.outcome == 'success'
+        uses: actions/upload-artifact@v7
+        with:
+          name: mobile-coverage-html-${{ github.run_id }}
+          path: src/QueenZone.Mobile/coverage/merged/html
+          retention-days: 1
+          if-no-files-found: error
 
   # Unsigned Android debug APK from CNG-generated native project (issue #794).
   # No keystore secrets: Gradle's default debug signing config is fine for a

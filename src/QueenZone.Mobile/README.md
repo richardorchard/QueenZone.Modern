@@ -63,12 +63,33 @@ npm run preflight
 
 `npm run preflight` runs typecheck, the unit tests, and the lockfile-pinned
 Expo Doctor check (`npm run doctor`). Doctor must pass all checks after a
-clean `npm ci`. CI `mobile-js` and the Android/TestFlight publish workflows
-run the same `npm run preflight` command. `npm test` discovers every
-`src/**/*.test.ts` and `src/**/*.test.tsx` file: Node's test runner executes
-pure `*.test.ts` files, and Jest + `jest-expo` + React Native Testing Library
-execute component/hook `*.test.tsx` files. Do not add tests to a path list
-in `package.json`. Device/emulator journeys stay in Maestro (#872).
+clean `npm ci`. Publish workflows still run `npm run preflight`. CI
+`mobile-js` runs typecheck, `npm run test:coverage`, the coverage gate, and
+Doctor so the same suites are measured without running tests twice.
+`npm test` discovers every `src/**/*.test.ts` and `src/**/*.test.tsx` file:
+Node's test runner executes pure `*.test.ts` files, and Jest + `jest-expo` +
+React Native Testing Library execute component/hook `*.test.tsx` files. Do
+not add tests to a path list in `package.json`. Device/emulator journeys
+stay in Maestro (#872 / #883) and are not part of coverage totals.
+
+### Unit test coverage
+
+Both host-free suites publish line, branch, function, and statement
+coverage. Jest `collectCoverageFrom` includes every production
+`src/**/*.{ts,tsx}` file. The gate overlays Node hits onto that universe
+and enforces the floors in `scripts/mobile-coverage-floors.json` — not
+Jest `coverageThreshold`. Contracts (#869) and Maestro stay out.
+
+```powershell
+npm run test:coverage
+node ../../scripts/Test-MobileCoverageGate.mjs
+# or:
+npm run coverage
+node ../../scripts/Test-MobileCoverageGate.mjs --self-test
+```
+
+Do not commit `coverage/`. Policy, measured baseline, and the changed-line
+gate: [`docs/architecture/testing-policy.md`](../../docs/architecture/testing-policy.md).
 
 SDK 57 always uses React Native's New Architecture, so `app.json` does not
 set `newArchEnabled` (the field is no longer in the config schema). Splash
@@ -285,22 +306,24 @@ component tests.
 
 ```text
 unit / component (npm test, #833)
+  ≠ npm test coverage (#871)
   ≠ consumer contracts (#869)
   ≠ native compile
-  ≠ device smoke (Maestro, #872 Option A)
+  ≠ device smoke (Maestro, #872 / #883)
 ```
 
 `npm test` discovers every `src/**/*.test.ts` and `src/**/*.test.tsx` file
 and runs both the Node pure suite and the Jest component suite. Do not add
 new tests to a path list in `package.json`. `npm run preflight` is typecheck
-+ those tests + lockfile-pinned `npm run doctor`.
++ those tests + lockfile-pinned `npm run doctor`. CI `mobile-js` collects
+coverage from both suites and enforces `scripts/Test-MobileCoverageGate.mjs`.
 
 PR check **names** (job `name:` values; these are the strings to require on
 `main`):
 
 | Check name | What it is | What it is not |
 | --- | --- | --- |
-| `Mobile typecheck and unit tests` | `npm ci` + `npm run preflight` | Native compile, contracts, or device E2E |
+| `Mobile typecheck and unit tests` | `npm ci` + typecheck + `npm run test:coverage` + coverage gate + Doctor | Native compile, contracts, or device E2E |
 | `Mobile Android build` | Unsigned debug APK compile | Play-store signing or device E2E |
 | `Mobile iOS build` | Unsigned Simulator compile | TestFlight signing or device E2E |
 | `Mobile API consumer contracts` | Testing host + real mobile parsers | Native compile, OpenAPI-only, or device E2E |

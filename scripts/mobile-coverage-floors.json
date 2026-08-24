@@ -1,0 +1,15 @@
+{
+  "$comment": "No-regression floors for QueenZone.Mobile (#871 Option A). Changing these values is an explicit, reviewable edit. Do not put thresholds only in package.json jest config — Jest is one of two suites. Contracts (#869) and Maestro (#872/#883) stay out of these totals.",
+  "measuredAt": "2026-08-24",
+  "measuredFrom": "61eab2b",
+  "measured": {
+    "lines": { "covered": 1249, "total": 2913, "pct": 42.88 },
+    "branches": { "covered": 382, "total": 2360, "pct": 16.19 },
+    "functions": { "covered": 305, "total": 829, "pct": 36.79 },
+    "statements": { "covered": 1259, "total": 2988, "pct": 42.14 }
+  },
+  "globalLine": 42.8,
+  "globalBranch": 16.1,
+  "changedLine": 70,
+  "notes": "Floors are the 2026-08-24 measured merged totals (Jest collectCoverageFrom universe, Node V8 hits overlaid onto matching Istanbul lines) rounded down to one decimal to absorb single-line jitter. Branch stays on the Jest/Istanbul map because V8 BRDA keys do not overlay. Changed-line starts at 70% because the #833 component/hook harness can cover TSX; it is a new-code bar, not a copy of the web C# 70%. Later ratchets are separate PRs."
+}
