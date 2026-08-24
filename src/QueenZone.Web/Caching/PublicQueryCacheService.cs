@@ -44,7 +44,7 @@ public sealed class PublicQueryCacheService(
         return GetOrCreateAsync(
             PublicQueryCacheKeys.NewsPublishedCount(version),
             options.Value.NewsCacheDuration,
-            () => newsRepository.GetPublishedCountAsync(cancellationToken),
+            () => newsRepository.GetPublishedCountAsync(cancellationToken: cancellationToken),
             cancellationToken);
     }
 

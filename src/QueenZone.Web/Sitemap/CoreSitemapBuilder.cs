@@ -73,7 +73,7 @@ public sealed class CoreSitemapBuilder(
 
     private async Task AddNewsEntriesAsync(List<SitemapEntry> entries, CancellationToken cancellationToken)
     {
-        var publishedCount = await newsRepository.GetPublishedCountAsync(cancellationToken);
+        var publishedCount = await newsRepository.GetPublishedCountAsync(cancellationToken: cancellationToken);
         var totalPages = NewsRoutes.GetArchiveTotalPages(publishedCount);
         for (var page = 1; page <= totalPages; page++)
         {

@@ -10,15 +10,19 @@ public sealed class InMemoryNewsRepository(
         return await AddSubmissionAttributionAsync(published.Take(count).ToList(), cancellationToken);
     }
 
-    public async Task<IReadOnlyList<NewsItem>> GetArchivePageAsync(int page, int pageSize, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<NewsItem>> GetArchivePageAsync(
+        int page,
+        int pageSize,
+        NewsArchiveFilter filter = default,
+        CancellationToken cancellationToken = default)
     {
-        var published = store.GetPublishedNewsItems();
+        var published = NewsArchiveFiltering.Apply(store.GetPublishedNewsItems(), filter);
         var skip = Math.Max(page - 1, 0) * pageSize;
         return await AddSubmissionAttributionAsync(published.Skip(skip).Take(pageSize).ToList(), cancellationToken);
     }
 
-    public Task<int> GetPublishedCountAsync(CancellationToken cancellationToken = default) =>
-        Task.FromResult(store.GetPublishedNewsItems().Count);
+    public Task<int> GetPublishedCountAsync(NewsArchiveFilter filter = default, CancellationToken cancellationToken = default) =>
+        Task.FromResult(NewsArchiveFiltering.Apply(store.GetPublishedNewsItems(), filter).Count);
 
     public async Task<NewsItem?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
