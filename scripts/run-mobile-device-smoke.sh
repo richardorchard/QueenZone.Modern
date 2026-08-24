@@ -282,7 +282,9 @@ set +e
 maestro test "$flow" \
   --format junit \
   --output "$results_dir/junit.xml" \
-  --debug-output "$results_dir/debug"
+  --debug-output "$results_dir/debug" \
+  --flatten-debug-output \
+  -e "SMOKE_AUTH_URL=${SMOKE_AUTH_URL}"
 maestro_status=$?
 set -e
 
