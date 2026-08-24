@@ -1,13 +1,12 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react-native';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { PanResponder, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ApiError, fetchPhotoDetail, type PhotoDetail } from '../../api';
 import type { PhotosStackParamList } from '../../navigation/types';
 import { testIds } from '../../test/testIds';
 import { type, useTheme } from '../../theme';
-import { ArchiveImage } from '../../ui/ArchiveImage';
 import { IconButton } from '../../ui/IconButton';
 import { MetaLine } from '../../ui/MetaLine';
 import { ErrorBlock, LoadingBlock } from '../../ui/ScreenStates';
@@ -16,13 +15,10 @@ import {
   photoCounterLabel,
   photoDetailMeta,
   photoSizeFromPath,
-  photoSwipeDirection,
-  photoSwipeIsTap,
-  photoSwipeShouldCapture,
-  photoSwipeShouldStart,
   photoViewerParams,
   resolvedPhotoSize,
 } from './photoGalleryMeta';
+import { ZoomableArchiveImage } from './ZoomableArchiveImage';
 
 type Props = NativeStackScreenProps<PhotosStackParamList, 'PhotoViewer'>;
 
@@ -79,32 +75,22 @@ export function PhotoViewerScreen({ navigation, route }: Props) {
   const previousPicId = photo?.previous?.picId ?? null;
   const nextPicId = photo?.next?.picId ?? null;
 
-  const swipeResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onStartShouldSetPanResponder: (event) => photoSwipeShouldStart(event.nativeEvent.pageX),
-        onMoveShouldSetPanResponder: (event, gesture) =>
-          photoSwipeShouldCapture(gesture.dx, gesture.dy, event.nativeEvent.pageX - gesture.dx),
-        onMoveShouldSetPanResponderCapture: (event, gesture) =>
-          photoSwipeShouldCapture(gesture.dx, gesture.dy, event.nativeEvent.pageX - gesture.dx),
-        onPanResponderTerminationRequest: () => false,
-        onPanResponderRelease: (_, gesture) => {
-          const direction = photoSwipeDirection(gesture.dx, gesture.dy);
-          if (direction === 'previous' && previousPicId != null) {
-            goTo(previousPicId);
-            return;
-          }
-          if (direction === 'next' && nextPicId != null) {
-            goTo(nextPicId);
-            return;
-          }
-          if (photoSwipeIsTap(gesture.dx, gesture.dy)) {
-            setChromeVisible((value) => !value);
-          }
-        },
-      }),
+  const handleGallerySwipe = useCallback(
+    (direction: 'previous' | 'next') => {
+      if (direction === 'previous' && previousPicId != null) {
+        goTo(previousPicId);
+        return;
+      }
+      if (direction === 'next' && nextPicId != null) {
+        goTo(nextPicId);
+      }
+    },
     [goTo, nextPicId, previousPicId],
   );
+
+  const toggleChrome = useCallback(() => {
+    setChromeVisible((value) => !value);
+  }, []);
 
   if (loading && !photo) {
     return <LoadingBlock label="Loading photograph…" />;
@@ -118,23 +104,20 @@ export function PhotoViewerScreen({ navigation, route }: Props) {
 
   return (
     <View testID={testIds.photoViewerScreen} style={{ flex: 1, backgroundColor: '#000' }}>
-      <View
-        style={{ flex: 1 }}
-        collapsable={false}
-        accessibilityHint="Swipe left or right to change photograph"
-        {...swipeResponder.panHandlers}
-      >
+      <View style={{ flex: 1 }}>
         {image ? (
-          <View pointerEvents="none" style={{ flex: 1, width: '100%' }}>
-            <ArchiveImage
-              source={image}
-              label={photo.title}
-              contentFit="contain"
-              recyclingKey={`photo-full-${photo.picId}`}
-              priority="high"
-              style={{ flex: 1, width: '100%' }}
-            />
-          </View>
+          <ZoomableArchiveImage
+            source={image}
+            label={photo.title}
+            recyclingKey={`photo-full-${photo.picId}`}
+            imageWidth={photo.pictureWidth}
+            imageHeight={photo.pictureHeight}
+            resetKey={photo.picId}
+            canSwipePrevious={previousPicId != null}
+            canSwipeNext={nextPicId != null}
+            onGallerySwipe={handleGallerySwipe}
+            onToggleChrome={toggleChrome}
+          />
         ) : (
           <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
             <Text style={[type.body, { color: c.textSecondary }]}>Image unavailable</Text>
