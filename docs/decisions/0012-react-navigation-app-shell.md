@@ -44,6 +44,11 @@ Use **React Navigation** (`@react-navigation/native`) in
 - New archive sections become rows on the Archive hub, never a sixth tab.
 - Member-only screens use an in-tree `MemberGate` so deep links cannot skip
   the boundary.
+- Sign-in is a root `fullScreenModal` (`SignIn` on the app stack, not inside
+  `HomeStack`) so the provider list is never trapped behind the forum compose
+  modal or another tab. After a successful OAuth hop the app returns to the
+  screen that asked for login (compose, photo submit, a fan-performance
+  recording) or to Profile when sign-in started from Home.
 - Session state is the Epic 0 OAuth2 PKCE client: system-browser authorize,
   `queenzone://auth/callback`, Bearer + refresh tokens in the device secret
   store, and `GET /api/v1/me` for the signed-in profile.

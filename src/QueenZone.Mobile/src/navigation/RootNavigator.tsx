@@ -1,13 +1,16 @@
 import { getFocusedRouteNameFromRoute, type RouteProp } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Archive, Camera, House, MessageSquare, Newspaper, type LucideIcon } from 'lucide-react-native';
 import { Platform, View } from 'react-native';
+import { SignInScreen } from '../screens/account/SignInScreen';
 import { useTheme, type ColorScheme } from '../theme';
-import { ArchiveStack, ForumStack, HomeStack, NewsStack, PhotosStack } from './stacks';
-import type { RootTabParamList } from './types';
+import { ArchiveStack, ForumStack, HomeStack, NewsStack, PhotosStack, stackScreenOptions } from './stacks';
+import type { RootStackParamList, RootTabParamList } from './types';
 import { shouldHideTabBar } from './visibility';
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
+const RootStack = createNativeStackNavigator<RootStackParamList>();
 
 function TabGlyph({
   Icon,
@@ -87,7 +90,7 @@ function reselectRoot(tabName: keyof RootTabParamList, screen: string) {
   });
 }
 
-export function RootNavigator() {
+function MainTabs() {
   const { c, chrome } = useTheme();
   const platformChrome = Platform.OS === 'android' ? chrome.android : chrome.ios;
 
@@ -165,5 +168,23 @@ export function RootNavigator() {
         listeners={reselectRoot('ForumTab', 'ForumIndex')}
       />
     </Tab.Navigator>
+  );
+}
+
+export function RootNavigator() {
+  return (
+    <RootStack.Navigator screenOptions={{ headerShown: false }}>
+      <RootStack.Screen name="Tabs" component={MainTabs} />
+      <RootStack.Screen
+        name="SignIn"
+        component={SignInScreen}
+        options={{
+          ...stackScreenOptions,
+          headerShown: true,
+          title: 'Sign in',
+          presentation: 'fullScreenModal',
+        }}
+      />
+    </RootStack.Navigator>
   );
 }

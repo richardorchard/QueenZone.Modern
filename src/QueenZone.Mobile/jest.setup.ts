@@ -21,6 +21,15 @@ jest.mock('expo-splash-screen', () => ({
   hideAsync: jest.fn(async () => {}),
 }));
 
+jest.mock('expo-web-browser', () => ({
+  maybeCompleteAuthSession: jest.fn(),
+  openAuthSessionAsync: jest.fn(),
+  dismissAuthSession: jest.fn(),
+  dismissBrowser: jest.fn(),
+  warmUpAsync: jest.fn(async () => {}),
+  coolDownAsync: jest.fn(async () => {}),
+}));
+
 jest.mock('expo-image', () => {
   const { View } = require('react-native');
   return { Image: View };

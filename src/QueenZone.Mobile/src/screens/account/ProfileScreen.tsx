@@ -6,6 +6,7 @@ import { getAppConfig } from '../../config/appConfig';
 import { avatarUrl, formatMemberSince, type MemberProfile } from '../../api/me';
 import type { HomeStackParamList } from '../../navigation/types';
 import { useSession } from '../../session/SessionContext';
+import { openSignIn } from '../../session/signInNavigation';
 import { space, type, useTheme } from '../../theme';
 import { messagesA11yLabel } from '../messages/inboxMeta';
 import { useUnreadConversationCount } from '../messages/useUnreadConversationCount';
@@ -71,7 +72,7 @@ export function ProfileScreen({ navigation }: Props) {
           Sign in to save articles, post on the forum, and keep reading history on this device.
         </Text>
         <View style={{ alignSelf: 'stretch', gap: 10, marginTop: space.sm }}>
-          <Button label="Sign in" onPress={() => navigation.navigate('SignIn')} />
+          <Button label="Sign in" onPress={() => openSignIn(navigation)} />
         </View>
         <Pressable accessibilityRole="button" onPress={() => navigation.navigate('Contact')}>
           <Text style={[type.button, { color: c.accentPrimary }]}>Contact</Text>

@@ -1,9 +1,8 @@
 import type { ReactNode } from 'react';
 import { useNavigation } from '@react-navigation/native';
-import type { NavigationProp } from '@react-navigation/native';
 import { PlaceholderScreen } from '../ui/PlaceholderScreen';
-import type { RootTabParamList } from '../navigation/types';
 import { useSession } from './SessionContext';
+import { openSignIn } from './signInNavigation';
 
 type Props = {
   title: string;
@@ -12,7 +11,7 @@ type Props = {
 
 export function MemberGate({ title, children }: Props) {
   const { isSignedIn, isRestoring } = useSession();
-  const navigation = useNavigation<NavigationProp<RootTabParamList>>();
+  const navigation = useNavigation();
 
   if (isRestoring) {
     return null;
@@ -31,7 +30,7 @@ export function MemberGate({ title, children }: Props) {
       actions={[
         {
           label: 'Sign in',
-          onPress: () => navigation.navigate('HomeTab', { screen: 'SignIn' }),
+          onPress: () => openSignIn(navigation),
         },
       ]}
     />

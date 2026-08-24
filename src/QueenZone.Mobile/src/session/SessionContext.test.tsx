@@ -128,6 +128,7 @@ describe('SessionProvider', () => {
 
     await user.press(screen.getByText('do-sign-in'));
     await waitFor(() => expect(screen.getByText('signed-in')).toBeOnTheScreen());
+    await waitFor(() => expect(screen.getByText('Freddie')).toBeOnTheScreen());
     expect(signInWithProvider).toHaveBeenCalledWith('http://qz.test', 'Google');
 
     await user.press(screen.getByText('do-sign-out'));

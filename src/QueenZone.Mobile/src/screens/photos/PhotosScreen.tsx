@@ -7,6 +7,7 @@ import { fetchPhotoCategories, type PhotoCategoryListItem } from '../../api';
 import { usePagedContent } from '../../hooks/usePagedContent';
 import type { PhotosStackParamList, RootTabParamList } from '../../navigation/types';
 import { useSession } from '../../session/SessionContext';
+import { openPhotoSubmit } from '../../session/signInNavigation';
 import { radius, space, type, useTheme } from '../../theme';
 import { ArchiveImage } from '../../ui/ArchiveImage';
 import { Button } from '../../ui/Button';
@@ -79,7 +80,7 @@ export function PhotosScreen({ navigation }: Props) {
               label="Sign in to submit"
               variant="ghost"
               size="sm"
-              onPress={() => navigation.navigate('PhotoSubmit')}
+              onPress={() => openPhotoSubmit(navigation, isSignedIn, () => navigation.navigate('PhotoSubmit'))}
             />
           )}
         </View>

@@ -5,6 +5,8 @@ import { Plus } from 'lucide-react-native';
 import { fetchForumCategories, type ForumCategoryListItem } from '../../api';
 import { usePagedContent } from '../../hooks/usePagedContent';
 import type { ForumStackParamList } from '../../navigation/types';
+import { useSession } from '../../session/SessionContext';
+import { openForumComposer } from '../../session/signInNavigation';
 import { shadow, space, type, useTheme } from '../../theme';
 import { ArticleRow } from '../../ui/ArticleRow';
 import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from '../../ui/ScreenStates';
@@ -18,6 +20,7 @@ const categoryPageSize = 50;
 
 export function ForumScreen({ navigation }: Props) {
   const { c, chrome } = useTheme();
+  const { isSignedIn } = useSession();
   const fabSize = chrome.android.fabSize ?? 58;
   const paged = usePagedContent<ForumCategoryListItem>(
     useCallback(
@@ -36,7 +39,7 @@ export function ForumScreen({ navigation }: Props) {
   }, [paged.items, paged.totalCount]);
 
   const compose = () => {
-    navigation.navigate('Composer', {});
+    openForumComposer(navigation, isSignedIn, {});
   };
 
   const header = (
