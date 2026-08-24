@@ -49,7 +49,7 @@ public sealed class NewsArchiveFilterTests
     {
         var items = new[]
         {
-            new NewsItem(1, "A", "Ex", "Body", new DateTime(2008, 1, 1, DateTimeKind.Utc), null, true),
+            new NewsItem(1, "A", "Ex", "Body", new DateTime(2008, 1, 1, 0, 0, 0, DateTimeKind.Utc), null, true),
         };
 
         Assert.Same(items, NewsArchiveFiltering.Apply(items, NewsArchiveFilter.None));
@@ -59,8 +59,8 @@ public sealed class NewsArchiveFilterTests
     [Fact]
     public void Apply_keeps_items_inside_the_decade_window()
     {
-        var inWindow = new NewsItem(1, "In", "Ex", "Body", new DateTime(2008, 3, 4, DateTimeKind.Utc), null, true);
-        var outside = new NewsItem(2, "Out", "Ex", "Body", new DateTime(2011, 1, 1, DateTimeKind.Utc), null, true);
+        var inWindow = new NewsItem(1, "In", "Ex", "Body", new DateTime(2008, 3, 4, 0, 0, 0, DateTimeKind.Utc), null, true);
+        var outside = new NewsItem(2, "Out", "Ex", "Body", new DateTime(2011, 1, 1, 0, 0, 0, DateTimeKind.Utc), null, true);
 
         var applied = NewsArchiveFiltering.Apply([inWindow, outside], new NewsArchiveFilter(2000));
 
