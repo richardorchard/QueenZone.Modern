@@ -58,4 +58,37 @@ describe('NewsIndexScreen', () => {
     await user.press(screen.getByRole('button', { name: 'Try again' }));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Open Queen headline' })).toBeOnTheScreen());
   });
+
+  it('picking a decade re-queries the server instead of filtering the loaded page', async () => {
+    // Regression for #838: an older decade's first matching article can be well past whatever
+    // page happens to be loaded, so filtering must be a fresh server request, not client-side.
+    fetchNews.mockResolvedValueOnce(pagedResponse([newsItemFixture({ id: 1, title: 'Recent article' })], 1, 1));
+    renderNews();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Open Recent article' })).toBeOnTheScreen());
+    expect(fetchNews).toHaveBeenCalledWith(expect.objectContaining({ page: 1, decade: undefined }));
+
+    fetchNews.mockResolvedValueOnce(
+      pagedResponse([newsItemFixture({ id: 9999, title: 'Old article from the 2000s' })], 1, 1),
+    );
+    const user = userEvent.setup();
+    await user.press(screen.getByRole('button', { name: '2000s' }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Open Old article from the 2000s' })).toBeOnTheScreen(),
+    );
+    expect(screen.queryByRole('button', { name: 'Open Recent article' })).not.toBeOnTheScreen();
+    expect(fetchNews).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, decade: 2000 }));
+  });
+
+  it('shows decade-specific empty copy when the server returns no matches', async () => {
+    fetchNews.mockResolvedValueOnce(pagedResponse([newsItemFixture()], 1, 1));
+    renderNews();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Open Queen headline' })).toBeOnTheScreen());
+
+    fetchNews.mockResolvedValueOnce(pagedResponse([], 1, 0));
+    const user = userEvent.setup();
+    await user.press(screen.getByRole('button', { name: '2000s' }));
+
+    await waitFor(() => expect(screen.getByText('No articles for this decade yet.')).toBeOnTheScreen());
+  });
 });
