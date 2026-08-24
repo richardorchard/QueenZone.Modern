@@ -221,7 +221,12 @@ describe('mobile API consumer contracts', { concurrency: false }, () => {
     const badReply = await expectApiError(
       'POST /api/v1/forum/topics/1002/posts',
       400,
-      () => createForumReply(1002, { body: '<script>alert(1)</script>' }, token),
+      () =>
+        sendJson('/forum/topics/1002/posts', {
+          method: 'POST',
+          body: { body: '<script>alert(1)</script>' },
+          accessToken: token,
+        }),
     );
     assert.match(
       badReply.message,

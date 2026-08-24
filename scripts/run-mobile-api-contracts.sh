@@ -80,5 +80,5 @@ fi
 
 (
   cd src/QueenZone.Mobile
-  node scripts/run-api-contracts.mjs
+  npm run test:api-contracts
 )
