@@ -13,7 +13,9 @@
     "prebuild": "expo prebuild",
     "prebuild:clean": "expo prebuild --clean",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test src/navigation/visibility.test.ts src/theme/tokens.test.ts src/config/environments.test.ts src/config/buildMetadata.test.ts src/api/text.test.ts src/api/contact.test.ts src/api/me.test.ts src/api/auth.test.ts src/api/photoSubmissions.test.ts src/api/submissions.test.ts src/api/messages.test.ts src/cache/contentCache.test.ts src/ui/html/prepareNewsHtml.test.ts src/ui/html/resolveContentUrl.test.ts src/screens/forum/forumListMeta.test.ts src/screens/forum/forumThreadMeta.test.ts src/screens/forum/composerMeta.test.ts src/screens/forum/forumPollMeta.test.ts src/screens/photos/photoGalleryMeta.test.ts src/screens/photos/photoSubmitMeta.test.ts src/screens/messages/inboxMeta.test.ts src/screens/home/homeMeta.test.ts src/audio/formatDuration.test.ts"
+    "test": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test src/navigation/visibility.test.ts src/theme/tokens.test.ts src/config/environments.test.ts src/config/buildMetadata.test.ts src/api/text.test.ts src/api/contact.test.ts src/api/me.test.ts src/api/auth.test.ts src/api/photoSubmissions.test.ts src/api/submissions.test.ts src/api/messages.test.ts src/cache/contentCache.test.ts src/ui/html/prepareNewsHtml.test.ts src/ui/html/resolveContentUrl.test.ts src/screens/forum/forumListMeta.test.ts src/screens/forum/forumThreadMeta.test.ts src/screens/forum/composerMeta.test.ts src/screens/forum/forumPollMeta.test.ts src/screens/photos/photoGalleryMeta.test.ts src/screens/photos/photoSubmitMeta.test.ts src/screens/messages/inboxMeta.test.ts src/screens/home/homeMeta.test.ts src/audio/formatDuration.test.ts",
+    "doctor": "expo-doctor",
+    "preflight": "npm run typecheck && npm test && npm run doctor"
   },
   "dependencies": {
     "@expo-google-fonts/cinzel": "^0.4.2",
@@ -25,6 +27,7 @@
     "@react-navigation/native-stack": "^7.18.9",
     "@sentry/react-native": "~7.11.0",
     "expo": "~57.0.15",
+    "expo-asset": "~57.0.13",
     "expo-audio": "~57.0.4",
     "expo-constants": "~57.0.13",
     "expo-crypto": "~57.0.1",
@@ -47,6 +50,7 @@
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
+    "expo-doctor": "^1.20.2",
     "typescript": "~6.0.3"
   }
 }
