@@ -8,6 +8,7 @@ import type { SearchResult } from '../../api/types';
 import { getAppConfig } from '../../config/appConfig';
 import { usePagedContent } from '../../hooks/usePagedContent';
 import { fonts, space, type, useTheme } from '../../theme';
+import { testIds } from '../../test/testIds';
 import { ArchiveFooter } from '../../ui/ArchiveFooter';
 import { ArticleRow } from '../../ui/ArticleRow';
 import { Chip } from '../../ui/Chip';
@@ -91,6 +92,7 @@ function SearchResults({
       onEndReachedThreshold={0.4}
       renderItem={({ item }) => (
         <ArticleRow
+          testID={`search-result-${item.sourceKey.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}`}
           title={item.title}
           subtitle={item.summary}
           meta={[searchTypeLabel(item.contentType), formatPublishedDate(item.publishedAt ?? '')]
@@ -123,7 +125,7 @@ export function SearchScreen({ onOpen }: Props) {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: c.surfacePage }}>
+    <View testID={testIds.searchScreen} style={{ flex: 1, backgroundColor: c.surfacePage }}>
       <View style={{ paddingHorizontal: space.xl, paddingTop: space.md, paddingBottom: space.lg }}>
         <View
           style={{
@@ -140,6 +142,7 @@ export function SearchScreen({ onOpen }: Props) {
         >
           <Search size={18} color={c.textMuted} strokeWidth={1.5} />
           <TextInput
+            testID={testIds.searchInput}
             autoFocus
             value={query}
             onChangeText={setQuery}
@@ -188,6 +191,7 @@ export function SearchScreen({ onOpen }: Props) {
           {searchQueryPresets.map((preset) => (
             <Pressable
               key={preset}
+              testID={`search-preset-${preset.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}`}
               accessibilityRole="button"
               accessibilityLabel={`Search for ${preset}`}
               onPress={() => applyPreset(preset)}

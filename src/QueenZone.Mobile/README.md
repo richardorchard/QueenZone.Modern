@@ -284,7 +284,10 @@ part of `npm test` / `npm run preflight` — those stay host-free unit and
 component tests.
 
 ```text
-unit (npm test) ≠ consumer contracts ≠ native compile ≠ device smoke
+unit / component (npm test, #833)
+  ≠ consumer contracts (#869)
+  ≠ native compile
+  ≠ device smoke (Maestro, #872 Option A)
 ```
 
 `npm test` discovers every `src/**/*.test.ts` and `src/**/*.test.tsx` file
@@ -323,7 +326,58 @@ runner; `mobile-ios` builds an unsigned Simulator `.app` (zipped) on a
 GitHub-hosted macOS runner — no Apple account or signing credentials are
 used. Both jobs upload their build as a workflow artifact
 (`mobile-android-<run-id>` / `mobile-ios-<run-id>`), downloadable from the
-run's summary page for one day.
+run's summary page for one day. Those compile artifacts are **not** the
+device-smoke binaries: `EXPO_PUBLIC_API_BASE_URL` is bake-time, so smoke
+rebuilds Debug with a loopback Testing origin.
+
+## Device smoke (Maestro)
+
+Device smoke boots a Debug APK / Simulator `.app` against the same
+Testing contract host as the consumer-contract suite
+(`ASPNETCORE_ENVIRONMENT=Testing`, `QUEENZONE_MOBILE_CONTRACT_HOST=1`).
+It is **not** a substitute for `npm test` (#833), consumer contracts
+(#869), or the unsigned compile jobs. It does not use EAS, Expo Go, the
+live site, Azure SQL, real OAuth, or member passwords.
+
+| Smoke is | Smoke is not |
+| --- | --- |
+| Launch past splash, five tabs, Home → news detail, News → story, Photography → category + viewer, Archive search → result, Forum → board + thread, Profile signed-out + member-only gate, one Testing-token authenticated inbox | Component state permutations, write/upload/audio/permission journeys, production credentials, a required PR check (Phase 1) |
+
+Shared flows live in [`maestro/`](maestro/). Android and iOS use the same YAML; overlays are only for real platform differences.
+
+Local (repo root). Install [Maestro](https://maestro.mobile.dev) first
+(`curl -Ls "https://get.maestro.mobile.dev" | bash`). Unset any
+`ConnectionStrings__*` env vars. The script starts the Testing host on
+port 5098, bakes a Debug binary, and runs `maestro/smoke.yaml`.
+
+```bash
+# Android: start an API 36 emulator first
+./scripts/run-mobile-device-smoke.sh --platform android
+
+# iOS Simulator (macOS only)
+./scripts/run-mobile-device-smoke.sh --platform ios
+
+# Prove a failed assertion uploads diagnostics
+./scripts/run-mobile-device-smoke.sh --platform android --prove-failure
+```
+
+Authenticated smoke injects the contract-host access token through
+`queenzone://smoke-auth`. That deep link is handled only when `__DEV__`
+is true (Debug). It is not compiled into staging/production Release
+behavior.
+
+CI: [`.github/workflows/mobile-device-smoke.yml`](../../.github/workflows/mobile-device-smoke.yml)
+runs on **Actions → Mobile device smoke** (`workflow_dispatch`) and
+weekdays at 04:00 UTC. Jobs are `Mobile Android device smoke` and
+`Mobile iOS device smoke`. Phase 1 is soak only — do **not** add those
+names as required checks on `main`. Device smoke is **not** started for
+API-only PRs (that stays `mobile-api-contracts`). After pass rate and
+duration are known, promote the short set by adding the jobs to `ci.yml`
+when `mobile=true` (with skip-success stubs) and then enabling branch
+protection; record the date on #872. See
+[`docs/architecture/testing-policy.md`](../../docs/architecture/testing-policy.md).
+Failures upload `maestro-results/` (screenshots, JUnit, host/app logs).
+Maestro flows are not retried.
 
 The unsigned jobs are PR compile checks only. A separate manual workflow,
 [`publish-ios-testflight.yml`](../../.github/workflows/publish-ios-testflight.yml),

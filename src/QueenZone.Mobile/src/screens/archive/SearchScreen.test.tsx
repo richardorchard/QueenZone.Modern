@@ -84,6 +84,7 @@ describe('SearchScreen', () => {
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'QueenZone modernisation begins. News' })).toBeOnTheScreen(),
     );
+    expect(screen.getByTestId('search-result-news-1003')).toBeOnTheScreen();
     expect(fetchSearch).toHaveBeenCalledWith(
       expect.objectContaining({ q: 'modernisation', type: null, page: 1, pageSize: 20 }),
     );

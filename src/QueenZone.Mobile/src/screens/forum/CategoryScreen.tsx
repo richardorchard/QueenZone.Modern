@@ -15,6 +15,7 @@ import { useSession } from '../../session/SessionContext';
 import { openForumComposer } from '../../session/signInNavigation';
 import { ArticleRow } from '../../ui/ArticleRow';
 import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from '../../ui/ScreenStates';
+import { testIds } from '../../test/testIds';
 import { space, type, useTheme } from '../../theme';
 import { formatForumCount, topicMeta } from './forumListMeta';
 
@@ -121,6 +122,7 @@ export function CategoryScreen({ navigation, route }: Props) {
 
   return (
     <FlatList
+      testID={testIds.forumCategoryScreen}
       style={[styles.list, { backgroundColor: c.surfacePage }]}
       data={paged.items}
       keyExtractor={(item) => String(item.id)}
@@ -143,6 +145,7 @@ export function CategoryScreen({ navigation, route }: Props) {
           meta={topicMeta(item)}
           onPress={() => navigation.navigate('Thread', { id: item.id, title: item.title })}
           accessibilityLabel={`Open thread ${item.title}`}
+          testID={`forum-thread-${item.id}`}
         />
       )}
     />

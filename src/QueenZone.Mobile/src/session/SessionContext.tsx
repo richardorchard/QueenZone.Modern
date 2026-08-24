@@ -1,9 +1,16 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Linking } from 'react-native';
 import { getAppConfig } from '../config/appConfig';
 import { fetchJson } from '../api/client';
 import { parseMemberProfile, type MemberProfile } from '../api/me';
 import type { AuthTokens } from '../api/auth';
 import { logoutRemote, refreshAccessToken, revokeRefreshToken, signInWithProvider } from './oauth';
+import {
+  isSmokeAuthEnabled,
+  parseSmokeAuthAccessToken,
+  smokeAuthExpiresInSeconds,
+  smokeAuthRefreshPlaceholder,
+} from './smokeAuth';
 import { clearStoredSession, readStoredSession, writeStoredSession } from './tokenStore';
 
 export type Session = {
@@ -19,6 +26,7 @@ type SessionContextValue = Session & {
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<MemberProfile | null>;
   setAccessToken: (accessToken: string | null) => void;
+  applySmokeSession: (accessToken: string) => Promise<boolean>;
 };
 
 const SessionContext = createContext<SessionContextValue | undefined>(undefined);
@@ -130,6 +138,47 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     };
   }, [clearLocal]);
 
+  const applySmokeSession = useCallback(
+    async (accessToken: string): Promise<boolean> => {
+      if (!isSmokeAuthEnabled()) {
+        return false;
+      }
+
+      const token = accessToken.trim();
+      if (!token) {
+        return false;
+      }
+
+      await applyTokens({
+        accessToken: token,
+        refreshToken: smokeAuthRefreshPlaceholder,
+        expiresIn: smokeAuthExpiresInSeconds,
+      });
+      return true;
+    },
+    [applyTokens],
+  );
+
+  useEffect(() => {
+    if (!isSmokeAuthEnabled()) {
+      return;
+    }
+
+    const handleUrl = (url: string | null) => {
+      if (!url) {
+        return;
+      }
+      const token = parseSmokeAuthAccessToken(url);
+      if (token) {
+        void applySmokeSession(token);
+      }
+    };
+
+    const subscription = Linking.addEventListener('url', ({ url }) => handleUrl(url));
+    void Linking.getInitialURL().then(handleUrl);
+    return () => subscription.remove();
+  }, [applySmokeSession]);
+
   const value = useMemo<SessionContextValue>(
     () => ({
       ...session,
@@ -137,6 +186,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         const tokens = await signInWithProvider(getAppConfig().apiBaseUrl, provider);
         await applyTokens(tokens);
       },
+      applySmokeSession,
       signOut: async () => {
         const token = session.accessToken;
         const refresh = refreshToken;
@@ -172,7 +222,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           accessToken,
         })),
     }),
-    [applyTokens, clearLocal, ensureAccessToken, refreshToken, session],
+    [applySmokeSession, applyTokens, clearLocal, ensureAccessToken, refreshToken, session],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

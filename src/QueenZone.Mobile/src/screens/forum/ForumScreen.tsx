@@ -12,6 +12,7 @@ import { ArticleRow } from '../../ui/ArticleRow';
 import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from '../../ui/ScreenStates';
 import { PageTitleBlock } from '../../ui/PageTitleBlock';
 import { SectionHeader } from '../../ui/SectionHeader';
+import { testIds } from '../../test/testIds';
 import { categoryMeta, formatForumCount } from './forumListMeta';
 
 type Props = NativeStackScreenProps<ForumStackParamList, 'ForumIndex'>;
@@ -101,16 +102,18 @@ export function ForumScreen({ navigation }: Props) {
             meta={categoryMeta(item)}
             onPress={() => navigation.navigate('Category', { id: item.id, name: item.name })}
             accessibilityLabel={`Open board ${item.name}`}
+            testID={`forum-board-${item.id}`}
           />
         )}
       />
     );
 
   return (
-    <View style={{ flex: 1, backgroundColor: c.surfacePage }}>
+    <View testID={testIds.forumScreen} style={{ flex: 1, backgroundColor: c.surfacePage }}>
       {body}
       {Platform.OS === 'android' ? (
         <Pressable
+          testID={testIds.forumNewThread}
           accessibilityRole="button"
           accessibilityLabel="New thread"
           onPress={compose}

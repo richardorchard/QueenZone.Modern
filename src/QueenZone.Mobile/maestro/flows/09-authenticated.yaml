@@ -1,0 +1,24 @@
+appId: org.queenzone.mobile
+---
+# Testing-seeded access token from the contract-host fixture. The runner
+# exports SMOKE_AUTH_URL. Debug builds only handle queenzone://smoke-auth.
+- openLink: ${SMOKE_AUTH_URL}
+- tapOn:
+    id: tab-home
+- tapOn:
+    id: home-profile
+- extendedWaitUntil:
+    visible:
+      id: profile-signed-in
+    timeout: 20000
+- assertVisible:
+    id: profile-display-name
+- assertVisible: Contract Member
+- tapOn: Messages
+- extendedWaitUntil:
+    visible:
+      id: inbox-screen
+    timeout: 20000
+- assertNotVisible:
+    id: member-gate
+- assertVisible: You have no private messages yet.

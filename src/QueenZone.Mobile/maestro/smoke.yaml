@@ -1,0 +1,13 @@
+appId: org.queenzone.mobile
+name: QueenZone PR-bound device smoke
+---
+# Deterministic Testing host fixtures (#869). Do not re-test #833 permutations.
+- runFlow: flows/01-launch.yaml
+- runFlow: flows/02-tabs.yaml
+- runFlow: flows/03-home-detail.yaml
+- runFlow: flows/04-news-story.yaml
+- runFlow: flows/05-photography.yaml
+- runFlow: flows/06-archive-search.yaml
+- runFlow: flows/07-forum.yaml
+- runFlow: flows/08-profile-signed-out.yaml
+- runFlow: flows/09-authenticated.yaml

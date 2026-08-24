@@ -7,12 +7,13 @@ type Props = {
   meta?: string;
   onPress?: () => void;
   accessibilityLabel?: string;
+  testID?: string;
 };
 
 /**
  * Archive list row — STYLE_GUIDE §3 List: hairline separators, type hierarchy, no cards.
  */
-export function ArticleRow({ title, subtitle, meta, onPress, accessibilityLabel }: Props) {
+export function ArticleRow({ title, subtitle, meta, onPress, accessibilityLabel, testID }: Props) {
   const { c } = useTheme();
   const content = (
     <View style={[styles.row, { borderTopColor: c.hairline }]}>
@@ -47,6 +48,7 @@ export function ArticleRow({ title, subtitle, meta, onPress, accessibilityLabel 
 
   return (
     <Pressable
+      testID={testID}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? title}
       onPress={onPress}
