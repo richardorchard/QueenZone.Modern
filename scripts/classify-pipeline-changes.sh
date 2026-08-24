@@ -9,7 +9,8 @@
 # validate itself), or mobile-only (src/QueenZone.Mobile/). Empty stdin
 # fails closed as code=true (and mobile_api_contracts=true).
 #
-# mobile=true when any path is under src/QueenZone.Mobile/.
+# mobile=true when any path is under src/QueenZone.Mobile/, or when the
+# mobile coverage gate / floors change (those run inside mobile-js).
 # A mobile-only change does not set code=true: the website binary is
 # unchanged, so web tests and App Service deploy should not run.
 # Mixed mobile + web still sets both flags.
@@ -25,6 +26,7 @@ set -euo pipefail
 
 skip_re='^(docs/|infra/|design/|[^/]*\.md$|LICENSE$|THIRD-PARTY-NOTICES\.md$|\.github/)'
 mobile_re='^src/QueenZone\.Mobile(/|$)'
+mobile_coverage_re='^scripts/(Test-MobileCoverageGate\.mjs|mobile-coverage-floors\.json)$'
 migration_re='^(src/QueenZone\.Data/Migrations/|src/QueenZone\.Data/QueenZoneDbContext\.cs|src/QueenZone\.Data/QueenZoneDbContextFactory\.cs|src/QueenZone\.Data/Entities/)'
 # Keep this list explicit so an unclassified contract path is a classifier
 # bug, not a silent skip. Fail closed: empty input sets the flag true.
@@ -42,7 +44,7 @@ classify() {
     [ -z "${path}" ] && continue
     saw_any=true
 
-    if printf '%s\n' "${path}" | grep -qE "${mobile_re}"; then
+    if printf '%s\n' "${path}" | grep -qE "${mobile_re}|${mobile_coverage_re}"; then
       mobile=true
     fi
 
@@ -178,6 +180,16 @@ if [ "${1:-}" = "--self-test" ]; then
   assert_classify deploy-yml-only \
     "code=false${nl}migrations=false${nl}mobile=false${nl}mobile_api_contracts=false" \
     ".github/workflows/deploy.yml" \
+    || fail=1
+
+  assert_classify mobile-coverage-gate \
+    "code=true${nl}migrations=false${nl}mobile=true${nl}mobile_api_contracts=false" \
+    "scripts/Test-MobileCoverageGate.mjs" \
+    || fail=1
+
+  assert_classify mobile-coverage-floors \
+    "code=true${nl}migrations=false${nl}mobile=true${nl}mobile_api_contracts=false" \
+    "scripts/mobile-coverage-floors.json" \
     || fail=1
 
   assert_classify migrations \

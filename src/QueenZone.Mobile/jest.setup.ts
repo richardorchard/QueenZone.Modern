@@ -24,6 +24,7 @@ jest.mock('expo-splash-screen', () => ({
 jest.mock('expo-web-browser', () => ({
   maybeCompleteAuthSession: jest.fn(),
   openAuthSessionAsync: jest.fn(),
+  openBrowserAsync: jest.fn(async () => ({ type: 'dismiss' })),
   dismissAuthSession: jest.fn(),
   dismissBrowser: jest.fn(),
   warmUpAsync: jest.fn(async () => {}),

@@ -43,6 +43,19 @@ export function pagedSchema<T extends z.ZodTypeAny>(item: T) {
   });
 }
 
+export const searchResultSchema = z.object({
+  contentType: z.string().min(1),
+  sourceKey: z.string().min(1),
+  title: z.string().min(1),
+  summary: z.string(),
+  url: z.string().min(1),
+  publishedAt: isoDateTime.nullish(),
+  imageUrl: z.string().nullish(),
+  category: z.string().nullish(),
+  authorDisplayName: z.string().nullish(),
+  id: z.number().int().nullish(),
+});
+
 export const newsListItemSchema = z.object({
   id: z.number().int(),
   title: z.string().min(1),
