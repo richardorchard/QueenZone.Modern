@@ -1,0 +1,13 @@
+appId: org.queenzone.mobile
+---
+- launchApp:
+    clearState: true
+    clearKeychain: true
+- extendedWaitUntil:
+    visible:
+      id: home-screen
+    timeout: 45000
+- extendedWaitUntil:
+    visible:
+      id: home-hero
+    timeout: 30000

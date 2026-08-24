@@ -9,6 +9,7 @@ import { space, useTheme } from '../../theme';
 import { ArticleRow } from '../../ui/ArticleRow';
 import { Chip } from '../../ui/Chip';
 import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from '../../ui/ScreenStates';
+import { testIds } from '../../test/testIds';
 import { PageTitleBlock } from '../../ui/PageTitleBlock';
 
 type Props = NativeStackScreenProps<NewsStackParamList, 'NewsIndex'>;
@@ -52,7 +53,7 @@ export function NewsIndexScreen({ navigation }: Props) {
 
   if (paged.loading && paged.items.length === 0) {
     return (
-      <View style={[styles.list, { backgroundColor: c.surfacePage }]}>
+      <View testID={testIds.newsScreen} style={[styles.list, { backgroundColor: c.surfacePage }]}>
         {header}
         <LoadingBlock label="Loading news…" />
       </View>
@@ -70,6 +71,7 @@ export function NewsIndexScreen({ navigation }: Props) {
 
   return (
     <FlatList
+      testID={testIds.newsScreen}
       style={[styles.list, { backgroundColor: c.surfacePage }]}
       data={paged.items}
       keyExtractor={(item) => String(item.id)}
@@ -90,6 +92,7 @@ export function NewsIndexScreen({ navigation }: Props) {
           meta={formatPublishedDate(item.publishedAt)}
           onPress={() => navigation.navigate('Story', { id: item.id })}
           accessibilityLabel={`Open ${item.title}`}
+          testID={`news-story-${item.id}`}
         />
       )}
     />

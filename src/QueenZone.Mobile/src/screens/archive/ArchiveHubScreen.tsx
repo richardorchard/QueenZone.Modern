@@ -10,6 +10,7 @@ import type { ArchiveStackParamList, RootTabParamList } from '../../navigation/t
 import { useTheme } from '../../theme';
 import { ArchiveFooter } from '../../ui/ArchiveFooter';
 import { DestinationRow } from '../../ui/DestinationRow';
+import { testIds } from '../../test/testIds';
 import { PageTitleBlock } from '../../ui/PageTitleBlock';
 
 type Props = CompositeScreenProps<
@@ -51,6 +52,7 @@ export function ArchiveHubScreen({ navigation }: Props) {
 
   return (
     <FlatList
+      testID={testIds.archiveHubScreen}
       style={{ flex: 1, backgroundColor: c.surfacePage }}
       data={archiveDestinations}
       keyExtractor={(item) => item.id}

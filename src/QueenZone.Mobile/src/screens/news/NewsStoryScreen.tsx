@@ -5,6 +5,7 @@ import { ApiError, fetchNewsDetail, formatPublishedDate, type NewsDetail } from 
 import type { NewsStackParamList } from '../../navigation/types';
 import { RichHtmlBody } from '../../ui/RichHtmlBody';
 import { ErrorBlock, LoadingBlock } from '../../ui/ScreenStates';
+import { testIds } from '../../test/testIds';
 import { space, type, useTheme } from '../../theme';
 
 type Props = NativeStackScreenProps<NewsStackParamList, 'Story'>;
@@ -55,6 +56,7 @@ export function NewsStoryScreen({ navigation, route }: Props) {
 
   return (
     <ScrollView
+      testID={testIds.newsStoryScreen}
       style={[styles.scroll, { backgroundColor: c.surfacePage }]}
       contentContainerStyle={styles.content}
     >
