@@ -64,8 +64,11 @@ npm run preflight
 `npm run preflight` runs typecheck, the unit tests, and the lockfile-pinned
 Expo Doctor check (`npm run doctor`). Doctor must pass all checks after a
 clean `npm ci`. CI `mobile-js` and the Android/TestFlight publish workflows
-run the same `npm run preflight` command. New `*.test.ts` / `*.test.tsx`
-files under `src/` are discovered automatically.
+run the same `npm run preflight` command. `npm test` discovers every
+`src/**/*.test.ts` and `src/**/*.test.tsx` file: Node's test runner executes
+pure `*.test.ts` files, and Jest + `jest-expo` + React Native Testing Library
+execute component/hook `*.test.tsx` files. Do not add tests to a path list
+in `package.json`. Device/emulator journeys stay in Maestro (#872).
 
 SDK 57 always uses React Native's New Architecture, so `app.json` does not
 set `newArchEnabled` (the field is no longer in the config schema). Splash
@@ -242,9 +245,10 @@ npm ci
 npm run preflight
 ```
 
-`npm test` discovers every `src/**/*.test.ts` and `src/**/*.test.tsx` file.
-Do not add new tests to a path list in `package.json`. `npm run preflight`
-is typecheck + those tests + lockfile-pinned `npm run doctor`.
+`npm test` discovers every `src/**/*.test.ts` and `src/**/*.test.tsx` file
+and runs both the Node pure suite and the Jest component suite. Do not add
+new tests to a path list in `package.json`. `npm run preflight` is typecheck
++ those tests + lockfile-pinned `npm run doctor`.
 
 PR check **names** (job `name:` values; these are the strings to require on
 `main`):

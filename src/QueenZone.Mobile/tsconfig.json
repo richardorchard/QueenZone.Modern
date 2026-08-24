@@ -3,5 +3,14 @@
   "compilerOptions": {
     "strict": true
   },
-  "exclude": ["node_modules", "**/*.test.ts"]
+  "exclude": [
+    "node_modules",
+    "scripts",
+    "jest.setup.ts",
+    "jest.config.js",
+    "babel.config.js",
+    "src/test",
+    "**/*.test.ts",
+    "**/*.test.tsx"
+  ]
 }

@@ -336,7 +336,7 @@ These gates are guardrails, not a replacement for useful assertions. New or chan
 | `mobile-android` | Unsigned debug APK compile (GitHub-hosted Linux) | Yes — required on `main` after #870; skip-success stub when that tree is unchanged |
 | `mobile-ios` | Unsigned Simulator compile (GitHub-hosted macOS) | Yes — required on `main` after #870; skip-success stub when that tree is unchanged |
 
-Local mobile validation from `src/QueenZone.Mobile` is a clean `npm ci` then `npm run preflight`. `npm test` discovers every `src/**/*.test.ts` and `src/**/*.test.tsx` file (no package.json path list) and self-checks that an unlisted probe file still runs. `npm run preflight` is typecheck + those tests + `npm run doctor` (lockfile-pinned `expo-doctor`).
+Local mobile validation from `src/QueenZone.Mobile` is a clean `npm ci` then `npm run preflight`. `npm test` discovers every `src/**/*.test.ts` and `src/**/*.test.tsx` file (no package.json path list) and self-checks that unlisted Node and Jest probes still run. Pure `*.test.ts` files use Node's test runner; `*.test.tsx` files use Jest + `jest-expo` + React Native Testing Library (no devices, Metro, or production services). `npm run preflight` is typecheck + those tests + `npm run doctor` (lockfile-pinned `expo-doctor`). Device E2E remains a separate track (#872).
 
 These three **GitHub check names** (the job `name:` values in `ci.yml`) must be required contexts on protected `main`. A workflow file cannot enable branch protection; a human with repo admin access has to add them after this change merges:
 
@@ -348,7 +348,7 @@ These three **GitHub check names** (the job `name:` values in `ci.yml`) must be 
 
 Android and iOS are equal: a mobile PR cannot treat either native compile as optional. Non-mobile PRs are not left pending: `ci.yml` emits skip-success stubs (`mobile-js-ok`, `mobile-android-ok`, `mobile-ios-ok`) with those exact check names, the same idea as `test-docs-ok`.
 
-**Layers (do not collapse these):** Node unit tests (`npm test`, fast, no native toolchain) are not a substitute for `mobile-android` / `mobile-ios` compile, and those unsigned CI compiles are not device/E2E coverage. Device E2E is a separate track.
+**Layers (do not collapse these):** Node + Jest tests (`npm test`, fast, no native toolchain) are not a substitute for `mobile-android` / `mobile-ios` compile, and those unsigned CI compiles are not device/E2E coverage. Device E2E is a separate track.
 
 **Publish preflight:** `.github/workflows/publish-mobile-test-build.yml` and `.github/workflows/publish-ios-testflight.yml` run `npm ci` + `npm run preflight` against `github.sha` in a job with no signing secrets. The signing/upload job `needs` that preflight and runs only when `needs.preflight.result == 'success'`. A failed or cancelled preflight skips publication.
 
