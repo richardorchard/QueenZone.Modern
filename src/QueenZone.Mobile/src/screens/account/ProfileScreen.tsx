@@ -10,6 +10,7 @@ import { openSignIn } from '../../session/signInNavigation';
 import { space, type, useTheme } from '../../theme';
 import { messagesA11yLabel } from '../messages/inboxMeta';
 import { useUnreadConversationCount } from '../messages/useUnreadConversationCount';
+import { testIds } from '../../test/testIds';
 import { ArchiveFooter } from '../../ui/ArchiveFooter';
 import { Button } from '../../ui/Button';
 import { CrestSeal } from '../../ui/CrestSeal';
@@ -57,6 +58,7 @@ export function ProfileScreen({ navigation }: Props) {
   if (!isSignedIn) {
     return (
       <ScrollView
+        testID={testIds.profileSignedOut}
         style={{ flex: 1, backgroundColor: c.surfacePage }}
         contentContainerStyle={{
           paddingHorizontal: space.xl,
@@ -87,7 +89,7 @@ export function ProfileScreen({ navigation }: Props) {
   const imageUri = avatarUrl(getAppConfig().apiBaseUrl, member?.avatarPath ?? null, member?.displayName);
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: c.surfacePage }}>
+    <ScrollView testID={testIds.profileSignedIn} style={{ flex: 1, backgroundColor: c.surfacePage }}>
       <View
         style={{
           flexDirection: 'row',
@@ -116,7 +118,9 @@ export function ProfileScreen({ navigation }: Props) {
           )}
         </View>
         <View style={{ flex: 1, gap: 6 }}>
-          <Text style={[type.articleTitle, { color: c.textPrimary }]}>{displayName}</Text>
+          <Text testID={testIds.profileDisplayName} style={[type.articleTitle, { color: c.textPrimary }]}>
+            {displayName}
+          </Text>
           {since ? (
             <Text style={[type.meta, { color: c.accentPrimary }]}>Member since {since}</Text>
           ) : null}

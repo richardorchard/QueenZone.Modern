@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { Platform, Pressable, Text, TextInput, View } from 'react-native';
 import { searchSuggestions } from '../../content/sample';
 import { fonts, space, type, useTheme } from '../../theme';
+import { testIds } from '../../test/testIds';
 import { ArchiveFooter } from '../../ui/ArchiveFooter';
 import { Eyebrow } from '../../ui/Eyebrow';
 
@@ -29,7 +30,7 @@ export function SearchScreen({ onOpen }: Props) {
   const section = query.trim().length > 1 ? 'Results' : 'Suggested';
 
   return (
-    <View style={{ flex: 1, backgroundColor: c.surfacePage }}>
+    <View testID={testIds.searchScreen} style={{ flex: 1, backgroundColor: c.surfacePage }}>
       <View style={{ paddingHorizontal: space.xl, paddingTop: space.md, paddingBottom: space.lg }}>
         <View
           style={{
@@ -46,6 +47,7 @@ export function SearchScreen({ onOpen }: Props) {
         >
           <Search size={18} color={c.textMuted} strokeWidth={1.5} />
           <TextInput
+            testID={testIds.searchInput}
             autoFocus
             value={query}
             onChangeText={setQuery}
@@ -72,6 +74,7 @@ export function SearchScreen({ onOpen }: Props) {
         results.map((item) => (
           <Pressable
             key={item.title}
+            testID={`search-result-${item.title.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}`}
             accessibilityRole="button"
             accessibilityLabel={`${item.title}. ${item.tag}`}
             onPress={() => onOpen?.(item.target)}

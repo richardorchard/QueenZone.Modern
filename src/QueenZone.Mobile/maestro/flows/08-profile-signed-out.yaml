@@ -1,0 +1,39 @@
+appId: org.queenzone.mobile
+---
+- tapOn:
+    id: tab-home
+- tapOn:
+    id: home-profile
+- extendedWaitUntil:
+    visible:
+      id: profile-signed-out
+    timeout: 15000
+- assertVisible: Join the archive
+# Profile hides the tab bar. Maestro - back is Android/Web only — tap the
+# shared header control so iOS and Android leave the same way.
+- tapOn:
+    id: profile-back
+- extendedWaitUntil:
+    visible:
+      id: home-screen
+    timeout: 15000
+- tapOn:
+    id: tab-forum
+- extendedWaitUntil:
+    visible:
+      id: forum-screen
+    timeout: 15000
+- tapOn:
+    id: forum-new-thread
+# #880 openSignIn is a root fullScreenModal — MemberGate never mounts here.
+- extendedWaitUntil:
+    visible: Sign in
+    timeout: 15000
+- assertVisible: Sign in
+# Leave SignIn before 09. A leftover modal auto-completes to Composer.
+- tapOn:
+    id: sign-in-close
+- extendedWaitUntil:
+    visible:
+      id: forum-screen
+    timeout: 15000

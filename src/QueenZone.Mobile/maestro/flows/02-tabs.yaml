@@ -1,0 +1,32 @@
+appId: org.queenzone.mobile
+---
+- tapOn:
+    id: tab-news
+- extendedWaitUntil:
+    visible:
+      id: news-screen
+    timeout: 20000
+- tapOn:
+    id: tab-photos
+- extendedWaitUntil:
+    visible:
+      id: photos-screen
+    timeout: 20000
+- tapOn:
+    id: tab-archive
+- extendedWaitUntil:
+    visible:
+      id: archive-hub-screen
+    timeout: 20000
+- tapOn:
+    id: tab-forum
+- extendedWaitUntil:
+    visible:
+      id: forum-screen
+    timeout: 20000
+- tapOn:
+    id: tab-home
+- extendedWaitUntil:
+    visible:
+      id: home-screen
+    timeout: 15000

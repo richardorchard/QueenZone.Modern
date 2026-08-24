@@ -1,0 +1,15 @@
+appId: org.queenzone.mobile
+---
+- tapOn:
+    id: home-hero
+- extendedWaitUntil:
+    visible:
+      id: news-story-screen
+    timeout: 20000
+- assertVisible: QueenZone modernisation begins
+- tapOn:
+    id: tab-home
+- extendedWaitUntil:
+    visible:
+      id: home-screen
+    timeout: 15000
