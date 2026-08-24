@@ -1,32 +1,117 @@
 import { useNavigation } from '@react-navigation/native';
-import { ChevronRight, Search } from 'lucide-react-native';
-import { useMemo, useState } from 'react';
-import { Platform, Pressable, Text, TextInput, View } from 'react-native';
-import { searchSuggestions } from '../../content/sample';
+import * as WebBrowser from 'expo-web-browser';
+import { Search } from 'lucide-react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { FlatList, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { fetchSearchPage, formatPublishedDate } from '../../api';
+import type { SearchResult } from '../../api/types';
+import { getAppConfig } from '../../config/appConfig';
+import { usePagedContent } from '../../hooks/usePagedContent';
 import { fonts, space, type, useTheme } from '../../theme';
 import { ArchiveFooter } from '../../ui/ArchiveFooter';
+import { ArticleRow } from '../../ui/ArticleRow';
+import { Chip } from '../../ui/Chip';
 import { Eyebrow } from '../../ui/Eyebrow';
-
-type Target = (typeof searchSuggestions)[number]['target'];
+import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from '../../ui/ScreenStates';
+import {
+  searchMinQueryLength,
+  searchQueryPresets,
+  searchTypeFilters,
+  searchTypeLabel,
+  type SearchTypeFilter,
+} from './searchMeta';
+import { applySearchTarget, targetForSearchResult, type SearchOpenTarget } from './searchNavigation';
 
 type Props = {
-  onOpen?: (target: Target) => void;
+  onOpen?: (target: SearchOpenTarget, item: SearchResult) => void;
 };
+
+function SearchResults({
+  query,
+  type,
+  onOpen,
+}: {
+  query: string;
+  type: SearchTypeFilter;
+  onOpen?: Props['onOpen'];
+}) {
+  const paged = usePagedContent<SearchResult>(
+    useCallback(
+      (page, signal) => fetchSearchPage({ q: query, type, page, pageSize: 20, signal }),
+      [query, type],
+    ),
+    20,
+    `${query}|${type ?? ''}`,
+  );
+
+  if (paged.loading && paged.items.length === 0) {
+    return <LoadingBlock label="Searching the archive…" />;
+  }
+
+  if (paged.error && paged.items.length === 0) {
+    return <ErrorBlock message={paged.error} onRetry={paged.reload} />;
+  }
+
+  const countLine =
+    paged.totalCount === 1
+      ? `1 result for “${query}”`
+      : `${paged.totalCount.toLocaleString('en-GB')} results for “${query}”`;
+
+  return (
+    <FlatList
+      style={{ flex: 1 }}
+      data={paged.items}
+      keyExtractor={(item) => item.sourceKey}
+      keyboardShouldPersistTaps="handled"
+      ListHeaderComponent={
+        <View style={{ paddingHorizontal: space.xl, paddingBottom: space.md }}>
+          <Eyebrow tone="muted">{paged.totalCount > 0 ? countLine : 'Results'}</Eyebrow>
+        </View>
+      }
+      ListEmptyComponent={
+        <EmptyBlock message={`No results found for “${query}”. Try different keywords.`} />
+      }
+      ListFooterComponent={
+        <>
+          <ListFooterLoading visible={paged.loadingMore} />
+          <ArchiveFooter />
+        </>
+      }
+      refreshControl={undefined}
+      onEndReached={paged.loadMore}
+      onEndReachedThreshold={0.4}
+      renderItem={({ item }) => (
+        <ArticleRow
+          title={item.title}
+          subtitle={item.summary}
+          meta={[searchTypeLabel(item.contentType), formatPublishedDate(item.publishedAt ?? '')]
+            .filter(Boolean)
+            .join(' · ')}
+          accessibilityLabel={`${item.title}. ${searchTypeLabel(item.contentType)}`}
+          onPress={() => onOpen?.(targetForSearchResult(item, getAppConfig().apiBaseUrl), item)}
+        />
+      )}
+    />
+  );
+}
 
 export function SearchScreen({ onOpen }: Props) {
   const { c, chrome } = useTheme();
   const [query, setQuery] = useState('');
+  const [committedQuery, setCommittedQuery] = useState('');
+  const [typeFilter, setTypeFilter] = useState<SearchTypeFilter>(null);
   const fieldRadius = Platform.OS === 'ios' ? chrome.ios.searchFieldRadius : chrome.android.searchFieldRadius;
-  const results = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (q.length <= 1) {
-      return searchSuggestions;
-    }
-    return searchSuggestions.filter(
-      (item) => item.title.toLowerCase().includes(q) || item.tag.toLowerCase().includes(q),
-    );
+  const shouldSearch = committedQuery.length >= searchMinQueryLength;
+
+  useEffect(() => {
+    const handle = setTimeout(() => setCommittedQuery(query.trim()), 300);
+    return () => clearTimeout(handle);
   }, [query]);
-  const section = query.trim().length > 1 ? 'Results' : 'Suggested';
+
+  const applyPreset = (preset: string) => {
+    setQuery(preset);
+    setCommittedQuery(preset);
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: c.surfacePage }}>
@@ -49,9 +134,12 @@ export function SearchScreen({ onOpen }: Props) {
             autoFocus
             value={query}
             onChangeText={setQuery}
-            placeholder="Search 4,000+ articles and photographs"
+            placeholder="Search news, articles and discussions"
             placeholderTextColor={c.textMuted}
             accessibilityLabel="Search the archive"
+            autoCorrect={false}
+            autoCapitalize="none"
+            returnKeyType="search"
             style={{
               flex: 1,
               color: c.textPrimary,
@@ -61,46 +149,52 @@ export function SearchScreen({ onOpen }: Props) {
           />
         </View>
       </View>
-      <View style={{ paddingHorizontal: space.xl, paddingBottom: space.md }}>
-        <Eyebrow tone="muted">{section}</Eyebrow>
-      </View>
-      {results.length === 0 ? (
-        <Text style={[type.body, { color: c.textSecondary, paddingHorizontal: space.xl }]}>
-          Nothing in the archive matches that — yet.
-        </Text>
+
+      {shouldSearch ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ paddingHorizontal: space.xl, gap: 8, paddingBottom: space.md }}
+        >
+          {searchTypeFilters.map((filter) => (
+            <Chip
+              key={filter.label}
+              label={filter.label}
+              active={typeFilter === filter.type}
+              onPress={() => setTypeFilter(filter.type)}
+            />
+          ))}
+        </ScrollView>
       ) : (
-        results.map((item) => (
-          <Pressable
-            key={item.title}
-            accessibilityRole="button"
-            accessibilityLabel={`${item.title}. ${item.tag}`}
-            onPress={() => onOpen?.(item.target)}
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              paddingHorizontal: space.xl,
-              paddingVertical: 16,
-              borderTopWidth: 1,
-              borderTopColor: c.hairline,
-              gap: 12,
-            }}
-          >
-            <View style={{ flex: 1, gap: 6 }}>
-              <Text style={[type.listTitle, { color: c.textPrimary }]}>{item.title}</Text>
-              <Text
-                style={[
-                  type.meta,
-                  { color: item.editorial ? c.accentPrimary : c.textMuted },
-                ]}
-              >
-                {item.tag.toUpperCase()}
-              </Text>
-            </View>
-            <ChevronRight size={17} color={c.textMuted} strokeWidth={1.5} />
-          </Pressable>
-        ))
+        <View style={{ paddingHorizontal: space.xl, paddingBottom: space.md }}>
+          <Eyebrow tone="muted">Suggested</Eyebrow>
+        </View>
       )}
-      <ArchiveFooter />
+
+      {shouldSearch ? (
+        <SearchResults query={committedQuery} type={typeFilter} onOpen={onOpen} />
+      ) : (
+        <View style={{ flex: 1 }}>
+          {searchQueryPresets.map((preset) => (
+            <Pressable
+              key={preset}
+              accessibilityRole="button"
+              accessibilityLabel={`Search for ${preset}`}
+              onPress={() => applyPreset(preset)}
+              style={{
+                paddingHorizontal: space.xl,
+                paddingVertical: 16,
+                borderTopWidth: 1,
+                borderTopColor: c.hairline,
+              }}
+            >
+              <Text style={[type.listTitle, { color: c.textPrimary }]}>{preset}</Text>
+            </Pressable>
+          ))}
+          <ArchiveFooter />
+        </View>
+      )}
     </View>
   );
 }
@@ -110,20 +204,13 @@ export function SearchRouteScreen() {
   return (
     <SearchScreen
       onOpen={(target) => {
-        const root = navigation.getParent();
-        if (target === 'story') {
-          root?.navigate('ArchiveTab', { screen: 'Story', params: { id: 0 } });
-          return;
-        }
-        if (target === 'photos') {
-          root?.navigate('PhotosTab', { screen: 'PhotoIndex' });
-          return;
-        }
-        if (target === 'news') {
-          root?.navigate('NewsTab', { screen: 'NewsIndex' });
-          return;
-        }
-        root?.navigate('ForumTab', { screen: 'Thread', params: { id: 'magic-tour' } });
+        applySearchTarget(
+          target,
+          (tab, params) => navigation.getParent()?.navigate(tab, params),
+          (url) => {
+            void WebBrowser.openBrowserAsync(url);
+          },
+        );
       }}
     />
   );
