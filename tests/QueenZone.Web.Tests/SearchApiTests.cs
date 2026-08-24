@@ -96,8 +96,8 @@ public sealed class SearchApiTests : IClassFixture<QueenZoneWebApplicationFactor
     {
         using var client = factory.CreateAnonymousClient();
 
-        using var allResponse = await client.GetAsync($"{SearchApiEndpoints.Path}?q=archive");
-        using var newsResponse = await client.GetAsync($"{SearchApiEndpoints.Path}?q=archive&type=news");
+        using var allResponse = await client.GetAsync($"{SearchApiEndpoints.Path}?q=studio+album");
+        using var newsResponse = await client.GetAsync($"{SearchApiEndpoints.Path}?q=studio+album&type=news");
 
         Assert.Equal(HttpStatusCode.OK, allResponse.StatusCode);
         Assert.Equal(HttpStatusCode.OK, newsResponse.StatusCode);
@@ -115,7 +115,7 @@ public sealed class SearchApiTests : IClassFixture<QueenZoneWebApplicationFactor
     {
         using var client = factory.CreateAnonymousClient();
 
-        using var response = await client.GetAsync($"{SearchApiEndpoints.Path}?q=archive&type=not-a-real-type");
+        using var response = await client.GetAsync($"{SearchApiEndpoints.Path}?q=studio+album&type=not-a-real-type");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<ApiPagedResponse<SearchResultDto>>();
