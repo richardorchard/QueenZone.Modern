@@ -1,0 +1,334 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { ApiError, fetchJson, sendJson, sendMultipart } from '../src/api/client.ts';
+import {
+  fetchFanPerformancesPage,
+  fetchNewsDetail,
+  fetchNewsPage,
+  fetchPhotoCategoryItems,
+  fetchPhotoDetail,
+} from '../src/api/content.ts';
+import {
+  createForumReply,
+  fetchForumTopic,
+  fetchForumTopicPoll,
+  fetchForumTopicPosts,
+  voteForumTopicPoll,
+} from '../src/api/forum.ts';
+import { parseMemberProfile } from '../src/api/me.ts';
+import {
+  composeMessage,
+  fetchConversation,
+  fetchInbox,
+} from '../src/api/messages.ts';
+import { parsePhotoSubmissionCreated, photoSubmissionsPath } from '../src/api/photoSubmissionForm.ts';
+import {
+  conversationDetailSchema,
+  expectedField,
+  expectedStatus,
+  fanPerformanceSchema,
+  forumPollSchema,
+  forumPostCreatedSchema,
+  forumPostSchema,
+  forumTopicDetailSchema,
+  inboxConversationSchema,
+  memberProfileSchema,
+  newsDetailSchema,
+  newsListItemSchema,
+  pagedSchema,
+  parseContract,
+  photoDetailSchema,
+  photoListItemSchema,
+  photoSubmissionCreatedSchema,
+  problemDetailsSchema,
+} from '../src/api/schemas.ts';
+import { isPhotoCdnUrl } from '../src/screens/photos/photoGalleryMeta.ts';
+import { resolveMediaUrl } from '../src/api/submissions.ts';
+import { loadContractFixture, pngPixel } from './host.ts';
+
+const fixture = loadContractFixture();
+const token = fixture.member.accessToken;
+
+async function expectApiError(
+  endpoint: string,
+  expected: number,
+  run: () => Promise<unknown>,
+): Promise<ApiError> {
+  try {
+    await run();
+  } catch (err) {
+    if (err instanceof ApiError) {
+      expectedStatus(endpoint, err.status, expected);
+      if (err.problem) {
+        parseContract(endpoint, problemDetailsSchema, err.problem);
+      }
+      return err;
+    }
+    throw err;
+  }
+
+  throw new Error(`Contract ${endpoint} failed: expected status ${expected}, but the request succeeded.`);
+}
+
+describe('mobile API consumer contracts', { concurrency: false }, () => {
+  it('reads a paged news list and a published news detail', async () => {
+    const page = parseContract(
+      'GET /api/v1/content/news',
+      pagedSchema(newsListItemSchema),
+      await fetchNewsPage({ page: 1, pageSize: 5 }),
+    );
+    expectedField('GET /api/v1/content/news', 'items', page.items, Array.isArray, 'a non-empty array');
+    assert.ok(page.items.length > 0, 'Contract GET /api/v1/content/news failed: expected field items to be non-empty');
+    assert.equal(page.page, 1);
+    assert.equal(page.pageSize, 5);
+    assert.ok(page.totalCount >= page.items.length);
+    assert.ok(page.totalPages >= 1);
+
+    const detail = parseContract(
+      'GET /api/v1/content/news/1003',
+      newsDetailSchema,
+      await fetchNewsDetail(1003),
+    );
+    assert.equal(detail.id, 1003);
+    assert.match(detail.body, /ugc\/news\//);
+    const relativeMedia = resolveMediaUrl(fixture.baseUrl, '/ugc/news/sample-crest.jpg');
+    assert.equal(relativeMedia, `${fixture.baseUrl}/ugc/news/sample-crest.jpg`);
+  });
+
+  it('reads photo category items at pageSize 24 with CDN media URLs', async () => {
+    const page = parseContract(
+      'GET /api/v1/content/photos/categories/brian-may/items',
+      pagedSchema(photoListItemSchema),
+      await fetchPhotoCategoryItems('brian-may'),
+    );
+    assert.equal(page.pageSize, 24, 'Contract GET /api/v1/content/photos/categories/brian-may/items failed: expected field pageSize to be 24');
+    assert.ok(page.items.length > 0);
+    assert.ok(
+      isPhotoCdnUrl(page.items[0]?.thumbnailUrl),
+      `Contract GET /api/v1/content/photos/categories/brian-may/items failed: expected field thumbnailUrl to be a cdn.queenzone.org URL, received ${page.items[0]?.thumbnailUrl}`,
+    );
+
+    const photo = parseContract(
+      'GET /api/v1/content/photos/categories/brian-may/items/101',
+      photoDetailSchema,
+      await fetchPhotoDetail('brian-may', 101),
+    );
+    assert.ok(
+      isPhotoCdnUrl(photo.imageUrl),
+      `Contract GET /api/v1/content/photos/categories/brian-may/items/101 failed: expected field imageUrl to be a cdn.queenzone.org URL, received ${photo.imageUrl}`,
+    );
+    assert.equal(resolveMediaUrl(fixture.baseUrl, photo.imageUrl), photo.imageUrl);
+  });
+
+  it('reads a forum topic with posts and a fan-performances list including empty pages', async () => {
+    const topic = parseContract(
+      'GET /api/v1/forum/topics/1002',
+      forumTopicDetailSchema,
+      await fetchForumTopic(1002),
+    );
+    assert.equal(topic.id, 1002);
+
+    const posts = parseContract(
+      'GET /api/v1/forum/topics/1002/posts',
+      pagedSchema(forumPostSchema),
+      await fetchForumTopicPosts(1002),
+    );
+    assert.ok(posts.items.length > 0, 'Contract GET /api/v1/forum/topics/1002/posts failed: expected field items to be non-empty');
+    assert.equal(posts.pageSize, 15);
+
+    const performances = parseContract(
+      'GET /api/v1/content/fan-performances',
+      pagedSchema(fanPerformanceSchema),
+      await fetchFanPerformancesPage(),
+    );
+    assert.ok(performances.items.length > 0);
+    assert.ok(
+      performances.items[0]?.audioPath.startsWith('/api/v1/content/fan-performances/'),
+      `Contract GET /api/v1/content/fan-performances failed: expected field audioPath to be app-relative, received ${performances.items[0]?.audioPath}`,
+    );
+    assert.equal(
+      resolveMediaUrl(fixture.baseUrl, performances.items[0]!.audioPath),
+      `${fixture.baseUrl}${performances.items[0]!.audioPath}`,
+    );
+
+    const empty = parseContract(
+      'GET /api/v1/content/fan-performances?page=9',
+      pagedSchema(fanPerformanceSchema),
+      await fetchFanPerformancesPage({ page: 9, pageSize: 5 }),
+    );
+    assert.equal(empty.items.length, 0, 'Contract GET /api/v1/content/fan-performances?page=9 failed: expected field items to be an empty array');
+    assert.equal(empty.page, 9);
+    assert.equal(empty.pageSize, 5);
+    assert.ok(empty.totalCount > 0);
+    assert.ok(empty.totalPages >= 1);
+  });
+
+  it('reads /me and an empty-then-populated messages inbox/thread', async () => {
+    const rawProfile = await fetchJson('/me', { accessToken: token });
+    parseContract('GET /api/v1/me', memberProfileSchema, rawProfile);
+    const profile = parseMemberProfile(rawProfile);
+    assert.equal(profile.memberId, fixture.member.id);
+    assert.equal(profile.displayName, fixture.member.displayName);
+
+    const emptyInbox = parseContract(
+      'GET /api/v1/me/messages',
+      pagedSchema(inboxConversationSchema),
+      await fetchInbox(token),
+    );
+    assert.equal(emptyInbox.items.length, 0, 'Contract GET /api/v1/me/messages failed: expected field items to be empty before compose');
+
+    const thread = parseContract(
+      'POST /api/v1/me/messages',
+      conversationDetailSchema,
+      await composeMessage(token, fixture.otherMember.id, 'Hello from the consumer-contract suite.'),
+    );
+    assert.equal(thread.otherParticipantId, fixture.otherMember.id);
+    assert.ok(thread.messages.length > 0);
+
+    const inbox = parseContract(
+      'GET /api/v1/me/messages',
+      pagedSchema(inboxConversationSchema),
+      await fetchInbox(token),
+    );
+    assert.ok(inbox.items.length > 0, 'Contract GET /api/v1/me/messages failed: expected field items to be non-empty after compose');
+
+    const opened = parseContract(
+      `GET /api/v1/me/messages/${thread.conversationId}`,
+      conversationDetailSchema,
+      await fetchConversation(token, thread.conversationId),
+    );
+    assert.equal(opened.conversationId, thread.conversationId);
+  });
+
+  it('accepts a photo-submission 201 through sendMultipart', async () => {
+    const form = new FormData();
+    form.append('title', 'Contract Wembley shot');
+    form.append('description', 'Seeded by the consumer-contract suite');
+    form.append('photo', pngPixel(), 'photo.png');
+
+    const created = parsePhotoSubmissionCreated(
+      parseContract(
+        'POST /api/v1/member/photo-submissions',
+        photoSubmissionCreatedSchema,
+        await sendMultipart(photoSubmissionsPath, form, { accessToken: token }),
+      ),
+    );
+    assert.equal(created.title, 'Contract Wembley shot');
+    assert.equal(created.status, 'Pending');
+  });
+
+  it('maps forum reply validation 400 and auth 401 through ApiError', async () => {
+    const badReply = await expectApiError(
+      'POST /api/v1/forum/topics/1002/posts',
+      400,
+      () =>
+        sendJson('/forum/topics/1002/posts', {
+          method: 'POST',
+          body: { body: '<script>alert(1)</script>' },
+          accessToken: token,
+        }),
+    );
+    assert.match(
+      badReply.message,
+      /Body is required/i,
+      `Contract POST /api/v1/forum/topics/1002/posts failed: expected Problem Details detail about the body, received ${badReply.message}`,
+    );
+    expectedField(
+      'POST /api/v1/forum/topics/1002/posts',
+      'problem.title',
+      badReply.problem?.title,
+      (value) => typeof value === 'string' && value.length > 0,
+      'a non-empty RFC 7807 title',
+    );
+
+    const unauthorized = await expectApiError('GET /api/v1/me', 401, () => fetchJson('/me'));
+    expectedField(
+      'GET /api/v1/me',
+      'problem.title',
+      unauthorized.problem?.title,
+      (value) => value === 'Unauthorized',
+      'Unauthorized',
+    );
+  });
+
+  it('maps forbidden 403, not found 404, and poll conflict 409', async () => {
+    const forbidden = await expectApiError(
+      'POST /api/v1/forum/topics/1002/posts',
+      403,
+      () => createForumReply(1002, { body: 'Suspended members cannot post.' }, fixture.suspendedMember.accessToken),
+    );
+    expectedField(
+      'POST /api/v1/forum/topics/1002/posts',
+      'problem.title',
+      forbidden.problem?.title,
+      (value) => value === 'Forbidden',
+      'Forbidden',
+    );
+
+    const missing = await expectApiError(
+      'GET /api/v1/content/news/999999',
+      404,
+      () => fetchNewsDetail(999999),
+    );
+    expectedField(
+      'GET /api/v1/content/news/999999',
+      'problem.title',
+      missing.problem?.title,
+      (value) => typeof value === 'string' && /not found/i.test(value),
+      'Not Found',
+    );
+
+    const poll = parseContract(
+      `GET /api/v1/forum/topics/${fixture.pollTopicId}/poll`,
+      forumPollSchema,
+      await fetchForumTopicPoll(fixture.pollTopicId, token),
+    );
+    parseContract(
+      `POST /api/v1/forum/topics/${fixture.pollTopicId}/poll/vote`,
+      forumPollSchema,
+      await voteForumTopicPoll(fixture.pollTopicId, [fixture.pollOptionId], token),
+    );
+    const conflict = await expectApiError(
+      `POST /api/v1/forum/topics/${fixture.pollTopicId}/poll/vote`,
+      409,
+      () => voteForumTopicPoll(fixture.pollTopicId, [poll.options[0]!.optionId], token),
+    );
+    expectedField(
+      `POST /api/v1/forum/topics/${fixture.pollTopicId}/poll/vote`,
+      'problem.title',
+      conflict.problem?.title,
+      (value) => value === 'Conflict',
+      'Conflict',
+    );
+  });
+
+  it('maps forum write quota 429 Problem Details', async () => {
+    let lastError: ApiError | null = null;
+    for (let i = 0; i < 6; i += 1) {
+      try {
+        parseContract(
+          'POST /api/v1/forum/topics/1002/posts',
+          forumPostCreatedSchema,
+          await createForumReply(1002, { body: `Contract rate-limit reply ${i}` }, token),
+        );
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 429) {
+          lastError = err;
+          break;
+        }
+        throw err;
+      }
+    }
+
+    assert.ok(lastError, 'Contract POST /api/v1/forum/topics/1002/posts failed: expected status 429 after repeated replies');
+    expectedStatus('POST /api/v1/forum/topics/1002/posts', lastError.status, 429);
+    parseContract('POST /api/v1/forum/topics/1002/posts', problemDetailsSchema, lastError.problem);
+    expectedField(
+      'POST /api/v1/forum/topics/1002/posts',
+      'problem.status',
+      lastError.problem?.status,
+      (value) => value === 429,
+      '429',
+    );
+  });
+});
