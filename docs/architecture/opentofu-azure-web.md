@@ -22,9 +22,10 @@ secrets or the ARM-owned deployment settings.
 The live main-site restriction remains Cloudflare allow-only with deny-all.
 SCM retains a separate allow-all policy for the current deployment workflow.
 AzureRM 5.0.1 normalises both explicit terminal rules to empty default-action
-fields during import. Those two provider fields are ignored so an apply cannot
-silently open the origin or lock out SCM; the actual allow ranges remain
-managed. Coordinate any rule redesign with the Cloudflare work in #626.
+fields during import; #626 now sets `ip_restriction_default_action = "Deny"`
+and `scm_ip_restriction_default_action = "Allow"` explicitly so a plan cannot
+silently open the origin or lock out SCM. The Cloudflare allow ranges remain
+managed alongside them.
 
 ## Certificate boundary
 

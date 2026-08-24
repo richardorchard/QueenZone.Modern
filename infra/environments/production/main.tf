@@ -54,6 +54,5 @@ module "cloudflare_edge" {
   zone_name  = var.cloudflare_zone_name
 }
 
-# The Cloudflare module remains an import contract until #626 adds its
-# resources. Azure web and data resources use declarative imports in
-# imports.tf; an apply must never precede plan review.
+# All modules use declarative imports in imports.tf; an apply must never
+# precede plan review.

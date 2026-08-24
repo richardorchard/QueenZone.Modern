@@ -98,7 +98,7 @@ Account id `f93121b2086286e79a7a9fdb8d03cb4c`. Zone id `079fc2f37095c82fb3a2b4da
 
 | Item | Treatment | Notes |
 | --- | --- | --- |
-| Zone `queenzone.org` | import (#626) | Free plan; never recreate casually |
+| Zone `queenzone.org` | import | Free plan; never recreate casually |
 | DNS `queenzone.org` A → `52.237.246.162` (proxied) | import | App Service inbound IP |
 | DNS `www` CNAME → `queenzone-dev.azurewebsites.net` (proxied) | import | |
 | DNS `cdn` / `cdn2` CNAME → `queenzone.blob.core.windows.net` (proxied) | import | Only **cdn2** has a Worker route |

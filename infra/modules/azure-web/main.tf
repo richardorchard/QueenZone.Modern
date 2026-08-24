@@ -108,6 +108,8 @@ resource "azurerm_linux_web_app" "production" {
     remote_debugging_enabled          = false
     scm_minimum_tls_version           = "1.2"
     scm_use_main_ip_restriction       = false
+    scm_ip_restriction_default_action = "Allow"
+    ip_restriction_default_action     = "Deny"
     use_32_bit_worker                 = true
     websockets_enabled                = false
     worker_count                      = var.worker_count
@@ -150,14 +152,9 @@ resource "azurerm_linux_web_app" "production" {
 
     # ADR 0008 keeps the split ARM/operator settings map outside OpenTofu.
     # Reading this map into state would expose values; managing an incomplete
-    # map would delete live settings. AzureRM also normalises the
-    # live explicit main-site deny-all and SCM allow-all rules to empty default
-    # actions during import, then plans unsafe/default-only rewrites. Keep the
-    # imported rules authoritative until the coordinated edge work in #626.
+    # map would delete live settings.
     ignore_changes = [
       app_settings,
-      site_config[0].ip_restriction_default_action,
-      site_config[0].scm_ip_restriction_default_action,
     ]
   }
 }

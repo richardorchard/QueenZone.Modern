@@ -37,3 +37,20 @@ variable "worker_route" {
     error_message = "The pictures-queenzone-org Worker route must remain on cdn2 only."
   }
 }
+
+variable "legacy_redirect_worker_name" {
+  description = "Existing legacy media-redirect Worker name."
+  type        = string
+  default     = "pictures-legacy-redirect"
+}
+
+variable "legacy_redirect_route" {
+  description = "Existing legacy redirect Worker route. Serves robots.txt and redirects to cdn."
+  type        = string
+  default     = "pictures.queenzone.org/*"
+
+  validation {
+    condition     = var.legacy_redirect_route == "pictures.queenzone.org/*"
+    error_message = "The pictures-legacy-redirect Worker route must remain on pictures.queenzone.org only."
+  }
+}
