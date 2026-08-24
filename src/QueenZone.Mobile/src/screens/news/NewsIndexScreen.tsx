@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { FlatList, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { fetchNewsPage, formatPublishedDate, type NewsListItem } from '../../api';
@@ -14,28 +14,17 @@ import { PageTitleBlock } from '../../ui/PageTitleBlock';
 
 type Props = NativeStackScreenProps<NewsStackParamList, 'NewsIndex'>;
 
-function decadeOf(iso: string): string | null {
-  const year = new Date(iso).getFullYear();
-  if (Number.isNaN(year)) {
-    return null;
-  }
-  const start = Math.floor(year / 10) * 10;
-  return `${start}s`;
-}
-
 export function NewsIndexScreen({ navigation }: Props) {
   const { c } = useTheme();
-  const [decade, setDecade] = useState<(typeof newsDecades)[number]>('ALL');
+  const [decade, setDecade] = useState<(typeof newsDecades)[number]>(newsDecades[0]);
   const paged = usePagedContent<NewsListItem>(
-    useCallback((page, signal) => fetchNewsPage({ page, pageSize: 20, signal }), []),
+    useCallback(
+      (page, signal) => fetchNewsPage({ page, pageSize: 20, decade: decade.decadeStart ?? undefined, signal }),
+      [decade],
+    ),
+    20,
+    decade.label,
   );
-
-  const items = useMemo(() => {
-    if (decade === 'ALL') {
-      return paged.items;
-    }
-    return paged.items.filter((item) => decadeOf(item.publishedAt) === decade);
-  }, [decade, paged.items]);
 
   const countLine =
     paged.totalCount > 0
@@ -50,8 +39,13 @@ export function NewsIndexScreen({ navigation }: Props) {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: space.xl, gap: 8, paddingBottom: 18 }}
       >
-        {newsDecades.map((label) => (
-          <Chip key={label} label={label} active={decade === label} onPress={() => setDecade(label)} />
+        {newsDecades.map((option) => (
+          <Chip
+            key={option.label}
+            label={option.label}
+            active={decade.label === option.label}
+            onPress={() => setDecade(option)}
+          />
         ))}
       </ScrollView>
     </View>
@@ -79,11 +73,11 @@ export function NewsIndexScreen({ navigation }: Props) {
     <FlatList
       testID={testIds.newsScreen}
       style={[styles.list, { backgroundColor: c.surfacePage }]}
-      data={items}
+      data={paged.items}
       keyExtractor={(item) => String(item.id)}
       ListHeaderComponent={header}
       ListEmptyComponent={
-        <EmptyBlock message={decade === 'ALL' ? 'No news articles yet.' : 'No articles for this decade yet.'} />
+        <EmptyBlock message={decade.decadeStart === null ? 'No news articles yet.' : 'No articles for this decade yet.'} />
       }
       ListFooterComponent={<ListFooterLoading visible={paged.loadingMore} />}
       refreshControl={

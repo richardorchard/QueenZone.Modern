@@ -495,13 +495,17 @@ public sealed class PublicQueryCacheServiceTests
             return Task.FromResult<IReadOnlyList<NewsItem>>([item]);
         }
 
-        public virtual Task<int> GetPublishedCountAsync(CancellationToken cancellationToken = default)
+        public virtual Task<int> GetPublishedCountAsync(NewsArchiveFilter filter = default, CancellationToken cancellationToken = default)
         {
             PublishedCountCallCount++;
             return Task.FromResult(PublishedCountCallCount);
         }
 
-        public Task<IReadOnlyList<NewsItem>> GetArchivePageAsync(int page, int pageSize, CancellationToken cancellationToken = default) =>
+        public Task<IReadOnlyList<NewsItem>> GetArchivePageAsync(
+            int page,
+            int pageSize,
+            NewsArchiveFilter filter = default,
+            CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<NewsItem>>([]);
 
         public Task<NewsItem?> GetByIdAsync(int id, CancellationToken cancellationToken = default) =>
@@ -751,10 +755,10 @@ public sealed class PublicQueryCacheServiceTests
             return await base.GetLatestAsync(count, cancellationToken);
         }
 
-        public override async Task<int> GetPublishedCountAsync(CancellationToken cancellationToken = default)
+        public override async Task<int> GetPublishedCountAsync(NewsArchiveFilter filter = default, CancellationToken cancellationToken = default)
         {
             await gate.EnterAsync(cancellationToken);
-            return await base.GetPublishedCountAsync(cancellationToken);
+            return await base.GetPublishedCountAsync(filter, cancellationToken);
         }
     }
 

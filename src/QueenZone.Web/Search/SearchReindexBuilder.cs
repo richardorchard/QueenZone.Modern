@@ -61,12 +61,12 @@ public sealed class SearchReindexBuilder(
 
     public async Task ReindexNewsAsync(CancellationToken cancellationToken = default)
     {
-        var totalCount = await newsRepository.GetPublishedCountAsync(cancellationToken);
+        var totalCount = await newsRepository.GetPublishedCountAsync(cancellationToken: cancellationToken);
         var documents = new List<SearchDocumentEntity>();
 
         for (var page = 1; (page - 1) * BatchSize < totalCount; page++)
         {
-            var items = await newsRepository.GetArchivePageAsync(page, BatchSize, cancellationToken);
+            var items = await newsRepository.GetArchivePageAsync(page, BatchSize, cancellationToken: cancellationToken);
             documents.AddRange(items.Select(MapNews));
         }
 
