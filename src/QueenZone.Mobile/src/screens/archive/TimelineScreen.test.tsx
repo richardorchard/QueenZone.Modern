@@ -46,8 +46,12 @@ describe('TimelineScreen', () => {
       { navigation: false },
     );
     await waitFor(() => expect(screen.getByRole('button', { name: 'Live Aid' })).toBeOnTheScreen());
-    expect(screen.getByRole('button', { name: 'Live Aid' })).toHaveAccessibilityState({ expanded: true });
+    expect(screen.getByRole('button', { name: 'Live Aid' }).props.accessibilityState).toEqual({
+      expanded: true,
+    });
     expect(screen.getByText('Wembley Stadium.')).toBeOnTheScreen();
-    expect(screen.getByRole('button', { name: 'Another' })).toHaveAccessibilityState({ expanded: false });
+    expect(screen.getByRole('button', { name: 'Another' }).props.accessibilityState).toEqual({
+      expanded: false,
+    });
   });
 });
