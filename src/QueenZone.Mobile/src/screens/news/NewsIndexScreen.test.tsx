@@ -80,7 +80,28 @@ describe('NewsIndexScreen', () => {
     expect(fetchNews).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, decade: 2000 }));
   });
 
-  it('shows decade-specific empty copy when the server returns no matches', async () => {
+  it('the year rail jumps to an exact calendar year, distinct from the decade chips', async () => {
+    // #886: the rail filters to a single year via the server-side 'year' param, finer-grained
+    // than the decade chips' 10-year 'decade' param.
+    fetchNews.mockResolvedValueOnce(pagedResponse([newsItemFixture({ id: 1, title: 'Recent article' })], 1, 1));
+    renderNews();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Open Recent article' })).toBeOnTheScreen());
+
+    fetchNews.mockResolvedValueOnce(
+      pagedResponse([newsItemFixture({ id: 9999, title: 'Article from 2013' })], 1, 1),
+    );
+    const user = userEvent.setup();
+    await user.press(screen.getByRole('button', { name: 'Jump to 2013' }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Open Article from 2013' })).toBeOnTheScreen(),
+    );
+    expect(fetchNews).toHaveBeenLastCalledWith(
+      expect.objectContaining({ page: 1, decade: undefined, year: 2013 }),
+    );
+  });
+
+  it('shows decade-specific empty copy when the server returns no matches for a decade', async () => {
     fetchNews.mockResolvedValueOnce(pagedResponse([newsItemFixture()], 1, 1));
     renderNews();
     await waitFor(() => expect(screen.getByRole('button', { name: 'Open Queen headline' })).toBeOnTheScreen());
@@ -90,5 +111,17 @@ describe('NewsIndexScreen', () => {
     await user.press(screen.getByRole('button', { name: '2000s' }));
 
     await waitFor(() => expect(screen.getByText('No articles for this decade yet.')).toBeOnTheScreen());
+  });
+
+  it('shows year-specific empty copy when the server returns no matches for a year', async () => {
+    fetchNews.mockResolvedValueOnce(pagedResponse([newsItemFixture()], 1, 1));
+    renderNews();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Open Queen headline' })).toBeOnTheScreen());
+
+    fetchNews.mockResolvedValueOnce(pagedResponse([], 1, 0));
+    const user = userEvent.setup();
+    await user.press(screen.getByRole('button', { name: 'Jump to 2013' }));
+
+    await waitFor(() => expect(screen.getByText('No articles for 2013 yet.')).toBeOnTheScreen());
   });
 });

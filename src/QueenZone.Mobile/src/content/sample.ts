@@ -232,6 +232,24 @@ export const newsDecades = [
   { label: '2000s', decadeStart: 2000 },
 ] as const;
 
+export type NewsYearOption = { label: string; year: number };
+
+/** News' archive starts ~2006, but the year-rail (issue #886) rounds down to 2004 for a tidy range. */
+export const newsArchiveStartYear = 2004;
+
+/**
+ * Descending list of years for the News year-rail scrubber (issue #886), most recent first —
+ * dragging/tapping the rail jumps to that exact calendar year via `fetchNewsPage`'s `year` param,
+ * finer-grained than the decade chips above.
+ */
+export function newsYearOptions(currentYear: number = new Date().getFullYear()): NewsYearOption[] {
+  const years: NewsYearOption[] = [];
+  for (let year = currentYear; year >= newsArchiveStartYear; year--) {
+    years.push({ label: String(year), year });
+  }
+  return years;
+}
+
 export const searchSuggestions = [
   { title: 'The day Queen stole Live Aid', tag: 'Story · 8 min read', editorial: true, target: 'story' as const },
   { title: 'Live Aid, Wembley Stadium — 14 photographs', tag: 'Gallery', editorial: false, target: 'photos' as const },
