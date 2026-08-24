@@ -43,6 +43,10 @@ yarn-error.*
 src/discovery-probe-*.test.ts
 src/.discovery-probe-*.test.ts
 
+# Written by the Testing contract host (scripts/run-mobile-api-contracts.sh).
+contracts/host.json
+contracts/host.json.tmp
+
 # Generated native projects (Continuous Native Generation).
 /ios
 /android

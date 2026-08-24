@@ -253,9 +253,13 @@ npx expo run:android
 `mobile-js`, `mobile-android`, and `mobile-ios` in
 [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) run whenever
 `src/QueenZone.Mobile/` changes, or on demand via `workflow_dispatch`.
-Path classification lives in `scripts/classify-pipeline-changes.sh`
-(mobile-only PRs skip the .NET suite; mixed PRs run both; docs-only PRs
-run neither).
+`mobile-api-contracts` is a **separate** classifier output
+(`mobile_api_contracts=true`) so `/api/v1` or mobile client-parser changes
+run the Testing-host consumer suite **without** forcing Android/iOS native
+builds. Path classification lives in `scripts/classify-pipeline-changes.sh`
+(mobile-only PRs skip the .NET suite; API-only PRs skip native compiles;
+mixed PRs run both; docs-only PRs run neither unless they are json-api
+contract docs).
 
 Local preflight after a clean install:
 
@@ -263,6 +267,24 @@ Local preflight after a clean install:
 cd src/QueenZone.Mobile
 npm ci
 npm run preflight
+```
+
+Consumer contracts (repo root; no secrets or real database). Run twice from
+a clean checkout to prove determinism:
+
+```powershell
+bash ./scripts/run-mobile-api-contracts.sh
+```
+
+That starts `QueenZone.Web` in `Testing` (`QUEENZONE_MOBILE_CONTRACT_HOST=1`)
+and runs `npm run test:api-contracts`. Failures name the endpoint and the
+expected field or status. A renamed server JSON field or a tightened zod
+assert must fail that way (revert the probe; do not commit it). This is not
+part of `npm test` / `npm run preflight` — those stay host-free unit and
+component tests.
+
+```text
+unit (npm test) ≠ consumer contracts ≠ native compile ≠ device smoke
 ```
 
 `npm test` discovers every `src/**/*.test.ts` and `src/**/*.test.tsx` file
@@ -275,16 +297,18 @@ PR check **names** (job `name:` values; these are the strings to require on
 
 | Check name | What it is | What it is not |
 | --- | --- | --- |
-| `Mobile typecheck and unit tests` | `npm ci` + `npm run preflight` | Native compile or device E2E |
+| `Mobile typecheck and unit tests` | `npm ci` + `npm run preflight` | Native compile, contracts, or device E2E |
 | `Mobile Android build` | Unsigned debug APK compile | Play-store signing or device E2E |
 | `Mobile iOS build` | Unsigned Simulator compile | TestFlight signing or device E2E |
+| `Mobile API consumer contracts` | Testing host + real mobile parsers | Native compile, OpenAPI-only, or device E2E |
 
 Android and iOS are equal: a mobile PR cannot skip either native compile.
 Non-mobile PRs get skip-success stubs with those same names so required
-checks are not left pending (same idea as `test-docs-ok`).
+checks are not left pending (same idea as `test-docs-ok`). Server-only API
+PRs get the Android/iOS stubs and **do** run `Mobile API consumer contracts`.
 
 **Branch protection is repository settings, not YAML.** A human must add
-those three names as required status checks on `main` after merge. Live
+those four names as required status checks on `main` after merge. Live
 required contexts on 2026-08-24 did **not** yet include them; see
 `docs/architecture/testing-policy.md`.
 
