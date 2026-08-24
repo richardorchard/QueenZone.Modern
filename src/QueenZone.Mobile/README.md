@@ -258,8 +258,10 @@ bash ./scripts/run-mobile-api-contracts.sh
 
 That starts `QueenZone.Web` in `Testing` (`QUEENZONE_MOBILE_CONTRACT_HOST=1`)
 and runs `npm run test:api-contracts`. Failures name the endpoint and the
-expected field or status. This is not part of `npm test` / `npm run preflight`
-— those stay host-free unit and component tests.
+expected field or status. A renamed server JSON field or a tightened zod
+assert must fail that way (revert the probe; do not commit it). This is not
+part of `npm test` / `npm run preflight` — those stay host-free unit and
+component tests.
 
 ```text
 unit (npm test) ≠ consumer contracts ≠ native compile ≠ device smoke

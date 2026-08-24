@@ -346,7 +346,7 @@ These four **GitHub check names** (the job `name:` values in `ci.yml`) must be r
 - `Mobile iOS build`
 - `Mobile API consumer contracts`
 
-**Live `main` required contexts** (queried 2026-08-24; mobile names are **not** in this list yet): `build`, `test (0)`, `test (1)`, `sql-server-tests`, `coverage`, `smoke-test`, `e2e-test`, `Verify formatting`, `Small test projects (Tools/Storage/NewsAgent)`. Do not treat YAML as proof that mobile checks are required. After merge, add the three mobile names above and re-query Settings → Branches → `main` → Status checks to confirm.
+**Live `main` required contexts** (queried 2026-08-24; mobile names are **not** in this list yet): `build`, `test (0)`, `test (1)`, `sql-server-tests`, `coverage`, `smoke-test`, `e2e-test`, `Verify formatting`, `Small test projects (Tools/Storage/NewsAgent)`. Do not treat YAML as proof that mobile checks are required. After merge, add the four mobile names above and re-query Settings → Branches → `main` → Status checks to confirm.
 
 Android and iOS are equal: a mobile PR cannot treat either native compile as optional. Non-mobile PRs are not left pending: `ci.yml` emits skip-success stubs (`mobile-js-ok`, `mobile-android-ok`, `mobile-ios-ok`) with those exact check names, the same idea as `test-docs-ok`. `mobile-api-contracts-ok` is the matching stub for `Mobile API consumer contracts`.
 
@@ -371,7 +371,7 @@ bash ./scripts/run-mobile-api-contracts.sh
 bash ./scripts/run-mobile-api-contracts.sh --no-build
 ```
 
-The script starts `QueenZone.Web` with `ASPNETCORE_ENVIRONMENT=Testing` and `QUEENZONE_MOBILE_CONTRACT_HOST=1` on a loopback ephemeral port, then runs `npm run test:api-contracts` in `src/QueenZone.Mobile`. Failures name the endpoint and expected field or status.
+The script starts `QueenZone.Web` with `ASPNETCORE_ENVIRONMENT=Testing` and `QUEENZONE_MOBILE_CONTRACT_HOST=1` on a loopback ephemeral port, then runs `npm run test:api-contracts` in `src/QueenZone.Mobile`. Failures name the endpoint and expected field or status. A renamed server JSON property (for example `NewsListItemDto.Title` → `Headline`) or a tightened consumer schema (for example `title: z.number()`) must fail with a message such as `Contract GET /api/v1/content/news failed: items.0.title: ...`. Revert those probes; do not commit them.
 
 **Publish preflight:** `.github/workflows/publish-mobile-test-build.yml` and `.github/workflows/publish-ios-testflight.yml` run `npm ci` + `npm run preflight` against `github.sha` in a job with no signing secrets. The signing/upload job `needs` that preflight and runs only when `needs.preflight.result == 'success'`. A failed or cancelled preflight skips publication.
 
