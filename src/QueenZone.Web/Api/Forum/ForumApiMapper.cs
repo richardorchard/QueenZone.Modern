@@ -37,6 +37,20 @@ public static class ForumApiMapper
         IEnumerable<ForumTopicItem> topics) =>
         topics.Select(ToTopicListItem).ToList();
 
+    public static ForumRecentThreadDto ToRecentThread(ForumRecentThreadItem item) =>
+        new(
+            item.TopicId,
+            item.Title,
+            item.CategoryId,
+            item.CategoryName,
+            item.ReplyCount,
+            item.LastActivityAt,
+            ForumRoutes.GetTopicCanonicalPath(item.TopicId, item.Title));
+
+    public static IReadOnlyList<ForumRecentThreadDto> ToRecentThreads(
+        IEnumerable<ForumRecentThreadItem> items) =>
+        items.Select(ToRecentThread).ToList();
+
     public static ForumTopicDetailDto ToTopicDetail(
         ForumTopicHeader header,
         int postCount,

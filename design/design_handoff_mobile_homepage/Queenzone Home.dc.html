@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/queenzone-design-system-6c12e8ec-2c2c-448b-858b-dbeb24fd8c3c/tokens/fonts.css">
+<link rel="stylesheet" href="_ds/queenzone-design-system-6c12e8ec-2c2c-448b-858b-dbeb24fd8c3c/tokens/colors.css">
+<link rel="stylesheet" href="_ds/queenzone-design-system-6c12e8ec-2c2c-448b-858b-dbeb24fd8c3c/tokens/typography.css">
+<link rel="stylesheet" href="_ds/queenzone-design-system-6c12e8ec-2c2c-448b-858b-dbeb24fd8c3c/tokens/spacing.css">
+<link rel="stylesheet" href="_ds/queenzone-design-system-6c12e8ec-2c2c-448b-858b-dbeb24fd8c3c/tokens/base.css">
+<link rel="stylesheet" href="_ds/queenzone-design-system-6c12e8ec-2c2c-448b-858b-dbeb24fd8c3c/styles.css">
+<script src="_ds/queenzone-design-system-6c12e8ec-2c2c-448b-858b-dbeb24fd8c3c/_ds_bundle.js"></script>
+<style>
+body { margin: 0; }
+a { color: var(--link); text-decoration: none; }
+a:hover { color: var(--link-hover); }
+.qz-rail::-webkit-scrollbar, .ios-scroll::-webkit-scrollbar { display: none; }
+.qz-crest-dark { display: none; }
+.qz-root[data-theme="dark"] .qz-crest-dark { display: block; }
+.qz-root[data-theme="dark"] .qz-crest-light { display: none; }
+/* theme token sets — light is the default, dark overrides the same names */
+.qz-root {
+  --bg: #FFFFFF; --bg-alt: #F7F6F3; --band: #111111; --desk: #E6E4DF;
+  --txt: #2B2B2B; --txt2: #5F5F5B; --txt3: #8A8A85;
+  --line: #E8E8E8; --chrome: rgba(255,255,255,0.92);
+  --lnk: #244A8F; --archive: #5D3A8A; --pill: #FFFFFF;
+  --chip-off: #5F5F5B; --chip-on-bg: #2B2B2B; --chip-on-txt: #FFFFFF;
+}
+.qz-root[data-theme="dark"] {
+  --bg: #121212; --bg-alt: #1A1A1A; --band: #000000; --desk: #1B1B1A;
+  --txt: #F2F1ED; --txt2: rgba(255,255,255,0.66); --txt3: rgba(255,255,255,0.45);
+  --line: rgba(255,255,255,0.14); --chrome: rgba(18,18,18,0.92);
+  --lnk: #8CA9DD; --archive: #B79BD8; --pill: #1F1F1F;
+  --chip-off: rgba(255,255,255,0.6); --chip-on-bg: #F2F1ED; --chip-on-txt: #111111;
+}
+</style>
+</helmet>
+
+<div class="qz-root" data-theme="{{ theme }}" style="min-height: 100vh; display: flex; align-items: flex-start; justify-content: center; padding: 40px 20px; background-color: var(--desk); font-family: var(--font-body);">
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" width="{{ deviceWidth }}" height="{{ deviceHeight }}" dark="{{ isDark }}" hint-size="402px,874px">
+
+<div style="background: var(--bg); font-family: var(--font-body); min-height: 100%; display: flex; flex-direction: column;">
+
+  <div style="height: 62px; flex: 0 0 auto;"></div>
+  <div style="position: sticky; top: 62px; z-index: 10; background: var(--chrome); backdrop-filter: saturate(180%) blur(12px); border-bottom: 1px solid var(--line); padding: 10px 18px 12px; display: flex; align-items: center; justify-content: space-between;">
+    <div style="display: flex; align-items: center; gap: 9px;">
+      <img class="qz-crest-light" src="assets/crest-black.png" alt="" style="height: 24px;">
+      <img class="qz-crest-dark" src="assets/crest-white.png" alt="" style="height: 24px;">
+      <span style="font-family: var(--font-titling); font-weight: 600; font-size: 13px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--txt);">Queenzone</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 4px;">
+      <button onClick="{{ toggleTheme }}" title="Toggle appearance" style="width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; background: none; border: 0; padding: 0; cursor: pointer;">{{ themeIcon }}</button>
+      <button style="width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; background: none; border: 0; padding: 0; cursor: pointer;">{{ searchIcon }}</button>
+      <button style="position: relative; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; background: none; border: 0; padding: 0; cursor: pointer;">
+        {{ mailIcon }}
+        <span style="position: absolute; top: 6px; right: 5px; min-width: 15px; height: 15px; padding: 0 4px; border-radius: 999px; background: var(--qz-burgundy); color: #fff; font-size: 9px; font-weight: 600; display: flex; align-items: center; justify-content: center; border: 1.5px solid var(--bg);">{{ unreadCount }}</span>
+      </button>
+      <div style="width: 32px; height: 32px; border-radius: 50%; background: var(--bg-alt); border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-weight: 600; font-size: 13px; color: var(--txt); margin-left: 4px;">RO</div>
+    </div>
+  </div>
+
+  <sc-if value="{{ showTicker }}" hint-placeholder-val="{{ true }}">
+    <div style="background: var(--band); padding: 9px 18px; display: flex; align-items: center; gap: 9px; overflow: hidden;">
+      <span style="width: 6px; height: 6px; border-radius: 50%; background: var(--qz-gold); flex: 0 0 auto;"></span>
+      <span style="font-family: var(--font-titling); font-size: 10px; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; color: var(--qz-gold); flex: 0 0 auto;">Live</span>
+      <span style="font-size: 12px; color: rgba(255,255,255,0.72); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">126 members reading · 14 new forum replies today</span>
+    </div>
+  </sc-if>
+
+  <div class="qz-rail" style="display: flex; gap: 8px; overflow-x: auto; padding: 14px 18px 12px; scrollbar-width: none; border-bottom: 1px solid var(--line);">
+    <sc-for list="{{ filters }}" as="f" hint-placeholder-count="5">
+      <button onClick="{{ f.select }}" style="{{ f.style }}">{{ f.label }}</button>
+    </sc-for>
+  </div>
+
+  <a href="#" style="display: block; text-decoration: none; color: inherit;">
+    <div style="position: relative; height: 300px; overflow: hidden; background: #111111;">
+      <img src="assets/img-stage.jpg" alt="" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.86; filter: grayscale(1);">
+      <div style="position: absolute; inset: 0; background: linear-gradient(to top, rgba(17,17,17,0.94) 0%, rgba(17,17,17,0.55) 42%, rgba(17,17,17,0.05) 100%);"></div>
+      <div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 0 20px 20px;">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+          <span style="background: var(--qz-burgundy); color: #fff; font-family: var(--font-titling); font-size: 9.5px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; padding: 5px 9px; border-radius: 2px;">Lead story</span>
+          <span style="font-size: 11px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(255,255,255,0.6);">2 hours ago</span>
+        </div>
+        <h1 style="font-family: var(--font-display); font-weight: 500; font-size: 29px; line-height: 1.08; letter-spacing: -0.015em; color: #fff; margin: 0 0 10px; text-wrap: pretty;">Queen Budapest screening comes to The Roundhouse</h1>
+        <p style="font-size: 14px; line-height: 1.5; color: rgba(255,255,255,0.76); margin: 0;">An exclusive screening of the Budapest concert, 3 October 2026.</p>
+      </div>
+    </div>
+  </a>
+
+  <section style="padding: 26px 20px 8px;">
+    <div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px;">
+      <h2 style="font-family: var(--font-display); font-weight: 500; font-size: 23px; margin: 0; color: var(--txt);">Latest news</h2>
+      <a href="#" style="font-family: var(--font-titling); font-size: 10px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--lnk);">All 4,000+</a>
+    </div>
+    <a href="#" style="display: flex; gap: 14px; align-items: flex-start; padding: 14px 0; border-top: 1px solid var(--line); text-decoration: none; color: inherit;">
+      <div style="flex: 1;">
+        <div style="font-family: var(--font-titling); font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--archive); margin-bottom: 6px;">14 August 2026</div>
+        <h3 style="font-family: var(--font-display); font-weight: 600; font-size: 18px; line-height: 1.25; margin: 0; color: var(--txt); text-wrap: pretty;">Roger Taylor releases new single and video, 'I See You Now'</h3>
+      </div>
+      <img src="assets/img-portrait.jpg" alt="" style="width: 76px; height: 76px; object-fit: cover; border-radius: 3px; filter: grayscale(1); flex: 0 0 auto;">
+    </a>
+    <a href="#" style="display: flex; gap: 14px; align-items: flex-start; padding: 14px 0; border-top: 1px solid var(--line); text-decoration: none; color: inherit;">
+      <div style="flex: 1;">
+        <div style="font-family: var(--font-titling); font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--archive); margin-bottom: 6px;">11 August 2026</div>
+        <h3 style="font-family: var(--font-display); font-weight: 600; font-size: 18px; line-height: 1.25; margin: 0; color: var(--txt); text-wrap: pretty;">Queen's last concert with Freddie Mercury, forty years on</h3>
+      </div>
+      <img src="assets/img-crowd.jpg" alt="" style="width: 76px; height: 76px; object-fit: cover; border-radius: 3px; filter: grayscale(1); flex: 0 0 auto;">
+    </a>
+    <a href="#" style="display: flex; gap: 14px; align-items: flex-start; padding: 14px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); text-decoration: none; color: inherit;">
+      <div style="flex: 1;">
+        <div style="font-family: var(--font-titling); font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--archive); margin-bottom: 6px;">07 August 2026</div>
+        <h3 style="font-family: var(--font-display); font-weight: 600; font-size: 18px; line-height: 1.25; margin: 0; color: var(--txt); text-wrap: pretty;">Brian May joins The Darkness on 'The Legend of Eternia'</h3>
+      </div>
+      <img src="assets/img-studio.jpg" alt="" style="width: 76px; height: 76px; object-fit: cover; border-radius: 3px; filter: grayscale(1); flex: 0 0 auto;">
+    </a>
+  </section>
+
+  <section style="position: relative; background: var(--band); padding: 28px 20px 26px; margin-top: 26px; overflow: hidden;">
+    <img src="assets/crest-white.png" alt="" style="position: absolute; right: -46px; top: -18px; width: 168px; opacity: 0.06;">
+    <div style="position: relative; display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 16px;">
+      <div>
+        <div style="font-family: var(--font-titling); font-size: 10px; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; color: var(--qz-gold); margin-bottom: 8px;">The Community</div>
+        <h2 style="font-family: var(--font-display); font-weight: 500; font-size: 23px; margin: 0; color: #fff;">In the forum</h2>
+      </div>
+      <a href="#" style="font-family: var(--font-titling); font-size: 10px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: rgba(255,255,255,0.66);">Enter</a>
+    </div>
+    <div style="position: relative; display: flex; flex-direction: column;">
+      <a href="#" style="display: flex; gap: 12px; align-items: center; padding: 14px 0; border-top: 1px solid rgba(255,255,255,0.16); text-decoration: none;">
+        <div style="width: 34px; height: 34px; border-radius: 50%; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.18); display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.85); flex: 0 0 auto;">MJ</div>
+        <div style="flex: 1; min-width: 0;">
+          <div style="font-size: 14.5px; font-weight: 500; line-height: 1.3; color: #fff; margin-bottom: 4px;">Was Knebworth really the right ending?</div>
+          <div style="font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(255,255,255,0.46);">Live &amp; Tours · 18 replies · 20 min ago</div>
+        </div>
+        <span style="width: 6px; height: 6px; border-radius: 50%; background: var(--qz-gold); flex: 0 0 auto;"></span>
+      </a>
+      <a href="#" style="display: flex; gap: 12px; align-items: center; padding: 14px 0; border-top: 1px solid rgba(255,255,255,0.16); text-decoration: none;">
+        <div style="width: 34px; height: 34px; border-radius: 50%; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.18); display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.85); flex: 0 0 auto;">PS</div>
+        <div style="flex: 1; min-width: 0;">
+          <div style="font-size: 14.5px; font-weight: 500; line-height: 1.3; color: #fff; margin-bottom: 4px;">Rockfield sessions: what the tapes actually show</div>
+          <div style="font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(255,255,255,0.46);">Recordings · 7 replies · 1 hr ago</div>
+        </div>
+      </a>
+      <a href="#" style="display: flex; gap: 12px; align-items: center; padding: 14px 0; border-top: 1px solid rgba(255,255,255,0.16); border-bottom: 1px solid rgba(255,255,255,0.16); text-decoration: none;">
+        <div style="width: 34px; height: 34px; border-radius: 50%; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.18); display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.85); flex: 0 0 auto;">AK</div>
+        <div style="flex: 1; min-width: 0;">
+          <div style="font-size: 14.5px; font-weight: 500; line-height: 1.3; color: #fff; margin-bottom: 4px;">Identifying this 1977 News of the World print</div>
+          <div style="font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(255,255,255,0.46);">Collectors · 32 replies · 3 hrs ago</div>
+        </div>
+      </a>
+    </div>
+  </section>
+
+  <section style="padding: 26px 0 4px;">
+    <div style="display: flex; align-items: baseline; justify-content: space-between; margin: 0 20px 14px;">
+      <h2 style="font-family: var(--font-display); font-weight: 500; font-size: 23px; margin: 0; color: var(--txt);">New in the gallery</h2>
+      <a href="#" style="font-family: var(--font-titling); font-size: 10px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--lnk);">Browse</a>
+    </div>
+    <div class="qz-rail" style="display: flex; gap: 10px; overflow-x: auto; padding: 0 20px 6px; scrollbar-width: none;">
+      <a href="#" style="flex: 0 0 auto; width: 148px; text-decoration: none; color: inherit;">
+        <div style="position: relative; height: 148px; overflow: hidden; border-radius: 3px; background: var(--bg-alt);">
+          <img src="assets/img-crowd.jpg" alt="" style="width: 100%; height: 100%; object-fit: cover; filter: grayscale(1);">
+        </div>
+        <div style="font-family: var(--font-display); font-weight: 600; font-size: 14px; margin-top: 9px; color: var(--txt);">Fan Pics</div>
+        <div style="font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--txt3); margin-top: 3px;">968 images · 24 new</div>
+      </a>
+      <a href="#" style="flex: 0 0 auto; width: 148px; text-decoration: none; color: inherit;">
+        <div style="position: relative; height: 148px; overflow: hidden; border-radius: 3px; background: var(--bg-alt);">
+          <img src="assets/img-portrait.jpg" alt="" style="width: 100%; height: 100%; object-fit: cover; filter: grayscale(1);">
+        </div>
+        <div style="font-family: var(--font-display); font-weight: 600; font-size: 14px; margin-top: 9px; color: var(--txt);">Brian May</div>
+        <div style="font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--txt3); margin-top: 3px;">670 images · 9 new</div>
+      </a>
+      <a href="#" style="flex: 0 0 auto; width: 148px; text-decoration: none; color: inherit;">
+        <div style="position: relative; height: 148px; overflow: hidden; border-radius: 3px; background: var(--bg-alt);">
+          <img src="assets/img-hero.jpg" alt="" style="width: 100%; height: 100%; object-fit: cover; filter: grayscale(1);">
+        </div>
+        <div style="font-family: var(--font-display); font-weight: 600; font-size: 14px; margin-top: 9px; color: var(--txt);">Live &amp; Tours</div>
+        <div style="font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--txt3); margin-top: 3px;">552 images · 6 new</div>
+      </a>
+    </div>
+  </section>
+
+  <sc-if value="{{ showMessages }}" hint-placeholder-val="{{ true }}">
+    <section style="background: var(--bg-alt); padding: 26px 20px; margin-top: 26px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);">
+      <div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px;">
+        <h2 style="font-family: var(--font-display); font-weight: 500; font-size: 23px; margin: 0; color: var(--txt);">Your messages</h2>
+        <a href="#" style="font-family: var(--font-titling); font-size: 10px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--lnk);">Inbox</a>
+      </div>
+      <a href="#" style="display: flex; gap: 12px; align-items: center; padding: 13px 0; border-top: 1px solid var(--line); text-decoration: none; color: inherit;">
+        <div style="width: 34px; height: 34px; border-radius: 50%; background: var(--pill); border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-size: 12px; font-weight: 600; color: var(--txt); flex: 0 0 auto;">DL</div>
+        <div style="flex: 1; min-width: 0;">
+          <div style="font-size: 14.5px; font-weight: 600; line-height: 1.3; margin-bottom: 3px; color: var(--txt);">Dave Lomax</div>
+          <div style="font-size: 13px; line-height: 1.35; color: var(--txt2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Found the 1986 Wembley programme scans you asked about…</div>
+        </div>
+        <span style="width: 7px; height: 7px; border-radius: 50%; background: var(--lnk); flex: 0 0 auto;"></span>
+      </a>
+      <a href="#" style="display: flex; gap: 12px; align-items: center; padding: 13px 0; border-top: 1px solid var(--line); text-decoration: none; color: inherit;">
+        <div style="width: 34px; height: 34px; border-radius: 50%; background: var(--pill); border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-size: 12px; font-weight: 600; color: var(--txt); flex: 0 0 auto;">QZ</div>
+        <div style="flex: 1; min-width: 0;">
+          <div style="font-size: 14.5px; font-weight: 600; line-height: 1.3; margin-bottom: 3px; color: var(--txt);">Queenzone Editors</div>
+          <div style="font-size: 13px; line-height: 1.35; color: var(--txt2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Your restored photo submission has been published.</div>
+        </div>
+      </a>
+    </section>
+  </sc-if>
+
+  <section style="background: var(--band); padding: 28px 20px 30px; position: relative; overflow: hidden;">
+    <div style="font-family: var(--font-titling); font-size: 10px; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; color: var(--qz-gold); margin-bottom: 10px;">On this day</div>
+    <div style="font-family: var(--font-titling); font-size: 12px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(255,255,255,0.5); margin-bottom: 14px;">22 August 1980</div>
+    <p style="font-family: var(--font-display); font-weight: 400; font-size: 20px; line-height: 1.4; color: #fff; margin: 0 0 18px; text-wrap: pretty;">'Another One Bites the Dust' is released — a US number one built on John Deacon's bass riff.</p>
+    <a href="#" style="display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-titling); font-size: 10px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--qz-gold);">View timeline
+      <svg width="14" height="10" viewBox="0 0 14 10" fill="none" stroke="#B89A4A" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M1 5h11M8.5 1.5L12 5l-3.5 3.5"></path></svg>
+    </a>
+  </section>
+
+  <div style="padding: 22px 20px 26px; text-align: center; background: var(--bg);">
+    <p style="font-size: 11px; line-height: 1.6; color: var(--txt3); margin: 0;">An independent fan archive. Not affiliated with Queen or its representatives.</p>
+  </div>
+
+  <div style="position: sticky; bottom: 0; margin-top: auto; z-index: 40; background: var(--chrome); backdrop-filter: saturate(180%) blur(12px); border-top: 1px solid var(--line); padding: 9px 8px 30px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px;">
+    <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="5">
+      <button onClick="{{ t.select }}" style="{{ t.style }}">
+        <span style="{{ t.iconStyle }}">{{ t.icon }}</span>
+        <span style="font-size: 9.5px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 500;">{{ t.label }}</span>
+      </button>
+    </sc-for>
+  </div>
+
+</div>
+</x-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:460,&quot;height&quot;:960},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Light&quot;,&quot;Dark&quot;],&quot;default&quot;:&quot;Light&quot;,&quot;tsType&quot;:&quot;'Light' | 'Dark'&quot;,&quot;section&quot;:&quot;Appearance&quot;},&quot;showTicker&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Front page&quot;},&quot;showMessages&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Front page&quot;},&quot;unreadCount&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:3,&quot;min&quot;:0,&quot;max&quot;:99,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Front page&quot;}}">
+const ICONS = {
+  home: 'M3 10.5L12 3l9 7.5M5.5 9.5V21h13V9.5',
+  news: 'M4 5h16v14H4zM7 9h7M7 12.5h7M7 16h5M17 9v7',
+  photos: 'M3 6h18v13H3zM3 15l5-4 4 3 3-2.5 6 4.5',
+  forum: 'M4 5h16v10H8l-4 3z',
+  you: 'M12 12a4 4 0 100-8 4 4 0 000 8zM4.5 20a7.5 7.5 0 0115 0'
+};
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { filter: 'All', tab: 'Home', theme: (props.theme || 'Light').toLowerCase() };
+  }
+
+  componentDidUpdate(prev) {
+    const t = (this.props.theme || 'Light').toLowerCase();
+    if ((prev.theme || 'Light').toLowerCase() !== t) this.setState({ theme: t });
+  }
+
+  icon(children, stroke, size) {
+    return React.createElement('svg',
+      { width: size || 20, height: size || 20, viewBox: '0 0 24 24', fill: 'none', stroke, strokeWidth: 1.5, strokeLinecap: 'round', strokeLinejoin: 'round' },
+      children);
+  }
+
+  renderVals() {
+    const dark = this.state.theme === 'dark';
+    const ink = dark ? '#F2F1ED' : '#2B2B2B';
+    const path = (d) => React.createElement('path', { key: d, d });
+
+    return {
+      theme: this.state.theme,
+      isDark: dark,
+      deviceWidth: 402,
+      deviceHeight: 874,
+      crestSrc: dark ? 'assets/crest-white.png' : 'assets/crest-black.png',
+      unreadCount: this.props.unreadCount ?? 3,
+      showTicker: this.props.showTicker ?? true,
+      showMessages: this.props.showMessages ?? true,
+      toggleTheme: () => this.setState((s) => ({ theme: s.theme === 'dark' ? 'light' : 'dark' })),
+      themeIcon: dark
+        ? this.icon([React.createElement('circle', { key: 'c', cx: 12, cy: 12, r: 4.2 }), path('M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6L17 7M7 17l-1.4 1.4')], ink)
+        : this.icon([path('M20 14.5A8.5 8.5 0 019.5 4a7 7 0 1010.5 10.5z')], ink),
+      searchIcon: this.icon([React.createElement('circle', { key: 'c', cx: 11, cy: 11, r: 7 }), path('M20 20l-3.6-3.6')], ink),
+      mailIcon: this.icon([path('M4 6h16v11H8l-4 3z')], ink),
+      filters: ['All', 'News', 'Forum', 'Photography', 'Timeline'].map((label) => {
+        const active = this.state.filter === label;
+        return {
+          label,
+          select: () => this.setState({ filter: label }),
+          style: {
+            flex: '0 0 auto', padding: '7px 14px', borderRadius: 999,
+            border: '1px solid ' + (active ? 'transparent' : 'var(--line)'),
+            background: active ? 'var(--chip-on-bg)' : 'transparent',
+            color: active ? 'var(--chip-on-txt)' : 'var(--chip-off)',
+            fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 500,
+            letterSpacing: '0.08em', textTransform: 'uppercase', cursor: 'pointer',
+            transition: 'background 180ms cubic-bezier(0.22,0.61,0.36,1)'
+          }
+        };
+      }),
+      tabs: [['Home', 'home'], ['News', 'news'], ['Photos', 'photos'], ['Forum', 'forum'], ['You', 'you']].map(([label, k]) => {
+        const active = this.state.tab === label;
+        return {
+          label,
+          icon: this.icon([path(ICONS[k])], active ? (dark ? '#8CA9DD' : '#244A8F') : (dark ? 'rgba(255,255,255,0.45)' : '#8A8A85'), 21),
+          iconStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center', height: 24 },
+          style: {
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+            background: 'none', border: 0, padding: '4px 0', cursor: 'pointer',
+            fontFamily: 'var(--font-body)',
+            color: active ? 'var(--lnk)' : 'var(--txt3)'
+          },
+          select: () => this.setState({ tab: label })
+        };
+      })
+    };
+  }
+}
+</script>
+</body>
+</html>

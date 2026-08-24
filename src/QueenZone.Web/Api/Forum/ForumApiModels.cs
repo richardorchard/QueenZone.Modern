@@ -73,6 +73,20 @@ public sealed record ForumAttachmentDto(
     string? ThumbnailUrl);
 
 /// <summary>
+/// Cross-board recent-activity row for <c>/api/v1/forum/recent-threads</c>. Same source
+/// (<see cref="PublicQueryCacheService.GetForumRecentThreadsAsync"/>) as the website
+/// forum index's activity feed, most-recent first.
+/// </summary>
+public sealed record ForumRecentThreadDto(
+    int TopicId,
+    string Title,
+    int CategoryId,
+    string CategoryName,
+    int ReplyCount,
+    DateTime LastActivityAt,
+    string DetailPath);
+
+/// <summary>
 /// Create-topic or reply body. Plain text is wrapped as HTML before the same
 /// <see cref="UgcHtml"/> sanitizer the website uses. Polls are not accepted on
 /// these write routes (#734).
