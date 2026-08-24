@@ -169,4 +169,25 @@ public sealed class ContentApiNewsTests : IClassFixture<QueenZoneWebApplicationF
         Assert.Equal(0, payload!.TotalCount);
         Assert.Empty(payload.Items);
     }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(9995)]
+    public async Task News_list_out_of_range_decade_does_not_return_server_error(int decade)
+    {
+        using var client = factory.CreateAnonymousClient();
+
+        using var unfiltered = await client.GetAsync($"{ContentApiEndpoints.RootPath}/news");
+        using var response = await client.GetAsync($"{ContentApiEndpoints.RootPath}/news?decade={decade}");
+
+        Assert.Equal(HttpStatusCode.OK, unfiltered.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotEqual(HttpStatusCode.InternalServerError, response.StatusCode);
+
+        var unfilteredPayload = await unfiltered.Content.ReadFromJsonAsync<ApiPagedResponse<NewsListItemDto>>();
+        var payload = await response.Content.ReadFromJsonAsync<ApiPagedResponse<NewsListItemDto>>();
+        Assert.NotNull(payload);
+        Assert.Equal(unfilteredPayload!.TotalCount, payload!.TotalCount);
+        Assert.True(payload.TotalCount > 0);
+    }
 }
