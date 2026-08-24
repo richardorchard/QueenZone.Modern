@@ -29,6 +29,10 @@ concurrency:
 # Docs/infra/design/workflow-only and mobile-only merges skip
 # migrate/deploy/post-deploy-smoke (see `changes`) since ci.yml never
 # produced a website binary to reuse for those.
+# Mixed web+mobile merges still deploy the website: resolve-ci-run keys
+# off the web-publish artifact (not overall ci.yml success), because
+# long Mobile iOS/Android jobs can leave the workflow in_progress after
+# required web checks — and merge — already passed.
 # post-deploy-smoke is the safety net after the real deploy.
 jobs:
   # Mirrors ci.yml's non-web bypass (scripts/classify-pipeline-changes.sh).
@@ -107,23 +111,20 @@ jobs:
           echo "Resolved PR head SHA: $HEAD_SHA"
           echo "head_sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
 
+      # Prefer web-publish artifact presence over overall workflow conclusion.
+      # Mixed web+mobile PRs leave ci.yml in_progress on native builds after
+      # required web checks (and merge) already passed — see
+      # scripts/Resolve-CiPublishRun.sh and deploys after #860 / #866.
+      - name: Self-test CI publish-run resolver
+        run: bash ./scripts/Resolve-CiPublishRun.sh --self-test
       - name: Find matching CI run
         id: find
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
           HEAD_SHA: ${{ steps.sha.outputs.head_sha }}
         run: |
-          RUN_ID=$(gh run list --repo "${{ github.repository }}" --workflow=ci.yml \
-            --json databaseId,headSha,conclusion,event \
-            --jq "[.[] | select(.headSha == \"$HEAD_SHA\" and .conclusion == \"success\" and .event == \"pull_request\")][0].databaseId")
-
-          if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ]; then
-            echo "::error::No successful ci.yml run found for PR head SHA $HEAD_SHA. Cannot deploy without a tested build artifact."
-            exit 1
-          fi
-
-          echo "Using ci.yml run $RUN_ID (artifact web-publish-$RUN_ID)"
-          echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
+          bash ./scripts/Resolve-CiPublishRun.sh >> "$GITHUB_OUTPUT"
 
   migrate:
     name: Apply database migrations
