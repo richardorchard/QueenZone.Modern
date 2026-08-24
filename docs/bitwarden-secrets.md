@@ -93,7 +93,7 @@ deployment if the mapped value is missing or shorter than 32 characters.
 
 ## APNs push credential
 
-The dedicated Apple Push Notification service key for `org.queenzone.mobile` is named `QueenZone APNs` in
+The dedicated Apple Push Notification service key for `org.queenzone.mobile` is named `QueenZone APNs 2026` in
 Apple Developer **Certificates, Identifiers & Profiles → Keys**. It is production-only and topic-specific to
 that bundle ID. The credential is separate from the Apple distribution certificate and provisioning profile
 used by the TestFlight build.
@@ -104,7 +104,7 @@ App Service setting names verbatim:
 | Setting | Value source |
 | --- | --- |
 | `PushNotifications__Apns__TeamId` | Apple Developer membership Team ID |
-| `PushNotifications__Apns__KeyId` | The Key ID shown for `QueenZone APNs` |
+| `PushNotifications__Apns__KeyId` | The Key ID shown for `QueenZone APNs 2026` |
 | `PushNotifications__Apns__PrivateKeyPem` | Complete one-time `.p8` download, including the PEM header and footer |
 | `PushNotifications__Apns__Environment` | `production` |
 
