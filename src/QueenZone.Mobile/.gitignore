@@ -43,9 +43,13 @@ yarn-error.*
 src/discovery-probe-*.test.ts
 src/.discovery-probe-*.test.ts
 
-# Written by the Testing contract host (scripts/run-mobile-api-contracts.sh).
+# Written by the Testing contract host (scripts/run-mobile-api-contracts.sh
+# and scripts/run-mobile-device-smoke.sh).
 contracts/host.json
 contracts/host.json.tmp
+
+# Maestro device-smoke output (#872).
+maestro-results/
 
 # Generated native projects (Continuous Native Generation).
 /ios

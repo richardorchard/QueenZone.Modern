@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
+import { View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { testIds } from '../test/testIds';
 import { PlaceholderScreen } from '../ui/PlaceholderScreen';
 import { useSession } from './SessionContext';
 import { openSignIn } from './signInNavigation';
@@ -22,17 +24,19 @@ export function MemberGate({ title, children }: Props) {
   }
 
   return (
-    <PlaceholderScreen
-      title={title}
-      epic="Members"
-      access="member"
-      description="This area matches the website's member-only boundary. Sign in with Google, Microsoft, Discord, GitHub, or Apple to continue."
-      actions={[
-        {
-          label: 'Sign in',
-          onPress: () => openSignIn(navigation),
-        },
-      ]}
-    />
+    <View testID={testIds.memberGate} style={{ flex: 1 }}>
+      <PlaceholderScreen
+        title={title}
+        epic="Members"
+        access="member"
+        description="This area matches the website's member-only boundary. Sign in with Google, Microsoft, Discord, GitHub, or Apple to continue."
+        actions={[
+          {
+            label: 'Sign in',
+            onPress: () => openSignIn(navigation),
+          },
+        ]}
+      />
+    </View>
   );
 }

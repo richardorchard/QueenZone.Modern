@@ -1,0 +1,26 @@
+appId: org.queenzone.mobile
+---
+- tapOn:
+    id: tab-photos
+- extendedWaitUntil:
+    visible:
+      id: photos-screen
+    timeout: 20000
+- tapOn:
+    id: photo-category-brian-may
+- extendedWaitUntil:
+    visible:
+      id: photo-category-screen
+    timeout: 20000
+- tapOn:
+    id: photo-item-101
+- extendedWaitUntil:
+    visible:
+      id: photo-viewer-screen
+    timeout: 20000
+- tapOn:
+    id: tab-photos
+- extendedWaitUntil:
+    visible:
+      id: photos-screen
+    timeout: 15000

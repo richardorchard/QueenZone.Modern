@@ -11,6 +11,7 @@ import { radius, space, type, useTheme } from '../../theme';
 import { Button } from '../../ui/Button';
 import { PageTitleBlock } from '../../ui/PageTitleBlock';
 import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from '../../ui/ScreenStates';
+import { testIds } from '../../test/testIds';
 import {
   formatMessageTimestamp,
   inboxPageSize,
@@ -95,6 +96,7 @@ function InboxList({ navigation }: Pick<Props, 'navigation'>) {
 
   return (
     <FlatList
+      testID={testIds.inboxScreen}
       style={{ flex: 1, backgroundColor: c.surfacePage }}
       data={paged.items}
       keyExtractor={(item) => item.conversationId}

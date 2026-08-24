@@ -7,6 +7,7 @@ type Props = {
   icon: LucideIcon;
   onPress: () => void;
   accessibilityLabel: string;
+  testID?: string;
   tone?: 'onDark' | 'accent';
   size?: 20 | 24;
   active?: boolean;
@@ -16,6 +17,7 @@ export function IconButton({
   icon: Icon,
   onPress,
   accessibilityLabel,
+  testID,
   tone = 'onDark',
   size = 20,
   active = false,
@@ -26,6 +28,7 @@ export function IconButton({
 
   return (
     <Pressable
+      testID={testID}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       onPress={onPress}

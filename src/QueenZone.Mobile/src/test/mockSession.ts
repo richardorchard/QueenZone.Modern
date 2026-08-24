@@ -11,6 +11,7 @@ export function createMockSession() {
     signOut: jest.fn(),
     refreshProfile: jest.fn(),
     setAccessToken: jest.fn(),
+    applySmokeSession: jest.fn(),
   };
 }
 

@@ -1,4 +1,5 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { testIds } from '../test/testIds';
 import { dark } from '../theme';
 import { HomeScreen } from '../screens/home/HomeScreen';
 
@@ -34,7 +35,7 @@ import { ForumScreen } from '../screens/forum/ForumScreen';
 import { CategoryScreen } from '../screens/forum/CategoryScreen';
 import { ThreadScreen } from '../screens/forum/ThreadScreen';
 import { ComposerScreen } from '../screens/forum/ComposerScreen';
-import { ForumIndexHeaderRight, SearchHeaderButton } from './headerButtons';
+import { ForumIndexHeaderRight, HeaderBackButton, SearchHeaderButton } from './headerButtons';
 import type {
   ArchiveStackParamList,
   ForumStackParamList,
@@ -62,7 +63,15 @@ export function HomeStack() {
     <Home.Navigator screenOptions={stackScreenOptions}>
       <Home.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
       <Home.Screen name="Search" component={SearchRouteScreen} />
-      <Home.Screen name="Profile" component={ProfileScreen} />
+      <Home.Screen
+        name="Profile"
+        component={ProfileScreen}
+        options={({ navigation }) => ({
+          headerLeft: () => (
+            <HeaderBackButton testID={testIds.profileBack} onPress={() => navigation.goBack()} />
+          ),
+        })}
+      />
       <Home.Screen name="Settings" component={SettingsScreen} />
       <Home.Screen name="Contact" component={ContactScreen} options={{ title: 'Contact' }} />
       <Home.Screen name="DeleteAccount" component={DeleteAccountScreen} options={{ title: 'Delete account' }} />

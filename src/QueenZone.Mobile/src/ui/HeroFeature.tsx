@@ -15,16 +15,18 @@ type Props = {
     image: number | { uri: string };
   };
   onPress: () => void;
+  testID?: string;
   height?: number;
   priority?: 'low' | 'normal' | 'high';
 };
 
-export function HeroFeature({ item, onPress, height = 468, priority = 'normal' }: Props) {
+export function HeroFeature({ item, onPress, testID, height = 468, priority = 'normal' }: Props) {
   const { c } = useTheme();
   const press = usePressProps();
 
   return (
     <Pressable
+      testID={testID}
       accessible
       accessibilityRole="button"
       accessibilityLabel={`${item.kicker}. ${item.title}. ${item.standfirst}`}
