@@ -21,6 +21,7 @@ jobs:
       code: ${{ steps.check.outputs.code }}
       migrations: ${{ steps.check.outputs.migrations }}
       mobile: ${{ steps.check.outputs.mobile }}
+      mobile_api_contracts: ${{ steps.check.outputs.mobile_api_contracts }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -34,6 +35,7 @@ jobs:
             echo "code=true" >> $GITHUB_OUTPUT
             echo "migrations=true" >> $GITHUB_OUTPUT
             echo "mobile=true" >> $GITHUB_OUTPUT
+            echo "mobile_api_contracts=true" >> $GITHUB_OUTPUT
             exit 0
           fi
 
@@ -259,6 +261,56 @@ jobs:
     steps:
       - name: No mobile changes — required check satisfied
         run: echo "No mobile changes — marking Mobile iOS build as satisfied without compiling iOS."
+
+  # Deterministic mobile consumer contracts against the Testing host (#869 / Option A).
+  # Independent of mobile=true so server-only /api/v1 changes run this job without
+  # Android/iOS native compilation. Does not use live data, Azure SQL, Blob, or OAuth.
+  mobile-api-contracts:
+    name: Mobile API consumer contracts
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.mobile_api_contracts == 'true'
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+          cache: true
+          cache-dependency-path: |
+            **/*.csproj
+            .config/dotnet-tools.json
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: src/QueenZone.Mobile/package-lock.json
+
+      - name: Restore and build web
+        run: |
+          dotnet restore QueenZone.sln
+          dotnet build src/QueenZone.Web/QueenZone.Web.csproj --configuration Release --no-restore
+
+      - name: Install mobile packages
+        working-directory: src/QueenZone.Mobile
+        run: npm ci
+
+      - name: Run mobile API consumer contracts
+        run: bash ./scripts/run-mobile-api-contracts.sh --no-build
+
+  mobile-api-contracts-ok:
+    name: Mobile API consumer contracts
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.mobile_api_contracts != 'true'
+    steps:
+      - name: No mobile API contract changes — required check satisfied
+        run: echo "No mobile API contract changes — marking Mobile API consumer contracts as satisfied without starting the Testing host."
 
   # Builds and publishes the Linux app once per PR run ("build once, test many").
   # Deterministic tests run in the `test` matrix (mixed Web.Tests shards — see
