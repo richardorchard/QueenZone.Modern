@@ -13,7 +13,6 @@ import { usePressProps } from './press';
 
 export type YearRailOption = {
   label: string;
-  decadeStart: number | null;
 };
 
 type Props<T extends YearRailOption> = {

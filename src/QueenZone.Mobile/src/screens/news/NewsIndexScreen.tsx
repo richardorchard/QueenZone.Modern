@@ -1,8 +1,8 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { FlatList, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { fetchNewsPage, formatPublishedDate, type NewsListItem } from '../../api';
-import { newsDecades } from '../../content/sample';
+import { newsDecades, newsYearOptions, type NewsYearOption } from '../../content/sample';
 import { usePagedContent } from '../../hooks/usePagedContent';
 import type { NewsStackParamList } from '../../navigation/types';
 import { space, useTheme } from '../../theme';
@@ -15,22 +15,35 @@ import { YearRail } from '../../ui/YearRail';
 
 type Props = NativeStackScreenProps<NewsStackParamList, 'NewsIndex'>;
 
+type ArchiveFilter = { label: string; decadeStart: number | null; year?: number };
+
 export function NewsIndexScreen({ navigation }: Props) {
   const { c } = useTheme();
-  const [decade, setDecade] = useState<(typeof newsDecades)[number]>(newsDecades[0]);
+  const [filter, setFilter] = useState<ArchiveFilter>(newsDecades[0]);
+  const yearOptions = useMemo(() => newsYearOptions(), []);
+  const activeYearOption: NewsYearOption =
+    yearOptions.find((option) => option.year === filter.year) ?? { label: '', year: 0 };
+
   const paged = usePagedContent<NewsListItem>(
     useCallback(
-      (page, signal) => fetchNewsPage({ page, pageSize: 20, decade: decade.decadeStart ?? undefined, signal }),
-      [decade],
+      (page, signal) =>
+        fetchNewsPage({ page, pageSize: 20, decade: filter.decadeStart ?? undefined, year: filter.year, signal }),
+      [filter],
     ),
     20,
-    decade.label,
+    filter.label,
   );
 
   const countLine =
     paged.totalCount > 0
       ? `${paged.totalCount.toLocaleString('en-GB')} articles · restored from Queenzone.com`
       : 'Restored from Queenzone.com';
+
+  const emptyMessage = filter.year
+    ? `No articles for ${filter.year} yet.`
+    : filter.decadeStart !== null
+      ? 'No articles for this decade yet.'
+      : 'No news articles yet.';
 
   const header = (
     <View>
@@ -44,15 +57,23 @@ export function NewsIndexScreen({ navigation }: Props) {
           <Chip
             key={option.label}
             label={option.label}
-            active={decade.label === option.label}
-            onPress={() => setDecade(option)}
+            active={filter.label === option.label}
+            onPress={() => setFilter(option)}
           />
         ))}
       </ScrollView>
     </View>
   );
 
-  const rail = newsDecades.length > 1 ? <YearRail options={newsDecades} value={decade} onChange={setDecade} testID="news-year-rail" /> : null;
+  const rail =
+    yearOptions.length > 1 ? (
+      <YearRail
+        options={yearOptions}
+        value={activeYearOption}
+        onChange={(option) => setFilter({ label: option.label, decadeStart: null, year: option.year })}
+        testID="news-year-rail"
+      />
+    ) : null;
 
   if (paged.loading && paged.items.length === 0) {
     return (
@@ -86,9 +107,7 @@ export function NewsIndexScreen({ navigation }: Props) {
         data={paged.items}
         keyExtractor={(item) => String(item.id)}
         ListHeaderComponent={header}
-        ListEmptyComponent={
-          <EmptyBlock message={decade.decadeStart === null ? 'No news articles yet.' : 'No articles for this decade yet.'} />
-        }
+        ListEmptyComponent={<EmptyBlock message={emptyMessage} />}
         ListFooterComponent={<ListFooterLoading visible={paged.loadingMore} />}
         refreshControl={
           <RefreshControl refreshing={paged.refreshing} onRefresh={paged.refresh} tintColor={c.accentPrimary} />

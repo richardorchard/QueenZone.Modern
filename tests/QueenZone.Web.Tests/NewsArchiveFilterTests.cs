@@ -18,17 +18,47 @@ public sealed class NewsArchiveFilterTests
     {
         var filter = NewsArchiveFilter.Parse(input);
 
-        Assert.Equal(expectedDecadeStart, filter.DecadeStartYear);
+        Assert.Equal(expectedDecadeStart, filter.StartYear);
         Assert.Equal(expectedDecadeStart is not null, filter.IsActive);
     }
 
-    [Fact]
-    public void GetDecadeBounds_returns_inclusive_exclusive_utc_window()
+    [Theory]
+    [InlineData(null, null)]
+    [InlineData(0, null)]
+    [InlineData(-1, null)]
+    [InlineData(9999, null)]
+    [InlineData(2000, 2000)]
+    [InlineData(2013, 2013)]
+    [InlineData(2026, 2026)]
+    [InlineData(9995, 9995)]
+    public void ParseYear_keeps_the_exact_year_and_ignores_unsafe_years(int? input, int? expectedYear)
     {
-        var (start, end) = new NewsArchiveFilter(2000).GetDecadeBounds();
+        var filter = NewsArchiveFilter.ParseYear(input);
+
+        Assert.Equal(expectedYear, filter.StartYear);
+        Assert.Equal(expectedYear is not null, filter.IsActive);
+        if (expectedYear is not null)
+        {
+            Assert.Equal(1, filter.SpanYears);
+        }
+    }
+
+    [Fact]
+    public void GetBounds_returns_inclusive_exclusive_utc_window_for_a_decade()
+    {
+        var (start, end) = new NewsArchiveFilter(2000).GetBounds();
 
         Assert.Equal(new DateTime(2000, 1, 1, 0, 0, 0, DateTimeKind.Utc), start);
         Assert.Equal(new DateTime(2010, 1, 1, 0, 0, 0, DateTimeKind.Utc), end);
+    }
+
+    [Fact]
+    public void GetBounds_returns_a_single_calendar_year_window_for_ParseYear()
+    {
+        var (start, end) = NewsArchiveFilter.ParseYear(2013).GetBounds();
+
+        Assert.Equal(new DateTime(2013, 1, 1, 0, 0, 0, DateTimeKind.Utc), start);
+        Assert.Equal(new DateTime(2014, 1, 1, 0, 0, 0, DateTimeKind.Utc), end);
     }
 
     [Theory]
@@ -40,8 +70,8 @@ public sealed class NewsArchiveFilterTests
         var filter = new NewsArchiveFilter(year);
 
         Assert.False(filter.IsActive);
-        Assert.False(filter.TryGetDecadeBounds(out _, out _));
-        Assert.Throws<InvalidOperationException>(() => filter.GetDecadeBounds());
+        Assert.False(filter.TryGetBounds(out _, out _));
+        Assert.Throws<InvalidOperationException>(() => filter.GetBounds());
     }
 
     [Fact]

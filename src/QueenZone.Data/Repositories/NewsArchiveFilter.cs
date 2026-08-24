@@ -1,26 +1,27 @@
 namespace QueenZone.Data;
 
 /// <summary>
-/// Optional decade filter for <see cref="INewsRepository.GetArchivePageAsync"/> and
-/// <see cref="INewsRepository.GetPublishedCountAsync"/>.
+/// Optional date-range filter for <see cref="INewsRepository.GetArchivePageAsync"/> and
+/// <see cref="INewsRepository.GetPublishedCountAsync"/>: either a decade (10-year span, from the
+/// decade chips) or a single calendar year (1-year span, from the year-rail scrubber, issue #886).
 /// </summary>
 /// <remarks>
 /// News runs roughly 2006-present, unlike the older biography/discography timelines. Filtering
 /// client-side over whatever page happens to be loaded produces false "no articles" results for
-/// older decades (issue #838), so the decade bound is pushed down to the repository/SQL layer
+/// older decades (issue #838), so the date bound is pushed down to the repository/SQL layer
 /// instead.
 /// </remarks>
-public readonly record struct NewsArchiveFilter(int? DecadeStartYear)
+public readonly record struct NewsArchiveFilter(int? StartYear, int SpanYears = 10)
 {
     public static readonly NewsArchiveFilter None = default;
 
     /// <summary>
-    /// True when <see cref="DecadeStartYear"/> can be turned into a UTC
-    /// <see cref="DateTime"/> window. Out-of-range years (0, negative, or
-    /// a start that would overflow <see cref="DateTime.MaxValue"/>) stay inactive
-    /// so public query strings cannot throw <see cref="ArgumentOutOfRangeException"/>.
+    /// True when <see cref="StartYear"/>/<see cref="SpanYears"/> can be turned into a UTC
+    /// <see cref="DateTime"/> window. Out-of-range years (0, negative, or a start that would
+    /// overflow <see cref="DateTime.MaxValue"/>) stay inactive so public query strings cannot
+    /// throw <see cref="ArgumentOutOfRangeException"/>.
     /// </summary>
-    public bool IsActive => TryGetDecadeBounds(out _, out _);
+    public bool IsActive => TryGetBounds(out _, out _);
 
     /// <summary>
     /// Parses a <c>decade</c> query value the way <see cref="PhotoListFilter.Parse"/>
@@ -40,60 +41,85 @@ public readonly record struct NewsArchiveFilter(int? DecadeStartYear)
         }
 
         var startYear = (year / 10) * 10;
-        if (!TryCreateDecadeBounds(startYear, out _, out _))
+        if (!TryCreateBounds(startYear, 10, out _, out _))
         {
             return None;
         }
 
-        return new NewsArchiveFilter(startYear);
+        return new NewsArchiveFilter(startYear, 10);
     }
 
-    /// <summary>Inclusive start / exclusive end of the decade, in UTC.</summary>
-    public (DateTime Start, DateTime End) GetDecadeBounds()
+    /// <summary>
+    /// Parses a <c>year</c> query value (e.g. from the year-rail scrubber, issue #886): an exact
+    /// calendar year, not floored to a decade. Unsafe years become <see cref="None"/>, matching
+    /// <see cref="Parse"/>.
+    /// </summary>
+    public static NewsArchiveFilter ParseYear(int? year)
     {
-        if (!TryGetDecadeBounds(out var start, out var end))
+        if (year is not { } y)
         {
-            throw new InvalidOperationException($"{nameof(GetDecadeBounds)} requires an active filter.");
+            return None;
+        }
+
+        if (y < DateTime.MinValue.Year || y > DateTime.MaxValue.Year)
+        {
+            return None;
+        }
+
+        if (!TryCreateBounds(y, 1, out _, out _))
+        {
+            return None;
+        }
+
+        return new NewsArchiveFilter(y, 1);
+    }
+
+    /// <summary>Inclusive start / exclusive end of the filter window, in UTC.</summary>
+    public (DateTime Start, DateTime End) GetBounds()
+    {
+        if (!TryGetBounds(out var start, out var end))
+        {
+            throw new InvalidOperationException($"{nameof(GetBounds)} requires an active filter.");
         }
 
         return (start, end);
     }
 
-    public bool TryGetDecadeBounds(out DateTime start, out DateTime end)
+    public bool TryGetBounds(out DateTime start, out DateTime end)
     {
-        if (DecadeStartYear is not { } year)
+        if (StartYear is not { } year)
         {
             start = default;
             end = default;
             return false;
         }
 
-        return TryCreateDecadeBounds(year, out start, out end);
+        return TryCreateBounds(year, SpanYears, out start, out end);
     }
 
-    private static bool TryCreateDecadeBounds(int startYear, out DateTime start, out DateTime end)
+    private static bool TryCreateBounds(int startYear, int spanYears, out DateTime start, out DateTime end)
     {
         start = default;
         end = default;
 
-        // End is start+10; reject before constructing so DateTime never throws.
-        if (startYear < DateTime.MinValue.Year || startYear > DateTime.MaxValue.Year - 10)
+        // End is start+span; reject before constructing so DateTime never throws.
+        if (startYear < DateTime.MinValue.Year || startYear > DateTime.MaxValue.Year - spanYears)
         {
             return false;
         }
 
         start = new DateTime(startYear, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-        end = new DateTime(startYear + 10, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        end = new DateTime(startYear + spanYears, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         return true;
     }
 }
 
-/// <summary>In-memory equivalent of the SQL decade WHERE clause, shared by the sample/in-memory repositories.</summary>
+/// <summary>In-memory equivalent of the SQL date-range WHERE clause, shared by the sample/in-memory repositories.</summary>
 internal static class NewsArchiveFiltering
 {
     public static IReadOnlyList<NewsItem> Apply(IReadOnlyList<NewsItem> items, NewsArchiveFilter filter)
     {
-        if (!filter.TryGetDecadeBounds(out var start, out var end))
+        if (!filter.TryGetBounds(out var start, out var end))
         {
             return items;
         }

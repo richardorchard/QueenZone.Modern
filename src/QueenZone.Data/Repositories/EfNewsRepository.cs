@@ -95,7 +95,7 @@ public sealed class EfNewsRepository : INewsRepository
         List<int> values;
         if (filter.IsActive)
         {
-            var (start, end) = filter.GetDecadeBounds();
+            var (start, end) = filter.GetBounds();
             values = await dbContext.Database
                 .SqlQueryRaw<int>(countByDecadeSql, start, end)
                 .ToListAsync(cancellationToken);
@@ -123,7 +123,7 @@ public sealed class EfNewsRepository : INewsRepository
         List<NewsRow> rows;
         if (filter.IsActive)
         {
-            var (start, end) = filter.GetDecadeBounds();
+            var (start, end) = filter.GetBounds();
             rows = await dbContext.Database
                 .SqlQueryRaw<NewsRow>(archivePageByDecadeSql, start, end, offset, take)
                 .ToListAsync(cancellationToken);

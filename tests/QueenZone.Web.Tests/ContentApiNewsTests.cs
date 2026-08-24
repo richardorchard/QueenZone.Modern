@@ -170,6 +170,86 @@ public sealed class ContentApiNewsTests : IClassFixture<QueenZoneWebApplicationF
         Assert.Empty(payload.Items);
     }
 
+    [Fact]
+    public async Task News_list_year_filter_finds_a_single_calendar_year_article()
+    {
+        // Year-rail scrubber (issue #886): 'year' filters to an exact calendar year, unlike
+        // 'decade' which spans ten. A 2008 and a 2013 article both fall in the 2000s/2010s decades
+        // respectively, but only 'year=2013' should return the 2013 article.
+        var items = new List<NewsItem>
+        {
+            new(1, "2008 article", "Excerpt", "Body", new DateTime(2008, 3, 4, 0, 0, 0, DateTimeKind.Utc), null, true),
+            new(2, "2013 article", "Excerpt", "Body", new DateTime(2013, 6, 1, 0, 0, 0, DateTimeKind.Utc), null, true),
+            new(3, "2014 article", "Excerpt", "Body", new DateTime(2014, 1, 1, 0, 0, 0, DateTimeKind.Utc), null, true),
+        };
+
+        using var appFactory = QueenZoneWebApplicationFactory.WithServices(services =>
+        {
+            services.RemoveAll<INewsRepository>();
+            services.AddSingleton<INewsRepository>(_ => new FixedNewsRepository(items));
+        });
+
+        using var client = appFactory.CreateAnonymousClient();
+
+        using var response = await client.GetAsync($"{ContentApiEndpoints.RootPath}/news?year=2013");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<ApiPagedResponse<NewsListItemDto>>();
+        Assert.NotNull(payload);
+        Assert.Equal(1, payload!.TotalCount);
+        Assert.Single(payload.Items);
+        Assert.Equal(2, payload.Items[0].Id);
+    }
+
+    [Fact]
+    public async Task News_list_year_filter_takes_precedence_over_decade_when_both_are_given()
+    {
+        var items = new List<NewsItem>
+        {
+            new(1, "2013 article", "Excerpt", "Body", new DateTime(2013, 6, 1, 0, 0, 0, DateTimeKind.Utc), null, true),
+            new(2, "2017 article", "Excerpt", "Body", new DateTime(2017, 1, 1, 0, 0, 0, DateTimeKind.Utc), null, true),
+        };
+
+        using var appFactory = QueenZoneWebApplicationFactory.WithServices(services =>
+        {
+            services.RemoveAll<INewsRepository>();
+            services.AddSingleton<INewsRepository>(_ => new FixedNewsRepository(items));
+        });
+
+        using var client = appFactory.CreateAnonymousClient();
+
+        // decade=2010 alone would match both articles; year=2013 should narrow to just the one.
+        using var response = await client.GetAsync($"{ContentApiEndpoints.RootPath}/news?decade=2010&year=2013");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<ApiPagedResponse<NewsListItemDto>>();
+        Assert.NotNull(payload);
+        Assert.Equal(1, payload!.TotalCount);
+        Assert.Single(payload.Items);
+        Assert.Equal(1, payload.Items[0].Id);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(9999)]
+    public async Task News_list_out_of_range_year_does_not_return_server_error(int year)
+    {
+        using var client = factory.CreateAnonymousClient();
+
+        using var unfiltered = await client.GetAsync($"{ContentApiEndpoints.RootPath}/news");
+        using var response = await client.GetAsync($"{ContentApiEndpoints.RootPath}/news?year={year}");
+
+        Assert.Equal(HttpStatusCode.OK, unfiltered.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotEqual(HttpStatusCode.InternalServerError, response.StatusCode);
+
+        var unfilteredPayload = await unfiltered.Content.ReadFromJsonAsync<ApiPagedResponse<NewsListItemDto>>();
+        var payload = await response.Content.ReadFromJsonAsync<ApiPagedResponse<NewsListItemDto>>();
+        Assert.NotNull(payload);
+        Assert.Equal(unfilteredPayload!.TotalCount, payload!.TotalCount);
+        Assert.True(payload.TotalCount > 0);
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(9995)]

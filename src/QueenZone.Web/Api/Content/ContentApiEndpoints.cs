@@ -32,7 +32,7 @@ public static class ContentApiEndpoints
 
         group.MapGet("/news", GetNewsListAsync)
             .WithName("GetContentNewsList")
-            .WithSummary("Paged list of published news articles. Optional 'decade' (e.g. 2010) filters server-side to that 10-year span; out-of-range years are ignored.")
+            .WithSummary("Paged list of published news articles. Optional 'year' (e.g. 2013) filters server-side to that single calendar year (year-rail scrubber, issue #886); optional 'decade' (e.g. 2010) filters to that 10-year span instead. 'year' takes precedence when both are given; out-of-range values are ignored.")
             .Produces<ApiPagedResponse<NewsListItemDto>>();
 
         group.MapGet("/news/{id:int}", GetNewsDetailAsync)
@@ -132,10 +132,11 @@ public static class ContentApiEndpoints
         int? page,
         int? pageSize,
         int? decade,
+        int? year,
         CancellationToken cancellationToken)
     {
         var request = ApiPagination.Normalize(page, pageSize);
-        var filter = NewsArchiveFilter.Parse(decade);
+        var filter = year is not null ? NewsArchiveFilter.ParseYear(year) : NewsArchiveFilter.Parse(decade);
         var items = await newsRepository.GetArchivePageAsync(request.Page, request.PageSize, filter, cancellationToken);
         var totalCount = await newsRepository.GetPublishedCountAsync(filter, cancellationToken);
 

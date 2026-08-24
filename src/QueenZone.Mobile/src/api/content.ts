@@ -33,11 +33,13 @@ function pageParams({ page, pageSize }: PageQuery) {
 export type NewsPageQuery = PageQuery & {
   /** First year of a 10-year span (e.g. 2010 for the 2010s). Server-side filter — see issue #838. */
   decade?: number;
+  /** A single calendar year (e.g. 2013). Server-side filter for the year-rail scrubber — see issue #886. Takes precedence over `decade` when both are set. */
+  year?: number;
 };
 
 export function fetchNewsPage(query: NewsPageQuery = {}): Promise<ApiPagedResponse<NewsListItem>> {
   return fetchJson('/content/news', {
-    query: { ...pageParams(query), decade: query.decade },
+    query: { ...pageParams(query), decade: query.decade, year: query.year },
     signal: query.signal,
   });
 }
