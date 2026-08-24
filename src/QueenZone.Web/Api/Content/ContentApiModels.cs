@@ -110,6 +110,13 @@ public sealed record FreddieTributeDto(
     string? TimeText);
 
 /// <summary>
+/// Shape for <c>/api/v1/content/live-activity</c>. No presence/heartbeat tracking exists,
+/// so this deliberately carries only the honestly-computable count of forum replies posted
+/// today, not a "members reading" figure.
+/// </summary>
+public sealed record LiveActivitySummaryDto(int NewForumRepliesToday);
+
+/// <summary>
 /// Category card for <c>/api/v1/content/photos/categories</c> and
 /// <c>/api/v1/content/photos/categories/{slug}</c>. Cover URLs are CDN
 /// (<c>cdn.queenzone.org</c>) via <see cref="QueenZone.Data.PhotoImageUrl"/>.

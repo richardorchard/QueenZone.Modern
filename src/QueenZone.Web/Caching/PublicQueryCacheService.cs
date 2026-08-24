@@ -12,7 +12,8 @@ public sealed class PublicQueryCacheService(
     IArticlesRepository articlesRepository,
     IForumRepository forumRepository,
     IQueenHistoryRepository queenHistoryRepository,
-    IPhotoRepository photoRepository)
+    IPhotoRepository photoRepository,
+    ILiveActivityQueryService liveActivityQuery)
 {
     private static readonly MemoryCacheEntryOptions VersionEntryOptions = new()
     {
@@ -139,6 +140,17 @@ public sealed class PublicQueryCacheService(
             () => photoRepository.GetCategoryPageAsync(catId, page, pageSize, activeFilter, cancellationToken),
             cancellationToken);
     }
+
+    /// <summary>
+    /// Count of forum posts made today. Short 45s TTL: no presence-tracking exists, so this
+    /// is the only honest "live" signal for the mobile home screen's activity strip.
+    /// </summary>
+    public Task<int> GetLiveActivityNewForumRepliesTodayAsync(CancellationToken cancellationToken = default) =>
+        GetOrCreateAsync(
+            PublicQueryCacheKeys.LiveActivityNewForumReplies,
+            options.Value.LiveActivityCacheDuration,
+            () => liveActivityQuery.GetNewForumRepliesTodayAsync(cancellationToken),
+            cancellationToken);
 
     /// <summary>
     /// Invalidates all public news cache entries (latest lists for any count and published count)

@@ -10,7 +10,8 @@ public sealed class PublicQueryCacheOptionsValidator : IValidateOptions<PublicQu
             || options.ArticleCountCacheDuration <= TimeSpan.Zero
             || options.ForumStatsCacheDuration <= TimeSpan.Zero
             || options.OnThisDayCacheDuration <= TimeSpan.Zero
-            || options.PhotoCacheDuration <= TimeSpan.Zero)
+            || options.PhotoCacheDuration <= TimeSpan.Zero
+            || options.LiveActivityCacheDuration <= TimeSpan.Zero)
         {
             return ValidateOptionsResult.Fail(
                 $"{PublicQueryCacheOptions.SectionName} durations must be greater than zero.");

@@ -74,6 +74,7 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddScoped<ISearchReindexRunLeaseService, EfSearchReindexRunLeaseService>();
         services.AddScoped<ISearchReindexRunRequestRepository, EfSearchReindexRunRequestRepository>();
         services.AddScoped<IMobileAuthGrantRepository, EfMobileAuthGrantRepository>();
+        services.AddScoped<ILiveActivityQueryService, EfLiveActivityQueryService>();
 
         return services;
     }
@@ -111,6 +112,7 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddSingleton<IAdminNewsRepository, InMemoryAdminNewsRepository>();
         services.AddSingleton<INewsAuditRepository, InMemoryNewsAuditRepository>();
         services.AddSingleton<IMemberAccountRepository, InMemoryMemberAccountRepository>();
+        services.AddSingleton<ILiveActivityQueryService, InMemoryLiveActivityQueryService>();
         var discoveryStore = new SharedNewsDiscoveryStore();
         SampleNewsDiscoveryData.Seed(discoveryStore);
         services.AddSingleton(discoveryStore);
