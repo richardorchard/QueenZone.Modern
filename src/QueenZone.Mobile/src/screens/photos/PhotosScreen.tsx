@@ -13,6 +13,7 @@ import { ArchiveImage } from '../../ui/ArchiveImage';
 import { Button } from '../../ui/Button';
 import { PageTitleBlock } from '../../ui/PageTitleBlock';
 import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from '../../ui/ScreenStates';
+import { testIds } from '../../test/testIds';
 import { photoCdnSource, photoCountLabel } from './photoGalleryMeta';
 
 type Props = CompositeScreenProps<
@@ -34,15 +35,24 @@ export function PhotosScreen({ navigation }: Props) {
   );
 
   if (paged.loading && paged.items.length === 0) {
-    return <LoadingBlock label="Loading photography…" />;
+    return (
+      <View testID={testIds.photosScreen} style={{ flex: 1 }}>
+        <LoadingBlock label="Loading photography…" />
+      </View>
+    );
   }
 
   if (paged.error && paged.items.length === 0) {
-    return <ErrorBlock message={paged.error} onRetry={paged.reload} />;
+    return (
+      <View testID={testIds.photosScreen} style={{ flex: 1 }}>
+        <ErrorBlock message={paged.error} onRetry={paged.reload} />
+      </View>
+    );
   }
 
   return (
     <FlatList
+      testID={testIds.photosScreen}
       style={{ flex: 1, backgroundColor: c.surfacePage }}
       data={paged.items}
       keyExtractor={(item) => item.slug}
@@ -98,6 +108,7 @@ export function PhotosScreen({ navigation }: Props) {
         const cover = photoCdnSource(item.coverThumbnailUrl);
         return (
           <Pressable
+            testID={`photo-category-${item.slug}`}
             accessibilityRole="button"
             accessibilityLabel={`${item.name}, ${photoCountLabel(item.imageCount)}`}
             onPress={() => navigation.navigate('PhotoCategory', { slug: item.slug, name: item.name })}

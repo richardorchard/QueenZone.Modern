@@ -1,0 +1,27 @@
+appId: org.queenzone.mobile
+---
+- tapOn:
+    id: tab-forum
+- extendedWaitUntil:
+    visible:
+      id: forum-screen
+    timeout: 20000
+- tapOn:
+    id: forum-board-1
+- extendedWaitUntil:
+    visible:
+      id: forum-category-screen
+    timeout: 20000
+- tapOn:
+    id: forum-thread-1002
+- extendedWaitUntil:
+    visible:
+      id: forum-thread-screen
+    timeout: 20000
+- assertVisible: Ranking every studio album
+- tapOn:
+    id: tab-forum
+- extendedWaitUntil:
+    visible:
+      id: forum-screen
+    timeout: 15000

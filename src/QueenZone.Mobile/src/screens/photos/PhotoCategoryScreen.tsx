@@ -22,6 +22,7 @@ import { space, type, useTheme } from '../../theme';
 import { ArchiveImage } from '../../ui/ArchiveImage';
 import { Chip } from '../../ui/Chip';
 import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from '../../ui/ScreenStates';
+import { testIds } from '../../test/testIds';
 import {
   photoCategoryPageSize,
   photoCdnSource,
@@ -120,6 +121,7 @@ export function PhotoCategoryScreen({ navigation, route }: Props) {
 
   return (
     <FlatList
+      testID={testIds.photoCategoryScreen}
       style={{ flex: 1, backgroundColor: c.surfacePage }}
       data={paged.items}
       keyExtractor={(item) => String(item.picId)}
@@ -183,6 +185,7 @@ export function PhotoCategoryScreen({ navigation, route }: Props) {
         const thumb = photoCdnSource(item.thumbnailUrl);
         return (
           <Pressable
+            testID={`photo-item-${item.picId}`}
             accessibilityRole="button"
             accessibilityLabel={item.title}
             onPress={() =>

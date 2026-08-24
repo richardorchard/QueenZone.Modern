@@ -336,8 +336,9 @@ These gates are guardrails, not a replacement for useful assertions. New or chan
 | `mobile-android` | Unsigned debug APK compile (GitHub-hosted Linux) | Yes — required on `main` after #870; skip-success stub when that tree is unchanged |
 | `mobile-ios` | Unsigned Simulator compile (GitHub-hosted macOS) | Yes — required on `main` after #870; skip-success stub when that tree is unchanged |
 | `mobile-api-contracts` | Testing-host consumer contracts: real `/api/v1` responses through the mobile `fetchJson` / domain clients plus runtime zod schemas (#869 Option A) | Independent of native jobs; skip-success stub when contract paths are unchanged |
+| `mobile-android-smoke` / `mobile-ios-smoke` | Maestro device smoke against a Debug build baked at the local Testing contract host (#872 Option A) | **No (Phase 1).** `.github/workflows/mobile-device-smoke.yml` is `workflow_dispatch` + weekday 04:00 UTC only. Do not add these names to branch protection yet. |
 
-Local mobile validation from `src/QueenZone.Mobile` is a clean `npm ci` then `npm run preflight`. `npm test` discovers every `src/**/*.test.ts` and `src/**/*.test.tsx` file (no package.json path list) and self-checks that unlisted Node and Jest probes still run. Pure `*.test.ts` files use Node's test runner; `*.test.tsx` files use Jest + `jest-expo` + React Native Testing Library (no devices, Metro, or production services). `npm run preflight` is typecheck + those tests + `npm run doctor` (lockfile-pinned `expo-doctor`). Device E2E remains a separate track (#872).
+Local mobile validation from `src/QueenZone.Mobile` is a clean `npm ci` then `npm run preflight`. `npm test` discovers every `src/**/*.test.ts` and `src/**/*.test.tsx` file (no package.json path list) and self-checks that unlisted Node and Jest probes still run. Pure `*.test.ts` files use Node's test runner; `*.test.tsx` files use Jest + `jest-expo` + React Native Testing Library (no devices, Metro, or production services). `npm run preflight` is typecheck + those tests + `npm run doctor` (lockfile-pinned `expo-doctor`). Device smoke is a separate Maestro suite (#872); it is not part of `npm test` or `npm run preflight`.
 
 These four **GitHub check names** (the job `name:` values in `ci.yml`) must be required contexts on protected `main`. A workflow file cannot enable branch protection; a human with repo admin access has to add them after this change merges:
 
@@ -353,13 +354,35 @@ Android and iOS are equal: a mobile PR cannot treat either native compile as opt
 **Layers (do not collapse these):**
 
 ```text
-unit (npm test / Web.Tests)
-  ≠ consumer contracts (Testing host + real mobile parsers)
-  ≠ native compile (mobile-android / mobile-ios)
-  ≠ device smoke (#872)
+unit / component (npm test, #833)
+  ≠ consumer contracts (Testing host + real mobile parsers, #869)
+  ≠ native compile (mobile-android / mobile-ios unsigned Debug)
+  ≠ device smoke (Maestro + Testing host, #872 Option A)
 ```
 
-Node + Jest tests (`npm test`, fast, no native toolchain) are not a substitute for `mobile-android` / `mobile-ios` compile, and those unsigned CI compiles are not device/E2E coverage. Static TypeScript and generated OpenAPI → TS types are not a substitute for the consumer-contract suite: `src/api/client.ts` uses `fetch` plus `as T`, so a renamed JSON field still typechecks. Device E2E is a separate track (#872).
+Node + Jest tests (`npm test`, fast, no native toolchain) are not a substitute for `mobile-android` / `mobile-ios` compile, and those unsigned CI compiles are not device coverage — they never boot the binary. Static TypeScript and generated OpenAPI → TS types are not a substitute for the consumer-contract suite: `src/api/client.ts` uses `fetch` plus `as T`, so a renamed JSON field still typechecks. Device smoke does not re-test #833 state permutations and does not replace #869 contracts.
+
+### Mobile device smoke (#872 Option A)
+
+Maestro drives the same short journey on Android emulator and iOS Simulator. The smoke path rebuilds a **Debug** binary with `EXPO_PUBLIC_API_BASE_URL` baked for the runner (`http://10.0.2.2:<port>` on Android, `http://127.0.0.1:<port>` on iOS) because that origin is bake-time (`apiEnvironments.cjs` / `app.config.ts`). Sideloaded compile-only artifacts aimed at production cannot talk to the local Testing host. Staging/production publish recipes are unchanged. Generated `android/` and `ios/` stay uncommitted.
+
+The backend is the same Testing contract host as #869: `ASPNETCORE_ENVIRONMENT=Testing`, `QUEENZONE_MOBILE_CONTRACT_HOST=1`, connection-string env vars unset. Signed-out flows use the real signed-out UI. One authenticated step injects the Testing-seeded access token through `queenzone://smoke-auth` — that handler is compiled only when `__DEV__` is true (Debug). It is not a staging/production Release bypass and uses no real member credentials.
+
+**Phase 1 (this change):** `.github/workflows/mobile-device-smoke.yml` runs on `workflow_dispatch` and weekdays at 04:00 UTC. Android and iOS jobs are equal; both must pass for that workflow run to be green. Maestro flows are **not** retried. Failures upload `src/QueenZone.Mobile/maestro-results/` (screenshots, JUnit, runner/app logs). A forced assertion is `workflow_dispatch` with `prove_failure=true` (runs `maestro/prove-failure.yaml`).
+
+**Phase 2 (later, do not do this silently):** after pass rate and duration are known, add `mobile-android-smoke` / `mobile-ios-smoke` to `ci.yml` that run only when `mobile=true` (binary/UI changes — **not** API-only PRs, which stay on #869 contracts), each `needs` its compile job or rebuilds Debug smoke, and emit skip-success stubs when mobile is unchanged (same pattern as `mobile-android-ok` / `mobile-ios-ok`). Then a human adds the two **check names** as required contexts on `main` and records the date on #872. Broader journeys stay nightly/on-demand.
+
+Local (repo root; no production credentials):
+
+```bash
+# Android emulator must already be running (API 36). Maestro on PATH.
+./scripts/run-mobile-device-smoke.sh --platform android
+
+# iOS Simulator (macOS only)
+./scripts/run-mobile-device-smoke.sh --platform ios
+```
+
+Linux agents cannot boot the iOS Simulator; ship the iOS workflow and Maestro flows anyway and treat iOS execution as CI-only.
 
 Local consumer contracts (no secrets, no real database; run twice to prove determinism):
 
@@ -377,7 +400,7 @@ The script starts `QueenZone.Web` with `ASPNETCORE_ENVIRONMENT=Testing` and `QUE
 
 CI/CD uses two workflows. `.github/workflows/ci.yml` runs the pull-request build, deterministic tests, coverage gates, conditional `ef-migrations`, smoke test, and required e2e merge gate. After merge, `.github/workflows/deploy.yml` resolves the `ci.yml` run that built and tested the merged PR's head commit (via merge-commit second parent, or the commit→PR association for squash/rebase merges) and reuses its `web-publish` artifact (no rebuild), then runs `migrate` (only when EF paths changed) → `deploy` (zip-pushes, Kudu recycle, polls `/warmup` **and** the new `data-build-version` on `/`) → `post-deploy-smoke`. Resolution keys off a non-expired `web-publish-*` artifact for that head SHA (`scripts/Resolve-CiPublishRun.sh`), not overall workflow `conclusion == success`: mixed web+mobile PRs keep `ci.yml` in_progress on native Mobile iOS/Android builds after required web checks (and often merge) already passed, which previously failed deploy on #860 / #866 even though the zip existed. ARM `WEBSITE_RUN_FROM_PACKAGE=1` does swap the zip, but #688 showed that skipping the extra Kudu recycle leaves `/warmup` on HTTP 500; keep the restart. Skipping migrate must not skip smoke: `post-deploy-smoke` uses `if: always()` and requires `deploy` to have succeeded. Smoke also requires `data-build-version` on `/` to match the PR-head short SHA stamped at CI build (`OverrideGitCommitShort`). The PR `ef-migrations` job uses the same migration connection string as deploy so SQL Server failures are caught before merge.
 
-Two further workflows run on a schedule only and never gate a PR merge or a deploy: `.github/workflows/nightly-legacy-checks.yml` (legacy read/write probes, then the real-data Playwright UI suite, then a residue check — see "Data Integration Tests" and "Nightly UI Regression (Real Data)" above) and `.github/workflows/livesite-readonly-sweep.yml` (the live-site read-only sweep). Both are continuous signal for catching drift, not merge gates; a failure there does not block or revert anything automatically.
+Three further workflows run on a schedule and/or `workflow_dispatch` and never gate a PR merge or a deploy: `.github/workflows/nightly-legacy-checks.yml` (legacy read/write probes, then the real-data Playwright UI suite, then a residue check — see "Data Integration Tests" and "Nightly UI Regression (Real Data)" above), `.github/workflows/livesite-readonly-sweep.yml` (the live-site read-only sweep), and `.github/workflows/mobile-device-smoke.yml` (weekday/on-demand Maestro Android + iOS smoke, #872 Phase 1). These are continuous signal, not merge gates; a failure there does not block or revert anything automatically.
 
 Pull requests that do not change the website skip `build` / `test` / coverage / smoke / e2e. Classification lives in `scripts/classify-pipeline-changes.sh`:
 

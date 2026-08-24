@@ -34,6 +34,7 @@ import { initials } from '../../ui/initials';
 import { MetaLine } from '../../ui/MetaLine';
 import { SectionErrorBlock } from '../../ui/ScreenStates';
 import { SectionHeader } from '../../ui/SectionHeader';
+import { testIds } from '../../test/testIds';
 import { profileA11yLabel } from '../messages/inboxMeta';
 import { useUnreadConversationCount } from '../messages/useUnreadConversationCount';
 import {
@@ -133,6 +134,7 @@ export function HomeScreen({ navigation }: Props) {
 
   return (
     <FlatList
+      testID={testIds.homeScreen}
       style={{ flex: 1, backgroundColor: c.surfacePage }}
       data={[]}
       renderItem={() => null}
@@ -174,8 +176,14 @@ export function HomeScreen({ navigation }: Props) {
               </Text>
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <IconButton icon={Search} accessibilityLabel="Search" onPress={() => navigation.navigate('Search')} />
+              <IconButton
+                icon={Search}
+                testID={testIds.homeSearch}
+                accessibilityLabel="Search"
+                onPress={() => navigation.navigate('Search')}
+              />
               <Pressable
+                testID={testIds.homeProfile}
                 accessibilityRole="button"
                 accessibilityLabel={profileA11yLabel(isSignedIn ? unreadCount : 0)}
                 onPress={() => navigation.navigate('Profile')}
@@ -279,6 +287,7 @@ export function HomeScreen({ navigation }: Props) {
                 <SectionErrorBlock message={news.error} onRetry={news.reload} />
               ) : hero ? (
                 <HeroFeature
+                  testID={testIds.homeHero}
                   priority="high"
                   height={300}
                   item={{

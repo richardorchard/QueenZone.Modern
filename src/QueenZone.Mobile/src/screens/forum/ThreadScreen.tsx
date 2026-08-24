@@ -22,6 +22,7 @@ import { RichHtmlBody } from '../../ui/RichHtmlBody';
 import { Button } from '../../ui/Button';
 import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from '../../ui/ScreenStates';
 import { resolveContentUrl } from '../../ui/html/resolveContentUrl';
+import { testIds } from '../../test/testIds';
 import { radius, space, type, useTheme } from '../../theme';
 import { ForumPollCard } from './ForumPollCard';
 import { pollActionErrorMessage, pollTokenRequiredMessage, shouldLoadPoll } from './forumPollMeta';
@@ -259,6 +260,7 @@ export function ThreadScreen({ navigation, route }: Props) {
 
   return (
     <FlatList
+      testID={testIds.forumThreadScreen}
       style={[styles.list, { backgroundColor: c.surfacePage }]}
       data={paged.items}
       keyExtractor={(item) => String(item.id)}

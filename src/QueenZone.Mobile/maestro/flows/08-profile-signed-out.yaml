@@ -1,0 +1,24 @@
+appId: org.queenzone.mobile
+---
+- tapOn:
+    id: tab-home
+- tapOn:
+    id: home-profile
+- extendedWaitUntil:
+    visible:
+      id: profile-signed-out
+    timeout: 15000
+- assertVisible: Join the archive
+- tapOn:
+    id: tab-forum
+- extendedWaitUntil:
+    visible:
+      id: forum-screen
+    timeout: 15000
+- tapOn:
+    id: forum-new-thread
+- extendedWaitUntil:
+    visible:
+      id: member-gate
+    timeout: 15000
+- assertVisible: Sign in

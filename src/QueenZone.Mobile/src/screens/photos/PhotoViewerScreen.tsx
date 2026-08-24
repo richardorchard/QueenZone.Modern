@@ -5,6 +5,7 @@ import { PanResponder, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ApiError, fetchPhotoDetail, type PhotoDetail } from '../../api';
 import type { PhotosStackParamList } from '../../navigation/types';
+import { testIds } from '../../test/testIds';
 import { type, useTheme } from '../../theme';
 import { ArchiveImage } from '../../ui/ArchiveImage';
 import { IconButton } from '../../ui/IconButton';
@@ -116,7 +117,7 @@ export function PhotoViewerScreen({ navigation, route }: Props) {
   const image = photoCdnSource(photo.imageUrl);
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#000' }}>
+    <View testID={testIds.photoViewerScreen} style={{ flex: 1, backgroundColor: '#000' }}>
       <View
         style={{ flex: 1 }}
         collapsable={false}

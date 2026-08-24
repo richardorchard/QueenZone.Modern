@@ -53,6 +53,17 @@ function Probe() {
         do-sign-in
       </Text>
       <Text onPress={() => void session.signOut()}>do-sign-out</Text>
+      <Text
+        onPress={() => {
+          void session.applySmokeSession('smoke-access').then((ok) => {
+            if (!ok) {
+              /* ignored — Debug-only helper */
+            }
+          });
+        }}
+      >
+        do-smoke-auth
+      </Text>
     </>
   );
 }
@@ -149,6 +160,22 @@ describe('SessionProvider', () => {
     expect(signInWithProvider).toHaveBeenCalledWith('http://qz.test', 'Google');
     expect(screen.getByText('signed-out')).toBeOnTheScreen();
     expect(clearStored).not.toHaveBeenCalled();
+  });
+
+  it('applies a Debug smoke access token without the OAuth hop', async () => {
+    const user = userEvent.setup();
+    readStored.mockResolvedValue(null);
+    renderSession();
+    await waitFor(() => expect(screen.getByText('signed-out')).toBeOnTheScreen());
+
+    await user.press(screen.getByText('do-smoke-auth'));
+    await waitFor(() => expect(screen.getByText('signed-in')).toBeOnTheScreen());
+    expect(signInWithProvider).not.toHaveBeenCalled();
+    expect(tokenStore.writeStoredSession).toHaveBeenCalledWith({
+      accessToken: 'smoke-access',
+      refreshToken: 'smoke-debug-no-refresh',
+      expiresIn: 3600,
+    });
   });
 
   it('stays signed in when profile load fails', async () => {

@@ -4,6 +4,7 @@ import { Platform, Pressable, Text, View } from 'react-native';
 import { useSession } from '../session/SessionContext';
 import { openForumComposer } from '../session/signInNavigation';
 import { fonts, useTheme } from '../theme';
+import { testIds } from '../test/testIds';
 import { IconButton } from '../ui/IconButton';
 import type { ForumStackParamList } from './types';
 
@@ -15,11 +16,19 @@ export function ComposeHeaderButton({ onPress }: { onPress: () => void }) {
   const { c } = useTheme();
 
   if (Platform.OS === 'android') {
-    return <IconButton icon={Plus} accessibilityLabel="New thread" onPress={onPress} />;
+    return (
+      <IconButton
+        icon={Plus}
+        testID={testIds.forumNewThread}
+        accessibilityLabel="New thread"
+        onPress={onPress}
+      />
+    );
   }
 
   return (
     <Pressable
+      testID={testIds.forumNewThread}
       accessibilityRole="button"
       accessibilityLabel="New thread"
       onPress={onPress}

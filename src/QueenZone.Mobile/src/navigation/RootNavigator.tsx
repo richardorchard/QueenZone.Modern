@@ -4,6 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Archive, Camera, House, MessageSquare, Newspaper, type LucideIcon } from 'lucide-react-native';
 import { Platform, View } from 'react-native';
 import { SignInScreen } from '../screens/account/SignInScreen';
+import { testIds } from '../test/testIds';
 import { useTheme, type ColorScheme } from '../theme';
 import { ArchiveStack, ForumStack, HomeStack, NewsStack, PhotosStack, stackScreenOptions } from './stacks';
 import type { RootStackParamList, RootTabParamList } from './types';
@@ -114,6 +115,7 @@ function MainTabs() {
         options={({ route }) => ({
           title: 'Home',
           tabBarAccessibilityLabel: 'Home',
+          tabBarButtonTestID: testIds.tabHome,
           tabBarIcon: tabIcon(House),
           ...hideTabBarIfDetail(c, route, 'Home'),
         })}
@@ -125,6 +127,7 @@ function MainTabs() {
         options={({ route }) => ({
           title: 'News',
           tabBarAccessibilityLabel: 'News',
+          tabBarButtonTestID: testIds.tabNews,
           tabBarIcon: tabIcon(Newspaper),
           ...hideTabBarIfDetail(c, route, 'NewsIndex'),
         })}
@@ -136,6 +139,7 @@ function MainTabs() {
         options={({ route }) => ({
           title: 'Photography',
           tabBarAccessibilityLabel: 'Photography',
+          tabBarButtonTestID: testIds.tabPhotos,
           tabBarIcon: tabIcon(Camera),
           tabBarLabelStyle: {
             fontSize: platformChrome.tabLabel,
@@ -151,6 +155,7 @@ function MainTabs() {
         options={({ route }) => ({
           title: 'Archive',
           tabBarAccessibilityLabel: 'Archive',
+          tabBarButtonTestID: testIds.tabArchive,
           tabBarIcon: tabIcon(Archive),
           ...hideTabBarIfDetail(c, route, 'ArchiveHub'),
         })}
@@ -162,6 +167,7 @@ function MainTabs() {
         options={({ route }) => ({
           title: 'Forum',
           tabBarAccessibilityLabel: 'Forum',
+          tabBarButtonTestID: testIds.tabForum,
           tabBarIcon: tabIcon(MessageSquare),
           ...hideTabBarIfDetail(c, route, 'ForumIndex'),
         })}

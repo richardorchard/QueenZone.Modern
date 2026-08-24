@@ -1,0 +1,9 @@
+appId: org.queenzone.mobile
+name: Forced assertion failure (diagnostics proof)
+---
+# Used only with --prove-failure. Must fail the job and upload artifacts.
+- launchApp:
+    clearState: true
+- assertVisible:
+    id: this-id-does-not-exist-on-purpose
+    timeout: 5000
