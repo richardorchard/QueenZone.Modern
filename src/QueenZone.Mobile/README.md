@@ -215,9 +215,29 @@ Fan performances list from `/api/v1/content/fan-performances`; streaming uses
 `GET /api/v1/content/fan-performances/{id}/audio` with the member Bearer token
 (same private `songfiles` blob as the website). Background playback and lock-screen
 controls come from `expo-audio`.
-Home → avatar → **Sign in** toggles the local session until the Epic 0 token
-client is wired. Member-only routes also render a sign-in gate so they stay
-closed while signed out.
+Home → **Member sign in**, Profile → **Sign in**, and signed-out **Sign in to
+reply / submit / New thread** all open a root Sign-in modal (Google, Microsoft,
+Discord, GitHub, Apple). After OAuth succeeds the app returns to the screen
+that asked for login, or to Profile from the Home row. Member-only routes also
+render a `MemberGate` so they stay closed while signed out.
+
+### Testing member sign-in
+
+Automated tests mock `expo-web-browser` and do not need real OAuth credentials.
+A live emulator check does: the hop is a system browser against the configured
+API host (`EXPO_PUBLIC_APP_ENV` / `EXPO_PUBLIC_API_BASE_URL`), so Google /
+Microsoft (or another listed provider) must already be enabled on that host.
+
+1. Start the development client (`npx expo run:android` or `run:ios`).
+2. From Home, tap **Member sign in** — the provider list should appear without
+   swiping anything away.
+3. Pick a provider, complete OAuth in the system browser, and confirm the app
+   dismisses Sign in and lands on Profile (or back on compose / photo submit if
+   that is what started the hop).
+4. If the custom tab stays in front of the app after the redirect, swipe it
+   away once; the app should still finish the token exchange from the deep link.
+
+Do not commit credentials. A one-off local login as a real member is enough.
 
 Rebuild the development client after this native dependency set changes
 (`react-native-screens`, `react-native-safe-area-context`, `react-native-svg`,

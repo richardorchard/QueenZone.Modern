@@ -1,6 +1,13 @@
 import { screen } from '@testing-library/react-native';
 import { RootNavigator } from './RootNavigator';
+import { createMockSession } from '../test/mockSession';
 import { renderWithProviders } from '../test/render';
+
+const mockSession = createMockSession();
+
+jest.mock('../session/SessionContext', () => ({
+  useSession: () => mockSession,
+}));
 
 jest.mock('./stacks', () => {
   const React = require('react');

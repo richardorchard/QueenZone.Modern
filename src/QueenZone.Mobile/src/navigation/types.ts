@@ -1,11 +1,20 @@
 import type { NavigatorScreenParams } from '@react-navigation/native';
 
+export type SignInReturnTo = {
+  tab: keyof RootTabParamList;
+  screen: string;
+  params?: object;
+};
+
+export type SignInParams = {
+  returnTo?: SignInReturnTo;
+};
+
 export type HomeStackParamList = {
   Home: undefined;
   Search: undefined;
   Profile: undefined;
   Settings: undefined;
-  SignIn: undefined;
   Contact: undefined;
   Inbox: undefined;
   Conversation: { id: string };
@@ -67,8 +76,13 @@ export type RootTabParamList = {
   ForumTab: NavigatorScreenParams<ForumStackParamList>;
 };
 
+export type RootStackParamList = {
+  Tabs: NavigatorScreenParams<RootTabParamList> | undefined;
+  SignIn: SignInParams | undefined;
+};
+
 declare global {
   namespace ReactNavigation {
-    interface RootParamList extends RootTabParamList {}
+    interface RootParamList extends RootStackParamList {}
   }
 }

@@ -1,7 +1,11 @@
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Plus, Search } from 'lucide-react-native';
 import { Platform, Pressable, Text, View } from 'react-native';
+import { useSession } from '../session/SessionContext';
+import { openForumComposer } from '../session/signInNavigation';
 import { fonts, useTheme } from '../theme';
 import { IconButton } from '../ui/IconButton';
+import type { ForumStackParamList } from './types';
 
 export function SearchHeaderButton({ onPress }: { onPress: () => void }) {
   return <IconButton icon={Search} accessibilityLabel="Search" onPress={onPress} />;
@@ -47,5 +51,19 @@ export function ForumHeaderRight({
       {Platform.OS === 'ios' ? <ComposeHeaderButton onPress={onCompose} /> : null}
       <SearchHeaderButton onPress={onSearch} />
     </View>
+  );
+}
+
+export function ForumIndexHeaderRight({
+  navigation,
+}: {
+  navigation: NativeStackNavigationProp<ForumStackParamList, 'ForumIndex'>;
+}) {
+  const { isSignedIn } = useSession();
+  return (
+    <ForumHeaderRight
+      onSearch={() => navigation.navigate('Search')}
+      onCompose={() => openForumComposer(navigation, isSignedIn, {})}
+    />
   );
 }

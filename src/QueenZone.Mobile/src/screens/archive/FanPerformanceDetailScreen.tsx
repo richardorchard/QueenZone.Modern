@@ -7,6 +7,7 @@ import { useFanPerformancePlayer } from '../../audio/FanPerformancePlayer';
 import { formatTrackDuration } from '../../audio/formatDuration';
 import type { ArchiveStackParamList } from '../../navigation/types';
 import { useSession } from '../../session/SessionContext';
+import { openSignIn } from '../../session/signInNavigation';
 import { ErrorBlock, LoadingBlock } from '../../ui/ScreenStates';
 import { Button } from '../../ui/Button';
 import { IconButton } from '../../ui/IconButton';
@@ -177,7 +178,13 @@ function FanPerformancePlayerPanel({ navigation, route }: Props) {
           <View style={{ marginTop: space.base }}>
             <Button
               label="Sign in"
-              onPress={() => navigation.getParent()?.navigate('HomeTab', { screen: 'SignIn' })}
+              onPress={() =>
+                openSignIn(navigation, {
+                  tab: 'ArchiveTab',
+                  screen: 'FanPerformanceDetail',
+                  params: { id },
+                })
+              }
             />
           </View>
         </View>

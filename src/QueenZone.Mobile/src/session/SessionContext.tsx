@@ -40,6 +40,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const stored = await writeStoredSession(tokens);
     setRefreshToken(stored.refreshToken);
     setExpiresAt(stored.expiresAt);
+    setSession({
+      isSignedIn: true,
+      isRestoring: false,
+      accessToken: tokens.accessToken,
+      displayName: null,
+      profile: null,
+    });
     const profile = await loadProfile(tokens.accessToken);
     setSession({
       isSignedIn: true,

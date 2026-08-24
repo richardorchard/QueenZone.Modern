@@ -6,6 +6,7 @@ import { renderWithProviders } from '../test/render';
 
 const mockSession = createMockSession();
 const mockNavigate = jest.fn();
+const mockDispatch = jest.fn();
 
 jest.mock('./SessionContext', () => ({
   useSession: () => mockSession,
@@ -15,7 +16,7 @@ jest.mock('@react-navigation/native', () => {
   const actual = jest.requireActual('@react-navigation/native');
   return {
     ...actual,
-    useNavigation: () => ({ navigate: mockNavigate }),
+    useNavigation: () => ({ navigate: mockNavigate, dispatch: mockDispatch }),
   };
 });
 
@@ -24,6 +25,7 @@ describe('MemberGate', () => {
     mockSession.isSignedIn = false;
     mockSession.isRestoring = false;
     mockNavigate.mockReset();
+    mockDispatch.mockReset();
   });
 
   it('renders nothing while session restore is in flight', () => {
@@ -38,7 +40,7 @@ describe('MemberGate', () => {
     expect(screen.queryByText('inbox')).toBeNull();
   });
 
-  it('shows a sign-in gate and routes to HomeTab SignIn', async () => {
+  it('shows a sign-in gate and opens the root SignIn modal', async () => {
     const user = userEvent.setup();
     renderWithProviders(
       <MemberGate title="Messages">
@@ -50,7 +52,12 @@ describe('MemberGate', () => {
     expect(screen.getByText(/member-only boundary/)).toBeOnTheScreen();
     expect(screen.queryByText('inbox')).toBeNull();
     await user.press(screen.getByRole('button', { name: 'Sign in' }));
-    expect(mockNavigate).toHaveBeenCalledWith('HomeTab', { screen: 'SignIn' });
+    expect(mockDispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'NAVIGATE',
+        payload: expect.objectContaining({ name: 'SignIn' }),
+      }),
+    );
   });
 
   it('renders children when signed in', () => {

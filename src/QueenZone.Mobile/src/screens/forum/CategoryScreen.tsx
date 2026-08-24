@@ -11,6 +11,8 @@ import {
 import { usePagedContent } from '../../hooks/usePagedContent';
 import { ComposeHeaderButton } from '../../navigation/headerButtons';
 import type { ForumStackParamList } from '../../navigation/types';
+import { useSession } from '../../session/SessionContext';
+import { openForumComposer } from '../../session/signInNavigation';
 import { ArticleRow } from '../../ui/ArticleRow';
 import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from '../../ui/ScreenStates';
 import { space, type, useTheme } from '../../theme';
@@ -27,6 +29,7 @@ function messageFromUnknownError(err: unknown): string {
 
 export function CategoryScreen({ navigation, route }: Props) {
   const { c } = useTheme();
+  const { isSignedIn } = useSession();
   const { id, name } = route.params;
   const [category, setCategory] = useState<ForumCategoryListItem | null>(null);
   const [categoryError, setCategoryError] = useState<string | null>(null);
@@ -65,7 +68,7 @@ export function CategoryScreen({ navigation, route }: Props) {
       headerRight: () => (
         <ComposeHeaderButton
           onPress={() =>
-            navigation.navigate('Composer', {
+            openForumComposer(navigation, isSignedIn, {
               categoryId: id,
               categoryName: boardName,
             })
@@ -73,7 +76,7 @@ export function CategoryScreen({ navigation, route }: Props) {
         />
       ),
     });
-  }, [category?.name, id, name, navigation]);
+  }, [category?.name, id, isSignedIn, name, navigation]);
 
   const retryCategory = useCallback(() => setCategoryReloadToken((n) => n + 1), []);
 

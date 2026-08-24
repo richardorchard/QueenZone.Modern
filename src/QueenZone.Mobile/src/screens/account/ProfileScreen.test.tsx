@@ -39,7 +39,12 @@ describe('ProfileScreen', () => {
     );
     expect(screen.getByText('Join the archive')).toBeOnTheScreen();
     await user.press(screen.getByRole('button', { name: 'Sign in' }));
-    expect(navigation.navigate).toHaveBeenCalledWith('SignIn');
+    expect(navigation.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'NAVIGATE',
+        payload: expect.objectContaining({ name: 'SignIn' }),
+      }),
+    );
   });
 
   it('shows member identity and sign out when signed in', async () => {
