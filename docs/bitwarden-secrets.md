@@ -91,6 +91,42 @@ which is configured separately in Azure App Service settings.
 to the same-named App Service setting before every web deployment, including rotations, and fails before
 deployment if the mapped value is missing or shorter than 32 characters.
 
+## APNs push credential
+
+The dedicated Apple Push Notification service key for `org.queenzone.mobile` is named `QueenZone APNs` in
+Apple Developer **Certificates, Identifiers & Profiles → Keys**. It is production-only and topic-specific to
+that bundle ID. The credential is separate from the Apple distribution certificate and provisioning profile
+used by the TestFlight build.
+
+Store its four runtime values as separate secrets in the `Queenzone Development` Bitwarden project, using the
+App Service setting names verbatim:
+
+| Setting | Value source |
+| --- | --- |
+| `PushNotifications__Apns__TeamId` | Apple Developer membership Team ID |
+| `PushNotifications__Apns__KeyId` | The Key ID shown for `QueenZone APNs` |
+| `PushNotifications__Apns__PrivateKeyPem` | Complete one-time `.p8` download, including the PEM header and footer |
+| `PushNotifications__Apns__Environment` | `production` |
+
+Copy the same four names and values into the `queenzone-dev` App Service configuration. These settings are
+operator-owned under ADR 0008: changing Bitwarden does not update App Service, and the deploy workflow does not
+reconcile them. Never add the `.p8` file or any private-key text to the repository, issue, PR, or logs.
+
+### APNs rotation
+
+Apple permits an Auth Key private key to be downloaded only once. Rotate with a create-test-revoke sequence so
+push delivery is not interrupted:
+
+1. In Apple Developer, register a replacement key with APNs enabled, environment `Production`, restriction
+   `Topic Specific`, and topic `org.queenzone.mobile`. Download its `.p8` immediately to a temporary local file.
+2. Update `PushNotifications__Apns__KeyId` and `PushNotifications__Apns__PrivateKeyPem` in Bitwarden. Confirm the
+   unchanged Team ID and keep `PushNotifications__Apns__Environment` set to `production`.
+3. Apply all four Bitwarden values to the same-named App Service settings, restart the app, and verify push
+   delivery to a TestFlight or App Store build. Verify setting names and value lengths only; never print values.
+4. Revoke the previous key in Apple Developer only after the replacement has delivered successfully. Delete any
+   temporary `.p8` file after Bitwarden and App Service have been verified.
+5. Record the rotation date and new Key ID in the tracking issue without recording the private key.
+
 ## Rotation and break-glass (App Service settings)
 
 [ADR 0008](decisions/0008-app-service-settings-ownership.md) keeps App Service application settings outside
