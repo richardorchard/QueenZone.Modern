@@ -5,6 +5,7 @@ import type {
   ForumPoll,
   ForumPost,
   ForumPostCreated,
+  ForumRecentThread,
   ForumTopicCreated,
   ForumTopicDetail,
   ForumTopicListItem,
@@ -16,6 +17,14 @@ function pageParams({ page, pageSize }: PageQuery) {
     page,
     pageSize,
   };
+}
+
+/** Cross-board recent-activity feed, most-recent first. Used by the home screen. */
+export function fetchForumRecentThreads(
+  count: number,
+  signal?: AbortSignal,
+): Promise<ForumRecentThread[]> {
+  return fetchJson('/forum/recent-threads', { query: { count }, signal });
 }
 
 export function fetchForumCategories(

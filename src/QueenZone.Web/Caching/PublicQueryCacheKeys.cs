@@ -30,6 +30,8 @@ public static class PublicQueryCacheKeys
 
     public const string PhotoCategoryPageSegment = Prefix + ":photo:category-page";
 
+    public const string LiveActivityNewForumReplies = Prefix + ":live-activity:new-forum-replies";
+
     public static string LatestNews(string version, int count) =>
         $"{LatestNewsSegment}:v{version}:{count}";
 

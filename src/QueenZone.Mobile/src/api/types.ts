@@ -262,6 +262,22 @@ export type ForumPollOption = {
   selectedByViewer: boolean;
 };
 
+export type ForumRecentThread = {
+  topicId: number;
+  title: string;
+  categoryId: number;
+  categoryName: string;
+  replyCount: number;
+  lastActivityAt: string;
+  detailPath: string;
+};
+
+/** Shape for `/api/v1/content/live-activity`. No presence tracking exists, so this
+ * deliberately carries only the honestly-computable forum-replies-today count. */
+export type LiveActivitySummary = {
+  newForumRepliesToday: number;
+};
+
 export type ForumPoll = {
   pollId: string;
   topicId: number;

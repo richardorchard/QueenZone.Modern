@@ -7,6 +7,7 @@ import type {
   BiographyChapterDetail,
   BiographyChapterListItem,
   FreddieTribute,
+  LiveActivitySummary,
   NewsDetail,
   NewsListItem,
   PhotoCategoryListItem,
@@ -76,6 +77,19 @@ export function fetchTimelinePage(
   query: PageQuery = {},
 ): Promise<ApiPagedResponse<TimelineEvent>> {
   return fetchJson('/content/timeline', { query: pageParams(query), signal: query.signal });
+}
+
+/** The single most notable history event for today's date, or null when there is none. */
+export function fetchOnThisDay(signal?: AbortSignal): Promise<TimelineEvent | null> {
+  return fetchJson('/content/on-this-day', { signal });
+}
+
+/**
+ * Count of new forum replies posted today. No presence/reading tracking exists, so this is
+ * the only honest live signal for the home screen's activity strip.
+ */
+export function fetchLiveActivity(signal?: AbortSignal): Promise<LiveActivitySummary> {
+  return fetchJson('/content/live-activity', { signal });
 }
 
 export function fetchFreddieTributePage(

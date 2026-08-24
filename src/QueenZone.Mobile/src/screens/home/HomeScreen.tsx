@@ -1,89 +1,134 @@
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { Search } from 'lucide-react-native';
-import { Image } from 'expo-image';
-import { useCallback } from 'react';
-import { FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
+import { ChevronRight, Search } from 'lucide-react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { FlatList, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { media } from '../../content/media';
 import {
-  archiveShort,
-  featuredStories,
-  homeLead,
-  onThisDay,
-  sampleThreads,
-  type ArchiveDestination,
-  type FeatureItem,
-} from '../../content/sample';
+  fetchForumRecentThreads,
+  fetchInbox,
+  fetchLiveActivity,
+  fetchNewsPage,
+  fetchOnThisDay,
+  fetchPhotoCategories,
+  type ForumRecentThread,
+  type InboxConversation,
+  type NewsListItem,
+  type PhotoCategoryListItem,
+} from '../../api';
+import { media } from '../../content/media';
+import { useHomeSection } from '../../hooks/useHomeSection';
 import type { HomeStackParamList, RootTabParamList } from '../../navigation/types';
 import { useSession } from '../../session/SessionContext';
-import { fonts, space, type, useTheme } from '../../theme';
+import { fonts, radius, space, type, useTheme } from '../../theme';
 import { ArchiveFooter } from '../../ui/ArchiveFooter';
+import { ArchiveImage } from '../../ui/ArchiveImage';
+import { Chip } from '../../ui/Chip';
+import { Eyebrow } from '../../ui/Eyebrow';
 import { FeatureBlock } from '../../ui/FeatureBlock';
-import { FeatureRail } from '../../ui/FeatureRail';
 import { HeroFeature } from '../../ui/HeroFeature';
 import { IconButton } from '../../ui/IconButton';
+import { initials } from '../../ui/initials';
 import { MetaLine } from '../../ui/MetaLine';
+import { SectionErrorBlock } from '../../ui/ScreenStates';
 import { SectionHeader } from '../../ui/SectionHeader';
-import { ChevronRight } from 'lucide-react-native';
 import { profileA11yLabel } from '../messages/inboxMeta';
 import { useUnreadConversationCount } from '../messages/useUnreadConversationCount';
+import {
+  formatForumThreadMeta,
+  formatGalleryCardMeta,
+  homeFilters,
+  liveStripIsVisible,
+  liveStripLabel,
+  onThisDayIsVisible,
+  stockImageIndexForId,
+  visibleSectionsForFilter,
+  type HomeFilterKey,
+} from './homeMeta';
 
 type Props = CompositeScreenProps<
   NativeStackScreenProps<HomeStackParamList, 'Home'>,
   BottomTabScreenProps<RootTabParamList>
 >;
 
-function initials(name: string | null): string {
-  if (!name) {
-    return '';
-  }
-  const parts = name.replace(/_/g, ' ').trim().split(/\s+/);
-  if (parts.length === 1) {
-    return parts[0].slice(0, 2).toUpperCase();
-  }
-  return `${parts[0][0] ?? ''}${parts[1][0] ?? ''}`.toUpperCase();
+const stockImages = [media.hero, media.stage, media.crowd, media.portrait, media.studio];
+
+function stockImageForId(id: number): number {
+  return stockImages[stockImageIndexForId(id, stockImages.length)];
 }
 
 export function HomeScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
-  const { c } = useTheme();
-  const { isSignedIn, displayName } = useSession();
+  const { c, mode } = useTheme();
+  const { isSignedIn, displayName, accessToken } = useSession();
   const unreadCount = useUnreadConversationCount();
   const avatar = isSignedIn ? initials(displayName) : '';
+  const [filter, setFilter] = useState<HomeFilterKey>('all');
+  const visibleSections = useMemo(() => visibleSectionsForFilter(filter), [filter]);
+  const [manualRefreshing, setManualRefreshing] = useState(false);
 
-  const openStory = useCallback(() => {
-    navigation.navigate('ArchiveTab', { screen: 'Story', params: { id: 0 } });
-  }, [navigation]);
+  const news = useHomeSection(
+    useCallback((signal) => fetchNewsPage({ page: 1, pageSize: 4, signal }), []),
+  );
+  const forum = useHomeSection(
+    useCallback((signal) => fetchForumRecentThreads(3, signal), []),
+  );
+  const gallery = useHomeSection(
+    useCallback((signal) => fetchPhotoCategories({ page: 1, pageSize: 3, signal }), []),
+  );
+  const onThisDay = useHomeSection(useCallback((signal) => fetchOnThisDay(signal), []));
+  const liveActivity = useHomeSection(useCallback((signal) => fetchLiveActivity(signal), []));
+  const messages = useHomeSection(
+    useCallback(
+      (signal) =>
+        isSignedIn && accessToken
+          ? fetchInbox(accessToken, { pageSize: 2, signal })
+          : Promise.resolve(null),
+      [isSignedIn, accessToken],
+    ),
+    [isSignedIn, accessToken],
+  );
 
-  const openFeature = useCallback(
-    (_item: FeatureItem) => {
-      navigation.navigate('ArchiveTab', { screen: 'Story', params: { id: 0 } });
+  const openNewsStory = useCallback(
+    (id: number) => {
+      navigation.navigate('NewsTab', { screen: 'Story', params: { id } });
     },
     [navigation],
   );
 
-  const openArchiveRow = useCallback(
-    (row: ArchiveDestination) => {
-      if (row.id === 'stories') {
-        navigation.navigate('ArchiveTab', { screen: 'Stories' });
-        return;
-      }
-      if (row.id === 'timeline') {
-        navigation.navigate('ArchiveTab', { screen: 'Timeline' });
-        return;
-      }
-      if (row.id === 'biography') {
-        navigation.navigate('ArchiveTab', { screen: 'Biography' });
-        return;
-      }
-      if (row.id === 'discography') {
-        navigation.navigate('ArchiveTab', { screen: 'Discography' });
-      }
+  const openThread = useCallback(
+    (thread: ForumRecentThread) => {
+      navigation.navigate('ForumTab', { screen: 'Thread', params: { id: thread.topicId, title: thread.title } });
     },
     [navigation],
   );
+
+  const openGalleryCategory = useCallback(
+    (category: PhotoCategoryListItem) => {
+      navigation.navigate('PhotosTab', { screen: 'PhotoCategory', params: { slug: category.slug, name: category.name } });
+    },
+    [navigation],
+  );
+
+  const refreshAll = useCallback(() => {
+    setManualRefreshing(true);
+    news.reload();
+    forum.reload();
+    gallery.reload();
+    onThisDay.reload();
+    liveActivity.reload();
+    messages.reload();
+    // Sections resolve independently; the pull spinner is a short, fixed-feeling gesture
+    // rather than tracking every section's own loading flag.
+    setTimeout(() => setManualRefreshing(false), 600);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const newsItems = news.data?.items ?? [];
+  const hero = newsItems[0] ?? null;
+  const latestNews = newsItems.slice(1, 4);
+  const totalNewsCount = news.data?.totalCount ?? 0;
 
   return (
     <FlatList
@@ -91,180 +136,456 @@ export function HomeScreen({ navigation }: Props) {
       data={[]}
       renderItem={() => null}
       refreshing={false}
-      refreshControl={<RefreshControl refreshing={false} tintColor={c.accentPrimary} />}
+      refreshControl={
+        <RefreshControl refreshing={manualRefreshing} onRefresh={refreshAll} tintColor={c.accentPrimary} />
+      }
       ListHeaderComponent={
         <>
-          <View>
-            <HeroFeature item={homeLead} onPress={openStory} />
-            <View
-              pointerEvents="box-none"
-              style={{
-                position: 'absolute',
-                top: insets.top + 8,
-                left: 20,
-                right: 12,
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
-                <Image
-                  source={media.crestWhite}
-                  style={{ height: 26, width: 26 }}
-                  contentFit="contain"
-                  importantForAccessibility="no"
-                  accessibilityElementsHidden
-                />
-                <Text
+          <View
+            style={{
+              paddingTop: insets.top + 10,
+              paddingHorizontal: space.xl,
+              paddingBottom: space.md,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              backgroundColor: c.surfacePage,
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
+              <ArchiveImage
+                source={mode === 'dark' ? media.crestWhite : media.crestBlack}
+                label="Queenzone crest"
+                style={{ height: 24, width: 24 }}
+                contentFit="contain"
+              />
+              <Text
+                style={{
+                  fontFamily: fonts.titling,
+                  fontSize: 13,
+                  fontWeight: '600',
+                  letterSpacing: 2.3,
+                  textTransform: 'uppercase',
+                  color: c.textPrimary,
+                }}
+              >
+                Queenzone
+              </Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <IconButton icon={Search} accessibilityLabel="Search" onPress={() => navigation.navigate('Search')} />
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={profileA11yLabel(isSignedIn ? unreadCount : 0)}
+                onPress={() => navigation.navigate('Profile')}
+                style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
+              >
+                <View
                   style={{
-                    fontFamily: fonts.titling,
-                    fontSize: 13,
-                    fontWeight: '600',
-                    letterSpacing: 2.3,
-                    textTransform: 'uppercase',
-                    color: c.textPrimary,
+                    width: 32,
+                    height: 32,
+                    borderRadius: 16,
+                    backgroundColor: c.surfaceCard,
+                    borderWidth: 1,
+                    borderColor: c.border,
+                    alignItems: 'center',
+                    justifyContent: 'center',
                   }}
                 >
-                  Queenzone
-                </Text>
-              </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <IconButton
-                  icon={Search}
-                  accessibilityLabel="Search"
-                  onPress={() => navigation.navigate('Search')}
-                />
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={profileA11yLabel(isSignedIn ? unreadCount : 0)}
-                  onPress={() => navigation.navigate('Profile')}
-                  style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
-                >
+                  <Text style={{ fontFamily: fonts.bodyMedium, fontSize: 12, color: c.textPrimary }}>
+                    {avatar || '·'}
+                  </Text>
+                </View>
+                {isSignedIn && unreadCount > 0 ? (
                   <View
                     style={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: 16,
-                      backgroundColor: 'rgba(17,17,17,0.55)',
-                      borderWidth: 1,
-                      borderColor: 'rgba(255,255,255,0.4)',
+                      position: 'absolute',
+                      top: 2,
+                      right: 2,
+                      minWidth: 16,
+                      height: 16,
+                      borderRadius: 8,
+                      paddingHorizontal: 4,
+                      backgroundColor: c.accentPrimary,
                       alignItems: 'center',
                       justifyContent: 'center',
                     }}
+                    importantForAccessibility="no"
+                    accessibilityElementsHidden
                   >
-                    <Text style={{ fontFamily: fonts.bodyMedium, fontSize: 12, color: c.textPrimary }}>
-                      {avatar || '·'}
+                    <Text
+                      style={{
+                        fontFamily: fonts.bodyMedium,
+                        fontSize: 9,
+                        lineHeight: 11,
+                        color: c.textOnAccent,
+                      }}
+                    >
+                      {unreadCount > 99 ? '99+' : unreadCount}
                     </Text>
                   </View>
-                  {isSignedIn && unreadCount > 0 ? (
-                    <View
-                      style={{
-                        position: 'absolute',
-                        top: 2,
-                        right: 2,
-                        minWidth: 16,
-                        height: 16,
-                        borderRadius: 8,
-                        paddingHorizontal: 4,
-                        backgroundColor: c.accentPrimary,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                      importantForAccessibility="no"
-                      accessibilityElementsHidden
-                    >
-                      <Text
-                        style={{
-                          fontFamily: fonts.bodyMedium,
-                          fontSize: 9,
-                          lineHeight: 11,
-                          color: c.textOnAccent,
-                        }}
-                      >
-                        {unreadCount > 99 ? '99+' : unreadCount}
-                      </Text>
-                    </View>
-                  ) : null}
-                </Pressable>
-              </View>
+                ) : null}
+              </Pressable>
             </View>
           </View>
 
-          <SectionHeader
-            title="Featured stories"
-            actionLabel="All"
-            onAction={() => navigation.navigate('NewsTab', { screen: 'NewsIndex' })}
-          />
-          <FeatureRail items={featuredStories} onOpen={openFeature} />
-
-          <FeatureBlock
-            eyebrow={onThisDay.eyebrow}
-            numeral={onThisDay.numeral}
-            body={onThisDay.body}
-            actionLabel={onThisDay.actionLabel}
-            onAction={openStory}
-          />
-
-          <SectionHeader
-            title="Explore the archive"
-            actionLabel="All"
-            onAction={() => navigation.navigate('ArchiveTab', { screen: 'ArchiveHub' })}
-          />
-          {archiveShort.map((row) => (
-            <Pressable
-              key={row.id}
-              accessible
-              accessibilityRole="button"
-              accessibilityLabel={`${row.title}. ${row.meta.join(', ')}`}
-              onPress={() => openArchiveRow(row)}
+          {!liveActivity.loading && liveActivity.data && liveStripIsVisible(liveActivity.data.newForumRepliesToday) ? (
+            <View
               style={{
-                marginHorizontal: space.xl,
-                paddingVertical: 13,
+                backgroundColor: '#181614',
+                paddingVertical: 9,
+                paddingHorizontal: space.xl,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 8,
+              }}
+            >
+              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#B89A4A' }} />
+              <Text
+                numberOfLines={1}
+                style={{ fontFamily: fonts.body, fontSize: 12, color: 'rgba(255,255,255,0.72)' }}
+              >
+                {liveStripLabel(liveActivity.data.newForumRepliesToday)}
+              </Text>
+            </View>
+          ) : null}
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{
+              paddingHorizontal: space.xl,
+              paddingTop: space.md,
+              paddingBottom: space.md,
+              gap: 8,
+            }}
+          >
+            {homeFilters.map((option) => (
+              <Chip
+                key={option.key}
+                label={option.label}
+                active={filter === option.key}
+                onPress={() => setFilter(option.key)}
+              />
+            ))}
+          </ScrollView>
+
+          {visibleSections.has('hero') && (
+            <>
+              {news.loading && !hero ? (
+                <View style={{ height: 300, backgroundColor: c.surfaceCard }} />
+              ) : news.error && !hero ? (
+                <SectionErrorBlock message={news.error} onRetry={news.reload} />
+              ) : hero ? (
+                <HeroFeature
+                  priority="high"
+                  height={300}
+                  item={{
+                    kicker: 'Lead story',
+                    title: hero.title,
+                    standfirst: hero.excerpt,
+                    meta: [],
+                    image: stockImageForId(hero.id),
+                  }}
+                  onPress={() => openNewsStory(hero.id)}
+                />
+              ) : null}
+            </>
+          )}
+
+          {visibleSections.has('news') && (
+            <>
+              <SectionHeader
+                title="Latest news"
+                actionLabel={totalNewsCount > 0 ? `All ${totalNewsCount.toLocaleString()}+` : 'All'}
+                onAction={() => navigation.navigate('NewsTab', { screen: 'NewsIndex' })}
+              />
+              {news.loading && latestNews.length === 0 ? (
+                <View style={{ paddingHorizontal: space.xl, gap: 14 }}>
+                  {[0, 1, 2].map((key) => (
+                    <View key={key} style={{ height: 76, backgroundColor: c.surfaceCard, borderRadius: radius.xs }} />
+                  ))}
+                </View>
+              ) : news.error && latestNews.length === 0 ? (
+                <SectionErrorBlock message={news.error} onRetry={news.reload} />
+              ) : (
+                latestNews.map((item: NewsListItem) => (
+                  <Pressable
+                    key={item.id}
+                    accessible
+                    accessibilityRole="button"
+                    accessibilityLabel={item.title}
+                    onPress={() => openNewsStory(item.id)}
+                    style={{
+                      marginHorizontal: space.xl,
+                      paddingVertical: 14,
+                      borderTopWidth: 1,
+                      borderTopColor: c.hairline,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 14,
+                    }}
+                  >
+                    <View style={{ flex: 1, gap: 6 }}>
+                      <Eyebrow tone="accent" size={10}>
+                        {new Date(item.publishedAt).toLocaleDateString(undefined, {
+                          day: 'numeric',
+                          month: 'long',
+                          year: 'numeric',
+                        })}
+                      </Eyebrow>
+                      <Text numberOfLines={2} style={[type.listTitle, { color: c.textPrimary }]}>
+                        {item.title}
+                      </Text>
+                    </View>
+                    <ArchiveImage
+                      source={stockImageForId(item.id)}
+                      label={item.title}
+                      priority="low"
+                      style={{ width: 76, height: 76, borderRadius: radius.xs }}
+                    />
+                  </Pressable>
+                ))
+              )}
+            </>
+          )}
+
+          {visibleSections.has('forum') && (
+            <View style={{ marginTop: space.xxl, backgroundColor: '#181614', paddingVertical: 26, paddingHorizontal: space.xl }}>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: space.md }}>
+                <View style={{ gap: 6 }}>
+                  <Eyebrow tone="onDark" size={10}>The community</Eyebrow>
+                  <Text style={[type.pageTitle, { color: '#F2F1ED', fontSize: 23 }]}>In the forum</Text>
+                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => navigation.navigate('ForumTab', { screen: 'ForumIndex' })}
+                  hitSlop={8}
+                >
+                  <Text
+                    style={{
+                      fontFamily: fonts.bodyMedium,
+                      fontSize: 12,
+                      letterSpacing: 0.7,
+                      textTransform: 'uppercase',
+                      color: 'rgba(255,255,255,0.66)',
+                    }}
+                  >
+                    Enter
+                  </Text>
+                </Pressable>
+              </View>
+
+              {forum.loading && (forum.data?.length ?? 0) === 0 ? (
+                <View style={{ gap: 12 }}>
+                  {[0, 1, 2].map((key) => (
+                    <View key={key} style={{ height: 44, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: radius.xs }} />
+                  ))}
+                </View>
+              ) : forum.error && (forum.data?.length ?? 0) === 0 ? (
+                <SectionErrorBlock message={forum.error} onRetry={forum.reload} />
+              ) : (
+                (forum.data ?? []).map((thread, index) => (
+                  <Pressable
+                    key={thread.topicId}
+                    accessible
+                    accessibilityRole="button"
+                    accessibilityLabel={thread.title}
+                    onPress={() => openThread(thread)}
+                    style={{
+                      paddingVertical: 14,
+                      borderTopWidth: 1,
+                      borderTopColor: 'rgba(255,255,255,0.16)',
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 12,
+                    }}
+                  >
+                    <View
+                      style={{
+                        width: 34,
+                        height: 34,
+                        borderRadius: 17,
+                        backgroundColor: 'rgba(255,255,255,0.10)',
+                        borderWidth: 1,
+                        borderColor: 'rgba(255,255,255,0.18)',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Text style={{ fontFamily: fonts.display, fontSize: 12, color: 'rgba(255,255,255,0.85)' }}>
+                        {initials(thread.categoryName)}
+                      </Text>
+                    </View>
+                    <View style={{ flex: 1, gap: 4 }}>
+                      <Text numberOfLines={2} style={{ fontFamily: fonts.bodyMedium, fontSize: 14.5, color: '#FFFFFF' }}>
+                        {thread.title}
+                      </Text>
+                      <MetaLine parts={formatForumThreadMeta(thread)} />
+                    </View>
+                    {index === 0 ? (
+                      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#B89A4A' }} />
+                    ) : null}
+                  </Pressable>
+                ))
+              )}
+            </View>
+          )}
+
+          {visibleSections.has('gallery') && (
+            <>
+              <SectionHeader
+                title="New in the gallery"
+                actionLabel="Browse"
+                onAction={() => navigation.navigate('PhotosTab', { screen: 'PhotoIndex' })}
+              />
+              {gallery.loading && (gallery.data?.items.length ?? 0) === 0 ? (
+                <View style={{ flexDirection: 'row', paddingHorizontal: space.xl, gap: 10 }}>
+                  {[0, 1, 2].map((key) => (
+                    <View key={key} style={{ width: 148, height: 148, backgroundColor: c.surfaceCard, borderRadius: radius.xs }} />
+                  ))}
+                </View>
+              ) : gallery.error && (gallery.data?.items.length ?? 0) === 0 ? (
+                <SectionErrorBlock message={gallery.error} onRetry={gallery.reload} />
+              ) : (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ paddingHorizontal: space.xl, gap: 10 }}
+                >
+                  {(gallery.data?.items ?? []).map((category) => (
+                    <Pressable
+                      key={category.catId}
+                      accessible
+                      accessibilityRole="button"
+                      accessibilityLabel={category.name}
+                      onPress={() => openGalleryCategory(category)}
+                      style={{ width: 148, gap: 9 }}
+                    >
+                      {category.coverThumbnailUrl ? (
+                        <ArchiveImage
+                          source={{ uri: category.coverThumbnailUrl }}
+                          label={category.name}
+                          priority="low"
+                          style={{ width: 148, height: 148, borderRadius: radius.xs }}
+                        />
+                      ) : (
+                        <View style={{ width: 148, height: 148, borderRadius: radius.xs, backgroundColor: c.surfaceCard }} />
+                      )}
+                      <Text style={[type.cardTitle, { fontSize: 14, color: c.textPrimary }]}>{category.name}</Text>
+                      <MetaLine parts={[formatGalleryCardMeta(category)]} />
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              )}
+            </>
+          )}
+
+          {isSignedIn ? (
+            <View
+              style={{
+                marginTop: space.xxl,
+                backgroundColor: c.surfaceRaised,
+                paddingVertical: 26,
+                paddingHorizontal: space.xl,
+                borderTopWidth: 1,
                 borderBottomWidth: 1,
-                borderBottomColor: c.hairline,
+                borderColor: c.hairline,
+              }}
+            >
+              <SectionHeader
+                title="Your messages"
+                actionLabel="Inbox"
+                onAction={() => navigation.navigate('Inbox')}
+              />
+              {messages.loading && (messages.data?.items.length ?? 0) === 0 ? (
+                <View style={{ gap: 12 }}>
+                  {[0, 1].map((key) => (
+                    <View key={key} style={{ height: 44, backgroundColor: c.surfaceCard, borderRadius: radius.xs }} />
+                  ))}
+                </View>
+              ) : messages.error && (messages.data?.items.length ?? 0) === 0 ? (
+                <SectionErrorBlock message={messages.error} onRetry={messages.reload} />
+              ) : (messages.data?.items.length ?? 0) === 0 ? null : (
+                messages.data!.items.map((conversation: InboxConversation) => (
+                  <Pressable
+                    key={conversation.conversationId}
+                    accessible
+                    accessibilityRole="button"
+                    accessibilityLabel={conversation.otherParticipantDisplayName}
+                    onPress={() => navigation.navigate('Conversation', { id: conversation.conversationId })}
+                    style={{
+                      paddingVertical: 13,
+                      borderTopWidth: 1,
+                      borderTopColor: c.hairline,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 12,
+                    }}
+                  >
+                    <View
+                      style={{
+                        width: 34,
+                        height: 34,
+                        borderRadius: 17,
+                        backgroundColor: c.surfaceSheet,
+                        borderWidth: 1,
+                        borderColor: c.border,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Text style={{ fontFamily: fonts.display, fontSize: 12, color: c.textPrimary }}>
+                        {initials(conversation.otherParticipantDisplayName)}
+                      </Text>
+                    </View>
+                    <View style={{ flex: 1, gap: 4 }}>
+                      <Text style={{ fontFamily: fonts.bodySemi, fontSize: 14.5, color: c.textPrimary }}>
+                        {conversation.otherParticipantDisplayName}
+                      </Text>
+                      <Text numberOfLines={1} style={[type.body, { fontSize: 13, color: c.textSecondary }]}>
+                        {conversation.lastMessagePreview}
+                      </Text>
+                    </View>
+                    {conversation.hasUnread ? (
+                      <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: c.accentPrimary }} />
+                    ) : null}
+                  </Pressable>
+                ))
+              )}
+            </View>
+          ) : (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Member sign in"
+              onPress={() => navigation.navigate('SignIn')}
+              style={{
+                marginTop: space.xxl,
+                backgroundColor: c.surfaceRaised,
+                paddingVertical: 18,
+                paddingHorizontal: space.xl,
+                borderTopWidth: 1,
+                borderBottomWidth: 1,
+                borderColor: c.hairline,
                 flexDirection: 'row',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                gap: 14,
               }}
             >
-              <View style={{ flex: 1, gap: 5 }}>
-                <Text style={[type.cardTitle, { fontSize: 20, lineHeight: 24, color: c.textPrimary }]}>
-                  {row.title}
-                </Text>
-                <MetaLine parts={row.meta} />
-              </View>
+              <Text style={[type.body, { color: c.textSecondary }]}>Member sign in</Text>
               <ChevronRight size={17} color={c.textMuted} strokeWidth={1.5} />
             </Pressable>
-          ))}
+          )}
 
-          <SectionHeader
-            title="Popular discussions"
-            actionLabel="Forum"
-            onAction={() => navigation.navigate('ForumTab', { screen: 'ForumIndex' })}
-          />
-          {sampleThreads.slice(0, 3).map((thread) => (
-            <Pressable
-              key={thread.id}
-              accessible
-              accessibilityRole="button"
-              accessibilityLabel={thread.title}
-              onPress={() => navigation.navigate('ForumTab', { screen: 'Thread', params: { id: thread.id } })}
-              style={{
-                marginHorizontal: space.xl,
-                paddingVertical: 14,
-                borderBottomWidth: 1,
-                borderBottomColor: c.hairline,
-                gap: 7,
-              }}
-            >
-              <Text numberOfLines={2} style={[type.listTitle, { color: c.textPrimary }]}>
-                {thread.title}
-              </Text>
-              <MetaLine parts={[thread.author, thread.board]} />
-            </Pressable>
-          ))}
+          {visibleSections.has('onThisDay') && !onThisDay.loading && onThisDayIsVisible(onThisDay.data) ? (
+            <FeatureBlock
+              eyebrow="On this day"
+              numeral={onThisDay.data!.formattedDate.toUpperCase()}
+              body={onThisDay.data!.summary}
+              actionLabel="View timeline"
+              onAction={() => navigation.navigate('ArchiveTab', { screen: 'Timeline' })}
+            />
+          ) : null}
 
           <ArchiveFooter />
         </>

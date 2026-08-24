@@ -41,6 +41,30 @@ export function ErrorBlock({ message, onRetry }: StateProps) {
   );
 }
 
+/**
+ * Compact inline retry for one section of a screen with several independent sections
+ * (e.g. Home). Same visual language as `ErrorBlock` but sized to sit within a section's
+ * slot instead of filling the screen.
+ */
+export function SectionErrorBlock({ message, onRetry }: StateProps) {
+  const { c } = useTheme();
+  return (
+    <View style={[styles.section, { paddingHorizontal: space.xl }]}>
+      <Text style={[type.body, { color: c.textSecondary }]}>{message}</Text>
+      {onRetry ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Try again"
+          onPress={onRetry}
+          hitSlop={8}
+        >
+          <Text style={[type.button, { color: c.accentPrimary, marginTop: space.xs }]}>Retry</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
 export function EmptyBlock({ message }: { message: string }) {
   const { c } = useTheme();
   return (
@@ -78,6 +102,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderRadius: radius.xs,
+  },
+  section: {
+    paddingVertical: space.lg,
   },
   footer: {
     paddingVertical: space.xl,
