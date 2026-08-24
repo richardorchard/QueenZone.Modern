@@ -1,8 +1,8 @@
 {
   "auditDate": "2026-08-12",
-  "refreshedDate": "2026-08-15",
+  "refreshedDate": "2026-08-24",
   "issue": 624,
-  "refreshNotes": "Re-listed App Service setting names and GitHub environments after #666 ARM deploy-settings work. Secret values were not recorded. Azure/Cloudflare resource IDs were not re-probed.",
+  "refreshNotes": "Added the four live APNs App Service setting names created for #846. Secret values were not recorded. GitHub environments and Azure/Cloudflare resource IDs were not re-probed.",
   "github": {
     "environments": [
       {
@@ -100,6 +100,10 @@
       "Authentication__Microsoft__ClientId",
       "Authentication__Microsoft__ClientSecret",
       "MobileAuth__SigningKey",
+      "PushNotifications__Apns__Environment",
+      "PushNotifications__Apns__KeyId",
+      "PushNotifications__Apns__PrivateKeyPem",
+      "PushNotifications__Apns__TeamId",
       "AZURE_WEBAPP_PUBLISH_PROFILE",
       "AzureAd__CallbackPath",
       "AzureAd__ClientId",
@@ -136,6 +140,10 @@
     "Authentication__Microsoft__ClientId",
     "Authentication__Microsoft__ClientSecret",
     "MobileAuth__SigningKey",
+    "PushNotifications__Apns__Environment",
+    "PushNotifications__Apns__KeyId",
+    "PushNotifications__Apns__PrivateKeyPem",
+    "PushNotifications__Apns__TeamId",
     "BlobUpload__PublicBaseUrl",
     "ConnectionStrings__BlobStorage",
     "ConnectionStrings__QueenZoneLegacy",
