@@ -63,8 +63,9 @@ npm run preflight
 
 `npm run preflight` runs typecheck, the unit tests, and the lockfile-pinned
 Expo Doctor check (`npm run doctor`). Doctor must pass all checks after a
-clean `npm ci`. A required CI/publish Doctor gate is tracked in #870; run
-the same `npm run doctor` command locally before opening a mobile PR.
+clean `npm ci`. CI `mobile-js` and the Android/TestFlight publish workflows
+run the same `npm run preflight` command. New `*.test.ts` / `*.test.tsx`
+files under `src/` are discovered automatically.
 
 SDK 57 always uses React Native's New Architecture, so `app.json` does not
 set `newArchEnabled` (the field is no longer in the config schema). Splash
@@ -226,15 +227,53 @@ npx expo run:android
 
 ## CI build pipeline
 
-`mobile-js` (typecheck + unit tests), `mobile-android`, and `mobile-ios`
-(native compile) in [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)
-run whenever `src/QueenZone.Mobile/` changes, or on demand via
-`workflow_dispatch`. Local preflight is `npm run preflight` (typecheck, unit
-tests, and lockfile-pinned `npm run doctor`). Making Doctor a required
-`mobile-js` / publish check is #870. `mobile-android` builds an unsigned debug APK on a
-GitHub-hosted Linux runner; `mobile-ios` builds an unsigned Simulator `.app`
-(zipped) on a GitHub-hosted macOS runner — no Apple account or signing
-credentials are used. Both jobs upload their build as a workflow artifact
+`mobile-js`, `mobile-android`, and `mobile-ios` in
+[`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) run whenever
+`src/QueenZone.Mobile/` changes, or on demand via `workflow_dispatch`.
+Path classification lives in `scripts/classify-pipeline-changes.sh`
+(mobile-only PRs skip the .NET suite; mixed PRs run both; docs-only PRs
+run neither).
+
+Local preflight after a clean install:
+
+```powershell
+cd src/QueenZone.Mobile
+npm ci
+npm run preflight
+```
+
+`npm test` discovers every `src/**/*.test.ts` and `src/**/*.test.tsx` file.
+Do not add new tests to a path list in `package.json`. `npm run preflight`
+is typecheck + those tests + lockfile-pinned `npm run doctor`.
+
+PR check **names** (job `name:` values; these are the strings to require on
+`main`):
+
+| Check name | What it is | What it is not |
+| --- | --- | --- |
+| `Mobile typecheck and unit tests` | `npm ci` + `npm run preflight` | Native compile or device E2E |
+| `Mobile Android build` | Unsigned debug APK compile | Play-store signing or device E2E |
+| `Mobile iOS build` | Unsigned Simulator compile | TestFlight signing or device E2E |
+
+Android and iOS are equal: a mobile PR cannot skip either native compile.
+Non-mobile PRs get skip-success stubs with those same names so required
+checks are not left pending (same idea as `test-docs-ok`).
+
+**Branch protection is repository settings, not YAML.** A human must add
+those three names as required status checks on `main` after merge. Live
+required contexts on 2026-08-24 did **not** yet include them; see
+`docs/architecture/testing-policy.md`.
+
+The unsigned jobs are PR compile checks only. Publishing runs the same
+`npm run preflight` against `github.sha` **before** signing or upload:
+[`publish-mobile-test-build.yml`](../../.github/workflows/publish-mobile-test-build.yml)
+and [`publish-ios-testflight.yml`](../../.github/workflows/publish-ios-testflight.yml).
+A failed or cancelled preflight skips publication.
+
+`mobile-android` builds an unsigned debug APK on a GitHub-hosted Linux
+runner; `mobile-ios` builds an unsigned Simulator `.app` (zipped) on a
+GitHub-hosted macOS runner — no Apple account or signing credentials are
+used. Both jobs upload their build as a workflow artifact
 (`mobile-android-<run-id>` / `mobile-ios-<run-id>`), downloadable from the
 run's summary page for one day.
 

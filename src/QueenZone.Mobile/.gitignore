@@ -39,6 +39,10 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
+# Written by scripts/run-tests.mjs during the discovery self-check.
+src/discovery-probe-*.test.ts
+src/.discovery-probe-*.test.ts
+
 # Generated native projects (Continuous Native Generation).
 /ios
 /android

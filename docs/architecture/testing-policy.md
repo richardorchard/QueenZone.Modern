@@ -332,9 +332,25 @@ These gates are guardrails, not a replacement for useful assertions. New or chan
 | `ef-migrations` | When migration-related paths change: snapshot check + `database update` on Azure SQL | Yes (same-repo PRs only; skipped otherwise) |
 | `smoke-test` | Published app, curl `/health`, `/`, `/news` (starts after `build`, overlaps shards/coverage) | Yes |
 | `e2e-test` | Playwright suite on a self-hosted `e2e` runner (Windows or macOS; starts after `build`, overlaps coverage) | Yes (required PR merge gate) |
-| `mobile-js` | Node typecheck + unit tests in `src/QueenZone.Mobile` | When that tree changes |
+| `mobile-js` | `npm ci` + `npm run preflight` in `src/QueenZone.Mobile` (typecheck, discovered unit tests, pinned Expo Doctor) | Yes — required on `main` after #870; skip-success stub when that tree is unchanged |
+| `mobile-android` | Unsigned debug APK compile (GitHub-hosted Linux) | Yes — required on `main` after #870; skip-success stub when that tree is unchanged |
+| `mobile-ios` | Unsigned Simulator compile (GitHub-hosted macOS) | Yes — required on `main` after #870; skip-success stub when that tree is unchanged |
 
-From `src/QueenZone.Mobile`, `npm run preflight` is the shared local mobile preflight: typecheck, unit tests, and `npm run doctor` (lockfile-pinned `expo-doctor`). Making Doctor a required PR/publish check is #870.
+Local mobile validation from `src/QueenZone.Mobile` is a clean `npm ci` then `npm run preflight`. `npm test` discovers every `src/**/*.test.ts` and `src/**/*.test.tsx` file (no package.json path list) and self-checks that an unlisted probe file still runs. `npm run preflight` is typecheck + those tests + `npm run doctor` (lockfile-pinned `expo-doctor`).
+
+These three **GitHub check names** (the job `name:` values in `ci.yml`) must be required contexts on protected `main`. A workflow file cannot enable branch protection; a human with repo admin access has to add them after this change merges:
+
+- `Mobile typecheck and unit tests`
+- `Mobile Android build`
+- `Mobile iOS build`
+
+**Live `main` required contexts** (queried 2026-08-24; mobile names are **not** in this list yet): `build`, `test (0)`, `test (1)`, `sql-server-tests`, `coverage`, `smoke-test`, `e2e-test`, `Verify formatting`, `Small test projects (Tools/Storage/NewsAgent)`. Do not treat YAML as proof that mobile checks are required. After merge, add the three mobile names above and re-query Settings → Branches → `main` → Status checks to confirm.
+
+Android and iOS are equal: a mobile PR cannot treat either native compile as optional. Non-mobile PRs are not left pending: `ci.yml` emits skip-success stubs (`mobile-js-ok`, `mobile-android-ok`, `mobile-ios-ok`) with those exact check names, the same idea as `test-docs-ok`.
+
+**Layers (do not collapse these):** Node unit tests (`npm test`, fast, no native toolchain) are not a substitute for `mobile-android` / `mobile-ios` compile, and those unsigned CI compiles are not device/E2E coverage. Device E2E is a separate track.
+
+**Publish preflight:** `.github/workflows/publish-mobile-test-build.yml` and `.github/workflows/publish-ios-testflight.yml` run `npm ci` + `npm run preflight` against `github.sha` in a job with no signing secrets. The signing/upload job `needs` that preflight and runs only when `needs.preflight.result == 'success'`. A failed or cancelled preflight skips publication.
 
 CI/CD uses two workflows. `.github/workflows/ci.yml` runs the pull-request build, deterministic tests, coverage gates, conditional `ef-migrations`, smoke test, and required e2e merge gate. After merge, `.github/workflows/deploy.yml` resolves the `ci.yml` run that built and tested the merged PR's head commit (via merge-commit second parent, or the commit→PR association for squash/rebase merges) and reuses its `web-publish` artifact (no rebuild), then runs `migrate` (only when EF paths changed) → `deploy` (zip-pushes, Kudu recycle, polls `/warmup` **and** the new `data-build-version` on `/`) → `post-deploy-smoke`. Resolution keys off a non-expired `web-publish-*` artifact for that head SHA (`scripts/Resolve-CiPublishRun.sh`), not overall workflow `conclusion == success`: mixed web+mobile PRs keep `ci.yml` in_progress on native Mobile iOS/Android builds after required web checks (and often merge) already passed, which previously failed deploy on #860 / #866 even though the zip existed. ARM `WEBSITE_RUN_FROM_PACKAGE=1` does swap the zip, but #688 showed that skipping the extra Kudu recycle leaves `/warmup` on HTTP 500; keep the restart. Skipping migrate must not skip smoke: `post-deploy-smoke` uses `if: always()` and requires `deploy` to have succeeded. Smoke also requires `data-build-version` on `/` to match the PR-head short SHA stamped at CI build (`OverrideGitCommitShort`). The PR `ef-migrations` job uses the same migration connection string as deploy so SQL Server failures are caught before merge.
 
@@ -345,11 +361,11 @@ Pull requests that do not change the website skip `build` / `test` / coverage / 
 - **Non-web** when **every** changed file is under `docs/`, `infra/`, `design/`, `.github/` (except `.github/workflows/ci.yml`), a root `*.md`, `LICENSE`, `THIRD-PARTY-NOTICES.md`, or `src/QueenZone.Mobile/`.
 - Changing `ci.yml` itself still runs the full .NET suite.
 - `src/` (except the mobile client), `tests/`, `scripts/`, project files, and `wwwroot` stay on the full web path.
-- A mobile-only PR still runs `mobile-js` (Node typecheck + unit tests), plus `mobile-android` and `mobile-ios` native compile builds (unsigned debug APK / Simulator build, uploaded as 1-day workflow artifacts). Local mobile validation is `npm run preflight` in `src/QueenZone.Mobile` (typecheck, unit tests, and `npm run doctor`). Wiring Doctor into required PR/publish checks is #870.
+- A mobile-only PR still runs `mobile-js` (`npm run preflight`: typecheck, discovered unit tests, pinned Expo Doctor), plus `mobile-android` and `mobile-ios` native compile builds (unsigned debug APK / Simulator build, uploaded as 1-day workflow artifacts). Those three check names are intended to be required on `main` (#870); a human must enable them in branch protection after merge. Non-mobile PRs get skip-success stubs so they are not left pending.
 - Mixed mobile + web PRs run both pipelines.
 - Deploy uses the same classifier so an infra-only or mobile-only merge does not zip-deploy unchanged website binaries. Mixed web+mobile merges still deploy the website; `resolve-ci-run` must not wait for Mobile iOS/Android to finish the overall `ci.yml` conclusion (see `scripts/Resolve-CiPublishRun.sh`).
 
-Skipped non-matrix jobs still report under their required check names, which GitHub treats as satisfied. The `test` matrix is different: skipping it entirely would report a single `test` check and never create the required `test (0)` / `test (1)` checks, leaving the PR blocked forever. `ci.yml` therefore runs a lightweight `test-docs-ok` matrix on non-web PRs that emits success for those exact names without running the .NET suite.
+Skipped non-matrix jobs still report under their required check names, which GitHub treats as satisfied. The `test` matrix is different: skipping it entirely would report a single `test` check and never create the required `test (0)` / `test (1)` checks, leaving the PR blocked forever. `ci.yml` therefore runs a lightweight `test-docs-ok` matrix on non-web PRs that emits success for those exact names without running the .NET suite. The three mobile jobs similarly emit skip-success stubs (`mobile-js-ok`, `mobile-android-ok`, `mobile-ios-ok`) on non-mobile PRs so required mobile contexts are not left pending.
 
 ### EF migration consistency
 
