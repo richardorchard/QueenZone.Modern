@@ -38,6 +38,7 @@ public class LiveSiteContentApiTests : RealDataPageTest
         "/api/v1/content/fan-performances",
         "/api/v1/content/fan-performances/{id}",
         "/api/v1/content/fan-performances/{id}/audio",
+        "/api/v1/search",
         "/api/v1/forum/categories",
         "/api/v1/forum/categories/{id}",
         "/api/v1/forum/categories/{id}/topics",

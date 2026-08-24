@@ -18,6 +18,8 @@ export {
   fetchPhotoDetail,
   fetchTimelinePage,
 } from './content';
+export { fetchSearchPage } from './search';
+export type { SearchPageQuery } from './search';
 export {
   closeForumTopicPoll,
   createForumReply,

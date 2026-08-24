@@ -8,6 +8,7 @@ import {
   fetchPhotoCategoryItems,
   fetchPhotoDetail,
 } from '../src/api/content.ts';
+import { fetchSearchPage } from '../src/api/search.ts';
 import {
   createForumReply,
   fetchForumTopic,
@@ -41,6 +42,7 @@ import {
   photoListItemSchema,
   photoSubmissionCreatedSchema,
   problemDetailsSchema,
+  searchResultSchema,
 } from '../src/api/schemas.ts';
 import { isPhotoCdnUrl } from '../src/screens/photos/photoGalleryMeta.ts';
 import { resolveMediaUrl } from '../src/api/submissions.ts';
@@ -93,6 +95,21 @@ describe('mobile API consumer contracts', { concurrency: false }, () => {
     assert.match(detail.body, /ugc\/news\//);
     const relativeMedia = resolveMediaUrl(fixture.baseUrl, '/ugc/news/sample-crest.jpg');
     assert.equal(relativeMedia, `${fixture.baseUrl}/ugc/news/sample-crest.jpg`);
+  });
+
+  it('searches the shared SearchDocument index', async () => {
+    const page = parseContract(
+      'GET /api/v1/search',
+      pagedSchema(searchResultSchema),
+      await fetchSearchPage({ q: 'modernisation', page: 1, pageSize: 20 }),
+    );
+    expectedField('GET /api/v1/search', 'items', page.items, Array.isArray, 'an array');
+    assert.equal(page.page, 1);
+    assert.equal(page.pageSize, 20);
+    const news = page.items.find((item) => item.sourceKey === 'news:1003');
+    assert.ok(news, 'Contract GET /api/v1/search failed: expected a news:1003 hit for modernisation');
+    assert.equal(news.id, 1003);
+    assert.equal(news.contentType, 'news');
   });
 
   it('reads photo category items at pageSize 24 with CDN media URLs', async () => {

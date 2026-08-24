@@ -58,9 +58,10 @@ public sealed class EfSiteSearchService(QueenZoneDbContext dbContext) : ISiteSea
             take);
     }
 
-    private static SiteSearchResult Map(SiteSearchRow row) =>
+    internal static SiteSearchResult Map(SiteSearchRow row) =>
         new(
             row.ContentType,
+            row.SourceKey,
             row.Title,
             row.Summary ?? string.Empty,
             row.Url,
@@ -72,6 +73,8 @@ public sealed class EfSiteSearchService(QueenZoneDbContext dbContext) : ISiteSea
     internal sealed class SiteSearchRow
     {
         public string ContentType { get; set; } = string.Empty;
+
+        public string SourceKey { get; set; } = string.Empty;
 
         public string Title { get; set; } = string.Empty;
 
