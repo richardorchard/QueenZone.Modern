@@ -1,4 +1,5 @@
-import { screen, userEvent, waitFor } from '@testing-library/react-native';
+import { fireEvent, screen, userEvent, waitFor } from '@testing-library/react-native';
+import { RefreshControl } from 'react-native';
 import {
   fetchForumRecentThreads,
   fetchLiveActivity,
@@ -106,5 +107,15 @@ describe('HomeScreen', () => {
       { screen: 'Thread', params: { id: 1002, title: 'Ranking every studio album' } },
     );
     expect(JSON.stringify(navigation.navigate.mock.calls)).not.toContain('magic-tour');
+  });
+
+  it('pull-to-refresh reloads live home sections', async () => {
+    renderHome();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Live Aid remembered' })).toBeOnTheScreen());
+    const newsCalls = fetchNews.mock.calls.length;
+    const forumCalls = fetchForum.mock.calls.length;
+    fireEvent(screen.UNSAFE_getByType(RefreshControl), 'refresh');
+    await waitFor(() => expect(fetchNews.mock.calls.length).toBeGreaterThan(newsCalls));
+    expect(fetchForum.mock.calls.length).toBeGreaterThan(forumCalls);
   });
 });

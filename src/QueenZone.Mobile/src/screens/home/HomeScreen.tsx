@@ -133,6 +133,7 @@ export function HomeScreen({ navigation }: Props) {
 
   return (
     <FlatList
+      testID="home-feed"
       style={{ flex: 1, backgroundColor: c.surfacePage }}
       data={[]}
       renderItem={() => null}

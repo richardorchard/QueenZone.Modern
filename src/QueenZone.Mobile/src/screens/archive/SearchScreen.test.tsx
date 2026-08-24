@@ -1,4 +1,4 @@
-import { screen, userEvent, waitFor } from '@testing-library/react-native';
+import { fireEvent, screen, userEvent, waitFor } from '@testing-library/react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { fetchSearchPage } from '../../api';
 import { ApiError } from '../../api/client';
@@ -130,6 +130,31 @@ describe('SearchScreen', () => {
     await user.press(screen.getByRole('button', { name: 'Try again' }));
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'QueenZone modernisation begins. News' })).toBeOnTheScreen(),
+    );
+  });
+
+  it('loads the next page when the result list reaches the end', async () => {
+    fetchSearch
+      .mockResolvedValueOnce(pagedResponse([resultFixture()], 1, 2))
+      .mockResolvedValueOnce(
+        pagedResponse(
+          [resultFixture({ sourceKey: 'news:7', id: 7, title: 'Second page hit' })],
+          2,
+          2,
+        ),
+      );
+    renderSearch();
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText('Search the archive'), 'modernisation');
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'QueenZone modernisation begins. News' })).toBeOnTheScreen(),
+    );
+    fireEvent(screen.getByTestId('search-results'), 'onEndReached');
+    await waitFor(() =>
+      expect(fetchSearch).toHaveBeenCalledWith(expect.objectContaining({ q: 'modernisation', page: 2 })),
+    );
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Second page hit. News' })).toBeOnTheScreen(),
     );
   });
 

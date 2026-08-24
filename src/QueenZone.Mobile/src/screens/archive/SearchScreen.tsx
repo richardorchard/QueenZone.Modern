@@ -59,6 +59,7 @@ function SearchResults({
 
   return (
     <FlatList
+      testID="search-results"
       style={{ flex: 1 }}
       data={paged.items}
       keyExtractor={(item) => item.sourceKey}
