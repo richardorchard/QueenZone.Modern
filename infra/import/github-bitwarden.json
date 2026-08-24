@@ -2,7 +2,8 @@
   "auditDate": "2026-08-12",
   "refreshedDate": "2026-08-24",
   "issue": 624,
-  "refreshNotes": "Re-listed App Service setting names after adding Android FCM settings for #847. Secret values were not recorded. GitHub environments and Azure/Cloudflare resource IDs were not re-probed.",
+  "refreshNotes": "Added the four live APNs App Service setting names created for #846 and the Android FCM setting names for #847. Secret values were not recorded. GitHub environments and Azure/Cloudflare resource IDs were not re-probed.",
+
   "github": {
     "environments": [
       {
@@ -100,7 +101,14 @@
       "Authentication__Microsoft__ClientId",
       "Authentication__Microsoft__ClientSecret",
       "MobileAuth__SigningKey",
+      "PushNotifications__Apns__Environment",
+      "PushNotifications__Apns__KeyId",
+      "PushNotifications__Apns__PrivateKeyPem",
+      "PushNotifications__Apns__TeamId",
+      "PushNotifications__Fcm__ProjectId",
+      "PushNotifications__Fcm__ServiceAccountJson",
       "AZURE_WEBAPP_PUBLISH_PROFILE",
+
       "AzureAd__CallbackPath",
       "AzureAd__ClientId",
       "AzureAd__ClientSecret",
@@ -113,9 +121,8 @@
       "ConnectionStrings__QueenZoneLegacyLocal",
       "OpenRouter__ApiKey",
       "OPENROUTER_API_KEY",
-      "PushNotifications__Fcm__ProjectId",
-      "PushNotifications__Fcm__ServiceAccountJson",
       "QUEENZONE_SQL_EXPRESS_PROBE_PASSWORD",
+
       "QUEENZONE_SQL_EXPRESS_PROBE_USERNAME",
       "CLOUDFLARE_API_TOKEN_READONLY",
       "CLOUDFLARE_WORKER_READWRITE"
@@ -138,8 +145,13 @@
     "Authentication__Microsoft__ClientId",
     "Authentication__Microsoft__ClientSecret",
     "MobileAuth__SigningKey",
+    "PushNotifications__Apns__Environment",
+    "PushNotifications__Apns__KeyId",
+    "PushNotifications__Apns__PrivateKeyPem",
+    "PushNotifications__Apns__TeamId",
     "PushNotifications__Fcm__ProjectId",
     "PushNotifications__Fcm__ServiceAccountJson",
+
     "BlobUpload__PublicBaseUrl",
     "ConnectionStrings__BlobStorage",
     "ConnectionStrings__QueenZoneLegacy",
