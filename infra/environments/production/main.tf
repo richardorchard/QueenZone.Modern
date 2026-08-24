@@ -13,6 +13,23 @@ check "production_scale_contract" {
   }
 }
 
+check "cloudflare_origin_cidrs_allowed" {
+  assert {
+    condition = (
+      length(setsubtract(toset(module.cloudflare_edge.published_ipv4_cidrs), toset(module.azure_web.origin_allow_ipv4_cidrs))) == 0 &&
+      length(setsubtract(toset(module.cloudflare_edge.published_ipv6_cidrs), toset(module.azure_web.origin_allow_ipv6_cidrs))) == 0
+    )
+    error_message = "Every published Cloudflare IPv4 and IPv6 origin CIDR must stay allowed on the App Service."
+  }
+}
+
+check "cdn_worker_boundary" {
+  assert {
+    condition     = !contains(module.cloudflare_edge.worker_route_patterns, "cdn.queenzone.org/*")
+    error_message = "cdn.queenzone.org must not have a Worker route."
+  }
+}
+
 resource "azurerm_resource_group" "production" {
   name     = var.azure_resource_group_name
   location = var.azure_location
@@ -54,6 +71,6 @@ module "cloudflare_edge" {
   zone_name  = var.cloudflare_zone_name
 }
 
-# The Cloudflare module remains an import contract until #626 adds its
-# resources. Azure web and data resources use declarative imports in
-# imports.tf; an apply must never precede plan review.
+# Azure and Cloudflare resources use declarative imports in imports.tf.
+# An apply must never precede plan review. The first Cloudflare apply is
+# import-only; do not publish Worker source or rewrite DNS from a local session.

@@ -7,6 +7,10 @@
 # Shell scripts must stay LF for execution on Linux runners/containers.
 *.sh text eol=lf
 
+# Cloudflare Worker sources must stay LF. A CRLF rewrite would look like a
+# Worker publish on the next OpenTofu plan.
+infra/modules/cloudflare-edge/workers/*.js text eol=lf
+
 # Expo / Node sources stay LF so Metro, npm, and Linux mobile CI match
 # Expo defaults. Binary rules below still apply to images under this tree.
 src/QueenZone.Mobile/**/*.js text eol=lf

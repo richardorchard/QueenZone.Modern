@@ -15,6 +15,32 @@ locals {
     "queen-memorabillia", "roger-taylor", "songfiles", "special-events",
     "ugc-avatars", "ugc-forum", "us-convention-2001",
   ])
+  cloudflare_zone_id    = var.cloudflare_zone_id
+  cloudflare_account_id = var.cloudflare_account_id
+  cloudflare_dns_record_ids = {
+    apex          = "c22f8759158c7a3f06e290e5f51f5da8"
+    www           = "fdd05b163df7c2941ae1e36986558228"
+    dev           = "299da79a473f1c6bc03dc8a2f735269a"
+    cdn           = "c8989e49d2d624756ddf35a05e3ac153"
+    cdn2          = "1af26073508a0494bc5d66f5b23df57f"
+    pictures      = "4bc9968da3b9ec19d792fef11ef4d77a"
+    asverify_cdn  = "9b996207c2701bd567962763ed653142"
+    asuid         = "afd377459a21a49b39458293e929221a"
+    asuid_www     = "b3d6ee3412118593835755b3a424f0c8"
+    google_site   = "4d6c859c709bc0f9382ba74f93465b89"
+    bing_verify_1 = "30eaa5bf1d4ad3834d5c7db37174c83b"
+    bing_verify_2 = "fd000f4e7e714d719eb3ae0618e9ff4c"
+  }
+  cloudflare_worker_route_ids = {
+    cdn2            = "0fd4ebdc9c3e4825a1d9e6527fbd4d24"
+    legacy_pictures = "276e102a9ef8402c9b610c7bc60bbedb"
+  }
+  cloudflare_string_zone_settings = toset([
+    "ssl", "always_use_https", "tls_1_3", "automatic_https_rewrites",
+    "security_level", "cache_level", "browser_check", "brotli",
+    "http2", "http3", "websockets", "polish", "hotlink_protection",
+    "development_mode",
+  ])
 }
 
 import {
@@ -111,4 +137,46 @@ import {
   for_each = local.azure_data_containers
   to       = module.azure_data.azapi_resource.container[each.value]
   id       = "${local.azure_storage_base_id}/storageAccounts/queenzone/blobServices/default/containers/${each.value}"
+}
+
+import {
+  to = module.cloudflare_edge.cloudflare_zone.production
+  id = local.cloudflare_zone_id
+}
+
+import {
+  for_each = local.cloudflare_dns_record_ids
+  to       = module.cloudflare_edge.cloudflare_dns_record.this[each.key]
+  id       = "${local.cloudflare_zone_id}/${each.value}"
+}
+
+import {
+  for_each = local.cloudflare_string_zone_settings
+  to       = module.cloudflare_edge.cloudflare_zone_setting.this[each.value]
+  id       = "${local.cloudflare_zone_id}/${each.value}"
+}
+
+import {
+  to = module.cloudflare_edge.cloudflare_zone_setting.challenge_ttl
+  id = "${local.cloudflare_zone_id}/challenge_ttl"
+}
+
+import {
+  to = module.cloudflare_edge.cloudflare_workers_script.cdn2
+  id = "${local.cloudflare_account_id}/pictures-queenzone-org"
+}
+
+import {
+  to = module.cloudflare_edge.cloudflare_workers_script.legacy_pictures
+  id = "${local.cloudflare_account_id}/pictures-legacy-redirect"
+}
+
+import {
+  to = module.cloudflare_edge.cloudflare_workers_route.cdn2
+  id = "${local.cloudflare_zone_id}/${local.cloudflare_worker_route_ids.cdn2}"
+}
+
+import {
+  to = module.cloudflare_edge.cloudflare_workers_route.legacy_pictures
+  id = "${local.cloudflare_zone_id}/${local.cloudflare_worker_route_ids.legacy_pictures}"
 }

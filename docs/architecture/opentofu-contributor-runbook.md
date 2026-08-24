@@ -10,7 +10,7 @@ Issue #619 declared no managed resources. The current adoption state is:
 
 - `azure-web`: #622 declares the resource group, web, telemetry, hostname, TLS binding, and ingress resources with declarative imports;
 - `azure-data`: #628 owns SQL, Storage, containers, and data-protection configuration;
-- `cloudflare-edge`: #626 owns zone, DNS, TLS, Worker, and route resources.
+- `cloudflare-edge`: #626 owns the zone, inventory DNS, Full (strict) TLS settings, Workers, and routes.
 
 Uploaded App Service certificates are the deliberate exception in #622. Their
 private PFX material and renewal path are outside state; the imported hostname
@@ -25,7 +25,7 @@ Install the version in `.opentofu-version`, then run:
 ./scripts/Test-OpenTofu.ps1 -UseRemoteBackend
 ```
 
-The default uses `-backend=false` and needs no cloud credentials. The remote check uses the Entra-authenticated backend from #616. Cloudflare credentials are not required until a configuration reads Cloudflare data or plans managed resources.
+The default uses `-backend=false` and needs no cloud credentials. The remote check uses the Entra-authenticated backend from #616. Local validation also checks that every published Cloudflare origin CIDR is present in the imported App Service allow list. A production plan that refreshes Cloudflare resources requires `CLOUDFLARE_API_TOKEN`.
 
 The validation script runs formatting, credential-pattern checks, lifecycle checks, `init`, and `validate` for the production root and every module. Critical Azure/Cloudflare resources fail validation unless they set `lifecycle { prevent_destroy = true }`; broad `ignore_changes = all` is forbidden.
 
@@ -110,7 +110,9 @@ Azure object and every object inside it; `prevent_destroy` is what stops that
 apply.
 
 Never run `tofu destroy` against production. Do not apply a plan that deletes or
-replaces SQL, Storage, App Service, hostname bindings, or the `cdn2` Worker.
+replaces SQL, Storage, App Service, hostname bindings, proxied DNS, or the
+`cdn2` / `pictures` Workers. Cloudflare rollback order is in
+[`opentofu-cloudflare-edge.md`](opentofu-cloudflare-edge.md).
 To stop managing a resource without deleting it, use `tofu state rm` after
 review (see [State moves and removals](#state-moves-and-removals)).
 

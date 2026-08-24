@@ -6,8 +6,9 @@ the existing Cloudflare-only main-site ingress policy.
 
 The SCM endpoint deliberately keeps its separate allow-all default policy so
 the existing application deployment workflow remains available. The main-site
-deny is already live; changes to its Cloudflare ranges must be coordinated with
-the Cloudflare edge stack.
+deny is already live. Cloudflare's published IP list is the source of truth
+for the allow rules; do not regroup the packed CIDR strings, and add a new
+range only in a reviewed plan after `Test-CloudflareOriginCidrs.ps1` fails.
 
 Uploaded App Service certificate resources remain outside OpenTofu. AzureRM
 cannot describe them without the private PFX material, and their renewal path

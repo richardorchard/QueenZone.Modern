@@ -69,7 +69,10 @@ Store the values in the `Queenzone Development` Bitwarden Secrets Manager projec
 
 Those two OpenTofu token names are **not created yet**. Live Worker publishes use `CLOUDFLARE_WORKER_READWRITE` (Workers Scripts Edit). Inventory/ops reads use `CLOUDFLARE_API_TOKEN_READONLY`. Do not reuse the Worker token as the future OpenTofu apply token unless its zone/DNS/settings scopes are reviewed.
 
-The bootstrap does not create the OpenTofu tokens. Create them immediately before the first Cloudflare plan in #626, then wire their Bitwarden output names during #625.
+The bootstrap does not create the OpenTofu tokens. #626 declares the Cloudflare
+resources and import blocks; create `CLOUDFLARE_API_TOKEN_TOFU_PLAN` and
+`CLOUDFLARE_API_TOKEN_TOFU_APPLY` immediately before the first remote Cloudflare
+plan, then wire their Bitwarden output names during #625.
 
 Rotation sequence:
 

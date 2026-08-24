@@ -1,4 +1,8 @@
 locals {
+  # Packed to match the live imported App Service rules. Do not regroup these
+  # strings; a different join order is an in-place origin-restriction update.
+  # data.cloudflare_ip_ranges is the published source of truth — the production
+  # check and scripts/Test-CloudflareOriginCidrs.ps1 fail if a range is missing.
   cloudflare_ip_restrictions = [
     {
       name        = "Cloudflare-IPv4-1"
@@ -19,6 +23,18 @@ locals {
       description = "Allow Cloudflare published IPv6 ranges"
     },
   ]
+
+  origin_allow_ipv4_cidrs = sort(distinct(flatten([
+    for rule in local.cloudflare_ip_restrictions : [
+      for cidr in split(",", rule.ip_address) : cidr if !strcontains(cidr, ":")
+    ]
+  ])))
+
+  origin_allow_ipv6_cidrs = sort(distinct(flatten([
+    for rule in local.cloudflare_ip_restrictions : [
+      for cidr in split(",", rule.ip_address) : cidr if strcontains(cidr, ":")
+    ]
+  ])))
 }
 
 resource "azurerm_log_analytics_workspace" "production" {
@@ -152,8 +168,9 @@ resource "azurerm_linux_web_app" "production" {
     # Reading this map into state would expose values; managing an incomplete
     # map would delete live settings. AzureRM also normalises the
     # live explicit main-site deny-all and SCM allow-all rules to empty default
-    # actions during import, then plans unsafe/default-only rewrites. Keep the
-    # imported rules authoritative until the coordinated edge work in #626.
+    # actions during import, then plans unsafe/default-only rewrites. Keep
+    # those imported default actions authoritative; #626 validates that every
+    # published Cloudflare CIDR remains in the allow rules above.
     ignore_changes = [
       app_settings,
       site_config[0].ip_restriction_default_action,

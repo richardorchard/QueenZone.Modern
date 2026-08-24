@@ -24,7 +24,8 @@ SCM retains a separate allow-all policy for the current deployment workflow.
 AzureRM 5.0.1 normalises both explicit terminal rules to empty default-action
 fields during import. Those two provider fields are ignored so an apply cannot
 silently open the origin or lock out SCM; the actual allow ranges remain
-managed. Coordinate any rule redesign with the Cloudflare work in #626.
+managed. #626 treats Cloudflare's published IP list as the source of truth and
+fails validation if a current range is missing from these imported rules.
 
 ## Certificate boundary
 

@@ -27,6 +27,11 @@ if ($LASTEXITCODE -ne 0) {
     throw "OpenTofu safety checks failed."
 }
 
+& (Join-Path $PSScriptRoot "Test-CloudflareOriginCidrs.ps1") -InfraPath $infraPath
+if ($LASTEXITCODE -ne 0) {
+    throw "Cloudflare origin CIDR coverage check failed."
+}
+
 $initArguments = @("-chdir=$productionPath", "init", "-input=false", "-reconfigure")
 if ($UseRemoteBackend) {
     $initArguments += "-backend-config=$backendConfig"

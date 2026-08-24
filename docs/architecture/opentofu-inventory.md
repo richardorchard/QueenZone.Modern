@@ -94,7 +94,7 @@ Treatments:
 
 ### Cloudflare (API inventory complete)
 
-Account id `f93121b2086286e79a7a9fdb8d03cb4c`. Zone id `079fc2f37095c82fb3a2b4da65718b2b` (`queenzone.org`, Free, full setup). NS: `daisy.ns.cloudflare.com`, `skip.ns.cloudflare.com`. DNSSEC disabled. Detail JSON: [`infra/import/cloudflare-hostnames.json`](../../infra/import/cloudflare-hostnames.json). Worker source snapshot: [`infra/import/workers/pictures-queenzone-org.js`](../../infra/import/workers/pictures-queenzone-org.js).
+Account id `f93121b2086286e79a7a9fdb8d03cb4c`. Zone id `079fc2f37095c82fb3a2b4da65718b2b` (`queenzone.org`, Free, full setup). NS: `daisy.ns.cloudflare.com`, `skip.ns.cloudflare.com`. DNSSEC disabled. Detail JSON: [`infra/import/cloudflare-hostnames.json`](../../infra/import/cloudflare-hostnames.json). Worker source snapshot: [`infra/import/workers/pictures-queenzone-org.js`](../../infra/import/workers/pictures-queenzone-org.js). Import/module contract: [`opentofu-cloudflare-edge.md`](opentofu-cloudflare-edge.md).
 
 | Item | Treatment | Notes |
 | --- | --- | --- |
