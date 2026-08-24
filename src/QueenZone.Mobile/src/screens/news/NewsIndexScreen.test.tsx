@@ -80,6 +80,24 @@ describe('NewsIndexScreen', () => {
     expect(fetchNews).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, decade: 2000 }));
   });
 
+  it('the year rail jumps decade the same way the chips do', async () => {
+    // #886: the rail is an additional way to reach the same server-side decade filter (#838).
+    fetchNews.mockResolvedValueOnce(pagedResponse([newsItemFixture({ id: 1, title: 'Recent article' })], 1, 1));
+    renderNews();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Open Recent article' })).toBeOnTheScreen());
+
+    fetchNews.mockResolvedValueOnce(
+      pagedResponse([newsItemFixture({ id: 9999, title: 'Old article from the 2000s' })], 1, 1),
+    );
+    const user = userEvent.setup();
+    await user.press(screen.getByRole('button', { name: 'Jump to 2000s' }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Open Old article from the 2000s' })).toBeOnTheScreen(),
+    );
+    expect(fetchNews).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, decade: 2000 }));
+  });
+
   it('shows decade-specific empty copy when the server returns no matches', async () => {
     fetchNews.mockResolvedValueOnce(pagedResponse([newsItemFixture()], 1, 1));
     renderNews();

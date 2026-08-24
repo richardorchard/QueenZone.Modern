@@ -11,6 +11,7 @@ import { Chip } from '../../ui/Chip';
 import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from '../../ui/ScreenStates';
 import { testIds } from '../../test/testIds';
 import { PageTitleBlock } from '../../ui/PageTitleBlock';
+import { YearRail } from '../../ui/YearRail';
 
 type Props = NativeStackScreenProps<NewsStackParamList, 'NewsIndex'>;
 
@@ -51,54 +52,66 @@ export function NewsIndexScreen({ navigation }: Props) {
     </View>
   );
 
+  const rail = newsDecades.length > 1 ? <YearRail options={newsDecades} value={decade} onChange={setDecade} testID="news-year-rail" /> : null;
+
   if (paged.loading && paged.items.length === 0) {
     return (
-      <View testID={testIds.newsScreen} style={[styles.list, { backgroundColor: c.surfacePage }]}>
-        {header}
-        <LoadingBlock label="Loading news…" />
+      <View style={styles.wrapper}>
+        <View testID={testIds.newsScreen} style={[styles.list, { backgroundColor: c.surfacePage }]}>
+          {header}
+          <LoadingBlock label="Loading news…" />
+        </View>
+        {rail}
       </View>
     );
   }
 
   if (paged.error && paged.items.length === 0) {
     return (
-      <View style={[styles.list, { backgroundColor: c.surfacePage }]}>
-        {header}
-        <ErrorBlock message={paged.error} onRetry={paged.reload} />
+      <View style={styles.wrapper}>
+        <View style={[styles.list, { backgroundColor: c.surfacePage }]}>
+          {header}
+          <ErrorBlock message={paged.error} onRetry={paged.reload} />
+        </View>
+        {rail}
       </View>
     );
   }
 
   return (
-    <FlatList
-      testID={testIds.newsScreen}
-      style={[styles.list, { backgroundColor: c.surfacePage }]}
-      data={paged.items}
-      keyExtractor={(item) => String(item.id)}
-      ListHeaderComponent={header}
-      ListEmptyComponent={
-        <EmptyBlock message={decade.decadeStart === null ? 'No news articles yet.' : 'No articles for this decade yet.'} />
-      }
-      ListFooterComponent={<ListFooterLoading visible={paged.loadingMore} />}
-      refreshControl={
-        <RefreshControl refreshing={paged.refreshing} onRefresh={paged.refresh} tintColor={c.accentPrimary} />
-      }
-      onEndReached={paged.loadMore}
-      onEndReachedThreshold={0.4}
-      renderItem={({ item }) => (
-        <ArticleRow
-          title={item.title}
-          subtitle={item.excerpt}
-          meta={formatPublishedDate(item.publishedAt)}
-          onPress={() => navigation.navigate('Story', { id: item.id })}
-          accessibilityLabel={`Open ${item.title}`}
-          testID={`news-story-${item.id}`}
-        />
-      )}
-    />
+    <View style={styles.wrapper}>
+      <FlatList
+        testID={testIds.newsScreen}
+        style={[styles.list, { backgroundColor: c.surfacePage }]}
+        data={paged.items}
+        keyExtractor={(item) => String(item.id)}
+        ListHeaderComponent={header}
+        ListEmptyComponent={
+          <EmptyBlock message={decade.decadeStart === null ? 'No news articles yet.' : 'No articles for this decade yet.'} />
+        }
+        ListFooterComponent={<ListFooterLoading visible={paged.loadingMore} />}
+        refreshControl={
+          <RefreshControl refreshing={paged.refreshing} onRefresh={paged.refresh} tintColor={c.accentPrimary} />
+        }
+        onEndReached={paged.loadMore}
+        onEndReachedThreshold={0.4}
+        renderItem={({ item }) => (
+          <ArticleRow
+            title={item.title}
+            subtitle={item.excerpt}
+            meta={formatPublishedDate(item.publishedAt)}
+            onPress={() => navigation.navigate('Story', { id: item.id })}
+            accessibilityLabel={`Open ${item.title}`}
+            testID={`news-story-${item.id}`}
+          />
+        )}
+      />
+      {rail}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  wrapper: { flex: 1 },
   list: { flex: 1 },
 });
