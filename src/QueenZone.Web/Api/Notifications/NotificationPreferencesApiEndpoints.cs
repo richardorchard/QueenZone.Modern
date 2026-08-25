@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Microsoft.AspNetCore.Mvc;
 using QueenZone.Data;
 
 namespace QueenZone.Web;
@@ -36,8 +37,8 @@ public static class NotificationPreferencesApiEndpoints
     internal static async Task<IResult> GetAsync(
         HttpContext httpContext,
         ClaimsPrincipal user,
-        IMemberAccountRepository memberAccountRepository,
-        INotificationPreferenceRepository notificationPreferenceRepository,
+        [FromServices] IMemberAccountRepository memberAccountRepository,
+        [FromServices] INotificationPreferenceRepository notificationPreferenceRepository,
         CancellationToken cancellationToken)
     {
         var memberId = await RequireAccountAsync(user, memberAccountRepository, cancellationToken);
@@ -53,8 +54,8 @@ public static class NotificationPreferencesApiEndpoints
 
     internal static async Task<IResult> PatchAsync(
         ClaimsPrincipal user,
-        IMemberAccountRepository memberAccountRepository,
-        INotificationPreferenceRepository notificationPreferenceRepository,
+        [FromServices] IMemberAccountRepository memberAccountRepository,
+        [FromServices] INotificationPreferenceRepository notificationPreferenceRepository,
         NotificationPreferencePatchRequest? request,
         CancellationToken cancellationToken)
     {
