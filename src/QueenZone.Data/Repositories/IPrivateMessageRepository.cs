@@ -199,4 +199,51 @@ public interface IPrivateMessageRepository
         Guid conversationId,
         Guid reporterMemberId,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Admin moderation queue (issue #470). Pass "all" or null/whitespace for
+    /// <paramref name="status"/> to return every status, otherwise a single
+    /// <see cref="PrivateMessageReportStatus"/> value. Newest first.
+    /// </summary>
+    Task<PrivateMessageReportListPage> ListReportsAsync(
+        string? status,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Count of reports in <see cref="PrivateMessageReportStatus.Open"/>, for dashboard tiles.</summary>
+    Task<int> CountOpenReportsAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Transitions a report's status and records the transition in the report access audit
+    /// log (ADR 0015) in the same operation, so a status change can never happen without a
+    /// matching audit row. Returns null when no report with <paramref name="reportId"/> exists.
+    /// </summary>
+    Task<PrivateMessageReport?> UpdateReportStatusAsync(
+        Guid reportId,
+        string status,
+        string actorEmail,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Records that <paramref name="actorEmail"/> viewed a report's snapshotted content
+    /// (ADR 0015). Call once per admin review-page load, not from list views that only
+    /// show report metadata.
+    /// </summary>
+    Task AppendReportViewedAuditAsync(
+        Guid reportId,
+        string actorEmail,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Permanently deletes reports that reached a terminal status (Dismissed/Actioned) at least
+    /// <see cref="PrivateMessageLimits.ReportRetentionAfterTerminalStatus"/> before
+    /// <paramref name="asOfUtc"/> (ADR 0015 decision 2). "Reached" is the most recent
+    /// <c>StatusChanged</c> audit row for the report — a terminal report always has one, since
+    /// reports are created Open and only leave Open via <see cref="UpdateReportStatusAsync"/>.
+    /// Open/Reviewed reports are never purged. The report's audit log rows are retained
+    /// (ADR 0015 decision 3) — only the <see cref="PrivateMessageReportEntity"/> row is removed.
+    /// Returns the number of reports purged.
+    /// </summary>
+    Task<int> PurgeExpiredReportsAsync(DateTimeOffset asOfUtc, CancellationToken cancellationToken = default);
 }

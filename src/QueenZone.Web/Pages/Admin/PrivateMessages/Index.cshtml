@@ -1,0 +1,76 @@
+@page "/admin/private-messages"
+@model QueenZone.Web.Pages.Admin.PrivateMessages.IndexModel
+@using QueenZone.Data
+
+<div class="admin-shell">
+  <h1>Reported messages</h1>
+  <p>
+    <a href="/admin">Back to admin</a>
+  </p>
+  <p>
+    Reviewing a report opens the reported message content and records who viewed it and when
+    (<a href="https://github.com/richardorchard/QueenZone.Modern/blob/main/docs/decisions/0015-private-message-report-retention-and-audit.md">ADR 0015</a>).
+    This queue does not support browsing private messages outside of a filed report.
+  </p>
+
+  <form method="get" class="admin-search-form">
+    <label>
+      Status
+      <select name="status">
+        @if (string.Equals(Model.StatusFilter, "all", StringComparison.OrdinalIgnoreCase))
+        {
+          <option value="all" selected>All</option>
+        }
+        else
+        {
+          <option value="all">All</option>
+        }
+        @foreach (var status in PrivateMessageReportStatus.All)
+        {
+          if (string.Equals(Model.StatusFilter, status, StringComparison.Ordinal))
+          {
+            <option value="@status" selected>@status</option>
+          }
+          else
+          {
+            <option value="@status">@status</option>
+          }
+        }
+      </select>
+    </label>
+    <button type="submit" class="qz-button">Filter</button>
+  </form>
+
+  @if (Model.List.Items.Count == 0)
+  {
+    <p>No reports in this view.</p>
+  }
+  else
+  {
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Reported member</th>
+          <th>Reporter</th>
+          <th>Reason</th>
+          <th>Reported</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @foreach (var item in Model.List.Items)
+        {
+          <tr>
+            <td>@item.ReportedDisplayName</td>
+            <td>@item.ReporterDisplayName</td>
+            <td>@(string.IsNullOrWhiteSpace(item.Reason) ? "—" : item.Reason)</td>
+            <td>@item.CreatedAt.ToString("u")</td>
+            <td><partial name="_SubmissionStatusBadge" model="item.Status" /></td>
+            <td><a href="/admin/private-messages/@item.Id">Open</a></td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+</div>
