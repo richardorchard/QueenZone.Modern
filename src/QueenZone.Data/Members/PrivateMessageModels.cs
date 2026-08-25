@@ -19,6 +19,10 @@ public static class PrivateMessageLimits
     public const int InboxPageSize = 50;
 
     public const int MaxInboxPageSize = 100;
+
+    public const int MaxReportReasonLength = 1000;
+
+    public const int ReportPrecedingMessageCount = 2;
 }
 
 public sealed record PrivateConversationListItem(
@@ -49,7 +53,8 @@ public sealed record PrivateMessageItem(
     string Body,
     DateTimeOffset CreatedAt,
     bool IsMine,
-    long SortKey);
+    long SortKey,
+    bool ReportedByViewer = false);
 
 public sealed record PrivateConversationDetail(
     Guid ConversationId,

@@ -11,8 +11,11 @@ import {
   conversationBodyMaxLength,
   replyRequiredMessage,
   replyTooLongMessage,
+  reportReasonMaxLength,
+  reportReasonTooLongMessage,
   unableToSendMessage,
   validateReplyBody,
+  validateReportReason,
 } from './inboxMeta.ts';
 
 describe('inboxMeta', () => {
@@ -57,5 +60,12 @@ describe('inboxMeta', () => {
     assert.equal(validateReplyBody('<script>alert(1)</script>'), null);
     assert.equal(conversationBodyMaxLength, 4000);
     assert.equal(unableToSendMessage, 'Unable to send message.');
+  });
+
+  it('validates optional report reasons', () => {
+    assert.equal(validateReportReason(''), null);
+    assert.equal(validateReportReason('Harassment'), null);
+    assert.equal(validateReportReason('a'.repeat(1001)), reportReasonTooLongMessage);
+    assert.equal(reportReasonMaxLength, 1000);
   });
 });

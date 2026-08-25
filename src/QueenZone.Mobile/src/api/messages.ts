@@ -5,6 +5,7 @@ import {
   messagesApiPath,
   messagesConversationPath,
   messagesRecipientsPath,
+  messagesReportPath,
   messagesUnreadCountPath,
 } from './messagesPaths';
 
@@ -12,6 +13,7 @@ export {
   messagesApiPath,
   messagesConversationPath,
   messagesRecipientsPath,
+  messagesReportPath,
   messagesUnreadCountPath,
 } from './messagesPaths';
 
@@ -34,6 +36,7 @@ export type ConversationMessage = {
   createdAt: string;
   isMine: boolean;
   sortKey: number;
+  reportedByViewer: boolean;
 };
 
 export type ConversationDetail = {
@@ -127,6 +130,26 @@ export function composeMessage(
   return sendJson(messagesApiPath, {
     method: 'POST',
     body: { recipientMemberId, body },
+    accessToken,
+    signal,
+  });
+}
+
+export type MessageReportResult = {
+  reportId: string;
+  alreadyReported: boolean;
+};
+
+export function reportConversationMessage(
+  accessToken: string,
+  conversationId: string,
+  messageId: string,
+  reason?: string,
+  signal?: AbortSignal,
+): Promise<MessageReportResult> {
+  return sendJson(messagesReportPath(conversationId, messageId), {
+    method: 'POST',
+    body: { reason: reason?.trim() ? reason.trim() : null },
     accessToken,
     signal,
   });

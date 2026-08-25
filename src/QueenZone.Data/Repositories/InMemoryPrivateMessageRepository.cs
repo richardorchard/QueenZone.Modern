@@ -8,6 +8,7 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
     private readonly List<PrivateConversationEntity> conversations = [];
     private readonly List<PrivateConversationParticipantEntity> participants = [];
     private readonly List<PrivateMessageEntity> messages = [];
+    private readonly List<PrivateMessageReportEntity> reports = [];
     private readonly List<MemberMessageBlockEntity> blocks = [];
     private readonly Func<Guid, MemberAccount?>? resolveMember;
     private long nextSortKey = 1;
@@ -169,6 +170,10 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
                     .ToList();
             }
 
+            var reportedIds = reports
+                .Where(r => r.ConversationId == conversationId && r.ReporterMemberId == memberId)
+                .Select(r => r.MessageId)
+                .ToHashSet();
             IReadOnlyList<PrivateMessageItem> items = pageMessages
                 .Select(m => new PrivateMessageItem(
                     m.Id,
@@ -177,7 +182,8 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
                     m.Body,
                     m.CreatedAt,
                     m.SenderMemberId == memberId,
-                    m.SortKey))
+                    m.SortKey,
+                    reportedIds.Contains(m.Id)))
                 .ToList();
 
             return Task.FromResult<PrivateConversationDetail?>(
@@ -560,6 +566,104 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
                 .Distinct()
                 .Count();
             return Task.FromResult(count);
+        }
+    }
+
+    public Task<PrivateMessageReportResult> CreateReportAsync(
+        Guid reporterMemberId,
+        Guid conversationId,
+        Guid messageId,
+        string? reason,
+        DateTimeOffset createdAt,
+        CancellationToken cancellationToken = default)
+    {
+        lock (sync)
+        {
+            var message = messages.SingleOrDefault(m => m.Id == messageId);
+            if (message is null || message.ConversationId != conversationId)
+            {
+                return Task.FromResult(new PrivateMessageReportResult(
+                    false,
+                    null,
+                    PrivateMessageReportText.MessageNotFound));
+            }
+
+            if (!participants.Any(p => p.ConversationId == conversationId && p.MemberId == reporterMemberId))
+            {
+                return Task.FromResult(new PrivateMessageReportResult(
+                    false,
+                    null,
+                    PrivateMessageReportText.NotAParticipant));
+            }
+
+            if (message.SenderMemberId == reporterMemberId)
+            {
+                return Task.FromResult(new PrivateMessageReportResult(
+                    false,
+                    null,
+                    PrivateMessageReportText.CannotReportOwn));
+            }
+
+            var existing = reports.SingleOrDefault(
+                r => r.ReporterMemberId == reporterMemberId && r.MessageId == messageId);
+            if (existing is not null)
+            {
+                return Task.FromResult(new PrivateMessageReportResult(
+                    true,
+                    existing.Id,
+                    null,
+                    AlreadyReported: true));
+            }
+
+            var senderName = resolveMember?.Invoke(message.SenderMemberId)?.DisplayName ?? "Unknown member";
+            var preceding = messages
+                .Where(m => m.ConversationId == conversationId && m.SortKey < message.SortKey)
+                .OrderByDescending(m => m.SortKey)
+                .Take(PrivateMessageLimits.ReportPrecedingMessageCount)
+                .OrderBy(m => m.SortKey)
+                .Select(m => new PrivateMessageReportContextItem(
+                    m.Id,
+                    m.SenderMemberId,
+                    resolveMember?.Invoke(m.SenderMemberId)?.DisplayName ?? "Unknown member",
+                    m.Body,
+                    m.CreatedAt))
+                .ToList();
+
+            var entity = PrivateMessageReportMapping.CreateEntity(
+                reporterMemberId,
+                message,
+                senderName,
+                preceding,
+                reason,
+                createdAt);
+            reports.Add(entity);
+            return Task.FromResult(new PrivateMessageReportResult(true, entity.Id, null));
+        }
+    }
+
+    public Task<PrivateMessageReport?> GetReportAsync(
+        Guid reportId,
+        CancellationToken cancellationToken = default)
+    {
+        lock (sync)
+        {
+            var entity = reports.SingleOrDefault(r => r.Id == reportId);
+            return Task.FromResult(entity is null ? null : PrivateMessageReportMapping.ToModel(entity));
+        }
+    }
+
+    public Task<IReadOnlySet<Guid>> GetReportedMessageIdsAsync(
+        Guid conversationId,
+        Guid reporterMemberId,
+        CancellationToken cancellationToken = default)
+    {
+        lock (sync)
+        {
+            IReadOnlySet<Guid> ids = reports
+                .Where(r => r.ConversationId == conversationId && r.ReporterMemberId == reporterMemberId)
+                .Select(r => r.MessageId)
+                .ToHashSet();
+            return Task.FromResult(ids);
         }
     }
 

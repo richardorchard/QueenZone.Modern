@@ -4,6 +4,7 @@ import {
   messagesApiPath,
   messagesConversationPath,
   messagesRecipientsPath,
+  messagesReportPath,
   messagesUnreadCountPath,
 } from './messagesPaths.ts';
 
@@ -15,6 +16,13 @@ describe('messages API paths', () => {
     assert.equal(
       messagesConversationPath('aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'),
       '/me/messages/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+    );
+    assert.equal(
+      messagesReportPath(
+        'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+        '11111111-2222-3333-4444-555555555555',
+      ),
+      '/me/messages/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/messages/11111111-2222-3333-4444-555555555555/report',
     );
   });
 });

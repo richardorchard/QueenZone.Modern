@@ -74,6 +74,8 @@ public sealed class QueenZoneDbContext : DbContext
 
     public DbSet<PrivateMessageEntity> PrivateMessages => Set<PrivateMessageEntity>();
 
+    public DbSet<PrivateMessageReportEntity> PrivateMessageReports => Set<PrivateMessageReportEntity>();
+
     public DbSet<MemberMessageBlockEntity> MemberMessageBlocks => Set<MemberMessageBlockEntity>();
 
     public DbSet<MemberFollowEntity> MemberFollows => Set<MemberFollowEntity>();
@@ -837,6 +839,58 @@ public sealed class QueenZoneDbContext : DbContext
             entity.HasOne(message => message.Sender)
                 .WithMany()
                 .HasForeignKey(message => message.SenderMemberId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<PrivateMessageReportEntity>(entity =>
+        {
+            entity.ToTable("PrivateMessageReports");
+            entity.HasKey(report => report.Id);
+
+            entity.Property(report => report.Reason)
+                .HasMaxLength(PrivateMessageLimits.MaxReportReasonLength);
+            entity.Property(report => report.Status)
+                .HasMaxLength(50)
+                .IsRequired();
+            entity.Property(report => report.MessageBodySnapshot)
+                .HasMaxLength(PrivateMessageLimits.MaxBodyLength)
+                .IsRequired();
+            entity.Property(report => report.SenderDisplayNameSnapshot)
+                .HasMaxLength(100)
+                .IsRequired();
+            entity.Property(report => report.CreatedAt).IsRequired();
+            entity.Property(report => report.MessageCreatedAtSnapshot).IsRequired();
+            entity.Property(report => report.MessageSortKeySnapshot).IsRequired();
+
+            entity.HasIndex(report => new { report.ReporterMemberId, report.MessageId })
+                .IsUnique()
+                .HasDatabaseName("IX_PrivateMessageReports_Reporter_Message");
+
+            entity.HasIndex(report => new { report.Status, report.CreatedAt })
+                .IsDescending(false, true)
+                .HasDatabaseName("IX_PrivateMessageReports_Status_CreatedAt");
+
+            entity.HasIndex(report => report.ConversationId)
+                .HasDatabaseName("IX_PrivateMessageReports_Conversation");
+
+            entity.HasOne(report => report.Message)
+                .WithMany()
+                .HasForeignKey(report => report.MessageId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(report => report.Conversation)
+                .WithMany()
+                .HasForeignKey(report => report.ConversationId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(report => report.Reporter)
+                .WithMany()
+                .HasForeignKey(report => report.ReporterMemberId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(report => report.Reported)
+                .WithMany()
+                .HasForeignKey(report => report.ReportedMemberId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 

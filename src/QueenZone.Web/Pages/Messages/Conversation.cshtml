@@ -63,6 +63,31 @@
             </header>
             @* Plain text: Razor encoding is the XSS barrier. Do not Html.Raw or auto-link. *@
             <div class="qz-message-thread__body">@message.Body</div>
+            @if (!message.IsMine)
+            {
+              <footer class="qz-message-thread__actions">
+                @if (message.ReportedByViewer)
+                {
+                  <p class="qz-message-thread__reported" role="status">Reported</p>
+                }
+                else
+                {
+                  <form method="post" asp-page-handler="Report" class="qz-message-report">
+                    <input type="hidden" name="pageNumber" value="@Model.PageNumber" />
+                    <input type="hidden" name="ReportInput.MessageId" value="@message.Id" />
+                    <label class="visually-hidden" for="report-reason-@message.Id">Optional reason</label>
+                    <input
+                      id="report-reason-@message.Id"
+                      class="qz-message-report__reason"
+                      type="text"
+                      name="ReportInput.Reason"
+                      maxlength="1000"
+                      placeholder="Optional reason" />
+                    <button class="qz-button qz-button--ghost" type="submit">Report message</button>
+                  </form>
+                }
+              </footer>
+            }
           </article>
         }
       </div>
