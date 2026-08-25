@@ -644,6 +644,83 @@ public sealed class PrivateMessageServiceTests
         Assert.False(await service.CanMessageAsync(alice.Id, bob.Id));
     }
 
+    [Fact]
+    public async Task ReportMessage_SnapshotsContext_AndDoesNotNotifyReportedMember()
+    {
+        var (service, _, messages, alice, bob) = CreateSystem();
+        var first = await service.ComposeAsync(alice.Id, bob.Id, "Earlier context");
+        var conversationId = first.ConversationId!.Value;
+        Assert.True((await service.ReplyAsync(conversationId, alice.Id, "Abusive follow-up")).Succeeded);
+
+        var unreadBefore = await service.CountUnreadConversationsAsync(alice.Id);
+        var detailBefore = await service.GetConversationAsync(conversationId, bob.Id, markRead: false);
+        var reported = detailBefore!.Messages[^1];
+
+        var result = await service.ReportMessageAsync(bob.Id, conversationId, reported.Id, "Harassment");
+        Assert.True(result.Succeeded);
+        Assert.False(result.AlreadyReported);
+        Assert.NotNull(result.ReportId);
+
+        var report = await messages.GetReportAsync(result.ReportId!.Value);
+        Assert.NotNull(report);
+        Assert.Equal(PrivateMessageReportStatus.Open, report!.Status);
+        Assert.Equal(bob.Id, report.ReporterMemberId);
+        Assert.Equal(alice.Id, report.ReportedMemberId);
+        Assert.Equal("Harassment", report.Reason);
+        Assert.Equal("Abusive follow-up", report.MessageBodySnapshot);
+        Assert.Equal("Alice", report.SenderDisplayNameSnapshot);
+        var preceding = Assert.Single(report.PrecedingMessages);
+        Assert.Equal("Earlier context", preceding.Body);
+
+        var detailAfter = await service.GetConversationAsync(conversationId, bob.Id, markRead: false);
+        Assert.Equal(detailBefore.Messages.Count, detailAfter!.Messages.Count);
+        Assert.True(detailAfter.Messages[^1].ReportedByViewer);
+        Assert.Equal(unreadBefore, await service.CountUnreadConversationsAsync(alice.Id));
+
+        var again = await service.ReportMessageAsync(bob.Id, conversationId, reported.Id, "Second reason");
+        Assert.True(again.Succeeded);
+        Assert.True(again.AlreadyReported);
+        Assert.Equal(result.ReportId, again.ReportId);
+        Assert.Equal("Harassment", (await messages.GetReportAsync(again.ReportId!.Value))!.Reason);
+    }
+
+    [Fact]
+    public async Task ReportMessage_RejectsNonParticipant_OwnMessage_AndOversizedReason()
+    {
+        var (service, members, messages, alice, bob) = CreateSystem();
+        var created = await service.ComposeAsync(alice.Id, bob.Id, "Please report me");
+        var conversationId = created.ConversationId!.Value;
+        var message = Assert.Single(
+            (await service.GetConversationAsync(conversationId, bob.Id, markRead: false))!.Messages);
+
+        var own = await service.ReportMessageAsync(alice.Id, conversationId, message.Id, null);
+        Assert.False(own.Succeeded);
+        Assert.Equal(PrivateMessageReportText.CannotReportOwn, own.ErrorMessage);
+
+        var carol = await members.CreateAsync(new MemberAccount
+        {
+            Id = Guid.Parse("33333333-3333-3333-3333-333333333333"),
+            Email = "carol@example.com",
+            DisplayName = "Carol",
+            CreatedAt = DateTime.UtcNow,
+        });
+        var outsider = await service.ReportMessageAsync(carol.Id, conversationId, message.Id, "Nope");
+        Assert.False(outsider.Succeeded);
+        Assert.Equal(PrivateMessageReportText.NotAParticipant, outsider.ErrorMessage);
+
+        var tooLong = await service.ReportMessageAsync(
+            bob.Id,
+            conversationId,
+            message.Id,
+            new string('x', PrivateMessageLimits.MaxReportReasonLength + 1));
+        Assert.False(tooLong.Succeeded);
+        Assert.Equal(PrivateMessageReportText.ReasonTooLong, tooLong.ErrorMessage);
+
+        var omitted = await service.ReportMessageAsync(bob.Id, conversationId, message.Id, "   ");
+        Assert.True(omitted.Succeeded);
+        Assert.Null((await messages.GetReportAsync(omitted.ReportId!.Value))!.Reason);
+    }
+
     private static (
         PrivateMessageService Service,
         IMemberAccountRepository Members,

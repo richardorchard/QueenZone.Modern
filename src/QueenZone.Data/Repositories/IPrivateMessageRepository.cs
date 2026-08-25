@@ -173,4 +173,30 @@ public interface IPrivateMessageRepository
         Guid senderMemberId,
         DateTimeOffset sinceUtc,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Records a report for a message in a conversation the reporter participates in.
+    /// Snapshots the message body and a little preceding context. Idempotent when the
+    /// same reporter already reported the same message. Does not notify the reported member.
+    /// </summary>
+    Task<PrivateMessageReportResult> CreateReportAsync(
+        Guid reporterMemberId,
+        Guid conversationId,
+        Guid messageId,
+        string? reason,
+        DateTimeOffset createdAt,
+        CancellationToken cancellationToken = default);
+
+    Task<PrivateMessageReport?> GetReportAsync(
+        Guid reportId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Message ids in <paramref name="conversationId"/> that <paramref name="reporterMemberId"/>
+    /// has already reported. Used to hide the report action on the conversation page.
+    /// </summary>
+    Task<IReadOnlySet<Guid>> GetReportedMessageIdsAsync(
+        Guid conversationId,
+        Guid reporterMemberId,
+        CancellationToken cancellationToken = default);
 }

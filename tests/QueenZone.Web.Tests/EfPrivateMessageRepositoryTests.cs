@@ -806,6 +806,46 @@ public sealed class EfPrivateMessageRepositoryTests : IAsyncDisposable
         Assert.Equal(1, await repository.CountDistinctNewRecipientsSinceAsync(aliceId, since));
     }
 
+    [Fact]
+    public async Task CreateReport_SnapshotsPrecedingMessages_AndIsIdempotent()
+    {
+        var first = await repository.SendNewOrExistingAsync(aliceId, bobId, "First", DateTimeOffset.UtcNow);
+        var conversationId = first.ConversationId!.Value;
+        await repository.ReplyAsync(conversationId, aliceId, "Second", DateTimeOffset.UtcNow);
+        await repository.ReplyAsync(conversationId, aliceId, "Third", DateTimeOffset.UtcNow);
+        var target = (await repository.GetConversationAsync(conversationId, bobId))!.Messages[^1];
+
+        var created = await repository.CreateReportAsync(
+            bobId,
+            conversationId,
+            target.Id,
+            "Abuse",
+            DateTimeOffset.UtcNow);
+        Assert.True(created.Succeeded);
+        var report = await repository.GetReportAsync(created.ReportId!.Value);
+        Assert.Equal("Third", report!.MessageBodySnapshot);
+        Assert.Equal("Alice EF", report.SenderDisplayNameSnapshot);
+        Assert.Equal(["First", "Second"], report.PrecedingMessages.Select(m => m.Body).ToArray());
+
+        var again = await repository.CreateReportAsync(
+            bobId,
+            conversationId,
+            target.Id,
+            "Ignored",
+            DateTimeOffset.UtcNow);
+        Assert.True(again.AlreadyReported);
+        Assert.Equal(created.ReportId, again.ReportId);
+
+        var outsider = await repository.CreateReportAsync(
+            carolId,
+            conversationId,
+            target.Id,
+            "Nope",
+            DateTimeOffset.UtcNow);
+        Assert.False(outsider.Succeeded);
+        Assert.Equal(PrivateMessageReportText.NotAParticipant, outsider.ErrorMessage);
+    }
+
     private static QueenZoneDbContext CreateContext(string connectionString)
     {
         var options = new DbContextOptionsBuilder<QueenZoneDbContext>()

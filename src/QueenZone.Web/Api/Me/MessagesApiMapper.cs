@@ -34,7 +34,8 @@ public static class MessagesApiMapper
             message.Body,
             message.CreatedAt,
             message.IsMine,
-            message.SortKey);
+            message.SortKey,
+            message.ReportedByViewer);
 
     public static ConversationDetailDto ToConversation(
         PrivateConversationDetail detail,

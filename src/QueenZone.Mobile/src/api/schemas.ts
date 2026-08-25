@@ -234,6 +234,7 @@ export const conversationMessageSchema = z.object({
   createdAt: isoDateTime,
   isMine: z.boolean(),
   sortKey: z.number(),
+  reportedByViewer: z.boolean(),
 });
 
 export const conversationDetailSchema = z.object({

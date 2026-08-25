@@ -340,4 +340,26 @@ public sealed class PrivateMessageService(
             _ => false,
         };
     }
+
+    public async Task<PrivateMessageReportResult> ReportMessageAsync(
+        Guid reporterMemberId,
+        Guid conversationId,
+        Guid messageId,
+        string? reason,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedReason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
+        if (normalizedReason is { Length: > PrivateMessageLimits.MaxReportReasonLength })
+        {
+            return new PrivateMessageReportResult(false, null, PrivateMessageReportText.ReasonTooLong);
+        }
+
+        return await privateMessageRepository.CreateReportAsync(
+            reporterMemberId,
+            conversationId,
+            messageId,
+            normalizedReason,
+            timeProvider.GetUtcNow(),
+            cancellationToken);
+    }
 }

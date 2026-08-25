@@ -15,6 +15,7 @@ import { ApiError } from '../../api/client';
 import {
   fetchConversation,
   replyToConversation,
+  reportConversationMessage,
   type ConversationDetail,
   type ConversationMessage,
 } from '../../api/messages';
@@ -29,8 +30,10 @@ import {
   conversationPageSize,
   formatMessageTimestamp,
   parseConversationId,
+  reportReasonMaxLength,
   unableToSendMessage,
   validateReplyBody,
+  validateReportReason,
 } from './inboxMeta';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'Conversation'>;
@@ -61,6 +64,10 @@ function ConversationThread({ navigation, route }: Props) {
   const [draft, setDraft] = useState('');
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [reportingMessageId, setReportingMessageId] = useState<string | null>(null);
+  const [reportReason, setReportReason] = useState('');
+  const [reportError, setReportError] = useState<string | null>(null);
+  const [reportBusy, setReportBusy] = useState(false);
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -141,6 +148,48 @@ function ConversationThread({ navigation, route }: Props) {
     }
   }, [accessToken, conversationId, draft]);
 
+  const submitReport = useCallback(
+    async (messageId: string) => {
+      const validation = validateReportReason(reportReason);
+      if (validation) {
+        setReportError(validation);
+        return;
+      }
+      if (!accessToken || !conversationId) {
+        setReportError('Sign in to continue.');
+        return;
+      }
+
+      setReportBusy(true);
+      setReportError(null);
+      try {
+        await reportConversationMessage(
+          accessToken,
+          conversationId,
+          messageId,
+          reportReason.trim() || undefined,
+        );
+        setDetail((current) =>
+          current
+            ? {
+                ...current,
+                messages: current.messages.map((item) =>
+                  item.id === messageId ? { ...item, reportedByViewer: true } : item,
+                ),
+              }
+            : current,
+        );
+        setReportingMessageId(null);
+        setReportReason('');
+      } catch (err: unknown) {
+        setReportError(messageFromUnknownError(err));
+      } finally {
+        setReportBusy(false);
+      }
+    },
+    [accessToken, conversationId, reportReason],
+  );
+
   if (loading && !detail) {
     return <LoadingBlock label="Loading conversation…" />;
   }
@@ -172,7 +221,29 @@ function ConversationThread({ navigation, route }: Props) {
           />
         }
         contentContainerStyle={styles.thread}
-        renderItem={({ item }) => <MessageBubble item={item} />}
+        renderItem={({ item }) => (
+          <MessageBubble
+            item={item}
+            reporting={reportingMessageId === item.id}
+            reportReason={reportReason}
+            reportError={reportingMessageId === item.id ? reportError : null}
+            reportBusy={reportBusy}
+            onStartReport={() => {
+              setReportingMessageId(item.id);
+              setReportReason('');
+              setReportError(null);
+            }}
+            onCancelReport={() => {
+              setReportingMessageId(null);
+              setReportReason('');
+              setReportError(null);
+            }}
+            onChangeReason={setReportReason}
+            onSubmitReport={() => {
+              void submitReport(item.id);
+            }}
+          />
+        )}
       />
       {canSendReply ? (
         <View
@@ -235,7 +306,27 @@ function ConversationThread({ navigation, route }: Props) {
   );
 }
 
-function MessageBubble({ item }: { item: ConversationMessage }) {
+function MessageBubble({
+  item,
+  reporting,
+  reportReason,
+  reportError,
+  reportBusy,
+  onStartReport,
+  onCancelReport,
+  onChangeReason,
+  onSubmitReport,
+}: {
+  item: ConversationMessage;
+  reporting: boolean;
+  reportReason: string;
+  reportError: string | null;
+  reportBusy: boolean;
+  onStartReport: () => void;
+  onCancelReport: () => void;
+  onChangeReason: (value: string) => void;
+  onSubmitReport: () => void;
+}) {
   const { c } = useTheme();
   const stamp = formatMessageTimestamp(item.createdAt);
   return (
@@ -264,6 +355,45 @@ function MessageBubble({ item }: { item: ConversationMessage }) {
       >
         {item.body}
       </Text>
+      {!item.isMine ? (
+        item.reportedByViewer ? (
+          <Text style={[type.caption, { color: c.textMuted }]}>Reported</Text>
+        ) : reporting ? (
+          <View style={{ alignSelf: 'stretch', gap: space.sm }}>
+            <TextInput
+              value={reportReason}
+              onChangeText={onChangeReason}
+              placeholder="Optional reason"
+              placeholderTextColor={c.textMuted}
+              accessibilityLabel="Optional reason"
+              maxLength={reportReasonMaxLength}
+              editable={!reportBusy}
+              style={[
+                styles.reportField,
+                {
+                  color: c.textPrimary,
+                  borderColor: c.border,
+                  backgroundColor: c.surfaceCard,
+                },
+              ]}
+            />
+            {reportError ? (
+              <Text style={[type.caption, { color: c.textSecondary }]}>{reportError}</Text>
+            ) : null}
+            <View style={styles.reportActions}>
+              <Button
+                label="Submit report"
+                size="sm"
+                onPress={onSubmitReport}
+                loading={reportBusy}
+              />
+              <Button label="Cancel" size="sm" variant="ghost" onPress={onCancelReport} disabled={reportBusy} />
+            </View>
+          </View>
+        ) : (
+          <Button label="Report message" size="sm" variant="ghost" onPress={onStartReport} />
+        )
+      ) : null}
     </View>
   );
 }
@@ -290,5 +420,19 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     fontFamily: fonts.body,
     fontSize: 16,
+  },
+  reportField: {
+    minHeight: 40,
+    borderWidth: 1,
+    borderRadius: radius.xs,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontFamily: fonts.body,
+    fontSize: 16,
+  },
+  reportActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: space.sm,
   },
 });

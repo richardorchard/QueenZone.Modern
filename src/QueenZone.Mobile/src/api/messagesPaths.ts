@@ -9,3 +9,7 @@ export const messagesRecipientsPath = `${messagesApiPath}/recipients`;
 export function messagesConversationPath(conversationId: string): string {
   return `${messagesApiPath}/${conversationId}`;
 }
+
+export function messagesReportPath(conversationId: string, messageId: string): string {
+  return `${messagesConversationPath(conversationId)}/messages/${messageId}/report`;
+}

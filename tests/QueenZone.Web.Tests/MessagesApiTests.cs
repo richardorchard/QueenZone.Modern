@@ -606,6 +606,62 @@ public sealed class MessagesApiTests : IClassFixture<QueenZoneWebApplicationFact
     }
 
     [Fact]
+    public async Task ReportMessage_CreatesSnapshot_AndRejectsOutsiders()
+    {
+        var (aliceId, bobId) = await SeedConversationPairAsync(
+            "api-report-alice@example.com",
+            "API Report Alice",
+            "api-report-bob@example.com",
+            "API Report Bob");
+        var carolId = Guid.NewGuid();
+        await SeedMemberAsync(carolId, "API Report Carol", "api-report-carol@example.com");
+        var service = factory.Services.GetRequiredService<PrivateMessageService>();
+        var sent = await service.ComposeAsync(aliceId, bobId, "Report this");
+        var conversationId = sent.ConversationId!.Value;
+        var message = Assert.Single(
+            (await service.GetConversationAsync(conversationId, bobId, markRead: false))!.Messages);
+
+        using var bob = CreateBearerClient(bobId, "API Report Bob", "api-report-bob@example.com");
+        using var created = await bob.PostAsJsonAsync(
+            MessagesApiEndpoints.ReportPath(conversationId, message.Id),
+            new { reason = "Harassment" });
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var dto = await created.Content.ReadFromJsonAsync<ReportMessageDto>(JsonOptions);
+        Assert.False(dto!.AlreadyReported);
+        Assert.NotEqual(Guid.Empty, dto.ReportId);
+
+        using var conversation = await bob.GetAsync(MessagesApiEndpoints.ConversationPath(conversationId));
+        var detail = await conversation.Content.ReadFromJsonAsync<ConversationDetailDto>(JsonOptions);
+        Assert.True(Assert.Single(detail!.Messages).ReportedByViewer);
+
+        using var again = await bob.PostAsJsonAsync(
+            MessagesApiEndpoints.ReportPath(conversationId, message.Id),
+            new { reason = "Again" });
+        Assert.Equal(HttpStatusCode.OK, again.StatusCode);
+        var againDto = await again.Content.ReadFromJsonAsync<ReportMessageDto>(JsonOptions);
+        Assert.True(againDto!.AlreadyReported);
+        Assert.Equal(dto.ReportId, againDto.ReportId);
+
+        using var own = CreateBearerClient(aliceId, "API Report Alice", "api-report-alice@example.com");
+        using var ownResponse = await own.PostAsJsonAsync(
+            MessagesApiEndpoints.ReportPath(conversationId, message.Id),
+            new { reason = "Mine" });
+        Assert.Equal(HttpStatusCode.BadRequest, ownResponse.StatusCode);
+
+        using var carol = CreateBearerClient(carolId, "API Report Carol", "api-report-carol@example.com");
+        using var outsider = await carol.PostAsJsonAsync(
+            MessagesApiEndpoints.ReportPath(conversationId, message.Id),
+            new { reason = "Nope" });
+        Assert.Equal(HttpStatusCode.NotFound, outsider.StatusCode);
+
+        using var anon = factory.CreateAnonymousClient(allowAutoRedirect: false);
+        using var unauth = await anon.PostAsJsonAsync(
+            MessagesApiEndpoints.ReportPath(conversationId, message.Id),
+            new { reason = "Nope" });
+        Assert.Equal(HttpStatusCode.Unauthorized, unauth.StatusCode);
+    }
+
+    [Fact]
     public void Mapper_CopiesInboxAndConversationFields()
     {
         var conversationId = Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
@@ -655,6 +711,7 @@ public sealed class MessagesApiTests : IClassFixture<QueenZoneWebApplicationFact
         Assert.Equal("See you at Wembley", message.Body);
         Assert.False(message.IsMine);
         Assert.Equal(9, message.SortKey);
+        Assert.False(message.ReportedByViewer);
         Assert.True(detail.CanSendReply);
         Assert.Equal("/messages/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", detail.DetailPath);
 

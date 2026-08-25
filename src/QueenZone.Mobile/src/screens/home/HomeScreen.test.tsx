@@ -1,4 +1,4 @@
-import { fireEvent, screen, userEvent, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, screen, userEvent, waitFor } from '@testing-library/react-native';
 import { RefreshControl } from 'react-native';
 import {
   fetchForumRecentThreads,
@@ -9,7 +9,7 @@ import {
 } from '../../api';
 import { newsItemFixture, pagedResponse } from '../../test/fixtures';
 import { createMockSession } from '../../test/mockSession';
-import { fakeNavigation, renderWithProviders } from '../../test/render';
+import { fakeNavigation, flushVirtualizedList, renderWithProviders } from '../../test/render';
 import { HomeScreen } from './HomeScreen';
 
 jest.mock('../../api', () => {
@@ -86,6 +86,10 @@ describe('HomeScreen', () => {
     fetchLive.mockResolvedValue({ newForumRepliesToday: 0 });
   });
 
+  afterEach(async () => {
+    await flushVirtualizedList();
+  });
+
   it('opens live news and forum rows with numeric ids, not placeholders', async () => {
     const { navigation } = renderHome();
     await waitFor(() => expect(screen.getByRole('button', { name: 'Live Aid remembered' })).toBeOnTheScreen());
@@ -115,8 +119,11 @@ describe('HomeScreen', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Live Aid remembered' })).toBeOnTheScreen());
     const newsCalls = fetchNews.mock.calls.length;
     const forumCalls = fetchForum.mock.calls.length;
-    fireEvent(screen.UNSAFE_getByType(RefreshControl), 'refresh');
+    await act(async () => {
+      fireEvent(screen.UNSAFE_getByType(RefreshControl), 'refresh');
+    });
     await waitFor(() => expect(fetchNews.mock.calls.length).toBeGreaterThan(newsCalls));
     expect(fetchForum.mock.calls.length).toBeGreaterThan(forumCalls);
+    await flushVirtualizedList();
   });
 });

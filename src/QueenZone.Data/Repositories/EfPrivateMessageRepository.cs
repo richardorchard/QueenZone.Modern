@@ -201,6 +201,11 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
                 .ToListAsync(cancellationToken);
         }
 
+        var reportedIds = await LoadReportedMessageIdsAsync(
+            conversationId,
+            memberId,
+            messageRows.Select(m => m.Id),
+            cancellationToken);
         IReadOnlyList<PrivateMessageItem> items = messageRows
             .Select(m => new PrivateMessageItem(
                 m.Id,
@@ -209,7 +214,8 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
                 m.Body,
                 m.CreatedAt,
                 m.SenderMemberId == memberId,
-                m.SortKey))
+                m.SortKey,
+                reportedIds.Contains(m.Id)))
             .ToList();
 
         return new PrivateConversationDetail(
@@ -938,6 +944,154 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
                     (message, conversation) => message.ConversationId)
                 .Distinct()
                 .CountAsync(cancellationToken);
+
+    public async Task<PrivateMessageReportResult> CreateReportAsync(
+        Guid reporterMemberId,
+        Guid conversationId,
+        Guid messageId,
+        string? reason,
+        DateTimeOffset createdAt,
+        CancellationToken cancellationToken = default)
+    {
+        var message = await dbContext.PrivateMessages
+            .AsNoTracking()
+            .SingleOrDefaultAsync(m => m.Id == messageId, cancellationToken);
+        if (message is null || message.ConversationId != conversationId)
+        {
+            return new PrivateMessageReportResult(false, null, PrivateMessageReportText.MessageNotFound);
+        }
+
+        var isParticipant = await IsParticipantAsync(conversationId, reporterMemberId, cancellationToken);
+        if (!isParticipant)
+        {
+            return new PrivateMessageReportResult(false, null, PrivateMessageReportText.NotAParticipant);
+        }
+
+        if (message.SenderMemberId == reporterMemberId)
+        {
+            return new PrivateMessageReportResult(false, null, PrivateMessageReportText.CannotReportOwn);
+        }
+
+        var existing = await dbContext.PrivateMessageReports
+            .AsNoTracking()
+            .SingleOrDefaultAsync(
+                r => r.ReporterMemberId == reporterMemberId && r.MessageId == messageId,
+                cancellationToken);
+        if (existing is not null)
+        {
+            return new PrivateMessageReportResult(true, existing.Id, null, AlreadyReported: true);
+        }
+
+        var senderName = await dbContext.MemberAccounts
+            .AsNoTracking()
+            .Where(m => m.Id == message.SenderMemberId)
+            .Select(m => m.DisplayName)
+            .SingleOrDefaultAsync(cancellationToken);
+        if (string.IsNullOrWhiteSpace(senderName))
+        {
+            senderName = "Unknown member";
+        }
+
+        var precedingRows = await dbContext.PrivateMessages
+            .AsNoTracking()
+            .Where(m => m.ConversationId == conversationId && m.SortKey < message.SortKey)
+            .OrderByDescending(m => m.SortKey)
+            .Take(PrivateMessageLimits.ReportPrecedingMessageCount)
+            .Select(m => new
+            {
+                m.Id,
+                m.SenderMemberId,
+                SenderName = m.Sender != null ? m.Sender.DisplayName : string.Empty,
+                m.Body,
+                m.CreatedAt,
+                m.SortKey,
+            })
+            .ToListAsync(cancellationToken);
+        var preceding = precedingRows
+            .OrderBy(m => m.SortKey)
+            .Select(m => new PrivateMessageReportContextItem(
+                m.Id,
+                m.SenderMemberId,
+                string.IsNullOrWhiteSpace(m.SenderName) ? "Unknown member" : m.SenderName,
+                m.Body,
+                m.CreatedAt))
+            .ToList();
+
+        var entity = PrivateMessageReportMapping.CreateEntity(
+            reporterMemberId,
+            message,
+            senderName,
+            preceding,
+            reason,
+            createdAt);
+        dbContext.PrivateMessageReports.Add(entity);
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return new PrivateMessageReportResult(true, entity.Id, null);
+        }
+        catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
+        {
+            dbContext.ChangeTracker.Clear();
+            var raced = await dbContext.PrivateMessageReports
+                .AsNoTracking()
+                .SingleOrDefaultAsync(
+                    r => r.ReporterMemberId == reporterMemberId && r.MessageId == messageId,
+                    cancellationToken);
+            if (raced is not null)
+            {
+                return new PrivateMessageReportResult(true, raced.Id, null, AlreadyReported: true);
+            }
+
+            throw;
+        }
+    }
+
+    public async Task<PrivateMessageReport?> GetReportAsync(
+        Guid reportId,
+        CancellationToken cancellationToken = default)
+    {
+        var entity = await dbContext.PrivateMessageReports
+            .AsNoTracking()
+            .SingleOrDefaultAsync(r => r.Id == reportId, cancellationToken);
+        return entity is null ? null : PrivateMessageReportMapping.ToModel(entity);
+    }
+
+    public async Task<IReadOnlySet<Guid>> GetReportedMessageIdsAsync(
+        Guid conversationId,
+        Guid reporterMemberId,
+        CancellationToken cancellationToken = default)
+    {
+        var ids = await dbContext.PrivateMessageReports
+            .AsNoTracking()
+            .Where(r => r.ConversationId == conversationId && r.ReporterMemberId == reporterMemberId)
+            .Select(r => r.MessageId)
+            .ToListAsync(cancellationToken);
+        return ids.ToHashSet();
+    }
+
+    private async Task<HashSet<Guid>> LoadReportedMessageIdsAsync(
+        Guid conversationId,
+        Guid reporterMemberId,
+        IEnumerable<Guid> messageIds,
+        CancellationToken cancellationToken)
+    {
+        var ids = messageIds.ToArray();
+        if (ids.Length == 0)
+        {
+            return [];
+        }
+
+        var reported = await dbContext.PrivateMessageReports
+            .AsNoTracking()
+            .Where(r =>
+                r.ConversationId == conversationId
+                && r.ReporterMemberId == reporterMemberId
+                && ids.Contains(r.MessageId))
+            .Select(r => r.MessageId)
+            .ToListAsync(cancellationToken);
+        return reported.ToHashSet();
+    }
 
     // SQLite fallback (also exercised in tests): the provider cannot translate DateTimeOffset
     // range comparisons, so materialise the sender's messages then filter by CreatedAt in
