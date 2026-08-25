@@ -19,6 +19,71 @@ type PagedState<T> = {
   loadMore: () => void;
 };
 
+const IDENTITY_KEYS = ['id', 'albumId', 'picId', 'catId', 'conversationId', 'sourceKey'] as const;
+
+function isAbortError(err: unknown): boolean {
+  return err instanceof Error && err.name === 'AbortError';
+}
+
+function pagedItemKey(item: unknown): unknown {
+  if (item !== null && typeof item === 'object') {
+    const record = item as Record<string, unknown>;
+    for (const key of IDENTITY_KEYS) {
+      const value = record[key];
+      if (typeof value === 'string' || typeof value === 'number') {
+        return `${key}:${value}`;
+      }
+    }
+  }
+  return item;
+}
+
+export function appendUniquePagedItems<T>(previous: T[], incoming: T[]): T[] {
+  if (incoming.length === 0) {
+    return previous;
+  }
+
+  const seen = new Set(previous.map(pagedItemKey));
+  const extra: T[] = [];
+  for (const item of incoming) {
+    const key = pagedItemKey(item);
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    extra.push(item);
+  }
+
+  return extra.length === 0 ? previous : [...previous, ...extra];
+}
+
+/**
+ * Owns AbortControllers and a generation counter so only the latest request
+ * may commit. Reset, refresh, load-more, and unmount all go through here.
+ */
+export class PagedRequestCoordinator {
+  private generation = 0;
+  private controller: AbortController | null = null;
+
+  begin(): { generation: number; signal: AbortSignal } {
+    this.controller?.abort();
+    this.generation += 1;
+    this.controller = new AbortController();
+    return { generation: this.generation, signal: this.controller.signal };
+  }
+
+  /** Drop every in-flight request and invalidate their generation (reset/unmount). */
+  invalidate(): void {
+    this.generation += 1;
+    this.controller?.abort();
+    this.controller = null;
+  }
+
+  isCurrent(generation: number): boolean {
+    return generation === this.generation;
+  }
+}
+
 /**
  * Loads a paged `/api/v1` collection with pull-to-refresh and infinite scroll.
  */
@@ -38,10 +103,35 @@ export function usePagedContent<T>(
   const [reloadToken, setReloadToken] = useState(0);
   const fetcherRef = useRef(fetcher);
   fetcherRef.current = fetcher;
+  const coordinatorRef = useRef<PagedRequestCoordinator | null>(null);
+  if (coordinatorRef.current === null) {
+    coordinatorRef.current = new PagedRequestCoordinator();
+  }
+  const coordinator = coordinatorRef.current;
+  const pageRef = useRef(0);
+  const totalPagesRef = useRef(0);
+  const loadingRef = useRef(true);
+  const refreshingRef = useRef(false);
+  const loadingMoreRef = useRef(false);
+
+  const applyPageMeta = (response: ApiPagedResponse<T>) => {
+    pageRef.current = response.page;
+    totalPagesRef.current = response.totalPages;
+    setPage(response.page);
+    setTotalPages(response.totalPages);
+    setTotalCount(response.totalCount);
+  };
 
   useEffect(() => {
-    const controller = new AbortController();
+    const { generation, signal } = coordinator.begin();
+    loadingRef.current = true;
+    refreshingRef.current = false;
+    loadingMoreRef.current = false;
+    pageRef.current = 0;
+    totalPagesRef.current = 0;
     setLoading(true);
+    setRefreshing(false);
+    setLoadingMore(false);
     setError(null);
     setItems([]);
     setPage(0);
@@ -49,75 +139,92 @@ export function usePagedContent<T>(
     setTotalCount(0);
 
     fetcherRef
-      .current(1, controller.signal)
+      .current(1, signal)
       .then((response) => {
-        if (controller.signal.aborted) {
+        if (!coordinator.isCurrent(generation) || signal.aborted) {
           return;
         }
         setItems(response.items);
-        setPage(response.page);
-        setTotalPages(response.totalPages);
-        setTotalCount(response.totalCount);
+        applyPageMeta(response);
+        loadingRef.current = false;
         setLoading(false);
       })
       .catch((err: unknown) => {
-        if (controller.signal.aborted || (err instanceof Error && err.name === 'AbortError')) {
+        if (!coordinator.isCurrent(generation) || signal.aborted || isAbortError(err)) {
           return;
         }
         const message = err instanceof ApiError ? err.message : 'Something went wrong.';
         setError(message);
+        loadingRef.current = false;
         setLoading(false);
       });
 
-    return () => controller.abort();
-  }, [reloadToken, pageSize, resetKey]);
+    return () => coordinator.invalidate();
+  }, [coordinator, reloadToken, pageSize, resetKey]);
 
   const refresh = useCallback(() => {
-    const controller = new AbortController();
+    const { generation, signal } = coordinator.begin();
+    refreshingRef.current = true;
+    loadingMoreRef.current = false;
     setRefreshing(true);
+    setLoadingMore(false);
     setError(null);
     fetcherRef
-      .current(1, controller.signal)
+      .current(1, signal)
       .then((response) => {
+        if (!coordinator.isCurrent(generation) || signal.aborted) {
+          return;
+        }
         setItems(response.items);
-        setPage(response.page);
-        setTotalPages(response.totalPages);
-        setTotalCount(response.totalCount);
+        applyPageMeta(response);
+        loadingRef.current = false;
+        refreshingRef.current = false;
+        setLoading(false);
         setRefreshing(false);
       })
       .catch((err: unknown) => {
-        if (err instanceof Error && err.name === 'AbortError') {
+        if (!coordinator.isCurrent(generation) || signal.aborted || isAbortError(err)) {
           return;
         }
         const message = err instanceof ApiError ? err.message : 'Something went wrong.';
         setError(message);
+        loadingRef.current = false;
+        refreshingRef.current = false;
+        setLoading(false);
         setRefreshing(false);
       });
-  }, []);
+  }, [coordinator]);
 
   const loadMore = useCallback(() => {
-    if (loading || refreshing || loadingMore || page >= totalPages || totalPages === 0) {
+    if (loadingRef.current || refreshingRef.current || loadingMoreRef.current) {
       return;
     }
-    const nextPage = page + 1;
-    const controller = new AbortController();
+    if (pageRef.current >= totalPagesRef.current || totalPagesRef.current === 0) {
+      return;
+    }
+    const nextPage = pageRef.current + 1;
+    const { generation, signal } = coordinator.begin();
+    loadingMoreRef.current = true;
     setLoadingMore(true);
     fetcherRef
-      .current(nextPage, controller.signal)
+      .current(nextPage, signal)
       .then((response) => {
-        setItems((prev) => [...prev, ...response.items]);
-        setPage(response.page);
-        setTotalPages(response.totalPages);
-        setTotalCount(response.totalCount);
+        if (!coordinator.isCurrent(generation) || signal.aborted) {
+          return;
+        }
+        setItems((prev) => appendUniquePagedItems(prev, response.items));
+        applyPageMeta(response);
+        loadingMoreRef.current = false;
         setLoadingMore(false);
       })
       .catch((err: unknown) => {
-        if (err instanceof Error && err.name === 'AbortError') {
+        if (!coordinator.isCurrent(generation) || signal.aborted || isAbortError(err)) {
           return;
         }
+        loadingMoreRef.current = false;
         setLoadingMore(false);
       });
-  }, [loading, refreshing, loadingMore, page, totalPages]);
+  }, [coordinator]);
 
   return {
     items,
