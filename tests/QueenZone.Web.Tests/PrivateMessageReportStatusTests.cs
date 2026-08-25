@@ -22,6 +22,16 @@ public sealed class PrivateMessageReportStatusTests
         Assert.False(PrivateMessageReportStatus.IsKnown("Pending"));
     }
 
+    [Theory]
+    [InlineData(PrivateMessageReportStatus.Open, "Open")]
+    [InlineData(PrivateMessageReportStatus.Reviewed, "Reviewed")]
+    [InlineData(PrivateMessageReportStatus.Dismissed, "Dismissed")]
+    [InlineData(PrivateMessageReportStatus.Actioned, "Actioned")]
+    public void DisplayName_ReturnsCanonicalLabel(string status, string expected)
+    {
+        Assert.Equal(expected, PrivateMessageReportStatus.DisplayName(status));
+    }
+
     [Fact]
     public void ContextSerializer_RoundTripsAndToleratesBadJson()
     {

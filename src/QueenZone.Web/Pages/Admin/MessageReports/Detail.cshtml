@@ -1,0 +1,144 @@
+@page "/admin/message-reports/{id:guid}"
+@model QueenZone.Web.Pages.Admin.MessageReports.DetailModel
+@using QueenZone.Data
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+
+@{
+  var review = Model.Review!;
+  var report = review.Report;
+  var token = Antiforgery.GetAndStoreTokens(ViewContext.HttpContext).RequestToken;
+}
+
+<div class="admin-shell">
+  <h1>Reported private message</h1>
+  <p><a href="/admin/message-reports">Back to message reports</a></p>
+
+  @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+  {
+    <p class="qz-account-notice @(Model.StatusMessageKind == "error" ? "qz-account-notice--error" : "qz-account-notice--success")" role="status">
+      @Model.StatusMessage
+    </p>
+  }
+
+  <p>
+    This page shows the snapshot captured when the report was filed, plus limited
+    preceding context. It is not a browse of the conversation or of other private messages.
+  </p>
+
+  <dl class="admin-detail-list">
+    <dt>Status</dt>
+    <dd><partial name="_SubmissionStatusBadge" model="report.Status" /></dd>
+    <dt>Filed</dt>
+    <dd>@report.CreatedAt.ToString("u")</dd>
+    <dt>Reporter</dt>
+    <dd>
+      @review.ReporterDisplayName
+      · <a href="/admin/members/@report.ReporterMemberId">Member account</a>
+    </dd>
+    <dt>Reported member</dt>
+    <dd>
+      @review.ReportedDisplayName
+      · <a href="/admin/members/@report.ReportedMemberId">Member account</a>
+    </dd>
+    <dt>Reason</dt>
+    <dd>@(string.IsNullOrWhiteSpace(report.Reason) ? "—" : report.Reason)</dd>
+    <dt>Reviewed</dt>
+    <dd>@(review.ReviewedAt?.ToString("u") ?? "—")</dd>
+    <dt>Reviewer</dt>
+    <dd>@(review.ReviewerEmail ?? "—")</dd>
+    <dt>Internal notes</dt>
+    <dd>@(string.IsNullOrWhiteSpace(review.ReviewNotes) ? "—" : review.ReviewNotes)</dd>
+  </dl>
+
+  <section>
+    <h2>Reported message</h2>
+    <p>
+      <strong>@report.SenderDisplayNameSnapshot</strong>
+      <time datetime="@report.MessageCreatedAtSnapshot.ToString("O")">@report.MessageCreatedAtSnapshot.ToString("u")</time>
+    </p>
+    <p style="white-space: pre-wrap;">@report.MessageBodySnapshot</p>
+  </section>
+
+  <section>
+    <h2>Limited preceding context</h2>
+    @if (report.PrecedingMessages.Count == 0)
+    {
+      <p>No preceding messages were captured with this report.</p>
+    }
+    else
+    {
+      <ol>
+        @foreach (var item in report.PrecedingMessages)
+        {
+          <li>
+            <p>
+              <strong>@item.SenderDisplayName</strong>
+              <time datetime="@item.CreatedAt.ToString("O")">@item.CreatedAt.ToString("u")</time>
+            </p>
+            <p style="white-space: pre-wrap;">@item.Body</p>
+          </li>
+        }
+      </ol>
+    }
+  </section>
+
+  <section>
+    <h2>Update status</h2>
+    <form method="post" action="/admin/message-reports/@report.Id/status" class="admin-inline-form">
+      <input type="hidden" name="@AdminMessageReportsPageModel.AntiforgeryTokenFieldName" value="@token" />
+      <label>
+        Status
+        <select name="status">
+          @foreach (var status in PrivateMessageReportStatus.All)
+          {
+            @if (report.Status == status)
+            {
+              <option value="@status" selected>@PrivateMessageReportStatus.DisplayName(status)</option>
+            }
+            else
+            {
+              <option value="@status">@PrivateMessageReportStatus.DisplayName(status)</option>
+            }
+          }
+        </select>
+      </label>
+      <label>
+        Internal notes
+        <input name="reviewNotes" maxlength="500" value="@review.ReviewNotes" />
+      </label>
+      <button type="submit">Save</button>
+    </form>
+  </section>
+
+  <section>
+    <h2>Access audit</h2>
+    @if (review.AuditLogs.Count == 0)
+    {
+      <p>No audit entries yet.</p>
+    }
+    else
+    {
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>When</th>
+            <th>Action</th>
+            <th>Admin</th>
+            <th>Details</th>
+          </tr>
+        </thead>
+        <tbody>
+          @foreach (var log in review.AuditLogs)
+          {
+            <tr>
+              <td>@log.OccurredAt.ToString("u")</td>
+              <td>@log.Action</td>
+              <td>@log.ActorEmail</td>
+              <td>@(log.Details ?? "—")</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+  </section>
+</div>

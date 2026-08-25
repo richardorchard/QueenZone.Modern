@@ -64,6 +64,7 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddScoped<INewsSuggestionRepository, EfNewsSuggestionRepository>();
         services.AddScoped<IHelpRequestRepository, EfHelpRequestRepository>();
         services.AddScoped<IPrivateMessageRepository, EfPrivateMessageRepository>();
+        services.AddScoped<IPrivateMessageReportReviewRepository, EfPrivateMessageReportReviewRepository>();
         services.AddScoped<IMemberFollowRepository, EfMemberFollowRepository>();
         services.AddScoped<IMemberPublicActivityRepository, EfMemberPublicActivityRepository>();
         services.AddScoped<ILinksRepository, EfLinksRepository>();
@@ -135,12 +136,16 @@ public static class QueenZoneDataServiceCollectionExtensions
                 members.FindByIdAsync(id).GetAwaiter().GetResult());
         });
         services.AddSingleton<IHelpRequestRepository, InMemoryHelpRequestRepository>();
-        services.AddSingleton<IPrivateMessageRepository>(sp =>
+        services.AddSingleton<InMemoryPrivateMessageRepository>(sp =>
         {
             var members = sp.GetRequiredService<IMemberAccountRepository>();
             return new InMemoryPrivateMessageRepository(id =>
                 members.FindByIdAsync(id).GetAwaiter().GetResult());
         });
+        services.AddSingleton<IPrivateMessageRepository>(sp =>
+            sp.GetRequiredService<InMemoryPrivateMessageRepository>());
+        services.AddSingleton<IPrivateMessageReportReviewRepository>(sp =>
+            sp.GetRequiredService<InMemoryPrivateMessageRepository>());
         services.AddSingleton<IMemberFollowRepository, InMemoryMemberFollowRepository>();
 
         services.AddSingleton<IArticleSubmissionRepository>(sp =>
