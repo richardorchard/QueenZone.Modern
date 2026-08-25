@@ -1,7 +1,7 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { FlatList, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { fetchNewsPage, formatPublishedDate, type NewsListItem } from '../../api';
+import { fetchNewsPage, fetchNewsYearRange, formatPublishedDate, type NewsListItem, type NewsYearRange } from '../../api';
 import { newsDecades } from '../../content/sample';
 import { usePagedContent } from '../../hooks/usePagedContent';
 import type { NewsStackParamList } from '../../navigation/types';
@@ -11,20 +11,48 @@ import { Chip } from '../../ui/Chip';
 import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from '../../ui/ScreenStates';
 import { testIds } from '../../test/testIds';
 import { PageTitleBlock } from '../../ui/PageTitleBlock';
+import { YearRail } from '../../ui/YearRail';
 
 type Props = NativeStackScreenProps<NewsStackParamList, 'NewsIndex'>;
 
 export function NewsIndexScreen({ navigation }: Props) {
   const { c } = useTheme();
   const [decade, setDecade] = useState<(typeof newsDecades)[number]>(newsDecades[0]);
+  const [selectedYear, setSelectedYear] = useState<number | null>(null);
+  const [yearRange, setYearRange] = useState<NewsYearRange | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchNewsYearRange(controller.signal)
+      .then(setYearRange)
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, []);
+
   const paged = usePagedContent<NewsListItem>(
     useCallback(
-      (page, signal) => fetchNewsPage({ page, pageSize: 20, decade: decade.decadeStart ?? undefined, signal }),
-      [decade],
+      (page, signal) =>
+        fetchNewsPage({
+          page,
+          pageSize: 20,
+          decade: selectedYear === null ? decade.decadeStart ?? undefined : undefined,
+          year: selectedYear ?? undefined,
+          signal,
+        }),
+      [decade, selectedYear],
     ),
     20,
-    decade.label,
+    selectedYear === null ? decade.label : `year-${selectedYear}`,
   );
+
+  const selectDecade = useCallback((option: (typeof newsDecades)[number]) => {
+    setSelectedYear(null);
+    setDecade(option);
+  }, []);
+
+  const selectYear = useCallback((year: number) => {
+    setSelectedYear(year);
+  }, []);
 
   const countLine =
     paged.totalCount > 0
@@ -43,8 +71,8 @@ export function NewsIndexScreen({ navigation }: Props) {
           <Chip
             key={option.label}
             label={option.label}
-            active={decade.label === option.label}
-            onPress={() => setDecade(option)}
+            active={selectedYear === null && decade.label === option.label}
+            onPress={() => selectDecade(option)}
           />
         ))}
       </ScrollView>
@@ -69,36 +97,49 @@ export function NewsIndexScreen({ navigation }: Props) {
     );
   }
 
+  const emptyMessage = selectedYear !== null
+    ? `No articles for ${selectedYear} yet.`
+    : decade.decadeStart === null
+      ? 'No news articles yet.'
+      : 'No articles for this decade yet.';
+
   return (
-    <FlatList
-      testID={testIds.newsScreen}
-      style={[styles.list, { backgroundColor: c.surfacePage }]}
-      data={paged.items}
-      keyExtractor={(item) => String(item.id)}
-      ListHeaderComponent={header}
-      ListEmptyComponent={
-        <EmptyBlock message={decade.decadeStart === null ? 'No news articles yet.' : 'No articles for this decade yet.'} />
-      }
-      ListFooterComponent={<ListFooterLoading visible={paged.loadingMore} />}
-      refreshControl={
-        <RefreshControl refreshing={paged.refreshing} onRefresh={paged.refresh} tintColor={c.accentPrimary} />
-      }
-      onEndReached={paged.loadMore}
-      onEndReachedThreshold={0.4}
-      renderItem={({ item }) => (
-        <ArticleRow
-          title={item.title}
-          subtitle={item.excerpt}
-          meta={formatPublishedDate(item.publishedAt)}
-          onPress={() => navigation.navigate('Story', { id: item.id })}
-          accessibilityLabel={`Open ${item.title}`}
-          testID={`news-story-${item.id}`}
-        />
-      )}
-    />
+    <View style={styles.container}>
+      <FlatList
+        testID={testIds.newsScreen}
+        style={[styles.list, { backgroundColor: c.surfacePage }]}
+        data={paged.items}
+        keyExtractor={(item) => String(item.id)}
+        ListHeaderComponent={header}
+        ListEmptyComponent={<EmptyBlock message={emptyMessage} />}
+        ListFooterComponent={<ListFooterLoading visible={paged.loadingMore} />}
+        refreshControl={
+          <RefreshControl refreshing={paged.refreshing} onRefresh={paged.refresh} tintColor={c.accentPrimary} />
+        }
+        onEndReached={paged.loadMore}
+        onEndReachedThreshold={0.4}
+        renderItem={({ item }) => (
+          <ArticleRow
+            title={item.title}
+            subtitle={item.excerpt}
+            meta={formatPublishedDate(item.publishedAt)}
+            onPress={() => navigation.navigate('Story', { id: item.id })}
+            accessibilityLabel={`Open ${item.title}`}
+            testID={`news-story-${item.id}`}
+          />
+        )}
+      />
+      <YearRail
+        minYear={yearRange?.minYear ?? null}
+        maxYear={yearRange?.maxYear ?? null}
+        activeYear={selectedYear}
+        onSelectYear={selectYear}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: { flex: 1 },
   list: { flex: 1 },
 });

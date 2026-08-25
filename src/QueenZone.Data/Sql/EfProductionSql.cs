@@ -100,7 +100,8 @@ internal static class EfProductionSql
         string ById,
         string Sitemap,
         string ArchivePageByDecade,
-        string CountByDecade)
+        string CountByDecade,
+        string YearRange)
         CreateNewsQueries(string listCte, string detailCte) =>
         (
             // $$ raw strings: {{expr}} interpolates; single {0} stays a literal EF parameter placeholder.
@@ -192,6 +193,15 @@ internal static class EfProductionSql
                 FROM PublishedNews
                 WHERE {{PublishedNewsQuery.LatestRowFilter}}
                   AND PublishedAt >= {0} AND PublishedAt < {1}
+                """,
+            // Feeds the mobile year-rail scrubber's tick-mark range (issue #886).
+            listCte + $$"""
+
+                SELECT
+                    MIN(PublishedAt) AS MinPublishedAt,
+                    MAX(PublishedAt) AS MaxPublishedAt
+                FROM PublishedNews
+                WHERE {{PublishedNewsQuery.LatestRowFilter}}
                 """);
 
     /// <summary>

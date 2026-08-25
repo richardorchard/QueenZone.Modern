@@ -1560,6 +1560,29 @@ namespace QueenZone.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("QueenZone.Data.Entities.NotificationPreferenceEntity", b =>
+                {
+                    b.Property<Guid>("MemberAccountId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Category")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("MemberAccountId", "Category");
+
+                    b.HasIndex("Category", "IsEnabled")
+                        .HasDatabaseName("IX_NotificationPreferences_Category_IsEnabled");
+
+                    b.ToTable("NotificationPreferences", (string)null);
+                });
+
             modelBuilder.Entity("QueenZone.Data.Entities.PhotoAdminAuditLogEntity", b =>
                 {
                     b.Property<long>("Id")
@@ -2465,6 +2488,17 @@ namespace QueenZone.Data.Migrations
                     b.Navigation("DuplicateCandidate");
 
                     b.Navigation("Submitter");
+                });
+
+            modelBuilder.Entity("QueenZone.Data.Entities.NotificationPreferenceEntity", b =>
+                {
+                    b.HasOne("QueenZone.Data.Entities.MemberAccount", "MemberAccount")
+                        .WithMany()
+                        .HasForeignKey("MemberAccountId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("MemberAccount");
                 });
 
             modelBuilder.Entity("QueenZone.Data.Entities.PhotoSubmissionAuditLogEntity", b =>

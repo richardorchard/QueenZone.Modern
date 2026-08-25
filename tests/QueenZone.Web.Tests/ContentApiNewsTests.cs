@@ -190,4 +190,96 @@ public sealed class ContentApiNewsTests : IClassFixture<QueenZoneWebApplicationF
         Assert.Equal(unfilteredPayload!.TotalCount, payload!.TotalCount);
         Assert.True(payload.TotalCount > 0);
     }
+
+    [Fact]
+    public async Task News_list_year_filter_finds_article_absent_from_unfiltered_first_page()
+    {
+        // Same setup as the decade-filter test, but the year-rail scrubber (issue #886) needs a
+        // single-year window rather than a 10-year one.
+        var items = new List<NewsItem>();
+        for (var i = 0; i < 25; i++)
+        {
+            items.Add(new NewsItem(
+                2000 + i,
+                $"2020s article {i}",
+                "Excerpt",
+                "Body",
+                new DateTime(2020, 6, 1, 0, 0, 0, DateTimeKind.Utc).AddDays(-i),
+                null,
+                true));
+        }
+
+        items.Add(new NewsItem(
+            9999,
+            "Old article from 2008",
+            "Excerpt",
+            "Body",
+            new DateTime(2008, 3, 4, 0, 0, 0, DateTimeKind.Utc),
+            null,
+            true));
+
+        using var appFactory = QueenZoneWebApplicationFactory.WithServices(services =>
+        {
+            services.RemoveAll<INewsRepository>();
+            services.AddSingleton<INewsRepository>(_ => new FixedNewsRepository(items));
+        });
+
+        using var client = appFactory.CreateAnonymousClient();
+
+        using var response = await client.GetAsync($"{ContentApiEndpoints.RootPath}/news?year=2008");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<ApiPagedResponse<NewsListItemDto>>();
+        Assert.NotNull(payload);
+        Assert.Equal(1, payload!.TotalCount);
+        Assert.Single(payload.Items);
+        Assert.Equal(9999, payload.Items[0].Id);
+    }
+
+    [Fact]
+    public async Task News_list_year_filter_wins_when_decade_is_also_supplied()
+    {
+        using var appFactory = QueenZoneWebApplicationFactory.WithServices(services =>
+        {
+            services.RemoveAll<INewsRepository>();
+            services.AddSingleton<INewsRepository>(_ => new FixedNewsRepository([
+                new NewsItem(1, "2008 article", "Ex", "Body", new DateTime(2008, 1, 1, 0, 0, 0, DateTimeKind.Utc), null, true),
+                new NewsItem(2, "2015 article", "Ex", "Body", new DateTime(2015, 1, 1, 0, 0, 0, DateTimeKind.Utc), null, true),
+            ]));
+        });
+
+        using var client = appFactory.CreateAnonymousClient();
+
+        using var response = await client.GetAsync($"{ContentApiEndpoints.RootPath}/news?decade=2010&year=2008");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<ApiPagedResponse<NewsListItemDto>>();
+        Assert.NotNull(payload);
+        Assert.Equal(1, payload!.TotalCount);
+        Assert.Equal(1, payload.Items[0].Id);
+    }
+
+    [Fact]
+    public async Task News_years_returns_min_and_max_published_year()
+    {
+        using var appFactory = QueenZoneWebApplicationFactory.WithServices(services =>
+        {
+            services.RemoveAll<INewsRepository>();
+            services.AddSingleton<INewsRepository>(_ => new FixedNewsRepository([
+                new NewsItem(1, "Oldest", "Ex", "Body", new DateTime(2006, 5, 1, 0, 0, 0, DateTimeKind.Utc), null, true),
+                new NewsItem(2, "Newest", "Ex", "Body", new DateTime(2026, 6, 11, 0, 0, 0, DateTimeKind.Utc), null, true),
+                new NewsItem(3, "Hidden", "Ex", "Body", new DateTime(2001, 1, 1, 0, 0, 0, DateTimeKind.Utc), null, false),
+            ]));
+        });
+
+        using var client = appFactory.CreateAnonymousClient();
+
+        using var response = await client.GetAsync($"{ContentApiEndpoints.RootPath}/news/years");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<NewsYearRangeDto>();
+        Assert.NotNull(payload);
+        Assert.Equal(2006, payload!.MinYear);
+        Assert.Equal(2026, payload.MaxYear);
+    }
 }

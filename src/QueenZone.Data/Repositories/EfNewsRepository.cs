@@ -20,6 +20,7 @@ public sealed class EfNewsRepository : INewsRepository
     private readonly string sitemapSql;
     private readonly string archivePageByDecadeSql;
     private readonly string countByDecadeSql;
+    private readonly string archiveYearRangeSql;
 
     // SQLite-only: LIKE-based fallback for deterministic tests.
     // On SQL Server the SearchAsync path uses dbo.NEWS_T_SearchPublished instead.
@@ -40,7 +41,7 @@ public sealed class EfNewsRepository : INewsRepository
         // List/count/sitemap omit ARTICLE; detail still projects full body.
         var listCte = PublishedNewsQuery.BuildPublishedNewsCte(includeSlug, includeBody: false);
         var detailCte = PublishedNewsQuery.BuildPublishedNewsCte(includeSlug, includeBody: true);
-        (latestSql, countSql, archivePageSql, byIdSql, sitemapSql, archivePageByDecadeSql, countByDecadeSql) =
+        (latestSql, countSql, archivePageSql, byIdSql, sitemapSql, archivePageByDecadeSql, countByDecadeSql, archiveYearRangeSql) =
             EfProductionSql.CreateNewsQueries(listCte, detailCte);
         // SQLite fallback: body-inclusive CTE for LIKE matching (not used on SQL Server).
         var searchCte = PublishedNewsQuery.BuildPublishedNewsCte(includeSlug, includeBody: true);
@@ -63,7 +64,8 @@ public sealed class EfNewsRepository : INewsRepository
         string sqliteLikeSearchCountSql = "",
         INewsSuggestionRepository? newsSuggestionRepository = null,
         string archivePageByDecadeSql = "",
-        string countByDecadeSql = "")
+        string countByDecadeSql = "",
+        string archiveYearRangeSql = "")
     {
         this.dbContext = dbContext;
         this.latestSql = latestSql;
@@ -76,6 +78,7 @@ public sealed class EfNewsRepository : INewsRepository
         this.newsSuggestionRepository = newsSuggestionRepository;
         this.archivePageByDecadeSql = archivePageByDecadeSql;
         this.countByDecadeSql = countByDecadeSql;
+        this.archiveYearRangeSql = archiveYearRangeSql;
     }
 
     public async Task<IReadOnlyList<NewsItem>> GetLatestAsync(int count, CancellationToken cancellationToken = default)
@@ -136,6 +139,15 @@ public sealed class EfNewsRepository : INewsRepository
         }
 
         return await AddSubmissionAttributionAsync(rows.Select(Map).ToList(), cancellationToken);
+    }
+
+    public async Task<NewsArchiveYearRange> GetArchiveYearRangeAsync(CancellationToken cancellationToken = default)
+    {
+        var rows = await dbContext.Database
+            .SqlQueryRaw<NewsDateRangeRow>(archiveYearRangeSql)
+            .ToListAsync(cancellationToken);
+        var row = rows.FirstOrDefault();
+        return new NewsArchiveYearRange(row?.MinPublishedAt?.Year, row?.MaxPublishedAt?.Year);
     }
 
     public async Task<NewsItem?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
@@ -304,5 +316,12 @@ public sealed class EfNewsRepository : INewsRepository
         public bool IsPublished { get; set; }
 
         public string? Slug { get; set; }
+    }
+
+    internal sealed class NewsDateRangeRow
+    {
+        public DateTime? MinPublishedAt { get; set; }
+
+        public DateTime? MaxPublishedAt { get; set; }
     }
 }
