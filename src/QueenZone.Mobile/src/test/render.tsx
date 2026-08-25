@@ -17,18 +17,21 @@ export function renderWithProviders(ui: ReactElement, options: Options = {}) {
   const { navigation = true, ...renderOptions } = options;
   const content = navigation ? <NavigationContainer>{ui}</NavigationContainer> : ui;
 
-  return render(
-    <SafeAreaProvider initialMetrics={safeAreaMetrics}>
-      <ThemeProvider>{content}</ThemeProvider>
-    </SafeAreaProvider>,
-    renderOptions,
-  );
+  return render(content, {
+    wrapper: ({ children }) => (
+      <SafeAreaProvider initialMetrics={safeAreaMetrics}>
+        <ThemeProvider>{children}</ThemeProvider>
+      </SafeAreaProvider>
+    ),
+    ...renderOptions,
+  });
 }
 
 export function fakeNavigation() {
   return {
     navigate: jest.fn(),
     goBack: jest.fn(),
+    setParams: jest.fn(),
     setOptions: jest.fn(),
     addListener: jest.fn(() => jest.fn()),
     isFocused: jest.fn(() => true),
