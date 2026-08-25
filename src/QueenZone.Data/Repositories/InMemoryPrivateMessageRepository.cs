@@ -9,9 +9,11 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
     private readonly List<PrivateConversationParticipantEntity> participants = [];
     private readonly List<PrivateMessageEntity> messages = [];
     private readonly List<PrivateMessageReportEntity> reports = [];
+    private readonly List<PrivateMessageReportAuditLogEntity> reportAuditLogs = [];
     private readonly List<MemberMessageBlockEntity> blocks = [];
     private readonly Func<Guid, MemberAccount?>? resolveMember;
     private long nextSortKey = 1;
+    private long nextReportAuditLogId = 1;
 
     public InMemoryPrivateMessageRepository(Func<Guid, MemberAccount?>? resolveMember = null)
     {
@@ -664,6 +666,135 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
                 .Select(r => r.MessageId)
                 .ToHashSet();
             return Task.FromResult(ids);
+        }
+    }
+
+    public Task<PrivateMessageReportListPage> ListReportsAsync(
+        string? status,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        lock (sync)
+        {
+            page = Math.Max(1, page);
+            pageSize = Math.Clamp(pageSize, 1, 100);
+            var statusFilter = string.IsNullOrWhiteSpace(status)
+                || string.Equals(status, "all", StringComparison.OrdinalIgnoreCase)
+                ? null
+                : PrivateMessageReportStatus.Normalize(status);
+
+            var filtered = statusFilter is null
+                ? reports
+                : reports.Where(r => r.Status == statusFilter).ToList();
+
+            var ordered = filtered.OrderByDescending(r => r.CreatedAt).ToList();
+            var items = ordered
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(r => new PrivateMessageReportListItem(
+                    r.Id,
+                    r.MessageId,
+                    r.ConversationId,
+                    r.ReporterMemberId,
+                    resolveMember?.Invoke(r.ReporterMemberId)?.DisplayName ?? "Unknown member",
+                    r.ReportedMemberId,
+                    resolveMember?.Invoke(r.ReportedMemberId)?.DisplayName ?? "Unknown member",
+                    r.Reason,
+                    r.Status,
+                    r.CreatedAt))
+                .ToList();
+
+            return Task.FromResult(new PrivateMessageReportListPage(items, ordered.Count, statusFilter));
+        }
+    }
+
+    public Task<int> CountOpenReportsAsync(CancellationToken cancellationToken = default)
+    {
+        lock (sync)
+        {
+            return Task.FromResult(reports.Count(r => r.Status == PrivateMessageReportStatus.Open));
+        }
+    }
+
+    public Task<PrivateMessageReport?> UpdateReportStatusAsync(
+        Guid reportId,
+        string status,
+        string actorEmail,
+        CancellationToken cancellationToken = default)
+    {
+        lock (sync)
+        {
+            var entity = reports.SingleOrDefault(r => r.Id == reportId);
+            if (entity is null)
+            {
+                return Task.FromResult<PrivateMessageReport?>(null);
+            }
+
+            var normalizedStatus = PrivateMessageReportStatus.Normalize(status);
+            var previousStatus = entity.Status;
+            entity.Status = normalizedStatus;
+
+            if (!string.Equals(previousStatus, normalizedStatus, StringComparison.Ordinal))
+            {
+                reportAuditLogs.Add(new PrivateMessageReportAuditLogEntity
+                {
+                    Id = nextReportAuditLogId++,
+                    ReportId = reportId,
+                    Action = PrivateMessageReportAuditAction.StatusChanged,
+                    ActorEmail = actorEmail,
+                    OccurredAt = DateTimeOffset.UtcNow,
+                    Details = $"{previousStatus} -> {normalizedStatus}",
+                });
+            }
+
+            return Task.FromResult<PrivateMessageReport?>(PrivateMessageReportMapping.ToModel(entity));
+        }
+    }
+
+    public Task AppendReportViewedAuditAsync(
+        Guid reportId,
+        string actorEmail,
+        CancellationToken cancellationToken = default)
+    {
+        lock (sync)
+        {
+            reportAuditLogs.Add(new PrivateMessageReportAuditLogEntity
+            {
+                Id = nextReportAuditLogId++,
+                ReportId = reportId,
+                Action = PrivateMessageReportAuditAction.Viewed,
+                ActorEmail = actorEmail,
+                OccurredAt = DateTimeOffset.UtcNow,
+            });
+            return Task.CompletedTask;
+        }
+    }
+
+    public Task<int> PurgeExpiredReportsAsync(
+        DateTimeOffset asOfUtc,
+        CancellationToken cancellationToken = default)
+    {
+        lock (sync)
+        {
+            var cutoff = asOfUtc - PrivateMessageLimits.ReportRetentionAfterTerminalStatus;
+
+            var eligibleIds = reports
+                .Where(r => r.Status == PrivateMessageReportStatus.Dismissed
+                    || r.Status == PrivateMessageReportStatus.Actioned)
+                .Where(r =>
+                {
+                    var lastStatusChangeAt = reportAuditLogs
+                        .Where(log => log.ReportId == r.Id && log.Action == PrivateMessageReportAuditAction.StatusChanged)
+                        .Select(log => (DateTimeOffset?)log.OccurredAt)
+                        .Max();
+                    return lastStatusChangeAt is not null && lastStatusChangeAt <= cutoff;
+                })
+                .Select(r => r.Id)
+                .ToList();
+
+            reports.RemoveAll(r => eligibleIds.Contains(r.Id));
+            return Task.FromResult(eligibleIds.Count);
         }
     }
 

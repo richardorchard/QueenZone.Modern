@@ -1070,6 +1070,169 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
         return ids.ToHashSet();
     }
 
+    public async Task<PrivateMessageReportListPage> ListReportsAsync(
+        string? status,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 100);
+        var statusFilter = NormalizeOptionalReportStatus(status);
+
+        var query = dbContext.PrivateMessageReports.AsNoTracking();
+        if (statusFilter is not null)
+        {
+            query = query.Where(r => r.Status == statusFilter);
+        }
+
+        if (IsSqliteDatabase())
+        {
+            var allRows = await query
+                .Select(r => new PrivateMessageReportListItem(
+                    r.Id,
+                    r.MessageId,
+                    r.ConversationId,
+                    r.ReporterMemberId,
+                    r.Reporter != null ? r.Reporter.DisplayName : "Unknown member",
+                    r.ReportedMemberId,
+                    r.Reported != null ? r.Reported.DisplayName : "Unknown member",
+                    r.Reason,
+                    r.Status,
+                    r.CreatedAt))
+                .ToListAsync(cancellationToken);
+
+            var ordered = allRows.OrderByDescending(r => r.CreatedAt).ToList();
+            var pagedItems = ordered.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+            return new PrivateMessageReportListPage(pagedItems, ordered.Count, statusFilter);
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken);
+        var items = await query
+            .OrderByDescending(r => r.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(r => new PrivateMessageReportListItem(
+                r.Id,
+                r.MessageId,
+                r.ConversationId,
+                r.ReporterMemberId,
+                r.Reporter != null ? r.Reporter.DisplayName : "Unknown member",
+                r.ReportedMemberId,
+                r.Reported != null ? r.Reported.DisplayName : "Unknown member",
+                r.Reason,
+                r.Status,
+                r.CreatedAt))
+            .ToListAsync(cancellationToken);
+
+        return new PrivateMessageReportListPage(items, totalCount, statusFilter);
+    }
+
+    public async Task<int> CountOpenReportsAsync(CancellationToken cancellationToken = default) =>
+        await dbContext.PrivateMessageReports
+            .AsNoTracking()
+            .CountAsync(r => r.Status == PrivateMessageReportStatus.Open, cancellationToken);
+
+    public async Task<PrivateMessageReport?> UpdateReportStatusAsync(
+        Guid reportId,
+        string status,
+        string actorEmail,
+        CancellationToken cancellationToken = default)
+    {
+        var entity = await dbContext.PrivateMessageReports
+            .SingleOrDefaultAsync(r => r.Id == reportId, cancellationToken);
+        if (entity is null)
+        {
+            return null;
+        }
+
+        var normalizedStatus = PrivateMessageReportStatus.Normalize(status);
+        var previousStatus = entity.Status;
+        entity.Status = normalizedStatus;
+
+        if (!string.Equals(previousStatus, normalizedStatus, StringComparison.Ordinal))
+        {
+            dbContext.PrivateMessageReportAuditLogs.Add(new PrivateMessageReportAuditLogEntity
+            {
+                ReportId = reportId,
+                Action = PrivateMessageReportAuditAction.StatusChanged,
+                ActorEmail = actorEmail,
+                OccurredAt = DateTimeOffset.UtcNow,
+                Details = $"{previousStatus} -> {normalizedStatus}",
+            });
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return PrivateMessageReportMapping.ToModel(entity);
+    }
+
+    public async Task AppendReportViewedAuditAsync(
+        Guid reportId,
+        string actorEmail,
+        CancellationToken cancellationToken = default)
+    {
+        dbContext.PrivateMessageReportAuditLogs.Add(new PrivateMessageReportAuditLogEntity
+        {
+            ReportId = reportId,
+            Action = PrivateMessageReportAuditAction.Viewed,
+            ActorEmail = actorEmail,
+            OccurredAt = DateTimeOffset.UtcNow,
+        });
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<int> PurgeExpiredReportsAsync(
+        DateTimeOffset asOfUtc,
+        CancellationToken cancellationToken = default)
+    {
+        var cutoff = asOfUtc - PrivateMessageLimits.ReportRetentionAfterTerminalStatus;
+
+        var terminalReportIds = await dbContext.PrivateMessageReports
+            .AsNoTracking()
+            .Where(r => r.Status == PrivateMessageReportStatus.Dismissed
+                || r.Status == PrivateMessageReportStatus.Actioned)
+            .Select(r => r.Id)
+            .ToListAsync(cancellationToken);
+        if (terminalReportIds.Count == 0)
+        {
+            return 0;
+        }
+
+        // SQLite (tests) cannot translate MAX() over DateTimeOffset; materialise the relevant
+        // audit rows and aggregate client-side. Production always targets SQL Server.
+        var statusChangeRows = await dbContext.PrivateMessageReportAuditLogs
+            .AsNoTracking()
+            .Where(log =>
+                log.Action == PrivateMessageReportAuditAction.StatusChanged
+                && terminalReportIds.Contains(log.ReportId))
+            .Select(log => new { log.ReportId, log.OccurredAt })
+            .ToListAsync(cancellationToken);
+
+        var eligibleIds = statusChangeRows
+            .GroupBy(row => row.ReportId)
+            .Where(g => g.Max(row => row.OccurredAt) <= cutoff)
+            .Select(g => g.Key)
+            .ToList();
+        if (eligibleIds.Count == 0)
+        {
+            return 0;
+        }
+
+        return await dbContext.PrivateMessageReports
+            .Where(r => eligibleIds.Contains(r.Id))
+            .ExecuteDeleteAsync(cancellationToken);
+    }
+
+    private static string? NormalizeOptionalReportStatus(string? status)
+    {
+        if (string.IsNullOrWhiteSpace(status) || string.Equals(status, "all", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        return PrivateMessageReportStatus.Normalize(status);
+    }
+
     private async Task<HashSet<Guid>> LoadReportedMessageIdsAsync(
         Guid conversationId,
         Guid reporterMemberId,

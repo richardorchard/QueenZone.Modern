@@ -91,6 +91,10 @@
         <span class="admin-dashboard__nav-link-title">Help requests</span>
         <span class="admin-dashboard__nav-link-desc">Read visitor and member messages to the site admin</span>
       </a>
+      <a class="admin-dashboard__nav-link" href="/admin/private-messages">
+        <span class="admin-dashboard__nav-link-title">Reported messages</span>
+        <span class="admin-dashboard__nav-link-desc">Review private messages reported by members</span>
+      </a>
     </nav>
   </section>
 
@@ -227,6 +231,11 @@
         <span class="admin-dashboard__queue-tile-label">Help requests</span>
         <span class="admin-dashboard__queue-tile-count">@Model.OpenHelpRequestCount</span>
         <span class="admin-dashboard__queue-tile-sub">open or in progress</span>
+      </a>
+      <a class="admin-dashboard__queue-tile" href="/admin/private-messages">
+        <span class="admin-dashboard__queue-tile-label">Reported messages</span>
+        <span class="admin-dashboard__queue-tile-count">@Model.OpenPrivateMessageReportCount</span>
+        <span class="admin-dashboard__queue-tile-sub">open</span>
       </a>
     </div>
   </section>

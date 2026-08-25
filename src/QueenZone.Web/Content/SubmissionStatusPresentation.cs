@@ -12,23 +12,27 @@ public static class SubmissionStatusPresentation
                 or NewsSuggestionStatus.Pending
                 or ArticleSubmissionStatus.Draft
                 or ArticleSubmissionStatus.Submitted
-                or HelpRequestStatus.Open => "pending",
+                or HelpRequestStatus.Open
+                or PrivateMessageReportStatus.Open => "pending",
             PhotoSubmissionStatus.UnderReview
                 or NewsSuggestionStatus.UnderReview
                 or ArticleSubmissionStatus.UnderReview
                 or ArticleSubmissionStatus.ApprovedForPublishing
-                or HelpRequestStatus.InProgress => "review",
+                or HelpRequestStatus.InProgress
+                or PrivateMessageReportStatus.Reviewed => "review",
             PhotoSubmissionStatus.NeedsInfo
                 or ArticleSubmissionStatus.RequiresRevision => "attention",
             PhotoSubmissionStatus.Approved
                 or NewsSuggestionStatus.Promoted
                 or ArticleSubmissionStatus.Published
-                or HelpRequestStatus.Resolved => "success",
+                or HelpRequestStatus.Resolved
+                or PrivateMessageReportStatus.Dismissed => "success",
             PhotoSubmissionStatus.Rejected
                 or NewsSuggestionStatus.Rejected
                 or NewsSuggestionStatus.Duplicate
                 or ArticleSubmissionStatus.Rejected
-                or HelpRequestStatus.Spam => "danger",
+                or HelpRequestStatus.Spam
+                or PrivateMessageReportStatus.Actioned => "danger",
             _ => "neutral",
         };
 
