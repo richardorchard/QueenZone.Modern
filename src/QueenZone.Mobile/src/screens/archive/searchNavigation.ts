@@ -1,5 +1,4 @@
 import type { SearchResult } from '../../api/types';
-import { nestedTabParams } from '../../navigation/nestedTab';
 
 export function websiteUrl(apiBaseUrl: string, path: string): string | null {
   if (!path) {
@@ -114,6 +113,8 @@ export function applySearchTarget(
   }
   navigate(
     target.tab,
-    target.params ? nestedTabParams(target.screen, target.params) : nestedTabParams(target.screen),
+    target.params
+      ? { screen: target.screen, params: target.params, initial: false }
+      : { screen: target.screen, initial: false },
   );
 }
