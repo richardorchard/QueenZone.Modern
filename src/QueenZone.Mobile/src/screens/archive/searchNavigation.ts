@@ -1,4 +1,5 @@
 import type { SearchResult } from '../../api/types';
+import { nestedTabParams } from '../../navigation/nestedTab';
 
 export function websiteUrl(apiBaseUrl: string, path: string): string | null {
   if (!path) {
@@ -93,7 +94,10 @@ export function targetForSearchResult(item: SearchResult, apiBaseUrl: string): S
   return tabOrWeb(item, apiBaseUrl, null);
 }
 
-type TabNavigate = (tab: SearchTabTarget['tab'], params: { screen: string; params?: object }) => void;
+type TabNavigate = (
+  tab: SearchTabTarget['tab'],
+  params: { screen: string; params?: object; initial?: boolean },
+) => void;
 
 /** Applies a mapped search target: tab navigation or in-app browser. */
 export function applySearchTarget(
@@ -110,6 +114,6 @@ export function applySearchTarget(
   }
   navigate(
     target.tab,
-    target.params ? { screen: target.screen, params: target.params } : { screen: target.screen },
+    target.params ? nestedTabParams(target.screen, target.params) : nestedTabParams(target.screen),
   );
 }

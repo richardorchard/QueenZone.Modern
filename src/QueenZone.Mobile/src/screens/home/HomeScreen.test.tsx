@@ -95,17 +95,22 @@ describe('HomeScreen', () => {
 
     const user = userEvent.setup();
     await user.press(screen.getByRole('button', { name: 'Live Aid remembered' }));
-    expect(navigation.navigate).toHaveBeenCalledWith('NewsTab', { screen: 'Story', params: { id: 7 } });
+    expect(navigation.navigate).toHaveBeenCalledWith('NewsTab', {
+      screen: 'Story',
+      params: { id: 7 },
+      initial: false,
+    });
     expect(navigation.navigate).not.toHaveBeenCalledWith(
       'ArchiveTab',
       expect.objectContaining({ params: { id: 0 } }),
     );
 
     await user.press(screen.getByRole('button', { name: 'Ranking every studio album' }));
-    expect(navigation.navigate).toHaveBeenCalledWith(
-      'ForumTab',
-      { screen: 'Thread', params: { id: 1002, title: 'Ranking every studio album' } },
-    );
+    expect(navigation.navigate).toHaveBeenCalledWith('ForumTab', {
+      screen: 'Thread',
+      params: { id: 1002, title: 'Ranking every studio album' },
+      initial: false,
+    });
     expect(JSON.stringify(navigation.navigate.mock.calls)).not.toContain('magic-tour');
   });
 

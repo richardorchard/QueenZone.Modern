@@ -163,21 +163,24 @@ export function SearchScreen({ onOpen }: Props) {
       </View>
 
       {shouldSearch ? (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ paddingHorizontal: space.xl, gap: 8, paddingBottom: space.md }}
-        >
-          {searchTypeFilters.map((filter) => (
-            <Chip
-              key={filter.label}
-              label={filter.label}
-              active={typeFilter === filter.type}
-              onPress={() => setTypeFilter(filter.type)}
-            />
-          ))}
-        </ScrollView>
+        <View testID={testIds.searchTypeFilters} style={{ flexGrow: 0, flexShrink: 0 }}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            style={{ flexGrow: 0 }}
+            contentContainerStyle={{ paddingHorizontal: space.xl, gap: 8, paddingBottom: space.md }}
+          >
+            {searchTypeFilters.map((filter) => (
+              <Chip
+                key={filter.label}
+                label={filter.label}
+                active={typeFilter === filter.type}
+                onPress={() => setTypeFilter(filter.type)}
+              />
+            ))}
+          </ScrollView>
+        </View>
       ) : (
         <View style={{ paddingHorizontal: space.xl, paddingBottom: space.md }}>
           <Eyebrow tone="muted">Suggested</Eyebrow>
