@@ -3,7 +3,7 @@ import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-na
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ApiError, fetchNewsDetail, formatPublishedDate, type NewsDetail } from '../../api';
 import { HeaderBackButton } from '../../navigation/headerButtons';
-import { goBackOrFallback } from '../../navigation/nestedTab';
+import { leaveStoryScreen } from '../../navigation/nestedTab';
 import type { NewsStackParamList } from '../../navigation/types';
 import { RichHtmlBody } from '../../ui/RichHtmlBody';
 import { ErrorBlock, LoadingBlock } from '../../ui/ScreenStates';
@@ -26,7 +26,7 @@ export function NewsStoryScreen({ navigation, route }: Props) {
       headerLeft: () => (
         <HeaderBackButton
           testID={testIds.newsStoryBack}
-          onPress={() => goBackOrFallback(navigation, 'NewsIndex')}
+          onPress={() => leaveStoryScreen(navigation)}
         />
       ),
     });

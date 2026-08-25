@@ -39,3 +39,17 @@ export function goBackOrFallback<Screen extends string>(
 
   navigation.navigate(fallbackScreen);
 }
+
+/** Home-stack stories fall back to Home; News-stack stories fall back to News. */
+export function storyLeaveFallback(routeNames: readonly string[] | undefined): 'Home' | 'NewsIndex' {
+  return routeNames?.includes('Home') ? 'Home' : 'NewsIndex';
+}
+
+export function leaveStoryScreen(navigation: {
+  canGoBack: () => boolean;
+  goBack: () => void;
+  navigate: (name: 'Home' | 'NewsIndex') => void;
+  getState?: () => { routeNames?: readonly string[] } | undefined;
+}): void {
+  goBackOrFallback(navigation, storyLeaveFallback(navigation.getState?.()?.routeNames));
+}

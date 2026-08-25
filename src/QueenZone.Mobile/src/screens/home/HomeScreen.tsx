@@ -95,7 +95,7 @@ export function HomeScreen({ navigation }: Props) {
 
   const openNewsStory = useCallback(
     (id: number) => {
-      navigation.navigate('NewsTab', nestedTabParams('Story', { id }));
+      navigation.navigate('Story', { id });
     },
     [navigation],
   );

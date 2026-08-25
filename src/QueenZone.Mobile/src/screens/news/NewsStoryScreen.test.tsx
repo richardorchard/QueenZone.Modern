@@ -47,6 +47,20 @@ describe('NewsStoryScreen', () => {
     );
   });
 
+  it('installs a back control that returns to Home when opened from the Home stack', async () => {
+    const navigation = fakeNavigation();
+    navigation.canGoBack.mockReturnValue(false);
+    navigation.getState.mockReturnValue({ routeNames: ['Home', 'Search', 'Story'] });
+    renderStory(navigation, 7);
+    await waitFor(() => expect(screen.getByTestId(testIds.newsStoryScreen)).toBeOnTheScreen());
+
+    const user = userEvent.setup();
+    renderWithProviders(<>{lastHeaderOptions(navigation).headerLeft?.()}</>, { navigation: false });
+    await user.press(screen.getByTestId(testIds.newsStoryBack));
+    expect(navigation.goBack).not.toHaveBeenCalled();
+    expect(navigation.navigate).toHaveBeenCalledWith('Home');
+  });
+
   it('installs a back control that returns to NewsIndex when the stack has no history', async () => {
     const navigation = fakeNavigation();
     navigation.canGoBack.mockReturnValue(false);

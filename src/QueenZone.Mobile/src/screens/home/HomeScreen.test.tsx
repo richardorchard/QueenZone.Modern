@@ -95,11 +95,7 @@ describe('HomeScreen', () => {
 
     const user = userEvent.setup();
     await user.press(screen.getByRole('button', { name: 'Live Aid remembered' }));
-    expect(navigation.navigate).toHaveBeenCalledWith('NewsTab', {
-      screen: 'Story',
-      params: { id: 7 },
-      initial: false,
-    });
+    expect(navigation.navigate).toHaveBeenCalledWith('Story', { id: 7 });
     expect(navigation.navigate).not.toHaveBeenCalledWith(
       'ArchiveTab',
       expect.objectContaining({ params: { id: 0 } }),

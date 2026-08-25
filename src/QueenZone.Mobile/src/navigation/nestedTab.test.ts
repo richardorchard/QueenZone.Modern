@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { goBackOrFallback, nestedTabParams } from './nestedTab.ts';
+import { goBackOrFallback, leaveStoryScreen, nestedTabParams, storyLeaveFallback } from './nestedTab.ts';
 
 describe('nestedTabParams', () => {
   it('keeps the tab root under a detail screen', () => {
@@ -42,5 +42,30 @@ describe('goBackOrFallback', () => {
     const calls: string[] = [];
     goBackOrFallback(navigation, 'NewsIndex');
     assert.deepEqual(calls, ['NewsIndex']);
+  });
+});
+
+describe('storyLeaveFallback', () => {
+  it('returns Home when the article was opened on the Home stack', () => {
+    assert.equal(storyLeaveFallback(['Home', 'Story']), 'Home');
+    assert.equal(storyLeaveFallback(['NewsIndex', 'Story']), 'NewsIndex');
+    assert.equal(storyLeaveFallback(undefined), 'NewsIndex');
+  });
+});
+
+describe('leaveStoryScreen', () => {
+  it('returns to Home when a Home-stack story has no history', () => {
+    const calls: string[] = [];
+    leaveStoryScreen({
+      canGoBack: () => false,
+      goBack: () => {
+        calls.push('back');
+      },
+      navigate: (name) => {
+        calls.push(name);
+      },
+      getState: () => ({ routeNames: ['Home', 'Search', 'Story'] }),
+    });
+    assert.deepEqual(calls, ['Home']);
   });
 });
