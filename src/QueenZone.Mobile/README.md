@@ -282,6 +282,12 @@ builds. Path classification lives in `scripts/classify-pipeline-changes.sh`
 mixed PRs run both; docs-only PRs run neither unless they are json-api
 contract docs).
 
+The unsigned `mobile-ios` job prefers an online, idle self-hosted Apple Silicon
+runner carrying the dedicated `ios-build` label. If that runner is offline,
+busy, or cannot be queried, the same job immediately targets GitHub-hosted
+`macos-26`. TestFlight remains separate and Mac-only on `ios-signing`; neither
+job uses the cross-platform `e2e` label.
+
 Local preflight after a clean install:
 
 ```powershell
