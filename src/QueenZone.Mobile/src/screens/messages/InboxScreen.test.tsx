@@ -84,6 +84,34 @@ describe('InboxScreen', () => {
     expect(navigation.navigate).toHaveBeenCalledWith('Conversation', { id: 'convo-1' });
   });
 
+  it('shows markup and URLs in the preview as plain text', async () => {
+    mockSession.isSignedIn = true;
+    mockSession.accessToken = 'tok';
+    fetchInboxMock.mockResolvedValueOnce(
+      pagedResponse(
+        [
+          {
+            conversationId: 'convo-2',
+            otherParticipantId: 'member-3',
+            otherParticipantDisplayName: 'John',
+            lastMessagePreview: '<script>alert(1)</script> https://example.com',
+            lastMessageAt: '2024-01-15T12:00:00.000Z',
+            hasUnread: false,
+            unreadCount: 0,
+            detailPath: '/messages/convo-2',
+          },
+        ],
+        1,
+        1,
+      ),
+    );
+    renderInbox();
+    await waitFor(() =>
+      expect(screen.getByText('<script>alert(1)</script> https://example.com')).toBeOnTheScreen(),
+    );
+    expect(screen.queryByRole('link')).toBeNull();
+  });
+
   it('shows a retryable error', async () => {
     mockSession.isSignedIn = true;
     mockSession.accessToken = 'tok';

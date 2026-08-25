@@ -504,6 +504,71 @@ public sealed class PrivateMessageRoutesTests : IClassFixture<WebApplicationFact
     }
 
     [Fact]
+    public async Task ConversationAndInbox_EncodeMarkupAndDoNotLinkifyUrls()
+    {
+        var (_, alice) = await CreateMemberAsync("pm-xss-alice@example.com", "Xss Alice");
+        var (bobClient, bob) = await CreateMemberAsync("pm-xss-bob@example.com", "Xss Bob");
+        var service = factory.Services.GetRequiredService<PrivateMessageService>();
+        const string markup = """<script>alert(1)</script><img onerror="alert(1)" src=x>""";
+        const string withUrl = "See https://example.com and javascript:alert(1)";
+        var created = await service.ComposeAsync(alice.Id, bob.Id, markup);
+        Assert.True(created.Succeeded);
+
+        var inbox = await bobClient.GetStringAsync("/messages");
+        Assert.Contains("&lt;script&gt;alert(1)&lt;/script&gt;", inbox);
+        Assert.DoesNotContain("<script>alert(1)</script>", inbox);
+
+        Assert.True((await service.ReplyAsync(created.ConversationId!.Value, bob.Id, withUrl)).Succeeded);
+
+        var conversation = await bobClient.GetStringAsync($"/messages/{created.ConversationId}");
+        Assert.Contains("&lt;script&gt;alert(1)&lt;/script&gt;", conversation);
+        Assert.Contains("&lt;img onerror=&quot;alert(1)&quot; src=x&gt;", conversation);
+        Assert.DoesNotContain("<script>alert(1)</script>", conversation);
+        Assert.DoesNotContain("""<img onerror="alert(1)" """, conversation);
+        Assert.Contains("See https://example.com and javascript:alert(1)", conversation);
+        Assert.DoesNotContain("href=\"https://example.com\"", conversation);
+        Assert.DoesNotContain("href=\"javascript:", conversation);
+    }
+
+    [Fact]
+    public async Task ComposeAndReply_OversizedBody_ShowsValidationError()
+    {
+        var (aliceClient, alice) = await CreateMemberAsync("pm-long-alice@example.com", "Long Alice");
+        var (bobClient, bob) = await CreateMemberAsync("pm-long-bob@example.com", "Long Bob");
+        var tooLong = new string('a', PrivateMessageLimits.MaxBodyLength + 1);
+
+        var composePage = await aliceClient.GetStringAsync($"/messages/compose?to={bob.Id}");
+        var composeResponse = await aliceClient.PostAsync(
+            "/messages/compose",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(composePage),
+                ["Input.RecipientMemberId"] = bob.Id.ToString(),
+                ["Input.Body"] = tooLong,
+            }));
+        Assert.Equal(HttpStatusCode.OK, composeResponse.StatusCode);
+        var composeHtml = await composeResponse.Content.ReadAsStringAsync();
+        Assert.Contains("Message body must be 4000 characters or fewer.", composeHtml);
+        Assert.Contains("You have no private messages yet", await aliceClient.GetStringAsync("/messages"));
+
+        var service = factory.Services.GetRequiredService<PrivateMessageService>();
+        var created = await service.ComposeAsync(alice.Id, bob.Id, "Short hello");
+        var conversationPath = $"/messages/{created.ConversationId}";
+        var conversationPage = await bobClient.GetStringAsync(conversationPath);
+        var replyResponse = await bobClient.PostAsync(
+            conversationPath,
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(conversationPage),
+                ["Input.Body"] = tooLong,
+            }));
+        Assert.Equal(HttpStatusCode.OK, replyResponse.StatusCode);
+        var replyHtml = await replyResponse.Content.ReadAsStringAsync();
+        Assert.Contains("Message body must be 4000 characters or fewer.", replyHtml);
+        Assert.DoesNotContain(tooLong, await bobClient.GetStringAsync(conversationPath));
+    }
+
+    [Fact]
     public async Task Conversation_ReportMessage_IsParticipantOnly_AndDoesNotNotify()
     {
         var (aliceClient, alice) = await CreateMemberAsync("report-alice@example.com", "Report Alice");
