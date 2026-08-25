@@ -13,9 +13,11 @@ import {
   replyTooLongMessage,
   reportReasonMaxLength,
   reportReasonTooLongMessage,
+  sendingBlockedNotice,
   unableToSendMessage,
   validateReplyBody,
   validateReportReason,
+  youHaveBlockedThisMemberMessage,
 } from './inboxMeta.ts';
 
 describe('inboxMeta', () => {
@@ -67,5 +69,17 @@ describe('inboxMeta', () => {
     assert.equal(validateReportReason('Harassment'), null);
     assert.equal(validateReportReason('a'.repeat(1001)), reportReasonTooLongMessage);
     assert.equal(reportReasonMaxLength, 1000);
+  });
+
+  it('picks the same sending-blocked notice priority as the website conversation page', () => {
+    assert.equal(sendingBlockedNotice(false, true), null);
+    assert.equal(sendingBlockedNotice(false, false), unableToSendMessage);
+    assert.equal(sendingBlockedNotice(true, false), youHaveBlockedThisMemberMessage);
+    // The blocked-by-you notice wins even if canSendReply were somehow true.
+    assert.equal(sendingBlockedNotice(true, true), youHaveBlockedThisMemberMessage);
+    assert.equal(
+      youHaveBlockedThisMemberMessage,
+      'You have blocked this member. They can no longer send you private messages.',
+    );
   });
 });

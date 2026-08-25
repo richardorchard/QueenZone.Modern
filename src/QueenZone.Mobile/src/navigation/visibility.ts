@@ -51,6 +51,7 @@ export const publicScreenNames = [
 
 export const memberOnlyScreenNames = [
   'Inbox',
+  'Archived',
   'Conversation',
   'ComposeMessage',
   'Composer',
@@ -95,6 +96,7 @@ export const detailScreenNames = [
   'Profile',
   'SignIn',
   'Inbox',
+  'Archived',
   'SavedList',
   'DeleteAccount',
   'Search',

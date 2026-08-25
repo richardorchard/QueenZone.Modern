@@ -6,10 +6,20 @@ export const messagesUnreadCountPath = `${messagesApiPath}/unread-count`;
 
 export const messagesRecipientsPath = `${messagesApiPath}/recipients`;
 
+export const messagesArchivedPath = `${messagesApiPath}/archived`;
+
 export function messagesConversationPath(conversationId: string): string {
   return `${messagesApiPath}/${conversationId}`;
 }
 
 export function messagesReportPath(conversationId: string, messageId: string): string {
   return `${messagesConversationPath(conversationId)}/messages/${messageId}/report`;
+}
+
+export function messagesArchivePath(conversationId: string): string {
+  return `${messagesConversationPath(conversationId)}/archive`;
+}
+
+export function messagesUnarchivePath(conversationId: string): string {
+  return `${messagesConversationPath(conversationId)}/unarchive`;
 }

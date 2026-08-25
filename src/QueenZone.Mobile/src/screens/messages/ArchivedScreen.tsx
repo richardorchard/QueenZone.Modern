@@ -2,38 +2,33 @@ import { useCallback, useRef, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { archiveConversation, fetchInbox, type InboxConversation } from '../../api/messages';
+import { fetchArchivedInbox, unarchiveConversation, type InboxConversation } from '../../api/messages';
 import { usePagedContent } from '../../hooks/usePagedContent';
 import type { HomeStackParamList } from '../../navigation/types';
 import { MemberGate } from '../../session/MemberGate';
 import { useSession } from '../../session/SessionContext';
-import { radius, space, type, useTheme } from '../../theme';
+import { space, type, useTheme } from '../../theme';
 import { Button } from '../../ui/Button';
 import { PageTitleBlock } from '../../ui/PageTitleBlock';
 import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from '../../ui/ScreenStates';
 import { testIds } from '../../test/testIds';
-import {
-  formatMessageTimestamp,
-  inboxPageSize,
-  inboxRowA11yLabel,
-  unreadBadgeLabel,
-} from './inboxMeta';
+import { formatMessageTimestamp, inboxPageSize, inboxRowA11yLabel, unreadBadgeLabel } from './inboxMeta';
 
-type Props = NativeStackScreenProps<HomeStackParamList, 'Inbox'>;
+type Props = NativeStackScreenProps<HomeStackParamList, 'Archived'>;
 
-export function InboxScreen({ navigation }: Props) {
+export function ArchivedScreen({ navigation }: Props) {
   return (
-    <MemberGate title="Messages">
-      <InboxList navigation={navigation} />
+    <MemberGate title="Archived messages">
+      <ArchivedList navigation={navigation} />
     </MemberGate>
   );
 }
 
-function InboxList({ navigation }: Pick<Props, 'navigation'>) {
+function ArchivedList({ navigation }: Pick<Props, 'navigation'>) {
   const { c } = useTheme();
   const { accessToken } = useSession();
   const skipNextFocusRefresh = useRef(true);
-  const [archivingId, setArchivingId] = useState<string | null>(null);
+  const [unarchivingId, setUnarchivingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const paged = usePagedContent<InboxConversation>(
     useCallback(
@@ -47,7 +42,7 @@ function InboxList({ navigation }: Pick<Props, 'navigation'>) {
             totalPages: 0,
           });
         }
-        return fetchInbox(accessToken, { page, pageSize: inboxPageSize, signal });
+        return fetchArchivedInbox(accessToken, { page, pageSize: inboxPageSize, signal });
       },
       [accessToken],
     ),
@@ -65,20 +60,20 @@ function InboxList({ navigation }: Pick<Props, 'navigation'>) {
     }, [paged.refresh]),
   );
 
-  const handleArchive = useCallback(
+  const handleUnarchive = useCallback(
     async (conversationId: string) => {
       if (!accessToken) {
         return;
       }
       setActionError(null);
-      setArchivingId(conversationId);
+      setUnarchivingId(conversationId);
       try {
-        await archiveConversation(accessToken, conversationId);
+        await unarchiveConversation(accessToken, conversationId);
         paged.refresh();
       } catch {
-        setActionError('Unable to archive this conversation. Try again.');
+        setActionError('Unable to unarchive this conversation. Try again.');
       } finally {
-        setArchivingId(null);
+        setUnarchivingId(null);
       }
     },
     [accessToken, paged.refresh],
@@ -88,13 +83,9 @@ function InboxList({ navigation }: Pick<Props, 'navigation'>) {
     <View>
       <PageTitleBlock
         eyebrow="Community"
-        title="Messages"
-        subtitle="Private conversations with other members."
+        title="Archived messages"
+        subtitle="Conversations you have archived."
       />
-      <View style={{ paddingHorizontal: space.xl, paddingBottom: space.lg, flexDirection: 'row', gap: space.sm }}>
-        <Button label="New message" onPress={() => navigation.navigate('ComposeMessage')} />
-        <Button label="Archived" variant="ghost" onPress={() => navigation.navigate('Archived')} />
-      </View>
       {actionError ? (
         <View style={{ paddingHorizontal: space.xl, paddingBottom: space.md }}>
           <Text style={[type.caption, { color: c.textSecondary }]}>{actionError}</Text>
@@ -107,7 +98,7 @@ function InboxList({ navigation }: Pick<Props, 'navigation'>) {
     return (
       <View style={{ flex: 1, backgroundColor: c.surfacePage }}>
         {header}
-        <LoadingBlock label="Loading messages…" />
+        <LoadingBlock label="Loading archived messages…" />
       </View>
     );
   }
@@ -123,12 +114,12 @@ function InboxList({ navigation }: Pick<Props, 'navigation'>) {
 
   return (
     <FlatList
-      testID={testIds.inboxScreen}
+      testID={testIds.archivedScreen}
       style={{ flex: 1, backgroundColor: c.surfacePage }}
       data={paged.items}
       keyExtractor={(item) => item.conversationId}
       ListHeaderComponent={header}
-      ListEmptyComponent={<EmptyBlock message="You have no private messages yet." />}
+      ListEmptyComponent={<EmptyBlock message="You have no archived conversations." />}
       ListFooterComponent={<ListFooterLoading visible={paged.loadingMore} />}
       refreshControl={
         <RefreshControl
@@ -140,12 +131,12 @@ function InboxList({ navigation }: Pick<Props, 'navigation'>) {
       onEndReached={paged.loadMore}
       onEndReachedThreshold={0.4}
       renderItem={({ item }) => (
-        <InboxRow
+        <ArchivedRow
           item={item}
-          archiving={archivingId === item.conversationId}
+          unarchiving={unarchivingId === item.conversationId}
           onPress={() => navigation.navigate('Conversation', { id: item.conversationId })}
-          onArchive={() => {
-            void handleArchive(item.conversationId);
+          onUnarchive={() => {
+            void handleUnarchive(item.conversationId);
           }}
         />
       )}
@@ -153,16 +144,16 @@ function InboxList({ navigation }: Pick<Props, 'navigation'>) {
   );
 }
 
-function InboxRow({
+function ArchivedRow({
   item,
-  archiving,
+  unarchiving,
   onPress,
-  onArchive,
+  onUnarchive,
 }: {
   item: InboxConversation;
-  archiving: boolean;
+  unarchiving: boolean;
   onPress: () => void;
-  onArchive: () => void;
+  onUnarchive: () => void;
 }) {
   const { c } = useTheme();
   const unread = unreadBadgeLabel(item.unreadCount);
@@ -173,46 +164,24 @@ function InboxRow({
         accessibilityLabel={inboxRowA11yLabel(item)}
         onPress={onPress}
         style={({ pressed }) => [
-          {
-            paddingVertical: space.base,
-            paddingHorizontal: space.xl,
-            gap: 6,
-            opacity: pressed ? 0.72 : 1,
-          },
+          { paddingVertical: space.base, paddingHorizontal: space.xl, gap: 6, opacity: pressed ? 0.72 : 1 },
         ]}
       >
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <Text
-            numberOfLines={1}
-            style={[
-              type.listTitle,
-              { color: c.textPrimary, flex: 1 },
-            ]}
-          >
-            {item.otherParticipantDisplayName}
-          </Text>
-          {unread ? (
-            <View
-              style={{
-                backgroundColor: c.accentPrimary,
-                borderRadius: radius.pill,
-                paddingHorizontal: 8,
-                paddingVertical: 3,
-              }}
-            >
-              <Text style={[type.meta, { color: c.textOnAccent, letterSpacing: 0.4 }]}>{unread}</Text>
-            </View>
-          ) : null}
-        </View>
+        <Text numberOfLines={1} style={[type.listTitle, { color: c.textPrimary }]}>
+          {item.otherParticipantDisplayName}
+        </Text>
         {item.lastMessagePreview ? (
           <Text numberOfLines={2} style={[type.caption, { color: c.textSecondary }]}>
             {item.lastMessagePreview}
           </Text>
         ) : null}
-        <Text style={[type.meta, { color: c.textMuted }]}>{formatMessageTimestamp(item.lastMessageAt)}</Text>
+        <Text style={[type.meta, { color: c.textMuted }]}>
+          {formatMessageTimestamp(item.lastMessageAt)}
+          {unread ? ` · ${unread}` : ''}
+        </Text>
       </Pressable>
       <View style={{ paddingHorizontal: space.xl, paddingBottom: space.md }}>
-        <Button label="Archive" size="sm" variant="ghost" onPress={onArchive} loading={archiving} />
+        <Button label="Unarchive" size="sm" variant="ghost" onPress={onUnarchive} loading={unarchiving} />
       </View>
     </View>
   );

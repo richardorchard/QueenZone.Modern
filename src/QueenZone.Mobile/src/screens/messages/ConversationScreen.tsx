@@ -13,6 +13,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ApiError } from '../../api/client';
 import {
+  archiveConversation,
   fetchConversation,
   replyToConversation,
   reportConversationMessage,
@@ -31,7 +32,7 @@ import {
   formatMessageTimestamp,
   parseConversationId,
   reportReasonMaxLength,
-  unableToSendMessage,
+  sendingBlockedNotice,
   validateReplyBody,
   validateReportReason,
 } from './inboxMeta';
@@ -68,6 +69,8 @@ function ConversationThread({ navigation, route }: Props) {
   const [reportReason, setReportReason] = useState('');
   const [reportError, setReportError] = useState<string | null>(null);
   const [reportBusy, setReportBusy] = useState(false);
+  const [archiving, setArchiving] = useState(false);
+  const [archiveError, setArchiveError] = useState<string | null>(null);
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -190,6 +193,22 @@ function ConversationThread({ navigation, route }: Props) {
     [accessToken, conversationId, reportReason],
   );
 
+  const handleArchive = useCallback(async () => {
+    if (!accessToken || !conversationId) {
+      return;
+    }
+    setArchiveError(null);
+    setArchiving(true);
+    try {
+      await archiveConversation(accessToken, conversationId);
+      navigation.navigate('Inbox');
+    } catch (err: unknown) {
+      setArchiveError(messageFromUnknownError(err));
+    } finally {
+      setArchiving(false);
+    }
+  }, [accessToken, conversationId, navigation]);
+
   if (loading && !detail) {
     return <LoadingBlock label="Loading conversation…" />;
   }
@@ -199,12 +218,31 @@ function ConversationThread({ navigation, route }: Props) {
   }
 
   const canSendReply = detail?.canSendReply === true;
+  const notice = detail
+    ? sendingBlockedNotice(detail.hasBlockedOtherParticipant, canSendReply)
+    : null;
 
   return (
     <KeyboardAvoidingView
       style={[styles.flex, { backgroundColor: c.surfacePage }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
+      {detail ? (
+        <View style={[styles.toolbar, { borderBottomColor: c.hairline }]}>
+          <Button
+            label="Archive conversation"
+            size="sm"
+            variant="ghost"
+            onPress={() => {
+              void handleArchive();
+            }}
+            loading={archiving}
+          />
+          {archiveError ? (
+            <Text style={[type.caption, { color: c.textSecondary }]}>{archiveError}</Text>
+          ) : null}
+        </View>
+      ) : null}
       <FlatList
         ref={listRef}
         style={styles.flex}
@@ -289,7 +327,7 @@ function ConversationThread({ navigation, route }: Props) {
             disabled={!accessToken}
           />
         </View>
-      ) : detail ? (
+      ) : notice ? (
         <View
           style={[
             styles.notice,
@@ -299,7 +337,7 @@ function ConversationThread({ navigation, route }: Props) {
             },
           ]}
         >
-          <Text style={[type.body, { color: c.textSecondary }]}>{unableToSendMessage}</Text>
+          <Text style={[type.body, { color: c.textSecondary }]}>{notice}</Text>
         </View>
       ) : null}
     </KeyboardAvoidingView>
@@ -401,6 +439,12 @@ function MessageBubble({
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   thread: { paddingBottom: space.sm },
+  toolbar: {
+    paddingHorizontal: space.xl,
+    paddingVertical: space.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: space.xs,
+  },
   composer: {
     paddingHorizontal: space.xl,
     paddingTop: space.md,

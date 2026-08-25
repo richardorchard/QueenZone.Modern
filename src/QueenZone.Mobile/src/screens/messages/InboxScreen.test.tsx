@@ -1,5 +1,5 @@
 import { screen, userEvent, waitFor } from '@testing-library/react-native';
-import { fetchInbox } from '../../api/messages';
+import { archiveConversation, fetchInbox } from '../../api/messages';
 import { ApiError } from '../../api/client';
 import { pagedResponse } from '../../test/fixtures';
 import { createMockSession } from '../../test/mockSession';
@@ -14,6 +14,7 @@ jest.mock('../../session/SessionContext', () => ({
 
 jest.mock('../../api/messages', () => ({
   fetchInbox: jest.fn(),
+  archiveConversation: jest.fn(),
 }));
 
 jest.mock('@react-navigation/native', () => {
@@ -25,6 +26,7 @@ jest.mock('@react-navigation/native', () => {
 });
 
 const fetchInboxMock = fetchInbox as jest.MockedFunction<typeof fetchInbox>;
+const archiveConversationMock = archiveConversation as jest.MockedFunction<typeof archiveConversation>;
 
 function renderInbox() {
   return renderWithProviders(
@@ -37,6 +39,7 @@ describe('InboxScreen', () => {
     mockSession.isSignedIn = false;
     mockSession.accessToken = null;
     fetchInboxMock.mockReset();
+    archiveConversationMock.mockReset();
   });
 
   it('gates unsigned visitors', () => {
@@ -82,6 +85,52 @@ describe('InboxScreen', () => {
     const user = userEvent.setup();
     await user.press(screen.getByRole('button', { name: /Brian/ }));
     expect(navigation.navigate).toHaveBeenCalledWith('Conversation', { id: 'convo-1' });
+  });
+
+  it('navigates to the archived list', async () => {
+    const navigation = fakeNavigation();
+    mockSession.isSignedIn = true;
+    mockSession.accessToken = 'tok';
+    fetchInboxMock.mockResolvedValueOnce(pagedResponse([], 1, 0));
+    renderWithProviders(
+      <InboxScreen navigation={navigation as never} route={{ key: 'inbox', name: 'Inbox' } as never} />,
+    );
+    await waitFor(() => expect(screen.getByText('You have no private messages yet.')).toBeOnTheScreen());
+    const user = userEvent.setup();
+    await user.press(screen.getByRole('button', { name: 'Archived' }));
+    expect(navigation.navigate).toHaveBeenCalledWith('Archived');
+  });
+
+  it('archives a conversation from the inbox row and refreshes the list', async () => {
+    mockSession.isSignedIn = true;
+    mockSession.accessToken = 'tok';
+    fetchInboxMock.mockResolvedValue(
+      pagedResponse(
+        [
+          {
+            conversationId: 'convo-1',
+            otherParticipantId: 'member-2',
+            otherParticipantDisplayName: 'Brian',
+            lastMessagePreview: 'See you at Wembley',
+            lastMessageAt: '2024-01-15T12:00:00.000Z',
+            hasUnread: false,
+            unreadCount: 0,
+            detailPath: '/messages/convo-1',
+          },
+        ],
+        1,
+        1,
+      ),
+    );
+    archiveConversationMock.mockResolvedValueOnce(undefined);
+    renderInbox();
+    await waitFor(() => expect(screen.getByText('Brian')).toBeOnTheScreen());
+
+    const user = userEvent.setup();
+    await user.press(screen.getByRole('button', { name: 'Archive' }));
+
+    await waitFor(() => expect(archiveConversationMock).toHaveBeenCalledWith('tok', 'convo-1'));
+    await waitFor(() => expect(fetchInboxMock).toHaveBeenCalledTimes(2));
   });
 
   it('shows markup and URLs in the preview as plain text', async () => {
