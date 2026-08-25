@@ -234,7 +234,8 @@ jobs:
   # #794 and #893). No signing identity or Apple credential is needed.
   mobile-ios:
     name: Mobile iOS build
-    runs-on: ${{ fromJSON(needs.mobile-ios-runner.outputs.runs_on) }}
+    # Temporary validation override for issue #893; not part of the PR branch.
+    runs-on: [self-hosted, macOS, ARM64, ios-build]
     needs: [changes, mobile-ios-runner]
     if: needs.changes.outputs.mobile == 'true'
     defaults:
