@@ -1,9 +1,11 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Linking } from 'react-native';
+import { AppState, Linking } from 'react-native';
+import * as Notifications from 'expo-notifications';
 import { getAppConfig } from '../config/appConfig';
 import { fetchJson } from '../api/client';
 import { parseMemberProfile, type MemberProfile } from '../api/me';
 import type { AuthTokens } from '../api/auth';
+import { clearPushRegistration, refreshPushRegistration, syncPushRegistration } from '../notifications';
 import { logoutRemote, refreshAccessToken, revokeRefreshToken, signInWithProvider } from './oauth';
 import {
   isSmokeAuthEnabled,
@@ -179,6 +181,35 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return () => subscription.remove();
   }, [applySmokeSession]);
 
+  const isSignedIn = session.isSignedIn;
+  const accessToken = session.accessToken;
+
+  // #850: request push permission and register the device once signed in
+  // (not before) — never on cold start. Best-effort throughout; see
+  // notifications/pushRegistration.ts.
+  useEffect(() => {
+    if (!isSignedIn || !accessToken) {
+      return;
+    }
+
+    void syncPushRegistration(accessToken);
+
+    const tokenSubscription = Notifications.addPushTokenListener(() => {
+      void syncPushRegistration(accessToken);
+    });
+
+    const appStateSubscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        void refreshPushRegistration(accessToken);
+      }
+    });
+
+    return () => {
+      tokenSubscription.remove();
+      appStateSubscription.remove();
+    };
+  }, [isSignedIn, accessToken]);
+
   const value = useMemo<SessionContextValue>(
     () => ({
       ...session,
@@ -191,6 +222,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         const token = session.accessToken;
         const refresh = refreshToken;
         if (token) {
+          await clearPushRegistration(token);
           await logoutRemote(getAppConfig().apiBaseUrl, token);
         }
 
