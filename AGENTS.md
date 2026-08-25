@@ -215,7 +215,7 @@ GitHub Actions workflow `.github/workflows/ci.yml` blocks merge when these fail:
 | **Smoke test** | Published app responds on `/health`, `/`, `/news` (starts after `build`, overlaps coverage) | Yes |
 | **EF migrations (Azure SQL)** | When migration-related paths change: `has-pending-model-changes` + `database update` against the deploy SQL Server | Yes (job runs only for those PRs) |
 | **Playwright e2e** | Self-hosted runner selected by the `e2e` label (Windows or macOS) | Yes (required PR merge gate; not rerun by deploy) |
-| **Mobile JS** | `npm ci`, `typecheck`, and `npm test` in `src/QueenZone.Mobile` when that tree changes | Runs when mobile files change; skipped otherwise (non-matrix skip is treated as passing) |
+| **Mobile JS** | `npm ci`, typecheck, `npm run test:coverage`, `scripts/Test-MobileCoverageGate.mjs`, and Expo Doctor in `src/QueenZone.Mobile` when that tree (or the mobile coverage scripts) changes | Runs when mobile files change; skipped otherwise (non-matrix skip is treated as passing) |
 | **Mobile Android build** | Unsigned debug APK via `expo prebuild` + `gradlew assembleDebug`, uploaded as a 1-day workflow artifact | Runs when mobile files change (or `workflow_dispatch`) |
 | **Mobile iOS build** | Unsigned Simulator build via `expo prebuild` + `xcodebuild` on a macOS runner, zipped and uploaded as a 1-day workflow artifact | Runs when mobile files change (or `workflow_dispatch`) |
 
@@ -277,7 +277,14 @@ On Linux or GitHub Actions, use `pwsh` instead of `powershell` for the last comm
 
 If the gate reports uncovered changed lines, it prints up to 20 `path:line` entries. Add or extend tests until changed-line coverage is at least 70%.
 
-Full detail, test-layer guidance, and coverage troubleshooting: `docs/architecture/testing-policy.md` (sections **Continuous Integration** and **Pre-pull request checklist**).
+When the PR changes `src/QueenZone.Mobile` production TypeScript/TSX, also run the mobile coverage gate (floors in `scripts/mobile-coverage-floors.json`; do not copy the web C# 51%/70% numbers):
+
+```powershell
+cd src/QueenZone.Mobile
+npm run coverage
+```
+
+Full detail, test-layer guidance, and coverage troubleshooting: `docs/architecture/testing-policy.md` (sections **Continuous Integration**, **Mobile coverage gates**, and **Pre-pull request checklist**).
 
 ## Local Secrets
 

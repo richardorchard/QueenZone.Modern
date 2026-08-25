@@ -319,6 +319,50 @@ Rules:
 
 These gates are guardrails, not a replacement for useful assertions. New or changed pure logic should still normally include targeted unit coverage, especially for canonical routes, pagination, visibility rules, date formatting, and HTML sanitisation.
 
+### Mobile coverage gates (#871)
+
+`npm test` coverage is a third layer, not a substitute for consumer contracts or device smoke:
+
+```text
+npm test coverage (#871)  ≠  #869 contracts  ≠  #872 Maestro smoke
+```
+
+Contracts (`npm run test:api-contracts` / `mobile-api-contracts`) and Maestro device smoke (#883) stay **out** of these totals. Do not fold host-backed contract execution into the coverage gate.
+
+**Collection.** `src/QueenZone.Mobile` runs two host-free suites. Both contribute:
+
+| Suite | Runner | Report |
+| --- | --- | --- |
+| Pure TypeScript | Node test runner (`*.test.ts`) | `coverage/node/lcov.info` (V8 / `--experimental-test-coverage`) |
+| Component / hook | Jest + `jest-expo` (`*.test.tsx`) | `coverage/jest/coverage-final.json` + Cobertura |
+
+Jest `collectCoverageFrom` includes every production `src/**/*.{ts,tsx}` file, not only modules a test imported. Narrow exclusions only: `*.test.ts(x)`, `src/test/**` fixtures, `*.d.ts`, and generated native (`ios/` / `android/`). Screens, session, API clients, and hooks stay in the totals.
+
+The merged aggregate overlays Node/V8 hits onto the Jest/Istanbul coverable universe (union by file and line; do **not** sum overlapping reports). V8 emits a DA row for almost every physical line; a naive union of those line sets with Istanbul statements inflates global % because well-tested files gain extra covered V8 lines while untested screens keep only Istanbul's smaller uncovered set. Job summaries always publish **separate** suite totals **and** the merged aggregate. Never drop a suite to inflate the number. Missing or malformed reports fail closed.
+
+**Enforcement.** Floors live in `scripts/mobile-coverage-floors.json` and are applied by `scripts/Test-MobileCoverageGate.mjs`. They are **not** Jest `coverageThreshold` values — Jest is only one runner. Changing a floor is an explicit, reviewable edit to that JSON (and this document). Later ratchets are separate PRs, not silent bumps.
+
+Measured baseline on 2026-08-24 from `61eab2b` (after #833 / #883), then enforced as no-regression floors rounded down one decimal to absorb single-line jitter:
+
+| Gate | Floor | Measured | What it measures |
+| --- | --- | --- | --- |
+| **Global line** | **≥ 42.8%** | 42.88% (1249/2913) | Merged coverable production lines |
+| **Global branch** | **≥ 16.1%** | 16.19% (382/2360) | Jest/Istanbul branch map across all production files (V8 `BRDA` keys do not overlay) |
+| **Changed-line** | **≥ 70%** | n/a (new-code bar) | Coverable `src/QueenZone.Mobile/src/**/*.{ts,tsx}` lines in `git diff origin/main...HEAD` |
+
+Changed-line starts at 70% because the #833 component/hook harness can cover TSX; it is **not** a copy of the web C# 70% without evidence. The global floor is the measured mobile baseline (42.8%), not the web C# 51%. If a pull request changes no coverable mobile TypeScript/TSX lines, the changed-line gate is skipped. Paths are normalized to POSIX `src/QueenZone.Mobile/...` so Windows and Linux reports match.
+
+**CI.** `mobile-js` (same path triggers as preflight, plus the coverage script/floors files) runs typecheck, `npm run test:coverage`, the gate, and Expo Doctor. It writes a job summary with line/branch/function/statement totals for both suites and the merge, plus uncovered changed coverable lines. Artifacts: machine-readable merged Cobertura + `summary.json` (3-day) and a short HTML report (1-day). Do not commit `coverage/` output.
+
+Local commands from `src/QueenZone.Mobile`:
+
+```powershell
+npm run test:coverage
+node ../../scripts/Test-MobileCoverageGate.mjs
+# or: npm run coverage
+node ../../scripts/Test-MobileCoverageGate.mjs --self-test
+```
+
 ### Other CI jobs
 
 | Job | Purpose | Blocks merge? |
@@ -332,13 +376,13 @@ These gates are guardrails, not a replacement for useful assertions. New or chan
 | `ef-migrations` | When migration-related paths change: snapshot check + `database update` on Azure SQL | Yes (same-repo PRs only; skipped otherwise) |
 | `smoke-test` | Published app, curl `/health`, `/`, `/news` (starts after `build`, overlaps shards/coverage) | Yes |
 | `e2e-test` | Playwright suite on a self-hosted `e2e` runner (Windows or macOS; starts after `build`, overlaps coverage) | Yes (required PR merge gate) |
-| `mobile-js` | `npm ci` + `npm run preflight` in `src/QueenZone.Mobile` (typecheck, discovered unit tests, pinned Expo Doctor) | Yes — required on `main` after #870; skip-success stub when that tree is unchanged |
+| `mobile-js` | `npm ci` + typecheck + `npm run test:coverage` + `scripts/Test-MobileCoverageGate.mjs` + Expo Doctor in `src/QueenZone.Mobile` | Yes — required on `main` after #870; skip-success stub when that tree is unchanged |
 | `mobile-android` | Unsigned debug APK compile (GitHub-hosted Linux) | Yes — required on `main` after #870; skip-success stub when that tree is unchanged |
 | `mobile-ios` | Unsigned Simulator compile (GitHub-hosted macOS) | Yes — required on `main` after #870; skip-success stub when that tree is unchanged |
 | `mobile-api-contracts` | Testing-host consumer contracts: real `/api/v1` responses through the mobile `fetchJson` / domain clients plus runtime zod schemas (#869 Option A) | Independent of native jobs; skip-success stub when contract paths are unchanged |
 | `mobile-android-smoke` / `mobile-ios-smoke` | Maestro device smoke against a Debug build baked at the local Testing contract host (#872 Option A) | **No (Phase 1).** `.github/workflows/mobile-device-smoke.yml` is `workflow_dispatch` + weekday 04:00 UTC only. Do not add these names to branch protection yet. |
 
-Local mobile validation from `src/QueenZone.Mobile` is a clean `npm ci` then `npm run preflight`. `npm test` discovers every `src/**/*.test.ts` and `src/**/*.test.tsx` file (no package.json path list) and self-checks that unlisted Node and Jest probes still run. Pure `*.test.ts` files use Node's test runner; `*.test.tsx` files use Jest + `jest-expo` + React Native Testing Library (no devices, Metro, or production services). `npm run preflight` is typecheck + those tests + `npm run doctor` (lockfile-pinned `expo-doctor`). Device smoke is a separate Maestro suite (#872); it is not part of `npm test` or `npm run preflight`.
+Local mobile validation from `src/QueenZone.Mobile` is a clean `npm ci` then `npm run preflight`. `npm test` discovers every `src/**/*.test.ts` and `src/**/*.test.tsx` file (no package.json path list) and self-checks that unlisted Node and Jest probes still run. Pure `*.test.ts` files use Node's test runner; `*.test.tsx` files use Jest + `jest-expo` + React Native Testing Library (no devices, Metro, or production services). `npm run preflight` is typecheck + those tests + `npm run doctor` (lockfile-pinned `expo-doctor`) and stays host-free / coverage-free. CI `mobile-js` runs typecheck + `npm run test:coverage` + the documented coverage gate + Doctor instead of `preflight` so tests are not executed twice. Publish workflows still use `npm run preflight`. Device smoke is a separate Maestro suite (#872 / #883); it is not part of `npm test`, `npm run preflight`, or coverage totals.
 
 These four **GitHub check names** (the job `name:` values in `ci.yml`) must be required contexts on protected `main`. A workflow file cannot enable branch protection; a human with repo admin access has to add them after this change merges:
 
@@ -355,9 +399,10 @@ Android and iOS are equal: a mobile PR cannot treat either native compile as opt
 
 ```text
 unit / component (npm test, #833)
+  ≠ npm test coverage (#871)
   ≠ consumer contracts (Testing host + real mobile parsers, #869)
   ≠ native compile (mobile-android / mobile-ios unsigned Debug)
-  ≠ device smoke (Maestro + Testing host, #872 Option A)
+  ≠ device smoke (Maestro + Testing host, #872 / #883)
 ```
 
 Node + Jest tests (`npm test`, fast, no native toolchain) are not a substitute for `mobile-android` / `mobile-ios` compile, and those unsigned CI compiles are not device coverage — they never boot the binary. Static TypeScript and generated OpenAPI → TS types are not a substitute for the consumer-contract suite: `src/api/client.ts` uses `fetch` plus `as T`, so a renamed JSON field still typechecks. Device smoke does not re-test #833 state permutations and does not replace #869 contracts.
@@ -407,7 +452,7 @@ Pull requests that do not change the website skip `build` / `test` / coverage / 
 - **Non-web** when **every** changed file is under `docs/`, `infra/`, `design/`, `.github/` (except `.github/workflows/ci.yml`), a root `*.md`, `LICENSE`, `THIRD-PARTY-NOTICES.md`, or `src/QueenZone.Mobile/`.
 - Changing `ci.yml` itself still runs the full .NET suite.
 - `src/` (except the mobile client), `tests/`, `scripts/`, project files, and `wwwroot` stay on the full web path.
-- A mobile-only PR still runs `mobile-js` (`npm run preflight`: typecheck, discovered unit tests, pinned Expo Doctor), plus `mobile-android` and `mobile-ios` native compile builds (unsigned debug APK / Simulator build, uploaded as 1-day workflow artifacts). Those three check names are intended to be required on `main` (#870); a human must enable them in branch protection after merge. Non-mobile PRs get skip-success stubs so they are not left pending.
+- A mobile-only PR still runs `mobile-js` (typecheck, discovered unit tests with coverage, the #871 coverage gate, pinned Expo Doctor), plus `mobile-android` and `mobile-ios` native compile builds (unsigned debug APK / Simulator build, uploaded as 1-day workflow artifacts). Changing `scripts/Test-MobileCoverageGate.mjs` or `scripts/mobile-coverage-floors.json` also sets `mobile=true`. Those three check names are intended to be required on `main` (#870); a human must enable them in branch protection after merge. Non-mobile PRs get skip-success stubs so they are not left pending.
 - `mobile_api_contracts=true` is **independent of** `mobile=true`. Server-only `/api/v1` changes (and json-api docs, mobile `src/api` / config / session helpers, the contract host/scripts, or `ci.yml`) run `mobile-api-contracts` without Android/iOS native compilation. A UI-only mobile change still compiles native jobs and does **not** start the contract host.
 - Mixed mobile + web PRs run both pipelines. Mixed API + mobile client PRs run contracts **and** native jobs.
 - Deploy uses the same classifier so an infra-only or mobile-only merge does not zip-deploy unchanged website binaries. Mixed web+mobile merges still deploy the website; `resolve-ci-run` must not wait for Mobile iOS/Android to finish the overall `ci.yml` conclusion (see `scripts/Resolve-CiPublishRun.sh`).

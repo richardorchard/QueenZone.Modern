@@ -1,4 +1,4 @@
-﻿const ORIGIN = 'https://queenzone.blob.core.windows.net';
+const ORIGIN = 'https://queenzone.blob.core.windows.net';
 const EDGE_TTL_SECONDS = 60 * 60 * 24 * 30;
 const BROWSER_TTL_SECONDS = 60 * 60 * 24;
 

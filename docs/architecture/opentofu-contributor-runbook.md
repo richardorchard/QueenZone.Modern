@@ -10,7 +10,7 @@ Issue #619 declared no managed resources. The current adoption state is:
 
 - `azure-web`: #622 declares the resource group, web, telemetry, hostname, TLS binding, and ingress resources with declarative imports;
 - `azure-data`: #628 owns SQL, Storage, containers, and data-protection configuration;
-- `cloudflare-edge`: #626 owns zone, DNS, TLS, Worker, and route resources.
+- `cloudflare-edge`: #626 declares the zone, DNS records, TLS/security/cache zone settings, both Worker scripts, and both routes with declarative imports.
 
 Uploaded App Service certificates are the deliberate exception in #622. Their
 private PFX material and renewal path are outside state; the imported hostname

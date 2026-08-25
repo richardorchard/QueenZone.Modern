@@ -23,7 +23,7 @@ public abstract class NewsArchivePageModel(
             page,
             NewsRoutes.ArchivePageSize,
             ct => publicQueryCache.GetNewsPublishedCountAsync(ct),
-            (p, size, ct) => newsRepository.GetArchivePageAsync(p, size, ct),
+            (p, size, ct) => newsRepository.GetArchivePageAsync(p, size, cancellationToken: ct),
             (p, ic, pc, tp) => NewsRoutes.ResolveArchiveTotalPages(p, ic, pc, tp),
             (p, total) => new ArchivePageContext(
                 p, total,

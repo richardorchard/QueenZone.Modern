@@ -3,12 +3,8 @@ const CANONICAL_HOST = 'cdn.queenzone.org';
 export default {
   async fetch(request) {
     if (request.method !== 'GET' && request.method !== 'HEAD') {
-      return new Response('Method Not Allowed', {
-        status: 405,
-        headers: { Allow: 'GET, HEAD' }
-      });
+      return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'GET, HEAD' } });
     }
-
     const incomingUrl = new URL(request.url);
     if (incomingUrl.pathname === '/robots.txt') {
       return new Response('User-agent: *\nDisallow: /\n', {
@@ -19,7 +15,6 @@ export default {
         }
       });
     }
-
     incomingUrl.protocol = 'https:';
     incomingUrl.hostname = CANONICAL_HOST;
     incomingUrl.port = '';
