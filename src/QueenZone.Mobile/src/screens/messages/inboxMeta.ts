@@ -19,6 +19,28 @@ export const reportReasonTooLongMessage = `Report reason must be ${reportReasonM
 /** Matches `PrivateMessageService.UnableToSendMessage`. */
 export const unableToSendMessage = 'Unable to send message.';
 
+/** Matches the blocked-participant notice on `Pages/Messages/Conversation.cshtml`. */
+export const youHaveBlockedThisMemberMessage =
+  'You have blocked this member. They can no longer send you private messages.';
+
+/**
+ * Same priority as `Conversation.cshtml`: the blocked-by-you notice takes
+ * precedence over the generic sending-blocked/privacy-disabled notice.
+ * Returns null when a reply composer should be shown instead.
+ */
+export function sendingBlockedNotice(
+  hasBlockedOtherParticipant: boolean,
+  canSendReply: boolean,
+): string | null {
+  if (hasBlockedOtherParticipant) {
+    return youHaveBlockedThisMemberMessage;
+  }
+  if (!canSendReply) {
+    return unableToSendMessage;
+  }
+  return null;
+}
+
 const guidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

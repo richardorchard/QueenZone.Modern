@@ -39,6 +39,7 @@ export const testIds = {
 
   memberGate: 'member-gate',
   inboxScreen: 'inbox-screen',
+  archivedScreen: 'archived-screen',
 } as const;
 
 export type TestId = (typeof testIds)[keyof typeof testIds];

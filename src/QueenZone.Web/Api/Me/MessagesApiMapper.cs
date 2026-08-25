@@ -39,7 +39,8 @@ public static class MessagesApiMapper
 
     public static ConversationDetailDto ToConversation(
         PrivateConversationDetail detail,
-        bool canSendReply) =>
+        bool canSendReply,
+        bool hasBlockedOtherParticipant = false) =>
         new(
             detail.ConversationId,
             detail.OtherParticipantId,
@@ -50,7 +51,8 @@ public static class MessagesApiMapper
             detail.TotalCount,
             detail.TotalPages,
             ConversationDetailPath(detail.ConversationId),
-            canSendReply);
+            canSendReply,
+            hasBlockedOtherParticipant);
 
     public static MessageRecipientDto ToRecipient(MemberRecipientMatch match) =>
         new(match.MemberId, match.DisplayName);

@@ -51,7 +51,8 @@ public sealed record ConversationDetailDto(
     int TotalCount,
     int TotalPages,
     string DetailPath,
-    bool CanSendReply);
+    bool CanSendReply,
+    bool HasBlockedOtherParticipant);
 
 /// <summary>
 /// JSON body for <c>POST /api/v1/me/messages/{conversationId}</c>.

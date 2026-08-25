@@ -19,10 +19,16 @@ public static class MessagesApiEndpoints
 
     public const string RecipientsPath = $"{Path}/recipients";
 
+    public const string ArchivedPath = $"{Path}/archived";
+
     public static string ConversationPath(Guid conversationId) => $"{Path}/{conversationId:D}";
 
     public static string ReportPath(Guid conversationId, Guid messageId) =>
         $"{Path}/{conversationId:D}/messages/{messageId:D}/report";
+
+    public static string ArchivePath(Guid conversationId) => $"{ConversationPath(conversationId)}/archive";
+
+    public static string UnarchivePath(Guid conversationId) => $"{ConversationPath(conversationId)}/unarchive";
 
     public static void MapMessagesApiEndpoints(this WebApplication app)
     {
@@ -48,6 +54,12 @@ public static class MessagesApiEndpoints
             .WithName("SearchMemberMessageRecipients")
             .WithSummary("Display-name recipient search matching GET /messages/compose?q=.")
             .Produces<MessageRecipientsDto>()
+            .ProducesProblem(StatusCodes.Status401Unauthorized);
+
+        group.MapGet("/messages/archived", GetArchivedInboxAsync)
+            .WithName("GetMemberArchivedInbox")
+            .WithSummary("Paged archived conversations matching GET /messages/archived.")
+            .Produces<ApiPagedResponse<InboxConversationDto>>()
             .ProducesProblem(StatusCodes.Status401Unauthorized);
 
         group.MapPost("/messages", ComposeAsync)
@@ -77,6 +89,18 @@ public static class MessagesApiEndpoints
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+        group.MapPost("/messages/{conversationId:guid}/archive", ArchiveConversationAsync)
+            .WithName("ArchiveMemberConversation")
+            .WithSummary("Archive a conversation matching POST /messages/{id} (Archive handler).")
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapPost("/messages/{conversationId:guid}/unarchive", UnarchiveConversationAsync)
+            .WithName("UnarchiveMemberConversation")
+            .WithSummary("Move an archived conversation back to the inbox, matching POST /messages/archived (Unarchive handler).")
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status404NotFound);
 
         group.MapPost("/messages/{conversationId:guid}/messages/{messageId:guid}/report", ReportMessageAsync)
             .WithName("ReportMemberMessage")
@@ -198,6 +222,91 @@ public static class MessagesApiEndpoints
             cancellationToken);
         httpContext.Response.Headers.CacheControl = "no-store";
         return Results.Ok(MessagesApiMapper.ToRecipients(matches));
+    }
+
+    internal static async Task<IResult> GetArchivedInboxAsync(
+        HttpContext httpContext,
+        ClaimsPrincipal user,
+        PrivateMessageService privateMessageService,
+        int? page,
+        int? pageSize,
+        CancellationToken cancellationToken)
+    {
+        var memberId = RequireMemberId(user, out var unauthorized);
+        if (unauthorized is not null)
+        {
+            return unauthorized;
+        }
+
+        var request = ApiPagination.Normalize(
+            page,
+            pageSize,
+            PrivateMessageLimits.InboxPageSize,
+            PrivateMessageLimits.MaxInboxPageSize);
+        var inbox = await privateMessageService.GetArchivedInboxAsync(
+            memberId,
+            request.Page,
+            request.PageSize,
+            cancellationToken);
+
+        httpContext.Response.Headers.CacheControl = "no-store";
+        return Results.Ok(ApiPagedResponse<InboxConversationDto>.Create(
+            MessagesApiMapper.ToInboxItems(inbox.Items),
+            inbox.Page,
+            inbox.PageSize,
+            inbox.TotalCount));
+    }
+
+    internal static async Task<IResult> ArchiveConversationAsync(
+        HttpContext httpContext,
+        ClaimsPrincipal user,
+        PrivateMessageService privateMessageService,
+        Guid conversationId,
+        CancellationToken cancellationToken)
+    {
+        var memberId = RequireMemberId(user, out var unauthorized);
+        if (unauthorized is not null)
+        {
+            return unauthorized;
+        }
+
+        var archived = await privateMessageService.ArchiveConversationAsync(
+            conversationId,
+            memberId,
+            cancellationToken);
+        if (!archived)
+        {
+            return ConversationNotFound();
+        }
+
+        httpContext.Response.Headers.CacheControl = "no-store";
+        return Results.NoContent();
+    }
+
+    internal static async Task<IResult> UnarchiveConversationAsync(
+        HttpContext httpContext,
+        ClaimsPrincipal user,
+        PrivateMessageService privateMessageService,
+        Guid conversationId,
+        CancellationToken cancellationToken)
+    {
+        var memberId = RequireMemberId(user, out var unauthorized);
+        if (unauthorized is not null)
+        {
+            return unauthorized;
+        }
+
+        var unarchived = await privateMessageService.UnarchiveConversationAsync(
+            conversationId,
+            memberId,
+            cancellationToken);
+        if (!unarchived)
+        {
+            return ConversationNotFound();
+        }
+
+        httpContext.Response.Headers.CacheControl = "no-store";
+        return Results.NoContent();
     }
 
     internal static async Task<IResult> ComposeAsync(
@@ -366,7 +475,11 @@ public static class MessagesApiEndpoints
             memberId,
             detail,
             cancellationToken);
-        return MessagesApiMapper.ToConversation(detail, canSendReply);
+        var hasBlockedOtherParticipant = await privateMessageService.HasBlockedAsync(
+            memberId,
+            detail.OtherParticipantId,
+            cancellationToken);
+        return MessagesApiMapper.ToConversation(detail, canSendReply, hasBlockedOtherParticipant);
     }
 
     private static IResult MapSendFailure(PrivateMessageSendResult result)

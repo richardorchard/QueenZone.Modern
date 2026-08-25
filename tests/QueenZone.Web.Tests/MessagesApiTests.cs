@@ -235,6 +235,124 @@ public sealed class MessagesApiTests : IClassFixture<QueenZoneWebApplicationFact
     }
 
     [Fact]
+    public async Task GetConversation_ReturnsHasBlockedOtherParticipant_WhenViewerBlockedSender()
+    {
+        var (aliceId, bobId) = await SeedConversationPairAsync(
+            "api-viewer-block-alice@example.com",
+            "API Viewer Block Alice",
+            "api-viewer-block-bob@example.com",
+            "API Viewer Block Bob");
+        var service = factory.Services.GetRequiredService<PrivateMessageService>();
+        var sent = await service.ComposeAsync(aliceId, bobId, "Hello");
+        var conversationId = sent.ConversationId!.Value;
+        Assert.True((await service.BlockAsync(bobId, aliceId)).Succeeded);
+
+        using var bob = CreateBearerClient(bobId, "API Viewer Block Bob", "api-viewer-block-bob@example.com");
+        using var get = await bob.GetAsync(MessagesApiEndpoints.ConversationPath(conversationId));
+        var detail = await get.Content.ReadFromJsonAsync<ConversationDetailDto>(JsonOptions);
+        Assert.True(detail!.HasBlockedOtherParticipant);
+        Assert.False(detail.CanSendReply);
+    }
+
+    [Fact]
+    public async Task Archived_ArchiveThenUnarchive_MatchesWebsiteBehavior()
+    {
+        var (aliceId, bobId) = await SeedConversationPairAsync(
+            "api-archive-alice@example.com",
+            "API Archive Alice",
+            "api-archive-bob@example.com",
+            "API Archive Bob");
+        var service = factory.Services.GetRequiredService<PrivateMessageService>();
+        var sent = await service.ComposeAsync(aliceId, bobId, "Archive me");
+        var conversationId = sent.ConversationId!.Value;
+
+        using var bob = CreateBearerClient(bobId, "API Archive Bob", "api-archive-bob@example.com");
+
+        using var emptyArchived = await bob.GetAsync(MessagesApiEndpoints.ArchivedPath);
+        var emptyArchivedPage = await emptyArchived.Content.ReadFromJsonAsync<ApiPagedResponse<InboxConversationDto>>(JsonOptions);
+        Assert.Empty(emptyArchivedPage!.Items);
+
+        using var archive = await bob.PostAsync(MessagesApiEndpoints.ArchivePath(conversationId), null);
+        Assert.Equal(HttpStatusCode.NoContent, archive.StatusCode);
+        Assert.Contains("no-store", archive.Headers.CacheControl?.ToString() ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+
+        using var inboxAfterArchive = await bob.GetAsync(MessagesApiEndpoints.Path);
+        var inboxAfterArchivePage = await inboxAfterArchive.Content.ReadFromJsonAsync<ApiPagedResponse<InboxConversationDto>>(JsonOptions);
+        Assert.Empty(inboxAfterArchivePage!.Items);
+
+        using var archivedAfterArchive = await bob.GetAsync(MessagesApiEndpoints.ArchivedPath);
+        var archivedAfterArchivePage = await archivedAfterArchive.Content.ReadFromJsonAsync<ApiPagedResponse<InboxConversationDto>>(JsonOptions);
+        var archivedRow = Assert.Single(archivedAfterArchivePage!.Items);
+        Assert.Equal(conversationId, archivedRow.ConversationId);
+
+        using var bobWeb = CreateCookieClient(bobId, "API Archive Bob", "api-archive-bob@example.com");
+        var inboxHtml = await bobWeb.GetStringAsync("/messages");
+        Assert.DoesNotContain("API Archive Alice", inboxHtml, StringComparison.Ordinal);
+        var archivedHtml = await bobWeb.GetStringAsync("/messages/archived");
+        Assert.Contains("API Archive Alice", archivedHtml, StringComparison.Ordinal);
+
+        using var unarchive = await bob.PostAsync(MessagesApiEndpoints.UnarchivePath(conversationId), null);
+        Assert.Equal(HttpStatusCode.NoContent, unarchive.StatusCode);
+
+        using var inboxAfterUnarchive = await bob.GetAsync(MessagesApiEndpoints.Path);
+        var inboxAfterUnarchivePage = await inboxAfterUnarchive.Content.ReadFromJsonAsync<ApiPagedResponse<InboxConversationDto>>(JsonOptions);
+        var inboxRow = Assert.Single(inboxAfterUnarchivePage!.Items);
+        Assert.Equal(conversationId, inboxRow.ConversationId);
+
+        using var archivedAfterUnarchive = await bob.GetAsync(MessagesApiEndpoints.ArchivedPath);
+        var archivedAfterUnarchivePage = await archivedAfterUnarchive.Content.ReadFromJsonAsync<ApiPagedResponse<InboxConversationDto>>(JsonOptions);
+        Assert.Empty(archivedAfterUnarchivePage!.Items);
+    }
+
+    [Fact]
+    public async Task Archive_And_Unarchive_ReturnNotFound_ForNonParticipant()
+    {
+        var (aliceId, bobId) = await SeedConversationPairAsync(
+            "api-archive-404-alice@example.com",
+            "API Archive 404 Alice",
+            "api-archive-404-bob@example.com",
+            "API Archive 404 Bob");
+        var outsiderId = Guid.NewGuid();
+        await SeedMemberAsync(outsiderId, "API Archive 404 Outsider", "api-archive-404-outsider@example.com");
+        var service = factory.Services.GetRequiredService<PrivateMessageService>();
+        var sent = await service.ComposeAsync(aliceId, bobId, "Private");
+
+        using var outsider = CreateBearerClient(outsiderId, "API Archive 404 Outsider", "api-archive-404-outsider@example.com");
+        using var archiveHidden = await outsider.PostAsync(
+            MessagesApiEndpoints.ArchivePath(sent.ConversationId!.Value),
+            null);
+        Assert.Equal(HttpStatusCode.NotFound, archiveHidden.StatusCode);
+
+        using var bob = CreateBearerClient(bobId, "API Archive 404 Bob", "api-archive-404-bob@example.com");
+        using var archiveMissing = await bob.PostAsync(MessagesApiEndpoints.ArchivePath(Guid.NewGuid()), null);
+        Assert.Equal(HttpStatusCode.NotFound, archiveMissing.StatusCode);
+
+        using var unarchiveMissing = await bob.PostAsync(MessagesApiEndpoints.UnarchivePath(Guid.NewGuid()), null);
+        Assert.Equal(HttpStatusCode.NotFound, unarchiveMissing.StatusCode);
+    }
+
+    [Fact]
+    public async Task Archived_RequiresMobileBearer_NotCookie()
+    {
+        using var anonymous = factory.CreateAnonymousClient(allowAutoRedirect: false);
+        using var cookieOnly = factory.CreateAnonymousClient(allowAutoRedirect: false);
+        cookieOnly.DefaultRequestHeaders.Add(TestMemberAuthHandler.MemberIdHeader, Guid.NewGuid().ToString());
+        cookieOnly.DefaultRequestHeaders.Add(TestMemberAuthHandler.DisplayNameHeader, "Cookie Fan");
+
+        foreach (var client in new[] { anonymous, cookieOnly })
+        {
+            using var archived = await client.GetAsync(MessagesApiEndpoints.ArchivedPath);
+            Assert.Equal(HttpStatusCode.Unauthorized, archived.StatusCode);
+
+            using var archive = await client.PostAsync(MessagesApiEndpoints.ArchivePath(Guid.NewGuid()), null);
+            Assert.Equal(HttpStatusCode.Unauthorized, archive.StatusCode);
+
+            using var unarchive = await client.PostAsync(MessagesApiEndpoints.UnarchivePath(Guid.NewGuid()), null);
+            Assert.Equal(HttpStatusCode.Unauthorized, unarchive.StatusCode);
+        }
+    }
+
+    [Fact]
     public async Task Reply_RequiresMobileBearer_NotCookie()
     {
         using var anonymous = factory.CreateAnonymousClient(allowAutoRedirect: false);
@@ -737,6 +855,7 @@ public sealed class MessagesApiTests : IClassFixture<QueenZoneWebApplicationFact
         Assert.Equal(9, message.SortKey);
         Assert.False(message.ReportedByViewer);
         Assert.True(detail.CanSendReply);
+        Assert.False(detail.HasBlockedOtherParticipant);
         Assert.Equal("/messages/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", detail.DetailPath);
 
         var blocked = MessagesApiMapper.ToConversation(
@@ -748,8 +867,10 @@ public sealed class MessagesApiTests : IClassFixture<QueenZoneWebApplicationFact
                 TotalCount: 1,
                 Page: 1,
                 PageSize: 50),
-            canSendReply: false);
+            canSendReply: false,
+            hasBlockedOtherParticipant: true);
         Assert.False(blocked.CanSendReply);
+        Assert.True(blocked.HasBlockedOtherParticipant);
 
         var recipientId = Guid.Parse("99999999-8888-7777-6666-555555555555");
         var recipients = MessagesApiMapper.ToRecipients(
