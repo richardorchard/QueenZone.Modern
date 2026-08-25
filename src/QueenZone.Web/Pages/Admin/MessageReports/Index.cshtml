@@ -1,0 +1,75 @@
+@page "/admin/message-reports"
+@model QueenZone.Web.Pages.Admin.MessageReports.IndexModel
+@using QueenZone.Data
+
+<div class="admin-shell">
+  <h1>Message reports</h1>
+  <p>
+    <a href="/admin">Back to admin</a>
+  </p>
+  <p>
+    This queue lists reports filed by members. Message bodies are shown only on the
+    report detail page, and that access is audited. There is no search of private conversations.
+  </p>
+
+  <form method="get" class="admin-search-form">
+    <label>
+      Status
+      <select name="status">
+        @if (string.Equals(Model.StatusFilter, "all", StringComparison.OrdinalIgnoreCase))
+        {
+          <option value="all" selected>All</option>
+        }
+        else
+        {
+          <option value="all">All</option>
+        }
+        @foreach (var status in PrivateMessageReportStatus.All)
+        {
+          if (string.Equals(Model.StatusFilter, status, StringComparison.Ordinal))
+          {
+            <option value="@status" selected>@PrivateMessageReportStatus.DisplayName(status)</option>
+          }
+          else
+          {
+            <option value="@status">@PrivateMessageReportStatus.DisplayName(status)</option>
+          }
+        }
+      </select>
+    </label>
+    <button type="submit" class="qz-button">Filter</button>
+  </form>
+
+  @if (Model.List.Items.Count == 0)
+  {
+    <p>No message reports in this view.</p>
+  }
+  else
+  {
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Reported member</th>
+          <th>Reporter</th>
+          <th>Reason</th>
+          <th>Filed</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @foreach (var item in Model.List.Items)
+        {
+          <tr>
+            <td>@item.ReportedDisplayName</td>
+            <td>@item.ReporterDisplayName</td>
+            <td>@(string.IsNullOrWhiteSpace(item.Reason) ? "—" : item.Reason)</td>
+            <td>@item.CreatedAt.ToString("u")</td>
+            <td><partial name="_SubmissionStatusBadge" model="item.Status" /></td>
+            <td><a href="/admin/message-reports/@item.Id">Review</a></td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+</div>

@@ -26,6 +26,12 @@ public sealed class PrivateMessageReportEntity
 
     public string Status { get; set; } = PrivateMessageReportStatus.Open;
 
+    public string? ReviewerEmail { get; set; }
+
+    public DateTimeOffset? ReviewedAt { get; set; }
+
+    public string? ReviewNotes { get; set; }
+
     public string MessageBodySnapshot { get; set; } = string.Empty;
 
     public string SenderDisplayNameSnapshot { get; set; } = string.Empty;

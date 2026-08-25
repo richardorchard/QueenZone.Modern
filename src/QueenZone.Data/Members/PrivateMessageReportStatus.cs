@@ -34,4 +34,14 @@ public static class PrivateMessageReportStatus
         return match
             ?? throw new ArgumentException($"Unknown private-message report status '{status}'.", nameof(status));
     }
+
+    public static string DisplayName(string status) =>
+        Normalize(status) switch
+        {
+            Open => "Open",
+            Reviewed => "Reviewed",
+            Dismissed => "Dismissed",
+            Actioned => "Actioned",
+            _ => status,
+        };
 }

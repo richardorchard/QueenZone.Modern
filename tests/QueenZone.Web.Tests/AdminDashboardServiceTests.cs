@@ -25,6 +25,7 @@ public sealed class AdminDashboardServiceTests
         Assert.Equal(SubmissionTypeCounts.Empty, snapshot.SubmissionQueue.NewsSuggestions);
         Assert.Equal(SubmissionTypeCounts.Empty, snapshot.SubmissionQueue.Articles);
         Assert.Equal(0, snapshot.OpenHelpRequestCount);
+        Assert.Equal(0, snapshot.OpenMessageReportCount);
         Assert.Equal("stub-traffic", snapshot.Traffic.UnavailableReason);
     }
 

@@ -19,6 +19,8 @@ public static class PrivateMessageLimits
     public const int MaxReportReasonLength = 1000;
 
     public const int ReportPrecedingMessageCount = 2;
+
+    public const int MaxReportReviewNotesLength = 500;
 }
 
 public sealed record PrivateConversationListItem(
