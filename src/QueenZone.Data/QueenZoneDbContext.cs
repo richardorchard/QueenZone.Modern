@@ -96,6 +96,8 @@ public sealed class QueenZoneDbContext : DbContext
 
     public DbSet<DeviceTokenEntity> DeviceTokens => Set<DeviceTokenEntity>();
 
+    public DbSet<NotificationPreferenceEntity> NotificationPreferences => Set<NotificationPreferenceEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<NewsTableRow>(entity =>
@@ -1066,6 +1068,24 @@ public sealed class QueenZoneDbContext : DbContext
             entity.HasOne(token => token.MemberAccount)
                 .WithMany()
                 .HasForeignKey(token => token.MemberAccountId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<NotificationPreferenceEntity>(entity =>
+        {
+            entity.ToTable("NotificationPreferences");
+            entity.HasKey(row => new { row.MemberAccountId, row.Category });
+
+            entity.Property(row => row.Category).HasConversion<string>().HasMaxLength(40).IsRequired();
+            entity.Property(row => row.IsEnabled).IsRequired();
+            entity.Property(row => row.UpdatedAt).IsRequired();
+
+            entity.HasIndex(row => new { row.Category, row.IsEnabled })
+                .HasDatabaseName("IX_NotificationPreferences_Category_IsEnabled");
+
+            entity.HasOne(row => row.MemberAccount)
+                .WithMany()
+                .HasForeignKey(row => row.MemberAccountId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }
