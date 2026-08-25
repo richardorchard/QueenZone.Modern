@@ -1,10 +1,10 @@
 /**
- * Debug-only smoke session injection (#872 Option A).
+ * Debug-only smoke session injection (#872, tightened by #831 Option A).
  *
- * Production / staging Release builds compile `__DEV__` to false, so this
- * handler is never registered there. The deep link is also an explicit
- * opt-in — it does not bypass sign-in unless something opens
- * `queenzone://smoke-auth?accessToken=…`.
+ * Enabled only when `__DEV__ === true` and `appEnv === 'development'`.
+ * Staging/production fail closed even if a Debug client is pointed at
+ * those origins. Release builds also compile `__DEV__` to false.
+ * `applySmokeSession` no-ops when this returns false.
  */
 
 export const smokeAuthScheme = 'queenzone';
@@ -12,12 +12,16 @@ export const smokeAuthHost = 'smoke-auth';
 export const smokeAuthRefreshPlaceholder = 'smoke-debug-no-refresh';
 export const smokeAuthExpiresInSeconds = 3600;
 
-export function isSmokeAuthEnabled(
-  env: { dev?: boolean } = {
-    dev: typeof __DEV__ !== 'undefined' ? __DEV__ : false,
-  },
-): boolean {
-  return env.dev === true;
+export type SmokeAuthGate = {
+  /** Metro/Release compile flag. Missing or false fails closed. */
+  dev?: boolean;
+  /** Runtime app environment. Anything other than development fails closed. */
+  appEnv?: string;
+};
+
+export function isSmokeAuthEnabled(env: SmokeAuthGate = {}): boolean {
+  const dev = env.dev ?? (typeof __DEV__ !== 'undefined' ? __DEV__ : false);
+  return dev === true && env.appEnv === 'development';
 }
 
 export function parseSmokeAuthAccessToken(url: string): string | null {
