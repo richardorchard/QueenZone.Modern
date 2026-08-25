@@ -378,7 +378,7 @@ node ../../scripts/Test-MobileCoverageGate.mjs --self-test
 | `e2e-test` | Playwright suite on a self-hosted `e2e` runner (Windows or macOS; starts after `build`, overlaps coverage) | Yes (required PR merge gate) |
 | `mobile-js` | `npm ci` + typecheck + `npm run test:coverage` + `scripts/Test-MobileCoverageGate.mjs` + Expo Doctor in `src/QueenZone.Mobile` | Yes — required on `main` after #870; skip-success stub when that tree is unchanged |
 | `mobile-android` | Unsigned debug APK compile (GitHub-hosted Linux) | Yes — required on `main` after #870; skip-success stub when that tree is unchanged |
-| `mobile-ios` | Unsigned Simulator compile (GitHub-hosted macOS) | Yes — required on `main` after #870; skip-success stub when that tree is unchanged |
+| `mobile-ios` | Unsigned Simulator compile (idle self-hosted `ios-build` Mac preferred; `macos-26` fallback) | Yes — required on `main` after #870; skip-success stub when that tree is unchanged |
 | `mobile-api-contracts` | Testing-host consumer contracts: real `/api/v1` responses through the mobile `fetchJson` / domain clients plus runtime zod schemas (#869 Option A) | Independent of native jobs; skip-success stub when contract paths are unchanged |
 | `mobile-android-smoke` / `mobile-ios-smoke` | Maestro device smoke against a Debug build baked at the local Testing contract host (#872 Option A) | **No (Phase 1).** `.github/workflows/mobile-device-smoke.yml` is `workflow_dispatch` + weekday 04:00 UTC only. Do not add these names to branch protection yet. |
 

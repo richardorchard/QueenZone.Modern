@@ -108,6 +108,14 @@ in-place update only when the package identifier and signing key match the
 installed app. If this key is lost or changed, uninstall the existing QueenZone
 test app before installing the next APK.
 
+## iOS CI runner status token
+
+The unsigned iOS CI runner probe uses an `IOS_RUNNER_ADMIN_TOKEN` entry in
+Bitwarden. It is a fine-grained GitHub PAT for this repository with
+Administration read-only access, mapped by the repository variable
+`BITWARDEN_IOS_RUNNER_SECRETS`. Rotate it in GitHub and Bitwarden together; if
+it is absent or expired, CI safely chooses hosted `macos-26`.
+
 ## Six Labors build licence
 
 ImageSharp 4 requires the complete Six Labors licence string during restore and

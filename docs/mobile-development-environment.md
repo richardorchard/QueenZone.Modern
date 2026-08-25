@@ -30,7 +30,24 @@ Xcode.
 | Watchman | Latest stable | Recommended on macOS. It is not required on Windows. |
 | Expo SDK | **57** | Pinned in `src/QueenZone.Mobile/package.json`. Development builds only; Expo Go is not supported. |
 | Xcode | **26.4+** | Required on macOS to compile the iOS target for Expo SDK 57. |
-| CocoaPods | Homebrew `cocoapods` on the signing Mac; Expo prebuild on GitHub-hosted CI | Interactive `npx expo run:ios` can install pods itself. The self-hosted TestFlight runner service does not load `~/.zprofile`, so [publish-ios-testflight.yml](../.github/workflows/publish-ios-testflight.yml) adds Homebrew to `PATH`, sets `IOS_BUILD_NUMBER` from the workflow run number before prebuild (App Store Connect requires a unique `CFBundleVersion`), and runs `pod install` explicitly. |
+| CocoaPods | Homebrew `cocoapods` on the self-hosted Mac; Expo prebuild on hosted CI | Interactive `npx expo run:ios` can install pods itself. The self-hosted runner service does not load `~/.zprofile`, so both iOS workflows add Homebrew to `PATH`; TestFlight also sets `IOS_BUILD_NUMBER` and runs `pod install` explicitly. |
+
+### Self-hosted Mac build service
+
+The M2 Mac Mini is shared by unsigned `ios-build`, signed `ios-signing`, and
+Playwright `e2e` work. Keep only one runner job active on the 16 GB machine at a
+time; concurrent Xcode builds can force swapping and make CI flaky. Configure
+the machine not to sleep while its launchd runner service is enabled (`sudo
+pmset -a sleep 0`, or an equivalent managed `caffeinate` service), because a
+sleeping runner can appear available briefly and miss the hosted fallback.
+
+The launchd environment must expose `/opt/homebrew/bin`, and CocoaPods must be
+installed there (`brew install cocoapods`). Select `/Applications/Xcode.app`
+once as an administrator before starting the service; CI deliberately does not
+run passworded `sudo xcode-select` on self-hosted jobs. Check Simulator runtimes,
+DerivedData, and CocoaPods caches periodically on the 512 GB disk. Sustained
+back-to-back builds may thermal-throttle this Mini, so compare runner choice in
+the job summary before treating a slow compile as a code regression.
 
 The established Windows reference currently uses Node 24, Temurin 17, Android
 SDK Platform 36, and Build-Tools 36.0.0. Match those compatibility versions on
