@@ -58,6 +58,26 @@ The job is a required pull-request merge gate. If both runners are offline, the 
 
    Use `./svc.sh status`, `./svc.sh stop`, and `./svc.sh uninstall` to inspect or manage it.
 
+### macOS runner label matrix
+
+Keep the three Mac workloads distinct:
+
+| Label | Workload | Availability behavior |
+| --- | --- | --- |
+| `e2e` | Playwright browser suite | Can run on the Windows or Mac runner; queues if both are unavailable |
+| `ios-signing` | Signed TestFlight archive | Mac-only; Apple credentials remain isolated to the release workflow |
+| `ios-build` | Unsigned PR Simulator compile | Uses the Mac only when the status probe sees it online and idle; otherwise uses hosted `macos-26` |
+
+Add `ios-build` to the Apple Silicon runner in **Settings > Actions >
+Runners**. If separate runner processes are used for label isolation, serialize
+them at the machine level: the M2 Mini has 16 GB RAM and should run only one
+Xcode job at a time. Two processes with different labels do not prevent two
+simultaneous jobs by themselves.
+
+The iOS status probe needs the Bitwarden-mapped `IOS_RUNNER_ADMIN_TOKEN`
+described in `docs/bitwarden-secrets.md`. If the token or API is unavailable,
+it deliberately chooses hosted macOS instead of leaving the PR queued.
+
 ## Machine Prerequisites
 
 The runner executes the same steps as the workflow locally, so this machine needs:
