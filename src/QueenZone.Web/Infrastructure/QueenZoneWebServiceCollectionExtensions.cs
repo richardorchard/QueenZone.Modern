@@ -247,6 +247,7 @@ public static class QueenZoneWebServiceCollectionExtensions
         services.AddHostedService<MemberAccountDeletionHostedService>();
         services.AddScoped<PrivateMessageRateLimiter>();
         services.AddScoped<PrivateMessageService>();
+        services.AddHostedService<PrivateMessageReportPurgeHostedService>();
         services.AddScoped<MemberFollowService>();
         services.AddScoped<PhotoSubmissionService>();
         services.AddScoped<AdminPhotoService>();

@@ -846,6 +846,137 @@ public sealed class EfPrivateMessageRepositoryTests : IAsyncDisposable
         Assert.Equal(PrivateMessageReportText.NotAParticipant, outsider.ErrorMessage);
     }
 
+    [Fact]
+    public async Task ListReportsAsync_FiltersByStatus_AndOrdersNewestFirst()
+    {
+        var first = await repository.SendNewOrExistingAsync(aliceId, bobId, "First", DateTimeOffset.UtcNow);
+        var firstMessageId = (await repository.GetConversationAsync(first.ConversationId!.Value, bobId))!.Messages[^1].Id;
+        var olderReport = await repository.CreateReportAsync(
+            bobId, first.ConversationId!.Value, firstMessageId, "Older", DateTimeOffset.UtcNow.AddMinutes(-5));
+
+        var second = await repository.SendNewOrExistingAsync(aliceId, carolId, "Hi Carol", DateTimeOffset.UtcNow);
+        var secondMessageId = (await repository.GetConversationAsync(second.ConversationId!.Value, carolId))!.Messages[^1].Id;
+        var newerReport = await repository.CreateReportAsync(
+            carolId, second.ConversationId!.Value, secondMessageId, "Newer", DateTimeOffset.UtcNow);
+
+        var openPage = await repository.ListReportsAsync(PrivateMessageReportStatus.Open, 1, 50);
+        Assert.Equal(2, openPage.TotalCount);
+        Assert.Equal(newerReport.ReportId, openPage.Items[0].Id);
+        Assert.Equal(olderReport.ReportId, openPage.Items[1].Id);
+        Assert.Equal("Alice EF", openPage.Items[0].ReportedDisplayName);
+        Assert.Equal("Carol EF", openPage.Items[0].ReporterDisplayName);
+
+        await repository.UpdateReportStatusAsync(
+            olderReport.ReportId!.Value, PrivateMessageReportStatus.Dismissed, "mod@example.com");
+
+        var dismissedPage = await repository.ListReportsAsync(PrivateMessageReportStatus.Dismissed, 1, 50);
+        Assert.Equal(olderReport.ReportId, Assert.Single(dismissedPage.Items).Id);
+
+        var stillOpenPage = await repository.ListReportsAsync(PrivateMessageReportStatus.Open, 1, 50);
+        Assert.Equal(newerReport.ReportId, Assert.Single(stillOpenPage.Items).Id);
+
+        var allPage = await repository.ListReportsAsync("all", 1, 50);
+        Assert.Equal(2, allPage.TotalCount);
+
+        Assert.Equal(1, await repository.CountOpenReportsAsync());
+    }
+
+    [Fact]
+    public async Task UpdateReportStatusAsync_WritesAuditRowOnlyOnActualTransition()
+    {
+        var sent = await repository.SendNewOrExistingAsync(aliceId, bobId, "Hi", DateTimeOffset.UtcNow);
+        var messageId = (await repository.GetConversationAsync(sent.ConversationId!.Value, bobId))!.Messages[^1].Id;
+        var created = await repository.CreateReportAsync(
+            bobId, sent.ConversationId!.Value, messageId, "Reason", DateTimeOffset.UtcNow);
+        var reportId = created.ReportId!.Value;
+
+        var updated = await repository.UpdateReportStatusAsync(
+            reportId, PrivateMessageReportStatus.Reviewed, "mod@example.com");
+        Assert.Equal(PrivateMessageReportStatus.Reviewed, updated!.Status);
+
+        // Re-applying the same status should not add a second audit row.
+        await repository.UpdateReportStatusAsync(reportId, PrivateMessageReportStatus.Reviewed, "mod@example.com");
+
+        var auditRows = await dbContext.PrivateMessageReportAuditLogs
+            .Where(log => log.ReportId == reportId)
+            .ToListAsync();
+        var statusChangeRow = Assert.Single(
+            auditRows,
+            log => log.Action == PrivateMessageReportAuditAction.StatusChanged);
+        Assert.Equal("mod@example.com", statusChangeRow.ActorEmail);
+        Assert.Equal($"{PrivateMessageReportStatus.Open} -> {PrivateMessageReportStatus.Reviewed}", statusChangeRow.Details);
+
+        var missing = await repository.UpdateReportStatusAsync(
+            Guid.NewGuid(), PrivateMessageReportStatus.Reviewed, "mod@example.com");
+        Assert.Null(missing);
+    }
+
+    [Fact]
+    public async Task AppendReportViewedAuditAsync_WritesOneRowPerCall()
+    {
+        var sent = await repository.SendNewOrExistingAsync(aliceId, bobId, "Hi", DateTimeOffset.UtcNow);
+        var messageId = (await repository.GetConversationAsync(sent.ConversationId!.Value, bobId))!.Messages[^1].Id;
+        var created = await repository.CreateReportAsync(
+            bobId, sent.ConversationId!.Value, messageId, "Reason", DateTimeOffset.UtcNow);
+        var reportId = created.ReportId!.Value;
+
+        await repository.AppendReportViewedAuditAsync(reportId, "mod@example.com");
+        await repository.AppendReportViewedAuditAsync(reportId, "mod@example.com");
+
+        var viewedRows = await dbContext.PrivateMessageReportAuditLogs
+            .Where(log => log.ReportId == reportId && log.Action == PrivateMessageReportAuditAction.Viewed)
+            .ToListAsync();
+        Assert.Equal(2, viewedRows.Count);
+        Assert.All(viewedRows, row => Assert.Equal("mod@example.com", row.ActorEmail));
+    }
+
+    [Fact]
+    public async Task PurgeExpiredReportsAsync_DeletesOnlyTerminalReportsPastTheRetentionWindow()
+    {
+        var now = DateTimeOffset.Parse("2026-08-25T00:00:00Z");
+        var retention = PrivateMessageLimits.ReportRetentionAfterTerminalStatus;
+
+        var sentOpen = await repository.SendNewOrExistingAsync(aliceId, bobId, "Still open", now);
+        var openReport = await repository.CreateReportAsync(
+            bobId, sentOpen.ConversationId!.Value,
+            (await repository.GetConversationAsync(sentOpen.ConversationId!.Value, bobId))!.Messages[^1].Id,
+            "Reason", now);
+
+        var sentExpired = await repository.SendNewOrExistingAsync(aliceId, carolId, "Long dismissed", now);
+        var expiredReport = await repository.CreateReportAsync(
+            carolId, sentExpired.ConversationId!.Value,
+            (await repository.GetConversationAsync(sentExpired.ConversationId!.Value, carolId))!.Messages[^1].Id,
+            "Reason", now);
+        await repository.UpdateReportStatusAsync(
+            expiredReport.ReportId!.Value, PrivateMessageReportStatus.Dismissed, "mod@example.com");
+        // Backdate the status-change audit row past the retention window (repository writes it at UtcNow).
+        var expiredAuditRow = await dbContext.PrivateMessageReportAuditLogs
+            .SingleAsync(log => log.ReportId == expiredReport.ReportId!.Value);
+        expiredAuditRow.OccurredAt = now - retention - TimeSpan.FromDays(1);
+        await dbContext.SaveChangesAsync();
+
+        var sentRecent = await repository.SendNewOrExistingAsync(bobId, carolId, "Recently dismissed", now);
+        var recentReport = await repository.CreateReportAsync(
+            carolId, sentRecent.ConversationId!.Value,
+            (await repository.GetConversationAsync(sentRecent.ConversationId!.Value, carolId))!.Messages[^1].Id,
+            "Reason", now);
+        await repository.UpdateReportStatusAsync(
+            recentReport.ReportId!.Value, PrivateMessageReportStatus.Dismissed, "mod@example.com");
+
+        var purgedCount = await repository.PurgeExpiredReportsAsync(now);
+
+        Assert.Equal(1, purgedCount);
+        Assert.Null(await repository.GetReportAsync(expiredReport.ReportId!.Value));
+        Assert.NotNull(await repository.GetReportAsync(openReport.ReportId!.Value));
+        Assert.NotNull(await repository.GetReportAsync(recentReport.ReportId!.Value));
+
+        // Audit rows for the purged report are retained (ADR 0015 decision 3).
+        var remainingAuditRows = await dbContext.PrivateMessageReportAuditLogs
+            .Where(log => log.ReportId == expiredReport.ReportId!.Value)
+            .CountAsync();
+        Assert.True(remainingAuditRows > 0);
+    }
+
     private static QueenZoneDbContext CreateContext(string connectionString)
     {
         var options = new DbContextOptionsBuilder<QueenZoneDbContext>()
