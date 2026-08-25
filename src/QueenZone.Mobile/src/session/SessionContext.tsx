@@ -1,9 +1,11 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Linking } from 'react-native';
+import { AppState, Linking } from 'react-native';
+import * as Notifications from 'expo-notifications';
 import { getAppConfig } from '../config/appConfig';
 import { fetchJson } from '../api/client';
 import { parseMemberProfile, type MemberProfile } from '../api/me';
 import type { AuthTokens } from '../api/auth';
+import { clearPushRegistration, refreshPushRegistration, syncPushRegistration } from '../notifications';
 import { logoutRemote, refreshAccessToken, revokeRefreshToken, signInWithProvider } from './oauth';
 import {
   isSmokeAuthEnabled,
@@ -39,6 +41,28 @@ const signedOut: Session = {
   profile: null,
 };
 
+function sessionFromAccessToken(
+  accessToken: string | null | undefined,
+  extras: Partial<Pick<Session, 'isRestoring' | 'displayName' | 'profile'>> = {},
+): Session {
+  const trimmed = accessToken?.trim() ?? '';
+  const token = trimmed.length > 0 ? trimmed : null;
+  return {
+    isSignedIn: token !== null,
+    isRestoring: extras.isRestoring ?? false,
+    displayName: extras.displayName ?? null,
+    accessToken: token,
+    profile: extras.profile ?? null,
+  };
+}
+
+function smokeAuthAllowed(): boolean {
+  return isSmokeAuthEnabled({
+    dev: typeof __DEV__ !== 'undefined' ? __DEV__ : false,
+    appEnv: getAppConfig().appEnv,
+  });
+}
+
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session>({ ...signedOut, isRestoring: true });
   const [refreshToken, setRefreshToken] = useState<string | null>(null);
@@ -48,21 +72,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const stored = await writeStoredSession(tokens);
     setRefreshToken(stored.refreshToken);
     setExpiresAt(stored.expiresAt);
-    setSession({
-      isSignedIn: true,
-      isRestoring: false,
-      accessToken: tokens.accessToken,
-      displayName: null,
-      profile: null,
-    });
+    setSession(sessionFromAccessToken(tokens.accessToken));
     const profile = await loadProfile(tokens.accessToken);
-    setSession({
-      isSignedIn: true,
-      isRestoring: false,
-      accessToken: tokens.accessToken,
-      displayName: profile?.displayName ?? null,
-      profile,
-    });
+    setSession(
+      sessionFromAccessToken(tokens.accessToken, {
+        displayName: profile?.displayName ?? null,
+        profile,
+      }),
+    );
     return profile;
   }, []);
 
@@ -119,13 +136,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
         setRefreshToken(tokens.refreshToken);
         setExpiresAt(tokens.expiresAt);
-        setSession({
-          isSignedIn: true,
-          isRestoring: false,
-          accessToken: tokens.accessToken,
-          displayName: profile?.displayName ?? null,
-          profile,
-        });
+        setSession(
+          sessionFromAccessToken(tokens.accessToken, {
+            displayName: profile?.displayName ?? null,
+            profile,
+          }),
+        );
       } catch {
         if (!cancelled) {
           await clearLocal();
@@ -140,7 +156,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const applySmokeSession = useCallback(
     async (accessToken: string): Promise<boolean> => {
-      if (!isSmokeAuthEnabled()) {
+      if (!smokeAuthAllowed()) {
         return false;
       }
 
@@ -160,7 +176,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   );
 
   useEffect(() => {
-    if (!isSmokeAuthEnabled()) {
+    if (!smokeAuthAllowed()) {
       return;
     }
 
@@ -179,6 +195,35 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return () => subscription.remove();
   }, [applySmokeSession]);
 
+  const isSignedIn = session.isSignedIn;
+  const accessToken = session.accessToken;
+
+  // #850: request push permission and register the device once signed in
+  // (not before) — never on cold start. Best-effort throughout; see
+  // notifications/pushRegistration.ts.
+  useEffect(() => {
+    if (!isSignedIn || !accessToken) {
+      return;
+    }
+
+    void syncPushRegistration(accessToken);
+
+    const tokenSubscription = Notifications.addPushTokenListener(() => {
+      void syncPushRegistration(accessToken);
+    });
+
+    const appStateSubscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        void refreshPushRegistration(accessToken);
+      }
+    });
+
+    return () => {
+      tokenSubscription.remove();
+      appStateSubscription.remove();
+    };
+  }, [isSignedIn, accessToken]);
+
   const value = useMemo<SessionContextValue>(
     () => ({
       ...session,
@@ -191,6 +236,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         const token = session.accessToken;
         const refresh = refreshToken;
         if (token) {
+          await clearPushRegistration(token);
           await logoutRemote(getAppConfig().apiBaseUrl, token);
         }
 
@@ -207,20 +253,23 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         }
 
         const profile = await loadProfile(token);
-        setSession((current) => ({
-          ...current,
-          isSignedIn: true,
-          displayName: profile?.displayName ?? current.displayName,
-          profile,
-        }));
+        setSession((current) =>
+          sessionFromAccessToken(token, {
+            isRestoring: current.isRestoring,
+            displayName: profile?.displayName ?? current.displayName,
+            profile,
+          }),
+        );
         return profile;
       },
       setAccessToken: (accessToken) =>
-        setSession((current) => ({
-          ...current,
-          isSignedIn: current.isSignedIn || Boolean(accessToken),
-          accessToken,
-        })),
+        setSession((current) =>
+          sessionFromAccessToken(accessToken, {
+            isRestoring: current.isRestoring,
+            displayName: current.displayName,
+            profile: current.profile,
+          }),
+        ),
     }),
     [applySmokeSession, applyTokens, clearLocal, ensureAccessToken, refreshToken, session],
   );

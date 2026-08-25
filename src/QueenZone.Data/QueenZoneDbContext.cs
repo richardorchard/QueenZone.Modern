@@ -76,6 +76,9 @@ public sealed class QueenZoneDbContext : DbContext
 
     public DbSet<PrivateMessageReportEntity> PrivateMessageReports => Set<PrivateMessageReportEntity>();
 
+    public DbSet<PrivateMessageReportAuditLogEntity> PrivateMessageReportAuditLogs =>
+        Set<PrivateMessageReportAuditLogEntity>();
+
     public DbSet<MemberMessageBlockEntity> MemberMessageBlocks => Set<MemberMessageBlockEntity>();
 
     public DbSet<MemberFollowEntity> MemberFollows => Set<MemberFollowEntity>();
@@ -92,6 +95,8 @@ public sealed class QueenZoneDbContext : DbContext
     public DbSet<MobileAuthRefreshTokenEntity> MobileAuthRefreshTokens => Set<MobileAuthRefreshTokenEntity>();
 
     public DbSet<DeviceTokenEntity> DeviceTokens => Set<DeviceTokenEntity>();
+
+    public DbSet<NotificationPreferenceEntity> NotificationPreferences => Set<NotificationPreferenceEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -894,6 +899,24 @@ public sealed class QueenZoneDbContext : DbContext
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
+        modelBuilder.Entity<PrivateMessageReportAuditLogEntity>(entity =>
+        {
+            entity.ToTable("PrivateMessageReportAuditLog");
+            entity.HasKey(log => log.Id);
+
+            entity.Property(log => log.Action).HasMaxLength(50).IsRequired();
+            entity.Property(log => log.ActorEmail).HasMaxLength(256).IsRequired();
+            entity.Property(log => log.OccurredAt).IsRequired();
+            entity.Property(log => log.Details).HasMaxLength(2000);
+
+            // No navigation/FK constraint to PrivateMessageReportEntity: this log must outlive
+            // the report's retention-window purge (ADR 0015), so the relationship is
+            // application-enforced only.
+            entity.HasIndex(log => new { log.ReportId, log.OccurredAt })
+                .IsDescending(false, true)
+                .HasDatabaseName("IX_PrivateMessageReportAuditLog_ReportId_OccurredAt");
+        });
+
         modelBuilder.Entity<MemberMessageBlockEntity>(entity =>
         {
             entity.ToTable("MemberMessageBlocks");
@@ -1045,6 +1068,24 @@ public sealed class QueenZoneDbContext : DbContext
             entity.HasOne(token => token.MemberAccount)
                 .WithMany()
                 .HasForeignKey(token => token.MemberAccountId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<NotificationPreferenceEntity>(entity =>
+        {
+            entity.ToTable("NotificationPreferences");
+            entity.HasKey(row => new { row.MemberAccountId, row.Category });
+
+            entity.Property(row => row.Category).HasConversion<string>().HasMaxLength(40).IsRequired();
+            entity.Property(row => row.IsEnabled).IsRequired();
+            entity.Property(row => row.UpdatedAt).IsRequired();
+
+            entity.HasIndex(row => new { row.Category, row.IsEnabled })
+                .HasDatabaseName("IX_NotificationPreferences_Category_IsEnabled");
+
+            entity.HasOne(row => row.MemberAccount)
+                .WithMany()
+                .HasForeignKey(row => row.MemberAccountId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }

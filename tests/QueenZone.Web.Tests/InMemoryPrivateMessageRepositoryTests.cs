@@ -433,6 +433,66 @@ public sealed class InMemoryPrivateMessageRepositoryTests
         Assert.Contains(target.Id, await repo.GetReportedMessageIdsAsync(conversationId, bob.Id));
     }
 
+    [Fact]
+    public async Task ListReportsAsync_And_UpdateReportStatusAsync_TrackStatusAndAudit()
+    {
+        var members = new InMemoryMemberAccountRepository();
+        var alice = await members.CreateAsync(NewMember("a-mod@example.com", "Alice"));
+        var bob = await members.CreateAsync(NewMember("b-mod@example.com", "Bob"));
+        var repo = new InMemoryPrivateMessageRepository(id =>
+            members.FindByIdAsync(id).GetAwaiter().GetResult());
+
+        var created = await repo.SendNewOrExistingAsync(alice.Id, bob.Id, "Hi", DateTimeOffset.UtcNow);
+        var conversationId = created.ConversationId!.Value;
+        var target = (await repo.GetConversationAsync(conversationId, bob.Id))!.Messages[^1];
+        var report = await repo.CreateReportAsync(bob.Id, conversationId, target.Id, "Abuse", DateTimeOffset.UtcNow);
+        var reportId = report.ReportId!.Value;
+
+        var openPage = await repo.ListReportsAsync(PrivateMessageReportStatus.Open, 1, 50);
+        var listed = Assert.Single(openPage.Items);
+        Assert.Equal("Alice", listed.ReportedDisplayName);
+        Assert.Equal("Bob", listed.ReporterDisplayName);
+        Assert.Equal(1, await repo.CountOpenReportsAsync());
+
+        await repo.AppendReportViewedAuditAsync(reportId, "mod@example.com");
+
+        var updated = await repo.UpdateReportStatusAsync(reportId, PrivateMessageReportStatus.Actioned, "mod@example.com");
+        Assert.Equal(PrivateMessageReportStatus.Actioned, updated!.Status);
+        Assert.Equal(0, await repo.CountOpenReportsAsync());
+
+        var actionedPage = await repo.ListReportsAsync(PrivateMessageReportStatus.Actioned, 1, 50);
+        Assert.Equal(reportId, Assert.Single(actionedPage.Items).Id);
+
+        var missing = await repo.UpdateReportStatusAsync(Guid.NewGuid(), PrivateMessageReportStatus.Actioned, "mod@example.com");
+        Assert.Null(missing);
+    }
+
+    [Fact]
+    public async Task PurgeExpiredReportsAsync_OnlyRemovesTerminalReportsPastRetention()
+    {
+        var members = new InMemoryMemberAccountRepository();
+        var alice = await members.CreateAsync(NewMember("a-purge@example.com", "Alice"));
+        var bob = await members.CreateAsync(NewMember("b-purge@example.com", "Bob"));
+        var repo = new InMemoryPrivateMessageRepository(id =>
+            members.FindByIdAsync(id).GetAwaiter().GetResult());
+
+        var now = DateTimeOffset.Parse("2026-08-25T00:00:00Z");
+        var sent = await repo.SendNewOrExistingAsync(alice.Id, bob.Id, "Hi", now);
+        var target = (await repo.GetConversationAsync(sent.ConversationId!.Value, bob.Id))!.Messages[^1];
+        var report = await repo.CreateReportAsync(bob.Id, sent.ConversationId!.Value, target.Id, "Reason", now);
+        var reportId = report.ReportId!.Value;
+
+        await repo.UpdateReportStatusAsync(reportId, PrivateMessageReportStatus.Dismissed, "mod@example.com");
+
+        // Not yet past the retention window: nothing purged.
+        Assert.Equal(0, await repo.PurgeExpiredReportsAsync(now));
+        Assert.NotNull(await repo.GetReportAsync(reportId));
+
+        var wellPastRetention = now + PrivateMessageLimits.ReportRetentionAfterTerminalStatus + TimeSpan.FromDays(1);
+        Assert.Equal(1, await repo.PurgeExpiredReportsAsync(wellPastRetention));
+        Assert.Null(await repo.GetReportAsync(reportId));
+    }
+
     private static MemberAccount NewMember(string email, string name) =>
         new()
         {

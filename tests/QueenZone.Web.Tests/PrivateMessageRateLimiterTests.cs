@@ -337,5 +337,33 @@ public sealed class PrivateMessageRateLimiterTests
             Guid reporterMemberId,
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
+
+        public virtual Task<PrivateMessageReportListPage> ListReportsAsync(
+            string? status,
+            int page,
+            int pageSize,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public virtual Task<int> CountOpenReportsAsync(CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public virtual Task<PrivateMessageReport?> UpdateReportStatusAsync(
+            Guid reportId,
+            string status,
+            string actorEmail,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public virtual Task AppendReportViewedAuditAsync(
+            Guid reportId,
+            string actorEmail,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public virtual Task<int> PurgeExpiredReportsAsync(
+            DateTimeOffset asOfUtc,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 }
