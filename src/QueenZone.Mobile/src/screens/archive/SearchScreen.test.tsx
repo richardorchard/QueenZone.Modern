@@ -1,12 +1,12 @@
 import { useNavigation } from '@react-navigation/native';
-import { fireEvent, screen, userEvent, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, screen, userEvent, waitFor } from '@testing-library/react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { RefreshControl } from 'react-native';
 import { fetchSearchPage } from '../../api';
 import { ApiError } from '../../api/client';
 import type { SearchResult } from '../../api/types';
 import { deferred, pagedResponse } from '../../test/fixtures';
-import { renderWithProviders } from '../../test/render';
+import { renderWithProviders, flushVirtualizedList } from '../../test/render';
 import { testIds } from '../../test/testIds';
 import { SearchRouteScreen, SearchScreen } from './SearchScreen';
 
@@ -64,6 +64,10 @@ describe('SearchScreen', () => {
     (useNavigation as jest.Mock).mockReturnValue({
       getParent: () => ({ navigate: mockTabNavigate }),
     });
+  });
+
+  afterEach(async () => {
+    await flushVirtualizedList();
   });
 
   it('shows suggested query presets and does not search one character', async () => {
@@ -227,11 +231,14 @@ describe('SearchScreen', () => {
       expect(screen.getByRole('button', { name: 'QueenZone modernisation begins. News' })).toBeOnTheScreen(),
     );
     const callsAfterLoad = fetchSearch.mock.calls.length;
-    fireEvent(screen.UNSAFE_getByType(RefreshControl), 'refresh');
+    await act(async () => {
+      fireEvent(screen.UNSAFE_getByType(RefreshControl), 'refresh');
+    });
     await waitFor(() => expect(fetchSearch.mock.calls.length).toBeGreaterThan(callsAfterLoad));
     expect(fetchSearch).toHaveBeenLastCalledWith(
       expect.objectContaining({ q: 'modernisation', page: 1 }),
     );
+    await flushVirtualizedList();
   });
 });
 

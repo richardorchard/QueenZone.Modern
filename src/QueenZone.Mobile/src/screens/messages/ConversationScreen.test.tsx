@@ -1,7 +1,7 @@
 import { screen, userEvent, waitFor } from '@testing-library/react-native';
 import { fetchConversation, reportConversationMessage } from '../../api/messages';
 import { createMockSession } from '../../test/mockSession';
-import { fakeNavigation, renderWithProviders } from '../../test/render';
+import { fakeNavigation, flushVirtualizedList, renderWithProviders } from '../../test/render';
 import { ConversationScreen } from './ConversationScreen';
 
 const conversationId = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
@@ -38,6 +38,10 @@ describe('ConversationScreen', () => {
     mockSession.accessToken = 'tok';
     fetchConversationMock.mockReset();
     reportConversationMessageMock.mockReset();
+  });
+
+  afterEach(async () => {
+    await flushVirtualizedList();
   });
 
   it('lets a member report someone else\'s message with an optional reason', async () => {

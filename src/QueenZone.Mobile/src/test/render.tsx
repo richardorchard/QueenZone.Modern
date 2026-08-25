@@ -1,5 +1,5 @@
 import { NavigationContainer } from '@react-navigation/native';
-import { render, type RenderOptions } from '@testing-library/react-native';
+import { act, render, type RenderOptions } from '@testing-library/react-native';
 import type { ReactElement } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ThemeProvider } from '../theme';
@@ -42,4 +42,14 @@ export function fakeNavigation() {
     getState: jest.fn(),
     getId: jest.fn(),
   };
+}
+
+/**
+ * Drain VirtualizedList's deferred `_updateCellsToRender` timeout so it cannot
+ * leak an `act(...)` warning into a later Jest file.
+ */
+export async function flushVirtualizedList(): Promise<void> {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  });
 }
