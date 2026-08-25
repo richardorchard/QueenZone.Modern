@@ -3,6 +3,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { SessionProvider } from './src/session/SessionContext';
@@ -54,15 +55,17 @@ export default function App() {
   }
 
   return (
-    <SafeAreaProvider>
-      <ThemeProvider preference="dark">
-        <SessionProvider>
-          <FanPerformancePlayerProvider>
-            <AppNavigation />
-          </FanPerformancePlayerProvider>
-        </SessionProvider>
-      </ThemeProvider>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <ThemeProvider preference="dark">
+          <SessionProvider>
+            <FanPerformancePlayerProvider>
+              <AppNavigation />
+            </FanPerformancePlayerProvider>
+          </SessionProvider>
+        </ThemeProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
 

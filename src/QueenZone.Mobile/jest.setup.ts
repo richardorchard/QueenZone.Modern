@@ -21,6 +21,10 @@ jest.mock('expo-splash-screen', () => ({
   hideAsync: jest.fn(async () => {}),
 }));
 
+jest.mock('react-native-reanimated', () => require('./jest.reanimated.mock.js'));
+
+jest.mock('react-native-gesture-handler', () => require('./jest.gesture-handler.mock.js'));
+
 jest.mock('expo-web-browser', () => ({
   maybeCompleteAuthSession: jest.fn(),
   openAuthSessionAsync: jest.fn(),
