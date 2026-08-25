@@ -24,6 +24,9 @@ public sealed class SampleNewsRepository : INewsRepository
     public Task<int> GetPublishedCountAsync(NewsArchiveFilter filter = default, CancellationToken cancellationToken = default) =>
         Task.FromResult(NewsArchiveFiltering.Apply(PublishedItems, filter).Count);
 
+    public Task<NewsArchiveYearRange> GetArchiveYearRangeAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(NewsArchiveYearRanges.Compute(PublishedItems));
+
     public Task<NewsItem?> GetByIdAsync(int id, CancellationToken cancellationToken = default) =>
         Task.FromResult(
             NewsItemOrdering.ByCreatedDateDescending(

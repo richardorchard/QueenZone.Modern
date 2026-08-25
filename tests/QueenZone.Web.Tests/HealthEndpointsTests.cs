@@ -357,6 +357,9 @@ public sealed class HealthEndpointsTests : IClassFixture<WebApplicationFactory<P
         public Task<int> GetPublishedCountAsync(NewsArchiveFilter filter = default, CancellationToken cancellationToken = default) =>
             Task.FromResult(0);
 
+        public Task<NewsArchiveYearRange> GetArchiveYearRangeAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(new NewsArchiveYearRange(null, null));
+
         public Task<NewsItem?> GetByIdAsync(int id, CancellationToken cancellationToken = default) =>
             Task.FromResult<NewsItem?>(null);
 

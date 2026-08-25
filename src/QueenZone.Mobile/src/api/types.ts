@@ -38,6 +38,12 @@ export type NewsDetail = {
   detailPath: string;
 };
 
+/** Earliest/latest published years in the archive; both null when there are no articles. */
+export type NewsYearRange = {
+  minYear: number | null;
+  maxYear: number | null;
+};
+
 export type BiographyChapterListItem = {
   id: number;
   title: string;

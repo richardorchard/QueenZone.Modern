@@ -24,6 +24,9 @@ public sealed class InMemoryNewsRepository(
     public Task<int> GetPublishedCountAsync(NewsArchiveFilter filter = default, CancellationToken cancellationToken = default) =>
         Task.FromResult(NewsArchiveFiltering.Apply(store.GetPublishedNewsItems(), filter).Count);
 
+    public Task<NewsArchiveYearRange> GetArchiveYearRangeAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(NewsArchiveYearRanges.Compute(store.GetPublishedNewsItems()));
+
     public async Task<NewsItem?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         var item = store.GetPublishedNewsItems().SingleOrDefault(item => item.Id == id);

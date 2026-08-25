@@ -21,6 +21,9 @@ public interface INewsRepository
 
     Task<int> GetPublishedCountAsync(NewsArchiveFilter filter = default, CancellationToken cancellationToken = default);
 
+    /// <summary>Earliest/latest published years across the whole archive, for the mobile year-rail scrubber.</summary>
+    Task<NewsArchiveYearRange> GetArchiveYearRangeAsync(CancellationToken cancellationToken = default);
+
     Task<NewsItem?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<SitemapContentEntry>> GetPublishedSitemapEntriesAsync(CancellationToken cancellationToken = default);

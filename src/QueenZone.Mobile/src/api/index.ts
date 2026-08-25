@@ -11,6 +11,7 @@ export {
   fetchLiveActivity,
   fetchNewsDetail,
   fetchNewsPage,
+  fetchNewsYearRange,
   fetchOnThisDay,
   fetchPhotoCategories,
   fetchPhotoCategory,
