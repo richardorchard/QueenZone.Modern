@@ -1,5 +1,9 @@
 namespace QueenZone.Data;
 
+/// <summary>
+/// Shared private-message size caps. Bodies are stored and shown as plain text:
+/// no HTML, markdown, or auto-linkification. Renderers must encode, not interpret.
+/// </summary>
 public static class PrivateMessageLimits
 {
     public const int MaxBodyLength = 4000;

@@ -54,6 +54,7 @@ describe('inboxMeta', () => {
     assert.equal(validateReplyBody('   '), replyRequiredMessage);
     assert.equal(validateReplyBody('a'.repeat(4001)), replyTooLongMessage);
     assert.equal(validateReplyBody('Hello back'), null);
+    assert.equal(validateReplyBody('<script>alert(1)</script>'), null);
     assert.equal(conversationBodyMaxLength, 4000);
     assert.equal(unableToSendMessage, 'Unable to send message.');
   });

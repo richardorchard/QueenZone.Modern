@@ -73,6 +73,36 @@ public sealed class InMemoryPrivateMessageRepositoryTests
     }
 
     [Fact]
+    public async Task ComposeAndReply_StoreMarkupAsPlainText_AndRejectOverLength()
+    {
+        var members = new InMemoryMemberAccountRepository();
+        var alice = await members.CreateAsync(NewMember("a-xss@example.com", "Alice"));
+        var bob = await members.CreateAsync(NewMember("b-xss@example.com", "Bob"));
+        var repo = new InMemoryPrivateMessageRepository(id =>
+            members.FindByIdAsync(id).GetAwaiter().GetResult());
+        const string markup = "<script>alert(1)</script>";
+
+        var created = await repo.SendNewOrExistingAsync(alice.Id, bob.Id, markup, DateTimeOffset.UtcNow);
+        Assert.True(created.Succeeded);
+        var conversationId = created.ConversationId!.Value;
+        var reply = await repo.ReplyAsync(conversationId, bob.Id, markup + " reply", DateTimeOffset.UtcNow);
+        Assert.True(reply.Succeeded);
+
+        var tooLong = await repo.SendNewOrExistingAsync(
+            alice.Id,
+            bob.Id,
+            new string('x', PrivateMessageLimits.MaxBodyLength + 1),
+            DateTimeOffset.UtcNow);
+        Assert.False(tooLong.Succeeded);
+        Assert.Contains("4000", tooLong.ErrorMessage, StringComparison.Ordinal);
+
+        var detail = await repo.GetConversationAsync(conversationId, bob.Id);
+        Assert.Equal(markup, detail!.Messages[0].Body);
+        Assert.Equal(markup + " reply", detail.Messages[1].Body);
+        Assert.Equal(markup + " reply", (await repo.GetInboxAsync(alice.Id)).Items[0].LastMessagePreview);
+    }
+
+    [Fact]
     public async Task GetConversation_PagesMessages_DefaultingToLatestPage()
     {
         var members = new InMemoryMemberAccountRepository();

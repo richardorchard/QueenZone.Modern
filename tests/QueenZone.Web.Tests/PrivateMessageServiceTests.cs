@@ -82,6 +82,30 @@ public sealed class PrivateMessageServiceTests
     }
 
     [Fact]
+    public async Task Compose_And_Reply_StoreMarkupAsPlainText_AndRejectOverLength()
+    {
+        var (service, _, _, alice, bob) = CreateSystem();
+        const string markup = "<script>alert(1)</script>";
+
+        var created = await service.ComposeAsync(alice.Id, bob.Id, markup);
+        Assert.True(created.Succeeded);
+        var conversationId = created.ConversationId!.Value;
+        Assert.True((await service.ReplyAsync(conversationId, bob.Id, markup + " reply")).Succeeded);
+
+        var tooLong = await service.ComposeAsync(
+            alice.Id,
+            bob.Id,
+            new string('x', PrivateMessageLimits.MaxBodyLength + 1));
+        Assert.False(tooLong.Succeeded);
+        Assert.Contains("4000", tooLong.ErrorMessage, StringComparison.Ordinal);
+
+        var detail = await service.GetConversationAsync(conversationId, bob.Id, markRead: false);
+        Assert.Equal(markup, detail!.Messages[0].Body);
+        Assert.Equal(markup + " reply", detail.Messages[1].Body);
+        Assert.Equal(markup + " reply", (await service.GetInboxAsync(alice.Id)).Items[0].LastMessagePreview);
+    }
+
+    [Fact]
     public async Task Compose_And_Reply_RejectSuspendedSender()
     {
         var (service, members, _, alice, bob) = CreateSystem();
