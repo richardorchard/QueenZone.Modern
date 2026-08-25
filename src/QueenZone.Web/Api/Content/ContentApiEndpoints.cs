@@ -32,7 +32,7 @@ public static class ContentApiEndpoints
 
         group.MapGet("/news", GetNewsListAsync)
             .WithName("GetContentNewsList")
-            .WithSummary("Paged list of published news articles. Optional 'decade' (e.g. 2010) filters server-side to that 10-year span; out-of-range years are ignored.")
+            .WithSummary("Paged list of published news articles. Optional 'decade' (e.g. 2010) filters server-side to that 10-year span, or 'year' (e.g. 2008) to a single year; 'year' wins if both are given. Out-of-range years are ignored.")
             .Produces<ApiPagedResponse<NewsListItemDto>>();
 
         group.MapGet("/news/{id:int}", GetNewsDetailAsync)
@@ -40,6 +40,11 @@ public static class ContentApiEndpoints
             .WithSummary("A single published news article.")
             .Produces<NewsDetailDto>()
             .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapGet("/news/years", GetNewsYearRangeAsync)
+            .WithName("GetContentNewsYearRange")
+            .WithSummary("Earliest/latest published years across the news archive, for the year-rail scrubber's tick marks.")
+            .Produces<NewsYearRangeDto>();
 
         group.MapGet("/timeline", GetTimelineEventsAsync)
             .WithName("GetContentTimelineEvents")
@@ -132,10 +137,11 @@ public static class ContentApiEndpoints
         int? page,
         int? pageSize,
         int? decade,
+        int? year,
         CancellationToken cancellationToken)
     {
         var request = ApiPagination.Normalize(page, pageSize);
-        var filter = NewsArchiveFilter.Parse(decade);
+        var filter = NewsArchiveFilter.Parse(decade, year);
         var items = await newsRepository.GetArchivePageAsync(request.Page, request.PageSize, filter, cancellationToken);
         var totalCount = await newsRepository.GetPublishedCountAsync(filter, cancellationToken);
 
@@ -146,6 +152,14 @@ public static class ContentApiEndpoints
             totalCount);
 
         return Results.Ok(response);
+    }
+
+    internal static async Task<IResult> GetNewsYearRangeAsync(
+        INewsRepository newsRepository,
+        CancellationToken cancellationToken)
+    {
+        var range = await newsRepository.GetArchiveYearRangeAsync(cancellationToken);
+        return Results.Ok(new NewsYearRangeDto(range.MinYear, range.MaxYear));
     }
 
     internal static async Task<IResult> GetNewsDetailAsync(

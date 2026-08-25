@@ -14,6 +14,7 @@ export const testIds = {
   newsScreen: 'news-screen',
   newsStoryScreen: 'news-story-screen',
   newsStoryBack: 'news-story-back',
+  newsYearRail: 'news-year-rail',
 
   searchTypeFilters: 'search-type-filters',
 

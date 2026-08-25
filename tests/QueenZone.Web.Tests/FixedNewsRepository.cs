@@ -32,6 +32,9 @@ internal sealed class FixedNewsRepository : INewsRepository
     public Task<int> GetPublishedCountAsync(NewsArchiveFilter filter = default, CancellationToken cancellationToken = default) =>
         Task.FromResult(NewsArchiveFiltering.Apply(publishedItems, filter).Count);
 
+    public Task<NewsArchiveYearRange> GetArchiveYearRangeAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(NewsArchiveYearRanges.Compute(publishedItems));
+
     public Task<NewsItem?> GetByIdAsync(int id, CancellationToken cancellationToken = default) =>
         Task.FromResult(publishedItems.SingleOrDefault(item => item.Id == id));
 
