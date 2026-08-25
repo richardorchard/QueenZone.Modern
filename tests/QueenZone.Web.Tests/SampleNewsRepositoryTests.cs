@@ -32,4 +32,13 @@ public sealed class SampleNewsRepositoryTests
 
         Assert.Contains(page.Items, item => item.Id == 1003);
     }
+
+    [Fact]
+    public async Task GetArchiveYearRangeAsync_excludes_unpublished_items()
+    {
+        var range = await repository.GetArchiveYearRangeAsync();
+
+        Assert.Equal(2026, range.MinYear);
+        Assert.Equal(2026, range.MaxYear);
+    }
 }

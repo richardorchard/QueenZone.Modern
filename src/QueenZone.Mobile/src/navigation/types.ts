@@ -18,6 +18,7 @@ export type HomeStackParamList = {
   Settings: undefined;
   Contact: undefined;
   Inbox: undefined;
+  Archived: undefined;
   Conversation: { id: string };
   ComposeMessage: undefined;
   SavedList: { kind: 'articles' | 'photographs' | 'offline' | 'history' };

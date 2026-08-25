@@ -76,6 +76,18 @@ export default ({ config }: ConfigContext): ExpoConfig => {
           ...(process.env.SENTRY_PROJECT ? { project: process.env.SENTRY_PROJECT } : {}),
         },
       ],
+      [
+        // ADR 0014: direct APNs/FCM, no EAS. `mode` sets the iOS
+        // `aps-environment` entitlement — sandbox (development) for every
+        // pre-release build, production only for the App Store build (#848).
+        'expo-notifications',
+        {
+          icon: './assets/ic-notification.png',
+          color: '#B89A4A',
+          defaultChannel: 'default',
+          mode: appEnv === 'production' ? 'production' : 'development',
+        },
+      ],
     ],
   };
 };

@@ -26,6 +26,13 @@ public sealed record NewsDetailDto(
     DateTime PublishedAt,
     string? SourceUrl,
     string DetailPath);
+
+/// <summary>
+/// Earliest/latest published years for <c>/api/v1/content/news/years</c>. Backs the mobile
+/// year-rail scrubber's tick marks (issue #886); both are <see langword="null"/> when the
+/// archive has no published articles.
+/// </summary>
+public sealed record NewsYearRangeDto(int? MinYear, int? MaxYear);
 /// <summary>
 /// List-card shape for <c>/api/v1/content/timeline</c>. No detail endpoint: the website
 /// has no single-event page, only the one continuous timeline list.

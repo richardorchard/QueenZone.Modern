@@ -10,6 +10,7 @@ import { DeleteAccountScreen } from '../screens/account/DeleteAccountScreen';
 import { SavedListScreen } from '../screens/account/SavedListScreen';
 import { MySubmissionsScreen } from '../screens/account/MySubmissionsScreen';
 import { InboxScreen } from '../screens/messages/InboxScreen';
+import { ArchivedScreen } from '../screens/messages/ArchivedScreen';
 import { ConversationScreen } from '../screens/messages/ConversationScreen';
 import { ComposeMessageScreen } from '../screens/messages/ComposeMessageScreen';
 import { ArchiveHubScreen } from '../screens/archive/ArchiveHubScreen';
@@ -77,6 +78,7 @@ export function HomeStack() {
       <Home.Screen name="Contact" component={ContactScreen} options={{ title: 'Contact' }} />
       <Home.Screen name="DeleteAccount" component={DeleteAccountScreen} options={{ title: 'Delete account' }} />
       <Home.Screen name="Inbox" component={InboxScreen} options={{ title: 'Messages' }} />
+      <Home.Screen name="Archived" component={ArchivedScreen} options={{ title: 'Archived messages' }} />
       <Home.Screen name="Conversation" component={ConversationScreen} />
       <Home.Screen name="ComposeMessage" component={ComposeMessageScreen} options={{ title: 'New message' }} />
       <Home.Screen name="SavedList" component={SavedListScreen} options={{ title: 'Library' }} />

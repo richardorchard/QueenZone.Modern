@@ -789,5 +789,48 @@ public sealed class EfPublicReadRepositoryTests : IAsyncDisposable
         var emptyDecade = new NewsArchiveFilter(1980);
         Assert.Equal(0, await repository.GetPublishedCountAsync(emptyDecade));
         Assert.Empty(await repository.GetArchivePageAsync(1, 20, emptyDecade));
+
+        // The year-rail scrubber (issue #886) reuses the same date-bounded SQL with a 1-year window.
+        var yearFilter = new NewsArchiveFilter(null, 2008);
+        var yearFilteredPage = await repository.GetArchivePageAsync(1, 20, yearFilter);
+        Assert.Single(yearFilteredPage);
+        Assert.Equal(9999, yearFilteredPage[0].Id);
+        Assert.Equal(1, await repository.GetPublishedCountAsync(yearFilter));
+    }
+
+    [Fact]
+    public async Task GetArchiveYearRangeAsync_returns_the_min_and_max_published_years()
+    {
+        dbContext.Database.ExecuteSqlRaw(
+            """
+            CREATE TABLE IF NOT EXISTS NewsRows (
+                Id INTEGER NOT NULL,
+                Title TEXT NOT NULL,
+                Excerpt TEXT NOT NULL,
+                Body TEXT NOT NULL,
+                PublishedAt TEXT NOT NULL,
+                SourceUrl TEXT,
+                IsPublished INTEGER NOT NULL,
+                Slug TEXT
+            );
+            INSERT INTO NewsRows (Id, Title, Excerpt, Body, PublishedAt, IsPublished) VALUES
+                (1, 'Newest', 'Ex', 'Body', '2026-06-11', 1),
+                (2, 'Oldest', 'Ex', 'Body', '2008-03-04', 1),
+                (3, 'Hidden', 'Ex', 'Body', '2001-01-01', 0);
+            """);
+
+        var repository = new EfNewsRepository(
+            dbContext,
+            latestSql: "SELECT Id, Title, Excerpt, Body, PublishedAt, SourceUrl, IsPublished, Slug FROM NewsRows WHERE IsPublished = 1 LIMIT {0}",
+            countSql: "SELECT COUNT(*) AS Value FROM NewsRows WHERE IsPublished = 1",
+            archivePageSql: "SELECT Id, Title, Excerpt, Body, PublishedAt, SourceUrl, IsPublished, Slug FROM NewsRows WHERE IsPublished = 1 LIMIT {1} OFFSET {0}",
+            byIdSql: "SELECT Id, Title, Excerpt, Body, PublishedAt, SourceUrl, IsPublished, Slug FROM NewsRows WHERE IsPublished = 1 AND Id = {0}",
+            sitemapSql: "SELECT Id, Title, PublishedAt, Slug FROM NewsRows WHERE IsPublished = 1",
+            archiveYearRangeSql: "SELECT MIN(PublishedAt) AS MinPublishedAt, MAX(PublishedAt) AS MaxPublishedAt FROM NewsRows WHERE IsPublished = 1");
+
+        var range = await repository.GetArchiveYearRangeAsync();
+
+        Assert.Equal(2008, range.MinYear);
+        Assert.Equal(2026, range.MaxYear);
     }
 }

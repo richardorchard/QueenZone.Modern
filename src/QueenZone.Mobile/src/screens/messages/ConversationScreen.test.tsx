@@ -1,6 +1,11 @@
 import { screen, userEvent, waitFor } from '@testing-library/react-native';
 import { ApiError } from '../../api/client';
-import { fetchConversation, replyToConversation, reportConversationMessage } from '../../api/messages';
+import {
+  archiveConversation,
+  fetchConversation,
+  replyToConversation,
+  reportConversationMessage,
+} from '../../api/messages';
 import { createMockSession } from '../../test/mockSession';
 import { fakeNavigation, flushVirtualizedList, renderWithProviders } from '../../test/render';
 import { ConversationScreen } from './ConversationScreen';
@@ -17,6 +22,7 @@ jest.mock('../../api/messages', () => ({
   fetchConversation: jest.fn(),
   replyToConversation: jest.fn(),
   reportConversationMessage: jest.fn(),
+  archiveConversation: jest.fn(),
 }));
 
 const fetchConversationMock = fetchConversation as jest.MockedFunction<typeof fetchConversation>;
@@ -24,6 +30,7 @@ const replyToConversationMock = replyToConversation as jest.MockedFunction<typeo
 const reportConversationMessageMock = reportConversationMessage as jest.MockedFunction<
   typeof reportConversationMessage
 >;
+const archiveConversationMock = archiveConversation as jest.MockedFunction<typeof archiveConversation>;
 
 function renderConversation() {
   return renderWithProviders(
@@ -34,16 +41,19 @@ function renderConversation() {
   );
 }
 
-function conversationDetail(messages: Array<{
-  id: string;
-  senderMemberId: string;
-  senderDisplayName: string;
-  body: string;
-  createdAt: string;
-  isMine: boolean;
-  sortKey: number;
-  reportedByViewer?: boolean;
-}>) {
+function conversationDetail(
+  messages: Array<{
+    id: string;
+    senderMemberId: string;
+    senderDisplayName: string;
+    body: string;
+    createdAt: string;
+    isMine: boolean;
+    sortKey: number;
+    reportedByViewer?: boolean;
+  }>,
+  overrides: { canSendReply?: boolean; hasBlockedOtherParticipant?: boolean } = {},
+) {
   return {
     conversationId,
     otherParticipantId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
@@ -54,7 +64,8 @@ function conversationDetail(messages: Array<{
     totalCount: messages.length,
     totalPages: 1,
     detailPath: `/messages/${conversationId}`,
-    canSendReply: true,
+    canSendReply: overrides.canSendReply ?? true,
+    hasBlockedOtherParticipant: overrides.hasBlockedOtherParticipant ?? false,
   };
 }
 
@@ -65,6 +76,7 @@ describe('ConversationScreen', () => {
     fetchConversationMock.mockReset();
     replyToConversationMock.mockReset();
     reportConversationMessageMock.mockReset();
+    archiveConversationMock.mockReset();
   });
 
   afterEach(async () => {
@@ -154,12 +166,56 @@ describe('ConversationScreen', () => {
     await waitFor(() => expect(fetchConversationMock).toHaveBeenCalledTimes(2));
   });
 
-  it('shows the unable-to-send notice instead of a composer when canSendReply is false', async () => {
-    fetchConversationMock.mockResolvedValue({ ...conversationDetail([]), canSendReply: false });
+  it('shows the generic sending-blocked notice when the reply composer is hidden', async () => {
+    fetchConversationMock.mockResolvedValue(
+      conversationDetail(
+        [
+          {
+            id: theirMessageId,
+            senderMemberId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+            senderDisplayName: 'Bob',
+            body: 'Hello',
+            createdAt: '2026-08-19T12:00:00.000Z',
+            isMine: false,
+            sortKey: 1,
+            reportedByViewer: false,
+          },
+        ],
+        { canSendReply: false },
+      ),
+    );
 
     renderConversation();
     await waitFor(() => expect(screen.getByText('Unable to send message.')).toBeOnTheScreen());
     expect(screen.queryByLabelText('Reply')).toBeNull();
+  });
+
+  it('shows the you-blocked-this-member notice ahead of the generic notice', async () => {
+    fetchConversationMock.mockResolvedValue(
+      conversationDetail(
+        [
+          {
+            id: theirMessageId,
+            senderMemberId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+            senderDisplayName: 'Bob',
+            body: 'Hello',
+            createdAt: '2026-08-19T12:00:00.000Z',
+            isMine: false,
+            sortKey: 1,
+            reportedByViewer: false,
+          },
+        ],
+        { canSendReply: false, hasBlockedOtherParticipant: true },
+      ),
+    );
+
+    renderConversation();
+    await waitFor(() =>
+      expect(
+        screen.getByText('You have blocked this member. They can no longer send you private messages.'),
+      ).toBeOnTheScreen(),
+    );
+    expect(screen.queryByText('Unable to send message.')).toBeNull();
   });
 
   it('sends a reply and clears the draft', async () => {
@@ -202,5 +258,38 @@ describe('ConversationScreen', () => {
 
     await waitFor(() => expect(screen.getByText('Message body is required.')).toBeOnTheScreen());
     expect(replyToConversationMock).not.toHaveBeenCalled();
+  });
+
+  it('archives the conversation and returns to the inbox', async () => {
+    const navigation = fakeNavigation();
+    fetchConversationMock.mockResolvedValue(
+      conversationDetail([
+        {
+          id: theirMessageId,
+          senderMemberId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+          senderDisplayName: 'Bob',
+          body: 'Hello',
+          createdAt: '2026-08-19T12:00:00.000Z',
+          isMine: false,
+          sortKey: 1,
+          reportedByViewer: false,
+        },
+      ]),
+    );
+    archiveConversationMock.mockResolvedValueOnce(undefined);
+
+    renderWithProviders(
+      <ConversationScreen
+        navigation={navigation as never}
+        route={{ key: 'conversation', name: 'Conversation', params: { id: conversationId } } as never}
+      />,
+    );
+    await waitFor(() => expect(screen.getByText('Hello')).toBeOnTheScreen());
+
+    const user = userEvent.setup();
+    await user.press(screen.getByRole('button', { name: 'Archive conversation' }));
+
+    await waitFor(() => expect(archiveConversationMock).toHaveBeenCalledWith('tok', conversationId));
+    expect(navigation.navigate).toHaveBeenCalledWith('Inbox');
   });
 });

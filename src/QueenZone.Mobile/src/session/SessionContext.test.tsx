@@ -7,6 +7,7 @@ import { renderWithProviders } from '../test/render';
 import { SessionProvider, useSession } from './SessionContext';
 import * as oauth from './oauth';
 import * as tokenStore from './tokenStore';
+import * as notifications from '../notifications';
 
 const mockAppConfig = {
   apiBaseUrl: 'http://qz.test',
@@ -38,6 +39,12 @@ jest.mock('./tokenStore', () => ({
   clearStoredSession: jest.fn(async () => {}),
 }));
 
+jest.mock('../notifications', () => ({
+  syncPushRegistration: jest.fn(async () => {}),
+  refreshPushRegistration: jest.fn(async () => {}),
+  clearPushRegistration: jest.fn(async () => {}),
+}));
+
 const fetchJsonMock = fetchJson as jest.MockedFunction<typeof fetchJson>;
 const readStored = tokenStore.readStoredSession as jest.MockedFunction<typeof tokenStore.readStoredSession>;
 const writeStored = tokenStore.writeStoredSession as jest.MockedFunction<typeof tokenStore.writeStoredSession>;
@@ -46,6 +53,12 @@ const signInWithProvider = oauth.signInWithProvider as jest.MockedFunction<typeo
 const refreshAccessToken = oauth.refreshAccessToken as jest.MockedFunction<typeof oauth.refreshAccessToken>;
 const logoutRemote = oauth.logoutRemote as jest.MockedFunction<typeof oauth.logoutRemote>;
 const revokeRefreshToken = oauth.revokeRefreshToken as jest.MockedFunction<typeof oauth.revokeRefreshToken>;
+const syncPushRegistration = notifications.syncPushRegistration as jest.MockedFunction<
+  typeof notifications.syncPushRegistration
+>;
+const clearPushRegistration = notifications.clearPushRegistration as jest.MockedFunction<
+  typeof notifications.clearPushRegistration
+>;
 
 function Probe() {
   const session = useSession();
@@ -103,9 +116,13 @@ beforeEach(() => {
   refreshAccessToken.mockReset();
   logoutRemote.mockReset();
   revokeRefreshToken.mockReset();
+  syncPushRegistration.mockReset();
+  clearPushRegistration.mockReset();
   fetchJsonMock.mockResolvedValue(memberProfilePayload());
   logoutRemote.mockResolvedValue(undefined);
   revokeRefreshToken.mockResolvedValue(undefined);
+  syncPushRegistration.mockResolvedValue(undefined);
+  clearPushRegistration.mockResolvedValue(undefined);
 });
 
 describe('SessionProvider', () => {
@@ -178,12 +195,31 @@ describe('SessionProvider', () => {
     await waitFor(() => expect(screen.getByText('signed-in')).toBeOnTheScreen());
     await waitFor(() => expect(screen.getByText('Freddie')).toBeOnTheScreen());
     expect(signInWithProvider).toHaveBeenCalledWith('http://qz.test', 'Google');
+    await waitFor(() => expect(syncPushRegistration).toHaveBeenCalledWith(authTokensFixture().accessToken));
 
     await user.press(screen.getByText('do-sign-out'));
     await waitFor(() => expect(screen.getByText('signed-out')).toBeOnTheScreen());
+    expect(clearPushRegistration).toHaveBeenCalledWith(authTokensFixture().accessToken);
     expect(logoutRemote).toHaveBeenCalled();
     expect(revokeRefreshToken).toHaveBeenCalled();
     expect(clearStored).toHaveBeenCalled();
+  });
+
+  it('does not register for push before sign-in', async () => {
+    readStored.mockResolvedValue(null);
+    renderSession();
+    await waitFor(() => expect(screen.getByText('signed-out')).toBeOnTheScreen());
+    expect(syncPushRegistration).not.toHaveBeenCalled();
+  });
+
+  it('registers for push when a stored session is restored', async () => {
+    readStored.mockResolvedValue({
+      ...authTokensFixture(),
+      expiresAt: Date.now() + 60_000,
+    });
+    renderSession();
+    await waitFor(() => expect(screen.getByText('signed-in')).toBeOnTheScreen());
+    await waitFor(() => expect(syncPushRegistration).toHaveBeenCalledWith(authTokensFixture().accessToken));
   });
 
   it('stays signed out when the provider hop is cancelled', async () => {

@@ -508,6 +508,9 @@ public sealed class PublicQueryCacheServiceTests
             CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<NewsItem>>([]);
 
+        public Task<NewsArchiveYearRange> GetArchiveYearRangeAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(new NewsArchiveYearRange(null, null));
+
         public Task<NewsItem?> GetByIdAsync(int id, CancellationToken cancellationToken = default) =>
             Task.FromResult<NewsItem?>(null);
 
