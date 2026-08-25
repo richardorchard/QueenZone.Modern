@@ -4,7 +4,7 @@ export const inboxPageSize = 50;
 /** Matches website conversation pages (`PrivateMessageLimits.ConversationPageSize`). */
 export const conversationPageSize = 50;
 
-/** Matches `PrivateMessageLimits.MaxBodyLength` / website reply textarea. */
+/** Matches `PrivateMessageLimits.MaxBodyLength` / website reply textarea. Bodies are plain text. */
 export const conversationBodyMaxLength = 4000;
 
 /** Matches `PrivateMessageLimits.MaxReportReasonLength`. */

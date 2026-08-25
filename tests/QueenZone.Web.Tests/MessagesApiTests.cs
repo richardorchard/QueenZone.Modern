@@ -151,6 +151,30 @@ public sealed class MessagesApiTests : IClassFixture<QueenZoneWebApplicationFact
     }
 
     [Fact]
+    public async Task Conversation_ReturnsMarkupBodiesAsPlainText()
+    {
+        var (aliceId, bobId) = await SeedConversationPairAsync(
+            "api-xss-alice@example.com",
+            "API Xss Alice",
+            "api-xss-bob@example.com",
+            "API Xss Bob");
+        var service = factory.Services.GetRequiredService<PrivateMessageService>();
+        const string markup = "<script>alert(1)</script>";
+        var sent = await service.ComposeAsync(aliceId, bobId, markup);
+        Assert.True(sent.Succeeded);
+
+        using var bob = CreateBearerClient(bobId, "API Xss Bob", "api-xss-bob@example.com");
+        using var conversationResponse = await bob.GetAsync(
+            MessagesApiEndpoints.ConversationPath(sent.ConversationId!.Value));
+        var detail = await conversationResponse.Content.ReadFromJsonAsync<ConversationDetailDto>(JsonOptions);
+        Assert.Equal(markup, Assert.Single(detail!.Messages).Body);
+
+        using var inboxResponse = await bob.GetAsync(MessagesApiEndpoints.Path);
+        var inbox = await inboxResponse.Content.ReadFromJsonAsync<ApiPagedResponse<InboxConversationDto>>(JsonOptions);
+        Assert.Equal(markup, Assert.Single(inbox!.Items).LastMessagePreview);
+    }
+
+    [Fact]
     public async Task GetConversation_ReturnsNotFound_ForNonParticipantAndUnknownId()
     {
         var (aliceId, bobId) = await SeedConversationPairAsync(

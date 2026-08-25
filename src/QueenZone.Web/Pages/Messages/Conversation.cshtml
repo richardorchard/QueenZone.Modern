@@ -61,6 +61,7 @@
                 @message.CreatedAt.UtcDateTime.ToString("dd MMM yyyy HH:mm") UTC
               </time>
             </header>
+            @* Plain text: Razor encoding is the XSS barrier. Do not Html.Raw or auto-link. *@
             <div class="qz-message-thread__body">@message.Body</div>
             @if (!message.IsMine)
             {
