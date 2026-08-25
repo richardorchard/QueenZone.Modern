@@ -23,6 +23,13 @@ public static class PrivateMessageLimits
     public const int MaxReportReasonLength = 1000;
 
     public const int ReportPrecedingMessageCount = 2;
+
+    /// <summary>
+    /// How long a report stays retained after reaching a terminal status (Dismissed/Actioned)
+    /// before it is eligible for permanent deletion (ADR 0015 decision 2). Reports in Open or
+    /// Reviewed status are never purged by this window.
+    /// </summary>
+    public static readonly TimeSpan ReportRetentionAfterTerminalStatus = TimeSpan.FromDays(180);
 }
 
 public sealed record PrivateConversationListItem(

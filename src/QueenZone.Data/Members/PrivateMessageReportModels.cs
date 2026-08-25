@@ -43,6 +43,24 @@ public sealed record PrivateMessageReportResult(
     string? ErrorMessage,
     bool AlreadyReported = false);
 
+/// <summary>Row shown on the admin moderation queue (issue #470).</summary>
+public sealed record PrivateMessageReportListItem(
+    Guid Id,
+    Guid MessageId,
+    Guid ConversationId,
+    Guid ReporterMemberId,
+    string ReporterDisplayName,
+    Guid ReportedMemberId,
+    string ReportedDisplayName,
+    string? Reason,
+    string Status,
+    DateTimeOffset CreatedAt);
+
+public sealed record PrivateMessageReportListPage(
+    IReadOnlyList<PrivateMessageReportListItem> Items,
+    int TotalCount,
+    string? StatusFilter);
+
 internal static class PrivateMessageReportContextSerializer
 {
     private static readonly JsonSerializerOptions JsonOptions = new()

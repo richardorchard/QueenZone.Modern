@@ -1,0 +1,93 @@
+@page "/admin/private-messages/{id:guid}"
+@model QueenZone.Web.Pages.Admin.PrivateMessages.DetailModel
+@using QueenZone.Data
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+
+@{
+  var report = Model.Report!;
+  var token = Antiforgery.GetAndStoreTokens(ViewContext.HttpContext).RequestToken;
+}
+
+<div class="admin-shell">
+  <h1>Reported message</h1>
+  <p><a href="/admin/private-messages">Back to reported messages</a></p>
+
+  @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+  {
+    <p class="qz-account-notice @(Model.StatusMessageKind == "error" ? "qz-account-notice--error" : "qz-account-notice--success")" role="status">
+      @Model.StatusMessage
+    </p>
+  }
+
+  <dl class="admin-detail-list">
+    <dt>Reported member</dt>
+    <dd>
+      @(Model.Reported?.DisplayName ?? report.SenderDisplayNameSnapshot)
+      @if (Model.Reported is not null)
+      {
+        <span> &lt;<a href="mailto:@Model.Reported.Email">@Model.Reported.Email</a>&gt; · <a href="/admin/members/@report.ReportedMemberId">Member account</a></span>
+      }
+    </dd>
+    <dt>Reporter</dt>
+    <dd>
+      @(Model.Reporter?.DisplayName ?? "Unknown member")
+      @if (Model.Reporter is not null)
+      {
+        <span> &lt;<a href="mailto:@Model.Reporter.Email">@Model.Reporter.Email</a>&gt; · <a href="/admin/members/@report.ReporterMemberId">Member account</a></span>
+      }
+    </dd>
+    <dt>Reason</dt>
+    <dd>@(string.IsNullOrWhiteSpace(report.Reason) ? "—" : report.Reason)</dd>
+    <dt>Status</dt>
+    <dd><partial name="_SubmissionStatusBadge" model="report.Status" /></dd>
+    <dt>Reported at</dt>
+    <dd>@report.CreatedAt.ToString("u")</dd>
+    <dt>Reported message sent</dt>
+    <dd>@report.MessageCreatedAtSnapshot.ToString("u")</dd>
+  </dl>
+
+  <section>
+    <h2>Reported message content</h2>
+    <p class="qz-account-notice" role="note">
+      This is a snapshot captured when the report was filed, kept independently of the live
+      conversation (<a href="https://github.com/richardorchard/QueenZone.Modern/blob/main/docs/decisions/0015-private-message-report-retention-and-audit.md">ADR 0015</a>).
+      It may no longer match the current conversation, or the conversation may no longer exist.
+    </p>
+    <blockquote style="white-space: pre-wrap;">@report.MessageBodySnapshot</blockquote>
+
+    @if (report.PrecedingMessages.Count > 0)
+    {
+      <h3>Preceding context</h3>
+      <ul>
+        @foreach (var item in report.PrecedingMessages)
+        {
+          <li><strong>@item.SenderDisplayName</strong> (@item.CreatedAt.ToString("u")): @item.Body</li>
+        }
+      </ul>
+    }
+  </section>
+
+  <section>
+    <h2>Update status</h2>
+    <form method="post" action="/admin/private-messages/@report.Id/status" class="admin-inline-form">
+      <input type="hidden" name="@AdminPrivateMessageReportsPageModel.AntiforgeryTokenFieldName" value="@token" />
+      <label>
+        Status
+        <select name="status">
+          @foreach (var status in PrivateMessageReportStatus.All)
+          {
+            @if (report.Status == status)
+            {
+              <option value="@status" selected>@status</option>
+            }
+            else
+            {
+              <option value="@status">@status</option>
+            }
+          }
+        </select>
+      </label>
+      <button type="submit">Save</button>
+    </form>
+  </section>
+</div>

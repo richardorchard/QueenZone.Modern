@@ -76,6 +76,9 @@ public sealed class QueenZoneDbContext : DbContext
 
     public DbSet<PrivateMessageReportEntity> PrivateMessageReports => Set<PrivateMessageReportEntity>();
 
+    public DbSet<PrivateMessageReportAuditLogEntity> PrivateMessageReportAuditLogs =>
+        Set<PrivateMessageReportAuditLogEntity>();
+
     public DbSet<MemberMessageBlockEntity> MemberMessageBlocks => Set<MemberMessageBlockEntity>();
 
     public DbSet<MemberFollowEntity> MemberFollows => Set<MemberFollowEntity>();
@@ -892,6 +895,24 @@ public sealed class QueenZoneDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(report => report.ReportedMemberId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<PrivateMessageReportAuditLogEntity>(entity =>
+        {
+            entity.ToTable("PrivateMessageReportAuditLog");
+            entity.HasKey(log => log.Id);
+
+            entity.Property(log => log.Action).HasMaxLength(50).IsRequired();
+            entity.Property(log => log.ActorEmail).HasMaxLength(256).IsRequired();
+            entity.Property(log => log.OccurredAt).IsRequired();
+            entity.Property(log => log.Details).HasMaxLength(2000);
+
+            // No navigation/FK constraint to PrivateMessageReportEntity: this log must outlive
+            // the report's retention-window purge (ADR 0015), so the relationship is
+            // application-enforced only.
+            entity.HasIndex(log => new { log.ReportId, log.OccurredAt })
+                .IsDescending(false, true)
+                .HasDatabaseName("IX_PrivateMessageReportAuditLog_ReportId_OccurredAt");
         });
 
         modelBuilder.Entity<MemberMessageBlockEntity>(entity =>

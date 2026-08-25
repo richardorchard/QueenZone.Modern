@@ -39,6 +39,9 @@ public sealed class AdminDashboardService(IServiceScopeFactory scopeFactory)
         var openHelpRequestsTask = RunAsync(
             sp => sp.GetRequiredService<IHelpRequestRepository>()
                 .CountOpenAsync(cancellationToken));
+        var openPrivateMessageReportsTask = RunAsync(
+            sp => sp.GetRequiredService<IPrivateMessageRepository>()
+                .CountOpenReportsAsync(cancellationToken));
 
         var photoContributorsTask = RunAsync(
             sp => sp.GetRequiredService<IPhotoSubmissionRepository>()
@@ -62,6 +65,7 @@ public sealed class AdminDashboardService(IServiceScopeFactory scopeFactory)
             newsCountsTask,
             articleCountsTask,
             openHelpRequestsTask,
+            openPrivateMessageReportsTask,
             photoContributorsTask,
             newsContributorsTask,
             articleContributorsTask,
@@ -83,6 +87,7 @@ public sealed class AdminDashboardService(IServiceScopeFactory scopeFactory)
             await dailyRegistrationsTask.ConfigureAwait(false),
             submissionQueue,
             await openHelpRequestsTask.ConfigureAwait(false),
+            await openPrivateMessageReportsTask.ConfigureAwait(false),
             await trafficTask.ConfigureAwait(false));
     }
 
@@ -117,4 +122,5 @@ public sealed record AdminDashboardSnapshot(
     IReadOnlyList<DailyRegistration> DailyRegistrations,
     SubmissionQueueStats SubmissionQueue,
     int OpenHelpRequestCount,
+    int OpenPrivateMessageReportCount,
     GoogleAnalyticsTrafficSnapshot Traffic);
