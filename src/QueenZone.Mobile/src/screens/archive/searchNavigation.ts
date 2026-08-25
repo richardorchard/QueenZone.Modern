@@ -93,7 +93,10 @@ export function targetForSearchResult(item: SearchResult, apiBaseUrl: string): S
   return tabOrWeb(item, apiBaseUrl, null);
 }
 
-type TabNavigate = (tab: SearchTabTarget['tab'], params: { screen: string; params?: object }) => void;
+type TabNavigate = (
+  tab: SearchTabTarget['tab'],
+  params: { screen: string; params?: object; initial?: boolean },
+) => void;
 
 /** Applies a mapped search target: tab navigation or in-app browser. */
 export function applySearchTarget(
@@ -110,6 +113,8 @@ export function applySearchTarget(
   }
   navigate(
     target.tab,
-    target.params ? { screen: target.screen, params: target.params } : { screen: target.screen },
+    target.params
+      ? { screen: target.screen, params: target.params, initial: false }
+      : { screen: target.screen, initial: false },
   );
 }

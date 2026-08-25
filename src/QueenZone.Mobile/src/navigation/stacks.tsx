@@ -62,6 +62,7 @@ export function HomeStack() {
   return (
     <Home.Navigator screenOptions={stackScreenOptions}>
       <Home.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
+      <Home.Screen name="Story" component={NewsStoryScreen} />
       <Home.Screen name="Search" component={SearchRouteScreen} />
       <Home.Screen
         name="Profile"

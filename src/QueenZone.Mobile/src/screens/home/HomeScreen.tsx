@@ -19,6 +19,7 @@ import {
 } from '../../api';
 import { media } from '../../content/media';
 import { useHomeSection } from '../../hooks/useHomeSection';
+import { nestedTabParams } from '../../navigation/nestedTab';
 import type { HomeStackParamList, RootTabParamList } from '../../navigation/types';
 import { useSession } from '../../session/SessionContext';
 import { openSignIn } from '../../session/signInNavigation';
@@ -94,21 +95,24 @@ export function HomeScreen({ navigation }: Props) {
 
   const openNewsStory = useCallback(
     (id: number) => {
-      navigation.navigate('NewsTab', { screen: 'Story', params: { id } });
+      navigation.navigate('Story', { id });
     },
     [navigation],
   );
 
   const openThread = useCallback(
     (thread: ForumRecentThread) => {
-      navigation.navigate('ForumTab', { screen: 'Thread', params: { id: thread.topicId, title: thread.title } });
+      navigation.navigate('ForumTab', nestedTabParams('Thread', { id: thread.topicId, title: thread.title }));
     },
     [navigation],
   );
 
   const openGalleryCategory = useCallback(
     (category: PhotoCategoryListItem) => {
-      navigation.navigate('PhotosTab', { screen: 'PhotoCategory', params: { slug: category.slug, name: category.name } });
+      navigation.navigate(
+        'PhotosTab',
+        nestedTabParams('PhotoCategory', { slug: category.slug, name: category.name }),
+      );
     },
     [navigation],
   );

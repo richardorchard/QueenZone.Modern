@@ -150,9 +150,12 @@ describe('targetForSearchResult', () => {
       navigated.push([tab, params]);
     }, () => {});
 
-    assert.deepEqual(navigated[0], ['NewsTab', { screen: 'Story', params: { id: 1003 } }]);
-    assert.deepEqual(navigated[1], ['ArchiveTab', { screen: 'Timeline', params: { focusId: 12 } }]);
-    assert.deepEqual(navigated[2], ['ArchiveTab', { screen: 'Timeline' }]);
+    assert.deepEqual(navigated[0], ['NewsTab', { screen: 'Story', params: { id: 1003 }, initial: false }]);
+    assert.deepEqual(navigated[1], [
+      'ArchiveTab',
+      { screen: 'Timeline', params: { focusId: 12 }, initial: false },
+    ]);
+    assert.deepEqual(navigated[2], ['ArchiveTab', { screen: 'Timeline', initial: false }]);
     assert.deepEqual(opened, ['https://www.queenzone.org/articles/x']);
     assert.equal(navigated.length, 3);
   });

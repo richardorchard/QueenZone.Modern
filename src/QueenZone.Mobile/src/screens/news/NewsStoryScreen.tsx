@@ -2,6 +2,8 @@ import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ApiError, fetchNewsDetail, formatPublishedDate, type NewsDetail } from '../../api';
+import { HeaderBackButton } from '../../navigation/headerButtons';
+import { leaveStoryScreen } from '../../navigation/nestedTab';
 import type { NewsStackParamList } from '../../navigation/types';
 import { RichHtmlBody } from '../../ui/RichHtmlBody';
 import { ErrorBlock, LoadingBlock } from '../../ui/ScreenStates';
@@ -19,7 +21,15 @@ export function NewsStoryScreen({ navigation, route }: Props) {
   const [reloadToken, setReloadToken] = useState(0);
 
   useLayoutEffect(() => {
-    navigation.setOptions({ title: article?.title ?? 'Story' });
+    navigation.setOptions({
+      title: article?.title ?? 'Story',
+      headerLeft: () => (
+        <HeaderBackButton
+          testID={testIds.newsStoryBack}
+          onPress={() => leaveStoryScreen(navigation)}
+        />
+      ),
+    });
   }, [navigation, article?.title]);
 
   useEffect(() => {

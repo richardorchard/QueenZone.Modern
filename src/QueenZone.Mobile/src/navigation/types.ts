@@ -12,6 +12,7 @@ export type SignInParams = {
 
 export type HomeStackParamList = {
   Home: undefined;
+  Story: { id: number };
   Search: undefined;
   Profile: undefined;
   Settings: undefined;

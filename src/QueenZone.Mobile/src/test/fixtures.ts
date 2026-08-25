@@ -1,4 +1,4 @@
-import type { ApiPagedResponse, NewsListItem } from '../api/types';
+import type { ApiPagedResponse, NewsDetail, NewsListItem } from '../api/types';
 import type { MemberProfile } from '../api/me';
 import type { AuthTokens } from '../api/auth';
 
@@ -65,6 +65,19 @@ export function newsItemFixture(overrides: Partial<NewsListItem> = {}): NewsList
     title: 'Queen headline',
     excerpt: 'A restored archive story.',
     publishedAt: '2024-01-15T12:00:00.000Z',
+    detailPath: '/news/42',
+    ...overrides,
+  };
+}
+
+export function newsDetailFixture(overrides: Partial<NewsDetail> = {}): NewsDetail {
+  return {
+    id: 42,
+    title: 'Queen headline',
+    excerpt: 'A restored archive story.',
+    body: '<p>The restored article body.</p>',
+    publishedAt: '2024-01-15T12:00:00.000Z',
+    sourceUrl: null,
     detailPath: '/news/42',
     ...overrides,
   };

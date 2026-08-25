@@ -13,6 +13,9 @@ export const testIds = {
 
   newsScreen: 'news-screen',
   newsStoryScreen: 'news-story-screen',
+  newsStoryBack: 'news-story-back',
+
+  searchTypeFilters: 'search-type-filters',
 
   photosScreen: 'photos-screen',
   photoCategoryScreen: 'photo-category-screen',

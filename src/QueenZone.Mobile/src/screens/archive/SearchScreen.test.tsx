@@ -7,6 +7,7 @@ import { ApiError } from '../../api/client';
 import type { SearchResult } from '../../api/types';
 import { deferred, pagedResponse } from '../../test/fixtures';
 import { renderWithProviders } from '../../test/render';
+import { testIds } from '../../test/testIds';
 import { SearchRouteScreen, SearchScreen } from './SearchScreen';
 
 const mockTabNavigate = jest.fn();
@@ -214,6 +215,7 @@ describe('SearchScreen', () => {
     await waitFor(() =>
       expect(fetchSearch).toHaveBeenCalledWith(expect.objectContaining({ q: 'archive', type: 'news' })),
     );
+    expect(screen.getByTestId(testIds.searchTypeFilters)).toHaveStyle({ flexGrow: 0, flexShrink: 0 });
   });
 
   it('pull-to-refresh reloads the current search page', async () => {
@@ -251,7 +253,11 @@ describe('SearchRouteScreen', () => {
       expect(screen.getByRole('button', { name: 'QueenZone modernisation begins. News' })).toBeOnTheScreen(),
     );
     await user.press(screen.getByRole('button', { name: 'QueenZone modernisation begins. News' }));
-    expect(mockTabNavigate).toHaveBeenCalledWith('NewsTab', { screen: 'Story', params: { id: 1003 } });
+    expect(mockTabNavigate).toHaveBeenCalledWith('NewsTab', {
+      screen: 'Story',
+      params: { id: 1003 },
+      initial: false,
+    });
   });
 
   it('opens article hits in the in-app browser', async () => {
