@@ -21,6 +21,9 @@ public static class MessagesApiEndpoints
 
     public static string ConversationPath(Guid conversationId) => $"{Path}/{conversationId:D}";
 
+    public static string ReportPath(Guid conversationId, Guid messageId) =>
+        $"{Path}/{conversationId:D}/messages/{messageId:D}/report";
+
     public static void MapMessagesApiEndpoints(this WebApplication app)
     {
         var group = app.MapGroup("/api/v1/me")
@@ -74,6 +77,16 @@ public static class MessagesApiEndpoints
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
+        group.MapPost("/messages/{conversationId:guid}/messages/{messageId:guid}/report", ReportMessageAsync)
+            .WithName("ReportMemberMessage")
+            .WithSummary("Report an abusive private message without notifying the reported member.")
+            .Accepts<ReportMessageRequest>("application/json")
+            .Produces<ReportMessageDto>(StatusCodes.Status201Created)
+            .Produces<ReportMessageDto>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status404NotFound);
     }
 
     internal static async Task<IResult> GetInboxAsync(
@@ -292,6 +305,42 @@ public static class MessagesApiEndpoints
         return Results.Created(mapped.DetailPath, mapped);
     }
 
+    internal static async Task<IResult> ReportMessageAsync(
+        HttpContext httpContext,
+        ClaimsPrincipal user,
+        PrivateMessageService privateMessageService,
+        Guid conversationId,
+        Guid messageId,
+        ReportMessageRequest? request,
+        CancellationToken cancellationToken)
+    {
+        var memberId = RequireMemberId(user, out var unauthorized);
+        if (unauthorized is not null)
+        {
+            return unauthorized;
+        }
+
+        var result = await privateMessageService.ReportMessageAsync(
+            memberId,
+            conversationId,
+            messageId,
+            request?.Reason,
+            cancellationToken);
+        if (!result.Succeeded || result.ReportId is null)
+        {
+            return MapReportFailure(result);
+        }
+
+        httpContext.Response.Headers.CacheControl = "no-store";
+        var dto = new ReportMessageDto(result.ReportId.Value, result.AlreadyReported);
+        if (result.AlreadyReported)
+        {
+            return Results.Ok(dto);
+        }
+
+        return Results.Created(ReportPath(conversationId, messageId), dto);
+    }
+
     private static async Task<ConversationDetailDto?> MapConversationAsync(
         PrivateMessageService privateMessageService,
         Guid conversationId,
@@ -341,6 +390,24 @@ public static class MessagesApiEndpoints
             return Results.Problem(
                 statusCode: StatusCodes.Status403Forbidden,
                 title: "Forbidden",
+                detail: message);
+        }
+
+        return Results.Problem(
+            statusCode: StatusCodes.Status400BadRequest,
+            title: "Bad Request",
+            detail: message);
+    }
+
+    private static IResult MapReportFailure(PrivateMessageReportResult result)
+    {
+        var message = result.ErrorMessage ?? PrivateMessageReportText.MessageNotFound;
+        if (string.Equals(message, PrivateMessageReportText.NotAParticipant, StringComparison.Ordinal)
+            || string.Equals(message, PrivateMessageReportText.MessageNotFound, StringComparison.Ordinal))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status404NotFound,
+                title: "Not Found",
                 detail: message);
         }
 

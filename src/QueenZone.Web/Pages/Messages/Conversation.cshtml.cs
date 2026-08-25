@@ -32,6 +32,9 @@ public sealed class ConversationModel(PrivateMessageService privateMessageServic
     [BindProperty]
     public ReplyInput Input { get; set; } = new();
 
+    [BindProperty]
+    public ReportInputModel ReportInput { get; set; } = new();
+
     public async Task<IActionResult> OnGetAsync(CancellationToken cancellationToken)
     {
         var memberId = await GetCurrentMemberIdAsync();
@@ -220,6 +223,43 @@ public sealed class ConversationModel(PrivateMessageService privateMessageServic
         return RedirectToPage(new { conversationId = ConversationId, pageNumber = PageNumber });
     }
 
+    public async Task<IActionResult> OnPostReportAsync(CancellationToken cancellationToken)
+    {
+        var memberId = await GetCurrentMemberIdAsync();
+        if (memberId is null)
+        {
+            return Challenge();
+        }
+
+        if (ReportInput.MessageId == Guid.Empty)
+        {
+            return NotFound();
+        }
+
+        var result = await privateMessageService.ReportMessageAsync(
+            memberId.Value,
+            ConversationId,
+            ReportInput.MessageId,
+            ReportInput.Reason,
+            cancellationToken);
+        if (!result.Succeeded)
+        {
+            if (string.Equals(result.ErrorMessage, PrivateMessageReportText.NotAParticipant, StringComparison.Ordinal)
+                || string.Equals(result.ErrorMessage, PrivateMessageReportText.MessageNotFound, StringComparison.Ordinal))
+            {
+                return NotFound();
+            }
+
+            TempData[IndexModel.SuccessMessageKey] = result.ErrorMessage ?? "Unable to report this message.";
+            return RedirectToPage(new { conversationId = ConversationId, pageNumber = PageNumber });
+        }
+
+        TempData[IndexModel.SuccessMessageKey] = result.AlreadyReported
+            ? "You have already reported this message."
+            : "Message reported. Moderators will review it. The other person is not notified.";
+        return RedirectToPage(new { conversationId = ConversationId, pageNumber = PageNumber });
+    }
+
     private async Task PopulateConversationChromeAsync(Guid memberId, CancellationToken cancellationToken)
     {
         if (Detail is null)
@@ -269,5 +309,16 @@ public sealed class ConversationModel(PrivateMessageService privateMessageServic
             PrivateMessageLimits.MaxBodyLength,
             ErrorMessage = "Message body must be {1} characters or fewer.")]
         public string Body { get; set; } = string.Empty;
+    }
+
+    public sealed class ReportInputModel
+    {
+        public Guid MessageId { get; set; }
+
+        [Display(Name = "Optional reason")]
+        [StringLength(
+            PrivateMessageLimits.MaxReportReasonLength,
+            ErrorMessage = "Report reason must be {1} characters or fewer.")]
+        public string? Reason { get; set; }
     }
 }

@@ -317,5 +317,25 @@ public sealed class PrivateMessageRateLimiterTests
             DateTimeOffset sinceUtc,
             CancellationToken cancellationToken = default) =>
             Task.FromResult(0);
+
+        public virtual Task<PrivateMessageReportResult> CreateReportAsync(
+            Guid reporterMemberId,
+            Guid conversationId,
+            Guid messageId,
+            string? reason,
+            DateTimeOffset createdAt,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public virtual Task<PrivateMessageReport?> GetReportAsync(
+            Guid reportId,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public virtual Task<IReadOnlySet<Guid>> GetReportedMessageIdsAsync(
+            Guid conversationId,
+            Guid reporterMemberId,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 }

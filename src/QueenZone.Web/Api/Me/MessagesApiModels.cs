@@ -31,7 +31,8 @@ public sealed record ConversationMessageDto(
     string Body,
     DateTimeOffset CreatedAt,
     bool IsMine,
-    long SortKey);
+    long SortKey,
+    bool ReportedByViewer);
 
 /// <summary>
 /// Conversation thread for <c>GET /api/v1/me/messages/{conversationId}</c>
@@ -75,3 +76,15 @@ public sealed record MessageRecipientsDto(IReadOnlyList<MessageRecipientDto> Ite
 /// Same recipient + body rules as website <c>POST /messages/compose</c>.
 /// </summary>
 public sealed record ComposeMessageRequest(Guid? RecipientMemberId, string? Body);
+
+/// <summary>
+/// JSON body for <c>POST /api/v1/me/messages/{conversationId}/messages/{messageId}/report</c>.
+/// Reason is optional; empty or whitespace is stored as omitted.
+/// </summary>
+public sealed record ReportMessageRequest(string? Reason);
+
+/// <summary>
+/// Result of reporting a private message. <see cref="AlreadyReported"/> is true when
+/// this member had already reported the same message (idempotent success).
+/// </summary>
+public sealed record ReportMessageDto(Guid ReportId, bool AlreadyReported);

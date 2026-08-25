@@ -362,6 +362,47 @@ public sealed class InMemoryPrivateMessageRepositoryTests
         Assert.Equal(1, await repo.CountDistinctNewRecipientsSinceAsync(alice.Id, since));
     }
 
+    [Fact]
+    public async Task CreateReport_SurvivesInboxRemoval_AndRejectsOutsiders()
+    {
+        var members = new InMemoryMemberAccountRepository();
+        var alice = await members.CreateAsync(NewMember("a-report@example.com", "Alice"));
+        var bob = await members.CreateAsync(NewMember("b-report@example.com", "Bob"));
+        var carol = await members.CreateAsync(NewMember("c-report@example.com", "Carol"));
+        var repo = new InMemoryPrivateMessageRepository(id =>
+            members.FindByIdAsync(id).GetAwaiter().GetResult());
+
+        var created = await repo.SendNewOrExistingAsync(alice.Id, bob.Id, "Context", DateTimeOffset.UtcNow);
+        var conversationId = created.ConversationId!.Value;
+        await repo.ReplyAsync(conversationId, alice.Id, "Target", DateTimeOffset.UtcNow);
+        var target = (await repo.GetConversationAsync(conversationId, bob.Id))!.Messages[^1];
+
+        var outsider = await repo.CreateReportAsync(
+            carol.Id,
+            conversationId,
+            target.Id,
+            "Nope",
+            DateTimeOffset.UtcNow);
+        Assert.False(outsider.Succeeded);
+        Assert.Equal(PrivateMessageReportText.NotAParticipant, outsider.ErrorMessage);
+
+        var reported = await repo.CreateReportAsync(
+            bob.Id,
+            conversationId,
+            target.Id,
+            "Abuse",
+            DateTimeOffset.UtcNow);
+        Assert.True(reported.Succeeded);
+        Assert.True(await repo.RemoveConversationAsync(conversationId, bob.Id));
+
+        var snapshot = await repo.GetReportAsync(reported.ReportId!.Value);
+        Assert.NotNull(snapshot);
+        Assert.Equal("Target", snapshot!.MessageBodySnapshot);
+        Assert.Equal("Abuse", snapshot.Reason);
+        Assert.Equal("Context", Assert.Single(snapshot.PrecedingMessages).Body);
+        Assert.Contains(target.Id, await repo.GetReportedMessageIdsAsync(conversationId, bob.Id));
+    }
+
     private static MemberAccount NewMember(string email, string name) =>
         new()
         {

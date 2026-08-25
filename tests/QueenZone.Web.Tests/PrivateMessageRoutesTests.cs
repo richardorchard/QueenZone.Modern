@@ -504,6 +504,60 @@ public sealed class PrivateMessageRoutesTests : IClassFixture<WebApplicationFact
     }
 
     [Fact]
+    public async Task Conversation_ReportMessage_IsParticipantOnly_AndDoesNotNotify()
+    {
+        var (aliceClient, alice) = await CreateMemberAsync("report-alice@example.com", "Report Alice");
+        var (bobClient, bob) = await CreateMemberAsync("report-bob@example.com", "Report Bob");
+        var (carolClient, _) = await CreateMemberAsync("report-carol@example.com", "Report Carol");
+        var service = factory.Services.GetRequiredService<PrivateMessageService>();
+        var created = await service.ComposeAsync(alice.Id, bob.Id, "Please report this");
+        var conversationId = created.ConversationId!.Value;
+        var message = Assert.Single(
+            (await service.GetConversationAsync(conversationId, bob.Id, markRead: false))!.Messages);
+
+        var bobPage = await bobClient.GetStringAsync($"/messages/{conversationId}");
+        Assert.Contains("Report message", bobPage);
+        Assert.Contains("Optional reason", bobPage);
+
+        var alicePage = await aliceClient.GetStringAsync($"/messages/{conversationId}");
+        Assert.DoesNotContain("Report message", alicePage);
+
+        var unreadBefore = await service.CountUnreadConversationsAsync(alice.Id);
+        var messageCountBefore = (await service.GetConversationAsync(
+            conversationId,
+            alice.Id,
+            markRead: false))!.TotalCount;
+        var reportResponse = await bobClient.PostAsync(
+            $"/messages/{conversationId}?handler=Report",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(bobPage),
+                ["ReportInput.MessageId"] = message.Id.ToString(),
+                ["ReportInput.Reason"] = "Harassment",
+            }));
+        Assert.Equal(HttpStatusCode.Redirect, reportResponse.StatusCode);
+
+        var after = await bobClient.GetStringAsync($"/messages/{conversationId}");
+        Assert.Contains("Message reported", after);
+        Assert.Contains(">Reported<", after);
+        Assert.Equal(unreadBefore, await service.CountUnreadConversationsAsync(alice.Id));
+        Assert.Equal(
+            messageCountBefore,
+            (await service.GetConversationAsync(conversationId, alice.Id, markRead: false))!.TotalCount);
+
+        var carolInbox = await carolClient.GetStringAsync("/messages");
+        var outsider = await carolClient.PostAsync(
+            $"/messages/{conversationId}?handler=Report",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(carolInbox),
+                ["ReportInput.MessageId"] = message.Id.ToString(),
+                ["ReportInput.Reason"] = "Nope",
+            }));
+        Assert.Equal(HttpStatusCode.NotFound, outsider.StatusCode);
+    }
+
+    [Fact]
     public async Task MemberProfile_Unauthenticated_PromptsSignInToMessage()
     {
         var (_, bob) = await CreateMemberAsync("profile-public@example.com", "Public Bob");

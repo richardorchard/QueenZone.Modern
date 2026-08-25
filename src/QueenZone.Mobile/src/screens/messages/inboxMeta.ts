@@ -7,9 +7,14 @@ export const conversationPageSize = 50;
 /** Matches `PrivateMessageLimits.MaxBodyLength` / website reply textarea. */
 export const conversationBodyMaxLength = 4000;
 
+/** Matches `PrivateMessageLimits.MaxReportReasonLength`. */
+export const reportReasonMaxLength = 1000;
+
 export const replyRequiredMessage = 'Message body is required.';
 
 export const replyTooLongMessage = `Message body must be ${conversationBodyMaxLength} characters or fewer.`;
+
+export const reportReasonTooLongMessage = `Report reason must be ${reportReasonMaxLength} characters or fewer.`;
 
 /** Matches `PrivateMessageService.UnableToSendMessage`. */
 export const unableToSendMessage = 'Unable to send message.';
@@ -73,6 +78,13 @@ export function validateReplyBody(body: string): string | null {
   }
   if (body.trim().length > conversationBodyMaxLength) {
     return replyTooLongMessage;
+  }
+  return null;
+}
+
+export function validateReportReason(reason: string): string | null {
+  if (reason.trim().length > reportReasonMaxLength) {
+    return reportReasonTooLongMessage;
   }
   return null;
 }
