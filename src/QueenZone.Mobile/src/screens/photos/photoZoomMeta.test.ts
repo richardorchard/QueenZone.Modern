@@ -43,6 +43,10 @@ describe('photo zoom meta', () => {
       width: 300,
       height: 600,
     });
+    assert.deepEqual(containedImageSize({ width: 0, height: 800 }, { width: 1600, height: 900 }), {
+      width: 0,
+      height: 0,
+    });
   });
 
   it('allows no pan at 1× and clamps pan when zoomed', () => {
@@ -63,6 +67,7 @@ describe('photo zoom meta', () => {
     const next = focalPhotoZoomTranslation(0, 0, 1, 2, 300, 200, container);
     assert.equal(next.x, -100);
     assert.equal(next.y, 0);
+    assert.deepEqual(focalPhotoZoomTranslation(5, 7, 0, 2, 300, 200, container), { x: 5, y: 7 });
   });
 
   it('matches gallery swipe activation rules at 1×', () => {
