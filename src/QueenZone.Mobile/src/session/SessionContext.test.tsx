@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Text } from 'react-native';
 import { screen, waitFor, userEvent } from '@testing-library/react-native';
 import { fetchJson } from '../api/client';
@@ -7,8 +8,14 @@ import { SessionProvider, useSession } from './SessionContext';
 import * as oauth from './oauth';
 import * as tokenStore from './tokenStore';
 
+const mockAppConfig = {
+  apiBaseUrl: 'http://qz.test',
+  appEnv: 'development' as string,
+  version: '0.1.0',
+};
+
 jest.mock('../config/appConfig', () => ({
-  getAppConfig: () => ({ apiBaseUrl: 'http://qz.test', appEnv: 'development', version: '0.1.0' }),
+  getAppConfig: () => mockAppConfig,
 }));
 
 jest.mock('../api/client', () => ({
@@ -33,6 +40,7 @@ jest.mock('./tokenStore', () => ({
 
 const fetchJsonMock = fetchJson as jest.MockedFunction<typeof fetchJson>;
 const readStored = tokenStore.readStoredSession as jest.MockedFunction<typeof tokenStore.readStoredSession>;
+const writeStored = tokenStore.writeStoredSession as jest.MockedFunction<typeof tokenStore.writeStoredSession>;
 const clearStored = tokenStore.clearStoredSession as jest.MockedFunction<typeof tokenStore.clearStoredSession>;
 const signInWithProvider = oauth.signInWithProvider as jest.MockedFunction<typeof oauth.signInWithProvider>;
 const refreshAccessToken = oauth.refreshAccessToken as jest.MockedFunction<typeof oauth.refreshAccessToken>;
@@ -41,10 +49,13 @@ const revokeRefreshToken = oauth.revokeRefreshToken as jest.MockedFunction<typeo
 
 function Probe() {
   const session = useSession();
+  const [smokeResult, setSmokeResult] = useState('smoke-idle');
   return (
     <>
       <Text>{session.isRestoring ? 'restoring' : session.isSignedIn ? 'signed-in' : 'signed-out'}</Text>
       <Text>{session.displayName ?? 'anonymous'}</Text>
+      <Text>{session.accessToken ?? 'no-token'}</Text>
+      <Text>{smokeResult}</Text>
       <Text
         onPress={() => {
           void session.signIn('Google').catch(() => {});
@@ -56,14 +67,15 @@ function Probe() {
       <Text
         onPress={() => {
           void session.applySmokeSession('smoke-access').then((ok) => {
-            if (!ok) {
-              /* ignored — Debug-only helper */
-            }
+            setSmokeResult(ok ? 'smoke-applied' : 'smoke-rejected');
           });
         }}
       >
         do-smoke-auth
       </Text>
+      <Text onPress={() => session.setAccessToken('manual-token')}>set-token</Text>
+      <Text onPress={() => session.setAccessToken(null)}>clear-token</Text>
+      <Text onPress={() => session.setAccessToken('')}>set-empty-token</Text>
     </>
   );
 }
@@ -78,8 +90,14 @@ function renderSession() {
 }
 
 beforeEach(() => {
+  mockAppConfig.appEnv = 'development';
   fetchJsonMock.mockReset();
   readStored.mockReset();
+  writeStored.mockReset();
+  writeStored.mockImplementation(async (tokens) => ({
+    ...tokens,
+    expiresAt: Date.now() + 60_000,
+  }));
   clearStored.mockReset();
   signInWithProvider.mockReset();
   refreshAccessToken.mockReset();
@@ -95,6 +113,25 @@ describe('SessionProvider', () => {
     readStored.mockResolvedValue(null);
     renderSession();
     await waitFor(() => expect(screen.getByText('signed-out')).toBeOnTheScreen());
+    expect(screen.getByText('no-token')).toBeOnTheScreen();
+  });
+
+  it('rejects the smoke session when __DEV__ is false', async () => {
+    const user = userEvent.setup();
+    const previous = (globalThis as { __DEV__: boolean }).__DEV__;
+    (globalThis as { __DEV__: boolean }).__DEV__ = false;
+    try {
+      readStored.mockResolvedValue(null);
+      renderSession();
+      await waitFor(() => expect(screen.getByText('signed-out')).toBeOnTheScreen());
+
+      await user.press(screen.getByText('do-smoke-auth'));
+      await waitFor(() => expect(screen.getByText('smoke-rejected')).toBeOnTheScreen());
+      expect(screen.getByText('signed-out')).toBeOnTheScreen();
+      expect(writeStored).not.toHaveBeenCalled();
+    } finally {
+      (globalThis as { __DEV__: boolean }).__DEV__ = previous;
+    }
   });
 
   it('restores a valid stored access token and profile', async () => {
@@ -162,7 +199,7 @@ describe('SessionProvider', () => {
     expect(clearStored).not.toHaveBeenCalled();
   });
 
-  it('applies a Debug smoke access token without the OAuth hop', async () => {
+  it('applies a Debug smoke access token without the OAuth hop when appEnv is development', async () => {
     const user = userEvent.setup();
     readStored.mockResolvedValue(null);
     renderSession();
@@ -170,12 +207,53 @@ describe('SessionProvider', () => {
 
     await user.press(screen.getByText('do-smoke-auth'));
     await waitFor(() => expect(screen.getByText('signed-in')).toBeOnTheScreen());
+    expect(screen.getByText('smoke-applied')).toBeOnTheScreen();
     expect(signInWithProvider).not.toHaveBeenCalled();
-    expect(tokenStore.writeStoredSession).toHaveBeenCalledWith({
+    expect(writeStored).toHaveBeenCalledWith({
       accessToken: 'smoke-access',
       refreshToken: 'smoke-debug-no-refresh',
       expiresIn: 3600,
     });
+  });
+
+  it.each(['staging', 'production'] as const)(
+    'rejects the smoke session when appEnv is %s',
+    async (appEnv) => {
+      const user = userEvent.setup();
+      mockAppConfig.appEnv = appEnv;
+      readStored.mockResolvedValue(null);
+      renderSession();
+      await waitFor(() => expect(screen.getByText('signed-out')).toBeOnTheScreen());
+
+      await user.press(screen.getByText('do-smoke-auth'));
+      await waitFor(() => expect(screen.getByText('smoke-rejected')).toBeOnTheScreen());
+      expect(screen.getByText('signed-out')).toBeOnTheScreen();
+      expect(screen.getByText('no-token')).toBeOnTheScreen();
+      expect(writeStored).not.toHaveBeenCalled();
+    },
+  );
+
+  it('derives isSignedIn from setAccessToken and stays signed out without a token', async () => {
+    const user = userEvent.setup();
+    readStored.mockResolvedValue(null);
+    renderSession();
+    await waitFor(() => expect(screen.getByText('signed-out')).toBeOnTheScreen());
+
+    await user.press(screen.getByText('clear-token'));
+    expect(screen.getByText('signed-out')).toBeOnTheScreen();
+    expect(screen.getByText('no-token')).toBeOnTheScreen();
+
+    await user.press(screen.getByText('set-empty-token'));
+    expect(screen.getByText('signed-out')).toBeOnTheScreen();
+    expect(screen.getByText('no-token')).toBeOnTheScreen();
+
+    await user.press(screen.getByText('set-token'));
+    expect(screen.getByText('signed-in')).toBeOnTheScreen();
+    expect(screen.getByText('manual-token')).toBeOnTheScreen();
+
+    await user.press(screen.getByText('clear-token'));
+    expect(screen.getByText('signed-out')).toBeOnTheScreen();
+    expect(screen.getByText('no-token')).toBeOnTheScreen();
   });
 
   it('stays signed in when profile load fails', async () => {

@@ -9,9 +9,13 @@ import {
 } from './smokeAuth.ts';
 
 describe('smokeAuth', () => {
-  it('enables only when the Debug __DEV__ flag is true', () => {
-    assert.equal(isSmokeAuthEnabled({ dev: true }), true);
-    assert.equal(isSmokeAuthEnabled({ dev: false }), false);
+  it('enables only when __DEV__ is true and appEnv is development', () => {
+    assert.equal(isSmokeAuthEnabled({ dev: true, appEnv: 'development' }), true);
+    assert.equal(isSmokeAuthEnabled({ dev: true, appEnv: 'staging' }), false);
+    assert.equal(isSmokeAuthEnabled({ dev: true, appEnv: 'production' }), false);
+    assert.equal(isSmokeAuthEnabled({ dev: false, appEnv: 'development' }), false);
+    assert.equal(isSmokeAuthEnabled({ dev: false, appEnv: 'staging' }), false);
+    assert.equal(isSmokeAuthEnabled({ dev: true }), false);
     assert.equal(isSmokeAuthEnabled({}), false);
   });
 
