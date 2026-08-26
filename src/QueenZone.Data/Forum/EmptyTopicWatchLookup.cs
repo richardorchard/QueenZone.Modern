@@ -1,8 +1,8 @@
 namespace QueenZone.Data;
 
 /// <summary>
-/// Placeholder until #735 Watch storage lands. Registered so the forum-reply
-/// hook is real; fan-out is always empty.
+/// Empty Watch list for unit tests that isolate dispatch without Watch storage.
+/// Production uses <see cref="ITopicWatchRepository"/>.
 /// </summary>
 public sealed class EmptyTopicWatchLookup : ITopicWatchLookup
 {

@@ -7,6 +7,8 @@ import {
   imagePreviewUrl,
   parseTopicId,
   topicReplyAllowed,
+  watchButtonLabel,
+  watchHint,
 } from './forumThreadMeta.ts';
 
 describe('forum thread meta', () => {
@@ -39,6 +41,13 @@ describe('forum thread meta', () => {
     assert.equal(topicReplyAllowed({ isLocked: false }), true);
     assert.equal(topicReplyAllowed({ isLocked: true }), false);
     assert.equal(topicReplyAllowed(null), true);
+  });
+
+  it('labels Watch versus Unwatch without implying auto-subscribe', () => {
+    assert.equal(watchButtonLabel(false), 'Watch topic');
+    assert.equal(watchButtonLabel(true), 'Unwatch');
+    assert.match(watchHint(false), /does not subscribe/i);
+    assert.match(watchHint(true), /someone else replies/i);
   });
 
   it('parses numeric topic ids and rejects prototype slugs', () => {

@@ -224,6 +224,10 @@ export type ForumTopicDetail = {
   isLocked: boolean;
 };
 
+export type ForumTopicWatch = {
+  watching: boolean;
+};
+
 export type ForumAttachment = {
   fileName: string;
   url: string;
