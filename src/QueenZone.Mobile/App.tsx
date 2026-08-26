@@ -1,4 +1,9 @@
-import { DarkTheme, DefaultTheme, NavigationContainer } from '@react-navigation/native';
+import {
+  DarkTheme,
+  DefaultTheme,
+  NavigationContainer,
+  useNavigationContainerRef,
+} from '@react-navigation/native';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
@@ -8,6 +13,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { SessionProvider } from './src/session/SessionContext';
 import { FanPerformancePlayerProvider } from './src/audio/FanPerformancePlayer';
+import { navigationIntegration } from './src/config/sentry';
 import { ThemeProvider, dark, useQueenzoneFonts, useTheme } from './src/theme';
 
 SplashScreen.preventAutoHideAsync().catch(() => {
@@ -31,8 +37,14 @@ function AppNavigation() {
     },
   };
 
+  const navigationRef = useNavigationContainerRef();
+
   return (
-    <NavigationContainer theme={navigationTheme}>
+    <NavigationContainer
+      ref={navigationRef}
+      theme={navigationTheme}
+      onReady={() => navigationIntegration.registerNavigationContainer(navigationRef)}
+    >
       <StatusBar style={mode === 'light' ? 'dark' : 'light'} />
       <RootNavigator />
     </NavigationContainer>

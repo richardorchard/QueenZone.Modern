@@ -189,15 +189,20 @@ rather than hard-coding hosts.
 
 ## Crash and error monitoring
 
-[Sentry](https://sentry.io) (`@sentry/react-native`) reports JS exceptions and
-native crashes. Configured in the `self-0tb` org, project `queenzone-mobile`
-(#855). It stays a no-op — `initSentry()` in `src/config/sentry.ts` returns
-immediately — until `EXPO_PUBLIC_SENTRY_DSN` is set, so builds and local dev
-work fine without it (e.g. a fresh clone before copying `.env.example`).
+[Sentry](https://sentry.io) (`@sentry/react-native`) reports JS exceptions,
+native crashes, and performance traces. Configured in the `self-0tb` org,
+project `queenzone-mobile` (#855, #886). It stays a no-op — `initSentry()` in
+`src/config/sentry.ts` returns immediately — until `EXPO_PUBLIC_SENTRY_DSN` is
+set, so builds and local dev work fine without it (e.g. a fresh clone before
+copying `.env.example`). Once a DSN is set, `tracesSampleRate` and the
+`reactNavigationIntegration` (registered against the root `NavigationContainer`
+ref in `App.tsx`) turn on route-change performance traces — a DSN alone only
+enables error/crash reporting, not the Performance/Traces views.
 
 | Variable | Where | Purpose |
 | --- | --- | --- |
 | `EXPO_PUBLIC_SENTRY_DSN` | `.env` locally; `vars.SENTRY_DSN` repo variable in CI | Enables reporting. DSNs are not secret. |
+| `EXPO_PUBLIC_SENTRY_TRACES_SAMPLE_RATE` | `.env` locally; optional | Fraction (0.0-1.0) of sessions traced for performance. Defaults to `1.0`. |
 | `SENTRY_ORG` / `SENTRY_PROJECT` | CI repo `vars` | `self-0tb` / `queenzone-mobile` — target org/project for source map and dSYM upload at build time. |
 | `SENTRY_AUTH_TOKEN` | Bitwarden `Queenzone Development` project (Android) / `secrets.SENTRY_AUTH_TOKEN` repo secret (iOS) | Lets `sentry-cli` upload symbols during the native build. Never committed — read directly from the build environment, not from Expo config. |
 | `SENTRY_DISABLE_AUTO_UPLOAD` | CI unsigned mobile jobs (`ci.yml`); optional locally | Skips source-map / dSYM upload when org/token are unset. Required for simulator/debug CI builds once the Sentry Expo plugin is registered — otherwise Xcode fails with "organization ID or slug is required". |
