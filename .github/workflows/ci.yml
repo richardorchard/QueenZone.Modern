@@ -44,11 +44,12 @@ jobs:
             >> "$GITHUB_OUTPUT"
 
   # JS preflight + coverage gate for src/QueenZone.Mobile (#871 Option A).
-  # typecheck, discovered unit tests with coverage, pinned Expo Doctor, then
-  # the documented mobile coverage floors. Native Android/iOS compile builds
-  # run in mobile-android/mobile-ios below. Mixed web+mobile PRs run this
-  # alongside the .NET suite; mobile-only PRs skip the website path entirely.
-  # Required on main after #870 — see mobile-js-ok stubs.
+  # After npm ci: #837 advisory gate, typecheck, discovered unit tests with
+  # coverage, pinned Expo Doctor, then the documented mobile coverage floors.
+  # Native Android/iOS compile builds run in mobile-android/mobile-ios below.
+  # Mixed web+mobile PRs run this alongside the .NET suite; mobile-only PRs
+  # skip the website path entirely. Required on main after #870 — see
+  # mobile-js-ok stubs.
   mobile-js:
     name: Mobile typecheck and unit tests
     runs-on: ubuntu-latest
@@ -67,6 +68,10 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: node scripts/Test-MobileCoverageGate.mjs --self-test
 
+      - name: Self-test npm advisory gate
+        working-directory: ${{ github.workspace }}
+        run: node src/QueenZone.Mobile/scripts/check-npm-advisories.mjs --self-test
+
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
@@ -76,6 +81,9 @@ jobs:
 
       - name: Install
         run: npm ci
+
+      - name: Enforce npm advisory policy
+        run: node scripts/check-npm-advisories.mjs
 
       - name: Typecheck
         run: npm run typecheck

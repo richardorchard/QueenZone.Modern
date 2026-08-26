@@ -53,6 +53,7 @@ Use **EF Core as the single data-access library** in `QueenZone.Data`, while kee
 | Member accounts | `IMemberAccountRepository` | `EfMemberAccountRepository` | EF Core | Modern tables |
 | Private messaging | `IPrivateMessageRepository` | `EfPrivateMessageRepository` | EF Core | Modern `PrivateConversations` / `PrivateMessages` tables (MVP 1:1) |
 | Member follows | `IMemberFollowRepository` | `EfMemberFollowRepository` | EF Core | Modern `MemberFollows` table; used by private-message privacy |
+| Forum topic watches | `ITopicWatchRepository` | `EfTopicWatchRepository` | EF Core | Modern `MemberTopicWatches` table; deliberate Watch opt-in for forum reply pushes (#735) |
 | Help requests | `IHelpRequestRepository` | `EfHelpRequestRepository` | EF Core | Modern `HelpRequests` table; public `/contact` form + admin inbox |
 | News discovery / agent drafts | `INewsDiscoveryRepository` | `EfNewsDiscoveryRepository` | EF Core | Modern workflow tables |
 | News agent run leases | `INewsAgentRunLeaseService` | `EfNewsAgentRunLeaseService` | EF Core (+ SQL for lease upsert) | Modern lease table |

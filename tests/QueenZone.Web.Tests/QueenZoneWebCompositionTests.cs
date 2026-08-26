@@ -59,8 +59,11 @@ public sealed class QueenZoneWebCompositionTests
             Assert.NotNull(scope.ServiceProvider.GetRequiredService<MobileAuthAccountRateLimiter>());
             Assert.NotNull(scope.ServiceProvider.GetRequiredService<INotificationDispatcher>());
             Assert.NotNull(scope.ServiceProvider.GetRequiredService<IPushTransport>());
-            Assert.IsType<EmptyTopicWatchLookup>(
+            Assert.IsType<InMemoryTopicWatchRepository>(
                 scope.ServiceProvider.GetRequiredService<ITopicWatchLookup>());
+            Assert.Same(
+                scope.ServiceProvider.GetRequiredService<ITopicWatchLookup>(),
+                scope.ServiceProvider.GetRequiredService<ITopicWatchRepository>());
             Assert.NotNull(scope.ServiceProvider.GetRequiredService<AdminNewsWriteService>());
         }
 
