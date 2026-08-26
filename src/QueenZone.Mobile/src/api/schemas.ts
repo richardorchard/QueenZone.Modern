@@ -254,6 +254,12 @@ export const conversationDetailSchema = z.object({
   canSendReply: z.boolean(),
 });
 
+export const notificationPreferencesSchema = z.object({
+  forumReply: z.boolean(),
+  privateMessage: z.boolean(),
+  news: z.boolean(),
+});
+
 export const memberProfileSchema = z.object({
   memberId: guid,
   email: z.string().min(1),

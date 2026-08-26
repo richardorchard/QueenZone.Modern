@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { newsListItemSchema, parseContract, searchResultSchema } from './schemas.ts';
+import { newsListItemSchema, notificationPreferencesSchema, parseContract, searchResultSchema } from './schemas.ts';
 
 describe('parseContract', () => {
   it('names the endpoint and missing field when a payload is incompatible', () => {
@@ -36,5 +36,15 @@ describe('parseContract', () => {
     });
     assert.equal(item.sourceKey, 'news:1003');
     assert.equal(item.id, 1003);
+  });
+
+  it('accepts notification preference toggles', () => {
+    const prefs = parseContract('GET /api/v1/me/notification-preferences', notificationPreferencesSchema, {
+      forumReply: true,
+      privateMessage: true,
+      news: false,
+    });
+    assert.equal(prefs.forumReply, true);
+    assert.equal(prefs.news, false);
   });
 });

@@ -44,6 +44,10 @@ export const testIds = {
   archivedScreen: 'archived-screen',
 
   notificationBanner: 'notification-banner',
+
+  settingsNotifyForumReply: 'settings-notify-forum-reply',
+  settingsNotifyPrivateMessage: 'settings-notify-private-message',
+  settingsNotifyNews: 'settings-notify-news',
 } as const;
 
 export type TestId = (typeof testIds)[keyof typeof testIds];
