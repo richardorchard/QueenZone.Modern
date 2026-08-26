@@ -142,6 +142,14 @@ public sealed class MemberAccountService(
     public async Task<MemberAccount?> FindByIdAsync(Guid memberId, CancellationToken cancellationToken = default) =>
         await memberAccountRepository.FindByIdAsync(memberId, cancellationToken);
 
+    public async Task<MemberAccount?> SuspendAsync(
+        Guid memberId,
+        string reason,
+        string suspendedByAdminEmail,
+        DateTime suspendedAt,
+        CancellationToken cancellationToken = default) =>
+        await memberAccountRepository.SuspendAsync(memberId, reason, suspendedByAdminEmail, suspendedAt, cancellationToken);
+
     public async Task<IReadOnlyList<string>> ListExternalProvidersAsync(Guid memberId, CancellationToken cancellationToken = default) =>
         await memberAccountRepository.ListExternalProvidersAsync(memberId, cancellationToken);
 
