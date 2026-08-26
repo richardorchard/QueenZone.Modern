@@ -198,7 +198,7 @@ describe('timeouts and GET retry', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it('does not time out multipart at 12s and does at 60s', async () => {
+  it('does not time out multipart at 12s and does at 180s', async () => {
     fetchMock.mockImplementation(hangingFetch);
     const pending = sendMultipart('/upload', new FormData());
     const expectation = expect(pending).rejects.toMatchObject({
@@ -207,7 +207,7 @@ describe('timeouts and GET retry', () => {
     });
     await jest.advanceTimersByTimeAsync(12_000);
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    await jest.advanceTimersByTimeAsync(48_000);
+    await jest.advanceTimersByTimeAsync(168_000);
     await expectation;
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
@@ -218,14 +218,25 @@ describe('offline, HTTP retry, and malformed JSON', () => {
     jest.restoreAllMocks();
   });
 
-  it('maps a TypeError to offline and does not retry', async () => {
-    fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+  it('maps a TypeError to offline, keeps the cause, and does not retry', async () => {
+    const cause = new TypeError('Failed to fetch');
+    fetchMock.mockRejectedValueOnce(cause);
     await expect(fetchJson('/x')).rejects.toMatchObject({
       kind: 'offline',
       status: 0,
       message: 'Unable to reach QueenZone. Check your connection and try again.',
+      cause,
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the fetch TypeError on a multipart offline failure', async () => {
+    const cause = new TypeError('Network request failed');
+    fetchMock.mockRejectedValueOnce(cause);
+    await expect(sendMultipart('/member/photo-submissions', new FormData())).rejects.toMatchObject({
+      kind: 'offline',
+      cause,
+    });
   });
 
   it('retries a GET 503 once and then succeeds', async () => {

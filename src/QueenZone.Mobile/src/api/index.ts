@@ -8,7 +8,10 @@ export {
   sendMultipart,
   toPlainText,
 } from './client';
+export { isLocalFileFailure } from './errors';
 export type { ApiFailureKind } from './client';
+export { appendUploadFile, readUploadFileBlob } from './uploadFile';
+export type { UploadFilePart } from './uploadFile';
 export type { FetchJsonOptions, SendJsonOptions } from './client';
 export {
   fetchAlbumDetail,

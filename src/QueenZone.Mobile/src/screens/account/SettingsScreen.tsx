@@ -5,7 +5,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { getAppConfig } from '../../config/appConfig';
 import { fetchJson, sendJson, sendMultipart } from '../../api/client';
-import { ApiError } from '../../api/errors';
+import { ApiError, isLocalFileFailure } from '../../api/errors';
+import { appendUploadFile } from '../../api/uploadFile';
+import { reportApiFailure } from '../../config/sentry';
 import {
   avatarUrl,
   messagePrivacyOptions,
@@ -181,18 +183,27 @@ function SettingsForm({ navigation }: Pick<Props, 'navigation'>) {
 
     const asset = picked.assets[0];
     const form = new FormData();
-    form.append('file', {
-      uri: asset.uri,
-      name: asset.fileName ?? 'avatar.jpg',
-      type: asset.mimeType ?? 'image/jpeg',
-    } as unknown as Blob);
 
     setAvatarBusy(true);
     setError(null);
     try {
+      await appendUploadFile(form, 'file', {
+        uri: asset.uri,
+        name: asset.fileName ?? 'avatar.jpg',
+        type: asset.mimeType ?? 'image/jpeg',
+      });
       const next = parseMemberProfile(await sendMultipart('/me/avatar', form, { accessToken }));
       await applyProfile(next, 'Avatar updated.');
     } catch (err) {
+      if (isLocalFileFailure(err)) {
+        reportApiFailure({
+          kind: err.kind,
+          status: err.status,
+          method: 'POST',
+          path: '/me/avatar',
+          cause: err.cause,
+        });
+      }
       setError(err instanceof ApiError ? err.message : 'Could not update avatar.');
     } finally {
       setAvatarBusy(false);

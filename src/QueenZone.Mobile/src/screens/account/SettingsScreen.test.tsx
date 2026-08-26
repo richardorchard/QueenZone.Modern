@@ -1,6 +1,9 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { fetchJson, sendJson } from '../../api/client';
 import { ApiError } from '../../api/errors';
+import { appendUploadFile } from '../../api/uploadFile';
+import { reportApiFailure } from '../../config/sentry';
 import { createMockSession } from '../../test/mockSession';
 import { fakeNavigation, renderWithProviders } from '../../test/render';
 import { testIds } from '../../test/testIds';
@@ -30,6 +33,14 @@ jest.mock('../../api/client', () => ({
   sendMultipart: jest.fn(),
 }));
 
+jest.mock('../../api/uploadFile', () => ({
+  appendUploadFile: jest.fn(),
+}));
+
+jest.mock('../../config/sentry', () => ({
+  reportApiFailure: jest.fn(),
+}));
+
 jest.mock('expo-image-picker', () => ({
   requestMediaLibraryPermissionsAsync: jest.fn(),
   requestCameraPermissionsAsync: jest.fn(),
@@ -39,6 +50,8 @@ jest.mock('expo-image-picker', () => ({
 
 const fetchJsonMock = fetchJson as jest.MockedFunction<typeof fetchJson>;
 const sendJsonMock = sendJson as jest.MockedFunction<typeof sendJson>;
+const appendUploadFileMock = appendUploadFile as jest.MockedFunction<typeof appendUploadFile>;
+const reportApiFailureMock = reportApiFailure as jest.MockedFunction<typeof reportApiFailure>;
 
 const profilePayload = {
   memberId: '11111111-1111-1111-1111-111111111111',
@@ -74,6 +87,8 @@ describe('SettingsScreen notifications', () => {
     mockSession.refreshProfile.mockResolvedValue(undefined);
     mockSettingsLoad();
     sendJsonMock.mockReset();
+    appendUploadFileMock.mockReset();
+    reportApiFailureMock.mockReset();
   });
 
   it('gates unsigned visitors', () => {
@@ -126,5 +141,31 @@ describe('SettingsScreen notifications', () => {
       expect(screen.getByText('The server had a problem. Try again shortly.')).toBeOnTheScreen(),
     );
     expect(screen.getByRole('switch', { name: 'News' })).toHaveProp('value', false);
+  });
+
+  it('reports a local-file avatar failure instead of a fake offline message', async () => {
+    const cause = new TypeError('Network request failed');
+    appendUploadFileMock.mockRejectedValueOnce(ApiError.localFile(cause));
+    (ImagePicker.requestMediaLibraryPermissionsAsync as jest.Mock).mockResolvedValue({ granted: true });
+    (ImagePicker.launchImageLibraryAsync as jest.Mock).mockResolvedValue({
+      canceled: false,
+      assets: [{ uri: 'file:///tmp/avatar.jpg', fileName: 'avatar.jpg', mimeType: 'image/jpeg' }],
+    });
+
+    renderSettings();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Choose photo' })).toBeOnTheScreen());
+    fireEvent.press(screen.getByRole('button', { name: 'Choose photo' }));
+
+    await waitFor(() =>
+      expect(screen.getByText('Could not read the selected photo. Try choosing it again.')).toBeOnTheScreen(),
+    );
+    expect(reportApiFailureMock).toHaveBeenCalledWith({
+      kind: 'local-file',
+      status: 0,
+      method: 'POST',
+      path: '/me/avatar',
+      cause,
+    });
+    expect(screen.queryByText('Unable to reach QueenZone. Check your connection and try again.')).toBeNull();
   });
 });

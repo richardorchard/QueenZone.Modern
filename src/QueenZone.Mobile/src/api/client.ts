@@ -22,7 +22,7 @@ export type SendJsonOptions = FetchJsonOptions & {
 const GET_ATTEMPT_MS = 12_000;
 const GET_TOTAL_MS = 15_000;
 const JSON_WRITE_MS = 15_000;
-const MULTIPART_MS = 60_000;
+const MULTIPART_MS = 180_000;
 const GET_MAX_ATTEMPTS = 2;
 const RETRY_BASE_MS = 300;
 const RETRY_CAP_MS = 1_500;
@@ -165,9 +165,9 @@ function classifyFetchFailure(err: unknown, deadline: DeadlineHandle, caller?: A
     return isCallerAbort(err) ? err : Object.assign(new Error('Aborted'), { name: 'AbortError' });
   }
   if (isCallerAbort(err)) {
-    return deadline.timedOut() ? ApiError.timeout() : err;
+    return deadline.timedOut() ? ApiError.timeout(err) : err;
   }
-  return ApiError.offline();
+  return ApiError.offline(err);
 }
 
 function shouldRetryGet(err: unknown): boolean {
@@ -211,6 +211,7 @@ function reportTerminal(err: unknown, method: HttpMethod, path: string): void {
     status: err.status,
     method,
     path,
+    cause: err.cause,
   });
 }
 
