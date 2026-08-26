@@ -192,7 +192,10 @@ public sealed class InMemoryNewsDiscoveryRepository(SharedNewsDiscoveryStore sto
             run.ErrorMessage,
             run.StartedAt,
             run.CompletedAt,
-            run.CreatedAt);
+            run.CreatedAt,
+            run.GuidanceRevisionId,
+            run.GuidanceRevisionNumber,
+            run.GuidanceContentHash);
 
     private static NewsAgentDraft MapDraft(Entities.NewsAgentDraftEntity draft) =>
         new(

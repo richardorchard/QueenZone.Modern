@@ -107,17 +107,20 @@ internal static class NewsAgentTestSupport
             repository,
             CreateAiRunExecutor(repository, aiClient),
             new NewsTriageDeterministicAnalyzer(repository),
+            EmptyNewsAgentGuidanceProvider.Instance,
             Options.Create(new NewsTriageOptions()),
             NullLogger<NewsTriageService>.Instance);
 
     public static NewsDraftGenerationService CreateDraftGenerationService(
         INewsDiscoveryRepository repository,
         INewsAiClient aiClient,
-        INewsDiscoveryHttpClient? httpClient = null) =>
+        INewsDiscoveryHttpClient? httpClient = null,
+        INewsAgentGuidanceProvider? guidanceProvider = null) =>
         new(
             repository,
             CreateAiRunExecutor(repository, aiClient),
             httpClient ?? new FakeNewsDiscoveryHttpClient(new Dictionary<string, string>()),
+            guidanceProvider ?? EmptyNewsAgentGuidanceProvider.Instance,
             Options.Create(new NewsDraftGenerationOptions()),
             NullLogger<NewsDraftGenerationService>.Instance);
 
