@@ -470,8 +470,18 @@ public sealed class QueenZoneDbContext : DbContext
             entity.Property(revision => revision.CreatedAt).IsRequired();
             entity.Property(revision => revision.CreatedByEmail).HasMaxLength(320).IsRequired();
             entity.Property(revision => revision.PublishedByEmail).HasMaxLength(320);
-            entity.Property(revision => revision.RowVersion)
-                .IsRowVersion();
+            if (Database.IsSqlServer())
+            {
+                entity.Property(revision => revision.RowVersion).IsRowVersion();
+            }
+            else
+            {
+                // SQLite and in-memory providers do not generate rowversion; persist a client token.
+                entity.Property(revision => revision.RowVersion)
+                    .IsConcurrencyToken()
+                    .IsRequired()
+                    .ValueGeneratedNever();
+            }
 
             entity.HasIndex(revision => new { revision.Type, revision.RevisionNumber })
                 .IsUnique()
