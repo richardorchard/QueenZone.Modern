@@ -53,6 +53,17 @@ public sealed class EfNotificationPreferenceRepository(QueenZoneDbContext dbCont
         return ids.Where(id => overrides.TryGetValue(id, out var enabled) ? enabled : defaultOn).ToArray();
     }
 
+    public async Task<IReadOnlyList<Guid>> ListEnabledAsync(
+        NotificationCategory category,
+        CancellationToken cancellationToken = default)
+    {
+        return await dbContext.NotificationPreferences
+            .AsNoTracking()
+            .Where(row => row.Category == category && row.IsEnabled)
+            .Select(row => row.MemberAccountId)
+            .ToListAsync(cancellationToken);
+    }
+
     private async Task UpsertIfSetAsync(
         Guid memberAccountId,
         NotificationCategory category,

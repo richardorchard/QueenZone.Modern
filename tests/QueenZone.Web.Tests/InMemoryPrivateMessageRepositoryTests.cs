@@ -476,7 +476,9 @@ public sealed class InMemoryPrivateMessageRepositoryTests
         var repo = new InMemoryPrivateMessageRepository(id =>
             members.FindByIdAsync(id).GetAwaiter().GetResult());
 
-        var now = DateTimeOffset.Parse("2026-08-25T00:00:00Z");
+        // Status-change audits are stamped with DateTimeOffset.UtcNow (same as EF).
+        // Anchor `now` to the clock so the retention window does not drift off a hardcoded day.
+        var now = DateTimeOffset.UtcNow;
         var sent = await repo.SendNewOrExistingAsync(alice.Id, bob.Id, "Hi", now);
         var target = (await repo.GetConversationAsync(sent.ConversationId!.Value, bob.Id))!.Messages[^1];
         var report = await repo.CreateReportAsync(bob.Id, sent.ConversationId!.Value, target.Id, "Reason", now);

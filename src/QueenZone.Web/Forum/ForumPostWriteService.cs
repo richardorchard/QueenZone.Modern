@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using QueenZone.Data;
 using QueenZone.Storage;
 using QueenZone.Web.Search;
@@ -85,6 +86,8 @@ public sealed class ForumPostWriteService(
     ForumAttachmentValidator attachmentValidator,
     ForumAttachmentUploadService attachmentUploadService,
     ForumSearchIndexSynchronizer forumSearchIndex,
+    INotificationDispatcher notificationDispatcher,
+    ILogger<ForumPostWriteService> logger,
     TimeProvider timeProvider)
 {
     public const int SubjectMinLength = 5;
@@ -270,7 +273,28 @@ public sealed class ForumPostWriteService(
                 attachmentValidation.AcceptedFiles,
                 cancellationToken);
             publicQueryCache.InvalidateForumStatsCache();
-            return ForumWriteOutcome.Created(topicId, postId, sanitizedBody, title);
+            var created = ForumWriteOutcome.Created(topicId, postId, sanitizedBody, title);
+            try
+            {
+                await notificationDispatcher.NotifyForumReplyAsync(
+                    topicId,
+                    postId,
+                    memberId,
+                    title,
+                    cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(
+                    ex,
+                    "Push dispatch failed after forum reply {TopicId}/{PostId} by member {MemberId}: {Error}",
+                    topicId,
+                    postId,
+                    memberId,
+                    ex.Message);
+            }
+
+            return created;
         }
         catch (NotSupportedException ex)
         {

@@ -1,3 +1,4 @@
+using System.Net;
 using System.Security.Claims;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
@@ -94,6 +95,9 @@ public static class QueenZoneWebServiceCollectionExtensions
             .Bind(configuration.GetSection(GalleryOrphanSweepOptions.SectionName))
             .ValidateOnStart();
         services.AddSingleton<IValidateOptions<GalleryOrphanSweepOptions>, GalleryOrphanSweepOptionsValidator>();
+
+        services.AddOptions<PushNotificationOptions>()
+            .Bind(configuration.GetSection(PushNotificationOptions.SectionName));
 
         return services;
     }
@@ -266,6 +270,20 @@ public static class QueenZoneWebServiceCollectionExtensions
         services.AddScoped<ForumAttachmentValidator>();
         services.AddScoped<ForumAttachmentUploadService>();
         services.AddScoped<ForumPostWriteService>();
+        services.AddSingleton<IFcmAccessTokenProvider, GoogleFcmAccessTokenProvider>();
+        services.AddHttpClient(DirectPushTransport.ApnsClientName, client =>
+        {
+            client.DefaultRequestVersion = HttpVersion.Version20;
+            client.DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrHigher;
+            client.Timeout = TimeSpan.FromSeconds(30);
+        });
+        services.AddHttpClient(DirectPushTransport.FcmClientName, client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(30);
+        });
+        services.AddSingleton<IPushTransport, DirectPushTransport>();
+        services.AddScoped<INotificationDispatcher, NotificationDispatcher>();
+        services.AddScoped<AdminNewsWriteService>();
         services.AddSingleton<IGoogleAnalyticsDataClient, GoogleAnalyticsDataClient>();
         services.AddScoped<IGoogleAnalyticsTrafficService, GoogleAnalyticsTrafficService>();
         services.AddScoped<AdminDashboardService>();

@@ -8,6 +8,7 @@ namespace QueenZone.Web.Pages.Admin.News;
 
 public sealed class ActionModel(
     IAdminNewsRepository adminNewsRepository,
+    AdminNewsWriteService adminNewsWriteService,
     INewsRepository newsRepository,
     INewsAuditRepository auditRepository,
     INewsDiscoveryRepository discoveryRepository,
@@ -41,7 +42,7 @@ public sealed class ActionModel(
             return Redirect($"/admin/news/{id}/edit");
         }
 
-        await adminNewsRepository.PublishAsync(id, EditorEmail, cancellationToken);
+        await adminNewsWriteService.PublishAsync(article, EditorEmail, cancellationToken);
         await InvalidatePublicNewsCachesAsync(cancellationToken);
         await auditRepository.AppendAsync(id, "publish", EditorEmail, $"Published \"{article.Title}\"", cancellationToken);
         await UpsertSearchIndexAsync(id, cancellationToken);
