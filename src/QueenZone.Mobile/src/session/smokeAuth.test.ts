@@ -19,6 +19,10 @@ describe('smokeAuth', () => {
     assert.equal(isSmokeAuthEnabled({}), false);
   });
 
+  it('falls back to the compiled __DEV__ flag when dev is not given', () => {
+    assert.equal(isSmokeAuthEnabled({ appEnv: 'development' }), false);
+  });
+
   it('parses a smoke-auth deep link and ignores OAuth callbacks', () => {
     const token = 'header.payload.signature';
     const url = buildSmokeAuthUrl(token);
@@ -30,6 +34,11 @@ describe('smokeAuth', () => {
     );
     assert.equal(parseSmokeAuthAccessToken('queenzone://smoke-auth'), null);
     assert.equal(parseSmokeAuthAccessToken('not-a-url'), null);
+    assert.equal(parseSmokeAuthAccessToken(`${smokeAuthScheme}://${smokeAuthHost}?accessToken=`), null);
+    assert.equal(
+      parseSmokeAuthAccessToken(`${smokeAuthScheme}://${smokeAuthHost}?accessToken=%20`),
+      null,
+    );
   });
 
   it('rejects an empty token when building a smoke-auth URL', () => {

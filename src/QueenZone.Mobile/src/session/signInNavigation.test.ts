@@ -170,4 +170,22 @@ describe('gated compose helpers', () => {
     assert.equal(submitted, false);
     assert.equal(dispatched.length, 1);
   });
+
+  it('runs the signed-in navigate callback directly when already signed in', () => {
+    let submitted = false;
+    const dispatched: unknown[] = [];
+    openPhotoSubmit(
+      {
+        dispatch: (action) => {
+          dispatched.push(action);
+        },
+      },
+      true,
+      () => {
+        submitted = true;
+      },
+    );
+    assert.equal(submitted, true);
+    assert.equal(dispatched.length, 0);
+  });
 });

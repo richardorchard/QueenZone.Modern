@@ -1,5 +1,11 @@
 import { screen, userEvent, waitFor } from '@testing-library/react-native';
-import { archiveConversation, fetchConversation, reportConversationMessage } from '../../api/messages';
+import { ApiError } from '../../api/client';
+import {
+  archiveConversation,
+  fetchConversation,
+  replyToConversation,
+  reportConversationMessage,
+} from '../../api/messages';
 import { createMockSession } from '../../test/mockSession';
 import { fakeNavigation, flushVirtualizedList, renderWithProviders } from '../../test/render';
 import { ConversationScreen } from './ConversationScreen';
@@ -20,6 +26,7 @@ jest.mock('../../api/messages', () => ({
 }));
 
 const fetchConversationMock = fetchConversation as jest.MockedFunction<typeof fetchConversation>;
+const replyToConversationMock = replyToConversation as jest.MockedFunction<typeof replyToConversation>;
 const reportConversationMessageMock = reportConversationMessage as jest.MockedFunction<
   typeof reportConversationMessage
 >;
@@ -67,6 +74,7 @@ describe('ConversationScreen', () => {
     mockSession.isSignedIn = true;
     mockSession.accessToken = 'tok';
     fetchConversationMock.mockReset();
+    replyToConversationMock.mockReset();
     reportConversationMessageMock.mockReset();
     archiveConversationMock.mockReset();
   });
@@ -146,6 +154,18 @@ describe('ConversationScreen', () => {
     );
   });
 
+  it('shows an error block with retry when the fetch fails', async () => {
+    fetchConversationMock.mockRejectedValueOnce(new ApiError(500, 'The server had a problem.'));
+    fetchConversationMock.mockResolvedValueOnce(conversationDetail([]));
+
+    renderConversation();
+    await waitFor(() => expect(screen.getByText('The server had a problem.')).toBeOnTheScreen());
+
+    const user = userEvent.setup();
+    await user.press(screen.getByRole('button', { name: 'Try again' }));
+    await waitFor(() => expect(fetchConversationMock).toHaveBeenCalledTimes(2));
+  });
+
   it('shows the generic sending-blocked notice when the reply composer is hidden', async () => {
     fetchConversationMock.mockResolvedValue(
       conversationDetail(
@@ -196,6 +216,48 @@ describe('ConversationScreen', () => {
       ).toBeOnTheScreen(),
     );
     expect(screen.queryByText('Unable to send message.')).toBeNull();
+  });
+
+  it('sends a reply and clears the draft', async () => {
+    fetchConversationMock.mockResolvedValue(conversationDetail([]));
+    replyToConversationMock.mockResolvedValue(
+      conversationDetail([
+        {
+          id: '33333333-4444-5555-6666-777777777777',
+          senderMemberId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+          senderDisplayName: 'Alice',
+          body: 'Hello Bob',
+          createdAt: '2026-08-19T12:02:00.000Z',
+          isMine: true,
+          sortKey: 1,
+          reportedByViewer: false,
+        },
+      ]),
+    );
+
+    renderConversation();
+    await waitFor(() => expect(screen.getByLabelText('Reply')).toBeOnTheScreen());
+
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText('Reply'), 'Hello Bob');
+    await user.press(screen.getByRole('button', { name: 'Send reply' }));
+
+    await waitFor(() => expect(screen.getByText('Hello Bob')).toBeOnTheScreen());
+    expect(replyToConversationMock).toHaveBeenCalledWith('tok', conversationId, 'Hello Bob');
+    expect(screen.getByLabelText('Reply').props.value).toBe('');
+  });
+
+  it('rejects an empty reply without calling the API', async () => {
+    fetchConversationMock.mockResolvedValue(conversationDetail([]));
+
+    renderConversation();
+    await waitFor(() => expect(screen.getByLabelText('Reply')).toBeOnTheScreen());
+
+    const user = userEvent.setup();
+    await user.press(screen.getByRole('button', { name: 'Send reply' }));
+
+    await waitFor(() => expect(screen.getByText('Message body is required.')).toBeOnTheScreen());
+    expect(replyToConversationMock).not.toHaveBeenCalled();
   });
 
   it('archives the conversation and returns to the inbox', async () => {
