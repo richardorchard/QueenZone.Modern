@@ -1,0 +1,201 @@
+name: Publish Android to Google Play
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish_to_play:
+        description: Upload the bundle to the Google Play internal track
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-android-google-play
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    name: Mobile preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: src/QueenZone.Mobile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: src/QueenZone.Mobile/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Preflight
+        run: npm run preflight
+
+  publish-android:
+    name: Sign and upload Android build
+    needs: preflight
+    if: always() && github.ref == 'refs/heads/main' && needs.preflight.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    environment: deploy
+    defaults:
+      run:
+        working-directory: src/QueenZone.Mobile
+    env:
+      APP_PACKAGE_NAME: org.queenzone.mobile
+      ANDROID_VERSION_CODE: ${{ github.run_number }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Record build metadata
+        run: |
+          echo "BUILD_TIMESTAMP_UTC=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_ENV"
+          echo "BUILD_REVISION=${GITHUB_SHA:0:7}" >> "$GITHUB_ENV"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: src/QueenZone.Mobile/package-lock.json
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install
+        run: npm ci
+
+      - name: Generate Android project
+        env:
+          EXPO_PUBLIC_APP_ENV: staging
+          EXPO_PUBLIC_SENTRY_DSN: ${{ vars.SENTRY_DSN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
+        run: npx expo prebuild --platform android --clean --no-install
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-play-${{ runner.os }}-${{ hashFiles('src/QueenZone.Mobile/android/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-play-${{ runner.os }}-
+            gradle-${{ runner.os }}-
+
+      - name: Fetch Android publishing secrets from Bitwarden
+        id: bitwarden-secrets
+        uses: bitwarden/sm-action@v3.0.1
+        with:
+          access_token: ${{ secrets.BITWARDEN_SECRETS_MANAGER_ACCESS_TOKEN }}
+          secrets: ${{ vars.BITWARDEN_MOBILE_BUILD_SECRETS }}
+
+      - name: Check publishing credentials
+        env:
+          ANDROID_TEST_KEYSTORE_BASE64: ${{ steps.bitwarden-secrets.outputs.ANDROID_TEST_KEYSTORE_BASE64 }}
+          ANDROID_TEST_KEYSTORE_PASSWORD: ${{ steps.bitwarden-secrets.outputs.ANDROID_TEST_KEYSTORE_PASSWORD }}
+          ANDROID_TEST_KEY_PASSWORD: ${{ steps.bitwarden-secrets.outputs.ANDROID_TEST_KEY_PASSWORD }}
+          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ steps.bitwarden-secrets.outputs.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          SENTRY_AUTH_TOKEN: ${{ steps.bitwarden-secrets.outputs.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
+          PUBLISH_TO_PLAY: ${{ inputs.publish_to_play }}
+        run: |
+          missing=0
+          for name in \
+            ANDROID_TEST_KEYSTORE_BASE64 \
+            ANDROID_TEST_KEYSTORE_PASSWORD \
+            ANDROID_TEST_KEY_PASSWORD \
+            SENTRY_AUTH_TOKEN \
+            SENTRY_ORG \
+            SENTRY_PROJECT; do
+            eval "value=\${$name-}"
+            if [ -z "$value" ]; then
+              echo "::error::$name is not configured for the deploy environment."
+              missing=1
+            else
+              echo "$name is set (length ${#value})"
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+          if [ "$PUBLISH_TO_PLAY" = "true" ]; then
+            if [ -z "$GOOGLE_PLAY_SERVICE_ACCOUNT_JSON" ]; then
+              echo "::error::GOOGLE_PLAY_SERVICE_ACCOUNT_JSON is not configured for the deploy environment."
+              exit 1
+            fi
+            echo "GOOGLE_PLAY_SERVICE_ACCOUNT_JSON is set (length ${#GOOGLE_PLAY_SERVICE_ACCOUNT_JSON})"
+            printf '%s' "$GOOGLE_PLAY_SERVICE_ACCOUNT_JSON" | jq -e \
+              '.type == "service_account" and (.client_email | length > 0) and (.private_key | length > 0)' \
+              >/dev/null
+          fi
+
+      - name: Restore upload key
+        env:
+          ANDROID_TEST_KEYSTORE_BASE64: ${{ steps.bitwarden-secrets.outputs.ANDROID_TEST_KEYSTORE_BASE64 }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/queenzone-signing"
+          printf '%s' "$ANDROID_TEST_KEYSTORE_BASE64" | base64 --decode \
+            > "$RUNNER_TEMP/queenzone-signing/queenzone-upload.jks"
+
+      - name: Build signed Android App Bundle
+        working-directory: src/QueenZone.Mobile/android
+        env:
+          EXPO_PUBLIC_APP_ENV: staging
+          ANDROID_TEST_KEYSTORE_PASSWORD: ${{ steps.bitwarden-secrets.outputs.ANDROID_TEST_KEYSTORE_PASSWORD }}
+          ANDROID_TEST_KEY_PASSWORD: ${{ steps.bitwarden-secrets.outputs.ANDROID_TEST_KEY_PASSWORD }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
+          SENTRY_AUTH_TOKEN: ${{ steps.bitwarden-secrets.outputs.SENTRY_AUTH_TOKEN }}
+        run: |
+          ./gradlew bundleRelease \
+            -Pandroid.injected.version.code="$ANDROID_VERSION_CODE" \
+            -Pandroid.injected.version.name="0.1.0-internal.$ANDROID_VERSION_CODE" \
+            -Pandroid.injected.signing.store.file="$RUNNER_TEMP/queenzone-signing/queenzone-upload.jks" \
+            -Pandroid.injected.signing.store.password="$ANDROID_TEST_KEYSTORE_PASSWORD" \
+            -Pandroid.injected.signing.key.alias=queenzone-test \
+            -Pandroid.injected.signing.key.password="$ANDROID_TEST_KEY_PASSWORD"
+
+      - name: Verify Android App Bundle
+        run: |
+          bundle=android/app/build/outputs/bundle/release/app-release.aab
+          test -f "$bundle"
+          jarsigner -verify -strict "$bundle"
+
+      - name: Upload bundle artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: queen-zone-android-play-${{ github.run_number }}
+          path: src/QueenZone.Mobile/android/app/build/outputs/bundle/release/app-release.aab
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Upload to Google Play internal testing
+        if: inputs.publish_to_play
+        uses: r0adkll/upload-google-play@v1.1.3
+        with:
+          serviceAccountJsonPlainText: ${{ steps.bitwarden-secrets.outputs.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: org.queenzone.mobile
+          releaseFiles: src/QueenZone.Mobile/android/app/build/outputs/bundle/release/app-release.aab
+          tracks: internal
+          status: completed
