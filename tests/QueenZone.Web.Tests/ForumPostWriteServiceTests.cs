@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
+using QueenZone.Data;
+using QueenZone.Data.Entities;
 
 namespace QueenZone.Web.Tests;
 
@@ -78,6 +80,70 @@ public sealed class ForumPostWriteServiceTests : IClassFixture<QueenZoneWebAppli
         Assert.Equal(ForumWriteStatus.ValidationFailed, outcome.Status);
         Assert.Contains(outcome.FieldErrors, error =>
             error.Field == "Attachments" && error.Message.Contains("not allowed", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task CreateReply_autosuspends_member_who_posts_a_link_moments_after_registering()
+    {
+        using var scope = factory.Services.CreateScope();
+        var memberId = await CreateMemberAsync(scope, DateTime.UtcNow);
+        var service = scope.ServiceProvider.GetRequiredService<ForumPostWriteService>();
+
+        var outcome = await service.CreateReplyAsync(
+            memberId, "Service Tester", 1002, "Check this out https://spam.example.com", attachments: null);
+
+        Assert.True(outcome.Succeeded);
+        var repository = scope.ServiceProvider.GetRequiredService<IMemberAccountRepository>();
+        var account = await repository.FindByIdAsync(memberId);
+        Assert.NotNull(account);
+        Assert.True(account!.IsSuspended);
+        Assert.Equal(ForumPostWriteService.AutoModeratorEmail, account.SuspendedByAdminEmail);
+    }
+
+    [Fact]
+    public async Task CreateReply_does_not_flag_link_post_from_an_older_account()
+    {
+        using var scope = factory.Services.CreateScope();
+        var memberId = await CreateMemberAsync(scope, DateTime.UtcNow - TimeSpan.FromHours(1));
+        var service = scope.ServiceProvider.GetRequiredService<ForumPostWriteService>();
+
+        var outcome = await service.CreateReplyAsync(
+            memberId, "Service Tester", 1002, "Check this out https://spam.example.com", attachments: null);
+
+        Assert.True(outcome.Succeeded);
+        var repository = scope.ServiceProvider.GetRequiredService<IMemberAccountRepository>();
+        var account = await repository.FindByIdAsync(memberId);
+        Assert.False(account!.IsSuspended);
+    }
+
+    [Fact]
+    public async Task CreateReply_does_not_flag_new_account_posting_without_a_link()
+    {
+        using var scope = factory.Services.CreateScope();
+        var memberId = await CreateMemberAsync(scope, DateTime.UtcNow);
+        var service = scope.ServiceProvider.GetRequiredService<ForumPostWriteService>();
+
+        var outcome = await service.CreateReplyAsync(
+            memberId, "Service Tester", 1002, "Excited to join this community!", attachments: null);
+
+        Assert.True(outcome.Succeeded);
+        var repository = scope.ServiceProvider.GetRequiredService<IMemberAccountRepository>();
+        var account = await repository.FindByIdAsync(memberId);
+        Assert.False(account!.IsSuspended);
+    }
+
+    private static async Task<Guid> CreateMemberAsync(IServiceScope scope, DateTime createdAt)
+    {
+        var repository = scope.ServiceProvider.GetRequiredService<IMemberAccountRepository>();
+        var member = new MemberAccount
+        {
+            Id = Guid.NewGuid(),
+            Email = $"{Guid.NewGuid():N}@example.test",
+            DisplayName = "New Member",
+            CreatedAt = createdAt,
+        };
+        await repository.CreateAsync(member);
+        return member.Id;
     }
 
     private async Task<ForumWriteOutcome> CreateTopicAsync(
