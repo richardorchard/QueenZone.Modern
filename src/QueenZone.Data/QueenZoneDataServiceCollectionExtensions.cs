@@ -55,6 +55,7 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddScoped<IForumAttachmentRepository, EfForumAttachmentRepository>();
         services.AddScoped<IForumPollRepository, EfForumPollRepository>();
         services.AddScoped<INewsDiscoveryRepository, EfNewsDiscoveryRepository>();
+        services.AddScoped<INewsAgentGuidanceRepository, EfNewsAgentGuidanceRepository>();
         services.AddScoped<INewsAgentRunLeaseService, EfNewsAgentRunLeaseService>();
         services.AddScoped<INewsAgentRunRequestRepository, EfNewsAgentRunRequestRepository>();
         services.AddScoped<IQueenHistoryRepository, EfQueenHistoryRepository>();
@@ -120,6 +121,9 @@ public static class QueenZoneDataServiceCollectionExtensions
         SampleNewsDiscoveryData.Seed(discoveryStore);
         services.AddSingleton(discoveryStore);
         services.AddSingleton<INewsDiscoveryRepository, InMemoryNewsDiscoveryRepository>();
+        var guidanceStore = new SharedNewsAgentGuidanceStore();
+        services.AddSingleton(guidanceStore);
+        services.AddSingleton<INewsAgentGuidanceRepository, InMemoryNewsAgentGuidanceRepository>();
         services.AddSingleton<SharedNewsAgentLeaseStore>();
         services.AddSingleton<INewsAgentRunLeaseService, InMemoryNewsAgentRunLeaseService>();
         services.AddSingleton<SharedNewsAgentRunRequestStore>();
