@@ -69,3 +69,41 @@ describe('initSentry', () => {
     );
   });
 });
+
+describe('reportApiFailure', () => {
+  it('records kind, status, method, and path only', () => {
+    const { reportApiFailure } = loadSentryModule();
+    reportApiFailure({
+      kind: 'timeout',
+      status: 0,
+      method: 'GET',
+      path: '/content/news',
+    });
+
+    expect(Sentry.addBreadcrumb).toHaveBeenCalledWith({
+      category: 'api',
+      type: 'http',
+      level: 'error',
+      data: {
+        kind: 'timeout',
+        status: 0,
+        method: 'GET',
+        path: '/content/news',
+      },
+    });
+  });
+
+  it('marks client HTTP errors as warnings', () => {
+    const { reportApiFailure } = loadSentryModule();
+    reportApiFailure({
+      kind: 'http',
+      status: 404,
+      method: 'GET',
+      path: '/content/news/1',
+    });
+
+    expect(Sentry.addBreadcrumb).toHaveBeenCalledWith(
+      expect.objectContaining({ level: 'warning' }),
+    );
+  });
+});
