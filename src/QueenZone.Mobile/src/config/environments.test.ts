@@ -8,6 +8,7 @@ const {
   normalizeApiBaseUrl,
   resolveApiBaseUrl,
   resolveAppEnvironment,
+  resolveIosApsEnvironment,
   resolveIosBuildNumber,
   rewriteLoopbackForAndroid,
 } = require('../../apiEnvironments.cjs') as typeof import('../../apiEnvironments.cjs');
@@ -89,6 +90,52 @@ describe('rewriteLoopbackForAndroid', () => {
     assert.equal(
       rewriteLoopbackForAndroid('https://www.queenzone.org', 'android'),
       'https://www.queenzone.org',
+    );
+  });
+});
+
+describe('resolveIosApsEnvironment', () => {
+  it('defaults to development for local non-production builds', () => {
+    assert.equal(resolveIosApsEnvironment(), 'development');
+    assert.equal(resolveIosApsEnvironment({}), 'development');
+    assert.equal(resolveIosApsEnvironment({ appEnv: 'development' }), 'development');
+    assert.equal(resolveIosApsEnvironment({ appEnv: 'staging' }), 'development');
+  });
+
+  it('uses production for App Store and TestFlight distribution builds', () => {
+    assert.equal(resolveIosApsEnvironment({ appEnv: 'production' }), 'production');
+    assert.equal(
+      resolveIosApsEnvironment({ appEnv: 'staging', distributionBuild: true }),
+      'production',
+    );
+    assert.equal(
+      resolveIosApsEnvironment({ appEnv: 'development', distributionBuild: true }),
+      'production',
+    );
+  });
+
+  it('lets IOS_APS_ENVIRONMENT override inferred mode', () => {
+    assert.equal(
+      resolveIosApsEnvironment({
+        override: 'production',
+        appEnv: 'development',
+      }),
+      'production',
+    );
+    assert.equal(
+      resolveIosApsEnvironment({
+        override: 'Development',
+        appEnv: 'production',
+        distributionBuild: true,
+      }),
+      'development',
+    );
+  });
+
+  it('rejects unknown override values', () => {
+    assert.throws(
+      () => resolveIosApsEnvironment({ override: 'sandbox' }),
+      /production or development/,
     );
   });
 });

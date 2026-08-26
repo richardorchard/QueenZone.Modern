@@ -51,6 +51,10 @@ jobs:
       IOS_BUILD_NUMBER: ${{ github.run_number }}
       APPLE_TEAM_ID: X28Z75P69M
       PROVISIONING_PROFILE_NAME: QueenZone App Store
+      # App Store / TestFlight profiles only include aps-environment=production.
+      # Staging still talks to the staging API; the entitlement follows signing.
+      IOS_APS_ENVIRONMENT: production
+      IOS_DISTRIBUTION_BUILD: '1'
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -164,6 +168,8 @@ jobs:
           # so App Store Connect rejected re-uploads with CFBundleVersion=1.
           IOS_BUILD_NUMBER: ${{ github.run_number }}
           GITHUB_RUN_NUMBER: ${{ github.run_number }}
+          IOS_APS_ENVIRONMENT: production
+          IOS_DISTRIBUTION_BUILD: '1'
           EXPO_PUBLIC_SENTRY_DSN: ${{ vars.SENTRY_DSN }}
           SENTRY_ORG: ${{ vars.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
@@ -187,6 +193,18 @@ jobs:
           echo "Info.plist ITSAppUsesNonExemptEncryption=${encryption}"
           if [ "$encryption" != "false" ]; then
             echo "::error::ITSAppUsesNonExemptEncryption must be false."
+            exit 1
+          fi
+          entitlements=$(find ios -name '*.entitlements' -not -path '*/Pods/*' -print -quit)
+          if [ -z "$entitlements" ]; then
+            echo "::error::prebuild did not produce an entitlements file."
+            exit 1
+          fi
+          aps_environment=$(/usr/libexec/PlistBuddy -c 'Print :aps-environment' "$entitlements")
+          echo "Entitlements aps-environment=${aps_environment} (from ${entitlements})"
+          if [ "$aps_environment" != "$IOS_APS_ENVIRONMENT" ]; then
+            echo "::error::aps-environment is ${aps_environment}, expected ${IOS_APS_ENVIRONMENT}."
+            echo "TestFlight / App Store profiles only include production. Set IOS_APS_ENVIRONMENT=production."
             exit 1
           fi
 
@@ -270,6 +288,18 @@ jobs:
           fi
           if [ "$application_id" != "$APPLE_TEAM_ID.$APP_BUNDLE_ID" ]; then
             echo "::error::Provisioning profile does not match $APP_BUNDLE_ID."
+            exit 1
+          fi
+          aps_environment=$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:aps-environment' "$profile_plist" 2>/dev/null || true)
+          echo "Provisioning profile aps-environment=${aps_environment:-<missing>}"
+          if [ -z "$aps_environment" ]; then
+            echo "::error::Provisioning profile \"$profile_name\" does not include the Push Notifications capability (aps-environment)."
+            echo "Enable Push Notifications on App ID $APP_BUNDLE_ID, regenerate the \"$PROVISIONING_PROFILE_NAME\" profile, then update secret IOS_PROVISIONING_PROFILE_BASE64 with the new .mobileprovision (base64)."
+            exit 1
+          fi
+          if [ "$aps_environment" != "$IOS_APS_ENVIRONMENT" ]; then
+            echo "::error::Provisioning profile aps-environment is ${aps_environment}, expected ${IOS_APS_ENVIRONMENT}."
+            echo "App Store / TestFlight signing requires a distribution profile with aps-environment=production."
             exit 1
           fi
 
@@ -382,6 +412,14 @@ jobs:
             "$verify_dir/embedded-profile.plist")
           if [ "$application_id" != "$APPLE_TEAM_ID.$APP_BUNDLE_ID" ]; then
             echo "::error::Exported IPA has the wrong application identifier."
+            exit 1
+          fi
+          ipa_aps_environment=$(/usr/libexec/PlistBuddy \
+            -c 'Print :Entitlements:aps-environment' \
+            "$verify_dir/embedded-profile.plist")
+          echo "IPA aps-environment=${ipa_aps_environment}"
+          if [ "$ipa_aps_environment" != "$IOS_APS_ENVIRONMENT" ]; then
+            echo "::error::Exported IPA aps-environment is ${ipa_aps_environment}, expected ${IOS_APS_ENVIRONMENT}."
             exit 1
           fi
 

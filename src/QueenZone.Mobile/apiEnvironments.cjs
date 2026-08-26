@@ -115,11 +115,41 @@ function resolveIosBuildNumber(input = {}) {
   return '1';
 }
 
+/**
+ * iOS `aps-environment` entitlement for the expo-notifications `mode`.
+ *
+ * App Store and TestFlight distribution profiles only include
+ * `aps-environment=production`. Sandbox (`development`) is valid only for
+ * locally installed development-signed builds. Staging TestFlight builds
+ * still talk to the staging API, but they must use the production
+ * entitlement — ADR 0014 and `PushNotifications__Apns__Environment` are
+ * production for those uploads.
+ *
+ * @param {{ override?: string | null, appEnv?: string | null, distributionBuild?: boolean }} [input]
+ * @returns {'production' | 'development'}
+ */
+function resolveIosApsEnvironment(input = {}) {
+  const raw = (input.override ?? '').trim().toLowerCase();
+  if (raw === 'production' || raw === 'development') {
+    return raw;
+  }
+  if (raw) {
+    throw new Error(
+      `iOS APS environment must be production or development (got "${input.override}").`,
+    );
+  }
+  if (input.distributionBuild === true || input.appEnv === 'production') {
+    return 'production';
+  }
+  return 'development';
+}
+
 module.exports = {
   defaultApiBaseUrls,
   normalizeApiBaseUrl,
   resolveApiBaseUrl,
   resolveAppEnvironment,
+  resolveIosApsEnvironment,
   resolveIosBuildNumber,
   rewriteLoopbackForAndroid,
 };
