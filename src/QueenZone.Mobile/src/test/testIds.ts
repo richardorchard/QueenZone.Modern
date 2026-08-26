@@ -41,6 +41,8 @@ export const testIds = {
   memberGate: 'member-gate',
   inboxScreen: 'inbox-screen',
   archivedScreen: 'archived-screen',
+
+  notificationBanner: 'notification-banner',
 } as const;
 
 export type TestId = (typeof testIds)[keyof typeof testIds];

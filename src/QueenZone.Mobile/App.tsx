@@ -11,6 +11,7 @@ import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { RootNavigator } from './src/navigation/RootNavigator';
+import { configureForegroundNotificationHandler } from './src/notifications';
 import { SessionProvider } from './src/session/SessionContext';
 import { FanPerformancePlayerProvider } from './src/audio/FanPerformancePlayer';
 import { navigationIntegration } from './src/config/sentry';
@@ -19,6 +20,8 @@ import { ThemeProvider, dark, useQueenzoneFonts, useTheme } from './src/theme';
 SplashScreen.preventAutoHideAsync().catch(() => {
   /* already prevented or unavailable in tests */
 });
+
+configureForegroundNotificationHandler();
 
 function AppNavigation() {
   const { c, mode } = useTheme();
