@@ -6,6 +6,8 @@ export const media = {
   crestWhite: require('../../assets/archive/crest-white.png') as number,
   crestBlack: require('../../assets/archive/crest-black.png') as number,
   crestSilver: require('../../assets/archive/crest-silver.png') as number,
+  /** Tight crop, wordmark cropped off — used by the boot splash hero + watermark. */
+  crestEmblem: require('../../assets/archive/crest-emblem.png') as number,
   hero: require('../../assets/archive/img-hero.jpg') as number,
   crowd: require('../../assets/archive/img-crowd.jpg') as number,
   portrait: require('../../assets/archive/img-portrait.jpg') as number,
