@@ -18,6 +18,10 @@ import {
 } from '../src/api/forum.ts';
 import { parseMemberProfile } from '../src/api/me.ts';
 import {
+  fetchNotificationPreferences,
+  patchNotificationPreferences,
+} from '../src/api/notificationPreferences.ts';
+import {
   composeMessage,
   fetchConversation,
   fetchInbox,
@@ -36,6 +40,7 @@ import {
   memberProfileSchema,
   newsDetailSchema,
   newsListItemSchema,
+  notificationPreferencesSchema,
   pagedSchema,
   parseContract,
   photoDetailSchema,
@@ -186,6 +191,25 @@ describe('mobile API consumer contracts', { concurrency: false }, () => {
     const profile = parseMemberProfile(rawProfile);
     assert.equal(profile.memberId, fixture.member.id);
     assert.equal(profile.displayName, fixture.member.displayName);
+
+    const preferences = parseContract(
+      'GET /api/v1/me/notification-preferences',
+      notificationPreferencesSchema,
+      await fetchNotificationPreferences(token),
+    );
+    assert.equal(typeof preferences.forumReply, 'boolean');
+    assert.equal(typeof preferences.privateMessage, 'boolean');
+    assert.equal(typeof preferences.news, 'boolean');
+
+    const patched = parseContract(
+      'PATCH /api/v1/me/notification-preferences',
+      notificationPreferencesSchema,
+      await patchNotificationPreferences(token, { news: !preferences.news }),
+    );
+    assert.equal(patched.news, !preferences.news);
+    assert.equal(patched.forumReply, preferences.forumReply);
+    assert.equal(patched.privateMessage, preferences.privateMessage);
+    await patchNotificationPreferences(token, { news: preferences.news });
 
     const emptyInbox = parseContract(
       'GET /api/v1/me/messages',
