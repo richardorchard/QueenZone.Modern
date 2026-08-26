@@ -8,6 +8,7 @@ const shims = new Map([
   ['expo-constants', path.join(shimsDir, 'expo-constants.mjs')],
   ['react-native', path.join(shimsDir, 'react-native.mjs')],
   ['@react-native-async-storage/async-storage', path.join(shimsDir, 'async-storage.mjs')],
+  ['@sentry/react-native', path.join(shimsDir, 'sentry-react-native.mjs')],
 ]);
 
 export async function resolve(specifier, context, nextResolve) {
