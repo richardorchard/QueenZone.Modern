@@ -9,6 +9,7 @@ import type {
   ForumTopicCreated,
   ForumTopicDetail,
   ForumTopicListItem,
+  ForumTopicWatch,
 } from './types';
 import type { PageQuery } from './content';
 
@@ -121,6 +122,38 @@ export function closeForumTopicPoll(
 ): Promise<ForumPoll> {
   return sendJson(`/forum/topics/${topicId}/poll/close`, {
     method: 'POST',
+    accessToken,
+    signal,
+  });
+}
+
+export function fetchForumTopicWatch(
+  topicId: number,
+  accessToken: string,
+  signal?: AbortSignal,
+): Promise<ForumTopicWatch> {
+  return fetchJson(`/forum/topics/${topicId}/watch`, { accessToken, signal });
+}
+
+export function watchForumTopic(
+  topicId: number,
+  accessToken: string,
+  signal?: AbortSignal,
+): Promise<ForumTopicWatch> {
+  return sendJson(`/forum/topics/${topicId}/watch`, {
+    method: 'POST',
+    accessToken,
+    signal,
+  });
+}
+
+export function unwatchForumTopic(
+  topicId: number,
+  accessToken: string,
+  signal?: AbortSignal,
+): Promise<ForumTopicWatch> {
+  return sendJson(`/forum/topics/${topicId}/watch`, {
+    method: 'DELETE',
     accessToken,
     signal,
   });

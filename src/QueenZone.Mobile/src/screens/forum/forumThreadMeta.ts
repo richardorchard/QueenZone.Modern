@@ -18,6 +18,16 @@ export function topicReplyAllowed(topic: { isLocked: boolean } | null | undefine
   return topic?.isLocked !== true;
 }
 
+export function watchButtonLabel(watching: boolean): string {
+  return watching ? 'Unwatch' : 'Watch topic';
+}
+
+export function watchHint(watching: boolean): string {
+  return watching
+    ? "You're watching this topic. You'll get a push when someone else replies."
+    : 'Watch to get a push when someone else replies. Posting does not subscribe you.';
+}
+
 export function parseTopicId(id: number | string): number | null {
   const value = typeof id === 'number' ? id : Number.parseInt(id, 10);
   if (!Number.isFinite(value) || value <= 0 || !Number.isInteger(value)) {

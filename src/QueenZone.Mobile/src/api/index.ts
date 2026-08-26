@@ -42,7 +42,10 @@ export {
   fetchForumTopic,
   fetchForumTopicPoll,
   fetchForumTopicPosts,
+  fetchForumTopicWatch,
+  unwatchForumTopic,
   voteForumTopicPoll,
+  watchForumTopic,
 } from './forum';
 export { createPhotoSubmission } from './photoSubmissions';
 export {
