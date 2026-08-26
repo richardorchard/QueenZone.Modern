@@ -67,6 +67,21 @@ public sealed class InMemoryNotificationPreferenceRepository(SharedNotificationP
         }
     }
 
+    public Task<IReadOnlyList<Guid>> ListEnabledAsync(
+        NotificationCategory category,
+        CancellationToken cancellationToken = default)
+    {
+        lock (store.Gate)
+        {
+            var enabled = store.Rows
+                .Where(row => row.Category == category && row.IsEnabled)
+                .Select(row => row.MemberAccountId)
+                .Distinct()
+                .ToList();
+            return Task.FromResult<IReadOnlyList<Guid>>(enabled);
+        }
+    }
+
     private NotificationPreferences ResolveLocked(Guid memberAccountId) =>
         NotificationPreferencesMerge.Resolve(
             store.Rows

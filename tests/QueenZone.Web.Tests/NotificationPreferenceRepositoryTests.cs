@@ -62,6 +62,33 @@ public sealed class NotificationPreferenceRepositoryTests
     }
 
     [Fact]
+    public async Task ListEnabledAsync_News_ReturnsOnlyExplicitEnabledRows()
+    {
+        var repository = CreateRepository();
+        var enabled = Guid.NewGuid();
+        var muted = Guid.NewGuid();
+        var forumOnly = Guid.NewGuid();
+
+        await repository.ApplyAsync(enabled, new NotificationPreferencePatch(null, null, true));
+        await repository.ApplyAsync(muted, new NotificationPreferencePatch(null, null, false));
+        await repository.ApplyAsync(forumOnly, new NotificationPreferencePatch(true, null, null));
+
+        var listed = await repository.ListEnabledAsync(NotificationCategory.News);
+
+        Assert.Equal([enabled], listed);
+    }
+
+    [Fact]
+    public async Task ListEnabledAsync_EmptyStore_ReturnsEmpty()
+    {
+        var repository = CreateRepository();
+
+        var listed = await repository.ListEnabledAsync(NotificationCategory.News);
+
+        Assert.Empty(listed);
+    }
+
+    [Fact]
     public async Task ApplyAsync_KeepsRow_WhenValueMatchesDefault()
     {
         var store = new SharedNotificationPreferenceStore();

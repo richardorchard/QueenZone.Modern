@@ -107,4 +107,14 @@ public sealed class NotificationPreferencesTests
         Assert.True(new NotificationPreferencePatch(null, null, null).IsEmpty);
         Assert.False(new NotificationPreferencePatch(false, null, null).IsEmpty);
     }
+
+    [Fact]
+    public void ToPayloadValue_UsesStableContractNames()
+    {
+        Assert.Equal("forumReply", NotificationCategory.ForumReply.ToPayloadValue());
+        Assert.Equal("privateMessage", NotificationCategory.PrivateMessage.ToPayloadValue());
+        Assert.Equal("news", NotificationCategory.News.ToPayloadValue());
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => ((NotificationCategory)99).ToPayloadValue());
+    }
 }

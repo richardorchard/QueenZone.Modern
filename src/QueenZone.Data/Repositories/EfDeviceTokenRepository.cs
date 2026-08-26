@@ -38,4 +38,20 @@ public sealed class EfDeviceTokenRepository(QueenZoneDbContext dbContext) : IDev
 
         return deleted == 1;
     }
+
+    public async Task<IReadOnlyList<DeviceTokenEntity>> ListByMemberIdsAsync(
+        IReadOnlyCollection<Guid> memberAccountIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (memberAccountIds.Count == 0)
+        {
+            return [];
+        }
+
+        var ids = memberAccountIds.Distinct().ToArray();
+        return await dbContext.DeviceTokens
+            .AsNoTracking()
+            .Where(row => ids.Contains(row.MemberAccountId))
+            .ToListAsync(cancellationToken);
+    }
 }

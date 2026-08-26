@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using QueenZone.Data;
 using QueenZone.Data.Entities;
 
@@ -8,6 +9,8 @@ public sealed class PrivateMessageService(
     IMemberAccountRepository memberAccountRepository,
     IMemberFollowRepository memberFollowRepository,
     PrivateMessageRateLimiter privateMessageRateLimiter,
+    INotificationDispatcher notificationDispatcher,
+    ILogger<PrivateMessageService> logger,
     TimeProvider timeProvider)
 {
     public const string UnableToSendMessage = "Unable to send message.";
@@ -139,12 +142,22 @@ public sealed class PrivateMessageService(
             return new PrivateMessageSendResult(false, null, RateLimitedMessage);
         }
 
-        return await privateMessageRepository.SendNewOrExistingAsync(
+        var result = await privateMessageRepository.SendNewOrExistingAsync(
             senderMemberId,
             recipientMemberId,
             body ?? string.Empty,
             timeProvider.GetUtcNow(),
             cancellationToken);
+        if (result.Succeeded && result.ConversationId is Guid conversationId)
+        {
+            await TryNotifyPrivateMessageAsync(
+                conversationId,
+                recipientMemberId,
+                senderMemberId,
+                cancellationToken);
+        }
+
+        return result;
     }
 
     public async Task<PrivateMessageSendResult> ReplyAsync(
@@ -198,12 +211,47 @@ public sealed class PrivateMessageService(
             return new PrivateMessageSendResult(false, null, RateLimitedMessage);
         }
 
-        return await privateMessageRepository.ReplyAsync(
+        var result = await privateMessageRepository.ReplyAsync(
             conversationId,
             senderMemberId,
             body ?? string.Empty,
             timeProvider.GetUtcNow(),
             cancellationToken);
+        if (result.Succeeded && otherParticipantId is Guid recipientId)
+        {
+            await TryNotifyPrivateMessageAsync(
+                conversationId,
+                recipientId,
+                senderMemberId,
+                cancellationToken);
+        }
+
+        return result;
+    }
+
+    private async Task TryNotifyPrivateMessageAsync(
+        Guid conversationId,
+        Guid recipientMemberId,
+        Guid senderMemberId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await notificationDispatcher.NotifyPrivateMessageAsync(
+                conversationId,
+                recipientMemberId,
+                senderMemberId,
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(
+                ex,
+                "Push dispatch failed after private message to member {MemberId} conversation {ConversationId}: {Error}",
+                recipientMemberId,
+                conversationId,
+                ex.Message);
+        }
     }
 
     public Task<PrivateInboxPage> GetArchivedInboxAsync(

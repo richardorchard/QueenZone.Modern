@@ -788,7 +788,14 @@ public sealed class PrivateMessageServiceTests
             TimeProvider.System,
             Options.Create(rateLimitOptions ?? PermissiveRateLimitOptions()),
             NullLogger<PrivateMessageRateLimiter>.Instance);
-        var service = new PrivateMessageService(messages, members, follows, rateLimiter, TimeProvider.System);
+        var service = new PrivateMessageService(
+            messages,
+            members,
+            follows,
+            rateLimiter,
+            NoOpNotificationDispatcher.Instance,
+            NullLogger<PrivateMessageService>.Instance,
+            TimeProvider.System);
         return (service, members, messages, follows, alice, bob);
     }
 

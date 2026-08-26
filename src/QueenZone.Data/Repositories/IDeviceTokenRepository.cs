@@ -22,4 +22,12 @@ public interface IDeviceTokenRepository
         Guid memberAccountId,
         string deviceId,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns every stored device token for the given members. A member with two
+    /// devices yields two rows. Empty input returns an empty list.
+    /// </summary>
+    Task<IReadOnlyList<DeviceTokenEntity>> ListByMemberIdsAsync(
+        IReadOnlyCollection<Guid> memberAccountIds,
+        CancellationToken cancellationToken = default);
 }

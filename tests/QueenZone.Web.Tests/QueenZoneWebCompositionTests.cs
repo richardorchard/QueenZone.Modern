@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using QueenZone.Data;
 using QueenZone.NewsAgent;
 using QueenZone.Storage;
+using QueenZone.Web;
 using QueenZone.Web.Sitemap;
 
 namespace QueenZone.Web.Tests;
@@ -56,6 +57,11 @@ public sealed class QueenZoneWebCompositionTests
             Assert.NotNull(scope.ServiceProvider.GetRequiredService<IMobileAuthGrantRepository>());
             Assert.NotNull(scope.ServiceProvider.GetRequiredService<MobileAuthService>());
             Assert.NotNull(scope.ServiceProvider.GetRequiredService<MobileAuthAccountRateLimiter>());
+            Assert.NotNull(scope.ServiceProvider.GetRequiredService<INotificationDispatcher>());
+            Assert.NotNull(scope.ServiceProvider.GetRequiredService<IPushTransport>());
+            Assert.IsType<EmptyTopicWatchLookup>(
+                scope.ServiceProvider.GetRequiredService<ITopicWatchLookup>());
+            Assert.NotNull(scope.ServiceProvider.GetRequiredService<AdminNewsWriteService>());
         }
 
         Assert.Equal(["admin@test.local"], provider.GetRequiredService<IOptions<AdminOptions>>().Value.AllowedEmails);

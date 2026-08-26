@@ -45,6 +45,26 @@ public sealed class InMemoryDeviceTokenRepository(SharedDeviceTokenStore store) 
         }
     }
 
+    public Task<IReadOnlyList<DeviceTokenEntity>> ListByMemberIdsAsync(
+        IReadOnlyCollection<Guid> memberAccountIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (memberAccountIds.Count == 0)
+        {
+            return Task.FromResult<IReadOnlyList<DeviceTokenEntity>>([]);
+        }
+
+        lock (store.Gate)
+        {
+            var ids = memberAccountIds.ToHashSet();
+            var matches = store.Tokens
+                .Where(row => ids.Contains(row.MemberAccountId))
+                .Select(Clone)
+                .ToList();
+            return Task.FromResult<IReadOnlyList<DeviceTokenEntity>>(matches);
+        }
+    }
+
     private static DeviceTokenEntity Clone(DeviceTokenEntity token) =>
         new()
         {
