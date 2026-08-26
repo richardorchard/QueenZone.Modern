@@ -10,6 +10,7 @@ type Props = {
   disabled?: boolean;
   loading?: boolean;
   accessibilityLabel?: string;
+  testID?: string;
 };
 
 export function Button({
@@ -20,6 +21,7 @@ export function Button({
   disabled,
   loading,
   accessibilityLabel,
+  testID,
 }: Props) {
   const { c } = useTheme();
   const press = usePressProps();
@@ -43,6 +45,7 @@ export function Button({
 
   return (
     <Pressable
+      testID={testID}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
       accessibilityState={{ disabled: !!disabled, busy: !!loading }}

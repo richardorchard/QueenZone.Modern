@@ -26,3 +26,27 @@ public sealed record PhotoSubmissionCreatedDto(
     string Status,
     string Title,
     DateTimeOffset SubmittedAt);
+
+/// <summary>
+/// JSON body for <c>POST /api/v1/member/news-suggestions</c>.
+/// Identity is the mobile JWT, not a body member id.
+/// </summary>
+public sealed record NewsSuggestionRequestDto
+{
+    public string? Url { get; init; }
+
+    public string? Title { get; init; }
+
+    public string? Notes { get; init; }
+}
+
+/// <summary>
+/// Result of <c>POST /api/v1/member/news-suggestions</c>.
+/// <see cref="Url"/> is the normalized canonical URL stored for dedupe.
+/// </summary>
+public sealed record NewsSuggestionCreatedDto(
+    Guid Id,
+    string Status,
+    string Url,
+    string? Title,
+    DateTimeOffset SubmittedAt);

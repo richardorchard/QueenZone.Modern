@@ -24,6 +24,7 @@ export type HomeStackParamList = {
   SavedList: { kind: 'articles' | 'photographs' | 'offline' | 'history' };
   DeleteAccount: undefined;
   MySubmissions: undefined;
+  SuggestNews: undefined;
 };
 
 export type NewsStackParamList = {

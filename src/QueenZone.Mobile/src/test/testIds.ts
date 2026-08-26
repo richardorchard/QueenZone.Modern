@@ -15,6 +15,18 @@ export const testIds = {
   newsStoryScreen: 'news-story-screen',
   newsStoryBack: 'news-story-back',
   newsYearRail: 'news-year-rail',
+  newsSuggest: 'news-suggest',
+
+  suggestNewsScreen: 'suggest-news-screen',
+  suggestNewsUrl: 'suggest-news-url',
+  suggestNewsTitle: 'suggest-news-title',
+  suggestNewsNotes: 'suggest-news-notes',
+  suggestNewsSubmit: 'suggest-news-submit',
+  suggestNewsCancel: 'suggest-news-cancel',
+  suggestNewsSignIn: 'suggest-news-sign-in',
+  suggestNewsRetry: 'suggest-news-retry',
+  suggestNewsChooser: 'suggest-news-chooser',
+  suggestNewsSuccess: 'suggest-news-success',
 
   searchTypeFilters: 'search-type-filters',
 
