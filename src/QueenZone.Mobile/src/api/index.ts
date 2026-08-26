@@ -53,6 +53,17 @@ export {
 } from './messages';
 export type { ConversationDetail, ConversationMessage, InboxConversation } from './messages';
 export {
+  fetchNotificationPreferences,
+  notificationPreferencesApiPath,
+  parseNotificationPreferences,
+  patchNotificationPreferences,
+} from './notificationPreferences';
+export type {
+  NotificationPreferenceKey,
+  NotificationPreferencePatch,
+  NotificationPreferences,
+} from './notificationPreferences';
+export {
   parsePhotoSubmissionCreated,
   photoSubmissionFieldEntries,
   photoSubmissionsPath,
