@@ -143,6 +143,19 @@ describe('useHomeSection', () => {
     await waitFor(() => expect(result.current.view).toEqual({ kind: 'content', data: 'fresh' }));
   });
 
+  it('reloads when the fetcher identity changes', async () => {
+    const first = jest.fn().mockResolvedValue('one');
+    const second = jest.fn().mockResolvedValue('two');
+    const { result, rerender } = renderHook(({ fn }) => useHomeSection(fn), {
+      initialProps: { fn: first },
+    });
+    await waitFor(() => expect(result.current.view).toEqual({ kind: 'content', data: 'one' }));
+
+    rerender({ fn: second });
+    await waitFor(() => expect(result.current.view).toEqual({ kind: 'content', data: 'two' }));
+    expect(second).toHaveBeenCalled();
+  });
+
   it('reloads from error without data through skeleton then content', async () => {
     const retry = deferred<string>();
     const fetcher = jest.fn();

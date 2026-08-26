@@ -42,13 +42,8 @@ export type HomeSection<T> = {
   refresh: () => Promise<void>;
 };
 
-export function useHomeSection<T>(
-  fetcher: (signal: AbortSignal) => Promise<T>,
-  deps: unknown[] = [],
-): HomeSection<T> {
+export function useHomeSection<T>(fetcher: (signal: AbortSignal) => Promise<T>): HomeSection<T> {
   const [snapshot, setSnapshot] = useState<SectionSnapshot<T>>({ status: 'pending', data: null });
-  const fetcherRef = useRef(fetcher);
-  fetcherRef.current = fetcher;
   const coordinatorRef = useRef<PagedRequestCoordinator | null>(null);
   if (coordinatorRef.current === null) {
     coordinatorRef.current = new PagedRequestCoordinator();
@@ -63,7 +58,7 @@ export function useHomeSection<T>(
       }
 
       try {
-        const result = await fetcherRef.current(signal);
+        const result = await fetcher(signal);
         if (!coordinator.isCurrent(generation)) {
           return;
         }
@@ -79,14 +74,13 @@ export function useHomeSection<T>(
         }));
       }
     },
-    [coordinator],
+    [coordinator, fetcher],
   );
 
   useEffect(() => {
     void runSection('reload');
     return () => coordinator.invalidate();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [coordinator, ...deps]);
+  }, [coordinator, runSection]);
 
   const reload = useCallback(() => {
     void runSection('reload');

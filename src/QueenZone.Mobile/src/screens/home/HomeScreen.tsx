@@ -90,7 +90,6 @@ export function HomeScreen({ navigation }: Props) {
           : Promise.resolve(null),
       [isSignedIn, accessToken],
     ),
-    [isSignedIn, accessToken],
   );
 
   const openNewsStory = useCallback(
