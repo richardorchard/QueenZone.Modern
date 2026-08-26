@@ -164,6 +164,25 @@ then update both matching App Service settings and restart/verify the site. Conf
 send succeeds before permanently deleting the previous key in Google Cloud. Verify values only by exact in-memory
 comparison or value length; never emit the JSON or its private key.
 
+## Google Play publishing credential
+
+Google Play publishing uses the dedicated Google Cloud service account
+`queenzone-play-publisher@queenzone-mobile.iam.gserviceaccount.com`. It has no Google Cloud project IAM roles.
+In Play Console it is scoped only to `org.queenzone.mobile`, with read-only app/app-quality access and permission
+to release apps to testing tracks. It has no production, financial, policy, store-listing, tester-list, or
+user-management permission.
+
+The complete private service-account JSON is stored in Bitwarden as
+`GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`. The repository variable `BITWARDEN_MOBILE_BUILD_SECRETS` maps that Bitwarden
+secret ID to the same output name for `publish-android-google-play.yml`. Do not reuse
+`PushNotifications__Fcm__ServiceAccountJson`: FCM delivery and Play publishing are different identities with
+different permissions.
+
+To rotate the publisher credential, create a new JSON key on the same service account, replace the Bitwarden
+secret value without changing its secret ID, then run the Google Play workflow from `main`. Delete the previous
+Google Cloud key only after an internal-track upload succeeds. Remove every temporary downloaded JSON file after
+Bitwarden is verified; never add the JSON directly to GitHub Actions secrets or the repository.
+
 
 ## Rotation and break-glass (App Service settings)
 

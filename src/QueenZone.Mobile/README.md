@@ -524,8 +524,9 @@ The one-time Play Console setup for `org.queenzone.mobile` is:
 - add internal testers and copy the opt-in link;
 - enable the Google Play Android Developer API in the existing
   `queenzone-mobile` Google Cloud project;
-- create a dedicated service account and grant it app-scoped permission to
-  release to testing tracks; and
+- use the dedicated service account
+  `queenzone-play-publisher@queenzone-mobile.iam.gserviceaccount.com`, which has
+  app-scoped permission to release only to testing tracks; and
 - store its JSON credential in Bitwarden as
   `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`, then add that secret's ID to the existing
   `BITWARDEN_MOBILE_BUILD_SECRETS` deploy-environment mapping.
