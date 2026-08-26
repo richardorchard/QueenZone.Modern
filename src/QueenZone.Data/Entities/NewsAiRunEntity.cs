@@ -14,6 +14,12 @@ public sealed class NewsAiRunEntity
 
     public string PromptVersion { get; set; } = string.Empty;
 
+    public int? GuidanceRevisionId { get; set; }
+
+    public int? GuidanceRevisionNumber { get; set; }
+
+    public string? GuidanceContentHash { get; set; }
+
     public NewsAiRunStatus Status { get; set; }
 
     public int? InputTokens { get; set; }

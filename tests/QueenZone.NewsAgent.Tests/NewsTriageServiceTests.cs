@@ -260,6 +260,7 @@ public sealed class NewsTriageServiceTests
             repository,
             executor,
             new NewsTriageDeterministicAnalyzer(repository),
+            EmptyNewsAgentGuidanceProvider.Instance,
             Options.Create(new NewsTriageOptions()),
             NullLogger<NewsTriageService>.Instance);
     }
