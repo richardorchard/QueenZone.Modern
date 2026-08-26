@@ -38,11 +38,17 @@ jest.mock('expo-web-browser', () => ({
 jest.mock('expo-notifications', () => ({
   AndroidImportance: { DEFAULT: 3 },
   IosAuthorizationStatus: { NOT_DETERMINED: 0, DENIED: 1, AUTHORIZED: 2, PROVISIONAL: 3, EPHEMERAL: 4 },
+  DEFAULT_ACTION_IDENTIFIER: 'expo.modules.notifications.actions.DEFAULT',
   getPermissionsAsync: jest.fn(async () => ({ granted: false, canAskAgain: true, status: 'undetermined' })),
   requestPermissionsAsync: jest.fn(async () => ({ granted: false, canAskAgain: true, status: 'undetermined' })),
   getDevicePushTokenAsync: jest.fn(async () => ({ type: 'ios', data: 'mock-device-token' })),
   setNotificationChannelAsync: jest.fn(async () => null),
+  setNotificationHandler: jest.fn(),
   addPushTokenListener: jest.fn(() => ({ remove: jest.fn() })),
+  addNotificationReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
+  addNotificationResponseReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
+  getLastNotificationResponseAsync: jest.fn(async () => null),
+  clearLastNotificationResponseAsync: jest.fn(async () => {}),
 }));
 
 jest.mock('expo-image', () => {

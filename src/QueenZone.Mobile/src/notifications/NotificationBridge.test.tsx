@@ -1,0 +1,159 @@
+import { act, screen, userEvent, waitFor } from '@testing-library/react-native';
+import * as Notifications from 'expo-notifications';
+import { testIds } from '../test/testIds';
+import { renderWithProviders } from '../test/render';
+import { NotificationBridge } from './NotificationBridge';
+
+const mockSession = {
+  isSignedIn: true,
+  isRestoring: false,
+  displayName: 'Contract Member',
+  accessToken: 'token',
+  profile: null,
+};
+
+const navigate = jest.fn();
+
+jest.mock('../session/SessionContext', () => ({
+  useSession: () => mockSession,
+}));
+
+jest.mock('@react-navigation/native', () => {
+  const actual = jest.requireActual('@react-navigation/native') as Record<string, unknown>;
+  return {
+    ...actual,
+    useNavigation: () => ({ navigate }),
+  };
+});
+
+const addNotificationResponseReceivedListener =
+  Notifications.addNotificationResponseReceivedListener as jest.MockedFunction<
+    typeof Notifications.addNotificationResponseReceivedListener
+  >;
+const addNotificationReceivedListener = Notifications.addNotificationReceivedListener as jest.MockedFunction<
+  typeof Notifications.addNotificationReceivedListener
+>;
+const getLastNotificationResponseAsync = Notifications.getLastNotificationResponseAsync as jest.MockedFunction<
+  typeof Notifications.getLastNotificationResponseAsync
+>;
+const setNotificationHandler = Notifications.setNotificationHandler as jest.MockedFunction<
+  typeof Notifications.setNotificationHandler
+>;
+
+const conversationId = '11111111-2222-3333-4444-555555555555';
+
+function notification(data: Record<string, unknown>, identifier: string, title = 'Title', body = 'Body') {
+  return {
+    date: 1,
+    request: {
+      identifier,
+      content: { title, body, data },
+    },
+  } as Notifications.Notification;
+}
+
+function response(data: Record<string, unknown>, identifier: string): Notifications.NotificationResponse {
+  return {
+    actionIdentifier: Notifications.DEFAULT_ACTION_IDENTIFIER,
+    notification: notification(data, identifier),
+  };
+}
+
+describe('NotificationBridge', () => {
+  let responseListener: ((value: Notifications.NotificationResponse) => void) | undefined;
+  let receivedListener: ((value: Notifications.Notification) => void) | undefined;
+
+  beforeEach(() => {
+    navigate.mockReset();
+    mockSession.isRestoring = false;
+    mockSession.isSignedIn = true;
+    responseListener = undefined;
+    receivedListener = undefined;
+    addNotificationResponseReceivedListener.mockImplementation((cb) => {
+      responseListener = cb;
+      return { remove: jest.fn() };
+    });
+    addNotificationReceivedListener.mockImplementation((cb) => {
+      receivedListener = cb;
+      return { remove: jest.fn() };
+    });
+    getLastNotificationResponseAsync.mockReset().mockResolvedValue(null);
+    setNotificationHandler.mockClear();
+  });
+
+  it('opens a forum thread from a cold-start tap', async () => {
+    getLastNotificationResponseAsync.mockResolvedValue(
+      response({ category: 'forumReply', topicId: '1002', postId: '9' }, 'cold-forum'),
+    );
+
+    renderWithProviders(<NotificationBridge />, { navigation: false });
+
+    await waitFor(() => expect(navigate).toHaveBeenCalledTimes(1));
+    expect(navigate).toHaveBeenCalledWith('Tabs', {
+      screen: 'ForumTab',
+      params: { screen: 'Thread', params: { id: 1002, postId: 9 }, initial: false },
+    });
+    expect(setNotificationHandler).toHaveBeenCalled();
+  });
+
+  it('opens a conversation from a background tap', async () => {
+    renderWithProviders(<NotificationBridge />, { navigation: false });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      responseListener?.(response({ category: 'privateMessage', conversationId }, 'warm-pm'));
+    });
+
+    expect(navigate).toHaveBeenCalledWith('Tabs', {
+      screen: 'HomeTab',
+      params: { screen: 'Conversation', params: { id: conversationId }, initial: false },
+    });
+  });
+
+  it('opens a news article from the in-app foreground banner', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<NotificationBridge />, { navigation: false });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      receivedListener?.(
+        notification({ category: 'news', articleId: '1003' }, 'fg-news', 'QueenZone modernisation begins', 'New article published.'),
+      );
+    });
+
+    expect(screen.getByText('News')).toBeOnTheScreen();
+    expect(screen.getByText('QueenZone modernisation begins')).toBeOnTheScreen();
+
+    await user.press(screen.getByTestId(testIds.notificationBanner));
+
+    expect(navigate).toHaveBeenCalledWith('Tabs', {
+      screen: 'NewsTab',
+      params: { screen: 'Story', params: { id: 1003 }, initial: false },
+    });
+  });
+
+  it('waits for session restore before applying a cold-start tap', async () => {
+    mockSession.isRestoring = true;
+    getLastNotificationResponseAsync.mockResolvedValue(response({ category: 'news', articleId: '88' }, 'cold-wait'));
+
+    const view = renderWithProviders(<NotificationBridge />, { navigation: false });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(navigate).not.toHaveBeenCalled();
+
+    mockSession.isRestoring = false;
+    view.rerender(<NotificationBridge />);
+
+    await waitFor(() => expect(navigate).toHaveBeenCalledTimes(1));
+    expect(navigate).toHaveBeenCalledWith('Tabs', {
+      screen: 'NewsTab',
+      params: { screen: 'Story', params: { id: 88 }, initial: false },
+    });
+  });
+});
