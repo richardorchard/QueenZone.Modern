@@ -1,61 +1,99 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ApiError } from '../api/client';
+import { PagedRequestCoordinator } from './usePagedContent';
 
-type SectionState<T> = {
-  data: T | null;
-  loading: boolean;
-  error: string | null;
+export type SectionSnapshot<T> =
+  | { status: 'pending'; data: T | null }
+  | { status: 'ready'; data: T }
+  | { status: 'failed'; data: T | null; message: string };
+
+export type SectionView<T> =
+  | { kind: 'skeleton' }
+  | { kind: 'error'; message: string }
+  | { kind: 'content'; data: T };
+
+export function sectionViewOf<T>(snapshot: SectionSnapshot<T>): SectionView<T> {
+  switch (snapshot.status) {
+    case 'pending':
+      return snapshot.data !== null ? { kind: 'content', data: snapshot.data } : { kind: 'skeleton' };
+    case 'ready':
+      return { kind: 'content', data: snapshot.data };
+    case 'failed':
+      return snapshot.data !== null
+        ? { kind: 'content', data: snapshot.data }
+        : { kind: 'error', message: snapshot.message };
+  }
+}
+
+function isAbortError(err: unknown): boolean {
+  return err instanceof Error && err.name === 'AbortError';
+}
+
+function errorMessage(err: unknown): string {
+  return err instanceof ApiError ? err.message : 'Something went wrong.';
+}
+
+export type HomeSection<T> = {
+  view: SectionView<T>;
   reload: () => void;
+  /**
+   * Always resolves: success, mapped failure, abort, or supersede.
+   */
+  refresh: () => Promise<void>;
 };
 
-/**
- * Loads a single non-paged `/api/v1` value (not a list — see `usePagedContent` for those).
- * Each call owns its own `AbortController`, so one section's failure or retry never blocks
- * another section's render — used by the home screen to paint independently per section
- * instead of gating first paint on one big `Promise.all`.
- */
 export function useHomeSection<T>(
   fetcher: (signal: AbortSignal) => Promise<T>,
   deps: unknown[] = [],
-): SectionState<T> {
-  const [data, setData] = useState<T | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [reloadToken, setReloadToken] = useState(0);
+): HomeSection<T> {
+  const [snapshot, setSnapshot] = useState<SectionSnapshot<T>>({ status: 'pending', data: null });
   const fetcherRef = useRef(fetcher);
   fetcherRef.current = fetcher;
+  const coordinatorRef = useRef<PagedRequestCoordinator | null>(null);
+  if (coordinatorRef.current === null) {
+    coordinatorRef.current = new PagedRequestCoordinator();
+  }
+  const coordinator = coordinatorRef.current;
+
+  const runSection = useCallback(
+    async (mode: 'reload' | 'refresh'): Promise<void> => {
+      const { generation, signal } = coordinator.begin();
+      if (mode === 'reload') {
+        setSnapshot((current) => ({ status: 'pending', data: current.data }));
+      }
+
+      try {
+        const result = await fetcherRef.current(signal);
+        if (!coordinator.isCurrent(generation)) {
+          return;
+        }
+        setSnapshot({ status: 'ready', data: result });
+      } catch (err: unknown) {
+        if (!coordinator.isCurrent(generation) || isAbortError(err)) {
+          return;
+        }
+        setSnapshot((current) => ({
+          status: 'failed',
+          data: current.data,
+          message: errorMessage(err),
+        }));
+      }
+    },
+    [coordinator],
+  );
 
   useEffect(() => {
-    const controller = new AbortController();
-    setLoading(true);
-    setError(null);
-
-    fetcherRef
-      .current(controller.signal)
-      .then((result) => {
-        if (controller.signal.aborted) {
-          return;
-        }
-        setData(result);
-        setLoading(false);
-      })
-      .catch((err: unknown) => {
-        if (controller.signal.aborted || (err instanceof Error && err.name === 'AbortError')) {
-          return;
-        }
-        const message = err instanceof ApiError ? err.message : 'Something went wrong.';
-        setError(message);
-        setLoading(false);
-      });
-
-    return () => controller.abort();
+    void runSection('reload');
+    return () => coordinator.invalidate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reloadToken, ...deps]);
+  }, [coordinator, ...deps]);
 
-  return {
-    data,
-    loading,
-    error,
-    reload: useCallback(() => setReloadToken((n) => n + 1), []),
-  };
+  const reload = useCallback(() => {
+    void runSection('reload');
+  }, [runSection]);
+
+  const refresh = useCallback(() => runSection('refresh'), [runSection]);
+  const view = useMemo(() => sectionViewOf(snapshot), [snapshot]);
+
+  return { view, reload, refresh };
 }
