@@ -8,6 +8,7 @@ public sealed class NewsDraftGenerationService(
     INewsDiscoveryRepository repository,
     NewsAiRunExecutor aiRunExecutor,
     INewsDiscoveryHttpClient httpClient,
+    INewsAgentGuidanceProvider guidanceProvider,
     IOptions<NewsDraftGenerationOptions> draftOptions,
     ILogger<NewsDraftGenerationService> logger)
 {
@@ -103,14 +104,22 @@ public sealed class NewsDraftGenerationService(
             ?? throw new InvalidOperationException($"Discovery source {candidate.SourceId} was not found.");
 
         var evidence = await GetDraftEvidenceAsync(candidate, source, options.DryRun, cancellationToken);
-        var messages = NewsDraftPrompt.BuildMessages(candidate, source, evidence);
+        var guidance = await guidanceProvider.GetPublishedAsync(
+            NewsAgentGuidanceType.Draft,
+            cancellationToken);
+        var messages = NewsDraftPrompt.BuildMessages(
+            candidate,
+            source,
+            evidence,
+            guidance.HasOverlay ? guidance.Content : null);
         var execution = await aiRunExecutor.ExecuteAsync(
             candidate.Id,
             NewsAiRunKind.DraftGeneration,
             NewsAiModelRole.Drafting,
             NewsDraftPrompt.Version,
             messages,
-            cancellationToken: cancellationToken);
+            cancellationToken: cancellationToken,
+            guidance: guidance);
 
         if (execution.Completion.DryRun || string.IsNullOrWhiteSpace(execution.Completion.Content))
         {

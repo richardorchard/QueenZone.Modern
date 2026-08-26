@@ -24,7 +24,8 @@ public sealed class NewsAiRunExecutor(
         string promptVersion,
         IReadOnlyList<NewsAiChatMessage> messages,
         DateTime? runAtUtc = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        NewsAgentGuidanceSnapshot? guidance = null)
     {
         if (!aiClient.IsEnabled)
         {
@@ -36,6 +37,7 @@ public sealed class NewsAiRunExecutor(
         await budgetGuard.EnsureWithinBudgetAsync(utcNow, cancellationToken);
 
         var modelId = options.Value.ResolveModel(modelRole);
+        var recordedGuidance = guidance is { HasRevision: true } ? guidance : null;
         var aiRunId = await repository.CreateAiRunAsync(
             new NewsAiRunCreateRequest(
                 candidateId,
@@ -43,7 +45,10 @@ public sealed class NewsAiRunExecutor(
                 ModelProvider,
                 modelId,
                 promptVersion,
-                utcNow),
+                utcNow,
+                recordedGuidance?.RevisionId,
+                recordedGuidance?.RevisionNumber,
+                recordedGuidance?.ContentHash),
             cancellationToken);
 
         NewsAiChatCompletion completion;

@@ -27,6 +27,8 @@ public static class NewsAgentServiceCollectionExtensions
         RegisterDraftOptions(services, configuration);
         RegisterDiscoveryHttpClient(services);
         RegisterOpenRouterAiClient(services);
+        services.AddMemoryCache();
+        services.AddScoped<INewsAgentGuidanceProvider, NewsAgentGuidanceProvider>();
         services.AddScoped<NewsAiBudgetGuard>();
         services.AddScoped<NewsAiRunExecutor>();
         services.AddScoped<NewsDraftGenerationService>();
