@@ -8,6 +8,9 @@ jest.mock('@sentry/react-native', () => ({
   init: jest.fn(),
   captureException: jest.fn(),
   wrap: (app: unknown) => app,
+  reactNavigationIntegration: jest.fn(() => ({
+    registerNavigationContainer: jest.fn(),
+  })),
 }));
 
 jest.mock('expo-font', () => ({
