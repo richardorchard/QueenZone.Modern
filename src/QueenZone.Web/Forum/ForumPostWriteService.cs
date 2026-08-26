@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using QueenZone.Data;
 using QueenZone.Storage;
@@ -105,6 +106,24 @@ public sealed class ForumPostWriteService(
 
     public const string SuspendedMessage = "This account cannot post.";
 
+    /// <summary>
+    /// Admin-panel identity recorded on auto-suspensions from <see cref="FlagIfLikelySpamAsync"/>,
+    /// so they're distinguishable from a human moderator's action in the audit trail.
+    /// </summary>
+    public const string AutoModeratorEmail = "automod@queenzone.internal";
+
+    /// <summary>
+    /// A post containing a link, made this soon after account creation, is treated as an
+    /// automation signature (observed spam accounts post within ~2s of registering) rather
+    /// than something a human could plausibly type. Both conditions must hold — link alone,
+    /// or speed alone, is too noisy and would catch genuine members.
+    /// </summary>
+    internal static readonly TimeSpan SpamCandidateWindow = TimeSpan.FromSeconds(60);
+
+    private static readonly Regex UrlPattern = new(
+        @"https?://|www\.",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
     public async Task<ForumWriteOutcome> CreateTopicAsync(
         Guid memberId,
         string? identityName,
@@ -180,6 +199,8 @@ public sealed class ForumPostWriteService(
                 attachmentValidation.AcceptedFiles,
                 cancellationToken);
             publicQueryCache.InvalidateForumStatsCache();
+            await FlagIfLikelySpamAsync(
+                memberId, author.AccountCreatedAt, createdAt, sanitizedBody, cancellationToken);
             return ForumWriteOutcome.Created(
                 created.TopicId,
                 created.StarterPostId,
@@ -273,6 +294,8 @@ public sealed class ForumPostWriteService(
                 attachmentValidation.AcceptedFiles,
                 cancellationToken);
             publicQueryCache.InvalidateForumStatsCache();
+            await FlagIfLikelySpamAsync(
+                memberId, author.AccountCreatedAt, createdAt, sanitizedBody, cancellationToken);
             var created = ForumWriteOutcome.Created(topicId, postId, sanitizedBody, title);
             try
             {
@@ -310,7 +333,7 @@ public sealed class ForumPostWriteService(
         }
     }
 
-    private async Task<(ForumWriteStatus Status, string DisplayName)> ResolveAuthorAsync(
+    private async Task<(ForumWriteStatus Status, string DisplayName, DateTime? AccountCreatedAt)> ResolveAuthorAsync(
         Guid memberId,
         string? identityName,
         CancellationToken cancellationToken)
@@ -318,16 +341,56 @@ public sealed class ForumPostWriteService(
         var account = await memberAccountService.FindByIdAsync(memberId, cancellationToken);
         if (account?.IsSuspended == true)
         {
-            return (ForumWriteStatus.MemberSuspended, string.Empty);
+            return (ForumWriteStatus.MemberSuspended, string.Empty, null);
         }
 
         if (!string.IsNullOrWhiteSpace(account?.DisplayName))
         {
-            return (ForumWriteStatus.Success, account.DisplayName);
+            return (ForumWriteStatus.Success, account.DisplayName, account.CreatedAt);
         }
 
         var fallback = string.IsNullOrWhiteSpace(identityName) ? "Member" : identityName;
-        return (ForumWriteStatus.Success, fallback);
+        return (ForumWriteStatus.Success, fallback, account?.CreatedAt);
+    }
+
+    /// <summary>
+    /// Auto-suspends and hides content matching the bulk-signup-bot signature: a link posted
+    /// within <see cref="SpamCandidateWindow"/> of account creation. Runs after a successful
+    /// write so a false positive still leaves the post recoverable via admin reinstatement,
+    /// the same recovery path as a manual suspension.
+    /// </summary>
+    private async Task FlagIfLikelySpamAsync(
+        Guid memberId,
+        DateTime? accountCreatedAt,
+        DateTimeOffset postedAt,
+        string sanitizedBody,
+        CancellationToken cancellationToken)
+    {
+        if (accountCreatedAt is null || postedAt.UtcDateTime - accountCreatedAt.Value > SpamCandidateWindow)
+        {
+            return;
+        }
+
+        if (!UrlPattern.IsMatch(sanitizedBody))
+        {
+            return;
+        }
+
+        var reason =
+            $"Auto-flagged: posted a link within {SpamCandidateWindow.TotalSeconds:0}s of registering "
+            + "(matches automated bulk-signup pattern).";
+        var suspended = await memberAccountService.SuspendAsync(
+            memberId, reason, AutoModeratorEmail, timeProvider.GetUtcNow().UtcDateTime, cancellationToken);
+        if (suspended is null)
+        {
+            return;
+        }
+
+        await forumWriteRepository.HidePostsByMemberAsync(memberId, cancellationToken);
+        logger.LogWarning(
+            "Auto-suspended member {MemberId}: link posted {ElapsedSeconds:0}s after registration.",
+            memberId,
+            (postedAt.UtcDateTime - accountCreatedAt.Value).TotalSeconds);
     }
 
     private async Task UploadAttachmentsAsync(
