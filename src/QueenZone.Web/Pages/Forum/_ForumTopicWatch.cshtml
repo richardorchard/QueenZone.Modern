@@ -1,0 +1,33 @@
+@model ForumTopicPageModel
+@{
+  var returnUrl = Context.Request.Path.Value ?? "/forum";
+}
+
+<div class="qz-forum-topic-watch">
+  @if (Model.CanWatch)
+  {
+    @if (Model.IsWatching)
+    {
+      <form method="post" asp-page-handler="Unwatch" class="qz-forum-topic-watch__form">
+        @Html.AntiForgeryToken()
+        <button class="qz-button qz-button--outline" type="submit">Unwatch</button>
+      </form>
+      <p class="qz-meta qz-forum-topic-watch__hint">You're watching this topic. You'll get a push when someone else replies, unless forum replies are muted in Settings.</p>
+    }
+    else
+    {
+      <form method="post" asp-page-handler="Watch" class="qz-forum-topic-watch__form">
+        @Html.AntiForgeryToken()
+        <button class="qz-button qz-button--outline" type="submit">Watch topic</button>
+      </form>
+      <p class="qz-meta qz-forum-topic-watch__hint">Watch to get a push when someone else replies. Posting here does not subscribe you.</p>
+    }
+  }
+  else
+  {
+    <p>
+      <a class="qz-button qz-button--outline" href="/account/login?returnUrl=@Uri.EscapeDataString(returnUrl)">Sign in to watch</a>
+    </p>
+    <p class="qz-meta qz-forum-topic-watch__hint">Watching a topic is how you opt in to reply pushes.</p>
+  }
+</div>

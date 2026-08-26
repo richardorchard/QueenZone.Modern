@@ -10,17 +10,20 @@ namespace QueenZone.Web.Pages.Forum;
 public abstract class ForumTopicPageModel : PageModel
 {
     private readonly IForumRepository forumRepository;
+    private readonly ITopicWatchRepository topicWatchRepository;
     private readonly ForumOptions forumOptions;
     private readonly AdminOptions adminOptions;
     private readonly TimeProvider timeProvider;
 
     protected ForumTopicPageModel(
         IForumRepository forumRepository,
+        ITopicWatchRepository topicWatchRepository,
         IOptions<ForumOptions> forumOptions,
         IOptions<AdminOptions> adminOptions,
         TimeProvider timeProvider)
     {
         this.forumRepository = forumRepository;
+        this.topicWatchRepository = topicWatchRepository;
         this.forumOptions = forumOptions.Value;
         this.adminOptions = adminOptions.Value;
         this.timeProvider = timeProvider;
@@ -37,6 +40,10 @@ public abstract class ForumTopicPageModel : PageModel
     public int TotalPosts { get; private set; }
 
     public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
+    public bool CanWatch { get; private set; }
+
+    public bool IsWatching { get; private set; }
 
     protected AuthenticateResult? MemberAuth { get; set; }
 
@@ -86,6 +93,9 @@ public abstract class ForumTopicPageModel : PageModel
         var isAdmin = MemberAuth?.Principal is not null
             && ForumPollEndpoints.IsAdmin(MemberAuth.Principal, adminOptions);
         var utcNow = timeProvider.GetUtcNow();
+        CanWatch = memberId is not null;
+        IsWatching = memberId is not null
+            && await topicWatchRepository.IsWatchingAsync(memberId.Value, topicId, cancellationToken);
 
         Header = header;
         Posts = topicPage.Posts
@@ -127,6 +137,55 @@ public abstract class ForumTopicPageModel : PageModel
         }
 
         return Page();
+    }
+
+    public async Task<IActionResult> OnPostWatchAsync(
+        int topicId,
+        string slug,
+        CancellationToken cancellationToken) =>
+        await ToggleWatchAsync(topicId, slug, watch: true, cancellationToken);
+
+    public async Task<IActionResult> OnPostUnwatchAsync(
+        int topicId,
+        string slug,
+        CancellationToken cancellationToken) =>
+        await ToggleWatchAsync(topicId, slug, watch: false, cancellationToken);
+
+    private async Task<IActionResult> ToggleWatchAsync(
+        int topicId,
+        string slug,
+        bool watch,
+        CancellationToken cancellationToken)
+    {
+        var memberId = await GetCurrentMemberIdAsync();
+        if (memberId is null)
+        {
+            return Challenge(MemberAuthenticationSchemes.MembersCookie);
+        }
+
+        var page = Math.Max(CurrentPage, 1);
+        var loadResult = await LoadTopicPageAsync(topicId, slug, page, cancellationToken);
+        if (loadResult is not PageResult)
+        {
+            return loadResult;
+        }
+
+        if (watch)
+        {
+            await topicWatchRepository.WatchAsync(
+                memberId.Value,
+                topicId,
+                timeProvider.GetUtcNow(),
+                cancellationToken);
+        }
+        else
+        {
+            await topicWatchRepository.UnwatchAsync(memberId.Value, topicId, cancellationToken);
+        }
+
+        return Redirect(Header is null
+            ? ForumRoutes.GetTopicCanonicalPath(topicId, slug, page)
+            : ForumRoutes.GetTopicCanonicalPath(Header, page));
     }
 
     protected async Task<Guid?> GetCurrentMemberIdAsync()

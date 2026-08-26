@@ -7,9 +7,15 @@ namespace QueenZone.Web.Pages.Forum;
 
 public sealed class TopicPageModel(
     IForumRepository forumRepository,
+    ITopicWatchRepository topicWatchRepository,
     IOptions<ForumOptions> forumOptions,
     IOptions<AdminOptions> adminOptions,
-    TimeProvider timeProvider) : ForumTopicPageModel(forumRepository, forumOptions, adminOptions, timeProvider)
+    TimeProvider timeProvider) : ForumTopicPageModel(
+        forumRepository,
+        topicWatchRepository,
+        forumOptions,
+        adminOptions,
+        timeProvider)
 {
     [BindProperty(SupportsGet = true)]
     public int PageNumber { get; set; }
