@@ -21,6 +21,7 @@ import {
   photoThumbMeta,
   photoViewerParams,
   resolvedPhotoSize,
+  schedulePhotoGallerySwipe,
 } from './photoGalleryMeta.ts';
 
 describe('photo gallery meta', () => {
@@ -121,5 +122,15 @@ describe('photo gallery meta', () => {
     assert.equal(photoSwipeIsTap(photoSwipeTapSlopPx, photoSwipeTapSlopPx), true);
     assert.equal(photoSwipeIsTap(photoSwipeTapSlopPx + 1, 0), false);
     assert.equal(photoSwipeIsTap(Number.NaN, 0), false);
+  });
+
+  it('defers gallery navigation until after the current turn', async () => {
+    let called = false;
+    schedulePhotoGallerySwipe(() => {
+      called = true;
+    });
+    assert.equal(called, false);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.equal(called, true);
   });
 });

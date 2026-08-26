@@ -17,6 +17,7 @@ import {
   photoSizeFromPath,
   photoViewerParams,
   resolvedPhotoSize,
+  schedulePhotoGallerySwipe,
 } from './photoGalleryMeta';
 import { ZoomableArchiveImage } from './ZoomableArchiveImage';
 
@@ -32,6 +33,7 @@ export function PhotoViewerScreen({ navigation, route }: Props) {
   const [loading, setLoading] = useState(true);
   const [reloadToken, setReloadToken] = useState(0);
   const photoRef = useRef<PhotoDetail | null>(null);
+  const swipeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   photoRef.current = photo;
 
   useEffect(() => {
@@ -57,6 +59,14 @@ export function PhotoViewerScreen({ navigation, route }: Props) {
     return () => controller.abort();
   }, [slug, picId, size, reloadToken, navigation]);
 
+  useEffect(() => {
+    return () => {
+      if (swipeTimerRef.current != null) {
+        clearTimeout(swipeTimerRef.current);
+      }
+    };
+  }, []);
+
   const retry = useCallback(() => setReloadToken((n) => n + 1), []);
 
   const goTo = useCallback(
@@ -77,13 +87,16 @@ export function PhotoViewerScreen({ navigation, route }: Props) {
 
   const handleGallerySwipe = useCallback(
     (direction: 'previous' | 'next') => {
-      if (direction === 'previous' && previousPicId != null) {
-        goTo(previousPicId);
+      const targetPicId = direction === 'previous' ? previousPicId : nextPicId;
+      if (targetPicId == null) {
         return;
       }
-      if (direction === 'next' && nextPicId != null) {
-        goTo(nextPicId);
+
+      if (swipeTimerRef.current != null) {
+        clearTimeout(swipeTimerRef.current);
       }
+
+      swipeTimerRef.current = schedulePhotoGallerySwipe(() => goTo(targetPicId));
     },
     [goTo, nextPicId, previousPicId],
   );

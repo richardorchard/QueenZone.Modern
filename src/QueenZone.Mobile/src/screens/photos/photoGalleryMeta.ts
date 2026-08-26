@@ -195,3 +195,12 @@ export function photoSwipeIsTap(
 
   return Math.abs(dx) <= slopPx && Math.abs(dy) <= slopPx;
 }
+
+/**
+ * Run gallery navigation after the native pan callback returns.
+ * Calling `setParams` synchronously from a gesture `onEnd` tears down the
+ * handler while iOS is still finishing the swipe, which crashes the app.
+ */
+export function schedulePhotoGallerySwipe(swipe: () => void): ReturnType<typeof setTimeout> {
+  return setTimeout(swipe, 0);
+}
