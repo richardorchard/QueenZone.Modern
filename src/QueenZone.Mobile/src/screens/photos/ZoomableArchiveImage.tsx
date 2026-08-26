@@ -1,18 +1,19 @@
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, type LayoutChangeEvent, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
+  cancelAnimation,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated';
 import {
+  photoSwipeCapturePx,
   photoSwipeDirection,
   photoSwipeEdgeGuardPx,
-  photoSwipeIsTap,
+  photoSwipeMaxOffAxisPx,
   photoSwipeShouldStart,
-  photoSwipeCapturePx,
   type PhotoSwipeDirection,
 } from './photoGalleryMeta';
 import {
@@ -20,7 +21,6 @@ import {
   clampPhotoZoomScale,
   focalPhotoZoomTranslation,
   isPhotoZoomed,
-  photoPanShouldActivate,
   photoZoomAccessibilityMessage,
   photoZoomDoubleTapScale,
   photoZoomMinScale,
@@ -65,11 +65,18 @@ export function ZoomableArchiveImage({
   const pinchStartScale = useSharedValue(photoZoomMinScale);
   const pinchStartTranslateX = useSharedValue(0);
   const pinchStartTranslateY = useSharedValue(0);
-  const gestureStartPageX = useSharedValue(0);
-  const gestureStartX = useSharedValue(0);
-  const gestureStartY = useSharedValue(0);
   const imageWidthValue = useSharedValue(imageWidth);
   const imageHeightValue = useSharedValue(imageHeight);
+  const [zoomed, setZoomed] = useState(false);
+
+  const canSwipePreviousRef = useRef(canSwipePrevious);
+  const canSwipeNextRef = useRef(canSwipeNext);
+  const onGallerySwipeRef = useRef(onGallerySwipe);
+  const onToggleChromeRef = useRef(onToggleChrome);
+  canSwipePreviousRef.current = canSwipePrevious;
+  canSwipeNextRef.current = canSwipeNext;
+  onGallerySwipeRef.current = onGallerySwipe;
+  onToggleChromeRef.current = onToggleChrome;
 
   useEffect(() => {
     imageWidthValue.value = imageWidth;
@@ -77,39 +84,41 @@ export function ZoomableArchiveImage({
   }, [imageHeight, imageHeightValue, imageWidth, imageWidthValue]);
 
   useEffect(() => {
+    cancelAnimation(scale);
+    cancelAnimation(translateX);
+    cancelAnimation(translateY);
     scale.value = photoZoomMinScale;
     savedScale.value = photoZoomMinScale;
     translateX.value = 0;
     translateY.value = 0;
     savedTranslateX.value = 0;
     savedTranslateY.value = 0;
+    setZoomed(false);
   }, [resetKey]);
 
-  const announceZoom = useCallback((nextScale: number) => {
+  const announceAndTrackZoom = useCallback((nextScale: number) => {
+    setZoomed(isPhotoZoomed(nextScale));
     AccessibilityInfo.announceForAccessibility(photoZoomAccessibilityMessage(nextScale));
   }, []);
 
-  const handlePanEnd = useCallback(
-    (dx: number, dy: number, startPageX: number) => {
-      if (!photoSwipeShouldStart(startPageX)) {
-        return;
-      }
+  const handleGalleryPanEnd = useCallback((dx: number, dy: number, startPageX: number) => {
+    if (!photoSwipeShouldStart(startPageX)) {
+      return;
+    }
 
-      const direction = photoSwipeDirection(dx, dy);
-      if (direction === 'previous' && canSwipePrevious) {
-        onGallerySwipe('previous');
-        return;
-      }
-      if (direction === 'next' && canSwipeNext) {
-        onGallerySwipe('next');
-        return;
-      }
-      if (photoSwipeIsTap(dx, dy)) {
-        onToggleChrome();
-      }
-    },
-    [canSwipeNext, canSwipePrevious, onGallerySwipe, onToggleChrome],
-  );
+    const direction = photoSwipeDirection(dx, dy);
+    if (direction === 'previous' && canSwipePreviousRef.current) {
+      onGallerySwipeRef.current('previous');
+      return;
+    }
+    if (direction === 'next' && canSwipeNextRef.current) {
+      onGallerySwipeRef.current('next');
+    }
+  }, []);
+
+  const toggleChrome = useCallback(() => {
+    onToggleChromeRef.current();
+  }, []);
 
   const onLayout = useCallback(
     (event: LayoutChangeEvent) => {
@@ -129,19 +138,25 @@ export function ZoomableArchiveImage({
       savedTranslateX.value = 0;
       savedTranslateY.value = 0;
       if (announce) {
-        runOnJS(announceZoom)(photoZoomMinScale);
+        runOnJS(announceAndTrackZoom)(photoZoomMinScale);
       }
     };
 
-    const containerSize = () => ({
-      width: containerWidth.value,
-      height: containerHeight.value,
-    });
+    const containerSize = () => {
+      'worklet';
+      return {
+        width: containerWidth.value,
+        height: containerHeight.value,
+      };
+    };
 
-    const imageSize = () => ({
-      width: imageWidthValue.value,
-      height: imageHeightValue.value,
-    });
+    const imageSize = () => {
+      'worklet';
+      return {
+        width: imageWidthValue.value,
+        height: imageHeightValue.value,
+      };
+    };
 
     const applyPan = (nextX: number, nextY: number, currentScale: number) => {
       'worklet';
@@ -185,65 +200,42 @@ export function ZoomableArchiveImage({
         savedScale.value = scale.value;
         savedTranslateX.value = translateX.value;
         savedTranslateY.value = translateY.value;
-        runOnJS(announceZoom)(scale.value);
+        runOnJS(announceAndTrackZoom)(scale.value);
       });
 
-    const panGesture = Gesture.Pan()
-      .manualActivation(true)
-      .onTouchesDown((event) => {
-        const touch = event.allTouches[0];
-        if (!touch) {
-          return;
-        }
-
-        gestureStartPageX.value = touch.absoluteX;
-        gestureStartX.value = touch.x;
-        gestureStartY.value = touch.y;
-      })
-      .onTouchesMove((event, state) => {
-        const touch = event.allTouches[0];
-        if (!touch) {
-          return;
-        }
-
-        const dx = touch.x - gestureStartX.value;
-        const dy = touch.y - gestureStartY.value;
-        if (
-          photoPanShouldActivate(
-            dx,
-            dy,
-            gestureStartPageX.value,
-            isPhotoZoomed(scale.value),
-            photoSwipeCapturePx,
-            photoSwipeEdgeGuardPx,
-          )
-        ) {
-          state.activate();
+    // Gallery swipe stays on the JS thread: Reanimated 4 worklets crash on iOS
+    // when a Pan reads `event.allTouches` or calls `state.activate()`.
+    const galleryPan = Gesture.Pan()
+      .runOnJS(true)
+      .maxPointers(1)
+      .activeOffsetX([-photoSwipeCapturePx, photoSwipeCapturePx])
+      .failOffsetY([-photoSwipeMaxOffAxisPx, photoSwipeMaxOffAxisPx])
+      .onTouchesDown((event, state) => {
+        const touch = event.allTouches?.[0];
+        if (touch && touch.absoluteX < photoSwipeEdgeGuardPx) {
+          state.fail();
         }
       })
+      .onEnd((event) => {
+        handleGalleryPanEnd(
+          event.translationX,
+          event.translationY,
+          event.absoluteX - event.translationX,
+        );
+      });
+
+    const zoomPan = Gesture.Pan()
+      .maxPointers(1)
       .onUpdate((event) => {
-        if (!isPhotoZoomed(scale.value)) {
-          return;
-        }
-
         applyPan(
           savedTranslateX.value + event.translationX,
           savedTranslateY.value + event.translationY,
           scale.value,
         );
       })
-      .onEnd((event) => {
-        if (isPhotoZoomed(scale.value)) {
-          savedTranslateX.value = translateX.value;
-          savedTranslateY.value = translateY.value;
-          return;
-        }
-
-        runOnJS(handlePanEnd)(
-          event.translationX,
-          event.translationY,
-          event.absoluteX - event.translationX,
-        );
+      .onEnd(() => {
+        savedTranslateX.value = translateX.value;
+        savedTranslateY.value = translateY.value;
       });
 
     const doubleTapGesture = Gesture.Tap()
@@ -278,15 +270,26 @@ export function ZoomableArchiveImage({
         translateY.value = withSpring(clamped.y, photoZoomSpringConfig);
         savedTranslateX.value = clamped.x;
         savedTranslateY.value = clamped.y;
-        runOnJS(announceZoom)(newScale);
+        runOnJS(announceAndTrackZoom)(newScale);
       });
 
-    return Gesture.Simultaneous(pinchGesture, Gesture.Exclusive(doubleTapGesture, panGesture));
-  }, [announceZoom, handlePanEnd]);
+    const singleTapGesture = Gesture.Tap()
+      .runOnJS(true)
+      .onEnd(() => {
+        toggleChrome();
+      });
+
+    return Gesture.Simultaneous(
+      pinchGesture,
+      Gesture.Exclusive(
+        doubleTapGesture,
+        singleTapGesture,
+        zoomed ? zoomPan : galleryPan,
+      ),
+    );
+  }, [announceAndTrackZoom, handleGalleryPanEnd, toggleChrome, zoomed]);
 
   const animatedStyle = useAnimatedStyle(() => ({
-    flex: 1,
-    width: '100%',
     transform: [
       { translateX: translateX.value },
       { translateY: translateY.value },
@@ -302,7 +305,7 @@ export function ZoomableArchiveImage({
         onLayout={onLayout}
         accessibilityHint="Pinch or double tap to zoom. Swipe left or right to change photograph."
       >
-        <Animated.View style={animatedStyle}>
+        <Animated.View style={[styles.imageWrap, animatedStyle]}>
           <ArchiveImage
             source={source}
             label={label}
@@ -322,6 +325,10 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
     overflow: 'hidden',
+  },
+  imageWrap: {
+    flex: 1,
+    width: '100%',
   },
   image: {
     flex: 1,

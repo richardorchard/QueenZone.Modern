@@ -4,7 +4,9 @@ const { View } = require('react-native');
 const recorded = {
   pinch: null,
   pan: null,
+  zoomPan: null,
   tap: null,
+  singleTap: null,
 };
 
 function chain(kind) {
@@ -39,6 +41,18 @@ function chain(kind) {
     maxDuration() {
       return gesture;
     },
+    maxPointers() {
+      return gesture;
+    },
+    activeOffsetX() {
+      return gesture;
+    },
+    failOffsetY() {
+      return gesture;
+    },
+    runOnJS() {
+      return gesture;
+    },
     handlers,
   };
   recorded[kind] = gesture;
@@ -51,9 +65,15 @@ module.exports = {
   GestureHandlerRootView: passthrough,
   GestureDetector: passthrough,
   Gesture: {
-    Pinch: () => chain('pinch'),
-    Pan: () => chain('pan'),
-    Tap: () => chain('tap'),
+    Pinch: () => {
+      recorded.pan = null;
+      recorded.zoomPan = null;
+      recorded.tap = null;
+      recorded.singleTap = null;
+      return chain('pinch');
+    },
+    Pan: () => chain(recorded.pan == null ? 'pan' : 'zoomPan'),
+    Tap: () => chain(recorded.tap == null ? 'tap' : 'singleTap'),
     Simultaneous: (...gestures) => gestures[0],
     Exclusive: (...gestures) => gestures[0],
   },

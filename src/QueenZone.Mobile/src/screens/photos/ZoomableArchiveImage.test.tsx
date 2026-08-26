@@ -9,12 +9,17 @@ type RecordedGesture = {
     onBegin?: () => void;
     onUpdate?: (event: Record<string, unknown>) => void;
     onEnd?: (event: Record<string, unknown>) => void;
-    onTouchesDown?: (event: Record<string, unknown>) => void;
-    onTouchesMove?: (event: Record<string, unknown>, state: { activate: () => void }) => void;
+    onTouchesDown?: (event: Record<string, unknown>, state: { fail: () => void }) => void;
   };
 };
 
-function recordedGestures(): { pinch: RecordedGesture; pan: RecordedGesture; tap: RecordedGesture } {
+function recordedGestures(): {
+  pinch: RecordedGesture;
+  pan: RecordedGesture;
+  zoomPan: RecordedGesture;
+  tap: RecordedGesture;
+  singleTap: RecordedGesture;
+} {
   return jest.requireMock('react-native-gesture-handler').getRecordedGestures();
 }
 
@@ -52,23 +57,21 @@ function pinchTo(scale: number, focalX = 200, focalY = 400) {
   });
 }
 
-function panTouches(dx: number, dy: number, startPageX = 80) {
+function galleryPanEnd(dx: number, dy: number, startPageX = 80) {
   const pan = recordedGestures().pan;
-  const activate = jest.fn();
+  const fail = jest.fn();
   act(() => {
-    pan.handlers.onTouchesDown?.({ allTouches: [{ absoluteX: startPageX, x: 40, y: 40 }] });
-    pan.handlers.onTouchesMove?.(
-      { allTouches: [{ absoluteX: startPageX + dx, x: 40 + dx, y: 40 + dy }] },
-      { activate },
+    pan.handlers.onTouchesDown?.(
+      { allTouches: [{ absoluteX: startPageX, x: 40, y: 40 }] },
+      { fail },
     );
-    pan.handlers.onUpdate?.({ translationX: dx, translationY: dy });
     pan.handlers.onEnd?.({
       translationX: dx,
       translationY: dy,
       absoluteX: startPageX + dx,
     });
   });
-  return activate;
+  return fail;
 }
 
 describe('ZoomableArchiveImage', () => {
@@ -89,22 +92,24 @@ describe('ZoomableArchiveImage', () => {
     expect(AccessibilityInfo.announceForAccessibility).toHaveBeenCalledWith('Fit to screen');
   });
 
-  it('activates pan while zoomed and ignores gallery swipe until reset', () => {
+  it('pans while zoomed and ignores gallery swipe until reset', () => {
     const { onGallerySwipe, onToggleChrome } = renderZoom();
     pinchTo(2);
-    const activate = panTouches(80, 10);
-    expect(activate).toHaveBeenCalled();
+    act(() => {
+      recordedGestures().zoomPan.handlers.onUpdate?.({ translationX: 80, translationY: 10 });
+      recordedGestures().zoomPan.handlers.onEnd?.({ translationX: 80, translationY: 10 });
+    });
     expect(onGallerySwipe).not.toHaveBeenCalled();
     expect(onToggleChrome).not.toHaveBeenCalled();
   });
 
-  it('swipes previous and next at 1× and treats a short press as a chrome tap', () => {
+  it('swipes previous and next at 1× and treats a tap as a chrome toggle', () => {
     const { onGallerySwipe, onToggleChrome } = renderZoom();
-    panTouches(80, 0);
+    galleryPanEnd(80, 0);
     expect(onGallerySwipe).toHaveBeenCalledWith('previous');
-    panTouches(-80, 0);
+    galleryPanEnd(-80, 0);
     expect(onGallerySwipe).toHaveBeenCalledWith('next');
-    panTouches(2, 2);
+    act(() => recordedGestures().singleTap.handlers.onEnd?.({}));
     expect(onToggleChrome).toHaveBeenCalled();
   });
 
@@ -113,8 +118,9 @@ describe('ZoomableArchiveImage', () => {
       canSwipePrevious: false,
       canSwipeNext: false,
     });
-    panTouches(80, 0, 10);
-    panTouches(-80, 0);
+    const fail = galleryPanEnd(80, 0, 10);
+    expect(fail).toHaveBeenCalled();
+    galleryPanEnd(-80, 0);
     expect(onGallerySwipe).not.toHaveBeenCalled();
     expect(onToggleChrome).not.toHaveBeenCalled();
   });
@@ -122,12 +128,12 @@ describe('ZoomableArchiveImage', () => {
   it('ignores empty touch lists', () => {
     renderZoom();
     const pan = recordedGestures().pan;
-    const activate = jest.fn();
+    const fail = jest.fn();
     act(() => {
-      pan.handlers.onTouchesDown?.({ allTouches: [] });
-      pan.handlers.onTouchesMove?.({ allTouches: [] }, { activate });
+      pan.handlers.onTouchesDown?.({ allTouches: [] }, { fail });
+      pan.handlers.onTouchesDown?.({}, { fail });
     });
-    expect(activate).not.toHaveBeenCalled();
+    expect(fail).not.toHaveBeenCalled();
   });
 
   it('double-taps to zoom in and back to fit', () => {
@@ -159,7 +165,7 @@ describe('ZoomableArchiveImage', () => {
     fireEvent(screen.getByHintText(/Pinch or double tap to zoom/), 'layout', {
       nativeEvent: { layout: { x: 0, y: 0, width: 400, height: 800 } },
     });
-    panTouches(-80, 0);
+    galleryPanEnd(-80, 0);
     expect(onGallerySwipe).toHaveBeenCalledWith('next');
   });
 });

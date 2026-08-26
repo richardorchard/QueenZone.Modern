@@ -16,6 +16,8 @@ function runOnJS(fn) {
   return fn;
 }
 
+function cancelAnimation() {}
+
 const AnimatedView = View;
 
 module.exports = {
@@ -26,4 +28,5 @@ module.exports = {
   useAnimatedStyle,
   withSpring,
   runOnJS,
+  cancelAnimation,
 };
