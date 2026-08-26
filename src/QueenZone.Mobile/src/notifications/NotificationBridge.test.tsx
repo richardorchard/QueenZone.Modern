@@ -12,7 +12,7 @@ const mockSession = {
   profile: null,
 };
 
-const navigate = jest.fn();
+const mockNavigate = jest.fn();
 
 jest.mock('../session/SessionContext', () => ({
   useSession: () => mockSession,
@@ -22,7 +22,7 @@ jest.mock('@react-navigation/native', () => {
   const actual = jest.requireActual('@react-navigation/native') as Record<string, unknown>;
   return {
     ...actual,
-    useNavigation: () => ({ navigate }),
+    useNavigation: () => ({ navigate: mockNavigate }),
   };
 });
 
@@ -64,7 +64,7 @@ describe('NotificationBridge', () => {
   let receivedListener: ((value: Notifications.Notification) => void) | undefined;
 
   beforeEach(() => {
-    navigate.mockReset();
+    mockNavigate.mockReset();
     mockSession.isRestoring = false;
     mockSession.isSignedIn = true;
     responseListener = undefined;
@@ -88,8 +88,8 @@ describe('NotificationBridge', () => {
 
     renderWithProviders(<NotificationBridge />, { navigation: false });
 
-    await waitFor(() => expect(navigate).toHaveBeenCalledTimes(1));
-    expect(navigate).toHaveBeenCalledWith('Tabs', {
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledTimes(1));
+    expect(mockNavigate).toHaveBeenCalledWith('Tabs', {
       screen: 'ForumTab',
       params: { screen: 'Thread', params: { id: 1002, postId: 9 }, initial: false },
     });
@@ -106,7 +106,7 @@ describe('NotificationBridge', () => {
       responseListener?.(response({ category: 'privateMessage', conversationId }, 'warm-pm'));
     });
 
-    expect(navigate).toHaveBeenCalledWith('Tabs', {
+    expect(mockNavigate).toHaveBeenCalledWith('Tabs', {
       screen: 'HomeTab',
       params: { screen: 'Conversation', params: { id: conversationId }, initial: false },
     });
@@ -130,7 +130,7 @@ describe('NotificationBridge', () => {
 
     await user.press(screen.getByTestId(testIds.notificationBanner));
 
-    expect(navigate).toHaveBeenCalledWith('Tabs', {
+    expect(mockNavigate).toHaveBeenCalledWith('Tabs', {
       screen: 'NewsTab',
       params: { screen: 'Story', params: { id: 1003 }, initial: false },
     });
@@ -145,13 +145,38 @@ describe('NotificationBridge', () => {
       await Promise.resolve();
       await Promise.resolve();
     });
-    expect(navigate).not.toHaveBeenCalled();
+    expect(mockNavigate).not.toHaveBeenCalled();
 
     mockSession.isRestoring = false;
     view.rerender(<NotificationBridge />);
 
-    await waitFor(() => expect(navigate).toHaveBeenCalledTimes(1));
-    expect(navigate).toHaveBeenCalledWith('Tabs', {
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledTimes(1));
+    expect(mockNavigate).toHaveBeenCalledWith('Tabs', {
+      screen: 'NewsTab',
+      params: { screen: 'Story', params: { id: 88 }, initial: false },
+    });
+  });
+
+  it('holds a foreground-banner tap until session restore finishes', async () => {
+    mockSession.isRestoring = true;
+    const user = userEvent.setup();
+    const view = renderWithProviders(<NotificationBridge />, { navigation: false });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      receivedListener?.(notification({ category: 'news', articleId: '88' }, 'fg-wait', 'Held article', 'New article published.'));
+    });
+
+    await user.press(screen.getByTestId(testIds.notificationBanner));
+    expect(mockNavigate).not.toHaveBeenCalled();
+
+    mockSession.isRestoring = false;
+    view.rerender(<NotificationBridge />);
+
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledTimes(1));
+    expect(mockNavigate).toHaveBeenCalledWith('Tabs', {
       screen: 'NewsTab',
       params: { screen: 'Story', params: { id: 88 }, initial: false },
     });

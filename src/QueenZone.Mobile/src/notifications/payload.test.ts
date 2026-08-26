@@ -51,11 +51,14 @@ describe('parseNotificationData', () => {
 
   it('rejects missing or unknown contract fields', () => {
     assert.equal(parseNotificationData(null), null);
+    assert.equal(parseNotificationData(''), null);
+    assert.equal(parseNotificationData('   '), null);
     assert.equal(parseNotificationData({}), null);
     assert.equal(parseNotificationData({ category: 'digest' }), null);
     assert.equal(parseNotificationData({ category: 'forumReply' }), null);
     assert.equal(parseNotificationData({ category: 'forumReply', topicId: 0 }), null);
     assert.equal(parseNotificationData({ category: 'privateMessage', conversationId: 'not-a-guid' }), null);
+    assert.equal(parseNotificationData({ category: 'privateMessage', conversationId: 12 }), null);
     assert.equal(parseNotificationData({ category: 'news', articleId: '-1' }), null);
     assert.equal(parseNotificationData('not-json'), null);
   });

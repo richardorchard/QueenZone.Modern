@@ -85,6 +85,7 @@ describe('noticeFromNotification', () => {
       body: 'New article published.',
       destination: { category: 'news', articleId: 88 },
     });
+    expect(noticeFromNotification(notification({ category: 'news' }))).toBeNull();
   });
 });
 
