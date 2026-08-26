@@ -6,6 +6,7 @@ import { Platform, View } from 'react-native';
 import { SignInScreen } from '../screens/account/SignInScreen';
 import { testIds } from '../test/testIds';
 import { useTheme, type ColorScheme } from '../theme';
+import { NotificationBridge } from '../notifications/NotificationBridge';
 import { HeaderCloseButton } from './headerButtons';
 import { ArchiveStack, ForumStack, HomeStack, NewsStack, PhotosStack, stackScreenOptions } from './stacks';
 import type { RootStackParamList, RootTabParamList } from './types';
@@ -180,21 +181,24 @@ function MainTabs() {
 
 export function RootNavigator() {
   return (
-    <RootStack.Navigator screenOptions={{ headerShown: false }}>
-      <RootStack.Screen name="Tabs" component={MainTabs} />
-      <RootStack.Screen
-        name="SignIn"
-        component={SignInScreen}
-        options={({ navigation }) => ({
-          ...stackScreenOptions,
-          headerShown: true,
-          title: 'Sign in',
-          presentation: 'fullScreenModal',
-          headerLeft: () => (
-            <HeaderCloseButton testID={testIds.signInClose} onPress={() => navigation.goBack()} />
-          ),
-        })}
-      />
-    </RootStack.Navigator>
+    <View style={{ flex: 1 }}>
+      <RootStack.Navigator screenOptions={{ headerShown: false }}>
+        <RootStack.Screen name="Tabs" component={MainTabs} />
+        <RootStack.Screen
+          name="SignIn"
+          component={SignInScreen}
+          options={({ navigation }) => ({
+            ...stackScreenOptions,
+            headerShown: true,
+            title: 'Sign in',
+            presentation: 'fullScreenModal',
+            headerLeft: () => (
+              <HeaderCloseButton testID={testIds.signInClose} onPress={() => navigation.goBack()} />
+            ),
+          })}
+        />
+      </RootStack.Navigator>
+      <NotificationBridge />
+    </View>
   );
 }

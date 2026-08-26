@@ -22,12 +22,15 @@ type RecordedGesture = {
     onBegin?: () => void;
     onUpdate?: (event: Record<string, unknown>) => void;
     onEnd?: (event: Record<string, unknown>) => void;
-    onTouchesDown?: (event: Record<string, unknown>) => void;
-    onTouchesMove?: (event: Record<string, unknown>, state: { activate: () => void }) => void;
+    onTouchesDown?: (event: Record<string, unknown>, state: { fail: () => void }) => void;
   };
 };
 
-function recordedGestures(): { pinch: RecordedGesture; pan: RecordedGesture; tap: RecordedGesture } {
+function recordedGestures(): {
+  pinch: RecordedGesture;
+  pan: RecordedGesture;
+  singleTap: RecordedGesture;
+} {
   return jest.requireMock('react-native-gesture-handler').getRecordedGestures();
 }
 
@@ -94,6 +97,12 @@ function panEnd(dx: number, dy: number, startPageX = 80) {
       translationY: dy,
       absoluteX: startPageX + dx,
     });
+  });
+}
+
+async function flushGallerySwipe() {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
   });
 }
 
@@ -220,12 +229,15 @@ describe('PhotoViewerScreen', () => {
   it('swipes to neighbors and toggles chrome from a tap', async () => {
     const { navigation } = await loadPhoto();
     panEnd(80, 0);
+    expect(navigation.setParams).not.toHaveBeenCalled();
+    await flushGallerySwipe();
     expect(navigation.setParams).toHaveBeenCalledWith({ slug: 'brian-may', picId: 100 });
     panEnd(-80, 0);
+    await flushGallerySwipe();
     expect(navigation.setParams).toHaveBeenCalledWith({ slug: 'brian-may', picId: 102 });
-    panEnd(0, 0);
+    act(() => recordedGestures().singleTap.handlers.onEnd?.({}));
     expect(screen.queryByText('Live Aid')).toBeNull();
-    panEnd(0, 0);
+    act(() => recordedGestures().singleTap.handlers.onEnd?.({}));
     expect(screen.getByText('Live Aid')).toBeOnTheScreen();
   });
 
@@ -233,6 +245,15 @@ describe('PhotoViewerScreen', () => {
     const { navigation } = await loadPhoto(photoDetail({ previous: null, next: null }));
     panEnd(80, 0, 10);
     panEnd(-80, 0);
+    await flushGallerySwipe();
+    expect(navigation.setParams).not.toHaveBeenCalled();
+  });
+
+  it('does not navigate after the viewer unmounts mid-swipe', async () => {
+    const { navigation, unmount } = await loadPhoto();
+    panEnd(-80, 0);
+    unmount();
+    await flushGallerySwipe();
     expect(navigation.setParams).not.toHaveBeenCalled();
   });
 

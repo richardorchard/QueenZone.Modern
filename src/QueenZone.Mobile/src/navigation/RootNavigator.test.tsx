@@ -9,6 +9,10 @@ jest.mock('../session/SessionContext', () => ({
   useSession: () => mockSession,
 }));
 
+jest.mock('../notifications/NotificationBridge', () => ({
+  NotificationBridge: () => null,
+}));
+
 jest.mock('./stacks', () => {
   const React = require('react');
   const { Text } = require('react-native');
