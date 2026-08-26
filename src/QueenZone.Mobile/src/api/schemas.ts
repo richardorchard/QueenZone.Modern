@@ -153,6 +153,10 @@ export const forumTopicDetailSchema = z.object({
   isLocked: z.boolean(),
 });
 
+export const forumTopicWatchSchema = z.object({
+  watching: z.boolean(),
+});
+
 export const forumAttachmentSchema = z.object({
   fileName: z.string().min(1),
   url: z.string().min(1),

@@ -12,6 +12,8 @@ Amended 2026-07-09: completed migration of remaining public-read repositories of
 
 Amended 2026-07-27: register `IDbContextFactory<QueenZoneDbContext>` alongside scoped `QueenZoneDbContext` for SQL-backed mode so parallel admin/reporting reads can use independent contexts (issue #335).
 
+Amended 2026-08-26: add modern `NewsAgentGuidanceRevisions` (issue #929) for admin-published NewsAgent editorial overlays. No seed; empty or missing published content is the compiled default.
+
 ## Context
 
 ADR 0003 chose Dapper for initial legacy database access. Issue #5 added admin write workflows for `NEWS_T` and `NewsAuditLog` using hand-written SQL.
@@ -53,8 +55,10 @@ Use **EF Core as the single data-access library** in `QueenZone.Data`, while kee
 | Member accounts | `IMemberAccountRepository` | `EfMemberAccountRepository` | EF Core | Modern tables |
 | Private messaging | `IPrivateMessageRepository` | `EfPrivateMessageRepository` | EF Core | Modern `PrivateConversations` / `PrivateMessages` tables (MVP 1:1) |
 | Member follows | `IMemberFollowRepository` | `EfMemberFollowRepository` | EF Core | Modern `MemberFollows` table; used by private-message privacy |
+| Forum topic watches | `ITopicWatchRepository` | `EfTopicWatchRepository` | EF Core | Modern `MemberTopicWatches` table; deliberate Watch opt-in for forum reply pushes (#735) |
 | Help requests | `IHelpRequestRepository` | `EfHelpRequestRepository` | EF Core | Modern `HelpRequests` table; public `/contact` form + admin inbox |
 | News discovery / agent drafts | `INewsDiscoveryRepository` | `EfNewsDiscoveryRepository` | EF Core | Modern workflow tables |
+| News agent editorial guidance | `INewsAgentGuidanceRepository` | `EfNewsAgentGuidanceRepository` | EF Core | Modern `NewsAgentGuidanceRevisions` table; one published overlay per type (`triage` / `draft`); empty published content means compiled default |
 | News agent run leases | `INewsAgentRunLeaseService` | `EfNewsAgentRunLeaseService` | EF Core (+ SQL for lease upsert) | Modern lease table |
 | Queen history / on-this-day | `IQueenHistoryRepository` | `EfQueenHistoryRepository` | EF Core | Modern table |
 

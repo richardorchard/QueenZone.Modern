@@ -18,7 +18,9 @@ namespace QueenZone.Web;
 /// <see cref="ForumPostRateLimiter"/>). Poll vote/close reuse
 /// <see cref="IForumPollRepository"/> plus <see cref="ForumPollVoteMapper"/>
 /// (the same one-vote-per-member and closed rules as
-/// <c>/forum/poll/{id}/vote</c>). Attachment metadata includes the existing
+/// <c>/forum/poll/{id}/vote</c>). Topic Watch (#735) is <c>GET</c>/<c>POST</c>/
+/// <c>DELETE /topics/{id}/watch</c> under <see cref="MemberAuthenticationSchemes.MobileMemberPolicy"/>
+/// via <see cref="TopicWatchService"/>. Attachment metadata includes the existing
 /// member-gated <c>/forum/attachment/...</c> paths; the mobile client does not
 /// open those URLs.
 /// </summary>
@@ -116,6 +118,30 @@ public static class ForumApiEndpoints
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapGet("/topics/{id:int}/watch", GetTopicWatchAsync)
+            .WithName("GetForumTopicWatch")
+            .WithSummary("Whether the signed-in member is Watching this public topic. Watch is the opt-in for forum reply pushes.")
+            .RequireAuthorization(MemberAuthenticationSchemes.MobileMemberPolicy)
+            .Produces<ForumTopicWatchDto>()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapPost("/topics/{id:int}/watch", WatchTopicAsync)
+            .WithName("WatchForumTopic")
+            .WithSummary("Watch a public topic. Idempotent. Does not auto-watch on post.")
+            .RequireAuthorization(MemberAuthenticationSchemes.MobileMemberPolicy)
+            .Produces<ForumTopicWatchDto>()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapDelete("/topics/{id:int}/watch", UnwatchTopicAsync)
+            .WithName("UnwatchForumTopic")
+            .WithSummary("Stop Watching a public topic. Idempotent when not currently Watching.")
+            .RequireAuthorization(MemberAuthenticationSchemes.MobileMemberPolicy)
+            .Produces<ForumTopicWatchDto>()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status404NotFound);
     }
 
@@ -541,6 +567,71 @@ public static class ForumApiEndpoints
         return poll is null
             ? PollNotFound(topicId)
             : Results.Ok(ForumApiMapper.ToPoll(poll));
+    }
+
+    internal static async Task<IResult> GetTopicWatchAsync(
+        HttpContext httpContext,
+        ClaimsPrincipal user,
+        int id,
+        TopicWatchService topicWatchService,
+        CancellationToken cancellationToken)
+    {
+        var memberId = ForumMember.GetMemberId(user);
+        if (memberId is null)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status401Unauthorized,
+                title: "Unauthorized");
+        }
+
+        var status = await topicWatchService.GetStatusAsync(memberId.Value, id, cancellationToken);
+        if (status is null)
+        {
+            return TopicNotFound(id);
+        }
+
+        httpContext.Response.Headers.CacheControl = "no-store";
+        return Results.Ok(new ForumTopicWatchDto(status.Watching));
+    }
+
+    internal static async Task<IResult> WatchTopicAsync(
+        ClaimsPrincipal user,
+        int id,
+        TopicWatchService topicWatchService,
+        CancellationToken cancellationToken)
+    {
+        var memberId = ForumMember.GetMemberId(user);
+        if (memberId is null)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status401Unauthorized,
+                title: "Unauthorized");
+        }
+
+        var status = await topicWatchService.WatchAsync(memberId.Value, id, cancellationToken);
+        return status is null
+            ? TopicNotFound(id)
+            : Results.Ok(new ForumTopicWatchDto(status.Watching));
+    }
+
+    internal static async Task<IResult> UnwatchTopicAsync(
+        ClaimsPrincipal user,
+        int id,
+        TopicWatchService topicWatchService,
+        CancellationToken cancellationToken)
+    {
+        var memberId = ForumMember.GetMemberId(user);
+        if (memberId is null)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status401Unauthorized,
+                title: "Unauthorized");
+        }
+
+        var status = await topicWatchService.UnwatchAsync(memberId.Value, id, cancellationToken);
+        return status is null
+            ? TopicNotFound(id)
+            : Results.Ok(new ForumTopicWatchDto(status.Watching));
     }
 
     private static async Task<Guid?> TryGetBearerMemberIdAsync(HttpContext httpContext)

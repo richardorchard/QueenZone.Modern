@@ -14,7 +14,10 @@ import {
   fetchForumTopic,
   fetchForumTopicPoll,
   fetchForumTopicPosts,
+  fetchForumTopicWatch,
+  unwatchForumTopic,
   voteForumTopicPoll,
+  watchForumTopic,
 } from '../src/api/forum.ts';
 import { parseMemberProfile } from '../src/api/me.ts';
 import {
@@ -37,6 +40,7 @@ import {
   forumPostCreatedSchema,
   forumPostSchema,
   forumTopicDetailSchema,
+  forumTopicWatchSchema,
   inboxConversationSchema,
   memberProfileSchema,
   newsDetailSchema,
@@ -151,6 +155,25 @@ describe('mobile API consumer contracts', { concurrency: false }, () => {
       await fetchForumTopic(1002),
     );
     assert.equal(topic.id, 1002);
+
+    const watch = parseContract(
+      'GET /api/v1/forum/topics/1002/watch',
+      forumTopicWatchSchema,
+      await fetchForumTopicWatch(1002, token),
+    );
+    assert.equal(watch.watching, false);
+    const watched = parseContract(
+      'POST /api/v1/forum/topics/1002/watch',
+      forumTopicWatchSchema,
+      await watchForumTopic(1002, token),
+    );
+    assert.equal(watched.watching, true);
+    const unwatched = parseContract(
+      'DELETE /api/v1/forum/topics/1002/watch',
+      forumTopicWatchSchema,
+      await unwatchForumTopic(1002, token),
+    );
+    assert.equal(unwatched.watching, false);
 
     const posts = parseContract(
       'GET /api/v1/forum/topics/1002/posts',

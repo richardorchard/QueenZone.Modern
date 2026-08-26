@@ -1796,6 +1796,23 @@ body.qz-menu-lock .qz-masthead {
   margin-top: var(--space-6);
 }
 
+.qz-forum-topic-watch {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+  margin: 0 0 var(--space-6);
+}
+
+.qz-forum-topic-watch__form {
+  margin: 0;
+}
+
+.qz-forum-topic-watch__hint {
+  flex: 1 1 16rem;
+  margin: 0;
+}
+
 .qz-forum-stats strong {
   display: block;
   color: var(--qz-gold);

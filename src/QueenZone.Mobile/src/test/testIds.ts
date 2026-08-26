@@ -41,6 +41,7 @@ export const testIds = {
   forumScreen: 'forum-screen',
   forumCategoryScreen: 'forum-category-screen',
   forumThreadScreen: 'forum-thread-screen',
+  forumThreadWatch: 'forum-thread-watch',
   forumNewThread: 'forum-new-thread',
 
   profileSignedOut: 'profile-signed-out',

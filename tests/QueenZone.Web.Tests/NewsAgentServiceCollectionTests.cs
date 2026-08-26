@@ -21,6 +21,7 @@ public sealed class NewsAgentServiceCollectionTests
         var sp = scope.ServiceProvider;
 
         Assert.NotNull(sp.GetRequiredService<NewsDraftGenerationService>());
+        Assert.NotNull(sp.GetRequiredService<INewsAgentGuidanceProvider>());
         Assert.NotNull(sp.GetRequiredService<NewsAiRunExecutor>());
         Assert.NotNull(sp.GetRequiredService<INewsAiClient>());
         Assert.False(sp.GetRequiredService<INewsAiClient>().IsEnabled);
@@ -56,6 +57,7 @@ public sealed class NewsAgentServiceCollectionTests
 
         Assert.NotNull(sp.GetRequiredService<DiscoverNewsWorker>());
         Assert.NotNull(sp.GetRequiredService<NewsTriageService>());
+        Assert.NotNull(sp.GetRequiredService<INewsAgentGuidanceProvider>());
         Assert.NotNull(sp.GetRequiredService<NewsDraftGenerationService>());
         Assert.NotNull(sp.GetRequiredService<INewsDiscoveryHttpClient>());
         Assert.NotNull(sp.GetRequiredService<IOptions<NewsTriageOptions>>());

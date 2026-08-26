@@ -1,9 +1,8 @@
 namespace QueenZone.Data;
 
 /// <summary>
-/// Members who Watch a forum topic. #735 will persist rows; until then the
-/// registered implementation returns an empty list so reply fan-out is a no-op.
-/// Never treat prior posters or the topic starter as implicit watchers.
+/// Members who Watch a forum topic. Never treat prior posters or the topic
+/// starter as implicit watchers.
 /// </summary>
 public interface ITopicWatchLookup
 {

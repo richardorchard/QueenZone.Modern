@@ -55,6 +55,7 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddScoped<IForumAttachmentRepository, EfForumAttachmentRepository>();
         services.AddScoped<IForumPollRepository, EfForumPollRepository>();
         services.AddScoped<INewsDiscoveryRepository, EfNewsDiscoveryRepository>();
+        services.AddScoped<INewsAgentGuidanceRepository, EfNewsAgentGuidanceRepository>();
         services.AddScoped<INewsAgentRunLeaseService, EfNewsAgentRunLeaseService>();
         services.AddScoped<INewsAgentRunRequestRepository, EfNewsAgentRunRequestRepository>();
         services.AddScoped<IQueenHistoryRepository, EfQueenHistoryRepository>();
@@ -76,7 +77,8 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddScoped<IMobileAuthGrantRepository, EfMobileAuthGrantRepository>();
         services.AddScoped<IDeviceTokenRepository, EfDeviceTokenRepository>();
         services.AddScoped<INotificationPreferenceRepository, EfNotificationPreferenceRepository>();
-        services.AddSingleton<ITopicWatchLookup, EmptyTopicWatchLookup>();
+        services.AddScoped<ITopicWatchRepository, EfTopicWatchRepository>();
+        services.AddScoped<ITopicWatchLookup>(sp => sp.GetRequiredService<ITopicWatchRepository>());
         services.AddScoped<ILiveActivityQueryService, EfLiveActivityQueryService>();
 
         return services;
@@ -120,6 +122,9 @@ public static class QueenZoneDataServiceCollectionExtensions
         SampleNewsDiscoveryData.Seed(discoveryStore);
         services.AddSingleton(discoveryStore);
         services.AddSingleton<INewsDiscoveryRepository, InMemoryNewsDiscoveryRepository>();
+        var guidanceStore = new SharedNewsAgentGuidanceStore();
+        services.AddSingleton(guidanceStore);
+        services.AddSingleton<INewsAgentGuidanceRepository, InMemoryNewsAgentGuidanceRepository>();
         services.AddSingleton<SharedNewsAgentLeaseStore>();
         services.AddSingleton<INewsAgentRunLeaseService, InMemoryNewsAgentRunLeaseService>();
         services.AddSingleton<SharedNewsAgentRunRequestStore>();
@@ -171,7 +176,8 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddSingleton<IDeviceTokenRepository, InMemoryDeviceTokenRepository>();
         services.AddSingleton<SharedNotificationPreferenceStore>();
         services.AddSingleton<INotificationPreferenceRepository, InMemoryNotificationPreferenceRepository>();
-        services.AddSingleton<ITopicWatchLookup, EmptyTopicWatchLookup>();
+        services.AddSingleton<ITopicWatchRepository, InMemoryTopicWatchRepository>();
+        services.AddSingleton<ITopicWatchLookup>(sp => sp.GetRequiredService<ITopicWatchRepository>());
 
         return services;
     }
