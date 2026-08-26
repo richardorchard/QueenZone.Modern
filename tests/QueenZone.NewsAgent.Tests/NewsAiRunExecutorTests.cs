@@ -116,6 +116,38 @@ public sealed class NewsAiRunExecutorTests
         Assert.Equal(1, aiClient.CallCount);
     }
 
+    [Fact]
+    public async Task ExecuteAsync_records_guidance_revision_without_storing_guidance_text()
+    {
+        var repository = new InMemoryNewsDiscoveryRepository(new SharedNewsDiscoveryStore());
+        var candidateId = await CreateCandidateAsync(repository);
+        var executor = CreateExecutor(
+            repository,
+            new FakeNewsAiClient(enabled: true, completion: new NewsAiChatCompletion(
+                """{"relevant":true}""",
+                "openai/gpt-4.1-nano",
+                100,
+                20,
+                0.0002m,
+                DryRun: false)));
+
+        executor.BeginRun();
+        await executor.ExecuteAsync(
+            candidateId,
+            NewsAiRunKind.Triage,
+            NewsAiModelRole.Triage,
+            "triage-v2",
+            [new NewsAiChatMessage("user", "Classify headline.")],
+            guidance: new NewsAgentGuidanceSnapshot(12, 4, "abc123", "prefer member-news"));
+
+        var runs = await repository.GetAiRunsForCandidateAsync(candidateId);
+        Assert.Equal(12, runs[0].GuidanceRevisionId);
+        Assert.Equal(4, runs[0].GuidanceRevisionNumber);
+        Assert.Equal("abc123", runs[0].GuidanceContentHash);
+        Assert.Equal("triage-v2", runs[0].PromptVersion);
+        Assert.DoesNotContain("prefer member-news", runs[0].StructuredResultJson, StringComparison.Ordinal);
+    }
+
     private static NewsAiRunExecutor CreateExecutor(
         INewsDiscoveryRepository repository,
         INewsAiClient aiClient,

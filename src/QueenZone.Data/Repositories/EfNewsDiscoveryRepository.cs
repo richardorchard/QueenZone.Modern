@@ -434,6 +434,9 @@ public sealed class EfNewsDiscoveryRepository(QueenZoneDbContext dbContext) : IN
             ModelProvider = request.ModelProvider,
             ModelId = request.ModelId,
             PromptVersion = request.PromptVersion,
+            GuidanceRevisionId = request.GuidanceRevisionId,
+            GuidanceRevisionNumber = request.GuidanceRevisionNumber,
+            GuidanceContentHash = request.GuidanceContentHash,
             Status = NewsAiRunStatus.Pending,
             StartedAt = request.StartedAt,
             CreatedAt = request.StartedAt
@@ -615,7 +618,10 @@ public sealed class EfNewsDiscoveryRepository(QueenZoneDbContext dbContext) : IN
             run.ErrorMessage,
             run.StartedAt,
             run.CompletedAt,
-            run.CreatedAt);
+            run.CreatedAt,
+            run.GuidanceRevisionId,
+            run.GuidanceRevisionNumber,
+            run.GuidanceContentHash);
 
     private static NewsAgentDraft MapDraft(NewsAgentDraftEntity draft) =>
         new(

@@ -47,6 +47,7 @@ export const publicScreenNames = [
   'Profile',
   'Contact',
   'SignIn',
+  'SuggestNews',
 ] as const;
 
 export const memberOnlyScreenNames = [
@@ -100,6 +101,7 @@ export const detailScreenNames = [
   'SavedList',
   'DeleteAccount',
   'Search',
+  'SuggestNews',
 ] as const;
 
 export function shouldHideTabBar(routeName: string | undefined): boolean {

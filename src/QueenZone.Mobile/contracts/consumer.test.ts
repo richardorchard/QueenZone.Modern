@@ -14,7 +14,10 @@ import {
   fetchForumTopic,
   fetchForumTopicPoll,
   fetchForumTopicPosts,
+  fetchForumTopicWatch,
+  unwatchForumTopic,
   voteForumTopicPoll,
+  watchForumTopic,
 } from '../src/api/forum.ts';
 import { parseMemberProfile } from '../src/api/me.ts';
 import {
@@ -26,6 +29,7 @@ import {
   fetchConversation,
   fetchInbox,
 } from '../src/api/messages.ts';
+import { parseNewsSuggestionCreated, newsSuggestionsPath } from '../src/api/newsSuggestionResponse.ts';
 import { parsePhotoSubmissionCreated, photoSubmissionsPath } from '../src/api/photoSubmissionForm.ts';
 import {
   conversationDetailSchema,
@@ -36,10 +40,12 @@ import {
   forumPostCreatedSchema,
   forumPostSchema,
   forumTopicDetailSchema,
+  forumTopicWatchSchema,
   inboxConversationSchema,
   memberProfileSchema,
   newsDetailSchema,
   newsListItemSchema,
+  newsSuggestionCreatedSchema,
   notificationPreferencesSchema,
   pagedSchema,
   parseContract,
@@ -150,6 +156,25 @@ describe('mobile API consumer contracts', { concurrency: false }, () => {
     );
     assert.equal(topic.id, 1002);
 
+    const watch = parseContract(
+      'GET /api/v1/forum/topics/1002/watch',
+      forumTopicWatchSchema,
+      await fetchForumTopicWatch(1002, token),
+    );
+    assert.equal(watch.watching, false);
+    const watched = parseContract(
+      'POST /api/v1/forum/topics/1002/watch',
+      forumTopicWatchSchema,
+      await watchForumTopic(1002, token),
+    );
+    assert.equal(watched.watching, true);
+    const unwatched = parseContract(
+      'DELETE /api/v1/forum/topics/1002/watch',
+      forumTopicWatchSchema,
+      await unwatchForumTopic(1002, token),
+    );
+    assert.equal(unwatched.watching, false);
+
     const posts = parseContract(
       'GET /api/v1/forum/topics/1002/posts',
       pagedSchema(forumPostSchema),
@@ -256,6 +281,42 @@ describe('mobile API consumer contracts', { concurrency: false }, () => {
     );
     assert.equal(created.title, 'Contract Wembley shot');
     assert.equal(created.status, 'Pending');
+  });
+
+  it('accepts a news-suggestion 201 through sendJson', async () => {
+    const created = parseNewsSuggestionCreated(
+      parseContract(
+        'POST /api/v1/member/news-suggestions',
+        newsSuggestionCreatedSchema,
+        await sendJson(newsSuggestionsPath, {
+          method: 'POST',
+          body: {
+            url: `https://www.bbc.co.uk/news/contract-${Date.now()}`,
+            title: 'Contract Queen dates',
+            notes: null,
+          },
+          accessToken: token,
+        }),
+      ),
+    );
+    assert.equal(created.status, 'Pending');
+    assert.match(created.url, /^https:\/\//);
+  });
+
+  it('maps news-suggestion auth 401 through ApiError', async () => {
+    const unauthorized = await expectApiError('POST /api/v1/member/news-suggestions', 401, () =>
+      sendJson(newsSuggestionsPath, {
+        method: 'POST',
+        body: { url: 'https://www.bbc.co.uk/news/example' },
+      }),
+    );
+    expectedField(
+      'POST /api/v1/member/news-suggestions',
+      'problem.title',
+      unauthorized.problem?.title,
+      (value) => value === 'Unauthorized',
+      'Unauthorized',
+    );
   });
 
   it('maps forum reply validation 400 and auth 401 through ApiError', async () => {

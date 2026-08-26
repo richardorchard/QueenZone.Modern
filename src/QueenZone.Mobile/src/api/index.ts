@@ -1,4 +1,14 @@
-export { ApiError, fetchJson, formatPublishedDate, sendJson, sendMultipart, toPlainText } from './client';
+export {
+  ApiError,
+  fetchJson,
+  formatPublishedDate,
+  isOfflineFailure,
+  isTimeoutFailure,
+  sendJson,
+  sendMultipart,
+  toPlainText,
+} from './client';
+export type { ApiFailureKind } from './client';
 export type { FetchJsonOptions, SendJsonOptions } from './client';
 export {
   fetchAlbumDetail,
@@ -32,9 +42,18 @@ export {
   fetchForumTopic,
   fetchForumTopicPoll,
   fetchForumTopicPosts,
+  fetchForumTopicWatch,
+  unwatchForumTopic,
   voteForumTopicPoll,
+  watchForumTopic,
 } from './forum';
 export { createPhotoSubmission } from './photoSubmissions';
+export {
+  createNewsSuggestion,
+  newsSuggestionsPath,
+  parseNewsSuggestionCreated,
+} from './newsSuggestions';
+export type { NewsSuggestionWrite } from './newsSuggestions';
 export {
   fetchConversation,
   fetchInbox,

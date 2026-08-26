@@ -43,6 +43,8 @@ public sealed class QueenZoneDbContext : DbContext
 
     public DbSet<NewsAiRunEntity> NewsAiRuns => Set<NewsAiRunEntity>();
 
+    public DbSet<NewsAgentGuidanceRevisionEntity> NewsAgentGuidanceRevisions => Set<NewsAgentGuidanceRevisionEntity>();
+
     public DbSet<NewsAgentDraftEntity> NewsAgentDrafts => Set<NewsAgentDraftEntity>();
 
     public DbSet<NewsAgentRunLeaseEntity> NewsAgentRunLeases => Set<NewsAgentRunLeaseEntity>();
@@ -97,6 +99,8 @@ public sealed class QueenZoneDbContext : DbContext
     public DbSet<DeviceTokenEntity> DeviceTokens => Set<DeviceTokenEntity>();
 
     public DbSet<NotificationPreferenceEntity> NotificationPreferences => Set<NotificationPreferenceEntity>();
+
+    public DbSet<MemberTopicWatchEntity> MemberTopicWatches => Set<MemberTopicWatchEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -430,6 +434,9 @@ public sealed class QueenZoneDbContext : DbContext
             entity.Property(run => run.ModelProvider).HasMaxLength(100).IsRequired();
             entity.Property(run => run.ModelId).HasMaxLength(200).IsRequired();
             entity.Property(run => run.PromptVersion).HasMaxLength(100).IsRequired();
+            entity.Property(run => run.GuidanceRevisionId);
+            entity.Property(run => run.GuidanceRevisionNumber);
+            entity.Property(run => run.GuidanceContentHash).HasMaxLength(64);
             entity.Property(run => run.Status).HasConversion<string>().HasMaxLength(50).IsRequired();
             entity.Property(run => run.EstimatedCostUsd).HasPrecision(10, 6);
             entity.Property(run => run.StructuredResultJson).HasMaxLength(8000);
@@ -445,6 +452,50 @@ public sealed class QueenZoneDbContext : DbContext
                 .WithMany(candidate => candidate.AiRuns)
                 .HasForeignKey(run => run.CandidateId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<NewsAgentGuidanceRevisionEntity>(entity =>
+        {
+            entity.ToTable("NewsAgentGuidanceRevisions");
+            entity.HasKey(revision => revision.Id);
+
+            entity.Property(revision => revision.Type)
+                .HasConversion(
+                    value => NewsAgentGuidanceText.ToStorageType(value),
+                    value => NewsAgentGuidanceText.ParseType(value))
+                .HasMaxLength(20)
+                .IsRequired();
+            entity.Property(revision => revision.RevisionNumber).IsRequired();
+            entity.Property(revision => revision.Content).HasMaxLength(4000).IsRequired();
+            entity.Property(revision => revision.ContentHash).HasMaxLength(64).IsRequired();
+            entity.Property(revision => revision.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
+            entity.Property(revision => revision.CreatedAt).IsRequired();
+            entity.Property(revision => revision.CreatedByEmail).HasMaxLength(320).IsRequired();
+            entity.Property(revision => revision.PublishedByEmail).HasMaxLength(320);
+            if (Database.IsSqlServer())
+            {
+                entity.Property(revision => revision.RowVersion).IsRowVersion();
+            }
+            else
+            {
+                // SQLite and in-memory providers do not generate rowversion; persist a client token.
+                entity.Property(revision => revision.RowVersion)
+                    .IsConcurrencyToken()
+                    .IsRequired()
+                    .ValueGeneratedNever();
+            }
+
+            entity.HasIndex(revision => new { revision.Type, revision.RevisionNumber })
+                .IsUnique()
+                .HasDatabaseName("UX_NewsAgentGuidanceRevisions_Type_RevisionNumber");
+
+            entity.HasIndex(revision => revision.Type, "UX_NewsAgentGuidanceRevisions_Type_Published")
+                .IsUnique()
+                .HasFilter("[Status] = 'Published'");
+
+            entity.HasIndex(revision => revision.Type, "UX_NewsAgentGuidanceRevisions_Type_Draft")
+                .IsUnique()
+                .HasFilter("[Status] = 'Draft'");
         });
 
         modelBuilder.Entity<NewsAgentDraftEntity>(entity =>
@@ -1086,6 +1137,22 @@ public sealed class QueenZoneDbContext : DbContext
             entity.HasOne(row => row.MemberAccount)
                 .WithMany()
                 .HasForeignKey(row => row.MemberAccountId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<MemberTopicWatchEntity>(entity =>
+        {
+            entity.ToTable("MemberTopicWatches");
+            entity.HasKey(watch => new { watch.MemberAccountId, watch.TopicId });
+
+            entity.Property(watch => watch.CreatedAt).IsRequired();
+
+            entity.HasIndex(watch => watch.TopicId)
+                .HasDatabaseName("IX_MemberTopicWatches_TopicId");
+
+            entity.HasOne(watch => watch.MemberAccount)
+                .WithMany()
+                .HasForeignKey(watch => watch.MemberAccountId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }

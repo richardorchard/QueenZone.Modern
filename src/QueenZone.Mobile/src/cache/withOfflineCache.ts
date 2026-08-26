@@ -4,15 +4,15 @@ function isOfflineFailure(err: unknown): boolean {
   return (
     err instanceof Error &&
     err.name === 'ApiError' &&
-    'status' in err &&
-    (err as { status: unknown }).status === 0
+    'kind' in err &&
+    (err as { kind: unknown }).kind === 'offline'
   );
 }
 
 /**
  * Network-first with offline cache fallback.
- * On success, refreshes the cache. On network failure (`ApiError` status 0),
- * returns the last cached payload when present.
+ * On success, refreshes the cache. On offline failure, returns the last
+ * cached payload when present.
  */
 export async function withOfflineCache<T>(
   cache: ContentCache,
@@ -23,9 +23,7 @@ export async function withOfflineCache<T>(
     const data = await fetchFresh();
     try {
       await cache.put(cacheKey, data);
-    } catch {
-      // Cache write failures must not break online reading.
-    }
+    } catch {}
     return data;
   } catch (err) {
     if (err instanceof Error && err.name === 'AbortError') {
@@ -40,9 +38,7 @@ export async function withOfflineCache<T>(
       if (cached !== null) {
         return cached;
       }
-    } catch {
-      // Fall through to the original network error.
-    }
+    } catch {}
     throw err;
   }
 }

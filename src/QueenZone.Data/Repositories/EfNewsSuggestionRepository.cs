@@ -1,3 +1,4 @@
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using QueenZone.Data.Entities;
 
@@ -24,7 +25,15 @@ public sealed class EfNewsSuggestionRepository(QueenZoneDbContext dbContext) : I
         };
 
         dbContext.NewsSuggestions.Add(entity);
-        await dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (IsActiveUrlHashUniqueViolation(ex))
+        {
+            throw new DuplicateActiveNewsSuggestionException(ex);
+        }
+
         return Map(entity);
     }
 
@@ -378,6 +387,28 @@ public sealed class EfNewsSuggestionRepository(QueenZoneDbContext dbContext) : I
                 string.IsNullOrWhiteSpace(c.DisplayName) ? "Unknown member" : c.DisplayName,
                 c.Count))
             .ToList();
+    }
+
+    internal const string ActiveUrlHashIndexName = "IX_NewsSuggestions_UrlHash_Active";
+
+    internal static bool IsActiveUrlHashUniqueViolation(DbUpdateException exception)
+    {
+        var sawSqlUnique = false;
+        var sawIndexName = false;
+        for (Exception? current = exception; current is not null; current = current.InnerException)
+        {
+            if (current is SqlException sql && sql.Number is 2601 or 2627)
+            {
+                sawSqlUnique = true;
+            }
+
+            if (current.Message.Contains(ActiveUrlHashIndexName, StringComparison.Ordinal))
+            {
+                sawIndexName = true;
+            }
+        }
+
+        return sawSqlUnique && sawIndexName;
     }
 
     private bool IsSqliteDatabase() =>

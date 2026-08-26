@@ -123,6 +123,67 @@ public sealed class NotificationDispatchWritePathTests : IClassFixture<QueenZone
     }
 
     [Fact]
+    public async Task ForumReply_PersistedWatch_DispatchesOnce_ExcludingAuthor()
+    {
+        var transport = new RecordingPushTransport();
+        using var scopedFactory = QueenZoneWebApplicationFactory.WithServices(services =>
+        {
+            services.RemoveAll<IPushTransport>();
+            services.AddSingleton<IPushTransport>(transport);
+        });
+
+        var author = Guid.NewGuid();
+        var watcher = Guid.NewGuid();
+        var lurker = Guid.NewGuid();
+        await SeedFactoryTokenAsync(scopedFactory, watcher, "watcher-tok");
+        await SeedFactoryTokenAsync(scopedFactory, author, "author-tok");
+        await SeedFactoryTokenAsync(scopedFactory, lurker, "lurker-tok");
+
+        using var scope = scopedFactory.Services.CreateScope();
+        var write = scope.ServiceProvider.GetRequiredService<ForumPostWriteService>();
+        var watches = scope.ServiceProvider.GetRequiredService<ITopicWatchRepository>();
+        var topic = await write.CreateTopicAsync(
+            author,
+            "Author",
+            1,
+            "Persisted watch thread",
+            "Starter body",
+            attachments: null,
+            poll: null);
+        Assert.True(topic.Succeeded);
+
+        await watches.WatchAsync(watcher, topic.TopicId, DateTimeOffset.UtcNow);
+        await watches.WatchAsync(author, topic.TopicId, DateTimeOffset.UtcNow);
+        await watches.WatchAsync(watcher, topic.TopicId, DateTimeOffset.UtcNow);
+
+        var reply = await write.CreateReplyAsync(
+            author,
+            "Author",
+            topic.TopicId,
+            "A reply that should notify the Watcher only",
+            attachments: null);
+        Assert.True(reply.Succeeded);
+
+        var send = Assert.Single(transport.Sends);
+        Assert.Equal(NotificationCategoryNames.ForumReply, send.Payload.Category);
+        Assert.Equal(topic.TopicId.ToString(), send.Payload.Data["topicId"]);
+        Assert.Equal(reply.PostId.ToString(), send.Payload.Data["postId"]);
+        Assert.Equal(watcher, Assert.Single(send.Tokens).MemberAccountId);
+
+        await watches.UnwatchAsync(watcher, topic.TopicId);
+        await watches.UnwatchAsync(author, topic.TopicId);
+        transport.Sends.Clear();
+        var second = await write.CreateReplyAsync(
+            lurker,
+            "Lurker",
+            topic.TopicId,
+            "No watchers left except the author",
+            attachments: null);
+        Assert.True(second.Succeeded);
+        Assert.Empty(transport.Sends);
+    }
+
+    [Fact]
     public async Task ForumReply_EmptyWatchers_SendsNothing()
     {
         var transport = new RecordingPushTransport();

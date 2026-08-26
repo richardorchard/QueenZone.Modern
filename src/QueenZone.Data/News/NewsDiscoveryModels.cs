@@ -96,7 +96,10 @@ public sealed record NewsAiRun(
     string? ErrorMessage,
     DateTime StartedAt,
     DateTime? CompletedAt,
-    DateTime CreatedAt);
+    DateTime CreatedAt,
+    int? GuidanceRevisionId = null,
+    int? GuidanceRevisionNumber = null,
+    string? GuidanceContentHash = null);
 
 public sealed record NewsAiRunCreateRequest(
     int CandidateId,
@@ -104,7 +107,10 @@ public sealed record NewsAiRunCreateRequest(
     string ModelProvider,
     string ModelId,
     string PromptVersion,
-    DateTime StartedAt);
+    DateTime StartedAt,
+    int? GuidanceRevisionId = null,
+    int? GuidanceRevisionNumber = null,
+    string? GuidanceContentHash = null);
 
 public sealed record NewsAiRunCompletion(
     NewsAiRunStatus Status,

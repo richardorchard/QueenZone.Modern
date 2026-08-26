@@ -54,6 +54,17 @@
           "microphonePermission": false,
           "recordAudioAndroid": false
         }
+      ],
+      [
+        "expo-share-intent",
+        {
+          "iosActivationRules": {
+            "NSExtensionActivationSupportsWebURLWithMaxCount": 1,
+            "NSExtensionActivationSupportsText": true
+          },
+          "iosAppGroupIdentifier": "group.org.queenzone.mobile",
+          "androidIntentFilters": ["text/*"]
+        }
       ]
     ]
   }

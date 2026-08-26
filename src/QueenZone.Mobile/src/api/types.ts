@@ -180,6 +180,15 @@ export type PhotoSubmissionCreated = {
   submittedAt: string;
 };
 
+/** Result of `POST /api/v1/member/news-suggestions` (`NewsSuggestionCreatedDto`). */
+export type NewsSuggestionCreated = {
+  id: string;
+  status: string;
+  url: string;
+  title: string | null;
+  submittedAt: string;
+};
+
 export type FanPerformance = {
   id: number;
   title: string;
@@ -222,6 +231,10 @@ export type ForumTopicDetail = {
   postCount: number;
   hasPoll: boolean | null;
   isLocked: boolean;
+};
+
+export type ForumTopicWatch = {
+  watching: boolean;
 };
 
 export type ForumAttachment = {

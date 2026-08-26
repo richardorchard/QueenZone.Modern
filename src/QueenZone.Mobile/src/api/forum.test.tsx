@@ -9,7 +9,10 @@ import {
   fetchForumTopic,
   fetchForumTopicPoll,
   fetchForumTopicPosts,
+  fetchForumTopicWatch,
+  unwatchForumTopic,
   voteForumTopicPoll,
+  watchForumTopic,
 } from './forum';
 import { jsonResponse } from '../test/fixtures';
 
@@ -104,5 +107,23 @@ describe('poll endpoints', () => {
     expect(url).toBe('http://qz.test/api/v1/forum/topics/10/poll/close');
     expect(init.method).toBe('POST');
     expect(init.headers).toMatchObject({ Authorization: 'Bearer tok' });
+  });
+});
+
+describe('topic watch endpoints', () => {
+  it('gets, watches, and unwatches with a Bearer token', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ watching: false }));
+    await fetchForumTopicWatch(10, 'tok');
+    expect(lastCall().url).toBe('http://qz.test/api/v1/forum/topics/10/watch');
+    expect(lastCall().init.headers).toMatchObject({ Authorization: 'Bearer tok' });
+
+    fetchMock.mockResolvedValueOnce(jsonResponse({ watching: true }));
+    await watchForumTopic(10, 'tok');
+    expect(lastCall().url).toBe('http://qz.test/api/v1/forum/topics/10/watch');
+    expect(lastCall().init.method).toBe('POST');
+
+    fetchMock.mockResolvedValueOnce(jsonResponse({ watching: false }));
+    await unwatchForumTopic(10, 'tok');
+    expect(lastCall().init.method).toBe('DELETE');
   });
 });
