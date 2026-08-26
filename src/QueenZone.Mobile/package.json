@@ -61,7 +61,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
-    "@testing-library/react-native": "^13.3.3",
+    "@testing-library/react-native": "^14.0.1",
     "@types/jest": "^29.5.14",
     "@types/react": "~19.2.2",
     "babel-preset-expo": "~57.0.4",
