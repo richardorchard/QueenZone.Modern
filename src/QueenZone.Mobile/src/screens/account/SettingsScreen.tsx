@@ -14,12 +14,20 @@ import {
   type MessagePrivacy,
   type MemberProfile,
 } from '../../api/me';
+import {
+  fetchNotificationPreferences,
+  patchNotificationPreferences,
+  type NotificationPreferenceKey,
+  type NotificationPreferences,
+} from '../../api/notificationPreferences';
 import type { HomeStackParamList } from '../../navigation/types';
 import { MemberGate } from '../../session/MemberGate';
 import { useSession } from '../../session/SessionContext';
+import { testIds } from '../../test/testIds';
 import { radius, space, type, useTheme } from '../../theme';
 import { Button } from '../../ui/Button';
 import { Eyebrow } from '../../ui/Eyebrow';
+import { SettingsRow } from '../../ui/SettingsRow';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'Settings'>;
 
@@ -37,6 +45,7 @@ function SettingsForm({ navigation }: Pick<Props, 'navigation'>) {
   const [profile, setProfile] = useState<MemberProfile | null>(null);
   const [displayName, setDisplayName] = useState('');
   const [privacy, setPrivacy] = useState<MessagePrivacy>('members');
+  const [preferences, setPreferences] = useState<NotificationPreferences | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [savingName, setSavingName] = useState(false);
@@ -53,11 +62,15 @@ function SettingsForm({ navigation }: Pick<Props, 'navigation'>) {
 
     setError(null);
     try {
-      const next = parseMemberProfile(await fetchJson('/me', { accessToken }));
+      const [next, nextPreferences] = await Promise.all([
+        fetchJson('/me', { accessToken }).then(parseMemberProfile),
+        fetchNotificationPreferences(accessToken),
+      ]);
       setProfile(next);
       setDisplayName(next.displayName);
       setPrivacy(next.messagePrivacy);
       setSelectedLegacyId(next.legacyLink.claimableMatches[0]?.userId ?? next.legacyLink.match?.userId ?? null);
+      setPreferences(nextPreferences);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not load account settings.');
     }
@@ -125,6 +138,24 @@ function SettingsForm({ navigation }: Pick<Props, 'navigation'>) {
       setError(err instanceof ApiError ? err.message : 'Could not update messaging privacy.');
     } finally {
       setSavingPrivacy(false);
+    }
+  }
+
+  async function savePreference(key: NotificationPreferenceKey, value: boolean) {
+    if (!accessToken || !preferences) {
+      return;
+    }
+
+    const previous = preferences;
+    setPreferences({ ...previous, [key]: value });
+    setError(null);
+    try {
+      const next = await patchNotificationPreferences(accessToken, { [key]: value });
+      setPreferences(next);
+      setStatus('Notification preferences updated.');
+    } catch (err) {
+      setPreferences(previous);
+      setError(err instanceof ApiError ? err.message : 'Could not update notification preferences.');
     }
   }
 
@@ -335,6 +366,36 @@ function SettingsForm({ navigation }: Pick<Props, 'navigation'>) {
         ))}
         {savingPrivacy ? <Text style={[type.caption, { color: c.textMuted }]}>Saving…</Text> : null}
       </View>
+
+      {preferences ? (
+        <View style={{ paddingTop: space.xxl }}>
+          <View style={{ paddingHorizontal: space.xl, paddingBottom: space.md }}>
+            <Eyebrow tone="muted">Notifications</Eyebrow>
+          </View>
+          <SettingsRow
+            title="Forum replies"
+            subtitle="You still need to Watch a topic to get forum reply pushes."
+            switchValue={preferences.forumReply}
+            onSwitch={(value) => void savePreference('forumReply', value)}
+            accessibilityLabel="Forum replies"
+            testID={testIds.settingsNotifyForumReply}
+          />
+          <SettingsRow
+            title="Private messages"
+            switchValue={preferences.privateMessage}
+            onSwitch={(value) => void savePreference('privateMessage', value)}
+            accessibilityLabel="Private messages"
+            testID={testIds.settingsNotifyPrivateMessage}
+          />
+          <SettingsRow
+            title="News"
+            switchValue={preferences.news}
+            onSwitch={(value) => void savePreference('news', value)}
+            accessibilityLabel="News"
+            testID={testIds.settingsNotifyNews}
+          />
+        </View>
+      ) : null}
 
       <View style={{ paddingHorizontal: space.xl, paddingTop: space.xxl, gap: space.md }}>
         <Eyebrow tone="muted">Linked sign-in providers</Eyebrow>
