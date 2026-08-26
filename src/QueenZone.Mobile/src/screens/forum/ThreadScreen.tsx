@@ -7,7 +7,10 @@ import {
   fetchForumTopic,
   fetchForumTopicPoll,
   fetchForumTopicPosts,
+  fetchForumTopicWatch,
+  unwatchForumTopic,
   voteForumTopicPoll,
+  watchForumTopic,
   type ForumAttachment,
   type ForumPoll,
   type ForumPost,
@@ -34,6 +37,8 @@ import {
   imagePreviewUrl,
   parseTopicId,
   topicReplyAllowed,
+  watchButtonLabel,
+  watchHint,
 } from './forumThreadMeta';
 
 type Props = NativeStackScreenProps<ForumStackParamList, 'Thread'>;
@@ -53,6 +58,9 @@ export function ThreadScreen({ navigation, route }: Props) {
   const [poll, setPoll] = useState<ForumPoll | null>(null);
   const [pollBusy, setPollBusy] = useState(false);
   const [pollError, setPollError] = useState<string | null>(null);
+  const [watching, setWatching] = useState(false);
+  const [watchBusy, setWatchBusy] = useState(false);
+  const [watchError, setWatchError] = useState<string | null>(null);
 
   const paged = usePagedContent<ForumPost>(
     useCallback(
@@ -79,6 +87,24 @@ export function ThreadScreen({ navigation, route }: Props) {
     fetchForumTopic(id, controller.signal)
       .then(async (item) => {
         setTopic(item);
+        if (accessToken) {
+          try {
+            const watch = await fetchForumTopicWatch(id, accessToken, controller.signal);
+            setWatching(watch.watching);
+            setWatchError(null);
+          } catch (err: unknown) {
+            if (err instanceof Error && err.name === 'AbortError') {
+              return;
+            }
+            setWatching(false);
+            if (!(err instanceof ApiError && err.status === 404)) {
+              setWatchError(messageFromUnknownError(err));
+            }
+          }
+        } else {
+          setWatching(false);
+          setWatchError(null);
+        }
         if (!shouldLoadPoll(item.hasPoll)) {
           setPoll(null);
           setPollError(null);
@@ -179,6 +205,25 @@ export function ThreadScreen({ navigation, route }: Props) {
     void runPollAction(() => closeForumTopicPoll(id, accessToken));
   }, [accessToken, id, runPollAction]);
 
+  const toggleWatch = useCallback(() => {
+    if (id === null) {
+      return;
+    }
+    if (!accessToken) {
+      openSignIn(navigation);
+      return;
+    }
+    setWatchBusy(true);
+    setWatchError(null);
+    const action = watching
+      ? unwatchForumTopic(id, accessToken)
+      : watchForumTopic(id, accessToken);
+    void action
+      .then((next) => setWatching(next.watching))
+      .catch((err: unknown) => setWatchError(messageFromUnknownError(err)))
+      .finally(() => setWatchBusy(false));
+  }, [accessToken, id, navigation, watching]);
+
   if (id === null) {
     return (
       <ErrorBlock message={topicError ?? 'This discussion is not available in the archive yet.'} />
@@ -215,6 +260,21 @@ export function ThreadScreen({ navigation, route }: Props) {
       {stats ? (
         <Text style={[type.meta, { color: c.textMuted, marginTop: space.md }]}>{stats}</Text>
       ) : null}
+      <View style={styles.watch} testID={testIds.forumThreadWatch}>
+        <Button
+          label={isSignedIn ? watchButtonLabel(watching) : 'Sign in to watch'}
+          variant="outline"
+          size="sm"
+          loading={watchBusy}
+          onPress={toggleWatch}
+        />
+        <Text style={[type.caption, { color: c.textMuted, marginTop: space.sm }]}>
+          {watchHint(watching)}
+        </Text>
+        {watchError ? (
+          <Text style={[type.caption, { color: c.textMuted, marginTop: space.sm }]}>{watchError}</Text>
+        ) : null}
+      </View>
       {poll ? (
         <View style={styles.poll}>
           <ForumPollCard
@@ -350,6 +410,9 @@ const styles = StyleSheet.create({
   },
   poll: {
     marginHorizontal: -space.xl,
+    marginTop: space.lg,
+  },
+  watch: {
     marginTop: space.lg,
   },
   post: {

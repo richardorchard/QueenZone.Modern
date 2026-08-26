@@ -100,6 +100,8 @@ public sealed class QueenZoneDbContext : DbContext
 
     public DbSet<NotificationPreferenceEntity> NotificationPreferences => Set<NotificationPreferenceEntity>();
 
+    public DbSet<MemberTopicWatchEntity> MemberTopicWatches => Set<MemberTopicWatchEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<NewsTableRow>(entity =>
@@ -1135,6 +1137,22 @@ public sealed class QueenZoneDbContext : DbContext
             entity.HasOne(row => row.MemberAccount)
                 .WithMany()
                 .HasForeignKey(row => row.MemberAccountId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<MemberTopicWatchEntity>(entity =>
+        {
+            entity.ToTable("MemberTopicWatches");
+            entity.HasKey(watch => new { watch.MemberAccountId, watch.TopicId });
+
+            entity.Property(watch => watch.CreatedAt).IsRequired();
+
+            entity.HasIndex(watch => watch.TopicId)
+                .HasDatabaseName("IX_MemberTopicWatches_TopicId");
+
+            entity.HasOne(watch => watch.MemberAccount)
+                .WithMany()
+                .HasForeignKey(watch => watch.MemberAccountId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }

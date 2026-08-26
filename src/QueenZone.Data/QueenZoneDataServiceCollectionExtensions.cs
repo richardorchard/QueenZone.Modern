@@ -77,7 +77,8 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddScoped<IMobileAuthGrantRepository, EfMobileAuthGrantRepository>();
         services.AddScoped<IDeviceTokenRepository, EfDeviceTokenRepository>();
         services.AddScoped<INotificationPreferenceRepository, EfNotificationPreferenceRepository>();
-        services.AddSingleton<ITopicWatchLookup, EmptyTopicWatchLookup>();
+        services.AddScoped<ITopicWatchRepository, EfTopicWatchRepository>();
+        services.AddScoped<ITopicWatchLookup>(sp => sp.GetRequiredService<ITopicWatchRepository>());
         services.AddScoped<ILiveActivityQueryService, EfLiveActivityQueryService>();
 
         return services;
@@ -175,7 +176,8 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddSingleton<IDeviceTokenRepository, InMemoryDeviceTokenRepository>();
         services.AddSingleton<SharedNotificationPreferenceStore>();
         services.AddSingleton<INotificationPreferenceRepository, InMemoryNotificationPreferenceRepository>();
-        services.AddSingleton<ITopicWatchLookup, EmptyTopicWatchLookup>();
+        services.AddSingleton<ITopicWatchRepository, InMemoryTopicWatchRepository>();
+        services.AddSingleton<ITopicWatchLookup>(sp => sp.GetRequiredService<ITopicWatchRepository>());
 
         return services;
     }
