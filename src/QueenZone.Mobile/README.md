@@ -262,7 +262,14 @@ add a second URL scheme — shares reuse `queenzone`. Do not add
 Fan performances list from `/api/v1/content/fan-performances`; streaming uses
 `GET /api/v1/content/fan-performances/{id}/audio` with the member Bearer token
 (same private `songfiles` blob as the website). Background playback and lock-screen
-controls come from `expo-audio`.
+controls come from `expo-audio` (`shouldPlayInBackground`, `setActiveForLockScreen`).
+The lock screen shows title, performer, and "Fan performances", with play/pause and
+seek. expo-audio does not expose next/previous-track buttons or JS remote-command
+events. In-app queue skip stays on the detail screen. Signing out or finishing the
+last queued recording clears the system now-playing entry. Rebuild the development
+client after plugin changes so iOS `UIBackgroundModes: audio` and the Android media
+foreground service are generated. Lock-screen chrome is not visible in the iOS
+Simulator.
 Home → **Member sign in**, Profile → **Sign in**, and signed-out **Sign in to
 reply / submit / New thread** all open a root Sign-in modal (Google, Microsoft,
 Discord, GitHub, Apple). After OAuth succeeds the app returns to the screen

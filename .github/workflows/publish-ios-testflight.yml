@@ -195,7 +195,12 @@ jobs:
             echo "::error::ITSAppUsesNonExemptEncryption must be false."
             exit 1
           fi
-          entitlements=$(find ios -name '*.entitlements' -not -path '*/Pods/*' -print -quit)
+          # expo-share-intent also generates ShareExtension.entitlements, but
+          # that extension must not carry the main app's push entitlement.
+          # Resolve the entitlements beside the already-identified app
+          # Info.plist instead of accepting whichever file find returns first.
+          app_ios_dir=$(dirname "$info_plist")
+          entitlements=$(find "$app_ios_dir" -maxdepth 1 -name '*.entitlements' -print -quit)
           if [ -z "$entitlements" ]; then
             echo "::error::prebuild did not produce an entitlements file."
             exit 1
