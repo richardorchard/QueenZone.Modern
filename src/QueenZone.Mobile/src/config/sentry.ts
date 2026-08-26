@@ -18,6 +18,25 @@ import { resolveAppEnvironment } from './environments';
 
 export const navigationIntegration = Sentry.reactNavigationIntegration();
 
+export function reportApiFailure(event: {
+  kind: string;
+  status: number;
+  method: string;
+  path: string;
+}): void {
+  Sentry.addBreadcrumb({
+    category: 'api',
+    type: 'http',
+    level: event.kind === 'http' && event.status < 500 ? 'warning' : 'error',
+    data: {
+      kind: event.kind,
+      status: event.status,
+      method: event.method,
+      path: event.path,
+    },
+  });
+}
+
 export function initSentry(): void {
   const dsn = process.env.EXPO_PUBLIC_SENTRY_DSN;
   if (!dsn) {

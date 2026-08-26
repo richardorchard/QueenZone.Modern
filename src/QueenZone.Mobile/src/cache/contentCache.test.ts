@@ -69,6 +69,20 @@ describe('withOfflineCache', () => {
     assert.deepEqual(result, { id: 1, title: 'cached' });
   });
 
+  it('does not fall back for a timeout', async () => {
+    const cache = new ContentCache({ storage: createMemoryStorage() });
+    await cache.put('news:1', { id: 1, title: 'cached' });
+
+    await assert.rejects(
+      () =>
+        withOfflineCache(cache, 'news:1', async () => {
+          throw ApiError.timeout();
+        }),
+      (err: unknown) => err instanceof ApiError && err.kind === 'timeout',
+    );
+    assert.deepEqual(await cache.get('news:1'), { id: 1, title: 'cached' });
+  });
+
   it('does not fall back for HTTP errors', async () => {
     const cache = new ContentCache({ storage: createMemoryStorage() });
     await cache.put('news:1', { id: 1, title: 'cached' });

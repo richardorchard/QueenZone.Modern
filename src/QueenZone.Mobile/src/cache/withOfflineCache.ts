@@ -4,15 +4,15 @@ function isOfflineFailure(err: unknown): boolean {
   return (
     err instanceof Error &&
     err.name === 'ApiError' &&
-    'status' in err &&
-    (err as { status: unknown }).status === 0
+    'kind' in err &&
+    (err as { kind: unknown }).kind === 'offline'
   );
 }
 
 /**
  * Network-first with offline cache fallback.
- * On success, refreshes the cache. On network failure (`ApiError` status 0),
- * returns the last cached payload when present.
+ * On success, refreshes the cache. On offline failure, returns the last
+ * cached payload when present. Timeout and HTTP miss the cache.
  */
 export async function withOfflineCache<T>(
   cache: ContentCache,
