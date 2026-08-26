@@ -19,6 +19,7 @@ import {
 } from '../../api';
 import { media } from '../../content/media';
 import { useHomeSection } from '../../hooks/useHomeSection';
+import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import { nestedTabParams } from '../../navigation/nestedTab';
 import type { HomeStackParamList, RootTabParamList } from '../../navigation/types';
 import { useSession } from '../../session/SessionContext';
@@ -69,7 +70,6 @@ export function HomeScreen({ navigation }: Props) {
   const avatar = isSignedIn ? initials(displayName) : '';
   const [filter, setFilter] = useState<HomeFilterKey>('all');
   const visibleSections = useMemo(() => visibleSectionsForFilter(filter), [filter]);
-  const [manualRefreshing, setManualRefreshing] = useState(false);
 
   const news = useHomeSection(
     useCallback((signal) => fetchNewsPage({ page: 1, pageSize: 4, signal }), []),
@@ -90,7 +90,6 @@ export function HomeScreen({ navigation }: Props) {
           : Promise.resolve(null),
       [isSignedIn, accessToken],
     ),
-    [isSignedIn, accessToken],
   );
 
   const openNewsStory = useCallback(
@@ -117,24 +116,19 @@ export function HomeScreen({ navigation }: Props) {
     [navigation],
   );
 
-  const refreshAll = useCallback(() => {
-    setManualRefreshing(true);
-    news.reload();
-    forum.reload();
-    gallery.reload();
-    onThisDay.reload();
-    liveActivity.reload();
-    messages.reload();
-    // Sections resolve independently; the pull spinner is a short, fixed-feeling gesture
-    // rather than tracking every section's own loading flag.
-    setTimeout(() => setManualRefreshing(false), 600);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const pull = usePullToRefresh([
+    news.refresh,
+    forum.refresh,
+    gallery.refresh,
+    onThisDay.refresh,
+    liveActivity.refresh,
+    messages.refresh,
+  ]);
 
-  const newsItems = news.data?.items ?? [];
+  const newsItems = news.view.kind === 'content' ? news.view.data.items : [];
   const hero = newsItems[0] ?? null;
   const latestNews = newsItems.slice(1, 4);
-  const totalNewsCount = news.data?.totalCount ?? 0;
+  const totalNewsCount = news.view.kind === 'content' ? news.view.data.totalCount : 0;
 
   return (
     <FlatList
@@ -142,9 +136,8 @@ export function HomeScreen({ navigation }: Props) {
       style={{ flex: 1, backgroundColor: c.surfacePage }}
       data={[]}
       renderItem={() => null}
-      refreshing={false}
       refreshControl={
-        <RefreshControl refreshing={manualRefreshing} onRefresh={refreshAll} tintColor={c.accentPrimary} />
+        <RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} tintColor={c.accentPrimary} />
       }
       ListHeaderComponent={
         <>
@@ -242,7 +235,8 @@ export function HomeScreen({ navigation }: Props) {
             </View>
           </View>
 
-          {!liveActivity.loading && liveActivity.data && liveStripIsVisible(liveActivity.data.newForumRepliesToday) ? (
+          {liveActivity.view.kind === 'content' &&
+          liveStripIsVisible(liveActivity.view.data.newForumRepliesToday) ? (
             <View
               style={{
                 backgroundColor: '#181614',
@@ -258,7 +252,7 @@ export function HomeScreen({ navigation }: Props) {
                 numberOfLines={1}
                 style={{ fontFamily: fonts.body, fontSize: 12, color: 'rgba(255,255,255,0.72)' }}
               >
-                {liveStripLabel(liveActivity.data.newForumRepliesToday)}
+                {liveStripLabel(liveActivity.view.data.newForumRepliesToday)}
               </Text>
             </View>
           ) : null}
@@ -285,10 +279,10 @@ export function HomeScreen({ navigation }: Props) {
 
           {visibleSections.has('hero') && (
             <>
-              {news.loading && !hero ? (
+              {news.view.kind === 'skeleton' ? (
                 <View style={{ height: 300, backgroundColor: c.surfaceCard }} />
-              ) : news.error && !hero ? (
-                <SectionErrorBlock message={news.error} onRetry={news.reload} />
+              ) : news.view.kind === 'error' ? (
+                <SectionErrorBlock message={news.view.message} onRetry={news.reload} />
               ) : hero ? (
                 <HeroFeature
                   testID={testIds.homeHero}
@@ -314,14 +308,14 @@ export function HomeScreen({ navigation }: Props) {
                 actionLabel={totalNewsCount > 0 ? `All ${totalNewsCount.toLocaleString()}+` : 'All'}
                 onAction={() => navigation.navigate('NewsTab', { screen: 'NewsIndex' })}
               />
-              {news.loading && latestNews.length === 0 ? (
+              {news.view.kind === 'skeleton' ? (
                 <View style={{ paddingHorizontal: space.xl, gap: 14 }}>
                   {[0, 1, 2].map((key) => (
                     <View key={key} style={{ height: 76, backgroundColor: c.surfaceCard, borderRadius: radius.xs }} />
                   ))}
                 </View>
-              ) : news.error && latestNews.length === 0 ? (
-                <SectionErrorBlock message={news.error} onRetry={news.reload} />
+              ) : news.view.kind === 'error' ? (
+                <SectionErrorBlock message={news.view.message} onRetry={news.reload} />
               ) : (
                 latestNews.map((item: NewsListItem) => (
                   <Pressable
@@ -390,16 +384,16 @@ export function HomeScreen({ navigation }: Props) {
                 </Pressable>
               </View>
 
-              {forum.loading && (forum.data?.length ?? 0) === 0 ? (
+              {forum.view.kind === 'skeleton' ? (
                 <View style={{ gap: 12 }}>
                   {[0, 1, 2].map((key) => (
                     <View key={key} style={{ height: 44, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: radius.xs }} />
                   ))}
                 </View>
-              ) : forum.error && (forum.data?.length ?? 0) === 0 ? (
-                <SectionErrorBlock message={forum.error} onRetry={forum.reload} />
+              ) : forum.view.kind === 'error' ? (
+                <SectionErrorBlock message={forum.view.message} onRetry={forum.reload} />
               ) : (
-                (forum.data ?? []).map((thread, index) => (
+                forum.view.data.map((thread, index) => (
                   <Pressable
                     key={thread.topicId}
                     accessible
@@ -453,21 +447,21 @@ export function HomeScreen({ navigation }: Props) {
                 actionLabel="Browse"
                 onAction={() => navigation.navigate('PhotosTab', { screen: 'PhotoIndex' })}
               />
-              {gallery.loading && (gallery.data?.items.length ?? 0) === 0 ? (
+              {gallery.view.kind === 'skeleton' ? (
                 <View style={{ flexDirection: 'row', paddingHorizontal: space.xl, gap: 10 }}>
                   {[0, 1, 2].map((key) => (
                     <View key={key} style={{ width: 148, height: 148, backgroundColor: c.surfaceCard, borderRadius: radius.xs }} />
                   ))}
                 </View>
-              ) : gallery.error && (gallery.data?.items.length ?? 0) === 0 ? (
-                <SectionErrorBlock message={gallery.error} onRetry={gallery.reload} />
+              ) : gallery.view.kind === 'error' ? (
+                <SectionErrorBlock message={gallery.view.message} onRetry={gallery.reload} />
               ) : (
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={{ paddingHorizontal: space.xl, gap: 10 }}
                 >
-                  {(gallery.data?.items ?? []).map((category) => (
+                  {gallery.view.data.items.map((category) => (
                     <Pressable
                       key={category.catId}
                       accessible
@@ -512,16 +506,18 @@ export function HomeScreen({ navigation }: Props) {
                 actionLabel="Inbox"
                 onAction={() => navigation.navigate('Inbox')}
               />
-              {messages.loading && (messages.data?.items.length ?? 0) === 0 ? (
+              {messages.view.kind === 'skeleton' ? (
                 <View style={{ gap: 12 }}>
                   {[0, 1].map((key) => (
                     <View key={key} style={{ height: 44, backgroundColor: c.surfaceCard, borderRadius: radius.xs }} />
                   ))}
                 </View>
-              ) : messages.error && (messages.data?.items.length ?? 0) === 0 ? (
-                <SectionErrorBlock message={messages.error} onRetry={messages.reload} />
-              ) : (messages.data?.items.length ?? 0) === 0 ? null : (
-                messages.data!.items.map((conversation: InboxConversation) => (
+              ) : messages.view.kind === 'error' ? (
+                <SectionErrorBlock message={messages.view.message} onRetry={messages.reload} />
+              ) : messages.view.kind === 'content' &&
+                messages.view.data !== null &&
+                messages.view.data.items.length > 0 ? (
+                messages.view.data.items.map((conversation: InboxConversation) => (
                   <Pressable
                     key={conversation.conversationId}
                     accessible
@@ -566,7 +562,7 @@ export function HomeScreen({ navigation }: Props) {
                     ) : null}
                   </Pressable>
                 ))
-              )}
+              ) : null}
             </View>
           ) : (
             <Pressable
@@ -591,11 +587,13 @@ export function HomeScreen({ navigation }: Props) {
             </Pressable>
           )}
 
-          {visibleSections.has('onThisDay') && !onThisDay.loading && onThisDayIsVisible(onThisDay.data) ? (
+          {visibleSections.has('onThisDay') &&
+          onThisDay.view.kind === 'content' &&
+          onThisDayIsVisible(onThisDay.view.data) ? (
             <FeatureBlock
               eyebrow="On this day"
-              numeral={onThisDay.data!.formattedDate.toUpperCase()}
-              body={onThisDay.data!.summary}
+              numeral={onThisDay.view.data.formattedDate.toUpperCase()}
+              body={onThisDay.view.data.summary}
               actionLabel="View timeline"
               onAction={() => navigation.navigate('ArchiveTab', { screen: 'Timeline' })}
             />
