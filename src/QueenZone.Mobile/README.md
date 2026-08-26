@@ -420,7 +420,10 @@ The one-time Apple setup for `org.queenzone.mobile` consists of:
 
 - Apple Developer team `X28Z75P69M`;
 - an Apple Distribution certificate;
-- the `QueenZone App Store` App Store Connect provisioning profile;
+- Push Notifications enabled on the `org.queenzone.mobile` App ID;
+- the `QueenZone App Store` App Store Connect provisioning profile
+  (regenerated after that capability is enabled, so it includes
+  `aps-environment=production`);
 - the QueenZone App Store Connect record (Apple ID `6803889011`); and
 - a Developer-role App Store Connect API key dedicated to GitHub uploads.
 
@@ -432,10 +435,13 @@ puts Homebrew (`/opt/homebrew/bin` or `/usr/local/bin`) on `PATH`, installs
 CocoaPods if `pod` is missing, runs `expo prebuild --no-install` with
 `IOS_BUILD_NUMBER` set to the workflow run number (so `CFBundleVersion` is unique
 for App Store Connect), records the UTC build time and source revision for the
-in-app build stamp, then runs `pod install` before archiving. Expo also writes
+in-app build stamp, then runs `pod install` before archiving. Expo writes
 `ITSAppUsesNonExemptEncryption=false` because the app uses only exempt platform
 HTTPS; this prevents each TestFlight build pausing for the same export-compliance
-questionnaire. Expo's own CocoaPods auto-install is skipped
+questionnaire. The workflow also sets `IOS_APS_ENVIRONMENT=production` so
+`expo-notifications` stamps `aps-environment=production` — App Store and
+TestFlight distribution profiles cannot carry the sandbox entitlement, even
+when the binary still talks to the staging API. Expo's own CocoaPods auto-install is skipped
 because a missing CLI is only a warning and otherwise continues without an
 `.xcworkspace`. It then imports signing material into a temporary Keychain,
 produces and verifies a signed `.ipa`, retains that IPA as a seven-day
@@ -466,9 +472,15 @@ commit their values):
 | `APP_STORE_CONNECT_PRIVATE_KEY` | One-time-downloaded App Store Connect `.p8` private key |
 
 Rotate the distribution certificate/profile before their shared expiry and
-replace the corresponding secrets together. Revoke and replace the API key if
-its private key is ever exposed. Signing material must never be copied into the
-repository, workflow artifacts, logs, or issue/PR text.
+replace the corresponding secrets together. After enabling a new App ID
+capability (for example Push Notifications), regenerate `QueenZone App Store`
+in Apple Developer **Profiles**, then replace `IOS_PROVISIONING_PROFILE_BASE64`
+with a base64 encoding of the new `.mobileprovision` (value length only in
+logs and chat). A stale profile fails the archive with "doesn't include the
+Push Notifications capability" / missing `aps-environment`. Revoke and
+replace the API key if its private key is ever exposed. Signing material must
+never be copied into the repository, workflow artifacts, logs, or issue/PR
+text.
 
 ## Install the latest Android test build
 
