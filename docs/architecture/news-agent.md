@@ -146,7 +146,8 @@ Authenticated admins use Razor Pages under `/admin/news-discovery`:
 | Route | Purpose |
 |-------|---------|
 | `/admin/news-discovery` | Filterable list (status, source, trust tier, confidence, entity, dates, has-draft) |
-| `/admin/news-discovery/{id}` | Candidate detail: source URL, evidence, AI rationale, draft fields |
+| `/admin/news-discovery/prompt-settings` | Publish triage/draft editorial guidance overlays (future runs only) |
+| `/admin/news-discovery/{id}` | Candidate detail: source URL, evidence, AI rationale, draft fields, AI provenance |
 | `/admin/news-discovery/{id}/edit-draft` | Edit generated draft fields |
 
 Editor actions (POST, anti-forgery protected):
@@ -158,7 +159,19 @@ Editor actions (POST, anti-forgery protected):
 - **Edit draft** → save fields; moves `NeedsReview` → `Drafted` when appropriate
 - **Promote to admin news** → creates an unpublished article in `/admin/news` and marks the candidate `PromotedToArticle`
 
-Draft generation uses prompt version `draft-v2`, which requires exact band-member quotations to appear in both the body and a `preserved_quotes` collection backed by evidence. Unverifiable quotation marks are stripped before the draft is stored. Review pages surface preserved quotes for editor comparison before promotion.
+Draft generation uses prompt version `draft-v4`, which requires exact band-member quotations to appear in both the body and a `preserved_quotes` collection backed by evidence. Unverifiable quotation marks are stripped before the draft is stored. Review pages surface preserved quotes for editor comparison before promotion.
+
+### Editorial guidance overlay (admin-editable)
+
+Admins can publish a short plain-text overlay for triage and draft runs from `/admin/news-discovery/prompt-settings`. This is **not** the compiled system prompt.
+
+- Compiled rules stay in `NewsTriagePrompt` (`triage-v2`) and `NewsDraftPrompt` (`draft-v4`): JSON schema, evidence, quotation, media-link, preservation, and safety.
+- Published overlay text is appended after those rules in a delimited untrusted block. Empty, missing, or invalid published guidance uses the compiled default (current behaviour).
+- Revisions live in the EF table `NewsAgentGuidanceRevisions`. There is no seed. After migration, both types have no published row, so workers keep today's compiled prompts.
+- **Restore compiled default** publishes a new empty revision (`Content` `""`). History stays. The worker treats empty content as no overlay.
+- Web and worker are separate processes. Published guidance is cached in-process with an **absolute 60 second** TTL. The web host may evict its cache on publish; the worker still waits up to 60 seconds. That TTL is the propagation contract.
+- If the database is down or a published row is invalid, the provider returns an empty snapshot (compiled default) and logs the guidance type plus fallback reason, never the guidance text.
+- Guidance affects **future runs only**. Existing candidates, AI results, and drafts are not rewritten. Each `NewsAiRun` stores compiled `PromptVersion` plus optional guidance revision id/number/hash, not the full overlay text.
 
 ### SQL Express mirror URL ingestion probe (opt-in)
 
