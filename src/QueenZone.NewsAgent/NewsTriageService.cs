@@ -8,6 +8,7 @@ public sealed class NewsTriageService(
     INewsDiscoveryRepository repository,
     NewsAiRunExecutor aiRunExecutor,
     NewsTriageDeterministicAnalyzer deterministicAnalyzer,
+    INewsAgentGuidanceProvider guidanceProvider,
     IOptions<NewsTriageOptions> triageOptions,
     ILogger<NewsTriageService> logger)
 {
@@ -106,7 +107,14 @@ public sealed class NewsTriageService(
 
         if (deterministic.DuplicateOfCandidateId is null && aiRunExecutor.IsAiEnabled)
         {
-            var messages = NewsTriagePrompt.BuildMessages(candidate, source, evidence);
+            var guidance = await guidanceProvider.GetPublishedAsync(
+                NewsAgentGuidanceType.Triage,
+                cancellationToken);
+            var messages = NewsTriagePrompt.BuildMessages(
+                candidate,
+                source,
+                evidence,
+                guidance.HasOverlay ? guidance.Content : null);
             var execution = await aiRunExecutor.ExecuteAsync(
                 candidate.Id,
                 NewsAiRunKind.Triage,
@@ -114,7 +122,8 @@ public sealed class NewsTriageService(
                 NewsTriagePrompt.Version,
                 messages,
                 options.RunAtUtc,
-                cancellationToken);
+                cancellationToken,
+                guidance);
 
             if (!execution.Completion.DryRun && !string.IsNullOrWhiteSpace(execution.Completion.Content))
             {
