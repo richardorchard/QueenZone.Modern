@@ -1,10 +1,23 @@
 import { ApiError } from './errors';
+import { shouldUseNativeMultipartUpload } from './nativeUpload';
 
 export type UploadFilePart = {
   uri: string;
   name: string;
   type: string;
 };
+
+/**
+ * React Native XMLHttpRequest understands this file object. Do not convert
+ * it to a Blob first — `fetch(file://)` throws on the same iOS builds.
+ */
+export function appendNativeUploadFile(form: FormData, fieldName: string, file: UploadFilePart): void {
+  form.append(fieldName, {
+    uri: file.uri,
+    name: file.name,
+    type: file.type,
+  } as unknown as Blob);
+}
 
 function isAbortError(err: unknown): boolean {
   return err instanceof Error && err.name === 'AbortError';
@@ -19,10 +32,8 @@ function typedBlob(blob: Blob, type: string): Blob {
 }
 
 /**
- * Read a picker `file://` / `content://` URI into a real Blob so FormData
- * does not depend on React Native's `{ uri, name, type }` file part.
- * That object throws `TypeError: Network request failed` on some iOS
- * TestFlight builds even for a small crop.
+ * Read a picker `file://` / `content://` URI into a real Blob for Node
+ * contract tests and any runtime that still posts multipart through fetch.
  */
 export async function readUploadFileBlob(file: UploadFilePart, signal?: AbortSignal): Promise<Blob> {
   let response: Response;
@@ -62,6 +73,11 @@ export async function appendUploadFile(
   file: UploadFilePart,
   signal?: AbortSignal,
 ): Promise<void> {
+  if (shouldUseNativeMultipartUpload()) {
+    appendNativeUploadFile(form, fieldName, file);
+    return;
+  }
+
   const blob = await readUploadFileBlob(file, signal);
   form.append(fieldName, blob, file.name);
 }

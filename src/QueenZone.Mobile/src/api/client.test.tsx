@@ -106,7 +106,7 @@ describe('sendJson and sendMultipart', () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ id: 9 }));
     const form = new FormData();
     form.append('photo', 'blob');
-    await sendMultipart('/member/photo-submissions', form, { accessToken: 'tok' });
+    await sendMultipart('/member/photo-submissions', form, { accessToken: 'tok', transport: 'fetch' });
     const { init } = lastCall();
     expect(init.method).toBe('POST');
     expect(init.body).toBe(form);
@@ -237,6 +237,112 @@ describe('offline, HTTP retry, and malformed JSON', () => {
       kind: 'offline',
       cause,
     });
+  });
+
+  it('posts multipart through XMLHttpRequest when transport is xhr', async () => {
+    const xhr = {
+      status: 200,
+      responseText: '{"ok":true}',
+      timeout: 0,
+      responseType: '',
+      headers: {} as Record<string, string>,
+      sent: null as FormData | null,
+      open: jest.fn(),
+      setRequestHeader: jest.fn((name: string, value: string) => {
+        xhr.headers[name] = value;
+      }),
+      getResponseHeader: jest.fn(() => 'application/json'),
+      send: jest.fn((body?: XMLHttpRequestBodyInit | null) => {
+        xhr.sent = body as FormData;
+        queueMicrotask(() => xhr.onload?.());
+      }),
+      abort: jest.fn(),
+      onload: null as (() => void) | null,
+      onerror: null as (() => void) | null,
+      ontimeout: null as (() => void) | null,
+      onabort: null as (() => void) | null,
+    };
+    const previous = global.XMLHttpRequest;
+    global.XMLHttpRequest = jest.fn(() => xhr) as unknown as typeof XMLHttpRequest;
+
+    try {
+      const form = new FormData();
+      form.append('file', 'avatar');
+      await expect(sendMultipart('/me/avatar', form, { accessToken: 'tok', transport: 'xhr' })).resolves.toEqual({
+        ok: true,
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(xhr.open).toHaveBeenCalledWith('POST', 'http://qz.test/api/v1/me/avatar');
+      expect(xhr.headers).toEqual({
+        Accept: 'application/json',
+        Authorization: 'Bearer tok',
+      });
+      expect(xhr.sent).toBe(form);
+    } finally {
+      global.XMLHttpRequest = previous;
+    }
+  });
+
+  it('maps an XHR 401 through Problem Details copy', async () => {
+    const xhr = {
+      status: 401,
+      responseText: '{"detail":"Sign in to continue."}',
+      timeout: 0,
+      responseType: '',
+      open: jest.fn(),
+      setRequestHeader: jest.fn(),
+      getResponseHeader: jest.fn(() => 'application/json'),
+      send: jest.fn(() => {
+        queueMicrotask(() => xhr.onload?.());
+      }),
+      abort: jest.fn(),
+      onload: null as (() => void) | null,
+      onerror: null as (() => void) | null,
+      ontimeout: null as (() => void) | null,
+      onabort: null as (() => void) | null,
+    };
+    const previous = global.XMLHttpRequest;
+    global.XMLHttpRequest = jest.fn(() => xhr) as unknown as typeof XMLHttpRequest;
+
+    try {
+      await expect(sendMultipart('/me/avatar', new FormData(), { transport: 'xhr' })).rejects.toMatchObject({
+        kind: 'http',
+        status: 401,
+        message: 'Sign in to continue.',
+      });
+    } finally {
+      global.XMLHttpRequest = previous;
+    }
+  });
+
+  it('maps an XHR network failure to offline', async () => {
+    const xhr = {
+      status: 0,
+      responseText: '',
+      timeout: 0,
+      responseType: '',
+      open: jest.fn(),
+      setRequestHeader: jest.fn(),
+      getResponseHeader: jest.fn(() => null),
+      send: jest.fn(() => {
+        queueMicrotask(() => xhr.onerror?.());
+      }),
+      abort: jest.fn(),
+      onload: null as (() => void) | null,
+      onerror: null as (() => void) | null,
+      ontimeout: null as (() => void) | null,
+      onabort: null as (() => void) | null,
+    };
+    const previous = global.XMLHttpRequest;
+    global.XMLHttpRequest = jest.fn(() => xhr) as unknown as typeof XMLHttpRequest;
+
+    try {
+      await expect(sendMultipart('/me/avatar', new FormData(), { transport: 'xhr' })).rejects.toMatchObject({
+        kind: 'offline',
+      });
+    } finally {
+      global.XMLHttpRequest = previous;
+    }
   });
 
   it('retries a GET 503 once and then succeeds', async () => {

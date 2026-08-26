@@ -10,9 +10,11 @@ export {
 } from './client';
 export { isLocalFileFailure } from './errors';
 export type { ApiFailureKind } from './client';
-export { appendUploadFile, readUploadFileBlob } from './uploadFile';
+export { appendNativeUploadFile, appendUploadFile, readUploadFileBlob } from './uploadFile';
 export type { UploadFilePart } from './uploadFile';
-export type { FetchJsonOptions, SendJsonOptions } from './client';
+export { shouldUseNativeMultipartUpload } from './nativeUpload';
+export type { FetchJsonOptions, SendJsonOptions, SendMultipartOptions } from './client';
+export { uploadMemberAvatar, memberAvatarPath } from './memberAvatar';
 export {
   fetchAlbumDetail,
   fetchBiographyChapter,

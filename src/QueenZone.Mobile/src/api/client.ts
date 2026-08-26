@@ -1,6 +1,12 @@
 import { apiV1Url } from '../config';
 import { reportApiFailure } from '../config/sentry';
 import { ApiError, isTimeoutFailure } from './errors';
+import {
+  classifyXhrFailure,
+  interpretMultipartXhrResult,
+  postFormWithXhr,
+} from './multipartXhr';
+import { shouldUseNativeMultipartUpload } from './nativeUpload';
 import type { ProblemDetails } from './types';
 
 export { ApiError, isOfflineFailure, isTimeoutFailure } from './errors';
@@ -11,6 +17,14 @@ export type FetchJsonOptions = {
   query?: Record<string, string | number | undefined | null>;
   /** Optional Bearer — poll GET fills viewer flags; writes require it. */
   accessToken?: string | null;
+};
+
+export type SendMultipartOptions = FetchJsonOptions & {
+  /**
+   * `auto` uses XMLHttpRequest on React Native (iOS fetch+FormData throws)
+   * and fetch everywhere else. Tests may force either transport.
+   */
+  transport?: 'auto' | 'fetch' | 'xhr';
 };
 
 export type SendJsonOptions = FetchJsonOptions & {
@@ -359,15 +373,47 @@ export async function sendJson<T>(path: string, options: SendJsonOptions = {}): 
   });
 }
 
+function useXhrTransport(options: SendMultipartOptions): boolean {
+  if (options.transport === 'xhr') {
+    return true;
+  }
+  if (options.transport === 'fetch') {
+    return false;
+  }
+  return shouldUseNativeMultipartUpload();
+}
+
 /**
  * Multipart write to `/api/v1{path}` (avatar upload, photo submissions).
- * Do not set Content-Type; fetch supplies the multipart boundary.
+ * Do not set Content-Type; the transport supplies the multipart boundary.
+ * React Native uses XMLHttpRequest because `fetch`+FormData file parts
+ * throw `TypeError: Network request failed` on some iOS TestFlight builds.
  */
 export async function sendMultipart<T>(
   path: string,
   formData: FormData,
-  options: FetchJsonOptions = {},
+  options: SendMultipartOptions = {},
 ): Promise<T> {
+  if (useXhrTransport(options)) {
+    const url = buildUrl(path, options.query);
+    try {
+      const result = await postFormWithXhr({
+        url,
+        formData,
+        headers: authHeaders(options.accessToken),
+        timeoutMs: MULTIPART_POLICY.attemptTimeoutMs,
+        signal: options.signal,
+      });
+      return interpretMultipartXhrResult<T>(result, messageForWriteStatus, messageFromProblem);
+    } catch (err) {
+      const classified = classifyXhrFailure(err, options.signal);
+      if (classified instanceof ApiError) {
+        reportTerminal(classified, 'POST', path);
+      }
+      throw classified;
+    }
+  }
+
   return request<T>({
     method: 'POST',
     path,

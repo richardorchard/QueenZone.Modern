@@ -1,5 +1,5 @@
 import { ApiError } from './errors';
-import { appendUploadFile, readUploadFileBlob } from './uploadFile';
+import { appendNativeUploadFile, appendUploadFile, readUploadFileBlob } from './uploadFile';
 
 const fetchMock = jest.fn<Promise<Response>, [RequestInfo | URL, RequestInit?]>();
 
@@ -140,5 +140,22 @@ describe('appendUploadFile', () => {
     if (part instanceof File) {
       expect(part.name).toBe('crowd.jpg');
     }
+  });
+});
+
+describe('appendNativeUploadFile', () => {
+  it('appends the React Native { uri, name, type } file part', () => {
+    const append = jest.fn();
+    const form = { append } as unknown as FormData;
+    appendNativeUploadFile(form, 'file', {
+      uri: 'file:///tmp/avatar.jpg',
+      name: 'avatar.jpg',
+      type: 'image/jpeg',
+    });
+    expect(append).toHaveBeenCalledWith('file', {
+      uri: 'file:///tmp/avatar.jpg',
+      name: 'avatar.jpg',
+      type: 'image/jpeg',
+    });
   });
 });
