@@ -215,6 +215,14 @@ export const photoSubmissionCreatedSchema = z.object({
   submittedAt: isoDateTime,
 });
 
+export const newsSuggestionCreatedSchema = z.object({
+  id: guid,
+  status: z.string().min(1),
+  url: z.string().min(1),
+  title: z.string().nullable(),
+  submittedAt: isoDateTime,
+});
+
 export const inboxConversationSchema = z.object({
   conversationId: guid,
   otherParticipantId: guid,

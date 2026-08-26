@@ -28,6 +28,24 @@ jest.mock('react-native-reanimated', () => require('./jest.reanimated.mock.js'))
 
 jest.mock('react-native-gesture-handler', () => require('./jest.gesture-handler.mock.js'));
 
+jest.mock('expo-share-intent', () => ({
+  useShareIntent: () => ({
+    isReady: true,
+    hasShareIntent: false,
+    shareIntent: { text: null, webUrl: null, files: null, type: null },
+    resetShareIntent: jest.fn(),
+    error: null,
+  }),
+  ShareIntentProvider: ({ children }: { children: unknown }) => children,
+  useShareIntentContext: () => ({
+    isReady: true,
+    hasShareIntent: false,
+    shareIntent: { text: null, webUrl: null, files: null, type: null },
+    resetShareIntent: jest.fn(),
+    error: null,
+  }),
+}));
+
 jest.mock('expo-web-browser', () => ({
   maybeCompleteAuthSession: jest.fn(),
   openAuthSessionAsync: jest.fn(),

@@ -28,6 +28,7 @@ import { AboutArchiveScreen } from '../screens/archive/AboutArchiveScreen';
 import { SearchRouteScreen } from '../screens/archive/SearchScreen';
 import { NewsIndexScreen } from '../screens/news/NewsIndexScreen';
 import { NewsStoryScreen } from '../screens/news/NewsStoryScreen';
+import { SuggestNewsScreen } from '../screens/news/SuggestNewsScreen';
 import { PhotosScreen } from '../screens/photos/PhotosScreen';
 import { PhotoCategoryScreen } from '../screens/photos/PhotoCategoryScreen';
 import { PhotoViewerScreen } from '../screens/photos/PhotoViewerScreen';
@@ -36,7 +37,7 @@ import { ForumScreen } from '../screens/forum/ForumScreen';
 import { CategoryScreen } from '../screens/forum/CategoryScreen';
 import { ThreadScreen } from '../screens/forum/ThreadScreen';
 import { ComposerScreen } from '../screens/forum/ComposerScreen';
-import { ForumIndexHeaderRight, HeaderBackButton, SearchHeaderButton } from './headerButtons';
+import { ForumIndexHeaderRight, HeaderBackButton, NewsIndexHeaderRight, SearchHeaderButton } from './headerButtons';
 import type {
   ArchiveStackParamList,
   ForumStackParamList,
@@ -83,6 +84,7 @@ export function HomeStack() {
       <Home.Screen name="ComposeMessage" component={ComposeMessageScreen} options={{ title: 'New message' }} />
       <Home.Screen name="SavedList" component={SavedListScreen} options={{ title: 'Library' }} />
       <Home.Screen name="MySubmissions" component={MySubmissionsScreen} options={{ title: 'My submissions' }} />
+      <Home.Screen name="SuggestNews" component={SuggestNewsScreen} options={{ title: 'Suggest news' }} />
     </Home.Navigator>
   );
 }
@@ -95,7 +97,7 @@ export function NewsStack() {
         component={NewsIndexScreen}
         options={({ navigation }) => ({
           title: 'News',
-          headerRight: () => <SearchHeaderButton onPress={() => navigation.navigate('Search')} />,
+          headerRight: () => <NewsIndexHeaderRight navigation={navigation} />,
         })}
       />
       <News.Screen name="Story" component={NewsStoryScreen} />
