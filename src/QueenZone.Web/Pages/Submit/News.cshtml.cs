@@ -52,28 +52,32 @@ public sealed class NewsModel(NewsSuggestionService newsSuggestionService) : Pag
             return Page();
         }
 
-        var result = await newsSuggestionService.SubmitAsync(
+        var outcome = await newsSuggestionService.SubmitAsync(
             memberId.Value,
             StoryUrl,
             Title,
             Notes,
             cancellationToken);
 
-        if (!result.Succeeded || result.Suggestion is null)
+        // Records synthesize a copy constructor, so CS8509 cannot see the nested sum as closed.
+#pragma warning disable CS8509
+        return outcome switch
         {
-            if (result.IsDuplicateActive)
-            {
-                ModelState.AddModelError(string.Empty, result.Error ?? NewsSuggestionService.DuplicateActiveMessage);
-            }
-            else
-            {
-                ModelState.AddModelError(string.Empty, result.Error ?? "Could not submit suggestion.");
-            }
+            SubmitOutcome.Accepted => Redirect("/submit/news/confirmation"),
+            SubmitOutcome.InvalidField
+                or SubmitOutcome.DuplicateActive
+                or SubmitOutcome.DailyLimit
+                or SubmitOutcome.SignInRequired => FailurePage(outcome.Message),
+        };
+#pragma warning restore CS8509
 
+        IActionResult FailurePage(string message)
+        {
+            ModelState.AddModelError(
+                string.Empty,
+                string.IsNullOrEmpty(message) ? "Could not submit suggestion." : message);
             return Page();
         }
-
-        return Redirect("/submit/news/confirmation");
     }
 
     private async Task<Guid?> GetCurrentMemberIdAsync()

@@ -4,17 +4,21 @@ using QueenZone.Data;
 namespace QueenZone.Web;
 
 /// <summary>
-/// Authenticated member writes under <c>/api/v1/member/*</c> (issue #746).
+/// Authenticated member writes under <c>/api/v1/member/*</c> (issues #746 / #926).
 /// Photo submit requires <see cref="MemberAuthenticationSchemes.MobileMemberPolicy"/>
 /// and delegates to <see cref="PhotoSubmissionService.SubmitAsync"/> — the same
 /// <c>ugc-photos</c> path, admin queue, and <see cref="MemberUploadQuotaService"/>
 /// bucket as <c>/submit/photo</c>. Do not add a second quota counter.
+/// News suggestions reuse <see cref="NewsSuggestionService.SubmitAsync"/> with the
+/// same daily cap and active-URL dedupe as <c>/submit/news</c>.
 /// </summary>
 public static class MemberApiEndpoints
 {
     public const string RootPath = "/api/v1/member";
 
     public const string PhotoSubmissionsPath = $"{RootPath}/photo-submissions";
+
+    public const string NewsSuggestionsPath = $"{RootPath}/news-suggestions";
 
     public static void MapMemberApiEndpoints(this WebApplication app)
     {
@@ -31,6 +35,18 @@ public static class MemberApiEndpoints
             .Produces<PhotoSubmissionCreatedDto>(StatusCodes.Status201Created)
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests)
+            .DisableAntiforgery();
+
+        group.MapPost("/news-suggestions", CreateNewsSuggestionAsync)
+            .WithName("CreateMemberNewsSuggestion")
+            .WithSummary("Suggest a news URL for review. Same NewsSuggestionService as /submit/news.")
+            .RequireAuthorization(MemberAuthenticationSchemes.MobileMemberPolicy)
+            .Accepts<NewsSuggestionRequestDto>("application/json")
+            .Produces<NewsSuggestionCreatedDto>(StatusCodes.Status201Created)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status429TooManyRequests)
             .DisableAntiforgery();
     }
@@ -142,6 +158,64 @@ public static class MemberApiEndpoints
         }
 
         return files.FirstOrDefault(file => file is { Length: > 0 });
+    }
+
+    internal static async Task<IResult> CreateNewsSuggestionAsync(
+        ClaimsPrincipal user,
+        NewsSuggestionRequestDto? request,
+        NewsSuggestionService newsSuggestionService,
+        CancellationToken cancellationToken)
+    {
+        var memberId = ForumMember.GetMemberId(user);
+        if (memberId is null)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status401Unauthorized,
+                title: "Unauthorized");
+        }
+
+        var outcome = await newsSuggestionService.SubmitAsync(
+            memberId.Value,
+            request?.Url ?? string.Empty,
+            request?.Title,
+            request?.Notes,
+            cancellationToken);
+
+        return MapNewsSuggestionOutcome(outcome);
+    }
+
+    internal static IResult MapNewsSuggestionOutcome(SubmitOutcome outcome)
+    {
+        // Records synthesize a copy constructor, so CS8509 cannot see the nested sum as closed.
+#pragma warning disable CS8509
+        return outcome switch
+        {
+            SubmitOutcome.Accepted accepted => Results.Created(
+                $"{NewsSuggestionsPath}/{accepted.Suggestion.Id:D}",
+                new NewsSuggestionCreatedDto(
+                    accepted.Suggestion.Id,
+                    accepted.Suggestion.Status,
+                    accepted.Suggestion.Url,
+                    accepted.Suggestion.Title,
+                    accepted.Suggestion.SubmittedAt)),
+            SubmitOutcome.InvalidField invalid => Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Bad Request",
+                detail: invalid.Message),
+            SubmitOutcome.SignInRequired signIn => Results.Problem(
+                statusCode: StatusCodes.Status401Unauthorized,
+                title: "Unauthorized",
+                detail: signIn.Message),
+            SubmitOutcome.DuplicateActive duplicate => Results.Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                title: "Conflict",
+                detail: duplicate.Message),
+            SubmitOutcome.DailyLimit limit => Results.Problem(
+                statusCode: StatusCodes.Status429TooManyRequests,
+                title: "Too Many Requests",
+                detail: limit.Message),
+        };
+#pragma warning restore CS8509
     }
 
     private static string? FirstNonEmpty(params string?[] values)

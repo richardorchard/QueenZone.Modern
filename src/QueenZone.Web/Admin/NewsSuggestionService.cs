@@ -1,7 +1,43 @@
+using System.Net;
 using Microsoft.Extensions.Options;
 using QueenZone.Data;
+using QueenZone.NewsAgent;
 
 namespace QueenZone.Web;
+
+public abstract record SubmitOutcome
+{
+    private SubmitOutcome()
+    {
+    }
+
+    public abstract string Message { get; }
+
+    public sealed record Accepted(NewsSuggestion Suggestion) : SubmitOutcome
+    {
+        public override string Message => string.Empty;
+    }
+
+    public sealed record InvalidField(string message) : SubmitOutcome
+    {
+        public override string Message { get; } = message;
+    }
+
+    public sealed record DuplicateActive(string message) : SubmitOutcome
+    {
+        public override string Message { get; } = message;
+    }
+
+    public sealed record DailyLimit(string message) : SubmitOutcome
+    {
+        public override string Message { get; } = message;
+    }
+
+    public sealed record SignInRequired() : SubmitOutcome
+    {
+        public override string Message => "Sign in is required to suggest news.";
+    }
+}
 
 public sealed class NewsSuggestionService(
     INewsSuggestionRepository newsSuggestionRepository,
@@ -10,13 +46,7 @@ public sealed class NewsSuggestionService(
     public const string DuplicateActiveMessage =
         "This story has already been suggested — thank you, we are reviewing it.";
 
-    public sealed record SubmitResult(
-        bool Succeeded,
-        NewsSuggestion? Suggestion,
-        string? Error,
-        bool IsDuplicateActive);
-
-    public async Task<SubmitResult> SubmitAsync(
+    public async Task<SubmitOutcome> SubmitAsync(
         Guid memberAccountId,
         string url,
         string? title,
@@ -25,23 +55,23 @@ public sealed class NewsSuggestionService(
     {
         if (memberAccountId == Guid.Empty)
         {
-            return new SubmitResult(false, null, "Sign in is required to suggest news.", false);
+            return new SubmitOutcome.SignInRequired();
         }
 
-        var validationError = ValidateUrl(url);
+        var validationError = DescribeUrlProblem(url);
         if (validationError is not null)
         {
-            return new SubmitResult(false, null, validationError, false);
+            return new SubmitOutcome.InvalidField(validationError);
         }
 
         if (!string.IsNullOrWhiteSpace(title) && title.Trim().Length > 300)
         {
-            return new SubmitResult(false, null, "Suggested headline must be 300 characters or fewer.", false);
+            return new SubmitOutcome.InvalidField("Suggested headline must be 300 characters or fewer.");
         }
 
         if (!string.IsNullOrWhiteSpace(notes) && notes.Trim().Length > 1000)
         {
-            return new SubmitResult(false, null, "Notes must be 1000 characters or fewer.", false);
+            return new SubmitOutcome.InvalidField("Notes must be 1000 characters or fewer.");
         }
 
         var normalizedUrl = NewsCandidateDedupe.NormalizeCanonicalUrl(url.Trim());
@@ -49,7 +79,7 @@ public sealed class NewsSuggestionService(
 
         if (await newsSuggestionRepository.HasActiveDuplicateAsync(urlHash, cancellationToken))
         {
-            return new SubmitResult(false, null, DuplicateActiveMessage, true);
+            return new SubmitOutcome.DuplicateActive(DuplicateActiveMessage);
         }
 
         var maxPerDay = Math.Max(1, options.Value.MaxSubmissionsPerMemberPerDay);
@@ -60,51 +90,75 @@ public sealed class NewsSuggestionService(
             cancellationToken);
         if (recentCount >= maxPerDay)
         {
-            return new SubmitResult(
-                false,
-                null,
-                $"You can suggest up to {maxPerDay} news stories per day. Please try again tomorrow.",
-                false);
+            return new SubmitOutcome.DailyLimit(
+                $"You can suggest up to {maxPerDay} news stories per day. Please try again tomorrow.");
         }
 
-        var created = await newsSuggestionRepository.CreateAsync(
-            new NewsSuggestion(
-                Guid.NewGuid(),
-                memberAccountId,
-                normalizedUrl,
-                urlHash,
-                string.IsNullOrWhiteSpace(title) ? null : title.Trim(),
-                string.IsNullOrWhiteSpace(notes) ? null : notes.Trim(),
-                NewsSuggestionStatus.Pending,
-                DateTimeOffset.UtcNow,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null),
-            cancellationToken);
+        try
+        {
+            var created = await newsSuggestionRepository.CreateAsync(
+                new NewsSuggestion(
+                    Guid.NewGuid(),
+                    memberAccountId,
+                    normalizedUrl,
+                    urlHash,
+                    string.IsNullOrWhiteSpace(title) ? null : title.Trim(),
+                    string.IsNullOrWhiteSpace(notes) ? null : notes.Trim(),
+                    NewsSuggestionStatus.Pending,
+                    DateTimeOffset.UtcNow,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null),
+                cancellationToken);
 
-        return new SubmitResult(true, created, null, false);
+            return new SubmitOutcome.Accepted(created);
+        }
+        catch (DuplicateActiveNewsSuggestionException)
+        {
+            return new SubmitOutcome.DuplicateActive(DuplicateActiveMessage);
+        }
     }
 
-    internal static string? ValidateUrl(string? url)
+    internal static string? ValidateUrl(string? url) => DescribeUrlProblem(url);
+
+    internal static string? DescribeUrlProblem(string? url)
     {
         if (string.IsNullOrWhiteSpace(url))
         {
             return "URL is required.";
         }
 
-        if (url.Trim().Length > 2000)
+        var trimmed = url.Trim();
+        if (trimmed.Length > 2000)
         {
             return "URL must be 2000 characters or fewer.";
         }
 
-        if (!Uri.TryCreate(url.Trim(), UriKind.Absolute, out var uri)
-            || uri.Scheme != Uri.UriSchemeHttps)
+        if (!Uri.TryCreate(trimmed, UriKind.Absolute, out var uri)
+            || uri.Scheme != Uri.UriSchemeHttps
+            || string.IsNullOrWhiteSpace(uri.Host))
         {
             return "URL must be a well-formed https:// link.";
+        }
+
+        if (!string.IsNullOrEmpty(uri.UserInfo))
+        {
+            return "URL must not include credentials.";
+        }
+
+        if (IPAddress.TryParse(uri.DnsSafeHost, out var literal)
+            && OutboundUrlSafety.IsBlockedAddress(literal))
+        {
+            return "URL must be a public https:// link.";
+        }
+
+        if (OutboundUrlSafety.IsBlockedHostName(uri.DnsSafeHost))
+        {
+            return "URL must be a public https:// link.";
         }
 
         return null;
