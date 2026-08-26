@@ -17,6 +17,7 @@ import { apiV1Url } from '../config';
 import { useSession } from '../session/SessionContext';
 import type { FanPerformance } from '../api';
 import { fanPerformanceAudioPath } from './formatDuration';
+import { audioSessionMode, lockScreenMetadata, lockScreenOptions } from './lockScreen';
 
 type PlayerState = {
   current: FanPerformance | null;
@@ -50,14 +51,16 @@ export function FanPerformancePlayerProvider({ children }: { children: ReactNode
   queueRef.current = queue;
 
   useEffect(() => {
-    setAudioModeAsync({
-      playsInSilentMode: true,
-      shouldPlayInBackground: true,
-      interruptionMode: 'doNotMix',
-    }).catch(() => {
+    setAudioModeAsync({ ...audioSessionMode }).catch(() => {
       /* native audio session is unavailable in node tests */
     });
   }, []);
+
+  const clearNowPlaying = useCallback(() => {
+    player.pause();
+    player.clearLockScreenControls();
+    setCurrent(null);
+  }, [player]);
 
   const load = useCallback(
     (track: FanPerformance) => {
@@ -73,16 +76,8 @@ export function FanPerformancePlayerProvider({ children }: { children: ReactNode
         headers: { Authorization: `Bearer ${accessToken}` },
         name: track.title,
       });
+      player.setActiveForLockScreen(true, lockScreenMetadata(track), { ...lockScreenOptions });
       player.play();
-      player.setActiveForLockScreen(
-        true,
-        {
-          title: track.title,
-          artist: track.performedBy,
-          albumTitle: 'Fan performances',
-        },
-        { showSeekBackward: true, showSeekForward: true },
-      );
     },
     [accessToken, player],
   );
@@ -96,29 +91,58 @@ export function FanPerformancePlayerProvider({ children }: { children: ReactNode
   );
 
   const playAdjacent = useCallback(
-    (direction: 1 | -1) => {
+    (direction: 1 | -1): boolean => {
       const list = queueRef.current;
       const playing = currentRef.current;
       if (!playing || list.length === 0) {
-        return;
+        return false;
       }
       const index = list.findIndex((item) => item.id === playing.id);
       const next = list[index + direction];
-      if (next) {
-        load(next);
+      if (!next) {
+        return false;
       }
+      load(next);
+      return true;
     },
     [load],
   );
 
-  const playNext = useCallback(() => playAdjacent(1), [playAdjacent]);
-  const playPrevious = useCallback(() => playAdjacent(-1), [playAdjacent]);
+  const playNext = useCallback(() => {
+    playAdjacent(1);
+  }, [playAdjacent]);
+  const playPrevious = useCallback(() => {
+    playAdjacent(-1);
+  }, [playAdjacent]);
 
   useEffect(() => {
-    if (status.didJustFinish) {
-      playNext();
+    if (!status.didJustFinish) {
+      return;
     }
-  }, [status.didJustFinish, playNext]);
+    if (!playAdjacent(1)) {
+      clearNowPlaying();
+    }
+  }, [status.didJustFinish, playAdjacent, clearNowPlaying]);
+
+  useEffect(() => {
+    if (accessToken) {
+      return;
+    }
+    if (!currentRef.current && queueRef.current.length === 0) {
+      return;
+    }
+    player.pause();
+    player.clearLockScreenControls();
+    setCurrent(null);
+    setQueue([]);
+    setError(null);
+  }, [accessToken, player]);
+
+  useEffect(() => {
+    return () => {
+      player.clearLockScreenControls();
+    };
+  }, [player]);
 
   const toggle = useCallback(() => {
     if (!currentRef.current) {
