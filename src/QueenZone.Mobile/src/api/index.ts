@@ -8,8 +8,13 @@ export {
   sendMultipart,
   toPlainText,
 } from './client';
+export { isLocalFileFailure } from './errors';
 export type { ApiFailureKind } from './client';
-export type { FetchJsonOptions, SendJsonOptions } from './client';
+export { appendNativeUploadFile, appendUploadFile, readUploadFileBlob } from './uploadFile';
+export type { UploadFilePart } from './uploadFile';
+export { shouldUseNativeMultipartUpload } from './nativeUpload';
+export type { FetchJsonOptions, SendJsonOptions, SendMultipartOptions } from './client';
+export { uploadMemberAvatar, memberAvatarPath } from './memberAvatar';
 export {
   fetchAlbumDetail,
   fetchBiographyChapter,

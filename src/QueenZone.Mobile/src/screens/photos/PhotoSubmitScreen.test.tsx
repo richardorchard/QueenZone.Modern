@@ -1,6 +1,8 @@
 import { screen, userEvent, waitFor } from '@testing-library/react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { fetchPhotoCategories } from '../../api';
+import { ApiError } from '../../api/errors';
+import { createPhotoSubmission } from '../../api/photoSubmissions';
 import { pagedResponse } from '../../test/fixtures';
 import { createMockSession } from '../../test/mockSession';
 import { fakeNavigation, renderWithProviders } from '../../test/render';
@@ -28,6 +30,14 @@ jest.mock('../../api', () => {
   };
 });
 
+jest.mock('../../api/photoSubmissions', () => {
+  const actual = jest.requireActual('../../api/photoSubmissions');
+  return {
+    ...actual,
+    createPhotoSubmission: jest.fn(),
+  };
+});
+
 jest.mock('expo-image-picker', () => ({
   requestMediaLibraryPermissionsAsync: jest.fn(),
   requestCameraPermissionsAsync: jest.fn(),
@@ -37,6 +47,7 @@ jest.mock('expo-image-picker', () => ({
 }));
 
 const fetchCategories = fetchPhotoCategories as jest.MockedFunction<typeof fetchPhotoCategories>;
+const submitPhoto = createPhotoSubmission as jest.MockedFunction<typeof createPhotoSubmission>;
 
 function renderSubmit() {
   return renderWithProviders(
@@ -52,6 +63,7 @@ describe('PhotoSubmitScreen', () => {
     mockSession.isSignedIn = false;
     mockSession.accessToken = null;
     fetchCategories.mockResolvedValue(pagedResponse([], 1, 0));
+    submitPhoto.mockReset();
   });
 
   it('gates unsigned visitors', () => {
@@ -73,5 +85,28 @@ describe('PhotoSubmitScreen', () => {
     await waitFor(() =>
       expect(screen.getByText('Photo library permission is required to choose a photo.')).toBeOnTheScreen(),
     );
+  });
+
+  it('shows a local-file error instead of a fake offline message', async () => {
+    const user = userEvent.setup();
+    mockSession.isSignedIn = true;
+    mockSession.accessToken = 'tok';
+    (ImagePicker.requestMediaLibraryPermissionsAsync as jest.Mock).mockResolvedValue({ granted: true });
+    (ImagePicker.launchImageLibraryAsync as jest.Mock).mockResolvedValue({
+      canceled: false,
+      assets: [{ uri: 'file:///tmp/crop.jpg', fileName: 'crop.jpg', mimeType: 'image/jpeg', fileSize: 12_000 }],
+    });
+    submitPhoto.mockRejectedValueOnce(ApiError.localFile(new TypeError('Network request failed')));
+
+    renderSubmit();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Submit for review' })).toBeOnTheScreen());
+    await user.type(screen.getByLabelText('Title'), 'Fan pic');
+    await user.press(screen.getByRole('button', { name: 'Choose from library' }));
+    await user.press(screen.getByRole('button', { name: 'Submit for review' }));
+
+    await waitFor(() =>
+      expect(screen.getByText('Could not read the selected photo. Try choosing it again.')).toBeOnTheScreen(),
+    );
+    expect(screen.queryByText('Unable to reach QueenZone. Check your connection and try again.')).toBeNull();
   });
 });

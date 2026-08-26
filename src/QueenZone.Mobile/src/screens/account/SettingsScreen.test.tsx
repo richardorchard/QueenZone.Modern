@@ -1,6 +1,9 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { fetchJson, sendJson } from '../../api/client';
 import { ApiError } from '../../api/errors';
+import { uploadMemberAvatar } from '../../api/memberAvatar';
+import { fallbackProfileLimits } from '../../api/me';
 import { createMockSession } from '../../test/mockSession';
 import { fakeNavigation, renderWithProviders } from '../../test/render';
 import { testIds } from '../../test/testIds';
@@ -30,6 +33,10 @@ jest.mock('../../api/client', () => ({
   sendMultipart: jest.fn(),
 }));
 
+jest.mock('../../api/memberAvatar', () => ({
+  uploadMemberAvatar: jest.fn(),
+}));
+
 jest.mock('expo-image-picker', () => ({
   requestMediaLibraryPermissionsAsync: jest.fn(),
   requestCameraPermissionsAsync: jest.fn(),
@@ -39,6 +46,7 @@ jest.mock('expo-image-picker', () => ({
 
 const fetchJsonMock = fetchJson as jest.MockedFunction<typeof fetchJson>;
 const sendJsonMock = sendJson as jest.MockedFunction<typeof sendJson>;
+const uploadMemberAvatarMock = uploadMemberAvatar as jest.MockedFunction<typeof uploadMemberAvatar>;
 
 const profilePayload = {
   memberId: '11111111-1111-1111-1111-111111111111',
@@ -74,6 +82,7 @@ describe('SettingsScreen notifications', () => {
     mockSession.refreshProfile.mockResolvedValue(undefined);
     mockSettingsLoad();
     sendJsonMock.mockReset();
+    uploadMemberAvatarMock.mockReset();
   });
 
   it('gates unsigned visitors', () => {
@@ -126,5 +135,64 @@ describe('SettingsScreen notifications', () => {
       expect(screen.getByText('The server had a problem. Try again shortly.')).toBeOnTheScreen(),
     );
     expect(screen.getByRole('switch', { name: 'News' })).toHaveProp('value', false);
+  });
+
+  it('uploads the chosen avatar through the member avatar API', async () => {
+    uploadMemberAvatarMock.mockResolvedValueOnce({
+      memberId: profilePayload.memberId,
+      email: profilePayload.email,
+      displayName: 'Roger',
+      createdAt: '',
+      lastLoginAt: null,
+      hasAvatar: true,
+      avatarPath: '/account/avatar/11111111-1111-1111-1111-111111111111',
+      avatarThumbPath: null,
+      messagePrivacy: 'members',
+      linkedProviders: [],
+      legacyLink: { kind: 'none', match: null, claimableMatches: [], unavailableMatches: [] },
+      scheduledDeletionAt: null,
+      limits: fallbackProfileLimits,
+      deletion: {
+        confirmationPhrase: 'DELETE',
+        confirmationHint: 'Type DELETE to schedule deletion of the account.',
+        requestedTitle: 'Account deletion scheduled',
+        requestedMessage: 'You have been signed out.',
+        whatHappens: [],
+      },
+    });
+    (ImagePicker.requestMediaLibraryPermissionsAsync as jest.Mock).mockResolvedValue({ granted: true });
+    (ImagePicker.launchImageLibraryAsync as jest.Mock).mockResolvedValue({
+      canceled: false,
+      assets: [{ uri: 'file:///tmp/avatar.jpg', fileName: 'avatar.jpg', mimeType: 'image/jpeg' }],
+    });
+
+    renderSettings();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Choose photo' })).toBeOnTheScreen());
+    fireEvent.press(screen.getByRole('button', { name: 'Choose photo' }));
+
+    await waitFor(() => expect(screen.getByText('Avatar updated.')).toBeOnTheScreen());
+    expect(uploadMemberAvatarMock).toHaveBeenCalledWith(
+      { uri: 'file:///tmp/avatar.jpg', name: 'avatar.jpg', type: 'image/jpeg' },
+      'tok',
+    );
+  });
+
+  it('shows a local-file avatar failure instead of a fake offline message', async () => {
+    const cause = new TypeError('Network request failed');
+    uploadMemberAvatarMock.mockRejectedValueOnce(ApiError.localFile(cause));
+    (ImagePicker.requestMediaLibraryPermissionsAsync as jest.Mock).mockResolvedValue({ granted: true });
+    (ImagePicker.launchImageLibraryAsync as jest.Mock).mockResolvedValue({
+      canceled: false,
+      assets: [{ uri: 'file:///tmp/avatar.jpg', fileName: 'avatar.jpg', mimeType: 'image/jpeg' }],
+    });
+
+    renderSettings();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Choose photo' })).toBeOnTheScreen());
+    fireEvent.press(screen.getByRole('button', { name: 'Choose photo' }));
+
+    await waitFor(() =>
+      expect(screen.getByText('Could not read the selected photo. Try choosing it again.')).toBeOnTheScreen(),
+    );
+    expect(screen.queryByText('Unable to reach QueenZone. Check your connection and try again.')).toBeNull();
   });
 });

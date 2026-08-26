@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { ApiError, isOfflineFailure, isTimeoutFailure } from './errors.ts';
+import { ApiError, isLocalFileFailure, isOfflineFailure, isTimeoutFailure } from './errors.ts';
 
 describe('ApiError', () => {
   it('infers offline from status 0 and never invents timeout', () => {
@@ -43,5 +43,22 @@ describe('ApiError', () => {
     assert.equal(error.kind, 'http');
     assert.equal(error.status, 404);
     assert.equal(error.name, 'ApiError');
+  });
+
+  it('mints local-file through the factory and keeps the cause', () => {
+    const cause = new TypeError('Network request failed');
+    const error = ApiError.localFile(cause);
+    assert.equal(error.kind, 'local-file');
+    assert.equal(error.status, 0);
+    assert.equal(error.message, 'Could not read the selected photo. Try choosing it again.');
+    assert.equal(error.cause, cause);
+    assert.equal(isLocalFileFailure(error), true);
+    assert.equal(isOfflineFailure(error), false);
+  });
+
+  it('keeps the fetch TypeError on offline and timeout factories', () => {
+    const cause = new TypeError('Failed to fetch');
+    assert.equal(ApiError.offline(cause).cause, cause);
+    assert.equal(ApiError.timeout(cause).cause, cause);
   });
 });
