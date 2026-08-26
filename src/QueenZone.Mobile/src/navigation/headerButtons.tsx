@@ -1,12 +1,13 @@
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { ArrowLeft, ChevronLeft, Plus, Search, X } from 'lucide-react-native';
+import { ArrowLeft, ChevronLeft, Link, Plus, Search, X } from 'lucide-react-native';
 import { Platform, Pressable, Text, View } from 'react-native';
 import { useSession } from '../session/SessionContext';
 import { openForumComposer } from '../session/signInNavigation';
 import { fonts, useTheme } from '../theme';
 import { testIds } from '../test/testIds';
 import { IconButton } from '../ui/IconButton';
-import type { ForumStackParamList } from './types';
+import { openSuggestNews } from '../share/news/NewsShare';
+import type { ForumStackParamList, NewsStackParamList } from './types';
 
 export function HeaderBackButton({
   onPress,
@@ -46,6 +47,18 @@ export function HeaderCloseButton({
 
 export function SearchHeaderButton({ onPress }: { onPress: () => void }) {
   return <IconButton icon={Search} accessibilityLabel="Search" onPress={onPress} />;
+}
+
+export function SuggestNewsHeaderButton({ onPress }: { onPress: () => void }) {
+  return (
+    <IconButton
+      icon={Link}
+      testID={testIds.newsSuggest}
+      accessibilityLabel="Suggest news"
+      tone="accent"
+      onPress={onPress}
+    />
+  );
 }
 
 export function ComposeHeaderButton({ onPress }: { onPress: () => void }) {
@@ -95,6 +108,19 @@ export function ForumHeaderRight({
     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
       {Platform.OS === 'ios' ? <ComposeHeaderButton onPress={onCompose} /> : null}
       <SearchHeaderButton onPress={onSearch} />
+    </View>
+  );
+}
+
+export function NewsIndexHeaderRight({
+  navigation,
+}: {
+  navigation: NativeStackNavigationProp<NewsStackParamList, 'NewsIndex'>;
+}) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+      <SuggestNewsHeaderButton onPress={() => openSuggestNews(navigation)} />
+      <SearchHeaderButton onPress={() => navigation.navigate('Search')} />
     </View>
   );
 }

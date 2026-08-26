@@ -49,6 +49,12 @@ export {
 } from './forum';
 export { createPhotoSubmission } from './photoSubmissions';
 export {
+  createNewsSuggestion,
+  newsSuggestionsPath,
+  parseNewsSuggestionCreated,
+} from './newsSuggestions';
+export type { NewsSuggestionWrite } from './newsSuggestions';
+export {
   fetchConversation,
   fetchInbox,
   fetchUnreadConversationCount,
