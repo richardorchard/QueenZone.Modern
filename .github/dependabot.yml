@@ -1,4 +1,11 @@
 version: 2
+# Group minor/patch updates per ecosystem so CI (especially the ~30 min
+# mobile Android/iOS jobs) runs once per batch instead of once per package.
+# Keep unrelated major bumps as individual PRs — they often need code changes.
+# Expo and ASP.NET Core families stay grouped even on majors because those
+# packages are meant to move together.
+# Do not use multi-ecosystem-groups: a mixed nuget+npm PR would run both
+# the .NET suite and the native mobile builds (see scripts/classify-pipeline-changes.sh).
 updates:
   - package-ecosystem: "nuget"
     directory: "/"
@@ -9,18 +16,25 @@ updates:
       - "dependencies"
     groups:
       aspnetcore:
+        applies-to: version-updates
         patterns:
           - "Microsoft.AspNetCore.*"
           - "Microsoft.EntityFrameworkCore.*"
           - "Microsoft.Extensions.*"
-
-  - package-ecosystem: "github-actions"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 10
-    labels:
-      - "dependencies"
+      nuget-minor-patch:
+        applies-to: version-updates
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+      nuget-security-minor-patch:
+        applies-to: security-updates
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
 
   - package-ecosystem: "npm"
     directory: "/src/QueenZone.Mobile"
@@ -31,8 +45,46 @@ updates:
       - "dependencies"
     groups:
       expo-sdk:
+        applies-to: version-updates
         patterns:
           - "expo"
           - "expo-*"
           - "babel-preset-expo"
           - "jest-expo"
+      mobile-npm-minor-patch:
+        applies-to: version-updates
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+      mobile-npm-security-minor-patch:
+        applies-to: security-updates
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+    groups:
+      github-actions-minor-patch:
+        applies-to: version-updates
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+      github-actions-security-minor-patch:
+        applies-to: security-updates
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
