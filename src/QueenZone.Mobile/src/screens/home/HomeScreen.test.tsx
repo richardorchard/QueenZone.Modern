@@ -212,6 +212,26 @@ describe('HomeScreen', () => {
     await flushVirtualizedList();
   });
 
+  it('refetches filter-hidden sections on pull', async () => {
+    renderHome();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Live Aid remembered' })).toBeOnTheScreen());
+
+    const user = userEvent.setup();
+    await user.press(screen.getByRole('button', { name: 'News' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Ranking every studio album' })).not.toBeOnTheScreen(),
+    );
+
+    const forumCalls = fetchForum.mock.calls.length;
+    const dayCalls = fetchDay.mock.calls.length;
+    await act(async () => {
+      fireEvent(screen.UNSAFE_getByType(RefreshControl), 'refresh');
+    });
+    expect(fetchForum.mock.calls.length).toBe(forumCalls + 1);
+    expect(fetchDay.mock.calls.length).toBe(dayCalls + 1);
+    await flushVirtualizedList();
+  });
+
   it('keeps On This Day visible while a pull refreshes', async () => {
     fetchDay.mockResolvedValue(onThisDayFixture());
     renderHome();
