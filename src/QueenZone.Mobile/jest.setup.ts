@@ -7,6 +7,7 @@ jest.mock('@react-native-async-storage/async-storage', () =>
 jest.mock('@sentry/react-native', () => ({
   init: jest.fn(),
   captureException: jest.fn(),
+  addBreadcrumb: jest.fn(),
   wrap: (app: unknown) => app,
   reactNavigationIntegration: jest.fn(() => ({
     registerNavigationContainer: jest.fn(),

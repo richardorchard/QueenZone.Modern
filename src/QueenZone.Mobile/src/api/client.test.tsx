@@ -64,7 +64,7 @@ describe('fetchJson', () => {
     fetchMock.mockResolvedValueOnce(new Response('nope', { status: 404, headers: { 'Content-Type': 'text/plain' } }));
     await expect(fetchJson('/missing')).rejects.toMatchObject({ status: 404, message: 'Not found.' });
 
-    fetchMock.mockResolvedValueOnce(jsonResponse({}, 503));
+    fetchMock.mockResolvedValueOnce(jsonResponse({}, 500));
     await expect(fetchJson('/down')).rejects.toMatchObject({
       message: 'The server had a problem. Try again shortly.',
     });
@@ -138,5 +138,132 @@ describe('sendJson and sendMultipart', () => {
     await expect(sendJson('/x', { body: {} })).rejects.toBe(abort);
     fetchMock.mockRejectedValueOnce(abort);
     await expect(sendMultipart('/x', new FormData())).rejects.toBe(abort);
+  });
+});
+
+function hangingFetch(_url: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  return new Promise((_resolve, reject) => {
+    const signal = init?.signal;
+    const onAbort = () => {
+      reject(Object.assign(new Error('aborted'), { name: 'AbortError' }));
+    };
+    if (!signal) {
+      return;
+    }
+    if (signal.aborted) {
+      onAbort();
+      return;
+    }
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
+describe('timeouts and GET retry', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
+
+  it('times out a hanging GET as ApiError, not AbortError', async () => {
+    fetchMock.mockImplementation(hangingFetch);
+    const pending = fetchJson('/slow');
+    const settled = pending.then(
+      () => {
+        throw new Error('expected timeout');
+      },
+      (err: unknown) => err,
+    );
+    await jest.advanceTimersByTimeAsync(15_000);
+    const error = await settled;
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error).toMatchObject({
+      name: 'ApiError',
+      kind: 'timeout',
+      message: 'QueenZone is taking too long to respond. Check your connection and try again.',
+    });
+    expect((error as Error).name).not.toBe('AbortError');
+  });
+
+  it('retries a GET after a timeout and then resolves', async () => {
+    fetchMock.mockImplementationOnce(hangingFetch).mockResolvedValueOnce(jsonResponse({ ok: true }));
+    const pending = fetchJson('/retry-timeout');
+    const expectation = expect(pending).resolves.toEqual({ ok: true });
+    await jest.advanceTimersByTimeAsync(12_000);
+    await expectation;
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not time out multipart at 12s and does at 60s', async () => {
+    fetchMock.mockImplementation(hangingFetch);
+    const pending = sendMultipart('/upload', new FormData());
+    const expectation = expect(pending).rejects.toMatchObject({
+      kind: 'timeout',
+      name: 'ApiError',
+    });
+    await jest.advanceTimersByTimeAsync(12_000);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await jest.advanceTimersByTimeAsync(48_000);
+    await expectation;
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('offline, HTTP retry, and malformed JSON', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('maps a TypeError to offline and does not retry', async () => {
+    fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    await expect(fetchJson('/x')).rejects.toMatchObject({
+      kind: 'offline',
+      status: 0,
+      message: 'Unable to reach QueenZone. Check your connection and try again.',
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries a GET 503 once and then succeeds', async () => {
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    fetchMock.mockResolvedValueOnce(jsonResponse({}, 503)).mockResolvedValueOnce(jsonResponse({ ok: true }));
+    await expect(fetchJson('/flaky')).resolves.toEqual({ ok: true });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('fails a GET 503 after two attempts', async () => {
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    fetchMock.mockResolvedValue(jsonResponse({}, 503));
+    await expect(fetchJson('/down')).rejects.toMatchObject({
+      kind: 'http',
+      status: 503,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not retry a write 503', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({}, 503));
+    await expect(sendJson('/x', { body: {} })).rejects.toMatchObject({
+      kind: 'http',
+      status: 503,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('marks malformed 2xx JSON as malformed, not offline', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response('{not-json', { status: 200, headers: { 'Content-Type': 'application/json' } }),
+    );
+    await expect(fetchJson('/bad-json')).rejects.toEqual(
+      expect.objectContaining({
+        kind: 'malformed',
+        status: 200,
+        name: 'ApiError',
+      }),
+    );
   });
 });
