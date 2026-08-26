@@ -64,8 +64,12 @@ npm run preflight
 `npm run preflight` runs typecheck, the unit tests, and the lockfile-pinned
 Expo Doctor check (`npm run doctor`). Doctor must pass all checks after a
 clean `npm ci`. Publish workflows still run `npm run preflight`. CI
-`mobile-js` runs typecheck, `npm run test:coverage`, the coverage gate, and
-Doctor so the same suites are measured without running tests twice.
+`mobile-js` runs the npm advisory gate, typecheck, `npm run test:coverage`,
+the coverage gate, and Doctor so the same suites are measured without
+running tests twice. High/critical advisories fail closed unless the GHSA
+is in [`npm-advisory-allowlist.json`](./npm-advisory-allowlist.json); see
+[`npm-advisory-allowlist.md`](./npm-advisory-allowlist.md). Never run
+`npm audit fix --force`.
 `npm test` discovers every `src/**/*.test.ts` and `src/**/*.test.tsx` file:
 Node's test runner executes pure `*.test.ts` files, and Jest + `jest-expo` +
 React Native Testing Library execute component/hook `*.test.tsx` files. Do
@@ -326,15 +330,16 @@ unit / component (npm test, #833)
 `npm test` discovers every `src/**/*.test.ts` and `src/**/*.test.tsx` file
 and runs both the Node pure suite and the Jest component suite. Do not add
 new tests to a path list in `package.json`. `npm run preflight` is typecheck
-+ those tests + lockfile-pinned `npm run doctor`. CI `mobile-js` collects
-coverage from both suites and enforces `scripts/Test-MobileCoverageGate.mjs`.
++ those tests + lockfile-pinned `npm run doctor`. CI `mobile-js` runs the
+#837 npm advisory gate, then collects coverage from both suites and
+enforces `scripts/Test-MobileCoverageGate.mjs`.
 
 PR check **names** (job `name:` values; these are the strings to require on
 `main`):
 
 | Check name | What it is | What it is not |
 | --- | --- | --- |
-| `Mobile typecheck and unit tests` | `npm ci` + typecheck + `npm run test:coverage` + coverage gate + Doctor | Native compile, contracts, or device E2E |
+| `Mobile typecheck and unit tests` | `npm ci` + advisory gate + typecheck + `npm run test:coverage` + coverage gate + Doctor | Native compile, contracts, or device E2E |
 | `Mobile Android build` | Unsigned debug APK compile | Play-store signing or device E2E |
 | `Mobile iOS build` | Unsigned Simulator compile | TestFlight signing or device E2E |
 | `Mobile API consumer contracts` | Testing host + real mobile parsers | Native compile, OpenAPI-only, or device E2E |

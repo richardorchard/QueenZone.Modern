@@ -21,3 +21,18 @@ updates:
     open-pull-requests-limit: 10
     labels:
       - "dependencies"
+
+  - package-ecosystem: "npm"
+    directory: "/src/QueenZone.Mobile"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+    groups:
+      expo-sdk:
+        patterns:
+          - "expo"
+          - "expo-*"
+          - "babel-preset-expo"
+          - "jest-expo"
