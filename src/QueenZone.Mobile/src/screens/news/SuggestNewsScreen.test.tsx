@@ -73,6 +73,73 @@ describe('SuggestNewsScreen', () => {
     );
   });
 
+  it('dismisses a rejected share', async () => {
+    const cancel = jest.fn();
+    mockShare = {
+      kind: 'rejected',
+      reason: 'file',
+      detail: 'Share a link, not a file or photo.',
+      cancel,
+    };
+    const navigation = fakeNavigation();
+    navigation.canGoBack.mockReturnValue(true);
+    renderSuggest(navigation);
+    const user = userEvent.setup();
+    await user.press(screen.getByTestId(testIds.suggestNewsCancel));
+    expect(cancel).toHaveBeenCalled();
+    expect(navigation.goBack).toHaveBeenCalled();
+  });
+
+  it('cancels a chooser back to Home when the stack is empty', async () => {
+    const cancel = jest.fn();
+    mockShare = {
+      kind: 'choose',
+      candidates: ['https://www.bbc.co.uk/one', 'http://example.com/old'],
+      choose: jest.fn(),
+      cancel,
+    };
+    const navigation = fakeNavigation();
+    renderSuggest(navigation);
+    expect(screen.getByText('Needs an https:// link')).toBeOnTheScreen();
+    const user = userEvent.setup();
+    await user.press(screen.getByTestId(testIds.suggestNewsCancel));
+    expect(cancel).toHaveBeenCalled();
+    expect(navigation.navigate).toHaveBeenCalledWith('Home');
+  });
+
+  it('closes the idle empty state', async () => {
+    mockShare = { kind: 'idle' };
+    const navigation = fakeNavigation();
+    renderSuggest(navigation);
+    expect(screen.getByText('No story is waiting to be suggested.')).toBeOnTheScreen();
+    const user = userEvent.setup();
+    await user.press(screen.getByTestId(testIds.suggestNewsCancel));
+    expect(navigation.navigate).toHaveBeenCalledWith('Home');
+  });
+
+  it('cancels a form and pops the stack', async () => {
+    const cancel = jest.fn();
+    mockShare = {
+      kind: 'form',
+      draft: {
+        url: 'https://www.bbc.co.uk/news/example',
+        title: '',
+        notes: '',
+        origin: 'inApp',
+      },
+      patch: jest.fn(),
+      cancel,
+      submit: jest.fn(),
+    };
+    const navigation = fakeNavigation();
+    navigation.canGoBack.mockReturnValue(true);
+    renderSuggest(navigation);
+    const user = userEvent.setup();
+    await user.press(screen.getByTestId(testIds.suggestNewsCancel));
+    expect(cancel).toHaveBeenCalled();
+    expect(navigation.goBack).toHaveBeenCalled();
+  });
+
   it('lets the member pick from the chooser', async () => {
     const choose = jest.fn();
     mockShare = {
