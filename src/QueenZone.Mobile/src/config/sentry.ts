@@ -18,6 +18,45 @@ import { resolveAppEnvironment } from './environments';
 
 export const navigationIntegration = Sentry.reactNavigationIntegration();
 
+export function reportApiFailure(event: {
+  kind: string;
+  status: number;
+  method: string;
+  path: string;
+  cause?: unknown;
+}): void {
+  const causeMessage = event.cause instanceof Error ? event.cause.message : undefined;
+  Sentry.addBreadcrumb({
+    category: 'api',
+    type: 'http',
+    level: event.kind === 'http' && event.status < 500 ? 'warning' : 'error',
+    data: {
+      kind: event.kind,
+      status: event.status,
+      method: event.method,
+      path: event.path,
+      ...(causeMessage ? { cause: causeMessage } : {}),
+    },
+  });
+
+  if (event.method === 'GET') {
+    return;
+  }
+
+  if (event.kind !== 'offline' && event.kind !== 'timeout' && event.kind !== 'local-file') {
+    return;
+  }
+
+  Sentry.captureException(event.cause instanceof Error ? event.cause : new Error(`api ${event.kind}`), {
+    extra: {
+      kind: event.kind,
+      status: event.status,
+      method: event.method,
+      path: event.path,
+    },
+  });
+}
+
 export function initSentry(): void {
   const dsn = process.env.EXPO_PUBLIC_SENTRY_DSN;
   if (!dsn) {

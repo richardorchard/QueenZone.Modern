@@ -69,3 +69,69 @@ describe('initSentry', () => {
     );
   });
 });
+
+describe('reportApiFailure', () => {
+  it('records kind, status, method, and path only', () => {
+    const { reportApiFailure } = loadSentryModule();
+    reportApiFailure({
+      kind: 'timeout',
+      status: 0,
+      method: 'GET',
+      path: '/content/news',
+    });
+
+    expect(Sentry.addBreadcrumb).toHaveBeenCalledWith({
+      category: 'api',
+      type: 'http',
+      level: 'error',
+      data: {
+        kind: 'timeout',
+        status: 0,
+        method: 'GET',
+        path: '/content/news',
+      },
+    });
+    expect(Sentry.captureException).not.toHaveBeenCalled();
+  });
+
+  it('captures the original fetch error on write offline failures', () => {
+    const { reportApiFailure } = loadSentryModule();
+    const cause = new TypeError('Network request failed');
+    reportApiFailure({
+      kind: 'offline',
+      status: 0,
+      method: 'POST',
+      path: '/member/photo-submissions',
+      cause,
+    });
+
+    expect(Sentry.addBreadcrumb).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ cause: 'Network request failed' }),
+      }),
+    );
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      cause,
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          kind: 'offline',
+          path: '/member/photo-submissions',
+        }),
+      }),
+    );
+  });
+
+  it('marks client HTTP errors as warnings', () => {
+    const { reportApiFailure } = loadSentryModule();
+    reportApiFailure({
+      kind: 'http',
+      status: 404,
+      method: 'GET',
+      path: '/content/news/1',
+    });
+
+    expect(Sentry.addBreadcrumb).toHaveBeenCalledWith(
+      expect.objectContaining({ level: 'warning' }),
+    );
+  });
+});

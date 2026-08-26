@@ -1,4 +1,4 @@
-import type { ApiPagedResponse, NewsDetail, NewsListItem } from '../api/types';
+import type { ApiPagedResponse, FanPerformance, NewsDetail, NewsListItem } from '../api/types';
 import type { MemberProfile } from '../api/me';
 import type { AuthTokens } from '../api/auth';
 
@@ -79,6 +79,20 @@ export function newsDetailFixture(overrides: Partial<NewsDetail> = {}): NewsDeta
     publishedAt: '2024-01-15T12:00:00.000Z',
     sourceUrl: null,
     detailPath: '/news/42',
+    ...overrides,
+  };
+}
+
+export function fanPerformanceFixture(overrides: Partial<FanPerformance> = {}): FanPerformance {
+  return {
+    id: 187,
+    title: 'Somebody to Love',
+    performedBy: 'Jane',
+    description: 'A studio cover.',
+    dateAdded: '2024-01-15T12:00:00.000Z',
+    durationSeconds: 320,
+    detailPath: '/fan-performances/187',
+    audioPath: '/api/v1/content/fan-performances/187/audio',
     ...overrides,
   };
 }

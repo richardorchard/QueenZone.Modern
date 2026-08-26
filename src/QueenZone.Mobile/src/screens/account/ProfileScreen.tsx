@@ -7,6 +7,7 @@ import { avatarUrl, formatMemberSince, type MemberProfile } from '../../api/me';
 import type { HomeStackParamList } from '../../navigation/types';
 import { useSession } from '../../session/SessionContext';
 import { openSignIn } from '../../session/signInNavigation';
+import { openSuggestNews } from '../../share/news/NewsShare';
 import { space, type, useTheme } from '../../theme';
 import { messagesA11yLabel } from '../messages/inboxMeta';
 import { useUnreadConversationCount } from '../messages/useUnreadConversationCount';
@@ -139,6 +140,7 @@ export function ProfileScreen({ navigation }: Props) {
         onPress={() => navigation.navigate('Inbox')}
       />
       <SettingsRow title="My submissions" onPress={() => navigation.navigate('MySubmissions')} />
+      <SettingsRow title="Suggest news" onPress={() => openSuggestNews(navigation)} />
       <SettingsRow title="Contact" onPress={() => navigation.navigate('Contact')} />
       <View style={{ paddingHorizontal: space.xl, paddingTop: space.xl, paddingBottom: space.xl, gap: 10 }}>
         <Button label="Sign out" variant="outline" loading={busy} onPress={() => void onSignOut()} />

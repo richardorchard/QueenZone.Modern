@@ -1,4 +1,6 @@
+import { reportApiFailure } from '../config/sentry';
 import { sendMultipart } from './client';
+import { isLocalFileFailure } from './errors';
 import {
   parsePhotoSubmissionCreated,
   photoSubmissionFieldEntries,
@@ -7,6 +9,7 @@ import {
   type PhotoUploadFile,
 } from './photoSubmissionForm';
 import type { PhotoSubmissionCreated } from './types';
+import { appendUploadFile } from './uploadFile';
 
 export {
   parsePhotoSubmissionCreated,
@@ -29,11 +32,20 @@ export async function createPhotoSubmission(
     form.append(name, value);
   }
 
-  form.append('photo', {
-    uri: input.photo.uri,
-    name: input.photo.name,
-    type: input.photo.type,
-  } as unknown as Blob);
+  try {
+    await appendUploadFile(form, 'photo', input.photo, signal);
+  } catch (err) {
+    if (isLocalFileFailure(err)) {
+      reportApiFailure({
+        kind: err.kind,
+        status: err.status,
+        method: 'POST',
+        path: photoSubmissionsPath,
+        cause: err.cause,
+      });
+    }
+    throw err;
+  }
 
   return parsePhotoSubmissionCreated(
     await sendMultipart(photoSubmissionsPath, form, { accessToken, signal }),

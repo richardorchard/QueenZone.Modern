@@ -241,10 +241,35 @@ Signed-in members can submit a photo from the camera or photo library
 `POST /api/v1/member/photo-submissions` — the same `PhotoSubmissionService` /
 `ugc-photos` review queue as website `/submit/photo`. Camera and library access
 use `expo-image-picker` (already required for member avatars).
+
+Members can also share a public news URL into the app, or open **Suggest news**
+from the News header or Profile. That write lives on the Home stack
+(`HomeTab` → `SuggestNews`), not the News archive tab. The OS share sheet
+targets this app for `text/*` and URL shares only
+(`expo-share-intent@8.0.1` CNG plugin, plus `expo-linking`). The bridge copies
+the payload into `queenzone.newsShare.v1` before OAuth can background the
+process — `resetOnBackground: true` wipes the native share, so a later read
+would be empty. https links only; http is never upgraded and never stored.
+The client does not fetch the page or its HTML. Signed-out members still see
+the review form; Sign in uses `returnTo: { tab: 'HomeTab', screen: 'SuggestNews' }`.
+A 201 clears the slot and opens **My submissions** on the same stack.
+
+Signed iOS builds need an App Group `group.org.queenzone.mobile` and a Share
+Extension App ID on the existing `org.queenzone.mobile` record. There is no
+EAS project; regenerate the App Store profile after adding the group. Do not
+add a second URL scheme — shares reuse `queenzone`. Do not add
+`NavigationContainer.linking` for this flow.
 Fan performances list from `/api/v1/content/fan-performances`; streaming uses
 `GET /api/v1/content/fan-performances/{id}/audio` with the member Bearer token
 (same private `songfiles` blob as the website). Background playback and lock-screen
-controls come from `expo-audio`.
+controls come from `expo-audio` (`shouldPlayInBackground`, `setActiveForLockScreen`).
+The lock screen shows title, performer, and "Fan performances", with play/pause and
+seek. expo-audio does not expose next/previous-track buttons or JS remote-command
+events. In-app queue skip stays on the detail screen. Signing out or finishing the
+last queued recording clears the system now-playing entry. Rebuild the development
+client after plugin changes so iOS `UIBackgroundModes: audio` and the Android media
+foreground service are generated. Lock-screen chrome is not visible in the iOS
+Simulator.
 Home → **Member sign in**, Profile → **Sign in**, and signed-out **Sign in to
 reply / submit / New thread** all open a root Sign-in modal (Google, Microsoft,
 Discord, GitHub, Apple). After OAuth succeeds the app returns to the screen

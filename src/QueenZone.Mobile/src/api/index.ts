@@ -1,5 +1,20 @@
-export { ApiError, fetchJson, formatPublishedDate, sendJson, sendMultipart, toPlainText } from './client';
-export type { FetchJsonOptions, SendJsonOptions } from './client';
+export {
+  ApiError,
+  fetchJson,
+  formatPublishedDate,
+  isOfflineFailure,
+  isTimeoutFailure,
+  sendJson,
+  sendMultipart,
+  toPlainText,
+} from './client';
+export { isLocalFileFailure } from './errors';
+export type { ApiFailureKind } from './client';
+export { appendNativeUploadFile, appendUploadFile, readUploadFileBlob } from './uploadFile';
+export type { UploadFilePart } from './uploadFile';
+export { shouldUseNativeMultipartUpload } from './nativeUpload';
+export type { FetchJsonOptions, SendJsonOptions, SendMultipartOptions } from './client';
+export { uploadMemberAvatar, memberAvatarPath } from './memberAvatar';
 export {
   fetchAlbumDetail,
   fetchBiographyChapter,
@@ -38,6 +53,12 @@ export {
   watchForumTopic,
 } from './forum';
 export { createPhotoSubmission } from './photoSubmissions';
+export {
+  createNewsSuggestion,
+  newsSuggestionsPath,
+  parseNewsSuggestionCreated,
+} from './newsSuggestions';
+export type { NewsSuggestionWrite } from './newsSuggestions';
 export {
   fetchConversation,
   fetchInbox,

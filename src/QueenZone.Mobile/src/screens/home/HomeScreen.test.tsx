@@ -2,12 +2,13 @@ import { act, fireEvent, screen, userEvent, waitFor } from '@testing-library/rea
 import { RefreshControl } from 'react-native';
 import {
   fetchForumRecentThreads,
+  fetchInbox,
   fetchLiveActivity,
   fetchNewsPage,
   fetchOnThisDay,
   fetchPhotoCategories,
 } from '../../api';
-import { newsItemFixture, pagedResponse } from '../../test/fixtures';
+import { deferred, newsItemFixture, pagedResponse } from '../../test/fixtures';
 import { createMockSession } from '../../test/mockSession';
 import { fakeNavigation, flushVirtualizedList, renderWithProviders } from '../../test/render';
 import { HomeScreen } from './HomeScreen';
@@ -45,6 +46,20 @@ const fetchForum = fetchForumRecentThreads as jest.MockedFunction<typeof fetchFo
 const fetchPhotos = fetchPhotoCategories as jest.MockedFunction<typeof fetchPhotoCategories>;
 const fetchDay = fetchOnThisDay as jest.MockedFunction<typeof fetchOnThisDay>;
 const fetchLive = fetchLiveActivity as jest.MockedFunction<typeof fetchLiveActivity>;
+const fetchInboxMock = fetchInbox as jest.MockedFunction<typeof fetchInbox>;
+
+function onThisDayFixture() {
+  return {
+    id: 1,
+    title: 'The Game',
+    summary: 'Queen released The Game.',
+    eventDate: '1980-06-30',
+    formattedDate: '30 June 1980',
+    category: 'music',
+    categoryLabel: 'Release',
+    sourceUrl: null,
+  };
+}
 
 function renderHome(navigation = fakeNavigation()) {
   return {
@@ -84,6 +99,7 @@ describe('HomeScreen', () => {
     fetchPhotos.mockResolvedValue(pagedResponse([], 1, 0));
     fetchDay.mockResolvedValue(null);
     fetchLive.mockResolvedValue({ newForumRepliesToday: 0 });
+    fetchInboxMock.mockReset();
   });
 
   afterEach(async () => {
@@ -124,6 +140,125 @@ describe('HomeScreen', () => {
     });
     await waitFor(() => expect(fetchNews.mock.calls.length).toBeGreaterThan(newsCalls));
     expect(fetchForum.mock.calls.length).toBeGreaterThan(forumCalls);
+    await flushVirtualizedList();
+  });
+
+  it('holds RefreshControl refreshing until the deferred news fetch settles and refetches every section', async () => {
+    renderHome();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Live Aid remembered' })).toBeOnTheScreen());
+
+    const newsCalls = fetchNews.mock.calls.length;
+    const forumCalls = fetchForum.mock.calls.length;
+    const photoCalls = fetchPhotos.mock.calls.length;
+    const dayCalls = fetchDay.mock.calls.length;
+    const liveCalls = fetchLive.mock.calls.length;
+    const inboxCalls = fetchInboxMock.mock.calls.length;
+
+    const pendingNews = deferred<ReturnType<typeof pagedResponse<ReturnType<typeof newsItemFixture>>>>();
+    fetchNews.mockReturnValueOnce(pendingNews.promise);
+
+    await act(async () => {
+      fireEvent(screen.UNSAFE_getByType(RefreshControl), 'refresh');
+    });
+
+    expect(screen.UNSAFE_getByType(RefreshControl).props.refreshing).toBe(true);
+    await waitFor(() => expect(fetchNews.mock.calls.length).toBe(newsCalls + 1));
+    expect(fetchForum.mock.calls.length).toBe(forumCalls + 1);
+    expect(fetchPhotos.mock.calls.length).toBe(photoCalls + 1);
+    expect(fetchDay.mock.calls.length).toBe(dayCalls + 1);
+    expect(fetchLive.mock.calls.length).toBe(liveCalls + 1);
+    expect(fetchInboxMock.mock.calls.length).toBe(inboxCalls);
+
+    pendingNews.resolve(
+      pagedResponse(
+        [
+          newsItemFixture({ id: 1003, title: 'QueenZone modernisation begins' }),
+          newsItemFixture({ id: 7, title: 'Live Aid remembered' }),
+        ],
+        1,
+        1,
+      ),
+    );
+    await waitFor(() => expect(screen.UNSAFE_getByType(RefreshControl).props.refreshing).toBe(false));
+    await flushVirtualizedList();
+  });
+
+  it('keeps the live strip visible while a pull refreshes', async () => {
+    fetchLive.mockResolvedValue({ newForumRepliesToday: 4 });
+    renderHome();
+    await waitFor(() => expect(screen.getByText('4 new forum replies today')).toBeOnTheScreen());
+
+    const pendingNews = deferred<ReturnType<typeof pagedResponse<ReturnType<typeof newsItemFixture>>>>();
+    fetchNews.mockReturnValueOnce(pendingNews.promise);
+    await act(async () => {
+      fireEvent(screen.UNSAFE_getByType(RefreshControl), 'refresh');
+    });
+
+    expect(screen.UNSAFE_getByType(RefreshControl).props.refreshing).toBe(true);
+    expect(screen.getByText('4 new forum replies today')).toBeOnTheScreen();
+
+    pendingNews.resolve(
+      pagedResponse(
+        [
+          newsItemFixture({ id: 1003, title: 'QueenZone modernisation begins' }),
+          newsItemFixture({ id: 7, title: 'Live Aid remembered' }),
+        ],
+        1,
+        1,
+      ),
+    );
+    await waitFor(() => expect(screen.UNSAFE_getByType(RefreshControl).props.refreshing).toBe(false));
+    expect(screen.getByText('4 new forum replies today')).toBeOnTheScreen();
+    await flushVirtualizedList();
+  });
+
+  it('refetches filter-hidden sections on pull', async () => {
+    renderHome();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Live Aid remembered' })).toBeOnTheScreen());
+
+    const user = userEvent.setup();
+    await user.press(screen.getByRole('button', { name: 'News' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Ranking every studio album' })).not.toBeOnTheScreen(),
+    );
+
+    const forumCalls = fetchForum.mock.calls.length;
+    const dayCalls = fetchDay.mock.calls.length;
+    await act(async () => {
+      fireEvent(screen.UNSAFE_getByType(RefreshControl), 'refresh');
+    });
+    expect(fetchForum.mock.calls.length).toBe(forumCalls + 1);
+    expect(fetchDay.mock.calls.length).toBe(dayCalls + 1);
+    await flushVirtualizedList();
+  });
+
+  it('keeps On This Day visible while a pull refreshes', async () => {
+    fetchDay.mockResolvedValue(onThisDayFixture());
+    renderHome();
+    await waitFor(() => expect(screen.getByText('Queen released The Game.')).toBeOnTheScreen());
+
+    const pendingNews = deferred<ReturnType<typeof pagedResponse<ReturnType<typeof newsItemFixture>>>>();
+    fetchNews.mockReturnValueOnce(pendingNews.promise);
+    await act(async () => {
+      fireEvent(screen.UNSAFE_getByType(RefreshControl), 'refresh');
+    });
+
+    expect(screen.UNSAFE_getByType(RefreshControl).props.refreshing).toBe(true);
+    expect(screen.getByText('Queen released The Game.')).toBeOnTheScreen();
+    expect(screen.getByText('30 JUNE 1980')).toBeOnTheScreen();
+
+    pendingNews.resolve(
+      pagedResponse(
+        [
+          newsItemFixture({ id: 1003, title: 'QueenZone modernisation begins' }),
+          newsItemFixture({ id: 7, title: 'Live Aid remembered' }),
+        ],
+        1,
+        1,
+      ),
+    );
+    await waitFor(() => expect(screen.UNSAFE_getByType(RefreshControl).props.refreshing).toBe(false));
+    expect(screen.getByText('Queen released The Game.')).toBeOnTheScreen();
     await flushVirtualizedList();
   });
 });

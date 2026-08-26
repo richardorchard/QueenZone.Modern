@@ -64,7 +64,7 @@ describe('fetchJson', () => {
     fetchMock.mockResolvedValueOnce(new Response('nope', { status: 404, headers: { 'Content-Type': 'text/plain' } }));
     await expect(fetchJson('/missing')).rejects.toMatchObject({ status: 404, message: 'Not found.' });
 
-    fetchMock.mockResolvedValueOnce(jsonResponse({}, 503));
+    fetchMock.mockResolvedValueOnce(jsonResponse({}, 500));
     await expect(fetchJson('/down')).rejects.toMatchObject({
       message: 'The server had a problem. Try again shortly.',
     });
@@ -106,7 +106,7 @@ describe('sendJson and sendMultipart', () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ id: 9 }));
     const form = new FormData();
     form.append('photo', 'blob');
-    await sendMultipart('/member/photo-submissions', form, { accessToken: 'tok' });
+    await sendMultipart('/member/photo-submissions', form, { accessToken: 'tok', transport: 'fetch' });
     const { init } = lastCall();
     expect(init.method).toBe('POST');
     expect(init.body).toBe(form);
@@ -138,5 +138,249 @@ describe('sendJson and sendMultipart', () => {
     await expect(sendJson('/x', { body: {} })).rejects.toBe(abort);
     fetchMock.mockRejectedValueOnce(abort);
     await expect(sendMultipart('/x', new FormData())).rejects.toBe(abort);
+  });
+});
+
+function hangingFetch(_url: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  return new Promise((_resolve, reject) => {
+    const signal = init?.signal;
+    const onAbort = () => {
+      reject(Object.assign(new Error('aborted'), { name: 'AbortError' }));
+    };
+    if (!signal) {
+      return;
+    }
+    if (signal.aborted) {
+      onAbort();
+      return;
+    }
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
+describe('timeouts and GET retry', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
+
+  it('times out a hanging GET as ApiError, not AbortError', async () => {
+    fetchMock.mockImplementation(hangingFetch);
+    const pending = fetchJson('/slow');
+    const settled = pending.then(
+      () => {
+        throw new Error('expected timeout');
+      },
+      (err: unknown) => err,
+    );
+    await jest.advanceTimersByTimeAsync(15_000);
+    const error = await settled;
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error).toMatchObject({
+      name: 'ApiError',
+      kind: 'timeout',
+      message: 'QueenZone is taking too long to respond. Check your connection and try again.',
+    });
+    expect((error as Error).name).not.toBe('AbortError');
+  });
+
+  it('retries a GET after a timeout and then resolves', async () => {
+    fetchMock.mockImplementationOnce(hangingFetch).mockResolvedValueOnce(jsonResponse({ ok: true }));
+    const pending = fetchJson('/retry-timeout');
+    const expectation = expect(pending).resolves.toEqual({ ok: true });
+    await jest.advanceTimersByTimeAsync(12_000);
+    await expectation;
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not time out multipart at 12s and does at 180s', async () => {
+    fetchMock.mockImplementation(hangingFetch);
+    const pending = sendMultipart('/upload', new FormData());
+    const expectation = expect(pending).rejects.toMatchObject({
+      kind: 'timeout',
+      name: 'ApiError',
+    });
+    await jest.advanceTimersByTimeAsync(12_000);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await jest.advanceTimersByTimeAsync(168_000);
+    await expectation;
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('offline, HTTP retry, and malformed JSON', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('maps a TypeError to offline, keeps the cause, and does not retry', async () => {
+    const cause = new TypeError('Failed to fetch');
+    fetchMock.mockRejectedValueOnce(cause);
+    await expect(fetchJson('/x')).rejects.toMatchObject({
+      kind: 'offline',
+      status: 0,
+      message: 'Unable to reach QueenZone. Check your connection and try again.',
+      cause,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the fetch TypeError on a multipart offline failure', async () => {
+    const cause = new TypeError('Network request failed');
+    fetchMock.mockRejectedValueOnce(cause);
+    await expect(sendMultipart('/member/photo-submissions', new FormData())).rejects.toMatchObject({
+      kind: 'offline',
+      cause,
+    });
+  });
+
+  it('posts multipart through XMLHttpRequest when transport is xhr', async () => {
+    const xhr = {
+      status: 200,
+      responseText: '{"ok":true}',
+      timeout: 0,
+      responseType: '',
+      headers: {} as Record<string, string>,
+      sent: null as FormData | null,
+      open: jest.fn(),
+      setRequestHeader: jest.fn((name: string, value: string) => {
+        xhr.headers[name] = value;
+      }),
+      getResponseHeader: jest.fn(() => 'application/json'),
+      send: jest.fn((body?: XMLHttpRequestBodyInit | null) => {
+        xhr.sent = body as FormData;
+        queueMicrotask(() => xhr.onload?.());
+      }),
+      abort: jest.fn(),
+      onload: null as (() => void) | null,
+      onerror: null as (() => void) | null,
+      ontimeout: null as (() => void) | null,
+      onabort: null as (() => void) | null,
+    };
+    const previous = global.XMLHttpRequest;
+    global.XMLHttpRequest = jest.fn(() => xhr) as unknown as typeof XMLHttpRequest;
+
+    try {
+      const form = new FormData();
+      form.append('file', 'avatar');
+      await expect(sendMultipart('/me/avatar', form, { accessToken: 'tok', transport: 'xhr' })).resolves.toEqual({
+        ok: true,
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(xhr.open).toHaveBeenCalledWith('POST', 'http://qz.test/api/v1/me/avatar');
+      expect(xhr.headers).toEqual({
+        Accept: 'application/json',
+        Authorization: 'Bearer tok',
+      });
+      expect(xhr.sent).toBe(form);
+    } finally {
+      global.XMLHttpRequest = previous;
+    }
+  });
+
+  it('maps an XHR 401 through Problem Details copy', async () => {
+    const xhr = {
+      status: 401,
+      responseText: '{"detail":"Sign in to continue."}',
+      timeout: 0,
+      responseType: '',
+      open: jest.fn(),
+      setRequestHeader: jest.fn(),
+      getResponseHeader: jest.fn(() => 'application/json'),
+      send: jest.fn(() => {
+        queueMicrotask(() => xhr.onload?.());
+      }),
+      abort: jest.fn(),
+      onload: null as (() => void) | null,
+      onerror: null as (() => void) | null,
+      ontimeout: null as (() => void) | null,
+      onabort: null as (() => void) | null,
+    };
+    const previous = global.XMLHttpRequest;
+    global.XMLHttpRequest = jest.fn(() => xhr) as unknown as typeof XMLHttpRequest;
+
+    try {
+      await expect(sendMultipart('/me/avatar', new FormData(), { transport: 'xhr' })).rejects.toMatchObject({
+        kind: 'http',
+        status: 401,
+        message: 'Sign in to continue.',
+      });
+    } finally {
+      global.XMLHttpRequest = previous;
+    }
+  });
+
+  it('maps an XHR network failure to offline', async () => {
+    const xhr = {
+      status: 0,
+      responseText: '',
+      timeout: 0,
+      responseType: '',
+      open: jest.fn(),
+      setRequestHeader: jest.fn(),
+      getResponseHeader: jest.fn(() => null),
+      send: jest.fn(() => {
+        queueMicrotask(() => xhr.onerror?.());
+      }),
+      abort: jest.fn(),
+      onload: null as (() => void) | null,
+      onerror: null as (() => void) | null,
+      ontimeout: null as (() => void) | null,
+      onabort: null as (() => void) | null,
+    };
+    const previous = global.XMLHttpRequest;
+    global.XMLHttpRequest = jest.fn(() => xhr) as unknown as typeof XMLHttpRequest;
+
+    try {
+      await expect(sendMultipart('/me/avatar', new FormData(), { transport: 'xhr' })).rejects.toMatchObject({
+        kind: 'offline',
+      });
+    } finally {
+      global.XMLHttpRequest = previous;
+    }
+  });
+
+  it('retries a GET 503 once and then succeeds', async () => {
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    fetchMock.mockResolvedValueOnce(jsonResponse({}, 503)).mockResolvedValueOnce(jsonResponse({ ok: true }));
+    await expect(fetchJson('/flaky')).resolves.toEqual({ ok: true });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('fails a GET 503 after two attempts', async () => {
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    fetchMock.mockResolvedValue(jsonResponse({}, 503));
+    await expect(fetchJson('/down')).rejects.toMatchObject({
+      kind: 'http',
+      status: 503,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not retry a write 503', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({}, 503));
+    await expect(sendJson('/x', { body: {} })).rejects.toMatchObject({
+      kind: 'http',
+      status: 503,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('marks malformed 2xx JSON as malformed, not offline', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response('{not-json', { status: 200, headers: { 'Content-Type': 'application/json' } }),
+    );
+    await expect(fetchJson('/bad-json')).rejects.toEqual(
+      expect.objectContaining({
+        kind: 'malformed',
+        status: 200,
+        name: 'ApiError',
+      }),
+    );
   });
 });

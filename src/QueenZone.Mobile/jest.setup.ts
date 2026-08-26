@@ -7,6 +7,7 @@ jest.mock('@react-native-async-storage/async-storage', () =>
 jest.mock('@sentry/react-native', () => ({
   init: jest.fn(),
   captureException: jest.fn(),
+  addBreadcrumb: jest.fn(),
   wrap: (app: unknown) => app,
   reactNavigationIntegration: jest.fn(() => ({
     registerNavigationContainer: jest.fn(),
@@ -27,6 +28,24 @@ jest.mock('expo-splash-screen', () => ({
 jest.mock('react-native-reanimated', () => require('./jest.reanimated.mock.js'));
 
 jest.mock('react-native-gesture-handler', () => require('./jest.gesture-handler.mock.js'));
+
+jest.mock('expo-share-intent', () => ({
+  useShareIntent: () => ({
+    isReady: true,
+    hasShareIntent: false,
+    shareIntent: { text: null, webUrl: null, files: null, type: null },
+    resetShareIntent: jest.fn(),
+    error: null,
+  }),
+  ShareIntentProvider: ({ children }: { children: unknown }) => children,
+  useShareIntentContext: () => ({
+    isReady: true,
+    hasShareIntent: false,
+    shareIntent: { text: null, webUrl: null, files: null, type: null },
+    resetShareIntent: jest.fn(),
+    error: null,
+  }),
+}));
 
 jest.mock('expo-web-browser', () => ({
   maybeCompleteAuthSession: jest.fn(),

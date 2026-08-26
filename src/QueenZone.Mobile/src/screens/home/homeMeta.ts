@@ -51,7 +51,7 @@ export function formatGalleryCardMeta(category: { imageCount: number }): string 
   return `${category.imageCount.toLocaleString()} images`;
 }
 
-export function onThisDayIsVisible(event: TimelineEvent | null): boolean {
+export function onThisDayIsVisible(event: TimelineEvent | null): event is TimelineEvent {
   return event !== null;
 }
 
