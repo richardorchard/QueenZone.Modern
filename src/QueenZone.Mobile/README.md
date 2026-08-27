@@ -12,8 +12,8 @@ Host toolchain: [mobile development environment](../../docs/mobile-development-e
 
 | Tool | Version |
 | --- | --- |
-| Expo SDK | **57** (`expo@~57.0.16`) |
-| React Native | **0.86.2** |
+| Expo SDK | **57** (`expo@~57.0.17`) |
+| React Native | **0.86.3** |
 | Node.js | **24 LTS** (`>=24 <25`) |
 | npm | Bundled with Node.js |
 | JDK | **17** (Eclipse Temurin) |
@@ -262,7 +262,14 @@ add a second URL scheme — shares reuse `queenzone`. Do not add
 Fan performances list from `/api/v1/content/fan-performances`; streaming uses
 `GET /api/v1/content/fan-performances/{id}/audio` with the member Bearer token
 (same private `songfiles` blob as the website). Background playback and lock-screen
-controls come from `expo-audio`.
+controls come from `expo-audio` (`shouldPlayInBackground`, `setActiveForLockScreen`).
+The lock screen shows title, performer, and "Fan performances", with play/pause and
+seek. expo-audio does not expose next/previous-track buttons or JS remote-command
+events. In-app queue skip stays on the detail screen. Signing out or finishing the
+last queued recording clears the system now-playing entry. Rebuild the development
+client after plugin changes so iOS `UIBackgroundModes: audio` and the Android media
+foreground service are generated. Lock-screen chrome is not visible in the iOS
+Simulator.
 Home → **Member sign in**, Profile → **Sign in**, and signed-out **Sign in to
 reply / submit / New thread** all open a root Sign-in modal (Google, Microsoft,
 Discord, GitHub, Apple). After OAuth succeeds the app returns to the screen
@@ -509,6 +516,51 @@ Push Notifications capability" / missing `aps-environment`. Revoke and
 replace the API key if its private key is ever exposed. Signing material must
 never be copied into the repository, workflow artifacts, logs, or issue/PR
 text.
+
+## Install the latest Google Play internal-test build
+
+Google Play's equivalent of TestFlight is the **internal testing track**. Run
+**Publish Android to Google Play** from the repository's **Actions** tab and
+select `main`. The workflow runs mobile preflight, builds a signed Android App
+Bundle (`.aab`) against the staging API, verifies it, retains it as a seven-day
+artifact, and uploads it to the `internal` track for opted-in testers.
+
+The one-time Play Console setup for `org.queenzone.mobile` is:
+
+- enrol the app in Play App Signing;
+- add internal testers and copy the opt-in link;
+- enable the Google Play Android Developer API in the existing
+  `queenzone-mobile` Google Cloud project;
+- use the dedicated service account
+  `queenzone-play-publisher@queenzone-mobile.iam.gserviceaccount.com`, which has
+  app-scoped permission to release only to testing tracks; and
+- store its JSON credential in Bitwarden as
+  `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`, then add that secret's ID to the existing
+  `BITWARDEN_MOBILE_BUILD_SECRETS` deploy-environment mapping.
+
+Google Play requires the first bundle for a new app to be uploaded in Play
+Console before API publishing works. For that bootstrap only, run the workflow
+with **Upload the bundle to the Google Play internal track** cleared, download
+its `.aab` artifact, and upload it under **Internal testing → Create new
+release**. After that first release establishes the package and upload key, keep
+the option selected for normal automated internal releases.
+
+The workflow reuses the stable Android test key as the Play **upload key**.
+Google Play holds the separate app-signing key and signs the APKs delivered to
+testers. Keep the upload keystore and passwords in Bitwarden; do not add the
+service-account JSON or any private signing material to GitHub secrets or the
+repository.
+
+The Play-installed build and the APK from `dev.queenzone.org` cannot update one
+another because Play App Signing gives the store build a different signing
+certificate. Uninstall one distribution before switching to the other.
+
+Android push does not use APNs. The app already uses Firebase Cloud Messaging
+(FCM) directly, with the Firebase client configuration in
+`google-services.json`. The backend sender credential remains
+`PushNotifications__Fcm__ServiceAccountJson` plus
+`PushNotifications__Fcm__ProjectId`; it is separate from the Play publishing
+service account. APNs remains iOS-only.
 
 ## Install the latest Android test build
 
