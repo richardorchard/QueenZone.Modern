@@ -5,7 +5,6 @@ import type { ConfigContext, ExpoConfig } from 'expo/config';
 const {
   resolveApiBaseUrl,
   resolveAppEnvironment,
-  resolveIosApsEnvironment,
   resolveIosBuildNumber,
 } = require('./apiEnvironments.cjs') as typeof import('./apiEnvironments.cjs');
 
@@ -17,7 +16,6 @@ const {
  *   EXPO_PUBLIC_APP_ENV=staging|production|development
  *   EXPO_PUBLIC_API_BASE_URL=https://localhost:7162
  *   IOS_BUILD_NUMBER=<positive integer> (TestFlight CFBundleVersion; see GITHUB_RUN_NUMBER)
- *   IOS_APS_ENVIRONMENT=production|development (TestFlight must be production)
  */
 export default ({ config }: ConfigContext): ExpoConfig => {
   const appEnv = resolveAppEnvironment(
@@ -32,14 +30,6 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     githubRunNumber: process.env.GITHUB_RUN_NUMBER,
     fallback: config.ios?.buildNumber,
   });
-  const iosApsEnvironment = resolveIosApsEnvironment({
-    override: process.env.IOS_APS_ENVIRONMENT,
-    appEnv,
-    distributionBuild:
-      process.env.IOS_DISTRIBUTION_BUILD === '1' ||
-      process.env.IOS_DISTRIBUTION_BUILD === 'true',
-  });
-
   return {
     ...config,
     name: config.name ?? 'QueenZone',
@@ -90,16 +80,14 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         },
       ],
       [
-        // ADR 0014: direct APNs/FCM, no EAS. `mode` sets the iOS
-        // `aps-environment` entitlement. App Store / TestFlight profiles
-        // only include production; sandbox is for development-signed local
-        // installs. Staging TestFlight still uses production here.
+        // ADR 0014: direct APNs/FCM, no EAS. Expo SDK 57 always generates
+        // aps-environment=development at prebuild; Xcode changes it to
+        // production when archiving with the App Store distribution profile.
         'expo-notifications',
         {
           icon: './assets/ic-notification.png',
           color: '#B89A4A',
           defaultChannel: 'default',
-          mode: iosApsEnvironment,
         },
       ],
     ],
