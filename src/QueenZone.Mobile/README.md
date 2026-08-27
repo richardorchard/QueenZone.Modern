@@ -474,10 +474,11 @@ for App Store Connect), records the UTC build time and source revision for the
 in-app build stamp, then runs `pod install` before archiving. Expo writes
 `ITSAppUsesNonExemptEncryption=false` because the app uses only exempt platform
 HTTPS; this prevents each TestFlight build pausing for the same export-compliance
-questionnaire. The workflow also sets `IOS_APS_ENVIRONMENT=production` so
-`expo-notifications` stamps `aps-environment=production` — App Store and
-TestFlight distribution profiles cannot carry the sandbox entitlement, even
-when the binary still talks to the staging API. Expo's own CocoaPods auto-install is skipped
+questionnaire. Expo SDK 57 stamps `aps-environment=development` during prebuild;
+Xcode changes it to `production` when archiving with the App Store distribution
+profile. The workflow verifies both stages and rejects an exported IPA that does
+not carry the production entitlement, even when the binary still talks to the
+staging API. Expo's own CocoaPods auto-install is skipped
 because a missing CLI is only a warning and otherwise continues without an
 `.xcworkspace`. It then imports signing material into a temporary Keychain,
 produces and verifies a signed `.ipa`, retains that IPA as a seven-day
@@ -504,6 +505,7 @@ commit their values):
 | `IOS_DISTRIBUTION_CERTIFICATE_PASSWORD` | Password for the distribution `.p12` |
 | `IOS_PROVISIONING_PROFILE_BASE64` | Base64-encoded `QueenZone App Store App Groups` `.mobileprovision` |
 | `IOS_SHARE_EXTENSION_PROVISIONING_PROFILE_BASE64` | Base64-encoded `QueenZone Share Extension App Store` `.mobileprovision` |
+| `IOS_WIDGET_EXTENSION_PROVISIONING_PROFILE_BASE64` | Base64-encoded `QueenZone Widget Extension App Store` `.mobileprovision` |
 | `APP_STORE_CONNECT_KEY_ID` | App Store Connect API key identifier |
 | `APP_STORE_CONNECT_ISSUER_ID` | App Store Connect API issuer identifier |
 | `APP_STORE_CONNECT_PRIVATE_KEY` | One-time-downloaded App Store Connect `.p8` private key |
@@ -512,8 +514,10 @@ Rotate the distribution certificate/profiles before their shared expiry and
 replace the corresponding secrets together. After enabling a new App ID
 capability, regenerate the affected profile in Apple Developer **Profiles**
 and replace its base64 GitHub secret (value length only in logs and chat).
-Both profiles must include `group.org.queenzone.mobile`; only the main app
-profile includes Push Notifications / `aps-environment`. A stale profile fails
+All three profiles must include `group.org.queenzone.mobile`; only the main app
+profile includes Push Notifications / `aps-environment`. The extension profiles
+sign `org.queenzone.mobile.ShareExtension` and
+`org.queenzone.mobile.ExpoWidgetsTarget`, respectively. A stale profile fails
 before archive with a target-specific entitlement error. Revoke and
 replace the API key if its private key is ever exposed. Signing material must
 never be copied into the repository, workflow artifacts, logs, or issue/PR
