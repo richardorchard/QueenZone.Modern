@@ -138,14 +138,22 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       return sessionRef.current.accessToken;
     }
 
+    let tokens: AuthTokens;
     try {
-      const tokens = await refreshAccessToken(getAppConfig().apiBaseUrl, refresh);
-      await applyTokens(tokens);
-      return tokens.accessToken;
+      tokens = await refreshAccessToken(getAppConfig().apiBaseUrl, refresh);
     } catch {
       await clearLocal();
       return null;
     }
+
+    try {
+      await applyTokens(tokens);
+    } catch {
+      // The refresh grant itself succeeded — the access token is good. A follow-up
+      // `/me` hiccup (a transient 401, an outage, ...) shouldn't sign the member out;
+      // it just means the profile stays stale until it can be fetched successfully.
+    }
+    return tokens.accessToken;
   }, [applyTokens, clearLocal]);
 
   const ensureAccessToken = useCallback(async (): Promise<string | null> => {

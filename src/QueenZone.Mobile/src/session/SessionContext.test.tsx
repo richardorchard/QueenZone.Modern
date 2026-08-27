@@ -352,6 +352,32 @@ describe('SessionProvider', () => {
     expect(screen.getByText('Freddie')).toBeOnTheScreen();
   });
 
+  it('stays signed in with the refreshed token when a background refresh still gets a 401 from /me', async () => {
+    const user = userEvent.setup();
+    const now = 1_700_000_000_000;
+    const dateNow = jest.spyOn(Date, 'now').mockReturnValue(now);
+    try {
+      readStored.mockResolvedValue({
+        ...authTokensFixture(),
+        expiresAt: now + 60_000,
+      });
+      renderSession();
+      await waitFor(() => expect(screen.getByText('signed-in')).toBeOnTheScreen());
+
+      refreshAccessToken.mockResolvedValue(authTokensFixture({ accessToken: 'next' }));
+      fetchJsonMock.mockReset();
+      fetchJsonMock.mockRejectedValue(ApiError.http(401, 'Unauthorized'));
+      dateNow.mockReturnValue(now + 120_000);
+      await user.press(screen.getByText('do-ensure-token'));
+
+      await waitFor(() => expect(screen.getByText('next')).toBeOnTheScreen());
+      expect(screen.getByText('signed-in')).toBeOnTheScreen();
+      expect(clearStored).not.toHaveBeenCalled();
+    } finally {
+      dateNow.mockRestore();
+    }
+  });
+
   it('refreshes an expired token from ensureAccessToken and app foreground', async () => {
     const user = userEvent.setup();
     const now = 1_700_000_000_000;
