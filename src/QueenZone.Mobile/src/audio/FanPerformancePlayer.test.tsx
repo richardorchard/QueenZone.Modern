@@ -75,6 +75,12 @@ function Probe() {
       <Pressable testID="seek" onPress={() => player.seekTo(12)}>
         <Text>seek</Text>
       </Pressable>
+      <Pressable testID="seek-low" onPress={() => player.seekTo(-8)}>
+        <Text>seek-low</Text>
+      </Pressable>
+      <Pressable testID="seek-high" onPress={() => player.seekTo(999)}>
+        <Text>seek-high</Text>
+      </Pressable>
       <Pressable testID="skip" onPress={() => player.skip(15)}>
         <Text>skip</Text>
       </Pressable>
@@ -235,6 +241,23 @@ describe('FanPerformancePlayerProvider', () => {
     expect(mockPlayer.seekTo).toHaveBeenCalledWith(12);
     expect(mockPlayer.seekTo).toHaveBeenCalledWith(55);
     expect(screen.getByTestId('current')).toHaveTextContent(trackA.title);
+  });
+
+  it('clamps seek to the loaded duration', async () => {
+    const user = userEvent.setup();
+    mockStatus.currentTime = 40;
+    mockStatus.duration = 320;
+    const { rerender } = renderPlayer();
+    await user.press(screen.getByTestId('play-a'));
+    rerender(
+      <FanPerformancePlayerProvider>
+        <Probe />
+      </FanPerformancePlayerProvider>,
+    );
+    await user.press(screen.getByTestId('seek-low'));
+    await user.press(screen.getByTestId('seek-high'));
+    expect(mockPlayer.seekTo).toHaveBeenCalledWith(0);
+    expect(mockPlayer.seekTo).toHaveBeenCalledWith(320);
   });
 
   it('clears lock-screen controls on unmount', async () => {
