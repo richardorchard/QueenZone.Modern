@@ -31,18 +31,6 @@ const cream = '#F2F1ED';
 const mutedCream = 'rgba(242,241,237,0.72)';
 const cardBackground = '#181614';
 
-/** Matches Android `maxLines={3}` so long copy clips on systemSmall/systemMedium. */
-const widgetBodyLineLimit = 3;
-
-function bodyTextModifiers(color: string, size: number) {
-  return [
-    foregroundStyle(color),
-    font({ size }),
-    lineLimit(widgetBodyLineLimit),
-    truncationMode('tail'),
-  ];
-}
-
 function OnThisDayWidgetView(props: OnThisDayWidgetProps) {
   'widget';
 
@@ -63,13 +51,40 @@ function OnThisDayWidgetView(props: OnThisDayWidgetProps) {
         {widgetEyebrow(hasDay)}
       </Text>
       {hasDay ? (
-        <Text modifiers={bodyTextModifiers(cream, 13)}>{widgetDayText(props)}</Text>
+        <Text
+          modifiers={[
+            foregroundStyle(cream),
+            font({ size: 13 }),
+            lineLimit(3),
+            truncationMode('tail'),
+          ]}
+        >
+          {widgetDayText(props)}
+        </Text>
       ) : null}
       {hasQuote ? (
-        <Text modifiers={bodyTextModifiers(mutedCream, 12)}>{widgetQuoteText(props)}</Text>
+        <Text
+          modifiers={[
+            foregroundStyle(mutedCream),
+            font({ size: 12 }),
+            lineLimit(3),
+            truncationMode('tail'),
+          ]}
+        >
+          {widgetQuoteText(props)}
+        </Text>
       ) : null}
       {!hasDay && !hasQuote ? (
-        <Text modifiers={bodyTextModifiers(mutedCream, 12)}>{widgetEmptyText}</Text>
+        <Text
+          modifiers={[
+            foregroundStyle(mutedCream),
+            font({ size: 12 }),
+            lineLimit(3),
+            truncationMode('tail'),
+          ]}
+        >
+          {widgetEmptyText}
+        </Text>
       ) : null}
     </VStack>
   );
