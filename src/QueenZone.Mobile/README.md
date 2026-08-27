@@ -504,6 +504,7 @@ commit their values):
 | `IOS_DISTRIBUTION_CERTIFICATE_PASSWORD` | Password for the distribution `.p12` |
 | `IOS_PROVISIONING_PROFILE_BASE64` | Base64-encoded `QueenZone App Store App Groups` `.mobileprovision` |
 | `IOS_SHARE_EXTENSION_PROVISIONING_PROFILE_BASE64` | Base64-encoded `QueenZone Share Extension App Store` `.mobileprovision` |
+| `IOS_WIDGET_EXTENSION_PROVISIONING_PROFILE_BASE64` | Base64-encoded `QueenZone Widget Extension App Store` `.mobileprovision` |
 | `APP_STORE_CONNECT_KEY_ID` | App Store Connect API key identifier |
 | `APP_STORE_CONNECT_ISSUER_ID` | App Store Connect API issuer identifier |
 | `APP_STORE_CONNECT_PRIVATE_KEY` | One-time-downloaded App Store Connect `.p8` private key |
@@ -512,8 +513,10 @@ Rotate the distribution certificate/profiles before their shared expiry and
 replace the corresponding secrets together. After enabling a new App ID
 capability, regenerate the affected profile in Apple Developer **Profiles**
 and replace its base64 GitHub secret (value length only in logs and chat).
-Both profiles must include `group.org.queenzone.mobile`; only the main app
-profile includes Push Notifications / `aps-environment`. A stale profile fails
+All three profiles must include `group.org.queenzone.mobile`; only the main app
+profile includes Push Notifications / `aps-environment`. The extension profiles
+sign `org.queenzone.mobile.ShareExtension` and
+`org.queenzone.mobile.ExpoWidgetsTarget`, respectively. A stale profile fails
 before archive with a target-specific entitlement error. Revoke and
 replace the API key if its private key is ever exposed. Signing material must
 never be copied into the repository, workflow artifacts, logs, or issue/PR
