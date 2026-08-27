@@ -55,6 +55,8 @@ jobs:
         working-directory: src/QueenZone.Mobile
     env:
       ANDROID_VERSION_CODE: ${{ github.run_number }}
+      EXPO_PUBLIC_APP_ENV: staging
+      EXPO_PUBLIC_SENTRY_DSN: ${{ vars.SENTRY_DSN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -84,11 +86,19 @@ jobs:
 
       - name: Generate Android project
         env:
-          EXPO_PUBLIC_APP_ENV: staging
-          EXPO_PUBLIC_SENTRY_DSN: ${{ vars.SENTRY_DSN }}
           SENTRY_ORG: ${{ vars.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
         run: npx expo prebuild --platform android --clean --no-install
+
+      - name: Confirm Sentry DSN is baked into Expo extra
+        run: |
+          set -euo pipefail
+          dsn=$(npx expo config --json | jq -r '.extra.sentryDsn // .exp.extra.sentryDsn // empty')
+          if [ -z "$dsn" ]; then
+            echo "::error::app.config extra.sentryDsn is empty; published builds will not report to Sentry."
+            exit 1
+          fi
+          echo "extra.sentryDsn is set (length ${#dsn})"
 
       - name: Cache Gradle
         uses: actions/cache@v4
@@ -124,6 +134,7 @@ jobs:
             ANDROID_TEST_KEYSTORE_BASE64 \
             ANDROID_TEST_KEYSTORE_PASSWORD \
             ANDROID_TEST_KEY_PASSWORD \
+            EXPO_PUBLIC_SENTRY_DSN \
             SENTRY_AUTH_TOKEN \
             SENTRY_ORG \
             SENTRY_PROJECT; do
@@ -160,7 +171,6 @@ jobs:
       - name: Build signed Android App Bundle
         working-directory: src/QueenZone.Mobile/android
         env:
-          EXPO_PUBLIC_APP_ENV: staging
           ANDROID_TEST_KEYSTORE_PASSWORD: ${{ steps.bitwarden-secrets.outputs.ANDROID_TEST_KEYSTORE_PASSWORD }}
           ANDROID_TEST_KEY_PASSWORD: ${{ steps.bitwarden-secrets.outputs.ANDROID_TEST_KEY_PASSWORD }}
           SENTRY_ORG: ${{ vars.SENTRY_ORG }}

@@ -69,6 +69,9 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       buildNumber: iosBuildNumber,
       buildTimestampUtc: process.env.BUILD_TIMESTAMP_UTC,
       buildRevision: process.env.BUILD_REVISION,
+      // Baked at prebuild into EXConstants so published JS bundles still
+      // initialize Sentry when Metro does not inherit EXPO_PUBLIC_SENTRY_DSN.
+      sentryDsn: (process.env.EXPO_PUBLIC_SENTRY_DSN ?? '').trim() || undefined,
     },
     plugins: [
       ...(config.plugins ?? []),

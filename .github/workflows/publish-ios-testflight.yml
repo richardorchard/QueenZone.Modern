@@ -58,6 +58,8 @@ jobs:
       # Staging still talks to the staging API; the entitlement follows signing.
       IOS_APS_ENVIRONMENT: production
       IOS_DISTRIBUTION_BUILD: '1'
+      EXPO_PUBLIC_APP_ENV: staging
+      EXPO_PUBLIC_SENTRY_DSN: ${{ vars.SENTRY_DSN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -113,7 +115,7 @@ jobs:
         run: |
           set -euo pipefail
           missing=0
-          for name in SENTRY_DSN SENTRY_ORG SENTRY_PROJECT SENTRY_AUTH_TOKEN; do
+          for name in SENTRY_DSN EXPO_PUBLIC_SENTRY_DSN SENTRY_ORG SENTRY_PROJECT SENTRY_AUTH_TOKEN; do
             eval "value=\${$name-}"
             if [ -z "$value" ]; then
               echo "::error::$name is not set (Settings → Secrets and variables → Actions)."
@@ -167,7 +169,6 @@ jobs:
 
       - name: Generate iOS project
         env:
-          EXPO_PUBLIC_APP_ENV: staging
           # Expo writes ios.buildNumber literally into Info.plist at prebuild.
           # xcodebuild CURRENT_PROJECT_VERSION alone cannot override that literal,
           # so App Store Connect rejected re-uploads with CFBundleVersion=1.
@@ -175,7 +176,6 @@ jobs:
           GITHUB_RUN_NUMBER: ${{ github.run_number }}
           IOS_APS_ENVIRONMENT: production
           IOS_DISTRIBUTION_BUILD: '1'
-          EXPO_PUBLIC_SENTRY_DSN: ${{ vars.SENTRY_DSN }}
           SENTRY_ORG: ${{ vars.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
         run: |
@@ -217,6 +217,16 @@ jobs:
             echo "TestFlight / App Store profiles only include production. Set IOS_APS_ENVIRONMENT=production."
             exit 1
           fi
+
+      - name: Confirm Sentry DSN is baked into Expo extra
+        run: |
+          set -euo pipefail
+          dsn=$(npx expo config --json | jq -r '.extra.sentryDsn // .exp.extra.sentryDsn // empty')
+          if [ -z "$dsn" ]; then
+            echo "::error::app.config extra.sentryDsn is empty; published builds will not report to Sentry."
+            exit 1
+          fi
+          echo "extra.sentryDsn is set (length ${#dsn})"
 
       - name: Cache CocoaPods
         uses: actions/cache@v4
@@ -395,7 +405,6 @@ jobs:
       - name: Archive signed iOS app
         working-directory: src/QueenZone.Mobile/ios
         env:
-          EXPO_PUBLIC_APP_ENV: staging
           # Also set org/project here (not only at prebuild) so sentry-cli does
           # not depend solely on the generated sentry.properties file.
           SENTRY_ORG: ${{ vars.SENTRY_ORG }}
@@ -545,6 +554,14 @@ jobs:
           constants_config="$app_path/EXConstants.bundle/app.config"
           if ! grep -Fq "$BUILD_TIMESTAMP_UTC" "$constants_config"; then
             echo "::error::Exported IPA is missing build timestamp ${BUILD_TIMESTAMP_UTC}."
+            exit 1
+          fi
+          if [ -z "${EXPO_PUBLIC_SENTRY_DSN:-}" ]; then
+            echo "::error::EXPO_PUBLIC_SENTRY_DSN is not set; cannot verify Sentry extra in the IPA."
+            exit 1
+          fi
+          if ! grep -Fq "$EXPO_PUBLIC_SENTRY_DSN" "$constants_config"; then
+            echo "::error::Exported IPA is missing extra.sentryDsn; Sentry will not initialize."
             exit 1
           fi
           if ! grep -Fq "$BUILD_REVISION" "$constants_config"; then

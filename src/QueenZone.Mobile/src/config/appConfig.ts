@@ -19,6 +19,8 @@ export type AppConfig = {
   buildNumber?: string;
   buildTimestampUtc?: string;
   buildRevision?: string;
+  /** Public Sentry DSN baked at prebuild; unset keeps `initSentry()` a no-op. */
+  sentryDsn?: string;
 };
 
 type ExpoExtra = {
@@ -27,11 +29,18 @@ type ExpoExtra = {
   buildNumber?: string;
   buildTimestampUtc?: string;
   buildRevision?: string;
+  sentryDsn?: string;
 };
 
 function readExtra(): ExpoExtra {
   const extra = (Constants.expoConfig?.extra ?? Constants.manifest2?.extra ?? {}) as ExpoExtra;
   return extra;
+}
+
+function readSentryDsn(extra: ExpoExtra): string | undefined {
+  const fromExtra = typeof extra.sentryDsn === 'string' ? extra.sentryDsn.trim() : '';
+  const fromEnv = (process.env.EXPO_PUBLIC_SENTRY_DSN ?? '').trim();
+  return fromExtra || fromEnv || undefined;
 }
 
 /**
@@ -56,6 +65,7 @@ export function getAppConfig(): AppConfig {
     buildNumber: extra.buildNumber,
     buildTimestampUtc: extra.buildTimestampUtc,
     buildRevision: extra.buildRevision,
+    sentryDsn: readSentryDsn(extra),
   };
 }
 
