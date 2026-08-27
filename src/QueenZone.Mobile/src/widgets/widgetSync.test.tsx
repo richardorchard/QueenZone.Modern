@@ -1,16 +1,34 @@
+import * as BackgroundTask from 'expo-background-task';
+import * as TaskManager from 'expo-task-manager';
 import { Platform } from 'react-native';
-import { syncHomeWidget } from './widgetSync';
-import { writeCachedWidgetProps } from './widgetCache';
+import { fetchOnThisDay, fetchRandomQuote } from '../api/content';
+import {
+  HOME_WIDGET_BACKGROUND_TASK,
+  WIDGET_BACKGROUND_MIN_INTERVAL_MINUTES,
+  WIDGET_REFRESH_INTERVAL_MS,
+  defineHomeWidgetBackgroundTask,
+  refreshHomeWidget,
+  registerHomeWidgetBackgroundRefresh,
+  runHomeWidgetBackgroundRefresh,
+  syncHomeWidget,
+} from './widgetSync';
+import { readLastWidgetRefreshAt, writeCachedWidgetProps, writeLastWidgetRefreshAt } from './widgetCache';
 
 const mockUpdateSnapshot = jest.fn();
+const mockUpdateTimeline = jest.fn();
 const mockRequestWidgetUpdate = jest.fn().mockResolvedValue(undefined);
 
 jest.mock('./widgetCache', () => ({
   writeCachedWidgetProps: jest.fn().mockResolvedValue(undefined),
+  writeLastWidgetRefreshAt: jest.fn().mockResolvedValue(undefined),
+  readLastWidgetRefreshAt: jest.fn().mockResolvedValue(null),
 }));
 
 jest.mock('./OnThisDayWidget.ios', () => ({
-  OnThisDayWidget: { updateSnapshot: (...args: unknown[]) => mockUpdateSnapshot(...args) },
+  OnThisDayWidget: {
+    updateSnapshot: (...args: unknown[]) => mockUpdateSnapshot(...args),
+    updateTimeline: (...args: unknown[]) => mockUpdateTimeline(...args),
+  },
 }));
 
 jest.mock('react-native-android-widget', () => ({
@@ -21,7 +39,23 @@ jest.mock('./OnThisDayAndroidWidget', () => ({
   OnThisDayAndroidWidget: () => null,
 }));
 
+jest.mock('../api/content', () => ({
+  fetchOnThisDay: jest.fn(),
+  fetchRandomQuote: jest.fn(),
+}));
+
 const writeCached = writeCachedWidgetProps as jest.MockedFunction<typeof writeCachedWidgetProps>;
+const writeRefreshAt = writeLastWidgetRefreshAt as jest.MockedFunction<typeof writeLastWidgetRefreshAt>;
+const readRefreshAt = readLastWidgetRefreshAt as jest.MockedFunction<typeof readLastWidgetRefreshAt>;
+const fetchDay = fetchOnThisDay as jest.MockedFunction<typeof fetchOnThisDay>;
+const fetchQuote = fetchRandomQuote as jest.MockedFunction<typeof fetchRandomQuote>;
+const defineTask = TaskManager.defineTask as jest.MockedFunction<typeof TaskManager.defineTask>;
+const isTaskRegistered = TaskManager.isTaskRegisteredAsync as jest.MockedFunction<
+  typeof TaskManager.isTaskRegisteredAsync
+>;
+const registerTask = BackgroundTask.registerTaskAsync as jest.MockedFunction<
+  typeof BackgroundTask.registerTaskAsync
+>;
 
 const content = {
   onThisDay: {
@@ -37,40 +71,202 @@ const content = {
   quote: { id: 9, text: 'A kind of magic', whoSaid: 'Freddie Mercury' },
 };
 
+const widgetProps = {
+  formattedDate: '30 June 1980',
+  summary: 'Queen released The Game.',
+  quoteText: 'A kind of magic',
+  quoteWhoSaid: 'Freddie Mercury',
+};
+
 describe('syncHomeWidget', () => {
   const originalOs = Platform.OS;
 
   afterEach(() => {
     Object.defineProperty(Platform, 'OS', { value: originalOs });
+    jest.restoreAllMocks();
     mockUpdateSnapshot.mockClear();
+    mockUpdateTimeline.mockClear();
     mockRequestWidgetUpdate.mockClear();
     writeCached.mockClear();
+    writeRefreshAt.mockClear();
+    readRefreshAt.mockReset();
+    readRefreshAt.mockResolvedValue(null);
+    fetchDay.mockReset();
+    fetchQuote.mockReset();
+    defineTask.mockClear();
+    isTaskRegistered.mockReset();
+    isTaskRegistered.mockResolvedValue(false);
+    registerTask.mockReset();
+    registerTask.mockResolvedValue(undefined);
   });
 
-  it('pushes a snapshot on iOS', async () => {
+  it('schedules a 4-hour iOS timeline', async () => {
     Object.defineProperty(Platform, 'OS', { value: 'ios' });
+    const now = 1_700_000_000_000;
+    jest.spyOn(Date, 'now').mockReturnValue(now);
+
     await syncHomeWidget(content);
-    expect(mockUpdateSnapshot).toHaveBeenCalledWith({
-      formattedDate: '30 June 1980',
-      summary: 'Queen released The Game.',
-      quoteText: 'A kind of magic',
-      quoteWhoSaid: 'Freddie Mercury',
-    });
+
+    expect(mockUpdateTimeline).toHaveBeenCalledWith([
+      { date: new Date(now), props: widgetProps },
+      { date: new Date(now + WIDGET_REFRESH_INTERVAL_MS), props: widgetProps },
+    ]);
+    expect(mockUpdateSnapshot).not.toHaveBeenCalled();
     expect(mockRequestWidgetUpdate).not.toHaveBeenCalled();
+    expect(writeRefreshAt).toHaveBeenCalledWith(now);
+    jest.spyOn(Date, 'now').mockRestore();
   });
 
   it('caches props and requests an Android update', async () => {
     Object.defineProperty(Platform, 'OS', { value: 'android' });
     await syncHomeWidget(content);
-    expect(writeCached).toHaveBeenCalledWith({
-      formattedDate: '30 June 1980',
-      summary: 'Queen released The Game.',
-      quoteText: 'A kind of magic',
-      quoteWhoSaid: 'Freddie Mercury',
-    });
+    expect(writeCached).toHaveBeenCalledWith(widgetProps);
     expect(mockRequestWidgetUpdate).toHaveBeenCalledWith(
       expect.objectContaining({ widgetName: 'OnThisDayWidget' }),
     );
-    expect(mockUpdateSnapshot).not.toHaveBeenCalled();
+    expect(mockUpdateTimeline).not.toHaveBeenCalled();
+    expect(writeRefreshAt).toHaveBeenCalled();
+  });
+});
+
+describe('refreshHomeWidget', () => {
+  const originalOs = Platform.OS;
+
+  afterEach(() => {
+    Object.defineProperty(Platform, 'OS', { value: originalOs });
+    mockUpdateTimeline.mockClear();
+    mockRequestWidgetUpdate.mockClear();
+    writeCached.mockClear();
+    writeRefreshAt.mockClear();
+    readRefreshAt.mockReset();
+    readRefreshAt.mockResolvedValue(null);
+    fetchDay.mockReset();
+    fetchQuote.mockReset();
+  });
+
+  it('fetches on-this-day plus a new quote and pushes on iOS', async () => {
+    Object.defineProperty(Platform, 'OS', { value: 'ios' });
+    fetchDay.mockResolvedValue(content.onThisDay);
+    fetchQuote.mockResolvedValue(content.quote);
+
+    await expect(refreshHomeWidget()).resolves.toBe(true);
+
+    expect(fetchDay).toHaveBeenCalledTimes(1);
+    expect(fetchQuote).toHaveBeenCalledTimes(1);
+    expect(mockUpdateTimeline).toHaveBeenCalledWith(
+      expect.arrayContaining([expect.objectContaining({ props: widgetProps })]),
+    );
+  });
+
+  it('does not replace the last snapshot when a fetch fails', async () => {
+    Object.defineProperty(Platform, 'OS', { value: 'android' });
+    fetchDay.mockRejectedValue(new Error('offline'));
+    fetchQuote.mockResolvedValue(content.quote);
+
+    await expect(refreshHomeWidget()).resolves.toBe(false);
+
+    expect(writeCached).not.toHaveBeenCalled();
+    expect(writeRefreshAt).not.toHaveBeenCalled();
+    expect(mockRequestWidgetUpdate).not.toHaveBeenCalled();
+  });
+
+  it('skips a fetch when the last successful push was recent', async () => {
+    Object.defineProperty(Platform, 'OS', { value: 'android' });
+    readRefreshAt.mockResolvedValue(Date.now() - 60_000);
+
+    await expect(refreshHomeWidget()).resolves.toBe(true);
+
+    expect(fetchDay).not.toHaveBeenCalled();
+    expect(fetchQuote).not.toHaveBeenCalled();
+    expect(writeCached).not.toHaveBeenCalled();
+  });
+});
+
+describe('runHomeWidgetBackgroundRefresh', () => {
+  afterEach(() => {
+    fetchDay.mockReset();
+    fetchQuote.mockReset();
+    readRefreshAt.mockReset();
+    readRefreshAt.mockResolvedValue(null);
+    writeCached.mockClear();
+    writeRefreshAt.mockClear();
+  });
+
+  it('reports failure when the background fetch fails', async () => {
+    fetchDay.mockRejectedValue(new Error('offline'));
+    fetchQuote.mockRejectedValue(new Error('offline'));
+
+    await expect(runHomeWidgetBackgroundRefresh()).resolves.toBe(BackgroundTask.BackgroundTaskResult.Failed);
+    expect(writeCached).not.toHaveBeenCalled();
+  });
+
+  it('reports success after a fresh fetch', async () => {
+    Object.defineProperty(Platform, 'OS', { value: 'android' });
+    fetchDay.mockResolvedValue(content.onThisDay);
+    fetchQuote.mockResolvedValue(content.quote);
+
+    await expect(runHomeWidgetBackgroundRefresh()).resolves.toBe(BackgroundTask.BackgroundTaskResult.Success);
+  });
+});
+
+describe('registerHomeWidgetBackgroundRefresh', () => {
+  const originalOs = Platform.OS;
+
+  afterEach(() => {
+    Object.defineProperty(Platform, 'OS', { value: originalOs });
+    isTaskRegistered.mockReset();
+    isTaskRegistered.mockResolvedValue(false);
+    registerTask.mockReset();
+    registerTask.mockResolvedValue(undefined);
+  });
+
+  it('registers the iOS background task once', async () => {
+    Object.defineProperty(Platform, 'OS', { value: 'ios' });
+    isTaskRegistered.mockResolvedValue(false);
+
+    await registerHomeWidgetBackgroundRefresh();
+
+    expect(registerTask).toHaveBeenCalledWith(HOME_WIDGET_BACKGROUND_TASK, {
+      minimumInterval: WIDGET_BACKGROUND_MIN_INTERVAL_MINUTES,
+    });
+  });
+
+  it('does not register again when the task is already scheduled', async () => {
+    Object.defineProperty(Platform, 'OS', { value: 'ios' });
+    isTaskRegistered.mockResolvedValue(true);
+
+    await registerHomeWidgetBackgroundRefresh();
+
+    expect(registerTask).not.toHaveBeenCalled();
+  });
+
+  it('does not register on Android', async () => {
+    Object.defineProperty(Platform, 'OS', { value: 'android' });
+
+    await registerHomeWidgetBackgroundRefresh();
+
+    expect(isTaskRegistered).not.toHaveBeenCalled();
+    expect(registerTask).not.toHaveBeenCalled();
+  });
+
+  it('swallows a restricted-OS registration failure', async () => {
+    Object.defineProperty(Platform, 'OS', { value: 'ios' });
+    isTaskRegistered.mockRejectedValue(new Error('restricted'));
+
+    await expect(registerHomeWidgetBackgroundRefresh()).resolves.toBeUndefined();
+    expect(registerTask).not.toHaveBeenCalled();
+  });
+
+  it('defines the background task at the JS entry', async () => {
+    Object.defineProperty(Platform, 'OS', { value: 'android' });
+    fetchDay.mockResolvedValue(content.onThisDay);
+    fetchQuote.mockResolvedValue(content.quote);
+    readRefreshAt.mockResolvedValue(null);
+
+    defineHomeWidgetBackgroundTask();
+    expect(defineTask).toHaveBeenCalledWith(HOME_WIDGET_BACKGROUND_TASK, expect.any(Function));
+
+    const executor = defineTask.mock.calls.at(-1)?.[1] as () => Promise<BackgroundTask.BackgroundTaskResult>;
+    await expect(executor()).resolves.toBe(BackgroundTask.BackgroundTaskResult.Success);
   });
 });
