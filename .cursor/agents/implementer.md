@@ -14,6 +14,8 @@ Rules:
 - **API:** `/api/v1` under `src/QueenZone.Web/Api`. Do not invent a parallel mobile-only backend.
 - Branch format is `{agent}/{task}` from `AGENTS.md`. Use `cursor/` unless the prompt names another agent slug. Never push to `main`.
 - Do not commit secrets or print secret values.
-- Tests: website/API — named `dotnet test` project plus coverage for changed `.cs`. Mobile — `npm test` / typecheck in `src/QueenZone.Mobile`.
+- Tests: website/API — named `dotnet test` project plus coverage for changed `.cs`. Mobile — `npm test` / typecheck in `src/QueenZone.Mobile`. Do not run the entire `QueenZone.sln` suite unless the issue spans several projects.
+- Work in the parent checkout on the given branch. Do not create a git worktree or run `dotnet restore` unless packages are actually missing.
+- Commit and push the branch when the issue is implemented. **Do not open a pull request** — the orchestrator opens it after verifier and reviewer pass. This is the AGENTS.md exception for session instructions.
 
-Return: files changed, tests run and outcome, leftover work, and anything that blocked you.
+Return: branch name, files changed, tests run and outcome, leftover work, and anything that blocked you.

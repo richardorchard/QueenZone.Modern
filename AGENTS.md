@@ -18,7 +18,7 @@ This repository is the modern QueenZone rebuild. The project is archive-first: i
 - `docs/backlog/migration-backlog.md` tracks migration work.
 - `docs/sql/data-api-builder-mcp.md` explains the local SQL MCP setup for read-only legacy database investigation.
 - `docs/agent-bitwarden-secrets.md` is the multi-machine Bitwarden Secrets Manager (`bws`) setup for local agents (Windows vs macOS).
-- `.cursor/agents/` and `.cursor/skills/orchestrate-epic/` are the Cursor issue-queue orchestrator (planner / implementer / verifier) for epics or a list of GitHub issues, including website and `QueenZone.Mobile`. Pin the skill as a Custom Mode.
+- `.cursor/agents/` and `.cursor/skills/orchestrate-epic/` are the Cursor issue-queue orchestrator (planner / implementer / verifier / reviewer) for epics or a list of GitHub issues, including website and `QueenZone.Mobile`. Pin the skill as a Custom Mode. Sequential only: one issue, one subagent at a time, PR after review.
 
 Keep durable workflow guidance in this file and keep user-facing setup guidance in `README.md`.
 
@@ -98,11 +98,11 @@ Fill in the template's `## Issues` section with a real GitHub closing keyword �
 
 ## Cursor issue-queue orchestration
 
-Cursor custom subagents are markdown files in `.cursor/agents/` (`planner`, `implementer`, `verifier`, `orchestrator`). The spawn protocol lives in `.cursor/skills/orchestrate-epic/SKILL.md`. Pin that skill as a Custom Mode (`/orchestrate-epic`, then Alt+Enter on Windows or Option+Enter on Mac), or invoke `/orchestrator`.
+Cursor custom subagents are markdown files in `.cursor/agents/` (`planner`, `implementer`, `verifier`, `reviewer`, `orchestrator`). The spawn protocol lives in `.cursor/skills/orchestrate-epic/SKILL.md`. Pin that skill as a Custom Mode (`/orchestrate-epic`, then Alt+Enter on Windows or Option+Enter on Mac), or invoke `/orchestrator`.
 
-Use it for an epic's children **or** an explicit issue list (`work on #15 #16 #17`). The parent keeps a scoreboard and loops one issue (or at most two independent ones) through implementer then verifier so child context does not accumulate in the parent chat. Website and `src/QueenZone.Mobile` are both in scope; do not mix those surfaces in one implementer unless the issue requires both. Child branches use `cursor/` unless the prompt names another agent.
+Use it for an epic's children **or** an explicit issue list (`work on #15 #16 #17`). The parent keeps a scoreboard and loops **one issue at a time** through implementer → verifier → reviewer → PR so child context does not accumulate in the parent chat. Do not run sibling implementers in parallel. Share the parent checkout; do not isolate a git worktree per issue (that re-runs `dotnet restore` via `.cursor/worktrees.json` and is the usual cause of a slow queue). Website and `src/QueenZone.Mobile` are both in scope; do not mix those surfaces in one implementer unless the issue requires both. Child branches use `cursor/` unless the prompt names another agent.
 
-Grok 4.6 effort: parent high/xhigh, planner high, implementer medium, verifier high. Isolated child checkouts restore via `.cursor/worktrees.json`.
+Grok 4.6 effort: parent high (xhigh only if the split is messy), planner high, implementer medium, verifier high, reviewer high.
 
 ## Testing Expectations
 

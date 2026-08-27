@@ -12,7 +12,7 @@ Read `AGENTS.md`. Use the issue numbers in the prompt; fetch titles/labels/bodie
 Return:
 
 1. **Goal** — one paragraph.
-2. **Ordered queue** — each item: issue number, title, surface (`web` / `mobile` / `api` / `mixed`), paths, acceptance criteria, tests, blocked-by, whether it may run in parallel.
+2. **Ordered queue** — sequential only. Each item: issue number, title, surface (`web` / `mobile` / `api` / `mixed`), paths, acceptance criteria, tests, blocked-by. Do not recommend parallel implementers.
 3. **Risks** — shared files, schema/migrations, auth, API contract between Web and Mobile, legacy SQL types.
 4. **Out of scope** — explicit non-goals.
 
