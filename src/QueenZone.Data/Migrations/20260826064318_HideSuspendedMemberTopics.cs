@@ -202,7 +202,7 @@ public partial class HideSuspendedMemberTopics : Migration
                 (
                     SELECT p.ThreadId AS ThreadPk, MAX(ft.[RANK]) AS SearchRank
                     FROM dbo.ModernForumPost p
-                    INNER JOIN FREETEXTTABLE(dbo.ModernForumPost, Body, @Query) ft ON ft.[KEY] = p.Id
+                    INNER JOIN FREETEXTTABLE(dbo.ModernForumPost, BodyHtml, @Query) ft ON ft.[KEY] = p.Id
                     INNER JOIN dbo.ModernForumThread t ON t.Id = p.ThreadId
                     INNER JOIN dbo.ModernForumCategory c ON c.Id = t.CategoryId
                     WHERE t.IsLegacyTopicStarter = 1 AND t.StartedByUserValidated = 1
@@ -236,7 +236,7 @@ public partial class HideSuspendedMemberTopics : Migration
                 (
                     SELECT DISTINCT p.ThreadId AS ThreadPk
                     FROM dbo.ModernForumPost p
-                    INNER JOIN FREETEXTTABLE(dbo.ModernForumPost, Body, @Query) ft ON ft.[KEY] = p.Id
+                    INNER JOIN FREETEXTTABLE(dbo.ModernForumPost, BodyHtml, @Query) ft ON ft.[KEY] = p.Id
                     INNER JOIN dbo.ModernForumThread t ON t.Id = p.ThreadId
                     INNER JOIN dbo.ModernForumCategory c ON c.Id = t.CategoryId
                     WHERE t.IsLegacyTopicStarter = 1 AND t.StartedByUserValidated = 1
