@@ -2,7 +2,7 @@ import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ChevronRight, Search } from 'lucide-react-native';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -12,6 +12,7 @@ import {
   fetchNewsPage,
   fetchOnThisDay,
   fetchPhotoCategories,
+  fetchRandomQuote,
   type ForumRecentThread,
   type InboxConversation,
   type NewsListItem,
@@ -37,6 +38,7 @@ import { MetaLine } from '../../ui/MetaLine';
 import { SectionErrorBlock } from '../../ui/ScreenStates';
 import { SectionHeader } from '../../ui/SectionHeader';
 import { testIds } from '../../test/testIds';
+import { syncHomeWidget } from '../../widgets/widgetSync';
 import { profileA11yLabel } from '../messages/inboxMeta';
 import { useUnreadConversationCount } from '../messages/useUnreadConversationCount';
 import {
@@ -81,6 +83,7 @@ export function HomeScreen({ navigation }: Props) {
     useCallback((signal) => fetchPhotoCategories({ page: 1, pageSize: 3, signal }), []),
   );
   const onThisDay = useHomeSection(useCallback((signal) => fetchOnThisDay(signal), []));
+  const quote = useHomeSection(useCallback((signal) => fetchRandomQuote(signal), []));
   const liveActivity = useHomeSection(useCallback((signal) => fetchLiveActivity(signal), []));
   const messages = useHomeSection(
     useCallback(
@@ -121,9 +124,22 @@ export function HomeScreen({ navigation }: Props) {
     forum.refresh,
     gallery.refresh,
     onThisDay.refresh,
+    quote.refresh,
     liveActivity.refresh,
     messages.refresh,
   ]);
+
+  useEffect(() => {
+    if (onThisDay.view.kind !== 'content') {
+      return;
+    }
+    syncHomeWidget({
+      onThisDay: onThisDay.view.data,
+      quote: quote.view.kind === 'content' ? quote.view.data : null,
+    }).catch(() => {
+      /* widget sync is best-effort */
+    });
+  }, [onThisDay.view, quote.view]);
 
   const newsItems = news.view.kind === 'content' ? news.view.data.items : [];
   const hero = newsItems[0] ?? null;
@@ -594,6 +610,11 @@ export function HomeScreen({ navigation }: Props) {
               eyebrow="On this day"
               numeral={onThisDay.view.data.formattedDate.toUpperCase()}
               body={onThisDay.view.data.summary}
+              quote={
+                quote.view.kind === 'content' && quote.view.data
+                  ? { text: quote.view.data.text, whoSaid: quote.view.data.whoSaid }
+                  : undefined
+              }
               actionLabel="View timeline"
               onAction={() => navigation.navigate('ArchiveTab', { screen: 'Timeline' })}
             />

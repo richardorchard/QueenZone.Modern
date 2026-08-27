@@ -297,6 +297,13 @@ export type LiveActivitySummary = {
   newForumRepliesToday: number;
 };
 
+/** Shape for `/api/v1/content/quotes/random`, a single random published quote. */
+export type RandomQuote = {
+  id: number;
+  text: string;
+  whoSaid: string;
+};
+
 /** One hit from `GET /api/v1/search`. `id` is parsed from numeric source keys. */
 export type SearchResult = {
   contentType: string;

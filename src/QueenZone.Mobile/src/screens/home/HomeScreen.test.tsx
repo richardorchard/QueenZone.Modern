@@ -7,6 +7,7 @@ import {
   fetchNewsPage,
   fetchOnThisDay,
   fetchPhotoCategories,
+  fetchRandomQuote,
 } from '../../api';
 import { deferred, newsItemFixture, pagedResponse } from '../../test/fixtures';
 import { createMockSession } from '../../test/mockSession';
@@ -21,6 +22,7 @@ jest.mock('../../api', () => {
     fetchForumRecentThreads: jest.fn(),
     fetchPhotoCategories: jest.fn(),
     fetchOnThisDay: jest.fn(),
+    fetchRandomQuote: jest.fn(),
     fetchLiveActivity: jest.fn(),
     fetchInbox: jest.fn(),
   };
@@ -41,10 +43,16 @@ jest.mock('expo-linear-gradient', () => {
   return { LinearGradient: View };
 });
 
+const mockSyncHomeWidget = jest.fn().mockResolvedValue(undefined);
+jest.mock('../../widgets/widgetSync', () => ({
+  syncHomeWidget: (...args: unknown[]) => mockSyncHomeWidget(...args),
+}));
+
 const fetchNews = fetchNewsPage as jest.MockedFunction<typeof fetchNewsPage>;
 const fetchForum = fetchForumRecentThreads as jest.MockedFunction<typeof fetchForumRecentThreads>;
 const fetchPhotos = fetchPhotoCategories as jest.MockedFunction<typeof fetchPhotoCategories>;
 const fetchDay = fetchOnThisDay as jest.MockedFunction<typeof fetchOnThisDay>;
+const fetchQuote = fetchRandomQuote as jest.MockedFunction<typeof fetchRandomQuote>;
 const fetchLive = fetchLiveActivity as jest.MockedFunction<typeof fetchLiveActivity>;
 const fetchInboxMock = fetchInbox as jest.MockedFunction<typeof fetchInbox>;
 
@@ -98,7 +106,9 @@ describe('HomeScreen', () => {
     ]);
     fetchPhotos.mockResolvedValue(pagedResponse([], 1, 0));
     fetchDay.mockResolvedValue(null);
+    fetchQuote.mockResolvedValue(null);
     fetchLive.mockResolvedValue({ newForumRepliesToday: 0 });
+    mockSyncHomeWidget.mockClear();
     fetchInboxMock.mockReset();
   });
 
@@ -151,6 +161,7 @@ describe('HomeScreen', () => {
     const forumCalls = fetchForum.mock.calls.length;
     const photoCalls = fetchPhotos.mock.calls.length;
     const dayCalls = fetchDay.mock.calls.length;
+    const quoteCalls = fetchQuote.mock.calls.length;
     const liveCalls = fetchLive.mock.calls.length;
     const inboxCalls = fetchInboxMock.mock.calls.length;
 
@@ -166,6 +177,7 @@ describe('HomeScreen', () => {
     expect(fetchForum.mock.calls.length).toBe(forumCalls + 1);
     expect(fetchPhotos.mock.calls.length).toBe(photoCalls + 1);
     expect(fetchDay.mock.calls.length).toBe(dayCalls + 1);
+    expect(fetchQuote.mock.calls.length).toBe(quoteCalls + 1);
     expect(fetchLive.mock.calls.length).toBe(liveCalls + 1);
     expect(fetchInboxMock.mock.calls.length).toBe(inboxCalls);
 
@@ -259,6 +271,41 @@ describe('HomeScreen', () => {
     );
     await waitFor(() => expect(screen.UNSAFE_getByType(RefreshControl).props.refreshing).toBe(false));
     expect(screen.getByText('Queen released The Game.')).toBeOnTheScreen();
+    await flushVirtualizedList();
+  });
+
+  it('shows the quote of the day inside the On This Day card', async () => {
+    fetchDay.mockResolvedValue(onThisDayFixture());
+    fetchQuote.mockResolvedValue({ id: 9, text: 'A kind of magic', whoSaid: 'Freddie Mercury' });
+    renderHome();
+
+    await waitFor(() => expect(screen.getByText('Queen released The Game.')).toBeOnTheScreen());
+    expect(screen.getByText('“A kind of magic”')).toBeOnTheScreen();
+    expect(screen.getByText('— Freddie Mercury')).toBeOnTheScreen();
+    await flushVirtualizedList();
+  });
+
+  it('omits the quote row when no quote is published', async () => {
+    fetchDay.mockResolvedValue(onThisDayFixture());
+    fetchQuote.mockResolvedValue(null);
+    renderHome();
+
+    await waitFor(() => expect(screen.getByText('Queen released The Game.')).toBeOnTheScreen());
+    expect(screen.queryByText(/^“/)).not.toBeOnTheScreen();
+    await flushVirtualizedList();
+  });
+
+  it('syncs the home screen widget once on-this-day content resolves', async () => {
+    fetchDay.mockResolvedValue(onThisDayFixture());
+    fetchQuote.mockResolvedValue({ id: 9, text: 'A kind of magic', whoSaid: 'Freddie Mercury' });
+    renderHome();
+
+    await waitFor(() =>
+      expect(mockSyncHomeWidget).toHaveBeenCalledWith({
+        onThisDay: onThisDayFixture(),
+        quote: { id: 9, text: 'A kind of magic', whoSaid: 'Freddie Mercury' },
+      }),
+    );
     await flushVirtualizedList();
   });
 });
