@@ -1,5 +1,20 @@
 import * as Sentry from '@sentry/react-native';
 
+jest.mock('expo-constants', () => {
+  const extra: Record<string, unknown> = {};
+  return {
+    __esModule: true,
+    default: {
+      expoConfig: { extra, version: '0.1.0' },
+      manifest2: { extra },
+    },
+  };
+});
+
+function expoExtra(): Record<string, unknown> {
+  return require('expo-constants').default.expoConfig.extra as Record<string, unknown>;
+}
+
 // The DSN env var is bound via Expo's `expo/virtual/env` re-export of
 // process.env at module-import time, so each DSN variant needs a fresh
 // module instance (jest.isolateModules) loaded after process.env is set —
@@ -17,6 +32,10 @@ describe('initSentry', () => {
 
   afterEach(() => {
     process.env = { ...originalEnv };
+    const extra = expoExtra();
+    for (const key of Object.keys(extra)) {
+      delete extra[key];
+    }
     jest.clearAllMocks();
   });
 
@@ -43,6 +62,44 @@ describe('initSentry', () => {
         integrations: [navigationIntegration],
       }),
     );
+  });
+
+  it('initializes from Expo extra when Metro did not inline the DSN', () => {
+    delete process.env.EXPO_PUBLIC_SENTRY_DSN;
+    expoExtra().sentryDsn = 'https://extra@o0.ingest.sentry.io/2';
+    expoExtra().appEnv = 'staging';
+
+    const { initSentry } = loadSentryModule();
+    initSentry();
+
+    expect(Sentry.init).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dsn: 'https://extra@o0.ingest.sentry.io/2',
+        environment: 'staging',
+      }),
+    );
+  });
+
+  it('prefers the baked Expo extra DSN over a stale Metro env value', () => {
+    process.env.EXPO_PUBLIC_SENTRY_DSN = 'https://env@o0.ingest.sentry.io/3';
+    expoExtra().sentryDsn = 'https://extra@o0.ingest.sentry.io/2';
+
+    const { initSentry } = loadSentryModule();
+    initSentry();
+
+    expect(Sentry.init).toHaveBeenCalledWith(
+      expect.objectContaining({ dsn: 'https://extra@o0.ingest.sentry.io/2' }),
+    );
+  });
+
+  it('treats whitespace-only DSN values as unset', () => {
+    process.env.EXPO_PUBLIC_SENTRY_DSN = '   ';
+    expoExtra().sentryDsn = '  ';
+
+    const { initSentry } = loadSentryModule();
+    initSentry();
+
+    expect(Sentry.init).not.toHaveBeenCalled();
   });
 
   it('honors a custom traces sample rate', () => {

@@ -1,11 +1,11 @@
 /**
- * Crash/error monitoring bootstrap (#855, #886).
+ * Crash/error monitoring bootstrap (#855).
  *
- * DSN is public-by-design (Sentry DSNs are not secrets) and comes from
- * EXPO_PUBLIC_SENTRY_DSN so Metro inlines it at bundle time like the other
- * EXPO_PUBLIC_* config in `environments.ts`. Sentry stays disabled — init()
- * is a no-op — until a DSN is configured, so builds work before Sentry is
- * set up.
+ * DSN is public-by-design (Sentry DSNs are not secrets). Prefer the value
+ * baked into Expo `extra` at prebuild (`getAppConfig().sentryDsn`) so
+ * published Android/iOS bundles still initialize when Metro does not inherit
+ * `EXPO_PUBLIC_SENTRY_DSN`. Fall back to that env var for local Metro.
+ * Sentry stays disabled — init() is a no-op — until a DSN is configured.
  *
  * Performance tracing needs its own opt-in on top of the DSN: without a
  * tracesSampleRate and the react-native tracing integration, Sentry only
@@ -14,7 +14,7 @@
  * register the NavigationContainer ref and get route-change spans.
  */
 import * as Sentry from '@sentry/react-native';
-import { resolveAppEnvironment } from './environments';
+import { getAppConfig } from './appConfig';
 
 export const navigationIntegration = Sentry.reactNavigationIntegration();
 
@@ -58,8 +58,8 @@ export function reportApiFailure(event: {
 }
 
 export function initSentry(): void {
-  const dsn = process.env.EXPO_PUBLIC_SENTRY_DSN;
-  if (!dsn) {
+  const { sentryDsn, appEnv } = getAppConfig();
+  if (!sentryDsn) {
     return;
   }
 
@@ -68,10 +68,8 @@ export function initSentry(): void {
   );
 
   Sentry.init({
-    dsn,
-    environment: resolveAppEnvironment(
-      process.env.EXPO_PUBLIC_APP_ENV ?? process.env.APP_ENV,
-    ),
+    dsn: sentryDsn,
+    environment: appEnv,
     enableAutoSessionTracking: true,
     tracesSampleRate: Number.isFinite(tracesSampleRate) ? tracesSampleRate : 1.0,
     integrations: [navigationIntegration],

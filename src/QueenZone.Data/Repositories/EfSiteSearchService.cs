@@ -2,7 +2,11 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace QueenZone.Data;
 
-/// <summary>Calls <c>dbo.SearchDocument_Search</c> for ranked, paginated whole-site search.</summary>
+/// <summary>
+/// Calls <c>dbo.SearchDocument_Search</c> for ranked, paginated whole-site search.
+/// Passes <see cref="SiteSearchLimits.MaxRankedMatches"/> so common terms stay inside the
+/// command timeout.
+/// </summary>
 public sealed class EfSiteSearchService(QueenZoneDbContext dbContext) : ISiteSearchService
 {
     private const int MaxPageSize = 100;
@@ -46,6 +50,7 @@ public sealed class EfSiteSearchService(QueenZoneDbContext dbContext) : ISiteSea
                 command.Parameters.Add(EfSql.Input("@ContentType", contentType));
                 command.Parameters.Add(EfSql.Input("@Offset", offset));
                 command.Parameters.Add(EfSql.Input("@PageSize", take));
+                command.Parameters.Add(EfSql.Input("@RankLimit", SiteSearchLimits.MaxRankedMatches));
                 command.Parameters.Add(totalRecords);
             },
             cancellationToken: cancellationToken);
