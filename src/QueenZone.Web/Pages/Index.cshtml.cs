@@ -5,6 +5,7 @@ namespace QueenZone.Web.Pages;
 
 public sealed class IndexModel(
     PublicQueryCacheService publicQueryCache,
+    IQuoteRepository quoteRepository,
     TimeProvider timeProvider) : PageModel
 {
     /// <summary>Stock archive images cycled deterministically per article, since legacy
@@ -28,6 +29,8 @@ public sealed class IndexModel(
     public IReadOnlyList<HomeArticleTeaser> FeaturedArticles { get; private set; } = [];
 
     public IReadOnlyList<PhotoCategory> FeaturedGalleryCategories { get; private set; } = [];
+
+    public QuoteItem? FeaturedQuote { get; private set; }
 
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
@@ -61,6 +64,8 @@ public sealed class IndexModel(
             .Where(category => !string.IsNullOrWhiteSpace(category.CoverThumbnailUrl))
             .Take(FeaturedGalleryCount)
             .ToList();
+
+        FeaturedQuote = await quoteRepository.GetRandomPublishedAsync(cancellationToken);
     }
 }
 
