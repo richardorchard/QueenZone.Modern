@@ -217,7 +217,9 @@ public static class ContentApiEndpoints
             events = await publicQueryCache.GetAroundThisDayAsync(today, 7, 1, cancellationToken);
         }
 
-        return Results.Ok(events.Count > 0 ? ContentApiMapper.ToTimelineEvent(events[0]) : null);
+        // Results.Ok(null) / untyped Ok(object?) is an empty 200; the contract is TimelineEventDto?.
+        TimelineEventDto? payload = events.Count > 0 ? ContentApiMapper.ToTimelineEvent(events[0]) : null;
+        return Results.Ok<TimelineEventDto?>(payload);
     }
 
     internal static async Task<IResult> GetLiveActivityAsync(
