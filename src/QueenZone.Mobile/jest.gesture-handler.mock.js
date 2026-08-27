@@ -11,6 +11,7 @@ const recorded = {
 
 function chain(kind) {
   const handlers = {};
+  const config = {};
   const gesture = {
     onBegin(fn) {
       handlers.onBegin = fn;
@@ -35,10 +36,16 @@ function chain(kind) {
     manualActivation() {
       return gesture;
     },
-    numberOfTaps() {
+    numberOfTaps(value) {
+      config.numberOfTaps = value;
       return gesture;
     },
-    maxDuration() {
+    maxDuration(value) {
+      config.maxDuration = value;
+      return gesture;
+    },
+    maxDistance(value) {
+      config.maxDistance = value;
       return gesture;
     },
     maxPointers() {
@@ -54,6 +61,7 @@ function chain(kind) {
       return gesture;
     },
     handlers,
+    config,
   };
   recorded[kind] = gesture;
   return gesture;

@@ -74,7 +74,7 @@
             {
               "name": "OnThisDayWidget",
               "displayName": "On This Day",
-              "description": "A Queen history highlight and quote of the day.",
+              "description": "A Queen history highlight and a rolling random quote.",
               "supportedFamilies": ["systemSmall", "systemMedium"],
               "contentMarginsDisabled": false
             }
@@ -88,7 +88,7 @@
             {
               "name": "OnThisDayWidget",
               "label": "On This Day",
-              "description": "A Queen history highlight and quote of the day.",
+              "description": "A Queen history highlight and a rolling random quote.",
               "minWidth": "180dp",
               "minHeight": "110dp",
               "targetCellWidth": 3,
@@ -99,7 +99,8 @@
             }
           ]
         }
-      ]
+      ],
+      "expo-background-task"
     ]
   }
 }

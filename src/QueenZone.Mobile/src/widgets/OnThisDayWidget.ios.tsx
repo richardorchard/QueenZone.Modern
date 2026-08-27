@@ -1,5 +1,13 @@
 import { Text, VStack } from '@expo/ui/swift-ui';
-import { containerBackground, font, foregroundStyle, padding, widgetURL } from '@expo/ui/swift-ui/modifiers';
+import {
+  containerBackground,
+  font,
+  foregroundStyle,
+  lineLimit,
+  padding,
+  truncationMode,
+  widgetURL,
+} from '@expo/ui/swift-ui/modifiers';
 import { createWidget } from 'expo-widgets';
 import {
   widgetDayText,
@@ -15,6 +23,8 @@ import { widgetDeepLinkUrl } from './widgetDeepLink';
 /**
  * Props pushed from the app via `syncHomeWidget` (see widgetSync.tsx). Both halves are
  * optional and independent — either can be missing (no event today, no published quotes).
+ * Quote reloads every few hours with jitter; on-this-day is only refetched on a new
+ * calendar day.
  */
 export type OnThisDayWidgetProps = WidgetProps;
 
@@ -43,13 +53,40 @@ function OnThisDayWidgetView(props: OnThisDayWidgetProps) {
         {widgetEyebrow(hasDay)}
       </Text>
       {hasDay ? (
-        <Text modifiers={[foregroundStyle(cream), font({ size: 13 })]}>{widgetDayText(props)}</Text>
+        <Text
+          modifiers={[
+            foregroundStyle(cream),
+            font({ size: 13 }),
+            lineLimit(3),
+            truncationMode('tail'),
+          ]}
+        >
+          {widgetDayText(props)}
+        </Text>
       ) : null}
       {hasQuote ? (
-        <Text modifiers={[foregroundStyle(mutedCream), font({ size: 12 })]}>{widgetQuoteText(props)}</Text>
+        <Text
+          modifiers={[
+            foregroundStyle(mutedCream),
+            font({ size: 12 }),
+            lineLimit(3),
+            truncationMode('tail'),
+          ]}
+        >
+          {widgetQuoteText(props)}
+        </Text>
       ) : null}
       {!hasDay && !hasQuote ? (
-        <Text modifiers={[foregroundStyle(mutedCream), font({ size: 12 })]}>{widgetEmptyText}</Text>
+        <Text
+          modifiers={[
+            foregroundStyle(mutedCream),
+            font({ size: 12 }),
+            lineLimit(3),
+            truncationMode('tail'),
+          ]}
+        >
+          {widgetEmptyText}
+        </Text>
       ) : null}
     </VStack>
   );

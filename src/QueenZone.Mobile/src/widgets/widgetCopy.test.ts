@@ -27,7 +27,7 @@ describe('widgetCopy', () => {
 
   it('uses the quote eyebrow when there is no on-this-day event', () => {
     assert.equal(widgetEyebrow(true), 'ON THIS DAY');
-    assert.equal(widgetEyebrow(false), 'QUOTE OF THE DAY');
+    assert.equal(widgetEyebrow(false), 'QUOTE');
   });
 
   it('formats the day and quote lines the widgets render', () => {

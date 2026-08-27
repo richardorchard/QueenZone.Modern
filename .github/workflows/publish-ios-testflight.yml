@@ -59,6 +59,8 @@ jobs:
       # App Store / TestFlight profiles only include aps-environment=production.
       # Expo prebuild emits development; Xcode replaces it during the signed archive.
       IOS_APS_ENVIRONMENT: production
+      EXPO_PUBLIC_APP_ENV: staging
+      EXPO_PUBLIC_SENTRY_DSN: ${{ vars.SENTRY_DSN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -116,7 +118,7 @@ jobs:
         run: |
           set -euo pipefail
           missing=0
-          for name in SENTRY_DSN SENTRY_ORG SENTRY_PROJECT SENTRY_AUTH_TOKEN; do
+          for name in SENTRY_DSN EXPO_PUBLIC_SENTRY_DSN SENTRY_ORG SENTRY_PROJECT SENTRY_AUTH_TOKEN; do
             eval "value=\${$name-}"
             if [ -z "$value" ]; then
               echo "::error::$name is not set (Settings → Secrets and variables → Actions)."
@@ -170,7 +172,6 @@ jobs:
 
       - name: Generate iOS project
         env:
-          EXPO_PUBLIC_APP_ENV: staging
           # Expo writes ios.buildNumber literally into Info.plist at prebuild.
           # xcodebuild CURRENT_PROJECT_VERSION alone cannot override that literal,
           # so App Store Connect rejected re-uploads with CFBundleVersion=1.
@@ -218,6 +219,16 @@ jobs:
             echo "Expo SDK 57 emits development at prebuild; Xcode changes it to production during the App Store archive."
             exit 1
           fi
+
+      - name: Confirm Sentry DSN is baked into Expo extra
+        run: |
+          set -euo pipefail
+          dsn=$(npx expo config --json | jq -r '.extra.sentryDsn // .exp.extra.sentryDsn // empty')
+          if [ -z "$dsn" ]; then
+            echo "::error::app.config extra.sentryDsn is empty; published builds will not report to Sentry."
+            exit 1
+          fi
+          echo "extra.sentryDsn is set (length ${#dsn})"
 
       - name: Cache CocoaPods
         uses: actions/cache@v4
@@ -580,6 +591,14 @@ jobs:
           constants_config="$app_path/EXConstants.bundle/app.config"
           if ! grep -Fq "$BUILD_TIMESTAMP_UTC" "$constants_config"; then
             echo "::error::Exported IPA is missing build timestamp ${BUILD_TIMESTAMP_UTC}."
+            exit 1
+          fi
+          if [ -z "${EXPO_PUBLIC_SENTRY_DSN:-}" ]; then
+            echo "::error::EXPO_PUBLIC_SENTRY_DSN is not set; cannot verify Sentry extra in the IPA."
+            exit 1
+          fi
+          if ! grep -Fq "$EXPO_PUBLIC_SENTRY_DSN" "$constants_config"; then
+            echo "::error::Exported IPA is missing extra.sentryDsn; Sentry will not initialize."
             exit 1
           fi
           if ! grep -Fq "$BUILD_REVISION" "$constants_config"; then

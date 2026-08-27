@@ -1,12 +1,49 @@
+import * as BackgroundTask from 'expo-background-task';
+import * as TaskManager from 'expo-task-manager';
 import { Platform } from 'react-native';
+import { fetchOnThisDay, fetchRandomQuote } from '../api/content';
 import type { RandomQuote, TimelineEvent } from '../api/types';
 import type { OnThisDayAndroidWidgetProps } from './OnThisDayAndroidWidget';
-import { writeCachedWidgetProps } from './widgetCache';
+import {
+  readCachedWidgetProps,
+  readLastWidgetRefreshAt,
+  writeCachedWidgetProps,
+  writeLastWidgetRefreshAt,
+} from './widgetCache';
+
+export const HOME_WIDGET_BACKGROUND_TASK = 'queenzone-home-widget-refresh';
+
+/** Android `updatePeriodMillis` and the iOS quote timeline hold. Hours, not real-time. */
+export const WIDGET_REFRESH_INTERVAL_MS = 4 * 60 * 60 * 1000;
+
+/** Skip a quote fetch when the last successful push was this recent. */
+export const WIDGET_REFRESH_MIN_INTERVAL_MS = 3 * 60 * 60 * 1000;
+
+/** Spread `/quotes/random` hits so devices do not all refresh on the hour. */
+export const WIDGET_QUOTE_REFRESH_JITTER_MS = 30 * 60 * 1000;
+
+/** iOS BGTaskScheduler minimum interval, in minutes. Matches the 4-hour Android period. */
+export const WIDGET_BACKGROUND_MIN_INTERVAL_MINUTES = 240;
 
 export type WidgetContent = {
   onThisDay: TimelineEvent | null;
   quote: RandomQuote | null;
 };
+
+export function nextQuoteRefreshDelayMs(random: () => number = Math.random): number {
+  const unit = Math.min(Math.max(random(), 0), 1);
+  return WIDGET_REFRESH_INTERVAL_MS + Math.floor(unit * WIDGET_QUOTE_REFRESH_JITTER_MS);
+}
+
+export function isSameLocalCalendarDay(leftMs: number, rightMs: number): boolean {
+  const left = new Date(leftMs);
+  const right = new Date(rightMs);
+  return (
+    left.getFullYear() === right.getFullYear() &&
+    left.getMonth() === right.getMonth() &&
+    left.getDate() === right.getDate()
+  );
+}
 
 function toWidgetProps(content: WidgetContent): OnThisDayAndroidWidgetProps {
   return {
@@ -17,24 +54,62 @@ function toWidgetProps(content: WidgetContent): OnThisDayAndroidWidgetProps {
   };
 }
 
+function quoteFromProps(props: OnThisDayAndroidWidgetProps): RandomQuote | null {
+  if (!props.quoteText || !props.quoteWhoSaid) {
+    return null;
+  }
+  return { id: 0, text: props.quoteText, whoSaid: props.quoteWhoSaid };
+}
+
+function dayFromProps(props: OnThisDayAndroidWidgetProps): TimelineEvent | null {
+  if (!props.formattedDate || !props.summary) {
+    return null;
+  }
+  return {
+    id: 0,
+    title: '',
+    summary: props.summary,
+    eventDate: '',
+    formattedDate: props.formattedDate,
+    category: '',
+    categoryLabel: '',
+    sourceUrl: null,
+  };
+}
+
+function iosTimelineEntries(props: OnThisDayAndroidWidgetProps) {
+  const now = Date.now();
+  return [
+    { date: new Date(now), props },
+    { date: new Date(now + nextQuoteRefreshDelayMs()), props },
+  ];
+}
+
+function hasWidgetContent(content: WidgetContent): boolean {
+  return content.onThisDay != null || content.quote != null;
+}
+
 /**
- * Pushes the home screen's on-this-day + quote content to the OS widget. Called from
- * HomeScreen once both fetches settle — this is the widget's only refresh trigger for now
- * (see widgetTaskHandler.tsx; a true background-fetch cadence is a follow-up, not #983's
- * scope).
+ * Pushes on-this-day + quote content to the OS widget. HomeScreen calls this after its
+ * own fetches settle. Background refresh uses {@link refreshHomeWidget} instead.
+ * The throttle timestamp is written only when the payload has content — a Home error
+ * view (`{ onThisDay: null, quote: null }`) must not skip the next overnight fetch.
  */
 export async function syncHomeWidget(content: WidgetContent): Promise<void> {
   const props = toWidgetProps(content);
+  await writeCachedWidgetProps(props);
 
   if (Platform.OS === 'ios') {
     // eslint-disable-next-line @typescript-eslint/no-require-imports -- platform-gated: this module must not load on Android, where expo-widgets has no native counterpart.
     const { OnThisDayWidget } = require('./OnThisDayWidget.ios') as typeof import('./OnThisDayWidget.ios');
-    OnThisDayWidget.updateSnapshot(props);
+    OnThisDayWidget.updateTimeline(iosTimelineEntries(props));
+    if (hasWidgetContent(content)) {
+      await writeLastWidgetRefreshAt(Date.now());
+    }
     return;
   }
 
   if (Platform.OS === 'android') {
-    await writeCachedWidgetProps(props);
     // eslint-disable-next-line @typescript-eslint/no-require-imports -- lazy so iOS bundles never touch the Android-only widget module.
     const { requestWidgetUpdate } = require('react-native-android-widget') as typeof import('react-native-android-widget');
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -43,5 +118,99 @@ export async function syncHomeWidget(content: WidgetContent): Promise<void> {
       widgetName: 'OnThisDayWidget',
       renderWidget: () => <OnThisDayAndroidWidget {...props} />,
     });
+    if (hasWidgetContent(content)) {
+      await writeLastWidgetRefreshAt(Date.now());
+    }
+  }
+}
+
+async function shouldSkipBackgroundRefresh(): Promise<boolean> {
+  const last = await readLastWidgetRefreshAt();
+  if (last == null) {
+    return false;
+  }
+  return Date.now() - last < WIDGET_REFRESH_MIN_INTERVAL_MS;
+}
+
+function shouldFetchOnThisDay(lastRefreshAt: number | null, now: number): boolean {
+  return lastRefreshAt == null || !isSameLocalCalendarDay(lastRefreshAt, now);
+}
+
+/**
+ * Fetches a new random quote (and on-this-day when the calendar day changed) and
+ * pushes them to the widget. A failed quote fetch keeps the last good quote.
+ * Returns false when nothing new could be fetched so the last snapshot stays up.
+ */
+export async function refreshHomeWidget(): Promise<boolean> {
+  if (await shouldSkipBackgroundRefresh()) {
+    return true;
+  }
+
+  const cached = await readCachedWidgetProps();
+  let quote = quoteFromProps(cached);
+  let onThisDay = dayFromProps(cached);
+  const dayDue = shouldFetchOnThisDay(await readLastWidgetRefreshAt(), Date.now());
+
+  let quoteFetched = false;
+  let dayFetched = false;
+
+  const quoteTask = fetchRandomQuote()
+    .then((fresh) => {
+      if (fresh) {
+        quote = fresh;
+      }
+      quoteFetched = true;
+    })
+    .catch(() => {
+      /* last good quote stays */
+    });
+
+  const dayTask = dayDue
+    ? fetchOnThisDay()
+        .then((fresh) => {
+          onThisDay = fresh;
+          dayFetched = true;
+        })
+        .catch(() => {
+          /* last good on-this-day stays */
+        })
+    : Promise.resolve();
+
+  await Promise.all([quoteTask, dayTask]);
+
+  if (!quoteFetched && !dayFetched) {
+    return false;
+  }
+
+  await syncHomeWidget({ onThisDay, quote });
+  return true;
+}
+
+export async function runHomeWidgetBackgroundRefresh(): Promise<BackgroundTask.BackgroundTaskResult> {
+  const ok = await refreshHomeWidget();
+  return ok ? BackgroundTask.BackgroundTaskResult.Success : BackgroundTask.BackgroundTaskResult.Failed;
+}
+
+/** Must run from the JS entry so a background launch can find the task. */
+export function defineHomeWidgetBackgroundTask(): void {
+  TaskManager.defineTask(HOME_WIDGET_BACKGROUND_TASK, () => runHomeWidgetBackgroundRefresh());
+}
+
+/** iOS-only. Android already refreshes from the widget task's 4-hour period. */
+export async function registerHomeWidgetBackgroundRefresh(): Promise<void> {
+  if (Platform.OS !== 'ios') {
+    return;
+  }
+
+  try {
+    const registered = await TaskManager.isTaskRegisteredAsync(HOME_WIDGET_BACKGROUND_TASK);
+    if (registered) {
+      return;
+    }
+    await BackgroundTask.registerTaskAsync(HOME_WIDGET_BACKGROUND_TASK, {
+      minimumInterval: WIDGET_BACKGROUND_MIN_INTERVAL_MINUTES,
+    });
+  } catch {
+    /* Simulator / restricted OS — last snapshot stays until a run is granted. */
   }
 }
