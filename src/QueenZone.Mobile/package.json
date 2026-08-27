@@ -26,6 +26,7 @@
     "@expo-google-fonts/cinzel": "^0.4.2",
     "@expo-google-fonts/cormorant-garamond": "^0.4.1",
     "@expo-google-fonts/inter": "^0.4.2",
+    "@expo/ui": "~57.0.14",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-navigation/bottom-tabs": "^7.18.17",
     "@react-navigation/native": "^7.3.17",
@@ -48,9 +49,11 @@
     "expo-splash-screen": "~57.0.8",
     "expo-status-bar": "~57.0.1",
     "expo-web-browser": "~57.0.2",
+    "expo-widgets": "~57.0.13",
     "lucide-react-native": "^1.33.0",
     "react": "19.2.3",
     "react-native": "0.86.3",
+    "react-native-android-widget": "^0.22.1",
     "react-native-gesture-handler": "~2.32.0",
     "react-native-reanimated": "4.5.1",
     "react-native-render-html": "^6.3.4",
@@ -72,6 +75,7 @@
   },
   "overrides": {
     "react-test-renderer": "19.2.3",
+    "react-dom": "19.2.3",
     "image-size": "1.2.1"
   }
 }

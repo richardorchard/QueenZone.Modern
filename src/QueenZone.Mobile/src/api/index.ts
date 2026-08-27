@@ -32,6 +32,7 @@ export {
   fetchPhotoCategory,
   fetchPhotoCategoryItems,
   fetchPhotoDetail,
+  fetchRandomQuote,
   fetchTimelinePage,
 } from './content';
 export { fetchSearchPage } from './search';

@@ -14,6 +14,7 @@ import {
   fetchPhotoCategory,
   fetchPhotoCategoryItems,
   fetchPhotoDetail,
+  fetchRandomQuote,
   fetchTimelinePage,
 } from './content';
 import { jsonResponse } from '../test/fixtures';
@@ -103,6 +104,21 @@ describe('fetchLiveActivity', () => {
     const summary = await fetchLiveActivity();
     expect(lastUrl()).toBe('http://qz.test/api/v1/content/live-activity');
     expect(summary.newForumRepliesToday).toBe(3);
+  });
+});
+
+describe('fetchRandomQuote', () => {
+  it('requests the random quote and returns null when none are published', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(null));
+    const quote = await fetchRandomQuote();
+    expect(lastUrl()).toBe('http://qz.test/api/v1/content/quotes/random');
+    expect(quote).toBeNull();
+  });
+
+  it('returns the parsed quote body', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ id: 5, text: 'A kind of magic', whoSaid: 'Freddie Mercury' }));
+    const quote = await fetchRandomQuote();
+    expect(quote).toMatchObject({ id: 5, text: 'A kind of magic', whoSaid: 'Freddie Mercury' });
   });
 });
 

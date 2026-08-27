@@ -17,6 +17,10 @@ jest.mock('../share/news/NewsShare', () => ({
   NewsShareBridge: () => null,
 }));
 
+jest.mock('../widgets/WidgetLinkBridge', () => ({
+  WidgetLinkBridge: () => null,
+}));
+
 jest.mock('./stacks', () => {
   const React = require('react');
   const { Text } = require('react-native');
