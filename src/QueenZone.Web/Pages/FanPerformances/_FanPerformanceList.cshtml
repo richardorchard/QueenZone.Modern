@@ -6,24 +6,53 @@
 }
 else
 {
-  <ol class="qz-stage-list">
+  <ol class="qz-stage-list" data-qz-stage-list>
     @foreach (var performance in Model.Items)
     {
       <li class="qz-stage-row">
         <div class="qz-card__kicker"><time datetime="@performance.DateAdded.ToString("yyyy-MM-dd")">@performance.DateAdded.ToString("dd MMMM yyyy")</time></div>
-        <h2>@performance.Title</h2>
-        <p class="qz-meta">Performed by @performance.PerformedBy</p>
+        <div class="qz-stage-row__track">
+          @if (performance.AudioPlayPath is not null)
+          {
+            <button type="button"
+                    class="qz-stage-play"
+                    data-qz-stage-play
+                    data-title="@performance.Title"
+                    aria-pressed="false"
+                    aria-label="Play @performance.Title">
+              <svg class="qz-stage-play__icon qz-stage-play__icon--play" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M8 5.14v13.72L19 12 8 5.14z" fill="currentColor"></path>
+              </svg>
+              <svg class="qz-stage-play__icon qz-stage-play__icon--pause" viewBox="0 0 24 24" aria-hidden="true" focusable="false" hidden>
+                <rect x="6" y="5" width="4" height="14" fill="currentColor"></rect>
+                <rect x="14" y="5" width="4" height="14" fill="currentColor"></rect>
+              </svg>
+            </button>
+          }
+          else
+          {
+            <a class="qz-stage-play"
+               href="@FanPerformanceRoutes.GetLoginPath(Model.LoginReturnUrl)"
+               aria-label="Sign in to play @performance.Title">
+              <svg class="qz-stage-play__icon qz-stage-play__icon--play" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M8 5.14v13.72L19 12 8 5.14z" fill="currentColor"></path>
+              </svg>
+            </a>
+          }
+          <div class="qz-stage-row__copy">
+            <h2>@performance.Title</h2>
+            <p class="qz-meta">Performed by @performance.PerformedBy</p>
+          </div>
+        </div>
+        @if (performance.AudioPlayPath is null)
+        {
+          <p class="qz-meta qz-stage-row__signin">Sign in to play</p>
+        }
         @if (performance.AudioPlayPath is not null)
         {
-          <audio controls preload="metadata" src="@performance.AudioPlayPath">
+          <audio class="qz-stage-row__audio" controls preload="none" src="@performance.AudioPlayPath">
             <a href="@performance.AudioPlayPath">Download @performance.Title</a>
           </audio>
-        }
-        else
-        {
-          <p class="qz-meta">
-            <a href="@FanPerformanceRoutes.GetLoginPath(Model.LoginReturnUrl)">Sign in to play</a>
-          </p>
         }
         @if (!string.IsNullOrWhiteSpace(performance.Description))
         {
