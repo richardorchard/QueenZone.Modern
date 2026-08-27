@@ -180,6 +180,21 @@ describe('refreshHomeWidget', () => {
     expect(fetchQuote).not.toHaveBeenCalled();
     expect(writeCached).not.toHaveBeenCalled();
   });
+
+  it('does not throttle refreshHomeWidget after a null/error sync', async () => {
+    Object.defineProperty(Platform, 'OS', { value: 'android' });
+    fetchDay.mockResolvedValue(content.onThisDay);
+    fetchQuote.mockResolvedValue(content.quote);
+
+    await syncHomeWidget({ onThisDay: null, quote: null });
+
+    expect(writeRefreshAt).not.toHaveBeenCalled();
+
+    await expect(refreshHomeWidget()).resolves.toBe(true);
+
+    expect(fetchDay).toHaveBeenCalledTimes(1);
+    expect(fetchQuote).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('runHomeWidgetBackgroundRefresh', () => {

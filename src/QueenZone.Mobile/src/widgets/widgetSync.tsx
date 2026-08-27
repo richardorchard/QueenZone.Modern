@@ -39,9 +39,15 @@ function iosTimelineEntries(props: OnThisDayAndroidWidgetProps) {
   ];
 }
 
+function hasWidgetContent(content: WidgetContent): boolean {
+  return content.onThisDay != null || content.quote != null;
+}
+
 /**
  * Pushes on-this-day + quote content to the OS widget. HomeScreen calls this after its
  * own fetches settle. Background refresh uses {@link refreshHomeWidget} instead.
+ * The throttle timestamp is written only when the payload has content — a Home error
+ * view (`{ onThisDay: null, quote: null }`) must not skip the next overnight fetch.
  */
 export async function syncHomeWidget(content: WidgetContent): Promise<void> {
   const props = toWidgetProps(content);
@@ -50,7 +56,9 @@ export async function syncHomeWidget(content: WidgetContent): Promise<void> {
     // eslint-disable-next-line @typescript-eslint/no-require-imports -- platform-gated: this module must not load on Android, where expo-widgets has no native counterpart.
     const { OnThisDayWidget } = require('./OnThisDayWidget.ios') as typeof import('./OnThisDayWidget.ios');
     OnThisDayWidget.updateTimeline(iosTimelineEntries(props));
-    await writeLastWidgetRefreshAt(Date.now());
+    if (hasWidgetContent(content)) {
+      await writeLastWidgetRefreshAt(Date.now());
+    }
     return;
   }
 
@@ -64,7 +72,9 @@ export async function syncHomeWidget(content: WidgetContent): Promise<void> {
       widgetName: 'OnThisDayWidget',
       renderWidget: () => <OnThisDayAndroidWidget {...props} />,
     });
-    await writeLastWidgetRefreshAt(Date.now());
+    if (hasWidgetContent(content)) {
+      await writeLastWidgetRefreshAt(Date.now());
+    }
   }
 }
 
