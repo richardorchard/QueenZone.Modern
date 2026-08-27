@@ -40,6 +40,9 @@ public sealed class FanPerformancesPageTests : IClassFixture<WebApplicationFacto
         Assert.Contains("Reaching Out", body);
         Assert.Contains("Mike Ryde", body);
         Assert.Contains("Sign in to play", body);
+        Assert.Contains("aria-label=\"Sign in to play Reaching Out\"", body);
+        Assert.Contains("class=\"qz-stage-play\"", body);
+        Assert.DoesNotContain("data-qz-stage-play", body);
         Assert.Contains("returnUrl=%2Ffan-performances", body);
         Assert.DoesNotContain("songfiles", body, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("/fan-performances/187/audio", body);
@@ -47,15 +50,33 @@ public sealed class FanPerformancesPageTests : IClassFixture<WebApplicationFacto
     }
 
     [Fact]
-    public async Task FanPerformancesPage_ShowsAudioPlayer_WhenMemberSignedIn()
+    public async Task FanPerformancesPage_ShowsPlayControl_WhenMemberSignedIn()
     {
         var client = await CreateSignedInMemberClientAsync();
 
         var body = await client.GetStringAsync("/fan-performances");
 
         Assert.Contains("/fan-performances/187/audio", body);
+        Assert.Contains("data-qz-stage-play", body);
+        Assert.Contains("aria-label=\"Play Reaching Out\"", body);
+        Assert.Contains("class=\"qz-stage-play\"", body);
         Assert.DoesNotContain("Sign in to play", body);
         Assert.DoesNotContain("songfiles", body, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task FanPerformancesPage_ShowsPlayControl_WhenTestMemberHeaderIsPresent()
+    {
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestMemberAuthHandler.MemberIdHeader, Guid.NewGuid().ToString());
+        client.DefaultRequestHeaders.Add(TestMemberAuthHandler.DisplayNameHeader, "Stage Member");
+
+        var body = await client.GetStringAsync("/fan-performances");
+
+        Assert.Contains("/fan-performances/187/audio", body);
+        Assert.Contains("data-qz-stage-play", body);
+        Assert.Contains("aria-label=\"Play Reaching Out\"", body);
+        Assert.DoesNotContain("Sign in to play", body);
     }
 
     [Fact]
