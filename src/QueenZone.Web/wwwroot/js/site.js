@@ -428,3 +428,80 @@
     tracking = false;
   }, { passive: true });
 })();
+
+(() => {
+  const list = document.querySelector("[data-qz-stage-list]");
+  if (!list) {
+    return;
+  }
+
+  const rows = Array.from(list.querySelectorAll("[data-qz-stage-play]")).map((button) => {
+    const row = button.closest(".qz-stage-row");
+    return {
+      button,
+      row,
+      audio: row ? row.querySelector("audio") : null,
+      title: button.getAttribute("data-title") || "recording"
+    };
+  }).filter((player) => player.audio);
+
+  if (rows.length === 0) {
+    return;
+  }
+
+  const playIcon = (player) => player.button.querySelector(".qz-stage-play__icon--play");
+  const pauseIcon = (player) => player.button.querySelector(".qz-stage-play__icon--pause");
+
+  const setPlaying = (player, playing) => {
+    player.button.setAttribute("aria-pressed", playing ? "true" : "false");
+    player.button.setAttribute("aria-label", (playing ? "Pause " : "Play ") + player.title);
+    player.row.classList.toggle("is-playing", playing);
+    const play = playIcon(player);
+    const pause = pauseIcon(player);
+    if (play) {
+      play.hidden = playing;
+    }
+    if (pause) {
+      pause.hidden = !playing;
+    }
+  };
+
+  const pauseOthers = (active) => {
+    rows.forEach((player) => {
+      if (player !== active && !player.audio.paused) {
+        player.audio.pause();
+      }
+    });
+  };
+
+  rows.forEach((player) => {
+    player.button.addEventListener("click", () => {
+      if (player.audio.paused) {
+        pauseOthers(player);
+        const attempt = player.audio.play();
+        if (attempt && typeof attempt.catch === "function") {
+          attempt.catch(() => {
+            setPlaying(player, false);
+          });
+        }
+      } else {
+        player.audio.pause();
+      }
+    });
+
+    player.audio.addEventListener("play", () => {
+      pauseOthers(player);
+      setPlaying(player, true);
+    });
+
+    player.audio.addEventListener("pause", () => {
+      setPlaying(player, false);
+    });
+
+    player.audio.addEventListener("ended", () => {
+      setPlaying(player, false);
+    });
+  });
+
+  list.classList.add("is-enhanced");
+})();

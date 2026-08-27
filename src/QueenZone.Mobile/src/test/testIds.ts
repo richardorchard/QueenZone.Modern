@@ -50,6 +50,9 @@ export const testIds = {
   profileBack: 'profile-back',
   profileRestoring: 'profile-restoring',
   fanPerformanceSessionRestoring: 'fan-performance-session-restoring',
+  fanPerformancesScreen: 'fan-performances-screen',
+  fanPerformanceRowPrefix: 'fan-performance-',
+  fanPerformancePlayPrefix: 'fan-performance-play-',
 
   signInClose: 'sign-in-close',
 

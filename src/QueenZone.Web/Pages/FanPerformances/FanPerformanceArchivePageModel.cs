@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using QueenZone.Data;
@@ -63,7 +62,7 @@ public abstract class FanPerformanceArchivePageModel(IFanPerformanceRepository f
         int page,
         CancellationToken cancellationToken)
     {
-        var memberAuth = await HttpContext.AuthenticateAsync(MemberAuthenticationSchemes.MembersCookie);
+        var memberAuth = await HttpContext.AuthenticateMemberAsync();
         var isSignedIn = memberAuth.Succeeded;
         var loginReturnUrl = FanPerformanceRoutes.GetPagePath(page);
 
