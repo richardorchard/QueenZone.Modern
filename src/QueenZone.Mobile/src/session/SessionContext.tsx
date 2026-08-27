@@ -1,8 +1,17 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { AppState, Linking } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { getAppConfig } from '../config/appConfig';
-import { fetchJson } from '../api/client';
+import { ApiError, fetchJson } from '../api/client';
 import { parseMemberProfile, type MemberProfile } from '../api/me';
 import type { AuthTokens } from '../api/auth';
 import { clearPushRegistration, refreshPushRegistration, syncPushRegistration } from '../notifications';
@@ -27,6 +36,7 @@ type SessionContextValue = Session & {
   signIn: (provider: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<MemberProfile | null>;
+  ensureAccessToken: () => Promise<string | null>;
   setAccessToken: (accessToken: string | null) => void;
   applySmokeSession: (accessToken: string) => Promise<boolean>;
 };
@@ -67,47 +77,85 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session>({ ...signedOut, isRestoring: true });
   const [refreshToken, setRefreshToken] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState(0);
+  const sessionRef = useRef(session);
+  const refreshTokenRef = useRef(refreshToken);
+  const expiresAtRef = useRef(expiresAt);
+  sessionRef.current = session;
+  refreshTokenRef.current = refreshToken;
+  expiresAtRef.current = expiresAt;
 
-  const applyTokens = useCallback(async (tokens: AuthTokens): Promise<MemberProfile | null> => {
-    const stored = await writeStoredSession(tokens);
-    setRefreshToken(stored.refreshToken);
-    setExpiresAt(stored.expiresAt);
-    setSession(sessionFromAccessToken(tokens.accessToken));
-    const profile = await loadProfile(tokens.accessToken);
-    setSession(
-      sessionFromAccessToken(tokens.accessToken, {
+  const applyTokenState = useCallback((tokens: { accessToken: string; refreshToken: string; expiresAt: number }) => {
+    refreshTokenRef.current = tokens.refreshToken;
+    expiresAtRef.current = tokens.expiresAt;
+    setRefreshToken(tokens.refreshToken);
+    setExpiresAt(tokens.expiresAt);
+    setSession((current) => {
+      const next = sessionFromAccessToken(tokens.accessToken, {
+        displayName: current.accessToken === tokens.accessToken ? current.displayName : null,
+        profile: current.accessToken === tokens.accessToken ? current.profile : null,
+      });
+      sessionRef.current = next;
+      return next;
+    });
+  }, []);
+
+  const applyProfile = useCallback((accessToken: string, profile: MemberProfile | null) => {
+    setSession(() => {
+      const next = sessionFromAccessToken(accessToken, {
         displayName: profile?.displayName ?? null,
         profile,
-      }),
-    );
-    return profile;
+      });
+      sessionRef.current = next;
+      return next;
+    });
   }, []);
+
+  const applyTokens = useCallback(
+    async (tokens: AuthTokens): Promise<MemberProfile | null> => {
+      const stored = await writeStoredSession(tokens);
+      applyTokenState(stored);
+      const profile = await loadProfile(tokens.accessToken);
+      applyProfile(tokens.accessToken, profile);
+      return profile;
+    },
+    [applyProfile, applyTokenState],
+  );
 
   const clearLocal = useCallback(async () => {
     await clearStoredSession();
+    refreshTokenRef.current = null;
+    expiresAtRef.current = 0;
+    const next = { ...signedOut, isRestoring: false };
+    sessionRef.current = next;
     setRefreshToken(null);
     setExpiresAt(0);
-    setSession({ ...signedOut, isRestoring: false });
+    setSession(next);
   }, []);
 
-  const ensureAccessToken = useCallback(async (): Promise<string | null> => {
-    if (session.accessToken && expiresAt > Date.now()) {
-      return session.accessToken;
-    }
-
-    if (!refreshToken) {
-      return session.accessToken;
+  const refreshWithStoredGrant = useCallback(async (): Promise<string | null> => {
+    const refresh = refreshTokenRef.current;
+    if (!refresh) {
+      return sessionRef.current.accessToken;
     }
 
     try {
-      const tokens = await refreshAccessToken(getAppConfig().apiBaseUrl, refreshToken);
+      const tokens = await refreshAccessToken(getAppConfig().apiBaseUrl, refresh);
       await applyTokens(tokens);
       return tokens.accessToken;
     } catch {
       await clearLocal();
       return null;
     }
-  }, [applyTokens, clearLocal, expiresAt, refreshToken, session.accessToken]);
+  }, [applyTokens, clearLocal]);
+
+  const ensureAccessToken = useCallback(async (): Promise<string | null> => {
+    const currentToken = sessionRef.current.accessToken;
+    if (currentToken && expiresAtRef.current > Date.now()) {
+      return currentToken;
+    }
+
+    return refreshWithStoredGrant();
+  }, [refreshWithStoredGrant]);
 
   useEffect(() => {
     let cancelled = false;
@@ -129,19 +177,36 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             : await writeStoredSession(
                 await refreshAccessToken(getAppConfig().apiBaseUrl, stored.refreshToken),
               );
-        const profile = await loadProfile(tokens.accessToken);
         if (cancelled) {
           return;
         }
 
-        setRefreshToken(tokens.refreshToken);
-        setExpiresAt(tokens.expiresAt);
-        setSession(
-          sessionFromAccessToken(tokens.accessToken, {
-            displayName: profile?.displayName ?? null,
-            profile,
-          }),
-        );
+        applyTokenState(tokens);
+
+        try {
+          const profile = await loadProfile(tokens.accessToken);
+          if (!cancelled) {
+            applyProfile(tokens.accessToken, profile);
+          }
+        } catch (err) {
+          if (cancelled) {
+            return;
+          }
+
+          const canRetryRefresh =
+            err instanceof ApiError && err.status === 401 && stored.expiresAt > Date.now();
+          if (canRetryRefresh) {
+            const next = await refreshWithStoredGrant();
+            if (!next && !cancelled) {
+              await clearLocal();
+            }
+            return;
+          }
+
+          if (err instanceof ApiError && err.status === 401) {
+            await clearLocal();
+          }
+        }
       } catch {
         if (!cancelled) {
           await clearLocal();
@@ -152,7 +217,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [clearLocal]);
+  }, [applyProfile, applyTokenState, clearLocal, refreshWithStoredGrant]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active' && refreshTokenRef.current) {
+        void ensureAccessToken();
+      }
+    });
+    return () => subscription.remove();
+  }, [ensureAccessToken]);
 
   const applySmokeSession = useCallback(
     async (accessToken: string): Promise<boolean> => {
@@ -224,6 +298,37 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     };
   }, [isSignedIn, accessToken]);
 
+  const refreshProfile = useCallback(async () => {
+    const token = await ensureAccessToken();
+    if (!token) {
+      return null;
+    }
+
+    try {
+      const profile = await loadProfile(token);
+      applyProfile(token, profile);
+      return profile;
+    } catch (err) {
+      if (!(err instanceof ApiError) || err.status !== 401) {
+        return sessionRef.current.profile;
+      }
+
+      const refresh = refreshTokenRef.current;
+      if (!refresh) {
+        await clearLocal();
+        return null;
+      }
+
+      try {
+        const tokens = await refreshAccessToken(getAppConfig().apiBaseUrl, refresh);
+        return await applyTokens(tokens);
+      } catch {
+        await clearLocal();
+        return null;
+      }
+    }
+  }, [applyProfile, applyTokens, clearLocal, ensureAccessToken]);
+
   const value = useMemo<SessionContextValue>(
     () => ({
       ...session,
@@ -234,7 +339,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       applySmokeSession,
       signOut: async () => {
         const token = session.accessToken;
-        const refresh = refreshToken;
+        const refresh = refreshTokenRef.current;
         if (token) {
           await clearPushRegistration(token);
           await logoutRemote(getAppConfig().apiBaseUrl, token);
@@ -246,22 +351,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
         await clearLocal();
       },
-      refreshProfile: async () => {
-        const token = await ensureAccessToken();
-        if (!token) {
-          return null;
-        }
-
-        const profile = await loadProfile(token);
-        setSession((current) =>
-          sessionFromAccessToken(token, {
-            isRestoring: current.isRestoring,
-            displayName: profile?.displayName ?? current.displayName,
-            profile,
-          }),
-        );
-        return profile;
-      },
+      refreshProfile,
+      ensureAccessToken,
       setAccessToken: (accessToken) =>
         setSession((current) =>
           sessionFromAccessToken(accessToken, {
@@ -271,7 +362,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           }),
         ),
     }),
-    [applySmokeSession, applyTokens, clearLocal, ensureAccessToken, refreshToken, session],
+    [applySmokeSession, applyTokens, clearLocal, ensureAccessToken, refreshProfile, session],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
@@ -289,7 +380,11 @@ export function useSession(): SessionContextValue {
 async function loadProfile(accessToken: string): Promise<MemberProfile | null> {
   try {
     return parseMemberProfile(await fetchJson('/me', { accessToken }));
-  } catch {
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 401) {
+      throw err;
+    }
+
     return null;
   }
 }
