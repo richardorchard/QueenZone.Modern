@@ -2,6 +2,7 @@ import { act, fireEvent, screen } from '@testing-library/react-native';
 import type { ComponentProps } from 'react';
 import { AccessibilityInfo } from 'react-native';
 import { renderWithProviders } from '../../test/render';
+import { photoSwipeTapSlopPx } from './photoGalleryMeta';
 import { ZoomableArchiveImage } from './ZoomableArchiveImage';
 
 type RecordedGesture = {
@@ -13,12 +14,14 @@ type RecordedGesture = {
   };
 };
 
+type ConfiguredGesture = RecordedGesture & { config: Record<string, unknown> };
+
 function recordedGestures(): {
   pinch: RecordedGesture;
   pan: RecordedGesture;
   zoomPan: RecordedGesture;
-  tap: RecordedGesture;
-  singleTap: RecordedGesture;
+  tap: ConfiguredGesture;
+  singleTap: ConfiguredGesture;
 } {
   return jest.requireMock('react-native-gesture-handler').getRecordedGestures();
 }
@@ -111,6 +114,22 @@ describe('ZoomableArchiveImage', () => {
     expect(onGallerySwipe).toHaveBeenCalledWith('next');
     act(() => recordedGestures().singleTap.handlers.onEnd?.({}));
     expect(onToggleChrome).toHaveBeenCalled();
+  });
+
+  it('caps the tap gestures to the tap-slop distance so a fast swipe cannot win the Exclusive race', () => {
+    // Regression test for the swipe-navigation break introduced when the
+    // single/double-tap gestures were added ahead of the pan gesture in the
+    // gallery's `Gesture.Exclusive(...)` chain: `Gesture.Tap()` has no
+    // movement cap by default, so a swipe that lifts within the tap-duration
+    // window (a fast flick) was classified as a tap and consumed before the
+    // pan gesture ever got a chance to activate — arrow buttons kept working
+    // (they don't go through gesture arbitration) while swiping silently did
+    // nothing. Capping `maxDistance` to the tap slop makes the tap gestures
+    // fail fast on real drag distance, letting the pan gesture win instead.
+    renderZoom();
+    const { tap, singleTap } = recordedGestures();
+    expect(tap.config.maxDistance).toBe(photoSwipeTapSlopPx);
+    expect(singleTap.config.maxDistance).toBe(photoSwipeTapSlopPx);
   });
 
   it('does not swipe from the iOS back edge or when neighbors are disabled', () => {
