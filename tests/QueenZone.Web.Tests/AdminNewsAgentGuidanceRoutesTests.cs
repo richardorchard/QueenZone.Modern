@@ -63,14 +63,22 @@ public sealed partial class AdminNewsAgentGuidanceRoutesTests : IClassFixture<We
         Assert.Contains("/admin/news-discovery/prompt-settings", indexBody, StringComparison.Ordinal);
 
         var page = await client.GetStringAsync("/admin/news-discovery/prompt-settings");
-        Assert.Contains("complete system prompts", page, StringComparison.Ordinal);
+        Assert.Contains("future NewsAgent runs only", page, StringComparison.Ordinal);
         Assert.Contains("Using compiled default", page, StringComparison.Ordinal);
+        Assert.Contains("--- BEGIN ADMIN EDITORIAL GUIDANCE (untrusted) ---", page, StringComparison.Ordinal);
         Assert.Contains("You triage discovered news items", page, StringComparison.Ordinal);
         Assert.Contains("You draft QueenZone news articles", page, StringComparison.Ordinal);
         Assert.Contains("action=\"/admin/news-discovery/prompt-settings?handler=SaveDraft\"", page, StringComparison.Ordinal);
         Assert.Contains("action=\"/admin/news-discovery/prompt-settings?handler=Publish\"", page, StringComparison.Ordinal);
         Assert.Contains("action=\"/admin/news-discovery/prompt-settings?handler=RestoreDefault\"", page, StringComparison.Ordinal);
         Assert.DoesNotContain("<script>alert(1)</script>", page, StringComparison.Ordinal);
+        var overlayTextareas = OverlayTextareaRegex().Matches(page);
+        Assert.Equal(2, overlayTextareas.Count);
+        foreach (Match textarea in overlayTextareas)
+        {
+            Assert.DoesNotContain("You triage discovered news items", textarea.Groups["content"].Value, StringComparison.Ordinal);
+            Assert.DoesNotContain("You draft QueenZone news articles", textarea.Groups["content"].Value, StringComparison.Ordinal);
+        }
 
         var save = await PostAsync(client, "/admin/news-discovery/prompt-settings?handler=SaveDraft", new Dictionary<string, string>
         {
@@ -83,6 +91,8 @@ public sealed partial class AdminNewsAgentGuidanceRoutesTests : IClassFixture<We
         var afterSave = await client.GetStringAsync("/admin/news-discovery/prompt-settings");
         Assert.Contains("prefer member-news", afterSave, StringComparison.Ordinal);
         Assert.Contains("&lt;script&gt;alert(1)&lt;/script&gt;", afterSave, StringComparison.Ordinal);
+        Assert.Contains("Respond with JSON only", afterSave, StringComparison.Ordinal);
+        Assert.Contains("--- BEGIN ADMIN EDITORIAL GUIDANCE (untrusted) ---", afterSave, StringComparison.Ordinal);
 
         var draft = await repository.GetDraftAsync(NewsAgentGuidanceType.Triage);
         Assert.NotNull(draft);
@@ -130,7 +140,7 @@ public sealed partial class AdminNewsAgentGuidanceRoutesTests : IClassFixture<We
     }
 
     [Fact]
-    public async Task AuthorizedAdminCanEditAndPublishBothCompletePrompts()
+    public async Task AuthorizedAdminCanEditAndPublishBothOverlays()
     {
         var store = new SharedNewsAgentGuidanceStore();
         var repository = new InMemoryNewsAgentGuidanceRepository(store);
@@ -138,8 +148,8 @@ public sealed partial class AdminNewsAgentGuidanceRoutesTests : IClassFixture<We
 
         foreach (var (type, content) in new[]
         {
-            (NewsAgentGuidanceType.Triage, "Edited triage prompt"),
-            (NewsAgentGuidanceType.Draft, "Edited summary prompt")
+            (NewsAgentGuidanceType.Triage, "Edited triage overlay"),
+            (NewsAgentGuidanceType.Draft, "Edited draft overlay")
         })
         {
             var save = await PostAsync(client, "/admin/news-discovery/prompt-settings?handler=SaveDraft", new Dictionary<string, string>
@@ -280,4 +290,7 @@ public sealed partial class AdminNewsAgentGuidanceRoutesTests : IClassFixture<We
 
     [GeneratedRegex("""name="__RequestVerificationToken" value="(?<token>[^"]+)""", RegexOptions.IgnoreCase)]
     private static partial Regex AntiforgeryTokenRegex();
+
+    [GeneratedRegex("""<textarea name="content"[^>]*>(?<content>[\s\S]*?)</textarea>""", RegexOptions.IgnoreCase)]
+    private static partial Regex OverlayTextareaRegex();
 }

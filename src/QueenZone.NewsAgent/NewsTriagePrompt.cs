@@ -36,8 +36,8 @@ public static class NewsTriagePrompt
         Require stronger evidence for lower-confidence secondary sources.
         """;
 
-    public static string ComposeSystemPrompt(string? publishedPrompt = null) =>
-        string.IsNullOrWhiteSpace(publishedPrompt) ? BuildCompiledSystemPrompt() : publishedPrompt.Trim();
+    public static string ComposeSystemPrompt(string? editorialGuidance = null) =>
+        NewsAgentEditorialGuidance.AppendToSystemPrompt(BuildCompiledSystemPrompt(), editorialGuidance);
 
     public static IReadOnlyList<NewsAiChatMessage> BuildMessages(
         NewsCandidate candidate,

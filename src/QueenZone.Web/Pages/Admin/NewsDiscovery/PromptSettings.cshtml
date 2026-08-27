@@ -11,8 +11,8 @@
   </p>
 
   <p class="admin-status admin-status--info">
-    These are the complete system prompts for future NewsAgent runs. Publishing does not rewrite existing candidates, AI results, or drafts.
-    The worker may take up to 60 seconds to pick up a published change. Prompt edits do not require an application deployment.
+    Guidance is an overlay for future NewsAgent runs only. Publishing does not rewrite existing candidates, AI results, or drafts.
+    The worker may take up to 60 seconds to pick up a published change. Compiled JSON schema, evidence, quotation, media-link, and safety rules stay in code.
   </p>
 
   @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
@@ -33,7 +33,7 @@
   @foreach (var guidance in new[] { Model.Triage, Model.Draft })
   {
     <section class="admin-panel" id="guidance-@guidance.TypeKey">
-      <h2>@(guidance.Type == QueenZone.Data.NewsAgentGuidanceType.Triage ? "Triage prompt" : "Summary/draft prompt")</h2>
+      <h2>@(guidance.Type == QueenZone.Data.NewsAgentGuidanceType.Triage ? "Triage guidance" : "Draft guidance")</h2>
       <p class="admin-muted">@guidance.PublishedSummary</p>
       <p>
         Using compiled default:
@@ -52,8 +52,8 @@
         <input type="hidden" name="type" value="@guidance.Type" />
         <input type="hidden" name="rowVersion" value="@guidance.DraftRowVersion" />
         <label>
-          Working prompt (plain text, max 4000 characters)
-          <textarea name="content" rows="16" maxlength="4000">@guidance.DraftContent</textarea>
+          Working draft (plain text, max 4000 characters)
+          <textarea name="content" rows="8" maxlength="4000">@guidance.DraftContent</textarea>
         </label>
         <button type="submit">Save draft</button>
       </form>
@@ -69,7 +69,7 @@
         <button type="submit" @(guidance.Draft is null ? "disabled" : null)>Publish draft</button>
       </form>
 
-      <form method="post" action="/admin/news-discovery/prompt-settings?handler=RestoreDefault" class="admin-inline-form" onsubmit="return confirm('Restore the compiled default? This publishes an empty stored prompt. History is kept.');">
+      <form method="post" action="/admin/news-discovery/prompt-settings?handler=RestoreDefault" class="admin-inline-form" onsubmit="return confirm('Restore the compiled default? This publishes an empty overlay. History is kept.');">
         <input type="hidden" name="@AdminNewsDiscoveryPageModel.AntiforgeryTokenFieldName" value="@antiforgeryToken" />
         <input type="hidden" name="type" value="@guidance.Type" />
         <label>
@@ -80,9 +80,13 @@
       </form>
 
       <details>
-        <summary>Effective prompt preview</summary>
+        <summary>Composed preview (compiled rules plus overlay delimiter)</summary>
         <p class="admin-muted">
-          Read-only preview of the prompt used by the next run after publishing.
+          Read-only preview. The compiled system prompt is not editable here.
+          Overlay is appended after the compiled rules between
+          --- BEGIN ADMIN EDITORIAL GUIDANCE (untrusted) ---
+          and
+          --- END ADMIN EDITORIAL GUIDANCE ---.
         </p>
         <pre class="admin-review-pre">@guidance.ComposedPreview</pre>
       </details>
