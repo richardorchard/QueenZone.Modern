@@ -254,9 +254,10 @@ The client does not fetch the page or its HTML. Signed-out members still see
 the review form; Sign in uses `returnTo: { tab: 'HomeTab', screen: 'SuggestNews' }`.
 A 201 clears the slot and opens **My submissions** on the same stack.
 
-Signed iOS builds need an App Group `group.org.queenzone.mobile` and a Share
-Extension App ID on the existing `org.queenzone.mobile` record. There is no
-EAS project; regenerate the App Store profile after adding the group. Do not
+Signed iOS builds need an App Group `group.org.queenzone.mobile`, assigned to
+both the main `org.queenzone.mobile` App ID and the separate
+`org.queenzone.mobile.ShareExtension` App ID. There is no EAS project; each
+target needs its own regenerated App Store profile. Do not
 add a second URL scheme — shares reuse `queenzone`. Do not add
 `NavigationContainer.linking` for this flow.
 Fan performances list from `/api/v1/content/fan-performances`; streaming uses
@@ -501,18 +502,19 @@ commit their values):
 | --- | --- |
 | `IOS_DISTRIBUTION_CERTIFICATE_BASE64` | Base64-encoded password-protected Apple Distribution `.p12` |
 | `IOS_DISTRIBUTION_CERTIFICATE_PASSWORD` | Password for the distribution `.p12` |
-| `IOS_PROVISIONING_PROFILE_BASE64` | Base64-encoded `QueenZone App Store` `.mobileprovision` |
+| `IOS_PROVISIONING_PROFILE_BASE64` | Base64-encoded `QueenZone App Store App Groups` `.mobileprovision` |
+| `IOS_SHARE_EXTENSION_PROVISIONING_PROFILE_BASE64` | Base64-encoded `QueenZone Share Extension App Store` `.mobileprovision` |
 | `APP_STORE_CONNECT_KEY_ID` | App Store Connect API key identifier |
 | `APP_STORE_CONNECT_ISSUER_ID` | App Store Connect API issuer identifier |
 | `APP_STORE_CONNECT_PRIVATE_KEY` | One-time-downloaded App Store Connect `.p8` private key |
 
-Rotate the distribution certificate/profile before their shared expiry and
+Rotate the distribution certificate/profiles before their shared expiry and
 replace the corresponding secrets together. After enabling a new App ID
-capability (for example Push Notifications), regenerate `QueenZone App Store`
-in Apple Developer **Profiles**, then replace `IOS_PROVISIONING_PROFILE_BASE64`
-with a base64 encoding of the new `.mobileprovision` (value length only in
-logs and chat). A stale profile fails the archive with "doesn't include the
-Push Notifications capability" / missing `aps-environment`. Revoke and
+capability, regenerate the affected profile in Apple Developer **Profiles**
+and replace its base64 GitHub secret (value length only in logs and chat).
+Both profiles must include `group.org.queenzone.mobile`; only the main app
+profile includes Push Notifications / `aps-environment`. A stale profile fails
+before archive with a target-specific entitlement error. Revoke and
 replace the API key if its private key is ever exposed. Signing material must
 never be copied into the repository, workflow artifacts, logs, or issue/PR
 text.
