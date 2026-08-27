@@ -24,7 +24,8 @@ public sealed record ForumWriteThread(
     DateTimeOffset LastPostAt,
     int PostCount,
     bool IsLocked,
-    bool HasPoll = false);
+    bool HasPoll = false,
+    bool IsHidden = false);
 
 public sealed record ForumThreadCreateResult(int TopicId, int StarterPostId);
 
