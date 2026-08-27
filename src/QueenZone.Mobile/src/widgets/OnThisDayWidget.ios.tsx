@@ -23,6 +23,8 @@ import { widgetDeepLinkUrl } from './widgetDeepLink';
 /**
  * Props pushed from the app via `syncHomeWidget` (see widgetSync.tsx). Both halves are
  * optional and independent — either can be missing (no event today, no published quotes).
+ * Quote reloads every few hours with jitter; on-this-day is only refetched on a new
+ * calendar day.
  */
 export type OnThisDayWidgetProps = WidgetProps;
 
