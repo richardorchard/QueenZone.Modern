@@ -84,6 +84,7 @@ BEGIN
         INNER JOIN dbo.ModernForumCategory c ON c.Id = t.CategoryId
         WHERE t.IsLegacyTopicStarter = 1
           AND t.StartedByUserValidated = 1
+          AND t.IsHidden = 0
           AND c.IsSynthetic = 0
     ),
     BodyMatches AS
@@ -95,6 +96,8 @@ BEGIN
         INNER JOIN dbo.ModernForumCategory c ON c.Id = t.CategoryId
         WHERE t.IsLegacyTopicStarter = 1
           AND t.StartedByUserValidated = 1
+          AND t.IsHidden = 0
+          AND p.IsHidden = 0
           AND c.IsSynthetic = 0
         GROUP BY p.ThreadId
     ),
@@ -129,6 +132,7 @@ BEGIN
         INNER JOIN dbo.ModernForumCategory c ON c.Id = t.CategoryId
         WHERE t.IsLegacyTopicStarter = 1
           AND t.StartedByUserValidated = 1
+          AND t.IsHidden = 0
           AND c.IsSynthetic = 0
     ),
     BodyMatchIds AS
@@ -140,6 +144,8 @@ BEGIN
         INNER JOIN dbo.ModernForumCategory c ON c.Id = t.CategoryId
         WHERE t.IsLegacyTopicStarter = 1
           AND t.StartedByUserValidated = 1
+          AND t.IsHidden = 0
+          AND p.IsHidden = 0
           AND c.IsSynthetic = 0
     )
     SELECT @TotalRecords = COUNT(*)

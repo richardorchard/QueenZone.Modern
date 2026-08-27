@@ -441,7 +441,8 @@ public sealed class EfLegacyProbeResidueTests
             CREATE TABLE ModernForumThread (
                 Id INTEGER PRIMARY KEY,
                 Title TEXT NOT NULL,
-                StartedByDisplayName TEXT NOT NULL
+                StartedByDisplayName TEXT NOT NULL,
+                IsHidden INTEGER NOT NULL DEFAULT 0
             );
             INSERT INTO ModernForumThread (Id, Title, StartedByDisplayName)
             VALUES (900001, 'uie2e-predicate-proof', 'Residue proof');

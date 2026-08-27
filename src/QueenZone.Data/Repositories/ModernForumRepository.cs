@@ -143,6 +143,7 @@ public sealed class ModernForumRepository(QueenZoneDbContext dbContext) : IForum
             .AsNoTracking()
             .Where(thread =>
                 thread.IsLegacyTopicStarter
+                && !thread.IsHidden
                 && thread.StartedByUserValidated == true
                 && thread.LastActivityAt != null
                 && thread.Category != null

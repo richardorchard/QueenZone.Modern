@@ -230,6 +230,19 @@ public sealed class InMemoryForumWriteRepository : IForumWriteRepository
     {
         lock (sync)
         {
+            var startedTopicIds = posts
+                .GroupBy(post => post.TopicId)
+                .Where(topicPosts => topicPosts.OrderBy(post => post.PostId).First().MemberId == memberId)
+                .Select(topicPosts => topicPosts.Key)
+                .ToHashSet();
+            for (var i = 0; i < threads.Count; i++)
+            {
+                if (startedTopicIds.Contains(threads[i].TopicId))
+                {
+                    threads[i] = threads[i] with { IsHidden = true };
+                }
+            }
+
             for (var i = 0; i < posts.Count; i++)
             {
                 if (posts[i].MemberId == memberId)
@@ -246,6 +259,19 @@ public sealed class InMemoryForumWriteRepository : IForumWriteRepository
     {
         lock (sync)
         {
+            var startedTopicIds = posts
+                .GroupBy(post => post.TopicId)
+                .Where(topicPosts => topicPosts.OrderBy(post => post.PostId).First().MemberId == memberId)
+                .Select(topicPosts => topicPosts.Key)
+                .ToHashSet();
+            for (var i = 0; i < threads.Count; i++)
+            {
+                if (startedTopicIds.Contains(threads[i].TopicId))
+                {
+                    threads[i] = threads[i] with { IsHidden = false };
+                }
+            }
+
             for (var i = 0; i < posts.Count; i++)
             {
                 if (posts[i].MemberId == memberId)
@@ -262,7 +288,7 @@ public sealed class InMemoryForumWriteRepository : IForumWriteRepository
     {
         lock (sync)
         {
-            return threads.ToList();
+            return threads.Where(thread => !thread.IsHidden).ToList();
         }
     }
 
