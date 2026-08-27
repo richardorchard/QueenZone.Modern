@@ -88,12 +88,14 @@ public sealed class ContentApiOnThisDayAndLiveActivityTests : IClassFixture<Quee
     private static async Task<T?> ReadOnThisDayJsonAsync<T>(HttpResponseMessage response)
     {
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Equal("application/json", response.Content.Headers.ContentType?.MediaType);
 
         var body = await response.Content.ReadAsStringAsync();
         Assert.False(
             string.IsNullOrWhiteSpace(body),
             "OnThisDay must return JSON (object or null), not an empty 200 body.");
+        Assert.Equal(
+            "application/json",
+            response.Content.Headers.ContentType?.MediaType);
 
         return JsonSerializer.Deserialize<T>(body, JsonOptions);
     }
