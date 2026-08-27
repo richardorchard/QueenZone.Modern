@@ -57,9 +57,8 @@ jobs:
       SHARE_EXTENSION_PROVISIONING_PROFILE_NAME: QueenZone Share Extension App Store
       WIDGET_EXTENSION_PROVISIONING_PROFILE_NAME: QueenZone Widget Extension App Store
       # App Store / TestFlight profiles only include aps-environment=production.
-      # Staging still talks to the staging API; the entitlement follows signing.
+      # Expo prebuild emits development; Xcode replaces it during the signed archive.
       IOS_APS_ENVIRONMENT: production
-      IOS_DISTRIBUTION_BUILD: '1'
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -177,8 +176,6 @@ jobs:
           # so App Store Connect rejected re-uploads with CFBundleVersion=1.
           IOS_BUILD_NUMBER: ${{ github.run_number }}
           GITHUB_RUN_NUMBER: ${{ github.run_number }}
-          IOS_APS_ENVIRONMENT: production
-          IOS_DISTRIBUTION_BUILD: '1'
           EXPO_PUBLIC_SENTRY_DSN: ${{ vars.SENTRY_DSN }}
           SENTRY_ORG: ${{ vars.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
@@ -216,9 +213,9 @@ jobs:
           fi
           aps_environment=$(/usr/libexec/PlistBuddy -c 'Print :aps-environment' "$entitlements")
           echo "Entitlements aps-environment=${aps_environment} (from ${entitlements})"
-          if [ "$aps_environment" != "$IOS_APS_ENVIRONMENT" ]; then
-            echo "::error::aps-environment is ${aps_environment}, expected ${IOS_APS_ENVIRONMENT}."
-            echo "TestFlight / App Store profiles only include production. Set IOS_APS_ENVIRONMENT=production."
+          if [ "$aps_environment" != "development" ]; then
+            echo "::error::Prebuild aps-environment is ${aps_environment}, expected development."
+            echo "Expo SDK 57 emits development at prebuild; Xcode changes it to production during the App Store archive."
             exit 1
           fi
 
