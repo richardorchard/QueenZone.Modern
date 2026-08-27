@@ -308,4 +308,18 @@ describe('HomeScreen', () => {
     );
     await flushVirtualizedList();
   });
+
+  it('syncs a quote-only widget when on-this-day fails', async () => {
+    fetchDay.mockRejectedValue(new Error('offline'));
+    fetchQuote.mockResolvedValue({ id: 9, text: 'A kind of magic', whoSaid: 'Freddie Mercury' });
+    renderHome();
+
+    await waitFor(() =>
+      expect(mockSyncHomeWidget).toHaveBeenCalledWith({
+        onThisDay: null,
+        quote: { id: 9, text: 'A kind of magic', whoSaid: 'Freddie Mercury' },
+      }),
+    );
+    await flushVirtualizedList();
+  });
 });

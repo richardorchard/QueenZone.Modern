@@ -1,17 +1,21 @@
 'use no memo';
 import { FlexWidget, TextWidget } from 'react-native-android-widget';
+import {
+  widgetDayText,
+  widgetEmptyText,
+  widgetEyebrow,
+  widgetHasDay,
+  widgetHasQuote,
+  widgetQuoteText,
+  type WidgetProps,
+} from './widgetCopy';
 import { widgetDeepLinkUrl } from './widgetDeepLink';
 
 /**
- * Props rendered into the widget's bitmap (see limitations.md — the library rasterizes this
- * tree, it does not host live RN views). Kept in sync with OnThisDayWidget.ios.tsx's props.
+ * Props rendered into the widget's bitmap (the library rasterizes this tree, it does not
+ * host live RN views). Same shape as OnThisDayWidget.ios.tsx.
  */
-export type OnThisDayAndroidWidgetProps = {
-  formattedDate?: string;
-  summary?: string;
-  quoteText?: string;
-  quoteWhoSaid?: string;
-};
+export type OnThisDayAndroidWidgetProps = WidgetProps;
 
 const gold = '#B89A4A';
 const cream = '#F2F1ED';
@@ -19,8 +23,8 @@ const mutedCream = '#B8B6B0';
 const cardBackground = '#181614';
 
 export function OnThisDayAndroidWidget(props: OnThisDayAndroidWidgetProps) {
-  const hasDay = Boolean(props.formattedDate && props.summary);
-  const hasQuote = Boolean(props.quoteText && props.quoteWhoSaid);
+  const hasDay = widgetHasDay(props);
+  const hasQuote = widgetHasQuote(props);
 
   return (
     <FlexWidget
@@ -38,25 +42,21 @@ export function OnThisDayAndroidWidget(props: OnThisDayAndroidWidgetProps) {
       }}
     >
       <TextWidget
-        text={hasDay ? 'ON THIS DAY' : 'QUOTE OF THE DAY'}
+        text={widgetEyebrow(hasDay)}
         style={{ fontSize: 10, fontWeight: '600', color: gold, marginBottom: 6 }}
       />
       {hasDay ? (
         <TextWidget
-          text={`${props.formattedDate}: ${props.summary}`}
+          text={widgetDayText(props)}
           style={{ fontSize: 13, color: cream, marginBottom: 6 }}
           maxLines={3}
         />
       ) : null}
       {hasQuote ? (
-        <TextWidget
-          text={`“${props.quoteText}” — ${props.quoteWhoSaid}`}
-          style={{ fontSize: 12, color: mutedCream }}
-          maxLines={3}
-        />
+        <TextWidget text={widgetQuoteText(props)} style={{ fontSize: 12, color: mutedCream }} maxLines={3} />
       ) : null}
       {!hasDay && !hasQuote ? (
-        <TextWidget text="Open QueenZone to load today's story." style={{ fontSize: 12, color: mutedCream }} />
+        <TextWidget text={widgetEmptyText} style={{ fontSize: 12, color: mutedCream }} />
       ) : null}
     </FlexWidget>
   );

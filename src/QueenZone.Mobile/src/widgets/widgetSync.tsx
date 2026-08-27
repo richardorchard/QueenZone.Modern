@@ -39,7 +39,7 @@ export async function syncHomeWidget(content: WidgetContent): Promise<void> {
     const { requestWidgetUpdate } = require('react-native-android-widget') as typeof import('react-native-android-widget');
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { OnThisDayAndroidWidget } = require('./OnThisDayAndroidWidget') as typeof import('./OnThisDayAndroidWidget');
-    requestWidgetUpdate({
+    await requestWidgetUpdate({
       widgetName: 'OnThisDayWidget',
       renderWidget: () => <OnThisDayAndroidWidget {...props} />,
     });

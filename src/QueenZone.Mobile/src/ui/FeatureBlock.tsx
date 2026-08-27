@@ -65,7 +65,7 @@ export function FeatureBlock({ eyebrow, numeral, body, quote, actionLabel, onAct
               color: c.textSecondary,
             }}
           >
-            &ldquo;{quote.text}&rdquo;
+            “{quote.text}”
           </Text>
           <Text style={{ fontFamily: fonts.bodyMedium, fontSize: 12, color: c.textMuted }}>
             — {quote.whoSaid}

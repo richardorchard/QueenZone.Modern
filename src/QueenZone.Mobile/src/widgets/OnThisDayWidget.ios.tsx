@@ -1,18 +1,22 @@
 import { Text, VStack } from '@expo/ui/swift-ui';
 import { containerBackground, font, foregroundStyle, padding, widgetURL } from '@expo/ui/swift-ui/modifiers';
 import { createWidget } from 'expo-widgets';
+import {
+  widgetDayText,
+  widgetEmptyText,
+  widgetEyebrow,
+  widgetHasDay,
+  widgetHasQuote,
+  widgetQuoteText,
+  type WidgetProps,
+} from './widgetCopy';
 import { widgetDeepLinkUrl } from './widgetDeepLink';
 
 /**
- * Props pushed from the app via `syncHomeWidget` (see widgetSync.ts). Both halves are
+ * Props pushed from the app via `syncHomeWidget` (see widgetSync.tsx). Both halves are
  * optional and independent — either can be missing (no event today, no published quotes).
  */
-export type OnThisDayWidgetProps = {
-  formattedDate?: string;
-  summary?: string;
-  quoteText?: string;
-  quoteWhoSaid?: string;
-};
+export type OnThisDayWidgetProps = WidgetProps;
 
 const gold = '#B89A4A';
 const cream = '#F2F1ED';
@@ -22,8 +26,8 @@ const cardBackground = '#181614';
 function OnThisDayWidgetView(props: OnThisDayWidgetProps) {
   'widget';
 
-  const hasDay = Boolean(props.formattedDate && props.summary);
-  const hasQuote = Boolean(props.quoteText && props.quoteWhoSaid);
+  const hasDay = widgetHasDay(props);
+  const hasQuote = widgetHasQuote(props);
 
   return (
     <VStack
@@ -36,20 +40,16 @@ function OnThisDayWidgetView(props: OnThisDayWidgetProps) {
       ]}
     >
       <Text modifiers={[foregroundStyle(gold), font({ size: 10, weight: 'semibold' })]}>
-        {hasDay ? 'ON THIS DAY' : 'QUOTE OF THE DAY'}
+        {widgetEyebrow(hasDay)}
       </Text>
       {hasDay ? (
-        <Text modifiers={[foregroundStyle(cream), font({ size: 13 })]}>
-          {`${props.formattedDate}: ${props.summary}`}
-        </Text>
+        <Text modifiers={[foregroundStyle(cream), font({ size: 13 })]}>{widgetDayText(props)}</Text>
       ) : null}
       {hasQuote ? (
-        <Text modifiers={[foregroundStyle(mutedCream), font({ size: 12 })]}>
-          {`“${props.quoteText}” — ${props.quoteWhoSaid}`}
-        </Text>
+        <Text modifiers={[foregroundStyle(mutedCream), font({ size: 12 })]}>{widgetQuoteText(props)}</Text>
       ) : null}
       {!hasDay && !hasQuote ? (
-        <Text modifiers={[foregroundStyle(mutedCream), font({ size: 12 })]}>Open QueenZone to load today's story.</Text>
+        <Text modifiers={[foregroundStyle(mutedCream), font({ size: 12 })]}>{widgetEmptyText}</Text>
       ) : null}
     </VStack>
   );

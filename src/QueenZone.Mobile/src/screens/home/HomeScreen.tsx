@@ -130,11 +130,11 @@ export function HomeScreen({ navigation }: Props) {
   ]);
 
   useEffect(() => {
-    if (onThisDay.view.kind !== 'content') {
+    if (onThisDay.view.kind === 'skeleton' || quote.view.kind === 'skeleton') {
       return;
     }
     syncHomeWidget({
-      onThisDay: onThisDay.view.data,
+      onThisDay: onThisDay.view.kind === 'content' ? onThisDay.view.data : null,
       quote: quote.view.kind === 'content' ? quote.view.data : null,
     }).catch(() => {
       /* widget sync is best-effort */
