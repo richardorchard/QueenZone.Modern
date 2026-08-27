@@ -76,11 +76,13 @@ public sealed class InMemoryForumWriteRepositoryTests
         var visiblePosts = repository.GetPostsForTopic(thread.TopicId);
         Assert.Single(visiblePosts);
         Assert.DoesNotContain(visiblePosts, post => post.MemberId == spammerId);
+        Assert.DoesNotContain(repository.GetCreatedThreads(), item => item.TopicId == thread.TopicId);
         Assert.Equal(0, await repository.CountApprovedPostsByMemberAsync(spammerId));
 
         await repository.UnhidePostsByMemberAsync(spammerId);
 
         Assert.Equal(2, repository.GetPostsForTopic(thread.TopicId).Count);
+        Assert.Contains(repository.GetCreatedThreads(), item => item.TopicId == thread.TopicId);
         Assert.Equal(1, await repository.CountApprovedPostsByMemberAsync(spammerId));
     }
 

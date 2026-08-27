@@ -292,15 +292,50 @@ public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForu
             .CountAsync(post => post.AuthorDisplayName == displayName && !post.IsHidden, cancellationToken);
     }
 
-    public async Task HidePostsByMemberAsync(Guid memberId, CancellationToken cancellationToken = default) =>
+    public async Task HidePostsByMemberAsync(Guid memberId, CancellationToken cancellationToken = default)
+    {
+        var startedThreadIds = dbContext.ModernForumPosts
+            .Where(post => post.AuthorMemberId == memberId
+                && !dbContext.ModernForumPosts.Any(earlier =>
+                    earlier.ThreadId == post.ThreadId
+                    && earlier.LegacyPostId < post.LegacyPostId))
+            .Select(post => post.ThreadId);
+
+        await dbContext.ModernForumThreads
+            .Where(thread => startedThreadIds.Contains(thread.Id) && !thread.IsHidden)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(thread => thread.IsHidden, true), cancellationToken);
+
         await dbContext.ModernForumPosts
             .Where(post => post.AuthorMemberId == memberId && !post.IsHidden)
             .ExecuteUpdateAsync(setters => setters.SetProperty(post => post.IsHidden, true), cancellationToken);
 
-    public async Task UnhidePostsByMemberAsync(Guid memberId, CancellationToken cancellationToken = default) =>
+        await RefreshReadStatsIfSqlServerAsync(cancellationToken);
+    }
+
+    public async Task UnhidePostsByMemberAsync(Guid memberId, CancellationToken cancellationToken = default)
+    {
+        var startedThreadIds = dbContext.ModernForumPosts
+            .Where(post => post.AuthorMemberId == memberId
+                && !dbContext.ModernForumPosts.Any(earlier =>
+                    earlier.ThreadId == post.ThreadId
+                    && earlier.LegacyPostId < post.LegacyPostId))
+            .Select(post => post.ThreadId);
+
+        await dbContext.ModernForumThreads
+            .Where(thread => startedThreadIds.Contains(thread.Id) && thread.IsHidden)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(thread => thread.IsHidden, false), cancellationToken);
+
         await dbContext.ModernForumPosts
             .Where(post => post.AuthorMemberId == memberId && post.IsHidden)
             .ExecuteUpdateAsync(setters => setters.SetProperty(post => post.IsHidden, false), cancellationToken);
+
+        await RefreshReadStatsIfSqlServerAsync(cancellationToken);
+    }
+
+    private Task RefreshReadStatsIfSqlServerAsync(CancellationToken cancellationToken) =>
+        dbContext.Database.IsSqlServer()
+            ? dbContext.Database.ExecuteSqlRawAsync("EXEC dbo.ModernForum_RefreshReadStats;", cancellationToken)
+            : Task.CompletedTask;
 
     private async Task<int> AllocateNextTopicIdAsync(CancellationToken cancellationToken) =>
         await AllocateNextLegacyIdAsync(
