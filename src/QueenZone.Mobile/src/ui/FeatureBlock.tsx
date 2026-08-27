@@ -9,11 +9,12 @@ type Props = {
   eyebrow: string;
   numeral?: string;
   body: string;
+  quote?: { text: string; whoSaid: string };
   actionLabel: string;
   onAction: () => void;
 };
 
-export function FeatureBlock({ eyebrow, numeral, body, actionLabel, onAction }: Props) {
+export function FeatureBlock({ eyebrow, numeral, body, quote, actionLabel, onAction }: Props) {
   const { c } = useTheme();
   return (
     <View
@@ -46,6 +47,31 @@ export function FeatureBlock({ eyebrow, numeral, body, actionLabel, onAction }: 
       <Eyebrow>{eyebrow}</Eyebrow>
       {numeral ? <Text style={[type.numeral, { color: c.textPrimary }]}>{numeral}</Text> : null}
       <Text style={{ fontFamily: fonts.body, fontSize: 15, lineHeight: 24, color: c.textSecondary }}>{body}</Text>
+      {quote ? (
+        <View
+          style={{
+            borderTopWidth: 1,
+            borderTopColor: 'rgba(184,154,74,0.34)',
+            paddingTop: space.md,
+            gap: 6,
+          }}
+        >
+          <Text
+            style={{
+              fontFamily: fonts.body,
+              fontStyle: 'italic',
+              fontSize: 14,
+              lineHeight: 21,
+              color: c.textSecondary,
+            }}
+          >
+            “{quote.text}”
+          </Text>
+          <Text style={{ fontFamily: fonts.bodyMedium, fontSize: 12, color: c.textMuted }}>
+            — {quote.whoSaid}
+          </Text>
+        </View>
+      ) : null}
       <View style={{ alignSelf: 'flex-start', marginTop: space.xs }}>
         <Button variant="outline" size="sm" label={actionLabel} onPress={onAction} />
       </View>

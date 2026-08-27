@@ -61,6 +61,11 @@ public static class ContentApiEndpoints
             .WithSummary("Count of new forum replies posted today. No presence/reading tracking exists; this is the only honest live signal available.")
             .Produces<LiveActivitySummaryDto>();
 
+        group.MapGet("/quotes/random", GetRandomQuoteAsync)
+            .WithName("GetContentRandomQuote")
+            .WithSummary("A single random published quote, matching the homepage widget. Intended for the mobile app's homescreen widget.")
+            .Produces<QuoteDto?>();
+
         group.MapGet("/biography", GetBiographyChaptersAsync)
             .WithName("GetContentBiographyChapters")
             .WithSummary("Paged list of biography chapters, in reading order.")
@@ -230,6 +235,19 @@ public static class ContentApiEndpoints
     {
         var count = await publicQueryCache.GetLiveActivityNewForumRepliesTodayAsync(cancellationToken);
         return Results.Ok(new LiveActivitySummaryDto(count));
+    }
+
+    internal static async Task<IResult> GetRandomQuoteAsync(
+        IQuoteRepository quoteRepository,
+        CancellationToken cancellationToken)
+    {
+        var quote = await quoteRepository.GetRandomPublishedAsync(cancellationToken);
+
+        // ASP.NET Core Ok(null) / Json(null) write an empty 200. The contract is JSON null.
+        QuoteDto? payload = quote is null ? null : ContentApiMapper.ToQuoteDto(quote);
+        return payload is null
+            ? Results.Content("null", "application/json")
+            : Results.Ok(payload);
     }
 
     internal static async Task<IResult> GetBiographyChaptersAsync(

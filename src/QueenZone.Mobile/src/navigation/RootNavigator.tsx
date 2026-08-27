@@ -8,6 +8,7 @@ import { testIds } from '../test/testIds';
 import { useTheme, type ColorScheme } from '../theme';
 import { NotificationBridge } from '../notifications/NotificationBridge';
 import { NewsShareBridge } from '../share/news/NewsShare';
+import { WidgetLinkBridge } from '../widgets/WidgetLinkBridge';
 import { HeaderCloseButton } from './headerButtons';
 import { ArchiveStack, ForumStack, HomeStack, NewsStack, PhotosStack, stackScreenOptions } from './stacks';
 import type { RootStackParamList, RootTabParamList } from './types';
@@ -201,6 +202,7 @@ export function RootNavigator() {
       </RootStack.Navigator>
       <NotificationBridge />
       <NewsShareBridge />
+      <WidgetLinkBridge />
     </View>
   );
 }

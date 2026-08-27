@@ -14,6 +14,7 @@ import { useUnreadConversationCount } from '../messages/useUnreadConversationCou
 import { testIds } from '../../test/testIds';
 import { ArchiveFooter } from '../../ui/ArchiveFooter';
 import { Button } from '../../ui/Button';
+import { LoadingBlock } from '../../ui/ScreenStates';
 import { CrestSeal } from '../../ui/CrestSeal';
 import { Eyebrow } from '../../ui/Eyebrow';
 import { SettingsRow } from '../../ui/SettingsRow';
@@ -53,7 +54,11 @@ export function ProfileScreen({ navigation }: Props) {
   }, [signOut]);
 
   if (isRestoring) {
-    return <View style={{ flex: 1, backgroundColor: c.surfacePage }} />;
+    return (
+      <View testID={testIds.profileRestoring} style={{ flex: 1, backgroundColor: c.surfacePage }}>
+        <LoadingBlock label="Restoring your session…" />
+      </View>
+    );
   }
 
   if (!isSignedIn) {

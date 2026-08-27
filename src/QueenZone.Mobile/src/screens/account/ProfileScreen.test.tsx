@@ -47,6 +47,13 @@ describe('ProfileScreen', () => {
     );
   });
 
+  it('shows a restoring state instead of the signed-out gate', () => {
+    mockSession.isRestoring = true;
+    renderProfile();
+    expect(screen.getByTestId('profile-restoring')).toBeOnTheScreen();
+    expect(screen.queryByText('Join the archive')).toBeNull();
+  });
+
   it('shows member identity and sign out when signed in', async () => {
     mockSession.isSignedIn = true;
     mockSession.displayName = 'Freddie';

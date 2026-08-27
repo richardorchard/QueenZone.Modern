@@ -124,6 +124,12 @@ public sealed record FreddieTributeDto(
 public sealed record LiveActivitySummaryDto(int NewForumRepliesToday);
 
 /// <summary>
+/// Shape for <c>/api/v1/content/quotes/random</c>, backing the homepage widget and the
+/// mobile app's homescreen widget.
+/// </summary>
+public sealed record QuoteDto(int Id, string Text, string WhoSaid);
+
+/// <summary>
 /// Category card for <c>/api/v1/content/photos/categories</c> and
 /// <c>/api/v1/content/photos/categories/{slug}</c>. Cover URLs are CDN
 /// (<c>cdn.queenzone.org</c>) via <see cref="QueenZone.Data.PhotoImageUrl"/>.

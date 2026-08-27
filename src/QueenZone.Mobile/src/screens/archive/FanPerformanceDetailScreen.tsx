@@ -8,6 +8,7 @@ import { formatTrackDuration } from '../../audio/formatDuration';
 import type { ArchiveStackParamList } from '../../navigation/types';
 import { useSession } from '../../session/SessionContext';
 import { openSignIn } from '../../session/signInNavigation';
+import { testIds } from '../../test/testIds';
 import { ErrorBlock, LoadingBlock } from '../../ui/ScreenStates';
 import { Button } from '../../ui/Button';
 import { IconButton } from '../../ui/IconButton';
@@ -22,7 +23,7 @@ export function FanPerformanceDetailScreen({ navigation, route }: Props) {
 function FanPerformancePlayerPanel({ navigation, route }: Props) {
   const { c } = useTheme();
   const { id } = route.params;
-  const { accessToken } = useSession();
+  const { accessToken, isRestoring } = useSession();
   const player = useFanPerformancePlayer();
   const [track, setTrack] = useState<FanPerformance | null>(null);
   const [queue, setQueue] = useState<FanPerformance[]>([]);
@@ -168,6 +169,10 @@ function FanPerformancePlayerPanel({ navigation, route }: Props) {
               }}
             />
           </View>
+        </View>
+      ) : isRestoring ? (
+        <View style={styles.player} testID={testIds.fanPerformanceSessionRestoring}>
+          <Text style={[type.body, { color: c.textSecondary }]}>Restoring your session…</Text>
         </View>
       ) : (
         <View style={styles.player}>

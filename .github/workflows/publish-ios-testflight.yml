@@ -49,11 +49,13 @@ jobs:
     env:
       APP_BUNDLE_ID: org.queenzone.mobile
       SHARE_EXTENSION_BUNDLE_ID: org.queenzone.mobile.ShareExtension
+      WIDGET_EXTENSION_BUNDLE_ID: org.queenzone.mobile.ExpoWidgetsTarget
       APP_GROUP_ID: group.org.queenzone.mobile
       IOS_BUILD_NUMBER: ${{ github.run_number }}
       APPLE_TEAM_ID: X28Z75P69M
       APP_PROVISIONING_PROFILE_NAME: QueenZone App Store App Groups
       SHARE_EXTENSION_PROVISIONING_PROFILE_NAME: QueenZone Share Extension App Store
+      WIDGET_EXTENSION_PROVISIONING_PROFILE_NAME: QueenZone Widget Extension App Store
       # App Store / TestFlight profiles only include aps-environment=production.
       # Staging still talks to the staging API; the entitlement follows signing.
       IOS_APS_ENVIRONMENT: production
@@ -85,6 +87,7 @@ jobs:
           CERTIFICATE_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_PASSWORD }}
           APP_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
           SHARE_EXTENSION_PROFILE_BASE64: ${{ secrets.IOS_SHARE_EXTENSION_PROVISIONING_PROFILE_BASE64 }}
+          WIDGET_EXTENSION_PROFILE_BASE64: ${{ secrets.IOS_WIDGET_EXTENSION_PROVISIONING_PROFILE_BASE64 }}
           API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
           API_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
@@ -94,6 +97,7 @@ jobs:
             "$CERTIFICATE_PASSWORD" \
             "$APP_PROFILE_BASE64" \
             "$SHARE_EXTENSION_PROFILE_BASE64" \
+            "$WIDGET_EXTENSION_PROFILE_BASE64" \
             "$API_KEY_ID" \
             "$API_ISSUER_ID" \
             "$API_PRIVATE_KEY"; do
@@ -259,6 +263,7 @@ jobs:
           CERTIFICATE_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_PASSWORD }}
           APP_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
           SHARE_EXTENSION_PROFILE_BASE64: ${{ secrets.IOS_SHARE_EXTENSION_PROVISIONING_PROFILE_BASE64 }}
+          WIDGET_EXTENSION_PROFILE_BASE64: ${{ secrets.IOS_WIDGET_EXTENSION_PROVISIONING_PROFILE_BASE64 }}
         run: |
           set -euo pipefail
           signing_dir="$RUNNER_TEMP/queenzone-ios-signing"
@@ -267,11 +272,13 @@ jobs:
           certificate_path="$signing_dir/distribution.p12"
           app_profile_path="$signing_dir/app.mobileprovision"
           share_extension_profile_path="$signing_dir/share-extension.mobileprovision"
+          widget_extension_profile_path="$signing_dir/widget-extension.mobileprovision"
 
           mkdir -p "$signing_dir"
           printf '%s' "$CERTIFICATE_BASE64" | /usr/bin/base64 -D > "$certificate_path"
           printf '%s' "$APP_PROFILE_BASE64" | /usr/bin/base64 -D > "$app_profile_path"
           printf '%s' "$SHARE_EXTENSION_PROFILE_BASE64" | /usr/bin/base64 -D > "$share_extension_profile_path"
+          printf '%s' "$WIDGET_EXTENSION_PROFILE_BASE64" | /usr/bin/base64 -D > "$widget_extension_profile_path"
 
           security create-keychain -p "$keychain_password" "$keychain_path"
           security set-keychain-settings -lut 21600 "$keychain_path"
@@ -339,7 +346,7 @@ jobs:
                 exit 1
               fi
             elif [ -n "$aps_environment" ]; then
-              echo "::error::Share extension profile \"$profile_name\" unexpectedly includes aps-environment."
+              echo "::error::Extension profile \"$profile_name\" unexpectedly includes aps-environment."
               exit 1
             fi
 
@@ -355,6 +362,11 @@ jobs:
             "$share_extension_profile_path" \
             "$SHARE_EXTENSION_PROVISIONING_PROFILE_NAME" \
             "$SHARE_EXTENSION_BUNDLE_ID" \
+            false
+          install_profile \
+            "$widget_extension_profile_path" \
+            "$WIDGET_EXTENSION_PROVISIONING_PROFILE_NAME" \
+            "$WIDGET_EXTENSION_BUNDLE_ID" \
             false
 
           echo "IOS_KEYCHAIN_PATH=$keychain_path" >> "$GITHUB_ENV"
@@ -384,6 +396,10 @@ jobs:
             'ShareExtension' => {
               bundle_id: ENV.fetch('SHARE_EXTENSION_BUNDLE_ID'),
               profile_name: ENV.fetch('SHARE_EXTENSION_PROVISIONING_PROFILE_NAME')
+            },
+            'ExpoWidgetsTarget' => {
+              bundle_id: ENV.fetch('WIDGET_EXTENSION_BUNDLE_ID'),
+              profile_name: ENV.fetch('WIDGET_EXTENSION_PROVISIONING_PROFILE_NAME')
             }
           }
 
@@ -405,6 +421,12 @@ jobs:
       - name: Archive signed iOS app
         working-directory: src/QueenZone.Mobile/ios
         env:
+          EXPO_PUBLIC_APP_ENV: staging
+          # The "Bundle React Native code and images" Xcode build phase runs
+          # inside this step, not the earlier "Generate iOS project" step, so
+          # EXPO_PUBLIC_SENTRY_DSN must be set here too or it inlines as
+          # undefined and Sentry.init() silently no-ops in the shipped bundle.
+          EXPO_PUBLIC_SENTRY_DSN: ${{ vars.SENTRY_DSN }}
           # Also set org/project here (not only at prebuild) so sentry-cli does
           # not depend solely on the generated sentry.properties file.
           SENTRY_ORG: ${{ vars.SENTRY_ORG }}
@@ -456,6 +478,8 @@ jobs:
               <string>$APP_PROVISIONING_PROFILE_NAME</string>
               <key>$SHARE_EXTENSION_BUNDLE_ID</key>
               <string>$SHARE_EXTENSION_PROVISIONING_PROFILE_NAME</string>
+              <key>$WIDGET_EXTENSION_BUNDLE_ID</key>
+              <string>$WIDGET_EXTENSION_PROVISIONING_PROFILE_NAME</string>
             </dict>
             <key>signingCertificate</key>
             <string>Apple Distribution</string>
@@ -492,9 +516,23 @@ jobs:
           app_path=$(find "$verify_dir/Payload" -maxdepth 1 -name '*.app' -print -quit)
           test -n "$app_path"
           codesign --verify --deep --strict --verbose=2 "$app_path"
-          share_extension_path=$(find "$app_path/PlugIns" -maxdepth 1 -name '*.appex' -print -quit)
-          test -n "$share_extension_path"
+          find_extension_by_bundle_id() {
+            expected_bundle_id=$1
+            for extension_path in "$app_path"/PlugIns/*.appex; do
+              [ -d "$extension_path" ] || continue
+              extension_bundle_id=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$extension_path/Info.plist")
+              if [ "$extension_bundle_id" = "$expected_bundle_id" ]; then
+                printf '%s\n' "$extension_path"
+                return 0
+              fi
+            done
+            return 1
+          }
+
+          share_extension_path=$(find_extension_by_bundle_id "$SHARE_EXTENSION_BUNDLE_ID")
+          widget_extension_path=$(find_extension_by_bundle_id "$WIDGET_EXTENSION_BUNDLE_ID")
           codesign --verify --strict --verbose=2 "$share_extension_path"
+          codesign --verify --strict --verbose=2 "$widget_extension_path"
 
           verify_embedded_profile() {
             bundle_path=$1
@@ -534,6 +572,7 @@ jobs:
 
           verify_embedded_profile "$app_path" "$APP_BUNDLE_ID" true app
           verify_embedded_profile "$share_extension_path" "$SHARE_EXTENSION_BUNDLE_ID" false share-extension
+          verify_embedded_profile "$widget_extension_path" "$WIDGET_EXTENSION_BUNDLE_ID" false widget-extension
 
           expected_build="${IOS_BUILD_NUMBER}"
           bundle_version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$app_path/Info.plist")

@@ -15,6 +15,7 @@ import type {
   PhotoDetail,
   PhotoListItem,
   FanPerformance,
+  RandomQuote,
   TimelineEvent,
 } from './types';
 
@@ -106,6 +107,11 @@ export function fetchOnThisDay(signal?: AbortSignal): Promise<TimelineEvent | nu
  */
 export function fetchLiveActivity(signal?: AbortSignal): Promise<LiveActivitySummary> {
   return fetchJson('/content/live-activity', { signal });
+}
+
+/** A single random published quote, or null when none are published. */
+export function fetchRandomQuote(signal?: AbortSignal): Promise<RandomQuote | null> {
+  return fetchJson('/content/quotes/random', { signal });
 }
 
 export function fetchFreddieTributePage(

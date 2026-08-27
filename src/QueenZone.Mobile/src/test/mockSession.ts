@@ -10,6 +10,7 @@ export function createMockSession() {
     signIn: jest.fn(),
     signOut: jest.fn(),
     refreshProfile: jest.fn(),
+    ensureAccessToken: jest.fn(async () => null as string | null),
     setAccessToken: jest.fn(),
     applySmokeSession: jest.fn(),
   };

@@ -2196,6 +2196,43 @@ namespace QueenZone.Data.Migrations
                     b.ToTable("QueenLinkChecks", (string)null);
                 });
 
+            modelBuilder.Entity("QueenZone.Data.Entities.QuoteEntity", b =>
+                {
+                    b.Property<int>("QuoteId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasColumnName("QUEEN_QUOTE_ID");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("QuoteId"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("CREATE_DATE");
+
+                    b.Property<byte>("IsPublished")
+                        .HasColumnType("tinyint")
+                        .HasColumnName("DISPLAY");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(455)
+                        .HasColumnType("nvarchar(455)")
+                        .HasColumnName("QUEEN_QUOTE");
+
+                    b.Property<string>("WhoSaid")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("WHO_SAID");
+
+                    b.HasKey("QuoteId");
+
+                    b.ToTable("QUEEN_QUOTE_T", null, t =>
+                        {
+                            t.ExcludeFromMigrations();
+                        });
+                });
+
             modelBuilder.Entity("QueenZone.Data.Entities.SearchDocumentEntity", b =>
                 {
                     b.Property<Guid>("Id")

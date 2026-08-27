@@ -65,6 +65,40 @@
           "iosAppGroupIdentifier": "group.org.queenzone.mobile",
           "androidIntentFilters": ["text/*"]
         }
+      ],
+      [
+        "expo-widgets",
+        {
+          "groupIdentifier": "group.org.queenzone.mobile",
+          "widgets": [
+            {
+              "name": "OnThisDayWidget",
+              "displayName": "On This Day",
+              "description": "A Queen history highlight and quote of the day.",
+              "supportedFamilies": ["systemSmall", "systemMedium"],
+              "contentMarginsDisabled": false
+            }
+          ]
+        }
+      ],
+      [
+        "react-native-android-widget",
+        {
+          "widgets": [
+            {
+              "name": "OnThisDayWidget",
+              "label": "On This Day",
+              "description": "A Queen history highlight and quote of the day.",
+              "minWidth": "180dp",
+              "minHeight": "110dp",
+              "targetCellWidth": 3,
+              "targetCellHeight": 2,
+              "resizeMode": "horizontal|vertical",
+              "widgetFeatures": "reconfigurable",
+              "updatePeriodMillis": 14400000
+            }
+          ]
+        }
       ]
     ]
   }

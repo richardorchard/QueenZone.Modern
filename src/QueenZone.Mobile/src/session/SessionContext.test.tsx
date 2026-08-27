@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Text } from 'react-native';
-import { screen, waitFor, userEvent } from '@testing-library/react-native';
-import { fetchJson } from '../api/client';
+import { AppState, Text } from 'react-native';
+import { act, screen, waitFor, userEvent } from '@testing-library/react-native';
+import { ApiError, fetchJson } from '../api/client';
 import { authTokensFixture, memberProfilePayload } from '../test/fixtures';
 import { renderWithProviders } from '../test/render';
 import { SessionProvider, useSession } from './SessionContext';
@@ -19,9 +19,13 @@ jest.mock('../config/appConfig', () => ({
   getAppConfig: () => mockAppConfig,
 }));
 
-jest.mock('../api/client', () => ({
-  fetchJson: jest.fn(),
-}));
+jest.mock('../api/client', () => {
+  const actual = jest.requireActual('../api/client') as typeof import('../api/client');
+  return {
+    ...actual,
+    fetchJson: jest.fn(),
+  };
+});
 
 jest.mock('./oauth', () => ({
   signInWithProvider: jest.fn(),
@@ -89,6 +93,13 @@ function Probe() {
       <Text onPress={() => session.setAccessToken('manual-token')}>set-token</Text>
       <Text onPress={() => session.setAccessToken(null)}>clear-token</Text>
       <Text onPress={() => session.setAccessToken('')}>set-empty-token</Text>
+      <Text
+        onPress={() => {
+          void session.ensureAccessToken();
+        }}
+      >
+        do-ensure-token
+      </Text>
     </>
   );
 }
@@ -103,6 +114,13 @@ function renderSession() {
 }
 
 beforeEach(() => {
+  // `restoreMocks: true` (jest.config.js) restores a spied `jest.fn()` to a bare
+  // stub that returns `undefined`, not to the `{ remove: jest.fn() }}`-returning
+  // factory implementation the react-native jest preset ships. Re-establish that
+  // default every test so SessionProvider's `AppState.addEventListener(...)`
+  // cleanup (`subscription.remove()`) never runs against `undefined`, regardless
+  // of whether an earlier test in this file spied on and restored the mock.
+  jest.spyOn(AppState, 'addEventListener').mockImplementation(() => ({ remove: jest.fn() }));
   mockAppConfig.appEnv = 'development';
   fetchJsonMock.mockReset();
   readStored.mockReset();
@@ -301,5 +319,108 @@ describe('SessionProvider', () => {
     renderSession();
     await waitFor(() => expect(screen.getByText('signed-in')).toBeOnTheScreen());
     expect(screen.getByText('anonymous')).toBeOnTheScreen();
+  });
+
+  it('exposes the stored access token before profile load finishes', async () => {
+    let resolveProfile: (value: unknown) => void = () => {};
+    fetchJsonMock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveProfile = resolve;
+        }),
+    );
+    readStored.mockResolvedValue({
+      ...authTokensFixture(),
+      expiresAt: Date.now() + 60_000,
+    });
+    renderSession();
+    await waitFor(() => expect(screen.getByText('signed-in')).toBeOnTheScreen());
+    expect(screen.getByText('access-token')).toBeOnTheScreen();
+    expect(screen.getByText('anonymous')).toBeOnTheScreen();
+    expect(refreshAccessToken).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveProfile(memberProfilePayload());
+    });
+    await waitFor(() => expect(screen.getByText('Freddie')).toBeOnTheScreen());
+  });
+
+  it('refreshes a locally valid token when /me returns 401', async () => {
+    readStored.mockResolvedValue({
+      ...authTokensFixture(),
+      expiresAt: Date.now() + 60_000,
+    });
+    fetchJsonMock.mockRejectedValueOnce(ApiError.http(401, 'Unauthorized'));
+    fetchJsonMock.mockResolvedValue(memberProfilePayload());
+    refreshAccessToken.mockResolvedValue(authTokensFixture({ accessToken: 'next' }));
+    renderSession();
+    await waitFor(() => expect(screen.getByText('next')).toBeOnTheScreen());
+    expect(refreshAccessToken).toHaveBeenCalledWith('http://qz.test', 'refresh-token');
+    expect(screen.getByText('Freddie')).toBeOnTheScreen();
+  });
+
+  it('refreshes an expired token from ensureAccessToken and app foreground', async () => {
+    const user = userEvent.setup();
+    const now = 1_700_000_000_000;
+    const dateNow = jest.spyOn(Date, 'now').mockReturnValue(now);
+    const appStateHandlers: Array<(state: string) => void> = [];
+    jest.spyOn(AppState, 'addEventListener').mockImplementation((type, handler) => {
+      if (type === 'change') {
+        appStateHandlers.push(handler as (state: string) => void);
+      }
+      return { remove: jest.fn() };
+    });
+    try {
+      readStored.mockResolvedValue({
+        ...authTokensFixture(),
+        expiresAt: now + 60_000,
+      });
+      refreshAccessToken.mockResolvedValue(authTokensFixture({ accessToken: 'next' }));
+      renderSession();
+      await waitFor(() => expect(screen.getByText('signed-in')).toBeOnTheScreen());
+      expect(refreshAccessToken).not.toHaveBeenCalled();
+
+      dateNow.mockReturnValue(now + 120_000);
+      await user.press(screen.getByText('do-ensure-token'));
+      await waitFor(() => expect(screen.getByText('next')).toBeOnTheScreen());
+
+      refreshAccessToken.mockClear();
+      refreshAccessToken.mockResolvedValue(authTokensFixture({ accessToken: 'foreground' }));
+      dateNow.mockReturnValue(now + 180_000);
+      await act(async () => {
+        for (const handler of appStateHandlers) {
+          handler('active');
+        }
+      });
+      await waitFor(() => expect(screen.getByText('foreground')).toBeOnTheScreen());
+    } finally {
+      dateNow.mockRestore();
+    }
+  });
+
+  it('stays signed in with the refreshed token when a background refresh still gets a 401 from /me', async () => {
+    const user = userEvent.setup();
+    const now = 1_700_000_000_000;
+    const dateNow = jest.spyOn(Date, 'now').mockReturnValue(now);
+    try {
+      readStored.mockResolvedValue({
+        ...authTokensFixture(),
+        expiresAt: now + 60_000,
+      });
+      renderSession();
+      await waitFor(() => expect(screen.getByText('signed-in')).toBeOnTheScreen());
+
+      refreshAccessToken.mockResolvedValue(authTokensFixture({ accessToken: 'next' }));
+      fetchJsonMock.mockReset();
+      fetchJsonMock.mockRejectedValue(ApiError.http(401, 'Unauthorized'));
+      dateNow.mockReturnValue(now + 120_000);
+      await user.press(screen.getByText('do-ensure-token'));
+
+      await waitFor(() => expect(screen.getByText('next')).toBeOnTheScreen());
+      expect(screen.getByText('signed-in')).toBeOnTheScreen();
+      expect(clearStored).not.toHaveBeenCalled();
+    } finally {
+      dateNow.mockRestore();
+    }
   });
 });

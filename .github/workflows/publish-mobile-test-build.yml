@@ -126,6 +126,11 @@ jobs:
       - name: Assemble signed standalone APK
         working-directory: src/QueenZone.Mobile/android
         env:
+          EXPO_PUBLIC_APP_ENV: staging
+          # This step (not "Generate Android project") is what runs the JS
+          # bundling Gradle task, so EXPO_PUBLIC_SENTRY_DSN must be set here
+          # too or it inlines as undefined and Sentry.init() silently no-ops.
+          EXPO_PUBLIC_SENTRY_DSN: ${{ vars.SENTRY_DSN }}
           ANDROID_TEST_KEYSTORE_PASSWORD: ${{ steps.bitwarden-secrets.outputs.ANDROID_TEST_KEYSTORE_PASSWORD }}
           ANDROID_TEST_KEY_PASSWORD: ${{ steps.bitwarden-secrets.outputs.ANDROID_TEST_KEY_PASSWORD }}
           SENTRY_ORG: ${{ vars.SENTRY_ORG }}
