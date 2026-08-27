@@ -72,6 +72,10 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     },
     plugins: [
       ...(config.plugins ?? []),
+      // CNG: android/ is generated in CI. Force WorkManager 2.8.1 so
+      // react-native-android-widget's work-runtime does not clash with a
+      // transitive work-runtime-ktx 2.7.1 (duplicate OneTimeWorkRequestKt).
+      './plugins/withAndroidWorkRuntimeAlignment.cjs',
       [
         // Auth token is deliberately NOT passed here — sentry-cli picks up
         // SENTRY_AUTH_TOKEN from the build environment directly (Gradle /
