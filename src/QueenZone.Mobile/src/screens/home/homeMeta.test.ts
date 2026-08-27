@@ -5,6 +5,7 @@ import {
   formatGalleryCardMeta,
   liveStripIsVisible,
   liveStripLabel,
+  onThisDayEyebrow,
   onThisDayIsVisible,
   relativeTimeFromNow,
   stockImageIndexForId,
@@ -38,21 +39,25 @@ describe('home meta', () => {
     assert.equal(formatGalleryCardMeta({ imageCount: 968 }), '968 images');
   });
 
-  it('hides the on-this-day band only when there is no event', () => {
+  it('shows the on-this-day band for an event, a quote, or both', () => {
+    const event = {
+      id: 1,
+      title: 'x',
+      summary: 'x',
+      eventDate: '1980-08-22',
+      formattedDate: '22 August 1980',
+      category: 'music',
+      categoryLabel: 'Release',
+      sourceUrl: null,
+    };
+    const quote = { text: 'A kind of magic', whoSaid: 'Freddie Mercury' };
     assert.equal(onThisDayIsVisible(null), false);
-    assert.equal(
-      onThisDayIsVisible({
-        id: 1,
-        title: 'x',
-        summary: 'x',
-        eventDate: '1980-08-22',
-        formattedDate: '22 August 1980',
-        category: 'music',
-        categoryLabel: 'Release',
-        sourceUrl: null,
-      }),
-      true,
-    );
+    assert.equal(onThisDayIsVisible(null, null), false);
+    assert.equal(onThisDayIsVisible(event), true);
+    assert.equal(onThisDayIsVisible(null, quote), true);
+    assert.equal(onThisDayIsVisible(event, quote), true);
+    assert.equal(onThisDayEyebrow(event), 'On this day');
+    assert.equal(onThisDayEyebrow(null), 'Quote');
   });
 
   it('hides the live strip at zero and labels singular vs plural replies', () => {

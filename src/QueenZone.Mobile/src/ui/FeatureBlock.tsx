@@ -8,7 +8,7 @@ import { Eyebrow } from './Eyebrow';
 type Props = {
   eyebrow: string;
   numeral?: string;
-  body: string;
+  body?: string;
   quote?: { text: string; whoSaid: string };
   actionLabel: string;
   onAction: () => void;
@@ -46,7 +46,9 @@ export function FeatureBlock({ eyebrow, numeral, body, quote, actionLabel, onAct
       />
       <Eyebrow>{eyebrow}</Eyebrow>
       {numeral ? <Text style={[type.numeral, { color: c.textPrimary }]}>{numeral}</Text> : null}
-      <Text style={{ fontFamily: fonts.body, fontSize: 15, lineHeight: 24, color: c.textSecondary }}>{body}</Text>
+      {body ? (
+        <Text style={{ fontFamily: fonts.body, fontSize: 15, lineHeight: 24, color: c.textSecondary }}>{body}</Text>
+      ) : null}
       {quote ? (
         <View
           style={{
