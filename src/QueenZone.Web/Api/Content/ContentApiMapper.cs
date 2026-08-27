@@ -30,6 +30,9 @@ public static class ContentApiMapper
             item.SourceUrl,
             NewsRoutes.GetNewsDetailPath(item.Id, item.Title, item.Slug));
 
+    public static QuoteDto ToQuoteDto(QuoteItem quote) =>
+        new(quote.Id, quote.Text, quote.WhoSaid);
+
     public static TimelineEventDto ToTimelineEvent(QueenHistoryEvent historyEvent) =>
         new(
             historyEvent.Id,

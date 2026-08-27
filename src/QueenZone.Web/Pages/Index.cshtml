@@ -85,6 +85,18 @@
   </div>
 </section>
 
+@if (Model.FeaturedQuote is not null)
+{
+  <section class="qz-section" aria-label="Queen quote">
+    <div class="qz-container">
+      <blockquote class="qz-quote">
+        <p class="qz-quote__text">&ldquo;@Model.FeaturedQuote.Text&rdquo;</p>
+        <footer class="qz-quote__attribution">&mdash; @Model.FeaturedQuote.WhoSaid</footer>
+      </blockquote>
+    </div>
+  </section>
+}
+
 <section class="qz-section qz-band-dark">
   <partial name="_PictureImage" model="@("/design-system/assets/crest-white.png", "", false, "qz-band-dark__crest")" />
   <div class="qz-container">
