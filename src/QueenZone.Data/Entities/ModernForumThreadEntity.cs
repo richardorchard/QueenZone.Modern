@@ -33,6 +33,12 @@ public sealed class ModernForumThreadEntity
 
     public bool? StartedByUserValidated { get; set; }
 
+    /// <summary>
+    /// True when the topic starter has been suspended. Hidden topics are excluded from every
+    /// public forum read surface while the row remains available for reinstatement.
+    /// </summary>
+    public bool IsHidden { get; set; }
+
     public string? StarterAttachment { get; set; }
 
     public string? StarterFileSize { get; set; }

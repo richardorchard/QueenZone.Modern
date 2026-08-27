@@ -39,7 +39,7 @@ type PlayerState = {
 const PlayerContext = createContext<PlayerState | undefined>(undefined);
 
 export function FanPerformancePlayerProvider({ children }: { children: ReactNode }) {
-  const { accessToken } = useSession();
+  const { accessToken, ensureAccessToken } = useSession();
   const player = useAudioPlayer(null, { updateInterval: 250 });
   const status = useAudioPlayerStatus(player);
   const [current, setCurrent] = useState<FanPerformance | null>(null);
@@ -47,6 +47,7 @@ export function FanPerformancePlayerProvider({ children }: { children: ReactNode
   const [error, setError] = useState<string | null>(null);
   const currentRef = useRef<FanPerformance | null>(null);
   const queueRef = useRef<FanPerformance[]>([]);
+  const loadGenerationRef = useRef(0);
   currentRef.current = current;
   queueRef.current = queue;
 
@@ -64,22 +65,30 @@ export function FanPerformancePlayerProvider({ children }: { children: ReactNode
 
   const load = useCallback(
     (track: FanPerformance) => {
-      if (!accessToken) {
-        setError('Sign in with a member account to stream recordings.');
-        return;
-      }
+      const generation = ++loadGenerationRef.current;
+      void (async () => {
+        const token = await ensureAccessToken();
+        if (generation !== loadGenerationRef.current) {
+          return;
+        }
 
-      setError(null);
-      setCurrent(track);
-      player.replace({
-        uri: apiV1Url(fanPerformanceAudioPath(track.id)),
-        headers: { Authorization: `Bearer ${accessToken}` },
-        name: track.title,
-      });
-      player.setActiveForLockScreen(true, lockScreenMetadata(track), { ...lockScreenOptions });
-      player.play();
+        if (!token) {
+          setError('Sign in with a member account to stream recordings.');
+          return;
+        }
+
+        setError(null);
+        setCurrent(track);
+        player.replace({
+          uri: apiV1Url(fanPerformanceAudioPath(track.id)),
+          headers: { Authorization: `Bearer ${token}` },
+          name: track.title,
+        });
+        player.setActiveForLockScreen(true, lockScreenMetadata(track), { ...lockScreenOptions });
+        player.play();
+      })();
     },
-    [accessToken, player],
+    [ensureAccessToken, player],
   );
 
   const play = useCallback(

@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using QueenZone.Data;
 
@@ -11,9 +12,11 @@ using QueenZone.Data;
 namespace QueenZone.Data.Migrations
 {
     [DbContext(typeof(QueenZoneDbContext))]
-    partial class QueenZoneDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260826064318_HideSuspendedMemberTopics")]
+    partial class HideSuspendedMemberTopics
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -578,25 +581,6 @@ namespace QueenZone.Data.Migrations
                     b.ToTable("MemberMessageBlocks", (string)null);
                 });
 
-            modelBuilder.Entity("QueenZone.Data.Entities.MemberTopicWatchEntity", b =>
-                {
-                    b.Property<Guid>("MemberAccountId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<int>("TopicId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.HasKey("MemberAccountId", "TopicId");
-
-                    b.HasIndex("TopicId")
-                        .HasDatabaseName("IX_MemberTopicWatches_TopicId");
-
-                    b.ToTable("MemberTopicWatches", (string)null);
-                });
-
             modelBuilder.Entity("QueenZone.Data.Entities.MobileAuthAuthorizationCodeEntity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -993,75 +977,6 @@ namespace QueenZone.Data.Migrations
                     b.ToTable("NewsAgentDrafts", (string)null);
                 });
 
-            modelBuilder.Entity("QueenZone.Data.Entities.NewsAgentGuidanceRevisionEntity", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Content")
-                        .IsRequired()
-                        .HasMaxLength(4000)
-                        .HasColumnType("nvarchar(4000)");
-
-                    b.Property<string>("ContentHash")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("CreatedByEmail")
-                        .IsRequired()
-                        .HasMaxLength(320)
-                        .HasColumnType("nvarchar(320)");
-
-                    b.Property<DateTime?>("PublishedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("PublishedByEmail")
-                        .HasMaxLength(320)
-                        .HasColumnType("nvarchar(320)");
-
-                    b.Property<int>("RevisionNumber")
-                        .HasColumnType("int");
-
-                    b.Property<byte[]>("RowVersion")
-                        .IsConcurrencyToken()
-                        .IsRequired()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("rowversion");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Type", "RevisionNumber")
-                        .IsUnique()
-                        .HasDatabaseName("UX_NewsAgentGuidanceRevisions_Type_RevisionNumber");
-
-                    b.HasIndex(new[] { "Type" }, "UX_NewsAgentGuidanceRevisions_Type_Draft")
-                        .IsUnique()
-                        .HasFilter("[Status] = 'Draft'");
-
-                    b.HasIndex(new[] { "Type" }, "UX_NewsAgentGuidanceRevisions_Type_Published")
-                        .IsUnique()
-                        .HasFilter("[Status] = 'Published'");
-
-                    b.ToTable("NewsAgentGuidanceRevisions", (string)null);
-                });
-
             modelBuilder.Entity("QueenZone.Data.Entities.NewsAgentRunLeaseEntity", b =>
                 {
                     b.Property<string>("LeaseName")
@@ -1196,16 +1111,6 @@ namespace QueenZone.Data.Migrations
                     b.Property<decimal?>("EstimatedCostUsd")
                         .HasPrecision(10, 6)
                         .HasColumnType("decimal(10,6)");
-
-                    b.Property<string>("GuidanceContentHash")
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.Property<int?>("GuidanceRevisionId")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("GuidanceRevisionNumber")
-                        .HasColumnType("int");
 
                     b.Property<int?>("InputTokens")
                         .HasColumnType("int");
@@ -2471,17 +2376,6 @@ namespace QueenZone.Data.Migrations
                     b.Navigation("Blocked");
 
                     b.Navigation("Blocker");
-                });
-
-            modelBuilder.Entity("QueenZone.Data.Entities.MemberTopicWatchEntity", b =>
-                {
-                    b.HasOne("QueenZone.Data.Entities.MemberAccount", "MemberAccount")
-                        .WithMany()
-                        .HasForeignKey("MemberAccountId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("MemberAccount");
                 });
 
             modelBuilder.Entity("QueenZone.Data.Entities.MobileAuthAuthorizationCodeEntity", b =>

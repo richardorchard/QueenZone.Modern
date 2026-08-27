@@ -30,6 +30,7 @@ export function renderWithProviders(ui: ReactElement, options: Options = {}) {
 export function fakeNavigation() {
   return {
     navigate: jest.fn(),
+    replace: jest.fn(),
     goBack: jest.fn(),
     setParams: jest.fn(),
     setOptions: jest.fn(),

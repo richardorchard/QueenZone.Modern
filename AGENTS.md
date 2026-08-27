@@ -18,7 +18,7 @@ This repository is the modern QueenZone rebuild. The project is archive-first: i
 - `docs/backlog/migration-backlog.md` tracks migration work.
 - `docs/sql/data-api-builder-mcp.md` explains the local SQL MCP setup for read-only legacy database investigation.
 - `docs/agent-bitwarden-secrets.md` is the multi-machine Bitwarden Secrets Manager (`bws`) setup for local agents (Windows vs macOS).
-- `.cursor/agents/` and `.cursor/skills/orchestrate-epic/` are the Cursor issue-queue orchestrator (planner / implementer / verifier) for epics or a list of GitHub issues, including website and `QueenZone.Mobile`. Pin the skill as a Custom Mode.
+- `.cursor/agents/` and `.cursor/skills/orchestrate-epic/` are the QueenZone overlay for the sequential GitHub issue queue (planner / implementer / verifier / reviewer). Pin `/orchestrate-epic` as a Custom Mode. The portable protocol is the **issue-queue** Cursor plugin (`~/.cursor/plugins/local/issue-queue`, skill `/orchestrate-issues`). This repo keeps copies so a clone works without the plugin. Sequential only: one issue, one subagent at a time; one review plus one response, then PR.
 
 Keep durable workflow guidance in this file and keep user-facing setup guidance in `README.md`.
 
@@ -98,11 +98,13 @@ Fill in the template's `## Issues` section with a real GitHub closing keyword �
 
 ## Cursor issue-queue orchestration
 
-Cursor custom subagents are markdown files in `.cursor/agents/` (`planner`, `implementer`, `verifier`, `orchestrator`). The spawn protocol lives in `.cursor/skills/orchestrate-epic/SKILL.md`. Pin that skill as a Custom Mode (`/orchestrate-epic`, then Alt+Enter on Windows or Option+Enter on Mac), or invoke `/orchestrator`.
+Cursor custom subagents are markdown files in `.cursor/agents/` (`planner`, `implementer`, `verifier`, `reviewer`, `orchestrator`). The QueenZone spawn protocol lives in `.cursor/skills/orchestrate-epic/SKILL.md` (overlay: surfaces, tests, `cursor/` branches, no worktrees). Pin that skill as a Custom Mode (`/orchestrate-epic`, then Alt+Enter on Windows or Option+Enter on Mac), or invoke `/orchestrator`. Do not also pin `/orchestrate-issues` in the same QueenZone chat.
 
-Use it for an epic's children **or** an explicit issue list (`work on #15 #16 #17`). The parent keeps a scoreboard and loops one issue (or at most two independent ones) through implementer then verifier so child context does not accumulate in the parent chat. Website and `src/QueenZone.Mobile` are both in scope; do not mix those surfaces in one implementer unless the issue requires both. Child branches use `cursor/` unless the prompt names another agent.
+The same loop is packaged as the **issue-queue** Cursor plugin for other repos: clone or copy `~/.cursor/plugins/local/issue-queue` onto the machine, reload Cursor, pin `/orchestrate-issues`. Product rules stay in that repo's `AGENTS.md`. Change the loop in the plugin first, then copy it into the QueenZone overlay.
 
-Grok 4.6 effort: parent high/xhigh, planner high, implementer medium, verifier high. Isolated child checkouts restore via `.cursor/worktrees.json`.
+Use `/orchestrate-epic` here for **one issue** (`work on #757`), an epic's children, or an explicit list (`work on #15 #16 #17`). Skip planner when the queue has a single issue. The parent keeps a scoreboard and loops **one issue at a time** through implementer → verifier → reviewer → (one implementer response if the review requested changes) → PR so child context does not accumulate in the parent chat. Reviewer runs once per issue; do not send the same ticket back for a second review. Do not run sibling implementers in parallel. Share the parent checkout; do not isolate a git worktree per issue (that re-runs `dotnet restore` via `.cursor/worktrees.json` and is the usual cause of a slow queue). Website and `src/QueenZone.Mobile` are both in scope; do not mix those surfaces in one implementer unless the issue requires both. Child branches use `cursor/` unless the prompt names another agent.
+
+Grok 4.6 effort: parent high (xhigh only if the split is messy), planner high, implementer medium, verifier high, reviewer high.
 
 ## Testing Expectations
 

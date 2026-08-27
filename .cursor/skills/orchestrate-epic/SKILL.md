@@ -1,71 +1,60 @@
 ---
 name: orchestrate-epic
-description: Coordinate a GitHub epic or a numbered issue list until each item is done. Use for "work on #15 #16 #17", epic child fan-out, and mixed website plus QueenZone.Mobile work. Pin as a Custom Mode. Do not auto-apply to ordinary single-task chats.
+description: QueenZone overlay for the issue-queue protocol. Use for "work on #757" or "work on #15 #16 #17" in this repo. Pin as a Custom Mode. Do not auto-apply to ordinary single-task chats.
 disable-model-invocation: true
 icon: git-branch
 color: purple
 ---
 
-# Orchestrate issues
+# Orchestrate issues (QueenZone)
 
-You are the parent coordinator. Set the chat model to **Grok 4.6** at **high** or **xhigh**. Do not implement issues yourself. Your job is a queue, not a long coding session — that is how you keep a usable context window.
+You are the parent coordinator. Do not implement issues yourself.
 
-Subagents: `.cursor/agents/planner.md`, `implementer.md`, `verifier.md`.
+The portable protocol is the **issue-queue** Cursor plugin (`/orchestrate-issues`). This skill is the QueenZone pin: overlay plus a local copy of the loop so a clone of this repo works without the plugin. **Do not also pin `/orchestrate-issues` in this chat.**
 
-## Grok 4.6 effort
+Subagents: `.cursor/agents/planner.md`, `implementer.md`, `verifier.md`, `reviewer.md`. Tell every child to read `AGENTS.md`.
 
-Leave each subagent's frontmatter model in place. Do not pass a Task `model` override unless a child is unusually hard (then you may raise implementer to `grok-4.6[effort=high]`).
+Parent model: **Grok 4.6** at **high** (xhigh only if the split is messy). Leave child frontmatter models in place.
 
-| Role | Subagent | Model |
-| --- | --- | --- |
-| This chat | (parent) | `grok-4.6` high or xhigh |
-| Order / split | `planner` | `grok-4.6[effort=high]` |
-| One issue | `implementer` | `grok-4.6[effort=medium]` |
-| Check one issue | `verifier` | `grok-4.6[effort=high]` |
+## QueenZone overlay
 
-## Queue
+- Issues live in `richardorchard/QueenZone.Modern`.
+- Agent slug is `cursor/` unless the user named another (`grok/`, `claude/`, …). Never push to `main`.
+- One PR per issue unless the user asked to batch. `Closes #<n>`; `Relates to #<epic>` when there is a parent. Fill `.github/pull_request_template.md`.
+- Do **not** isolate git worktrees. `.cursor/worktrees.json` runs `dotnet restore QueenZone.sln` and dominates wall-clock.
+- Do not mix website UI and mobile UI in one implementer unless that single issue requires both. An API issue may still add a client call if the issue says so.
+- Pause for humans: Bitwarden, Apple/Google credentials, TestFlight/device checks, product questions.
 
-Work items are GitHub issues in `richardorchard/QueenZone.Modern`. Build the queue from:
-
-- An explicit list (`work on 15, 16, 17` / `#757 #758`), or
-- An epic's open children (e.g. #756).
-
-Fetch each issue when its turn starts (title, body, labels, acceptance criteria). Do not paste every issue body into this chat up front.
-
-**Scoreboard only in this chat** (one line per item): number, title, surface (`web` / `mobile` / `api` / `mixed`), status (`queued` / `blocked` / `in-progress` / `needs-retry` / `done` / `paused`), PR if any. After each child returns, drop the child's logs; keep the scoreboard.
-
-## Loop until done
-
-1. If order is unclear, spawn **planner** once with the issue numbers (not full bodies) and ask for dependency order, shared files, and web vs mobile. Confirm with the user only when the split is ambiguous, will open many PRs, or needs credentials/devices.
-2. Take the next unblocked item. Default is **one issue at a time**. Parallelize at most two implementers, and only when they do not share files and the user did not say "keep looping" as a single stream.
-3. Spawn **implementer** with a self-contained prompt (issue number, body or acceptance criteria, paths, tests, branch slug, "do not take sibling issues"). Isolated worktree/environment when overlapping files or each issue needs its own PR.
-4. Spawn **verifier** with that issue's acceptance criteria. Do not mark done on the implementer's word.
-5. If verifier fails: one retry implementer on the same issue, then **pause** (do not silently burn the rest of the queue).
-6. Pause for humans: Apple/Google/Bitwarden credentials, TestFlight/device checks, product questions. Then continue the queue.
-7. Repeat until the queue is empty or paused. Report the scoreboard.
-
-## Surfaces (website and mobile)
-
-This repo is both the ASP.NET site and `src/QueenZone.Mobile` (Expo, not in `QueenZone.sln`).
-
-| Surface | Typical paths | Tests |
+| Surface | Typical paths | Tests to name in child prompts |
 | --- | --- | --- |
 | Website | `src/QueenZone.Web`, Razor Pages | `dotnet test` on the touched test project |
 | API / data | `src/QueenZone.Web/Api`, `src/QueenZone.Data` | Web.Tests + coverage for changed `.cs` |
-| Mobile | `src/QueenZone.Mobile` | `npm test` / typecheck in that tree |
+| Mobile | `src/QueenZone.Mobile` (Expo, not in `QueenZone.sln`) | `npm test` / typecheck in that tree |
 
-Do not mix website UI and mobile UI in one implementer unless that single issue requires both. An API issue may still add a client call if the issue says so.
+Also enforce: SQL only in `QueenZone.Data`; visitor/admin pages as Razor Pages; no Expo Go as a supported runtime. If surface is mobile, tell the implementer to read `src/QueenZone.Mobile/README.md`.
 
-## Each implementer prompt must include
+## Loop
 
-- Issue number and title
-- Surface (`web` / `mobile` / `api` / `mixed`)
-- Paths it may touch
-- Acceptance criteria
-- Tests to run
-- Agent slug (`cursor/` unless the user named another)
-- "Do not expand scope. Do not take sibling issues."
+Same as issue-queue. Sequential only. Scoreboard in this chat; drop child logs.
 
-## QueenZone constraints
+1. **One issue** → skip planner. Two or more and order unclear → spawn planner once (issue numbers, not full bodies).
+2. Next unblocked item. One issue, one subagent at a time.
+3. **Implementer** (no PR). Wait.
+4. **Verifier**. Wait. Fail → one retry implementer, then pause.
+5. **Reviewer** once.
+   - Approve / nits → PR (nits in Follow-up).
+   - Request changes → one implementer response (blocking list verbatim) → verifier once → **do not review again**. Verifier pass → PR. Verifier fail → pause.
+6. `gh pr create` after merging `origin/main` into the branch.
+7. Repeat until the queue is empty or paused.
 
-Tell implementers to read `AGENTS.md`. You still enforce: no push to `main`; `{agent}/{task}` branches; SQL only in `QueenZone.Data`; visitor/admin pages as Razor Pages; mobile stays out of `QueenZone.sln`. One PR per issue unless the user asked to batch. `Closes #<n>` for that issue; `Relates to #<epic>` when there is a parent.
+A single issue is a valid queue (`work on #757`). Fetch each issue body when its turn starts.
+
+## Child prompts
+
+Implementer: issue, surface, paths, acceptance criteria, **named tests from the overlay table**, agent slug, no sibling issues, commit+push, no PR, no worktree.
+
+Review response: reviewer's blocking items verbatim, one pass, no new scope.
+
+Verifier: same named tests, no product edits, no PR, no worktree.
+
+Reviewer: single-pass, diff vs `origin/main`, no full test suite, no PR.

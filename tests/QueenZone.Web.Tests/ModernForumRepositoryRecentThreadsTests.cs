@@ -34,6 +34,7 @@ public sealed class ModernForumRepositoryRecentThreadsTests : IAsyncDisposable
         await SeedThreadAsync(lounge.Id, 2, legacyTopicId: 20, title: "Newest lounge", replyCount: 7, lastActivityAt: new DateTime(2026, 8, 3, 12, 0, 0, DateTimeKind.Utc), validated: true);
         await SeedThreadAsync(music.Id, 1, legacyTopicId: 11, title: "Unvalidated", replyCount: 9, lastActivityAt: new DateTime(2026, 8, 4, 12, 0, 0, DateTimeKind.Utc), validated: false);
         await SeedThreadAsync(music.Id, 1, legacyTopicId: 12, title: "Not a starter", replyCount: 1, lastActivityAt: new DateTime(2026, 8, 4, 13, 0, 0, DateTimeKind.Utc), validated: true, isStarter: false);
+        await SeedThreadAsync(music.Id, 1, legacyTopicId: 13, title: "Suspended starter", replyCount: 3, lastActivityAt: new DateTime(2026, 8, 5, 13, 0, 0, DateTimeKind.Utc), validated: true, isHidden: true);
 
         var recent = await repository.GetRecentThreadsAsync(10);
 
@@ -94,7 +95,8 @@ public sealed class ModernForumRepositoryRecentThreadsTests : IAsyncDisposable
         int replyCount,
         DateTime lastActivityAt,
         bool validated,
-        bool isStarter = true)
+        bool isStarter = true,
+        bool isHidden = false)
     {
         dbContext.ModernForumThreads.Add(new ModernForumThreadEntity
         {
@@ -109,6 +111,7 @@ public sealed class ModernForumRepositoryRecentThreadsTests : IAsyncDisposable
             IsLegacyTopicStarter = isStarter,
             LegacyDiscography = 0,
             StartedByUserValidated = validated,
+            IsHidden = isHidden,
             StarterAttachCount = 0,
             ImportedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
@@ -149,6 +152,7 @@ public sealed class ModernForumRepositoryRecentThreadsTests : IAsyncDisposable
                 IsLegacyTopicStarter INTEGER NOT NULL,
                 LegacyDiscography INTEGER NOT NULL,
                 StartedByUserValidated INTEGER NULL,
+                IsHidden INTEGER NOT NULL DEFAULT 0,
                 StarterAttachment TEXT NULL,
                 StarterFileSize TEXT NULL,
                 StarterAttachCount INTEGER NOT NULL,

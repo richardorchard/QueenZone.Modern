@@ -35,6 +35,7 @@ public sealed class EfMemberPublicActivityRepositoryTests : IAsyncDisposable
                 IsLegacyTopicStarter INTEGER NOT NULL,
                 LegacyDiscography INTEGER NOT NULL,
                 StartedByUserValidated INTEGER NULL,
+                IsHidden INTEGER NOT NULL DEFAULT 0,
                 StarterAttachment TEXT NULL,
                 StarterFileSize TEXT NULL,
                 StarterAttachCount INTEGER NOT NULL,

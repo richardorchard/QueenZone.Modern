@@ -30,7 +30,7 @@ public sealed class ActionModel(
 
         return RedirectWithMessage(
             id,
-            "Member suspended and their forum posts hidden. Their session will end on their next request.",
+            "Member suspended and their forum topics and posts hidden. Their session will end on their next request.",
             "success");
     }
 

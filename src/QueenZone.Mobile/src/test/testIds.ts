@@ -48,6 +48,8 @@ export const testIds = {
   profileSignedIn: 'profile-signed-in',
   profileDisplayName: 'profile-display-name',
   profileBack: 'profile-back',
+  profileRestoring: 'profile-restoring',
+  fanPerformanceSessionRestoring: 'fan-performance-session-restoring',
 
   signInClose: 'sign-in-close',
 

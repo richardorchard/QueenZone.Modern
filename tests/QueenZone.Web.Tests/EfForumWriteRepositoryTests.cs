@@ -165,8 +165,12 @@ public sealed class EfForumWriteRepositoryTests : IAsyncDisposable
             thread.TopicId, spammer.Id, spammer.DisplayName, "<p>Spam 2</p>", DateTimeOffset.UtcNow));
         await repository.CreatePostAsync(new NewForumPost(
             thread.TopicId, innocent.Id, innocent.DisplayName, "<p>Not spam</p>", DateTimeOffset.UtcNow));
+        var innocentThread = await repository.CreateThreadAsync(new NewForumThread(
+            1, innocent.Id, innocent.DisplayName, "Legitimate thread", "<p>Hello</p>", DateTimeOffset.UtcNow));
+        await repository.CreatePostAsync(new NewForumPost(
+            innocentThread.TopicId, spammer.Id, spammer.DisplayName, "<p>Spam reply</p>", DateTimeOffset.UtcNow));
 
-        Assert.Equal(2, await repository.CountApprovedPostsByMemberAsync(spammer.Id));
+        Assert.Equal(3, await repository.CountApprovedPostsByMemberAsync(spammer.Id));
 
         await repository.HidePostsByMemberAsync(spammer.Id);
 
@@ -174,16 +178,21 @@ public sealed class EfForumWriteRepositoryTests : IAsyncDisposable
         Assert.All(
             await dbContext.ModernForumPosts.AsNoTracking().Where(p => p.AuthorMemberId == spammer.Id).ToListAsync(),
             post => Assert.True(post.IsHidden));
-        Assert.False((await dbContext.ModernForumPosts.AsNoTracking().SingleAsync(p => p.AuthorMemberId == innocent.Id)).IsHidden);
+        Assert.All(
+            await dbContext.ModernForumPosts.AsNoTracking().Where(p => p.AuthorMemberId == innocent.Id).ToListAsync(),
+            post => Assert.False(post.IsHidden));
+        Assert.True((await dbContext.ModernForumThreads.AsNoTracking().SingleAsync(t => t.LegacyTopicId == thread.TopicId)).IsHidden);
+        Assert.False((await dbContext.ModernForumThreads.AsNoTracking().SingleAsync(t => t.LegacyTopicId == innocentThread.TopicId)).IsHidden);
         Assert.Equal(0, await repository.CountApprovedPostsByMemberAsync(spammer.Id));
-        Assert.Equal(1, await repository.CountApprovedPostsByMemberAsync(innocent.Id));
+        Assert.Equal(2, await repository.CountApprovedPostsByMemberAsync(innocent.Id));
 
         await repository.UnhidePostsByMemberAsync(spammer.Id);
 
         Assert.All(
             await dbContext.ModernForumPosts.AsNoTracking().Where(p => p.AuthorMemberId == spammer.Id).ToListAsync(),
             post => Assert.False(post.IsHidden));
-        Assert.Equal(2, await repository.CountApprovedPostsByMemberAsync(spammer.Id));
+        Assert.False((await dbContext.ModernForumThreads.AsNoTracking().SingleAsync(t => t.LegacyTopicId == thread.TopicId)).IsHidden);
+        Assert.Equal(3, await repository.CountApprovedPostsByMemberAsync(spammer.Id));
     }
 
     [Fact]
@@ -382,6 +391,7 @@ public sealed class EfForumWriteRepositoryTests : IAsyncDisposable
                 IsLegacyTopicStarter INTEGER NOT NULL,
                 LegacyDiscography INTEGER NOT NULL,
                 StartedByUserValidated INTEGER NULL,
+                IsHidden INTEGER NOT NULL DEFAULT 0,
                 StarterAttachment TEXT NULL,
                 StarterFileSize TEXT NULL,
                 StarterAttachCount INTEGER NOT NULL,
