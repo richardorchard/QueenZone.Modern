@@ -39,7 +39,7 @@ public sealed class PromptSettingsModel(
             confirmed: true,
             rowVersion,
             (expected, ct) => guidanceRepository.SaveDraftAsync(type, content ?? string.Empty, EditorEmail, expected, ct),
-            "Draft saved. Publish it to apply the overlay to future runs.",
+            "Draft saved. Publish it to apply the prompt to future runs.",
             cancellationToken);
 
     public Task<IActionResult> OnPostPublishAsync(
@@ -57,7 +57,7 @@ public sealed class PromptSettingsModel(
                 EditorEmail,
                 expected ?? throw new NewsAgentGuidanceConcurrencyException(),
                 ct),
-            "Published. Future triage and draft runs use this overlay within 60 seconds. Existing candidates are unchanged.",
+            "Published. Future runs use this prompt within 60 seconds. Existing candidates are unchanged.",
             cancellationToken);
 
     public Task<IActionResult> OnPostRollbackAsync(
@@ -151,7 +151,7 @@ public sealed class PromptSettingsModel(
         var compiledPrompt = type == NewsAgentGuidanceType.Triage
             ? NewsTriagePrompt.BuildCompiledSystemPrompt()
             : NewsDraftPrompt.BuildCompiledSystemPrompt();
-        var previewGuidance = draft?.Content ?? published?.Content;
+        var previewGuidance = draft?.Content ?? published?.Content ?? compiledPrompt;
         var composedPreview = type == NewsAgentGuidanceType.Triage
             ? NewsTriagePrompt.ComposeSystemPrompt(previewGuidance)
             : NewsDraftPrompt.ComposeSystemPrompt(previewGuidance);
@@ -209,7 +209,7 @@ public sealed record NewsAgentGuidanceSectionViewModel(
             string.Empty,
             []);
 
-    public string DraftContent => Draft?.Content ?? string.Empty;
+    public string DraftContent => Draft?.Content ?? Published?.Content ?? CompiledSystemPrompt;
 
     public string DraftRowVersion =>
         Draft is null ? string.Empty : Convert.ToBase64String(Draft.RowVersion);

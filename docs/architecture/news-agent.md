@@ -146,7 +146,7 @@ Authenticated admins use Razor Pages under `/admin/news-discovery`:
 | Route | Purpose |
 |-------|---------|
 | `/admin/news-discovery` | Filterable list (status, source, trust tier, confidence, entity, dates, has-draft) |
-| `/admin/news-discovery/prompt-settings` | Publish triage/draft editorial guidance overlays (future runs only) |
+| `/admin/news-discovery/prompt-settings` | Edit and publish the triage and draft system prompts (future runs only) |
 | `/admin/news-discovery/{id}` | Candidate detail: source URL, evidence, AI rationale, draft fields, AI provenance |
 | `/admin/news-discovery/{id}/edit-draft` | Edit generated draft fields |
 
@@ -161,17 +161,19 @@ Editor actions (POST, anti-forgery protected):
 
 Draft generation uses prompt version `draft-v4`, which requires exact band-member quotations to appear in both the body and a `preserved_quotes` collection backed by evidence. Unverifiable quotation marks are stripped before the draft is stored. Review pages surface preserved quotes for editor comparison before promotion.
 
-### Editorial guidance overlay (admin-editable)
+### System prompts (admin-editable)
 
-Admins can publish a short plain-text overlay for triage and draft runs from `/admin/news-discovery/prompt-settings`. This is **not** the compiled system prompt.
+Admins can edit and publish the complete triage and draft system prompts from `/admin/news-discovery/prompt-settings`. Until a prompt is published, the compiled prompt is shown and used as the default. Restoring the compiled default publishes an empty stored value so the current code-controlled prompt takes effect.
 
-- Compiled rules stay in `NewsTriagePrompt` (`triage-v2`) and `NewsDraftPrompt` (`draft-v4`): JSON schema, evidence, quotation, media-link, preservation, and safety.
-- Published overlay text is appended after those rules in a delimited untrusted block. Empty, missing, or invalid published guidance uses the compiled default (current behaviour).
+Published prompts are stored in the shared database. The local worker reads them at runtime, so later prompt edits do not require an application deployment.
+
+- Compiled defaults stay in `NewsTriagePrompt` (`triage-v2`) and `NewsDraftPrompt` (`draft-v4`). A published non-empty revision replaces the corresponding complete system prompt.
+- Empty, missing, or invalid published content uses the compiled default.
 - Revisions live in the EF table `NewsAgentGuidanceRevisions`. There is no seed. After migration, both types have no published row, so workers keep today's compiled prompts.
-- **Restore compiled default** publishes a new empty revision (`Content` `""`). History stays. The worker treats empty content as no overlay.
+- **Restore compiled default** publishes a new empty revision (`Content` `""`). History stays. The worker then uses the current compiled prompt.
 - Web and worker are separate processes. Published guidance is cached in-process with an **absolute 60 second** TTL. The web host may evict its cache on publish; the worker still waits up to 60 seconds. That TTL is the propagation contract.
 - If the database is down or a published row is invalid, the provider returns an empty snapshot (compiled default) and logs the guidance type plus fallback reason, never the guidance text.
-- Guidance affects **future runs only**. Existing candidates, AI results, and drafts are not rewritten. Each `NewsAiRun` stores compiled `PromptVersion` plus optional guidance revision id/number/hash, not the full overlay text.
+- Prompt changes affect **future runs only**. Existing candidates, AI results, and drafts are not rewritten. Each `NewsAiRun` stores compiled `PromptVersion` plus optional prompt revision id/number/hash, not the full prompt text.
 
 ### SQL Express mirror URL ingestion probe (opt-in)
 

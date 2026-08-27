@@ -63,9 +63,13 @@ public sealed partial class AdminNewsAgentGuidanceRoutesTests : IClassFixture<We
         Assert.Contains("/admin/news-discovery/prompt-settings", indexBody, StringComparison.Ordinal);
 
         var page = await client.GetStringAsync("/admin/news-discovery/prompt-settings");
-        Assert.Contains("future NewsAgent runs only", page, StringComparison.Ordinal);
+        Assert.Contains("complete system prompts", page, StringComparison.Ordinal);
         Assert.Contains("Using compiled default", page, StringComparison.Ordinal);
-        Assert.Contains("--- BEGIN ADMIN EDITORIAL GUIDANCE (untrusted) ---", page, StringComparison.Ordinal);
+        Assert.Contains("You triage discovered news items", page, StringComparison.Ordinal);
+        Assert.Contains("You draft QueenZone news articles", page, StringComparison.Ordinal);
+        Assert.Contains("action=\"/admin/news-discovery/prompt-settings?handler=SaveDraft\"", page, StringComparison.Ordinal);
+        Assert.Contains("action=\"/admin/news-discovery/prompt-settings?handler=Publish\"", page, StringComparison.Ordinal);
+        Assert.Contains("action=\"/admin/news-discovery/prompt-settings?handler=RestoreDefault\"", page, StringComparison.Ordinal);
         Assert.DoesNotContain("<script>alert(1)</script>", page, StringComparison.Ordinal);
 
         var save = await PostAsync(client, "/admin/news-discovery/prompt-settings?handler=SaveDraft", new Dictionary<string, string>
@@ -123,6 +127,42 @@ public sealed partial class AdminNewsAgentGuidanceRoutesTests : IClassFixture<We
         });
         Assert.Equal(HttpStatusCode.Redirect, restore.StatusCode);
         Assert.Equal(string.Empty, (await repository.GetPublishedAsync(NewsAgentGuidanceType.Triage))!.Content);
+    }
+
+    [Fact]
+    public async Task AuthorizedAdminCanEditAndPublishBothCompletePrompts()
+    {
+        var store = new SharedNewsAgentGuidanceStore();
+        var repository = new InMemoryNewsAgentGuidanceRepository(store);
+        var client = CreateClient(AdminEmail, store);
+
+        foreach (var (type, content) in new[]
+        {
+            (NewsAgentGuidanceType.Triage, "Edited triage prompt"),
+            (NewsAgentGuidanceType.Draft, "Edited summary prompt")
+        })
+        {
+            var save = await PostAsync(client, "/admin/news-discovery/prompt-settings?handler=SaveDraft", new Dictionary<string, string>
+            {
+                ["type"] = type.ToString(),
+                ["content"] = content,
+                ["rowVersion"] = string.Empty
+            });
+            Assert.Equal(HttpStatusCode.Redirect, save.StatusCode);
+
+            var draft = await repository.GetDraftAsync(type);
+            Assert.NotNull(draft);
+            Assert.Equal(content, draft.Content);
+
+            var publish = await PostAsync(client, "/admin/news-discovery/prompt-settings?handler=Publish", new Dictionary<string, string>
+            {
+                ["type"] = type.ToString(),
+                ["rowVersion"] = Convert.ToBase64String(draft.RowVersion),
+                ["confirm"] = "true"
+            });
+            Assert.Equal(HttpStatusCode.Redirect, publish.StatusCode);
+            Assert.Equal(content, (await repository.GetPublishedAsync(type))!.Content);
+        }
     }
 
     [Fact]

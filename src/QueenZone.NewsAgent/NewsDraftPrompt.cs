@@ -37,8 +37,8 @@ public static class NewsDraftPrompt
         Flag secondary_source_warning=true when the story relies only on secondary press or weaker evidence.
         """;
 
-    public static string ComposeSystemPrompt(string? editorialGuidance = null) =>
-        NewsAgentEditorialGuidance.AppendToSystemPrompt(BuildCompiledSystemPrompt(), editorialGuidance);
+    public static string ComposeSystemPrompt(string? publishedPrompt = null) =>
+        string.IsNullOrWhiteSpace(publishedPrompt) ? BuildCompiledSystemPrompt() : publishedPrompt.Trim();
 
     public static IReadOnlyList<NewsAiChatMessage> BuildMessages(
         NewsCandidate candidate,
