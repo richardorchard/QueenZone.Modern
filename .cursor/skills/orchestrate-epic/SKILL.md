@@ -1,6 +1,6 @@
 ---
 name: orchestrate-epic
-description: Coordinate a GitHub epic or a numbered issue list until each item is done. Use for "work on #15 #16 #17", epic child fan-out, and mixed website plus QueenZone.Mobile work. Pin as a Custom Mode. Do not auto-apply to ordinary single-task chats.
+description: Coordinate one GitHub issue, a numbered list, or an epic's children until each item is done. Use for "work on #757", "work on #15 #16 #17", and mixed website plus QueenZone.Mobile work. Pin as a Custom Mode. Do not auto-apply to ordinary single-task chats.
 disable-model-invocation: true
 icon: git-branch
 color: purple
@@ -26,8 +26,9 @@ Leave each subagent's frontmatter model in place. Do not pass a Task `model` ove
 
 ## Queue
 
-Work items are GitHub issues in `richardorchard/QueenZone.Modern`. Build the queue from:
+Work items are GitHub issues in `richardorchard/QueenZone.Modern`. A **single issue** is a valid queue (`work on #757`). Build the queue from:
 
+- One issue (`work on #757`),
 - An explicit list (`work on 15, 16, 17` / `#757 #758`), or
 - An epic's open children (e.g. #756).
 
@@ -51,6 +52,8 @@ Do **not** add these — they are why earlier runs felt stuck:
 
 - Isolated worktree / extra `dotnet restore` per child
 - Parallel implementers
+- Planner on a single-issue queue
+- A second reviewer pass after the implementer responds to comments
 - Reviewer re-running the full test suite (verifier already did)
 - Implementer or verifier running `dotnet test QueenZone.sln` when a named test project is enough
 - Parent at xhigh for scoreboard-only turns
@@ -58,15 +61,15 @@ Do **not** add these — they are why earlier runs felt stuck:
 
 ## Loop until done
 
-1. If order is unclear, spawn **planner** once with the issue numbers (not full bodies) and ask for dependency order, shared files, and web vs mobile. Confirm with the user only when the split is ambiguous, will open many PRs, or needs credentials/devices.
+1. If the queue has **exactly one issue**, skip **planner**. Fetch that issue and go to step 3. If there are two or more and order is unclear, spawn **planner** once with the issue numbers (not full bodies) and ask for dependency order, shared files, and web vs mobile. Confirm with the user only when the split is ambiguous, will open many PRs, or needs credentials/devices.
 2. Take the next unblocked item. One issue only.
 3. Spawn **implementer** with a self-contained prompt (issue number, body or acceptance criteria, paths, tests, branch slug, "do not take sibling issues", "do not open a PR"). Wait until it returns.
 4. Spawn **verifier** with that issue's acceptance criteria and branch. Do not mark done on the implementer's word. Wait until it returns.
 5. If verifier fails: one retry implementer on the same issue, then **pause** (do not silently burn the rest of the queue).
-6. Spawn **reviewer** on the same branch. Wait until it returns.
-   - **Request changes**: one retry implementer, then re-run verifier then reviewer. If still blocking, **pause**.
-   - **Approve** or **Nits only**: continue.
-7. Open **one PR** for that issue (`gh pr create`, fill `.github/pull_request_template.md`). Fetch `origin/main` and merge it into the branch first. `Closes #<n>` for that issue; `Relates to #<epic>` when there is a parent. Include reviewer nits in Follow-up when the verdict was nits-only.
+6. Spawn **reviewer** once on the same branch. Wait until it returns. This is the only review for that issue.
+   - **Approve** or **Nits only**: open the PR. Put nits in Follow-up.
+   - **Request changes**: spawn **implementer** once more with the reviewer's blocking items copied verbatim. That implementer addresses those comments only (one response). Then spawn **verifier** once on the updated branch. Do **not** spawn reviewer again. If verifier passes, open the PR and list any leftover disagreement in Follow-up. If verifier fails after that one response, **pause**.
+7. Open **one PR** for that issue (`gh pr create`, fill `.github/pull_request_template.md`). Fetch `origin/main` and merge it into the branch first. `Closes #<n>` for that issue; `Relates to #<epic>` when there is a parent.
 8. Pause for humans: Apple/Google/Bitwarden credentials, TestFlight/device checks, product questions. Then continue the queue.
 9. Repeat until the queue is empty or paused. Report the scoreboard.
 
@@ -94,6 +97,11 @@ Do not mix website UI and mobile UI in one implementer unless that single issue 
 - "Commit and push the branch. Do not open a pull request."
 - "Do not create a git worktree. Do not restore packages unless they are missing."
 
+When the implementer is the **one response to review**, also include:
+
+- The reviewer's blocking items, copied verbatim
+- "Address only these review comments. Do not start new scope. One pass. Commit and push. Do not open a PR."
+
 ## Each verifier prompt must include
 
 - Issue number, branch, acceptance criteria, paths
@@ -103,6 +111,7 @@ Do not mix website UI and mobile UI in one implementer unless that single issue 
 ## Each reviewer prompt must include
 
 - Issue number, branch, surface, paths, acceptance criteria
+- "Single-pass review. Do not expect a second look. List every blocking item the implementer must fix in one response."
 - "Review the diff against origin/main. Do not re-run the full test suite. Do not open a PR."
 
 ## QueenZone constraints

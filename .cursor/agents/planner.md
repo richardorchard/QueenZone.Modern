@@ -1,6 +1,6 @@
 ---
 name: planner
-description: Read-only planner for a GitHub epic or a list of issue numbers. Use before a loop of implementers to order work, mark web vs mobile vs API, and flag shared files. Do not write code.
+description: Read-only planner for a GitHub epic or two or more issue numbers. Use before a loop of implementers to order work, mark web vs mobile vs API, and flag shared files. Do not use when the queue is a single issue. Do not write code.
 model: grok-4.6[effort=high]
 readonly: true
 ---
