@@ -1,7 +1,12 @@
 import { Platform } from 'react-native';
 import type { WidgetTaskHandlerProps } from 'react-native-android-widget';
 import { fetchOnThisDay, fetchRandomQuote } from '../api/content';
-import { readCachedWidgetProps, writeCachedWidgetProps, writeLastWidgetRefreshAt } from './widgetCache';
+import {
+  readCachedWidgetProps,
+  readLastWidgetRefreshAt,
+  writeCachedWidgetProps,
+  writeLastWidgetRefreshAt,
+} from './widgetCache';
 import { widgetTaskHandler } from './widgetTaskHandler';
 
 jest.mock('./widgetCache', () => ({
@@ -27,6 +32,7 @@ jest.mock('react-native-android-widget', () => ({
 const readCached = readCachedWidgetProps as jest.MockedFunction<typeof readCachedWidgetProps>;
 const writeCached = writeCachedWidgetProps as jest.MockedFunction<typeof writeCachedWidgetProps>;
 const writeRefreshAt = writeLastWidgetRefreshAt as jest.MockedFunction<typeof writeLastWidgetRefreshAt>;
+const readRefreshAt = readLastWidgetRefreshAt as jest.MockedFunction<typeof readLastWidgetRefreshAt>;
 const fetchDay = fetchOnThisDay as jest.MockedFunction<typeof fetchOnThisDay>;
 const fetchQuote = fetchRandomQuote as jest.MockedFunction<typeof fetchRandomQuote>;
 
@@ -49,6 +55,8 @@ describe('widgetTaskHandler', () => {
     readCached.mockResolvedValue(cachedProps);
     writeCached.mockClear();
     writeRefreshAt.mockClear();
+    readRefreshAt.mockReset();
+    readRefreshAt.mockResolvedValue(null);
     fetchDay.mockReset();
     fetchQuote.mockReset();
   });
@@ -112,6 +120,52 @@ describe('widgetTaskHandler', () => {
     expect(writeCached).not.toHaveBeenCalled();
     expect(readCached).toHaveBeenCalled();
     expect(props.renderWidget).toHaveBeenCalled();
+  });
+
+  it('keeps the last good quote when the quote fetch fails', async () => {
+    fetchDay.mockResolvedValue({
+      id: 1,
+      title: 'The Game',
+      summary: 'Queen released The Game.',
+      eventDate: '1980-06-30',
+      formattedDate: '30 June 1980',
+      category: 'music',
+      categoryLabel: 'Release',
+      sourceUrl: null,
+    });
+    fetchQuote.mockRejectedValue(new Error('offline'));
+
+    const props = handlerProps('WIDGET_UPDATE');
+    await widgetTaskHandler(props);
+
+    expect(writeCached).toHaveBeenCalledWith({
+      formattedDate: '30 June 1980',
+      summary: 'Queen released The Game.',
+      quoteText: 'A kind of magic',
+      quoteWhoSaid: 'Freddie Mercury',
+    });
+    expect(props.renderWidget).toHaveBeenCalled();
+  });
+
+  it('still fetches a quote when on-this-day is skipped for the same day', async () => {
+    const now = 1_700_000_000_000;
+    jest.spyOn(Date, 'now').mockReturnValue(now);
+    readRefreshAt.mockResolvedValue(now - 4 * 60 * 60 * 1000);
+    fetchQuote.mockResolvedValue({ id: 3, text: 'Rolled quote', whoSaid: 'Roger Taylor' });
+
+    const props = handlerProps('WIDGET_UPDATE');
+    await widgetTaskHandler(props);
+
+    expect(fetchDay).not.toHaveBeenCalled();
+    expect(fetchQuote).toHaveBeenCalledTimes(1);
+    expect(writeCached).toHaveBeenCalledWith({
+      formattedDate: undefined,
+      summary: undefined,
+      quoteText: 'Rolled quote',
+      quoteWhoSaid: 'Roger Taylor',
+    });
+    expect(props.renderWidget).toHaveBeenCalled();
+    jest.spyOn(Date, 'now').mockRestore();
   });
 
   it('does not render on delete', async () => {

@@ -33,7 +33,7 @@ describe('OnThisDayAndroidWidget', () => {
       { navigation: false },
     );
 
-    expect(screen.getByText('QUOTE OF THE DAY')).toBeOnTheScreen();
+    expect(screen.getByText('QUOTE')).toBeOnTheScreen();
     expect(screen.getByText('“A kind of magic” — Freddie Mercury')).toBeOnTheScreen();
   });
 

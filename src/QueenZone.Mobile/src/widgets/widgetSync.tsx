@@ -4,15 +4,23 @@ import { Platform } from 'react-native';
 import { fetchOnThisDay, fetchRandomQuote } from '../api/content';
 import type { RandomQuote, TimelineEvent } from '../api/types';
 import type { OnThisDayAndroidWidgetProps } from './OnThisDayAndroidWidget';
-import { readLastWidgetRefreshAt, writeCachedWidgetProps, writeLastWidgetRefreshAt } from './widgetCache';
+import {
+  readCachedWidgetProps,
+  readLastWidgetRefreshAt,
+  writeCachedWidgetProps,
+  writeLastWidgetRefreshAt,
+} from './widgetCache';
 
 export const HOME_WIDGET_BACKGROUND_TASK = 'queenzone-home-widget-refresh';
 
-/** Android `updatePeriodMillis` and the iOS timeline hold. Hours, not real-time. */
+/** Android `updatePeriodMillis` and the iOS quote timeline hold. Hours, not real-time. */
 export const WIDGET_REFRESH_INTERVAL_MS = 4 * 60 * 60 * 1000;
 
-/** Skip a background fetch when the last successful push was this recent. */
+/** Skip a quote fetch when the last successful push was this recent. */
 export const WIDGET_REFRESH_MIN_INTERVAL_MS = 3 * 60 * 60 * 1000;
+
+/** Spread `/quotes/random` hits so devices do not all refresh on the hour. */
+export const WIDGET_QUOTE_REFRESH_JITTER_MS = 30 * 60 * 1000;
 
 /** iOS BGTaskScheduler minimum interval, in minutes. Matches the 4-hour Android period. */
 export const WIDGET_BACKGROUND_MIN_INTERVAL_MINUTES = 240;
@@ -21,6 +29,21 @@ export type WidgetContent = {
   onThisDay: TimelineEvent | null;
   quote: RandomQuote | null;
 };
+
+export function nextQuoteRefreshDelayMs(random: () => number = Math.random): number {
+  const unit = Math.min(Math.max(random(), 0), 1);
+  return WIDGET_REFRESH_INTERVAL_MS + Math.floor(unit * WIDGET_QUOTE_REFRESH_JITTER_MS);
+}
+
+export function isSameLocalCalendarDay(leftMs: number, rightMs: number): boolean {
+  const left = new Date(leftMs);
+  const right = new Date(rightMs);
+  return (
+    left.getFullYear() === right.getFullYear() &&
+    left.getMonth() === right.getMonth() &&
+    left.getDate() === right.getDate()
+  );
+}
 
 function toWidgetProps(content: WidgetContent): OnThisDayAndroidWidgetProps {
   return {
@@ -31,11 +54,34 @@ function toWidgetProps(content: WidgetContent): OnThisDayAndroidWidgetProps {
   };
 }
 
+function quoteFromProps(props: OnThisDayAndroidWidgetProps): RandomQuote | null {
+  if (!props.quoteText || !props.quoteWhoSaid) {
+    return null;
+  }
+  return { id: 0, text: props.quoteText, whoSaid: props.quoteWhoSaid };
+}
+
+function dayFromProps(props: OnThisDayAndroidWidgetProps): TimelineEvent | null {
+  if (!props.formattedDate || !props.summary) {
+    return null;
+  }
+  return {
+    id: 0,
+    title: '',
+    summary: props.summary,
+    eventDate: '',
+    formattedDate: props.formattedDate,
+    category: '',
+    categoryLabel: '',
+    sourceUrl: null,
+  };
+}
+
 function iosTimelineEntries(props: OnThisDayAndroidWidgetProps) {
   const now = Date.now();
   return [
     { date: new Date(now), props },
-    { date: new Date(now + WIDGET_REFRESH_INTERVAL_MS), props },
+    { date: new Date(now + nextQuoteRefreshDelayMs()), props },
   ];
 }
 
@@ -51,6 +97,7 @@ function hasWidgetContent(content: WidgetContent): boolean {
  */
 export async function syncHomeWidget(content: WidgetContent): Promise<void> {
   const props = toWidgetProps(content);
+  await writeCachedWidgetProps(props);
 
   if (Platform.OS === 'ios') {
     // eslint-disable-next-line @typescript-eslint/no-require-imports -- platform-gated: this module must not load on Android, where expo-widgets has no native counterpart.
@@ -63,7 +110,6 @@ export async function syncHomeWidget(content: WidgetContent): Promise<void> {
   }
 
   if (Platform.OS === 'android') {
-    await writeCachedWidgetProps(props);
     // eslint-disable-next-line @typescript-eslint/no-require-imports -- lazy so iOS bundles never touch the Android-only widget module.
     const { requestWidgetUpdate } = require('react-native-android-widget') as typeof import('react-native-android-widget');
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -86,22 +132,58 @@ async function shouldSkipBackgroundRefresh(): Promise<boolean> {
   return Date.now() - last < WIDGET_REFRESH_MIN_INTERVAL_MS;
 }
 
+function shouldFetchOnThisDay(lastRefreshAt: number | null, now: number): boolean {
+  return lastRefreshAt == null || !isSameLocalCalendarDay(lastRefreshAt, now);
+}
+
 /**
- * Fetches on-this-day plus a new random quote and pushes them to the widget.
- * Returns false when the fetch or push fails so the last good snapshot stays up.
+ * Fetches a new random quote (and on-this-day when the calendar day changed) and
+ * pushes them to the widget. A failed quote fetch keeps the last good quote.
+ * Returns false when nothing new could be fetched so the last snapshot stays up.
  */
 export async function refreshHomeWidget(): Promise<boolean> {
   if (await shouldSkipBackgroundRefresh()) {
     return true;
   }
 
-  try {
-    const [onThisDay, quote] = await Promise.all([fetchOnThisDay(), fetchRandomQuote()]);
-    await syncHomeWidget({ onThisDay, quote });
-    return true;
-  } catch {
+  const cached = await readCachedWidgetProps();
+  let quote = quoteFromProps(cached);
+  let onThisDay = dayFromProps(cached);
+  const dayDue = shouldFetchOnThisDay(await readLastWidgetRefreshAt(), Date.now());
+
+  let quoteFetched = false;
+  let dayFetched = false;
+
+  const quoteTask = fetchRandomQuote()
+    .then((fresh) => {
+      if (fresh) {
+        quote = fresh;
+      }
+      quoteFetched = true;
+    })
+    .catch(() => {
+      /* last good quote stays */
+    });
+
+  const dayTask = dayDue
+    ? fetchOnThisDay()
+        .then((fresh) => {
+          onThisDay = fresh;
+          dayFetched = true;
+        })
+        .catch(() => {
+          /* last good on-this-day stays */
+        })
+    : Promise.resolve();
+
+  await Promise.all([quoteTask, dayTask]);
+
+  if (!quoteFetched && !dayFetched) {
     return false;
   }
+
+  await syncHomeWidget({ onThisDay, quote });
+  return true;
 }
 
 export async function runHomeWidgetBackgroundRefresh(): Promise<BackgroundTask.BackgroundTaskResult> {

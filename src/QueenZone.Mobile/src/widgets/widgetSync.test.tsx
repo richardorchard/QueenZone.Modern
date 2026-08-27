@@ -5,14 +5,22 @@ import { fetchOnThisDay, fetchRandomQuote } from '../api/content';
 import {
   HOME_WIDGET_BACKGROUND_TASK,
   WIDGET_BACKGROUND_MIN_INTERVAL_MINUTES,
+  WIDGET_QUOTE_REFRESH_JITTER_MS,
   WIDGET_REFRESH_INTERVAL_MS,
   defineHomeWidgetBackgroundTask,
+  isSameLocalCalendarDay,
+  nextQuoteRefreshDelayMs,
   refreshHomeWidget,
   registerHomeWidgetBackgroundRefresh,
   runHomeWidgetBackgroundRefresh,
   syncHomeWidget,
 } from './widgetSync';
-import { readLastWidgetRefreshAt, writeCachedWidgetProps, writeLastWidgetRefreshAt } from './widgetCache';
+import {
+  readCachedWidgetProps,
+  readLastWidgetRefreshAt,
+  writeCachedWidgetProps,
+  writeLastWidgetRefreshAt,
+} from './widgetCache';
 
 const mockUpdateSnapshot = jest.fn();
 const mockUpdateTimeline = jest.fn();
@@ -22,6 +30,7 @@ jest.mock('./widgetCache', () => ({
   writeCachedWidgetProps: jest.fn().mockResolvedValue(undefined),
   writeLastWidgetRefreshAt: jest.fn().mockResolvedValue(undefined),
   readLastWidgetRefreshAt: jest.fn().mockResolvedValue(null),
+  readCachedWidgetProps: jest.fn().mockResolvedValue({}),
 }));
 
 jest.mock('./OnThisDayWidget.ios', () => ({
@@ -47,6 +56,7 @@ jest.mock('../api/content', () => ({
 const writeCached = writeCachedWidgetProps as jest.MockedFunction<typeof writeCachedWidgetProps>;
 const writeRefreshAt = writeLastWidgetRefreshAt as jest.MockedFunction<typeof writeLastWidgetRefreshAt>;
 const readRefreshAt = readLastWidgetRefreshAt as jest.MockedFunction<typeof readLastWidgetRefreshAt>;
+const readCached = readCachedWidgetProps as jest.MockedFunction<typeof readCachedWidgetProps>;
 const fetchDay = fetchOnThisDay as jest.MockedFunction<typeof fetchOnThisDay>;
 const fetchQuote = fetchRandomQuote as jest.MockedFunction<typeof fetchRandomQuote>;
 const defineTask = TaskManager.defineTask as jest.MockedFunction<typeof TaskManager.defineTask>;
@@ -91,6 +101,8 @@ describe('syncHomeWidget', () => {
     writeRefreshAt.mockClear();
     readRefreshAt.mockReset();
     readRefreshAt.mockResolvedValue(null);
+    readCached.mockReset();
+    readCached.mockResolvedValue({});
     fetchDay.mockReset();
     fetchQuote.mockReset();
     defineTask.mockClear();
@@ -104,6 +116,7 @@ describe('syncHomeWidget', () => {
     Object.defineProperty(Platform, 'OS', { value: 'ios' });
     const now = 1_700_000_000_000;
     jest.spyOn(Date, 'now').mockReturnValue(now);
+    jest.spyOn(Math, 'random').mockReturnValue(0);
 
     await syncHomeWidget(content);
 
@@ -115,6 +128,23 @@ describe('syncHomeWidget', () => {
     expect(mockRequestWidgetUpdate).not.toHaveBeenCalled();
     expect(writeRefreshAt).toHaveBeenCalledWith(now);
     jest.spyOn(Date, 'now').mockRestore();
+    jest.spyOn(Math, 'random').mockRestore();
+  });
+
+  it('adds jitter so the iOS quote reload is not on the hour', async () => {
+    Object.defineProperty(Platform, 'OS', { value: 'ios' });
+    const now = 1_700_000_000_000;
+    jest.spyOn(Date, 'now').mockReturnValue(now);
+    jest.spyOn(Math, 'random').mockReturnValue(0.5);
+
+    await syncHomeWidget(content);
+
+    expect(mockUpdateTimeline).toHaveBeenCalledWith([
+      { date: new Date(now), props: widgetProps },
+      { date: new Date(now + WIDGET_REFRESH_INTERVAL_MS + WIDGET_QUOTE_REFRESH_JITTER_MS / 2), props: widgetProps },
+    ]);
+    jest.spyOn(Date, 'now').mockRestore();
+    jest.spyOn(Math, 'random').mockRestore();
   });
 
   it('caches props and requests an Android update', async () => {
@@ -134,12 +164,15 @@ describe('refreshHomeWidget', () => {
 
   afterEach(() => {
     Object.defineProperty(Platform, 'OS', { value: originalOs });
+    jest.restoreAllMocks();
     mockUpdateTimeline.mockClear();
     mockRequestWidgetUpdate.mockClear();
     writeCached.mockClear();
     writeRefreshAt.mockClear();
     readRefreshAt.mockReset();
     readRefreshAt.mockResolvedValue(null);
+    readCached.mockReset();
+    readCached.mockResolvedValue({});
     fetchDay.mockReset();
     fetchQuote.mockReset();
   });
@@ -158,16 +191,57 @@ describe('refreshHomeWidget', () => {
     );
   });
 
-  it('does not replace the last snapshot when a fetch fails', async () => {
+  it('does not replace the last snapshot when both fetches fail', async () => {
     Object.defineProperty(Platform, 'OS', { value: 'android' });
     fetchDay.mockRejectedValue(new Error('offline'));
-    fetchQuote.mockResolvedValue(content.quote);
+    fetchQuote.mockRejectedValue(new Error('offline'));
 
     await expect(refreshHomeWidget()).resolves.toBe(false);
 
     expect(writeCached).not.toHaveBeenCalled();
     expect(writeRefreshAt).not.toHaveBeenCalled();
     expect(mockRequestWidgetUpdate).not.toHaveBeenCalled();
+  });
+
+  it('keeps the last good quote when the quote fetch fails', async () => {
+    Object.defineProperty(Platform, 'OS', { value: 'android' });
+    readCached.mockResolvedValue({
+      quoteText: 'A kind of magic',
+      quoteWhoSaid: 'Freddie Mercury',
+    });
+    fetchDay.mockResolvedValue(content.onThisDay);
+    fetchQuote.mockRejectedValue(new Error('offline'));
+
+    await expect(refreshHomeWidget()).resolves.toBe(true);
+
+    expect(writeCached).toHaveBeenCalledWith({
+      formattedDate: '30 June 1980',
+      summary: 'Queen released The Game.',
+      quoteText: 'A kind of magic',
+      quoteWhoSaid: 'Freddie Mercury',
+    });
+    expect(mockRequestWidgetUpdate).toHaveBeenCalled();
+  });
+
+  it('skips on-this-day when the last refresh was the same calendar day', async () => {
+    Object.defineProperty(Platform, 'OS', { value: 'android' });
+    const now = 1_700_000_000_000;
+    jest.spyOn(Date, 'now').mockReturnValue(now);
+    readRefreshAt.mockResolvedValue(now - 4 * 60 * 60 * 1000);
+    readCached.mockResolvedValue(widgetProps);
+    fetchQuote.mockResolvedValue({ id: 2, text: 'New quote', whoSaid: 'Brian May' });
+
+    await expect(refreshHomeWidget()).resolves.toBe(true);
+
+    expect(fetchDay).not.toHaveBeenCalled();
+    expect(fetchQuote).toHaveBeenCalledTimes(1);
+    expect(writeCached).toHaveBeenCalledWith({
+      formattedDate: '30 June 1980',
+      summary: 'Queen released The Game.',
+      quoteText: 'New quote',
+      quoteWhoSaid: 'Brian May',
+    });
+    jest.spyOn(Date, 'now').mockRestore();
   });
 
   it('skips a fetch when the last successful push was recent', async () => {
@@ -203,6 +277,8 @@ describe('runHomeWidgetBackgroundRefresh', () => {
     fetchQuote.mockReset();
     readRefreshAt.mockReset();
     readRefreshAt.mockResolvedValue(null);
+    readCached.mockReset();
+    readCached.mockResolvedValue({});
     writeCached.mockClear();
     writeRefreshAt.mockClear();
   });
@@ -283,5 +359,21 @@ describe('registerHomeWidgetBackgroundRefresh', () => {
 
     const executor = defineTask.mock.calls.at(-1)?.[1] as () => Promise<BackgroundTask.BackgroundTaskResult>;
     await expect(executor()).resolves.toBe(BackgroundTask.BackgroundTaskResult.Success);
+  });
+});
+
+describe('quote cadence helpers', () => {
+  it('keeps the quote interval in hours and adds up to 30 minutes of jitter', () => {
+    expect(nextQuoteRefreshDelayMs(() => 0)).toBe(WIDGET_REFRESH_INTERVAL_MS);
+    expect(nextQuoteRefreshDelayMs(() => 1)).toBe(WIDGET_REFRESH_INTERVAL_MS + WIDGET_QUOTE_REFRESH_JITTER_MS);
+    expect(WIDGET_REFRESH_INTERVAL_MS).toBe(4 * 60 * 60 * 1000);
+    expect(WIDGET_QUOTE_REFRESH_JITTER_MS).toBe(30 * 60 * 1000);
+  });
+
+  it('treats midnight as a new local calendar day', () => {
+    const late = Date.parse('2026-08-27T23:00:00');
+    const nextMorning = Date.parse('2026-08-28T01:00:00');
+    expect(isSameLocalCalendarDay(late, late)).toBe(true);
+    expect(isSameLocalCalendarDay(late, nextMorning)).toBe(false);
   });
 });

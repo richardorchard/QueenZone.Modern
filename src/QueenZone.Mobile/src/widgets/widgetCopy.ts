@@ -14,7 +14,7 @@ export function widgetHasQuote(props: WidgetProps): boolean {
 }
 
 export function widgetEyebrow(hasDay: boolean): string {
-  return hasDay ? 'ON THIS DAY' : 'QUOTE OF THE DAY';
+  return hasDay ? 'ON THIS DAY' : 'QUOTE';
 }
 
 export function widgetDayText(props: WidgetProps): string {

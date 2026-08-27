@@ -10,8 +10,9 @@ async function renderCachedWidget(props: WidgetTaskHandlerProps): Promise<void> 
 
 /**
  * Android-only. Runs headless (system-triggered add/resize/periodic update, per
- * `updatePeriodMillis` in app.json). Periodic `WIDGET_UPDATE` fetches on-this-day
- * plus a new random quote; add/resize redraw from the last good cache.
+ * `updatePeriodMillis` in app.json). Periodic `WIDGET_UPDATE` fetches a new random
+ * quote (~4 hours) and on-this-day only when the calendar day changed; add/resize
+ * redraw from the last good cache. A failed quote fetch keeps the previous quote.
  */
 export async function widgetTaskHandler(props: WidgetTaskHandlerProps): Promise<void> {
   switch (props.widgetAction) {
