@@ -217,7 +217,11 @@ public static class ContentApiEndpoints
             events = await publicQueryCache.GetAroundThisDayAsync(today, 7, 1, cancellationToken);
         }
 
-        return Results.Ok(events.Count > 0 ? ContentApiMapper.ToTimelineEvent(events[0]) : null);
+        // ASP.NET Core Ok(null) / Json(null) write an empty 200. The contract is JSON null.
+        TimelineEventDto? payload = events.Count > 0 ? ContentApiMapper.ToTimelineEvent(events[0]) : null;
+        return payload is null
+            ? Results.Content("null", "application/json")
+            : Results.Ok(payload);
     }
 
     internal static async Task<IResult> GetLiveActivityAsync(
