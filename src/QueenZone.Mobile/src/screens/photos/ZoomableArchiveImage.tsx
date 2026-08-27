@@ -14,6 +14,7 @@ import {
   photoSwipeEdgeGuardPx,
   photoSwipeMaxOffAxisPx,
   photoSwipeShouldStart,
+  photoSwipeTapSlopPx,
   type PhotoSwipeDirection,
 } from './photoGalleryMeta';
 import {
@@ -241,6 +242,7 @@ export function ZoomableArchiveImage({
     const doubleTapGesture = Gesture.Tap()
       .numberOfTaps(2)
       .maxDuration(250)
+      .maxDistance(photoSwipeTapSlopPx)
       .onEnd((event) => {
         if (isPhotoZoomed(scale.value)) {
           resetZoomAnimated(true);
@@ -273,8 +275,12 @@ export function ZoomableArchiveImage({
         runOnJS(announceAndTrackZoom)(newScale);
       });
 
+    // Cap movement so a swipe that lifts within the tap window (a fast flick)
+    // fails this gesture instead of winning the Exclusive race and eating the
+    // touch before `galleryPan` gets a chance to activate.
     const singleTapGesture = Gesture.Tap()
       .runOnJS(true)
+      .maxDistance(photoSwipeTapSlopPx)
       .onEnd(() => {
         toggleChrome();
       });
