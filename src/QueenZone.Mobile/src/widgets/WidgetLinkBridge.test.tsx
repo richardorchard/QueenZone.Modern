@@ -1,6 +1,7 @@
 import { act, waitFor } from '@testing-library/react-native';
 import * as Linking from 'expo-linking';
 import { WidgetLinkBridge } from './WidgetLinkBridge';
+import { resetInitialWidgetUrlConsumption } from './widgetDeepLink';
 import { renderWithProviders } from '../test/render';
 
 const mockNavigate = jest.fn();
@@ -21,8 +22,14 @@ jest.mock('expo-linking', () => ({
 const getInitialURL = Linking.getInitialURL as jest.MockedFunction<typeof Linking.getInitialURL>;
 const addEventListener = Linking.addEventListener as jest.MockedFunction<typeof Linking.addEventListener>;
 
+const homeDestination = {
+  screen: 'HomeTab',
+  params: { screen: 'Home', initial: false },
+};
+
 describe('WidgetLinkBridge', () => {
   beforeEach(() => {
+    resetInitialWidgetUrlConsumption();
     mockNavigate.mockClear();
     getInitialURL.mockReset();
     addEventListener.mockReset();
@@ -30,19 +37,21 @@ describe('WidgetLinkBridge', () => {
     addEventListener.mockReturnValue({ remove: jest.fn() } as never);
   });
 
-  it('opens Timeline when launched from the widget URL', async () => {
+  it('opens Home when launched from the widget URL', async () => {
+    getInitialURL.mockResolvedValue('queenzone://home');
+    renderWithProviders(<WidgetLinkBridge />);
+
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('Tabs', homeDestination));
+  });
+
+  it('still opens Home from the older timeline widget URL', async () => {
     getInitialURL.mockResolvedValue('queenzone://timeline');
     renderWithProviders(<WidgetLinkBridge />);
 
-    await waitFor(() =>
-      expect(mockNavigate).toHaveBeenCalledWith('Tabs', {
-        screen: 'ArchiveTab',
-        params: { screen: 'Timeline', params: {}, initial: false },
-      }),
-    );
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('Tabs', homeDestination));
   });
 
-  it('opens Timeline from a later url event', async () => {
+  it('opens Home from a later url event', async () => {
     let handler: ((event: { url: string }) => void) | undefined;
     addEventListener.mockImplementation((_type, next) => {
       handler = next as (event: { url: string }) => void;
@@ -53,13 +62,42 @@ describe('WidgetLinkBridge', () => {
     await waitFor(() => expect(addEventListener).toHaveBeenCalled());
 
     await act(async () => {
-      handler?.({ url: 'queenzone://timeline' });
+      handler?.({ url: 'queenzone://home' });
     });
 
-    expect(mockNavigate).toHaveBeenCalledWith('Tabs', {
-      screen: 'ArchiveTab',
-      params: { screen: 'Timeline', params: {}, initial: false },
+    expect(mockNavigate).toHaveBeenCalledWith('Tabs', homeDestination);
+  });
+
+  it('does not re-apply the launch URL when the root navigator remounts', async () => {
+    getInitialURL.mockResolvedValue('queenzone://home');
+    const first = renderWithProviders(<WidgetLinkBridge />);
+
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledTimes(1));
+    first.unmount();
+    mockNavigate.mockClear();
+
+    renderWithProviders(<WidgetLinkBridge />);
+    await waitFor(() => expect(getInitialURL).toHaveBeenCalledTimes(2));
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it('still handles a later widget tap after the launch URL was consumed', async () => {
+    let handler: ((event: { url: string }) => void) | undefined;
+    addEventListener.mockImplementation((_type, next) => {
+      handler = next as (event: { url: string }) => void;
+      return { remove: jest.fn() } as never;
     });
+    getInitialURL.mockResolvedValue('queenzone://home');
+    renderWithProviders(<WidgetLinkBridge />);
+
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledTimes(1));
+    mockNavigate.mockClear();
+
+    await act(async () => {
+      handler?.({ url: 'queenzone://home' });
+    });
+
+    expect(mockNavigate).toHaveBeenCalledWith('Tabs', homeDestination);
   });
 
   it('ignores unrelated deep links', async () => {

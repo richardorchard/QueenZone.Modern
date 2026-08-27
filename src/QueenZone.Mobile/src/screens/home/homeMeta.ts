@@ -51,8 +51,18 @@ export function formatGalleryCardMeta(category: { imageCount: number }): string 
   return `${category.imageCount.toLocaleString()} images`;
 }
 
-export function onThisDayIsVisible(event: TimelineEvent | null): event is TimelineEvent {
-  return event !== null;
+export type HomeQuote = { text: string; whoSaid: string };
+
+/** The Home card stays up for an event, a quote, or both — quote-only days still need a surface. */
+export function onThisDayIsVisible(
+  event: TimelineEvent | null,
+  quote: HomeQuote | null = null,
+): boolean {
+  return event !== null || quote !== null;
+}
+
+export function onThisDayEyebrow(event: TimelineEvent | null): string {
+  return event ? 'On this day' : 'Quote';
 }
 
 export function liveStripIsVisible(newForumRepliesToday: number): boolean {

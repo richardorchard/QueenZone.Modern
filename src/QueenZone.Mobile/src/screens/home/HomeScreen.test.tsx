@@ -320,6 +320,21 @@ describe('HomeScreen', () => {
         quote: { id: 9, text: 'A kind of magic', whoSaid: 'Freddie Mercury' },
       }),
     );
+    expect(screen.getByText('“A kind of magic”')).toBeOnTheScreen();
+    expect(screen.getByText('Quote')).toBeOnTheScreen();
+    await flushVirtualizedList();
+  });
+
+  it('shows the quote card when there is no on-this-day event', async () => {
+    fetchDay.mockResolvedValue(null);
+    fetchQuote.mockResolvedValue({ id: 9, text: 'A kind of magic', whoSaid: 'Freddie Mercury' });
+    renderHome();
+
+    await waitFor(() => expect(screen.getByText('“A kind of magic”')).toBeOnTheScreen());
+    expect(screen.getByText('— Freddie Mercury')).toBeOnTheScreen();
+    expect(screen.getByText('Quote')).toBeOnTheScreen();
+    expect(screen.queryByText('Queen released The Game.')).not.toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'View timeline' })).toBeOnTheScreen();
     await flushVirtualizedList();
   });
 });
