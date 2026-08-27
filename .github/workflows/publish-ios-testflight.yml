@@ -396,6 +396,11 @@ jobs:
         working-directory: src/QueenZone.Mobile/ios
         env:
           EXPO_PUBLIC_APP_ENV: staging
+          # The "Bundle React Native code and images" Xcode build phase runs
+          # inside this step, not the earlier "Generate iOS project" step, so
+          # EXPO_PUBLIC_SENTRY_DSN must be set here too or it inlines as
+          # undefined and Sentry.init() silently no-ops in the shipped bundle.
+          EXPO_PUBLIC_SENTRY_DSN: ${{ vars.SENTRY_DSN }}
           # Also set org/project here (not only at prebuild) so sentry-cli does
           # not depend solely on the generated sentry.properties file.
           SENTRY_ORG: ${{ vars.SENTRY_ORG }}
