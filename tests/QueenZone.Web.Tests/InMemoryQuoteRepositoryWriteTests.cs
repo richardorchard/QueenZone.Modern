@@ -60,4 +60,39 @@ public sealed class InMemoryQuoteRepositoryWriteTests
         Assert.NotNull(quote);
         Assert.Equal(publishedId, quote.Id);
     }
+
+    [Fact]
+    public async Task GetAllAsync_returns_every_quote_newest_first()
+    {
+        var repository = new InMemoryQuoteRepository(new SharedQuoteStore());
+        var firstId = await repository.CreateAsync(new AdminQuoteDraft("First", "Speaker A", true));
+        var secondId = await repository.CreateAsync(new AdminQuoteDraft("Second", "Speaker B", false));
+
+        var quotes = await repository.GetAllAsync();
+
+        Assert.Equal(2, quotes.Count);
+        Assert.Equal(secondId, quotes[0].Id);
+        Assert.Equal(firstId, quotes[1].Id);
+    }
+
+    [Fact]
+    public async Task SetPublishedAsync_toggles_publish_state()
+    {
+        var repository = new InMemoryQuoteRepository(new SharedQuoteStore());
+        var id = await repository.CreateAsync(new AdminQuoteDraft("Text", "Speaker", false));
+
+        await repository.SetPublishedAsync(id, true);
+
+        var quote = await repository.GetByIdAsync(id);
+        Assert.NotNull(quote);
+        Assert.True(quote.IsPublished);
+    }
+
+    [Fact]
+    public async Task SetPublishedAsync_missing_quote_throws()
+    {
+        var repository = new InMemoryQuoteRepository(new SharedQuoteStore());
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => repository.SetPublishedAsync(42, true));
+    }
 }

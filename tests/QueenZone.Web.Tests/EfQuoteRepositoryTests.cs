@@ -127,6 +127,12 @@ public sealed class EfQuoteRepositoryTests : IAsyncDisposable
         Assert.False(quote.IsPublished);
     }
 
+    [Fact]
+    public async Task SetPublishedAsync_throws_when_quote_is_missing()
+    {
+        await Assert.ThrowsAsync<InvalidOperationException>(() => repository.SetPublishedAsync(9999, true));
+    }
+
     public async ValueTask DisposeAsync()
     {
         await dbContext.DisposeAsync();
