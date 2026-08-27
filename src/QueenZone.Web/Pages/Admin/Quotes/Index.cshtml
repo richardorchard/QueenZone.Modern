@@ -1,0 +1,71 @@
+@page "/admin/quotes"
+@model IndexModel
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@{
+  var antiforgeryToken = Antiforgery.GetAndStoreTokens(HttpContext).RequestToken;
+}
+
+<div class="admin-shell">
+@if (Model.CreateForm is not null)
+{
+  ViewData["AntiforgeryToken"] = antiforgeryToken;
+  <partial name="_QuoteForm" model="Model.CreateForm" />
+}
+else
+{
+  <h1>Quotes</h1>
+
+  @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+  {
+    <p class="admin-status admin-status--@Model.StatusMessageKind">@Model.StatusMessage</p>
+  }
+
+  <p>
+    <a href="/admin/quotes/new">Add quote</a>
+  </p>
+
+  @if (Model.Quotes.Count == 0)
+  {
+    <p>No quotes yet.</p>
+  }
+  else
+  {
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Quote</th>
+          <th>Who said it</th>
+          <th>Added</th>
+          <th>Published</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        @foreach (var quote in Model.Quotes)
+        {
+          <tr>
+            <td class="admin-title-cell">@quote.Text</td>
+            <td>@quote.WhoSaid</td>
+            <td>@quote.CreatedAt.ToString("dd MMMM yyyy")</td>
+            <td>@(quote.IsPublished ? "Yes" : "No")</td>
+            <td class="admin-actions">
+              <a href="/admin/quotes/@quote.Id/edit">Edit</a>
+              <form method="post" action="/admin/quotes?handler=TogglePublish" style="display:inline">
+                <input type="hidden" name="@AdminQuotePageModel.AntiforgeryTokenFieldName" value="@antiforgeryToken">
+                <input type="hidden" name="id" value="@quote.Id">
+                <input type="hidden" name="isPublished" value="@quote.IsPublished">
+                <button type="submit">@(quote.IsPublished ? "Unpublish" : "Publish")</button>
+              </form>
+              <form method="post" action="/admin/quotes?handler=Delete" style="display:inline" onsubmit="return confirm('Delete this quote?');">
+                <input type="hidden" name="@AdminQuotePageModel.AntiforgeryTokenFieldName" value="@antiforgeryToken">
+                <input type="hidden" name="id" value="@quote.Id">
+                <button type="submit">Delete</button>
+              </form>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+}
+</div>

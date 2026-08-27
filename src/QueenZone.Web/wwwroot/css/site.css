@@ -1629,6 +1629,26 @@ body.qz-menu-lock .qz-masthead {
   color: rgba(255, 255, 255, 0.66);
 }
 
+.qz-quote {
+  margin: 0 auto;
+  max-width: 46rem;
+  text-align: center;
+  padding: 0;
+  border: none;
+}
+
+.qz-quote__text {
+  font-size: var(--text-2xl, 1.5rem);
+  line-height: 1.4;
+  font-style: italic;
+  margin: 0 0 var(--space-3);
+}
+
+.qz-quote__attribution {
+  font-size: var(--text-base, 1rem);
+  opacity: 0.7;
+}
+
 .qz-on-this-day-note {
   margin-top: calc(-1 * var(--space-4));
   margin-bottom: var(--space-5);
