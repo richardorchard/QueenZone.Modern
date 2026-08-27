@@ -164,6 +164,8 @@ public sealed class AdminMembersRoutesTests : IClassFixture<WebApplicationFactor
         var profileClient = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
         var beforeSuspend = await profileClient.GetStringAsync($"/members/{memberId}");
         Assert.Contains("Buy cheap watches here", beforeSuspend);
+        var topicsBeforeSuspend = await profileClient.GetStringAsync("/api/v1/forum/categories/1/topics");
+        Assert.Contains("Buy cheap watches here", topicsBeforeSuspend);
 
         var admin = CreateAdminClient(AdminEmail);
         var detail = await admin.GetStringAsync($"/admin/members/{memberId}");
@@ -178,6 +180,8 @@ public sealed class AdminMembersRoutesTests : IClassFixture<WebApplicationFactor
 
         var afterSuspend = await profileClient.GetStringAsync($"/members/{memberId}");
         Assert.DoesNotContain("Buy cheap watches here", afterSuspend);
+        var topicsAfterSuspend = await profileClient.GetStringAsync("/api/v1/forum/categories/1/topics");
+        Assert.DoesNotContain("Buy cheap watches here", topicsAfterSuspend);
 
         var reinstateDetail = await admin.GetStringAsync($"/admin/members/{memberId}");
         var reinstateResponse = await admin.PostAsync(
@@ -190,6 +194,8 @@ public sealed class AdminMembersRoutesTests : IClassFixture<WebApplicationFactor
 
         var afterReinstate = await profileClient.GetStringAsync($"/members/{memberId}");
         Assert.Contains("Buy cheap watches here", afterReinstate);
+        var topicsAfterReinstate = await profileClient.GetStringAsync("/api/v1/forum/categories/1/topics");
+        Assert.Contains("Buy cheap watches here", topicsAfterReinstate);
     }
 
     private HttpClient CreateAdminClient(string? email = null)

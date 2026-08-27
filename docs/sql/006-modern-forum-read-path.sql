@@ -25,6 +25,11 @@ IF OBJECT_ID(N'dbo.ModernForumPost', N'U') IS NULL
     THROW 51000, 'dbo.ModernForumPost does not exist. Run 004-modern-forum-batched-import.sql first.', 1;
 GO
 
+IF COL_LENGTH(N'dbo.ModernForumThread', N'IsHidden') IS NULL
+    ALTER TABLE dbo.ModernForumThread ADD IsHidden bit NOT NULL
+        CONSTRAINT DF_ModernForumThread_IsHidden DEFAULT (0);
+GO
+
 IF NOT EXISTS
 (
     SELECT 1
@@ -128,8 +133,8 @@ BEGIN
         SELECT
             c.Id AS CategoryId,
             c.LegacyForumId,
-            COUNT_BIG(CASE WHEN t.IsLegacyTopicStarter = 1 THEN 1 END) AS TotalThreads,
-            COUNT_BIG(CASE WHEN t.IsLegacyTopicStarter = 1 AND t.StartedByUserValidated = 1 THEN 1 END) AS ValidatedDisplayThreads
+            COUNT_BIG(CASE WHEN t.IsLegacyTopicStarter = 1 AND t.IsHidden = 0 THEN 1 END) AS TotalThreads,
+            COUNT_BIG(CASE WHEN t.IsLegacyTopicStarter = 1 AND t.StartedByUserValidated = 1 AND t.IsHidden = 0 THEN 1 END) AS ValidatedDisplayThreads
         FROM dbo.ModernForumCategory c
         LEFT JOIN dbo.ModernForumThread t ON t.CategoryId = c.Id
         GROUP BY c.Id, c.LegacyForumId
@@ -159,7 +164,7 @@ BEGIN
         SELECT
             t.Id AS ThreadId,
             t.LegacyTopicId,
-            COUNT_BIG(p.Id) AS PostCount
+            COUNT_BIG(CASE WHEN p.IsHidden = 0 THEN p.Id END) AS PostCount
         FROM dbo.ModernForumThread t
         LEFT JOIN dbo.ModernForumPost p ON p.ThreadId = t.Id
         GROUP BY t.Id, t.LegacyTopicId
@@ -184,6 +189,7 @@ BEGIN
             CONVERT(int, COUNT_BIG(*)) AS TotalThreads,
             CONVERT(int, COUNT_BIG(CASE WHEN NULLIF(LTRIM(RTRIM(Title)), '') IS NOT NULL THEN 1 END)) AS SitemapTopicCount
         FROM dbo.ModernForumThread
+        WHERE IsHidden = 0
     ) AS source
     ON target.Id = source.Id
     WHEN MATCHED THEN
@@ -237,6 +243,7 @@ BEGIN
         FROM dbo.ModernForumThread t WITH (INDEX(IX_ModernForumThread_CategoryStarter_Latest))
         WHERE t.CategoryId = c.Id
           AND t.IsLegacyTopicStarter = 1
+          AND t.IsHidden = 0
         ORDER BY t.LastActivityAt DESC, t.LegacyTopicId DESC
     ) latest
     WHERE c.LegacyForumId = @Q_FORUM_ID
@@ -255,7 +262,7 @@ BEGIN
 
     DECLARE @Offset int = (CASE WHEN @CurrentPage > 1 THEN @CurrentPage - 1 ELSE 0 END) * @PageSize;
 
-    SELECT @TotalRecords = s.TotalThreads
+    SELECT @TotalRecords = s.ValidatedDisplayThreads
     FROM dbo.ModernForumCategory c
     INNER JOIN dbo.ModernForumCategoryReadStats s ON s.CategoryId = c.Id
     WHERE c.LegacyForumId = @Q_FORUM_ID
@@ -268,7 +275,9 @@ BEGIN
         INNER JOIN dbo.ModernForumCategory c ON c.Id = t.CategoryId
         WHERE c.LegacyForumId = @Q_FORUM_ID
           AND c.IsSynthetic = 0
-          AND t.IsLegacyTopicStarter = 1;
+          AND t.IsLegacyTopicStarter = 1
+          AND t.StartedByUserValidated = 1
+          AND t.IsHidden = 0;
     END;
 
     SELECT
@@ -287,6 +296,7 @@ BEGIN
       AND c.IsSynthetic = 0
       AND t.IsLegacyTopicStarter = 1
       AND t.StartedByUserValidated = 1
+      AND t.IsHidden = 0
     ORDER BY t.IsSticky DESC, t.LastActivityAt DESC, t.LegacyTopicId ASC
     OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;
 END;
@@ -319,7 +329,8 @@ BEGIN
         @DISCO = t.LegacyDiscography
     FROM dbo.ModernForumThread t
     INNER JOIN dbo.ModernForumCategory c ON c.Id = t.CategoryId
-    WHERE t.LegacyTopicId = @Q_FORUM_TOPIC_ID;
+    WHERE t.LegacyTopicId = @Q_FORUM_TOPIC_ID
+      AND t.IsHidden = 0;
 
     IF @ThreadId IS NULL
     BEGIN
@@ -381,7 +392,7 @@ BEGIN
 
     SELECT COALESCE(
         (SELECT TotalThreads FROM dbo.ModernForumArchiveReadStats WHERE Id = 1),
-        (SELECT CONVERT(int, COUNT_BIG(*)) FROM dbo.ModernForumThread));
+        (SELECT CONVERT(int, COUNT_BIG(*)) FROM dbo.ModernForumThread WHERE IsHidden = 0));
 END;
 GO
 
@@ -392,7 +403,7 @@ BEGIN
 
     SELECT COALESCE(
         (SELECT SitemapTopicCount FROM dbo.ModernForumArchiveReadStats WHERE Id = 1),
-        (SELECT CONVERT(int, COUNT_BIG(*)) FROM dbo.ModernForumThread WHERE NULLIF(LTRIM(RTRIM(Title)), '') IS NOT NULL));
+        (SELECT CONVERT(int, COUNT_BIG(*)) FROM dbo.ModernForumThread WHERE IsHidden = 0 AND NULLIF(LTRIM(RTRIM(Title)), '') IS NOT NULL));
 END;
 GO
 
@@ -408,7 +419,8 @@ BEGIN
         LTRIM(RTRIM(t.Title)) AS Title,
         t.LastActivityAt
     FROM dbo.ModernForumThread t WITH (INDEX(IX_ModernForumThread_Sitemap))
-    WHERE NULLIF(LTRIM(RTRIM(t.Title)), '') IS NOT NULL
+    WHERE t.IsHidden = 0
+      AND NULLIF(LTRIM(RTRIM(t.Title)), '') IS NOT NULL
     ORDER BY t.LegacyTopicId ASC
     OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;
 END;

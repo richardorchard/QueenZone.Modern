@@ -233,6 +233,7 @@ public sealed class QueenZoneDbContext : DbContext
             entity.HasKey(thread => thread.Id);
             entity.Property(thread => thread.Title).HasMaxLength(200).IsRequired();
             entity.Property(thread => thread.StartedByDisplayName).HasMaxLength(100).IsRequired();
+            entity.Property(thread => thread.IsHidden).IsRequired().HasDefaultValue(false);
             entity.Property(thread => thread.StarterAttachment).HasMaxLength(120);
             entity.Property(thread => thread.StarterFileSize).HasMaxLength(12);
             entity.HasIndex(thread => thread.LegacyTopicId)
