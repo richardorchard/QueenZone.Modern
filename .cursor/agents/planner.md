@@ -1,6 +1,6 @@
 ---
 name: planner
-description: Read-only planner for a GitHub epic or two or more issue numbers. Use before a loop of implementers to order work, mark web vs mobile vs API, and flag shared files. Do not use when the queue is a single issue. Do not write code.
+description: Read-only planner for a GitHub epic or two or more issue numbers. Use before a loop of implementers to order work, mark surfaces, and flag shared files. Do not use when the queue is a single issue. Do not write code.
 model: grok-4.6[effort=high]
 readonly: true
 ---
@@ -13,7 +13,7 @@ Return:
 
 1. **Goal** — one paragraph.
 2. **Ordered queue** — sequential only. Each item: issue number, title, surface (`web` / `mobile` / `api` / `mixed`), paths, acceptance criteria, tests, blocked-by. Do not recommend parallel implementers.
-3. **Risks** — shared files, schema/migrations, auth, API contract between Web and Mobile, legacy SQL types.
+3. **Risks** — shared files, schema/migrations, auth, API contracts, unusual data types.
 4. **Out of scope** — explicit non-goals.
 
 Do not implement. If the list is too vague, ask and stop.
