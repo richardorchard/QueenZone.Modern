@@ -209,7 +209,7 @@ public sealed record NewsAgentGuidanceSectionViewModel(
             string.Empty,
             []);
 
-    public string DraftContent => Draft?.Content ?? string.Empty;
+    public string DraftContent => Draft?.Content ?? Published?.Content ?? string.Empty;
 
     public string DraftRowVersion =>
         Draft is null ? string.Empty : Convert.ToBase64String(Draft.RowVersion);
