@@ -54,7 +54,6 @@ jobs:
       run:
         working-directory: src/QueenZone.Mobile
     env:
-      APP_PACKAGE_NAME: org.queenzone.mobile
       ANDROID_VERSION_CODE: ${{ github.run_number }}
     steps:
       - name: Checkout
@@ -197,5 +196,5 @@ jobs:
           serviceAccountJsonPlainText: ${{ steps.bitwarden-secrets.outputs.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: org.queenzone.mobile
           releaseFiles: src/QueenZone.Mobile/android/app/build/outputs/bundle/release/app-release.aab
-          tracks: internal
+          track: internal
           status: completed
