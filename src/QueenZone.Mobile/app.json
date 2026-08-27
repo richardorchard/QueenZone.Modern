@@ -99,7 +99,8 @@
             }
           ]
         }
-      ]
+      ],
+      "expo-background-task"
     ]
   }
 }
