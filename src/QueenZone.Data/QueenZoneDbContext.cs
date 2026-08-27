@@ -102,8 +102,28 @@ public sealed class QueenZoneDbContext : DbContext
 
     public DbSet<MemberTopicWatchEntity> MemberTopicWatches => Set<MemberTopicWatchEntity>();
 
+    public DbSet<QuoteEntity> Quotes => Set<QuoteEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<QuoteEntity>(entity =>
+        {
+            entity.ToTable("QUEEN_QUOTE_T", table => table.ExcludeFromMigrations());
+            entity.HasKey(quote => quote.QuoteId);
+
+            entity.Property(quote => quote.QuoteId)
+                .HasColumnName("QUEEN_QUOTE_ID")
+                .ValueGeneratedOnAdd();
+            entity.Property(quote => quote.Text).HasColumnName("QUEEN_QUOTE").HasMaxLength(QuoteValidation.MaxTextLength);
+            entity.Property(quote => quote.WhoSaid).HasColumnName("WHO_SAID").HasMaxLength(QuoteValidation.MaxWhoSaidLength);
+            entity.Property(quote => quote.CreatedAt).HasColumnName("CREATE_DATE");
+            entity.Property(quote => quote.IsPublished)
+                .HasColumnName("DISPLAY")
+                .HasConversion(
+                    value => value ? (byte)1 : (byte)0,
+                    value => value == 1);
+        });
+
         modelBuilder.Entity<NewsTableRow>(entity =>
         {
             entity.ToTable("NEWS_T", table => table.ExcludeFromMigrations());

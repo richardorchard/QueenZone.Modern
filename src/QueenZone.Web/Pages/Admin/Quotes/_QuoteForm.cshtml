@@ -1,0 +1,43 @@
+@model QueenZone.Web.Pages.Admin.Quotes.QuoteFormViewModel
+@using QueenZone.Data
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@{
+  var antiforgeryToken = (ViewData["AntiforgeryToken"] as string)
+    ?? Antiforgery.GetAndStoreTokens(Context).RequestToken;
+}
+
+<div class="admin-form-panel">
+<h1>@Model.Title</h1>
+
+@if (Model.Errors is { Count: > 0 })
+{
+  <ul class="admin-errors">
+    @foreach (var error in Model.Errors)
+    {
+      <li>@error</li>
+    }
+  </ul>
+}
+
+<form method="post" action="@Model.Action" class="admin-form">
+  <input type="hidden" name="@AdminQuotePageModel.AntiforgeryTokenFieldName" value="@antiforgeryToken">
+  <label>
+    Quote
+    <textarea name="text" maxlength="@QuoteValidation.MaxTextLength" rows="4" required>@Model.Draft.Text</textarea>
+  </label>
+  <label>
+    Who said it
+    <input type="text" name="whoSaid" value="@Model.Draft.WhoSaid" maxlength="@QuoteValidation.MaxWhoSaidLength" required>
+  </label>
+  <label>
+    <input type="hidden" name="isPublished" value="false">
+    <input type="checkbox" name="isPublished" value="true" checked="@Model.Draft.IsPublished">
+    Published (visible on the homepage)
+  </label>
+
+  <div class="admin-form-actions">
+    <button type="submit">Save</button>
+    <a href="/admin/quotes">Cancel</a>
+  </div>
+</form>
+</div>
