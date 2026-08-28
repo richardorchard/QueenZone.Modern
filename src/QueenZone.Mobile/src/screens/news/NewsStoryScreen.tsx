@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
+import { useCallback, useLayoutEffect } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { ApiError, fetchNewsDetail, formatPublishedDate, type NewsDetail } from '../../api';
+import { fetchNewsDetail, formatPublishedDate } from '../../api';
+import { useDetailQuery } from '../../hooks/useDetailQuery';
 import { HeaderBackButton } from '../../navigation/headerButtons';
 import { leaveStoryScreen } from '../../navigation/nestedTab';
 import type { NewsStackParamList } from '../../navigation/types';
@@ -15,10 +16,8 @@ type Props = NativeStackScreenProps<NewsStackParamList, 'Story'>;
 export function NewsStoryScreen({ navigation, route }: Props) {
   const { c } = useTheme();
   const { id } = route.params;
-  const [article, setArticle] = useState<NewsDetail | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [reloadToken, setReloadToken] = useState(0);
+  const loadArticle = useCallback((signal: AbortSignal) => fetchNewsDetail(id, signal), [id]);
+  const { data: article, error, loading, reload } = useDetailQuery(loadArticle);
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -32,34 +31,12 @@ export function NewsStoryScreen({ navigation, route }: Props) {
     });
   }, [navigation, article?.title]);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    setLoading(true);
-    setError(null);
-    fetchNewsDetail(id, controller.signal)
-      .then((detail) => {
-        setArticle(detail);
-        setLoading(false);
-      })
-      .catch((err: unknown) => {
-        if (err instanceof Error && err.name === 'AbortError') {
-          return;
-        }
-        setArticle(null);
-        setError(err instanceof ApiError ? err.message : 'Something went wrong.');
-        setLoading(false);
-      });
-    return () => controller.abort();
-  }, [id, reloadToken]);
-
-  const retry = useCallback(() => setReloadToken((n) => n + 1), []);
-
   if (loading) {
     return <LoadingBlock label="Loading article…" />;
   }
 
   if (error || !article) {
-    return <ErrorBlock message={error ?? 'Article not found.'} onRetry={retry} />;
+    return <ErrorBlock message={error ?? 'Article not found.'} onRetry={reload} />;
   }
 
   const published = formatPublishedDate(article.publishedAt);
