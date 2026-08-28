@@ -37,13 +37,13 @@ describe('applyOnThisDayNativeWidget', () => {
   it('replaces the JSC entry view with native SwiftUI once', () => {
     const first = applyOnThisDayNativeWidget(generatedSwift);
     assert.equal(first.includes(GENERATED_ENTRY), false);
-    assert.match(first, new RegExp(NATIVE_ENTRY.replace(/[()]/g, '\\$&')));
+    assert.equal(first.includes(NATIVE_ENTRY), true);
     assert.match(first, /struct OnThisDayNativeEntryView/);
     assert.match(first, /Open QueenZone to load today's story\./);
     assert.match(first, /queenzone:\/\/home/);
     assert.match(first, /containerBackground/);
     assert.match(first, /foregroundColor/);
-    assert.match(first, new RegExp(TAG));
+    assert.equal(first.includes(TAG), true);
 
     const second = applyOnThisDayNativeWidget(first);
     assert.equal(second, first);
