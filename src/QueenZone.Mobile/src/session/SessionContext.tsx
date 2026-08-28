@@ -122,7 +122,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   );
 
   const clearLocal = useCallback(async () => {
-    await clearStoredSession();
+    try {
+      await clearStoredSession();
+    } catch {
+      // In-memory sign-out still has to happen if SecureStore delete fails.
+    }
     refreshTokenRef.current = null;
     expiresAtRef.current = 0;
     const next = { ...signedOut, isRestoring: false };
@@ -346,18 +350,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       },
       applySmokeSession,
       signOut: async () => {
-        const token = session.accessToken;
+        const token = sessionRef.current.accessToken;
         const refresh = refreshTokenRef.current;
-        if (token) {
-          await clearPushRegistration(token);
-          await logoutRemote(getAppConfig().apiBaseUrl, token);
-        }
-
-        if (refresh) {
-          await revokeRefreshToken(getAppConfig().apiBaseUrl, refresh);
-        }
-
+        const apiBaseUrl = getAppConfig().apiBaseUrl;
+        // Clear the device session first. Remote logout/revoke/push unregister
+        // can hang (React Native fetch often ignores AbortSignal) or crash the
+        // process; awaiting them first left the member signed in after a kill.
         await clearLocal();
+        startRemoteSignOut({ accessToken: token, refreshToken: refresh, apiBaseUrl });
       },
       refreshProfile,
       ensureAccessToken,
@@ -383,6 +383,26 @@ export function useSession(): SessionContextValue {
   }
 
   return value;
+}
+
+function startRemoteSignOut(input: {
+  accessToken: string | null;
+  refreshToken: string | null;
+  apiBaseUrl: string;
+}): void {
+  const tasks: Promise<unknown>[] = [];
+  if (input.accessToken) {
+    tasks.push(clearPushRegistration(input.accessToken));
+    tasks.push(logoutRemote(input.apiBaseUrl, input.accessToken));
+  }
+  if (input.refreshToken) {
+    tasks.push(revokeRefreshToken(input.apiBaseUrl, input.refreshToken));
+  }
+  if (tasks.length === 0) {
+    return;
+  }
+
+  void Promise.allSettled(tasks);
 }
 
 async function loadProfile(accessToken: string): Promise<MemberProfile | null> {
