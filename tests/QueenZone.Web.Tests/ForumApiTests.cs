@@ -228,8 +228,16 @@ public sealed class ForumApiTests : IClassFixture<QueenZoneWebApplicationFactory
         Assert.Single(postDto.Attachments);
         Assert.Equal("anoto-setlist-scan.jpg", postDto.Attachments[0].FileName);
         Assert.Equal("/forum/attachment/legacy/1002", postDto.Attachments[0].Url);
+        Assert.Equal("/api/v1/forum/attachments/legacy/1002", postDto.Attachments[0].DownloadUrl);
         Assert.Equal("JPG", postDto.Attachments[0].Extension);
         Assert.True(postDto.Attachments[0].IsImage);
+        Assert.Equal(
+            "/api/v1/forum/attachments/legacy/1002",
+            ForumApiMapper.ToAttachmentDownloadUrl("/forum/attachment/legacy/1002"));
+        Assert.Equal(
+            "/api/v1/forum/attachments/9001/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+            ForumApiMapper.ToAttachmentDownloadUrl("/forum/attachment/9001/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"));
+        Assert.Equal("/already-absolute", ForumApiMapper.ToAttachmentDownloadUrl("/already-absolute"));
         var mappedPosts = ForumApiMapper.ToPosts([post], ugcHtml);
         Assert.Equal(postDto.Id, mappedPosts[0].Id);
         Assert.Equal(postDto.Body, mappedPosts[0].Body);
@@ -327,6 +335,7 @@ public sealed class ForumApiTests : IClassFixture<QueenZoneWebApplicationFactory
         Assert.Single(firstPage.Items[0].Attachments);
         Assert.Equal("anoto-setlist-scan.jpg", firstPage.Items[0].Attachments[0].FileName);
         Assert.Equal("/forum/attachment/legacy/1002", firstPage.Items[0].Attachments[0].Url);
+        Assert.Equal("/api/v1/forum/attachments/legacy/1002", firstPage.Items[0].Attachments[0].DownloadUrl);
         Assert.Equal("JPG", firstPage.Items[0].Attachments[0].Extension);
         Assert.Equal("278.0 KB", firstPage.Items[0].Attachments[0].FormattedSize);
         Assert.True(firstPage.Items[0].Attachments[0].IsImage);
@@ -335,6 +344,7 @@ public sealed class ForumApiTests : IClassFixture<QueenZoneWebApplicationFactory
         Assert.Single(notes.Attachments);
         Assert.Equal("opera-side-two-notes.pdf", notes.Attachments[0].FileName);
         Assert.Equal("/forum/attachment/legacy/1101", notes.Attachments[0].Url);
+        Assert.Equal("/api/v1/forum/attachments/legacy/1101", notes.Attachments[0].DownloadUrl);
         Assert.Equal("PDF", notes.Attachments[0].Extension);
         Assert.False(notes.Attachments[0].IsImage);
 

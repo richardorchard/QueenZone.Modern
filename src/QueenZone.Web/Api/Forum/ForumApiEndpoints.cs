@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
 using QueenZone.Data;
+using QueenZone.Storage;
 
 namespace QueenZone.Web;
 
@@ -21,8 +22,10 @@ namespace QueenZone.Web;
 /// <c>/forum/poll/{id}/vote</c>). Topic Watch (#735) is <c>GET</c>/<c>POST</c>/
 /// <c>DELETE /topics/{id}/watch</c> under <see cref="MemberAuthenticationSchemes.MobileMemberPolicy"/>
 /// via <see cref="TopicWatchService"/>. Attachment metadata includes the existing
-/// member-gated <c>/forum/attachment/...</c> paths; the mobile client does not
-/// open those URLs.
+/// cookie-gated <c>/forum/attachment/...</c> <c>url</c> plus additive
+/// <c>downloadUrl</c> under <c>/api/v1/forum/attachments/...</c>
+/// (<see cref="MemberAuthenticationSchemes.MobileMemberPolicy"/>). The mobile
+/// client opens <c>downloadUrl</c> only.
 /// </summary>
 public static class ForumApiEndpoints
 {
@@ -141,6 +144,22 @@ public static class ForumApiEndpoints
             .WithSummary("Stop Watching a public topic. Idempotent when not currently Watching.")
             .RequireAuthorization(MemberAuthenticationSchemes.MobileMemberPolicy)
             .Produces<ForumTopicWatchDto>()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapGet("/attachments/legacy/{legacyPostId:int}", DownloadLegacyAttachmentAsync)
+            .WithName("GetForumLegacyAttachment")
+            .WithSummary("Member-gated legacy attachment. Same redirect as /forum/attachment/legacy/{legacyPostId}.")
+            .RequireAuthorization(MemberAuthenticationSchemes.MobileMemberPolicy)
+            .Produces(StatusCodes.Status302Found)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapGet("/attachments/{legacyPostId:int}/{attachmentId:guid}", DownloadModernAttachmentAsync)
+            .WithName("GetForumAttachment")
+            .WithSummary("Member-gated modern attachment. Same stream as /forum/attachment/{legacyPostId}/{attachmentId}.")
+            .RequireAuthorization(MemberAuthenticationSchemes.MobileMemberPolicy)
+            .Produces(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status404NotFound);
     }
@@ -633,6 +652,25 @@ public static class ForumApiEndpoints
             ? TopicNotFound(id)
             : Results.Ok(new ForumTopicWatchDto(status.Watching));
     }
+
+    internal static Task<IResult> DownloadLegacyAttachmentAsync(
+        int legacyPostId,
+        IForumAttachmentRepository attachmentRepository,
+        CancellationToken cancellationToken) =>
+        ForumAttachmentEndpoints.ServeLegacyAsync(legacyPostId, attachmentRepository, cancellationToken);
+
+    internal static Task<IResult> DownloadModernAttachmentAsync(
+        int legacyPostId,
+        Guid attachmentId,
+        IForumAttachmentRepository attachmentRepository,
+        IBlobUploadService blobUploadService,
+        CancellationToken cancellationToken) =>
+        ForumAttachmentEndpoints.ServeModernAsync(
+            legacyPostId,
+            attachmentId,
+            attachmentRepository,
+            blobUploadService,
+            cancellationToken);
 
     private static async Task<Guid?> TryGetBearerMemberIdAsync(HttpContext httpContext)
     {

@@ -177,6 +177,7 @@ export const forumAttachmentSchema = z.object({
   formattedSize: z.string(),
   isImage: z.boolean(),
   thumbnailUrl: z.string().nullable(),
+  downloadUrl: z.string().min(1),
 });
 
 export const forumPostSchema = z.object({

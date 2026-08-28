@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
+  attachmentAction,
   attachmentMeta,
   formatMemberSince,
   formatPostTimestamp,
@@ -90,5 +91,28 @@ describe('forum thread meta', () => {
       }),
       null,
     );
+  });
+
+  it('opens signed-in attachments without a thumb and stays inert when signed out', () => {
+    const legacyJpg = {
+      isImage: true,
+      thumbnailUrl: null,
+      url: '/forum/attachment/legacy/1002',
+    };
+    const thumbed = {
+      isImage: true,
+      thumbnailUrl: '/ugc/forum/a-thumb.webp',
+      url: '/forum/attachment/1/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+    };
+    const pdf = {
+      isImage: false,
+      thumbnailUrl: null,
+      url: '/forum/attachment/legacy/1101',
+    };
+    assert.equal(attachmentAction(legacyJpg, true), 'view-image');
+    assert.equal(attachmentAction(legacyJpg, false), 'none');
+    assert.equal(attachmentAction(thumbed, true), 'none');
+    assert.equal(attachmentAction(pdf, true), 'open-file');
+    assert.equal(attachmentAction(pdf, false), 'none');
   });
 });
