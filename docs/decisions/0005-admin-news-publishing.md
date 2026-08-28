@@ -55,7 +55,7 @@ Tradeoffs:
 
 ## Database Changes
 
-Run `docs/sql/001-news-admin-columns.sql` or apply the EF Core migration in `src/QueenZone.Data/Migrations` before enabling admin writes. See ADR 0006 for the hybrid Dapper/EF Core data-access split.
+Run `docs/sql/001-news-admin-columns.sql` or apply the EF Core migration in `src/QueenZone.Data/Migrations` before enabling admin writes. See ADR 0006 for the hybrid Dapper/EF Core data-access split. Later nullable extension columns on `NEWS_T` follow the same pattern; `FORUM_TOPIC_ID` (article-owned 1:1 to a forum topic) is recorded in [ADR 0016](0016-news-forum-topic-on-first-publish.md).
 
 ## Security
 

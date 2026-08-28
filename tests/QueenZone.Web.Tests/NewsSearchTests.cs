@@ -149,7 +149,8 @@ public sealed class EfNewsRepositorySearchTests : IAsyncDisposable
             DISPLAY    AS IsPublished,
             SLUG       AS Slug,
             IMAGE_BLOB_KEY AS ImageBlobKey,
-            IMAGE_GALLERY_PIC_ID AS ImageGalleryPicId
+            IMAGE_GALLERY_PIC_ID AS ImageGalleryPicId,
+            FORUM_TOPIC_ID AS ForumTopicId
         FROM NEWS_T
         WHERE DISPLAY = 1
           AND (TITLE LIKE {0} OR EXCERPT LIKE {0} OR ARTICLE LIKE {0})

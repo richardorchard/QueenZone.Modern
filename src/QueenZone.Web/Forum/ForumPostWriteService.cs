@@ -132,7 +132,8 @@ public sealed class ForumPostWriteService(
         string? body,
         IReadOnlyList<IFormFile>? attachments,
         NewForumPoll? poll,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool trustedSystemAuthor = false)
     {
         var category = await forumRepository.GetCategoryByIdAsync(categoryId, cancellationToken);
         if (category is null)
@@ -170,7 +171,7 @@ public sealed class ForumPostWriteService(
             return ForumWriteOutcome.Validation(sanitizedBody, fieldErrors);
         }
 
-        if (!await rateLimiter.IsAllowedAsync(memberId, cancellationToken))
+        if (!trustedSystemAuthor && !await rateLimiter.IsAllowedAsync(memberId, cancellationToken))
         {
             return ForumWriteOutcome.Fail(ForumWriteStatus.RateLimited, sanitizedBody);
         }
@@ -199,8 +200,12 @@ public sealed class ForumPostWriteService(
                 attachmentValidation.AcceptedFiles,
                 cancellationToken);
             publicQueryCache.InvalidateForumStatsCache();
-            await FlagIfLikelySpamAsync(
-                memberId, author.AccountCreatedAt, createdAt, sanitizedBody, cancellationToken);
+            if (!trustedSystemAuthor)
+            {
+                await FlagIfLikelySpamAsync(
+                    memberId, author.AccountCreatedAt, createdAt, sanitizedBody, cancellationToken);
+            }
+
             return ForumWriteOutcome.Created(
                 created.TopicId,
                 created.StarterPostId,

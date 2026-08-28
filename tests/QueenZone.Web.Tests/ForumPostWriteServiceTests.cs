@@ -132,6 +132,70 @@ public sealed class ForumPostWriteServiceTests : IClassFixture<QueenZoneWebAppli
         Assert.False(account!.IsSuspended);
     }
 
+    [Fact]
+    public async Task CreateTopic_trustedSystemAuthor_does_not_autosuspend_new_account_link_post()
+    {
+        using var scope = factory.Services.CreateScope();
+        var memberId = await CreateMemberAsync(scope, DateTime.UtcNow);
+        var service = scope.ServiceProvider.GetRequiredService<ForumPostWriteService>();
+
+        var outcome = await service.CreateTopicAsync(
+            memberId,
+            "QueenZone",
+            1,
+            "Trusted system news topic",
+            "Excerpt\n\nhttps://www.queenzone.org/news/1/trusted",
+            attachments: null,
+            poll: null,
+            trustedSystemAuthor: true);
+
+        Assert.True(outcome.Succeeded);
+        var repository = scope.ServiceProvider.GetRequiredService<IMemberAccountRepository>();
+        var account = await repository.FindByIdAsync(memberId);
+        Assert.False(account!.IsSuspended);
+    }
+
+    [Fact]
+    public async Task CreateTopic_trustedSystemAuthor_bypasses_rate_limit()
+    {
+        using var scope = factory.Services.CreateScope();
+        var memberId = await CreateMemberAsync(scope, DateTime.UtcNow.AddDays(-1));
+        var service = scope.ServiceProvider.GetRequiredService<ForumPostWriteService>();
+        for (var i = 0; i < ForumPostRateLimiter.MaxPostsPerMinute; i++)
+        {
+            var blocked = await service.CreateTopicAsync(
+                memberId,
+                "Service Tester",
+                1,
+                $"Rate fill topic {i} xx",
+                "Body",
+                attachments: null,
+                poll: null);
+            Assert.True(blocked.Succeeded);
+        }
+
+        var limited = await service.CreateTopicAsync(
+            memberId,
+            "Service Tester",
+            1,
+            "Rate limited topic xx",
+            "Body",
+            attachments: null,
+            poll: null);
+        Assert.Equal(ForumWriteStatus.RateLimited, limited.Status);
+
+        var trusted = await service.CreateTopicAsync(
+            memberId,
+            "QueenZone",
+            1,
+            "Trusted rate bypass topic",
+            "Body with https://www.queenzone.org/news/2/x",
+            attachments: null,
+            poll: null,
+            trustedSystemAuthor: true);
+        Assert.True(trusted.Succeeded);
+    }
+
     private static async Task<Guid> CreateMemberAsync(IServiceScope scope, DateTime createdAt)
     {
         var repository = scope.ServiceProvider.GetRequiredService<IMemberAccountRepository>();

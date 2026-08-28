@@ -9,12 +9,20 @@ else
   <ol class="qz-news-list">
     @foreach (var item in Model)
     {
-      <li class="qz-news-row">
-        <div>
+      <li class="qz-news-row qz-news-row--thumb">
+        <div class="qz-news-row__meta">
           <div class="qz-card__kicker"><time datetime="@item.PublishedAt.ToString("yyyy-MM-dd")">@item.PublishedAt.ToString("dd MMMM yyyy")</time></div>
           <div class="qz-meta">News</div>
         </div>
-        <div>
+        <div class="qz-news-row__thumb">
+          <img src="@item.DisplayThumbnailUrl"
+               alt=""
+               width="240"
+               height="160"
+               loading="lazy"
+               decoding="async">
+        </div>
+        <div class="qz-news-row__body">
           <h2><a href="@item.DetailPath">@item.Title</a></h2>
           <p>@item.Excerpt</p>
           @if (item.SubmitterMemberId is Guid submitterMemberId && !string.IsNullOrWhiteSpace(item.SubmitterDisplayName))

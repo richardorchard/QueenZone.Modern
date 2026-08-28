@@ -24,6 +24,44 @@ public sealed class EfForumWriteRepositoryTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task EnsureCategoryAsync_CreatesNewsBoardOnce_AndNeverReturnsTheMusic()
+    {
+        await SeedCategoryAsync();
+
+        var first = await repository.EnsureCategoryAsync(
+            NewsForumDiscussion.CategorySlug,
+            NewsForumDiscussion.CategoryName);
+        var second = await repository.EnsureCategoryAsync(
+            NewsForumDiscussion.CategorySlug,
+            NewsForumDiscussion.CategoryName);
+
+        Assert.Equal(first, second);
+        Assert.NotEqual(1, first);
+        var created = await dbContext.ModernForumCategories.SingleAsync(category => category.LegacyForumId == first);
+        Assert.Equal(NewsForumDiscussion.CategoryName, created.Name);
+        Assert.False(NewsForumDiscussion.IsTheMusic(created.Name));
+    }
+
+    [Fact]
+    public async Task EnsureCategoryAsync_PrefersSlugMatch_ThenCreatesWhenNameDoesNotMatch()
+    {
+        await SeedCategoryAsync();
+        await SeedNamedCategoryAsync(3, "NEWS!");
+
+        var first = await repository.EnsureCategoryAsync(
+            NewsForumDiscussion.CategorySlug,
+            NewsForumDiscussion.CategoryName);
+        var second = await repository.EnsureCategoryAsync(
+            NewsForumDiscussion.CategorySlug,
+            NewsForumDiscussion.CategoryName);
+
+        Assert.Equal(3, first);
+        Assert.Equal(first, second);
+        var matched = await dbContext.ModernForumCategories.SingleAsync(category => category.LegacyForumId == first);
+        Assert.Equal("NEWS!", matched.Name);
+    }
+
+    [Fact]
     public async Task CreateThreadAsync_WritesModernForumThreadAndFirstPostAtomically()
     {
         var member = await SeedMemberAsync();
@@ -346,11 +384,16 @@ public sealed class EfForumWriteRepositoryTests : IAsyncDisposable
 
     private async Task SeedCategoryAsync()
     {
+        await SeedNamedCategoryAsync(1, "The Music");
+    }
+
+    private async Task SeedNamedCategoryAsync(int legacyForumId, string name)
+    {
         dbContext.ModernForumCategories.Add(new ModernForumCategoryEntity
         {
-            LegacyForumId = 1,
-            Name = "The Music",
-            SortOrder = 1,
+            LegacyForumId = legacyForumId,
+            Name = name,
+            SortOrder = legacyForumId,
             LegacyPostCount = 0,
             ImportedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,

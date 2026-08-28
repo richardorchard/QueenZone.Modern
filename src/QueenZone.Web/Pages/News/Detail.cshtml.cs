@@ -7,6 +7,7 @@ namespace QueenZone.Web.Pages.News;
 
 public sealed class DetailModel(
     INewsRepository newsRepository,
+    NewsDiscussionComposer newsDiscussion,
     IOptions<SiteOptions> siteOptions) : PageModel
 {
     public NewsDetailItem? Item { get; private set; }
@@ -23,7 +24,7 @@ public sealed class DetailModel(
             return NotFound();
         }
 
-        var detail = PublicContentMapper.ToNewsDetailItem(item);
+        var detail = await newsDiscussion.ToDetailItemAsync(item, cancellationToken);
         var canonicalSlug = NewsSlug.ResolveForArticle(item);
         if (!string.Equals(canonicalSlug, slug, StringComparison.OrdinalIgnoreCase))
         {

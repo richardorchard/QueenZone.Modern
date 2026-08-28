@@ -60,6 +60,8 @@ describe('NewsIndexScreen', () => {
     const user = userEvent.setup();
     await user.press(screen.getByRole('button', { name: 'Open Live Aid' }));
     expect(navigation.navigate).toHaveBeenCalledWith('Story', { id: 7 });
+    expect(screen.queryByText('Start the discussion')).toBeNull();
+    expect(screen.queryByText('Join the discussion')).toBeNull();
   });
 
   it('shows empty copy when the list has no items', async () => {

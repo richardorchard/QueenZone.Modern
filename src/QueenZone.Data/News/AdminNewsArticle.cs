@@ -13,4 +13,5 @@ public sealed record AdminNewsArticle(
     DateTime? UpdatedAt,
     string? EditorEmail,
     string? ImageBlobKey = null,
-    int? ImageGalleryPicId = null);
+    int? ImageGalleryPicId = null,
+    int? ForumTopicId = null);

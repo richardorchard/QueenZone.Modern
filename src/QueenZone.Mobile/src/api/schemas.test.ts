@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { newsListItemSchema, notificationPreferencesSchema, parseContract, searchResultSchema } from './schemas.ts';
+import { newsDetailSchema, newsListItemSchema, notificationPreferencesSchema, parseContract, searchResultSchema } from './schemas.ts';
 
 describe('parseContract', () => {
   it('names the endpoint and missing field when a payload is incompatible', () => {
@@ -43,6 +43,41 @@ describe('parseContract', () => {
       thumbnailUrl: null,
     });
     assert.equal(withoutImage.imageUrl, null);
+  });
+
+  it('accepts optional news discussion fields on detail', () => {
+    const withoutTopic = parseContract('GET /api/v1/content/news/1003', newsDetailSchema, {
+      id: 1003,
+      title: 'QueenZone modernisation begins',
+      excerpt: 'Excerpt',
+      body: '<p>Body</p>',
+      publishedAt: '2026-06-11T09:00:00',
+      sourceUrl: null,
+      detailPath: '/news/1003/queenzone-modernisation-begins',
+      topicId: null,
+      discussionReplyCount: null,
+      discussionPreview: null,
+    });
+    assert.equal(withoutTopic.topicId, null);
+
+    const withPreview = parseContract('GET /api/v1/content/news/42', newsDetailSchema, {
+      id: 42,
+      title: 'Linked story',
+      excerpt: 'Excerpt',
+      body: '<p>Body</p>',
+      publishedAt: '2026-08-01T08:00:00Z',
+      sourceUrl: null,
+      detailPath: '/news/42/linked-story',
+      topicId: 1002,
+      discussionReplyCount: 2,
+      discussionPreview: [
+        { authorDisplayName: 'Alice', postedAt: '2026-08-01T10:30:00Z', excerpt: 'First preview excerpt' },
+        { authorDisplayName: 'Bob', postedAt: '2026-08-01T11:30:00Z', excerpt: 'Latest preview excerpt' },
+      ],
+    });
+    assert.equal(withPreview.topicId, 1002);
+    assert.equal(withPreview.discussionReplyCount, 2);
+    assert.equal(withPreview.discussionPreview?.[1]?.authorDisplayName, 'Bob');
   });
 
   it('accepts a search hit with sourceKey and optional id', () => {

@@ -1615,6 +1615,10 @@ namespace QueenZone.Data.Migrations
                         .HasColumnType("nvarchar(800)")
                         .HasColumnName("EXCERPT");
 
+                    b.Property<int?>("ForumTopicId")
+                        .HasColumnType("int")
+                        .HasColumnName("FORUM_TOPIC_ID");
+
                     b.Property<string>("ImageBlobKey")
                         .HasMaxLength(512)
                         .HasColumnType("nvarchar(512)")

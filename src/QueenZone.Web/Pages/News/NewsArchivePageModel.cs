@@ -7,7 +7,8 @@ namespace QueenZone.Web.Pages.News;
 
 public abstract class NewsArchivePageModel(
     INewsRepository newsRepository,
-    PublicQueryCacheService publicQueryCache) : PageModel
+    PublicQueryCacheService publicQueryCache,
+    NewsDiscussionComposer newsDiscussion) : PageModel
 {
     public IReadOnlyList<NewsArchiveItem> Items { get; private set; } = [];
 
@@ -39,7 +40,7 @@ public abstract class NewsArchivePageModel(
         var success = (ArchivePageResult<NewsItem>.Success)result;
         var ctx = success.Context;
 
-        Items = PublicContentMapper.ToNewsArchiveItems(success.Items);
+        Items = await newsDiscussion.ToArchiveItemsAsync(success.Items, cancellationToken);
         CurrentPage = ctx.CurrentPage;
         TotalPages = ctx.TotalPages;
         Breadcrumbs = [BreadcrumbItem.Home, new BreadcrumbItem("News", "/news")];

@@ -57,6 +57,11 @@ public static class QueenZoneWebServiceCollectionExtensions
             .ValidateOnStart();
         services.AddSingleton<IValidateOptions<ForumOptions>, ForumOptionsValidator>();
 
+        services.AddOptions<NewsForumOptions>()
+            .Bind(configuration.GetSection(NewsForumOptions.SectionName))
+            .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<NewsForumOptions>, NewsForumOptionsValidator>();
+
         services.AddOptions<PublicQueryCacheOptions>()
             .Bind(configuration.GetSection(PublicQueryCacheOptions.SectionName))
             .ValidateOnStart();
@@ -284,6 +289,8 @@ public static class QueenZoneWebServiceCollectionExtensions
         });
         services.AddSingleton<IPushTransport, DirectPushTransport>();
         services.AddScoped<INotificationDispatcher, NotificationDispatcher>();
+        services.AddScoped<INewsForumTopicService, NewsForumTopicService>();
+        services.AddScoped<NewsDiscussionComposer>();
         services.AddScoped<AdminNewsWriteService>();
         services.AddScoped<NewsArticleImageService>();
         services.AddSingleton<IGoogleAnalyticsDataClient, GoogleAnalyticsDataClient>();

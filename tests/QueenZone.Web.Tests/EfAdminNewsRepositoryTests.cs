@@ -143,6 +143,23 @@ public sealed class EfAdminNewsRepositoryTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task TrySetForumTopicIdAsync_sets_once_and_is_noop_when_already_set()
+    {
+        Assert.True(await repository.TrySetForumTopicIdAsync(4201, 88001));
+        var first = await repository.GetByIdAsync(4201);
+        Assert.Equal(88001, first!.ForumTopicId);
+
+        Assert.False(await repository.TrySetForumTopicIdAsync(4201, 88002));
+        var second = await repository.GetByIdAsync(4201);
+        Assert.Equal(88001, second!.ForumTopicId);
+
+        await repository.UnpublishAsync(4201, "editor@test.local");
+        var unpublished = await repository.GetByIdAsync(4201);
+        Assert.False(unpublished!.IsPublished);
+        Assert.Equal(88001, unpublished.ForumTopicId);
+    }
+
+    [Fact]
     public async Task UnpublishAsync_clears_display_flag()
     {
         dbContext.Database.ExecuteSql($"""

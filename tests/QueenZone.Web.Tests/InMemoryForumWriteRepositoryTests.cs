@@ -201,4 +201,49 @@ public sealed class InMemoryForumWriteRepositoryTests
         Assert.Equal(1, post.EditCount);
         Assert.NotNull(post.EditedAt);
     }
+
+    [Fact]
+    public async Task EnsureCategoryAsync_CreatesNewsBoardOnce_AndNeverReturnsTheMusic()
+    {
+        var repository = new InMemoryForumWriteRepository();
+
+        var first = await repository.EnsureCategoryAsync(
+            NewsForumDiscussion.CategorySlug,
+            NewsForumDiscussion.CategoryName);
+        var second = await repository.EnsureCategoryAsync(
+            NewsForumDiscussion.CategorySlug,
+            NewsForumDiscussion.CategoryName);
+
+        Assert.Equal(first, second);
+        Assert.NotEqual(1, first);
+        var created = Assert.Single(repository.GetCreatedCategories());
+        Assert.Equal(first, created.Id);
+        Assert.Equal(NewsForumDiscussion.CategoryName, created.Name);
+        Assert.False(NewsForumDiscussion.IsTheMusic(created.Name));
+    }
+
+    [Fact]
+    public async Task EnsureCategoryAsync_PrefersSlugMatch_ThenName_AndCreatesWhenMissing()
+    {
+        var repository = new InMemoryForumWriteRepository();
+
+        var slugId = await repository.EnsureCategoryAsync(
+            NewsForumDiscussion.CategorySlug,
+            "NEWS!");
+        var sameBySlug = await repository.EnsureCategoryAsync(
+            NewsForumDiscussion.CategorySlug,
+            NewsForumDiscussion.CategoryName);
+        Assert.Equal(slugId, sameBySlug);
+        Assert.Equal("NEWS!", Assert.Single(repository.GetCreatedCategories()).Name);
+
+        var other = new InMemoryForumWriteRepository();
+        var deskId = await other.EnsureCategoryAsync("news-desk", "News Desk");
+        var newsId = await other.EnsureCategoryAsync(
+            NewsForumDiscussion.CategorySlug,
+            NewsForumDiscussion.CategoryName);
+        Assert.NotEqual(deskId, newsId);
+        Assert.Equal(
+            NewsForumDiscussion.CategoryName,
+            other.GetCreatedCategories().Single(category => category.Id == newsId).Name);
+    }
 }
