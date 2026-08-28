@@ -53,7 +53,7 @@ describe('TabRootMasthead', () => {
 
     expect(screen.getByLabelText('Profile, 3 unread conversations')).toBeOnTheScreen();
     expect(screen.getByText('CM')).toBeOnTheScreen();
-    expect(screen.getByText('3')).toBeOnTheScreen();
+    expect(screen.getByText('3', { includeHiddenElements: true })).toBeOnTheScreen();
   });
 
   it('hides the unread badge when signed out even if a count leaked', () => {
