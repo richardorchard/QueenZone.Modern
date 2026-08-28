@@ -2,6 +2,7 @@ import { screen, userEvent, waitFor } from '@testing-library/react-native';
 import { fetchPhotoCategory, fetchPhotoCategoryItems } from '../../api';
 import { ApiError } from '../../api/client';
 import type { PhotoCategoryListItem, PhotoListItem } from '../../api/types';
+import type { ApiPagedResponse } from '../../api/types';
 import { pagedResponse } from '../../test/fixtures';
 import { fakeNavigation, flushVirtualizedList, renderWithProviders } from '../../test/render';
 import { testIds } from '../../test/testIds';
@@ -50,6 +51,33 @@ function photoFixture(overrides: Partial<PhotoListItem> = {}): PhotoListItem {
     categoryPath: '/photography/brian-may',
     ...overrides,
   };
+}
+
+function photoItemsPage(
+  count: number,
+  totalCount: number,
+  overrides: Partial<PhotoListItem> = {},
+): ApiPagedResponse<PhotoListItem> {
+  const items = Array.from({ length: count }, (_, index) =>
+    photoFixture({
+      picId: 101 + index,
+      title: index === 0 ? 'Live Aid' : `Photo ${101 + index}`,
+      detailPath: `/photography/brian-may/${101 + index}`,
+      ...overrides,
+    }),
+  );
+  return {
+    items,
+    page: 1,
+    pageSize: 24,
+    totalCount,
+    totalPages: Math.max(1, Math.ceil(totalCount / 24)),
+  };
+}
+
+function querySize(call: unknown[]): string | undefined {
+  const query = call[1] as { size?: string } | undefined;
+  return query?.size;
 }
 
 function renderPhotoCategory(navigation = fakeNavigation()) {
@@ -123,25 +151,75 @@ describe('PhotoCategoryScreen', () => {
     );
   });
 
-  it('re-queries the collection when a size chip is pressed', async () => {
-    fetchCategory.mockResolvedValue(categoryFixture());
-    fetchItems.mockResolvedValue(pagedResponse([photoFixture()]));
+  it('keeps the size chip selected and uses the filtered total without resetting', async () => {
+    fetchCategory.mockResolvedValue(categoryFixture({ imageCount: 1087 }));
+    fetchItems.mockImplementation(async (_slug, query = {}) => {
+      if (query.size === 'desktop') {
+        return photoItemsPage(24, 412);
+      }
+      if (query.size === 'phone') {
+        return photoItemsPage(0, 0);
+      }
+      return photoItemsPage(24, 1087);
+    });
 
-    renderPhotoCategory();
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Live Aid' })).toBeOnTheScreen());
-    expect(fetchItems).toHaveBeenCalledWith(
-      'brian-may',
-      expect.objectContaining({ page: 1, pageSize: 24, size: undefined }),
-    );
+    const { navigation } = renderPhotoCategory();
+    await waitFor(() => expect(screen.getByText('Showing 1–24 of 1087')).toBeOnTheScreen());
+    expect(screen.getByText('1,087 images in the archive')).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'All sizes' }).props.accessibilityState).toEqual({
+      selected: true,
+    });
 
     const user = userEvent.setup();
     await user.press(screen.getByRole('button', { name: 'Desktop wallpaper' }));
 
+    await waitFor(() => expect(screen.getByText('Showing 1–24 of 412')).toBeOnTheScreen());
+    expect(screen.getByRole('button', { name: 'Desktop wallpaper' }).props.accessibilityState).toEqual({
+      selected: true,
+    });
+    expect(screen.getByRole('button', { name: 'All sizes' }).props.accessibilityState).toEqual({
+      selected: false,
+    });
+    expect(screen.getByText('1,087 images in the archive')).toBeOnTheScreen();
+    expect(querySize(fetchItems.mock.calls[fetchItems.mock.calls.length - 1])).toBe('desktop');
+    expect(fetchItems.mock.calls.slice(1).some((call) => querySize(call) === undefined)).toBe(false);
+
+    await user.press(screen.getByRole('button', { name: 'Live Aid' }));
+    expect(navigation.navigate).toHaveBeenCalledWith('PhotoViewer', {
+      slug: 'brian-may',
+      picId: 101,
+      size: 'desktop',
+    });
+
+    await user.press(screen.getByRole('button', { name: 'All sizes' }));
+    await waitFor(() => expect(screen.getByText('Showing 1–24 of 1087')).toBeOnTheScreen());
+    expect(screen.getByRole('button', { name: 'All sizes' }).props.accessibilityState).toEqual({
+      selected: true,
+    });
+    expect(querySize(fetchItems.mock.calls[fetchItems.mock.calls.length - 1])).toBeUndefined();
+  });
+
+  it('shows empty copy for a size preset with no matches', async () => {
+    fetchCategory.mockResolvedValue(categoryFixture());
+    fetchItems.mockImplementation(async (_slug, query = {}) => {
+      if (query.size === 'phone') {
+        return photoItemsPage(0, 0);
+      }
+      return pagedResponse([photoFixture()]);
+    });
+
+    renderPhotoCategory();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Live Aid' })).toBeOnTheScreen());
+
+    const user = userEvent.setup();
+    await user.press(screen.getByRole('button', { name: 'Phone wallpaper' }));
+
     await waitFor(() =>
-      expect(fetchItems).toHaveBeenCalledWith(
-        'brian-may',
-        expect.objectContaining({ page: 1, pageSize: 24, size: 'desktop' }),
-      ),
+      expect(screen.getByText('No images match Phone wallpaper.')).toBeOnTheScreen(),
     );
+    expect(screen.getByRole('button', { name: 'Phone wallpaper' }).props.accessibilityState).toEqual({
+      selected: true,
+    });
+    expect(screen.queryByRole('button', { name: 'Live Aid' })).toBeNull();
   });
 });

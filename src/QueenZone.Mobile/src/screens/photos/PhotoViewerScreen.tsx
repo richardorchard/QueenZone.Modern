@@ -14,7 +14,6 @@ import {
   photoCdnSource,
   photoCounterLabel,
   photoDetailMeta,
-  photoSizeFromPath,
   photoViewerParams,
   resolvedPhotoSize,
   schedulePhotoGallerySwipe,
@@ -75,9 +74,7 @@ export function PhotoViewerScreen({ navigation, route }: Props) {
         return;
       }
 
-      navigation.setParams(
-        photoViewerParams(slug, neighborPicId, photoSizeFromPath(photoRef.current.detailPath) ?? size),
-      );
+      navigation.setParams(photoViewerParams(slug, neighborPicId, size));
     },
     [navigation, picId, size, slug],
   );
