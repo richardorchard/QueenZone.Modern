@@ -27,13 +27,6 @@ export type OnThisDayWidgetProps = WidgetProps;
 function OnThisDayWidgetView(props: OnThisDayWidgetProps) {
   'widget';
 
-  const formattedDate = props == null ? undefined : props.formattedDate;
-  const summary = props == null ? undefined : props.summary;
-  const quoteText = props == null ? undefined : props.quoteText;
-  const quoteWhoSaid = props == null ? undefined : props.quoteWhoSaid;
-  const hasDay = Boolean(formattedDate && summary);
-  const hasQuote = Boolean(quoteText && quoteWhoSaid);
-
   return (
     <VStack
       alignment="leading"
@@ -45,9 +38,9 @@ function OnThisDayWidgetView(props: OnThisDayWidgetProps) {
       ]}
     >
       <Text modifiers={[foregroundStyle('#B89A4A'), font({ size: 10, weight: 'semibold' })]}>
-        {hasDay ? 'ON THIS DAY' : 'QUOTE'}
+        {props.formattedDate && props.summary ? 'ON THIS DAY' : 'QUOTE'}
       </Text>
-      {hasDay ? (
+      {props.formattedDate && props.summary ? (
         <Text
           modifiers={[
             foregroundStyle('#F2F1ED'),
@@ -56,10 +49,10 @@ function OnThisDayWidgetView(props: OnThisDayWidgetProps) {
             truncationMode('tail'),
           ]}
         >
-          {`${formattedDate}: ${summary}`}
+          {`${props.formattedDate}: ${props.summary}`}
         </Text>
       ) : null}
-      {hasQuote ? (
+      {props.quoteText && props.quoteWhoSaid ? (
         <Text
           modifiers={[
             foregroundStyle('#B8B6B0'),
@@ -68,10 +61,10 @@ function OnThisDayWidgetView(props: OnThisDayWidgetProps) {
             truncationMode('tail'),
           ]}
         >
-          {`“${quoteText}” — ${quoteWhoSaid}`}
+          {`“${props.quoteText}” — ${props.quoteWhoSaid}`}
         </Text>
       ) : null}
-      {!hasDay && !hasQuote ? (
+      {!(props.formattedDate && props.summary) && !(props.quoteText && props.quoteWhoSaid) ? (
         <Text
           modifiers={[
             foregroundStyle('#B8B6B0'),
