@@ -40,6 +40,9 @@ internal sealed class AdminEfWebTestHarness : IAsyncDisposable
                 services.RemoveAll<INewsAgentRunLeaseService>();
                 services.RemoveAll<IMemberAccountRepository>();
                 services.RemoveAll<SharedNewsDiscoveryStore>();
+                // Publish now creates a News-forum topic via ForumPostWriteService, which
+                // needs a member store for the QueenZone system author.
+                services.AddSingleton<IMemberAccountRepository, InMemoryMemberAccountRepository>();
 
                 // IArticleSubmissionRepository depends on IMemberAccountRepository (removed above).
                 // IArticleRepository depends on IArticleSubmissionRepository.
