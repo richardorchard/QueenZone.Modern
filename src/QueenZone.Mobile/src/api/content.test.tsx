@@ -3,6 +3,7 @@ import {
   fetchBiographyChapter,
   fetchBiographyPage,
   fetchDiscographyPage,
+  fetchAllFanPerformances,
   fetchFanPerformanceDetail,
   fetchFanPerformancesPage,
   fetchFreddieTributePage,
@@ -17,7 +18,7 @@ import {
   fetchRandomQuote,
   fetchTimelinePage,
 } from './content';
-import { jsonResponse } from '../test/fixtures';
+import { fanPerformanceFixture, jsonResponse } from '../test/fixtures';
 
 jest.mock('../config', () => ({
   apiV1Url: (path: string) => `http://qz.test/api/v1${path.startsWith('/') ? path : `/${path}`}`,
@@ -135,6 +136,40 @@ describe('fetchFreddieTributePage and fetchFanPerformancesPage/Detail', () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ id: 9 }));
     await fetchFanPerformanceDetail(9);
     expect(lastUrl()).toBe('http://qz.test/api/v1/content/fan-performances/9');
+  });
+
+  it('fetchAllFanPerformances walks every page at pageSize 100', async () => {
+    const first = fanPerformanceFixture({ id: 1, title: 'First' });
+    const second = fanPerformanceFixture({ id: 2, title: 'Second' });
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse({
+          items: [first],
+          page: 1,
+          pageSize: 100,
+          totalCount: 2,
+          totalPages: 2,
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          items: [second],
+          page: 2,
+          pageSize: 100,
+          totalCount: 2,
+          totalPages: 2,
+        }),
+      );
+
+    const catalog = await fetchAllFanPerformances();
+    expect(catalog).toEqual([first, second]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
+      'http://qz.test/api/v1/content/fan-performances?page=1&pageSize=100',
+    );
+    expect(String(fetchMock.mock.calls[1]?.[0])).toBe(
+      'http://qz.test/api/v1/content/fan-performances?page=2&pageSize=100',
+    );
   });
 });
 

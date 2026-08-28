@@ -126,6 +126,32 @@ export function fetchFanPerformancesPage(
   return fetchJson('/content/fan-performances', { query: pageParams(query), signal: query.signal });
 }
 
+/** Max page size the JSON API accepts (`ApiPagination.MaxPageSize`). */
+const FAN_PERFORMANCE_CATALOG_PAGE_SIZE = 100;
+
+/**
+ * Full published catalog for Play All / Shuffle Play All.
+ * Walks existing paged list GETs; does not use the list screen's loaded pages.
+ */
+export async function fetchAllFanPerformances(signal?: AbortSignal): Promise<FanPerformance[]> {
+  const catalog: FanPerformance[] = [];
+  let page = 1;
+  let totalPages = 1;
+
+  do {
+    const response = await fetchFanPerformancesPage({
+      page,
+      pageSize: FAN_PERFORMANCE_CATALOG_PAGE_SIZE,
+      signal,
+    });
+    catalog.push(...response.items);
+    totalPages = Math.max(response.totalPages, 1);
+    page += 1;
+  } while (page <= totalPages);
+
+  return catalog;
+}
+
 export function fetchFanPerformanceDetail(
   id: number,
   signal?: AbortSignal,

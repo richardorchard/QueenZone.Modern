@@ -54,6 +54,8 @@ export const testIds = {
   profileRestoring: 'profile-restoring',
   fanPerformanceSessionRestoring: 'fan-performance-session-restoring',
   fanPerformancesScreen: 'fan-performances-screen',
+  fanPerformancesPlayAll: 'fan-performances-play-all',
+  fanPerformancesShufflePlayAll: 'fan-performances-shuffle-play-all',
   fanPerformanceRowPrefix: 'fan-performance-',
   fanPerformancePlayPrefix: 'fan-performance-play-',
 
