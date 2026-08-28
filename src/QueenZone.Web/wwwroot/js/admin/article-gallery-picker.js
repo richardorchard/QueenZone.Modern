@@ -82,8 +82,7 @@
 
       resetCropFields(root);
 
-      if (preview && imageUrl) {
-        preview.src = imageUrl;
+      if (assignGalleryPreviewSrc(preview, imageUrl)) {
         preview.alt = title;
         preview.style.objectPosition = "";
       }
@@ -119,6 +118,23 @@
         panel.innerHTML = "<p class=\"admin-help\">Could not load gallery photos.</p>";
         panel.setAttribute("aria-busy", "false");
       });
+  }
+
+  // data-image-url is a modeled taint step (js/xss-through-dom).
+  // Only public photo CDN URLs may reach img.src; encodeURI is the XSS sanitizer
+  // CodeQL recognizes.
+  function asGalleryPreviewUrl(url) {
+    return typeof url === "string" && url.indexOf("https://cdn.queenzone.org/") === 0 ? url : "";
+  }
+
+  function assignGalleryPreviewSrc(image, url) {
+    var safeUrl = asGalleryPreviewUrl(url);
+    if (!image || !safeUrl) {
+      return false;
+    }
+
+    image.src = encodeURI(safeUrl);
+    return true;
   }
 
   function resetCropFields(root) {

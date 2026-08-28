@@ -775,6 +775,16 @@ public sealed class AdminNewsRoutesTests : IClassFixture<QueenZoneWebApplication
     }
 
     [Fact]
+    public async Task GalleryPickerScript_assigns_cdn_preview_through_encodeUri()
+    {
+        var script = await CreateClient().GetStringAsync("/js/admin/article-gallery-picker.js");
+
+        Assert.Contains("https://cdn.queenzone.org/", script);
+        Assert.Contains("encodeURI", script);
+        Assert.DoesNotContain("preview.src = imageUrl", script);
+    }
+
+    [Fact]
     public async Task GalleryPicker_requires_admin()
     {
         var anonymous = CreateClient();
