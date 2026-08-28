@@ -22,7 +22,9 @@ public abstract class AdminNewsPageModel : PageModel
             article.Excerpt,
             article.Body,
             article.PublishedAt,
-            article.SourceUrl);
+            article.SourceUrl,
+            article.ImageBlobKey,
+            article.ImageGalleryPicId);
 
     protected static NewsDetailItem ToNewsDetailItem(AdminNewsArticle article) =>
         PublicContentMapper.ToNewsDetailItem(article);

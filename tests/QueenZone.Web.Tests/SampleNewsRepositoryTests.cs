@@ -17,6 +17,8 @@ public sealed class SampleNewsRepositoryTests
         Assert.Contains("href=\"https://www.queenzone.org/news\"", item.Body, StringComparison.Ordinal);
         Assert.Contains("src=\"/ugc/news/sample-crest.jpg\"", item.Body, StringComparison.Ordinal);
         Assert.Contains("alt=\"QueenZone crest\"", item.Body, StringComparison.Ordinal);
+        Assert.Null(item.ImageBlobKey);
+        Assert.Null(item.ImageGalleryPicId);
     }
 
     [Fact]

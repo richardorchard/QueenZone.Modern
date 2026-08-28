@@ -10,4 +10,6 @@ public sealed record NewsItem(
     bool IsPublished,
     string? Slug = null,
     Guid? SubmitterMemberId = null,
-    string? SubmitterDisplayName = null);
+    string? SubmitterDisplayName = null,
+    string? ImageBlobKey = null,
+    int? ImageGalleryPicId = null);

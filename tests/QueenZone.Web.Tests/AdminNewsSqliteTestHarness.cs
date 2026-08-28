@@ -23,7 +23,9 @@ internal static class AdminNewsSqliteTestHarness
             CAST(NULL AS INTEGER) AS USER_ID,
             NEWS_ID AS NewsId,
             TYPE,
-            QUEEN_ONLINE
+            QUEEN_ONLINE,
+            IMAGE_BLOB_KEY,
+            IMAGE_GALLERY_PIC_ID
         FROM NEWS_T
         WHERE 1 = 1
         """;
@@ -45,7 +47,9 @@ internal static class AdminNewsSqliteTestHarness
                 EDITOR_EMAIL TEXT NULL,
                 USER_ID INTEGER NULL,
                 TYPE INTEGER NOT NULL DEFAULT 0,
-                QUEEN_ONLINE INTEGER NOT NULL DEFAULT 0
+                QUEEN_ONLINE INTEGER NOT NULL DEFAULT 0,
+                IMAGE_BLOB_KEY TEXT NULL,
+                IMAGE_GALLERY_PIC_ID INTEGER NULL
             );
             """);
     }

@@ -12,6 +12,7 @@ import {
 import { deferred, newsItemFixture, pagedResponse } from '../../test/fixtures';
 import { createMockSession } from '../../test/mockSession';
 import { fakeNavigation, flushVirtualizedList, renderWithProviders } from '../../test/render';
+import { bumpNewsListEpoch } from '../../notifications/newsListEpoch';
 import { HomeScreen } from './HomeScreen';
 
 jest.mock('../../api', () => {
@@ -138,6 +139,48 @@ describe('HomeScreen', () => {
       initial: false,
     });
     expect(JSON.stringify(navigation.navigate.mock.calls)).not.toContain('magic-tour');
+  });
+
+  it('refreshes only the news section when a news push bumps the list epoch', async () => {
+    renderHome();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Live Aid remembered' })).toBeOnTheScreen());
+    const newsCalls = fetchNews.mock.calls.length;
+    const forumCalls = fetchForum.mock.calls.length;
+    const photoCalls = fetchPhotos.mock.calls.length;
+
+    fetchNews.mockResolvedValueOnce(
+      pagedResponse(
+        [
+          newsItemFixture({ id: 2001, title: 'Brand new headline' }),
+          newsItemFixture({ id: 1003, title: 'QueenZone modernisation begins' }),
+        ],
+        1,
+        1,
+      ),
+    );
+
+    await act(async () => {
+      bumpNewsListEpoch();
+    });
+
+    await waitFor(() => expect(screen.getByText('Brand new headline')).toBeOnTheScreen());
+    expect(fetchNews.mock.calls.length).toBe(newsCalls + 1);
+    expect(fetchForum.mock.calls.length).toBe(forumCalls);
+    expect(fetchPhotos.mock.calls.length).toBe(photoCalls);
+    await flushVirtualizedList();
+  });
+
+  it('does not refetch news after unmount when a news push arrives', async () => {
+    const { unmount } = renderHome();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Live Aid remembered' })).toBeOnTheScreen());
+    const newsCalls = fetchNews.mock.calls.length;
+    unmount();
+
+    await act(async () => {
+      bumpNewsListEpoch();
+    });
+
+    expect(fetchNews.mock.calls.length).toBe(newsCalls);
   });
 
   it('pull-to-refresh reloads live home sections', async () => {

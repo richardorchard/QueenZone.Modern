@@ -16,7 +16,11 @@ public static class PublicContentMapper
             item.PublishedAt,
             NewsRoutes.GetNewsDetailPath(item.Id, item.Title, item.Slug),
             item.SubmitterMemberId,
-            item.SubmitterDisplayName);
+            item.SubmitterDisplayName,
+            item.ImageBlobKey,
+            item.ImageGalleryPicId,
+            NewsArticleImage.ResolveImageUrl(item.ImageBlobKey, item.ImageGalleryPicId),
+            NewsArticleImage.ResolveThumbnailUrl(item.ImageBlobKey, item.ImageGalleryPicId));
 
     public static IReadOnlyList<NewsArchiveItem> ToNewsArchiveItems(IEnumerable<NewsItem> items) =>
         items.Select(ToNewsArchiveItem).ToList();
@@ -31,7 +35,11 @@ public static class PublicContentMapper
             item.SourceUrl,
             NewsRoutes.GetNewsDetailPath(item.Id, item.Title, item.Slug),
             item.SubmitterMemberId,
-            item.SubmitterDisplayName);
+            item.SubmitterDisplayName,
+            item.ImageBlobKey,
+            item.ImageGalleryPicId,
+            NewsArticleImage.ResolveImageUrl(item.ImageBlobKey, item.ImageGalleryPicId),
+            NewsArticleImage.ResolveThumbnailUrl(item.ImageBlobKey, item.ImageGalleryPicId));
 
     public static NewsDetailItem ToNewsDetailItem(AdminNewsArticle article) =>
         new(
@@ -44,7 +52,11 @@ public static class PublicContentMapper
             NewsRoutes.GetNewsDetailPath(
                 article.Id,
                 article.Title,
-                string.IsNullOrWhiteSpace(article.Slug) ? null : article.Slug));
+                string.IsNullOrWhiteSpace(article.Slug) ? null : article.Slug),
+            ImageBlobKey: article.ImageBlobKey,
+            ImageGalleryPicId: article.ImageGalleryPicId,
+            ImageUrl: NewsArticleImage.ResolveImageUrl(article.ImageBlobKey, article.ImageGalleryPicId),
+            ThumbnailUrl: NewsArticleImage.ResolveThumbnailUrl(article.ImageBlobKey, article.ImageGalleryPicId));
 
     public static ArticleArchiveItem ToArticleArchiveItem(ArticleItem item) =>
         new(
