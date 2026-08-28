@@ -182,6 +182,26 @@ describe('mobile API consumer contracts', { concurrency: false }, () => {
     );
     assert.ok(posts.items.length > 0, 'Contract GET /api/v1/forum/topics/1002/posts failed: expected field items to be non-empty');
     assert.equal(posts.pageSize, 15);
+    const withAttachment = posts.items.find((item) => item.attachments.length > 0);
+    assert.ok(withAttachment, 'Contract GET /api/v1/forum/topics/1002/posts failed: expected an attachment');
+    assert.match(withAttachment.attachments[0].url, /^\/forum\/attachment\//);
+    assert.match(withAttachment.attachments[0].downloadUrl, /^\/api\/v1\/forum\/attachments\//);
+    assert.notEqual(withAttachment.attachments[0].url, withAttachment.attachments[0].downloadUrl);
+
+    const denied = await fetch(`${fixture.baseUrl}/api/v1/forum/attachments/legacy/1002`, {
+      redirect: 'manual',
+    });
+    expectedStatus('GET /api/v1/forum/attachments/legacy/1002', denied.status, 401);
+
+    const allowed = await fetch(`${fixture.baseUrl}/api/v1/forum/attachments/legacy/1002`, {
+      headers: { Authorization: `Bearer ${token}` },
+      redirect: 'manual',
+    });
+    assert.ok(
+      allowed.status === 301 || allowed.status === 302 || allowed.status === 307 || allowed.status === 308,
+      `Contract GET /api/v1/forum/attachments/legacy/1002 failed: expected a redirect for a signed-in member, received ${allowed.status}`,
+    );
+    assert.match(allowed.headers.get('location') ?? '', /cdn2\.queenzone\.org\/attachments\//);
 
     const performances = parseContract(
       'GET /api/v1/content/fan-performances',
