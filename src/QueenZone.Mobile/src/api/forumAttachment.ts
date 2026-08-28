@@ -40,6 +40,7 @@ export async function fetchForumAttachment(
 
   const response = await fetch(url, {
     method: 'GET',
+    redirect: 'follow',
     headers: {
       Accept: '*/*',
       Authorization: `Bearer ${accessToken}`,
@@ -61,6 +62,29 @@ export async function fetchForumAttachment(
     contentType,
     dataUri: `data:${contentType};base64,${bytesToBase64(bytes)}`,
   };
+}
+
+/**
+ * Bearer GET an image (follows the legacy CDN redirect) and return a local
+ * cached data URI for the in-app viewer. RN Image must not load `url`.
+ */
+export async function openForumAttachmentImage(
+  downloadUrl: string,
+  accessToken: string,
+  signal?: AbortSignal,
+): Promise<string> {
+  const cached = imageCache.get(downloadUrl);
+  if (cached) {
+    return cached;
+  }
+
+  const fetched = await fetchForumAttachment(downloadUrl, accessToken, signal);
+  if (isCookieGatedForumAttachmentPath(fetched.finalUrl)) {
+    throw ApiError.http(400, 'This attachment cannot be opened from the app.');
+  }
+
+  imageCache.set(downloadUrl, fetched.dataUri);
+  return fetched.dataUri;
 }
 
 /** Open a non-image after a Bearer fetch. Follows a public CDN redirect; otherwise shares the bytes. */
@@ -87,6 +111,8 @@ export async function openForumAttachmentFile(
     url: fetched.dataUri,
   });
 }
+
+const imageCache = new Map<string, string>();
 
 function bytesToBase64(bytes: Uint8Array): string {
   let binary = '';

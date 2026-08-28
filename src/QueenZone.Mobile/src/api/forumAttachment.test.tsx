@@ -1,5 +1,10 @@
 import { Linking, Share } from 'react-native';
-import { fetchForumAttachment, isCookieGatedForumAttachmentPath, openForumAttachmentFile } from './forumAttachment';
+import {
+  fetchForumAttachment,
+  isCookieGatedForumAttachmentPath,
+  openForumAttachmentFile,
+  openForumAttachmentImage,
+} from './forumAttachment';
 
 jest.mock('../config', () => ({
   getAppConfig: () => ({ apiBaseUrl: 'http://qz.test' }),
@@ -60,6 +65,8 @@ describe('fetchForumAttachment', () => {
     expect(fetchMock).toHaveBeenCalledWith(
       'http://qz.test/api/v1/forum/attachments/legacy/1002',
       expect.objectContaining({
+        method: 'GET',
+        redirect: 'follow',
         headers: expect.objectContaining({ Authorization: 'Bearer tok' }),
       }),
     );
@@ -112,5 +119,45 @@ describe('openForumAttachmentFile', () => {
     expect(Share.share).toHaveBeenCalledWith(
       expect.objectContaining({ title: 'notes.txt', url: expect.stringMatching(/^data:text\/plain;base64,/) }),
     );
+  });
+});
+
+describe('openForumAttachmentImage', () => {
+  it('refuses the cookie-gated path', async () => {
+    await expect(openForumAttachmentImage('/forum/attachment/legacy/1002', 'tok')).rejects.toMatchObject({
+      name: 'ApiError',
+      status: 400,
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('follows the legacy redirect and returns a cached data URI', async () => {
+    fetchMock.mockResolvedValue(
+      okResponse('image/jpeg', [1, 2, 3], 'https://cdn2.queenzone.org/attachments/scan.jpg'),
+    );
+
+    const first = await openForumAttachmentImage('/api/v1/forum/attachments/legacy/1043-scan', 'tok');
+    const second = await openForumAttachmentImage('/api/v1/forum/attachments/legacy/1043-scan', 'tok');
+
+    expect(first).toMatch(/^data:image\/jpeg;base64,/);
+    expect(second).toBe(first);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://qz.test/api/v1/forum/attachments/legacy/1043-scan',
+      expect.objectContaining({ redirect: 'follow' }),
+    );
+  });
+
+  it('refuses a cookie-gated final URL after follow', async () => {
+    fetchMock.mockResolvedValueOnce(
+      okResponse('image/jpeg', [1], 'http://qz.test/forum/attachment/legacy/1002'),
+    );
+
+    await expect(
+      openForumAttachmentImage('/api/v1/forum/attachments/legacy/1043-cookie-final', 'tok'),
+    ).rejects.toMatchObject({
+      name: 'ApiError',
+      status: 400,
+    });
   });
 });

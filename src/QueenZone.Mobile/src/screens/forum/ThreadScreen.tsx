@@ -20,6 +20,7 @@ import {
   fetchForumTopicWatch,
   isCookieGatedForumAttachmentPath,
   openForumAttachmentFile,
+  openForumAttachmentImage,
   unwatchForumTopic,
   voteForumTopicPoll,
   watchForumTopic,
@@ -399,9 +400,7 @@ function ForumAttachmentList({
 }) {
   const { c } = useTheme();
   const press = usePressProps();
-  const [viewer, setViewer] = useState<{ uri: string; headers: Record<string, string>; label: string } | null>(
-    null,
-  );
+  const [viewer, setViewer] = useState<{ uri: string; label: string } | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [errorKey, setErrorKey] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -416,23 +415,16 @@ function ForumAttachmentList({
       if (!accessToken || isCookieGatedForumAttachmentPath(attachment.downloadUrl)) {
         return;
       }
-      const viewerUri = resolveContentUrl(attachment.downloadUrl, getAppConfig().apiBaseUrl);
-      if (!viewerUri || isCookieGatedForumAttachmentPath(viewerUri)) {
-        return;
-      }
       const key = `${attachment.downloadUrl}-${attachment.fileName}`;
       setErrorKey(null);
       setErrorMessage(null);
-      if (action === 'view-image') {
-        setViewer({
-          uri: viewerUri,
-          headers: { Authorization: `Bearer ${accessToken}` },
-          label: attachment.fileName,
-        });
-        return;
-      }
       setBusyKey(key);
       try {
+        if (action === 'view-image') {
+          const uri = await openForumAttachmentImage(attachment.downloadUrl, accessToken);
+          setViewer({ uri, label: attachment.fileName });
+          return;
+        }
         await openForumAttachmentFile(attachment.downloadUrl, accessToken, attachment.fileName);
       } catch (err: unknown) {
         setErrorKey(key);
@@ -516,7 +508,7 @@ function ForumAttachmentList({
         >
           {viewer ? (
             <Image
-              source={{ uri: viewer.uri, headers: viewer.headers }}
+              source={{ uri: viewer.uri }}
               style={styles.viewerImage}
               resizeMode="contain"
               accessibilityLabel={viewer.label}

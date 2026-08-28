@@ -5,6 +5,7 @@ import {
   fetchForumTopicPosts,
   fetchForumTopicWatch,
   openForumAttachmentFile,
+  openForumAttachmentImage,
   unwatchForumTopic,
   voteForumTopicPoll,
   watchForumTopic,
@@ -29,6 +30,7 @@ jest.mock('../../api', () => {
     voteForumTopicPoll: jest.fn(),
     closeForumTopicPoll: jest.fn(),
     openForumAttachmentFile: jest.fn(),
+    openForumAttachmentImage: jest.fn(),
   };
 });
 
@@ -50,6 +52,7 @@ const watchTopic = watchForumTopic as jest.MockedFunction<typeof watchForumTopic
 const unwatchTopic = unwatchForumTopic as jest.MockedFunction<typeof unwatchForumTopic>;
 const votePoll = voteForumTopicPoll as jest.MockedFunction<typeof voteForumTopicPoll>;
 const openAttachment = openForumAttachmentFile as jest.MockedFunction<typeof openForumAttachmentFile>;
+const openImage = openForumAttachmentImage as jest.MockedFunction<typeof openForumAttachmentImage>;
 
 function renderThread(navigation = fakeNavigation()) {
   return {
@@ -112,6 +115,8 @@ describe('ThreadScreen watch control', () => {
     votePoll.mockReset();
     openAttachment.mockReset();
     openAttachment.mockResolvedValue(undefined);
+    openImage.mockReset();
+    openImage.mockResolvedValue('data:image/jpeg;base64,dGVzdA==');
   });
 
   afterEach(async () => {
@@ -303,7 +308,10 @@ describe('ThreadScreen attachments', () => {
     });
     fetchPoll.mockResolvedValue({} as never);
     fetchWatch.mockResolvedValue({ watching: false });
+    openAttachment.mockReset();
     openAttachment.mockResolvedValue(undefined);
+    openImage.mockReset();
+    openImage.mockResolvedValue('data:image/jpeg;base64,dGVzdA==');
   });
 
   afterEach(async () => {
@@ -336,17 +344,93 @@ describe('ThreadScreen attachments', () => {
     renderThread();
     await waitFor(() => expect(screen.getByText('anoto-setlist-scan.jpg')).toBeOnTheScreen());
     expect(screen.queryByTestId(testIds.forumThreadAttachmentViewer)).toBeNull();
+    expect(openImage).not.toHaveBeenCalled();
 
     const user = userEvent.setup();
     await user.press(screen.getByRole('button', { name: /anoto-setlist-scan.jpg/ }));
+    await waitFor(() =>
+      expect(openImage).toHaveBeenCalledWith('/api/v1/forum/attachments/legacy/1002', 'tok'),
+    );
     const viewer = screen.getByTestId(testIds.forumThreadAttachmentViewer);
     const viewerImage = within(viewer).getByLabelText('anoto-setlist-scan.jpg');
     expect(viewerImage.props.source).toEqual({
-      uri: 'http://qz.test/api/v1/forum/attachments/legacy/1002',
-      headers: { Authorization: 'Bearer tok' },
+      uri: 'data:image/jpeg;base64,dGVzdA==',
     });
-    expect(viewerImage.props.source.uri).not.toContain('/forum/attachment/legacy/');
+    expect(viewerImage.props.source.headers).toBeUndefined();
+    expect(viewerImage.props.source.uri).not.toContain('/forum/attachment/');
+    expect(viewerImage.props.source.uri).not.toMatch(/^https?:\/\//);
     expect(openAttachment).not.toHaveBeenCalled();
+  });
+
+  it('keeps a thumbed image inline and does not fetch the original', async () => {
+    mockSession.isSignedIn = true;
+    mockSession.accessToken = 'tok';
+    fetchPosts.mockResolvedValue(
+      pagedResponse(
+        [
+          {
+            id: 1002,
+            body: '<p>Hello</p>',
+            postedAt: '2024-06-01T10:00:00.000Z',
+            authorUsername: 'brightonrock',
+            signature: null,
+            authorMemberSince: null,
+            authorMemberId: null,
+            editedAt: null,
+            editCount: 0,
+            attachments: [
+              {
+                ...imageNoThumb,
+                fileName: 'tour-poster.jpg',
+                thumbnailUrl: '/ugc/forum/tour-poster-thumb.webp',
+              },
+            ],
+          },
+        ],
+        1,
+        1,
+      ),
+    );
+    renderThread();
+    await waitFor(() => expect(screen.getByText('tour-poster.jpg')).toBeOnTheScreen());
+    expect(screen.getByLabelText('tour-poster.jpg')).toBeOnTheScreen();
+    expect(screen.queryByRole('button', { name: /tour-poster.jpg/ })).toBeNull();
+    expect(screen.queryByTestId(testIds.forumThreadAttachmentViewer)).toBeNull();
+    expect(openImage).not.toHaveBeenCalled();
+    expect(openAttachment).not.toHaveBeenCalled();
+  });
+
+  it('shows an error when the image download fails', async () => {
+    mockSession.isSignedIn = true;
+    mockSession.accessToken = 'tok';
+    openImage.mockRejectedValueOnce(new ApiError(401, 'Sign in to continue.'));
+    fetchPosts.mockResolvedValue(
+      pagedResponse(
+        [
+          {
+            id: 1002,
+            body: '<p>Hello</p>',
+            postedAt: '2024-06-01T10:00:00.000Z',
+            authorUsername: 'brightonrock',
+            signature: null,
+            authorMemberSince: null,
+            authorMemberId: null,
+            editedAt: null,
+            editCount: 0,
+            attachments: [imageNoThumb],
+          },
+        ],
+        1,
+        1,
+      ),
+    );
+    renderThread();
+    await waitFor(() => expect(screen.getByText('anoto-setlist-scan.jpg')).toBeOnTheScreen());
+
+    const user = userEvent.setup();
+    await user.press(screen.getByRole('button', { name: /anoto-setlist-scan.jpg/ }));
+    await waitFor(() => expect(screen.getByText('Sign in to continue.')).toBeOnTheScreen());
+    expect(screen.queryByTestId(testIds.forumThreadAttachmentViewer)).toBeNull();
   });
 
   it('lets a signed-in member download a non-image attachment', async () => {
@@ -416,5 +500,6 @@ describe('ThreadScreen attachments', () => {
     expect(screen.queryByRole('button', { name: /opera-side-two-notes.pdf/ })).toBeNull();
     expect(screen.queryByTestId(testIds.forumThreadAttachmentViewer)).toBeNull();
     expect(openAttachment).not.toHaveBeenCalled();
+    expect(openImage).not.toHaveBeenCalled();
   });
 });
