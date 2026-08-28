@@ -10,7 +10,7 @@ public sealed class InMemoryDeviceTokenRepository(SharedDeviceTokenStore store) 
     {
         lock (store.Gate)
         {
-            var existing = store.Tokens.FirstOrDefault(row => row.DeviceId == token.DeviceId);
+            var existing = store.Tokens.FirstOrDefault(row => SameDeviceId(row.DeviceId, token.DeviceId));
             if (existing is null)
             {
                 var stored = Clone(token);
@@ -64,6 +64,9 @@ public sealed class InMemoryDeviceTokenRepository(SharedDeviceTokenStore store) 
             return Task.FromResult<IReadOnlyList<DeviceTokenEntity>>(matches);
         }
     }
+
+    private static bool SameDeviceId(string left, string right) =>
+        string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
 
     private static DeviceTokenEntity Clone(DeviceTokenEntity token) =>
         new()
