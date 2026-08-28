@@ -133,9 +133,23 @@ describe('tapFromResponse', () => {
         notification: notification({ category: 'forumReply', topicId: '12' }),
       }),
     ).toBeNull();
-    expect(tapFromResponse(response({ category: 'news' }))).toBeNull();
-    expect(tapFromResponse(iosResponse({ category: 'news' }))).toBeNull();
+    expect(tapFromResponse(response({ category: 'digest' }))).toBeNull();
     expect(tapFromResponse(null)).toBeNull();
+  });
+
+  it('opens the category listing when an iOS APNs tap has a category but no detail id', () => {
+    expect(tapFromResponse(iosResponse({ category: 'news' }))).toEqual({
+      identifier: 'req-1',
+      destination: { category: 'news' },
+    });
+    expect(tapFromResponse(iosResponse({ category: 'forumReply' }, 'ios-forum-list'))).toEqual({
+      identifier: 'ios-forum-list',
+      destination: { category: 'forumReply' },
+    });
+    expect(tapFromResponse(iosResponse({ category: 'privateMessage' }, 'ios-pm-list'))).toEqual({
+      identifier: 'ios-pm-list',
+      destination: { category: 'privateMessage' },
+    });
   });
 });
 
@@ -161,16 +175,30 @@ describe('noticeFromNotification', () => {
       body: 'New article published.',
       destination: { category: 'news', articleId: 88 },
     });
-    expect(noticeFromNotification(notification({ category: 'news' }))).toBeNull();
-    expect(noticeFromNotification(iosNotification({ category: 'news' }))).toBeNull();
+    expect(noticeFromNotification(notification({ category: 'digest' }))).toBeNull();
+    expect(noticeFromNotification(iosNotification({ category: 'digest' }))).toBeNull();
   });
 
-  it('maps an iOS APNs foreground receipt when content.data is empty', () => {
-    expect(noticeFromNotification(iosNotification({ category: 'news', articleId: '88' }, 'ios-fg'))).toEqual({
-      identifier: 'ios-fg',
+  it('maps iOS APNs foreground receipts for news, forum, and private message', () => {
+    expect(noticeFromNotification(iosNotification({ category: 'news', articleId: '88' }, 'ios-fg-news'))).toEqual({
+      identifier: 'ios-fg-news',
       title: 'QueenZone modernisation begins',
       body: 'New article published.',
       destination: { category: 'news', articleId: 88 },
+    });
+    expect(noticeFromNotification(iosNotification({ category: 'forumReply', topicId: '1002' }, 'ios-fg-forum'))).toEqual({
+      identifier: 'ios-fg-forum',
+      title: 'QueenZone modernisation begins',
+      body: 'New article published.',
+      destination: { category: 'forumReply', topicId: 1002 },
+    });
+    expect(
+      noticeFromNotification(iosNotification({ category: 'privateMessage', conversationId }, 'ios-fg-pm')),
+    ).toEqual({
+      identifier: 'ios-fg-pm',
+      title: 'QueenZone modernisation begins',
+      body: 'New article published.',
+      destination: { category: 'privateMessage', conversationId },
     });
   });
 });
@@ -260,6 +288,19 @@ describe('subscribeNotificationEvents', () => {
     expect(onTap).toHaveBeenCalledWith({
       identifier: 'ios-warm',
       destination: { category: 'forumReply', topicId: 1002 },
+    });
+  });
+
+  it('opens a private-message tap from an iOS APNs payload', async () => {
+    const onTap = jest.fn();
+    subscribeNotificationEvents({ onTap, onForeground: jest.fn() });
+    await Promise.resolve();
+
+    responseListener?.(iosResponse({ category: 'privateMessage', conversationId }, 'ios-warm-pm'));
+
+    expect(onTap).toHaveBeenCalledWith({
+      identifier: 'ios-warm-pm',
+      destination: { category: 'privateMessage', conversationId },
     });
   });
 

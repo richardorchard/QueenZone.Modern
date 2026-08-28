@@ -16,9 +16,9 @@ export const notificationCategories = ['forumReply', 'privateMessage', 'news'] a
 export type NotificationCategory = (typeof notificationCategories)[number];
 
 export type NotificationDestination =
-  | { category: 'forumReply'; topicId: number; postId?: number }
-  | { category: 'privateMessage'; conversationId: string }
-  | { category: 'news'; articleId: number };
+  | { category: 'forumReply'; topicId?: number; postId?: number }
+  | { category: 'privateMessage'; conversationId?: string }
+  | { category: 'news'; articleId?: number };
 
 const conversationIdPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -101,7 +101,7 @@ export function parseNotificationData(data: unknown): NotificationDestination | 
   if (category === 'forumReply') {
     const topicId = readPositiveInt(record.topicId);
     if (topicId === null) {
-      return null;
+      return { category };
     }
     const postId = readPositiveInt(record.postId);
     return postId === null ? { category, topicId } : { category, topicId, postId };
@@ -109,11 +109,11 @@ export function parseNotificationData(data: unknown): NotificationDestination | 
 
   if (category === 'privateMessage') {
     const conversationId = readConversationId(record.conversationId);
-    return conversationId === null ? null : { category, conversationId };
+    return conversationId === null ? { category } : { category, conversationId };
   }
 
   const articleId = readPositiveInt(record.articleId);
-  return articleId === null ? null : { category, articleId };
+  return articleId === null ? { category } : { category, articleId };
 }
 
 export function fallbackNoticeCopy(destination: NotificationDestination): { title: string; body: string } {
