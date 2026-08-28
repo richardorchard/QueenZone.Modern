@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { getNewsListEpoch, subscribeNewsListEpoch } from '../notifications/newsListEpoch';
+import { subscribeNewsListEpoch } from '../notifications/newsListEpoch';
 
 /**
  * Calls refresh() when a news push bumps the list epoch. Unmount removes the
@@ -9,15 +9,11 @@ export function useNewsListEpochRefresh(refresh: () => void | Promise<void>): vo
   const refreshRef = useRef(refresh);
   refreshRef.current = refresh;
 
-  useEffect(() => {
-    let seen = getNewsListEpoch();
-    return subscribeNewsListEpoch(() => {
-      const current = getNewsListEpoch();
-      if (current === seen) {
-        return;
-      }
-      seen = current;
-      void refreshRef.current();
-    });
-  }, []);
+  useEffect(
+    () =>
+      subscribeNewsListEpoch(() => {
+        void refreshRef.current();
+      }),
+    [],
+  );
 }
