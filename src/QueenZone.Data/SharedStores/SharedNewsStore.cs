@@ -70,7 +70,9 @@ public sealed class SharedNewsStore
                 false,
                 timestamp,
                 timestamp,
-                editorEmail));
+                editorEmail,
+                draft.ImageBlobKey,
+                draft.ImageGalleryPicId));
             return id;
         }
     }
@@ -95,7 +97,9 @@ public sealed class SharedNewsStore
                 PublishedAt = draft.PublishedAt,
                 SourceUrl = draft.SourceUrl,
                 UpdatedAt = DateTime.UtcNow,
-                EditorEmail = editorEmail
+                EditorEmail = editorEmail,
+                ImageBlobKey = draft.ImageBlobKey,
+                ImageGalleryPicId = draft.ImageGalleryPicId
             };
             return true;
         }
@@ -185,5 +189,7 @@ public sealed class SharedNewsStore
             article.PublishedAt,
             article.SourceUrl,
             article.IsPublished,
-            string.IsNullOrWhiteSpace(article.Slug) ? null : article.Slug);
+            string.IsNullOrWhiteSpace(article.Slug) ? null : article.Slug,
+            ImageBlobKey: article.ImageBlobKey,
+            ImageGalleryPicId: article.ImageGalleryPicId);
 }

@@ -43,6 +43,8 @@ public sealed class EfAdminNewsRepositoryTests : IAsyncDisposable
         Assert.Equal(4201, article.Id);
         Assert.Equal("SQLite admin article", article.Title);
         Assert.False(article.IsPublished);
+        Assert.Null(article.ImageBlobKey);
+        Assert.Null(article.ImageGalleryPicId);
     }
 
     [Fact]
@@ -281,6 +283,48 @@ public sealed class EfAdminNewsRepositoryTests : IAsyncDisposable
         command.Parameters.AddWithValue("$newsId", newsId);
         var savedSourceUrl = Assert.IsType<string>(await command.ExecuteScalarAsync());
         Assert.Equal(sourceUrl, savedSourceUrl);
+    }
+
+    [Fact]
+    public async Task CreateDraftAsync_and_UpdateAsync_persist_image_references_without_bytes()
+    {
+        var draft = new AdminNewsDraft(
+            "Created draft with image",
+            "created-draft-with-image",
+            "Created excerpt",
+            "Created body",
+            new DateTime(2026, 6, 21, 0, 0, 0, DateTimeKind.Utc),
+            null,
+            "editors/me/hero.webp",
+            3120);
+
+        var newsId = await repository.CreateDraftAsync(draft, "editor@test.local");
+        var created = await repository.GetByIdAsync(newsId);
+        Assert.NotNull(created);
+        Assert.Equal("editors/me/hero.webp", created.ImageBlobKey);
+        Assert.Equal(3120, created.ImageGalleryPicId);
+
+        await repository.UpdateAsync(
+            newsId,
+            draft with { ImageBlobKey = "gallery:99", ImageGalleryPicId = 99 },
+            "editor@test.local");
+
+        var updated = await repository.GetByIdAsync(newsId);
+        Assert.NotNull(updated);
+        Assert.Equal("gallery:99", updated.ImageBlobKey);
+        Assert.Equal(99, updated.ImageGalleryPicId);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT IMAGE_BLOB_KEY, IMAGE_GALLERY_PIC_ID, typeof(IMAGE_BLOB_KEY)
+            FROM NEWS_T WHERE NEWS_ID = $newsId
+            """;
+        command.Parameters.AddWithValue("$newsId", newsId);
+        await using var reader = await command.ExecuteReaderAsync();
+        Assert.True(await reader.ReadAsync());
+        Assert.Equal("gallery:99", reader.GetString(0));
+        Assert.Equal(99, reader.GetInt32(1));
+        Assert.Equal("text", reader.GetString(2), ignoreCase: true);
     }
 
     public async ValueTask DisposeAsync()

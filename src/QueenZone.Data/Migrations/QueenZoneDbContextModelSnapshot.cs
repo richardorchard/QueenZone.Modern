@@ -1615,6 +1615,15 @@ namespace QueenZone.Data.Migrations
                         .HasColumnType("nvarchar(800)")
                         .HasColumnName("EXCERPT");
 
+                    b.Property<string>("ImageBlobKey")
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)")
+                        .HasColumnName("IMAGE_BLOB_KEY");
+
+                    b.Property<int?>("ImageGalleryPicId")
+                        .HasColumnType("int")
+                        .HasColumnName("IMAGE_GALLERY_PIC_ID");
+
                     b.Property<int>("IsPublished")
                         .HasColumnType("int")
                         .HasColumnName("DISPLAY");

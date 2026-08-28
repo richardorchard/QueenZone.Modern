@@ -18,7 +18,9 @@ public sealed class InMemoryNewsSearchTests
         new(SampleNewsData.CreateSeedArticles()
             .Select(a => new NewsItem(
                 a.Id, a.Title, a.Excerpt, a.Body, a.PublishedAt, a.SourceUrl, a.IsPublished,
-                string.IsNullOrWhiteSpace(a.Slug) ? null : a.Slug)));
+                string.IsNullOrWhiteSpace(a.Slug) ? null : a.Slug,
+                ImageBlobKey: a.ImageBlobKey,
+                ImageGalleryPicId: a.ImageGalleryPicId)));
 
     [Fact]
     public async Task SearchReturnsResultsMatchingTitle()
@@ -145,7 +147,9 @@ public sealed class EfNewsRepositorySearchTests : IAsyncDisposable
             "DATE"  AS PublishedAt,
             SOURCE_URL AS SourceUrl,
             DISPLAY    AS IsPublished,
-            SLUG       AS Slug
+            SLUG       AS Slug,
+            IMAGE_BLOB_KEY AS ImageBlobKey,
+            IMAGE_GALLERY_PIC_ID AS ImageGalleryPicId
         FROM NEWS_T
         WHERE DISPLAY = 1
           AND (TITLE LIKE {0} OR EXCERPT LIKE {0} OR ARTICLE LIKE {0})

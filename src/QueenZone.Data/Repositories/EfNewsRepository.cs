@@ -37,14 +37,27 @@ public sealed class EfNewsRepository : INewsRepository
         this.newsSuggestionRepository = newsSuggestionRepository;
         var connectionString = dbContext.Database.GetConnectionString()
             ?? throw new InvalidOperationException("QueenZone legacy database connection string is not configured.");
-        var includeSlug = LegacyNewsSchema.HasSlugColumn(connectionString);
+        var columns = LegacyNewsSchema.GetNewsColumnAvailability(connectionString);
+        var includeSlug = columns.HasSlugColumn;
         // List/count/sitemap omit ARTICLE; detail still projects full body.
-        var listCte = PublishedNewsQuery.BuildPublishedNewsCte(includeSlug, includeBody: false);
-        var detailCte = PublishedNewsQuery.BuildPublishedNewsCte(includeSlug, includeBody: true);
+        var listCte = PublishedNewsQuery.BuildPublishedNewsCte(
+            includeSlug,
+            includeBody: false,
+            columns.HasImageBlobKeyColumn,
+            columns.HasImageGalleryPicIdColumn);
+        var detailCte = PublishedNewsQuery.BuildPublishedNewsCte(
+            includeSlug,
+            includeBody: true,
+            columns.HasImageBlobKeyColumn,
+            columns.HasImageGalleryPicIdColumn);
         (latestSql, countSql, archivePageSql, byIdSql, sitemapSql, archivePageByDecadeSql, countByDecadeSql, archiveYearRangeSql) =
             EfProductionSql.CreateNewsQueries(listCte, detailCte);
         // SQLite fallback: body-inclusive CTE for LIKE matching (not used on SQL Server).
-        var searchCte = PublishedNewsQuery.BuildPublishedNewsCte(includeSlug, includeBody: true);
+        var searchCte = PublishedNewsQuery.BuildPublishedNewsCte(
+            includeSlug,
+            includeBody: true,
+            columns.HasImageBlobKeyColumn,
+            columns.HasImageGalleryPicIdColumn);
         (sqliteLikeSearchSql, sqliteLikeSearchCountSql) =
             EfProductionSql.CreateNewsSqliteLikeSearchQueries(searchCte);
     }
@@ -297,7 +310,9 @@ public sealed class EfNewsRepository : INewsRepository
             row.PublishedAt,
             row.SourceUrl,
             row.IsPublished,
-            row.Slug);
+            row.Slug,
+            ImageBlobKey: row.ImageBlobKey,
+            ImageGalleryPicId: row.ImageGalleryPicId);
 
     internal sealed class NewsRow
     {
@@ -316,6 +331,10 @@ public sealed class EfNewsRepository : INewsRepository
         public bool IsPublished { get; set; }
 
         public string? Slug { get; set; }
+
+        public string? ImageBlobKey { get; set; }
+
+        public int? ImageGalleryPicId { get; set; }
     }
 
     internal sealed class NewsDateRangeRow

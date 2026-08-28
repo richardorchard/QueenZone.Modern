@@ -32,6 +32,21 @@ public sealed class LegacyNewsSchemaTests
         Assert.DoesNotContain("ARTICLE", cte, StringComparison.Ordinal);
         Assert.Contains("CAST(N'' AS nvarchar(max)) AS Body", cte, StringComparison.Ordinal);
         Assert.Contains("ISNULL(EXCERPT, '') AS Excerpt", cte, StringComparison.Ordinal);
+        Assert.Contains($"CAST(NULL AS nvarchar({NewsValidation.MaxImageBlobKeyLength})) AS ImageBlobKey", cte);
+        Assert.Contains("CAST(NULL AS int) AS ImageGalleryPicId", cte);
+    }
+
+    [Fact]
+    public void BuildPublishedNewsCte_ProjectsImageColumnsWhenAvailable()
+    {
+        var cte = PublishedNewsQuery.BuildPublishedNewsCte(
+            includeSlugColumn: true,
+            includeImageBlobKeyColumn: true,
+            includeImageGalleryPicIdColumn: true);
+
+        Assert.Contains("IMAGE_BLOB_KEY AS ImageBlobKey", cte);
+        Assert.Contains("IMAGE_GALLERY_PIC_ID AS ImageGalleryPicId", cte);
+        Assert.DoesNotContain($"CAST(NULL AS nvarchar({NewsValidation.MaxImageBlobKeyLength})) AS ImageBlobKey", cte);
     }
 
     [Fact]
@@ -43,7 +58,9 @@ public sealed class LegacyNewsSchemaTests
             HasSlugColumn = false,
             HasCreatedAtColumn = false,
             HasUpdatedAtColumn = false,
-            HasEditorEmailColumn = false
+            HasEditorEmailColumn = false,
+            HasImageBlobKeyColumn = false,
+            HasImageGalleryPicIdColumn = false
         });
 
         Assert.Contains("SOURCE_URL", sql);
@@ -53,6 +70,8 @@ public sealed class LegacyNewsSchemaTests
         Assert.Contains("CAST(NULL AS nvarchar(256)) AS EDITOR_EMAIL", sql);
         Assert.Contains("CAST(ISNULL(TYPE, 0) AS int) AS TYPE", sql);
         Assert.Contains("CAST(ISNULL(QUEEN_ONLINE, 0) AS int) AS QUEEN_ONLINE", sql);
+        Assert.Contains($"CAST(NULL AS nvarchar({NewsValidation.MaxImageBlobKeyLength})) AS IMAGE_BLOB_KEY", sql);
+        Assert.Contains("CAST(NULL AS int) AS IMAGE_GALLERY_PIC_ID", sql);
         Assert.Contains($"CASE WHEN {PublishedNewsQuery.PublishedFilter} THEN 1 ELSE 0 END AS DISPLAY", sql);
         Assert.DoesNotContain($"CAST(CASE WHEN {PublishedNewsQuery.PublishedFilter} THEN 1 ELSE 0 END AS bit) AS DISPLAY", sql);
         Assert.Contains("NEWS_ID", sql);
@@ -69,13 +88,19 @@ public sealed class LegacyNewsSchemaTests
             HasSlugColumn = true,
             HasCreatedAtColumn = true,
             HasUpdatedAtColumn = true,
-            HasEditorEmailColumn = true
+            HasEditorEmailColumn = true,
+            HasImageBlobKeyColumn = true,
+            HasImageGalleryPicIdColumn = true
         });
 
         Assert.Contains("SLUG", sql);
         Assert.Contains("CREATED_AT", sql);
         Assert.Contains("UPDATED_AT", sql);
         Assert.Contains("EDITOR_EMAIL", sql);
+        Assert.Contains("IMAGE_BLOB_KEY", sql);
+        Assert.Contains("IMAGE_GALLERY_PIC_ID", sql);
+        Assert.DoesNotContain($"CAST(NULL AS nvarchar({NewsValidation.MaxImageBlobKeyLength})) AS IMAGE_BLOB_KEY", sql);
+        Assert.DoesNotContain("CAST(NULL AS int) AS IMAGE_GALLERY_PIC_ID", sql);
         Assert.DoesNotContain("CAST(NULL AS nvarchar(200)) AS SLUG", sql);
         Assert.DoesNotContain("CAST(NULL AS datetime2) AS CREATED_AT", sql);
     }

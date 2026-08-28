@@ -8,6 +8,8 @@ public static class NewsValidation
 
     public const int MaxSourceUrlLength = 500;
 
+    public const int MaxImageBlobKeyLength = NewsArticleImage.MaxBlobKeyLength;
+
     public static IReadOnlyList<string> ValidateDraft(AdminNewsDraft draft, bool slugInUse)
     {
         var errors = new List<string>();
@@ -59,6 +61,17 @@ public static class NewsValidation
         if (!string.IsNullOrWhiteSpace(draft.SourceUrl) && !IsSafePublicUrl(draft.SourceUrl))
         {
             errors.Add("Source URL must be a safe http or https link.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(draft.ImageBlobKey)
+            && draft.ImageBlobKey.Length > MaxImageBlobKeyLength)
+        {
+            errors.Add($"Image blob key must be {MaxImageBlobKeyLength} characters or fewer.");
+        }
+
+        if (draft.ImageGalleryPicId is <= 0)
+        {
+            errors.Add("Image gallery picture id must be a positive PIC_FILES_T identifier.");
         }
 
         return errors;

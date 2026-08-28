@@ -59,6 +59,8 @@
     Source URL
     <input type="text" name="sourceUrl" value="@Model.Draft.SourceUrl" maxlength="@NewsValidation.MaxSourceUrlLength">
   </label>
+  <input type="hidden" name="imageBlobKey" value="@Model.Draft.ImageBlobKey">
+  <input type="hidden" name="imageGalleryPicId" value="@Model.Draft.ImageGalleryPicId">
 
   <div class="admin-form-actions">
     <button type="submit">Save</button>
