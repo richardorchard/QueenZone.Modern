@@ -14,7 +14,9 @@ public sealed record NewsArchiveItem(
     string? ImageBlobKey = null,
     int? ImageGalleryPicId = null,
     string? ImageUrl = null,
-    string? ThumbnailUrl = null);
+    string? ThumbnailUrl = null,
+    int? TopicId = null,
+    int? ReplyCount = null);
 
 /// <summary>
 /// Stable detail shape for public (and admin preview) news article pages.
@@ -32,4 +34,7 @@ public sealed record NewsDetailItem(
     string? ImageBlobKey = null,
     int? ImageGalleryPicId = null,
     string? ImageUrl = null,
-    string? ThumbnailUrl = null);
+    string? ThumbnailUrl = null,
+    int? TopicId = null,
+    int? DiscussionReplyCount = null,
+    IReadOnlyList<NewsDiscussionPreviewDto>? DiscussionPreview = null);

@@ -5,6 +5,7 @@ namespace QueenZone.Web.Pages;
 
 public sealed class IndexModel(
     PublicQueryCacheService publicQueryCache,
+    NewsDiscussionComposer newsDiscussion,
     IQuoteRepository quoteRepository,
     TimeProvider timeProvider) : PageModel
 {
@@ -38,7 +39,7 @@ public sealed class IndexModel(
         ViewData["Description"] = "The complete fan resource for Queen – music, news, history, photography and more, from the Queenzone.com archive.";
         ViewData["CanonicalPath"] = "/";
         var latest = await publicQueryCache.GetLatestNewsAsync(5, cancellationToken);
-        Latest = PublicContentMapper.ToNewsArchiveItems(latest);
+        Latest = await newsDiscussion.ToArchiveItemsAsync(latest, cancellationToken);
         var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
         OnThisDay = await publicQueryCache.GetOnThisDayAsync(today, 3, cancellationToken);
 

@@ -25,7 +25,8 @@ internal static class AdminNewsSqliteTestHarness
             TYPE,
             QUEEN_ONLINE,
             IMAGE_BLOB_KEY,
-            IMAGE_GALLERY_PIC_ID
+            IMAGE_GALLERY_PIC_ID,
+            FORUM_TOPIC_ID
         FROM NEWS_T
         WHERE 1 = 1
         """;
@@ -49,8 +50,12 @@ internal static class AdminNewsSqliteTestHarness
                 TYPE INTEGER NOT NULL DEFAULT 0,
                 QUEEN_ONLINE INTEGER NOT NULL DEFAULT 0,
                 IMAGE_BLOB_KEY TEXT NULL,
-                IMAGE_GALLERY_PIC_ID INTEGER NULL
+                IMAGE_GALLERY_PIC_ID INTEGER NULL,
+                FORUM_TOPIC_ID INTEGER NULL
             );
+            CREATE UNIQUE INDEX IF NOT EXISTS IX_NEWS_T_ForumTopicId
+                ON NEWS_T (FORUM_TOPIC_ID)
+                WHERE FORUM_TOPIC_ID IS NOT NULL;
             """);
     }
 

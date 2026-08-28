@@ -19,4 +19,10 @@ public interface IAdminNewsRepository
     Task DeleteAsync(int id, string editorEmail, CancellationToken cancellationToken = default);
 
     Task<bool> IsSlugInUseAsync(string slug, int? excludeNewsId = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Stores <paramref name="topicId"/> when the article has no forum topic yet.
+    /// Returns <see langword="false"/> when the article is missing or already linked.
+    /// </summary>
+    Task<bool> TrySetForumTopicIdAsync(int newsId, int topicId, CancellationToken cancellationToken = default);
 }

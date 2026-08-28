@@ -38,7 +38,8 @@ public static class PublishedNewsQuery
         bool includeSlugColumn,
         bool includeBody = true,
         bool includeImageBlobKeyColumn = false,
-        bool includeImageGalleryPicIdColumn = false)
+        bool includeImageGalleryPicIdColumn = false,
+        bool includeForumTopicIdColumn = false)
     {
         var slugProjection = includeSlugColumn
             ? "SLUG AS Slug"
@@ -54,6 +55,9 @@ public static class PublishedNewsQuery
         var imageGalleryPicIdProjection = includeImageGalleryPicIdColumn
             ? "IMAGE_GALLERY_PIC_ID AS ImageGalleryPicId"
             : "CAST(NULL AS int) AS ImageGalleryPicId";
+        var forumTopicIdProjection = includeForumTopicIdColumn
+            ? "FORUM_TOPIC_ID AS ForumTopicId"
+            : "CAST(NULL AS int) AS ForumTopicId";
 
         return $"""
             WITH PublishedNews AS (
@@ -68,6 +72,7 @@ public static class PublishedNewsQuery
                     CAST(CASE WHEN {PublishedFilter} THEN 1 ELSE 0 END AS bit) AS IsPublished,
                     {imageBlobKeyProjection},
                     {imageGalleryPicIdProjection},
+                    {forumTopicIdProjection},
                     {LatestRowNumberExpression} AS RowNumber
                 FROM NEWS_T
                 WHERE {PublishedFilter}
@@ -99,7 +104,8 @@ public static class PublishedNewsQuery
                 TYPE,
                 QUEEN_ONLINE,
                 IMAGE_BLOB_KEY,
-                IMAGE_GALLERY_PIC_ID
+                IMAGE_GALLERY_PIC_ID,
+                FORUM_TOPIC_ID
             FROM LatestNews
             WHERE {LatestRowFilter}
             """;
@@ -138,6 +144,9 @@ public static class PublishedNewsQuery
         var imageGalleryPicIdProjection = columns.HasImageGalleryPicIdColumn
             ? "IMAGE_GALLERY_PIC_ID"
             : "CAST(NULL AS int) AS IMAGE_GALLERY_PIC_ID";
+        var forumTopicIdProjection = columns.HasForumTopicIdColumn
+            ? "FORUM_TOPIC_ID"
+            : "CAST(NULL AS int) AS FORUM_TOPIC_ID";
 
         return $"""
 
@@ -159,6 +168,7 @@ public static class PublishedNewsQuery
                     CAST(ISNULL(QUEEN_ONLINE, 0) AS int) AS QUEEN_ONLINE,
                     {imageBlobKeyProjection},
                     {imageGalleryPicIdProjection},
+                    {forumTopicIdProjection},
                     {LatestRowNumberExpression} AS RowNumber
                 FROM NEWS_T
             )

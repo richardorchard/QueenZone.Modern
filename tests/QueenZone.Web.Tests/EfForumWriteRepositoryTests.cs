@@ -24,6 +24,25 @@ public sealed class EfForumWriteRepositoryTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task EnsureCategoryAsync_CreatesNewsBoardOnce_AndNeverReturnsTheMusic()
+    {
+        await SeedCategoryAsync();
+
+        var first = await repository.EnsureCategoryAsync(
+            NewsForumDiscussion.CategorySlug,
+            NewsForumDiscussion.CategoryName);
+        var second = await repository.EnsureCategoryAsync(
+            NewsForumDiscussion.CategorySlug,
+            NewsForumDiscussion.CategoryName);
+
+        Assert.Equal(first, second);
+        Assert.NotEqual(1, first);
+        var created = await dbContext.ModernForumCategories.SingleAsync(category => category.LegacyForumId == first);
+        Assert.Equal(NewsForumDiscussion.CategoryName, created.Name);
+        Assert.False(NewsForumDiscussion.IsTheMusic(created.Name));
+    }
+
+    [Fact]
     public async Task CreateThreadAsync_WritesModernForumThreadAndFirstPostAtomically()
     {
         var member = await SeedMemberAsync();

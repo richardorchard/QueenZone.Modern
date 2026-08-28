@@ -8,7 +8,9 @@ namespace QueenZone.Web;
 /// </summary>
 public static class PublicContentMapper
 {
-    public static NewsArchiveItem ToNewsArchiveItem(NewsItem item) =>
+    public static NewsArchiveItem ToNewsArchiveItem(
+        NewsItem item,
+        IReadOnlyDictionary<int, int>? replyCounts = null) =>
         new(
             item.Id,
             item.Title,
@@ -20,12 +22,17 @@ public static class PublicContentMapper
             item.ImageBlobKey,
             item.ImageGalleryPicId,
             NewsArticleImage.ResolveImageUrl(item.ImageBlobKey, item.ImageGalleryPicId),
-            NewsArticleImage.ResolveThumbnailUrl(item.ImageBlobKey, item.ImageGalleryPicId));
+            NewsArticleImage.ResolveThumbnailUrl(item.ImageBlobKey, item.ImageGalleryPicId),
+            item.ForumTopicId,
+            ReplyCountFor(item.ForumTopicId, replyCounts));
 
     public static IReadOnlyList<NewsArchiveItem> ToNewsArchiveItems(IEnumerable<NewsItem> items) =>
-        items.Select(ToNewsArchiveItem).ToList();
+        items.Select(item => ToNewsArchiveItem(item)).ToList();
 
-    public static NewsDetailItem ToNewsDetailItem(NewsItem item) =>
+    public static NewsDetailItem ToNewsDetailItem(
+        NewsItem item,
+        int? discussionReplyCount = null,
+        IReadOnlyList<NewsDiscussionPreviewDto>? discussionPreview = null) =>
         new(
             item.Id,
             item.Title,
@@ -39,7 +46,20 @@ public static class PublicContentMapper
             item.ImageBlobKey,
             item.ImageGalleryPicId,
             NewsArticleImage.ResolveImageUrl(item.ImageBlobKey, item.ImageGalleryPicId),
-            NewsArticleImage.ResolveThumbnailUrl(item.ImageBlobKey, item.ImageGalleryPicId));
+            NewsArticleImage.ResolveThumbnailUrl(item.ImageBlobKey, item.ImageGalleryPicId),
+            item.ForumTopicId,
+            item.ForumTopicId is null ? null : discussionReplyCount,
+            item.ForumTopicId is null ? null : discussionPreview);
+
+    private static int? ReplyCountFor(int? topicId, IReadOnlyDictionary<int, int>? replyCounts)
+    {
+        if (topicId is not int id)
+        {
+            return null;
+        }
+
+        return replyCounts is not null && replyCounts.TryGetValue(id, out var count) ? count : 0;
+    }
 
     public static NewsDetailItem ToNewsDetailItem(AdminNewsArticle article) =>
         new(
@@ -56,7 +76,8 @@ public static class PublicContentMapper
             ImageBlobKey: article.ImageBlobKey,
             ImageGalleryPicId: article.ImageGalleryPicId,
             ImageUrl: NewsArticleImage.ResolveImageUrl(article.ImageBlobKey, article.ImageGalleryPicId),
-            ThumbnailUrl: NewsArticleImage.ResolveThumbnailUrl(article.ImageBlobKey, article.ImageGalleryPicId));
+            ThumbnailUrl: NewsArticleImage.ResolveThumbnailUrl(article.ImageBlobKey, article.ImageGalleryPicId),
+            TopicId: article.ForumTopicId);
 
     public static ArticleArchiveItem ToArticleArchiveItem(ArticleItem item) =>
         new(

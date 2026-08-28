@@ -18,5 +18,6 @@ internal static class NewsTableRowMapper
             row.UpdatedAt,
             row.EditorEmail,
             row.ImageBlobKey,
-            row.ImageGalleryPicId);
+            row.ImageGalleryPicId,
+            row.ForumTopicId);
 }

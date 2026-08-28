@@ -12,4 +12,5 @@ public sealed record NewsItem(
     Guid? SubmitterMemberId = null,
     string? SubmitterDisplayName = null,
     string? ImageBlobKey = null,
-    int? ImageGalleryPicId = null);
+    int? ImageGalleryPicId = null,
+    int? ForumTopicId = null);

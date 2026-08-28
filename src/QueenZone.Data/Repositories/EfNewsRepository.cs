@@ -44,12 +44,14 @@ public sealed class EfNewsRepository : INewsRepository
             includeSlug,
             includeBody: false,
             columns.HasImageBlobKeyColumn,
-            columns.HasImageGalleryPicIdColumn);
+            columns.HasImageGalleryPicIdColumn,
+            columns.HasForumTopicIdColumn);
         var detailCte = PublishedNewsQuery.BuildPublishedNewsCte(
             includeSlug,
             includeBody: true,
             columns.HasImageBlobKeyColumn,
-            columns.HasImageGalleryPicIdColumn);
+            columns.HasImageGalleryPicIdColumn,
+            columns.HasForumTopicIdColumn);
         (latestSql, countSql, archivePageSql, byIdSql, sitemapSql, archivePageByDecadeSql, countByDecadeSql, archiveYearRangeSql) =
             EfProductionSql.CreateNewsQueries(listCte, detailCte);
         // SQLite fallback: body-inclusive CTE for LIKE matching (not used on SQL Server).
@@ -57,7 +59,8 @@ public sealed class EfNewsRepository : INewsRepository
             includeSlug,
             includeBody: true,
             columns.HasImageBlobKeyColumn,
-            columns.HasImageGalleryPicIdColumn);
+            columns.HasImageGalleryPicIdColumn,
+            columns.HasForumTopicIdColumn);
         (sqliteLikeSearchSql, sqliteLikeSearchCountSql) =
             EfProductionSql.CreateNewsSqliteLikeSearchQueries(searchCte);
     }
@@ -312,7 +315,8 @@ public sealed class EfNewsRepository : INewsRepository
             row.IsPublished,
             row.Slug,
             ImageBlobKey: row.ImageBlobKey,
-            ImageGalleryPicId: row.ImageGalleryPicId);
+            ImageGalleryPicId: row.ImageGalleryPicId,
+            ForumTopicId: row.ForumTopicId);
 
     internal sealed class NewsRow
     {
@@ -335,6 +339,8 @@ public sealed class EfNewsRepository : INewsRepository
         public string? ImageBlobKey { get; set; }
 
         public int? ImageGalleryPicId { get; set; }
+
+        public int? ForumTopicId { get; set; }
     }
 
     internal sealed class NewsDateRangeRow

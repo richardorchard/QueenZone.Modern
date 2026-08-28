@@ -4,11 +4,13 @@ using QueenZone.Data;
 namespace QueenZone.Web;
 
 /// <summary>
-/// Shared admin news publish path. Dispatch fires only on unpublished → published.
+/// Shared admin news publish path. Dispatch and News-forum topic create fire only on
+/// unpublished → published. Topic create is fail-open, like push.
 /// </summary>
 public sealed class AdminNewsWriteService(
     IAdminNewsRepository adminNewsRepository,
     INotificationDispatcher notificationDispatcher,
+    INewsForumTopicService newsForumTopicService,
     ILogger<AdminNewsWriteService> logger)
 {
     public async Task PublishAsync(
@@ -21,6 +23,19 @@ public sealed class AdminNewsWriteService(
         if (!firstPublish)
         {
             return;
+        }
+
+        try
+        {
+            await newsForumTopicService.EnsureTopicOnFirstPublishAsync(article, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(
+                ex,
+                "News forum topic create failed after news publish {NewsId}: {Error}",
+                article.Id,
+                ex.Message);
         }
 
         try

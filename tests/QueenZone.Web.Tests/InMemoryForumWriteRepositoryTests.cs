@@ -201,4 +201,24 @@ public sealed class InMemoryForumWriteRepositoryTests
         Assert.Equal(1, post.EditCount);
         Assert.NotNull(post.EditedAt);
     }
+
+    [Fact]
+    public async Task EnsureCategoryAsync_CreatesNewsBoardOnce_AndNeverReturnsTheMusic()
+    {
+        var repository = new InMemoryForumWriteRepository();
+
+        var first = await repository.EnsureCategoryAsync(
+            NewsForumDiscussion.CategorySlug,
+            NewsForumDiscussion.CategoryName);
+        var second = await repository.EnsureCategoryAsync(
+            NewsForumDiscussion.CategorySlug,
+            NewsForumDiscussion.CategoryName);
+
+        Assert.Equal(first, second);
+        Assert.NotEqual(1, first);
+        var created = Assert.Single(repository.GetCreatedCategories());
+        Assert.Equal(first, created.Id);
+        Assert.Equal(NewsForumDiscussion.CategoryName, created.Name);
+        Assert.False(NewsForumDiscussion.IsTheMusic(created.Name));
+    }
 }

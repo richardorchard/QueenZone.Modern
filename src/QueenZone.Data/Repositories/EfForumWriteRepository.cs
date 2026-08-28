@@ -478,6 +478,70 @@ public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForu
             ? new DateTimeOffset(DateTime.SpecifyKind(value.Value, DateTimeKind.Utc))
             : DateTimeOffset.MinValue;
 
+    public async Task<int> EnsureCategoryAsync(
+        string slug,
+        string name,
+        CancellationToken cancellationToken = default)
+    {
+        var existing = await FindMatchingCategoryAsync(slug, name, cancellationToken);
+        if (existing is not null)
+        {
+            return existing.LegacyForumId;
+        }
+
+        var now = DateTime.UtcNow;
+        var categories = await dbContext.ModernForumCategories
+            .Where(category => !category.IsSynthetic)
+            .ToListAsync(cancellationToken);
+        var nextLegacyId = categories.Select(category => category.LegacyForumId).DefaultIfEmpty(0).Max() + 1;
+        if (nextLegacyId < 2)
+        {
+            nextLegacyId = 2;
+        }
+
+        var entity = new ModernForumCategoryEntity
+        {
+            LegacyForumId = nextLegacyId,
+            Name = name.Trim(),
+            Description = "Discussion of published QueenZone news articles.",
+            SortOrder = categories.Select(category => category.SortOrder).DefaultIfEmpty(0).Max() + 10,
+            LegacyPostCount = 0,
+            IsSynthetic = false,
+            ImportedAt = now,
+            UpdatedAt = now,
+        };
+
+        dbContext.ModernForumCategories.Add(entity);
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return entity.LegacyForumId;
+        }
+        catch (DbUpdateException)
+        {
+            dbContext.Entry(entity).State = EntityState.Detached;
+            var retry = await FindMatchingCategoryAsync(slug, name, cancellationToken);
+            return retry?.LegacyForumId
+                ?? throw new InvalidOperationException("News forum category could not be created.");
+        }
+    }
+
+    private async Task<ModernForumCategoryEntity?> FindMatchingCategoryAsync(
+        string slug,
+        string name,
+        CancellationToken cancellationToken)
+    {
+        var categories = await dbContext.ModernForumCategories
+            .AsNoTracking()
+            .Where(category => !category.IsSynthetic)
+            .ToListAsync(cancellationToken);
+        return categories.FirstOrDefault(category =>
+            !NewsForumDiscussion.IsTheMusic(category.Name)
+            && (NewsForumDiscussion.MatchesNewsCategory(category.Name)
+                || string.Equals(NewsSlug.Slugify(category.Name), slug, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(category.Name, name, StringComparison.OrdinalIgnoreCase)));
+    }
+
     private static string TruncateBody(string body) =>
         body.Length <= BodyHtmlMaxLength ? body : body[..BodyHtmlMaxLength];
 }

@@ -15,7 +15,17 @@ public sealed record NewsListItemDto(
     DateTime PublishedAt,
     string DetailPath,
     string? ImageUrl = null,
-    string? ThumbnailUrl = null);
+    string? ThumbnailUrl = null,
+    int? TopicId = null,
+    int? ReplyCount = null);
+
+/// <summary>
+/// Last-N forum reply preview for news detail. Not the opening post.
+/// </summary>
+public sealed record NewsDiscussionPreviewDto(
+    string AuthorDisplayName,
+    DateTime PostedAt,
+    string Excerpt);
 
 /// <summary>
 /// Detail shape for <c>/api/v1/content/news/{id}</c>.
@@ -34,7 +44,10 @@ public sealed record NewsDetailDto(
     string? SourceUrl,
     string DetailPath,
     string? ImageUrl = null,
-    string? ThumbnailUrl = null);
+    string? ThumbnailUrl = null,
+    int? TopicId = null,
+    int? DiscussionReplyCount = null,
+    IReadOnlyList<NewsDiscussionPreviewDto>? DiscussionPreview = null);
 
 /// <summary>
 /// Earliest/latest published years for <c>/api/v1/content/news/years</c>. Backs the mobile

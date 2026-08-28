@@ -29,4 +29,10 @@ public interface IForumWriteRepository
     Task HidePostsByMemberAsync(Guid memberId, CancellationToken cancellationToken = default);
 
     Task UnhidePostsByMemberAsync(Guid memberId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Finds a category whose URL slug or name matches, or creates one named
+    /// <paramref name="name"/>. Never returns The Music.
+    /// </summary>
+    Task<int> EnsureCategoryAsync(string slug, string name, CancellationToken cancellationToken = default);
 }
