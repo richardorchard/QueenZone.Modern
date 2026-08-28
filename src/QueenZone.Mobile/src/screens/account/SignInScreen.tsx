@@ -7,6 +7,7 @@ import type { RootStackParamList } from '../../navigation/types';
 import { useSession } from '../../session/SessionContext';
 import { completeSignInNavigation } from '../../session/signInNavigation';
 import { space, type, useTheme } from '../../theme';
+import { AppleSignInButton } from '../../ui/AppleSignInButton';
 import { Button } from '../../ui/Button';
 import { CrestSeal } from '../../ui/CrestSeal';
 
@@ -100,18 +101,22 @@ export function SignInScreen({ navigation, route }: Props) {
         </Text>
       ) : null}
       <View style={{ gap: 10 }}>
-        {providers.map((provider) => (
-          <Button
-            key={provider.id}
-            label={provider.label}
-            variant="outline"
-            loading={busyProvider === provider.id}
-            disabled={busyProvider !== null && busyProvider !== provider.id}
-            onPress={() => {
+        {providers.map((provider) => {
+          const props = {
+            label: provider.label,
+            loading: busyProvider === provider.id,
+            disabled: busyProvider !== null && busyProvider !== provider.id,
+            onPress: () => {
               void onProvider(provider);
-            }}
-          />
-        ))}
+            },
+          };
+
+          return provider.id === 'Apple' ? (
+            <AppleSignInButton key={provider.id} {...props} />
+          ) : (
+            <Button key={provider.id} {...props} variant="outline" />
+          );
+        })}
       </View>
     </ScrollView>
   );
