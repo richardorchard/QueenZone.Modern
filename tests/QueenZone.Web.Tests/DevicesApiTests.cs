@@ -119,6 +119,33 @@ public sealed class DevicesApiTests : IClassFixture<QueenZoneWebApplicationFacto
         Assert.Equal(1, await CountDevicesAsync(deviceId));
     }
 
+    [Fact]
+    public async Task Register_SameDeviceId_DifferentCasing_UpdatesInPlace_NoDuplicate()
+    {
+        var memberId = Guid.NewGuid();
+        await SeedMemberAsync(memberId, "Case Fan", "device-case@example.com");
+        using var client = CreateBearerClient(memberId, "Case Fan", "device-case@example.com");
+        const string storedDeviceId = "E3C869B0-F770-4EE4-BE4A-46C63CCBA90F";
+        const string incomingDeviceId = "e3c869b0-f770-4ee4-be4a-46c63ccba90f";
+
+        using var first = await client.PostAsJsonAsync(
+            DevicesPath,
+            new { deviceId = storedDeviceId, platform = "apns", token = "token-old" });
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+
+        using var second = await client.PostAsJsonAsync(
+            DevicesPath,
+            new { deviceId = incomingDeviceId, platform = "fcm", token = "token-new" });
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+
+        Assert.Equal(1, await CountDevicesIgnoreCaseAsync(incomingDeviceId));
+        var stored = await FindDeviceIgnoreCaseAsync(incomingDeviceId);
+        Assert.NotNull(stored);
+        Assert.Equal(memberId, stored!.MemberAccountId);
+        Assert.Equal("token-new", stored.Token);
+        Assert.Equal(DevicePushPlatform.Fcm, stored.Platform);
+    }
+
     [Theory]
     [InlineData(null, "apns", "tok")]
     [InlineData("", "apns", "tok")]
@@ -227,6 +254,28 @@ public sealed class DevicesApiTests : IClassFixture<QueenZoneWebApplicationFacto
         lock (store.Gate)
         {
             return Task.FromResult(store.Tokens.Count(token => token.DeviceId == deviceId));
+        }
+    }
+
+    private Task<DeviceTokenEntity?> FindDeviceIgnoreCaseAsync(string deviceId)
+    {
+        using var scope = factory.Services.CreateScope();
+        var store = scope.ServiceProvider.GetRequiredService<SharedDeviceTokenStore>();
+        lock (store.Gate)
+        {
+            return Task.FromResult(store.Tokens.FirstOrDefault(
+                token => string.Equals(token.DeviceId, deviceId, StringComparison.OrdinalIgnoreCase)));
+        }
+    }
+
+    private Task<int> CountDevicesIgnoreCaseAsync(string deviceId)
+    {
+        using var scope = factory.Services.CreateScope();
+        var store = scope.ServiceProvider.GetRequiredService<SharedDeviceTokenStore>();
+        lock (store.Gate)
+        {
+            return Task.FromResult(store.Tokens.Count(
+                token => string.Equals(token.DeviceId, deviceId, StringComparison.OrdinalIgnoreCase)));
         }
     }
 }
