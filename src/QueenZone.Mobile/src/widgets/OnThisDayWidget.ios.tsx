@@ -17,10 +17,11 @@ import type { WidgetProps } from './widgetCopy';
  * Quote reloads every few hours with jitter; on-this-day is only refetched on a new
  * calendar day.
  *
- * The `'widget'` function is serialized and evaluated in the WidgetKit JSC runtime.
- * It must be referentially free: only `@expo/ui` imports, `props`, and literals.
- * Imported helpers / module constants become missing identifiers, and a Release
- * TestFlight build swallows that error as a black EmptyView.
+ * `createWidget` still has to store a layout string so `updateTimeline` can
+ * write props into the app group. The home-screen pixels come from native
+ * SwiftUI (`plugins/withIosOnThisDayNativeWidget.cjs`) because WidgetKit's
+ * gallery snapshot never runs this JS — a missing JSC layout is a black
+ * EmptyView in Release/TestFlight.
  */
 export type OnThisDayWidgetProps = WidgetProps;
 

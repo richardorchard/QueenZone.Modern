@@ -69,6 +69,9 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       // react-native-android-widget's work-runtime does not clash with a
       // transitive work-runtime-ktx 2.7.1 (duplicate OneTimeWorkRequestKt).
       './plugins/withAndroidWorkRuntimeAlignment.cjs',
+      // After expo-widgets writes ExpoWidgetsTarget: render On This Day in
+      // SwiftUI so the gallery/home snapshot is never a Release EmptyView.
+      './plugins/withIosOnThisDayNativeWidget.cjs',
       [
         // Auth token is deliberately NOT passed here — sentry-cli picks up
         // SENTRY_AUTH_TOKEN from the build environment directly (Gradle /
