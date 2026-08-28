@@ -269,7 +269,10 @@ add a second URL scheme — shares reuse `queenzone`. Do not add
 `NavigationContainer.linking` for this flow.
 Fan performances list from `/api/v1/content/fan-performances`; streaming uses
 `GET /api/v1/content/fan-performances/{id}/audio` with the member Bearer token
-(same private `songfiles` blob as the website). Background playback and lock-screen
+(same private `songfiles` blob as the website). Play All / Shuffle Play All on the
+list screen walk that same paged GET (`pageSize` 100) for the full catalog, then
+pass the ordered or once-shuffled queue to `FanPerformancePlayer.play` — not the
+`FlatList` pages already on screen. Background playback and lock-screen
 controls come from `expo-audio` (`shouldPlayInBackground`, `setActiveForLockScreen`).
 The lock screen shows title, performer, and "Fan performances", with play/pause and
 seek. expo-audio does not expose next/previous-track buttons or JS remote-command

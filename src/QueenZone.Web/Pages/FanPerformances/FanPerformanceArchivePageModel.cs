@@ -41,7 +41,7 @@ public abstract class FanPerformanceArchivePageModel(IFanPerformanceRepository f
             return NotFound();
         }
 
-        PerformanceList = await BuildPerformanceListAsync(items, page, cancellationToken);
+        PerformanceList = await BuildPerformanceListAsync(items, page, visibleCount, cancellationToken);
         CurrentPage = page;
         TotalPages = totalPages;
         Breadcrumbs = [BreadcrumbItem.Home, new BreadcrumbItem("Fan Performances", FanPerformanceRoutes.GetIndexPath())];
@@ -60,6 +60,7 @@ public abstract class FanPerformanceArchivePageModel(IFanPerformanceRepository f
     private async Task<FanPerformanceListViewModel> BuildPerformanceListAsync(
         IReadOnlyList<FanPerformance> items,
         int page,
+        int visibleCount,
         CancellationToken cancellationToken)
     {
         var memberAuth = await HttpContext.AuthenticateMemberAsync();
@@ -76,6 +77,18 @@ public abstract class FanPerformanceArchivePageModel(IFanPerformanceRepository f
                 isSignedIn ? FanPerformanceRoutes.GetAudioPath(performance.Id, performance.Title) : null))
             .ToList();
 
-        return new FanPerformanceListViewModel(listItems, loginReturnUrl);
+        IReadOnlyList<FanPerformanceCatalogEntry> catalog = [];
+        if (isSignedIn && visibleCount > 0)
+        {
+            var catalogSource = items;
+            if (page != 1 || items.Count < visibleCount)
+            {
+                catalogSource = await fanPerformanceRepository.GetPageAsync(1, visibleCount, cancellationToken);
+            }
+
+            catalog = FanPerformanceListViewModel.CreateCatalog(catalogSource);
+        }
+
+        return new FanPerformanceListViewModel(listItems, loginReturnUrl, catalog);
     }
 }

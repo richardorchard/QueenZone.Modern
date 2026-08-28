@@ -22,6 +22,7 @@ export {
   fetchDiscographyPage,
   fetchFanPerformanceDetail,
   fetchFanPerformancesPage,
+  fetchAllFanPerformances,
   fetchFreddieTributePage,
   fetchLiveActivity,
   fetchNewsDetail,

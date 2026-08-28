@@ -1,10 +1,12 @@
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using QueenZone.Data;
 using QueenZone.Storage;
 
@@ -43,6 +45,11 @@ public sealed class FanPerformancesPageTests : IClassFixture<WebApplicationFacto
         Assert.Contains("aria-label=\"Sign in to play Reaching Out\"", body);
         Assert.Contains("class=\"qz-stage-play\"", body);
         Assert.DoesNotContain("data-qz-stage-play", body);
+        Assert.DoesNotContain("data-qz-stage-play-all", body);
+        Assert.DoesNotContain("data-qz-stage-shuffle-all", body);
+        Assert.DoesNotContain("data-qz-stage-catalog", body);
+        Assert.DoesNotContain("Play All", body);
+        Assert.DoesNotContain("Shuffle Play All", body);
         Assert.Contains("returnUrl=%2Ffan-performances", body);
         Assert.DoesNotContain("songfiles", body, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("/fan-performances/187/audio", body);
@@ -60,8 +67,17 @@ public sealed class FanPerformancesPageTests : IClassFixture<WebApplicationFacto
         Assert.Contains("data-qz-stage-play", body);
         Assert.Contains("aria-label=\"Play Reaching Out\"", body);
         Assert.Contains("class=\"qz-stage-play\"", body);
+        Assert.Contains("data-qz-stage-play-all", body);
+        Assert.Contains("data-qz-stage-shuffle-all", body);
+        Assert.Contains(">Play All</button>", body);
+        Assert.Contains(">Shuffle Play All</button>", body);
         Assert.DoesNotContain("Sign in to play", body);
         Assert.DoesNotContain("songfiles", body, StringComparison.OrdinalIgnoreCase);
+
+        var catalog = ReadCatalog(body);
+        Assert.Equal([187, 186, 176, 173], catalog.Select(entry => entry.Id).ToArray());
+        Assert.All(catalog, entry => Assert.StartsWith("/fan-performances/", entry.AudioPlayPath));
+        Assert.All(catalog, entry => Assert.DoesNotContain("songfiles", entry.AudioPlayPath, StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -76,7 +92,51 @@ public sealed class FanPerformancesPageTests : IClassFixture<WebApplicationFacto
         Assert.Contains("/fan-performances/187/audio", body);
         Assert.Contains("data-qz-stage-play", body);
         Assert.Contains("aria-label=\"Play Reaching Out\"", body);
+        Assert.Contains("data-qz-stage-play-all", body);
         Assert.DoesNotContain("Sign in to play", body);
+    }
+
+    [Fact]
+    public async Task FanPerformancesPage_PlayAllCatalogSpansEveryPage_WhenMemberSignedIn()
+    {
+        var performances = Enumerable.Range(1, 25)
+            .Select(index => new FanPerformance(
+                index,
+                $"Track {index}",
+                "Performer",
+                "Cover",
+                $"{index}.mp3",
+                1024,
+                new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddDays(index)))
+            .ToList();
+        await using var customFactory = factory.WithWebHostBuilder(builder =>
+        {
+            builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<IFanPerformanceRepository>();
+                services.AddSingleton<IFanPerformanceRepository>(new InMemoryFanPerformanceRepository(performances));
+            });
+        });
+        var client = await CreateSignedInMemberClientAsync(factory: customFactory);
+
+        var pageOne = await client.GetStringAsync("/fan-performances");
+        var pageTwo = await client.GetStringAsync("/fan-performances/page/2");
+
+        var pageOneCatalog = ReadCatalog(pageOne);
+        var pageTwoCatalog = ReadCatalog(pageTwo);
+        var expectedIds = Enumerable.Range(1, 25).Reverse().ToArray();
+
+        Assert.Equal(expectedIds, pageOneCatalog.Select(entry => entry.Id).ToArray());
+        Assert.Equal(expectedIds, pageTwoCatalog.Select(entry => entry.Id).ToArray());
+        Assert.Contains("data-qz-stage-play-all", pageTwo);
+        Assert.Contains("data-qz-stage-shuffle-all", pageTwo);
+        Assert.Equal(20, CountOccurrences(pageOne, "aria-label=\"Play Track"));
+        Assert.Equal(5, CountOccurrences(pageTwo, "aria-label=\"Play Track"));
+        Assert.Equal(20, CountOccurrences(pageOne, "<audio "));
+        Assert.Equal(5, CountOccurrences(pageTwo, "<audio "));
+        Assert.Contains(">Track 25</h2>", pageOne);
+        Assert.DoesNotContain(">Track 5</h2>", pageOne);
+        Assert.Contains(">Track 5</h2>", pageTwo);
     }
 
     [Fact]
@@ -152,9 +212,11 @@ public sealed class FanPerformancesPageTests : IClassFixture<WebApplicationFacto
     }
 
     private async Task<HttpClient> CreateSignedInMemberClientAsync(
-        WebApplicationFactoryClientOptions? options = null)
+        WebApplicationFactoryClientOptions? options = null,
+        WebApplicationFactory<Program>? factory = null)
     {
-        var client = factory.CreateClient(options ?? new WebApplicationFactoryClientOptions
+        var host = factory ?? this.factory;
+        var client = host.CreateClient(options ?? new WebApplicationFactoryClientOptions
         {
             HandleCookies = true,
             AllowAutoRedirect = false,
@@ -169,5 +231,34 @@ public sealed class FanPerformancesPageTests : IClassFixture<WebApplicationFacto
         Assert.DoesNotContain("/account/login", callbackResponse.Headers.Location!.OriginalString);
 
         return client;
+    }
+
+    private static FanPerformanceCatalogEntry[] ReadCatalog(string body)
+    {
+        const string marker = "<script type=\"application/json\" data-qz-stage-catalog>";
+        var start = body.IndexOf(marker, StringComparison.Ordinal);
+        Assert.True(start >= 0, "Signed-in fan performance pages must embed the catalog payload.");
+        start += marker.Length;
+        var end = body.IndexOf("</script>", start, StringComparison.Ordinal);
+        Assert.True(end > start);
+        var json = body[start..end];
+        var catalog = JsonSerializer.Deserialize<FanPerformanceCatalogEntry[]>(
+            json,
+            new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+        Assert.NotNull(catalog);
+        return catalog;
+    }
+
+    private static int CountOccurrences(string body, string value)
+    {
+        var count = 0;
+        var index = 0;
+        while ((index = body.IndexOf(value, index, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            index += value.Length;
+        }
+
+        return count;
     }
 }
