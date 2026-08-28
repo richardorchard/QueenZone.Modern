@@ -72,6 +72,26 @@ describe('useDetailQuery', () => {
     expect(result.current).toMatchObject({ data: 'fresh', error: null, loading: false });
   });
 
+  it('ignores a stale resolve from the aborted first load', async () => {
+    const first = deferred<string>();
+    const second = deferred<string>();
+    const fetcher = jest.fn().mockReturnValueOnce(first.promise);
+    const { result, rerender } = renderHook(({ fn }) => useDetailQuery(fn), {
+      initialProps: { fn: fetcher },
+    });
+
+    const nextFetcher = jest.fn().mockReturnValueOnce(second.promise);
+    rerender({ fn: nextFetcher });
+    second.resolve('fresh');
+    await waitFor(() =>
+      expect(result.current).toMatchObject({ data: 'fresh', error: null, loading: false }),
+    );
+
+    first.resolve('stale');
+    await flush();
+    expect(result.current).toMatchObject({ data: 'fresh', error: null, loading: false });
+  });
+
   it('does not commit an AbortError from a superseded load', async () => {
     const first = deferred<string>();
     const fetcher = jest.fn().mockReturnValueOnce(first.promise);

@@ -80,11 +80,12 @@ describe('fetchJson', () => {
     fetchMock.mockRejectedValueOnce(abort);
     await expect(fetchJson('/x', { signal: AbortSignal.abort() })).rejects.toBe(abort);
 
-    fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
     await expect(fetchJson('/x')).rejects.toMatchObject({
       status: 0,
       message: 'Unable to reach QueenZone. Check your connection and try again.',
     });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 });
 
