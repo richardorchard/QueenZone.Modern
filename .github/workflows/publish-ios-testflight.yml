@@ -343,6 +343,12 @@ jobs:
                 echo "::error::Provisioning profile \"$profile_name\" aps-environment is ${aps_environment:-<missing>}, expected ${IOS_APS_ENVIRONMENT}."
                 exit 1
               fi
+              if ! /usr/libexec/PlistBuddy -c 'Print :Entitlements:com.apple.developer.applesignin' "$profile_plist" 2>/dev/null \
+                | grep -Fq 'Default'; then
+                echo "::error::Provisioning profile \"$profile_name\" does not include Sign in with Apple."
+                echo "Enable Sign in with Apple on App ID $expected_bundle_id, regenerate the profile, and update its GitHub Actions secret."
+                exit 1
+              fi
             elif [ -n "$aps_environment" ]; then
               echo "::error::Extension profile \"$profile_name\" unexpectedly includes aps-environment."
               exit 1
@@ -560,6 +566,12 @@ jobs:
               "$profile_plist" 2>/dev/null || true)
             if [ "$require_push" = true ] && [ "$ipa_aps_environment" != "$IOS_APS_ENVIRONMENT" ]; then
               echo "::error::$label aps-environment is ${ipa_aps_environment:-<missing>}, expected ${IOS_APS_ENVIRONMENT}."
+              exit 1
+            fi
+            if [ "$require_push" = true ] \
+              && ! /usr/libexec/PlistBuddy -c 'Print :Entitlements:com.apple.developer.applesignin' "$profile_plist" 2>/dev/null \
+                | grep -Fq 'Default'; then
+              echo "::error::$label embedded profile does not include Sign in with Apple."
               exit 1
             fi
             if [ "$require_push" = false ] && [ -n "$ipa_aps_environment" ]; then
