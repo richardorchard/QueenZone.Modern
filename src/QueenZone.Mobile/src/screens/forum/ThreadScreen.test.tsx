@@ -411,7 +411,7 @@ describe('ThreadScreen attachments', () => {
     renderThread();
     await waitFor(() => expect(screen.getByText('anoto-setlist-scan.jpg')).toBeOnTheScreen());
     expect(screen.getByText('opera-side-two-notes.pdf')).toBeOnTheScreen();
-    expect(screen.getByText(/Members only/)).toBeOnTheScreen();
+    expect(screen.getAllByText(/Members only/).length).toBe(2);
     expect(screen.queryByRole('button', { name: /anoto-setlist-scan.jpg/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /opera-side-two-notes.pdf/ })).toBeNull();
     expect(screen.queryByTestId(testIds.forumThreadAttachmentViewer)).toBeNull();
