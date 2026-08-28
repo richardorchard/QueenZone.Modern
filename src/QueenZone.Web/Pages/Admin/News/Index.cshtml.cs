@@ -3,10 +3,13 @@ using QueenZone.Data;
 
 namespace QueenZone.Web.Pages.Admin.News;
 
+[RequestFormLimits(MultipartBodyLengthLimit = 16 * 1024 * 1024)]
+[RequestSizeLimit(16 * 1024 * 1024)]
 public sealed class IndexModel(
     IAdminNewsRepository adminNewsRepository,
     INewsAuditRepository auditRepository,
-    UgcHtml ugcHtml) : AdminNewsListPageModel(adminNewsRepository)
+    UgcHtml ugcHtml,
+    NewsArticleImageService articleImageService) : AdminNewsListPageModel(adminNewsRepository)
 {
     public ArticleFormViewModel? CreateForm { get; private set; }
 
@@ -20,7 +23,25 @@ public sealed class IndexModel(
         var slugInUse = await AdminNewsRepository.IsSlugInUseAsync(
             NewsSlug.Resolve(draft.Title, draft.Slug),
             cancellationToken: cancellationToken);
-        var errors = NewsValidation.ValidateDraft(draft, slugInUse);
+        var errors = NewsValidation.ValidateDraft(draft, slugInUse).ToList();
+        var persistImage = errors.Count == 0;
+        var applied = await articleImageService.TryApplyAsync(
+            form.ArticleImage,
+            form.ToCrop(),
+            draft,
+            previousImageBlobKey: null,
+            User,
+            persistImage,
+            cancellationToken);
+        if (applied.Error is not null)
+        {
+            errors.Add(applied.Error);
+        }
+        else
+        {
+            draft = applied.Draft;
+        }
+
         if (errors.Count > 0)
         {
             ViewData["Title"] = "Create news article";

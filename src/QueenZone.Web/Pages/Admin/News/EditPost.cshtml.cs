@@ -5,6 +5,8 @@ using QueenZone.Web.Sitemap;
 
 namespace QueenZone.Web.Pages.Admin.News;
 
+[RequestFormLimits(MultipartBodyLengthLimit = 16 * 1024 * 1024)]
+[RequestSizeLimit(16 * 1024 * 1024)]
 public sealed class EditPostModel(
     IAdminNewsRepository adminNewsRepository,
     INewsDiscoveryRepository discoveryRepository,
@@ -13,6 +15,7 @@ public sealed class EditPostModel(
     CoreSitemapService coreSitemapService,
     IOutputCacheStore outputCacheStore,
     UgcHtml ugcHtml,
+    NewsArticleImageService articleImageService,
     ILogger<EditPostModel> logger) : AdminNewsPageModel
 {
     public ArticleFormViewModel? Form { get; private set; }
@@ -34,7 +37,25 @@ public sealed class EditPostModel(
             NewsSlug.Resolve(draft.Title, draft.Slug),
             excludeNewsId: id,
             cancellationToken: cancellationToken);
-        var errors = NewsValidation.ValidateDraft(draft, slugInUse);
+        var errors = NewsValidation.ValidateDraft(draft, slugInUse).ToList();
+        var persistImage = errors.Count == 0;
+        var applied = await articleImageService.TryApplyAsync(
+            form.ArticleImage,
+            form.ToCrop(),
+            draft,
+            existing.ImageBlobKey,
+            User,
+            persistImage,
+            cancellationToken);
+        if (applied.Error is not null)
+        {
+            errors.Add(applied.Error);
+        }
+        else
+        {
+            draft = applied.Draft;
+        }
+
         if (errors.Count > 0)
         {
             NewsDiscoveryProvenance? provenance = null;

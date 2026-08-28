@@ -19,7 +19,7 @@
     var hasArticleImage = NewsArticleImage.HasResolvedImage(Model.Item.ImageBlobKey, Model.Item.ImageGalleryPicId);
   }
   <figure class="admin-article-image">
-    <img src="@previewImageUrl" alt="@(hasArticleImage ? Model.Item.Title : "No article image")" width="640" height="360">
+    <img src="@previewImageUrl" alt="@(hasArticleImage ? Model.Item.Title : "No article image")" width="600" height="400">
   </figure>
 
   <p class="lede">@Model.Item.Excerpt</p>

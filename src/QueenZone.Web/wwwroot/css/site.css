@@ -2733,9 +2733,61 @@ a.qz-forum-post__author-link:focus-visible {
   max-width: 320px;
   width: 100%;
   height: auto;
-  aspect-ratio: 16 / 9;
+  aspect-ratio: 3 / 2;
   object-fit: cover;
   background: var(--qz-black);
+}
+
+.admin-article-image-error {
+  color: var(--qz-burgundy);
+  margin: 0 0 1rem;
+}
+
+.admin-article-crop {
+  width: min(36rem, calc(100vw - 2rem));
+  padding: 1.25rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xs);
+  background: var(--qz-warm-white, #fff);
+}
+
+.admin-article-crop::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.admin-article-crop__title {
+  font-size: 1.25rem;
+  margin: 0 0 0.5rem;
+}
+
+.admin-article-crop__stage {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  margin: 0 0 1rem;
+  background: var(--qz-black);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.admin-article-crop__stage.is-dragging {
+  cursor: grabbing;
+}
+
+.admin-article-crop__stage img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  max-width: none;
+  transform-origin: 0 0;
+  pointer-events: none;
+}
+
+.admin-article-crop__zoom {
+  display: block;
+  margin-bottom: 1rem;
 }
 
 .admin-form-panel h1 {

@@ -1,9 +1,16 @@
 @model QueenZone.Web.Pages.Admin.News.ArticleFormViewModel
+@using Microsoft.Extensions.Options
 @using QueenZone.Storage
 @inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@inject IOptions<BlobUploadOptions> BlobUploadOptions
 @{
   var antiforgeryToken = (ViewData["AntiforgeryToken"] as string)
     ?? Antiforgery.GetAndStoreTokens(Context).RequestToken;
+  var articleImageMaxBytes = BlobUploadOptions.Value.Containers.TryGetValue(BlobUploadContainers.Articles, out var articlePolicy)
+      && articlePolicy.MaxBytes is > 0
+    ? articlePolicy.MaxBytes.Value
+    : NewsArticleImageProcessor.MaxUploadBytes;
+  articleImageMaxBytes = Math.Min(articleImageMaxBytes, NewsArticleImageProcessor.MaxUploadBytes);
 }
 
 <div class="admin-form-panel">
@@ -28,7 +35,7 @@
   </ul>
 }
 
-<form method="post" action="@Model.Action" class="admin-form">
+<form method="post" action="@Model.Action" class="admin-form" enctype="multipart/form-data">
   <input type="hidden" name="@AdminNewsPageModel.AntiforgeryTokenFieldName" value="@antiforgeryToken">
   <label>
     Title
@@ -65,13 +72,51 @@
     var previewImageUrl = NewsArticleImage.ResolveDisplayUrl(Model.Draft.ImageBlobKey, Model.Draft.ImageGalleryPicId);
     var hasArticleImage = NewsArticleImage.HasResolvedImage(Model.Draft.ImageBlobKey, Model.Draft.ImageGalleryPicId);
   }
-  <figure class="admin-article-image">
-    <img src="@previewImageUrl" alt="@(hasArticleImage ? "Article image" : "No article image")" width="640" height="360">
-    @if (!hasArticleImage)
-    {
-      <figcaption class="admin-help">No article image yet. Listings will use this placeholder.</figcaption>
-    }
-  </figure>
+  <div class="admin-article-image-upload"
+       data-article-image-crop
+       data-aspect-width="@NewsArticleImageProcessor.CardAspectWidth"
+       data-aspect-height="@NewsArticleImageProcessor.CardAspectHeight"
+       data-max-bytes="@articleImageMaxBytes">
+    <figure class="admin-article-image">
+      <img src="@previewImageUrl"
+           alt="@(hasArticleImage ? "Article image" : "No article image")"
+           width="600"
+           height="400"
+           data-article-image-preview>
+      @if (!hasArticleImage)
+      {
+        <figcaption class="admin-help">No article image yet. Listings will use this placeholder.</figcaption>
+      }
+    </figure>
+    <label>
+      Article image
+      <input type="file"
+             name="articleImage"
+             accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+             data-article-image-input>
+    </label>
+    <p class="admin-help">JPEG, PNG, or WebP. Max 10&nbsp;MB. Crop to the 3:2 news-card frame before saving.</p>
+    <p class="admin-article-image-error" data-article-image-error hidden></p>
+    <input type="hidden" name="cropX" data-crop-x value="">
+    <input type="hidden" name="cropY" data-crop-y value="">
+    <input type="hidden" name="cropWidth" data-crop-width value="">
+    <input type="hidden" name="cropHeight" data-crop-height value="">
+    <dialog class="admin-article-crop" data-article-image-dialog>
+      <h2 class="admin-article-crop__title">Crop article image</h2>
+      <p class="admin-help">Drag to frame the 3:2 card. Zoom to tighten the crop.</p>
+      <div class="admin-article-crop__stage" data-article-image-stage>
+        <img alt="" data-article-image-stage-img>
+      </div>
+      <label class="admin-article-crop__zoom">
+        Zoom
+        <input type="range" min="1" max="3" step="0.01" value="1" data-article-image-zoom>
+      </label>
+      <div class="admin-form-actions">
+        <button type="button" data-article-image-apply>Use this crop</button>
+        <button type="button" data-article-image-cancel>Cancel</button>
+      </div>
+    </dialog>
+  </div>
 
   <div class="admin-form-actions">
     <button type="submit">Save</button>
@@ -98,3 +143,4 @@
   </div>
 }
 </div>
+<script src="~/js/admin/article-image-crop.js" asp-append-version="true"></script>

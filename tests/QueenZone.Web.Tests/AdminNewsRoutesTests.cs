@@ -4,8 +4,12 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using QueenZone.Data;
+using QueenZone.Storage;
 using QueenZone.Web;
 using QueenZone.Web.Pages.Admin.News;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.PixelFormats;
 
 namespace QueenZone.Web.Tests;
 
@@ -747,6 +751,243 @@ public sealed class AdminNewsRoutesTests : IClassFixture<QueenZoneWebApplication
     }
 
     [Fact]
+    public async Task ArticleForm_includes_card_image_upload_and_crop_controls()
+    {
+        var client = CreateClient(AdminEmail);
+
+        var body = await client.GetStringAsync("/admin/news/new");
+
+        Assert.Contains("enctype=\"multipart/form-data\"", body);
+        Assert.Contains("name=\"articleImage\"", body);
+        Assert.Contains("data-article-image-crop", body);
+        Assert.Contains("Crop article image", body);
+        Assert.Contains("3:2 news-card frame", body);
+        Assert.Contains("/js/admin/article-image-crop.js", body);
+    }
+
+    [Fact]
+    public async Task CreateArticle_with_valid_image_stores_ugc_articles_key_and_shows_preview()
+    {
+        var store = new SharedNewsStore();
+        var appFactory = CreateFactory(store);
+        var client = CreateClientFromFactory(appFactory, AdminEmail);
+        var image = await CreateCardPngAsync();
+
+        var createResponse = await AdminHttpTestHelpers.PostArticleMultipartAsync(
+            client,
+            "/admin/news/new",
+            "/admin/news",
+            new Dictionary<string, string>
+            {
+                ["title"] = "Uploaded card image",
+                ["excerpt"] = "Has a cropped photo.",
+                ["body"] = "Body after upload.",
+                ["publishedAt"] = "2026-06-14"
+            },
+            image,
+            "hero.png",
+            "image/png",
+            new Dictionary<string, string>
+            {
+                ["cropX"] = "0",
+                ["cropY"] = "0",
+                ["cropWidth"] = "600",
+                ["cropHeight"] = "400"
+            });
+
+        Assert.Equal(HttpStatusCode.Redirect, createResponse.StatusCode);
+        var articleId = AdminHttpTestHelpers.ParseNewsIdFromEditRedirect(createResponse);
+        var article = store.GetArticle(articleId);
+        Assert.NotNull(article);
+        Assert.False(string.IsNullOrWhiteSpace(article.ImageBlobKey));
+        Assert.False(NewsArticleImage.IsGalleryReference(article.ImageBlobKey));
+        Assert.Null(article.ImageGalleryPicId);
+
+        var blobs = appFactory.Services.GetRequiredService<IBlobUploadService>();
+        var stored = await blobs.OpenReadAsync(BlobUploadContainers.Articles, article.ImageBlobKey!);
+        Assert.NotNull(stored);
+        var thumb = await blobs.OpenReadAsync(
+            BlobUploadContainers.Articles,
+            UgcProxyPaths.ToThumbBlobName(article.ImageBlobKey!));
+        Assert.NotNull(thumb);
+
+        var previewUrl = NewsArticleImage.ResolveDisplayUrl(article.ImageBlobKey, article.ImageGalleryPicId);
+        var editBody = await client.GetStringAsync($"/admin/news/{articleId}/edit");
+        Assert.Contains(previewUrl, editBody);
+        Assert.Contains("alt=\"Article image\"", editBody);
+        Assert.DoesNotContain(NewsArticleImage.PlaceholderPath, editBody);
+
+        var previewBody = await client.GetStringAsync($"/admin/news/{articleId}/preview");
+        Assert.Contains(previewUrl, previewBody);
+    }
+
+    [Fact]
+    public async Task CreateArticle_rejects_unsupported_image_type()
+    {
+        var store = new SharedNewsStore();
+        var client = CreateClient(AdminEmail, store);
+
+        var response = await AdminHttpTestHelpers.PostArticleMultipartAsync(
+            client,
+            "/admin/news/new",
+            "/admin/news",
+            new Dictionary<string, string>
+            {
+                ["title"] = "Bad image type",
+                ["excerpt"] = "Should stay a draft form.",
+                ["body"] = "Plain text body.",
+                ["publishedAt"] = "2026-06-14"
+            },
+            "not-an-image"u8.ToArray(),
+            "notes.txt",
+            "text/plain");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("JPEG, PNG, or WebP", body);
+        Assert.Empty(store.GetAllArticles());
+    }
+
+    [Fact]
+    public async Task CreateArticle_rejects_oversized_image()
+    {
+        var store = new SharedNewsStore();
+        var client = CreateClient(AdminEmail, store);
+        var bytes = new byte[NewsArticleImageProcessor.MaxUploadBytes + 1];
+        bytes[0] = 0xFF;
+        bytes[1] = 0xD8;
+        bytes[2] = 0xFF;
+
+        var response = await AdminHttpTestHelpers.PostArticleMultipartAsync(
+            client,
+            "/admin/news/new",
+            "/admin/news",
+            new Dictionary<string, string>
+            {
+                ["title"] = "Huge image",
+                ["excerpt"] = "Should be rejected.",
+                ["body"] = "Plain text body.",
+                ["publishedAt"] = "2026-06-14"
+            },
+            bytes,
+            "huge.jpg",
+            "image/jpeg");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("bytes or smaller", body);
+        Assert.Empty(store.GetAllArticles());
+    }
+
+    [Fact]
+    public async Task EditArticle_replacing_uploaded_image_orphans_old_ugc_articles_blobs()
+    {
+        var store = new SharedNewsStore();
+        var appFactory = CreateFactory(store);
+        var client = CreateClientFromFactory(appFactory, AdminEmail);
+        var first = await CreateCardPngAsync();
+
+        var createResponse = await AdminHttpTestHelpers.PostArticleMultipartAsync(
+            client,
+            "/admin/news/new",
+            "/admin/news",
+            new Dictionary<string, string>
+            {
+                ["title"] = "Replace my photo",
+                ["excerpt"] = "First image.",
+                ["body"] = "Body for replace.",
+                ["publishedAt"] = "2026-06-14"
+            },
+            first,
+            "first.png",
+            "image/png");
+
+        var articleId = AdminHttpTestHelpers.ParseNewsIdFromEditRedirect(createResponse);
+        var previous = store.GetArticle(articleId)!.ImageBlobKey!;
+        var blobs = appFactory.Services.GetRequiredService<IBlobUploadService>();
+        Assert.NotNull(await blobs.OpenReadAsync(BlobUploadContainers.Articles, previous));
+
+        var second = await CreateCardPngAsync(640, 420);
+        var saveResponse = await AdminHttpTestHelpers.PostArticleMultipartAsync(
+            client,
+            $"/admin/news/{articleId}/edit",
+            $"/admin/news/{articleId}",
+            new Dictionary<string, string>
+            {
+                ["title"] = "Replace my photo",
+                ["excerpt"] = "Second image.",
+                ["body"] = "Body for replace.",
+                ["publishedAt"] = "2026-06-14",
+                ["imageBlobKey"] = previous
+            },
+            second,
+            "second.png",
+            "image/png");
+
+        Assert.Equal(HttpStatusCode.Redirect, saveResponse.StatusCode);
+        var updated = store.GetArticle(articleId);
+        Assert.NotNull(updated);
+        Assert.NotEqual(previous, updated.ImageBlobKey);
+        Assert.Null(await blobs.OpenReadAsync(BlobUploadContainers.Articles, previous));
+        Assert.Null(await blobs.OpenReadAsync(BlobUploadContainers.Articles, UgcProxyPaths.ToThumbBlobName(previous)));
+        Assert.NotNull(await blobs.OpenReadAsync(BlobUploadContainers.Articles, updated.ImageBlobKey!));
+
+        var editBody = await client.GetStringAsync($"/admin/news/{articleId}/edit");
+        Assert.Contains(NewsArticleImage.ResolveDisplayUrl(updated.ImageBlobKey, updated.ImageGalleryPicId), editBody);
+    }
+
+    [Fact]
+    public async Task EditArticle_replacing_gallery_reference_stores_ugc_articles_key()
+    {
+        var store = new SharedNewsStore(
+        [
+            new AdminNewsArticle(
+                4401,
+                "Gallery pick",
+                "gallery-pick",
+                "Excerpt",
+                "Body",
+                new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc),
+                null,
+                false,
+                DateTime.UtcNow,
+                DateTime.UtcNow,
+                AdminEmail,
+                "gallery:3120",
+                3120)
+        ]);
+        var client = CreateClient(AdminEmail, store);
+        var image = await CreateCardPngAsync();
+
+        var saveResponse = await AdminHttpTestHelpers.PostArticleMultipartAsync(
+            client,
+            "/admin/news/4401/edit",
+            "/admin/news/4401",
+            new Dictionary<string, string>
+            {
+                ["title"] = "Gallery pick",
+                ["excerpt"] = "Excerpt",
+                ["body"] = "Body",
+                ["publishedAt"] = "2026-06-01",
+                ["imageBlobKey"] = "gallery:3120",
+                ["imageGalleryPicId"] = "3120"
+            },
+            image,
+            "hero.png",
+            "image/png");
+
+        Assert.Equal(HttpStatusCode.Redirect, saveResponse.StatusCode);
+        var updated = store.GetArticle(4401);
+        Assert.NotNull(updated);
+        Assert.False(NewsArticleImage.IsGalleryReference(updated.ImageBlobKey));
+        Assert.Null(updated.ImageGalleryPicId);
+        Assert.StartsWith("editors/", updated.ImageBlobKey);
+        Assert.Contains(
+            NewsArticleImage.ResolveDisplayUrl(updated.ImageBlobKey, updated.ImageGalleryPicId),
+            await client.GetStringAsync("/admin/news/4401/edit"));
+    }
+
+    [Fact]
     public async Task GetDeleteUrl_redirectsToAdminList()
     {
         var client = CreateClient(AdminEmail, new SharedNewsStore());
@@ -977,6 +1218,14 @@ public sealed class AdminNewsRoutesTests : IClassFixture<QueenZoneWebApplication
 
     private static Task<HttpResponseMessage> PostActionAsync(HttpClient client, string actionPath) =>
         AdminHttpTestHelpers.PostNewsActionAsync(client, actionPath);
+
+    private static async Task<byte[]> CreateCardPngAsync(int width = 600, int height = 400)
+    {
+        using var image = new Image<Rgba32>(width, height);
+        await using var stream = new MemoryStream();
+        await image.SaveAsync(stream, new PngEncoder());
+        return stream.ToArray();
+    }
 
     private static IEnumerable<AdminNewsArticle> CreateSeedArticles(int count) =>
         Enumerable.Range(1, count).Select(index => new AdminNewsArticle(
