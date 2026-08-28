@@ -39,10 +39,11 @@ describe('notificationNavigateParams', () => {
       screen: 'HomeTab',
       params: { screen: 'Inbox', initial: false },
     });
-    assert.deepEqual(notificationNavigateParams({ category: 'news' }), {
-      screen: 'NewsTab',
-      params: { screen: 'NewsIndex', initial: false },
-    });
+    const newsList = notificationNavigateParams({ category: 'news' });
+    assert.equal(newsList.screen, 'NewsTab');
+    assert.equal(newsList.params.screen, 'NewsIndex');
+    assert.equal(newsList.params.initial, false);
+    assert.equal(typeof newsList.params.params?.refreshAt, 'number');
   });
 });
 

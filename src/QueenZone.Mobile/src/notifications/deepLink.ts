@@ -32,7 +32,7 @@ export function notificationNavigateParams(destination: NotificationDestination)
         screen: 'NewsTab',
         params:
           destination.articleId === undefined
-            ? nestedTabParams('NewsIndex')
+            ? nestedTabParams('NewsIndex', { refreshAt: Date.now() })
             : nestedTabParams('Story', { id: destination.articleId }),
       };
     default: {

@@ -208,7 +208,7 @@ describe('NotificationBridge', () => {
 
     expect(mockNavigate).toHaveBeenCalledWith('Tabs', {
       screen: 'NewsTab',
-      params: { screen: 'NewsIndex', initial: false },
+      params: { screen: 'NewsIndex', params: { refreshAt: expect.any(Number) }, initial: false },
     });
   });
 
