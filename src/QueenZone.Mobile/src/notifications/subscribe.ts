@@ -26,12 +26,32 @@ export function isDefaultNotificationTap(actionIdentifier: string): boolean {
   return actionIdentifier === defaultActionIdentifier();
 }
 
+/**
+ * expo-notifications copies APNs `userInfo.body` into `content.data`.
+ * Direct APNs puts the #757 keys beside `aps`, so `content.data` is often
+ * empty on iOS and the keys live on `trigger.payload`.
+ */
+function pushTriggerPayload(trigger: Notifications.Notification['request']['trigger']): unknown {
+  if (trigger == null || typeof trigger !== 'object' || !('type' in trigger) || trigger.type !== 'push') {
+    return undefined;
+  }
+
+  return 'payload' in trigger ? trigger.payload : undefined;
+}
+
+function destinationFromNotification(notification: Notifications.Notification): NotificationDestination | null {
+  return (
+    parseNotificationData(notification.request.content.data) ??
+    parseNotificationData(pushTriggerPayload(notification.request.trigger))
+  );
+}
+
 export function tapFromResponse(response: Notifications.NotificationResponse | null | undefined): NotificationTap | null {
   if (!response || !isDefaultNotificationTap(response.actionIdentifier)) {
     return null;
   }
 
-  const destination = parseNotificationData(response.notification.request.content.data);
+  const destination = destinationFromNotification(response.notification);
   if (!destination) {
     return null;
   }
@@ -43,7 +63,7 @@ export function tapFromResponse(response: Notifications.NotificationResponse | n
 }
 
 export function noticeFromNotification(notification: Notifications.Notification): ForegroundNotice | null {
-  const destination = parseNotificationData(notification.request.content.data);
+  const destination = destinationFromNotification(notification);
   if (!destination) {
     return null;
   }

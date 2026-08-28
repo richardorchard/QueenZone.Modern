@@ -83,7 +83,10 @@ function readConversationId(value: unknown): string | null {
   return conversationIdPattern.test(id) ? id : null;
 }
 
-/** Maps a notification `data` dictionary to a screen destination, or null if it is not actionable. */
+/**
+ * Maps a notification `data` dictionary to a screen destination, or null if it is not actionable.
+ * Accepts FCM `message.data` and an iOS APNs dictionary with the same #757 keys beside `aps`.
+ */
 export function parseNotificationData(data: unknown): NotificationDestination | null {
   const record = unwrapData(data);
   if (!record) {
