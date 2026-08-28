@@ -9,4 +9,5 @@ public sealed record ArticleFormViewModel(
     IReadOnlyList<string>? Errors,
     AdminNewsArticle? Article = null,
     NewsDiscoveryProvenance? DiscoveryProvenance = null,
-    string? Subtitle = null);
+    string? Subtitle = null,
+    string? PreviewImageUrl = null);

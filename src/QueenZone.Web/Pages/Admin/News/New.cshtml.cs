@@ -13,6 +13,9 @@ public sealed class NewModel : AdminNewsPageModel
         ViewData["Title"] = "Create news article";
     }
 
-    public static ArticleFormViewModel BuildForm(AdminNewsDraft draft, IReadOnlyList<string>? errors) =>
-        new("Create news article", "/admin/news", draft, errors);
+    public static ArticleFormViewModel BuildForm(
+        AdminNewsDraft draft,
+        IReadOnlyList<string>? errors,
+        string? previewImageUrl = null) =>
+        new("Create news article", "/admin/news", draft, errors, PreviewImageUrl: previewImageUrl);
 }
