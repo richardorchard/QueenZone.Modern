@@ -10,6 +10,7 @@ export const testIds = {
   homeHero: 'home-hero',
   homeSearch: 'home-search',
   homeProfile: 'home-profile',
+  tabMasthead: 'tab-masthead',
 
   newsScreen: 'news-screen',
   newsStoryScreen: 'news-story-screen',
