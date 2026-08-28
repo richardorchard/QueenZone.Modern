@@ -56,7 +56,11 @@
       }
 
       revokeObjectUrl();
-      objectUrl = URL.createObjectURL(file);
+      objectUrl = asBlobObjectUrl(URL.createObjectURL(file));
+      if (!objectUrl) {
+        return;
+      }
+
       stageImg.onload = function () {
         if (typeof dialog.showModal === "function") {
           dialog.showModal();
@@ -64,7 +68,7 @@
 
         startCropper();
       };
-      stageImg.src = objectUrl;
+      assignBlobImageSrc(stageImg, objectUrl);
     });
 
     zoomInput.addEventListener("input", function () {
@@ -98,7 +102,7 @@
       cropHeight.value = String(crop.height);
       cropApplied = true;
       if (preview) {
-        preview.src = objectUrl;
+        assignBlobImageSrc(preview, objectUrl);
         preview.alt = "Article image";
         preview.style.objectPosition =
           ((crop.x + crop.width / 2) / Math.max(stageImg.naturalWidth, 1)) * 100 + "% " +
@@ -260,6 +264,22 @@
         objectUrl = "";
       }
     }
+  }
+
+  // createObjectURL is a modeled taint step from input.files (js/xss-through-dom).
+  // Only browser blob: URLs may reach img.src; encodeURI is the XSS sanitizer CodeQL recognizes.
+  function asBlobObjectUrl(url) {
+    return typeof url === "string" && url.indexOf("blob:") === 0 ? url : "";
+  }
+
+  function assignBlobImageSrc(image, url) {
+    var safeUrl = asBlobObjectUrl(url);
+    if (!image || !safeUrl) {
+      return false;
+    }
+
+    image.src = encodeURI(safeUrl);
+    return true;
   }
 
   function validateFile(file, maxBytes) {
