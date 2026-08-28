@@ -74,6 +74,32 @@ public sealed class NewsDiscussionComposerTests : IClassFixture<QueenZoneWebAppl
     }
 
     [Fact]
+    public async Task Detail_ReturnsSingleReply_WhenOnlyOneReplyExists()
+    {
+        var lookup = new RecordingDiscussionLookup
+        {
+            Discussion = (
+                1,
+                [
+                    new NewsDiscussionPreview("Only", new DateTime(2026, 8, 1, 10, 0, 0, DateTimeKind.Utc), "sole reply"),
+                ]),
+        };
+        var composer = new NewsDiscussionComposer(lookup);
+
+        var detail = await composer.ToDetailAsync(Item(8, topicId: 55));
+        var website = await composer.ToDetailItemAsync(Item(8, topicId: 55));
+
+        Assert.Equal(55, detail.TopicId);
+        Assert.Equal(1, detail.DiscussionReplyCount);
+        var preview = Assert.Single(detail.DiscussionPreview!);
+        Assert.Equal("Only", preview.AuthorDisplayName);
+        Assert.Equal("sole reply", preview.Excerpt);
+        Assert.Equal(1, website.DiscussionReplyCount);
+        Assert.Single(website.DiscussionPreview!);
+        Assert.Equal(NewsForumDiscussion.PreviewReplyCount, lookup.LastPreviewCount);
+    }
+
+    [Fact]
     public async Task Detail_WithoutTopicId_HasNoDiscussionBlock()
     {
         var lookup = new RecordingDiscussionLookup();

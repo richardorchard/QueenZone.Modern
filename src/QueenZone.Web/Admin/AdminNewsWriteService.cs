@@ -33,8 +33,9 @@ public sealed class AdminNewsWriteService(
         {
             logger.LogWarning(
                 ex,
-                "News forum topic create failed after news publish {NewsId}: {Error}",
+                "News forum topic create failed after news publish {NewsId} for category {Category}: {Error}",
                 article.Id,
+                NewsForumDiscussion.CategoryName,
                 ex.Message);
         }
 

@@ -43,6 +43,7 @@ public sealed class NewsForumTopicPublishTests : IClassFixture<QueenZoneWebAppli
         var opening = Assert.Single(forumWrite.GetPostsForTopic(published.ForumTopicId.Value));
         Assert.Contains("https://www.queenzone.org/news/", opening.Body, StringComparison.Ordinal);
         Assert.Contains(NewsRoutes.GetNewsDetailPath(draft.Id, draft.Title, draft.Slug), opening.Body, StringComparison.Ordinal);
+        Assert.Contains("<p>https://www.queenzone.org", opening.Body, StringComparison.Ordinal);
         Assert.DoesNotContain(draft.Body, opening.Body, StringComparison.Ordinal);
 
         var author = await members.FindByEmailAsync(NewsForumDiscussion.SystemMemberEmail);
@@ -133,7 +134,8 @@ public sealed class NewsForumTopicPublishTests : IClassFixture<QueenZoneWebAppli
         Assert.Contains(
             logger.Warnings,
             message => message.Contains("News forum topic create failed", StringComparison.Ordinal)
-                && message.Contains(id.ToString(), StringComparison.Ordinal));
+                && message.Contains(id.ToString(), StringComparison.Ordinal)
+                && message.Contains(NewsForumDiscussion.CategoryName, StringComparison.Ordinal));
     }
 
     [Fact]
@@ -154,10 +156,15 @@ public sealed class NewsForumTopicPublishTests : IClassFixture<QueenZoneWebAppli
             "editor@test.local");
 
         var body = NewsForumTopicService.BuildOpeningPost(article);
+        var linkParagraph = NewsForumTopicService.BuildPublicArticleLinkParagraph(article);
+        var wrapped = UgcHtml.WrapPlainText(body);
 
         Assert.Equal(NewsForumDiscussion.OpeningExcerptMaxLength, body.IndexOf("\n\n", StringComparison.Ordinal));
-        Assert.Contains("https://www.queenzone.org/news/42/a-long-enough-title", body, StringComparison.Ordinal);
+        Assert.Equal("https://www.queenzone.org/news/42/a-long-enough-title", linkParagraph);
+        Assert.EndsWith("\n\n" + linkParagraph, body, StringComparison.Ordinal);
+        Assert.Contains($"<p>{linkParagraph}</p>", wrapped, StringComparison.Ordinal);
         Assert.DoesNotContain("Full article body", body, StringComparison.Ordinal);
+        Assert.Equal(linkParagraph, NewsForumTopicService.BuildOpeningPost(article with { Excerpt = "   " }));
         Assert.Equal("News article 7", NewsForumTopicService.ClampTitle("Hi", 7));
         Assert.Equal(ForumPostWriteService.SubjectMaxLength, NewsForumTopicService.ClampTitle(new string('t', 240), 8).Length);
     }

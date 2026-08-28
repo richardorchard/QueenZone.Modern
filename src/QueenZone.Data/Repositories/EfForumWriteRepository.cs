@@ -535,11 +535,11 @@ public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForu
             .AsNoTracking()
             .Where(category => !category.IsSynthetic)
             .ToListAsync(cancellationToken);
-        return categories.FirstOrDefault(category =>
-            !NewsForumDiscussion.IsTheMusic(category.Name)
-            && (NewsForumDiscussion.MatchesNewsCategory(category.Name)
-                || string.Equals(NewsSlug.Slugify(category.Name), slug, StringComparison.OrdinalIgnoreCase)
-                || string.Equals(category.Name, name, StringComparison.OrdinalIgnoreCase)));
+        return NewsForumDiscussion.FindExistingCategory(
+            categories,
+            category => category.Name,
+            slug,
+            name);
     }
 
     private static string TruncateBody(string body) =>

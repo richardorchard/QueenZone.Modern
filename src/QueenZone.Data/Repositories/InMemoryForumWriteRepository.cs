@@ -292,13 +292,11 @@ public sealed class InMemoryForumWriteRepository : IForumWriteRepository
     {
         lock (sync)
         {
-            var existing = createdCategories
-                .Concat(SampleForumData.CreateSeedCategories())
-                .FirstOrDefault(category =>
-                    !NewsForumDiscussion.IsTheMusic(category.Name)
-                    && (NewsForumDiscussion.MatchesNewsCategory(category.Name)
-                        || string.Equals(NewsSlug.Slugify(category.Name), slug, StringComparison.OrdinalIgnoreCase)
-                        || string.Equals(category.Name, name, StringComparison.OrdinalIgnoreCase)));
+            var existing = NewsForumDiscussion.FindExistingCategory(
+                createdCategories.Concat(SampleForumData.CreateSeedCategories()),
+                category => category.Name,
+                slug,
+                name);
             if (existing is not null)
             {
                 return Task.FromResult(existing.Id);

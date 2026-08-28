@@ -221,4 +221,29 @@ public sealed class InMemoryForumWriteRepositoryTests
         Assert.Equal(NewsForumDiscussion.CategoryName, created.Name);
         Assert.False(NewsForumDiscussion.IsTheMusic(created.Name));
     }
+
+    [Fact]
+    public async Task EnsureCategoryAsync_PrefersSlugMatch_ThenName_AndCreatesWhenMissing()
+    {
+        var repository = new InMemoryForumWriteRepository();
+
+        var slugId = await repository.EnsureCategoryAsync(
+            NewsForumDiscussion.CategorySlug,
+            "NEWS!");
+        var sameBySlug = await repository.EnsureCategoryAsync(
+            NewsForumDiscussion.CategorySlug,
+            NewsForumDiscussion.CategoryName);
+        Assert.Equal(slugId, sameBySlug);
+        Assert.Equal("NEWS!", Assert.Single(repository.GetCreatedCategories()).Name);
+
+        var other = new InMemoryForumWriteRepository();
+        var deskId = await other.EnsureCategoryAsync("news-desk", "News Desk");
+        var newsId = await other.EnsureCategoryAsync(
+            NewsForumDiscussion.CategorySlug,
+            NewsForumDiscussion.CategoryName);
+        Assert.NotEqual(deskId, newsId);
+        Assert.Equal(
+            NewsForumDiscussion.CategoryName,
+            other.GetCreatedCategories().Single(category => category.Id == newsId).Name);
+    }
 }

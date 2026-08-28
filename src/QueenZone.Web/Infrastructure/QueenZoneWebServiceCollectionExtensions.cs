@@ -57,6 +57,11 @@ public static class QueenZoneWebServiceCollectionExtensions
             .ValidateOnStart();
         services.AddSingleton<IValidateOptions<ForumOptions>, ForumOptionsValidator>();
 
+        services.AddOptions<NewsForumOptions>()
+            .Bind(configuration.GetSection(NewsForumOptions.SectionName))
+            .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<NewsForumOptions>, NewsForumOptionsValidator>();
+
         services.AddOptions<PublicQueryCacheOptions>()
             .Bind(configuration.GetSection(PublicQueryCacheOptions.SectionName))
             .ValidateOnStart();

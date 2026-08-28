@@ -26,15 +26,59 @@ public static partial class NewsForumDiscussion
 
     public const int PreviewExcerptMaxLength = 200;
 
-    public static bool MatchesNewsCategory(string? name)
+    public static bool MatchesNewsCategory(string? name) =>
+        MatchesCategorySlug(name, CategorySlug) || MatchesCategoryName(name, CategoryName);
+
+    /// <summary>
+    /// Slug first, then case-insensitive name. Never returns The Music.
+    /// </summary>
+    public static T? FindExistingCategory<T>(
+        IEnumerable<T> categories,
+        Func<T, string> nameSelector,
+        string slug,
+        string name)
     {
-        if (string.IsNullOrWhiteSpace(name))
+        ArgumentNullException.ThrowIfNull(categories);
+        ArgumentNullException.ThrowIfNull(nameSelector);
+
+        var list = categories as IList<T> ?? categories.ToList();
+        foreach (var category in list)
+        {
+            if (MatchesCategorySlug(nameSelector(category), slug))
+            {
+                return category;
+            }
+        }
+
+        foreach (var category in list)
+        {
+            if (MatchesCategoryName(nameSelector(category), name))
+            {
+                return category;
+            }
+        }
+
+        return default;
+    }
+
+    public static bool MatchesCategorySlug(string? name, string slug)
+    {
+        if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(slug) || IsTheMusic(name))
         {
             return false;
         }
 
-        return string.Equals(name.Trim(), CategoryName, StringComparison.OrdinalIgnoreCase)
-            || string.Equals(NewsSlug.Slugify(name), CategorySlug, StringComparison.OrdinalIgnoreCase);
+        return string.Equals(NewsSlug.Slugify(name), NewsSlug.Slugify(slug), StringComparison.OrdinalIgnoreCase);
+    }
+
+    public static bool MatchesCategoryName(string? name, string expected)
+    {
+        if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(expected) || IsTheMusic(name))
+        {
+            return false;
+        }
+
+        return string.Equals(name.Trim(), expected.Trim(), StringComparison.OrdinalIgnoreCase);
     }
 
     public static bool IsTheMusic(string? name)

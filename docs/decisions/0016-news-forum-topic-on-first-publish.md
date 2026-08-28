@@ -18,29 +18,29 @@ Open questions from [#1036](https://github.com/richardorchard/QueenZone.Modern/i
 
 `AdminNewsWriteService.PublishAsync` creates a forum topic only on the same `firstPublish` gate as news push. Republish and edit are no-ops. Existing articles are not backfilled. Unpublish does not delete the topic or clear the stored link.
 
-### 2. Persist `NEWS_T.FORUM_TOPIC_ID` (nullable, unique when set)
+### 2. Persist `NEWS_T.FORUM_TOPIC_ID` as an ADR 0005 extension column
 
-The link lives on `NEWS_T` as nullable `FORUM_TOPIC_ID` plus a unique filtered index when the column is set. If the column is already set, topic create is a no-op. News is not projected onto a modern table ([ADR 0004](0004-legacy-schema-is-import-source.md)).
+`ForumTopicId` is a nullable ADR 0005-style extension column on legacy `NEWS_T` (`FORUM_TOPIC_ID`) plus a unique filtered index when the column is set. The article owns the 1:1. If the column is already set, topic create is a no-op. Do not project news onto modern tables ([ADR 0004](0004-legacy-schema-is-import-source.md)).
 
-### 3. News board by slug/name, never The Music
+### 3. News board by slug first, then name; never The Music
 
-Resolve the category by slug `news`, else by name `News`. If missing, idempotent ensure-create a board named `News`. Do not hardcode a category id and never use The Music.
+Resolve the category by stable slug `news` first, then by case-insensitive name `News`. If missing, idempotent ensure-create a board named `News`. Do not hardcode a category id and never use The Music.
 
 ### 4. System member QueenZone; trusted create path
 
-The opening post is authored by a system member with display name `QueenZone`, not the Entra editor. Creation still goes through `ForumPostWriteService` sanitization (not raw SQL). Rate-limit and new-account+link auto-spam are bypassed on this trusted path only, because the opening post always contains a URL. Member replies stay on the existing Watch / `forumReply` path. Creating the topic must not send an extra news push.
+The opening post is authored by a configured, durable system member with display name `QueenZone` (`NewsForum` options; created if missing), not the Entra editor. Creation still goes through `ForumPostWriteService` sanitization (not raw SQL). Rate-limit and new-account+link auto-spam are bypassed on this trusted path only, because the opening post always contains a URL. Member replies stay on the existing Watch / `forumReply` path. Creating the topic must not send an extra news push.
 
-### 5. Opening post is excerpt plus public article URL
+### 5. Opening post is excerpt plus one public-article link paragraph
 
-Title is the article title. Body is the article excerpt capped at ~400 characters plus a link to `https://www.queenzone.org` and the article detail path. Not the full article. No images. No poll.
+Title is the article title. Body is the article's existing excerpt, capped at ~400 characters, plus one link paragraph to `https://www.queenzone.org` and the article detail path. Not the full article. No images. No poll.
 
 ### 6. Fail-open after `NEWS_T` write
 
-Order: write `NEWS_T` → ensure News category → `CreateTopic` → persist `ForumTopicId`. Topic create is fail-open like push: log a warning and leave the article published. Repair is a follow-up, not part of this change.
+Order: write `NEWS_T` → ensure News category → `CreateTopic` → persist `ForumTopicId`. Topic create is fail-open like push: the same try/catch + `LogWarning` shape as `NotifyNewsPublishedAsync`, and the article stays published. Repair is a follow-up, not part of this change.
 
 ### 7. Read fields for later UI stories
 
-Detail (`NewsDetailDto` and the website news model): `topicId`, `discussionReplyCount`, `discussionPreview` of the last N replies (not the opening post). N = 2. Listings: `topicId` and `replyCount` only, batched, no bodies. Null `topicId` means no discussion block. Website and mobile UI consume these fields in later stories.
+Detail (`NewsDetailDto` and the website news model): `topicId`, `discussionReplyCount`, `discussionPreview` of the last N replies (not the opening post). N = 2, or 1 if only one reply exists. Listings: `topicId` and `replyCount` only, batched, no bodies, no N+1. Null `topicId` means clients omit the discussion block. Website and mobile UI consume these fields in later stories.
 
 ## Consequences
 

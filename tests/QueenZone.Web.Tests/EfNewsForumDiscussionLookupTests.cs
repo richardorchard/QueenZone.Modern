@@ -88,6 +88,52 @@ public sealed class EfNewsForumDiscussionLookupTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task GetDiscussionAsync_ReturnsOneReply_WhenOnlyOneReplyExists()
+    {
+        var topicId = 78;
+        var now = new DateTime(2026, 8, 1, 10, 0, 0, DateTimeKind.Utc);
+        var category = new ModernForumCategoryEntity
+        {
+            LegacyForumId = 10,
+            Name = NewsForumDiscussion.CategoryName,
+            SortOrder = 100,
+            LegacyPostCount = 2,
+            ImportedAt = now,
+            UpdatedAt = now,
+        };
+        dbContext.ModernForumCategories.Add(category);
+        await dbContext.SaveChangesAsync();
+
+        var thread = new ModernForumThreadEntity
+        {
+            LegacyTopicId = topicId,
+            LegacyForumId = 10,
+            CategoryId = category.Id,
+            Title = "Single reply discussion",
+            StartedByDisplayName = NewsForumDiscussion.SystemMemberDisplayName,
+            StartedAt = now,
+            LastActivityAt = now.AddHours(1),
+            ReplyCount = 1,
+            ImportedAt = now,
+            UpdatedAt = now,
+        };
+        dbContext.ModernForumThreads.Add(thread);
+        await dbContext.SaveChangesAsync();
+
+        dbContext.ModernForumPosts.AddRange(
+            Post(thread, 11, NewsForumDiscussion.SystemMemberDisplayName, now, "Opening excerpt plus link"),
+            Post(thread, 12, "Only", now.AddHours(1), "sole reply"));
+        await dbContext.SaveChangesAsync();
+
+        var discussion = await lookup.GetDiscussionAsync(topicId, NewsForumDiscussion.PreviewReplyCount);
+
+        Assert.Equal(1, discussion.ReplyCount);
+        var preview = Assert.Single(discussion.Preview);
+        Assert.Equal("Only", preview.AuthorDisplayName);
+        Assert.Equal("sole reply", preview.Excerpt);
+    }
+
+    [Fact]
     public async Task GetReplyCountsAsync_EmptyInput_ReturnsEmpty()
     {
         var counts = await lookup.GetReplyCountsAsync([]);

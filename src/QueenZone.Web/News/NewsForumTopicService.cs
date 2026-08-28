@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using QueenZone.Data;
 using QueenZone.Data.Entities;
 
@@ -10,9 +11,12 @@ public sealed class NewsForumTopicService(
     ForumPostWriteService forumPostWrite,
     IMemberAccountRepository memberAccounts,
     IAdminNewsRepository adminNews,
+    IOptions<NewsForumOptions> newsForumOptions,
     TimeProvider timeProvider,
     ILogger<NewsForumTopicService> logger) : INewsForumTopicService
 {
+    private readonly NewsForumOptions options = newsForumOptions.Value;
+
     public async Task EnsureTopicOnFirstPublishAsync(
         AdminNewsArticle article,
         CancellationToken cancellationToken = default)
@@ -43,7 +47,7 @@ public sealed class NewsForumTopicService(
         var body = BuildOpeningPost(article);
         var outcome = await forumPostWrite.CreateTopicAsync(
             author.Id,
-            NewsForumDiscussion.SystemMemberDisplayName,
+            options.SystemMemberDisplayName,
             categoryId,
             title,
             body,
@@ -54,8 +58,9 @@ public sealed class NewsForumTopicService(
         if (!outcome.Succeeded)
         {
             logger.LogWarning(
-                "News forum topic create failed after news publish {NewsId}: {Status}",
+                "News forum topic create failed after news publish {NewsId} for category {Category}: {Status}",
                 article.Id,
+                NewsForumDiscussion.CategoryName,
                 outcome.Status);
             return;
         }
@@ -68,12 +73,19 @@ public sealed class NewsForumTopicService(
         var excerpt = NewsForumDiscussion.TruncatePlain(
             article.Excerpt,
             NewsForumDiscussion.OpeningExcerptMaxLength);
+        var linkParagraph = BuildPublicArticleLinkParagraph(article);
+        return string.IsNullOrWhiteSpace(excerpt)
+            ? linkParagraph
+            : excerpt + "\n\n" + linkParagraph;
+    }
+
+    internal static string BuildPublicArticleLinkParagraph(AdminNewsArticle article)
+    {
         var path = NewsRoutes.GetNewsDetailPath(
             article.Id,
             article.Title,
             string.IsNullOrWhiteSpace(article.Slug) ? null : article.Slug);
-        var url = NewsForumDiscussion.PublicArticleOrigin + path;
-        return string.IsNullOrWhiteSpace(excerpt) ? url : excerpt + "\n\n" + url;
+        return NewsForumDiscussion.PublicArticleOrigin + path;
     }
 
     internal static string ClampTitle(string title, int articleId)
@@ -92,7 +104,7 @@ public sealed class NewsForumTopicService(
     private async Task<MemberAccount> EnsureSystemMemberAsync(CancellationToken cancellationToken)
     {
         var existing = await memberAccounts.FindByEmailAsync(
-            NewsForumDiscussion.SystemMemberEmail,
+            options.SystemMemberEmail,
             cancellationToken);
         if (existing is not null)
         {
@@ -103,8 +115,8 @@ public sealed class NewsForumTopicService(
             new MemberAccount
             {
                 Id = Guid.NewGuid(),
-                Email = NewsForumDiscussion.SystemMemberEmail,
-                DisplayName = NewsForumDiscussion.SystemMemberDisplayName,
+                Email = options.SystemMemberEmail,
+                DisplayName = options.SystemMemberDisplayName,
                 CreatedAt = timeProvider.GetUtcNow().UtcDateTime,
             },
             cancellationToken);
