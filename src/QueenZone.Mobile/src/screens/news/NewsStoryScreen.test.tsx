@@ -214,4 +214,28 @@ describe('NewsStoryScreen', () => {
     });
     expect(navigation.navigate).not.toHaveBeenCalledWith('Composer', expect.anything());
   });
+
+  it('renders a single-reply preview with Join the discussion', async () => {
+    fetchDetail.mockResolvedValue(
+      newsDetailFixture({
+        title: 'Article with one reply',
+        topicId: 1002,
+        discussionReplyCount: 1,
+        discussionPreview: [
+          {
+            authorDisplayName: 'Only',
+            postedAt: '2026-08-02T09:00:00.000Z',
+            excerpt: 'Sole reply excerpt',
+          },
+        ],
+      }),
+    );
+    renderStory();
+    await waitFor(() => expect(screen.getByText('Join the discussion')).toBeOnTheScreen());
+
+    expect(screen.getByText('1 reply')).toBeOnTheScreen();
+    expect(screen.getByText('Only')).toBeOnTheScreen();
+    expect(screen.getByText('Sole reply excerpt')).toBeOnTheScreen();
+    expect(screen.queryByText('Start the discussion')).toBeNull();
+  });
 });
