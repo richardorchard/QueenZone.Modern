@@ -1731,9 +1731,26 @@ body.qz-menu-lock .qz-masthead {
   padding: 0;
 }
 
+.qz-stage-queue {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-4);
+}
+
+.qz-stage-now-playing {
+  margin: 0;
+  flex: 1 1 12rem;
+}
+
 .qz-stage-row {
   padding: var(--space-6) 0;
   border-bottom: 1px solid var(--hairline);
+}
+
+.qz-stage-row.is-playing {
+  background: color-mix(in srgb, var(--qz-charcoal) 6%, transparent);
 }
 
 .qz-stage-row__track {
