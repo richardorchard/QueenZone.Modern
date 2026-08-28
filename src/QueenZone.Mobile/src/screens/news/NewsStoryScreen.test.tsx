@@ -129,4 +129,89 @@ describe('NewsStoryScreen', () => {
     expect(screen.getByText('Kept headline')).toBeOnTheScreen();
     expect(screen.queryByText('Unable to load')).toBeNull();
   });
+
+  it('omits the discussion block when topicId is missing', async () => {
+    fetchDetail.mockResolvedValue(
+      newsDetailFixture({
+        title: 'Legacy article without topic',
+        discussionReplyCount: 2,
+        discussionPreview: [
+          { authorDisplayName: 'Should not render', postedAt: '2026-08-02T09:00:00.000Z', excerpt: 'Hidden excerpt' },
+        ],
+      }),
+    );
+    renderStory();
+    await waitFor(() => expect(screen.getByText('Legacy article without topic')).toBeOnTheScreen());
+
+    expect(screen.queryByTestId(testIds.newsStoryDiscussion)).toBeNull();
+    expect(screen.queryByText('Start the discussion')).toBeNull();
+    expect(screen.queryByText('Join the discussion')).toBeNull();
+    expect(screen.queryByText('Should not render')).toBeNull();
+    expect(screen.queryByText('Hidden excerpt')).toBeNull();
+  });
+
+  it('renders Start the discussion when the linked topic has no replies', async () => {
+    fetchDetail.mockResolvedValue(
+      newsDetailFixture({
+        title: 'Article awaiting replies',
+        topicId: 1002,
+        discussionReplyCount: 0,
+        discussionPreview: [],
+      }),
+    );
+    const { navigation } = renderStory();
+    await waitFor(() => expect(screen.getByText('Start the discussion')).toBeOnTheScreen());
+
+    expect(screen.getByTestId(testIds.newsStoryDiscussion)).toBeOnTheScreen();
+    expect(screen.queryByText('Join the discussion')).toBeNull();
+    expect(screen.queryByText('1 reply')).toBeNull();
+
+    const user = userEvent.setup();
+    await user.press(screen.getByTestId(testIds.newsStoryDiscussionCta));
+    expect(navigation.navigate).toHaveBeenCalledWith('ForumTab', {
+      screen: 'Thread',
+      params: { id: 1002, title: 'Article awaiting replies' },
+      initial: false,
+    });
+  });
+
+  it('renders preview and Join the discussion for a signed-out reader', async () => {
+    fetchDetail.mockResolvedValue(
+      newsDetailFixture({
+        title: 'Article with replies',
+        topicId: 1002,
+        discussionReplyCount: 3,
+        discussionPreview: [
+          {
+            authorDisplayName: 'Alice',
+            postedAt: '2026-08-01T10:30:00.000Z',
+            excerpt: 'First preview excerpt',
+          },
+          {
+            authorDisplayName: 'Bob',
+            postedAt: '2026-08-01T11:30:00.000Z',
+            excerpt: 'Latest preview excerpt',
+          },
+        ],
+      }),
+    );
+    const { navigation } = renderStory();
+    await waitFor(() => expect(screen.getByText('Join the discussion')).toBeOnTheScreen());
+
+    expect(screen.getByText('3 replies')).toBeOnTheScreen();
+    expect(screen.getByText('Alice')).toBeOnTheScreen();
+    expect(screen.getByText('First preview excerpt')).toBeOnTheScreen();
+    expect(screen.getByText('Bob')).toBeOnTheScreen();
+    expect(screen.getByText('Latest preview excerpt')).toBeOnTheScreen();
+    expect(screen.queryByText('Start the discussion')).toBeNull();
+
+    const user = userEvent.setup();
+    await user.press(screen.getByLabelText('Open discussion from Alice'));
+    expect(navigation.navigate).toHaveBeenCalledWith('ForumTab', {
+      screen: 'Thread',
+      params: { id: 1002, title: 'Article with replies' },
+      initial: false,
+    });
+    expect(navigation.navigate).not.toHaveBeenCalledWith('Composer', expect.anything());
+  });
 });

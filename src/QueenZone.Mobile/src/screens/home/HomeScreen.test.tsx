@@ -139,6 +139,8 @@ describe('HomeScreen', () => {
       initial: false,
     });
     expect(JSON.stringify(navigation.navigate.mock.calls)).not.toContain('magic-tour');
+    expect(screen.queryByText('Start the discussion')).toBeNull();
+    expect(screen.queryByText('Join the discussion')).toBeNull();
   });
 
   it('refreshes only the news section when a news push bumps the list epoch', async () => {
