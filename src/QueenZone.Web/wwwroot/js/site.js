@@ -451,6 +451,17 @@
     return;
   }
 
+  // catalogNode.textContent is a modeled taint step (js/xss-through-dom).
+  // Only cookie-gated same-origin audio paths may reach audio.src; encodeURI is
+  // the XSS sanitizer CodeQL recognizes.
+  const asFanPerformanceAudioPath = (path) => {
+    if (typeof path !== "string") {
+      return "";
+    }
+
+    return /^\/fan-performances\/\d+\/audio(?:\/[A-Za-z0-9._-]+)?$/.test(path) ? path : "";
+  };
+
   const catalogNode = document.querySelector("[data-qz-stage-catalog]");
   const catalog = (() => {
     if (!catalogNode) {
@@ -463,7 +474,10 @@
         return [];
       }
 
-      return parsed.filter((entry) => entry && Number.isInteger(entry.id) && typeof entry.audioPlayPath === "string");
+      return parsed.filter((entry) =>
+        entry &&
+        Number.isInteger(entry.id) &&
+        asFanPerformanceAudioPath(entry.audioPlayPath));
     } catch {
       return [];
     }
@@ -618,8 +632,14 @@
         player.audio.pause();
       }
     });
+    const audioPath = asFanPerformanceAudioPath(entry.audioPlayPath);
+    if (!audioPath) {
+      fail();
+      return;
+    }
+
     clearRowPlaying();
-    sharedAudio.src = entry.audioPlayPath;
+    sharedAudio.src = encodeURI(audioPath);
     updateNowPlaying(entry);
     playAttempt(sharedAudio, fail);
   };
