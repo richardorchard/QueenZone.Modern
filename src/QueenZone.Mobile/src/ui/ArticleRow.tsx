@@ -8,6 +8,12 @@ type Props = {
   meta?: string;
   hint?: string;
   leading?: ReactNode;
+  /**
+   * When true (default), `leading` stays outside the row press target so a
+   * play control can stream without opening detail. Decorative leading
+   * (news thumbnails) should pass false so the whole row is tappable.
+   */
+  leadingInteractive?: boolean;
   onPress?: () => void;
   accessibilityLabel?: string;
   testID?: string;
@@ -15,8 +21,9 @@ type Props = {
 
 /**
  * Archive list row — STYLE_GUIDE §3 List: hairline separators, type hierarchy, no cards.
- * `leading` sits beside the title and subtitle and is not inside the row press target,
- * so a play control can stream without blocking open-detail.
+ * `leading` sits beside the title and subtitle. Interactive leading (the default)
+ * stays outside the row press target so a play control can stream without
+ * opening detail. Pass `leadingInteractive={false}` for decorative leading.
  */
 export function ArticleRow({
   title,
@@ -24,6 +31,7 @@ export function ArticleRow({
   meta,
   hint,
   leading,
+  leadingInteractive = true,
   onPress,
   accessibilityLabel,
   testID,
@@ -61,7 +69,7 @@ export function ArticleRow({
     <Text style={[type.meta, { color: c.textMuted, marginTop: space.xs }]}>{hint}</Text>
   ) : null;
 
-  if (leading) {
+  if (leading && leadingInteractive) {
     const titleBlock = onPress ? (
       <Pressable
         testID={testID}
@@ -91,7 +99,14 @@ export function ArticleRow({
   const body = (
     <View style={[styles.row, { borderTopColor: c.hairline }]}>
       {metaLine}
-      {copy}
+      {leading ? (
+        <View style={styles.track}>
+          {leading}
+          <View style={styles.copy}>{copy}</View>
+        </View>
+      ) : (
+        copy
+      )}
       {hintLine}
     </View>
   );

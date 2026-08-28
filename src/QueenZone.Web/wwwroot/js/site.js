@@ -437,11 +437,13 @@
 
   const rows = Array.from(list.querySelectorAll("[data-qz-stage-play]")).map((button) => {
     const row = button.closest(".qz-stage-row");
+    const idValue = Number.parseInt(button.getAttribute("data-qz-stage-id") || (row && row.getAttribute("data-qz-stage-id")) || "", 10);
     return {
       button,
       row,
       audio: row ? row.querySelector("audio") : null,
-      title: button.getAttribute("data-title") || "recording"
+      title: button.getAttribute("data-title") || "recording",
+      id: Number.isInteger(idValue) ? idValue : null
     };
   }).filter((player) => player.audio);
 
@@ -449,8 +451,55 @@
     return;
   }
 
+  // catalogNode.textContent is a modeled taint step (js/xss-through-dom).
+  // Only cookie-gated same-origin audio paths may reach audio.src; encodeURI is
+  // the XSS sanitizer CodeQL recognizes.
+  const asFanPerformanceAudioPath = (path) => {
+    if (typeof path !== "string") {
+      return "";
+    }
+
+    return /^\/fan-performances\/\d+\/audio(?:\/[A-Za-z0-9._-]+)?$/.test(path) ? path : "";
+  };
+
+  const catalogNode = document.querySelector("[data-qz-stage-catalog]");
+  const catalog = (() => {
+    if (!catalogNode) {
+      return [];
+    }
+
+    try {
+      const parsed = JSON.parse(catalogNode.textContent || "[]");
+      if (!Array.isArray(parsed)) {
+        return [];
+      }
+
+      return parsed.filter((entry) =>
+        entry &&
+        Number.isInteger(entry.id) &&
+        asFanPerformanceAudioPath(entry.audioPlayPath));
+    } catch {
+      return [];
+    }
+  })();
+
+  const playAllButton = document.querySelector("[data-qz-stage-play-all]");
+  const shuffleAllButton = document.querySelector("[data-qz-stage-shuffle-all]");
+  const nowPlaying = document.querySelector("[data-qz-stage-now-playing]");
+  const sharedAudio = document.createElement("audio");
+  sharedAudio.preload = "none";
+  sharedAudio.hidden = true;
+  list.appendChild(sharedAudio);
+
+  let queue = null;
+  let queueGeneration = 0;
+
   const playIcon = (player) => player.button.querySelector(".qz-stage-play__icon--play");
   const pauseIcon = (player) => player.button.querySelector(".qz-stage-play__icon--pause");
+
+  const findRow = (id) => rows.find((player) => player.id === id);
+
+  const catalogEntry = (id) => catalog.find((entry) => entry.id === id);
 
   const setPlaying = (player, playing) => {
     player.button.setAttribute("aria-pressed", playing ? "true" : "false");
@@ -466,32 +515,170 @@
     }
   };
 
+  const clearRowPlaying = () => {
+    rows.forEach((player) => setPlaying(player, false));
+  };
+
+  const updateNowPlaying = (entry) => {
+    if (!nowPlaying) {
+      return;
+    }
+
+    if (!entry) {
+      nowPlaying.hidden = true;
+      nowPlaying.textContent = "";
+      return;
+    }
+
+    nowPlaying.hidden = false;
+    nowPlaying.textContent = "Now playing: " + (entry.title || "recording");
+  };
+
+  const pauseShared = () => {
+    if (!sharedAudio.paused) {
+      sharedAudio.pause();
+    }
+  };
+
   const pauseOthers = (active) => {
     rows.forEach((player) => {
       if (player !== active && !player.audio.paused) {
         player.audio.pause();
       }
     });
+    if (active) {
+      pauseShared();
+    }
+  };
+
+  const cancelQueue = () => {
+    queueGeneration += 1;
+    queue = null;
+  };
+
+  const shuffleIds = (ids) => {
+    const copy = ids.slice();
+    for (let index = copy.length - 1; index > 0; index -= 1) {
+      const swap = Math.floor(Math.random() * (index + 1));
+      const current = copy[index];
+      copy[index] = copy[swap];
+      copy[swap] = current;
+    }
+    return copy;
+  };
+
+  const playAttempt = (media, onFailure) => {
+    const attempt = media.play();
+    if (attempt && typeof attempt.catch === "function") {
+      attempt.catch(() => {
+        if (typeof onFailure === "function") {
+          onFailure();
+        }
+      });
+    }
+  };
+
+  const playNextInQueue = () => {
+    if (!queue) {
+      updateNowPlaying(null);
+      return;
+    }
+
+    queue.index += 1;
+    if (queue.index >= queue.ids.length) {
+      cancelQueue();
+      updateNowPlaying(null);
+      return;
+    }
+
+    playQueueIndex(queue.index);
+  };
+
+  const playQueueIndex = (index) => {
+    if (!queue || index < 0 || index >= queue.ids.length) {
+      return;
+    }
+
+    const generation = queueGeneration;
+    const id = queue.ids[index];
+    const entry = catalogEntry(id);
+    const rowPlayer = findRow(id);
+    queue.index = index;
+
+    const fail = () => {
+      if (generation !== queueGeneration) {
+        return;
+      }
+      cancelQueue();
+      updateNowPlaying(null);
+      clearRowPlaying();
+    };
+
+    if (rowPlayer) {
+      pauseOthers(rowPlayer);
+      updateNowPlaying(entry || { title: rowPlayer.title });
+      rowPlayer.audio.currentTime = 0;
+      playAttempt(rowPlayer.audio, fail);
+      return;
+    }
+
+    if (!entry) {
+      fail();
+      return;
+    }
+
+    rows.forEach((player) => {
+      if (!player.audio.paused) {
+        player.audio.pause();
+      }
+    });
+    const audioPath = asFanPerformanceAudioPath(entry.audioPlayPath);
+    if (!audioPath) {
+      fail();
+      return;
+    }
+
+    clearRowPlaying();
+    sharedAudio.src = encodeURI(audioPath);
+    updateNowPlaying(entry);
+    playAttempt(sharedAudio, fail);
+  };
+
+  const startQueue = (ids) => {
+    cancelQueue();
+    if (!ids.length) {
+      updateNowPlaying(null);
+      return;
+    }
+
+    queue = { ids, index: 0 };
+    playQueueIndex(0);
   };
 
   rows.forEach((player) => {
     player.button.addEventListener("click", () => {
+      cancelQueue();
       if (player.audio.paused) {
         pauseOthers(player);
-        const attempt = player.audio.play();
-        if (attempt && typeof attempt.catch === "function") {
-          attempt.catch(() => {
-            setPlaying(player, false);
-          });
-        }
+        playAttempt(player.audio, () => {
+          setPlaying(player, false);
+          updateNowPlaying(null);
+        });
       } else {
         player.audio.pause();
+        updateNowPlaying(null);
       }
     });
 
     player.audio.addEventListener("play", () => {
+      if (queue && queue.ids[queue.index] !== player.id) {
+        cancelQueue();
+      }
       pauseOthers(player);
       setPlaying(player, true);
+      if (!queue) {
+        updateNowPlaying({ title: player.title });
+      }
     });
 
     player.audio.addEventListener("pause", () => {
@@ -500,7 +687,33 @@
 
     player.audio.addEventListener("ended", () => {
       setPlaying(player, false);
+      playNextInQueue();
     });
+  });
+
+  sharedAudio.addEventListener("ended", () => {
+    playNextInQueue();
+  });
+
+  if (playAllButton) {
+    playAllButton.addEventListener("click", () => {
+      startQueue(catalog.map((entry) => entry.id));
+    });
+  }
+
+  if (shuffleAllButton) {
+    shuffleAllButton.addEventListener("click", () => {
+      startQueue(shuffleIds(catalog.map((entry) => entry.id)));
+    });
+  }
+
+  window.addEventListener("pagehide", () => {
+    cancelQueue();
+    pauseOthers(null);
+    pauseShared();
+    sharedAudio.removeAttribute("src");
+    updateNowPlaying(null);
+    clearRowPlaying();
   });
 
   list.classList.add("is-enhanced");

@@ -33,6 +33,7 @@ describe('parseContract', () => {
       thumbnailUrl: '/ugc/articles/editors/me/hero.webp?size=thumb',
     });
     assert.equal(withImage.imageUrl, '/ugc/articles/editors/me/hero.webp');
+    assert.equal(withImage.thumbnailUrl, '/ugc/articles/editors/me/hero.webp?size=thumb');
     const withoutImage = parseContract('GET /api/v1/content/news', newsListItemSchema, {
       id: 1004,
       title: 'No photo',
@@ -43,6 +44,7 @@ describe('parseContract', () => {
       thumbnailUrl: null,
     });
     assert.equal(withoutImage.imageUrl, null);
+    assert.equal(withoutImage.thumbnailUrl, null);
   });
 
   it('accepts optional news discussion fields on detail', () => {
