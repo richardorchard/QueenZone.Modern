@@ -33,6 +33,38 @@
     {
       <p class="article-source">Source: <a href="@Model.Item.SourceUrl" rel="noopener noreferrer">@Model.Item.SourceUrl</a></p>
     }
+
+    @if (Model.Item.TopicId is int topicId)
+    {
+      var topicPath = ForumRoutes.GetTopicCanonicalPath(topicId, Model.Item.Title);
+      var replyCount = Model.Item.DiscussionReplyCount ?? 0;
+      var previews = Model.Item.DiscussionPreview ?? [];
+      var invite = replyCount > 0 ? "Join the discussion" : "Start the discussion";
+      <section class="article-discussion" aria-labelledby="article-discussion-heading">
+        <h2 id="article-discussion-heading">Discussion</h2>
+        @if (replyCount > 0)
+        {
+          <p class="qz-meta">@(replyCount == 1 ? "1 reply" : $"{replyCount} replies")</p>
+        }
+        @if (replyCount > 0 && previews.Count > 0)
+        {
+          <ol>
+            @foreach (var preview in previews)
+            {
+              <li>
+                <a href="@topicPath">
+                  <span>@preview.AuthorDisplayName</span>
+                  <time datetime="@preview.PostedAt.ToString("yyyy-MM-ddTHH:mm:ss")">@preview.PostedAt.ToString("dd MMMM yyyy HH:mm")</time>
+                  <p>@preview.Excerpt</p>
+                </a>
+              </li>
+            }
+          </ol>
+        }
+        <p><a class="qz-button" href="@topicPath">@invite</a></p>
+      </section>
+    }
+
     <partial name="_SocialShare" />
   </div>
 }
