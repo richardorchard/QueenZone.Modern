@@ -133,6 +133,14 @@ describe('token maintenance', () => {
     await expect(revokeRefreshToken('http://qz.test', 'r')).resolves.toBeUndefined();
   });
 
+  it('completes logout and revoke when the server responds', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({}));
+    await expect(logoutRemote('http://qz.test', 'a')).resolves.toBeUndefined();
+    await expect(revokeRefreshToken('http://qz.test', 'r')).resolves.toBeUndefined();
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/api/v1/auth/logout');
+    expect(String(fetchMock.mock.calls[1]?.[0])).toContain('/api/v1/auth/revoke');
+  });
+
   it('resolves logout and revoke when fetch never settles', async () => {
     jest.useFakeTimers();
     try {

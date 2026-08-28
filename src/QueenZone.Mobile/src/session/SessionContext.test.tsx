@@ -241,6 +241,20 @@ describe('SessionProvider', () => {
     expect(screen.getByText('no-token')).toBeOnTheScreen();
   });
 
+  it('does not call remote logout when already signed out', async () => {
+    const user = userEvent.setup();
+    readStored.mockResolvedValue(null);
+    renderSession();
+    await waitFor(() => expect(screen.getByText('signed-out')).toBeOnTheScreen());
+
+    await user.press(screen.getByText('do-sign-out'));
+    await waitFor(() => expect(clearStored).toHaveBeenCalled());
+    expect(clearPushRegistration).not.toHaveBeenCalled();
+    expect(logoutRemote).not.toHaveBeenCalled();
+    expect(revokeRefreshToken).not.toHaveBeenCalled();
+    expect(screen.getByText('signed-out')).toBeOnTheScreen();
+  });
+
   it('signs out in memory when SecureStore delete fails', async () => {
     const user = userEvent.setup();
     readStored.mockResolvedValue({
