@@ -1,4 +1,5 @@
 import * as Notifications from 'expo-notifications';
+import { getNewsListEpoch } from './newsListEpoch';
 import {
   isDefaultNotificationTap,
   noticeFromNotification,
@@ -297,6 +298,32 @@ describe('subscribeNotificationEvents', () => {
       body: 'New article published.',
       destination: { category: 'news', articleId: 1003 },
     });
+  });
+
+  it('increments the news epoch on a news receive and tap, but not on other categories', async () => {
+    subscribeNotificationEvents({ onTap: jest.fn(), onForeground: jest.fn() });
+    await Promise.resolve();
+    const start = getNewsListEpoch();
+
+    receivedListener?.(notification({ category: 'forumReply', topicId: '1002' }, 'fg-forum'));
+    receivedListener?.(notification({ category: 'privateMessage', conversationId }, 'fg-pm'));
+    expect(getNewsListEpoch()).toBe(start);
+
+    receivedListener?.(notification({ category: 'news', articleId: '1003' }, 'fg-news'));
+    expect(getNewsListEpoch()).toBe(start + 1);
+
+    receivedListener?.(iosNotification({ category: 'news' }, 'fg-news-list'));
+    expect(getNewsListEpoch()).toBe(start + 2);
+
+    responseListener?.(response({ category: 'forumReply', topicId: '1002' }, 'tap-forum'));
+    responseListener?.(response({ category: 'privateMessage', conversationId }, 'tap-pm'));
+    expect(getNewsListEpoch()).toBe(start + 2);
+
+    responseListener?.(response({ category: 'news', articleId: '1003' }, 'tap-news'));
+    expect(getNewsListEpoch()).toBe(start + 3);
+
+    responseListener?.(iosResponse({ category: 'news' }, 'tap-news-list'));
+    expect(getNewsListEpoch()).toBe(start + 4);
   });
 
   it('does not handle a last response after unsubscribe', async () => {
