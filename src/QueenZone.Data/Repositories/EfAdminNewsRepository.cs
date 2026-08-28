@@ -217,6 +217,19 @@ public sealed class EfAdminNewsRepository : IAdminNewsRepository
             string.Equals(NewsSlug.Slugify(title), normalized, StringComparison.OrdinalIgnoreCase));
     }
 
+    public async Task<bool> TrySetForumTopicIdAsync(
+        int newsId,
+        int topicId,
+        CancellationToken cancellationToken = default)
+    {
+        var updated = await dbContext.NewsRows
+            .Where(row => row.NewsId == newsId && row.ForumTopicId == null)
+            .ExecuteUpdateAsync(
+                setters => setters.SetProperty(row => row.ForumTopicId, topicId),
+                cancellationToken);
+        return updated > 0;
+    }
+
     private async Task<int> GetAdminNewsTotalCountAsync(CancellationToken cancellationToken)
     {
         var values = await dbContext.Database

@@ -69,5 +69,11 @@ public sealed class ForumPostRateLimiterTests
 
         public Task UnhidePostsByMemberAsync(Guid memberId, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
+
+        public Task<int> EnsureCategoryAsync(
+            string slug,
+            string name,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 }

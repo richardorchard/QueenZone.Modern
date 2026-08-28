@@ -30,6 +30,9 @@ internal sealed class FailingCreateAdminNewsRepository(InMemoryAdminNewsReposito
 
     public Task<bool> IsSlugInUseAsync(string slug, int? excludeNewsId = null, CancellationToken cancellationToken = default) =>
         inner.IsSlugInUseAsync(slug, excludeNewsId, cancellationToken);
+
+    public Task<bool> TrySetForumTopicIdAsync(int newsId, int topicId, CancellationToken cancellationToken = default) =>
+        inner.TrySetForumTopicIdAsync(newsId, topicId, cancellationToken);
 }
 
 internal sealed class FailingDeleteAdminNewsRepository(InMemoryAdminNewsRepository inner, Exception deleteException) : IAdminNewsRepository
@@ -60,6 +63,9 @@ internal sealed class FailingDeleteAdminNewsRepository(InMemoryAdminNewsReposito
 
     public Task<bool> IsSlugInUseAsync(string slug, int? excludeNewsId = null, CancellationToken cancellationToken = default) =>
         inner.IsSlugInUseAsync(slug, excludeNewsId, cancellationToken);
+
+    public Task<bool> TrySetForumTopicIdAsync(int newsId, int topicId, CancellationToken cancellationToken = default) =>
+        inner.TrySetForumTopicIdAsync(newsId, topicId, cancellationToken);
 }
 
 internal sealed class ConfigurableNewsDiscoveryRepository(INewsDiscoveryRepository inner) : INewsDiscoveryRepository

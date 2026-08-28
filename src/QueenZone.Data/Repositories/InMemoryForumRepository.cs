@@ -10,7 +10,7 @@ public sealed class InMemoryForumRepository(
         Task.FromResult<IReadOnlyList<ForumCategoryItem>>(GetCategories());
 
     public Task<ForumCategoryItem?> GetCategoryByIdAsync(int id, CancellationToken cancellationToken = default) =>
-        Task.FromResult(seedCategories.SingleOrDefault(category => category.Id == id));
+        Task.FromResult(GetCategories().SingleOrDefault(category => category.Id == id));
 
     public Task<ForumCategoryTopicsPage> GetCategoryTopicsPageAsync(
         int forumId,
@@ -167,12 +167,16 @@ public sealed class InMemoryForumRepository(
     private IReadOnlyList<ForumCategoryItem> GetCategories()
     {
         var createdThreads = writeRepository?.GetCreatedThreads() ?? [];
+        var createdCategories = writeRepository?.GetCreatedCategories() ?? [];
+        var all = seedCategories
+            .Concat(createdCategories.Where(created => seedCategories.All(seed => seed.Id != created.Id)))
+            .ToList();
         if (createdThreads.Count == 0)
         {
-            return seedCategories;
+            return all;
         }
 
-        return seedCategories
+        return all
             .Select(category => OverlayCreatedThreadStats(category, createdThreads))
             .ToList();
     }
@@ -216,9 +220,10 @@ public sealed class InMemoryForumRepository(
             return null;
         }
 
-        var category = seedCategories.SingleOrDefault(category => category.Id == thread.CategoryId);
+        var category = seedCategories.SingleOrDefault(category => category.Id == thread.CategoryId)
+            ?? writeRepository?.GetCreatedCategories().SingleOrDefault(category => category.Id == thread.CategoryId);
         return category is null
-            ? null
+            ? new ForumTopicHeader(thread.TopicId, thread.Subject, thread.CategoryId, NewsForumDiscussion.CategoryName, thread.HasPoll)
             : new ForumTopicHeader(thread.TopicId, thread.Subject, category.Id, category.Name, thread.HasPoll);
     }
 

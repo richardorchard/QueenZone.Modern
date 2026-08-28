@@ -682,12 +682,12 @@ public sealed class EfPublicReadRepositoryTests : IAsyncDisposable
 
         // List SQL projects empty Body (no ARTICLE LOB) — mapping must not require real body text.
         const string listSelect = """
-            SELECT Id, Title, Excerpt, CAST('' AS TEXT) AS Body, PublishedAt, SourceUrl, IsPublished, Slug, CAST(NULL AS TEXT) AS ImageBlobKey, CAST(NULL AS INTEGER) AS ImageGalleryPicId
+            SELECT Id, Title, Excerpt, CAST('' AS TEXT) AS Body, PublishedAt, SourceUrl, IsPublished, Slug, CAST(NULL AS TEXT) AS ImageBlobKey, CAST(NULL AS INTEGER) AS ImageGalleryPicId, CAST(NULL AS INTEGER) AS ForumTopicId
             FROM NewsRows
             WHERE IsPublished = 1
             """;
         const string detailSelect = """
-            SELECT Id, Title, Excerpt, Body, PublishedAt, SourceUrl, IsPublished, Slug, CAST(NULL AS TEXT) AS ImageBlobKey, CAST(NULL AS INTEGER) AS ImageGalleryPicId
+            SELECT Id, Title, Excerpt, Body, PublishedAt, SourceUrl, IsPublished, Slug, CAST(NULL AS TEXT) AS ImageBlobKey, CAST(NULL AS INTEGER) AS ImageGalleryPicId, CAST(NULL AS INTEGER) AS ForumTopicId
             FROM NewsRows
             WHERE IsPublished = 1
             """;
@@ -756,7 +756,7 @@ public sealed class EfPublicReadRepositoryTests : IAsyncDisposable
             "INSERT INTO NewsRows (Id, Title, Excerpt, Body, PublishedAt, IsPublished) VALUES (9999, 'Old article', 'Ex', 'Body', '2008-03-04', 1)");
 
         const string listSelect = """
-            SELECT Id, Title, Excerpt, CAST('' AS TEXT) AS Body, PublishedAt, SourceUrl, IsPublished, Slug, CAST(NULL AS TEXT) AS ImageBlobKey, CAST(NULL AS INTEGER) AS ImageGalleryPicId
+            SELECT Id, Title, Excerpt, CAST('' AS TEXT) AS Body, PublishedAt, SourceUrl, IsPublished, Slug, CAST(NULL AS TEXT) AS ImageBlobKey, CAST(NULL AS INTEGER) AS ImageGalleryPicId, CAST(NULL AS INTEGER) AS ForumTopicId
             FROM NewsRows
             WHERE IsPublished = 1
             """;
@@ -821,10 +821,10 @@ public sealed class EfPublicReadRepositoryTests : IAsyncDisposable
 
         var repository = new EfNewsRepository(
             dbContext,
-            latestSql: "SELECT Id, Title, Excerpt, Body, PublishedAt, SourceUrl, IsPublished, Slug, CAST(NULL AS TEXT) AS ImageBlobKey, CAST(NULL AS INTEGER) AS ImageGalleryPicId FROM NewsRows WHERE IsPublished = 1 LIMIT {0}",
+            latestSql: "SELECT Id, Title, Excerpt, Body, PublishedAt, SourceUrl, IsPublished, Slug, CAST(NULL AS TEXT) AS ImageBlobKey, CAST(NULL AS INTEGER) AS ImageGalleryPicId, CAST(NULL AS INTEGER) AS ForumTopicId FROM NewsRows WHERE IsPublished = 1 LIMIT {0}",
             countSql: "SELECT COUNT(*) AS Value FROM NewsRows WHERE IsPublished = 1",
-            archivePageSql: "SELECT Id, Title, Excerpt, Body, PublishedAt, SourceUrl, IsPublished, Slug, CAST(NULL AS TEXT) AS ImageBlobKey, CAST(NULL AS INTEGER) AS ImageGalleryPicId FROM NewsRows WHERE IsPublished = 1 LIMIT {1} OFFSET {0}",
-            byIdSql: "SELECT Id, Title, Excerpt, Body, PublishedAt, SourceUrl, IsPublished, Slug, CAST(NULL AS TEXT) AS ImageBlobKey, CAST(NULL AS INTEGER) AS ImageGalleryPicId FROM NewsRows WHERE IsPublished = 1 AND Id = {0}",
+            archivePageSql: "SELECT Id, Title, Excerpt, Body, PublishedAt, SourceUrl, IsPublished, Slug, CAST(NULL AS TEXT) AS ImageBlobKey, CAST(NULL AS INTEGER) AS ImageGalleryPicId, CAST(NULL AS INTEGER) AS ForumTopicId FROM NewsRows WHERE IsPublished = 1 LIMIT {1} OFFSET {0}",
+            byIdSql: "SELECT Id, Title, Excerpt, Body, PublishedAt, SourceUrl, IsPublished, Slug, CAST(NULL AS TEXT) AS ImageBlobKey, CAST(NULL AS INTEGER) AS ImageGalleryPicId, CAST(NULL AS INTEGER) AS ForumTopicId FROM NewsRows WHERE IsPublished = 1 AND Id = {0}",
             sitemapSql: "SELECT Id, Title, PublishedAt, Slug FROM NewsRows WHERE IsPublished = 1",
             archiveYearRangeSql: "SELECT MIN(PublishedAt) AS MinPublishedAt, MAX(PublishedAt) AS MaxPublishedAt FROM NewsRows WHERE IsPublished = 1");
 

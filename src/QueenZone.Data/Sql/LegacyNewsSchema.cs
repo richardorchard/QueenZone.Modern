@@ -31,6 +31,8 @@ public static class LegacyNewsSchema
         public bool HasImageBlobKeyColumn { get; set; }
 
         public bool HasImageGalleryPicIdColumn { get; set; }
+
+        public bool HasForumTopicIdColumn { get; set; }
     }
 
     /// <inheritdoc cref="PublishedNewsQuery.BuildPublishedNewsCte"/>
@@ -38,12 +40,14 @@ public static class LegacyNewsSchema
         bool includeSlugColumn,
         bool includeBody = true,
         bool includeImageBlobKeyColumn = false,
-        bool includeImageGalleryPicIdColumn = false) =>
+        bool includeImageGalleryPicIdColumn = false,
+        bool includeForumTopicIdColumn = false) =>
         PublishedNewsQuery.BuildPublishedNewsCte(
             includeSlugColumn,
             includeBody,
             includeImageBlobKeyColumn,
-            includeImageGalleryPicIdColumn);
+            includeImageGalleryPicIdColumn,
+            includeForumTopicIdColumn);
 
     /// <inheritdoc cref="PublishedNewsQuery.BuildAdminLatestNewsSql"/>
     public static string BuildAdminLatestNewsSql(NewsColumnAvailability columns) =>
@@ -86,7 +90,8 @@ public static class LegacyNewsSchema
                 CAST(CASE WHEN COL_LENGTH('NEWS_T', 'UPDATED_AT') IS NOT NULL THEN 1 ELSE 0 END AS bit) AS HasUpdatedAtColumn,
                 CAST(CASE WHEN COL_LENGTH('NEWS_T', 'EDITOR_EMAIL') IS NOT NULL THEN 1 ELSE 0 END AS bit) AS HasEditorEmailColumn,
                 CAST(CASE WHEN COL_LENGTH('NEWS_T', 'IMAGE_BLOB_KEY') IS NOT NULL THEN 1 ELSE 0 END AS bit) AS HasImageBlobKeyColumn,
-                CAST(CASE WHEN COL_LENGTH('NEWS_T', 'IMAGE_GALLERY_PIC_ID') IS NOT NULL THEN 1 ELSE 0 END AS bit) AS HasImageGalleryPicIdColumn
+                CAST(CASE WHEN COL_LENGTH('NEWS_T', 'IMAGE_GALLERY_PIC_ID') IS NOT NULL THEN 1 ELSE 0 END AS bit) AS HasImageGalleryPicIdColumn,
+                CAST(CASE WHEN COL_LENGTH('NEWS_T', 'FORUM_TOPIC_ID') IS NOT NULL THEN 1 ELSE 0 END AS bit) AS HasForumTopicIdColumn
             """;
 
         return EfSql.QuerySingleSqlAsync<NewsColumnAvailability>(connectionString, sql).GetAwaiter().GetResult();

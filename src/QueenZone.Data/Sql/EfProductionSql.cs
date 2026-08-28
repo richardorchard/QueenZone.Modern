@@ -117,7 +117,8 @@ internal static class EfProductionSql
                     IsPublished,
                     Slug,
                     ImageBlobKey,
-                    ImageGalleryPicId
+                    ImageGalleryPicId,
+                    ForumTopicId
                 FROM PublishedNews
                 WHERE {{PublishedNewsQuery.LatestRowFilter}}
                 ORDER BY PublishedAt DESC, Id DESC
@@ -140,7 +141,8 @@ internal static class EfProductionSql
                     IsPublished,
                     Slug,
                     ImageBlobKey,
-                    ImageGalleryPicId
+                    ImageGalleryPicId,
+                    ForumTopicId
                 FROM PublishedNews
                 WHERE {{PublishedNewsQuery.LatestRowFilter}}
                 ORDER BY PublishedAt DESC, Id DESC
@@ -158,7 +160,8 @@ internal static class EfProductionSql
                     IsPublished,
                     Slug,
                     ImageBlobKey,
-                    ImageGalleryPicId
+                    ImageGalleryPicId,
+                    ForumTopicId
                 FROM PublishedNews
                 WHERE {{PublishedNewsQuery.LatestRowFilter}}
                   AND Id = {0}
@@ -187,7 +190,8 @@ internal static class EfProductionSql
                     IsPublished,
                     Slug,
                     ImageBlobKey,
-                    ImageGalleryPicId
+                    ImageGalleryPicId,
+                    ForumTopicId
                 FROM PublishedNews
                 WHERE {{PublishedNewsQuery.LatestRowFilter}}
                   AND PublishedAt >= {0} AND PublishedAt < {1}
@@ -234,7 +238,8 @@ internal static class EfProductionSql
                     IsPublished,
                     Slug,
                     ImageBlobKey,
-                    ImageGalleryPicId
+                    ImageGalleryPicId,
+                    ForumTopicId
                 FROM PublishedNews
                 WHERE {{PublishedNewsQuery.LatestRowFilter}}
                   AND (Title LIKE {0} OR Excerpt LIKE {0} OR Body LIKE {0})

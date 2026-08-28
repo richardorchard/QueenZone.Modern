@@ -34,6 +34,7 @@ public sealed class LegacyNewsSchemaTests
         Assert.Contains("ISNULL(EXCERPT, '') AS Excerpt", cte, StringComparison.Ordinal);
         Assert.Contains($"CAST(NULL AS nvarchar({NewsValidation.MaxImageBlobKeyLength})) AS ImageBlobKey", cte);
         Assert.Contains("CAST(NULL AS int) AS ImageGalleryPicId", cte);
+        Assert.Contains("CAST(NULL AS int) AS ForumTopicId", cte);
     }
 
     [Fact]
@@ -42,10 +43,12 @@ public sealed class LegacyNewsSchemaTests
         var cte = PublishedNewsQuery.BuildPublishedNewsCte(
             includeSlugColumn: true,
             includeImageBlobKeyColumn: true,
-            includeImageGalleryPicIdColumn: true);
+            includeImageGalleryPicIdColumn: true,
+            includeForumTopicIdColumn: true);
 
         Assert.Contains("IMAGE_BLOB_KEY AS ImageBlobKey", cte);
         Assert.Contains("IMAGE_GALLERY_PIC_ID AS ImageGalleryPicId", cte);
+        Assert.Contains("FORUM_TOPIC_ID AS ForumTopicId", cte);
         Assert.DoesNotContain($"CAST(NULL AS nvarchar({NewsValidation.MaxImageBlobKeyLength})) AS ImageBlobKey", cte);
     }
 
@@ -72,6 +75,7 @@ public sealed class LegacyNewsSchemaTests
         Assert.Contains("CAST(ISNULL(QUEEN_ONLINE, 0) AS int) AS QUEEN_ONLINE", sql);
         Assert.Contains($"CAST(NULL AS nvarchar({NewsValidation.MaxImageBlobKeyLength})) AS IMAGE_BLOB_KEY", sql);
         Assert.Contains("CAST(NULL AS int) AS IMAGE_GALLERY_PIC_ID", sql);
+        Assert.Contains("CAST(NULL AS int) AS FORUM_TOPIC_ID", sql);
         Assert.Contains($"CASE WHEN {PublishedNewsQuery.PublishedFilter} THEN 1 ELSE 0 END AS DISPLAY", sql);
         Assert.DoesNotContain($"CAST(CASE WHEN {PublishedNewsQuery.PublishedFilter} THEN 1 ELSE 0 END AS bit) AS DISPLAY", sql);
         Assert.Contains("NEWS_ID", sql);
@@ -90,7 +94,8 @@ public sealed class LegacyNewsSchemaTests
             HasUpdatedAtColumn = true,
             HasEditorEmailColumn = true,
             HasImageBlobKeyColumn = true,
-            HasImageGalleryPicIdColumn = true
+            HasImageGalleryPicIdColumn = true,
+            HasForumTopicIdColumn = true
         });
 
         Assert.Contains("SLUG", sql);
@@ -99,8 +104,10 @@ public sealed class LegacyNewsSchemaTests
         Assert.Contains("EDITOR_EMAIL", sql);
         Assert.Contains("IMAGE_BLOB_KEY", sql);
         Assert.Contains("IMAGE_GALLERY_PIC_ID", sql);
+        Assert.Contains("FORUM_TOPIC_ID", sql);
         Assert.DoesNotContain($"CAST(NULL AS nvarchar({NewsValidation.MaxImageBlobKeyLength})) AS IMAGE_BLOB_KEY", sql);
         Assert.DoesNotContain("CAST(NULL AS int) AS IMAGE_GALLERY_PIC_ID", sql);
+        Assert.DoesNotContain("CAST(NULL AS int) AS FORUM_TOPIC_ID", sql);
         Assert.DoesNotContain("CAST(NULL AS nvarchar(200)) AS SLUG", sql);
         Assert.DoesNotContain("CAST(NULL AS datetime2) AS CREATED_AT", sql);
     }
