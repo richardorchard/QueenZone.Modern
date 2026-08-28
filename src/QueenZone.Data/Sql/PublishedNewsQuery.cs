@@ -34,7 +34,11 @@ public static class PublishedNewsQuery
     /// When false, project an empty constant <c>Body</c> so EF materialization still works
     /// without reading the <c>ARTICLE</c> LOB (list/archive/count/sitemap).
     /// </param>
-    public static string BuildPublishedNewsCte(bool includeSlugColumn, bool includeBody = true)
+    public static string BuildPublishedNewsCte(
+        bool includeSlugColumn,
+        bool includeBody = true,
+        bool includeImageBlobKeyColumn = false,
+        bool includeImageGalleryPicIdColumn = false)
     {
         var slugProjection = includeSlugColumn
             ? "SLUG AS Slug"
@@ -44,6 +48,12 @@ public static class PublishedNewsQuery
         var bodyProjection = includeBody
             ? "ISNULL(ARTICLE, '') AS Body,"
             : "CAST(N'' AS nvarchar(max)) AS Body,";
+        var imageBlobKeyProjection = includeImageBlobKeyColumn
+            ? "IMAGE_BLOB_KEY AS ImageBlobKey"
+            : $"CAST(NULL AS nvarchar({NewsValidation.MaxImageBlobKeyLength})) AS ImageBlobKey";
+        var imageGalleryPicIdProjection = includeImageGalleryPicIdColumn
+            ? "IMAGE_GALLERY_PIC_ID AS ImageGalleryPicId"
+            : "CAST(NULL AS int) AS ImageGalleryPicId";
 
         return $"""
             WITH PublishedNews AS (
@@ -56,6 +66,8 @@ public static class PublishedNewsQuery
                     [DATE] AS PublishedAt,
                     SOURCE_URL AS SourceUrl,
                     CAST(CASE WHEN {PublishedFilter} THEN 1 ELSE 0 END AS bit) AS IsPublished,
+                    {imageBlobKeyProjection},
+                    {imageGalleryPicIdProjection},
                     {LatestRowNumberExpression} AS RowNumber
                 FROM NEWS_T
                 WHERE {PublishedFilter}
@@ -85,7 +97,9 @@ public static class PublishedNewsQuery
                 USER_ID,
                 NEWS_ID AS NewsId,
                 TYPE,
-                QUEEN_ONLINE
+                QUEEN_ONLINE,
+                IMAGE_BLOB_KEY,
+                IMAGE_GALLERY_PIC_ID
             FROM LatestNews
             WHERE {LatestRowFilter}
             """;
@@ -118,6 +132,12 @@ public static class PublishedNewsQuery
         var editorEmailProjection = columns.HasEditorEmailColumn
             ? "EDITOR_EMAIL"
             : "CAST(NULL AS nvarchar(256)) AS EDITOR_EMAIL";
+        var imageBlobKeyProjection = columns.HasImageBlobKeyColumn
+            ? "IMAGE_BLOB_KEY"
+            : $"CAST(NULL AS nvarchar({NewsValidation.MaxImageBlobKeyLength})) AS IMAGE_BLOB_KEY";
+        var imageGalleryPicIdProjection = columns.HasImageGalleryPicIdColumn
+            ? "IMAGE_GALLERY_PIC_ID"
+            : "CAST(NULL AS int) AS IMAGE_GALLERY_PIC_ID";
 
         return $"""
 
@@ -137,6 +157,8 @@ public static class PublishedNewsQuery
                     USER_ID,
                     CAST(ISNULL(TYPE, 0) AS int) AS TYPE,
                     CAST(ISNULL(QUEEN_ONLINE, 0) AS int) AS QUEEN_ONLINE,
+                    {imageBlobKeyProjection},
+                    {imageGalleryPicIdProjection},
                     {LatestRowNumberExpression} AS RowNumber
                 FROM NEWS_T
             )

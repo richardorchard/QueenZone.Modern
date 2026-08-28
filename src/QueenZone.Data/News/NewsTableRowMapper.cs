@@ -16,5 +16,7 @@ internal static class NewsTableRowMapper
             row.IsPublished,
             row.CreatedAt,
             row.UpdatedAt,
-            row.EditorEmail);
+            row.EditorEmail,
+            row.ImageBlobKey,
+            row.ImageGalleryPicId);
 }

@@ -25,6 +25,36 @@ public sealed class PublicContentMapperTests
         Assert.Equal("Excerpt", view.Excerpt);
         Assert.Equal(item.PublishedAt, view.PublishedAt);
         Assert.Equal("/news/42/custom-slug", view.DetailPath);
+        Assert.Null(view.ImageBlobKey);
+        Assert.Null(view.ImageGalleryPicId);
+        Assert.Null(view.ImageUrl);
+        Assert.Null(view.ThumbnailUrl);
+    }
+
+    [Fact]
+    public void ToNewsArchiveItem_ResolvesArticlesBlobUrlsAndLeavesGalleryPickUnresolved()
+    {
+        var withBlob = new NewsItem(
+            42,
+            "Queen tour dates",
+            "Excerpt",
+            "Body",
+            new DateTime(2024, 6, 1, 0, 0, 0, DateTimeKind.Utc),
+            null,
+            true,
+            "custom-slug",
+            ImageBlobKey: "editors/me/hero.webp");
+
+        var blobView = PublicContentMapper.ToNewsArchiveItem(withBlob);
+        Assert.Equal("editors/me/hero.webp", blobView.ImageBlobKey);
+        Assert.Equal("/ugc/articles/editors/me/hero.webp", blobView.ImageUrl);
+        Assert.Equal("/ugc/articles/editors/me/hero.webp?size=thumb", blobView.ThumbnailUrl);
+
+        var withGallery = withBlob with { ImageBlobKey = null, ImageGalleryPicId = 3120 };
+        var galleryView = PublicContentMapper.ToNewsArchiveItem(withGallery);
+        Assert.Equal(3120, galleryView.ImageGalleryPicId);
+        Assert.Null(galleryView.ImageUrl);
+        Assert.Null(galleryView.ThumbnailUrl);
     }
 
     [Fact]
@@ -49,6 +79,8 @@ public sealed class PublicContentMapperTests
         Assert.Equal("Body text", view.Body);
         Assert.Equal("https://example.com", view.SourceUrl);
         Assert.Equal("/news/7/preview-title", view.DetailPath);
+        Assert.Null(view.ImageUrl);
+        Assert.Null(view.ThumbnailUrl);
     }
 
     [Fact]

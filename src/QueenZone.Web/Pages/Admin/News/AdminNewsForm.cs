@@ -24,6 +24,12 @@ public sealed class AdminNewsForm
     [FromForm(Name = "sourceUrl")]
     public string? SourceUrl { get; init; }
 
+    [FromForm(Name = "imageBlobKey")]
+    public string? ImageBlobKey { get; init; }
+
+    [FromForm(Name = "imageGalleryPicId")]
+    public int? ImageGalleryPicId { get; init; }
+
     public AdminNewsDraft ToDraft()
     {
         DateTime publishedAt = default;
@@ -39,6 +45,8 @@ public sealed class AdminNewsForm
             (Excerpt ?? string.Empty).Trim(),
             Body ?? string.Empty,
             publishedAt,
-            string.IsNullOrWhiteSpace(SourceUrl) ? null : SourceUrl.Trim());
+            string.IsNullOrWhiteSpace(SourceUrl) ? null : SourceUrl.Trim(),
+            string.IsNullOrWhiteSpace(ImageBlobKey) ? null : ImageBlobKey.Trim(),
+            ImageGalleryPicId is > 0 ? ImageGalleryPicId : null);
     }
 }

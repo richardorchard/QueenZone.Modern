@@ -27,11 +27,23 @@ public static class LegacyNewsSchema
         public bool HasUpdatedAtColumn { get; set; }
 
         public bool HasEditorEmailColumn { get; set; }
+
+        public bool HasImageBlobKeyColumn { get; set; }
+
+        public bool HasImageGalleryPicIdColumn { get; set; }
     }
 
     /// <inheritdoc cref="PublishedNewsQuery.BuildPublishedNewsCte"/>
-    public static string BuildPublishedNewsCte(bool includeSlugColumn, bool includeBody = true) =>
-        PublishedNewsQuery.BuildPublishedNewsCte(includeSlugColumn, includeBody);
+    public static string BuildPublishedNewsCte(
+        bool includeSlugColumn,
+        bool includeBody = true,
+        bool includeImageBlobKeyColumn = false,
+        bool includeImageGalleryPicIdColumn = false) =>
+        PublishedNewsQuery.BuildPublishedNewsCte(
+            includeSlugColumn,
+            includeBody,
+            includeImageBlobKeyColumn,
+            includeImageGalleryPicIdColumn);
 
     /// <inheritdoc cref="PublishedNewsQuery.BuildAdminLatestNewsSql"/>
     public static string BuildAdminLatestNewsSql(NewsColumnAvailability columns) =>
@@ -72,7 +84,9 @@ public static class LegacyNewsSchema
                 CAST(CASE WHEN COL_LENGTH('NEWS_T', 'SLUG') IS NOT NULL THEN 1 ELSE 0 END AS bit) AS HasSlugColumn,
                 CAST(CASE WHEN COL_LENGTH('NEWS_T', 'CREATED_AT') IS NOT NULL THEN 1 ELSE 0 END AS bit) AS HasCreatedAtColumn,
                 CAST(CASE WHEN COL_LENGTH('NEWS_T', 'UPDATED_AT') IS NOT NULL THEN 1 ELSE 0 END AS bit) AS HasUpdatedAtColumn,
-                CAST(CASE WHEN COL_LENGTH('NEWS_T', 'EDITOR_EMAIL') IS NOT NULL THEN 1 ELSE 0 END AS bit) AS HasEditorEmailColumn
+                CAST(CASE WHEN COL_LENGTH('NEWS_T', 'EDITOR_EMAIL') IS NOT NULL THEN 1 ELSE 0 END AS bit) AS HasEditorEmailColumn,
+                CAST(CASE WHEN COL_LENGTH('NEWS_T', 'IMAGE_BLOB_KEY') IS NOT NULL THEN 1 ELSE 0 END AS bit) AS HasImageBlobKeyColumn,
+                CAST(CASE WHEN COL_LENGTH('NEWS_T', 'IMAGE_GALLERY_PIC_ID') IS NOT NULL THEN 1 ELSE 0 END AS bit) AS HasImageGalleryPicIdColumn
             """;
 
         return EfSql.QuerySingleSqlAsync<NewsColumnAvailability>(connectionString, sql).GetAwaiter().GetResult();

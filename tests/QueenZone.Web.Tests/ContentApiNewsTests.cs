@@ -32,6 +32,8 @@ public sealed class ContentApiNewsTests : IClassFixture<QueenZoneWebApplicationF
         Assert.Equal(5, payload.Items.Count);
         Assert.True(payload.TotalCount >= payload.Items.Count);
         Assert.All(payload.Items, item => Assert.False(string.IsNullOrWhiteSpace(item.DetailPath)));
+        Assert.All(payload.Items, item => Assert.Null(item.ImageUrl));
+        Assert.All(payload.Items, item => Assert.Null(item.ThumbnailUrl));
     }
 
     [Fact]
@@ -85,6 +87,35 @@ public sealed class ContentApiNewsTests : IClassFixture<QueenZoneWebApplicationF
         Assert.DoesNotContain("script", dto.Body, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("iframe", dto.Body, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("<em>world</em>", dto.Body);
+        Assert.Null(dto.ImageUrl);
+        Assert.Null(dto.ThumbnailUrl);
+    }
+
+    [Fact]
+    public void ToNewsListItem_and_ToNewsDetail_resolve_articles_blob_urls()
+    {
+        var item = new NewsItem(
+            42,
+            "Title",
+            "Excerpt",
+            "Body",
+            new DateTime(2026, 6, 11, 9, 0, 0, DateTimeKind.Utc),
+            null,
+            true,
+            ImageBlobKey: "editors/me/hero.webp");
+
+        var list = ContentApiMapper.ToNewsListItem(item);
+        Assert.Equal("/ugc/articles/editors/me/hero.webp", list.ImageUrl);
+        Assert.Equal("/ugc/articles/editors/me/hero.webp?size=thumb", list.ThumbnailUrl);
+
+        var detail = ContentApiMapper.ToNewsDetail(item);
+        Assert.Equal(list.ImageUrl, detail.ImageUrl);
+        Assert.Equal(list.ThumbnailUrl, detail.ThumbnailUrl);
+
+        var galleryOnly = item with { ImageBlobKey = "gallery:3120", ImageGalleryPicId = 3120 };
+        var galleryList = ContentApiMapper.ToNewsListItem(galleryOnly);
+        Assert.Null(galleryList.ImageUrl);
+        Assert.Null(galleryList.ThumbnailUrl);
     }
 
     [Fact]

@@ -10,7 +10,11 @@ public sealed record NewsArchiveItem(
     DateTime PublishedAt,
     string DetailPath,
     Guid? SubmitterMemberId = null,
-    string? SubmitterDisplayName = null);
+    string? SubmitterDisplayName = null,
+    string? ImageBlobKey = null,
+    int? ImageGalleryPicId = null,
+    string? ImageUrl = null,
+    string? ThumbnailUrl = null);
 
 /// <summary>
 /// Stable detail shape for public (and admin preview) news article pages.
@@ -24,4 +28,8 @@ public sealed record NewsDetailItem(
     string? SourceUrl,
     string DetailPath,
     Guid? SubmitterMemberId = null,
-    string? SubmitterDisplayName = null);
+    string? SubmitterDisplayName = null,
+    string? ImageBlobKey = null,
+    int? ImageGalleryPicId = null,
+    string? ImageUrl = null,
+    string? ThumbnailUrl = null);
