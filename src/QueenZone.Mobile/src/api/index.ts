@@ -54,6 +54,13 @@ export {
   voteForumTopicPoll,
   watchForumTopic,
 } from './forum';
+export {
+  fetchForumAttachment,
+  isCookieGatedForumAttachmentPath,
+  openForumAttachmentFile,
+  openForumAttachmentImage,
+} from './forumAttachment';
+export type { ForumAttachmentBytes } from './forumAttachment';
 export { createPhotoSubmission } from './photoSubmissions';
 export {
   createNewsSuggestion,

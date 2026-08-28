@@ -45,6 +45,8 @@ export const testIds = {
   forumCategoryScreen: 'forum-category-screen',
   forumThreadScreen: 'forum-thread-screen',
   forumThreadWatch: 'forum-thread-watch',
+  forumThreadAttachment: 'forum-thread-attachment',
+  forumThreadAttachmentViewer: 'forum-thread-attachment-viewer',
   forumNewThread: 'forum-new-thread',
 
   profileSignedOut: 'profile-signed-out',

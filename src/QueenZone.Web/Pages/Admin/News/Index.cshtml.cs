@@ -9,7 +9,8 @@ public sealed class IndexModel(
     IAdminNewsRepository adminNewsRepository,
     INewsAuditRepository auditRepository,
     UgcHtml ugcHtml,
-    NewsArticleImageService articleImageService) : AdminNewsListPageModel(adminNewsRepository)
+    NewsArticleImageService articleImageService,
+    IAdminPhotoRepository adminPhotoRepository) : AdminNewsListPageModel(adminNewsRepository)
 {
     public ArticleFormViewModel? CreateForm { get; private set; }
 
@@ -24,6 +25,16 @@ public sealed class IndexModel(
             NewsSlug.Resolve(draft.Title, draft.Slug),
             cancellationToken: cancellationToken);
         var errors = NewsValidation.ValidateDraft(draft, slugInUse).ToList();
+        var galleryError = await NewsArticleGalleryPicker.ValidatePicAsync(
+            adminPhotoRepository,
+            form.ArticleImage,
+            draft.ImageGalleryPicId,
+            cancellationToken);
+        if (galleryError is not null)
+        {
+            errors.Add(galleryError);
+        }
+
         var persistImage = errors.Count == 0;
         var applied = await articleImageService.TryApplyAsync(
             form.ArticleImage,
@@ -44,7 +55,10 @@ public sealed class IndexModel(
         if (errors.Count > 0)
         {
             ViewData["Title"] = "Create news article";
-            CreateForm = NewModel.BuildForm(draft, errors);
+            CreateForm = NewModel.BuildForm(
+                draft,
+                errors,
+                await NewsArticleGalleryPicker.ResolvePreviewUrlAsync(adminPhotoRepository, draft, cancellationToken));
             return Page();
         }
 

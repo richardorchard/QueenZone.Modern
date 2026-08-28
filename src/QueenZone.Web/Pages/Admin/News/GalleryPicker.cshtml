@@ -1,0 +1,79 @@
+@page "/admin/news/gallery-picker"
+@model GalleryPickerModel
+@{
+  Layout = null;
+  var photos = Model.Photos;
+}
+
+<div class="admin-gallery-picker__body" data-gallery-picker-panel>
+  <form method="get" action="@NewsArticleGalleryPicker.Path" class="admin-form admin-form--filter admin-gallery-picker__filters" data-gallery-picker-filter>
+    <label>
+      Category
+      <select name="catId">
+        <option value="">All</option>
+        @foreach (var category in Model.Categories)
+        {
+          if (Model.CatId == category.CatId)
+          {
+            <option value="@category.CatId" selected>@category.Name</option>
+          }
+          else
+          {
+            <option value="@category.CatId">@category.Name</option>
+          }
+        }
+      </select>
+    </label>
+    <label>
+      Search
+      <input type="search" name="q" value="@Model.Q" placeholder="Title or keywords">
+    </label>
+    <button type="submit">Filter</button>
+  </form>
+
+  @if (photos is null || photos.Items.Count == 0)
+  {
+    <p class="admin-help">No photos matched the current filters.</p>
+  }
+  else
+  {
+    <ul class="admin-gallery-picker__grid">
+      @foreach (var item in photos.Items)
+      {
+        var fileName = NewsArticleGalleryPicker.FileName(item);
+        <li>
+          <button type="button"
+                  class="admin-gallery-picker__item"
+                  data-gallery-pick
+                  data-pic-id="@item.PicId"
+                  data-image-url="@item.ImageUrl"
+                  data-thumb-url="@item.ThumbnailUrl"
+                  data-title="@item.Title">
+            <img src="@item.ThumbnailUrl" alt="" width="120" height="120">
+            <span class="admin-gallery-picker__meta">
+              <strong>@fileName</strong>
+              <span>@item.DateTime.ToString("yyyy-MM-dd")</span>
+              <span>@item.CategoryName</span>
+            </span>
+          </button>
+        </li>
+      }
+    </ul>
+
+    var totalPages = (int)Math.Ceiling(photos.TotalCount / (double)photos.PageSize);
+    if (totalPages > 1)
+    {
+      <p class="admin-gallery-picker__pager">
+        Page @photos.Page of @totalPages
+        @if (photos.Page > 1)
+        {
+          <a href="@NewsArticleGalleryPicker.BuildPath(Model.CatId, Model.Q, photos.Page - 1)" data-gallery-picker-page>Previous</a>
+        }
+        @if (photos.Page < totalPages)
+        {
+          <a href="@NewsArticleGalleryPicker.BuildPath(Model.CatId, Model.Q, photos.Page + 1)" data-gallery-picker-page>Next</a>
+        }
+      </p>
+    }
+  }
+</div>
