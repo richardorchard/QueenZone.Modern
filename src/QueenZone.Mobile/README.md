@@ -463,10 +463,12 @@ The one-time Apple setup for `org.queenzone.mobile` consists of:
 
 - Apple Developer team `X28Z75P69M`;
 - an Apple Distribution certificate;
-- Push Notifications enabled on the `org.queenzone.mobile` App ID;
-- the `QueenZone App Store` App Store Connect provisioning profile
-  (regenerated after that capability is enabled, so it includes
-  `aps-environment=production`);
+- Push Notifications and Sign in with Apple enabled on the
+  `org.queenzone.mobile` App ID;
+- the `QueenZone App Store App Groups` App Store provisioning profile
+  (regenerated after those capabilities are enabled, so it includes
+  `aps-environment=production`, `com.apple.developer.applesignin=Default`,
+  and `group.org.queenzone.mobile`);
 - the QueenZone App Store Connect record (Apple ID `6803889011`); and
 - a Developer-role App Store Connect API key dedicated to GitHub uploads.
 
@@ -522,7 +524,8 @@ replace the corresponding secrets together. After enabling a new App ID
 capability, regenerate the affected profile in Apple Developer **Profiles**
 and replace its base64 GitHub secret (value length only in logs and chat).
 All three profiles must include `group.org.queenzone.mobile`; only the main app
-profile includes Push Notifications / `aps-environment`. The extension profiles
+profile includes Push Notifications / `aps-environment` and Sign in with Apple.
+The extension profiles
 sign `org.queenzone.mobile.ShareExtension` and
 `org.queenzone.mobile.ExpoWidgetsTarget`, respectively. A stale profile fails
 before archive with a target-specific entitlement error. Revoke and

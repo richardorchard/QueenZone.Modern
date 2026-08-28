@@ -144,6 +144,54 @@ push delivery is not interrupted:
    temporary `.p8` file after Bitwarden and App Service have been verified.
 5. Record the rotation date and new Key ID in the tracking issue without recording the private key.
 
+## Sign in with Apple (member login) credential
+
+Apple App Review Guideline 4.8 applies to QueenZone because the mobile app offers third-party login for the
+member's primary account. Sign in with Apple is therefore a required equivalent option before public App Store
+submission; it is not merely an optional convenience login.
+
+The production registration uses these Apple Developer resources:
+
+- Primary App ID: `org.queenzone.mobile`, with the **Sign in with Apple** capability enabled as a primary App ID.
+- Services ID / OAuth client ID: `org.queenzone.web` (`QueenZone Member Login`).
+- Web domain: `www.queenzone.org`.
+- Return URL: `https://www.queenzone.org/signin-apple` (the ASP.NET Core Apple handler callback).
+- Sign in with Apple key: `QueenZone Sign in with Apple 2026 Replacement`, associated with the primary App ID.
+
+Store the four runtime values as separate secrets in the `Queenzone Development` Bitwarden project, using the
+App Service setting names verbatim:
+
+| Setting | Value source |
+| --- | --- |
+| `Authentication__Apple__ClientId` | Services ID (`org.queenzone.web`) |
+| `Authentication__Apple__TeamId` | Apple Developer membership Team ID |
+| `Authentication__Apple__KeyId` | Key ID shown for the active Sign in with Apple key |
+| `Authentication__Apple__PrivateKey` | Complete one-time `.p8` download, including the PEM header and footer |
+
+Copy the same four names and values into the `queenzone-dev` App Service configuration and restart the app.
+These settings are operator-owned under ADR 0008: updating Bitwarden does not update App Service and the deploy
+workflow does not reconcile them. Verify by setting name and value length only, then confirm Apple appears in
+`GET /api/v1/auth/providers` and that `/account/external-login?provider=Apple` redirects to Apple's authorization
+endpoint. Never commit, paste, or log the private key.
+
+The mobile client consumes the backend provider list dynamically, so enabling the backend makes Apple available
+without a mobile release. Its button deliberately uses Apple's black button treatment, Apple mark, system font,
+normal title casing, and the same 48-point height as the other login buttons. This follows Apple's
+[Sign in with Apple Human Interface Guidelines](https://developer.apple.com/design/human-interface-guidelines/sign-in-with-apple/),
+which require the Apple button to be prominent, no smaller than peer login buttons, and Apple-approved in appearance.
+
+### Sign in with Apple rotation
+
+Apple private keys can be downloaded only once. Rotate with a create-test-revoke sequence:
+
+1. Create a replacement Sign in with Apple key associated with `org.queenzone.mobile` and download its `.p8`
+   immediately to a temporary local file.
+2. Update `Authentication__Apple__KeyId` and `Authentication__Apple__PrivateKey` in Bitwarden, then apply all four
+   Apple settings to App Service and restart it.
+3. Verify the provider-list response and a real website/mobile Apple login before revoking the previous key.
+4. Revoke the previous key and remove every local `.p8` copy after verification. Record only the replacement key's
+   name, Key ID, and rotation date in the tracking issue.
+
 ## Android FCM push credential
 
 Android push uses Firebase project `queenzone-mobile` and its registered Android app
