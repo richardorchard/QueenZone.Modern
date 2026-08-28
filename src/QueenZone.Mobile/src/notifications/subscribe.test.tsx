@@ -1,5 +1,6 @@
 import * as Notifications from 'expo-notifications';
 import { getNewsListEpoch } from './newsListEpoch';
+import { getPmUnreadEpoch } from './pmUnreadEpoch';
 import {
   isDefaultNotificationTap,
   noticeFromNotification,
@@ -298,6 +299,25 @@ describe('subscribeNotificationEvents', () => {
       body: 'New article published.',
       destination: { category: 'news', articleId: 1003 },
     });
+  });
+
+  it('increments the PM epoch on a privateMessage receive only', async () => {
+    subscribeNotificationEvents({ onTap: jest.fn(), onForeground: jest.fn() });
+    await Promise.resolve();
+    const newsStart = getNewsListEpoch();
+    const pmStart = getPmUnreadEpoch();
+
+    receivedListener?.(notification({ category: 'news', articleId: '1003' }, 'fg-news-for-pm'));
+    receivedListener?.(notification({ category: 'forumReply', topicId: '1002' }, 'fg-forum-for-pm'));
+    expect(getPmUnreadEpoch()).toBe(pmStart);
+    expect(getNewsListEpoch()).toBe(newsStart + 1);
+
+    receivedListener?.(notification({ category: 'privateMessage', conversationId }, 'fg-pm-epoch'));
+    expect(getPmUnreadEpoch()).toBe(pmStart + 1);
+    expect(getNewsListEpoch()).toBe(newsStart + 1);
+
+    responseListener?.(response({ category: 'privateMessage', conversationId }, 'tap-pm-epoch'));
+    expect(getPmUnreadEpoch()).toBe(pmStart + 1);
   });
 
   it('increments the news epoch on a news receive and tap, but not on other categories', async () => {

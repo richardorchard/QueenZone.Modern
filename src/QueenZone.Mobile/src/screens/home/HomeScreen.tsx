@@ -1,7 +1,7 @@
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { ChevronRight, Search } from 'lucide-react-native';
+import { ChevronRight } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -33,15 +33,13 @@ import { Chip } from '../../ui/Chip';
 import { Eyebrow } from '../../ui/Eyebrow';
 import { FeatureBlock } from '../../ui/FeatureBlock';
 import { HeroFeature } from '../../ui/HeroFeature';
-import { IconButton } from '../../ui/IconButton';
 import { initials } from '../../ui/initials';
 import { MetaLine } from '../../ui/MetaLine';
 import { SectionErrorBlock } from '../../ui/ScreenStates';
 import { SectionHeader } from '../../ui/SectionHeader';
 import { testIds } from '../../test/testIds';
 import { syncHomeWidget } from '../../widgets/widgetSync';
-import { profileA11yLabel } from '../messages/inboxMeta';
-import { useUnreadConversationCount } from '../messages/useUnreadConversationCount';
+import { TabRootMasthead } from './TabRootMasthead';
 import {
   formatForumThreadMeta,
   formatGalleryCardMeta,
@@ -68,10 +66,8 @@ function stockImageForId(id: number): number {
 
 export function HomeScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
-  const { c, mode } = useTheme();
-  const { isSignedIn, displayName, accessToken } = useSession();
-  const unreadCount = useUnreadConversationCount();
-  const avatar = isSignedIn ? initials(displayName) : '';
+  const { c } = useTheme();
+  const { isSignedIn, accessToken } = useSession();
   const [filter, setFilter] = useState<HomeFilterKey>('all');
   const visibleSections = useMemo(() => visibleSectionsForFilter(filter), [filter]);
 
@@ -169,99 +165,11 @@ export function HomeScreen({ navigation }: Props) {
       }
       ListHeaderComponent={
         <>
-          <View
-            style={{
-              paddingTop: insets.top + 10,
-              paddingHorizontal: space.xl,
-              paddingBottom: space.md,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              backgroundColor: c.surfacePage,
-            }}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
-              <ArchiveImage
-                source={mode === 'dark' ? media.crestWhite : media.crestBlack}
-                label="Queenzone crest"
-                style={{ height: 24, width: 24 }}
-                contentFit="contain"
-              />
-              <Text
-                style={{
-                  fontFamily: fonts.titling,
-                  fontSize: 13,
-                  fontWeight: '600',
-                  letterSpacing: 2.3,
-                  textTransform: 'uppercase',
-                  color: c.textPrimary,
-                }}
-              >
-                Queenzone
-              </Text>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <IconButton
-                icon={Search}
-                testID={testIds.homeSearch}
-                accessibilityLabel="Search"
-                onPress={() => navigation.navigate('Search')}
-              />
-              <Pressable
-                testID={testIds.homeProfile}
-                accessibilityRole="button"
-                accessibilityLabel={profileA11yLabel(isSignedIn ? unreadCount : 0)}
-                onPress={() => navigation.navigate('Profile')}
-                style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
-              >
-                <View
-                  style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 16,
-                    backgroundColor: c.surfaceCard,
-                    borderWidth: 1,
-                    borderColor: c.border,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Text style={{ fontFamily: fonts.bodyMedium, fontSize: 12, color: c.textPrimary }}>
-                    {avatar || '·'}
-                  </Text>
-                </View>
-                {isSignedIn && unreadCount > 0 ? (
-                  <View
-                    style={{
-                      position: 'absolute',
-                      top: 2,
-                      right: 2,
-                      minWidth: 16,
-                      height: 16,
-                      borderRadius: 8,
-                      paddingHorizontal: 4,
-                      backgroundColor: c.accentPrimary,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                    importantForAccessibility="no"
-                    accessibilityElementsHidden
-                  >
-                    <Text
-                      style={{
-                        fontFamily: fonts.bodyMedium,
-                        fontSize: 9,
-                        lineHeight: 11,
-                        color: c.textOnAccent,
-                      }}
-                    >
-                      {unreadCount > 99 ? '99+' : unreadCount}
-                    </Text>
-                  </View>
-                ) : null}
-              </Pressable>
-            </View>
-          </View>
+          <TabRootMasthead
+            topInset={insets.top}
+            onSearch={() => navigation.navigate('Search')}
+            onProfilePress={() => navigation.navigate('Profile')}
+          />
 
           {liveActivity.view.kind === 'content' &&
           liveStripIsVisible(liveActivity.view.data.newForumRepliesToday) ? (

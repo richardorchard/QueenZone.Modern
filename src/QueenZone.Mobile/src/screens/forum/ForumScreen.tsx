@@ -1,10 +1,12 @@
+import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
+import type { CompositeScreenProps } from '@react-navigation/native';
 import { useCallback, useMemo } from 'react';
 import { FlatList, Platform, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Plus } from 'lucide-react-native';
 import { fetchForumCategories, type ForumCategoryListItem } from '../../api';
 import { usePagedContent } from '../../hooks/usePagedContent';
-import type { ForumStackParamList } from '../../navigation/types';
+import type { ForumStackParamList, RootTabParamList } from '../../navigation/types';
 import { useSession } from '../../session/SessionContext';
 import { openForumComposer } from '../../session/signInNavigation';
 import { shadow, space, type, useTheme } from '../../theme';
@@ -13,9 +15,13 @@ import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from '../../u
 import { PageTitleBlock } from '../../ui/PageTitleBlock';
 import { SectionHeader } from '../../ui/SectionHeader';
 import { testIds } from '../../test/testIds';
+import { TabRootMasthead } from '../home/TabRootMasthead';
 import { categoryMeta, formatForumCount } from './forumListMeta';
 
-type Props = NativeStackScreenProps<ForumStackParamList, 'ForumIndex'>;
+type Props = CompositeScreenProps<
+  NativeStackScreenProps<ForumStackParamList, 'ForumIndex'>,
+  BottomTabScreenProps<RootTabParamList>
+>;
 
 const categoryPageSize = 50;
 
@@ -45,6 +51,10 @@ export function ForumScreen({ navigation }: Props) {
 
   const header = (
     <View>
+      <TabRootMasthead
+        onSearch={() => navigation.navigate('Search')}
+        onProfilePress={() => navigation.navigate('HomeTab', { screen: 'Profile' })}
+      />
       <PageTitleBlock eyebrow="Community" title="Forum" />
       <View
         style={{
