@@ -18,7 +18,7 @@ export type NotificationCategory = (typeof notificationCategories)[number];
 export type NotificationDestination =
   | { category: 'forumReply'; topicId: number; postId?: number }
   | { category: 'privateMessage'; conversationId: string }
-  | { category: 'news'; articleId: number };
+  | { category: 'news'; articleId?: number };
 
 const conversationIdPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -83,7 +83,10 @@ function readConversationId(value: unknown): string | null {
   return conversationIdPattern.test(id) ? id : null;
 }
 
-/** Maps a notification `data` dictionary to a screen destination, or null if it is not actionable. */
+/**
+ * Maps a notification `data` dictionary to a screen destination, or null if it is not actionable.
+ * Accepts FCM `message.data` and an iOS APNs dictionary with the same #757 keys beside `aps`.
+ */
 export function parseNotificationData(data: unknown): NotificationDestination | null {
   const record = unwrapData(data);
   if (!record) {
@@ -110,7 +113,7 @@ export function parseNotificationData(data: unknown): NotificationDestination | 
   }
 
   const articleId = readPositiveInt(record.articleId);
-  return articleId === null ? null : { category, articleId };
+  return articleId === null ? { category } : { category, articleId };
 }
 
 export function fallbackNoticeCopy(destination: NotificationDestination): { title: string; body: string } {

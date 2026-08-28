@@ -3,7 +3,7 @@ import { fetchNewsPage, fetchNewsYearRange } from '../../api';
 import { ApiError } from '../../api/client';
 import { deferred, newsItemFixture, pagedResponse } from '../../test/fixtures';
 import { fakeNavigation, renderWithProviders } from '../../test/render';
-import { NewsIndexScreen } from './NewsIndexScreen';
+import { NewsIndexScreen, newsListResetKey } from './NewsIndexScreen';
 
 jest.mock('../../api', () => {
   const actual = jest.requireActual('../../api');
@@ -17,11 +17,14 @@ jest.mock('../../api', () => {
 const fetchNews = fetchNewsPage as jest.MockedFunction<typeof fetchNewsPage>;
 const fetchYearRange = fetchNewsYearRange as jest.MockedFunction<typeof fetchNewsYearRange>;
 
-function renderNews(navigation = fakeNavigation()) {
+function renderNews(navigation = fakeNavigation(), refreshAt?: number) {
   return {
     navigation,
     ...renderWithProviders(
-      <NewsIndexScreen navigation={navigation as never} route={{ key: 'news', name: 'NewsIndex' } as never} />,
+      <NewsIndexScreen
+        navigation={navigation as never}
+        route={{ key: 'news', name: 'NewsIndex', params: refreshAt === undefined ? undefined : { refreshAt } } as never}
+      />,
       { navigation: false },
     ),
   };
@@ -142,5 +145,31 @@ describe('NewsIndexScreen', () => {
 
     await waitFor(() => expect(screen.getByRole('button', { name: 'Open ALL article' })).toBeOnTheScreen());
     expect(fetchNews).toHaveBeenLastCalledWith(expect.objectContaining({ decade: undefined, year: undefined }));
+  });
+
+  it('reloads the list when a notification tap passes refreshAt', async () => {
+    fetchNews.mockResolvedValueOnce(pagedResponse([newsItemFixture({ id: 1, title: 'Stale headline' })], 1, 1));
+    const view = renderNews();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Open Stale headline' })).toBeOnTheScreen());
+
+    fetchNews.mockResolvedValueOnce(pagedResponse([newsItemFixture({ id: 1003, title: 'QueenZone modernisation begins' })], 1, 1));
+    view.rerender(
+      <NewsIndexScreen
+        navigation={fakeNavigation() as never}
+        route={{ key: 'news', name: 'NewsIndex', params: { refreshAt: 99 } } as never}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Open QueenZone modernisation begins' })).toBeOnTheScreen(),
+    );
+    expect(fetchNews).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('newsListResetKey', () => {
+  it('keeps the decade/year key until a notification refresh arrives', () => {
+    expect(newsListResetKey('ALL', undefined)).toBe('ALL');
+    expect(newsListResetKey('ALL', 99)).toBe('ALL:99');
   });
 });

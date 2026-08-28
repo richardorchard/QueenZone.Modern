@@ -59,6 +59,30 @@ function response(data: Record<string, unknown>, identifier: string): Notificati
   };
 }
 
+function iosNotification(contract: Record<string, unknown>, identifier: string, title = 'Title', body = 'Body') {
+  return {
+    date: 1,
+    request: {
+      identifier,
+      content: { title, body, data: {} },
+      trigger: {
+        type: 'push',
+        payload: {
+          aps: { alert: { title, body }, sound: 'default' },
+          ...contract,
+        },
+      },
+    },
+  } as Notifications.Notification;
+}
+
+function iosResponse(contract: Record<string, unknown>, identifier: string): Notifications.NotificationResponse {
+  return {
+    actionIdentifier: Notifications.DEFAULT_ACTION_IDENTIFIER,
+    notification: iosNotification(contract, identifier),
+  };
+}
+
 describe('NotificationBridge', () => {
   let responseListener: ((value: Notifications.NotificationResponse) => void) | undefined;
   let receivedListener: ((value: Notifications.Notification) => void) | undefined;
@@ -112,6 +136,50 @@ describe('NotificationBridge', () => {
     });
   });
 
+  it('opens a news article from an iOS APNs cold-start tap', async () => {
+    getLastNotificationResponseAsync.mockResolvedValue(iosResponse({ category: 'news', articleId: '1003' }, 'ios-cold-news'));
+
+    renderWithProviders(<NotificationBridge />, { navigation: false });
+
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledTimes(1));
+    expect(mockNavigate).toHaveBeenCalledWith('Tabs', {
+      screen: 'NewsTab',
+      params: { screen: 'Story', params: { id: 1003 }, initial: false },
+    });
+  });
+
+  it('opens a news article from an iOS APNs background tap', async () => {
+    renderWithProviders(<NotificationBridge />, { navigation: false });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      responseListener?.(iosResponse({ category: 'news', articleId: '1003' }, 'ios-warm-news'));
+    });
+
+    expect(mockNavigate).toHaveBeenCalledWith('Tabs', {
+      screen: 'NewsTab',
+      params: { screen: 'Story', params: { id: 1003 }, initial: false },
+    });
+  });
+
+  it('opens the news listing from an iOS APNs tap when articleId is missing', async () => {
+    renderWithProviders(<NotificationBridge />, { navigation: false });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      responseListener?.(iosResponse({ category: 'news' }, 'ios-news-list'));
+    });
+
+    expect(mockNavigate).toHaveBeenCalledWith('Tabs', {
+      screen: 'NewsTab',
+      params: { screen: 'NewsIndex', params: { refreshAt: expect.any(Number) }, initial: false },
+    });
+  });
+
   it('opens a news article from the in-app foreground banner', async () => {
     const user = userEvent.setup();
     renderWithProviders(<NotificationBridge />, { navigation: false });
@@ -122,6 +190,35 @@ describe('NotificationBridge', () => {
     await act(async () => {
       receivedListener?.(
         notification({ category: 'news', articleId: '1003' }, 'fg-news', 'QueenZone modernisation begins', 'New article published.'),
+      );
+    });
+
+    expect(screen.getByText('News')).toBeOnTheScreen();
+    expect(screen.getByText('QueenZone modernisation begins')).toBeOnTheScreen();
+
+    await user.press(screen.getByTestId(testIds.notificationBanner));
+
+    expect(mockNavigate).toHaveBeenCalledWith('Tabs', {
+      screen: 'NewsTab',
+      params: { screen: 'Story', params: { id: 1003 }, initial: false },
+    });
+  });
+
+  it('opens a news article from an iOS APNs in-app foreground banner', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<NotificationBridge />, { navigation: false });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      receivedListener?.(
+        iosNotification(
+          { category: 'news', articleId: '1003' },
+          'ios-fg-news',
+          'QueenZone modernisation begins',
+          'New article published.',
+        ),
       );
     });
 

@@ -15,11 +15,16 @@ import { YearRail } from '../../ui/YearRail';
 
 type Props = NativeStackScreenProps<NewsStackParamList, 'NewsIndex'>;
 
-export function NewsIndexScreen({ navigation }: Props) {
+export function newsListResetKey(listKey: string, refreshAt: number | undefined): string {
+  return refreshAt === undefined ? listKey : `${listKey}:${refreshAt}`;
+}
+
+export function NewsIndexScreen({ navigation, route }: Props) {
   const { c } = useTheme();
   const [decade, setDecade] = useState<(typeof newsDecades)[number]>(newsDecades[0]);
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [yearRange, setYearRange] = useState<NewsYearRange | null>(null);
+  const refreshAt = route.params?.refreshAt;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -42,7 +47,7 @@ export function NewsIndexScreen({ navigation }: Props) {
       [decade, selectedYear],
     ),
     20,
-    selectedYear === null ? decade.label : `year-${selectedYear}`,
+    newsListResetKey(selectedYear === null ? decade.label : `year-${selectedYear}`, refreshAt),
   );
 
   const selectDecade = useCallback((option: (typeof newsDecades)[number]) => {

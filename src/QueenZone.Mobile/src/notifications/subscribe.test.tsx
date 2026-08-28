@@ -43,11 +43,86 @@ function response(data: Record<string, unknown>, identifier = 'req-1'): Notifica
   };
 }
 
+/** iOS remote receipt: expo-notifications leaves content.data empty and keeps #757 keys beside `aps` on trigger.payload. */
+function iosNotification(contract: Record<string, unknown>, identifier = 'req-1') {
+  const title = 'QueenZone modernisation begins';
+  const body = 'New article published.';
+  return {
+    date: 1,
+    request: {
+      identifier,
+      content: {
+        title,
+        body,
+        data: {},
+      },
+      trigger: {
+        type: 'push',
+        payload: {
+          aps: { alert: { title, body }, sound: 'default' },
+          ...contract,
+        },
+      },
+    },
+  } as Notifications.Notification;
+}
+
+function iosResponse(contract: Record<string, unknown>, identifier = 'req-1'): Notifications.NotificationResponse {
+  return {
+    actionIdentifier: Notifications.DEFAULT_ACTION_IDENTIFIER,
+    notification: iosNotification(contract, identifier),
+  };
+}
+
 describe('tapFromResponse', () => {
   it('maps a default tap to a #757 destination', () => {
     expect(tapFromResponse(response({ category: 'forumReply', topicId: '12', postId: '34' }))).toEqual({
       identifier: 'req-1',
       destination: { category: 'forumReply', topicId: 12, postId: 34 },
+    });
+  });
+
+  it('prefers FCM content.data over an iOS trigger payload', () => {
+    const mixed = {
+      actionIdentifier: Notifications.DEFAULT_ACTION_IDENTIFIER,
+      notification: {
+        date: 1,
+        request: {
+          identifier: 'mixed',
+          content: {
+            title: 'Headline',
+            body: 'New article published.',
+            data: { category: 'news', articleId: '88' },
+          },
+          trigger: {
+            type: 'push',
+            payload: {
+              aps: { alert: { title: 'Headline', body: 'New article published.' }, sound: 'default' },
+              category: 'forumReply',
+              topicId: '12',
+            },
+          },
+        },
+      },
+    } as Notifications.NotificationResponse;
+    expect(tapFromResponse(mixed)).toEqual({
+      identifier: 'mixed',
+      destination: { category: 'news', articleId: 88 },
+    });
+  });
+
+  it('maps an iOS APNs tap when content.data is empty and keys sit beside aps', () => {
+    expect(tapFromResponse(iosResponse({ category: 'news', articleId: '88' }))).toEqual({
+      identifier: 'req-1',
+      destination: { category: 'news', articleId: 88 },
+    });
+    expect(tapFromResponse(iosResponse({ category: 'forumReply', topicId: '1002' }, 'ios-forum'))).toEqual({
+      identifier: 'ios-forum',
+      destination: { category: 'forumReply', topicId: 1002 },
+    });
+    expect(tapFromResponse(iosResponse({ category: 'privateMessage', conversationId }, 'ios-pm'))).toEqual({
+      identifier: 'ios-pm',
+      destination: { category: 'privateMessage', conversationId },
     });
   });
 
@@ -58,8 +133,15 @@ describe('tapFromResponse', () => {
         notification: notification({ category: 'forumReply', topicId: '12' }),
       }),
     ).toBeNull();
-    expect(tapFromResponse(response({ category: 'news' }))).toBeNull();
+    expect(tapFromResponse(response({ category: 'digest' }))).toBeNull();
     expect(tapFromResponse(null)).toBeNull();
+  });
+
+  it('opens the news listing when an iOS APNs tap has category news but no articleId', () => {
+    expect(tapFromResponse(iosResponse({ category: 'news' }))).toEqual({
+      identifier: 'req-1',
+      destination: { category: 'news' },
+    });
   });
 });
 
@@ -85,7 +167,17 @@ describe('noticeFromNotification', () => {
       body: 'New article published.',
       destination: { category: 'news', articleId: 88 },
     });
-    expect(noticeFromNotification(notification({ category: 'news' }))).toBeNull();
+    expect(noticeFromNotification(notification({ category: 'digest' }))).toBeNull();
+    expect(noticeFromNotification(iosNotification({ category: 'digest' }))).toBeNull();
+  });
+
+  it('maps an iOS APNs news receipt when content.data is empty', () => {
+    expect(noticeFromNotification(iosNotification({ category: 'news', articleId: '88' }, 'ios-fg-news'))).toEqual({
+      identifier: 'ios-fg-news',
+      title: 'QueenZone modernisation begins',
+      body: 'New article published.',
+      destination: { category: 'news', articleId: 88 },
+    });
   });
 });
 
@@ -150,6 +242,33 @@ describe('subscribeNotificationEvents', () => {
     });
   });
 
+  it('opens a cold-start last response from an iOS APNs payload', async () => {
+    getLastNotificationResponseAsync.mockResolvedValue(iosResponse({ category: 'news', articleId: '1003' }, 'ios-cold'));
+    const onTap = jest.fn();
+
+    subscribeNotificationEvents({ onTap, onForeground: jest.fn() });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(onTap).toHaveBeenCalledWith({
+      identifier: 'ios-cold',
+      destination: { category: 'news', articleId: 1003 },
+    });
+  });
+
+  it('opens an iOS APNs news tap from the response listener', async () => {
+    const onTap = jest.fn();
+    subscribeNotificationEvents({ onTap, onForeground: jest.fn() });
+    await Promise.resolve();
+
+    responseListener?.(iosResponse({ category: 'news', articleId: '1003' }, 'ios-warm'));
+
+    expect(onTap).toHaveBeenCalledWith({
+      identifier: 'ios-warm',
+      destination: { category: 'news', articleId: 1003 },
+    });
+  });
+
   it('surfaces a foreground receipt for the in-app banner', async () => {
     const onForeground = jest.fn();
     subscribeNotificationEvents({ onTap: jest.fn(), onForeground });
@@ -162,6 +281,21 @@ describe('subscribeNotificationEvents', () => {
       title: 'Ranking every studio album',
       body: 'New reply',
       destination: { category: 'privateMessage', conversationId },
+    });
+  });
+
+  it('surfaces an iOS APNs foreground receipt for the in-app banner', async () => {
+    const onForeground = jest.fn();
+    subscribeNotificationEvents({ onTap: jest.fn(), onForeground });
+    await Promise.resolve();
+
+    receivedListener?.(iosNotification({ category: 'news', articleId: '1003' }, 'ios-fg'));
+
+    expect(onForeground).toHaveBeenCalledWith({
+      identifier: 'ios-fg',
+      title: 'QueenZone modernisation begins',
+      body: 'New article published.',
+      destination: { category: 'news', articleId: 1003 },
     });
   });
 
