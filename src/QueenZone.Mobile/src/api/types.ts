@@ -26,6 +26,8 @@ export type NewsListItem = {
   excerpt: string;
   publishedAt: string;
   detailPath: string;
+  imageUrl?: string | null;
+  thumbnailUrl?: string | null;
 };
 
 export type NewsDetail = {
@@ -36,6 +38,8 @@ export type NewsDetail = {
   publishedAt: string;
   sourceUrl: string | null;
   detailPath: string;
+  imageUrl?: string | null;
+  thumbnailUrl?: string | null;
 };
 
 /** Earliest/latest published years in the archive; both null when there are no articles. */

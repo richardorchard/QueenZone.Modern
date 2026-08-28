@@ -61,6 +61,17 @@
   </label>
   <input type="hidden" name="imageBlobKey" value="@Model.Draft.ImageBlobKey">
   <input type="hidden" name="imageGalleryPicId" value="@Model.Draft.ImageGalleryPicId">
+  @{
+    var previewImageUrl = NewsArticleImage.ResolveDisplayUrl(Model.Draft.ImageBlobKey, Model.Draft.ImageGalleryPicId);
+    var hasArticleImage = NewsArticleImage.HasResolvedImage(Model.Draft.ImageBlobKey, Model.Draft.ImageGalleryPicId);
+  }
+  <figure class="admin-article-image">
+    <img src="@previewImageUrl" alt="@(hasArticleImage ? "Article image" : "No article image")" width="640" height="360">
+    @if (!hasArticleImage)
+    {
+      <figcaption class="admin-help">No article image yet. Listings will use this placeholder.</figcaption>
+    }
+  </figure>
 
   <div class="admin-form-actions">
     <button type="submit">Save</button>

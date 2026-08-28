@@ -2724,6 +2724,20 @@ a.qz-forum-post__author-link:focus-visible {
   line-height: 1.4;
 }
 
+.admin-article-image {
+  margin: 0 0 1.25rem;
+}
+
+.admin-article-image img {
+  display: block;
+  max-width: 320px;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  background: var(--qz-black);
+}
+
 .admin-form-panel h1 {
   font-size: clamp(1.5rem, 2.5vw, 2rem);
   line-height: 1.2;

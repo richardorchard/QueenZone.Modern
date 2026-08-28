@@ -14,6 +14,14 @@
 
   <h1>@Model.Item.Title</h1>
   <p class="date"><time datetime="@Model.Item.PublishedAt.ToString("yyyy-MM-dd")">@Model.Item.PublishedAt.ToString("dd MMMM yyyy")</time></p>
+  @{
+    var previewImageUrl = NewsArticleImage.ResolveDisplayUrl(Model.Item.ImageBlobKey, Model.Item.ImageGalleryPicId);
+    var hasArticleImage = NewsArticleImage.HasResolvedImage(Model.Item.ImageBlobKey, Model.Item.ImageGalleryPicId);
+  }
+  <figure class="admin-article-image">
+    <img src="@previewImageUrl" alt="@(hasArticleImage ? Model.Item.Title : "No article image")" width="640" height="360">
+  </figure>
+
   <p class="lede">@Model.Item.Excerpt</p>
   <article class="article-body">@Html.Raw(NewsArticleContent.FormatBody(Model.Item.Body))</article>
 
