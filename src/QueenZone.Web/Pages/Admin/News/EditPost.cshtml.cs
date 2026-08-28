@@ -43,7 +43,6 @@ public sealed class EditPostModel(
             form.ArticleImage,
             form.ToCrop(),
             draft,
-            existing.ImageBlobKey,
             User,
             persistImage,
             cancellationToken);
@@ -77,6 +76,10 @@ public sealed class EditPostModel(
         }
 
         await adminNewsRepository.UpdateAsync(id, draft, EditorEmail, cancellationToken);
+        await articleImageService.TryDeletePreviousUgcArticlesAsync(
+            existing.ImageBlobKey,
+            draft.ImageBlobKey,
+            cancellationToken);
         if (existing.IsPublished)
         {
             publicQueryCache.InvalidateNewsCache();

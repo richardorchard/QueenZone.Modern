@@ -760,8 +760,12 @@ public sealed class AdminNewsRoutesTests : IClassFixture<QueenZoneWebApplication
         Assert.Contains("enctype=\"multipart/form-data\"", body);
         Assert.Contains("name=\"articleImage\"", body);
         Assert.Contains("data-article-image-crop", body);
+        Assert.Contains($"data-min-crop-width=\"{NewsArticleImageProcessor.MinCropWidth}\"", body);
+        Assert.Contains($"data-min-crop-height=\"{NewsArticleImageProcessor.MinCropHeight}\"", body);
         Assert.Contains("Crop article image", body);
         Assert.Contains("3:2 news-card frame", body);
+        Assert.Contains("/js/admin/cropper.min.js", body);
+        Assert.Contains("/css/admin/cropper.min.css", body);
         Assert.Contains("/js/admin/article-image-crop.js", body);
     }
 
@@ -876,6 +880,41 @@ public sealed class AdminNewsRoutesTests : IClassFixture<QueenZoneWebApplication
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
         Assert.Contains("bytes or smaller", body);
+        Assert.Empty(store.GetAllArticles());
+    }
+
+    [Fact]
+    public async Task CreateArticle_rejects_in_bounds_card_crop_below_minimum()
+    {
+        var store = new SharedNewsStore();
+        var client = CreateClient(AdminEmail, store);
+        var image = await CreateCardPngAsync(1800, 600);
+
+        var response = await AdminHttpTestHelpers.PostArticleMultipartAsync(
+            client,
+            "/admin/news/new",
+            "/admin/news",
+            new Dictionary<string, string>
+            {
+                ["title"] = "Tight crop",
+                ["excerpt"] = "Should be rejected.",
+                ["body"] = "Plain text body.",
+                ["publishedAt"] = "2026-06-14"
+            },
+            image,
+            "wide.png",
+            "image/png",
+            new Dictionary<string, string>
+            {
+                ["cropX"] = "0",
+                ["cropY"] = "0",
+                ["cropWidth"] = "300",
+                ["cropHeight"] = "200"
+            });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("selected crop is too small", body);
         Assert.Empty(store.GetAllArticles());
     }
 

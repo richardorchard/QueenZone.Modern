@@ -60,6 +60,33 @@ public sealed class NewsArticleImageProcessorTests
     }
 
     [Fact]
+    public void ResolveCrop_rejects_in_bounds_card_crop_below_minimum()
+    {
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            NewsArticleImageProcessor.ResolveCrop(
+                1800,
+                600,
+                new NewsArticleImageCrop(0, 0, 300, 200)));
+
+        Assert.Contains("too small", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("400", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_rejects_in_bounds_card_crop_below_minimum()
+    {
+        await using var source = await CreatePngAsync(1800, 600);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            NewsArticleImageProcessor.ProcessAsync(
+                source,
+                "wide.png",
+                new NewsArticleImageCrop(0, 0, 300, 200)));
+
+        Assert.Contains("selected crop is too small", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void CenterCardCrop_crops_portrait_image_to_3_by_2()
     {
         var crop = NewsArticleImageProcessor.CenterCardCrop(600, 900);

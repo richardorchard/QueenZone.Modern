@@ -27,6 +27,14 @@ The full licence notice is retained at
 Copyright (c) 2017-2024, Slab; copyright (c) 2014, Jason Chen; copyright (c)
 2013, salesforce.com.
 
+## Cropper.js
+
+QueenZone Modern includes Cropper.js 1.6.2 (admin article-image crop) under the
+MIT License. The full licence notice is retained at
+`src/QueenZone.Web/wwwroot/js/admin/cropper.min.js.LICENSE.txt`.
+
+Copyright 2015-present Chen Fengyuan.
+
 ## Expo / React Native (QueenZone.Mobile)
 
 `src/QueenZone.Mobile` is generated from the Expo blank TypeScript template and

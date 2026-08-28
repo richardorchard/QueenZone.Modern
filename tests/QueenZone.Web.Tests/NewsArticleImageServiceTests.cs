@@ -23,7 +23,6 @@ public sealed class NewsArticleImageServiceTests
             CreateFormFile(png, "hero.png"),
             crop: null,
             draft,
-            previousImageBlobKey: null,
             CreateUser(),
             persist: true);
 
@@ -38,7 +37,7 @@ public sealed class NewsArticleImageServiceTests
     }
 
     [Fact]
-    public async Task TryApplyAsync_replacing_uploaded_image_deletes_old_ugc_articles_blobs()
+    public async Task TryApplyAsync_replacing_uploaded_image_keeps_old_blobs_until_caller_deletes()
     {
         var service = CreateService(out _, out var backend);
         var user = CreateUser();
@@ -48,7 +47,6 @@ public sealed class NewsArticleImageServiceTests
             CreateFormFile(first, "first.png"),
             null,
             draft,
-            null,
             user,
             persist: true);
         var previous = created.Draft.ImageBlobKey!;
@@ -58,19 +56,24 @@ public sealed class NewsArticleImageServiceTests
             CreateFormFile(second, "second.png"),
             null,
             created.Draft,
-            previous,
             user,
             persist: true);
 
         Assert.Null(replaced.Error);
         Assert.NotEqual(previous, replaced.Draft.ImageBlobKey);
+        Assert.True(backend.Exists(BlobUploadContainers.Articles, previous));
+        Assert.True(backend.Exists(BlobUploadContainers.Articles, UgcProxyPaths.ToThumbBlobName(previous)));
+        Assert.True(backend.Exists(BlobUploadContainers.Articles, replaced.Draft.ImageBlobKey!));
+
+        await service.TryDeletePreviousUgcArticlesAsync(previous, replaced.Draft.ImageBlobKey);
+
         Assert.False(backend.Exists(BlobUploadContainers.Articles, previous));
         Assert.False(backend.Exists(BlobUploadContainers.Articles, UgcProxyPaths.ToThumbBlobName(previous)));
         Assert.True(backend.Exists(BlobUploadContainers.Articles, replaced.Draft.ImageBlobKey!));
     }
 
     [Fact]
-    public async Task TryApplyAsync_does_not_delete_gallery_or_pic_references()
+    public async Task Replacing_gallery_reference_does_not_delete_gallery_or_pic_paths()
     {
         var blobs = new RecordingBlobUploadService();
         var service = new NewsArticleImageService(blobs, CreateDisabledQuota());
@@ -89,9 +92,10 @@ public sealed class NewsArticleImageServiceTests
             CreateFormFile(png, "hero.png"),
             null,
             draft,
-            "gallery:3120",
             CreateUser(),
             persist: true);
+
+        await service.TryDeletePreviousUgcArticlesAsync("gallery:3120", result.Draft.ImageBlobKey);
 
         Assert.Null(result.Error);
         Assert.DoesNotContain(
@@ -112,7 +116,6 @@ public sealed class NewsArticleImageServiceTests
             CreateFormFile(png, "hero.png"),
             null,
             draft,
-            null,
             CreateUser(),
             persist: false);
 
@@ -132,7 +135,6 @@ public sealed class NewsArticleImageServiceTests
             CreateFormFile(source, "note.txt", "text/plain"),
             null,
             draft,
-            null,
             CreateUser(),
             persist: true);
 
@@ -151,7 +153,6 @@ public sealed class NewsArticleImageServiceTests
             CreateFormFile(png, "hero.png"),
             null,
             draft,
-            null,
             CreateUser(),
             persist: true);
 

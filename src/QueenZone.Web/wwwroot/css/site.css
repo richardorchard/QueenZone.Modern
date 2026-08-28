@@ -2767,22 +2767,11 @@ a.qz-forum-post__author-link:focus-visible {
   aspect-ratio: 3 / 2;
   margin: 0 0 1rem;
   background: var(--qz-black);
-  cursor: grab;
-  touch-action: none;
-  user-select: none;
-}
-
-.admin-article-crop__stage.is-dragging {
-  cursor: grabbing;
 }
 
 .admin-article-crop__stage img {
-  position: absolute;
-  top: 0;
-  left: 0;
-  max-width: none;
-  transform-origin: 0 0;
-  pointer-events: none;
+  display: block;
+  max-width: 100%;
 }
 
 .admin-article-crop__zoom {

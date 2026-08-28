@@ -135,8 +135,8 @@ public static class NewsArticleImageProcessor
         var crop = requested.Value;
         if (crop.X < 0
             || crop.Y < 0
-            || crop.Width < MinCropWidth
-            || crop.Height < MinCropHeight
+            || crop.Width < 1
+            || crop.Height < 1
             || crop.X + crop.Width > width
             || crop.Y + crop.Height > height)
         {
@@ -148,6 +148,12 @@ public static class NewsArticleImageProcessor
         if (Math.Abs(aspect - expected) / expected > CropAspectTolerance)
         {
             return fallback;
+        }
+
+        if (crop.Width < MinCropWidth || crop.Height < MinCropHeight)
+        {
+            throw new InvalidOperationException(
+                $"The selected crop is too small. Use at least {MinCropWidth}×{MinCropHeight} pixels.");
         }
 
         return new Rectangle(crop.X, crop.Y, crop.Width, crop.Height);

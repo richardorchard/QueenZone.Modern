@@ -12,6 +12,7 @@
     : NewsArticleImageProcessor.MaxUploadBytes;
   articleImageMaxBytes = Math.Min(articleImageMaxBytes, NewsArticleImageProcessor.MaxUploadBytes);
 }
+<link rel="stylesheet" href="~/css/admin/cropper.min.css" asp-append-version="true" />
 
 <div class="admin-form-panel">
 <h1>@Model.Title</h1>
@@ -76,6 +77,8 @@
        data-article-image-crop
        data-aspect-width="@NewsArticleImageProcessor.CardAspectWidth"
        data-aspect-height="@NewsArticleImageProcessor.CardAspectHeight"
+       data-min-crop-width="@NewsArticleImageProcessor.MinCropWidth"
+       data-min-crop-height="@NewsArticleImageProcessor.MinCropHeight"
        data-max-bytes="@articleImageMaxBytes">
     <figure class="admin-article-image">
       <img src="@previewImageUrl"
@@ -143,4 +146,5 @@
   </div>
 }
 </div>
+<script src="~/js/admin/cropper.min.js" asp-append-version="true"></script>
 <script src="~/js/admin/article-image-crop.js" asp-append-version="true"></script>

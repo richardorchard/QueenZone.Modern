@@ -29,7 +29,6 @@ public sealed class IndexModel(
             form.ArticleImage,
             form.ToCrop(),
             draft,
-            previousImageBlobKey: null,
             User,
             persistImage,
             cancellationToken);
@@ -50,6 +49,10 @@ public sealed class IndexModel(
         }
 
         var id = await AdminNewsRepository.CreateDraftAsync(draft, EditorEmail, cancellationToken);
+        await articleImageService.TryDeletePreviousUgcArticlesAsync(
+            previousImageBlobKey: null,
+            draft.ImageBlobKey,
+            cancellationToken);
         await auditRepository.AppendAsync(id, "create", EditorEmail, $"Created draft \"{draft.Title}\"", cancellationToken);
         return Redirect($"/admin/news/{id}/edit");
     }

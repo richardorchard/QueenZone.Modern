@@ -1,6 +1,10 @@
 (function () {
   "use strict";
 
+  if (typeof Cropper !== "function") {
+    return;
+  }
+
   var allowedExtensions = { ".jpg": true, ".jpeg": true, ".png": true, ".webp": true };
 
   document.querySelectorAll("[data-article-image-crop]").forEach(bindCropper);
@@ -11,7 +15,6 @@
     var preview = root.querySelector("[data-article-image-preview]");
     var error = root.querySelector("[data-article-image-error]");
     var dialog = root.querySelector("[data-article-image-dialog]");
-    var stage = root.querySelector("[data-article-image-stage]");
     var stageImg = root.querySelector("[data-article-image-stage-img]");
     var zoomInput = root.querySelector("[data-article-image-zoom]");
     var applyButton = root.querySelector("[data-article-image-apply]");
@@ -20,27 +23,26 @@
     var cropY = root.querySelector("[data-crop-y]");
     var cropWidth = root.querySelector("[data-crop-width]");
     var cropHeight = root.querySelector("[data-crop-height]");
-    if (!form || !input || !dialog || !stage || !stageImg || !zoomInput) {
+    if (!form || !input || !dialog || !stageImg || !zoomInput) {
       return;
     }
 
     var aspectWidth = Number(root.getAttribute("data-aspect-width")) || 3;
     var aspectHeight = Number(root.getAttribute("data-aspect-height")) || 2;
+    var minCropWidth = Number(root.getAttribute("data-min-crop-width")) || 400;
+    var minCropHeight = Number(root.getAttribute("data-min-crop-height")) || 267;
     var maxBytes = Number(root.getAttribute("data-max-bytes")) || 10 * 1024 * 1024;
     var objectUrl = "";
-    var naturalWidth = 0;
-    var naturalHeight = 0;
-    var coverScale = 1;
-    var zoom = 1;
-    var translateX = 0;
-    var translateY = 0;
-    var drag = null;
+    var cropper = null;
     var cropApplied = false;
+    var baseRatio = 1;
+    var syncingZoom = false;
 
     input.addEventListener("change", function () {
       clearError();
       resetCropFields();
       cropApplied = false;
+      destroyCropper();
       var file = input.files && input.files[0];
       if (!file) {
         return;
@@ -56,46 +58,37 @@
       revokeObjectUrl();
       objectUrl = URL.createObjectURL(file);
       stageImg.onload = function () {
-        naturalWidth = stageImg.naturalWidth;
-        naturalHeight = stageImg.naturalHeight;
-        resetView();
         if (typeof dialog.showModal === "function") {
           dialog.showModal();
         }
+
+        startCropper();
       };
       stageImg.src = objectUrl;
     });
 
     zoomInput.addEventListener("input", function () {
-      zoom = Number(zoomInput.value) || 1;
-      clampPan();
-      render();
-    });
-
-    stage.addEventListener("pointerdown", function (event) {
-      drag = { id: event.pointerId, x: event.clientX, y: event.clientY, tx: translateX, ty: translateY };
-      stage.classList.add("is-dragging");
-      stage.setPointerCapture(event.pointerId);
-    });
-
-    stage.addEventListener("pointermove", function (event) {
-      if (!drag || drag.id !== event.pointerId) {
+      if (!cropper || syncingZoom) {
         return;
       }
 
-      translateX = drag.tx + (event.clientX - drag.x);
-      translateY = drag.ty + (event.clientY - drag.y);
-      clampPan();
-      render();
+      cropper.zoomTo(Number(zoomInput.value) || baseRatio);
     });
-
-    stage.addEventListener("pointerup", endDrag);
-    stage.addEventListener("pointercancel", endDrag);
 
     applyButton && applyButton.addEventListener("click", function () {
       var crop = currentCrop();
       if (!crop) {
         showError("Could not read the crop. Try another image.");
+        return;
+      }
+
+      if (crop.width < minCropWidth || crop.height < minCropHeight) {
+        showError(
+          "The selected crop is too small. Use at least " +
+            minCropWidth +
+            "\u00d7" +
+            minCropHeight +
+            " pixels.");
         return;
       }
 
@@ -108,8 +101,8 @@
         preview.src = objectUrl;
         preview.alt = "Article image";
         preview.style.objectPosition =
-          ((crop.x + crop.width / 2) / naturalWidth) * 100 + "% " +
-          ((crop.y + crop.height / 2) / naturalHeight) * 100 + "%";
+          ((crop.x + crop.width / 2) / Math.max(stageImg.naturalWidth, 1)) * 100 + "% " +
+          ((crop.y + crop.height / 2) / Math.max(stageImg.naturalHeight, 1)) * 100 + "%";
       }
 
       var caption = root.querySelector(".admin-article-image figcaption");
@@ -117,6 +110,7 @@
         caption.remove();
       }
 
+      destroyCropper();
       dialog.close();
     });
 
@@ -135,80 +129,99 @@
       if (typeof dialog.showModal === "function") {
         dialog.showModal();
       }
+
+      if (!cropper) {
+        startCropper();
+      }
     });
 
-    function endDrag(event) {
-      if (!drag || drag.id !== event.pointerId) {
-        return;
+    function startCropper() {
+      destroyCropper();
+      cropper = new Cropper(stageImg, {
+        aspectRatio: aspectWidth / aspectHeight,
+        viewMode: 2,
+        autoCropArea: 1,
+        dragMode: "move",
+        cropBoxMovable: false,
+        cropBoxResizable: false,
+        guides: false,
+        center: false,
+        highlight: false,
+        movable: true,
+        rotatable: false,
+        scalable: false,
+        zoomable: true,
+        zoomOnWheel: true,
+        ready: function () {
+          var imageData = cropper.getImageData();
+          baseRatio = imageData.width / Math.max(imageData.naturalWidth, 1);
+          zoomInput.min = String(baseRatio);
+          zoomInput.max = String(maxAllowedRatio(baseRatio));
+          zoomInput.step = "0.01";
+          zoomInput.value = String(baseRatio);
+        },
+        zoom: function (event) {
+          if (cropWouldBeTooSmall(event.detail.ratio, event.detail.oldRatio)) {
+            event.preventDefault();
+            return;
+          }
+
+          syncingZoom = true;
+          zoomInput.value = String(event.detail.ratio);
+          syncingZoom = false;
+        }
+      });
+    }
+
+    function maxAllowedRatio(startRatio) {
+      var data = cropper.getData();
+      if (data.width < 1 || data.height < 1) {
+        return startRatio;
       }
 
-      drag = null;
-      stage.classList.remove("is-dragging");
+      var byWidth = startRatio * (data.width / minCropWidth);
+      var byHeight = startRatio * (data.height / minCropHeight);
+      return Math.max(startRatio, Math.min(byWidth, byHeight));
     }
 
-    function resetView() {
-      zoom = 1;
-      zoomInput.value = "1";
-      coverScale = Math.max(
-        stage.clientWidth / Math.max(naturalWidth, 1),
-        stage.clientHeight / Math.max(naturalHeight, 1));
-      translateX = (stage.clientWidth - naturalWidth * coverScale) / 2;
-      translateY = (stage.clientHeight - naturalHeight * coverScale) / 2;
-      render();
-    }
+    function cropWouldBeTooSmall(newRatio, oldRatio) {
+      if (!cropper || !oldRatio || newRatio <= oldRatio) {
+        return false;
+      }
 
-    function displayScale() {
-      return coverScale * zoom;
-    }
-
-    function clampPan() {
-      var scale = displayScale();
-      var drawnWidth = naturalWidth * scale;
-      var drawnHeight = naturalHeight * scale;
-      var minX = Math.min(0, stage.clientWidth - drawnWidth);
-      var minY = Math.min(0, stage.clientHeight - drawnHeight);
-      translateX = Math.min(0, Math.max(minX, translateX));
-      translateY = Math.min(0, Math.max(minY, translateY));
-    }
-
-    function render() {
-      var scale = displayScale();
-      stageImg.style.transform =
-        "translate(" + translateX + "px, " + translateY + "px) scale(" + scale + ")";
+      var data = cropper.getData();
+      var scale = oldRatio / newRatio;
+      return data.width * scale < minCropWidth || data.height * scale < minCropHeight;
     }
 
     function currentCrop() {
-      var scale = displayScale();
-      if (scale <= 0 || naturalWidth < 1 || naturalHeight < 1) {
+      if (!cropper) {
         return null;
       }
 
-      var x = Math.round(-translateX / scale);
-      var y = Math.round(-translateY / scale);
-      var width = Math.round(stage.clientWidth / scale);
-      var height = Math.round(stage.clientHeight / scale);
-      x = clampNumber(x, 0, Math.max(0, naturalWidth - 1));
-      y = clampNumber(y, 0, Math.max(0, naturalHeight - 1));
-      width = clampNumber(width, 1, naturalWidth - x);
-      height = clampNumber(height, 1, naturalHeight - y);
-
-      var expected = aspectWidth / aspectHeight;
-      var actual = width / height;
-      if (Math.abs(actual - expected) / expected > 0.08) {
-        if (actual > expected) {
-          width = Math.max(1, Math.round(height * expected));
-        } else {
-          height = Math.max(1, Math.round(width / expected));
-        }
-
-        width = clampNumber(width, 1, naturalWidth - x);
-        height = clampNumber(height, 1, naturalHeight - y);
+      var data = cropper.getData(true);
+      if (!data || data.width < 1 || data.height < 1) {
+        return null;
       }
 
+      var naturalWidth = Math.max(stageImg.naturalWidth, 1);
+      var naturalHeight = Math.max(stageImg.naturalHeight, 1);
+      var x = clampNumber(data.x, 0, Math.max(0, naturalWidth - 1));
+      var y = clampNumber(data.y, 0, Math.max(0, naturalHeight - 1));
+      var width = clampNumber(data.width, 1, naturalWidth - x);
+      var height = clampNumber(data.height, 1, naturalHeight - y);
       return { x: x, y: y, width: width, height: height };
     }
 
+    function destroyCropper() {
+      if (cropper) {
+        cropper.destroy();
+        cropper = null;
+      }
+    }
+
     function cancelSelection() {
+      destroyCropper();
       input.value = "";
       resetCropFields();
       cropApplied = false;

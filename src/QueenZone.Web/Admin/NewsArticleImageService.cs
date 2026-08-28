@@ -5,8 +5,9 @@ using QueenZone.Storage;
 namespace QueenZone.Web;
 
 /// <summary>
-/// Stores article card images in <see cref="BlobUploadContainers.Articles"/> and
-/// quietly deletes replaced ugc-articles blobs. Gallery / PIC references are never deleted.
+/// Stores article card images in <see cref="BlobUploadContainers.Articles"/>.
+/// Replaced ugc-articles blobs are deleted only after the caller persists the new key.
+/// Gallery / PIC references are never deleted.
 /// </summary>
 public sealed class NewsArticleImageService(
     IBlobUploadService blobUploadService,
@@ -18,7 +19,6 @@ public sealed class NewsArticleImageService(
         IFormFile? file,
         NewsArticleImageCrop? crop,
         AdminNewsDraft draft,
-        string? previousImageBlobKey,
         ClaimsPrincipal user,
         bool persist,
         CancellationToken cancellationToken = default)
@@ -84,14 +84,14 @@ public sealed class NewsArticleImageService(
                     CloneContext(context, uploadedThumb),
                     cancellationToken);
 
-                var nextDraft = draft with
-                {
-                    ImageBlobKey = uploadedFull,
-                    ImageGalleryPicId = null,
-                };
-
-                await TryDeletePreviousUgcArticlesAsync(previousImageBlobKey, uploadedFull, cancellationToken);
-                return new ApplyResult(nextDraft, null);
+                // Persist the new key first (caller writes the draft), then delete the old blobs.
+                return new ApplyResult(
+                    draft with
+                    {
+                        ImageBlobKey = uploadedFull,
+                        ImageGalleryPicId = null,
+                    },
+                    null);
             }
             catch (NotSupportedException ex)
             {
@@ -114,6 +114,16 @@ public sealed class NewsArticleImageService(
         }
     }
 
+    public Task TryDeletePreviousUgcArticlesAsync(
+        string? previousImageBlobKey,
+        string? replacementBlobName,
+        CancellationToken cancellationToken = default) =>
+        TryDeletePreviousUgcArticlesAsync(
+            blobUploadService,
+            previousImageBlobKey,
+            replacementBlobName,
+            cancellationToken);
+
     internal static async Task TryDeletePreviousUgcArticlesAsync(
         IBlobUploadService blobs,
         string? previousImageBlobKey,
@@ -135,16 +145,6 @@ public sealed class NewsArticleImageService(
         await TryDeleteQuietlyAsync(blobs, previous, cancellationToken);
         await TryDeleteQuietlyAsync(blobs, UgcProxyPaths.ToThumbBlobName(previous), cancellationToken);
     }
-
-    private Task TryDeletePreviousUgcArticlesAsync(
-        string? previousImageBlobKey,
-        string? replacementBlobName,
-        CancellationToken cancellationToken) =>
-        TryDeletePreviousUgcArticlesAsync(
-            blobUploadService,
-            previousImageBlobKey,
-            replacementBlobName,
-            cancellationToken);
 
     private Task TryDeleteQuietlyAsync(string? blobName, CancellationToken cancellationToken) =>
         TryDeleteQuietlyAsync(blobUploadService, blobName, cancellationToken);
