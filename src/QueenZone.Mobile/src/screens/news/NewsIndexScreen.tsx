@@ -1,3 +1,5 @@
+import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
+import type { CompositeScreenProps } from '@react-navigation/native';
 import { useCallback, useEffect, useState } from 'react';
 import { FlatList, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -5,7 +7,7 @@ import { fetchNewsPage, fetchNewsYearRange, formatPublishedDate, type NewsListIt
 import { newsDecades } from '../../content/sample';
 import { useNewsListEpochRefresh } from '../../hooks/useNewsListEpochRefresh';
 import { usePagedContent } from '../../hooks/usePagedContent';
-import type { NewsStackParamList } from '../../navigation/types';
+import type { NewsStackParamList, RootTabParamList } from '../../navigation/types';
 import { space, useTheme } from '../../theme';
 import { ArticleRow } from '../../ui/ArticleRow';
 import { Chip } from '../../ui/Chip';
@@ -13,8 +15,12 @@ import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from '../../u
 import { testIds } from '../../test/testIds';
 import { PageTitleBlock } from '../../ui/PageTitleBlock';
 import { YearRail } from '../../ui/YearRail';
+import { TabRootMasthead } from '../home/TabRootMasthead';
 
-type Props = NativeStackScreenProps<NewsStackParamList, 'NewsIndex'>;
+type Props = CompositeScreenProps<
+  NativeStackScreenProps<NewsStackParamList, 'NewsIndex'>,
+  BottomTabScreenProps<RootTabParamList>
+>;
 
 export function newsListResetKey(listKey: string, refreshAt: number | undefined): string {
   return refreshAt === undefined ? listKey : `${listKey}:${refreshAt}`;
@@ -68,6 +74,10 @@ export function NewsIndexScreen({ navigation, route }: Props) {
 
   const header = (
     <View>
+      <TabRootMasthead
+        onSearch={() => navigation.navigate('Search')}
+        onProfilePress={() => navigation.navigate('HomeTab', { screen: 'Profile' })}
+      />
       <PageTitleBlock eyebrow="The archive" title="News" subtitle={countLine} />
       <ScrollView
         horizontal

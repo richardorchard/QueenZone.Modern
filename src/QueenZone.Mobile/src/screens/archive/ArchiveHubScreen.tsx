@@ -1,7 +1,7 @@
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { FlatList } from 'react-native';
+import { FlatList, View } from 'react-native';
 import {
   archiveDestinations,
   type ArchiveDestination,
@@ -12,6 +12,7 @@ import { ArchiveFooter } from '../../ui/ArchiveFooter';
 import { DestinationRow } from '../../ui/DestinationRow';
 import { testIds } from '../../test/testIds';
 import { PageTitleBlock } from '../../ui/PageTitleBlock';
+import { TabRootMasthead } from '../home/TabRootMasthead';
 
 type Props = CompositeScreenProps<
   NativeStackScreenProps<ArchiveStackParamList, 'ArchiveHub'>,
@@ -57,11 +58,17 @@ export function ArchiveHubScreen({ navigation }: Props) {
       data={archiveDestinations}
       keyExtractor={(item) => item.id}
       ListHeaderComponent={
-        <PageTitleBlock
-          eyebrow="The Queenzone.com archive"
-          title="Explore the archive"
-          subtitle="Four thousand articles, a hundred long-form features, tens of thousands of photographs and the community's own history — preserved and catalogued."
-        />
+        <View>
+          <TabRootMasthead
+            onSearch={() => navigation.navigate('Search')}
+            onProfilePress={() => navigation.navigate('HomeTab', { screen: 'Profile' })}
+          />
+          <PageTitleBlock
+            eyebrow="The Queenzone.com archive"
+            title="Explore the archive"
+            subtitle="Four thousand articles, a hundred long-form features, tens of thousands of photographs and the community's own history — preserved and catalogued."
+          />
+        </View>
       }
       ListFooterComponent={<ArchiveFooter />}
       renderItem={({ item }) => (

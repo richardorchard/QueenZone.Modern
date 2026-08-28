@@ -15,6 +15,18 @@ jest.mock('../../api', () => {
   };
 });
 
+jest.mock('../messages/useUnreadConversationCount', () => ({
+  useUnreadConversationCount: () => 0,
+}));
+
+jest.mock('../../session/SessionContext', () => ({
+  useSession: () => ({
+    isSignedIn: false,
+    displayName: null,
+    accessToken: null,
+  }),
+}));
+
 const fetchNews = fetchNewsPage as jest.MockedFunction<typeof fetchNewsPage>;
 const fetchYearRange = fetchNewsYearRange as jest.MockedFunction<typeof fetchNewsYearRange>;
 
