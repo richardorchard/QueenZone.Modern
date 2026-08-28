@@ -22,6 +22,7 @@ import {
   writeCachedWidgetProps,
   writeLastWidgetRefreshAt,
 } from './widgetCache';
+import { nextWidgetFaceSlotMs } from './widgetCopy';
 
 const mockUpdateSnapshot = jest.fn();
 const mockUpdateTimeline = jest.fn();
@@ -123,6 +124,7 @@ describe('syncHomeWidget', () => {
 
     expect(mockUpdateTimeline).toHaveBeenCalledWith([
       { date: new Date(now), props: widgetProps },
+      { date: new Date(nextWidgetFaceSlotMs(now)), props: widgetProps },
       { date: new Date(now + WIDGET_REFRESH_INTERVAL_MS), props: widgetProps },
     ]);
     expect(mockUpdateSnapshot).not.toHaveBeenCalled();
@@ -142,6 +144,7 @@ describe('syncHomeWidget', () => {
 
     expect(mockUpdateTimeline).toHaveBeenCalledWith([
       { date: new Date(now), props: widgetProps },
+      { date: new Date(nextWidgetFaceSlotMs(now)), props: widgetProps },
       { date: new Date(now + WIDGET_REFRESH_INTERVAL_MS + WIDGET_QUOTE_REFRESH_JITTER_MS / 2), props: widgetProps },
     ]);
     jest.spyOn(Date, 'now').mockRestore();

@@ -1,4 +1,5 @@
 import * as Notifications from 'expo-notifications';
+import { noteNewsListPush } from './newsListEpoch';
 import { fallbackNoticeCopy, parseNotificationData, type NotificationDestination } from './payload';
 
 export type NotificationTap = {
@@ -97,12 +98,14 @@ export function subscribeNotificationEvents(handlers: NotificationEventHandlers)
 
     handledTaps.add(tap.identifier);
     void Notifications.clearLastNotificationResponseAsync();
+    noteNewsListPush(tap.destination);
     handlers.onTap(tap);
   }
 
   function handleReceived(notification: Notifications.Notification): void {
     const notice = noticeFromNotification(notification);
     if (notice) {
+      noteNewsListPush(notice.destination);
       handlers.onForeground(notice);
     }
   }

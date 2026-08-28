@@ -7,6 +7,9 @@
  * (TestFlight) — a black box. Reading the same app-group timeline props in
  * SwiftUI works before the first app launch (empty-state copy) and after
  * Home / background refresh writes real on-this-day + quote data.
+ *
+ * When both halves are present the native view shows one face at a time on a
+ * 4-hour UTC slot (`entry.date`), matching `widgetActiveFace` in widgetCopy.ts.
  */
 const fs = require('fs');
 const path = require('path');
@@ -16,6 +19,8 @@ const TAG = 'queenzone-on-this-day-native-widget';
 const WIDGET_RELATIVE_PATH = path.join('ExpoWidgetsTarget', 'OnThisDayWidget.swift');
 const GENERATED_ENTRY = 'WidgetsEntryView(entry: entry)';
 const NATIVE_ENTRY = 'OnThisDayNativeEntryView(entry: entry)';
+const CREST_ASSET_NAME = 'crest-widget-watermark.png';
+const CREST_SOURCE_RELATIVE = path.join('assets', 'archive', CREST_ASSET_NAME);
 
 const NATIVE_VIEW_SOURCE = `
 struct OnThisDayNativeEntryView: View {
@@ -27,33 +32,56 @@ struct OnThisDayNativeEntryView: View {
   private var quoteWhoSaid: String { stringProp("quoteWhoSaid") }
   private var hasDay: Bool { !formattedDate.isEmpty && !summary.isEmpty }
   private var hasQuote: Bool { !quoteText.isEmpty && !quoteWhoSaid.isEmpty }
+  private var showDay: Bool {
+    if hasDay && hasQuote {
+      let slot = Int(floor(entry.date.timeIntervalSince1970 / (4 * 3600)))
+      return slot % 2 == 0
+    }
+    return hasDay
+  }
+  private var showQuote: Bool {
+    if hasDay && hasQuote {
+      return !showDay
+    }
+    return hasQuote
+  }
 
   var body: some View {
-    let card = VStack(alignment: .leading, spacing: 6) {
-      Text(hasDay ? "ON THIS DAY" : "QUOTE")
-        .font(.system(size: 10, weight: .semibold))
-        .foregroundColor(Color(red: 184 / 255, green: 154 / 255, blue: 74 / 255))
-      if hasDay {
-        Text("\\(formattedDate): \\(summary)")
-          .font(.system(size: 13))
-          .foregroundColor(Color(red: 242 / 255, green: 241 / 255, blue: 237 / 255))
-          .lineLimit(3)
+    let card = ZStack(alignment: .bottomTrailing) {
+      if let crest = UIImage(named: "crest-widget-watermark") {
+        Image(uiImage: crest)
+          .resizable()
+          .scaledToFit()
+          .frame(width: 120, height: 120)
+          .padding(8)
+          .accessibilityHidden(true)
       }
-      if hasQuote {
-        Text("“\\(quoteText)” — \\(quoteWhoSaid)")
-          .font(.system(size: 12))
-          .foregroundColor(Color(red: 184 / 255, green: 182 / 255, blue: 176 / 255))
-          .lineLimit(3)
+      VStack(alignment: .leading, spacing: 6) {
+        Text(showDay || (!hasDay && !hasQuote) ? "ON THIS DAY" : "QUEEN QUOTES")
+          .font(.system(size: 10, weight: .semibold))
+          .foregroundColor(Color(red: 184 / 255, green: 154 / 255, blue: 74 / 255))
+        if showDay {
+          Text("\\(formattedDate): \\(summary)")
+            .font(.system(size: 13))
+            .foregroundColor(Color(red: 242 / 255, green: 241 / 255, blue: 237 / 255))
+            .lineLimit(3)
+        }
+        if showQuote {
+          Text("“\\(quoteText)” — \\(quoteWhoSaid)")
+            .font(.system(size: 12))
+            .foregroundColor(Color(red: 184 / 255, green: 182 / 255, blue: 176 / 255))
+            .lineLimit(3)
+        }
+        if !hasDay && !hasQuote {
+          Text("Open QueenZone to load today's story.")
+            .font(.system(size: 12))
+            .foregroundColor(Color(red: 184 / 255, green: 182 / 255, blue: 176 / 255))
+            .lineLimit(3)
+        }
       }
-      if !hasDay && !hasQuote {
-        Text("Open QueenZone to load today's story.")
-          .font(.system(size: 12))
-          .foregroundColor(Color(red: 184 / 255, green: 182 / 255, blue: 176 / 255))
-          .lineLimit(3)
-      }
+      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+      .padding(14)
     }
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-    .padding(14)
     .widgetURL(URL(string: "queenzone://home"))
 
     if #available(iOS 17.0, *) {
@@ -82,8 +110,48 @@ function applyOnThisDayNativeWidget(contents) {
     );
   }
 
-  const replaced = contents.replace(GENERATED_ENTRY, NATIVE_ENTRY);
+  let replaced = contents.replace(GENERATED_ENTRY, NATIVE_ENTRY);
+  if (!replaced.includes('import UIKit')) {
+    replaced = replaced.replace(/^import SwiftUI$/m, 'import SwiftUI\nimport UIKit');
+  }
   return `${replaced.trimEnd()}\n\n// @generated begin ${TAG} - expo prebuild\n${NATIVE_VIEW_SOURCE}\n// @generated end ${TAG}\n`;
+}
+
+function copyWidgetCrestAsset(projectRoot, platformProjectRoot) {
+  const src = path.join(projectRoot, CREST_SOURCE_RELATIVE);
+  if (!fs.existsSync(src)) {
+    throw new Error(`Missing widget crest asset ${src}`);
+  }
+  const destDir = path.join(platformProjectRoot, 'ExpoWidgetsTarget');
+  fs.mkdirSync(destDir, { recursive: true });
+  const dest = path.join(destDir, CREST_ASSET_NAME);
+  fs.copyFileSync(src, dest);
+  return dest;
+}
+
+function widgetTargetUuid(project) {
+  const nativeTargets = project.pbxNativeTargetSection();
+  for (const [key, target] of Object.entries(nativeTargets)) {
+    if (typeof target === 'object' && String(target.name ?? '').includes('ExpoWidgetsTarget')) {
+      return key;
+    }
+  }
+  return null;
+}
+
+function addCrestResourceToXcodeProject(project) {
+  const targetUuid = widgetTargetUuid(project);
+  if (!targetUuid) {
+    return;
+  }
+  const files = project.pbxFileReferenceSection();
+  const already = Object.values(files).some(
+    (file) => typeof file === 'object' && String(file.path ?? '').includes(CREST_ASSET_NAME),
+  );
+  if (already) {
+    return;
+  }
+  project.addResourceFile(`ExpoWidgetsTarget/${CREST_ASSET_NAME}`, { target: targetUuid });
 }
 
 function withIosOnThisDayNativeWidget(config) {
@@ -95,6 +163,8 @@ function withIosOnThisDayNativeWidget(config) {
       );
     }
     fs.writeFileSync(widgetPath, applyOnThisDayNativeWidget(fs.readFileSync(widgetPath, 'utf8')));
+    copyWidgetCrestAsset(mod.modRequest.projectRoot, mod.modRequest.platformProjectRoot);
+    addCrestResourceToXcodeProject(mod.modResults);
     return mod;
   });
 }
@@ -102,10 +172,13 @@ function withIosOnThisDayNativeWidget(config) {
 const plugin = createRunOncePlugin(
   withIosOnThisDayNativeWidget,
   'withIosOnThisDayNativeWidget',
-  '1.0.0',
+  '1.1.0',
 );
 
 plugin.applyOnThisDayNativeWidget = applyOnThisDayNativeWidget;
+plugin.copyWidgetCrestAsset = copyWidgetCrestAsset;
+plugin.addCrestResourceToXcodeProject = addCrestResourceToXcodeProject;
+plugin.CREST_ASSET_NAME = CREST_ASSET_NAME;
 plugin.GENERATED_ENTRY = GENERATED_ENTRY;
 plugin.NATIVE_ENTRY = NATIVE_ENTRY;
 plugin.TAG = TAG;
