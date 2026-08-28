@@ -38,6 +38,7 @@ describe('OnThisDayWidget.ios referential freedom', () => {
     assert.match(viewBody, /#B8B6B0/);
     assert.match(viewBody, /Open QueenZone to load today's story\./);
     assert.match(viewBody, /ON THIS DAY/);
-    assert.match(viewBody, /QUOTE/);
+    assert.match(viewBody, /QUEEN QUOTES/);
+    assert.match(viewBody, /4 \* 60 \* 60 \* 1000/);
   });
 });
