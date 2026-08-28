@@ -37,6 +37,32 @@ describe('parseNotificationData', () => {
     });
   });
 
+  it('maps an iOS APNs payload with #757 keys beside aps', () => {
+    const aps = { alert: { title: 'Headline', body: 'New article published.' }, sound: 'default' };
+    assert.deepEqual(parseNotificationData({ aps, category: 'news', articleId: '88' }), {
+      category: 'news',
+      articleId: 88,
+    });
+    assert.deepEqual(parseNotificationData({ aps, category: 'forumReply', topicId: '12', postId: '34' }), {
+      category: 'forumReply',
+      topicId: 12,
+      postId: 34,
+    });
+    assert.deepEqual(parseNotificationData({ aps, category: 'privateMessage', conversationId }), {
+      category: 'privateMessage',
+      conversationId,
+    });
+  });
+
+  it('rejects an APNs alert that has no #757 contract keys', () => {
+    assert.equal(
+      parseNotificationData({
+        aps: { alert: { title: 'Headline', body: 'New article published.' }, sound: 'default' },
+      }),
+      null,
+    );
+  });
+
   it('ignores extra keys and an invalid optional postId', () => {
     assert.deepEqual(
       parseNotificationData({
@@ -49,6 +75,11 @@ describe('parseNotificationData', () => {
     );
   });
 
+  it('falls back to the news listing when articleId is missing', () => {
+    assert.deepEqual(parseNotificationData({ category: 'news' }), { category: 'news' });
+    assert.deepEqual(parseNotificationData({ category: 'news', articleId: '-1' }), { category: 'news' });
+  });
+
   it('rejects missing or unknown contract fields', () => {
     assert.equal(parseNotificationData(null), null);
     assert.equal(parseNotificationData(''), null);
@@ -59,7 +90,6 @@ describe('parseNotificationData', () => {
     assert.equal(parseNotificationData({ category: 'forumReply', topicId: 0 }), null);
     assert.equal(parseNotificationData({ category: 'privateMessage', conversationId: 'not-a-guid' }), null);
     assert.equal(parseNotificationData({ category: 'privateMessage', conversationId: 12 }), null);
-    assert.equal(parseNotificationData({ category: 'news', articleId: '-1' }), null);
     assert.equal(parseNotificationData('not-json'), null);
   });
 });

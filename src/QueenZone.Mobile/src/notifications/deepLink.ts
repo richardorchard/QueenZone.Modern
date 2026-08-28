@@ -2,14 +2,21 @@ import type { NotificationDestination } from './payload';
 
 export type NotificationTabTarget = {
   screen: 'ForumTab' | 'HomeTab' | 'NewsTab';
-  params: { screen: string; params: object; initial: false };
+  params: { screen: string; params?: object; initial: false };
 };
 
+function tabParams<Screen extends string>(
+  screen: Screen,
+): { screen: Screen; initial: false };
 function tabParams<Screen extends string, Params extends object>(
   screen: Screen,
   params: Params,
-): { screen: Screen; params: Params; initial: false } {
-  return { screen, params, initial: false };
+): { screen: Screen; params: Params; initial: false };
+function tabParams<Screen extends string, Params extends object>(
+  screen: Screen,
+  params?: Params,
+): { screen: Screen; params?: Params; initial: false } {
+  return params === undefined ? { screen, initial: false } : { screen, params, initial: false };
 }
 
 /** Nested-tab payload that keeps the tab root under the destination (back + tabs stay usable). */
@@ -18,12 +25,10 @@ export function notificationNavigateParams(destination: NotificationDestination)
     case 'forumReply':
       return {
         screen: 'ForumTab',
-        params: tabParams(
-          'Thread',
+        params:
           destination.postId === undefined
-            ? { id: destination.topicId }
-            : { id: destination.topicId, postId: destination.postId },
-        ),
+            ? tabParams('Thread', { id: destination.topicId })
+            : tabParams('Thread', { id: destination.topicId, postId: destination.postId }),
       };
     case 'privateMessage':
       return {
@@ -33,7 +38,10 @@ export function notificationNavigateParams(destination: NotificationDestination)
     case 'news':
       return {
         screen: 'NewsTab',
-        params: tabParams('Story', { id: destination.articleId }),
+        params:
+          destination.articleId === undefined
+            ? tabParams('NewsIndex', { refreshAt: Date.now() })
+            : tabParams('Story', { id: destination.articleId }),
       };
     default: {
       const _exhaustive: never = destination;

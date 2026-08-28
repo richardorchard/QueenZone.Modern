@@ -29,6 +29,14 @@ describe('notificationNavigateParams', () => {
       params: { screen: 'Story', params: { id: 88 }, initial: false },
     });
   });
+
+  it('opens a refreshed NewsIndex when articleId is missing', () => {
+    const newsList = notificationNavigateParams({ category: 'news' });
+    assert.equal(newsList.screen, 'NewsTab');
+    assert.equal(newsList.params.screen, 'NewsIndex');
+    assert.equal(newsList.params.initial, false);
+    assert.equal(typeof newsList.params.params?.refreshAt, 'number');
+  });
 });
 
 describe('openNotificationDestination', () => {
