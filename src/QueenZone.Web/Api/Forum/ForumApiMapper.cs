@@ -78,7 +78,8 @@ public static class ForumApiMapper
                 attachment.Extension,
                 attachment.FormattedSize,
                 attachment.IsImage,
-                attachment.ThumbnailUrl))
+                attachment.ThumbnailUrl,
+                ToAttachmentDownloadUrl(attachment.Url)))
             .ToList();
 
         return new ForumPostDto(
@@ -125,4 +126,26 @@ public static class ForumApiMapper
             option.VoteCount,
             option.Percentage,
             option.SelectedByViewer);
+
+    /// <summary>
+    /// Cookie path <c>/forum/attachment/...</c> → Bearer alias
+    /// <c>/api/v1/forum/attachments/...</c>. Unknown shapes are left unchanged.
+    /// </summary>
+    public static string ToAttachmentDownloadUrl(string cookieUrl)
+    {
+        const string legacyPrefix = "/forum/attachment/legacy/";
+        const string modernPrefix = "/forum/attachment/";
+
+        if (cookieUrl.StartsWith(legacyPrefix, StringComparison.Ordinal))
+        {
+            return $"{ForumApiEndpoints.RootPath}/attachments/legacy/{cookieUrl[legacyPrefix.Length..]}";
+        }
+
+        if (cookieUrl.StartsWith(modernPrefix, StringComparison.Ordinal))
+        {
+            return $"{ForumApiEndpoints.RootPath}/attachments/{cookieUrl[modernPrefix.Length..]}";
+        }
+
+        return cookieUrl;
+    }
 }

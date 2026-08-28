@@ -9,6 +9,8 @@ export type AttachmentPreviewInput = {
   url: string;
 };
 
+export type AttachmentAction = 'none' | 'view-image' | 'open-file';
+
 /** Matches website topic pages and `/api/v1/forum/topics/{id}/posts` (`ForumRoutes.PostsPageSize`). */
 export const forumPostsPageSize = 15;
 
@@ -82,4 +84,21 @@ export function imagePreviewUrl(item: AttachmentPreviewInput): string | null {
   }
   const thumb = item.thumbnailUrl?.trim() ?? '';
   return thumb.length > 0 ? thumb : null;
+}
+
+/**
+ * Signed-in, no stored thumb: open the original via Bearer `downloadUrl`.
+ * Thumb present stays inline. Signed-out stays metadata-only.
+ */
+export function attachmentAction(
+  item: AttachmentPreviewInput,
+  signedIn: boolean,
+): AttachmentAction {
+  if (!signedIn) {
+    return 'none';
+  }
+  if (item.isImage) {
+    return imagePreviewUrl(item) ? 'none' : 'view-image';
+  }
+  return 'open-file';
 }
