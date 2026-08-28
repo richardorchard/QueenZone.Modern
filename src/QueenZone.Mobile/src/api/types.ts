@@ -30,6 +30,13 @@ export type NewsListItem = {
   thumbnailUrl?: string | null;
 };
 
+/** Last-N forum reply preview on news detail. Not the opening post. */
+export type NewsDiscussionPreview = {
+  authorDisplayName: string;
+  postedAt: string;
+  excerpt: string;
+};
+
 export type NewsDetail = {
   id: number;
   title: string;
@@ -40,6 +47,9 @@ export type NewsDetail = {
   detailPath: string;
   imageUrl?: string | null;
   thumbnailUrl?: string | null;
+  topicId?: number | null;
+  discussionReplyCount?: number | null;
+  discussionPreview?: NewsDiscussionPreview[] | null;
 };
 
 /** Earliest/latest published years in the archive; both null when there are no articles. */

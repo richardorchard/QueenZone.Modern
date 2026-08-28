@@ -15,6 +15,8 @@ export const testIds = {
   newsScreen: 'news-screen',
   newsStoryScreen: 'news-story-screen',
   newsStoryBack: 'news-story-back',
+  newsStoryDiscussion: 'news-story-discussion',
+  newsStoryDiscussionCta: 'news-story-discussion-cta',
   newsYearRail: 'news-year-rail',
   newsSuggest: 'news-suggest',
 
