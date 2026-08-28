@@ -248,6 +248,8 @@ export type ForumAttachment = {
   formattedSize: string;
   isImage: boolean;
   thumbnailUrl: string | null;
+  /** Bearer alias under `/api/v1/forum/attachments/...`. Do not open `url`. */
+  downloadUrl: string;
 };
 
 export type ForumPost = {

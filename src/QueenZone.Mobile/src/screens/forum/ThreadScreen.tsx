@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { FlatList, Image, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  Image,
+  Modal,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   ApiError,
@@ -8,6 +18,8 @@ import {
   fetchForumTopicPoll,
   fetchForumTopicPosts,
   fetchForumTopicWatch,
+  isCookieGatedForumAttachmentPath,
+  openForumAttachmentFile,
   unwatchForumTopic,
   voteForumTopicPoll,
   watchForumTopic,
@@ -25,11 +37,13 @@ import { RichHtmlBody } from '../../ui/RichHtmlBody';
 import { Button } from '../../ui/Button';
 import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from '../../ui/ScreenStates';
 import { resolveContentUrl } from '../../ui/html/resolveContentUrl';
+import { usePressProps, pressedStyle } from '../../ui/press';
 import { testIds } from '../../test/testIds';
 import { radius, space, type, useTheme } from '../../theme';
 import { ForumPollCard } from './ForumPollCard';
 import { pollActionErrorMessage, pollTokenRequiredMessage, shouldLoadPoll } from './forumPollMeta';
 import {
+  attachmentAction,
   attachmentMeta,
   formatMemberSince,
   formatPostTimestamp,
@@ -332,12 +346,22 @@ export function ThreadScreen({ navigation, route }: Props) {
       }
       onEndReached={paged.loadMore}
       onEndReachedThreshold={0.4}
-      renderItem={({ item }) => <ForumPostRow post={item} />}
+      renderItem={({ item }) => (
+        <ForumPostRow post={item} isSignedIn={isSignedIn} accessToken={accessToken} />
+      )}
     />
   );
 }
 
-function ForumPostRow({ post }: { post: ForumPost }) {
+function ForumPostRow({
+  post,
+  isSignedIn,
+  accessToken,
+}: {
+  post: ForumPost;
+  isSignedIn: boolean;
+  accessToken: string | null;
+}) {
   const { c } = useTheme();
   const posted = formatPostTimestamp(post.postedAt);
   const memberSince = formatMemberSince(post.authorMemberSince);
@@ -354,7 +378,9 @@ function ForumPostRow({ post }: { post: ForumPost }) {
       <View style={styles.body}>
         <RichHtmlBody html={post.body} horizontalInset={space.xl} />
       </View>
-      {post.attachments.length > 0 ? <ForumAttachmentList attachments={post.attachments} /> : null}
+      {post.attachments.length > 0 ? (
+        <ForumAttachmentList attachments={post.attachments} isSignedIn={isSignedIn} accessToken={accessToken} />
+      ) : null}
       {post.signature ? (
         <Text style={[type.caption, { color: c.textMuted, marginTop: space.md }]}>{post.signature}</Text>
       ) : null}
@@ -362,9 +388,61 @@ function ForumPostRow({ post }: { post: ForumPost }) {
   );
 }
 
-function ForumAttachmentList({ attachments }: { attachments: ForumAttachment[] }) {
+function ForumAttachmentList({
+  attachments,
+  isSignedIn,
+  accessToken,
+}: {
+  attachments: ForumAttachment[];
+  isSignedIn: boolean;
+  accessToken: string | null;
+}) {
   const { c } = useTheme();
+  const press = usePressProps();
+  const [viewer, setViewer] = useState<{ uri: string; headers: Record<string, string>; label: string } | null>(
+    null,
+  );
+  const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [errorKey, setErrorKey] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const label = attachments.length === 1 ? 'Attachment' : 'Attachments';
+
+  const openAttachment = useCallback(
+    async (attachment: ForumAttachment) => {
+      const action = attachmentAction(attachment, isSignedIn);
+      if (action === 'none') {
+        return;
+      }
+      if (!accessToken || isCookieGatedForumAttachmentPath(attachment.downloadUrl)) {
+        return;
+      }
+      const viewerUri = resolveContentUrl(attachment.downloadUrl, getAppConfig().apiBaseUrl);
+      if (!viewerUri || isCookieGatedForumAttachmentPath(viewerUri)) {
+        return;
+      }
+      const key = `${attachment.downloadUrl}-${attachment.fileName}`;
+      setErrorKey(null);
+      setErrorMessage(null);
+      if (action === 'view-image') {
+        setViewer({
+          uri: viewerUri,
+          headers: { Authorization: `Bearer ${accessToken}` },
+          label: attachment.fileName,
+        });
+        return;
+      }
+      setBusyKey(key);
+      try {
+        await openForumAttachmentFile(attachment.downloadUrl, accessToken, attachment.fileName);
+      } catch (err: unknown) {
+        setErrorKey(key);
+        setErrorMessage(err instanceof ApiError ? err.message : 'Unable to open this attachment.');
+      } finally {
+        setBusyKey(null);
+      }
+    },
+    [accessToken, isSignedIn],
+  );
 
   return (
     <View style={styles.attachments}>
@@ -373,8 +451,21 @@ function ForumAttachmentList({ attachments }: { attachments: ForumAttachment[] }
         const preview = imagePreviewUrl(attachment);
         const previewUri = preview ? resolveContentUrl(preview, getAppConfig().apiBaseUrl) : null;
         const caption = attachmentMeta(attachment);
-        return (
-          <View key={`${attachment.url}-${attachment.fileName}`} style={styles.attachment}>
+        const action = attachmentAction(attachment, isSignedIn);
+        const key = `${attachment.downloadUrl}-${attachment.fileName}`;
+        const meta = (
+          <View style={styles.attachmentMeta} accessibilityLabel={`${attachment.fileName}. ${caption}`}>
+            <Text style={[type.listTitle, { color: c.textPrimary }]}>{attachment.fileName}</Text>
+            {caption ? (
+              <Text style={[type.meta, { color: c.textMuted, marginTop: space.xs }]}>{caption}</Text>
+            ) : null}
+            {errorKey === key && errorMessage ? (
+              <Text style={[type.caption, { color: c.textMuted, marginTop: space.xs }]}>{errorMessage}</Text>
+            ) : null}
+          </View>
+        );
+        const body = (
+          <>
             {previewUri ? (
               <Image
                 source={{ uri: previewUri }}
@@ -383,20 +474,56 @@ function ForumAttachmentList({ attachments }: { attachments: ForumAttachment[] }
                 accessibilityLabel={attachment.fileName}
               />
             ) : null}
-            {/*
-              Do not Linking.openURL cookie-gated /forum/attachment/... from the app.
-              A Bearer-authenticated download API is a follow-up before #733 uploads
-              rely on opening attachments.
-            */}
-            <View style={styles.attachmentMeta} accessibilityLabel={`${attachment.fileName}. ${caption}`}>
-              <Text style={[type.listTitle, { color: c.textPrimary }]}>{attachment.fileName}</Text>
-              {caption ? (
-                <Text style={[type.meta, { color: c.textMuted, marginTop: space.xs }]}>{caption}</Text>
-              ) : null}
+            {meta}
+            {busyKey === key ? <ActivityIndicator color={c.accentPrimary} /> : null}
+          </>
+        );
+        if (action === 'none') {
+          return (
+            <View key={key} style={styles.attachment} testID={testIds.forumThreadAttachment}>
+              {body}
             </View>
-          </View>
+          );
+        }
+        return (
+          <Pressable
+            key={key}
+            style={({ pressed }) => pressedStyle({ pressed }, styles.attachment)}
+            {...press}
+            testID={testIds.forumThreadAttachment}
+            accessibilityRole="button"
+            accessibilityLabel={`${attachment.fileName}. ${caption}. Open`}
+            onPress={() => {
+              void openAttachment(attachment);
+            }}
+          >
+            {body}
+          </Pressable>
         );
       })}
+      <Modal
+        visible={viewer != null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setViewer(null)}
+      >
+        <Pressable
+          style={[styles.viewerBackdrop, { backgroundColor: c.surfaceScrim }]}
+          onPress={() => setViewer(null)}
+          testID={testIds.forumThreadAttachmentViewer}
+          accessibilityRole="button"
+          accessibilityLabel="Close attachment"
+        >
+          {viewer ? (
+            <Image
+              source={{ uri: viewer.uri, headers: viewer.headers }}
+              style={styles.viewerImage}
+              resizeMode="contain"
+              accessibilityLabel={viewer.label}
+            />
+          ) : null}
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -444,5 +571,14 @@ const styles = StyleSheet.create({
     marginHorizontal: space.xl,
     marginTop: space.base,
     marginBottom: space.section,
+  },
+  viewerBackdrop: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: space.xl,
+  },
+  viewerImage: {
+    width: '100%',
+    height: '80%',
   },
 });
