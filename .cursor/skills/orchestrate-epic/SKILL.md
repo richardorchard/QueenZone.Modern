@@ -29,7 +29,7 @@ Parent model: **Grok 4.6** at **high** (xhigh only if the split is messy). Leave
 | --- | --- | --- |
 | Website | `src/QueenZone.Web`, Razor Pages | `dotnet test` on the touched test project |
 | API / data | `src/QueenZone.Web/Api`, `src/QueenZone.Data` | Web.Tests + coverage for changed `.cs` |
-| Mobile | `src/QueenZone.Mobile` (Expo, not in `QueenZone.sln`) | `npm test` / typecheck in that tree |
+| Mobile | `src/QueenZone.Mobile` (Expo, not in `QueenZone.sln`) | `npm run preflight` in that tree (typecheck + `npm test` + Expo Doctor). Doctor is a CI gate; `tsc` + Jest alone will miss SDK package drift. |
 
 Also enforce: SQL only in `QueenZone.Data`; visitor/admin pages as Razor Pages; no Expo Go as a supported runtime. If surface is mobile, tell the implementer to read `src/QueenZone.Mobile/README.md`.
 
