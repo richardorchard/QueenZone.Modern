@@ -29,6 +29,8 @@ public sealed class PublicContentMapperTests
         Assert.Null(view.ImageGalleryPicId);
         Assert.Null(view.ImageUrl);
         Assert.Null(view.ThumbnailUrl);
+        Assert.Equal(NewsArticleImage.PlaceholderPath, view.DisplayImageUrl);
+        Assert.Equal(NewsArticleImage.PlaceholderPath, view.DisplayThumbnailUrl);
     }
 
     [Fact]
@@ -49,12 +51,16 @@ public sealed class PublicContentMapperTests
         Assert.Equal("editors/me/hero.webp", blobView.ImageBlobKey);
         Assert.Equal("/ugc/articles/editors/me/hero.webp", blobView.ImageUrl);
         Assert.Equal("/ugc/articles/editors/me/hero.webp?size=thumb", blobView.ThumbnailUrl);
+        Assert.Equal(blobView.ImageUrl, blobView.DisplayImageUrl);
+        Assert.Equal(blobView.ThumbnailUrl, blobView.DisplayThumbnailUrl);
 
         var withGallery = withBlob with { ImageBlobKey = null, ImageGalleryPicId = 3120 };
         var galleryView = PublicContentMapper.ToNewsArchiveItem(withGallery);
         Assert.Equal(3120, galleryView.ImageGalleryPicId);
         Assert.Null(galleryView.ImageUrl);
         Assert.Null(galleryView.ThumbnailUrl);
+        Assert.Equal(NewsArticleImage.PlaceholderPath, galleryView.DisplayImageUrl);
+        Assert.Equal(NewsArticleImage.PlaceholderPath, galleryView.DisplayThumbnailUrl);
     }
 
     [Fact]
@@ -81,6 +87,8 @@ public sealed class PublicContentMapperTests
         Assert.Equal("/news/7/preview-title", view.DetailPath);
         Assert.Null(view.ImageUrl);
         Assert.Null(view.ThumbnailUrl);
+        Assert.Equal(NewsArticleImage.PlaceholderPath, view.DisplayImageUrl);
+        Assert.Equal(NewsArticleImage.PlaceholderPath, view.DisplayThumbnailUrl);
     }
 
     [Fact]

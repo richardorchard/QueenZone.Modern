@@ -16,6 +16,7 @@ public sealed class EditPostModel(
     IOutputCacheStore outputCacheStore,
     UgcHtml ugcHtml,
     NewsArticleImageService articleImageService,
+    IAdminPhotoRepository adminPhotoRepository,
     ILogger<EditPostModel> logger) : AdminNewsPageModel
 {
     public ArticleFormViewModel? Form { get; private set; }
@@ -38,6 +39,16 @@ public sealed class EditPostModel(
             excludeNewsId: id,
             cancellationToken: cancellationToken);
         var errors = NewsValidation.ValidateDraft(draft, slugInUse).ToList();
+        var galleryError = await NewsArticleGalleryPicker.ValidatePicAsync(
+            adminPhotoRepository,
+            form.ArticleImage,
+            draft.ImageGalleryPicId,
+            cancellationToken);
+        if (galleryError is not null)
+        {
+            errors.Add(galleryError);
+        }
+
         var persistImage = errors.Count == 0;
         var applied = await articleImageService.TryApplyAsync(
             form.ArticleImage,
@@ -71,7 +82,12 @@ public sealed class EditPostModel(
             }
 
             ViewData["Title"] = "Edit article";
-            Form = EditModel.BuildForm(existing, draft, errors, provenance);
+            Form = EditModel.BuildForm(
+                existing,
+                draft,
+                errors,
+                provenance,
+                await NewsArticleGalleryPicker.ResolvePreviewUrlAsync(adminPhotoRepository, draft, cancellationToken));
             return Page();
         }
 

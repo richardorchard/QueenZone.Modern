@@ -6,6 +6,7 @@ namespace QueenZone.Web.Pages.Admin.News;
 public sealed class EditModel(
     IAdminNewsRepository adminNewsRepository,
     INewsDiscoveryRepository discoveryRepository,
+    IAdminPhotoRepository adminPhotoRepository,
     ILogger<EditModel> logger) : AdminNewsPageModel
 {
     public ArticleFormViewModel? Form { get; private set; }
@@ -39,7 +40,13 @@ public sealed class EditModel(
         }
 
         ViewData["Title"] = "Edit article";
-        Form = BuildForm(article, ToDraft(article), null, provenance);
+        var draft = ToDraft(article);
+        Form = BuildForm(
+            article,
+            draft,
+            null,
+            provenance,
+            await NewsArticleGalleryPicker.ResolvePreviewUrlAsync(adminPhotoRepository, draft, cancellationToken));
         return Page();
     }
 
@@ -47,7 +54,8 @@ public sealed class EditModel(
         AdminNewsArticle article,
         AdminNewsDraft draft,
         IReadOnlyList<string>? errors,
-        NewsDiscoveryProvenance? discoveryProvenance = null) =>
+        NewsDiscoveryProvenance? discoveryProvenance = null,
+        string? previewImageUrl = null) =>
         new(
             "Edit article",
             $"/admin/news/{article.Id}",
@@ -55,5 +63,6 @@ public sealed class EditModel(
             errors,
             article,
             discoveryProvenance,
-            article.Title);
+            article.Title,
+            previewImageUrl);
 }
