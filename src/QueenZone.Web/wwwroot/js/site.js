@@ -603,6 +603,7 @@
     if (rowPlayer) {
       pauseOthers(rowPlayer);
       updateNowPlaying(entry || { title: rowPlayer.title });
+      rowPlayer.audio.currentTime = 0;
       playAttempt(rowPlayer.audio, fail);
       return;
     }
@@ -650,6 +651,9 @@
     });
 
     player.audio.addEventListener("play", () => {
+      if (queue && queue.ids[queue.index] !== player.id) {
+        cancelQueue();
+      }
       pauseOthers(player);
       setPlaying(player, true);
       if (!queue) {
