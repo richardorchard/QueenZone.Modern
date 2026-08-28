@@ -12,6 +12,7 @@ import {
   nextQuoteRefreshDelayMs,
   refreshHomeWidget,
   registerHomeWidgetBackgroundRefresh,
+  registerIosHomeWidgetLayout,
   runHomeWidgetBackgroundRefresh,
   syncHomeWidget,
 } from './widgetSync';
@@ -359,6 +360,33 @@ describe('registerHomeWidgetBackgroundRefresh', () => {
 
     const executor = defineTask.mock.calls.at(-1)?.[1] as () => Promise<BackgroundTask.BackgroundTaskResult>;
     await expect(executor()).resolves.toBe(BackgroundTask.BackgroundTaskResult.Success);
+  });
+});
+
+describe('registerIosHomeWidgetLayout', () => {
+  const originalOs = Platform.OS;
+
+  afterEach(() => {
+    Object.defineProperty(Platform, 'OS', { value: originalOs });
+    mockUpdateSnapshot.mockClear();
+    mockUpdateTimeline.mockClear();
+  });
+
+  it('stores an empty iOS snapshot at launch so the gallery is not blank', () => {
+    Object.defineProperty(Platform, 'OS', { value: 'ios' });
+
+    registerIosHomeWidgetLayout();
+
+    expect(mockUpdateSnapshot).toHaveBeenCalledWith({});
+    expect(mockUpdateTimeline).not.toHaveBeenCalled();
+  });
+
+  it('does not load the iOS widget module on Android', () => {
+    Object.defineProperty(Platform, 'OS', { value: 'android' });
+
+    registerIosHomeWidgetLayout();
+
+    expect(mockUpdateSnapshot).not.toHaveBeenCalled();
   });
 });
 
