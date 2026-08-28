@@ -61,8 +61,9 @@ public sealed record ForumPostDto(
 
 /// <summary>
 /// Attachment card for a forum post. <see cref="Url"/> is the existing
-/// cookie-gated download path (<c>/forum/attachment/...</c>). Mobile clients
-/// must not open it; a Bearer download API is a follow-up before #733.
+/// cookie-gated download path (<c>/forum/attachment/...</c>) and stays that
+/// shape for the website. <see cref="DownloadUrl"/> is the additive Bearer
+/// alias under <c>/api/v1/forum/attachments/...</c> for mobile.
 /// </summary>
 public sealed record ForumAttachmentDto(
     string FileName,
@@ -70,7 +71,8 @@ public sealed record ForumAttachmentDto(
     string Extension,
     string FormattedSize,
     bool IsImage,
-    string? ThumbnailUrl);
+    string? ThumbnailUrl,
+    string DownloadUrl);
 
 /// <summary>
 /// Cross-board recent-activity row for <c>/api/v1/forum/recent-threads</c>. Same source
