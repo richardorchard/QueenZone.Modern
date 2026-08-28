@@ -28,7 +28,7 @@ export type HomeStackParamList = {
 };
 
 export type NewsStackParamList = {
-  NewsIndex: undefined;
+  NewsIndex: { refreshAt?: number } | undefined;
   Story: { id: number };
   Search: undefined;
 };
