@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
-import { screen, userEvent, waitFor } from '@testing-library/react-native';
+import { act, screen, userEvent, waitFor } from '@testing-library/react-native';
 import { fetchNewsDetail } from '../../api';
 import { ApiError } from '../../api/client';
-import { newsDetailFixture } from '../../test/fixtures';
+import { deferred, newsDetailFixture } from '../../test/fixtures';
 import { fakeNavigation, renderWithProviders } from '../../test/render';
 import { testIds } from '../../test/testIds';
 import { NewsStoryScreen } from './NewsStoryScreen';
@@ -100,5 +100,33 @@ describe('NewsStoryScreen', () => {
     const user = userEvent.setup();
     await user.press(screen.getByRole('button', { name: 'Try again' }));
     await waitFor(() => expect(screen.getByText('Retried headline')).toBeOnTheScreen());
+  });
+
+  it('keeps the loaded article when the aborted first fetch later fails as offline', async () => {
+    const first = deferred<ReturnType<typeof newsDetailFixture>>();
+    fetchDetail
+      .mockReturnValueOnce(first.promise)
+      .mockResolvedValueOnce(newsDetailFixture({ title: 'Kept headline' }));
+    const navigation = fakeNavigation();
+    const { rerender } = renderWithProviders(
+      <NewsStoryScreen
+        navigation={navigation as never}
+        route={{ key: 'story', name: 'Story', params: { id: 1 } } as never}
+      />,
+      { navigation: false },
+    );
+    rerender(
+      <NewsStoryScreen
+        navigation={navigation as never}
+        route={{ key: 'story', name: 'Story', params: { id: 2 } } as never}
+      />,
+    );
+    await waitFor(() => expect(screen.getByText('Kept headline')).toBeOnTheScreen());
+
+    await act(async () => {
+      first.reject(new ApiError(0, 'Unable to reach QueenZone. Check your connection and try again.'));
+    });
+    expect(screen.getByText('Kept headline')).toBeOnTheScreen();
+    expect(screen.queryByText('Unable to load')).toBeNull();
   });
 });

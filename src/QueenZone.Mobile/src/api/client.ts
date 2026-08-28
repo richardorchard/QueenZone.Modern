@@ -1,6 +1,6 @@
 import { apiV1Url } from '../config';
 import { reportApiFailure } from '../config/sentry';
-import { ApiError, isTimeoutFailure } from './errors';
+import { ApiError, isOfflineFailure, isTimeoutFailure } from './errors';
 import {
   classifyXhrFailure,
   interpretMultipartXhrResult,
@@ -185,7 +185,7 @@ function classifyFetchFailure(err: unknown, deadline: DeadlineHandle, caller?: A
 }
 
 function shouldRetryGet(err: unknown): boolean {
-  if (isTimeoutFailure(err)) {
+  if (isTimeoutFailure(err) || isOfflineFailure(err)) {
     return true;
   }
   return err instanceof ApiError && err.kind === 'http' && RETRYABLE_HTTP.has(err.status);

@@ -80,11 +80,12 @@ describe('fetchJson', () => {
     fetchMock.mockRejectedValueOnce(abort);
     await expect(fetchJson('/x', { signal: AbortSignal.abort() })).rejects.toBe(abort);
 
-    fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
     await expect(fetchJson('/x')).rejects.toMatchObject({
       status: 0,
       message: 'Unable to reach QueenZone. Check your connection and try again.',
     });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 });
 
@@ -218,16 +219,25 @@ describe('offline, HTTP retry, and malformed JSON', () => {
     jest.restoreAllMocks();
   });
 
-  it('maps a TypeError to offline, keeps the cause, and does not retry', async () => {
+  it('retries a GET after a TypeError and then resolves', async () => {
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    const cause = new TypeError('Network request failed');
+    fetchMock.mockRejectedValueOnce(cause).mockResolvedValueOnce(jsonResponse({ ok: true }));
+    await expect(fetchJson('/flaky-network')).resolves.toEqual({ ok: true });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('maps a TypeError to offline after two GET attempts and keeps the cause', async () => {
+    jest.spyOn(Math, 'random').mockReturnValue(0);
     const cause = new TypeError('Failed to fetch');
-    fetchMock.mockRejectedValueOnce(cause);
+    fetchMock.mockRejectedValue(cause);
     await expect(fetchJson('/x')).rejects.toMatchObject({
       kind: 'offline',
       status: 0,
       message: 'Unable to reach QueenZone. Check your connection and try again.',
       cause,
     });
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('keeps the fetch TypeError on a multipart offline failure', async () => {
