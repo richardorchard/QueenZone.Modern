@@ -16,8 +16,8 @@ export const notificationCategories = ['forumReply', 'privateMessage', 'news'] a
 export type NotificationCategory = (typeof notificationCategories)[number];
 
 export type NotificationDestination =
-  | { category: 'forumReply'; topicId?: number; postId?: number }
-  | { category: 'privateMessage'; conversationId?: string }
+  | { category: 'forumReply'; topicId: number; postId?: number }
+  | { category: 'privateMessage'; conversationId: string }
   | { category: 'news'; articleId?: number };
 
 const conversationIdPattern =
@@ -101,7 +101,7 @@ export function parseNotificationData(data: unknown): NotificationDestination | 
   if (category === 'forumReply') {
     const topicId = readPositiveInt(record.topicId);
     if (topicId === null) {
-      return { category };
+      return null;
     }
     const postId = readPositiveInt(record.postId);
     return postId === null ? { category, topicId } : { category, topicId, postId };
@@ -109,7 +109,7 @@ export function parseNotificationData(data: unknown): NotificationDestination | 
 
   if (category === 'privateMessage') {
     const conversationId = readConversationId(record.conversationId);
-    return conversationId === null ? { category } : { category, conversationId };
+    return conversationId === null ? null : { category, conversationId };
   }
 
   const articleId = readPositiveInt(record.articleId);

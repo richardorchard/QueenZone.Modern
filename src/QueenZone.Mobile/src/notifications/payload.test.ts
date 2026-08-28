@@ -75,15 +75,7 @@ describe('parseNotificationData', () => {
     );
   });
 
-  it('falls back to the category listing when the detail id is missing', () => {
-    assert.deepEqual(parseNotificationData({ category: 'forumReply' }), { category: 'forumReply' });
-    assert.deepEqual(parseNotificationData({ category: 'forumReply', topicId: 0 }), { category: 'forumReply' });
-    assert.deepEqual(parseNotificationData({ category: 'privateMessage', conversationId: 'not-a-guid' }), {
-      category: 'privateMessage',
-    });
-    assert.deepEqual(parseNotificationData({ category: 'privateMessage', conversationId: 12 }), {
-      category: 'privateMessage',
-    });
+  it('falls back to the news listing when articleId is missing', () => {
     assert.deepEqual(parseNotificationData({ category: 'news' }), { category: 'news' });
     assert.deepEqual(parseNotificationData({ category: 'news', articleId: '-1' }), { category: 'news' });
   });
@@ -94,6 +86,10 @@ describe('parseNotificationData', () => {
     assert.equal(parseNotificationData('   '), null);
     assert.equal(parseNotificationData({}), null);
     assert.equal(parseNotificationData({ category: 'digest' }), null);
+    assert.equal(parseNotificationData({ category: 'forumReply' }), null);
+    assert.equal(parseNotificationData({ category: 'forumReply', topicId: 0 }), null);
+    assert.equal(parseNotificationData({ category: 'privateMessage', conversationId: 'not-a-guid' }), null);
+    assert.equal(parseNotificationData({ category: 'privateMessage', conversationId: 12 }), null);
     assert.equal(parseNotificationData('not-json'), null);
   });
 });

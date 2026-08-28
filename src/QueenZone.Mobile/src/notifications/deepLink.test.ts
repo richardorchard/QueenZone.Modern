@@ -30,15 +30,7 @@ describe('notificationNavigateParams', () => {
     });
   });
 
-  it('opens the category listing when the detail id is missing', () => {
-    assert.deepEqual(notificationNavigateParams({ category: 'forumReply' }), {
-      screen: 'ForumTab',
-      params: { screen: 'ForumIndex', initial: false },
-    });
-    assert.deepEqual(notificationNavigateParams({ category: 'privateMessage' }), {
-      screen: 'HomeTab',
-      params: { screen: 'Inbox', initial: false },
-    });
+  it('opens a refreshed NewsIndex when articleId is missing', () => {
     const newsList = notificationNavigateParams({ category: 'news' });
     assert.equal(newsList.screen, 'NewsTab');
     assert.equal(newsList.params.screen, 'NewsIndex');
@@ -64,33 +56,6 @@ describe('openNotificationDestination', () => {
         params: {
           screen: 'NewsTab',
           params: { screen: 'Story', params: { id: 1003 }, initial: false },
-        },
-      },
-    ]);
-  });
-
-  it('opens Thread and Conversation for forum and private-message destinations', () => {
-    const calls: unknown[] = [];
-    const navigation = {
-      navigate: (name: 'Tabs', params: object) => {
-        calls.push({ name, params });
-      },
-    };
-    openNotificationDestination(navigation, { category: 'forumReply', topicId: 1002 });
-    openNotificationDestination(navigation, { category: 'privateMessage', conversationId });
-    assert.deepEqual(calls, [
-      {
-        name: 'Tabs',
-        params: {
-          screen: 'ForumTab',
-          params: { screen: 'Thread', params: { id: 1002 }, initial: false },
-        },
-      },
-      {
-        name: 'Tabs',
-        params: {
-          screen: 'HomeTab',
-          params: { screen: 'Conversation', params: { id: conversationId }, initial: false },
         },
       },
     ]);

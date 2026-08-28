@@ -13,19 +13,14 @@ export function notificationNavigateParams(destination: NotificationDestination)
       return {
         screen: 'ForumTab',
         params:
-          destination.topicId === undefined
-            ? nestedTabParams('ForumIndex')
-            : destination.postId === undefined
-              ? nestedTabParams('Thread', { id: destination.topicId })
-              : nestedTabParams('Thread', { id: destination.topicId, postId: destination.postId }),
+          destination.postId === undefined
+            ? nestedTabParams('Thread', { id: destination.topicId })
+            : nestedTabParams('Thread', { id: destination.topicId, postId: destination.postId }),
       };
     case 'privateMessage':
       return {
         screen: 'HomeTab',
-        params:
-          destination.conversationId === undefined
-            ? nestedTabParams('Inbox')
-            : nestedTabParams('Conversation', { id: destination.conversationId }),
+        params: nestedTabParams('Conversation', { id: destination.conversationId }),
       };
     case 'news':
       return {

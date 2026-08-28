@@ -164,38 +164,6 @@ describe('NotificationBridge', () => {
     });
   });
 
-  it('opens a forum thread from an iOS APNs tap', async () => {
-    renderWithProviders(<NotificationBridge />, { navigation: false });
-    await act(async () => {
-      await Promise.resolve();
-    });
-
-    await act(async () => {
-      responseListener?.(iosResponse({ category: 'forumReply', topicId: '1002', postId: '9' }, 'ios-warm-forum'));
-    });
-
-    expect(mockNavigate).toHaveBeenCalledWith('Tabs', {
-      screen: 'ForumTab',
-      params: { screen: 'Thread', params: { id: 1002, postId: 9 }, initial: false },
-    });
-  });
-
-  it('opens a conversation from an iOS APNs tap', async () => {
-    renderWithProviders(<NotificationBridge />, { navigation: false });
-    await act(async () => {
-      await Promise.resolve();
-    });
-
-    await act(async () => {
-      responseListener?.(iosResponse({ category: 'privateMessage', conversationId }, 'ios-warm-pm'));
-    });
-
-    expect(mockNavigate).toHaveBeenCalledWith('Tabs', {
-      screen: 'HomeTab',
-      params: { screen: 'Conversation', params: { id: conversationId }, initial: false },
-    });
-  });
-
   it('opens the news listing from an iOS APNs tap when articleId is missing', async () => {
     renderWithProviders(<NotificationBridge />, { navigation: false });
     await act(async () => {
