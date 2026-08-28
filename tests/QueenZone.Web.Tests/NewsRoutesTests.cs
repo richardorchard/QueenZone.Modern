@@ -480,4 +480,116 @@ public sealed class NewsRoutesTests : IClassFixture<QueenZoneWebApplicationFacto
         Assert.DoesNotContain("Hidden duplicate candidate", pageTwo);
     }
 
+    [Fact]
+    public async Task NewsArchiveRendersPlaceholderThumbnailsWhenNoImage()
+    {
+        var client = factory.CreateClient();
+
+        var body = await client.GetStringAsync("/news");
+        var pageTwo = await client.GetStringAsync("/news/page/2");
+
+        Assert.Contains("qz-news-row__thumb", body);
+        Assert.Contains($"src=\"{NewsArticleImage.PlaceholderPath}\"", body);
+        Assert.Contains("loading=\"lazy\"", body);
+        Assert.Contains("width=\"240\"", body);
+        Assert.Contains("height=\"160\"", body);
+        Assert.Contains("qz-news-row__thumb", pageTwo);
+        Assert.DoesNotContain("blob.core.windows.net", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("/ugc/photos/", body);
+    }
+
+    [Fact]
+    public async Task NewsArchiveRendersUgcThumbnailsThroughArticlesProxy()
+    {
+        var items = new[]
+        {
+            new NewsItem(
+                6100,
+                "Article with uploaded image",
+                "Has a UGC thumbnail.",
+                "Body",
+                new DateTime(2026, 8, 1, 0, 0, 0, DateTimeKind.Utc),
+                null,
+                true,
+                ImageBlobKey: "editors/me/hero.webp"),
+            new NewsItem(
+                6101,
+                "Article without image",
+                "Uses the placeholder.",
+                "Body",
+                new DateTime(2026, 7, 1, 0, 0, 0, DateTimeKind.Utc),
+                null,
+                true),
+            new NewsItem(
+                6102,
+                "Article with gallery pick",
+                "Falls back until the PIC row is resolved.",
+                "Body",
+                new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc),
+                null,
+                true,
+                ImageBlobKey: "gallery:3120",
+                ImageGalleryPicId: 3120)
+        };
+
+        var client = factory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+            {
+                services.AddSingleton<INewsRepository>(new FixedNewsRepository(items));
+            })).CreateClient();
+
+        var body = await client.GetStringAsync("/news");
+
+        Assert.Contains("src=\"/ugc/articles/editors/me/hero.webp?size=thumb\"", body);
+        Assert.Contains($"src=\"{NewsArticleImage.PlaceholderPath}\"", body);
+        Assert.Contains("Article with uploaded image", body);
+        Assert.Contains("Article with gallery pick", body);
+        Assert.DoesNotContain("/ugc/photos/", body);
+        Assert.DoesNotContain("cdn.queenzone.org", body);
+        Assert.DoesNotContain("blob.core.windows.net", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("img-hero.jpg", body);
+    }
+
+    [Fact]
+    public async Task HomePageLatestNewsDoesNotRenderArchiveListingThumbs()
+    {
+        var client = factory.CreateClient();
+
+        var body = await client.GetStringAsync("/");
+
+        Assert.Contains("Latest news", body);
+        Assert.DoesNotContain("qz-news-row__thumb", body);
+        Assert.DoesNotContain(NewsArticleImage.PlaceholderPath, body);
+    }
+
+    [Fact]
+    public async Task NewsDetailRendersArticleImageOrPlaceholder()
+    {
+        var withImage = new NewsItem(
+            6200,
+            "Detail with image",
+            "Excerpt",
+            "Body",
+            new DateTime(2026, 8, 2, 0, 0, 0, DateTimeKind.Utc),
+            null,
+            true,
+            ImageBlobKey: "editors/me/hero.webp");
+
+        var client = factory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+            {
+                services.AddSingleton<INewsRepository>(new FixedNewsRepository([withImage]));
+            })).CreateClient();
+
+        var withImageBody = await client.GetStringAsync("/news/6200/detail-with-image");
+        var sampleBody = await factory.CreateClient().GetStringAsync("/news/1003/queenzone-modernisation-begins");
+
+        Assert.Contains("src=\"/ugc/articles/editors/me/hero.webp\"", withImageBody);
+        Assert.DoesNotContain("?size=thumb", withImageBody);
+        Assert.DoesNotContain("img-hero.jpg", withImageBody);
+        Assert.DoesNotContain("blob.core.windows.net", withImageBody, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains($"src=\"{NewsArticleImage.PlaceholderPath}\"", sampleBody);
+        Assert.DoesNotContain("img-hero.jpg", sampleBody);
+    }
+
 }

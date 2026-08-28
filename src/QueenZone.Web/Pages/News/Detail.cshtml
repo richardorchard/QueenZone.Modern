@@ -11,7 +11,12 @@
 @if (Model.Item is not null)
 {
   <section class="qz-article-hero">
-    <partial name="_PictureImage" model="@("/design-system/assets/img-hero.jpg", "", false, (string?)null)" />
+    <img src="@Model.Item.DisplayImageUrl"
+         alt="@(Model.Item.ImageUrl is null ? "" : Model.Item.Title)"
+         width="600"
+         height="400"
+         decoding="async"
+         fetchpriority="high">
     <div class="qz-container qz-article-hero__content qz-breadcrumbs-on-dark">
       <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
       <div class="qz-eyebrow">News archive</div>

@@ -1,3 +1,5 @@
+using QueenZone.Data;
+
 namespace QueenZone.Web;
 
 /// <summary>
@@ -14,7 +16,18 @@ public sealed record NewsArchiveItem(
     string? ImageBlobKey = null,
     int? ImageGalleryPicId = null,
     string? ImageUrl = null,
-    string? ThumbnailUrl = null);
+    string? ThumbnailUrl = null)
+{
+    /// <summary>
+    /// Listing thumbnail: resolved photo URL, or the shared placeholder when unset.
+    /// </summary>
+    public string DisplayThumbnailUrl => ThumbnailUrl ?? NewsArticleImage.PlaceholderPath;
+
+    /// <summary>
+    /// Full-size photo URL, or the shared placeholder when unset.
+    /// </summary>
+    public string DisplayImageUrl => ImageUrl ?? NewsArticleImage.PlaceholderPath;
+}
 
 /// <summary>
 /// Stable detail shape for public (and admin preview) news article pages.
@@ -32,4 +45,9 @@ public sealed record NewsDetailItem(
     string? ImageBlobKey = null,
     int? ImageGalleryPicId = null,
     string? ImageUrl = null,
-    string? ThumbnailUrl = null);
+    string? ThumbnailUrl = null)
+{
+    public string DisplayThumbnailUrl => ThumbnailUrl ?? NewsArticleImage.PlaceholderPath;
+
+    public string DisplayImageUrl => ImageUrl ?? NewsArticleImage.PlaceholderPath;
+}
