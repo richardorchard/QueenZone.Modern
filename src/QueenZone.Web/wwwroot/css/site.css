@@ -2724,6 +2724,61 @@ a.qz-forum-post__author-link:focus-visible {
   line-height: 1.4;
 }
 
+.admin-article-image {
+  margin: 0 0 1.25rem;
+}
+
+.admin-article-image img {
+  display: block;
+  max-width: 320px;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 3 / 2;
+  object-fit: cover;
+  background: var(--qz-black);
+}
+
+.admin-article-image-error {
+  color: var(--qz-burgundy);
+  margin: 0 0 1rem;
+}
+
+.admin-article-crop {
+  width: min(36rem, calc(100vw - 2rem));
+  padding: 1.25rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xs);
+  background: var(--qz-warm-white, #fff);
+}
+
+.admin-article-crop::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.admin-article-crop__title {
+  font-size: 1.25rem;
+  margin: 0 0 0.5rem;
+}
+
+.admin-article-crop__stage {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  margin: 0 0 1rem;
+  background: var(--qz-black);
+}
+
+.admin-article-crop__stage img {
+  display: block;
+  max-width: 100%;
+}
+
+.admin-article-crop__zoom {
+  display: block;
+  margin-bottom: 1rem;
+}
+
 .admin-form-panel h1 {
   font-size: clamp(1.5rem, 2.5vw, 2rem);
   line-height: 1.2;

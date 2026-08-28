@@ -30,6 +30,34 @@ public sealed class AdminNewsForm
     [FromForm(Name = "imageGalleryPicId")]
     public int? ImageGalleryPicId { get; init; }
 
+    [FromForm(Name = "articleImage")]
+    public IFormFile? ArticleImage { get; set; }
+
+    [FromForm(Name = "cropX")]
+    public string? CropX { get; init; }
+
+    [FromForm(Name = "cropY")]
+    public string? CropY { get; init; }
+
+    [FromForm(Name = "cropWidth")]
+    public string? CropWidth { get; init; }
+
+    [FromForm(Name = "cropHeight")]
+    public string? CropHeight { get; init; }
+
+    public NewsArticleImageCrop? ToCrop()
+    {
+        if (!TryParseCropPart(CropX, out var x)
+            || !TryParseCropPart(CropY, out var y)
+            || !TryParseCropPart(CropWidth, out var width)
+            || !TryParseCropPart(CropHeight, out var height))
+        {
+            return null;
+        }
+
+        return new NewsArticleImageCrop(x, y, width, height);
+    }
+
     public AdminNewsDraft ToDraft()
     {
         DateTime publishedAt = default;
@@ -48,5 +76,12 @@ public sealed class AdminNewsForm
             string.IsNullOrWhiteSpace(SourceUrl) ? null : SourceUrl.Trim(),
             string.IsNullOrWhiteSpace(ImageBlobKey) ? null : ImageBlobKey.Trim(),
             ImageGalleryPicId is > 0 ? ImageGalleryPicId : null);
+    }
+
+    private static bool TryParseCropPart(string? value, out int parsed)
+    {
+        parsed = 0;
+        return !string.IsNullOrWhiteSpace(value)
+            && int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out parsed);
     }
 }

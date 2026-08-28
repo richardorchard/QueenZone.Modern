@@ -287,6 +287,7 @@ public static class QueenZoneWebServiceCollectionExtensions
         services.AddScoped<INewsForumTopicService, NewsForumTopicService>();
         services.AddScoped<NewsDiscussionComposer>();
         services.AddScoped<AdminNewsWriteService>();
+        services.AddScoped<NewsArticleImageService>();
         services.AddSingleton<IGoogleAnalyticsDataClient, GoogleAnalyticsDataClient>();
         services.AddScoped<IGoogleAnalyticsTrafficService, GoogleAnalyticsTrafficService>();
         services.AddScoped<AdminDashboardService>();

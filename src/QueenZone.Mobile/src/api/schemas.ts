@@ -62,6 +62,8 @@ export const newsListItemSchema = z.object({
   excerpt: z.string(),
   publishedAt: isoDateTime,
   detailPath: z.string().min(1),
+  imageUrl: z.string().nullish(),
+  thumbnailUrl: z.string().nullish(),
 });
 
 export const newsDetailSchema = z.object({
@@ -72,6 +74,8 @@ export const newsDetailSchema = z.object({
   publishedAt: isoDateTime,
   sourceUrl: z.string().nullable(),
   detailPath: z.string().min(1),
+  imageUrl: z.string().nullish(),
+  thumbnailUrl: z.string().nullish(),
 });
 
 export const photoCategoryListItemSchema = z.object({
