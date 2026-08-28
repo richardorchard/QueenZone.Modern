@@ -46,16 +46,12 @@ export function NewsStoryScreen({ navigation, route }: Props) {
     });
   }, [navigation, article?.title]);
 
-  const openDiscussion = useCallback(() => {
-    if (article?.topicId == null) {
-      return;
-    }
-
-    navigation.navigate(
-      'ForumTab',
-      nestedTabParams('Thread', { id: article.topicId, title: article.title }),
-    );
-  }, [article?.title, article?.topicId, navigation]);
+  const openDiscussion = useCallback(
+    (topicId: number, title: string) => {
+      navigation.navigate('ForumTab', nestedTabParams('Thread', { id: topicId, title }));
+    },
+    [navigation],
+  );
 
   if (loading) {
     return <LoadingBlock label="Loading article…" />;
@@ -109,7 +105,7 @@ export function NewsStoryScreen({ navigation, route }: Props) {
         <StoryDiscussion
           replyCount={replyCount}
           preview={preview}
-          onOpenThread={openDiscussion}
+          onOpenThread={() => openDiscussion(topicId, article.title)}
         />
       ) : null}
       <View style={{ height: space.section }} />
