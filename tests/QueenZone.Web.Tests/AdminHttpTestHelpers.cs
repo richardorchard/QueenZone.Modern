@@ -43,6 +43,39 @@ internal static partial class AdminHttpTestHelpers
         return await client.PostAsync(postPath, new FormUrlEncodedContent(fields));
     }
 
+    internal static async Task<HttpResponseMessage> PostArticleMultipartAsync(
+        HttpClient client,
+        string formPath,
+        string postPath,
+        Dictionary<string, string> fields,
+        byte[] imageBytes,
+        string fileName,
+        string contentType,
+        IReadOnlyDictionary<string, string>? crop = null)
+    {
+        var formPage = await client.GetStringAsync(formPath);
+        fields[AdminNewsPageModel.AntiforgeryTokenFieldName] = ExtractAntiforgeryToken(formPage);
+
+        using var content = new MultipartFormDataContent();
+        foreach (var field in fields)
+        {
+            content.Add(new StringContent(field.Value), field.Key);
+        }
+
+        if (crop is not null)
+        {
+            foreach (var field in crop)
+            {
+                content.Add(new StringContent(field.Value), field.Key);
+            }
+        }
+
+        var file = new ByteArrayContent(imageBytes);
+        file.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
+        content.Add(file, "articleImage", fileName);
+        return await client.PostAsync(postPath, content);
+    }
+
     internal static async Task<HttpResponseMessage> PostNewsActionAsync(
         HttpClient client,
         string actionPath,

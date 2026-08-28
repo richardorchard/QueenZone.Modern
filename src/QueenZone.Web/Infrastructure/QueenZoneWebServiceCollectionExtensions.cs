@@ -285,6 +285,7 @@ public static class QueenZoneWebServiceCollectionExtensions
         services.AddSingleton<IPushTransport, DirectPushTransport>();
         services.AddScoped<INotificationDispatcher, NotificationDispatcher>();
         services.AddScoped<AdminNewsWriteService>();
+        services.AddScoped<NewsArticleImageService>();
         services.AddSingleton<IGoogleAnalyticsDataClient, GoogleAnalyticsDataClient>();
         services.AddScoped<IGoogleAnalyticsTrafficService, GoogleAnalyticsTrafficService>();
         services.AddScoped<AdminDashboardService>();
