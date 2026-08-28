@@ -1,3 +1,4 @@
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using QueenZone.Data.Entities;
 
@@ -5,26 +6,41 @@ namespace QueenZone.Data;
 
 public sealed class EfDeviceTokenRepository(QueenZoneDbContext dbContext) : IDeviceTokenRepository
 {
+    private const int MaxUniqueConflictRetries = 2;
+
     public async Task<DeviceTokenEntity> UpsertAsync(
         DeviceTokenEntity token,
         CancellationToken cancellationToken = default)
     {
-        var existing = await dbContext.DeviceTokens
-            .SingleOrDefaultAsync(row => row.DeviceId == token.DeviceId, cancellationToken);
-
-        if (existing is null)
+        for (var attempt = 1; attempt <= MaxUniqueConflictRetries; attempt++)
         {
+            var existing = await FindByDeviceIdAsync(token.DeviceId, cancellationToken);
+            if (existing is not null)
+            {
+                existing.MemberAccountId = token.MemberAccountId;
+                existing.Platform = token.Platform;
+                existing.Token = token.Token;
+                existing.UpdatedAt = token.UpdatedAt;
+                await dbContext.SaveChangesAsync(cancellationToken);
+                return existing;
+            }
+
             dbContext.DeviceTokens.Add(token);
-            await dbContext.SaveChangesAsync(cancellationToken);
-            return token;
+            try
+            {
+                await dbContext.SaveChangesAsync(cancellationToken);
+                return token;
+            }
+            catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex) && attempt < MaxUniqueConflictRetries)
+            {
+                // A concurrent register (or a case-insensitive unique hit the find missed)
+                // inserted first. Detach the failed INSERT and update that row.
+                dbContext.ChangeTracker.Clear();
+            }
         }
 
-        existing.MemberAccountId = token.MemberAccountId;
-        existing.Platform = token.Platform;
-        existing.Token = token.Token;
-        existing.UpdatedAt = token.UpdatedAt;
-        await dbContext.SaveChangesAsync(cancellationToken);
-        return existing;
+        throw new InvalidOperationException(
+            $"Could not upsert device token for DeviceId '{token.DeviceId}'.");
     }
 
     public async Task<bool> DeleteByDeviceIdAsync(
@@ -53,5 +69,37 @@ public sealed class EfDeviceTokenRepository(QueenZoneDbContext dbContext) : IDev
             .AsNoTracking()
             .Where(row => ids.Contains(row.MemberAccountId))
             .ToListAsync(cancellationToken);
+    }
+
+    private Task<DeviceTokenEntity?> FindByDeviceIdAsync(
+        string deviceId,
+        CancellationToken cancellationToken)
+    {
+        // IX_DeviceTokens_DeviceId is case-insensitive on SQL Server. Using ordinal ==
+        // here misses "E3C8…" vs "e3c8…" and the following INSERT fails with
+        // "Cannot insert duplicate key … IX_DeviceTokens_DeviceId".
+        var normalized = deviceId.ToLowerInvariant();
+        return dbContext.DeviceTokens
+            .SingleOrDefaultAsync(row => row.DeviceId.ToLower() == normalized, cancellationToken);
+    }
+
+    internal static bool IsUniqueConstraintViolation(DbUpdateException exception)
+    {
+        for (var inner = exception.InnerException; inner is not null; inner = inner.InnerException)
+        {
+            if (inner is SqlException sql && sql.Number is 2601 or 2627)
+            {
+                return true;
+            }
+
+            if (inner.Message.Contains("UNIQUE constraint failed", StringComparison.OrdinalIgnoreCase)
+                || inner.Message.Contains("unique index", StringComparison.OrdinalIgnoreCase)
+                || inner.Message.Contains("duplicate key", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
