@@ -279,7 +279,17 @@ On Linux or GitHub Actions, use `pwsh` instead of `powershell` for the last comm
 
 If the gate reports uncovered changed lines, it prints up to 20 `path:line` entries. Add or extend tests until changed-line coverage is at least 70%.
 
-When the PR changes `src/QueenZone.Mobile` production TypeScript/TSX, also run the mobile coverage gate (floors in `scripts/mobile-coverage-floors.json`; do not copy the web C# 51%/70% numbers):
+When the PR changes `src/QueenZone.Mobile`, run the same host-free gate CI uses before the coverage job — not typecheck + Jest alone:
+
+```powershell
+cd src/QueenZone.Mobile
+npm ci
+npm run preflight
+```
+
+`npm run preflight` is typecheck + unit tests + Expo Doctor. Doctor's package-version check consults Expo's current SDK list, so a lockfile that passed this morning can fail CI the same afternoon when Expo publishes a patch (`npx expo install <package>`). Do not skip Doctor on mobile PRs.
+
+When the PR also changes production TypeScript/TSX, run the mobile coverage gate (floors in `scripts/mobile-coverage-floors.json`; do not copy the web C# 51%/70% numbers):
 
 ```powershell
 cd src/QueenZone.Mobile

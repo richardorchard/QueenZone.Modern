@@ -61,12 +61,18 @@ npm ci
 npm run preflight
 ```
 
-`npm run preflight` runs typecheck, the unit tests, and the lockfile-pinned
-Expo Doctor check (`npm run doctor`). Doctor must pass all checks after a
-clean `npm ci`. Publish workflows still run `npm run preflight`. CI
-`mobile-js` runs the npm advisory gate, typecheck, `npm run test:coverage`,
-the coverage gate, and Doctor so the same suites are measured without
-running tests twice. High/critical advisories fail closed unless the GHSA
+`npm run preflight` runs typecheck, the unit tests, and Expo Doctor
+(`npm run doctor`). The `expo-doctor` binary is lockfile-pinned; the
+SDK package-version check is not — it compares `package.json` against
+Expo's current SDK 57 native-module list. A clean `npm ci` that passed
+Doctor this morning can fail CI later the same day when Expo publishes a
+patch. Fix with `npx expo install <package>` (or `npx expo install --fix`)
+and commit the lockfile. Do not add packages to `expo.install.exclude`
+just to silence Doctor. Typecheck + `npm test` alone is not a local
+substitute for the CI `mobile-js` job. Publish workflows still run
+`npm run preflight`. CI `mobile-js` runs the npm advisory gate, typecheck,
+`npm run test:coverage`, the coverage gate, and Doctor so the same suites
+are measured without running tests twice. High/critical advisories fail closed unless the GHSA
 is in [`npm-advisory-allowlist.json`](./npm-advisory-allowlist.json); see
 [`npm-advisory-allowlist.md`](./npm-advisory-allowlist.md). Never run
 `npm audit fix --force`.
@@ -363,7 +369,8 @@ unit / component (npm test, #833)
 `npm test` discovers every `src/**/*.test.ts` and `src/**/*.test.tsx` file
 and runs both the Node pure suite and the Jest component suite. Do not add
 new tests to a path list in `package.json`. `npm run preflight` is typecheck
-+ those tests + lockfile-pinned `npm run doctor`. CI `mobile-js` runs the
++ those tests + `npm run doctor` (see Clean checkout: Doctor's version
+check can move when Expo publishes a patch). CI `mobile-js` runs the
 #837 npm advisory gate, then collects coverage from both suites and
 enforces `scripts/Test-MobileCoverageGate.mjs`.
 
