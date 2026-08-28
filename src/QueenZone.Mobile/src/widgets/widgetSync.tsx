@@ -196,6 +196,21 @@ export function defineHomeWidgetBackgroundTask(): void {
   TaskManager.defineTask(HOME_WIDGET_BACKGROUND_TASK, () => runHomeWidgetBackgroundRefresh());
 }
 
+/**
+ * Stores the iOS layout in the app group as soon as JS starts, then pushes an
+ * empty snapshot so the gallery and home screen can render the empty-state copy
+ * before Home finishes fetching.
+ */
+export function registerIosHomeWidgetLayout(): void {
+  if (Platform.OS !== 'ios') {
+    return;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- platform-gated: this module must not load on Android.
+  const { OnThisDayWidget } = require('./OnThisDayWidget.ios') as typeof import('./OnThisDayWidget.ios');
+  OnThisDayWidget.updateSnapshot({});
+}
+
 /** iOS-only. Android already refreshes from the widget task's 4-hour period. */
 export async function registerHomeWidgetBackgroundRefresh(): Promise<void> {
   if (Platform.OS !== 'ios') {

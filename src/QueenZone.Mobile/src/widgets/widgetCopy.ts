@@ -5,6 +5,12 @@ export type WidgetProps = {
   quoteWhoSaid?: string;
 };
 
+/**
+ * Shared copy helpers for Android and tests. The iOS `'widget'` view must inline
+ * the same strings and logic — expo-widgets serializes that function into JSC
+ * without this module's bindings.
+ */
+
 export function widgetHasDay(props: WidgetProps): boolean {
   return Boolean(props.formattedDate && props.summary);
 }
