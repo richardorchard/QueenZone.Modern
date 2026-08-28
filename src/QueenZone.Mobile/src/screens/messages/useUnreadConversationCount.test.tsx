@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 import { fetchUnreadConversationCount } from '../../api/messages';
 import { bumpNewsListEpoch } from '../../notifications/newsListEpoch';
@@ -18,6 +17,7 @@ jest.mock('../../session/SessionContext', () => ({
 
 jest.mock('@react-navigation/native', () => {
   const actual = jest.requireActual('@react-navigation/native');
+  const { useEffect } = require('react');
   return {
     ...actual,
     useFocusEffect: (effect: () => void | (() => void)) => {
@@ -81,6 +81,20 @@ describe('useUnreadConversationCount', () => {
     });
 
     expect(fetchUnread).toHaveBeenCalledTimes(calls);
+  });
+
+  it('keeps the last count when a superseded fetch aborts', async () => {
+    const { result } = renderHook(() => useUnreadConversationCount());
+    await waitFor(() => expect(result.current).toBe(2));
+    const abortErr = new Error('aborted');
+    abortErr.name = 'AbortError';
+    fetchUnread.mockRejectedValueOnce(abortErr);
+
+    await act(async () => {
+      bumpPmUnreadEpoch();
+    });
+
+    expect(result.current).toBe(2);
   });
 
   it('does not refetch when the news list epoch bumps', async () => {

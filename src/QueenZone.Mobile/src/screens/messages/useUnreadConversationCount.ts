@@ -18,17 +18,18 @@ export function useUnreadConversationCount(): number {
 
   useFocusEffect(
     useCallback(() => {
-      if (!isSignedIn || !accessToken) {
+      if (!isSignedIn || accessToken == null) {
         setCount(0);
         return;
       }
 
+      const token: string = accessToken;
       let controller: AbortController | undefined;
 
       function load(): void {
         controller?.abort();
         controller = new AbortController();
-        fetchUnreadConversationCount(accessToken, controller.signal)
+        fetchUnreadConversationCount(token, controller.signal)
           .then(setCount)
           .catch((err: unknown) => {
             if (err instanceof Error && err.name === 'AbortError') {

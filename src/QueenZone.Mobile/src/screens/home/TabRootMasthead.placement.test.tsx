@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react-native';
+import { screen, userEvent, waitFor } from '@testing-library/react-native';
 import {
   fetchForumCategories,
   fetchForumRecentThreads,
@@ -236,6 +236,55 @@ describe('TabRootMasthead placement', () => {
       { navigation: false },
     );
     await waitFor(() => expect(screen.getByTestId(testIds.tabMasthead)).toBeOnTheScreen());
+  });
+
+  it('opens search and Profile from each tab-root masthead', async () => {
+    const user = userEvent.setup();
+    const homeNav = fakeNavigation();
+    const home = renderWithProviders(
+      <HomeScreen navigation={homeNav as never} route={{ key: 'home', name: 'Home' } as never} />,
+      { navigation: false },
+    );
+    await user.press(screen.getByTestId(testIds.homeSearch));
+    await user.press(screen.getByTestId(testIds.homeProfile));
+    expect(homeNav.navigate).toHaveBeenCalledWith('Search');
+    expect(homeNav.navigate).toHaveBeenCalledWith('Profile');
+    home.unmount();
+
+    const otherNav = fakeNavigation();
+    const screens = [
+      <NewsIndexScreen
+        key="news"
+        navigation={otherNav as never}
+        route={{ key: 'news', name: 'NewsIndex' } as never}
+      />,
+      <PhotosScreen
+        key="photos"
+        navigation={otherNav as never}
+        route={{ key: 'photos', name: 'PhotoIndex' } as never}
+      />,
+      <ArchiveHubScreen
+        key="archive"
+        navigation={otherNav as never}
+        route={{ key: 'archive', name: 'ArchiveHub' } as never}
+      />,
+      <ForumScreen
+        key="forum"
+        navigation={otherNav as never}
+        route={{ key: 'forum', name: 'ForumIndex' } as never}
+      />,
+    ];
+
+    for (const screenNode of screens) {
+      otherNav.navigate.mockClear();
+      const view = renderWithProviders(screenNode, { navigation: false });
+      await waitFor(() => expect(screen.getByTestId(testIds.tabMasthead)).toBeOnTheScreen());
+      await user.press(screen.getByTestId(testIds.homeSearch));
+      await user.press(screen.getByTestId(testIds.homeProfile));
+      expect(otherNav.navigate).toHaveBeenCalledWith('Search');
+      expect(otherNav.navigate).toHaveBeenCalledWith('HomeTab', { screen: 'Profile' });
+      view.unmount();
+    }
   });
 
   it('is absent on Story, Thread, and Conversation', async () => {
