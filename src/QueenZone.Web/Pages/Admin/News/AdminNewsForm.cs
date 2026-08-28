@@ -67,6 +67,13 @@ public sealed class AdminNewsForm
             publishedAt = parsed;
         }
 
+        var galleryPicId = ImageGalleryPicId is > 0 ? ImageGalleryPicId : null;
+        var imageBlobKey = string.IsNullOrWhiteSpace(ImageBlobKey) ? null : ImageBlobKey.Trim();
+        if (galleryPicId is int picId)
+        {
+            imageBlobKey = NewsArticleImage.ToGalleryReference(picId);
+        }
+
         return new AdminNewsDraft(
             (Title ?? string.Empty).Trim(),
             string.IsNullOrWhiteSpace(Slug) ? null : Slug.Trim(),
@@ -74,8 +81,8 @@ public sealed class AdminNewsForm
             Body ?? string.Empty,
             publishedAt,
             string.IsNullOrWhiteSpace(SourceUrl) ? null : SourceUrl.Trim(),
-            string.IsNullOrWhiteSpace(ImageBlobKey) ? null : ImageBlobKey.Trim(),
-            ImageGalleryPicId is > 0 ? ImageGalleryPicId : null);
+            imageBlobKey,
+            galleryPicId);
     }
 
     private static bool TryParseCropPart(string? value, out int parsed)

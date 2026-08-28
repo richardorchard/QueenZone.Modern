@@ -767,6 +767,189 @@ public sealed class AdminNewsRoutesTests : IClassFixture<QueenZoneWebApplication
         Assert.Contains("/js/admin/cropper.min.js", body);
         Assert.Contains("/css/admin/cropper.min.css", body);
         Assert.Contains("/js/admin/article-image-crop.js", body);
+        Assert.Contains("Choose from gallery", body);
+        Assert.Contains("data-gallery-picker-open", body);
+        Assert.Contains("data-gallery-picker-dialog", body);
+        Assert.Contains("/admin/news/gallery-picker", body);
+        Assert.Contains("/js/admin/article-gallery-picker.js", body);
+    }
+
+    [Fact]
+    public async Task GalleryPicker_requires_admin()
+    {
+        var anonymous = CreateClient();
+        var anonymousResponse = await anonymous.GetAsync("/admin/news/gallery-picker");
+        Assert.Equal(HttpStatusCode.Unauthorized, anonymousResponse.StatusCode);
+
+        var stranger = CreateClient("stranger@example.com");
+        var forbidden = await stranger.GetAsync("/admin/news/gallery-picker");
+        Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
+    }
+
+    [Fact]
+    public async Task GalleryPicker_lists_seed_photos_with_thumb_filename_date_and_category()
+    {
+        var client = CreateClient(AdminEmail);
+
+        var body = await client.GetStringAsync("/admin/news/gallery-picker");
+
+        Assert.Contains("img-101.jpg", body);
+        Assert.Contains("1986-07-12", body);
+        Assert.Contains("Brian May", body);
+        Assert.Contains("https://cdn.queenzone.org/brian-may/img-101-t.jpg", body);
+        Assert.Contains("data-gallery-pick", body);
+        Assert.Contains("data-pic-id=\"101\"", body);
+        Assert.Contains("name=\"catId\"", body);
+        Assert.Contains("name=\"q\"", body);
+        Assert.Contains("Soundcheck, Wembley", body);
+    }
+
+    [Fact]
+    public async Task GalleryPicker_filters_by_category_and_search()
+    {
+        var client = CreateClient(AdminEmail);
+
+        var category = await client.GetStringAsync("/admin/news/gallery-picker?catId=9");
+        Assert.Contains("img-101.jpg", category);
+        Assert.Contains("img-102.jpg", category);
+        Assert.DoesNotContain("img-201.jpg", category);
+
+        var search = await client.GetStringAsync("/admin/news/gallery-picker?q=Wembley");
+        Assert.Contains("img-102.jpg", search);
+        Assert.Contains("img-201.jpg", search);
+        Assert.DoesNotContain("img-101.jpg", search);
+    }
+
+    [Fact]
+    public async Task GalleryPicker_paginates_seed_gallery()
+    {
+        var client = CreateClient(AdminEmail);
+
+        var first = await client.GetStringAsync("/admin/news/gallery-picker");
+        Assert.Contains("Page 1 of 2", first);
+        Assert.Contains("pageNumber=2", first);
+        Assert.Contains("img-202.jpg", first);
+        Assert.DoesNotContain("img-203.jpg", first);
+
+        var second = await client.GetStringAsync("/admin/news/gallery-picker?pageNumber=2");
+        Assert.Contains("Page 2 of 2", second);
+        Assert.Contains("img-203.jpg", second);
+        Assert.DoesNotContain("img-202.jpg", second);
+    }
+
+    [Fact]
+    public async Task CreateArticle_with_gallery_pick_sets_ref_without_upload()
+    {
+        var store = new SharedNewsStore();
+        var appFactory = CreateFactory(store);
+        var client = CreateClientFromFactory(appFactory, AdminEmail);
+
+        var createResponse = await PostArticleAsync(
+            client,
+            "/admin/news/new",
+            "/admin/news",
+            new Dictionary<string, string>
+            {
+                ["title"] = "Library photo article",
+                ["excerpt"] = "Uses a gallery pick.",
+                ["body"] = "No new blob.",
+                ["publishedAt"] = "2026-06-14",
+                ["imageBlobKey"] = "editors/me/should-be-replaced.webp",
+                ["imageGalleryPicId"] = "101"
+            });
+
+        Assert.Equal(HttpStatusCode.Redirect, createResponse.StatusCode);
+        var articleId = AdminHttpTestHelpers.ParseNewsIdFromEditRedirect(createResponse);
+        var article = store.GetArticle(articleId);
+        Assert.NotNull(article);
+        Assert.Equal("gallery:101", article.ImageBlobKey);
+        Assert.Equal(101, article.ImageGalleryPicId);
+
+        var blobs = appFactory.Services.GetRequiredService<IBlobUploadService>();
+        Assert.Null(await blobs.OpenReadAsync(BlobUploadContainers.Articles, "editors/me/should-be-replaced.webp"));
+
+        var editBody = await client.GetStringAsync($"/admin/news/{articleId}/edit");
+        Assert.Contains("value=\"gallery:101\"", editBody);
+        Assert.Contains("value=\"101\"", editBody);
+        Assert.Contains("https://cdn.queenzone.org/brian-may/img-101.jpg", editBody);
+        Assert.Contains("alt=\"Article image\"", editBody);
+        Assert.DoesNotContain(NewsArticleImage.PlaceholderPath, editBody);
+    }
+
+    [Fact]
+    public async Task CreateArticle_rejects_unknown_gallery_pic()
+    {
+        var store = new SharedNewsStore();
+        var client = CreateClient(AdminEmail, store);
+
+        var response = await PostArticleAsync(
+            client,
+            "/admin/news/new",
+            "/admin/news",
+            new Dictionary<string, string>
+            {
+                ["title"] = "Missing library photo",
+                ["excerpt"] = "Should stay a draft form.",
+                ["body"] = "Plain text body.",
+                ["publishedAt"] = "2026-06-14",
+                ["imageGalleryPicId"] = "99999"
+            });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("That gallery photo was not found.", body);
+        Assert.Empty(store.GetAllArticles());
+    }
+
+    [Fact]
+    public async Task EditArticle_replacing_upload_with_gallery_pick_orphans_ugc_not_pic()
+    {
+        var store = new SharedNewsStore();
+        var appFactory = CreateFactory(store);
+        var client = CreateClientFromFactory(appFactory, AdminEmail);
+        var image = await CreateCardPngAsync();
+
+        var createResponse = await AdminHttpTestHelpers.PostArticleMultipartAsync(
+            client,
+            "/admin/news/new",
+            "/admin/news",
+            new Dictionary<string, string>
+            {
+                ["title"] = "Swap to library",
+                ["excerpt"] = "Starts as an upload.",
+                ["body"] = "Then becomes a gallery pick.",
+                ["publishedAt"] = "2026-06-14"
+            },
+            image,
+            "hero.png",
+            "image/png");
+
+        var articleId = AdminHttpTestHelpers.ParseNewsIdFromEditRedirect(createResponse);
+        var previous = store.GetArticle(articleId)!.ImageBlobKey!;
+        var blobs = appFactory.Services.GetRequiredService<IBlobUploadService>();
+        Assert.NotNull(await blobs.OpenReadAsync(BlobUploadContainers.Articles, previous));
+
+        var saveResponse = await PostArticleAsync(
+            client,
+            $"/admin/news/{articleId}/edit",
+            $"/admin/news/{articleId}",
+            new Dictionary<string, string>
+            {
+                ["title"] = "Swap to library",
+                ["excerpt"] = "Now a gallery pick.",
+                ["body"] = "Then becomes a gallery pick.",
+                ["publishedAt"] = "2026-06-14",
+                ["imageBlobKey"] = previous,
+                ["imageGalleryPicId"] = "102"
+            });
+
+        Assert.Equal(HttpStatusCode.Redirect, saveResponse.StatusCode);
+        var updated = store.GetArticle(articleId);
+        Assert.NotNull(updated);
+        Assert.Equal("gallery:102", updated.ImageBlobKey);
+        Assert.Equal(102, updated.ImageGalleryPicId);
+        Assert.Null(await blobs.OpenReadAsync(BlobUploadContainers.Articles, previous));
+        Assert.Null(await blobs.OpenReadAsync(BlobUploadContainers.Articles, UgcProxyPaths.ToThumbBlobName(previous)));
     }
 
     [Fact]

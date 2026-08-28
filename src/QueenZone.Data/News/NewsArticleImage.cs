@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace QueenZone.Data;
 
 /// <summary>
@@ -24,6 +26,33 @@ public static class NewsArticleImage
     public static bool IsGalleryReference(string? imageBlobKey) =>
         !string.IsNullOrWhiteSpace(imageBlobKey)
         && imageBlobKey.StartsWith(GalleryPrefix, StringComparison.OrdinalIgnoreCase);
+
+    public static string ToGalleryReference(int picId)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(picId);
+        return GalleryPrefix + picId.ToString(CultureInfo.InvariantCulture);
+    }
+
+    public static int? TryParseGalleryPicId(string? imageBlobKey)
+    {
+        if (!IsGalleryReference(imageBlobKey))
+        {
+            return null;
+        }
+
+        var suffix = imageBlobKey.AsSpan(GalleryPrefix.Length).Trim();
+        return int.TryParse(suffix, NumberStyles.Integer, CultureInfo.InvariantCulture, out var picId)
+            && picId > 0
+            ? picId
+            : null;
+    }
+
+    public static AdminNewsDraft WithGalleryPick(AdminNewsDraft draft, int picId) =>
+        draft with
+        {
+            ImageBlobKey = ToGalleryReference(picId),
+            ImageGalleryPicId = picId
+        };
 
     public static string? ArticlesBlobName(string? imageBlobKey)
     {

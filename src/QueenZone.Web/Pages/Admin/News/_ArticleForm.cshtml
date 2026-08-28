@@ -14,7 +14,7 @@
 }
 <link rel="stylesheet" href="~/css/admin/cropper.min.css" asp-append-version="true" />
 
-<div class="admin-form-panel">
+<div class="admin-form-panel" data-gallery-picker-host>
 <h1>@Model.Title</h1>
 @if (!string.IsNullOrWhiteSpace(Model.Subtitle))
 {
@@ -67,14 +67,18 @@
     Source URL
     <input type="text" name="sourceUrl" value="@Model.Draft.SourceUrl" maxlength="@NewsValidation.MaxSourceUrlLength">
   </label>
-  <input type="hidden" name="imageBlobKey" value="@Model.Draft.ImageBlobKey">
-  <input type="hidden" name="imageGalleryPicId" value="@Model.Draft.ImageGalleryPicId">
+  <input type="hidden" name="imageBlobKey" value="@Model.Draft.ImageBlobKey" data-article-image-blob-key>
+  <input type="hidden" name="imageGalleryPicId" value="@Model.Draft.ImageGalleryPicId" data-article-image-gallery-id>
   @{
-    var previewImageUrl = NewsArticleImage.ResolveDisplayUrl(Model.Draft.ImageBlobKey, Model.Draft.ImageGalleryPicId);
-    var hasArticleImage = NewsArticleImage.HasResolvedImage(Model.Draft.ImageBlobKey, Model.Draft.ImageGalleryPicId);
+    var previewImageUrl = !string.IsNullOrWhiteSpace(Model.PreviewImageUrl)
+      ? Model.PreviewImageUrl
+      : NewsArticleImage.ResolveDisplayUrl(Model.Draft.ImageBlobKey, Model.Draft.ImageGalleryPicId);
+    var hasArticleImage = !string.IsNullOrWhiteSpace(Model.PreviewImageUrl)
+      || NewsArticleImage.HasResolvedImage(Model.Draft.ImageBlobKey, Model.Draft.ImageGalleryPicId);
   }
   <div class="admin-article-image-upload"
        data-article-image-crop
+       data-gallery-picker
        data-aspect-width="@NewsArticleImageProcessor.CardAspectWidth"
        data-aspect-height="@NewsArticleImageProcessor.CardAspectHeight"
        data-min-crop-width="@NewsArticleImageProcessor.MinCropWidth"
@@ -99,6 +103,10 @@
              data-article-image-input>
     </label>
     <p class="admin-help">JPEG, PNG, or WebP. Max 10&nbsp;MB. Crop to the 3:2 news-card frame before saving.</p>
+    <p>
+      <button type="button" data-gallery-picker-open data-gallery-picker-url="@NewsArticleGalleryPicker.Path">Choose from gallery</button>
+    </p>
+    <p class="admin-help">Or attach an existing library photo without uploading a new file.</p>
     <p class="admin-article-image-error" data-article-image-error hidden></p>
     <input type="hidden" name="cropX" data-crop-x value="">
     <input type="hidden" name="cropY" data-crop-y value="">
@@ -132,6 +140,14 @@
   </div>
 </form>
 
+<dialog class="admin-gallery-picker" data-gallery-picker-dialog>
+  <div class="admin-gallery-picker__header">
+    <h2 class="admin-gallery-picker__title">Choose a gallery photo</h2>
+    <button type="button" data-gallery-picker-close>Close</button>
+  </div>
+  <div data-gallery-picker-panel></div>
+</dialog>
+
 @if (Model.Article is not null)
 {
   <div class="admin-form-actions admin-form-actions--secondary">
@@ -148,3 +164,4 @@
 </div>
 <script src="~/js/admin/cropper.min.js" asp-append-version="true"></script>
 <script src="~/js/admin/article-image-crop.js" asp-append-version="true"></script>
+<script src="~/js/admin/article-gallery-picker.js" asp-append-version="true"></script>
