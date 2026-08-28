@@ -10,6 +10,7 @@ import {
   writeCachedWidgetProps,
   writeLastWidgetRefreshAt,
 } from './widgetCache';
+import { nextWidgetFaceSlotMs } from './widgetCopy';
 
 export const HOME_WIDGET_BACKGROUND_TASK = 'queenzone-home-widget-refresh';
 
@@ -79,10 +80,10 @@ function dayFromProps(props: OnThisDayAndroidWidgetProps): TimelineEvent | null 
 
 function iosTimelineEntries(props: OnThisDayAndroidWidgetProps) {
   const now = Date.now();
-  return [
-    { date: new Date(now), props },
-    { date: new Date(now + nextQuoteRefreshDelayMs()), props },
-  ];
+  const times = new Set([now, nextWidgetFaceSlotMs(now), now + nextQuoteRefreshDelayMs()]);
+  return [...times]
+    .sort((left, right) => left - right)
+    .map((ms) => ({ date: new Date(ms), props }));
 }
 
 function hasWidgetContent(content: WidgetContent): boolean {

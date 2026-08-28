@@ -105,7 +105,9 @@ public sealed class EfAdminNewsRepository : IAdminNewsRepository
             UpdatedAt = timestamp,
             EditorEmail = editorEmail,
             Type = 0,
-            QueenOnline = 0
+            QueenOnline = 0,
+            ImageBlobKey = draft.ImageBlobKey,
+            ImageGalleryPicId = draft.ImageGalleryPicId
         };
 
         dbContext.NewsRows.Add(row);
@@ -126,7 +128,9 @@ public sealed class EfAdminNewsRepository : IAdminNewsRepository
                     .SetProperty(row => row.SourceUrl, draft.SourceUrl)
                     .SetProperty(row => row.Slug, NewsSlug.Resolve(draft.Title, draft.Slug))
                     .SetProperty(row => row.UpdatedAt, DateTime.UtcNow)
-                    .SetProperty(row => row.EditorEmail, editorEmail),
+                    .SetProperty(row => row.EditorEmail, editorEmail)
+                    .SetProperty(row => row.ImageBlobKey, draft.ImageBlobKey)
+                    .SetProperty(row => row.ImageGalleryPicId, draft.ImageGalleryPicId),
                 cancellationToken);
 
         if (updated == 0)

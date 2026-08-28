@@ -29,4 +29,14 @@ public sealed class NewsTableRow
     public int Type { get; set; }
 
     public int QueenOnline { get; set; }
+
+    /// <summary>
+    /// Blob key or prefixed gallery reference. Never image bytes.
+    /// </summary>
+    public string? ImageBlobKey { get; set; }
+
+    /// <summary>
+    /// Optional <c>PIC_FILES_T</c> pick for later gallery-backed article images.
+    /// </summary>
+    public int? ImageGalleryPicId { get; set; }
 }

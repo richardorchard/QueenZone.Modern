@@ -11,4 +11,6 @@ public sealed record AdminNewsArticle(
     bool IsPublished,
     DateTime? CreatedAt,
     DateTime? UpdatedAt,
-    string? EditorEmail);
+    string? EditorEmail,
+    string? ImageBlobKey = null,
+    int? ImageGalleryPicId = null);

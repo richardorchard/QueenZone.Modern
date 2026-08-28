@@ -102,6 +102,42 @@ public sealed class NewsValidationTests
     }
 
     [Fact]
+    public void ValidateDraftRejectsOverlongImageBlobKey()
+    {
+        var draft = new AdminNewsDraft(
+            "Title",
+            null,
+            "Excerpt",
+            "Body",
+            new DateTime(2026, 6, 10, 0, 0, 0, DateTimeKind.Utc),
+            null,
+            new string('a', NewsValidation.MaxImageBlobKeyLength + 1));
+
+        var errors = NewsValidation.ValidateDraft(draft, slugInUse: false);
+
+        Assert.Contains(
+            $"Image blob key must be {NewsValidation.MaxImageBlobKeyLength} characters or fewer.",
+            errors);
+    }
+
+    [Fact]
+    public void ValidateDraftRejectsNonPositiveGalleryPicId()
+    {
+        var draft = new AdminNewsDraft(
+            "Title",
+            null,
+            "Excerpt",
+            "Body",
+            new DateTime(2026, 6, 10, 0, 0, 0, DateTimeKind.Utc),
+            null,
+            ImageGalleryPicId: 0);
+
+        var errors = NewsValidation.ValidateDraft(draft, slugInUse: false);
+
+        Assert.Contains("Image gallery picture id must be a positive PIC_FILES_T identifier.", errors);
+    }
+
+    [Fact]
     public void NewsSlugResolveUsesOverrideWhenProvided()
     {
         Assert.Equal("custom-slug", NewsSlug.Resolve("Any title", "Custom Slug!"));

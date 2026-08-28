@@ -6,4 +6,6 @@ public sealed record AdminNewsDraft(
     string Excerpt,
     string Body,
     DateTime PublishedAt,
-    string? SourceUrl);
+    string? SourceUrl,
+    string? ImageBlobKey = null,
+    int? ImageGalleryPicId = null);

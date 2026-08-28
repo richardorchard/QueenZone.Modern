@@ -4,19 +4,26 @@ namespace QueenZone.Web;
 /// List-card shape for <c>/api/v1/content/news</c>. Deliberately decoupled from
 /// <see cref="NewsArchiveItem"/> so changes to the Razor Pages view model do not
 /// silently change the mobile JSON contract.
+/// <c>ImageUrl</c> / <c>ThumbnailUrl</c> are resolved public URLs (or
+/// <see langword="null"/> when the article has no image or the reference is a
+/// gallery pick). The database stores blob keys only — never image bytes.
 /// </summary>
 public sealed record NewsListItemDto(
     int Id,
     string Title,
     string Excerpt,
     DateTime PublishedAt,
-    string DetailPath);
+    string DetailPath,
+    string? ImageUrl = null,
+    string? ThumbnailUrl = null);
 
 /// <summary>
 /// Detail shape for <c>/api/v1/content/news/{id}</c>.
 /// <c>Body</c> is sanitized HTML suitable for display (same allowlist as
 /// <see cref="NewsArticleContent.FormatBody"/>): basic formatting, links, and UGC images.
 /// Plain-text legacy bodies are HTML-encoded with line breaks and auto-linked URLs.
+/// <c>ImageUrl</c> / <c>ThumbnailUrl</c> follow the same resolved-URL contract as
+/// <see cref="NewsListItemDto"/>.
 /// </summary>
 public sealed record NewsDetailDto(
     int Id,
@@ -25,7 +32,9 @@ public sealed record NewsDetailDto(
     string Body,
     DateTime PublishedAt,
     string? SourceUrl,
-    string DetailPath);
+    string DetailPath,
+    string? ImageUrl = null,
+    string? ThumbnailUrl = null);
 
 /// <summary>
 /// Earliest/latest published years for <c>/api/v1/content/news/years</c>. Backs the mobile

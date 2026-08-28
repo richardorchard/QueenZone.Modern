@@ -14,7 +14,9 @@ public static class ContentApiMapper
             item.Title,
             item.Excerpt,
             item.PublishedAt,
-            NewsRoutes.GetNewsDetailPath(item.Id, item.Title, item.Slug));
+            NewsRoutes.GetNewsDetailPath(item.Id, item.Title, item.Slug),
+            NewsArticleImage.ResolveImageUrl(item.ImageBlobKey, item.ImageGalleryPicId),
+            NewsArticleImage.ResolveThumbnailUrl(item.ImageBlobKey, item.ImageGalleryPicId));
 
     public static IReadOnlyList<NewsListItemDto> ToNewsListItems(IEnumerable<NewsItem> items) =>
         items.Select(ToNewsListItem).ToList();
@@ -28,7 +30,9 @@ public static class ContentApiMapper
             NewsArticleContent.FormatBody(item.Body),
             item.PublishedAt,
             item.SourceUrl,
-            NewsRoutes.GetNewsDetailPath(item.Id, item.Title, item.Slug));
+            NewsRoutes.GetNewsDetailPath(item.Id, item.Title, item.Slug),
+            NewsArticleImage.ResolveImageUrl(item.ImageBlobKey, item.ImageGalleryPicId),
+            NewsArticleImage.ResolveThumbnailUrl(item.ImageBlobKey, item.ImageGalleryPicId));
 
     public static QuoteDto ToQuoteDto(QuoteItem quote) =>
         new(quote.Id, quote.Text, quote.WhoSaid);
