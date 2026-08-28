@@ -39,4 +39,10 @@ public sealed class NewsTableRow
     /// Optional <c>PIC_FILES_T</c> pick for later gallery-backed article images.
     /// </summary>
     public int? ImageGalleryPicId { get; set; }
+
+    /// <summary>
+    /// Modern forum topic opened on first publish. Null until a topic is stored.
+    /// Unpublish does not clear this value.
+    /// </summary>
+    public int? ForumTopicId { get; set; }
 }

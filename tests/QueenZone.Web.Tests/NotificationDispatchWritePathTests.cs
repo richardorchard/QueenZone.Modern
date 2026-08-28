@@ -308,6 +308,7 @@ public sealed class NotificationDispatchWritePathTests : IClassFixture<QueenZone
         var write = new AdminNewsWriteService(
             admin,
             dispatcher,
+            new NoOpNewsForumTopicService(),
             NullLogger<AdminNewsWriteService>.Instance);
 
         var draftId = await admin.CreateDraftAsync(
@@ -368,6 +369,7 @@ public sealed class NotificationDispatchWritePathTests : IClassFixture<QueenZone
                 new EmptyTopicWatchLookup(),
                 transport,
                 NullLogger<NotificationDispatcher>.Instance),
+            new NoOpNewsForumTopicService(),
             NullLogger<AdminNewsWriteService>.Instance);
         var id = newsStore.CreateDraft(
             new AdminNewsDraft("Throw publish", null, "Ex", "Body", DateTime.UtcNow.Date, null),
@@ -445,5 +447,13 @@ public sealed class NotificationDispatchWritePathTests : IClassFixture<QueenZone
         using var scope = scopedFactory.Services.CreateScope();
         var repository = scope.ServiceProvider.GetRequiredService<IDeviceTokenRepository>();
         await repository.UpsertAsync(DeviceTokenTestData.Token(memberId, DevicePushPlatform.Apns, token));
+    }
+
+    private sealed class NoOpNewsForumTopicService : INewsForumTopicService
+    {
+        public Task EnsureTopicOnFirstPublishAsync(
+            AdminNewsArticle article,
+            CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
     }
 }

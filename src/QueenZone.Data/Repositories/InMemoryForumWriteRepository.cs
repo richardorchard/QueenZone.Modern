@@ -4,6 +4,7 @@ public sealed class InMemoryForumWriteRepository : IForumWriteRepository
 {
     private readonly List<ForumWriteThread> threads = [];
     private readonly List<InMemoryForumWritePost> posts = [];
+    private readonly List<ForumCategoryItem> createdCategories = [];
     private readonly object sync = new();
     private int nextTopicId = 200_000;
     private int nextPostId = 2_000_000;
@@ -281,6 +282,52 @@ public sealed class InMemoryForumWriteRepository : IForumWriteRepository
             }
 
             return Task.CompletedTask;
+        }
+    }
+
+    public Task<int> EnsureCategoryAsync(
+        string slug,
+        string name,
+        CancellationToken cancellationToken = default)
+    {
+        lock (sync)
+        {
+            var existing = NewsForumDiscussion.FindExistingCategory(
+                createdCategories.Concat(SampleForumData.CreateSeedCategories()),
+                category => category.Name,
+                slug,
+                name);
+            if (existing is not null)
+            {
+                return Task.FromResult(existing.Id);
+            }
+
+            var nextId = Math.Max(
+                createdCategories.Select(category => category.Id).DefaultIfEmpty(0).Max(),
+                SampleForumData.CreateSeedCategories().Select(category => category.Id).DefaultIfEmpty(0).Max()) + 1;
+            if (NewsForumDiscussion.IsTheMusic(name) || nextId == 1)
+            {
+                nextId = Math.Max(nextId, 2);
+            }
+
+            var created = new ForumCategoryItem(
+                nextId,
+                name,
+                "Discussion of published QueenZone news articles.",
+                0,
+                null,
+                null,
+                nextId * 10);
+            createdCategories.Add(created);
+            return Task.FromResult(nextId);
+        }
+    }
+
+    public IReadOnlyList<ForumCategoryItem> GetCreatedCategories()
+    {
+        lock (sync)
+        {
+            return createdCategories.ToList();
         }
     }
 

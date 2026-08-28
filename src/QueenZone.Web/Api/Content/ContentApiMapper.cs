@@ -8,7 +8,9 @@ namespace QueenZone.Web;
 /// </summary>
 public static class ContentApiMapper
 {
-    public static NewsListItemDto ToNewsListItem(NewsItem item) =>
+    public static NewsListItemDto ToNewsListItem(
+        NewsItem item,
+        IReadOnlyDictionary<int, int>? replyCounts = null) =>
         new(
             item.Id,
             item.Title,
@@ -16,12 +18,17 @@ public static class ContentApiMapper
             item.PublishedAt,
             NewsRoutes.GetNewsDetailPath(item.Id, item.Title, item.Slug),
             NewsArticleImage.ResolveImageUrl(item.ImageBlobKey, item.ImageGalleryPicId),
-            NewsArticleImage.ResolveThumbnailUrl(item.ImageBlobKey, item.ImageGalleryPicId));
+            NewsArticleImage.ResolveThumbnailUrl(item.ImageBlobKey, item.ImageGalleryPicId),
+            item.ForumTopicId,
+            ReplyCountFor(item.ForumTopicId, replyCounts));
 
     public static IReadOnlyList<NewsListItemDto> ToNewsListItems(IEnumerable<NewsItem> items) =>
-        items.Select(ToNewsListItem).ToList();
+        items.Select(item => ToNewsListItem(item)).ToList();
 
-    public static NewsDetailDto ToNewsDetail(NewsItem item) =>
+    public static NewsDetailDto ToNewsDetail(
+        NewsItem item,
+        int? discussionReplyCount = null,
+        IReadOnlyList<NewsDiscussionPreviewDto>? discussionPreview = null) =>
         new(
             item.Id,
             item.Title,
@@ -32,7 +39,20 @@ public static class ContentApiMapper
             item.SourceUrl,
             NewsRoutes.GetNewsDetailPath(item.Id, item.Title, item.Slug),
             NewsArticleImage.ResolveImageUrl(item.ImageBlobKey, item.ImageGalleryPicId),
-            NewsArticleImage.ResolveThumbnailUrl(item.ImageBlobKey, item.ImageGalleryPicId));
+            NewsArticleImage.ResolveThumbnailUrl(item.ImageBlobKey, item.ImageGalleryPicId),
+            item.ForumTopicId,
+            item.ForumTopicId is null ? null : discussionReplyCount,
+            item.ForumTopicId is null ? null : discussionPreview);
+
+    private static int? ReplyCountFor(int? topicId, IReadOnlyDictionary<int, int>? replyCounts)
+    {
+        if (topicId is not int id)
+        {
+            return null;
+        }
+
+        return replyCounts is not null && replyCounts.TryGetValue(id, out var count) ? count : 0;
+    }
 
     public static QuoteDto ToQuoteDto(QuoteItem quote) =>
         new(quote.Id, quote.Text, quote.WhoSaid);

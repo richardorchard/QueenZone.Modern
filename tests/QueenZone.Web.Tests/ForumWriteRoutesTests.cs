@@ -345,5 +345,11 @@ public sealed class ForumWriteRoutesTests : IClassFixture<WebApplicationFactory<
 
         public Task UnhidePostsByMemberAsync(Guid memberId, CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
+
+        public Task<int> EnsureCategoryAsync(
+            string slug,
+            string name,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(1);
     }
 }

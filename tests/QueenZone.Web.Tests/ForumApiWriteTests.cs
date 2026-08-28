@@ -329,5 +329,11 @@ public sealed class ForumApiWriteTests : IClassFixture<QueenZoneWebApplicationFa
 
         public Task UnhidePostsByMemberAsync(Guid memberId, CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
+
+        public Task<int> EnsureCategoryAsync(
+            string slug,
+            string name,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(1);
     }
 }

@@ -49,6 +49,7 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddScoped<IFanPerformanceRepository, EfFanPerformanceRepository>();
         services.AddScoped<ILegacyMemberLookupRepository, EfMemberLookupRepository>();
         services.AddScoped<IDiscographyRepository, EfDiscographyRepository>();
+        services.AddScoped<INewsForumDiscussionLookup, EfNewsForumDiscussionLookup>();
         services.AddScoped<IAdminNewsRepository, EfAdminNewsRepository>();
         services.AddScoped<INewsAuditRepository, EfNewsAuditRepository>();
         services.AddScoped<IMemberAccountRepository, EfMemberAccountRepository>();
@@ -110,6 +111,8 @@ public static class QueenZoneDataServiceCollectionExtensions
             SampleForumData.CreateSeedStats(),
             forumWriteRepository,
             forumAttachmentRepository));
+        services.AddSingleton<INewsForumDiscussionLookup>(
+            _ => new InMemoryNewsForumDiscussionLookup(forumWriteRepository));
         var photoStore = new SharedPhotoStore(SamplePhotoData.CreateSeedCategories());
         services.AddSingleton(photoStore);
         services.AddSingleton<IPhotoRepository>(_ => new InMemoryPhotoRepository(photoStore));

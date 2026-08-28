@@ -72,7 +72,8 @@ public sealed class SharedNewsStore
                 timestamp,
                 editorEmail,
                 draft.ImageBlobKey,
-                draft.ImageGalleryPicId));
+                draft.ImageGalleryPicId,
+                ForumTopicId: null));
             return id;
         }
     }
@@ -143,6 +144,21 @@ public sealed class SharedNewsStore
         }
     }
 
+    public bool TrySetForumTopicId(int newsId, int topicId)
+    {
+        lock (sync)
+        {
+            var index = articles.FindIndex(article => article.Id == newsId);
+            if (index < 0 || articles[index].ForumTopicId is not null)
+            {
+                return false;
+            }
+
+            articles[index] = articles[index] with { ForumTopicId = topicId };
+            return true;
+        }
+    }
+
     public bool IsSlugInUse(string slug, int? excludeNewsId)
     {
         lock (sync)
@@ -191,5 +207,6 @@ public sealed class SharedNewsStore
             article.IsPublished,
             string.IsNullOrWhiteSpace(article.Slug) ? null : article.Slug,
             ImageBlobKey: article.ImageBlobKey,
-            ImageGalleryPicId: article.ImageGalleryPicId);
+            ImageGalleryPicId: article.ImageGalleryPicId,
+            ForumTopicId: article.ForumTopicId);
 }

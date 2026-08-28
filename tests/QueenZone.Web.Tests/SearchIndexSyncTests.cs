@@ -77,7 +77,7 @@ public sealed class SearchIndexSyncTests : IClassFixture<WebApplicationFactory<P
         var unpublishResponse = await AdminHttpTestHelpers.PostNewsActionAsync(client, $"/admin/news/{articleId}/unpublish");
         Assert.Equal(HttpStatusCode.Redirect, unpublishResponse.StatusCode);
 
-        var afterUnpublish = await client.GetStringAsync("/search?q=search+sync+unpublish");
+        var afterUnpublish = await client.GetStringAsync("/search?q=search+sync+unpublish&type=news");
         Assert.DoesNotContain("Search sync unpublish title", afterUnpublish);
     }
 

@@ -148,6 +148,7 @@ public sealed class QueenZoneDbContext : DbContext
                 .HasColumnName("IMAGE_BLOB_KEY")
                 .HasMaxLength(NewsValidation.MaxImageBlobKeyLength);
             entity.Property(row => row.ImageGalleryPicId).HasColumnName("IMAGE_GALLERY_PIC_ID");
+            entity.Property(row => row.ForumTopicId).HasColumnName("FORUM_TOPIC_ID");
             entity.Property(row => row.IsPublished)
                 .HasColumnName("DISPLAY")
                 .HasConversion(

@@ -33,6 +33,38 @@ public sealed class StartupOptionsValidatorTests
     }
 
     [Fact]
+    public void NewsForumOptionsValidator_accepts_defaults()
+    {
+        var result = new NewsForumOptionsValidator().Validate(null, new NewsForumOptions());
+        Assert.False(result.Failed);
+        Assert.Equal(NewsForumDiscussion.SystemMemberEmail, new NewsForumOptions().SystemMemberEmail);
+        Assert.Equal(NewsForumDiscussion.SystemMemberDisplayName, new NewsForumOptions().SystemMemberDisplayName);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("not-an-email")]
+    public void NewsForumOptionsValidator_rejects_invalid_system_member_email(string email)
+    {
+        var result = new NewsForumOptionsValidator().Validate(
+            null,
+            new NewsForumOptions { SystemMemberEmail = email });
+        Assert.True(result.Failed);
+        Assert.Contains("SystemMemberEmail", result.FailureMessage);
+    }
+
+    [Fact]
+    public void NewsForumOptionsValidator_rejects_blank_display_name()
+    {
+        var result = new NewsForumOptionsValidator().Validate(
+            null,
+            new NewsForumOptions { SystemMemberDisplayName = "  " });
+        Assert.True(result.Failed);
+        Assert.Contains("SystemMemberDisplayName", result.FailureMessage);
+    }
+
+    [Fact]
     public void ForumOptionsValidator_accepts_default_zero_and_unlimited()
     {
         var validator = new ForumOptionsValidator();

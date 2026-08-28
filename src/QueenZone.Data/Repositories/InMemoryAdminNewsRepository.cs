@@ -66,4 +66,7 @@ public sealed class InMemoryAdminNewsRepository(SharedNewsStore store) : IAdminN
 
     public Task<bool> IsSlugInUseAsync(string slug, int? excludeNewsId = null, CancellationToken cancellationToken = default) =>
         Task.FromResult(store.IsSlugInUse(slug, excludeNewsId));
+
+    public Task<bool> TrySetForumTopicIdAsync(int newsId, int topicId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(store.TrySetForumTopicId(newsId, topicId));
 }

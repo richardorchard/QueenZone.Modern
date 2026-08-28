@@ -139,6 +139,7 @@ public static class ContentApiEndpoints
 
     internal static async Task<IResult> GetNewsListAsync(
         INewsRepository newsRepository,
+        NewsDiscussionComposer newsDiscussion,
         int? page,
         int? pageSize,
         int? decade,
@@ -151,7 +152,7 @@ public static class ContentApiEndpoints
         var totalCount = await newsRepository.GetPublishedCountAsync(filter, cancellationToken);
 
         var response = ApiPagedResponse<NewsListItemDto>.Create(
-            ContentApiMapper.ToNewsListItems(items),
+            await newsDiscussion.ToListItemsAsync(items, cancellationToken),
             request.Page,
             request.PageSize,
             totalCount);
@@ -169,6 +170,7 @@ public static class ContentApiEndpoints
 
     internal static async Task<IResult> GetNewsDetailAsync(
         INewsRepository newsRepository,
+        NewsDiscussionComposer newsDiscussion,
         int id,
         CancellationToken cancellationToken)
     {
@@ -181,7 +183,7 @@ public static class ContentApiEndpoints
                 detail: $"No published news article with id '{id}'.");
         }
 
-        return Results.Ok(ContentApiMapper.ToNewsDetail(item));
+        return Results.Ok(await newsDiscussion.ToDetailAsync(item, cancellationToken));
     }
 
     internal static async Task<IResult> GetTimelineEventsAsync(
