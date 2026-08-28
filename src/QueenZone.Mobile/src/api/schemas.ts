@@ -66,6 +66,12 @@ export const newsListItemSchema = z.object({
   thumbnailUrl: z.string().nullish(),
 });
 
+export const newsDiscussionPreviewSchema = z.object({
+  authorDisplayName: z.string(),
+  postedAt: isoDateTime,
+  excerpt: z.string(),
+});
+
 export const newsDetailSchema = z.object({
   id: z.number().int(),
   title: z.string().min(1),
@@ -76,6 +82,9 @@ export const newsDetailSchema = z.object({
   detailPath: z.string().min(1),
   imageUrl: z.string().nullish(),
   thumbnailUrl: z.string().nullish(),
+  topicId: z.number().int().nullish(),
+  discussionReplyCount: z.number().int().nonnegative().nullish(),
+  discussionPreview: z.array(newsDiscussionPreviewSchema).nullish(),
 });
 
 export const photoCategoryListItemSchema = z.object({
