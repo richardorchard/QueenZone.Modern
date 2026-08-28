@@ -667,6 +667,86 @@ public sealed class AdminNewsRoutesTests : IClassFixture<QueenZoneWebApplication
     }
 
     [Fact]
+    public async Task Placeholder_asset_is_served()
+    {
+        var client = CreateClient();
+
+        var response = await client.GetAsync(NewsArticleImage.PlaceholderPath);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("image/svg+xml", response.Content.Headers.ContentType?.MediaType);
+        var svg = await response.Content.ReadAsStringAsync();
+        Assert.Contains("<svg", svg);
+    }
+
+    [Fact]
+    public async Task ArticleFormAndPreview_show_placeholder_when_no_image()
+    {
+        var store = new SharedNewsStore();
+        var client = CreateClient(AdminEmail, store);
+
+        var newBody = await client.GetStringAsync("/admin/news/new");
+        Assert.Contains(NewsArticleImage.PlaceholderPath, newBody);
+        Assert.Contains("alt=\"No article image\"", newBody);
+
+        var createResponse = await PostArticleAsync(
+            client,
+            "/admin/news/new",
+            "/admin/news",
+            new Dictionary<string, string>
+            {
+                ["title"] = "Placeholder preview article",
+                ["excerpt"] = "No image set.",
+                ["body"] = "Body without a photo.",
+                ["publishedAt"] = "2026-06-14"
+            });
+
+        Assert.Equal(HttpStatusCode.Redirect, createResponse.StatusCode);
+        var editPath = createResponse.Headers.Location!.OriginalString;
+        var articleId = int.Parse(editPath.Split('/')[3], System.Globalization.CultureInfo.InvariantCulture);
+
+        var editBody = await client.GetStringAsync(editPath);
+        Assert.Contains(NewsArticleImage.PlaceholderPath, editBody);
+        Assert.Contains("alt=\"No article image\"", editBody);
+
+        var previewBody = await client.GetStringAsync($"/admin/news/{articleId}/preview");
+        Assert.Contains(NewsArticleImage.PlaceholderPath, previewBody);
+        Assert.Contains("alt=\"No article image\"", previewBody);
+    }
+
+    [Fact]
+    public async Task ArticleFormAndPreview_show_article_image_when_blob_key_is_set()
+    {
+        var store = new SharedNewsStore(
+        [
+            new AdminNewsArticle(
+                4301,
+                "Article with photo",
+                "article-with-photo",
+                "Excerpt",
+                "Body",
+                new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc),
+                null,
+                false,
+                DateTime.UtcNow,
+                DateTime.UtcNow,
+                AdminEmail,
+                "editors/me/hero.webp")
+        ]);
+        var client = CreateClient(AdminEmail, store);
+
+        var editBody = await client.GetStringAsync("/admin/news/4301/edit");
+        Assert.Contains("/ugc/articles/editors/me/hero.webp", editBody);
+        Assert.Contains("alt=\"Article image\"", editBody);
+        Assert.DoesNotContain(NewsArticleImage.PlaceholderPath, editBody);
+
+        var previewBody = await client.GetStringAsync("/admin/news/4301/preview");
+        Assert.Contains("/ugc/articles/editors/me/hero.webp", previewBody);
+        Assert.Contains("alt=\"Article with photo\"", previewBody);
+        Assert.DoesNotContain(NewsArticleImage.PlaceholderPath, previewBody);
+    }
+
+    [Fact]
     public async Task GetDeleteUrl_redirectsToAdminList()
     {
         var client = CreateClient(AdminEmail, new SharedNewsStore());

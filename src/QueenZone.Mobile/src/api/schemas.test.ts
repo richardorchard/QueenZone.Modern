@@ -19,6 +19,30 @@ describe('parseContract', () => {
       detailPath: '/news/1003/queenzone-modernisation-begins',
     });
     assert.equal(item.id, 1003);
+    assert.equal(item.imageUrl, undefined);
+  });
+
+  it('accepts optional news image urls', () => {
+    const withImage = parseContract('GET /api/v1/content/news', newsListItemSchema, {
+      id: 1003,
+      title: 'QueenZone modernisation begins',
+      excerpt: 'Excerpt',
+      publishedAt: '2026-06-11T09:00:00',
+      detailPath: '/news/1003/queenzone-modernisation-begins',
+      imageUrl: '/ugc/articles/editors/me/hero.webp',
+      thumbnailUrl: '/ugc/articles/editors/me/hero.webp?size=thumb',
+    });
+    assert.equal(withImage.imageUrl, '/ugc/articles/editors/me/hero.webp');
+    const withoutImage = parseContract('GET /api/v1/content/news', newsListItemSchema, {
+      id: 1004,
+      title: 'No photo',
+      excerpt: 'Excerpt',
+      publishedAt: '2026-06-11T09:00:00',
+      detailPath: '/news/1004/no-photo',
+      imageUrl: null,
+      thumbnailUrl: null,
+    });
+    assert.equal(withoutImage.imageUrl, null);
   });
 
   it('accepts a search hit with sourceKey and optional id', () => {

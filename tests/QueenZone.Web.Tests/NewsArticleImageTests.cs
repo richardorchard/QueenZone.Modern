@@ -30,4 +30,32 @@ public sealed class NewsArticleImageTests
         Assert.Null(NewsArticleImage.ResolveImageUrl("gallery:3120", null));
         Assert.Null(NewsArticleImage.ResolveImageUrl(null, 3120));
     }
+
+    [Fact]
+    public void ResolveDisplayUrl_returns_placeholder_when_unset()
+    {
+        Assert.Equal(NewsArticleImage.PlaceholderPath, NewsArticleImage.ResolveDisplayUrl(null, null));
+        Assert.Equal(NewsArticleImage.PlaceholderPath, NewsArticleImage.ResolveDisplayThumbnailUrl("  ", null));
+        Assert.False(NewsArticleImage.HasResolvedImage(null, null));
+    }
+
+    [Fact]
+    public void ResolveDisplayUrl_returns_placeholder_for_gallery_until_resolved()
+    {
+        Assert.Equal(NewsArticleImage.PlaceholderPath, NewsArticleImage.ResolveDisplayUrl("gallery:3120", null));
+        Assert.Equal(NewsArticleImage.PlaceholderPath, NewsArticleImage.ResolveDisplayUrl(null, 3120));
+        Assert.False(NewsArticleImage.HasResolvedImage("gallery:3120", null));
+    }
+
+    [Fact]
+    public void ResolveDisplayUrl_keeps_articles_proxy_when_set()
+    {
+        Assert.Equal(
+            "/ugc/articles/editors/me/hero.webp",
+            NewsArticleImage.ResolveDisplayUrl("editors/me/hero.webp", null));
+        Assert.Equal(
+            "/ugc/articles/editors/me/hero.webp?size=thumb",
+            NewsArticleImage.ResolveDisplayThumbnailUrl("editors/me/hero.webp", null));
+        Assert.True(NewsArticleImage.HasResolvedImage("editors/me/hero.webp", null));
+    }
 }

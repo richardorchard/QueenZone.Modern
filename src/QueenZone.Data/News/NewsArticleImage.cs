@@ -36,6 +36,12 @@ public static class NewsArticleImage
     }
 
     /// <summary>
+    /// Public path of the shared default graphic used when an article has no
+    /// resolvable photo. Served as a static file from QueenZone.Web.
+    /// </summary>
+    public const string PlaceholderPath = "/images/news-article-placeholder.svg";
+
+    /// <summary>
     /// Resolved public image URL, or <see langword="null"/> when unset or when the
     /// reference is a gallery pick (resolved later via <c>PIC_FILES_T</c>).
     /// </summary>
@@ -59,4 +65,24 @@ public static class NewsArticleImage
         var imageUrl = ResolveImageUrl(imageBlobKey, imageGalleryPicId);
         return imageUrl is null ? null : imageUrl + "?size=thumb";
     }
+
+    /// <summary>
+    /// True when <see cref="ResolveImageUrl"/> produced a photo URL (not the placeholder).
+    /// </summary>
+    public static bool HasResolvedImage(string? imageBlobKey, int? imageGalleryPicId) =>
+        ResolveImageUrl(imageBlobKey, imageGalleryPicId) is not null;
+
+    /// <summary>
+    /// Display URL for website surfaces: the resolved photo, or
+    /// <see cref="PlaceholderPath"/> when the article has no image.
+    /// </summary>
+    public static string ResolveDisplayUrl(string? imageBlobKey, int? imageGalleryPicId) =>
+        ResolveImageUrl(imageBlobKey, imageGalleryPicId) ?? PlaceholderPath;
+
+    /// <summary>
+    /// Display thumbnail URL, or <see cref="PlaceholderPath"/> when
+    /// <see cref="ResolveThumbnailUrl"/> is unset.
+    /// </summary>
+    public static string ResolveDisplayThumbnailUrl(string? imageBlobKey, int? imageGalleryPicId) =>
+        ResolveThumbnailUrl(imageBlobKey, imageGalleryPicId) ?? PlaceholderPath;
 }
