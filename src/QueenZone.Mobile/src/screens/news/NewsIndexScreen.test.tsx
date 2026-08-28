@@ -1,6 +1,7 @@
 import { act, fireEvent, screen, userEvent, waitFor } from '@testing-library/react-native';
 import { fetchNewsPage, fetchNewsYearRange } from '../../api';
 import { ApiError } from '../../api/client';
+import { newsArticlePlaceholder } from '../../content/newsArticleImage';
 import { deferred, newsItemFixture, pagedResponse } from '../../test/fixtures';
 import { fakeNavigation, renderWithProviders } from '../../test/render';
 import { bumpNewsListEpoch } from '../../notifications/newsListEpoch';
@@ -26,6 +27,14 @@ jest.mock('../../session/SessionContext', () => ({
     accessToken: null,
   }),
 }));
+
+jest.mock('../../config', () => {
+  const actual = jest.requireActual('../../config');
+  return {
+    ...actual,
+    getAppConfig: () => ({ apiBaseUrl: 'http://qz.test', appEnv: 'development', version: '0.1.0' }),
+  };
+});
 
 const fetchNews = fetchNewsPage as jest.MockedFunction<typeof fetchNewsPage>;
 const fetchYearRange = fetchNewsYearRange as jest.MockedFunction<typeof fetchNewsYearRange>;
@@ -213,6 +222,60 @@ describe('NewsIndexScreen', () => {
       expect(screen.getByRole('button', { name: 'Open QueenZone modernisation begins' })).toBeOnTheScreen(),
     );
     expect(fetchNews).toHaveBeenCalledTimes(2);
+  });
+
+  it('renders the bundled placeholder when the article has no image', async () => {
+    fetchNews.mockResolvedValue(
+      pagedResponse([newsItemFixture({ id: 7, title: 'Live Aid', imageUrl: null, thumbnailUrl: null })], 1, 1),
+    );
+    const { navigation } = renderNews();
+    await waitFor(() => expect(screen.getByTestId('news-story-7-thumb')).toBeOnTheScreen());
+    expect(screen.getByTestId('news-story-7-thumb').props.source).toBe(newsArticlePlaceholder);
+    expect(screen.getByTestId('news-story-7-thumb').props.placeholder).toBeUndefined();
+
+    const user = userEvent.setup();
+    await user.press(screen.getByTestId('news-story-7-thumb'));
+    expect(navigation.navigate).toHaveBeenCalledWith('Story', { id: 7 });
+  });
+
+  it('renders the resolved /ugc thumbnail and falls back after a failed load', async () => {
+    fetchNews.mockResolvedValue(
+      pagedResponse(
+        [
+          newsItemFixture({
+            id: 7,
+            title: 'Live Aid',
+            imageUrl: '/ugc/articles/editors/me/hero.webp',
+            thumbnailUrl: '/ugc/articles/editors/me/hero.webp?size=thumb',
+          }),
+        ],
+        1,
+        1,
+      ),
+    );
+    renderNews();
+    await waitFor(() => expect(screen.getByTestId('news-story-7-thumb')).toBeOnTheScreen());
+    const thumb = screen.getByTestId('news-story-7-thumb');
+    expect(thumb.props.source).toEqual({
+      uri: 'http://qz.test/ugc/articles/editors/me/hero.webp?size=thumb',
+    });
+    expect(thumb.props.placeholder).toBe(newsArticlePlaceholder);
+
+    fireEvent(thumb, 'error');
+    expect(screen.getByTestId('news-story-7-thumb').props.source).toBe(newsArticlePlaceholder);
+  });
+
+  it('uses the bundled placeholder when gallery picks expose null API urls', async () => {
+    fetchNews.mockResolvedValue(
+      pagedResponse(
+        [newsItemFixture({ id: 9, title: 'Gallery pick', imageUrl: null, thumbnailUrl: null })],
+        1,
+        1,
+      ),
+    );
+    renderNews();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Open Gallery pick' })).toBeOnTheScreen());
+    expect(screen.getByTestId('news-story-9-thumb').props.source).toBe(newsArticlePlaceholder);
   });
 });
 

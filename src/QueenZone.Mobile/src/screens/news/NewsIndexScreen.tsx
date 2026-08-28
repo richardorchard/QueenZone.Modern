@@ -1,21 +1,29 @@
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { CompositeScreenProps } from '@react-navigation/native';
+import { Image } from 'expo-image';
 import { useCallback, useEffect, useState } from 'react';
 import { FlatList, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { fetchNewsPage, fetchNewsYearRange, formatPublishedDate, type NewsListItem, type NewsYearRange } from '../../api';
+import { getAppConfig } from '../../config';
+import { newsArticleListImageSource, newsArticlePlaceholder } from '../../content/newsArticleImage';
 import { newsDecades } from '../../content/sample';
 import { useNewsListEpochRefresh } from '../../hooks/useNewsListEpochRefresh';
 import { usePagedContent } from '../../hooks/usePagedContent';
 import type { NewsStackParamList, RootTabParamList } from '../../navigation/types';
-import { space, useTheme } from '../../theme';
+import { radius, space, useTheme } from '../../theme';
 import { ArticleRow } from '../../ui/ArticleRow';
 import { Chip } from '../../ui/Chip';
+import { resolveContentUrl } from '../../ui/html/resolveContentUrl';
 import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from '../../ui/ScreenStates';
 import { testIds } from '../../test/testIds';
 import { PageTitleBlock } from '../../ui/PageTitleBlock';
 import { YearRail } from '../../ui/YearRail';
 import { TabRootMasthead } from '../home/TabRootMasthead';
+
+/** Compact 3:2 listing thumb — matches the website card crop, not a full-bleed hero. */
+const NEWS_LIST_THUMB_WIDTH = 84;
+const NEWS_LIST_THUMB_HEIGHT = 56;
 
 type Props = CompositeScreenProps<
   NativeStackScreenProps<NewsStackParamList, 'NewsIndex'>,
@@ -24,6 +32,46 @@ type Props = CompositeScreenProps<
 
 export function newsListResetKey(listKey: string, refreshAt: number | undefined): string {
   return refreshAt === undefined ? listKey : `${listKey}:${refreshAt}`;
+}
+
+function NewsListThumbnail({ item }: { item: NewsListItem }) {
+  const { c } = useTheme();
+  const apiBaseUrl = getAppConfig().apiBaseUrl;
+  const source = newsArticleListImageSource({
+    thumbnailUrl: resolveContentUrl(item.thumbnailUrl, apiBaseUrl),
+    imageUrl: resolveContentUrl(item.imageUrl, apiBaseUrl),
+  });
+  const isRemote = typeof source === 'object' && source !== null && 'uri' in source;
+  const [failed, setFailed] = useState(false);
+  const display = failed || !isRemote ? newsArticlePlaceholder : source;
+
+  useEffect(() => {
+    setFailed(false);
+  }, [item.id, item.thumbnailUrl, item.imageUrl]);
+
+  return (
+    <View
+      style={[
+        styles.thumbFrame,
+        { backgroundColor: c.surfaceCard, borderRadius: radius.md },
+      ]}
+    >
+      <Image
+        testID={`news-story-${item.id}-thumb`}
+        source={display}
+        placeholder={isRemote ? newsArticlePlaceholder : undefined}
+        onError={isRemote ? () => setFailed(true) : undefined}
+        style={styles.thumb}
+        contentFit="cover"
+        recyclingKey={String(item.id)}
+        cachePolicy="memory-disk"
+        priority="low"
+        accessible={false}
+        importantForAccessibility="no"
+        accessibilityIgnoresInvertColors
+      />
+    </View>
+  );
 }
 
 export function NewsIndexScreen({ navigation, route }: Props) {
@@ -140,6 +188,8 @@ export function NewsIndexScreen({ navigation, route }: Props) {
             title={item.title}
             subtitle={item.excerpt}
             meta={formatPublishedDate(item.publishedAt)}
+            leading={<NewsListThumbnail item={item} />}
+            leadingInteractive={false}
             onPress={() => navigation.navigate('Story', { id: item.id })}
             accessibilityLabel={`Open ${item.title}`}
             testID={`news-story-${item.id}`}
@@ -159,4 +209,13 @@ export function NewsIndexScreen({ navigation, route }: Props) {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   list: { flex: 1 },
+  thumbFrame: {
+    width: NEWS_LIST_THUMB_WIDTH,
+    height: NEWS_LIST_THUMB_HEIGHT,
+    overflow: 'hidden',
+  },
+  thumb: {
+    width: NEWS_LIST_THUMB_WIDTH,
+    height: NEWS_LIST_THUMB_HEIGHT,
+  },
 });
