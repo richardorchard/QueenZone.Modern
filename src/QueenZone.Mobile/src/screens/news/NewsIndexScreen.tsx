@@ -3,6 +3,7 @@ import { FlatList, RefreshControl, ScrollView, StyleSheet, View } from 'react-na
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { fetchNewsPage, fetchNewsYearRange, formatPublishedDate, type NewsListItem, type NewsYearRange } from '../../api';
 import { newsDecades } from '../../content/sample';
+import { useNewsListEpochRefresh } from '../../hooks/useNewsListEpochRefresh';
 import { usePagedContent } from '../../hooks/usePagedContent';
 import type { NewsStackParamList } from '../../navigation/types';
 import { space, useTheme } from '../../theme';
@@ -49,6 +50,7 @@ export function NewsIndexScreen({ navigation, route }: Props) {
     20,
     newsListResetKey(selectedYear === null ? decade.label : `year-${selectedYear}`, refreshAt),
   );
+  useNewsListEpochRefresh(paged.refresh);
 
   const selectDecade = useCallback((option: (typeof newsDecades)[number]) => {
     setSelectedYear(null);

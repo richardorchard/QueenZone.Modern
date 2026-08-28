@@ -20,6 +20,7 @@ import {
 } from '../../api';
 import { media } from '../../content/media';
 import { useHomeSection } from '../../hooks/useHomeSection';
+import { useNewsListEpochRefresh } from '../../hooks/useNewsListEpochRefresh';
 import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import { nestedTabParams } from '../../navigation/nestedTab';
 import type { HomeStackParamList, RootTabParamList } from '../../navigation/types';
@@ -77,6 +78,7 @@ export function HomeScreen({ navigation }: Props) {
   const news = useHomeSection(
     useCallback((signal) => fetchNewsPage({ page: 1, pageSize: 4, signal }), []),
   );
+  useNewsListEpochRefresh(news.refresh);
   const forum = useHomeSection(
     useCallback((signal) => fetchForumRecentThreads(3, signal), []),
   );

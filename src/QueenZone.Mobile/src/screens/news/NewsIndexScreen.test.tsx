@@ -1,8 +1,9 @@
-import { fireEvent, screen, userEvent, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, screen, userEvent, waitFor } from '@testing-library/react-native';
 import { fetchNewsPage, fetchNewsYearRange } from '../../api';
 import { ApiError } from '../../api/client';
 import { deferred, newsItemFixture, pagedResponse } from '../../test/fixtures';
 import { fakeNavigation, renderWithProviders } from '../../test/render';
+import { bumpNewsListEpoch } from '../../notifications/newsListEpoch';
 import { NewsIndexScreen, newsListResetKey } from './NewsIndexScreen';
 
 jest.mock('../../api', () => {
@@ -145,6 +146,40 @@ describe('NewsIndexScreen', () => {
 
     await waitFor(() => expect(screen.getByRole('button', { name: 'Open ALL article' })).toBeOnTheScreen());
     expect(fetchNews).toHaveBeenLastCalledWith(expect.objectContaining({ decade: undefined, year: undefined }));
+  });
+
+  it('refreshes the mounted list when a news push bumps the list epoch', async () => {
+    fetchNews.mockResolvedValueOnce(pagedResponse([newsItemFixture({ id: 1, title: 'Stale headline' })], 1, 1));
+    renderNews();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Open Stale headline' })).toBeOnTheScreen());
+    const newsCalls = fetchNews.mock.calls.length;
+
+    fetchNews.mockResolvedValueOnce(
+      pagedResponse([newsItemFixture({ id: 1003, title: 'QueenZone modernisation begins' })], 1, 1),
+    );
+    await act(async () => {
+      bumpNewsListEpoch();
+    });
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Open QueenZone modernisation begins' })).toBeOnTheScreen(),
+    );
+    expect(fetchNews).toHaveBeenCalledTimes(newsCalls + 1);
+    expect(fetchNews).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1 }));
+  });
+
+  it('does not refetch after unmount when a news push arrives', async () => {
+    fetchNews.mockResolvedValueOnce(pagedResponse([newsItemFixture({ id: 1, title: 'Stale headline' })], 1, 1));
+    const { unmount } = renderNews();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Open Stale headline' })).toBeOnTheScreen());
+    const newsCalls = fetchNews.mock.calls.length;
+    unmount();
+
+    await act(async () => {
+      bumpNewsListEpoch();
+    });
+
+    expect(fetchNews).toHaveBeenCalledTimes(newsCalls);
   });
 
   it('reloads the list when a notification tap passes refreshAt', async () => {
