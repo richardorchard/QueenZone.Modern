@@ -43,6 +43,12 @@ describe('SignInScreen', () => {
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Sign-in was cancelled.'));
   });
 
+  it('uses the Apple-approved visual treatment for the Apple provider', async () => {
+    renderSignIn();
+    await waitFor(() => expect(screen.getByTestId('apple-sign-in-button')).toBeOnTheScreen());
+    expect(screen.getByRole('button', { name: 'Continue with Apple' })).toBeOnTheScreen();
+  });
+
   it('leaves for the prompting screen after a successful provider hop', async () => {
     const user = userEvent.setup();
     mockSession.signIn.mockResolvedValue(undefined);
