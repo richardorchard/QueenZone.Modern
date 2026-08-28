@@ -1,10 +1,10 @@
 import { screen, userEvent, waitFor } from '@testing-library/react-native';
-import { fetchFanPerformancesPage } from '../../api';
+import { fetchAllFanPerformances, fetchFanPerformancesPage } from '../../api';
 import { fanPerformanceFixture, pagedResponse } from '../../test/fixtures';
 import { createMockSession } from '../../test/mockSession';
 import { fakeNavigation, flushVirtualizedList, renderWithProviders } from '../../test/render';
 import { testIds } from '../../test/testIds';
-import { FanPerformancesScreen } from './FanPerformancesScreen';
+import { FanPerformancesScreen, shuffleFanPerformances } from './FanPerformancesScreen';
 
 const mockSession = createMockSession();
 const mockPlayer = {
@@ -29,6 +29,7 @@ jest.mock('../../api', () => {
   return {
     ...actual,
     fetchFanPerformancesPage: jest.fn(),
+    fetchAllFanPerformances: jest.fn(),
   };
 });
 
@@ -41,7 +42,15 @@ jest.mock('../../audio/FanPerformancePlayer', () => ({
 }));
 
 const fetchPage = fetchFanPerformancesPage as jest.MockedFunction<typeof fetchFanPerformancesPage>;
+const fetchAll = fetchAllFanPerformances as jest.MockedFunction<typeof fetchAllFanPerformances>;
 const track = fanPerformanceFixture();
+const catalogSignIn = expect.objectContaining({
+  type: 'NAVIGATE',
+  payload: expect.objectContaining({
+    name: 'SignIn',
+    params: { returnTo: { tab: 'ArchiveTab', screen: 'FanPerformances' } },
+  }),
+});
 
 function renderList() {
   const navigation = fakeNavigation();
@@ -65,10 +74,14 @@ describe('FanPerformancesScreen', () => {
     mockPlayer.playing = false;
     mockPlayer.play.mockReset();
     mockPlayer.toggle.mockReset();
+    mockPlayer.playNext.mockReset();
     fetchPage.mockResolvedValue(pagedResponse([track]));
+    fetchAll.mockReset();
+    fetchAll.mockResolvedValue([track]);
   });
 
   afterEach(async () => {
+    jest.restoreAllMocks();
     await flushVirtualizedList();
   });
 
@@ -83,16 +96,24 @@ describe('FanPerformancesScreen', () => {
     expect(mockPlayer.play).not.toHaveBeenCalled();
 
     await user.press(screen.getByRole('button', { name: `Sign in to play ${track.title}` }));
-    expect(navigation.dispatch).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: 'NAVIGATE',
-        payload: expect.objectContaining({
-          name: 'SignIn',
-          params: { returnTo: { tab: 'ArchiveTab', screen: 'FanPerformances' } },
-        }),
-      }),
-    );
+    expect(navigation.dispatch).toHaveBeenCalledWith(catalogSignIn);
     expect(navigation.navigate).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends unsigned visitors to sign in from Play All and Shuffle Play All', async () => {
+    const { navigation } = renderList();
+    await waitFor(() => expect(screen.getByTestId(testIds.fanPerformancesPlayAll)).toBeOnTheScreen());
+
+    const user = userEvent.setup();
+    await user.press(screen.getByTestId(testIds.fanPerformancesPlayAll));
+    expect(navigation.dispatch).toHaveBeenCalledWith(catalogSignIn);
+    expect(fetchAll).not.toHaveBeenCalled();
+    expect(mockPlayer.play).not.toHaveBeenCalled();
+
+    await user.press(screen.getByTestId(testIds.fanPerformancesShufflePlayAll));
+    expect(navigation.dispatch).toHaveBeenCalledTimes(2);
+    expect(fetchAll).not.toHaveBeenCalled();
+    expect(mockPlayer.play).not.toHaveBeenCalled();
   });
 
   it('does not open sign-in from play while a session is restoring', async () => {
@@ -118,6 +139,51 @@ describe('FanPerformancesScreen', () => {
 
     await user.press(screen.getByRole('button', { name: `Open ${track.title}` }));
     expect(navigation.navigate).toHaveBeenCalledWith('FanPerformanceDetail', { id: track.id });
+  });
+
+  it('Play All queues the full catalog, not the loaded FlatList page', async () => {
+    mockSession.accessToken = 'member-token';
+    const first = fanPerformanceFixture({ id: 1, title: 'First' });
+    const second = fanPerformanceFixture({ id: 2, title: 'Second' });
+    const third = fanPerformanceFixture({ id: 3, title: 'Third' });
+    fetchPage.mockResolvedValue(pagedResponse([first], 1, 2));
+    fetchAll.mockResolvedValue([first, second, third]);
+    renderList();
+    await waitFor(() => expect(screen.getByTestId(testIds.fanPerformancesPlayAll)).toBeOnTheScreen());
+
+    const user = userEvent.setup();
+    await user.press(screen.getByTestId(testIds.fanPerformancesPlayAll));
+    await waitFor(() => expect(mockPlayer.play).toHaveBeenCalledTimes(1));
+    expect(mockPlayer.play).toHaveBeenCalledWith(first, [first, second, third]);
+    expect(fetchAll).toHaveBeenCalledTimes(1);
+  });
+
+  it('Shuffle Play All randomizes once per tap and passes that order as the queue', async () => {
+    mockSession.accessToken = 'member-token';
+    const first = fanPerformanceFixture({ id: 1, title: 'First' });
+    const second = fanPerformanceFixture({ id: 2, title: 'Second' });
+    const third = fanPerformanceFixture({ id: 3, title: 'Third' });
+    const catalog = [first, second, third];
+    fetchPage.mockResolvedValue(pagedResponse([first], 1, 2));
+    fetchAll.mockResolvedValue(catalog);
+    const random = jest.spyOn(Math, 'random').mockReturnValue(0);
+    renderList();
+    await waitFor(() => expect(screen.getByTestId(testIds.fanPerformancesShufflePlayAll)).toBeOnTheScreen());
+
+    const user = userEvent.setup();
+    await user.press(screen.getByTestId(testIds.fanPerformancesShufflePlayAll));
+    const shuffledOnce = shuffleFanPerformances(catalog, () => 0);
+    await waitFor(() => expect(mockPlayer.play).toHaveBeenCalledTimes(1));
+    expect(mockPlayer.play).toHaveBeenCalledWith(shuffledOnce[0], shuffledOnce);
+    expect(mockPlayer.playNext).not.toHaveBeenCalled();
+
+    random.mockReturnValue(0.99);
+    await user.press(screen.getByTestId(testIds.fanPerformancesShufflePlayAll));
+    const shuffledAgain = shuffleFanPerformances(catalog, () => 0.99);
+    await waitFor(() => expect(mockPlayer.play).toHaveBeenCalledTimes(2));
+    expect(mockPlayer.play.mock.calls[1]?.[1]).toEqual(shuffledAgain);
+    expect(shuffledAgain.map((item) => item.id)).not.toEqual(shuffledOnce.map((item) => item.id));
+    random.mockRestore();
   });
 
   it('toggles pause when the listed track is already playing', async () => {
