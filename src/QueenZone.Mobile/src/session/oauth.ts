@@ -52,26 +52,46 @@ export async function refreshAccessToken(apiBaseUrl: string, refreshToken: strin
   });
 }
 
+/** Caps best-effort logout/revoke so a hung React Native fetch cannot block sign-out. */
+export const remoteAuthTimeoutMs = 8_000;
+
 export async function revokeRefreshToken(apiBaseUrl: string, refreshToken: string): Promise<void> {
-  try {
-    await fetch(authRevokeUrl(apiBaseUrl), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
-      body: tokenFormBody({ token: refreshToken, client_id: mobileClientId }),
-    });
-  } catch {
-    // RFC 7009: revocation is best-effort.
-  }
+  await fetchBestEffort(authRevokeUrl(apiBaseUrl), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
+    body: tokenFormBody({ token: refreshToken, client_id: mobileClientId }),
+  });
 }
 
 export async function logoutRemote(apiBaseUrl: string, accessToken: string): Promise<void> {
+  await fetchBestEffort(authLogoutUrl(apiBaseUrl), {
+    method: 'POST',
+    headers: { Accept: 'application/json', Authorization: `Bearer ${accessToken}` },
+  });
+}
+
+async function fetchBestEffort(url: string, init: RequestInit, timeoutMs = remoteAuthTimeoutMs): Promise<void> {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<void>((resolve) => {
+    timer = setTimeout(() => {
+      controller.abort();
+      resolve();
+    }, timeoutMs);
+  });
+
   try {
-    await fetch(authLogoutUrl(apiBaseUrl), {
-      method: 'POST',
-      headers: { Accept: 'application/json', Authorization: `Bearer ${accessToken}` },
-    });
-  } catch {
-    // Local sign-out still proceeds.
+    await Promise.race([
+      fetch(url, { ...init, signal: controller.signal }).then(
+        () => undefined,
+        () => undefined,
+      ),
+      timeout,
+    ]);
+  } finally {
+    if (timer !== undefined) {
+      clearTimeout(timer);
+    }
   }
 }
 

@@ -2,7 +2,13 @@ import * as Crypto from 'expo-crypto';
 import * as WebBrowser from 'expo-web-browser';
 import { waitFor } from '@testing-library/react-native';
 import { Linking } from 'react-native';
-import { logoutRemote, refreshAccessToken, revokeRefreshToken, signInWithProvider } from './oauth';
+import {
+  logoutRemote,
+  refreshAccessToken,
+  remoteAuthTimeoutMs,
+  revokeRefreshToken,
+  signInWithProvider,
+} from './oauth';
 import { jsonResponse } from '../test/fixtures';
 
 jest.mock('expo-web-browser', () => ({
@@ -125,5 +131,19 @@ describe('token maintenance', () => {
     fetchMock.mockRejectedValue(new TypeError('offline'));
     await expect(logoutRemote('http://qz.test', 'a')).resolves.toBeUndefined();
     await expect(revokeRefreshToken('http://qz.test', 'r')).resolves.toBeUndefined();
+  });
+
+  it('resolves logout and revoke when fetch never settles', async () => {
+    jest.useFakeTimers();
+    try {
+      fetchMock.mockImplementation(() => new Promise(() => {}));
+      const logout = logoutRemote('http://qz.test', 'a');
+      const revoke = revokeRefreshToken('http://qz.test', 'r');
+      await jest.advanceTimersByTimeAsync(remoteAuthTimeoutMs);
+      await expect(logout).resolves.toBeUndefined();
+      await expect(revoke).resolves.toBeUndefined();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

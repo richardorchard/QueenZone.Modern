@@ -223,6 +223,39 @@ describe('SessionProvider', () => {
     expect(clearStored).toHaveBeenCalled();
   });
 
+  it('signs out locally even when remote logout never completes', async () => {
+    const user = userEvent.setup();
+    readStored.mockResolvedValue({
+      ...authTokensFixture(),
+      expiresAt: Date.now() + 60_000,
+    });
+    clearPushRegistration.mockImplementation(() => new Promise(() => {}));
+    logoutRemote.mockImplementation(() => new Promise(() => {}));
+    revokeRefreshToken.mockImplementation(() => new Promise(() => {}));
+    renderSession();
+    await waitFor(() => expect(screen.getByText('signed-in')).toBeOnTheScreen());
+
+    await user.press(screen.getByText('do-sign-out'));
+    await waitFor(() => expect(screen.getByText('signed-out')).toBeOnTheScreen());
+    expect(clearStored).toHaveBeenCalled();
+    expect(screen.getByText('no-token')).toBeOnTheScreen();
+  });
+
+  it('signs out in memory when SecureStore delete fails', async () => {
+    const user = userEvent.setup();
+    readStored.mockResolvedValue({
+      ...authTokensFixture(),
+      expiresAt: Date.now() + 60_000,
+    });
+    clearStored.mockRejectedValue(new Error('secure-store-unavailable'));
+    renderSession();
+    await waitFor(() => expect(screen.getByText('signed-in')).toBeOnTheScreen());
+
+    await user.press(screen.getByText('do-sign-out'));
+    await waitFor(() => expect(screen.getByText('signed-out')).toBeOnTheScreen());
+    expect(screen.getByText('no-token')).toBeOnTheScreen();
+  });
+
   it('does not register for push before sign-in', async () => {
     readStored.mockResolvedValue(null);
     renderSession();

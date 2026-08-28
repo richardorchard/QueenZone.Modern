@@ -63,4 +63,20 @@ describe('ProfileScreen', () => {
     expect(screen.getByText('Freddie')).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeOnTheScreen();
   });
+
+  it('calls sign out and shows a busy control while it is pending', async () => {
+    const user = userEvent.setup();
+    mockSession.isSignedIn = true;
+    mockSession.displayName = 'Freddie';
+    mockSession.profile = memberProfileFixture();
+    mockSession.refreshProfile.mockResolvedValue(mockSession.profile);
+    mockSession.signOut.mockImplementation(() => new Promise(() => {}));
+    renderProfile();
+
+    await user.press(screen.getByRole('button', { name: 'Sign out' }));
+    expect(mockSession.signOut).toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Sign out' }).props.accessibilityState).toEqual(
+      expect.objectContaining({ busy: true }),
+    );
+  });
 });
