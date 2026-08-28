@@ -79,7 +79,7 @@ describe('shouldHideTabBar', () => {
       'PhotoCategory',
       'ForumIndex',
       'Category',
-      'Stories',
+      'Articles',
       'Biography',
       'Discography',
       'Timeline',

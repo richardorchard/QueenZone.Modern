@@ -14,7 +14,7 @@ import { ArchivedScreen } from '../screens/messages/ArchivedScreen';
 import { ConversationScreen } from '../screens/messages/ConversationScreen';
 import { ComposeMessageScreen } from '../screens/messages/ComposeMessageScreen';
 import { ArchiveHubScreen } from '../screens/archive/ArchiveHubScreen';
-import { StoriesIndexScreen } from '../screens/archive/StoriesIndexScreen';
+import { ArticlesIndexScreen } from '../screens/archive/ArticlesIndexScreen';
 import { BiographyScreen } from '../screens/archive/BiographyScreen';
 import { BiographyChapterScreen } from '../screens/archive/BiographyChapterScreen';
 import { DiscographyScreen } from '../screens/archive/DiscographyScreen';
@@ -145,7 +145,7 @@ export function ArchiveStack() {
           headerRight: () => <SearchHeaderButton onPress={() => navigation.navigate('Search')} />,
         })}
       />
-      <Archive.Screen name="Stories" component={StoriesIndexScreen} />
+      <Archive.Screen name="Articles" component={ArticlesIndexScreen} options={{ title: 'Articles' }} />
       <Archive.Screen name="Biography" component={BiographyScreen} />
       <Archive.Screen name="BiographyChapter" component={BiographyChapterScreen} options={{ title: 'Chapter' }} />
       <Archive.Screen name="Discography" component={DiscographyScreen} />
