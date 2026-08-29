@@ -53,16 +53,20 @@ export function formatGalleryCardMeta(category: { imageCount: number }): string 
 
 export type HomeQuote = { text: string; whoSaid: string };
 
-/** The Home card stays up for an event, a quote, or both — quote-only days still need a surface. */
-export function onThisDayIsVisible(
-  event: TimelineEvent | null,
-  quote: HomeQuote | null = null,
-): boolean {
-  return event !== null || quote !== null;
+export function onThisDayIsVisible(event: TimelineEvent | null): boolean {
+  return event !== null;
 }
 
-export function onThisDayEyebrow(event: TimelineEvent | null): string {
-  return event ? 'On this day' : 'Quote';
+export function onThisDayEyebrow(): string {
+  return 'On this day';
+}
+
+export function queenQuotesIsVisible(quote: HomeQuote | null): boolean {
+  return quote !== null;
+}
+
+export function queenQuotesEyebrow(): string {
+  return 'Queen Quotes';
 }
 
 export function liveStripIsVisible(newForumRepliesToday: number): boolean {
