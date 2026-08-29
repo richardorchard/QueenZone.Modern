@@ -99,7 +99,7 @@ public static class NewsArticleGalleryPicker
 
     private static string GuessOriginalContentType(string fileName)
     {
-        var extension = Path.GetExtension(fileName);
+        var extension = System.IO.Path.GetExtension(fileName);
         return extension.ToLowerInvariant() switch
         {
             ".jpg" or ".jpeg" => "image/jpeg",
