@@ -34,7 +34,7 @@ public sealed class QuoteValidationTests
         var errors = QuoteValidation.ValidateDraft(
             new AdminQuoteDraft(new string('a', QuoteValidation.MaxTextLength + 1), "Freddie Mercury", true));
 
-        Assert.Contains(errors, error => error.Contains("455 characters", StringComparison.Ordinal));
+        Assert.Contains(errors, error => error.Contains($"{QuoteValidation.MaxTextLength} characters", StringComparison.Ordinal));
     }
 
     [Fact]

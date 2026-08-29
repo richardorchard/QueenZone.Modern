@@ -26,8 +26,14 @@ public sealed class EfQuoteRepositoryTests : IAsyncDisposable
                 Q_MEMBER_ID INTEGER NOT NULL DEFAULT 0,
                 USER_ID INTEGER NOT NULL DEFAULT 0,
                 CREATE_DATE TEXT NOT NULL,
-                DISPLAY INTEGER NOT NULL DEFAULT 0
+                DISPLAY INTEGER NOT NULL DEFAULT 0,
+                CONTEXT TEXT NULL,
+                SOURCE_TYPE TEXT NULL,
+                SOURCE_KEY TEXT NULL
             );
+            CREATE UNIQUE INDEX IF NOT EXISTS IX_QUEEN_QUOTE_T_Source
+                ON QUEEN_QUOTE_T (SOURCE_TYPE, SOURCE_KEY)
+                WHERE SOURCE_TYPE IS NOT NULL AND SOURCE_KEY IS NOT NULL;
             """);
         repository = new EfQuoteRepository(dbContext);
     }
