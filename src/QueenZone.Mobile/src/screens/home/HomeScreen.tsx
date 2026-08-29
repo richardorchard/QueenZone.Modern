@@ -168,6 +168,7 @@ export function HomeScreen({ navigation }: Props) {
           <TabRootMasthead
             topInset={insets.top}
             onSearch={() => navigation.navigate('Search')}
+            onMessagesPress={() => navigation.navigate('Inbox')}
             onProfilePress={() => navigation.navigate('Profile')}
           />
 
