@@ -22,15 +22,13 @@ public sealed class QuoteCsvImporter(QueenZoneDbContext dbContext)
     {
         var rows = ReadRows(csvPath);
         var sourceKeys = rows.Select(row => row.SourceKey).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-        var sourceTypes = rows.Select(row => row.SourceType).Distinct().ToList();
         var existing = await dbContext.Quotes
             .Where(item => item.SourceType != null
                 && item.SourceKey != null
-                && sourceTypes.Contains(item.SourceType.Value)
                 && sourceKeys.Contains(item.SourceKey))
             .ToListAsync(cancellationToken);
         var existingBySource = existing.ToDictionary(
-            item => BuildSourceKey(item.SourceType!.Value, item.SourceKey!),
+            item => CsvImportRowParsing.BuildSourceKey(item.SourceType!.Value, item.SourceKey!),
             StringComparer.OrdinalIgnoreCase);
 
         var created = 0;
@@ -39,7 +37,7 @@ public sealed class QuoteCsvImporter(QueenZoneDbContext dbContext)
 
         foreach (var row in rows)
         {
-            if (existingBySource.TryGetValue(BuildSourceKey(row.SourceType, row.SourceKey), out var entity))
+            if (existingBySource.TryGetValue(CsvImportRowParsing.BuildSourceKey(row.SourceType, row.SourceKey), out var entity))
             {
                 if (Apply(entity, row, isNew: false))
                 {
@@ -59,7 +57,7 @@ public sealed class QuoteCsvImporter(QueenZoneDbContext dbContext)
             };
             Apply(entity, row, isNew: true);
             dbContext.Quotes.Add(entity);
-            existingBySource[BuildSourceKey(row.SourceType, row.SourceKey)] = entity;
+            existingBySource[CsvImportRowParsing.BuildSourceKey(row.SourceType, row.SourceKey)] = entity;
             created++;
         }
 
@@ -88,6 +86,7 @@ public sealed class QuoteCsvImporter(QueenZoneDbContext dbContext)
         }
 
         var rows = new List<QuoteCsvImportRow>();
+        var rowNumbersBySource = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         var rowNumber = 1;
         while (!parser.EndOfData)
         {
@@ -103,7 +102,16 @@ public sealed class QuoteCsvImporter(QueenZoneDbContext dbContext)
                 throw new InvalidOperationException($"Row {rowNumber} has {fields.Length} columns; expected {ExpectedHeaders.Length}.");
             }
 
-            rows.Add(ParseRow(fields, rowNumber));
+            var row = ParseRow(fields, rowNumber);
+            var sourceKey = CsvImportRowParsing.BuildSourceKey(row.SourceType, row.SourceKey);
+            if (rowNumbersBySource.TryGetValue(sourceKey, out var firstRowNumber))
+            {
+                throw new InvalidOperationException(
+                    $"Row {rowNumber} has the same SourceType/SourceKey ({row.SourceType}:{row.SourceKey}) as row {firstRowNumber}.");
+            }
+
+            rowNumbersBySource.Add(sourceKey, rowNumber);
+            rows.Add(row);
         }
 
         return rows;
@@ -111,11 +119,11 @@ public sealed class QuoteCsvImporter(QueenZoneDbContext dbContext)
 
     private static QuoteCsvImportRow ParseRow(string[] fields, int rowNumber)
     {
-        var text = Required(fields[0], rowNumber, "Text");
-        var whoSaid = Required(fields[1], rowNumber, "WhoSaid");
+        var text = CsvImportRowParsing.Required(fields[0], rowNumber, "Text");
+        var whoSaid = CsvImportRowParsing.Required(fields[1], rowNumber, "WhoSaid");
         var context = string.IsNullOrWhiteSpace(fields[2]) ? null : fields[2].Trim();
-        var sourceType = ParseEnum<QuoteSourceType>(fields[3], rowNumber, "SourceType");
-        var sourceKey = Required(fields[4], rowNumber, "SourceKey");
+        var sourceType = CsvImportRowParsing.ParseEnum<QuoteSourceType>(fields[3], rowNumber, "SourceType");
+        var sourceKey = CsvImportRowParsing.Required(fields[4], rowNumber, "SourceKey");
 
         if (text.Length > QuoteValidation.MaxTextLength)
         {
@@ -132,16 +140,13 @@ public sealed class QuoteCsvImporter(QueenZoneDbContext dbContext)
             throw new InvalidOperationException($"Row {rowNumber} Context must be {QuoteValidation.MaxContextLength} characters or fewer.");
         }
 
-        if (sourceKey.Length > 200)
+        if (sourceKey.Length > QuoteValidation.MaxSourceKeyLength)
         {
-            throw new InvalidOperationException($"Row {rowNumber} SourceKey must be 200 characters or fewer.");
+            throw new InvalidOperationException($"Row {rowNumber} SourceKey must be {QuoteValidation.MaxSourceKeyLength} characters or fewer.");
         }
 
         return new QuoteCsvImportRow(text, whoSaid, context, sourceType, sourceKey);
     }
-
-    private static string BuildSourceKey(QuoteSourceType sourceType, string sourceKey) =>
-        $"{sourceType}:{sourceKey}";
 
     private static bool Apply(
         QuoteEntity entity,
@@ -153,8 +158,7 @@ public sealed class QuoteCsvImporter(QueenZoneDbContext dbContext)
             || entity.WhoSaid != row.WhoSaid
             || entity.Context != row.Context
             || entity.SourceType != row.SourceType
-            || entity.SourceKey != row.SourceKey
-            || !entity.IsPublished;
+            || entity.SourceKey != row.SourceKey;
 
         if (!changed)
         {
@@ -166,23 +170,15 @@ public sealed class QuoteCsvImporter(QueenZoneDbContext dbContext)
         entity.Context = row.Context;
         entity.SourceType = row.SourceType;
         entity.SourceKey = row.SourceKey;
-        entity.IsPublished = true;
-        return true;
-    }
 
-    private static string Required(string? value, int rowNumber, string column)
-    {
-        if (string.IsNullOrWhiteSpace(value))
+        // Only force-publish brand-new rows. An existing row's publish state is
+        // admin-owned (e.g. someone unpublished it in the admin UI) and must not
+        // be silently reverted by a routine re-import of the same source CSV.
+        if (isNew)
         {
-            throw new InvalidOperationException($"Row {rowNumber} {column} is required.");
+            entity.IsPublished = true;
         }
 
-        return value.Trim();
+        return true;
     }
-
-    private static TEnum ParseEnum<TEnum>(string value, int rowNumber, string column)
-        where TEnum : struct =>
-        Enum.TryParse<TEnum>(value, ignoreCase: true, out var parsed)
-            ? parsed
-            : throw new InvalidOperationException($"Row {rowNumber} {column} has unsupported value '{value}'.");
 }

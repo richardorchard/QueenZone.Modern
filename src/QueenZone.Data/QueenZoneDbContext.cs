@@ -116,9 +116,9 @@ public sealed class QueenZoneDbContext : DbContext
                 .ValueGeneratedOnAdd();
             entity.Property(quote => quote.Text).HasColumnName("QUEEN_QUOTE").HasMaxLength(QuoteValidation.MaxTextLength);
             entity.Property(quote => quote.WhoSaid).HasColumnName("WHO_SAID").HasMaxLength(QuoteValidation.MaxWhoSaidLength);
-            entity.Property(quote => quote.Context).HasColumnName("CONTEXT").HasMaxLength(QuoteValidation.MaxContextLength);
-            entity.Property(quote => quote.SourceType).HasColumnName("SOURCE_TYPE").HasConversion<string>().HasMaxLength(50);
-            entity.Property(quote => quote.SourceKey).HasColumnName("SOURCE_KEY").HasMaxLength(200);
+            entity.Property(quote => quote.Context).HasColumnName("CONTEXT").HasMaxLength(QuoteValidation.MaxContextLength).HasColumnType($"varchar({QuoteValidation.MaxContextLength})");
+            entity.Property(quote => quote.SourceType).HasColumnName("SOURCE_TYPE").HasConversion<string>().HasMaxLength(50).HasColumnType("varchar(50)");
+            entity.Property(quote => quote.SourceKey).HasColumnName("SOURCE_KEY").HasMaxLength(QuoteValidation.MaxSourceKeyLength).HasColumnType($"varchar({QuoteValidation.MaxSourceKeyLength})");
             entity.Property(quote => quote.CreatedAt).HasColumnName("CREATE_DATE");
             entity.Property(quote => quote.IsPublished)
                 .HasColumnName("DISPLAY")

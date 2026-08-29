@@ -43,7 +43,13 @@ internal static class ToolsApp
             return await RunImportQuotesAsync(args);
         }
 
-        return await RunImportHistoryAsync(args);
+        if (args.Length == 0 || string.Equals(args[0], "import-history", StringComparison.OrdinalIgnoreCase))
+        {
+            return await RunImportHistoryAsync(args);
+        }
+
+        PrintUsage($"Unknown command '{args[0]}'.");
+        return 2;
     }
 
     private static async Task<int> RunImportHistoryAsync(string[] args)

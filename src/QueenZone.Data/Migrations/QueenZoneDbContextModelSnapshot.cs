@@ -2220,7 +2220,7 @@ namespace QueenZone.Data.Migrations
 
                     b.Property<string>("Context")
                         .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)")
+                        .HasColumnType("varchar(500)")
                         .HasColumnName("CONTEXT");
 
                     b.Property<DateTime>("CreatedAt")
@@ -2233,12 +2233,12 @@ namespace QueenZone.Data.Migrations
 
                     b.Property<string>("SourceKey")
                         .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)")
+                        .HasColumnType("varchar(200)")
                         .HasColumnName("SOURCE_KEY");
 
                     b.Property<string>("SourceType")
                         .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)")
+                        .HasColumnType("varchar(50)")
                         .HasColumnName("SOURCE_TYPE");
 
                     b.Property<string>("Text")

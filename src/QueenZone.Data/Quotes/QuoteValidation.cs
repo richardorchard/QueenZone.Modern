@@ -8,6 +8,8 @@ public static class QuoteValidation
 
     public const int MaxContextLength = 500;
 
+    public const int MaxSourceKeyLength = 200;
+
     public static IReadOnlyList<string> ValidateDraft(AdminQuoteDraft draft)
     {
         var errors = new List<string>();

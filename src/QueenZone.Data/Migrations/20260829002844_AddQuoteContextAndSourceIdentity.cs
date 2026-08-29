@@ -48,6 +48,9 @@ namespace QueenZone.Data.Migrations
         }
 
         /// <inheritdoc />
+        // Note: shrinking QUEEN_QUOTE back to varchar(455) will fail with a truncation
+        // error if any row's text is 456-1000 characters (that's the situation this
+        // migration exists to allow). Check for and resolve such rows before rolling back.
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropIndex(
