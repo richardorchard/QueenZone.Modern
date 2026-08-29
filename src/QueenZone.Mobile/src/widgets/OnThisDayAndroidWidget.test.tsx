@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { screen } from '@testing-library/react-native';
 import { OnThisDayAndroidWidget } from './OnThisDayAndroidWidget';
 import { renderWithProviders } from '../test/render';
@@ -41,7 +42,7 @@ const bothHalves = {
   quoteWhoSaid: 'Freddie Mercury',
 };
 
-const source = readFileSync(new URL('./OnThisDayAndroidWidget.tsx', import.meta.url), 'utf8');
+const source = readFileSync(path.join(__dirname, 'OnThisDayAndroidWidget.tsx'), 'utf8');
 
 describe('OnThisDayAndroidWidget', () => {
   afterEach(() => {
