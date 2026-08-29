@@ -92,6 +92,7 @@ describe('PhotoSubmitScreen', () => {
     const user = userEvent.setup();
     mockSession.isSignedIn = true;
     mockSession.accessToken = 'tok';
+    fetchCategories.mockResolvedValue(pagedResponse([categoryFixture()], 1, 1));
     (ImagePicker.requestMediaLibraryPermissionsAsync as jest.Mock).mockResolvedValue({ granted: true });
     (ImagePicker.launchImageLibraryAsync as jest.Mock).mockResolvedValue({
       canceled: false,
@@ -100,8 +101,9 @@ describe('PhotoSubmitScreen', () => {
     submitPhoto.mockRejectedValueOnce(ApiError.localFile(new TypeError('Network request failed')));
 
     renderSubmit();
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Submit for review' })).toBeOnTheScreen());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Brian May' })).toBeOnTheScreen());
     await user.type(screen.getByLabelText('Title'), 'Fan pic');
+    await user.press(screen.getByRole('button', { name: 'Brian May' }));
     await user.press(screen.getByRole('button', { name: 'Choose from library' }));
     await user.press(screen.getByRole('button', { name: 'Submit for review' }));
 
