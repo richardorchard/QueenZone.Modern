@@ -51,6 +51,9 @@ public static class ForumApiMapper
         IEnumerable<ForumRecentThreadItem> items) =>
         items.Select(ToRecentThread).ToList();
 
+    public static ForumIndexStatsDto ToIndexStats(ForumIndexStats stats) =>
+        new(stats.ForumCount, stats.ThreadCount, stats.PostCount);
+
     public static ForumTopicDetailDto ToTopicDetail(
         ForumTopicHeader header,
         int postCount,

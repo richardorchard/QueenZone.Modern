@@ -15,6 +15,18 @@ export function formatForumCount(value: number): string {
   return value.toLocaleString();
 }
 
+export function forumIndexStatItems(input: {
+  boardCount: number;
+  threadCount: number;
+  postCount: number;
+}): { value: string; label: string }[] {
+  return [
+    { value: formatForumCount(input.boardCount), label: 'Boards' },
+    { value: formatForumCount(input.threadCount), label: 'Threads' },
+    { value: formatForumCount(input.postCount), label: 'Posts' },
+  ];
+}
+
 function formatListDate(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) {

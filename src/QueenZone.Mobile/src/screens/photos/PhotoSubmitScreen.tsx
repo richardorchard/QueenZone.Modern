@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -25,7 +27,6 @@ import {
   formatSubmittedAt,
   parseApproximateDate,
   parseApproximateYear,
-  photoCategoryMaxLength,
   photoDescriptionMaxLength,
   photoFromPickerAsset,
   photoSubmitCopy,
@@ -47,6 +48,7 @@ function PhotoSubmitForm({ navigation }: Pick<Props, 'navigation'>) {
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
   const { accessToken } = useSession();
+  const scrollRef = useRef<ScrollView>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [suggestedCategory, setSuggestedCategory] = useState('');
@@ -55,9 +57,18 @@ function PhotoSubmitForm({ navigation }: Pick<Props, 'navigation'>) {
   const [photo, setPhoto] = useState<PhotoUploadFile | null>(null);
   const [fileSize, setFileSize] = useState<number | null>(null);
   const [categories, setCategories] = useState<PhotoCategoryListItem[]>([]);
+  const [categoriesError, setCategoriesError] = useState<string | null>(null);
+  const [categoriesReload, setCategoriesReload] = useState(0);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [confirmation, setConfirmation] = useState<PhotoSubmissionCreated | null>(null);
+
+  const revealSubmitAfterPicker = useCallback(() => {
+    Keyboard.dismiss();
+    requestAnimationFrame(() => {
+      scrollRef.current?.scrollToEnd({ animated: true });
+    });
+  }, []);
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -67,13 +78,22 @@ function PhotoSubmitForm({ navigation }: Pick<Props, 'navigation'>) {
 
   useEffect(() => {
     const controller = new AbortController();
+    setCategoriesError(null);
     void fetchPhotoCategories({ page: 1, pageSize: 100, signal: controller.signal })
-      .then((page) => setCategories(page.items))
-      .catch(() => {
-        // Category chips are optional; the website datalist also allows a free-text value.
+      .then((page) => {
+        setCategories(page.items);
+        setCategoriesError(null);
+      })
+      .catch((err: unknown) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        setCategories([]);
+        setCategoriesError(err instanceof ApiError ? err.message : photoSubmitCopy.categoriesLoadError);
       });
     return () => controller.abort();
-  }, []);
+  }, [categoriesReload]);
 
   const resetForm = useCallback(() => {
     setTitle('');
@@ -88,6 +108,7 @@ function PhotoSubmitForm({ navigation }: Pick<Props, 'navigation'>) {
   }, []);
 
   const pickPhoto = useCallback(async (fromCamera: boolean) => {
+    Keyboard.dismiss();
     setSubmitError(null);
     const permission = fromCamera
       ? await ImagePicker.requestCameraPermissionsAsync()
@@ -98,6 +119,7 @@ function PhotoSubmitForm({ navigation }: Pick<Props, 'navigation'>) {
           ? 'Camera permission is required to take a photo.'
           : 'Photo library permission is required to choose a photo.',
       );
+      revealSubmitAfterPicker();
       return;
     }
 
@@ -111,21 +133,25 @@ function PhotoSubmitForm({ navigation }: Pick<Props, 'navigation'>) {
         ? await ImagePicker.launchCameraAsync(pickerOptions)
         : await ImagePicker.launchImageLibraryAsync(pickerOptions);
       if (picked.canceled || !picked.assets[0]) {
+        revealSubmitAfterPicker();
         return;
       }
 
       const mapped = photoFromPickerAsset(picked.assets[0]);
       if ('error' in mapped) {
         setSubmitError(mapped.error);
+        revealSubmitAfterPicker();
         return;
       }
 
       setPhoto(mapped.photo);
       setFileSize(mapped.fileSize);
+      revealSubmitAfterPicker();
     } catch {
       setSubmitError(fromCamera ? 'The camera is not available on this device.' : 'Could not open the photo library.');
+      revealSubmitAfterPicker();
     }
-  }, []);
+  }, [revealSubmitAfterPicker]);
 
   const submit = useCallback(async () => {
     const validation = validatePhotoSubmit({
@@ -186,11 +212,14 @@ function PhotoSubmitForm({ navigation }: Pick<Props, 'navigation'>) {
   return (
     <KeyboardAvoidingView
       style={[styles.flex, { backgroundColor: c.surfacePage }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior="padding"
+      keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
     >
       <ScrollView
+        ref={scrollRef}
         style={styles.flex}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + space.xxl }]}
       >
         <Text style={[type.eyebrow, { color: c.accentPrimary }]}>{photoSubmitCopy.eyebrow}</Text>
@@ -220,7 +249,7 @@ function PhotoSubmitForm({ navigation }: Pick<Props, 'navigation'>) {
             ) : null}
             {suggestedCategory.trim() ? (
               <MetaRow
-                label="Suggested category"
+                label={photoSubmitCopy.categoryLabel}
                 value={suggestedCategory.trim()}
                 color={c.textPrimary}
                 muted={c.textMuted}
@@ -265,7 +294,22 @@ function PhotoSubmitForm({ navigation }: Pick<Props, 'navigation'>) {
               ]}
             />
 
-            <FieldLabel color={c.textMuted}>Suggested category (optional)</FieldLabel>
+            <FieldLabel color={c.textMuted}>{photoSubmitCopy.categoryLabel}</FieldLabel>
+            {categoriesError ? (
+              <View>
+                <Text style={[type.body, { color: c.danger }]} accessibilityRole="alert">
+                  {categoriesError}
+                </Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Retry loading photo categories"
+                  onPress={() => setCategoriesReload((n) => n + 1)}
+                  hitSlop={8}
+                >
+                  <Text style={[type.button, { color: c.accentPrimary, marginTop: space.xs }]}>Retry</Text>
+                </Pressable>
+              </View>
+            ) : null}
             {categories.length > 0 ? (
               <View style={styles.chips}>
                 {categories.map((category) => {
@@ -275,21 +319,17 @@ function PhotoSubmitForm({ navigation }: Pick<Props, 'navigation'>) {
                       key={category.slug}
                       label={category.name}
                       active={active}
-                      onPress={() => setSuggestedCategory(active ? '' : category.name)}
+                      onPress={() => {
+                        setSuggestedCategory(active ? '' : category.name);
+                        if (!active) {
+                          setSubmitError(null);
+                        }
+                      }}
                     />
                   );
                 })}
               </View>
             ) : null}
-            <TextInput
-              value={suggestedCategory}
-              onChangeText={setSuggestedCategory}
-              maxLength={photoCategoryMaxLength}
-              accessibilityLabel="Suggested category"
-              placeholder="Category name"
-              placeholderTextColor={c.textMuted}
-              style={[styles.input, { color: c.textPrimary, borderColor: c.border, backgroundColor: c.surfaceCard }]}
-            />
 
             <FieldLabel color={c.textMuted}>Approximate year (optional)</FieldLabel>
             <TextInput
@@ -347,7 +387,7 @@ function PhotoSubmitForm({ navigation }: Pick<Props, 'navigation'>) {
             <Button
               label={photoSubmitCopy.submitAction}
               loading={submitting}
-              disabled={!accessToken}
+              disabled={!accessToken || Boolean(categoriesError)}
               onPress={() => {
                 void submit();
               }}

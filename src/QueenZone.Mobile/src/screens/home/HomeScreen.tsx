@@ -48,6 +48,8 @@ import {
   liveStripLabel,
   onThisDayEyebrow,
   onThisDayIsVisible,
+  queenQuotesEyebrow,
+  queenQuotesIsVisible,
   stockImageIndexForId,
   visibleSectionsForFilter,
   type HomeFilterKey,
@@ -150,9 +152,9 @@ export function HomeScreen({ navigation }: Props) {
       ? { text: quote.view.data.text, whoSaid: quote.view.data.whoSaid }
       : null;
   const showOnThisDay =
-    visibleSections.has('onThisDay') &&
-    (onThisDayEvent !== null || onThisDay.view.kind !== 'skeleton') &&
-    onThisDayIsVisible(onThisDayEvent, onThisDayQuote);
+    visibleSections.has('onThisDay') && onThisDayIsVisible(onThisDayEvent);
+  const showQueenQuotes =
+    visibleSections.has('onThisDay') && queenQuotesIsVisible(onThisDayQuote);
 
   return (
     <FlatList
@@ -524,15 +526,18 @@ export function HomeScreen({ navigation }: Props) {
             </Pressable>
           )}
 
-          {showOnThisDay ? (
+          {showOnThisDay && onThisDayEvent ? (
             <FeatureBlock
-              eyebrow={onThisDayEyebrow(onThisDayEvent)}
-              numeral={onThisDayEvent?.formattedDate.toUpperCase()}
-              body={onThisDayEvent?.summary}
-              quote={onThisDayQuote ?? undefined}
+              eyebrow={onThisDayEyebrow()}
+              numeral={onThisDayEvent.formattedDate.toUpperCase()}
+              body={onThisDayEvent.summary}
               actionLabel="View timeline"
               onAction={() => navigation.navigate('ArchiveTab', { screen: 'Timeline' })}
             />
+          ) : null}
+
+          {showQueenQuotes && onThisDayQuote ? (
+            <FeatureBlock eyebrow={queenQuotesEyebrow()} quote={onThisDayQuote} />
           ) : null}
 
           <ArchiveFooter />

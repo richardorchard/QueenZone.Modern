@@ -1,8 +1,10 @@
 import { screen, userEvent, waitFor } from '@testing-library/react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { Keyboard } from 'react-native';
 import { fetchPhotoCategories } from '../../api';
 import { ApiError } from '../../api/errors';
 import { createPhotoSubmission } from '../../api/photoSubmissions';
+import type { PhotoCategoryListItem } from '../../api/types';
 import { pagedResponse } from '../../test/fixtures';
 import { createMockSession } from '../../test/mockSession';
 import { fakeNavigation, renderWithProviders } from '../../test/render';
@@ -91,6 +93,7 @@ describe('PhotoSubmitScreen', () => {
     const user = userEvent.setup();
     mockSession.isSignedIn = true;
     mockSession.accessToken = 'tok';
+    fetchCategories.mockResolvedValue(pagedResponse([categoryFixture()], 1, 1));
     (ImagePicker.requestMediaLibraryPermissionsAsync as jest.Mock).mockResolvedValue({ granted: true });
     (ImagePicker.launchImageLibraryAsync as jest.Mock).mockResolvedValue({
       canceled: false,
@@ -99,8 +102,9 @@ describe('PhotoSubmitScreen', () => {
     submitPhoto.mockRejectedValueOnce(ApiError.localFile(new TypeError('Network request failed')));
 
     renderSubmit();
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Submit for review' })).toBeOnTheScreen());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Brian May' })).toBeOnTheScreen());
     await user.type(screen.getByLabelText('Title'), 'Fan pic');
+    await user.press(screen.getByRole('button', { name: 'Brian May' }));
     await user.press(screen.getByRole('button', { name: 'Choose from library' }));
     await user.press(screen.getByRole('button', { name: 'Submit for review' }));
 
@@ -109,4 +113,158 @@ describe('PhotoSubmitScreen', () => {
     );
     expect(screen.queryByText('Unable to reach QueenZone. Check your connection and try again.')).toBeNull();
   });
+
+  it('omits the free-text category field and submits a chip name', async () => {
+    const user = userEvent.setup();
+    mockSession.isSignedIn = true;
+    mockSession.accessToken = 'tok';
+    fetchCategories.mockResolvedValue(pagedResponse([categoryFixture()], 1, 1));
+    (ImagePicker.requestMediaLibraryPermissionsAsync as jest.Mock).mockResolvedValue({ granted: true });
+    (ImagePicker.launchImageLibraryAsync as jest.Mock).mockResolvedValue({
+      canceled: false,
+      assets: [{ uri: 'file:///tmp/crowd.jpg', fileName: 'crowd.jpg', mimeType: 'image/jpeg', fileSize: 12_000 }],
+    });
+    submitPhoto.mockResolvedValueOnce({
+      id: 'sub-1',
+      status: 'Pending',
+      title: 'Wembley',
+      submittedAt: '2026-08-23T00:15:00.000Z',
+    });
+
+    renderSubmit();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Brian May' })).toBeOnTheScreen());
+    expect(screen.getByText('Category')).toBeOnTheScreen();
+    expect(screen.queryByText('Suggested category (optional)')).toBeNull();
+    expect(screen.queryByLabelText('Suggested category')).toBeNull();
+    expect(screen.queryByPlaceholderText('Category name')).toBeNull();
+
+    await user.type(screen.getByLabelText('Title'), 'Wembley');
+    await user.press(screen.getByRole('button', { name: 'Brian May' }));
+    await user.press(screen.getByRole('button', { name: 'Choose from library' }));
+    await user.press(screen.getByRole('button', { name: 'Submit for review' }));
+
+    await waitFor(() => expect(submitPhoto).toHaveBeenCalledTimes(1));
+    expect(submitPhoto).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Wembley',
+        suggestedCategory: 'Brian May',
+        photo: expect.objectContaining({ name: 'crowd.jpg', type: 'image/jpeg' }),
+      }),
+      'tok',
+    );
+  });
+
+  it('blocks submit when no chip is selected and clears the error after a chip is chosen', async () => {
+    const user = userEvent.setup();
+    mockSession.isSignedIn = true;
+    mockSession.accessToken = 'tok';
+    fetchCategories.mockResolvedValue(pagedResponse([categoryFixture()], 1, 1));
+    (ImagePicker.requestMediaLibraryPermissionsAsync as jest.Mock).mockResolvedValue({ granted: true });
+    (ImagePicker.launchImageLibraryAsync as jest.Mock).mockResolvedValue({
+      canceled: false,
+      assets: [{ uri: 'file:///tmp/crowd.jpg', fileName: 'crowd.jpg', mimeType: 'image/jpeg', fileSize: 12_000 }],
+    });
+    submitPhoto.mockResolvedValueOnce({
+      id: 'sub-2',
+      status: 'Pending',
+      title: 'Fan pic',
+      submittedAt: '2026-08-23T00:15:00.000Z',
+    });
+
+    renderSubmit();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Brian May' })).toBeOnTheScreen());
+    await user.type(screen.getByLabelText('Title'), 'Fan pic');
+    await user.press(screen.getByRole('button', { name: 'Choose from library' }));
+    await user.press(screen.getByRole('button', { name: 'Submit for review' }));
+
+    expect(submitPhoto).not.toHaveBeenCalled();
+    expect(screen.getByText('Select a category.')).toBeOnTheScreen();
+
+    await user.press(screen.getByRole('button', { name: 'Brian May' }));
+    expect(screen.queryByText('Select a category.')).toBeNull();
+
+    await user.press(screen.getByRole('button', { name: 'Submit for review' }));
+    await waitFor(() => expect(submitPhoto).toHaveBeenCalledTimes(1));
+    expect(submitPhoto).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Fan pic',
+        suggestedCategory: 'Brian May',
+      }),
+      'tok',
+    );
+  });
+
+  it('dismisses the keyboard after a library pick so submit stays reachable', async () => {
+    const user = userEvent.setup();
+    const dismiss = jest.spyOn(Keyboard, 'dismiss');
+    mockSession.isSignedIn = true;
+    mockSession.accessToken = 'tok';
+    fetchCategories.mockResolvedValue(pagedResponse([categoryFixture()], 1, 1));
+    (ImagePicker.requestMediaLibraryPermissionsAsync as jest.Mock).mockResolvedValue({ granted: true });
+    (ImagePicker.launchImageLibraryAsync as jest.Mock).mockResolvedValue({
+      canceled: false,
+      assets: [{ uri: 'file:///tmp/crowd.jpg', fileName: 'crowd.jpg', mimeType: 'image/jpeg', fileSize: 12_000 }],
+    });
+
+    renderSubmit();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Brian May' })).toBeOnTheScreen());
+    await user.type(screen.getByLabelText('Title'), 'Wembley');
+    await user.press(screen.getByRole('button', { name: 'Choose from library' }));
+
+    await waitFor(() => expect(dismiss).toHaveBeenCalled());
+    expect(screen.getByRole('button', { name: 'Submit for review' })).toBeOnTheScreen();
+    dismiss.mockRestore();
+  });
+
+  it('dismisses the keyboard after a camera pick so submit stays reachable', async () => {
+    const user = userEvent.setup();
+    const dismiss = jest.spyOn(Keyboard, 'dismiss');
+    mockSession.isSignedIn = true;
+    mockSession.accessToken = 'tok';
+    fetchCategories.mockResolvedValue(pagedResponse([categoryFixture()], 1, 1));
+    (ImagePicker.requestCameraPermissionsAsync as jest.Mock).mockResolvedValue({ granted: true });
+    (ImagePicker.launchCameraAsync as jest.Mock).mockResolvedValue({
+      canceled: false,
+      assets: [{ uri: 'file:///tmp/stage.jpg', fileName: 'stage.jpg', mimeType: 'image/jpeg', fileSize: 12_000 }],
+    });
+
+    renderSubmit();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Brian May' })).toBeOnTheScreen());
+    await user.type(screen.getByLabelText('Title'), 'Live');
+    await user.press(screen.getByRole('button', { name: 'Take photo' }));
+
+    await waitFor(() => expect(dismiss).toHaveBeenCalled());
+    expect(screen.getByRole('button', { name: 'Submit for review' })).toBeOnTheScreen();
+    dismiss.mockRestore();
+  });
+
+  it('shows a retry action when photo categories fail to load', async () => {
+    const user = userEvent.setup();
+    mockSession.isSignedIn = true;
+    mockSession.accessToken = 'tok';
+    fetchCategories
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValueOnce(pagedResponse([categoryFixture()], 1, 1));
+
+    renderSubmit();
+    await waitFor(() => expect(screen.getByText('Could not load photo categories.')).toBeOnTheScreen());
+    expect(screen.getByRole('button', { name: 'Submit for review' })).toBeDisabled();
+
+    await user.press(screen.getByRole('button', { name: 'Retry loading photo categories' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Brian May' })).toBeOnTheScreen());
+    expect(screen.queryByText('Could not load photo categories.')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Submit for review' })).toBeEnabled();
+  });
 });
+
+function categoryFixture(overrides: Partial<PhotoCategoryListItem> = {}): PhotoCategoryListItem {
+  return {
+    catId: 1,
+    name: 'Brian May',
+    slug: 'brian-may',
+    imageCount: 3,
+    coverThumbnailUrl: null,
+    detailPath: '/photography/brian-may',
+    ...overrides,
+  };
+}

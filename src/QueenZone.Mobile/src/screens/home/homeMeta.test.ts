@@ -7,6 +7,8 @@ import {
   liveStripLabel,
   onThisDayEyebrow,
   onThisDayIsVisible,
+  queenQuotesEyebrow,
+  queenQuotesIsVisible,
   relativeTimeFromNow,
   stockImageIndexForId,
   visibleSectionsForFilter,
@@ -39,7 +41,7 @@ describe('home meta', () => {
     assert.equal(formatGalleryCardMeta({ imageCount: 968 }), '968 images');
   });
 
-  it('shows the on-this-day band for an event, a quote, or both', () => {
+  it('shows on-this-day and queen-quotes cards independently', () => {
     const event = {
       id: 1,
       title: 'x',
@@ -52,12 +54,11 @@ describe('home meta', () => {
     };
     const quote = { text: 'A kind of magic', whoSaid: 'Freddie Mercury' };
     assert.equal(onThisDayIsVisible(null), false);
-    assert.equal(onThisDayIsVisible(null, null), false);
     assert.equal(onThisDayIsVisible(event), true);
-    assert.equal(onThisDayIsVisible(null, quote), true);
-    assert.equal(onThisDayIsVisible(event, quote), true);
-    assert.equal(onThisDayEyebrow(event), 'On this day');
-    assert.equal(onThisDayEyebrow(null), 'Quote');
+    assert.equal(queenQuotesIsVisible(null), false);
+    assert.equal(queenQuotesIsVisible(quote), true);
+    assert.equal(onThisDayEyebrow(), 'On this day');
+    assert.equal(queenQuotesEyebrow(), 'Queen Quotes');
   });
 
   it('hides the live strip at zero and labels singular vs plural replies', () => {

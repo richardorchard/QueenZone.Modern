@@ -18,6 +18,8 @@ describe('photoSubmitCopy', () => {
   it('matches the website confirmation message', () => {
     assert.equal(photoSubmitCopy.confirmationTitle, 'Photo submitted');
     assert.equal(photoSubmitCopy.confirmationMessage, 'Your photo is under review.');
+    assert.equal(photoSubmitCopy.categoryLabel, 'Category');
+    assert.equal(photoSubmitCopy.categoryRequired, 'Select a category.');
     assert.match(photoSubmitCopy.help, /20 MB/);
   });
 });
@@ -93,7 +95,18 @@ describe('validatePhotoSubmit', () => {
       validatePhotoSubmit({
         title: 'Wembley',
         description: '',
-        suggestedCategory: '',
+        suggestedCategory: '   ',
+        approximateYear: '',
+        approximateDate: '',
+        photo,
+      }),
+      'Select a category.',
+    );
+    assert.equal(
+      validatePhotoSubmit({
+        title: 'Wembley',
+        description: '',
+        suggestedCategory: 'Queen',
         approximateYear: '',
         approximateDate: '',
         photo: null,
@@ -136,7 +149,7 @@ describe('validatePhotoSubmit', () => {
       validatePhotoSubmit({
         title: 'Wembley',
         description: '',
-        suggestedCategory: '',
+        suggestedCategory: 'Queen',
         approximateYear: 'abc',
         approximateDate: '',
         photo,

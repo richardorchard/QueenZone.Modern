@@ -75,6 +75,18 @@ public sealed record ForumAttachmentDto(
     string DownloadUrl);
 
 /// <summary>
+/// Index totals for <c>/api/v1/forum/stats</c>. Same numeric sources as the
+/// website forum index: <see cref="PublicContentMapper.ToForumIndexStats"/>
+/// with <see cref="PublicQueryCacheService.GetForumThreadCountAsync"/>.
+/// <see cref="BoardCount"/> is the public board count; <see cref="ThreadCount"/>
+/// is the archive thread total (not a sum of category DTOs).
+/// </summary>
+public sealed record ForumIndexStatsDto(
+    int BoardCount,
+    int ThreadCount,
+    long PostCount);
+
+/// <summary>
 /// Cross-board recent-activity row for <c>/api/v1/forum/recent-threads</c>. Same source
 /// (<see cref="PublicQueryCacheService.GetForumRecentThreadsAsync"/>) as the website
 /// forum index's activity feed, most-recent first.

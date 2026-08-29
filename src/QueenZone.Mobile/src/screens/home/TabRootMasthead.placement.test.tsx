@@ -2,6 +2,7 @@ import { screen, userEvent, waitFor } from '@testing-library/react-native';
 import {
   fetchForumCategories,
   fetchForumRecentThreads,
+  fetchForumStats,
   fetchForumTopic,
   fetchForumTopicPoll,
   fetchForumTopicPosts,
@@ -39,6 +40,7 @@ jest.mock('../../api', () => {
     fetchNewsDetail: jest.fn(),
     fetchForumRecentThreads: jest.fn(),
     fetchForumCategories: jest.fn(),
+    fetchForumStats: jest.fn(),
     fetchForumTopic: jest.fn(),
     fetchForumTopicPosts: jest.fn(),
     fetchForumTopicPoll: jest.fn(),
@@ -84,6 +86,7 @@ const fetchYearRange = fetchNewsYearRange as jest.MockedFunction<typeof fetchNew
 const fetchDetail = fetchNewsDetail as jest.MockedFunction<typeof fetchNewsDetail>;
 const fetchForum = fetchForumRecentThreads as jest.MockedFunction<typeof fetchForumRecentThreads>;
 const fetchForumCats = fetchForumCategories as jest.MockedFunction<typeof fetchForumCategories>;
+const fetchForumIndexStats = fetchForumStats as jest.MockedFunction<typeof fetchForumStats>;
 const fetchTopic = fetchForumTopic as jest.MockedFunction<typeof fetchForumTopic>;
 const fetchPosts = fetchForumTopicPosts as jest.MockedFunction<typeof fetchForumTopicPosts>;
 const fetchPoll = fetchForumTopicPoll as jest.MockedFunction<typeof fetchForumTopicPoll>;
@@ -122,6 +125,7 @@ describe('TabRootMasthead placement', () => {
         1,
       ),
     );
+    fetchForumIndexStats.mockResolvedValue({ boardCount: 1, threadCount: 12, postCount: 12 });
     fetchTopic.mockResolvedValue({
       id: 1002,
       title: 'Ranking every studio album',

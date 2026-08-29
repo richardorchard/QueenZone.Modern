@@ -319,23 +319,29 @@ describe('HomeScreen', () => {
     await flushVirtualizedList();
   });
 
-  it('shows the quote of the day inside the On This Day card', async () => {
+  it('shows On this day and Queen Quotes as distinct cards', async () => {
     fetchDay.mockResolvedValue(onThisDayFixture());
     fetchQuote.mockResolvedValue({ id: 9, text: 'A kind of magic', whoSaid: 'Freddie Mercury' });
     renderHome();
 
     await waitFor(() => expect(screen.getByText('Queen released The Game.')).toBeOnTheScreen());
+    expect(screen.getByText('On this day')).toBeOnTheScreen();
+    expect(screen.getByText('Queen Quotes')).toBeOnTheScreen();
     expect(screen.getByText('“A kind of magic”')).toBeOnTheScreen();
     expect(screen.getByText('— Freddie Mercury')).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'View timeline' })).toBeOnTheScreen();
     await flushVirtualizedList();
   });
 
-  it('omits the quote row when no quote is published', async () => {
+  it('keeps the On this day card when no quote is published', async () => {
     fetchDay.mockResolvedValue(onThisDayFixture());
     fetchQuote.mockResolvedValue(null);
     renderHome();
 
     await waitFor(() => expect(screen.getByText('Queen released The Game.')).toBeOnTheScreen());
+    expect(screen.getByText('On this day')).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'View timeline' })).toBeOnTheScreen();
+    expect(screen.queryByText('Queen Quotes')).not.toBeOnTheScreen();
     expect(screen.queryByText(/^“/)).not.toBeOnTheScreen();
     await flushVirtualizedList();
   });
@@ -366,20 +372,22 @@ describe('HomeScreen', () => {
       }),
     );
     expect(screen.getByText('“A kind of magic”')).toBeOnTheScreen();
-    expect(screen.getByText('Quote')).toBeOnTheScreen();
+    expect(screen.getByText('Queen Quotes')).toBeOnTheScreen();
+    expect(screen.queryByText('On this day')).not.toBeOnTheScreen();
     await flushVirtualizedList();
   });
 
-  it('shows the quote card when there is no on-this-day event', async () => {
+  it('shows the Queen Quotes card when there is no on-this-day event', async () => {
     fetchDay.mockResolvedValue(null);
     fetchQuote.mockResolvedValue({ id: 9, text: 'A kind of magic', whoSaid: 'Freddie Mercury' });
     renderHome();
 
     await waitFor(() => expect(screen.getByText('“A kind of magic”')).toBeOnTheScreen());
     expect(screen.getByText('— Freddie Mercury')).toBeOnTheScreen();
-    expect(screen.getByText('Quote')).toBeOnTheScreen();
+    expect(screen.getByText('Queen Quotes')).toBeOnTheScreen();
+    expect(screen.queryByText('On this day')).not.toBeOnTheScreen();
     expect(screen.queryByText('Queen released The Game.')).not.toBeOnTheScreen();
-    expect(screen.getByRole('button', { name: 'View timeline' })).toBeOnTheScreen();
+    expect(screen.queryByRole('button', { name: 'View timeline' })).not.toBeOnTheScreen();
     await flushVirtualizedList();
   });
 });

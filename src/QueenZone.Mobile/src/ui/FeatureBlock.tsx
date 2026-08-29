@@ -10,8 +10,8 @@ type Props = {
   numeral?: string;
   body?: string;
   quote?: { text: string; whoSaid: string };
-  actionLabel: string;
-  onAction: () => void;
+  actionLabel?: string;
+  onAction?: () => void;
 };
 
 export function FeatureBlock({ eyebrow, numeral, body, quote, actionLabel, onAction }: Props) {
@@ -74,9 +74,11 @@ export function FeatureBlock({ eyebrow, numeral, body, quote, actionLabel, onAct
           </Text>
         </View>
       ) : null}
-      <View style={{ alignSelf: 'flex-start', marginTop: space.xs }}>
-        <Button variant="outline" size="sm" label={actionLabel} onPress={onAction} />
-      </View>
+      {actionLabel && onAction ? (
+        <View style={{ alignSelf: 'flex-start', marginTop: space.xs }}>
+          <Button variant="outline" size="sm" label={actionLabel} onPress={onAction} />
+        </View>
+      ) : null}
     </View>
   );
 }
