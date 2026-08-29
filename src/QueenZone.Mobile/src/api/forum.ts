@@ -3,6 +3,7 @@ import { fetchJson, sendJson, sendMultipart } from './client';
 import type {
   ApiPagedResponse,
   ForumCategoryListItem,
+  ForumIndexStats,
   ForumPoll,
   ForumPost,
   ForumPostCreated,
@@ -29,6 +30,11 @@ export function fetchForumRecentThreads(
   signal?: AbortSignal,
 ): Promise<ForumRecentThread[]> {
   return fetchJson('/forum/recent-threads', { query: { count }, signal });
+}
+
+/** Index totals. `threadCount` is the website `GetForumThreadCountAsync` value. */
+export function fetchForumStats(signal?: AbortSignal): Promise<ForumIndexStats> {
+  return fetchJson('/forum/stats', { signal });
 }
 
 export function fetchForumCategories(

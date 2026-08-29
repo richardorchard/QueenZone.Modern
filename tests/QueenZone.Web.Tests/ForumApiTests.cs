@@ -61,6 +61,35 @@ public sealed class ForumApiTests : IClassFixture<QueenZoneWebApplicationFactory
     }
 
     [Fact]
+    public async Task Stats_requires_no_auth_and_matches_website_index_totals()
+    {
+        using var client = factory.CreateAnonymousClient();
+
+        using var response = await client.GetAsync($"{ForumApiEndpoints.RootPath}/stats");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<ForumIndexStatsDto>();
+        Assert.NotNull(payload);
+
+        var expected = PublicContentMapper.ToForumIndexStats(
+            SampleForumData.CreateSeedCategories(),
+            SampleForumData.CreateSeedStats().ThreadCount);
+        Assert.Equal(expected.ForumCount, payload!.BoardCount);
+        Assert.Equal(expected.ThreadCount, payload.ThreadCount);
+        Assert.Equal(expected.PostCount, payload.PostCount);
+        Assert.Equal(12_600, payload.ThreadCount);
+
+        var html = await client.GetStringAsync("/forum");
+        Assert.Contains($"{expected.ForumCount.ToString("N0")}</strong> boards", html, StringComparison.Ordinal);
+        Assert.Contains(" threads", html, StringComparison.Ordinal);
+        Assert.Contains(" posts", html, StringComparison.Ordinal);
+
+        using var openApi = await client.GetAsync(ApiV1.OpenApiPath);
+        var document = await openApi.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(document.GetProperty("paths").TryGetProperty("/api/v1/forum/stats", out _));
+    }
+
+    [Fact]
     public async Task Category_detail_returns_public_board()
     {
         using var client = factory.CreateAnonymousClient();
@@ -198,6 +227,9 @@ public sealed class ForumApiTests : IClassFixture<QueenZoneWebApplicationFactory
         Assert.Equal("/forum/topic/1002/ranking-every-studio-album", topicDto.DetailPath);
         Assert.Equal(ForumApiMapper.ToCategoryListItems([category])[0], categoryDto);
         Assert.Equal(ForumApiMapper.ToTopicListItems([topic])[0], topicDto);
+
+        var indexStats = PublicContentMapper.ToForumIndexStats([category], threadCount: 4);
+        Assert.Equal(new ForumIndexStatsDto(1, 4, 10), ForumApiMapper.ToIndexStats(indexStats));
 
         var header = new ForumTopicHeader(1002, " Ranking every studio album ", 1, " The Music ");
         var topicDetail = ForumApiMapper.ToTopicDetail(header, postCount: 26);

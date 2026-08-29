@@ -4,8 +4,9 @@ import { useCallback, useMemo } from 'react';
 import { FlatList, Platform, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Plus } from 'lucide-react-native';
-import { fetchForumCategories, type ForumCategoryListItem } from '../../api';
+import { fetchForumCategories, fetchForumStats, type ForumCategoryListItem } from '../../api';
 import { usePagedContent } from '../../hooks/usePagedContent';
+import { useDetailQuery } from '../../hooks/useDetailQuery';
 import type { ForumStackParamList, RootTabParamList } from '../../navigation/types';
 import { useSession } from '../../session/SessionContext';
 import { openForumComposer } from '../../session/signInNavigation';
@@ -16,7 +17,7 @@ import { PageTitleBlock } from '../../ui/PageTitleBlock';
 import { SectionHeader } from '../../ui/SectionHeader';
 import { testIds } from '../../test/testIds';
 import { TabRootMasthead } from '../home/TabRootMasthead';
-import { categoryMeta, formatForumCount } from './forumListMeta';
+import { categoryMeta, forumIndexStatItems } from './forumListMeta';
 
 type Props = CompositeScreenProps<
   NativeStackScreenProps<ForumStackParamList, 'ForumIndex'>,
@@ -36,14 +37,21 @@ export function ForumScreen({ navigation }: Props) {
     ),
     categoryPageSize,
   );
+  const forumStats = useDetailQuery(useCallback((signal) => fetchForumStats(signal), []));
 
   const stats = useMemo(() => {
     const postCount = paged.items.reduce((sum, item) => sum + item.postCount, 0);
-    return [
-      { value: formatForumCount(postCount), label: 'Posts' },
-      { value: formatForumCount(paged.totalCount), label: 'Boards' },
-    ];
-  }, [paged.items, paged.totalCount]);
+    return forumIndexStatItems({
+      boardCount: paged.totalCount,
+      threadCount: forumStats.data?.threadCount ?? 0,
+      postCount,
+    });
+  }, [forumStats.data?.threadCount, paged.items, paged.totalCount]);
+
+  const refresh = useCallback(() => {
+    forumStats.reload();
+    paged.refresh();
+  }, [forumStats.reload, paged.refresh]);
 
   const compose = () => {
     openForumComposer(navigation, isSignedIn, {});
@@ -99,7 +107,7 @@ export function ForumScreen({ navigation }: Props) {
         refreshControl={
           <RefreshControl
             refreshing={paged.refreshing}
-            onRefresh={paged.refresh}
+            onRefresh={refresh}
             tintColor={c.accentPrimary}
           />
         }

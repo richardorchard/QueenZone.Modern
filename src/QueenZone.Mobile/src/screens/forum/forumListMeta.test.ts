@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { categoryMeta, formatForumCount, topicMeta } from './forumListMeta.ts';
+import { categoryMeta, formatForumCount, forumIndexStatItems, topicMeta } from './forumListMeta.ts';
 
 describe('forum list meta', () => {
   it('prefers the latest thread title on a board card', () => {
@@ -54,5 +54,13 @@ describe('forum list meta', () => {
     });
     assert.equal(meta.startsWith('Pinned'), false);
     assert.match(meta, /^0 replies · /);
+  });
+
+  it('formats Boards, Threads, and Posts with locale grouping, website order', () => {
+    assert.deepEqual(forumIndexStatItems({ boardCount: 7, threadCount: 12600, postCount: 15 }), [
+      { value: formatForumCount(7), label: 'Boards' },
+      { value: formatForumCount(12600), label: 'Threads' },
+      { value: formatForumCount(15), label: 'Posts' },
+    ]);
   });
 });

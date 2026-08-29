@@ -46,6 +46,7 @@ export {
   fetchForumCategory,
   fetchForumCategoryTopics,
   fetchForumRecentThreads,
+  fetchForumStats,
   fetchForumTopic,
   fetchForumTopicPoll,
   fetchForumTopicPosts,
