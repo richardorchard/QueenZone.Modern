@@ -33,6 +33,8 @@ public sealed class ProfileModel(
 
     public string? StatusMessage { get; private set; }
 
+    public IReadOnlyList<MemberSocialLink> SocialLinks { get; private set; } = [];
+
     public IReadOnlyList<MemberActivityViewModel> Activity { get; private set; } = [];
 
     public ArchivePaginationViewModel? Pagination { get; private set; }
@@ -68,6 +70,7 @@ public sealed class ProfileModel(
                 cancellationToken);
         }
 
+        SocialLinks = await memberAccountRepository.ListSocialLinksAsync(Member.Id, cancellationToken);
         StatusMessage = TempData[StatusMessageKey] as string;
 
         var activityPage = await activityRepository.GetPageAsync(

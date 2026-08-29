@@ -5159,6 +5159,19 @@ a.qz-forum-post__author-link:focus-visible {
   justify-items: start;
 }
 
+.qz-member-profile__socials {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.qz-member-profile__socials a {
+  font-weight: var(--fw-medium);
+}
+
 .qz-member-activity {
   margin-top: var(--space-7);
 }

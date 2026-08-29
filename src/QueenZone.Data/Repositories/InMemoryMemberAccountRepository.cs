@@ -6,6 +6,7 @@ public sealed class InMemoryMemberAccountRepository : IMemberAccountRepository
 {
     private readonly List<MemberAccount> accounts = [];
     private readonly List<MemberExternalLogin> externalLogins = [];
+    private readonly List<MemberSocialLinkEntity> socialLinks = [];
     private readonly Lock gate = new();
 
     private readonly List<MemberAccountDeletionAuditLogEntity> deletionAuditLogs = [];
@@ -354,6 +355,7 @@ public sealed class InMemoryMemberAccountRepository : IMemberAccountRepository
             account.DisplayName = MemberAccountDeletionPolicy.DeletedDisplayName;
             account.AvatarUrl = null;
             account.DeletionRequestedAt = requestedAt;
+            socialLinks.RemoveAll(row => row.MemberId == memberId);
             deletionAuditLogs.Add(new MemberAccountDeletionAuditLogEntity
             {
                 MemberAccountId = memberId,
@@ -421,6 +423,7 @@ public sealed class InMemoryMemberAccountRepository : IMemberAccountRepository
             foreach (var account in dueAccounts)
             {
                 externalLogins.RemoveAll(login => login.MemberAccountId == account.Id);
+                socialLinks.RemoveAll(row => row.MemberId == account.Id);
                 var deletedEmail = MemberAccountDeletionPolicy.CreateDeletedEmail(account.Id);
                 account.Email = deletedEmail;
                 account.NormalizedEmail = Normalize(deletedEmail);
@@ -444,6 +447,56 @@ public sealed class InMemoryMemberAccountRepository : IMemberAccountRepository
             }
 
             return Task.FromResult(new MemberAccountDeletionPurgeResult(dueAccounts.Count, avatarBlobPaths));
+        }
+    }
+
+    public Task<IReadOnlyList<MemberSocialLink>> ListSocialLinksAsync(
+        Guid memberId,
+        CancellationToken cancellationToken = default)
+    {
+        lock (gate)
+        {
+            IReadOnlyList<MemberSocialLink> links = MemberSocialChannels.All
+                .Select(channel =>
+                {
+                    var key = MemberSocialChannels.ToKey(channel);
+                    var row = socialLinks.FirstOrDefault(candidate =>
+                        candidate.MemberId == memberId
+                        && string.Equals(candidate.Channel, key, StringComparison.Ordinal));
+                    return row is null ? null : new MemberSocialLink(channel, row.Url);
+                })
+                .OfType<MemberSocialLink>()
+                .ToList();
+            return Task.FromResult(links);
+        }
+    }
+
+    public Task ReplaceSocialLinksAsync(
+        Guid memberId,
+        IReadOnlyList<MemberSocialLink> links,
+        CancellationToken cancellationToken = default)
+    {
+        lock (gate)
+        {
+            socialLinks.RemoveAll(row => row.MemberId == memberId);
+            var seen = new HashSet<MemberSocialChannel>();
+            foreach (var link in links)
+            {
+                if (!seen.Add(link.Channel))
+                {
+                    throw new InvalidOperationException(
+                        $"Duplicate social channel '{MemberSocialChannels.ToKey(link.Channel)}' for member {memberId}.");
+                }
+
+                socialLinks.Add(new MemberSocialLinkEntity
+                {
+                    MemberId = memberId,
+                    Channel = MemberSocialChannels.ToKey(link.Channel),
+                    Url = link.Url,
+                });
+            }
+
+            return Task.CompletedTask;
         }
     }
 
