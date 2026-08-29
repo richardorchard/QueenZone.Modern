@@ -6,6 +6,7 @@ import {
   fetchForumCategory,
   fetchForumCategoryTopics,
   fetchForumRecentThreads,
+  fetchForumStats,
   fetchForumTopic,
   fetchForumTopicPoll,
   fetchForumTopicPosts,
@@ -47,6 +48,10 @@ describe('read endpoints', () => {
     fetchMock.mockResolvedValueOnce(jsonResponse([]));
     await fetchForumRecentThreads(5);
     expect(lastCall().url).toBe('http://qz.test/api/v1/forum/recent-threads?count=5');
+
+    fetchMock.mockResolvedValueOnce(jsonResponse({ boardCount: 6, threadCount: 12600, postCount: 1 }));
+    await fetchForumStats();
+    expect(lastCall().url).toBe('http://qz.test/api/v1/forum/stats');
 
     fetchMock.mockResolvedValueOnce(jsonResponse({ items: [] }));
     await fetchForumCategories({ page: 2 });

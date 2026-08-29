@@ -49,6 +49,11 @@ public static class ForumApiEndpoints
             .Produces<ForumCategoryListItemDto>()
             .ProducesProblem(StatusCodes.Status404NotFound);
 
+        group.MapGet("/stats", GetStatsAsync)
+            .WithName("GetForumStats")
+            .WithSummary("Public forum index totals (boards, threads, posts). Same ToForumIndexStats source as /forum.")
+            .Produces<ForumIndexStatsDto>();
+
         group.MapGet("/recent-threads", GetRecentThreadsAsync)
             .WithName("GetForumRecentThreads")
             .WithSummary("Cross-board recent-activity thread feed, most-recent first. Same source as the website forum index activity list.")
@@ -185,6 +190,16 @@ public static class ForumApiEndpoints
             categories.Count);
 
         return Results.Ok(response);
+    }
+
+    internal static async Task<IResult> GetStatsAsync(
+        PublicQueryCacheService publicQueryCache,
+        CancellationToken cancellationToken)
+    {
+        var categories = await publicQueryCache.GetForumCategoriesAsync(cancellationToken);
+        var threadCount = await publicQueryCache.GetForumThreadCountAsync(cancellationToken);
+        var stats = PublicContentMapper.ToForumIndexStats(categories, threadCount);
+        return Results.Ok(ForumApiMapper.ToIndexStats(stats));
     }
 
     internal static async Task<IResult> GetRecentThreadsAsync(

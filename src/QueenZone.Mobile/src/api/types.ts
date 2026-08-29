@@ -214,6 +214,13 @@ export type FanPerformance = {
   audioPath: string;
 };
 
+/** Shape for `/api/v1/forum/stats`. `threadCount` matches website `GetForumThreadCountAsync`. */
+export type ForumIndexStats = {
+  boardCount: number;
+  threadCount: number;
+  postCount: number;
+};
+
 export type ForumCategoryListItem = {
   id: number;
   name: string;
