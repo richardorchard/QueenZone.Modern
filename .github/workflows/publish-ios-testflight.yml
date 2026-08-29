@@ -593,6 +593,14 @@ jobs:
             exit 1
           fi
 
+          expected_short=$(node -e "const { marketingVersionPrefix, resolveMarketingVersion } = require('./apiEnvironments.cjs'); process.stdout.write(resolveMarketingVersion({ prefix: marketingVersionPrefix, runNumber: process.env.GITHUB_RUN_NUMBER || process.env.IOS_BUILD_NUMBER }));")
+          short_version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app_path/Info.plist")
+          echo "IPA CFBundleShortVersionString=${short_version} (expected ${expected_short})"
+          if [ "$short_version" != "$expected_short" ]; then
+            echo "::error::IPA CFBundleShortVersionString is ${short_version}, expected ${expected_short}."
+            exit 1
+          fi
+
           encryption=$(/usr/libexec/PlistBuddy -c 'Print :ITSAppUsesNonExemptEncryption' "$app_path/Info.plist")
           echo "IPA ITSAppUsesNonExemptEncryption=${encryption}"
           if [ "$encryption" != "false" ]; then

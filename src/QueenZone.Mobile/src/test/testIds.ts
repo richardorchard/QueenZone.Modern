@@ -8,6 +8,7 @@ export const testIds = {
 
   homeScreen: 'home-screen',
   homeHero: 'home-hero',
+  homeVersion: 'home-version',
   homeSearch: 'home-search',
   homeMessages: 'home-messages',
   homeMessagesUnread: 'home-messages-unread',

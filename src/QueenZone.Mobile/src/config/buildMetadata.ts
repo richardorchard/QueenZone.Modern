@@ -5,6 +5,41 @@ export type BuildStampMetadata = {
   buildRevision?: string;
 };
 
+const utcShortMonths = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+] as const;
+
+/** Calendar date from the baked UTC timestamp. No second clock, no time-of-day. */
+export function formatHomeFooterDate(buildTimestampUtc?: string): string | null {
+  if (!buildTimestampUtc) {
+    return null;
+  }
+
+  const builtAt = new Date(buildTimestampUtc);
+  if (Number.isNaN(builtAt.getTime())) {
+    return null;
+  }
+
+  return `${builtAt.getUTCDate()} ${utcShortMonths[builtAt.getUTCMonth()]} ${builtAt.getUTCFullYear()}`;
+}
+
+/** Home footer: store Version, plus the publish date when the timestamp is baked. */
+export function formatHomeFooter(metadata: Pick<BuildStampMetadata, 'version' | 'buildTimestampUtc'>): string {
+  const date = formatHomeFooterDate(metadata.buildTimestampUtc);
+  return date ? `${metadata.version} · ${date}` : metadata.version;
+}
+
 export function formatBuildStamp(
   metadata: BuildStampMetadata,
   locales?: Intl.LocalesArgument,
