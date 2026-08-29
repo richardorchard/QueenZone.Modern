@@ -9,6 +9,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   ApiError,
@@ -20,10 +22,20 @@ import {
 import type { ForumStackParamList } from '../../navigation/types';
 import { MemberGate } from '../../session/MemberGate';
 import { useSession } from '../../session/SessionContext';
+import { testIds } from '../../test/testIds';
 import { fonts, radius, space, type, useTheme } from '../../theme';
 import { Button } from '../../ui/Button';
 import { ErrorBlock, LoadingBlock } from '../../ui/ScreenStates';
-import { composerCopy, composerMode, validateComposer } from './composerMeta';
+import {
+  attachmentFromPickerAsset,
+  composerAttachCopy,
+  composerCopy,
+  composerMode,
+  forumImagePickerOptions,
+  validateComposer,
+  type ComposerAttachment,
+  type ComposerPickerAsset,
+} from './composerMeta';
 
 type Props = NativeStackScreenProps<ForumStackParamList, 'Composer'>;
 
@@ -52,6 +64,7 @@ function ComposerForm({ navigation, route }: Props) {
   const [boardsError, setBoardsError] = useState<string | null>(null);
   const [boardsLoading, setBoardsLoading] = useState(mode === 'newTopic' && categoryId == null);
   const [boardsReloadToken, setBoardsReloadToken] = useState(0);
+  const [attachment, setAttachment] = useState<ComposerAttachment | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -89,6 +102,54 @@ function ComposerForm({ navigation, route }: Props) {
     setBoardsReloadToken((n) => n + 1);
   }, []);
 
+  const applyPickedAsset = useCallback((asset: ComposerPickerAsset) => {
+    const mapped = attachmentFromPickerAsset(asset);
+    if ('error' in mapped) {
+      setSubmitError(mapped.error);
+      return;
+    }
+    setAttachment(mapped);
+  }, []);
+
+  const pickFromPhotos = useCallback(async () => {
+    setSubmitError(null);
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      setSubmitError(composerAttachCopy.photosPermission);
+      return;
+    }
+
+    try {
+      const picked = await ImagePicker.launchImageLibraryAsync({
+        ...forumImagePickerOptions,
+        preferredAssetRepresentationMode:
+          ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
+      });
+      if (picked.canceled || !picked.assets[0]) {
+        return;
+      }
+      applyPickedAsset(picked.assets[0]);
+    } catch {
+      setSubmitError(composerAttachCopy.photosUnavailable);
+    }
+  }, [applyPickedAsset]);
+
+  const pickFromFiles = useCallback(async () => {
+    setSubmitError(null);
+    try {
+      const picked = await DocumentPicker.getDocumentAsync({
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+      if (picked.canceled || !picked.assets?.[0]) {
+        return;
+      }
+      applyPickedAsset(picked.assets[0]);
+    } catch {
+      setSubmitError(composerAttachCopy.filesUnavailable);
+    }
+  }, [applyPickedAsset]);
+
   const submit = useCallback(async () => {
     const validation = validateComposer({
       mode,
@@ -110,7 +171,11 @@ function ComposerForm({ navigation, route }: Props) {
     setSubmitError(null);
     try {
       if (mode === 'reply' && route.params?.threadId != null) {
-        await createForumReply(route.params.threadId, { body: body.trim() }, accessToken);
+        await createForumReply(
+          route.params.threadId,
+          { body: body.trim(), ...(attachment ? { file: attachment } : {}) },
+          accessToken,
+        );
         navigation.goBack();
         return;
       }
@@ -122,7 +187,7 @@ function ComposerForm({ navigation, route }: Props) {
 
       const created = await createForumTopic(
         categoryId,
-        { title: title.trim(), body: body.trim() },
+        { title: title.trim(), body: body.trim(), ...(attachment ? { file: attachment } : {}) },
         accessToken,
       );
       navigation.replace('Thread', { id: created.id, title: created.title });
@@ -131,7 +196,7 @@ function ComposerForm({ navigation, route }: Props) {
     } finally {
       setSubmitting(false);
     }
-  }, [accessToken, body, categoryId, mode, navigation, route.params?.isLocked, route.params?.threadId, title]);
+  }, [accessToken, attachment, body, categoryId, mode, navigation, route.params?.isLocked, route.params?.threadId, title]);
 
   const context =
     mode === 'reply'
@@ -232,11 +297,52 @@ function ComposerForm({ navigation, route }: Props) {
           ]}
         />
 
-        {!accessToken ? (
+        {accessToken ? (
+          <View style={styles.attach}>
+            {attachment ? (
+              <Text
+                testID={testIds.forumComposerAttachment}
+                style={[type.body, { color: c.textPrimary }]}
+                accessibilityLabel={`Attached ${attachment.name}`}
+              >
+                {attachment.name}
+              </Text>
+            ) : null}
+            <View style={styles.pickerRow}>
+              <Button
+                label={composerAttachCopy.photos}
+                size="sm"
+                variant="outline"
+                testID={testIds.forumComposerAttachPhotos}
+                onPress={() => {
+                  void pickFromPhotos();
+                }}
+              />
+              <Button
+                label={composerAttachCopy.files}
+                size="sm"
+                variant="outline"
+                testID={testIds.forumComposerAttachFiles}
+                onPress={() => {
+                  void pickFromFiles();
+                }}
+              />
+              {attachment ? (
+                <Button
+                  label={composerAttachCopy.remove}
+                  size="sm"
+                  variant="ghost"
+                  onPress={() => setAttachment(null)}
+                />
+              ) : null}
+            </View>
+            <Text style={[type.caption, { color: c.textMuted }]}>{composerAttachCopy.oneFile}</Text>
+          </View>
+        ) : (
           <Text style={[type.caption, { color: c.textSecondary }]}>
             Sign in to publish to the site.
           </Text>
-        ) : null}
+        )}
 
         {submitError ? (
           <Text style={[type.caption, { color: c.textSecondary }]}>{submitError}</Text>
@@ -284,5 +390,13 @@ const styles = StyleSheet.create({
   body: {
     minHeight: 160,
     paddingTop: 12,
+  },
+  attach: {
+    gap: space.sm,
+  },
+  pickerRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: space.sm,
   },
 });

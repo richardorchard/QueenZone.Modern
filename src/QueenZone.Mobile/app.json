@@ -42,7 +42,7 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow QueenZone to use your photos for gallery submissions and your member avatar.",
+          "photosPermission": "Allow QueenZone to use your photos for gallery submissions, forum posts, and your member avatar.",
           "cameraPermission": "Allow QueenZone to use the camera for gallery submissions and your member avatar."
         }
       ],
