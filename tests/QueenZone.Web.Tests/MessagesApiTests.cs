@@ -332,6 +332,61 @@ public sealed class MessagesApiTests : IClassFixture<QueenZoneWebApplicationFact
     }
 
     [Fact]
+    public async Task Block_Then_Unblock_MatchesWebsiteBehavior()
+    {
+        var (aliceId, bobId) = await SeedConversationPairAsync(
+            "api-block-alice@example.com",
+            "API Block Alice",
+            "api-block-bob@example.com",
+            "API Block Bob");
+        var service = factory.Services.GetRequiredService<PrivateMessageService>();
+        var sent = await service.ComposeAsync(aliceId, bobId, "Hello");
+        var conversationId = sent.ConversationId!.Value;
+
+        using var bob = CreateBearerClient(bobId, "API Block Bob", "api-block-bob@example.com");
+
+        using var block = await bob.PostAsync(MessagesApiEndpoints.BlockPath(conversationId), null);
+        Assert.Equal(HttpStatusCode.NoContent, block.StatusCode);
+        Assert.Contains("no-store", block.Headers.CacheControl?.ToString() ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.True(await service.HasBlockedAsync(bobId, aliceId));
+
+        using var get = await bob.GetAsync(MessagesApiEndpoints.ConversationPath(conversationId));
+        var detail = await get.Content.ReadFromJsonAsync<ConversationDetailDto>(JsonOptions);
+        Assert.True(detail!.HasBlockedOtherParticipant);
+
+        using var unblock = await bob.PostAsync(MessagesApiEndpoints.UnblockPath(conversationId), null);
+        Assert.Equal(HttpStatusCode.NoContent, unblock.StatusCode);
+        Assert.False(await service.HasBlockedAsync(bobId, aliceId));
+    }
+
+    [Fact]
+    public async Task Block_And_Unblock_ReturnNotFound_ForNonParticipant()
+    {
+        var (aliceId, bobId) = await SeedConversationPairAsync(
+            "api-block-404-alice@example.com",
+            "API Block 404 Alice",
+            "api-block-404-bob@example.com",
+            "API Block 404 Bob");
+        var outsiderId = Guid.NewGuid();
+        await SeedMemberAsync(outsiderId, "API Block 404 Outsider", "api-block-404-outsider@example.com");
+        var service = factory.Services.GetRequiredService<PrivateMessageService>();
+        var sent = await service.ComposeAsync(aliceId, bobId, "Private");
+
+        using var outsider = CreateBearerClient(outsiderId, "API Block 404 Outsider", "api-block-404-outsider@example.com");
+        using var blockHidden = await outsider.PostAsync(
+            MessagesApiEndpoints.BlockPath(sent.ConversationId!.Value),
+            null);
+        Assert.Equal(HttpStatusCode.NotFound, blockHidden.StatusCode);
+
+        using var bob = CreateBearerClient(bobId, "API Block 404 Bob", "api-block-404-bob@example.com");
+        using var blockMissing = await bob.PostAsync(MessagesApiEndpoints.BlockPath(Guid.NewGuid()), null);
+        Assert.Equal(HttpStatusCode.NotFound, blockMissing.StatusCode);
+
+        using var unblockMissing = await bob.PostAsync(MessagesApiEndpoints.UnblockPath(Guid.NewGuid()), null);
+        Assert.Equal(HttpStatusCode.NotFound, unblockMissing.StatusCode);
+    }
+
+    [Fact]
     public async Task Archived_RequiresMobileBearer_NotCookie()
     {
         using var anonymous = factory.CreateAnonymousClient(allowAutoRedirect: false);

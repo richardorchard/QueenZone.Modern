@@ -23,3 +23,11 @@ export function messagesArchivePath(conversationId: string): string {
 export function messagesUnarchivePath(conversationId: string): string {
   return `${messagesConversationPath(conversationId)}/unarchive`;
 }
+
+export function messagesBlockPath(conversationId: string): string {
+  return `${messagesConversationPath(conversationId)}/block`;
+}
+
+export function messagesUnblockPath(conversationId: string): string {
+  return `${messagesConversationPath(conversationId)}/unblock`;
+}
