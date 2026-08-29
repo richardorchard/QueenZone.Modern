@@ -5,10 +5,12 @@ import {
   messagesApiPath,
   messagesArchivedPath,
   messagesArchivePath,
+  messagesBlockPath,
   messagesConversationPath,
   messagesRecipientsPath,
   messagesReportPath,
   messagesUnarchivePath,
+  messagesUnblockPath,
   messagesUnreadCountPath,
 } from './messagesPaths';
 
@@ -16,10 +18,12 @@ export {
   messagesApiPath,
   messagesArchivedPath,
   messagesArchivePath,
+  messagesBlockPath,
   messagesConversationPath,
   messagesRecipientsPath,
   messagesReportPath,
   messagesUnarchivePath,
+  messagesUnblockPath,
   messagesUnreadCountPath,
 } from './messagesPaths';
 
@@ -108,6 +112,31 @@ export function unarchiveConversation(
   signal?: AbortSignal,
 ): Promise<void> {
   return sendJson(messagesUnarchivePath(conversationId), {
+    method: 'POST',
+    accessToken,
+    signal,
+  });
+}
+
+/** Blocks the other participant in this conversation (matches website Conversation "Block" handler). */
+export function blockConversationParticipant(
+  accessToken: string,
+  conversationId: string,
+  signal?: AbortSignal,
+): Promise<void> {
+  return sendJson(messagesBlockPath(conversationId), {
+    method: 'POST',
+    accessToken,
+    signal,
+  });
+}
+
+export function unblockConversationParticipant(
+  accessToken: string,
+  conversationId: string,
+  signal?: AbortSignal,
+): Promise<void> {
+  return sendJson(messagesUnblockPath(conversationId), {
     method: 'POST',
     accessToken,
     signal,

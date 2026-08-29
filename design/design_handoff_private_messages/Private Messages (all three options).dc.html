@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="_ds/queenzone-design-system-6c12e8ec-2c2c-448b-858b-dbeb24fd8c3c/tokens/fonts.css">
+<link rel="stylesheet" href="_ds/queenzone-design-system-6c12e8ec-2c2c-448b-858b-dbeb24fd8c3c/tokens/colors.css">
+<link rel="stylesheet" href="_ds/queenzone-design-system-6c12e8ec-2c2c-448b-858b-dbeb24fd8c3c/tokens/typography.css">
+<link rel="stylesheet" href="_ds/queenzone-design-system-6c12e8ec-2c2c-448b-858b-dbeb24fd8c3c/tokens/spacing.css">
+<link rel="stylesheet" href="_ds/queenzone-design-system-6c12e8ec-2c2c-448b-858b-dbeb24fd8c3c/tokens/base.css">
+<link rel="stylesheet" href="_ds/queenzone-design-system-6c12e8ec-2c2c-448b-858b-dbeb24fd8c3c/styles.css">
+<script src="_ds/queenzone-design-system-6c12e8ec-2c2c-448b-858b-dbeb24fd8c3c/_ds_bundle.js"></script>
+<style>
+  body { margin: 0; background: #E4E3DF; }
+  a { color: var(--qz-blue); text-decoration: none; }
+  a:hover { color: var(--qz-blue-deep); }
+</style>
+</helmet>
+
+<section style="padding: 56px 56px 88px; display: flex; flex-direction: column; gap: 40px; font-family: Inter, system-ui, sans-serif;">
+  <div style="display: flex; flex-direction: column; gap: 10px; max-width: 720px;">
+    <div style="font-family: Cinzel, serif; font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--qz-burgundy);">Turn 1 · Private messages — thread view</div>
+    <h1 style="font-family: 'Cormorant Garamond', serif; font-size: 40px; font-weight: 500; letter-spacing: -0.015em; color: var(--qz-charcoal); margin: 0;">Telling who said what</h1>
+    <p style="font-size: 16px; line-height: 1.6; color: var(--qz-grey-600); margin: 0; text-wrap: pretty;">Three directions on the same conversation. Each fixes the same two problems: message text sitting at the same weight and colour as its metadata, and no visual difference between the two speakers. Pick one — <a href="#1a">1a</a>, <a href="#1b">1b</a>, <a href="#1c">1c</a>.</p>
+  </div>
+
+  <div style="display: flex; flex-wrap: wrap; gap: 48px; align-items: flex-start;">
+
+    <div id="1a" style="display: flex; flex-direction: column; gap: 14px; width: 402px;">
+      <div style="display: flex; align-items: baseline; gap: 12px;">
+        <span style="font-family: Cinzel, serif; font-size: 12px; letter-spacing: 0.2em; color: var(--qz-white); background: var(--qz-black); padding: 5px 9px 4px; border-radius: 2px;">1A</span>
+        <span style="font-family: 'Cormorant Garamond', serif; font-size: 22px; color: var(--qz-charcoal);">Paper &amp; ink</span>
+      </div>
+      <p style="font-size: 14px; line-height: 1.55; color: var(--qz-grey-600); margin: 0 0 4px; text-wrap: pretty;">Incoming messages arrive as bright paper cards on the dark page; yours stay dark with a hairline outline. Alignment, colour and avatar all say the same thing at once.</p>
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="402px,874px">
+        <div style="height: 100%; display: flex; flex-direction: column; background: #0C0C0C; padding-top: 54px;">
+          <div style="flex-shrink: 0; padding: 6px 14px 12px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid rgba(255,255,255,0.16); background: var(--qz-black);">
+            <div style="display: flex; align-items: center; gap: 3px; color: rgba(255,255,255,0.7); font-size: 15px; flex-shrink: 0;">
+              <svg width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M7.5 1L1.5 8l6 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span>Messages</span>
+            </div>
+            <div style="flex: 1; display: flex; align-items: center; gap: 9px; justify-content: center;">
+              <div style="width: 28px; height: 28px; border-radius: 50%; background: var(--qz-burgundy); color: var(--qz-white); font-family: Cinzel, serif; font-size: 11px; letter-spacing: 0.06em; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">RT</div>
+              <div style="font-family: 'Cormorant Garamond', serif; font-size: 21px; font-weight: 500; color: var(--qz-white); letter-spacing: -0.01em; white-space: nowrap;">Richard Orchard TW</div>
+            </div>
+            <div style="width: 20px; color: rgba(255,255,255,0.55); font-size: 17px; text-align: right; flex-shrink: 0;">···</div>
+          </div>
+
+          <div style="flex: 1; overflow: hidden; display: flex; flex-direction: column; gap: 20px; padding: 22px 16px 8px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div style="flex: 1; height: 1px; background: rgba(255,255,255,0.14);"></div>
+              <div style="font-family: Cinzel, serif; font-size: 10px; letter-spacing: 0.22em; color: rgba(255,255,255,0.5); white-space: nowrap;">2 AUGUST 2026</div>
+              <div style="flex: 1; height: 1px; background: rgba(255,255,255,0.14);"></div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px;">
+              <div style="font-family: Cinzel, serif; font-size: 9.5px; letter-spacing: 0.2em; color: rgba(255,255,255,0.62);">YOU · 17:10</div>
+              <div style="max-width: 80%; background: #171717; border: 1px solid rgba(255,255,255,0.28); border-radius: 4px; padding: 12px 14px; font-size: 16.5px; line-height: 1.5; color: var(--qz-white);">hello — how are you?</div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px;">
+              <div style="font-family: Cinzel, serif; font-size: 9.5px; letter-spacing: 0.2em; color: rgba(255,255,255,0.62);">YOU · 3 AUG, 10:50</div>
+              <div style="max-width: 80%; background: #171717; border: 1px solid rgba(255,255,255,0.28); border-radius: 4px; padding: 12px 14px; font-size: 16.5px; line-height: 1.5; color: var(--qz-white);">ok</div>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div style="flex: 1; height: 1px; background: rgba(255,255,255,0.14);"></div>
+              <div style="font-family: Cinzel, serif; font-size: 10px; letter-spacing: 0.22em; color: rgba(255,255,255,0.5); white-space: nowrap;">28 AUGUST 2026</div>
+              <div style="flex: 1; height: 1px; background: rgba(255,255,255,0.14);"></div>
+            </div>
+
+            <div style="display: flex; gap: 10px; align-items: flex-start;">
+              <div style="width: 28px; height: 28px; border-radius: 50%; background: var(--qz-burgundy); color: var(--qz-white); font-family: Cinzel, serif; font-size: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 18px;">RT</div>
+              <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 6px; max-width: 80%;">
+                <div style="font-family: Cinzel, serif; font-size: 9.5px; letter-spacing: 0.2em; color: rgba(255,255,255,0.72);">RICHARD ORCHARD TW · 12:38</div>
+                <div style="background: var(--qz-warm-white); border-radius: 4px; padding: 12px 14px; font-size: 16.5px; line-height: 1.5; color: var(--qz-charcoal);">hello, how are you?</div>
+                <div style="display: flex; align-items: center; gap: 6px; font-family: Cinzel, serif; font-size: 9px; letter-spacing: 0.18em; color: var(--qz-gold); padding-left: 2px;">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+                  <span>REPORTED</span>
+                </div>
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 10px; align-items: flex-start;">
+              <div style="width: 28px; height: 28px; flex-shrink: 0;"></div>
+              <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 6px; max-width: 80%;">
+                <div style="font-family: Cinzel, serif; font-size: 9.5px; letter-spacing: 0.2em; color: rgba(255,255,255,0.72);">12:41</div>
+                <div style="background: var(--qz-warm-white); border-radius: 4px; padding: 12px 14px; font-size: 16.5px; line-height: 1.5; color: var(--qz-charcoal);">I was after the 1975 tour programme scans — are they in the gallery yet?</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="flex-shrink: 0; border-top: 1px solid rgba(255,255,255,0.16); background: var(--qz-black); padding: 12px 16px 44px; display: flex; flex-direction: column; gap: 10px;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <div style="font-family: Cinzel, serif; font-size: 9.5px; letter-spacing: 0.2em; color: rgba(255,255,255,0.45);">REPLYING TO RICHARD ORCHARD TW</div>
+              <div style="font-family: Cinzel, serif; font-size: 9.5px; letter-spacing: 0.2em; color: var(--qz-gold);">ARCHIVE</div>
+            </div>
+            <div style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; padding: 12px 14px; font-size: 16px; color: rgba(255,255,255,0.45);">Write a reply</div>
+            <x-import component-from-global-scope="QueenzoneDesignSystem_6c12e8.Button" variant="cta" size="md" full-width="{{ true }}" dc-props="{{ goldBtn }}" hint-size="100%,44px">Send reply</x-import>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <div id="1b" style="display: flex; flex-direction: column; gap: 14px; width: 402px;">
+      <div style="display: flex; align-items: baseline; gap: 12px;">
+        <span style="font-family: Cinzel, serif; font-size: 12px; letter-spacing: 0.2em; color: var(--qz-white); background: var(--qz-black); padding: 5px 9px 4px; border-radius: 2px;">1B</span>
+        <span style="font-family: 'Cormorant Garamond', serif; font-size: 22px; color: var(--qz-charcoal);">Correspondence</span>
+      </div>
+      <p style="font-size: 14px; line-height: 1.55; color: var(--qz-grey-600); margin: 0 0 4px; text-wrap: pretty;">Black-on-warm-white letters column. No bubbles: a monogram rail and a coloured author rule carry the identity, and message text is the darkest thing on screen.</p>
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+        <div style="height: 100%; display: flex; flex-direction: column; background: var(--qz-warm-white); padding-top: 54px;">
+          <div style="flex-shrink: 0; padding: 6px 14px 12px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--qz-grey-300); background: var(--qz-white);">
+            <div style="display: flex; align-items: center; gap: 3px; color: var(--qz-blue); font-size: 15px; flex-shrink: 0;">
+              <svg width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M7.5 1L1.5 8l6 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span>Messages</span>
+            </div>
+            <div style="flex: 1; text-align: center; font-family: 'Cormorant Garamond', serif; font-size: 21px; font-weight: 500; color: var(--qz-charcoal); white-space: nowrap;">Richard Orchard TW</div>
+            <div style="width: 20px; color: var(--qz-grey-500); font-size: 17px; text-align: right; flex-shrink: 0;">···</div>
+          </div>
+
+          <div style="flex: 1; overflow: hidden; display: flex; flex-direction: column;">
+            <div style="padding: 14px 20px 12px; border-bottom: 1px solid var(--qz-grey-200); font-family: Cinzel, serif; font-size: 10px; letter-spacing: 0.22em; color: var(--qz-grey-500);">2 AUGUST 2026</div>
+
+            <div style="display: flex; gap: 14px; padding: 18px 20px; background: var(--qz-white); border-bottom: 1px solid var(--qz-grey-200); border-left: 3px solid var(--qz-blue);">
+              <div style="width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--qz-blue); color: var(--qz-blue); font-family: Cinzel, serif; font-size: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">RO</div>
+              <div style="display: flex; flex-direction: column; gap: 5px;">
+                <div style="display: flex; align-items: baseline; gap: 8px; font-family: Cinzel, serif; font-size: 9.5px; letter-spacing: 0.2em;"><span style="color: var(--qz-blue);">YOU</span><span style="color: var(--qz-grey-500);">17:10</span></div>
+                <div style="font-size: 17px; line-height: 1.55; color: var(--qz-black);">hello — how are you?</div>
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 14px; padding: 18px 20px; background: var(--qz-white); border-bottom: 1px solid var(--qz-grey-200); border-left: 3px solid var(--qz-blue);">
+              <div style="width: 32px; height: 32px; flex-shrink: 0;"></div>
+              <div style="display: flex; flex-direction: column; gap: 5px;">
+                <div style="display: flex; align-items: baseline; gap: 8px; font-family: Cinzel, serif; font-size: 9.5px; letter-spacing: 0.2em;"><span style="color: var(--qz-blue);">YOU</span><span style="color: var(--qz-grey-500);">3 AUG, 10:50</span></div>
+                <div style="font-size: 17px; line-height: 1.55; color: var(--qz-black);">ok</div>
+              </div>
+            </div>
+
+            <div style="padding: 14px 20px 12px; border-bottom: 1px solid var(--qz-grey-200); font-family: Cinzel, serif; font-size: 10px; letter-spacing: 0.22em; color: var(--qz-grey-500);">28 AUGUST 2026</div>
+
+            <div style="display: flex; gap: 14px; padding: 18px 20px; background: var(--qz-warm-white); border-bottom: 1px solid var(--qz-grey-200); border-left: 3px solid var(--qz-burgundy);">
+              <div style="width: 32px; height: 32px; border-radius: 50%; background: var(--qz-burgundy); color: var(--qz-white); font-family: Cinzel, serif; font-size: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">RT</div>
+              <div style="display: flex; flex-direction: column; gap: 5px;">
+                <div style="display: flex; align-items: baseline; gap: 8px; font-family: Cinzel, serif; font-size: 9.5px; letter-spacing: 0.2em;"><span style="color: var(--qz-burgundy);">RICHARD ORCHARD TW</span><span style="color: var(--qz-grey-500);">12:38</span></div>
+                <div style="font-size: 17px; line-height: 1.55; color: var(--qz-black);">hello, how are you?</div>
+                <div style="display: flex; align-items: center; gap: 6px; font-family: Cinzel, serif; font-size: 9px; letter-spacing: 0.18em; color: var(--qz-gold-deep); margin-top: 2px;">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+                  <span>REPORTED</span>
+                </div>
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 14px; padding: 18px 20px; background: var(--qz-warm-white); border-bottom: 1px solid var(--qz-grey-200); border-left: 3px solid var(--qz-burgundy);">
+              <div style="width: 32px; height: 32px; flex-shrink: 0;"></div>
+              <div style="display: flex; flex-direction: column; gap: 5px;">
+                <div style="display: flex; align-items: baseline; gap: 8px; font-family: Cinzel, serif; font-size: 9.5px; letter-spacing: 0.2em;"><span style="color: var(--qz-burgundy);">RICHARD ORCHARD TW</span><span style="color: var(--qz-grey-500);">12:41</span></div>
+                <div style="font-size: 17px; line-height: 1.55; color: var(--qz-black);">I was after the 1975 tour programme scans — are they in the gallery yet?</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="flex-shrink: 0; border-top: 1px solid var(--qz-grey-300); background: var(--qz-white); padding: 12px 16px 44px; display: flex; flex-direction: column; gap: 10px;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <div style="font-family: Cinzel, serif; font-size: 9.5px; letter-spacing: 0.2em; color: var(--qz-grey-500);">REPLYING AS RICHARD ORCHARD</div>
+              <div style="font-family: Cinzel, serif; font-size: 9.5px; letter-spacing: 0.2em; color: var(--qz-blue);">ARCHIVE</div>
+            </div>
+            <div style="background: var(--qz-warm-white); border: 1px solid var(--qz-grey-300); border-radius: 4px; padding: 12px 14px; font-size: 16px; color: var(--qz-grey-500);">Write a reply</div>
+            <x-import component-from-global-scope="QueenzoneDesignSystem_6c12e8.Button" variant="cta" size="md" full-width="{{ true }}" hint-size="100%,44px">Send reply</x-import>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <div id="1c" style="display: flex; flex-direction: column; gap: 14px; width: 402px;">
+      <div style="display: flex; align-items: baseline; gap: 12px;">
+        <span style="font-family: Cinzel, serif; font-size: 12px; letter-spacing: 0.2em; color: var(--qz-white); background: var(--qz-black); padding: 5px 9px 4px; border-radius: 2px;">1C</span>
+        <span style="font-family: 'Cormorant Garamond', serif; font-size: 22px; color: var(--qz-charcoal);">Speaker bands</span>
+      </div>
+      <p style="font-size: 14px; line-height: 1.55; color: var(--qz-grey-600); margin: 0 0 4px; text-wrap: pretty;">Stays dark, drops the bubbles. Each speaker owns a full-bleed band at a different lightness, held by a monogram spine — so long threads read as blocks of speech, not a list.</p>
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="402px,874px">
+        <div style="height: 100%; display: flex; flex-direction: column; background: var(--qz-black); padding-top: 54px;">
+          <div style="flex-shrink: 0; padding: 6px 14px 12px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid rgba(255,255,255,0.16); background: var(--qz-black);">
+            <div style="display: flex; align-items: center; gap: 3px; color: rgba(255,255,255,0.7); font-size: 15px; flex-shrink: 0;">
+              <svg width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M7.5 1L1.5 8l6 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span>Messages</span>
+            </div>
+            <div style="flex: 1; text-align: center; font-family: 'Cormorant Garamond', serif; font-size: 21px; font-weight: 500; color: var(--qz-white); white-space: nowrap;">Richard Orchard TW</div>
+            <div style="width: 20px; color: rgba(255,255,255,0.55); font-size: 17px; text-align: right; flex-shrink: 0;">···</div>
+          </div>
+
+          <div style="flex: 1; overflow: hidden; display: flex; flex-direction: column;">
+            <div style="padding: 13px 20px; background: #050505; font-family: Cinzel, serif; font-size: 10px; letter-spacing: 0.22em; color: rgba(255,255,255,0.5);">2 AUGUST 2026</div>
+
+            <div style="display: flex; background: #1E1E1D; border-top: 1px solid rgba(255,255,255,0.1);">
+              <div style="width: 56px; flex-shrink: 0; padding: 18px 0 0; display: flex; justify-content: center; background: rgba(255,255,255,0.04);">
+                <div style="width: 30px; height: 30px; border-radius: 50%; background: var(--qz-white); color: var(--qz-black); font-family: Cinzel, serif; font-size: 10px; display: flex; align-items: center; justify-content: center;">RO</div>
+              </div>
+              <div style="flex: 1; padding: 16px 20px 18px; display: flex; flex-direction: column; gap: 12px;">
+                <div style="font-family: Cinzel, serif; font-size: 10px; letter-spacing: 0.2em; color: var(--qz-white);">YOU</div>
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                  <div style="font-size: 17px; line-height: 1.55; color: var(--qz-white);">hello — how are you?</div>
+                  <div style="font-family: Cinzel, serif; font-size: 9px; letter-spacing: 0.18em; color: rgba(255,255,255,0.5);">17:10</div>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                  <div style="font-size: 17px; line-height: 1.55; color: var(--qz-white);">ok</div>
+                  <div style="font-family: Cinzel, serif; font-size: 9px; letter-spacing: 0.18em; color: rgba(255,255,255,0.5);">3 AUG · 10:50</div>
+                </div>
+              </div>
+            </div>
+
+            <div style="padding: 13px 20px; background: #050505; font-family: Cinzel, serif; font-size: 10px; letter-spacing: 0.22em; color: rgba(255,255,255,0.5);">28 AUGUST 2026</div>
+
+            <div style="display: flex; background: #F7F6F3;">
+              <div style="width: 56px; flex-shrink: 0; padding: 18px 0 0; display: flex; justify-content: center; background: rgba(0,0,0,0.05);">
+                <div style="width: 30px; height: 30px; border-radius: 50%; background: var(--qz-burgundy); color: var(--qz-white); font-family: Cinzel, serif; font-size: 10px; display: flex; align-items: center; justify-content: center;">RT</div>
+              </div>
+              <div style="flex: 1; padding: 16px 20px 18px; display: flex; flex-direction: column; gap: 12px;">
+                <div style="font-family: Cinzel, serif; font-size: 10px; letter-spacing: 0.2em; color: var(--qz-burgundy);">RICHARD ORCHARD TW</div>
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                  <div style="font-size: 17px; line-height: 1.55; color: var(--qz-black);">hello, how are you?</div>
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="font-family: Cinzel, serif; font-size: 9px; letter-spacing: 0.18em; color: var(--qz-grey-500);">12:38</div>
+                    <div style="font-family: Cinzel, serif; font-size: 9px; letter-spacing: 0.18em; color: var(--qz-gold-deep);">REPORTED</div>
+                  </div>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                  <div style="font-size: 17px; line-height: 1.55; color: var(--qz-black);">I was after the 1975 tour programme scans — are they in the gallery yet?</div>
+                  <div style="font-family: Cinzel, serif; font-size: 9px; letter-spacing: 0.18em; color: var(--qz-grey-500);">12:41</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style="flex-shrink: 0; border-top: 1px solid rgba(255,255,255,0.16); background: var(--qz-black); padding: 12px 16px 44px; display: flex; flex-direction: column; gap: 10px;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <div style="font-family: Cinzel, serif; font-size: 9.5px; letter-spacing: 0.2em; color: rgba(255,255,255,0.45);">REPLYING AS RICHARD ORCHARD</div>
+              <div style="font-family: Cinzel, serif; font-size: 9.5px; letter-spacing: 0.2em; color: var(--qz-gold);">ARCHIVE</div>
+            </div>
+            <div style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; padding: 12px 14px; font-size: 16px; color: rgba(255,255,255,0.45);">Write a reply</div>
+            <x-import component-from-global-scope="QueenzoneDesignSystem_6c12e8.Button" variant="cta" size="md" full-width="{{ true }}" dc-props="{{ goldBtn }}" hint-size="100%,44px">Send reply</x-import>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+  </div>
+</section>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{}">
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      goldBtn: { style: { background: 'var(--qz-gold)', color: 'var(--qz-black)', border: 'none' } },
+    };
+  }
+}
+
+</script>
+</body>
+</html>

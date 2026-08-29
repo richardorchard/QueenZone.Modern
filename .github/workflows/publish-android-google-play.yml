@@ -86,6 +86,9 @@ jobs:
 
       - name: Generate Android project
         env:
+          # Expo writes `version` / versionName at prebuild. Pass the run
+          # number here so Home and Play share `{prefix}.{run}` (#1078).
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
           SENTRY_ORG: ${{ vars.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
         run: npx expo prebuild --platform android --clean --no-install
@@ -184,7 +187,6 @@ jobs:
         run: |
           ./gradlew bundleRelease \
             -Pandroid.injected.version.code="$ANDROID_VERSION_CODE" \
-            -Pandroid.injected.version.name="0.1.0-internal.$ANDROID_VERSION_CODE" \
             -Pandroid.injected.signing.store.file="$RUNNER_TEMP/queenzone-signing/queenzone-upload.jks" \
             -Pandroid.injected.signing.store.password="$ANDROID_TEST_KEYSTORE_PASSWORD" \
             -Pandroid.injected.signing.key.alias=queenzone-test \

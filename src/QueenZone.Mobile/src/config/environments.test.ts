@@ -5,12 +5,28 @@ import { describe, it } from 'node:test';
 const require = createRequire(import.meta.url);
 const {
   defaultApiBaseUrls,
+  marketingVersionPrefix,
   normalizeApiBaseUrl,
   resolveApiBaseUrl,
   resolveAppEnvironment,
   resolveIosBuildNumber,
+  resolveMarketingVersion,
   rewriteLoopbackForAndroid,
 } = require('../../apiEnvironments.cjs') as typeof import('../../apiEnvironments.cjs');
+
+function compareDotted(left: string, right: string): number {
+  const a = left.split('.').map(Number);
+  const b = right.split('.').map(Number);
+  const length = Math.max(a.length, b.length);
+  for (let index = 0; index < length; index += 1) {
+    const av = a[index] ?? 0;
+    const bv = b[index] ?? 0;
+    if (av !== bv) {
+      return av - bv;
+    }
+  }
+  return 0;
+}
 
 describe('resolveAppEnvironment', () => {
   it('defaults to development when unset', () => {
@@ -90,6 +106,51 @@ describe('rewriteLoopbackForAndroid', () => {
       rewriteLoopbackForAndroid('https://www.queenzone.org', 'android'),
       'https://www.queenzone.org',
     );
+  });
+});
+
+describe('resolveMarketingVersion', () => {
+  it('uses the committed 0.1 prefix and local unsigned default', () => {
+    assert.equal(marketingVersionPrefix, '0.1');
+    assert.equal(resolveMarketingVersion(), '0.1.0');
+    assert.equal(resolveMarketingVersion({}), '0.1.0');
+    assert.equal(resolveMarketingVersion({ prefix: '0.1' }), '0.1.0');
+    assert.equal(resolveMarketingVersion({ prefix: '0.1', runNumber: '' }), '0.1.0');
+    assert.equal(resolveMarketingVersion({ prefix: '0.1', runNumber: '   ' }), '0.1.0');
+  });
+
+  it('appends the publish run number', () => {
+    assert.equal(resolveMarketingVersion({ prefix: '0.1', runNumber: '847' }), '0.1.847');
+    assert.equal(resolveMarketingVersion({ prefix: '0.1', runNumber: 214 }), '0.1.214');
+    assert.equal(resolveMarketingVersion({ prefix: '0.1', runNumber: '007' }), '0.1.7');
+  });
+
+  it('rejects prefixes that are not N.N and non-positive run numbers', () => {
+    assert.throws(() => resolveMarketingVersion({ prefix: '1' }), /N\.N/);
+    assert.throws(() => resolveMarketingVersion({ prefix: '1.0.0' }), /N\.N/);
+    assert.throws(() => resolveMarketingVersion({ prefix: 'v1.0' }), /N\.N/);
+    assert.throws(() => resolveMarketingVersion({ prefix: '1.x' }), /N\.N/);
+    assert.throws(() => resolveMarketingVersion({ prefix: '' }), /N\.N/);
+    assert.throws(
+      () => resolveMarketingVersion({ prefix: '0.1', runNumber: '0' }),
+      /positive integer/,
+    );
+    assert.throws(
+      () => resolveMarketingVersion({ prefix: '0.1', runNumber: '1.5' }),
+      /positive integer/,
+    );
+    assert.throws(
+      () => resolveMarketingVersion({ prefix: '0.1', runNumber: 'abc' }),
+      /positive integer/,
+    );
+  });
+
+  it('keeps a 1.x flip greater than 0.1.{n} as dotted integers', () => {
+    assert.equal(resolveMarketingVersion({ prefix: '1.0', runNumber: '847' }), '1.0.847');
+    assert.equal(resolveMarketingVersion({ prefix: '1.1', runNumber: '847' }), '1.1.847');
+    assert.ok(compareDotted('1.0.847', '0.1.847') > 0);
+    assert.ok(compareDotted('1.0.1', '0.1.999') > 0);
+    assert.ok(compareDotted('0.1.848', '0.1.847') > 0);
   });
 });
 

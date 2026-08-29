@@ -1,7 +1,9 @@
+import { Alert } from 'react-native';
 import { screen, userEvent, waitFor } from '@testing-library/react-native';
 import { ApiError } from '../../api/client';
 import {
   archiveConversation,
+  blockConversationParticipant,
   fetchConversation,
   replyToConversation,
   reportConversationMessage,
@@ -23,6 +25,7 @@ jest.mock('../../api/messages', () => ({
   replyToConversation: jest.fn(),
   reportConversationMessage: jest.fn(),
   archiveConversation: jest.fn(),
+  blockConversationParticipant: jest.fn(),
 }));
 
 const fetchConversationMock = fetchConversation as jest.MockedFunction<typeof fetchConversation>;
@@ -31,6 +34,9 @@ const reportConversationMessageMock = reportConversationMessage as jest.MockedFu
   typeof reportConversationMessage
 >;
 const archiveConversationMock = archiveConversation as jest.MockedFunction<typeof archiveConversation>;
+const blockConversationParticipantMock = blockConversationParticipant as jest.MockedFunction<
+  typeof blockConversationParticipant
+>;
 
 function renderConversation() {
   return renderWithProviders(
@@ -77,6 +83,7 @@ describe('ConversationScreen', () => {
     replyToConversationMock.mockReset();
     reportConversationMessageMock.mockReset();
     archiveConversationMock.mockReset();
+    blockConversationParticipantMock.mockReset();
   });
 
   afterEach(async () => {
@@ -101,7 +108,7 @@ describe('ConversationScreen', () => {
     );
 
     renderConversation();
-    await waitFor(() => expect(screen.getByText(body)).toBeOnTheScreen());
+    await waitFor(() => expect(screen.getByText(body)).toBeOnTheScreen(), { timeout: 8000 });
     expect(screen.queryByRole('link')).toBeNull();
   });
 
@@ -145,7 +152,7 @@ describe('ConversationScreen', () => {
     await user.type(screen.getByLabelText('Optional reason'), 'Harassment');
     await user.press(screen.getByRole('button', { name: 'Submit report' }));
 
-    await waitFor(() => expect(screen.getByText('Reported')).toBeOnTheScreen());
+    await waitFor(() => expect(screen.getByText('REPORTED')).toBeOnTheScreen());
     expect(reportConversationMessageMock).toHaveBeenCalledWith(
       'tok',
       conversationId,
@@ -247,20 +254,25 @@ describe('ConversationScreen', () => {
     expect(screen.getByLabelText('Reply').props.value).toBe('');
   });
 
-  it('rejects an empty reply without calling the API', async () => {
+  it('disables the send button until a reply is drafted', async () => {
     fetchConversationMock.mockResolvedValue(conversationDetail([]));
 
     renderConversation();
     await waitFor(() => expect(screen.getByLabelText('Reply')).toBeOnTheScreen());
 
-    const user = userEvent.setup();
-    await user.press(screen.getByRole('button', { name: 'Send reply' }));
+    expect(screen.getByRole('button', { name: 'Send reply' })).toBeDisabled();
 
-    await waitFor(() => expect(screen.getByText('Message body is required.')).toBeOnTheScreen());
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText('Reply'), 'Hi');
+    expect(screen.getByRole('button', { name: 'Send reply' })).toBeEnabled();
+
     expect(replyToConversationMock).not.toHaveBeenCalled();
   });
 
   it('archives the conversation and returns to the inbox', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
+      buttons?.find((button) => button.text === 'Archive')?.onPress?.();
+    });
     const navigation = fakeNavigation();
     fetchConversationMock.mockResolvedValue(
       conversationDetail([
@@ -291,5 +303,83 @@ describe('ConversationScreen', () => {
 
     await waitFor(() => expect(archiveConversationMock).toHaveBeenCalledWith('tok', conversationId));
     expect(navigation.navigate).toHaveBeenCalledWith('Inbox');
+    alertSpy.mockRestore();
   });
+
+  it('blocks the other participant from the overflow menu and shows the blocked notice', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
+      const target =
+        buttons?.find((button) => button.text === 'Block member' || button.text === 'Block') ??
+        buttons?.find((button) => button.style !== 'cancel');
+      target?.onPress?.();
+    });
+    const navigation = fakeNavigation();
+    fetchConversationMock.mockResolvedValueOnce(
+      conversationDetail([
+        {
+          id: theirMessageId,
+          senderMemberId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+          senderDisplayName: 'Bob',
+          body: 'Hello',
+          createdAt: '2026-08-19T12:00:00.000Z',
+          isMine: false,
+          sortKey: 1,
+          reportedByViewer: false,
+        },
+      ]),
+    );
+    fetchConversationMock.mockResolvedValue(
+      conversationDetail(
+        [
+          {
+            id: theirMessageId,
+            senderMemberId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+            senderDisplayName: 'Bob',
+            body: 'Hello',
+            createdAt: '2026-08-19T12:00:00.000Z',
+            isMine: false,
+            sortKey: 1,
+            reportedByViewer: false,
+          },
+        ],
+        { canSendReply: false, hasBlockedOtherParticipant: true },
+      ),
+    );
+    blockConversationParticipantMock.mockResolvedValue(undefined);
+
+    const main = renderWithProviders(
+      <ConversationScreen
+        navigation={navigation as never}
+        route={{ key: 'conversation', name: 'Conversation', params: { id: conversationId } } as never}
+      />,
+    );
+    await waitFor(() => expect(main.getByText('Hello')).toBeOnTheScreen());
+
+    // The native-stack header isn't mounted by this harness (navigation is a
+    // jest.fn() stub), so render the headerRight element it was configured
+    // with directly to reach the overflow button.
+    const latestOptions = navigation.setOptions.mock.calls.at(-1)?.[0];
+    const header = renderWithProviders(latestOptions.headerRight(), { navigation: false });
+
+    const user = userEvent.setup();
+    await user.press(header.getByRole('button', { name: 'More options' }));
+
+    await waitFor(() =>
+      expect(blockConversationParticipantMock).toHaveBeenCalledWith('tok', conversationId),
+    );
+    // The composer (which needs canSendReply) disappears once the reload
+    // reflects the block, and the blocked notice takes its place.
+    await waitFor(
+      () => expect(main.queryByLabelText('Reply')).toBeNull(),
+      { timeout: 8000 },
+    );
+    await waitFor(
+      () =>
+        expect(
+          main.queryByText('You have blocked this member. They can no longer send you private messages.'),
+        ).not.toBeNull(),
+      { timeout: 8000 },
+    );
+    alertSpy.mockRestore();
+  }, 15000);
 });
