@@ -1,17 +1,6 @@
 import { screen, userEvent } from '@testing-library/react-native';
-import { createMockSession } from '../../test/mockSession';
 import { fakeNavigation, flushVirtualizedList, renderWithProviders } from '../../test/render';
 import { ArchiveHubScreen } from './ArchiveHubScreen';
-
-const mockSession = createMockSession();
-
-jest.mock('../../session/SessionContext', () => ({
-  useSession: () => mockSession,
-}));
-
-jest.mock('../messages/useUnreadConversationCount', () => ({
-  useUnreadConversationCount: () => 0,
-}));
 
 describe('ArchiveHubScreen', () => {
   it('labels the articles destination Articles and opens the Articles route', async () => {

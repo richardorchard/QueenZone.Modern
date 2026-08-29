@@ -7,7 +7,6 @@ import { Plus } from 'lucide-react-native';
 import { fetchForumCategories, fetchForumStats, type ForumCategoryListItem } from '../../api';
 import { useDetailQuery } from '../../hooks/useDetailQuery';
 import { usePagedContent } from '../../hooks/usePagedContent';
-import { nestedTabParams } from '../../navigation/nestedTab';
 import type { ForumStackParamList, RootTabParamList } from '../../navigation/types';
 import { useSession } from '../../session/SessionContext';
 import { openForumComposer } from '../../session/signInNavigation';
@@ -17,7 +16,6 @@ import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from '../../u
 import { PageTitleBlock } from '../../ui/PageTitleBlock';
 import { SectionHeader } from '../../ui/SectionHeader';
 import { testIds } from '../../test/testIds';
-import { TabRootMasthead } from '../home/TabRootMasthead';
 import { categoryMeta, forumIndexStatItems } from './forumListMeta';
 
 type Props = CompositeScreenProps<
@@ -60,12 +58,7 @@ export function ForumScreen({ navigation }: Props) {
 
   const header = (
     <View>
-      <TabRootMasthead
-        onSearch={() => navigation.navigate('Search')}
-        onMessagesPress={() => navigation.navigate('HomeTab', nestedTabParams('Inbox'))}
-        onProfilePress={() => navigation.navigate('HomeTab', { screen: 'Profile' })}
-      />
-      <PageTitleBlock eyebrow="Community" title="Forum" />
+      <PageTitleBlock eyebrow="Community" />
       <View
         style={{
           flexDirection: 'row',

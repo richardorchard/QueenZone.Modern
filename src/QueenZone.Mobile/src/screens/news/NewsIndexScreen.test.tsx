@@ -16,18 +16,6 @@ jest.mock('../../api', () => {
   };
 });
 
-jest.mock('../messages/useUnreadConversationCount', () => ({
-  useUnreadConversationCount: () => 0,
-}));
-
-jest.mock('../../session/SessionContext', () => ({
-  useSession: () => ({
-    isSignedIn: false,
-    displayName: null,
-    accessToken: null,
-  }),
-}));
-
 jest.mock('../../config', () => {
   const actual = jest.requireActual('../../config');
   return {
