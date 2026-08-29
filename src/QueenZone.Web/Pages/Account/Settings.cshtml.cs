@@ -189,6 +189,7 @@ public sealed class SettingsModel(MemberAccountService memberAccountService) : P
         var submitted = CaptureSocialInputs();
         await PopulatePageAsync(account, cancellationToken);
         ApplySocialInputs(submitted);
+        SuppressUnrelatedBindErrors();
         ViewData["Title"] = "Account settings";
 
         var result = await memberAccountService.UpdateSocialLinksAsync(
@@ -368,6 +369,17 @@ public sealed class SettingsModel(MemberAccountService memberAccountService) : P
         ScheduledDeletionAt = account.DeletionRequestedAt?.AddDays(MemberAccountDeletionPolicy.RetentionDays);
         ApplySocialInputs((await memberAccountService.ListSocialLinksAsync(account.Id, cancellationToken))
             .ToDictionary(link => link.Channel, link => (string?)link.Url));
+    }
+
+    private void SuppressUnrelatedBindErrors()
+    {
+        // Dedicated handlers post only their own fields. [Required] on DisplayName
+        // would otherwise show "Display name is required" on a social-link field error.
+        ModelState.Remove(nameof(DisplayName));
+        ModelState.Remove(nameof(AvatarFile));
+        ModelState.Remove(nameof(MessagePrivacy));
+        ModelState.Remove(nameof(AdoptLegacyDisplayName));
+        ModelState.Remove(nameof(SelectedLegacyUserId));
     }
 
     private IReadOnlyDictionary<MemberSocialChannel, string?> CaptureSocialInputs() =>

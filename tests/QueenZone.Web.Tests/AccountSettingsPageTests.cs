@@ -175,6 +175,7 @@ public sealed partial class AccountSettingsPageTests : IClassFixture<WebApplicat
         var body = await rejected.Content.ReadAsStringAsync();
         Assert.Contains(MemberSocialLinkUrl.InvalidValueMessage, body);
         Assert.Contains("javascript:alert(1)", body);
+        Assert.DoesNotContain(">Display name is required.</span>", body);
 
         using var scope = factory.Services.CreateScope();
         var member = await scope.ServiceProvider
