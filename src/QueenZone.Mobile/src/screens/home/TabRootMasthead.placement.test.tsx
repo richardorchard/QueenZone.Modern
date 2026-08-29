@@ -18,6 +18,7 @@ import {
 import { fetchConversation } from '../../api/messages';
 import { newsDetailFixture, newsItemFixture, pagedResponse } from '../../test/fixtures';
 import { createMockSession } from '../../test/mockSession';
+import { nestedTabParams } from '../../navigation/nestedTab';
 import { fakeNavigation, flushVirtualizedList, renderWithProviders } from '../../test/render';
 import { testIds } from '../../test/testIds';
 import { ArchiveHubScreen } from '../archive/ArchiveHubScreen';
@@ -332,7 +333,7 @@ describe('TabRootMasthead placement', () => {
       const view = renderWithProviders(screenNode, { navigation: false });
       await waitFor(() => expect(screen.getByTestId(testIds.tabMasthead)).toBeOnTheScreen());
       await user.press(screen.getByTestId(testIds.homeMessages));
-      expect(otherNav.navigate).toHaveBeenCalledWith('HomeTab', { screen: 'Inbox' });
+      expect(otherNav.navigate).toHaveBeenCalledWith('HomeTab', nestedTabParams('Inbox'));
       view.unmount();
     }
   });

@@ -10,6 +10,7 @@ import { newsArticleListImageSource, newsArticlePlaceholder } from '../../conten
 import { newsDecades } from '../../content/sample';
 import { useNewsListEpochRefresh } from '../../hooks/useNewsListEpochRefresh';
 import { usePagedContent } from '../../hooks/usePagedContent';
+import { nestedTabParams } from '../../navigation/nestedTab';
 import type { NewsStackParamList, RootTabParamList } from '../../navigation/types';
 import { radius, space, useTheme } from '../../theme';
 import { ArticleRow } from '../../ui/ArticleRow';
@@ -124,7 +125,7 @@ export function NewsIndexScreen({ navigation, route }: Props) {
     <View>
       <TabRootMasthead
         onSearch={() => navigation.navigate('Search')}
-        onMessagesPress={() => navigation.navigate('HomeTab', { screen: 'Inbox' })}
+        onMessagesPress={() => navigation.navigate('HomeTab', nestedTabParams('Inbox'))}
         onProfilePress={() => navigation.navigate('HomeTab', { screen: 'Profile' })}
       />
       <PageTitleBlock eyebrow="The archive" title="News" subtitle={countLine} />

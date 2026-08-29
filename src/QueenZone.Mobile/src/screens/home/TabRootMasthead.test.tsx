@@ -125,4 +125,16 @@ describe('TabRootMasthead', () => {
     expect(onMessagesPress).toHaveBeenCalledTimes(1);
     expect(onProfilePress).toHaveBeenCalledTimes(1);
   });
+
+  it('opens messages when the unread badge is pressed', async () => {
+    mockSession.isSignedIn = true;
+    mockSession.displayName = 'Contract Member';
+    mockUnread.count = 3;
+    const { onMessagesPress } = renderMasthead();
+    const user = userEvent.setup();
+
+    await user.press(screen.getByText('3', { includeHiddenElements: true }));
+
+    expect(onMessagesPress).toHaveBeenCalledTimes(1);
+  });
 });
