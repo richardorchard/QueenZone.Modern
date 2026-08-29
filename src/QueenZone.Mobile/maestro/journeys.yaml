@@ -1,0 +1,7 @@
+appId: org.queenzone.mobile
+name: QueenZone on-demand Maestro journeys
+---
+# Three weekday/on-demand journeys (#1071–#1074). Do not add these to smoke.yaml.
+- runFlow: flows/10-forum-attach.yaml
+- runFlow: flows/11-news-discussion.yaml
+- runFlow: flows/12-masthead-unread.yaml
