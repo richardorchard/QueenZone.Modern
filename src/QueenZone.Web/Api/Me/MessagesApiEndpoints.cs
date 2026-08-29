@@ -30,6 +30,10 @@ public static class MessagesApiEndpoints
 
     public static string UnarchivePath(Guid conversationId) => $"{ConversationPath(conversationId)}/unarchive";
 
+    public static string BlockPath(Guid conversationId) => $"{ConversationPath(conversationId)}/block";
+
+    public static string UnblockPath(Guid conversationId) => $"{ConversationPath(conversationId)}/unblock";
+
     public static void MapMessagesApiEndpoints(this WebApplication app)
     {
         var group = app.MapGroup("/api/v1/me")
@@ -99,6 +103,19 @@ public static class MessagesApiEndpoints
         group.MapPost("/messages/{conversationId:guid}/unarchive", UnarchiveConversationAsync)
             .WithName("UnarchiveMemberConversation")
             .WithSummary("Move an archived conversation back to the inbox, matching POST /messages/archived (Unarchive handler).")
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapPost("/messages/{conversationId:guid}/block", BlockConversationParticipantAsync)
+            .WithName("BlockMemberConversationParticipant")
+            .WithSummary("Block the other participant in a conversation, matching POST /messages/{id} (Block handler).")
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapPost("/messages/{conversationId:guid}/unblock", UnblockConversationParticipantAsync)
+            .WithName("UnblockMemberConversationParticipant")
+            .WithSummary("Unblock the other participant in a conversation, matching POST /messages/{id} (Unblock handler).")
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
@@ -304,6 +321,79 @@ public static class MessagesApiEndpoints
         {
             return ConversationNotFound();
         }
+
+        httpContext.Response.Headers.CacheControl = "no-store";
+        return Results.NoContent();
+    }
+
+    internal static async Task<IResult> BlockConversationParticipantAsync(
+        HttpContext httpContext,
+        ClaimsPrincipal user,
+        PrivateMessageService privateMessageService,
+        Guid conversationId,
+        CancellationToken cancellationToken)
+    {
+        var memberId = RequireMemberId(user, out var unauthorized);
+        if (unauthorized is not null)
+        {
+            return unauthorized;
+        }
+
+        var detail = await privateMessageService.GetConversationAsync(
+            conversationId,
+            memberId,
+            markRead: false,
+            page: null,
+            cancellationToken: cancellationToken);
+        if (detail is null)
+        {
+            return ConversationNotFound();
+        }
+
+        var result = await privateMessageService.BlockAsync(
+            memberId,
+            detail.OtherParticipantId,
+            cancellationToken);
+        if (!result.Succeeded)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Bad Request",
+                detail: result.ErrorMessage ?? "Unable to block member.");
+        }
+
+        httpContext.Response.Headers.CacheControl = "no-store";
+        return Results.NoContent();
+    }
+
+    internal static async Task<IResult> UnblockConversationParticipantAsync(
+        HttpContext httpContext,
+        ClaimsPrincipal user,
+        PrivateMessageService privateMessageService,
+        Guid conversationId,
+        CancellationToken cancellationToken)
+    {
+        var memberId = RequireMemberId(user, out var unauthorized);
+        if (unauthorized is not null)
+        {
+            return unauthorized;
+        }
+
+        var detail = await privateMessageService.GetConversationAsync(
+            conversationId,
+            memberId,
+            markRead: false,
+            page: null,
+            cancellationToken: cancellationToken);
+        if (detail is null)
+        {
+            return ConversationNotFound();
+        }
+
+        await privateMessageService.UnblockAsync(
+            memberId,
+            detail.OtherParticipantId,
+            cancellationToken);
 
         httpContext.Response.Headers.CacheControl = "no-store";
         return Results.NoContent();

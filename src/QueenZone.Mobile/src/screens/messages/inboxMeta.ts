@@ -110,3 +110,97 @@ export function validateReportReason(reason: string): string | null {
   }
   return null;
 }
+
+/**
+ * Monogram initials for the thread header/avatar (design handoff
+ * `design/design_handoff_private_messages`). First letter of the first and
+ * last words — e.g. "Richard Orchard TW" → "RT" — falling back to the first
+ * two characters of a single-word name.
+ */
+export function initialsFor(displayName: string): string {
+  const parts = displayName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) {
+    return '';
+  }
+  if (parts.length === 1) {
+    return parts[0].slice(0, 2).toUpperCase();
+  }
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+/** 24-hour clock time only, e.g. "17:10" — used for per-message attribution lines. */
+export function formatMessageClockTime(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${hours}:${minutes}`;
+}
+
+/**
+ * Date-divider label: "TODAY" / "YESTERDAY" for the last two days, otherwise
+ * British long-date style, e.g. "2 AUGUST 2026".
+ */
+export function formatDateDividerLabel(iso: string, now: Date = new Date()): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+  const startOfDay = (value: Date) => new Date(value.getFullYear(), value.getMonth(), value.getDate()).getTime();
+  const diffDays = Math.round((startOfDay(now) - startOfDay(date)) / 86_400_000);
+  if (diffDays === 0) {
+    return 'TODAY';
+  }
+  if (diffDays === 1) {
+    return 'YESTERDAY';
+  }
+  const day = date.getDate();
+  const month = date.toLocaleString('en-GB', { month: 'long' }).toUpperCase();
+  return `${day} ${month} ${date.getFullYear()}`;
+}
+
+function dayKey(iso: string): string {
+  const date = new Date(iso);
+  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+}
+
+type ThreadMessageLike = {
+  id: string;
+  senderMemberId: string;
+  createdAt: string;
+};
+
+export type ThreadListItem<M extends ThreadMessageLike = ThreadMessageLike> =
+  | { kind: 'divider'; id: string; label: string }
+  | { kind: 'message'; id: string; message: M; isFirstOfRun: boolean };
+
+/**
+ * Flattens a conversation's oldest-first messages into date dividers plus
+ * grouped message runs (design handoff §"Message list" grouping rules).
+ */
+export function buildThreadItems<M extends ThreadMessageLike>(messages: ReadonlyArray<M>): ThreadListItem<M>[] {
+  const items: ThreadListItem<M>[] = [];
+  let lastDayKey: string | null = null;
+  let lastAuthor: string | null = null;
+
+  for (const message of messages) {
+    const key = dayKey(message.createdAt);
+    const showDivider = key !== lastDayKey;
+    if (showDivider) {
+      items.push({ kind: 'divider', id: `divider-${message.id}`, label: formatDateDividerLabel(message.createdAt) });
+      lastAuthor = null;
+    }
+    items.push({
+      kind: 'message',
+      id: message.id,
+      message,
+      isFirstOfRun: showDivider || message.senderMemberId !== lastAuthor,
+    });
+    lastDayKey = key;
+    lastAuthor = message.senderMemberId;
+  }
+
+  return items;
+}
