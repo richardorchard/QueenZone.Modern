@@ -61,6 +61,7 @@ export function ArchiveHubScreen({ navigation }: Props) {
         <View>
           <TabRootMasthead
             onSearch={() => navigation.navigate('Search')}
+            onMessagesPress={() => navigation.navigate('HomeTab', { screen: 'Inbox' })}
             onProfilePress={() => navigation.navigate('HomeTab', { screen: 'Profile' })}
           />
           <PageTitleBlock

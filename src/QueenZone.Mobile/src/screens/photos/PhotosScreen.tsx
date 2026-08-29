@@ -38,6 +38,7 @@ export function PhotosScreen({ navigation }: Props) {
   const masthead = (
     <TabRootMasthead
       onSearch={() => navigation.navigate('Search')}
+      onMessagesPress={() => navigation.navigate('HomeTab', { screen: 'Inbox' })}
       onProfilePress={() => navigation.navigate('HomeTab', { screen: 'Profile' })}
     />
   );

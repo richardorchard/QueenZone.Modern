@@ -124,6 +124,7 @@ export function NewsIndexScreen({ navigation, route }: Props) {
     <View>
       <TabRootMasthead
         onSearch={() => navigation.navigate('Search')}
+        onMessagesPress={() => navigation.navigate('HomeTab', { screen: 'Inbox' })}
         onProfilePress={() => navigation.navigate('HomeTab', { screen: 'Profile' })}
       />
       <PageTitleBlock eyebrow="The archive" title="News" subtitle={countLine} />

@@ -53,6 +53,7 @@ export function ForumScreen({ navigation }: Props) {
     <View>
       <TabRootMasthead
         onSearch={() => navigation.navigate('Search')}
+        onMessagesPress={() => navigation.navigate('HomeTab', { screen: 'Inbox' })}
         onProfilePress={() => navigation.navigate('HomeTab', { screen: 'Profile' })}
       />
       <PageTitleBlock eyebrow="Community" title="Forum" />
