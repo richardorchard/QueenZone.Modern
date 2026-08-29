@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using QueenZone.Data;
 using QueenZone.Storage;
@@ -456,5 +457,38 @@ public sealed class ForumApiTests : IClassFixture<QueenZoneWebApplicationFactory
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
+    public async Task Topic_lists_and_posts_omit_hidden_author_content()
+    {
+        using var scope = factory.Services.CreateScope();
+        var write = scope.ServiceProvider.GetRequiredService<IForumWriteRepository>();
+        var spammerId = Guid.NewGuid();
+        var innocentId = Guid.NewGuid();
+        var created = await write.CreateThreadAsync(new NewForumThread(
+            1, innocentId, "Innocent", "Visible mixed topic", "<p>Opener</p>", DateTimeOffset.UtcNow));
+        await write.CreatePostAsync(new NewForumPost(
+            created.TopicId, spammerId, "ApiSpammer", "<p>Hidden reply</p>", DateTimeOffset.UtcNow));
+
+        using var client = factory.CreateAnonymousClient();
+        var before = await client.GetFromJsonAsync<ApiPagedResponse<ForumTopicListItemDto>>(
+            $"{ForumApiEndpoints.RootPath}/categories/1/topics");
+        Assert.Contains(before!.Items, item => item.Title == "Visible mixed topic");
+
+        var postsBefore = await client.GetFromJsonAsync<ApiPagedResponse<ForumPostDto>>(
+            $"{ForumApiEndpoints.RootPath}/topics/{created.TopicId}/posts");
+        Assert.Contains(postsBefore!.Items, item => item.Body.Contains("Hidden reply", StringComparison.Ordinal));
+
+        await write.HideAuthorForumContentAsync(spammerId, "ApiSpammer");
+
+        var after = await client.GetFromJsonAsync<ApiPagedResponse<ForumTopicListItemDto>>(
+            $"{ForumApiEndpoints.RootPath}/categories/1/topics");
+        Assert.Contains(after!.Items, item => item.Title == "Visible mixed topic");
+
+        var postsAfter = await client.GetFromJsonAsync<ApiPagedResponse<ForumPostDto>>(
+            $"{ForumApiEndpoints.RootPath}/topics/{created.TopicId}/posts");
+        Assert.DoesNotContain(postsAfter!.Items, item => item.Body.Contains("Hidden reply", StringComparison.Ordinal));
+        Assert.Contains(postsAfter.Items, item => item.Body.Contains("Opener", StringComparison.Ordinal));
     }
 }

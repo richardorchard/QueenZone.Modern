@@ -324,11 +324,28 @@ public sealed class ForumApiWriteTests : IClassFixture<QueenZoneWebApplicationFa
             CancellationToken cancellationToken = default) =>
             Task.FromResult(0);
 
-        public Task HidePostsByMemberAsync(Guid memberId, CancellationToken cancellationToken = default) =>
+        public Task HideAuthorForumContentAsync(
+            Guid? memberId,
+            string displayName,
+            CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
 
-        public Task UnhidePostsByMemberAsync(Guid memberId, CancellationToken cancellationToken = default) =>
+        public Task UnhideAuthorForumContentAsync(
+            Guid? memberId,
+            string displayName,
+            CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
+
+        public Task<AuthorForumContentCounts> CountAuthorForumContentAsync(
+            Guid? memberId,
+            string displayName,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new AuthorForumContentCounts(displayName, 0, 0, 0, 0));
+
+        public Task<AuthorForumContentCounts?> FindForumAuthorByDisplayNameAsync(
+            string displayName,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<AuthorForumContentCounts?>(null);
 
         public Task<int> EnsureCategoryAsync(
             string slug,

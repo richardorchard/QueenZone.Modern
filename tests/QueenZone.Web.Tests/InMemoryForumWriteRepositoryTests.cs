@@ -57,7 +57,7 @@ public sealed class InMemoryForumWriteRepositoryTests
     }
 
     [Fact]
-    public async Task HidePostsByMemberAsync_ExcludesPostsFromTopicView_UnhideRestoresThem()
+    public async Task HideAuthorForumContentAsync_ExcludesPostsFromTopicView_UnhideRestoresThem()
     {
         var repository = new InMemoryForumWriteRepository();
         var spammerId = Guid.NewGuid();
@@ -71,7 +71,7 @@ public sealed class InMemoryForumWriteRepositoryTests
         Assert.Equal(2, repository.GetPostsForTopic(thread.TopicId).Count);
         Assert.Equal(1, await repository.CountApprovedPostsByMemberAsync(spammerId));
 
-        await repository.HidePostsByMemberAsync(spammerId);
+        await repository.HideAuthorForumContentAsync(spammerId, "Spammer");
 
         var visiblePosts = repository.GetPostsForTopic(thread.TopicId);
         Assert.Single(visiblePosts);
@@ -79,7 +79,7 @@ public sealed class InMemoryForumWriteRepositoryTests
         Assert.DoesNotContain(repository.GetCreatedThreads(), item => item.TopicId == thread.TopicId);
         Assert.Equal(0, await repository.CountApprovedPostsByMemberAsync(spammerId));
 
-        await repository.UnhidePostsByMemberAsync(spammerId);
+        await repository.UnhideAuthorForumContentAsync(spammerId, "Spammer");
 
         Assert.Equal(2, repository.GetPostsForTopic(thread.TopicId).Count);
         Assert.Contains(repository.GetCreatedThreads(), item => item.TopicId == thread.TopicId);
@@ -245,5 +245,44 @@ public sealed class InMemoryForumWriteRepositoryTests
         Assert.Equal(
             NewsForumDiscussion.CategoryName,
             other.GetCreatedCategories().Single(category => category.Id == newsId).Name);
+    }
+
+    [Fact]
+    public async Task HideAuthorForumContentAsync_HidesUnlinkedDisplayNameAndLeavesOtherAuthors()
+    {
+        var repository = new InMemoryForumWriteRepository();
+        var innocentId = Guid.NewGuid();
+        var createdAt = DateTimeOffset.UtcNow;
+
+        var spam = repository.SeedUnlinkedThread(1, "PatriciaCMardis", "Spam topic", "<p>Spam</p>", createdAt);
+        await repository.CreatePostAsync(new NewForumPost(
+            spam.TopicId, innocentId, "Innocent", "<p>Keep me</p>", createdAt));
+        var innocentThread = await repository.CreateThreadAsync(new NewForumThread(
+            1, innocentId, "Innocent", "Real topic", "<p>Hello</p>", createdAt));
+        repository.SeedUnlinkedReply(innocentThread.TopicId, "PatriciaCMardis", "<p>Spam reply</p>", createdAt);
+        await repository.CreateThreadAsync(new NewForumThread(
+            1, innocentId, "PatriciaCMardis", "Same name different member", "<p>Not spam</p>", createdAt));
+
+        var found = await repository.FindForumAuthorByDisplayNameAsync("patriciacmardis");
+        Assert.NotNull(found);
+        Assert.Equal("PatriciaCMardis", found.DisplayName);
+        Assert.Equal(2, found.PostCount);
+        Assert.Equal(1, found.ThreadCount);
+
+        await repository.HideAuthorForumContentAsync(null, "PatriciaCMardis");
+
+        var spamTopicVisible = repository.GetPostsForTopic(spam.TopicId);
+        Assert.Single(spamTopicVisible);
+        Assert.Equal(innocentId, spamTopicVisible[0].MemberId);
+        Assert.DoesNotContain(repository.GetCreatedThreads(), item => item.TopicId == spam.TopicId);
+        var innocentVisible = repository.GetPostsForTopic(innocentThread.TopicId);
+        Assert.Single(innocentVisible);
+        Assert.Equal(innocentId, innocentVisible[0].MemberId);
+        Assert.Contains(repository.GetCreatedThreads(), item => item.Subject == "Same name different member");
+
+        await repository.UnhideAuthorForumContentAsync(null, "PatriciaCMardis");
+
+        Assert.Equal(2, repository.GetPostsForTopic(spam.TopicId).Count);
+        Assert.Contains(repository.GetCreatedThreads(), item => item.TopicId == spam.TopicId);
     }
 }

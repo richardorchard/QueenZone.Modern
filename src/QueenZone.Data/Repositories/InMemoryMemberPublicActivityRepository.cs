@@ -29,7 +29,7 @@ public sealed class InMemoryMemberPublicActivityRepository(
 
         var forumItems = forumWriteRepository.GetCreatedThreads()
             .SelectMany(thread => forumWriteRepository.GetPostsForTopic(thread.TopicId)
-                .Where(post => authorIds.Contains(post.MemberId))
+                .Where(post => post.MemberId is Guid authorId && authorIds.Contains(authorId))
                 .Select(post => new MemberPublicActivityItem(
                     MemberPublicActivityType.ForumPost,
                     thread.Subject,

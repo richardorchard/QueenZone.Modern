@@ -198,6 +198,138 @@ public sealed class AdminMembersRoutesTests : IClassFixture<WebApplicationFactor
         Assert.Contains("Buy cheap watches here", topicsAfterReinstate);
     }
 
+    [Fact]
+    public async Task HideForumContent_HidesPostsWithoutSuspending_AndUnhideRestoresThem()
+    {
+        const string email = "hide-only@example.com";
+        await CreateSignedInMemberClientAsync(email, "Hide Only", "google-hide-only");
+        var memberId = await GetMemberIdForEmailAsync(email);
+
+        var forumWriteRepository = factory.Services.GetRequiredService<IForumWriteRepository>();
+        await forumWriteRepository.CreateThreadAsync(new NewForumThread(
+            1,
+            memberId,
+            "Hide Only",
+            "Hide this topic",
+            "<p>Spam body</p>",
+            DateTimeOffset.UtcNow));
+
+        var admin = CreateAdminClient(AdminEmail);
+        var detail = await admin.GetStringAsync($"/admin/members/{memberId}");
+        Assert.Contains("Hide all posts and threads", detail);
+        Assert.Contains("1 post(s) and 1 thread(s)", detail);
+
+        var hideResponse = await admin.PostAsync(
+            $"/admin/members/{memberId}/HideForumContent",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(detail),
+            }));
+        Assert.Equal(HttpStatusCode.Redirect, hideResponse.StatusCode);
+
+        var members = factory.Services.GetRequiredService<IMemberAccountRepository>();
+        var account = await members.FindByIdAsync(memberId);
+        Assert.False(account!.IsSuspended);
+
+        var profileClient = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        Assert.DoesNotContain("Hide this topic", await profileClient.GetStringAsync($"/members/{memberId}"));
+        Assert.DoesNotContain(
+            "Hide this topic",
+            await profileClient.GetStringAsync("/api/v1/forum/categories/1/topics"));
+
+        var hiddenDetail = await admin.GetStringAsync($"/admin/members/{memberId}");
+        Assert.Contains("Unhide posts and threads", hiddenDetail);
+        var unhideResponse = await admin.PostAsync(
+            $"/admin/members/{memberId}/UnhideForumContent",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(hiddenDetail),
+            }));
+        Assert.Equal(HttpStatusCode.Redirect, unhideResponse.StatusCode);
+
+        Assert.Contains("Hide this topic", await profileClient.GetStringAsync($"/members/{memberId}"));
+        Assert.Contains(
+            "Hide this topic",
+            await profileClient.GetStringAsync("/api/v1/forum/categories/1/topics"));
+    }
+
+    [Fact]
+    public async Task Search_ShowsNoAccountAuthor_AndHideUnhideWorks()
+    {
+        var write = factory.Services.GetRequiredService<IForumWriteRepository>() as InMemoryForumWriteRepository
+            ?? throw new InvalidOperationException("Expected in-memory forum write repository in Testing.");
+        write.SeedUnlinkedThread(
+            1,
+            "PatriciaCMardis",
+            "Unlinked spam topic",
+            "<p>Buy followers</p>",
+            DateTimeOffset.UtcNow);
+
+        var admin = CreateAdminClient(AdminEmail);
+        var search = await admin.GetStringAsync("/admin/members?query=PatriciaCMardis");
+        Assert.Contains("PatriciaCMardis", search);
+        Assert.Contains("No member account", search);
+        Assert.Contains("Hide all posts and threads", search);
+
+        var hideResponse = await admin.PostAsync(
+            "/admin/members/author/HideForumContent",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(search),
+                ["DisplayName"] = "PatriciaCMardis",
+            }));
+        Assert.Equal(HttpStatusCode.Redirect, hideResponse.StatusCode);
+
+        var profileClient = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        Assert.DoesNotContain(
+            "Unlinked spam topic",
+            await profileClient.GetStringAsync("/api/v1/forum/categories/1/topics"));
+
+        var hiddenSearch = await admin.GetStringAsync("/admin/members?query=PatriciaCMardis");
+        Assert.Contains("Unhide posts and threads", hiddenSearch);
+        var unhideResponse = await admin.PostAsync(
+            "/admin/members/author/UnhideForumContent",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(hiddenSearch),
+                ["DisplayName"] = "PatriciaCMardis",
+            }));
+        Assert.Equal(HttpStatusCode.Redirect, unhideResponse.StatusCode);
+
+        Assert.Contains(
+            "Unlinked spam topic",
+            await profileClient.GetStringAsync("/api/v1/forum/categories/1/topics"));
+    }
+
+    [Fact]
+    public async Task HideForumContent_RequiresAdminAuthentication()
+    {
+        const string email = "hide-auth@example.com";
+        await CreateSignedInMemberClientAsync(email, "Hide Auth", "google-hide-auth");
+        var memberId = await GetMemberIdForEmailAsync(email);
+        var admin = CreateAdminClient(AdminEmail);
+        var detail = await admin.GetStringAsync($"/admin/members/{memberId}");
+        var token = ExtractAntiforgeryToken(detail);
+
+        var stranger = CreateAdminClient("stranger@example.com");
+        var forbidden = await stranger.PostAsync(
+            $"/admin/members/{memberId}/HideForumContent",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = token,
+            }));
+        Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
+
+        var anonymous = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var unauthorized = await anonymous.PostAsync(
+            $"/admin/members/{memberId}/HideForumContent",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = token,
+            }));
+        Assert.Equal(HttpStatusCode.Unauthorized, unauthorized.StatusCode);
+    }
+
     private HttpClient CreateAdminClient(string? email = null)
     {
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });

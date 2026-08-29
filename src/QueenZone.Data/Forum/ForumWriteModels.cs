@@ -25,7 +25,8 @@ public sealed record ForumWriteThread(
     int PostCount,
     bool IsLocked,
     bool HasPoll = false,
-    bool IsHidden = false);
+    bool IsHidden = false,
+    string StartedByDisplayName = "");
 
 public sealed record ForumThreadCreateResult(int TopicId, int StarterPostId);
 
@@ -38,7 +39,26 @@ public sealed record ForumEditablePost(
     DateTimeOffset PostedAt,
     DateTimeOffset? EditedAt,
     int EditCount,
-    int PositionInThread = 1);
+    int PositionInThread = 1,
+    string AuthorDisplayName = "");
+
+public sealed record AuthorForumContentCounts(
+    string DisplayName,
+    int PostCount,
+    int HiddenPostCount,
+    int ThreadCount,
+    int HiddenThreadCount)
+{
+    public int VisiblePostCount => PostCount - HiddenPostCount;
+
+    public int VisibleThreadCount => ThreadCount - HiddenThreadCount;
+
+    public bool HasVisibleContent => VisiblePostCount > 0 || VisibleThreadCount > 0;
+
+    public bool HasHiddenContent => HiddenPostCount > 0 || HiddenThreadCount > 0;
+
+    public bool HasAnyContent => PostCount > 0 || ThreadCount > 0;
+}
 
 public enum ForumPostUpdateStatus
 {

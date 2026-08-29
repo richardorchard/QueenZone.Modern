@@ -34,6 +34,34 @@
     </dd>
   </dl>
 
+  <section class="admin-form">
+    <h2>Forum posts and threads</h2>
+    <p>
+      @Model.ForumContent.PostCount post(s) and @Model.ForumContent.ThreadCount thread(s) match
+      <strong>@Model.Member.DisplayName</strong>
+      (@Model.ForumContent.HiddenPostCount hidden post(s), @Model.ForumContent.HiddenThreadCount hidden thread(s)).
+      Display names are not unique — this is an exact name match plus this member id.
+    </p>
+    @if (Model.ForumContent.HasVisibleContent)
+    {
+      <form method="post" action="/admin/members/@Model.Member.Id/HideForumContent">
+        @Html.AntiForgeryToken()
+        <button type="submit"
+                class="qz-button qz-button--danger"
+                onclick="return confirm(@System.Text.Json.JsonSerializer.Serialize($"Hide all posts and threads started by {Model.Member.DisplayName}? Other people's posts stay. This matches {Model.ForumContent.VisiblePostCount} visible post(s) and {Model.ForumContent.VisibleThreadCount} visible thread(s)."));">
+          Hide all posts and threads
+        </button>
+      </form>
+    }
+    @if (Model.ForumContent.HasHiddenContent)
+    {
+      <form method="post" action="/admin/members/@Model.Member.Id/UnhideForumContent">
+        @Html.AntiForgeryToken()
+        <button type="submit" class="qz-button">Unhide posts and threads</button>
+      </form>
+    }
+  </section>
+
   @if (Model.Member.IsSuspended)
   {
     <section class="admin-form">

@@ -12,9 +12,56 @@
     <button type="submit" class="qz-button">Search</button>
   </form>
 
+  @if (Model.StatusMessage is not null)
+  {
+    <div class="admin-status admin-status--@Model.StatusMessageKind">@Model.StatusMessage</div>
+  }
+
   @if (Model.Members.Count == 0)
   {
     <p>No members found.</p>
+    @if (Model.NoAccountAuthor is { } author)
+    {
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Display name</th>
+            <th>Account</th>
+            <th>Forum content</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>@author.DisplayName</td>
+            <td>No member account</td>
+            <td>@author.PostCount post(s), @author.ThreadCount thread(s) (@author.HiddenPostCount hidden)</td>
+            <td>
+              @if (author.HasVisibleContent)
+              {
+                <form method="post" action="/admin/members/author/HideForumContent" style="display:inline">
+                  @Html.AntiForgeryToken()
+                  <input type="hidden" name="DisplayName" value="@author.DisplayName" />
+                  <button type="submit"
+                          class="qz-button qz-button--danger"
+                          onclick="return confirm(@System.Text.Json.JsonSerializer.Serialize($"Hide all posts and threads started by {author.DisplayName}? Other people's posts stay. This matches {author.VisiblePostCount} visible post(s) and {author.VisibleThreadCount} visible thread(s)."));">
+                    Hide all posts and threads
+                  </button>
+                </form>
+              }
+              @if (author.HasHiddenContent)
+              {
+                <form method="post" action="/admin/members/author/UnhideForumContent" style="display:inline">
+                  @Html.AntiForgeryToken()
+                  <input type="hidden" name="DisplayName" value="@author.DisplayName" />
+                  <button type="submit" class="qz-button">Unhide posts and threads</button>
+                </form>
+              }
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    }
   }
   else
   {

@@ -197,6 +197,7 @@ public static class PublicContentMapper
             EditedLabel = editedLabel,
             CanMessage = canMessage,
             IsAuthor = isAuthor,
+            CanHideAuthor = isAdmin,
         };
     }
 

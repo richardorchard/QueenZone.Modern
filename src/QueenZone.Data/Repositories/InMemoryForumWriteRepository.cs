@@ -29,7 +29,8 @@ public sealed class InMemoryForumWriteRepository : IForumWriteRepository
                 thread.CreatedAt,
                 1,
                 IsLocked: false,
-                HasPoll: thread.Poll is not null));
+                HasPoll: thread.Poll is not null,
+                StartedByDisplayName: thread.AuthorDisplayName.Trim()));
             posts.Add(new InMemoryForumWritePost(
                 postId,
                 topicId,
@@ -124,7 +125,8 @@ public sealed class InMemoryForumWriteRepository : IForumWriteRepository
                 post.CreatedAt,
                 post.EditedAt,
                 post.EditCount,
-                Math.Max(1, position)));
+                Math.Max(1, position),
+                post.DisplayName));
         }
     }
 
@@ -227,62 +229,198 @@ public sealed class InMemoryForumWriteRepository : IForumWriteRepository
         }
     }
 
-    public Task HidePostsByMemberAsync(Guid memberId, CancellationToken cancellationToken = default)
+    public Task HideAuthorForumContentAsync(
+        Guid? memberId,
+        string displayName,
+        CancellationToken cancellationToken = default)
     {
         lock (sync)
         {
-            var startedTopicIds = posts
-                .GroupBy(post => post.TopicId)
-                .Where(topicPosts => topicPosts.OrderBy(post => post.PostId).First().MemberId == memberId)
-                .Select(topicPosts => topicPosts.Key)
-                .ToHashSet();
-            for (var i = 0; i < threads.Count; i++)
-            {
-                if (startedTopicIds.Contains(threads[i].TopicId))
-                {
-                    threads[i] = threads[i] with { IsHidden = true };
-                }
-            }
-
-            for (var i = 0; i < posts.Count; i++)
-            {
-                if (posts[i].MemberId == memberId)
-                {
-                    posts[i] = posts[i] with { IsHidden = true };
-                }
-            }
-
+            SetAuthorHidden(memberId, displayName, hidden: true);
             return Task.CompletedTask;
         }
     }
 
-    public Task UnhidePostsByMemberAsync(Guid memberId, CancellationToken cancellationToken = default)
+    public Task UnhideAuthorForumContentAsync(
+        Guid? memberId,
+        string displayName,
+        CancellationToken cancellationToken = default)
     {
         lock (sync)
         {
-            var startedTopicIds = posts
-                .GroupBy(post => post.TopicId)
-                .Where(topicPosts => topicPosts.OrderBy(post => post.PostId).First().MemberId == memberId)
-                .Select(topicPosts => topicPosts.Key)
-                .ToHashSet();
-            for (var i = 0; i < threads.Count; i++)
-            {
-                if (startedTopicIds.Contains(threads[i].TopicId))
-                {
-                    threads[i] = threads[i] with { IsHidden = false };
-                }
-            }
-
-            for (var i = 0; i < posts.Count; i++)
-            {
-                if (posts[i].MemberId == memberId)
-                {
-                    posts[i] = posts[i] with { IsHidden = false };
-                }
-            }
-
+            SetAuthorHidden(memberId, displayName, hidden: false);
             return Task.CompletedTask;
         }
+    }
+
+    public Task<AuthorForumContentCounts> CountAuthorForumContentAsync(
+        Guid? memberId,
+        string displayName,
+        CancellationToken cancellationToken = default)
+    {
+        lock (sync)
+        {
+            return Task.FromResult(CountAuthorLocked(memberId, displayName));
+        }
+    }
+
+    public Task<AuthorForumContentCounts?> FindForumAuthorByDisplayNameAsync(
+        string displayName,
+        CancellationToken cancellationToken = default)
+    {
+        lock (sync)
+        {
+            var counts = CountAuthorLocked(null, displayName);
+            if (!counts.HasAnyContent)
+            {
+                return Task.FromResult<AuthorForumContentCounts?>(null);
+            }
+
+            var storedName = posts
+                .FirstOrDefault(post => post.MemberId is null
+                    && ForumAuthorContentMatching.NamesEqual(post.DisplayName, displayName))
+                ?.DisplayName
+                ?? threads.FirstOrDefault(thread =>
+                    ForumAuthorContentMatching.NamesEqual(thread.StartedByDisplayName, displayName))
+                    ?.StartedByDisplayName;
+
+            return Task.FromResult<AuthorForumContentCounts?>(
+                counts with { DisplayName = string.IsNullOrWhiteSpace(storedName) ? counts.DisplayName : storedName.Trim() });
+        }
+    }
+
+    public ForumThreadCreateResult SeedUnlinkedThread(
+        int categoryId,
+        string displayName,
+        string subject,
+        string body,
+        DateTimeOffset createdAt)
+    {
+        lock (sync)
+        {
+            var topicId = nextTopicId++;
+            var postId = nextPostId++;
+            var name = displayName.Trim();
+            threads.Add(new ForumWriteThread(
+                topicId,
+                categoryId,
+                subject.Trim(),
+                createdAt,
+                createdAt,
+                1,
+                IsLocked: false,
+                StartedByDisplayName: name));
+            posts.Add(new InMemoryForumWritePost(
+                postId,
+                topicId,
+                MemberId: null,
+                name,
+                body,
+                createdAt));
+            return new ForumThreadCreateResult(topicId, postId);
+        }
+    }
+
+    public int SeedUnlinkedReply(int topicId, string displayName, string body, DateTimeOffset createdAt)
+    {
+        lock (sync)
+        {
+            var index = threads.FindIndex(thread => thread.TopicId == topicId);
+            if (index < 0)
+            {
+                throw new InvalidOperationException("Forum thread not found.");
+            }
+
+            var postId = nextPostId++;
+            posts.Add(new InMemoryForumWritePost(
+                postId,
+                topicId,
+                MemberId: null,
+                displayName.Trim(),
+                body,
+                createdAt));
+            var thread = threads[index];
+            threads[index] = thread with
+            {
+                LastPostAt = createdAt,
+                PostCount = thread.PostCount + 1,
+            };
+            return postId;
+        }
+    }
+
+    private void SetAuthorHidden(Guid? memberId, string displayName, bool hidden)
+    {
+        var startedTopicIds = StartedTopicIds(memberId, displayName);
+        for (var i = 0; i < threads.Count; i++)
+        {
+            if (startedTopicIds.Contains(threads[i].TopicId))
+            {
+                threads[i] = threads[i] with { IsHidden = hidden };
+            }
+        }
+
+        for (var i = 0; i < posts.Count; i++)
+        {
+            if (ForumAuthorContentMatching.MatchesPost(
+                    memberId, displayName, posts[i].MemberId, posts[i].DisplayName))
+            {
+                posts[i] = posts[i] with { IsHidden = hidden };
+            }
+        }
+    }
+
+    private AuthorForumContentCounts CountAuthorLocked(Guid? memberId, string displayName)
+    {
+        var label = displayName.Trim();
+        if (memberId is null && ForumAuthorContentMatching.NormalizeDisplayName(displayName).Length == 0)
+        {
+            return new AuthorForumContentCounts(label, 0, 0, 0, 0);
+        }
+
+        var matchingPosts = posts
+            .Where(post => ForumAuthorContentMatching.MatchesPost(
+                memberId, displayName, post.MemberId, post.DisplayName))
+            .ToList();
+        var startedTopicIds = StartedTopicIds(memberId, displayName);
+        var matchingThreads = threads.Where(thread => startedTopicIds.Contains(thread.TopicId)).ToList();
+        return new AuthorForumContentCounts(
+            label,
+            matchingPosts.Count,
+            matchingPosts.Count(post => post.IsHidden),
+            matchingThreads.Count,
+            matchingThreads.Count(thread => thread.IsHidden));
+    }
+
+    private HashSet<int> StartedTopicIds(Guid? memberId, string displayName)
+    {
+        var fromFirstPost = posts
+            .GroupBy(post => post.TopicId)
+            .Where(topicPosts =>
+            {
+                var starter = topicPosts.OrderBy(post => post.PostId).First();
+                return ForumAuthorContentMatching.MatchesPost(
+                    memberId, displayName, starter.MemberId, starter.DisplayName);
+            })
+            .Select(topicPosts => topicPosts.Key);
+
+        var fromStartedByName = threads
+            .Where(thread =>
+            {
+                var starter = posts
+                    .Where(post => post.TopicId == thread.TopicId)
+                    .OrderBy(post => post.PostId)
+                    .FirstOrDefault();
+                return ForumAuthorContentMatching.MatchesStartedThread(
+                    memberId,
+                    displayName,
+                    starter?.MemberId,
+                    starter?.DisplayName,
+                    thread.StartedByDisplayName);
+            })
+            .Select(thread => thread.TopicId);
+
+        return fromFirstPost.Concat(fromStartedByName).ToHashSet();
     }
 
     public Task<int> EnsureCategoryAsync(
@@ -351,7 +489,7 @@ public sealed class InMemoryForumWriteRepository : IForumWriteRepository
 public sealed record InMemoryForumWritePost(
     int PostId,
     int TopicId,
-    Guid MemberId,
+    Guid? MemberId,
     string DisplayName,
     string Body,
     DateTimeOffset CreatedAt,

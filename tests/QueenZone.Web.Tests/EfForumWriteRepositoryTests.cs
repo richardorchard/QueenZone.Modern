@@ -191,7 +191,7 @@ public sealed class EfForumWriteRepositoryTests : IAsyncDisposable
     }
 
     [Fact]
-    public async Task HidePostsByMemberAsync_HidesAllPostsAndExcludesThemFromCounts_ThenUnhideRestoresThem()
+    public async Task HideAuthorForumContentAsync_HidesAllPostsAndExcludesThemFromCounts_ThenUnhideRestoresThem()
     {
         var spammer = await SeedMemberAsync("spammer@example.com", "Spammer");
         var innocent = await SeedMemberAsync("innocent@example.com", "Innocent");
@@ -210,7 +210,7 @@ public sealed class EfForumWriteRepositoryTests : IAsyncDisposable
 
         Assert.Equal(3, await repository.CountApprovedPostsByMemberAsync(spammer.Id));
 
-        await repository.HidePostsByMemberAsync(spammer.Id);
+        await repository.HideAuthorForumContentAsync(spammer.Id, spammer.DisplayName);
 
         // ExecuteUpdateAsync bypasses the change tracker, so re-query untracked to see the write.
         Assert.All(
@@ -224,7 +224,7 @@ public sealed class EfForumWriteRepositoryTests : IAsyncDisposable
         Assert.Equal(0, await repository.CountApprovedPostsByMemberAsync(spammer.Id));
         Assert.Equal(2, await repository.CountApprovedPostsByMemberAsync(innocent.Id));
 
-        await repository.UnhidePostsByMemberAsync(spammer.Id);
+        await repository.UnhideAuthorForumContentAsync(spammer.Id, spammer.DisplayName);
 
         Assert.All(
             await dbContext.ModernForumPosts.AsNoTracking().Where(p => p.AuthorMemberId == spammer.Id).ToListAsync(),
@@ -361,6 +361,71 @@ public sealed class EfForumWriteRepositoryTests : IAsyncDisposable
         Assert.NotNull(stored.EditedAt);
     }
 
+    [Fact]
+    public async Task HideAuthorForumContentAsync_HidesUnlinkedDisplayName_AndLeavesOtherMemberIds()
+    {
+        var innocent = await SeedMemberAsync("innocent@example.com", "PatriciaCMardis");
+        await SeedCategoryAsync();
+        var createdAt = DateTimeOffset.UtcNow;
+
+        var unlinked = await repository.CreateThreadAsync(new NewForumThread(
+            1, innocent.Id, "PatriciaCMardis", "Unlinked spam", "<p>Spam</p>", createdAt));
+        await UnlinkAuthorAsync(unlinked.StarterPostId);
+        var mixed = await repository.CreateThreadAsync(new NewForumThread(
+            1, innocent.Id, innocent.DisplayName, "Mixed thread", "<p>Real opener</p>", createdAt));
+        var spamReply = await repository.CreatePostAsync(new NewForumPost(
+            mixed.TopicId, innocent.Id, "PatriciaCMardis", "<p>Spam reply</p>", createdAt));
+        await UnlinkAuthorAsync(spamReply);
+        var sameNameMemberThread = await repository.CreateThreadAsync(new NewForumThread(
+            1, innocent.Id, innocent.DisplayName, "Member-owned same name", "<p>Keep</p>", createdAt));
+
+        var found = await repository.FindForumAuthorByDisplayNameAsync("patriciacmardis");
+        Assert.NotNull(found);
+        Assert.Equal(2, found.PostCount);
+        Assert.Equal(1, found.ThreadCount);
+
+        await repository.HideAuthorForumContentAsync(null, "PatriciaCMardis");
+
+        Assert.True((await dbContext.ModernForumPosts.AsNoTracking().SingleAsync(p => p.LegacyPostId == unlinked.StarterPostId)).IsHidden);
+        Assert.True((await dbContext.ModernForumPosts.AsNoTracking().SingleAsync(p => p.LegacyPostId == spamReply)).IsHidden);
+        Assert.False((await dbContext.ModernForumPosts.AsNoTracking().SingleAsync(p => p.LegacyPostId == mixed.StarterPostId)).IsHidden);
+        Assert.False((await dbContext.ModernForumPosts.AsNoTracking().SingleAsync(p => p.LegacyPostId == sameNameMemberThread.StarterPostId)).IsHidden);
+        Assert.True((await dbContext.ModernForumThreads.AsNoTracking().SingleAsync(t => t.LegacyTopicId == unlinked.TopicId)).IsHidden);
+        Assert.False((await dbContext.ModernForumThreads.AsNoTracking().SingleAsync(t => t.LegacyTopicId == mixed.TopicId)).IsHidden);
+        Assert.False((await dbContext.ModernForumThreads.AsNoTracking().SingleAsync(t => t.LegacyTopicId == sameNameMemberThread.TopicId)).IsHidden);
+
+        await repository.UnhideAuthorForumContentAsync(null, "PatriciaCMardis");
+
+        Assert.False((await dbContext.ModernForumPosts.AsNoTracking().SingleAsync(p => p.LegacyPostId == unlinked.StarterPostId)).IsHidden);
+        Assert.False((await dbContext.ModernForumThreads.AsNoTracking().SingleAsync(t => t.LegacyTopicId == unlinked.TopicId)).IsHidden);
+    }
+
+    [Fact]
+    public async Task HideAuthorForumContentAsync_WithMemberId_AlsoHidesUnlinkedSameDisplayName()
+    {
+        var spammer = await SeedMemberAsync("spammer@example.com", "Spammer");
+        var innocent = await SeedMemberAsync("innocent@example.com", "Innocent");
+        await SeedCategoryAsync();
+        var createdAt = DateTimeOffset.UtcNow;
+
+        var linked = await repository.CreateThreadAsync(new NewForumThread(
+            1, spammer.Id, spammer.DisplayName, "Linked spam", "<p>Spam</p>", createdAt));
+        var unlinked = await repository.CreateThreadAsync(new NewForumThread(
+            1, innocent.Id, "Spammer", "Unlinked same name", "<p>Old spam</p>", createdAt));
+        await UnlinkAuthorAsync(unlinked.StarterPostId);
+        var innocentThread = await repository.CreateThreadAsync(new NewForumThread(
+            1, innocent.Id, innocent.DisplayName, "Innocent topic", "<p>Hello</p>", createdAt));
+
+        await repository.HideAuthorForumContentAsync(spammer.Id, "spammer");
+
+        Assert.True((await dbContext.ModernForumPosts.AsNoTracking().SingleAsync(p => p.LegacyPostId == linked.StarterPostId)).IsHidden);
+        Assert.True((await dbContext.ModernForumPosts.AsNoTracking().SingleAsync(p => p.LegacyPostId == unlinked.StarterPostId)).IsHidden);
+        Assert.False((await dbContext.ModernForumPosts.AsNoTracking().SingleAsync(p => p.LegacyPostId == innocentThread.StarterPostId)).IsHidden);
+        Assert.True((await dbContext.ModernForumThreads.AsNoTracking().SingleAsync(t => t.LegacyTopicId == linked.TopicId)).IsHidden);
+        Assert.True((await dbContext.ModernForumThreads.AsNoTracking().SingleAsync(t => t.LegacyTopicId == unlinked.TopicId)).IsHidden);
+        Assert.False((await dbContext.ModernForumThreads.AsNoTracking().SingleAsync(t => t.LegacyTopicId == innocentThread.TopicId)).IsHidden);
+    }
+
     public async ValueTask DisposeAsync()
     {
         await dbContext.DisposeAsync();
@@ -380,6 +445,13 @@ public sealed class EfForumWriteRepositoryTests : IAsyncDisposable
         dbContext.MemberAccounts.Add(member);
         await dbContext.SaveChangesAsync();
         return member;
+    }
+
+    private async Task UnlinkAuthorAsync(int postId)
+    {
+        var post = await dbContext.ModernForumPosts.SingleAsync(item => item.LegacyPostId == postId);
+        post.AuthorMemberId = null;
+        await dbContext.SaveChangesAsync();
     }
 
     private async Task SeedCategoryAsync()

@@ -5033,6 +5033,7 @@ a.qz-forum-post__author-link:focus-visible {
 
 .qz-forum-post__quote-link,
 .qz-forum-post__edit-link,
+.qz-forum-post__hide-author-link,
 .qz-forum-post__message-link {
   display: inline-flex;
   align-items: center;
@@ -5047,6 +5048,7 @@ a.qz-forum-post__author-link:focus-visible {
 
 .qz-forum-post__quote-link:hover,
 .qz-forum-post__edit-link:hover,
+.qz-forum-post__hide-author-link:hover,
 .qz-forum-post__message-link:hover {
   color: var(--qz-blue);
 }

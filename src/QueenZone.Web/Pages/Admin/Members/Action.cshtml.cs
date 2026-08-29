@@ -25,7 +25,8 @@ public sealed class ActionModel(
             return NotFound();
         }
 
-        await forumWriteRepository.HidePostsByMemberAsync(id, cancellationToken);
+        await forumWriteRepository.HideAuthorForumContentAsync(
+            id, updated.DisplayName, cancellationToken);
         await mobileAuthGrantRepository.RevokeAllRefreshTokensForMemberAsync(id, DateTime.UtcNow, cancellationToken);
 
         return RedirectWithMessage(
@@ -42,9 +43,42 @@ public sealed class ActionModel(
             return NotFound();
         }
 
-        await forumWriteRepository.UnhidePostsByMemberAsync(id, cancellationToken);
+        await forumWriteRepository.UnhideAuthorForumContentAsync(
+            id, updated.DisplayName, cancellationToken);
 
         return RedirectWithMessage(id, "Member reinstated and their forum posts restored.", "success");
+    }
+
+    public async Task<IActionResult> OnPostHideForumContentAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var member = await memberAccountRepository.FindByIdAsync(id, cancellationToken);
+        if (member is null)
+        {
+            return NotFound();
+        }
+
+        await forumWriteRepository.HideAuthorForumContentAsync(
+            id, member.DisplayName, cancellationToken);
+        return RedirectWithMessage(
+            id,
+            $"Hidden all posts and threads started by {member.DisplayName}. Other people's posts stay. The member was not suspended.",
+            "success");
+    }
+
+    public async Task<IActionResult> OnPostUnhideForumContentAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var member = await memberAccountRepository.FindByIdAsync(id, cancellationToken);
+        if (member is null)
+        {
+            return NotFound();
+        }
+
+        await forumWriteRepository.UnhideAuthorForumContentAsync(
+            id, member.DisplayName, cancellationToken);
+        return RedirectWithMessage(
+            id,
+            $"Restored posts and threads started by {member.DisplayName}.",
+            "success");
     }
 
     private IActionResult RedirectWithMessage(Guid id, string message, string kind)

@@ -91,7 +91,7 @@ else
             <footer class="qz-forum-post__signature qz-meta">@post.Signature</footer>
           }
         </div>
-        @if ((post.IsAuthor && post.CanEdit) || post.CanMessage || canReply)
+        @if ((post.IsAuthor && post.CanEdit) || post.CanMessage || canReply || post.CanHideAuthor)
         {
           <div class="qz-forum-post__actions">
             @if (canReply)
@@ -106,6 +106,12 @@ else
               <a class="qz-forum-post__edit-link" href="/forum/post/@post.Id/edit">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path><path d="m15 5 4 4"></path></svg>
                 Edit
+              </a>
+            }
+            @if (post.CanHideAuthor)
+            {
+              <a class="qz-forum-post__hide-author-link" href="/forum/hide-author?postId=@post.Id">
+                Hide all by this author
               </a>
             }
             @if (post.CanMessage && post.AuthorMemberId is Guid authorMemberId)

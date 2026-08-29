@@ -165,6 +165,7 @@ public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForu
                 TopicSubject = post.Thread!.Title,
                 post.BodyHtml,
                 post.AuthorMemberId,
+                post.AuthorDisplayName,
                 post.PostedAt,
                 post.EditedAt,
                 post.EditCount,
@@ -191,7 +192,8 @@ public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForu
             ToOffset(row.PostedAt),
             row.EditedAt.HasValue ? ToOffset(row.EditedAt) : null,
             row.EditCount,
-            Math.Max(1, position));
+            Math.Max(1, position),
+            row.AuthorDisplayName);
     }
 
     public async Task<ForumPostUpdateResult> UpdatePostAsync(
@@ -292,44 +294,133 @@ public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForu
             .CountAsync(post => post.AuthorDisplayName == displayName && !post.IsHidden, cancellationToken);
     }
 
-    public async Task HidePostsByMemberAsync(Guid memberId, CancellationToken cancellationToken = default)
+    public Task HideAuthorForumContentAsync(
+        Guid? memberId,
+        string displayName,
+        CancellationToken cancellationToken = default) =>
+        SetAuthorForumContentHiddenAsync(memberId, displayName, hidden: true, cancellationToken);
+
+    public Task UnhideAuthorForumContentAsync(
+        Guid? memberId,
+        string displayName,
+        CancellationToken cancellationToken = default) =>
+        SetAuthorForumContentHiddenAsync(memberId, displayName, hidden: false, cancellationToken);
+
+    public async Task<AuthorForumContentCounts> CountAuthorForumContentAsync(
+        Guid? memberId,
+        string displayName,
+        CancellationToken cancellationToken = default)
     {
-        var startedThreadIds = dbContext.ModernForumPosts
-            .Where(post => post.AuthorMemberId == memberId
-                && !dbContext.ModernForumPosts.Any(earlier =>
-                    earlier.ThreadId == post.ThreadId
-                    && earlier.LegacyPostId < post.LegacyPostId))
-            .Select(post => post.ThreadId);
+        var normalized = ForumAuthorContentMatching.NormalizeDisplayName(displayName);
+        var label = displayName.Trim();
+        if (memberId is null && normalized.Length == 0)
+        {
+            return new AuthorForumContentCounts(label, 0, 0, 0, 0);
+        }
 
-        await dbContext.ModernForumThreads
-            .Where(thread => startedThreadIds.Contains(thread.Id) && !thread.IsHidden)
-            .ExecuteUpdateAsync(setters => setters.SetProperty(thread => thread.IsHidden, true), cancellationToken);
+        var matchingPosts = QueryMatchingPosts(memberId, normalized);
+        var postCount = await matchingPosts.CountAsync(cancellationToken);
+        var hiddenPostCount = await matchingPosts.CountAsync(post => post.IsHidden, cancellationToken);
 
-        await dbContext.ModernForumPosts
-            .Where(post => post.AuthorMemberId == memberId && !post.IsHidden)
-            .ExecuteUpdateAsync(setters => setters.SetProperty(post => post.IsHidden, true), cancellationToken);
+        var startedThreadIds = await QueryStartedThreadIds(memberId, normalized).ToListAsync(cancellationToken);
+        var threadCount = startedThreadIds.Count;
+        var hiddenThreadCount = threadCount == 0
+            ? 0
+            : await dbContext.ModernForumThreads
+                .AsNoTracking()
+                .CountAsync(thread => startedThreadIds.Contains(thread.Id) && thread.IsHidden, cancellationToken);
+
+        return new AuthorForumContentCounts(label, postCount, hiddenPostCount, threadCount, hiddenThreadCount);
+    }
+
+    public async Task<AuthorForumContentCounts?> FindForumAuthorByDisplayNameAsync(
+        string displayName,
+        CancellationToken cancellationToken = default)
+    {
+        var counts = await CountAuthorForumContentAsync(null, displayName, cancellationToken);
+        if (!counts.HasAnyContent)
+        {
+            return null;
+        }
+
+        var normalized = ForumAuthorContentMatching.NormalizeDisplayName(displayName);
+        var storedName = await dbContext.ModernForumPosts
+            .AsNoTracking()
+            .Where(post => post.AuthorMemberId == null && post.AuthorDisplayName.ToLower() == normalized)
+            .Select(post => post.AuthorDisplayName)
+            .FirstOrDefaultAsync(cancellationToken)
+            ?? await dbContext.ModernForumThreads
+                .AsNoTracking()
+                .Where(thread => thread.StartedByDisplayName.ToLower() == normalized)
+                .Select(thread => thread.StartedByDisplayName)
+                .FirstOrDefaultAsync(cancellationToken);
+
+        return counts with { DisplayName = string.IsNullOrWhiteSpace(storedName) ? counts.DisplayName : storedName.Trim() };
+    }
+
+    private async Task SetAuthorForumContentHiddenAsync(
+        Guid? memberId,
+        string displayName,
+        bool hidden,
+        CancellationToken cancellationToken)
+    {
+        var normalized = ForumAuthorContentMatching.NormalizeDisplayName(displayName);
+        if (memberId is null && normalized.Length == 0)
+        {
+            return;
+        }
+
+        var startedThreadIds = await QueryStartedThreadIds(memberId, normalized).ToListAsync(cancellationToken);
+        if (startedThreadIds.Count > 0)
+        {
+            await dbContext.ModernForumThreads
+                .Where(thread => startedThreadIds.Contains(thread.Id) && thread.IsHidden != hidden)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(thread => thread.IsHidden, hidden), cancellationToken);
+        }
+
+        await QueryMatchingPosts(memberId, normalized)
+            .Where(post => post.IsHidden != hidden)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(post => post.IsHidden, hidden), cancellationToken);
 
         await RefreshReadStatsIfSqlServerAsync(cancellationToken);
     }
 
-    public async Task UnhidePostsByMemberAsync(Guid memberId, CancellationToken cancellationToken = default)
+    private IQueryable<ModernForumPostEntity> QueryMatchingPosts(Guid? memberId, string normalized) =>
+        dbContext.ModernForumPosts.Where(post =>
+            (memberId != null && post.AuthorMemberId == memberId)
+            || (post.AuthorMemberId == null
+                && normalized.Length > 0
+                && post.AuthorDisplayName.ToLower() == normalized));
+
+    private IQueryable<long> QueryStartedThreadIds(Guid? memberId, string normalized)
     {
-        var startedThreadIds = dbContext.ModernForumPosts
-            .Where(post => post.AuthorMemberId == memberId
+        var fromFirstPost = dbContext.ModernForumPosts
+            .Where(post =>
+                ((memberId != null && post.AuthorMemberId == memberId)
+                    || (post.AuthorMemberId == null
+                        && normalized.Length > 0
+                        && post.AuthorDisplayName.ToLower() == normalized))
                 && !dbContext.ModernForumPosts.Any(earlier =>
                     earlier.ThreadId == post.ThreadId
                     && earlier.LegacyPostId < post.LegacyPostId))
             .Select(post => post.ThreadId);
 
-        await dbContext.ModernForumThreads
-            .Where(thread => startedThreadIds.Contains(thread.Id) && thread.IsHidden)
-            .ExecuteUpdateAsync(setters => setters.SetProperty(thread => thread.IsHidden, false), cancellationToken);
+        if (normalized.Length == 0)
+        {
+            return fromFirstPost;
+        }
 
-        await dbContext.ModernForumPosts
-            .Where(post => post.AuthorMemberId == memberId && post.IsHidden)
-            .ExecuteUpdateAsync(setters => setters.SetProperty(post => post.IsHidden, false), cancellationToken);
+        var fromStartedByName = dbContext.ModernForumThreads
+            .Where(thread => thread.StartedByDisplayName.ToLower() == normalized)
+            .Where(thread => !dbContext.ModernForumPosts.Any(post =>
+                post.ThreadId == thread.Id
+                && post.AuthorMemberId != null
+                && !dbContext.ModernForumPosts.Any(earlier =>
+                    earlier.ThreadId == thread.Id
+                    && earlier.LegacyPostId < post.LegacyPostId)))
+            .Select(thread => thread.Id);
 
-        await RefreshReadStatsIfSqlServerAsync(cancellationToken);
+        return fromFirstPost.Union(fromStartedByName);
     }
 
     private Task RefreshReadStatsIfSqlServerAsync(CancellationToken cancellationToken) =>

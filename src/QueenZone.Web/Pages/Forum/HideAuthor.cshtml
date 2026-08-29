@@ -1,0 +1,48 @@
+@page "/forum/hide-author"
+@model HideAuthorModel
+
+<section class="qz-page-hero">
+  <partial name="_PictureImage" model="@("/design-system/assets/crest-white.png", "", false, "qz-page-hero__crest")" />
+  <div class="qz-container qz-breadcrumbs-on-dark">
+    <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
+    <h1>Hide all by this author</h1>
+  </div>
+</section>
+
+<section class="qz-section">
+  <div class="qz-container">
+    @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+    {
+      <div class="qz-form__validation" role="alert">@Model.ErrorMessage</div>
+    }
+    else if (Model.Post is not null)
+    {
+      <p>
+        Hide all posts and threads started by <strong>@Model.ForumContent.DisplayName</strong>?
+        Other people's posts stay.
+      </p>
+      <p>
+        This matches @Model.ForumContent.VisiblePostCount visible post(s) and
+        @Model.ForumContent.VisibleThreadCount visible thread(s)
+        (@Model.ForumContent.PostCount total post(s), @Model.ForumContent.ThreadCount total thread(s)).
+        Display names are not unique — this is an exact name match
+        @if (Model.Post.AuthorMemberId is Guid memberId)
+        {
+          <text> plus member @memberId</text>
+        }
+        else
+        {
+          <text> for an author with no member account</text>
+        }.
+      </p>
+      <form method="post">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="postId" value="@Model.Post.PostId" />
+        <div class="qz-form-actions">
+          <button type="submit" class="qz-button qz-button--danger">Hide all posts and threads</button>
+          <a class="qz-button qz-button--ghost" href="@ForumRoutes.GetTopicCanonicalPath(Model.Post.TopicId, Model.Post.TopicSubject)#post-@Model.Post.PostId">Cancel</a>
+        </div>
+      </form>
+    }
+  </div>
+</section>

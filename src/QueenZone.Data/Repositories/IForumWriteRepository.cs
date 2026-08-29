@@ -23,12 +23,33 @@ public interface IForumWriteRepository
     Task<int> CountApprovedPostsByMemberAsync(Guid memberId, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Hides topics started by the given member and every post they wrote. Rows are retained so
-    /// <see cref="UnhidePostsByMemberAsync"/> can restore them on reinstatement.
+    /// Hides topics started by this author and every matching post. Rows are retained so
+    /// <see cref="UnhideAuthorForumContentAsync"/> can restore them.
+    /// When <paramref name="memberId"/> is set, matches that id or unlinked posts/threads whose
+    /// display name equals <paramref name="displayName"/> (case-insensitive exact). Name-only
+    /// matching never hides another member's <c>AuthorMemberId</c>.
     /// </summary>
-    Task HidePostsByMemberAsync(Guid memberId, CancellationToken cancellationToken = default);
+    Task HideAuthorForumContentAsync(
+        Guid? memberId,
+        string displayName,
+        CancellationToken cancellationToken = default);
 
-    Task UnhidePostsByMemberAsync(Guid memberId, CancellationToken cancellationToken = default);
+    Task UnhideAuthorForumContentAsync(
+        Guid? memberId,
+        string displayName,
+        CancellationToken cancellationToken = default);
+
+    Task<AuthorForumContentCounts> CountAuthorForumContentAsync(
+        Guid? memberId,
+        string displayName,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Exact display-name match for forum authors with no member row. Does not create accounts.
+    /// </summary>
+    Task<AuthorForumContentCounts?> FindForumAuthorByDisplayNameAsync(
+        string displayName,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Finds a category by URL slug first, then by case-insensitive name, or

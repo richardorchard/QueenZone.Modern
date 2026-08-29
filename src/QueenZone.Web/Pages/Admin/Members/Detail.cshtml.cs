@@ -4,9 +4,14 @@ using QueenZone.Data.Entities;
 
 namespace QueenZone.Web.Pages.Admin.Members;
 
-public sealed class DetailModel(IMemberAccountRepository memberAccountRepository) : AdminMembersPageModel
+public sealed class DetailModel(
+    IMemberAccountRepository memberAccountRepository,
+    IForumWriteRepository forumWriteRepository) : AdminMembersPageModel
 {
     public MemberAccount? Member { get; private set; }
+
+    public AuthorForumContentCounts ForumContent { get; private set; } =
+        new(string.Empty, 0, 0, 0, 0);
 
     public string? StatusMessage { get; private set; }
 
@@ -20,6 +25,8 @@ public sealed class DetailModel(IMemberAccountRepository memberAccountRepository
             return NotFound();
         }
 
+        ForumContent = await forumWriteRepository.CountAuthorForumContentAsync(
+            id, Member.DisplayName, cancellationToken);
         StatusMessage = TempData["MemberMessage"] as string;
         StatusMessageKind = TempData["MemberMessageKind"] as string;
         ViewData["Title"] = $"Member — {Member.DisplayName}";
