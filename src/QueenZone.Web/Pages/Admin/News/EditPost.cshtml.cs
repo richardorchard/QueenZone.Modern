@@ -56,6 +56,7 @@ public sealed class EditPostModel(
             draft,
             User,
             persistImage,
+            existing.ImageGalleryPicId,
             cancellationToken);
         if (applied.Error is not null)
         {

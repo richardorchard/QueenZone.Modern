@@ -33,12 +33,34 @@ public static class NewsArticleImageProcessor
 
     public sealed record ProcessedArticleImage(MemoryStream FullImage, MemoryStream Thumbnail);
 
-    public static async Task<ProcessedArticleImage> ProcessAsync(
+    public static Task<ProcessedArticleImage> ProcessAsync(
         Stream source,
         string originalFileName,
         NewsArticleImageCrop? crop = null,
         long maxBytes = MaxUploadBytes,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        ProcessAsync(source, originalFileName, crop, maxBytes, requireRequestedCrop: false, cancellationToken);
+
+    /// <summary>
+    /// Same as <see cref="ProcessAsync(Stream,string,NewsArticleImageCrop?,long,CancellationToken)"/>
+    /// but rejects a missing, out-of-bounds, or wrong-aspect crop instead of falling
+    /// back to a center crop. Used when copying a gallery original.
+    /// </summary>
+    public static Task<ProcessedArticleImage> ProcessRequiredCropAsync(
+        Stream source,
+        string originalFileName,
+        NewsArticleImageCrop crop,
+        long maxBytes = MaxUploadBytes,
+        CancellationToken cancellationToken = default) =>
+        ProcessAsync(source, originalFileName, crop, maxBytes, requireRequestedCrop: true, cancellationToken);
+
+    private static async Task<ProcessedArticleImage> ProcessAsync(
+        Stream source,
+        string originalFileName,
+        NewsArticleImageCrop? crop,
+        long maxBytes,
+        bool requireRequestedCrop,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(source);
         if (maxBytes <= 0)
@@ -93,7 +115,7 @@ public static class NewsArticleImageProcessor
         try
         {
             using var image = await Image.LoadAsync(buffer, cancellationToken);
-            var rect = ResolveCrop(image.Width, image.Height, crop);
+            var rect = ResolveCrop(image.Width, image.Height, crop, requireRequestedCrop);
             if (rect.Width < MinCropWidth || rect.Height < MinCropHeight)
             {
                 throw new InvalidOperationException(
@@ -124,11 +146,21 @@ public static class NewsArticleImageProcessor
         }
     }
 
-    internal static Rectangle ResolveCrop(int width, int height, NewsArticleImageCrop? requested)
+    internal static Rectangle ResolveCrop(
+        int width,
+        int height,
+        NewsArticleImageCrop? requested,
+        bool requireRequestedCrop = false)
     {
         var fallback = CenterCardCrop(width, height);
         if (requested is null)
         {
+            if (requireRequestedCrop)
+            {
+                throw new InvalidOperationException(
+                    "Apply a 3:2 crop before saving this gallery photo.");
+            }
+
             return fallback;
         }
 
@@ -140,6 +172,12 @@ public static class NewsArticleImageProcessor
             || crop.X + crop.Width > width
             || crop.Y + crop.Height > height)
         {
+            if (requireRequestedCrop)
+            {
+                throw new InvalidOperationException(
+                    "The selected crop is invalid. Frame the 3:2 card inside the photo.");
+            }
+
             return fallback;
         }
 
@@ -147,6 +185,12 @@ public static class NewsArticleImageProcessor
         var expected = CardAspectWidth / (double)CardAspectHeight;
         if (Math.Abs(aspect - expected) / expected > CropAspectTolerance)
         {
+            if (requireRequestedCrop)
+            {
+                throw new InvalidOperationException(
+                    "The selected crop is invalid. Frame the 3:2 card inside the photo.");
+            }
+
             return fallback;
         }
 
