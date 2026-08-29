@@ -1,0 +1,120 @@
+@page "/admin/timeline"
+@model IndexModel
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@{
+  var antiforgeryToken = Antiforgery.GetAndStoreTokens(HttpContext).RequestToken;
+  var events = Model.Events;
+}
+
+<div class="admin-shell">
+@if (Model.CreateForm is not null)
+{
+  ViewData["AntiforgeryToken"] = antiforgeryToken;
+  <partial name="_TimelineForm" model="Model.CreateForm" />
+}
+else
+{
+  <h1>Timeline</h1>
+
+  @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+  {
+    <p class="admin-status admin-status--@Model.StatusMessageKind">@Model.StatusMessage</p>
+  }
+
+  <p>
+    <a href="/admin/timeline/new">Add timeline event</a>
+  </p>
+
+  <form method="get" class="admin-form admin-form--filter">
+    <label>
+      Published
+      <select name="published">
+        <option value="">All</option>
+        @if (Model.Published == "published")
+        {
+          <option value="published" selected>Published</option>
+        }
+        else
+        {
+          <option value="published">Published</option>
+        }
+        @if (Model.Published == "unpublished")
+        {
+          <option value="unpublished" selected>Unpublished</option>
+        }
+        else
+        {
+          <option value="unpublished">Unpublished</option>
+        }
+      </select>
+    </label>
+    <label>
+      Search
+      <input type="search" name="q" value="@Model.Q" />
+    </label>
+    <button type="submit">Filter</button>
+  </form>
+
+  @if (events is null || events.Items.Count == 0)
+  {
+    <p>No timeline events matched the current filters.</p>
+  }
+  else
+  {
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Title</th>
+          <th>Date</th>
+          <th>Category</th>
+          <th>Importance</th>
+          <th>Published</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        @foreach (var item in events.Items)
+        {
+          <tr>
+            <td class="admin-title-cell">@item.Title</td>
+            <td>@item.FormattedDate</td>
+            <td>@item.Category</td>
+            <td>@item.Importance</td>
+            <td>@(item.IsPublished ? "Yes" : "No")</td>
+            <td class="admin-actions">
+              <a href="/admin/timeline/@item.Id/edit">Edit</a>
+              <form method="post" action="/admin/timeline?handler=TogglePublish" style="display:inline">
+                <input type="hidden" name="@AdminTimelinePageModel.AntiforgeryTokenFieldName" value="@antiforgeryToken">
+                <input type="hidden" name="id" value="@item.Id">
+                <input type="hidden" name="isPublished" value="@item.IsPublished">
+                <button type="submit">@(item.IsPublished ? "Unpublish" : "Publish")</button>
+              </form>
+              <form method="post" action="/admin/timeline?handler=Delete" style="display:inline" onsubmit="return confirm('Delete this timeline event?');">
+                <input type="hidden" name="@AdminTimelinePageModel.AntiforgeryTokenFieldName" value="@antiforgeryToken">
+                <input type="hidden" name="id" value="@item.Id">
+                <button type="submit">Delete</button>
+              </form>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+
+    var totalPages = (int)Math.Ceiling(events.TotalCount / (double)events.PageSize);
+    if (totalPages > 1)
+    {
+      <p>
+        Page @events.Page of @totalPages
+        @if (events.Page > 1)
+        {
+          <a href="?pageNumber=@(events.Page - 1)&published=@Model.Published&q=@Model.Q">Previous</a>
+        }
+        @if (events.Page < totalPages)
+        {
+          <a href="?pageNumber=@(events.Page + 1)&published=@Model.Published&q=@Model.Q">Next</a>
+        }
+      </p>
+    }
+  }
+}
+</div>

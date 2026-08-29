@@ -1,0 +1,90 @@
+@model QueenZone.Web.Pages.Admin.Timeline.TimelineFormViewModel
+@using QueenZone.Data
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@{
+  var antiforgeryToken = (ViewData["AntiforgeryToken"] as string)
+    ?? Antiforgery.GetAndStoreTokens(Context).RequestToken;
+  var eventDateValue = Model.Draft.EventDate == default
+    ? string.Empty
+    : Model.Draft.EventDate.ToString("yyyy-MM-dd");
+}
+
+<div class="admin-form-panel">
+<h1>@Model.Title</h1>
+
+@if (Model.Errors is { Count: > 0 })
+{
+  <ul class="admin-errors">
+    @foreach (var error in Model.Errors)
+    {
+      <li>@error</li>
+    }
+  </ul>
+}
+
+<form method="post" action="@Model.Action" class="admin-form">
+  <input type="hidden" name="@AdminTimelinePageModel.AntiforgeryTokenFieldName" value="@antiforgeryToken">
+  <label>
+    Title
+    <input type="text" name="title" value="@Model.Draft.Title" maxlength="@QueenHistoryValidation.MaxTitleLength" required>
+  </label>
+  <label>
+    Summary
+    <textarea name="summary" maxlength="@QueenHistoryValidation.MaxSummaryLength" rows="4" required>@Model.Draft.Summary</textarea>
+  </label>
+  <label>
+    Event date
+    <input type="date" name="eventDate" value="@eventDateValue" required>
+  </label>
+  <label>
+    Date precision
+    <select name="datePrecision">
+      @foreach (var precision in Enum.GetValues<QueenHistoryDatePrecision>())
+      {
+        if (Model.Draft.DatePrecision == precision)
+        {
+          <option value="@precision" selected>@precision</option>
+        }
+        else
+        {
+          <option value="@precision">@precision</option>
+        }
+      }
+    </select>
+  </label>
+  <label>
+    Category
+    <select name="category">
+      @foreach (var category in Enum.GetValues<QueenHistoryEventCategory>())
+      {
+        if (Model.Draft.Category == category)
+        {
+          <option value="@category" selected>@category</option>
+        }
+        else
+        {
+          <option value="@category">@category</option>
+        }
+      }
+    </select>
+  </label>
+  <label>
+    Importance
+    <input type="number" name="importance" value="@Model.Draft.Importance" min="@QueenHistoryValidation.MinImportance" max="@QueenHistoryValidation.MaxImportance" required>
+  </label>
+  <label>
+    Source URL
+    <input type="url" name="sourceUrl" value="@Model.Draft.SourceUrl" maxlength="@QueenHistoryValidation.MaxSourceUrlLength">
+  </label>
+  <label>
+    <input type="hidden" name="isPublished" value="false">
+    <input type="checkbox" name="isPublished" value="true" checked="@Model.Draft.IsPublished">
+    Published (visible on the public timeline)
+  </label>
+
+  <div class="admin-form-actions">
+    <button type="submit">Save</button>
+    <a href="/admin/timeline">Cancel</a>
+  </div>
+</form>
+</div>
