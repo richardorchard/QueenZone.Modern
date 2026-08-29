@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -54,6 +55,8 @@ function PhotoSubmitForm({ navigation }: Pick<Props, 'navigation'>) {
   const [photo, setPhoto] = useState<PhotoUploadFile | null>(null);
   const [fileSize, setFileSize] = useState<number | null>(null);
   const [categories, setCategories] = useState<PhotoCategoryListItem[]>([]);
+  const [categoriesError, setCategoriesError] = useState<string | null>(null);
+  const [categoriesReload, setCategoriesReload] = useState(0);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [confirmation, setConfirmation] = useState<PhotoSubmissionCreated | null>(null);
@@ -66,13 +69,22 @@ function PhotoSubmitForm({ navigation }: Pick<Props, 'navigation'>) {
 
   useEffect(() => {
     const controller = new AbortController();
+    setCategoriesError(null);
     void fetchPhotoCategories({ page: 1, pageSize: 100, signal: controller.signal })
-      .then((page) => setCategories(page.items))
-      .catch(() => {
-        // Category chips are optional; a missing list still lets the member submit.
+      .then((page) => {
+        setCategories(page.items);
+        setCategoriesError(null);
+      })
+      .catch((err: unknown) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        setCategories([]);
+        setCategoriesError(err instanceof ApiError ? err.message : photoSubmitCopy.categoriesLoadError);
       });
     return () => controller.abort();
-  }, []);
+  }, [categoriesReload]);
 
   const resetForm = useCallback(() => {
     setTitle('');
@@ -219,7 +231,7 @@ function PhotoSubmitForm({ navigation }: Pick<Props, 'navigation'>) {
             ) : null}
             {suggestedCategory.trim() ? (
               <MetaRow
-                label="Suggested category"
+                label={photoSubmitCopy.categoryLabel}
                 value={suggestedCategory.trim()}
                 color={c.textPrimary}
                 muted={c.textMuted}
@@ -264,7 +276,22 @@ function PhotoSubmitForm({ navigation }: Pick<Props, 'navigation'>) {
               ]}
             />
 
-            <FieldLabel color={c.textMuted}>Suggested category (optional)</FieldLabel>
+            <FieldLabel color={c.textMuted}>{photoSubmitCopy.categoryLabel}</FieldLabel>
+            {categoriesError ? (
+              <View>
+                <Text style={[type.body, { color: c.danger }]} accessibilityRole="alert">
+                  {categoriesError}
+                </Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Retry loading photo categories"
+                  onPress={() => setCategoriesReload((n) => n + 1)}
+                  hitSlop={8}
+                >
+                  <Text style={[type.button, { color: c.accentPrimary, marginTop: space.xs }]}>Retry</Text>
+                </Pressable>
+              </View>
+            ) : null}
             {categories.length > 0 ? (
               <View style={styles.chips}>
                 {categories.map((category) => {
@@ -274,7 +301,12 @@ function PhotoSubmitForm({ navigation }: Pick<Props, 'navigation'>) {
                       key={category.slug}
                       label={category.name}
                       active={active}
-                      onPress={() => setSuggestedCategory(active ? '' : category.name)}
+                      onPress={() => {
+                        setSuggestedCategory(active ? '' : category.name);
+                        if (!active) {
+                          setSubmitError(null);
+                        }
+                      }}
                     />
                   );
                 })}
@@ -337,7 +369,7 @@ function PhotoSubmitForm({ navigation }: Pick<Props, 'navigation'>) {
             <Button
               label={photoSubmitCopy.submitAction}
               loading={submitting}
-              disabled={!accessToken}
+              disabled={!accessToken || Boolean(categoriesError)}
               onPress={() => {
                 void submit();
               }}

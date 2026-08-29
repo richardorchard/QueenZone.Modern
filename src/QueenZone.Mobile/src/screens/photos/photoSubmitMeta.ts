@@ -19,6 +19,9 @@ export const photoSubmitCopy = {
   confirmationMessage: 'Your photo is under review.',
   submitAction: 'Submit for review',
   anotherAction: 'Submit another photo',
+  categoryLabel: 'Category',
+  categoryRequired: 'Select a category.',
+  categoriesLoadError: 'Could not load photo categories.',
 } as const;
 
 /** Keep originals for the archive; the screen adds Compatible representation to avoid HEIC. */
@@ -195,7 +198,12 @@ export function validatePhotoSubmit(input: PhotoSubmitFields): string | null {
     return 'Description must be 1000 characters or fewer.';
   }
 
-  if (input.suggestedCategory.trim().length > photoCategoryMaxLength) {
+  const category = input.suggestedCategory.trim();
+  if (!category) {
+    return photoSubmitCopy.categoryRequired;
+  }
+
+  if (category.length > photoCategoryMaxLength) {
     return 'Suggested category must be 100 characters or fewer.';
   }
 

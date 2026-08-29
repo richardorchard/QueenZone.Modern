@@ -130,6 +130,8 @@ describe('PhotoSubmitScreen', () => {
 
     renderSubmit();
     await waitFor(() => expect(screen.getByRole('button', { name: 'Brian May' })).toBeOnTheScreen());
+    expect(screen.getByText('Category')).toBeOnTheScreen();
+    expect(screen.queryByText('Suggested category (optional)')).toBeNull();
     expect(screen.queryByLabelText('Suggested category')).toBeNull();
     expect(screen.queryByPlaceholderText('Category name')).toBeNull();
 
@@ -149,7 +151,7 @@ describe('PhotoSubmitScreen', () => {
     );
   });
 
-  it('submits without a category when no chip is selected', async () => {
+  it('blocks submit when no chip is selected and clears the error after a chip is chosen', async () => {
     const user = userEvent.setup();
     mockSession.isSignedIn = true;
     mockSession.accessToken = 'tok';
@@ -172,14 +174,39 @@ describe('PhotoSubmitScreen', () => {
     await user.press(screen.getByRole('button', { name: 'Choose from library' }));
     await user.press(screen.getByRole('button', { name: 'Submit for review' }));
 
+    expect(submitPhoto).not.toHaveBeenCalled();
+    expect(screen.getByText('Select a category.')).toBeOnTheScreen();
+
+    await user.press(screen.getByRole('button', { name: 'Brian May' }));
+    expect(screen.queryByText('Select a category.')).toBeNull();
+
+    await user.press(screen.getByRole('button', { name: 'Submit for review' }));
     await waitFor(() => expect(submitPhoto).toHaveBeenCalledTimes(1));
     expect(submitPhoto).toHaveBeenCalledWith(
       expect.objectContaining({
         title: 'Fan pic',
-        suggestedCategory: '',
+        suggestedCategory: 'Brian May',
       }),
       'tok',
     );
+  });
+
+  it('shows a retry action when photo categories fail to load', async () => {
+    const user = userEvent.setup();
+    mockSession.isSignedIn = true;
+    mockSession.accessToken = 'tok';
+    fetchCategories
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValueOnce(pagedResponse([categoryFixture()], 1, 1));
+
+    renderSubmit();
+    await waitFor(() => expect(screen.getByText('Could not load photo categories.')).toBeOnTheScreen());
+    expect(screen.getByRole('button', { name: 'Submit for review' })).toBeDisabled();
+
+    await user.press(screen.getByRole('button', { name: 'Retry loading photo categories' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Brian May' })).toBeOnTheScreen());
+    expect(screen.queryByText('Could not load photo categories.')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Submit for review' })).toBeEnabled();
   });
 });
 
