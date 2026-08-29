@@ -220,10 +220,12 @@ public sealed class EfMemberPublicActivityRepositoryTests : IAsyncDisposable
 
     private void SeedMember(Guid id, string displayName)
     {
+        var email = $"{displayName.ToLowerInvariant()}-{id:N}@example.com";
         dbContext.MemberAccounts.Add(new MemberAccount
         {
             Id = id,
-            Email = $"{displayName.ToLowerInvariant()}-activity@example.com",
+            Email = email,
+            NormalizedEmail = email.ToUpperInvariant(),
             DisplayName = displayName,
             CreatedAt = DateTime.UtcNow,
         });
@@ -264,53 +266,62 @@ public sealed class EfMemberPublicActivityRepositoryTests : IAsyncDisposable
         Guid authorId,
         string title,
         string status,
-        DateTimeOffset? publishedAt) => new()
+        DateTimeOffset? publishedAt)
     {
-        Id = Guid.NewGuid(),
-        AuthorMemberId = authorId,
-        Title = title,
-        Slug = NewsSlug.Slugify(title),
-        Body = "Body",
-        Status = status,
-        PublishedAt = publishedAt,
-    };
+        return new ArticleSubmissionEntity
+        {
+            Id = Guid.NewGuid(),
+            AuthorMemberId = authorId,
+            Title = title,
+            Slug = NewsSlug.Slugify(title),
+            Body = "Body",
+            Status = status,
+            PublishedAt = publishedAt,
+        };
+    }
 
     private static PhotoSubmissionEntity PhotoFor(
         Guid authorId,
         string title,
         string status,
-        DateTimeOffset? reviewedAt) => new()
+        DateTimeOffset? reviewedAt)
     {
-        Id = Guid.NewGuid(),
-        SubmitterMemberId = authorId,
-        Title = title,
-        BlobPath = $"original/{Guid.NewGuid():N}.jpg",
-        WebOptimizedBlobPath = $"web/{Guid.NewGuid():N}.webp",
-        ThumbnailBlobPath = $"thumb/{Guid.NewGuid():N}.webp",
-        OriginalFileName = "photo.jpg",
-        MimeType = "image/jpeg",
-        Status = status,
-        SubmittedAt = DateTimeOffset.Parse("2026-08-01T08:00:00Z"),
-        ReviewedAt = reviewedAt,
-    };
+        return new PhotoSubmissionEntity
+        {
+            Id = Guid.NewGuid(),
+            SubmitterMemberId = authorId,
+            Title = title,
+            BlobPath = $"original/{Guid.NewGuid():N}.jpg",
+            WebOptimizedBlobPath = $"web/{Guid.NewGuid():N}.webp",
+            ThumbnailBlobPath = $"thumb/{Guid.NewGuid():N}.webp",
+            OriginalFileName = "photo.jpg",
+            MimeType = "image/jpeg",
+            Status = status,
+            SubmittedAt = DateTimeOffset.Parse("2026-08-01T08:00:00Z"),
+            ReviewedAt = reviewedAt,
+        };
+    }
 
     private static NewsSuggestionEntity NewsFor(
         Guid authorId,
         string title,
         string status,
         int? newsId,
-        DateTimeOffset? reviewedAt) => new()
+        DateTimeOffset? reviewedAt)
     {
-        Id = Guid.NewGuid(),
-        SubmitterMemberId = authorId,
-        Url = $"https://example.com/{Guid.NewGuid():N}",
-        UrlHash = Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N"),
-        Title = title,
-        Status = status,
-        SubmittedAt = DateTimeOffset.Parse("2026-08-01T08:00:00Z"),
-        ReviewedAt = reviewedAt,
-        PromotedNewsId = newsId,
-    };
+        return new NewsSuggestionEntity
+        {
+            Id = Guid.NewGuid(),
+            SubmitterMemberId = authorId,
+            Url = $"https://example.com/{Guid.NewGuid():N}",
+            UrlHash = Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N"),
+            Title = title,
+            Status = status,
+            SubmittedAt = DateTimeOffset.Parse("2026-08-01T08:00:00Z"),
+            ReviewedAt = reviewedAt,
+            PromotedNewsId = newsId,
+        };
+    }
 
     private ArticleSubmissionEntity Article(string title, string status, DateTimeOffset? publishedAt) => new()
     {
