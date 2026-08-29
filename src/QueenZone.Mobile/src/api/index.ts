@@ -54,6 +54,7 @@ export {
   voteForumTopicPoll,
   watchForumTopic,
 } from './forum';
+export type { ForumReplyWrite, ForumTopicWrite } from './forum';
 export {
   fetchForumAttachment,
   isCookieGatedForumAttachmentPath,

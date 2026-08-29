@@ -1,4 +1,5 @@
-import { fetchJson, sendJson } from './client';
+import { reportApiFailure } from '../config/sentry';
+import { fetchJson, sendJson, sendMultipart } from './client';
 import type {
   ApiPagedResponse,
   ForumCategoryListItem,
@@ -12,6 +13,8 @@ import type {
   ForumTopicWatch,
 } from './types';
 import type { PageQuery } from './content';
+import { isLocalFileFailure } from './errors';
+import { appendUploadFile, type UploadFilePart } from './uploadFile';
 
 function pageParams({ page, pageSize }: PageQuery) {
   return {
@@ -65,32 +68,84 @@ export function fetchForumTopicPosts(
   });
 }
 
+export type ForumTopicWrite = {
+  title: string;
+  body: string;
+  file?: UploadFilePart;
+};
+
+export type ForumReplyWrite = {
+  body: string;
+  file?: UploadFilePart;
+};
+
+async function postForumWrite<T>(
+  path: string,
+  fields: Record<string, string>,
+  file: UploadFilePart | undefined,
+  accessToken: string,
+  signal?: AbortSignal,
+): Promise<T> {
+  if (!file) {
+    return sendJson(path, {
+      method: 'POST',
+      body: fields,
+      accessToken,
+      signal,
+    });
+  }
+
+  const form = new FormData();
+  for (const [name, value] of Object.entries(fields)) {
+    form.append(name, value);
+  }
+
+  try {
+    await appendUploadFile(form, 'file', file, signal);
+  } catch (err) {
+    if (isLocalFileFailure(err)) {
+      reportApiFailure({
+        kind: err.kind,
+        status: err.status,
+        method: 'POST',
+        path,
+        cause: err.cause,
+      });
+    }
+    throw err;
+  }
+
+  return sendMultipart(path, form, { accessToken, signal });
+}
+
 export function createForumTopic(
   categoryId: number,
-  input: { title: string; body: string },
+  input: ForumTopicWrite,
   accessToken: string,
   signal?: AbortSignal,
 ): Promise<ForumTopicCreated> {
-  return sendJson(`/forum/categories/${categoryId}/topics`, {
-    method: 'POST',
-    body: { title: input.title, body: input.body },
+  return postForumWrite(
+    `/forum/categories/${categoryId}/topics`,
+    { title: input.title, body: input.body },
+    input.file,
     accessToken,
     signal,
-  });
+  );
 }
 
 export function createForumReply(
   topicId: number,
-  input: { body: string },
+  input: ForumReplyWrite,
   accessToken: string,
   signal?: AbortSignal,
 ): Promise<ForumPostCreated> {
-  return sendJson(`/forum/topics/${topicId}/posts`, {
-    method: 'POST',
-    body: { body: input.body },
+  return postForumWrite(
+    `/forum/topics/${topicId}/posts`,
+    { body: input.body },
+    input.file,
     accessToken,
     signal,
-  });
+  );
 }
 
 export function fetchForumTopicPoll(
