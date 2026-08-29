@@ -26,7 +26,10 @@ public sealed class EfQuoteRepositoryTests : IAsyncDisposable
                 Q_MEMBER_ID INTEGER NOT NULL DEFAULT 0,
                 USER_ID INTEGER NOT NULL DEFAULT 0,
                 CREATE_DATE TEXT NOT NULL,
-                DISPLAY INTEGER NOT NULL DEFAULT 0
+                DISPLAY INTEGER NOT NULL DEFAULT 0,
+                CONTEXT TEXT NULL,
+                SOURCE_TYPE TEXT NULL,
+                SOURCE_KEY TEXT NULL
             );
             """);
         repository = new EfQuoteRepository(dbContext);

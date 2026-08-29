@@ -38,27 +38,20 @@ internal static class ToolsApp
             return await ConvertLegacyBbCodeCommand.RunAsync(args[1..]);
         }
 
+        if (args.Length > 0 && string.Equals(args[0], "import-quotes", StringComparison.OrdinalIgnoreCase))
+        {
+            return await RunImportQuotesAsync(args);
+        }
+
         return await RunImportHistoryAsync(args);
     }
 
     private static async Task<int> RunImportHistoryAsync(string[] args)
     {
-        var options = ImportOptions.Parse(args);
+        var options = ImportOptions.Parse(args, "import-history");
         if (!options.IsValid)
         {
-            Console.Error.WriteLine(options.ErrorMessage);
-            Console.Error.WriteLine();
-            Console.Error.WriteLine("Usage:");
-            Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- import-history --csv <path> --connection-string <connection-string>");
-            Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- import-history --csv <path> --dry-run");
-            Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- check-photos [options]");
-            Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- generate-photo-thumbs [options]");
-            Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- check-links [options]");
-            Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- photo-dim-inventory [options]");
-            Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- backfill-photo-dimensions [options]");
-            Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- convert-legacy-bbcode [options]");
-            Console.Error.WriteLine();
-            Console.Error.WriteLine("Connection string can also be supplied with ConnectionStrings__QueenZoneLegacy.");
+            PrintUsage(options.ErrorMessage);
             return 2;
         }
 
@@ -90,6 +83,63 @@ internal static class ToolsApp
         Console.WriteLine($"Unchanged: {result.Unchanged}");
         return 0;
     }
+
+    private static async Task<int> RunImportQuotesAsync(string[] args)
+    {
+        var options = ImportOptions.Parse(args, "import-quotes");
+        if (!options.IsValid)
+        {
+            PrintUsage(options.ErrorMessage);
+            return 2;
+        }
+
+        if (!File.Exists(options.CsvPath))
+        {
+            Console.Error.WriteLine($"CSV file was not found: {options.CsvPath}");
+            return 2;
+        }
+
+        if (options.DryRun)
+        {
+            var rows = QuoteCsvImporter.ReadRows(options.CsvPath);
+            Console.WriteLine($"Rows read: {rows.Count}");
+            Console.WriteLine("Dry run only. No database changes were made.");
+            return 0;
+        }
+
+        var dbOptions = new DbContextOptionsBuilder<QueenZoneDbContext>()
+            .UseSqlServer(options.ConnectionString)
+            .Options;
+
+        await using var dbContext = new QueenZoneDbContext(dbOptions);
+        var importer = new QuoteCsvImporter(dbContext);
+        var result = await importer.ImportAsync(options.CsvPath, DateTime.UtcNow);
+
+        Console.WriteLine($"Rows read: {result.RowsRead}");
+        Console.WriteLine($"Created: {result.Created}");
+        Console.WriteLine($"Updated: {result.Updated}");
+        Console.WriteLine($"Unchanged: {result.Unchanged}");
+        return 0;
+    }
+
+    private static void PrintUsage(string errorMessage)
+    {
+        Console.Error.WriteLine(errorMessage);
+        Console.Error.WriteLine();
+        Console.Error.WriteLine("Usage:");
+        Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- import-history --csv <path> --connection-string <connection-string>");
+        Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- import-history --csv <path> --dry-run");
+        Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- import-quotes --csv <path> --connection-string <connection-string>");
+        Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- import-quotes --csv <path> --dry-run");
+        Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- check-photos [options]");
+        Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- generate-photo-thumbs [options]");
+        Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- check-links [options]");
+        Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- photo-dim-inventory [options]");
+        Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- backfill-photo-dimensions [options]");
+        Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- convert-legacy-bbcode [options]");
+        Console.Error.WriteLine();
+        Console.Error.WriteLine("Connection string can also be supplied with ConnectionStrings__QueenZoneLegacy.");
+    }
 }
 
 internal sealed class ImportOptions
@@ -108,9 +158,9 @@ internal sealed class ImportOptions
 
     public string ErrorMessage { get; private init; } = string.Empty;
 
-    public static ImportOptions Parse(string[] args)
+    public static ImportOptions Parse(string[] args, string commandName)
     {
-        if (args.Length == 0 || !string.Equals(args[0], "import-history", StringComparison.OrdinalIgnoreCase))
+        if (args.Length == 0 || !string.Equals(args[0], commandName, StringComparison.OrdinalIgnoreCase))
         {
             return Invalid("Command is required.");
         }

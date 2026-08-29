@@ -2,9 +2,11 @@ namespace QueenZone.Data;
 
 public static class QuoteValidation
 {
-    public const int MaxTextLength = 455;
+    public const int MaxTextLength = 1000;
 
     public const int MaxWhoSaidLength = 50;
+
+    public const int MaxContextLength = 500;
 
     public static IReadOnlyList<string> ValidateDraft(AdminQuoteDraft draft)
     {
@@ -26,6 +28,11 @@ public static class QuoteValidation
         else if (draft.WhoSaid.Length > MaxWhoSaidLength)
         {
             errors.Add($"Who said it must be {MaxWhoSaidLength} characters or fewer.");
+        }
+
+        if (draft.Context is { Length: > MaxContextLength })
+        {
+            errors.Add($"Context must be {MaxContextLength} characters or fewer.");
         }
 
         return errors;

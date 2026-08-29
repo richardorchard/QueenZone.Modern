@@ -49,7 +49,7 @@ public sealed class SharedQuoteStore
         lock (sync)
         {
             var id = nextId++;
-            quotes.Add(new QuoteItem(id, draft.Text, draft.WhoSaid, DateTime.UtcNow, draft.IsPublished));
+            quotes.Add(new QuoteItem(id, draft.Text, draft.WhoSaid, DateTime.UtcNow, draft.IsPublished, draft.Context));
             return id;
         }
     }
@@ -68,6 +68,7 @@ public sealed class SharedQuoteStore
             {
                 Text = draft.Text,
                 WhoSaid = draft.WhoSaid,
+                Context = draft.Context,
                 IsPublished = draft.IsPublished,
             };
             return true;
