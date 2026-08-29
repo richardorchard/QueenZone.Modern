@@ -15,7 +15,6 @@ import { Button } from '../../ui/Button';
 import { PageTitleBlock } from '../../ui/PageTitleBlock';
 import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from '../../ui/ScreenStates';
 import { testIds } from '../../test/testIds';
-import { TabRootMasthead } from '../home/TabRootMasthead';
 import { photoCdnSource, photoCountLabel } from './photoGalleryMeta';
 
 type Props = CompositeScreenProps<
@@ -36,18 +35,9 @@ export function PhotosScreen({ navigation }: Props) {
     20,
   );
 
-  const masthead = (
-    <TabRootMasthead
-      onSearch={() => navigation.navigate('Search')}
-      onMessagesPress={() => navigation.navigate('HomeTab', nestedTabParams('Inbox'))}
-      onProfilePress={() => navigation.navigate('HomeTab', { screen: 'Profile' })}
-    />
-  );
-
   if (paged.loading && paged.items.length === 0) {
     return (
       <View testID={testIds.photosScreen} style={{ flex: 1 }}>
-        {masthead}
         <LoadingBlock label="Loading photography…" />
       </View>
     );
@@ -56,7 +46,6 @@ export function PhotosScreen({ navigation }: Props) {
   if (paged.error && paged.items.length === 0) {
     return (
       <View testID={testIds.photosScreen} style={{ flex: 1 }}>
-        {masthead}
         <ErrorBlock message={paged.error} onRetry={paged.reload} />
       </View>
     );
@@ -70,14 +59,10 @@ export function PhotosScreen({ navigation }: Props) {
       keyExtractor={(item) => item.slug}
       numColumns={COLS}
       ListHeaderComponent={
-        <View>
-          {masthead}
-          <PageTitleBlock
-            eyebrow="The photographic archive"
-            title="Photography"
-            subtitle="Restored photographs, contact sheets and archive image collections, organised by collection."
-          />
-        </View>
+        <PageTitleBlock
+          eyebrow="The photographic archive"
+          subtitle="Restored photographs, contact sheets and archive image collections, organised by collection."
+        />
       }
       columnWrapperStyle={{ gap: GAP, paddingHorizontal: space.xl }}
       contentContainerStyle={{ paddingBottom: space.section }}

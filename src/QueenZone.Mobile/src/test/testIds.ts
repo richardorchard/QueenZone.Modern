@@ -14,6 +14,7 @@ export const testIds = {
   homeMessagesUnread: 'home-messages-unread',
   homeProfile: 'home-profile',
   tabMasthead: 'tab-masthead',
+  tabIdentityHeader: 'tab-identity-header',
 
   newsScreen: 'news-screen',
   newsStoryScreen: 'news-story-screen',
