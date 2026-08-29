@@ -1,6 +1,25 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { formatBuildStamp } from './buildMetadata.ts';
+import { formatBuildStamp, formatHomeFooter, formatHomeFooterDate } from './buildMetadata.ts';
+
+describe('formatHomeFooter', () => {
+  it('shows version alone when the publish timestamp is unset', () => {
+    assert.equal(formatHomeFooter({ version: '0.1.0' }), '0.1.0');
+    assert.equal(formatHomeFooterDate(undefined), null);
+    assert.equal(formatHomeFooterDate('not-a-date'), null);
+  });
+
+  it('adds the UTC calendar date from the baked timestamp', () => {
+    assert.equal(formatHomeFooterDate('2026-08-29T13:40:12Z'), '29 Aug 2026');
+    assert.equal(
+      formatHomeFooter({
+        version: '0.1.214',
+        buildTimestampUtc: '2026-08-29T13:40:12Z',
+      }),
+      '0.1.214 · 29 Aug 2026',
+    );
+  });
+});
 
 describe('formatBuildStamp', () => {
   it('formats version, build, local timestamp, and revision', () => {

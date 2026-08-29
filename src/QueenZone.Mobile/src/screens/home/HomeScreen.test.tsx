@@ -1,4 +1,4 @@
-import { act, fireEvent, screen, userEvent, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, screen, userEvent, waitFor, within } from '@testing-library/react-native';
 import { RefreshControl } from 'react-native';
 import {
   fetchForumRecentThreads,
@@ -13,7 +13,19 @@ import { deferred, newsItemFixture, pagedResponse } from '../../test/fixtures';
 import { createMockSession } from '../../test/mockSession';
 import { fakeNavigation, flushVirtualizedList, renderWithProviders } from '../../test/render';
 import { bumpNewsListEpoch } from '../../notifications/newsListEpoch';
+import { testIds } from '../../test/testIds';
 import { HomeScreen } from './HomeScreen';
+
+const mockAppConfig = {
+  appEnv: 'development' as const,
+  apiBaseUrl: 'http://qz.test',
+  version: '0.1.0',
+  buildTimestampUtc: undefined as string | undefined,
+};
+
+jest.mock('../../config/appConfig', () => ({
+  getAppConfig: () => mockAppConfig,
+}));
 
 jest.mock('../../api', () => {
   const actual = jest.requireActual('../../api');
@@ -84,6 +96,8 @@ describe('HomeScreen', () => {
   beforeEach(() => {
     mockSession.isSignedIn = false;
     mockSession.accessToken = null;
+    mockAppConfig.version = '0.1.0';
+    mockAppConfig.buildTimestampUtc = undefined;
     fetchNews.mockResolvedValue(
       pagedResponse(
         [
@@ -388,6 +402,36 @@ describe('HomeScreen', () => {
     expect(screen.queryByText('On this day')).not.toBeOnTheScreen();
     expect(screen.queryByText('Queen released The Game.')).not.toBeOnTheScreen();
     expect(screen.queryByRole('button', { name: 'View timeline' })).not.toBeOnTheScreen();
+    await flushVirtualizedList();
+  });
+
+  it('shows the baked version after the last section, not in the masthead', async () => {
+    renderHome();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Live Aid remembered' })).toBeOnTheScreen());
+
+    const footer = screen.getByTestId(testIds.homeVersion);
+    expect(footer).toBeOnTheScreen();
+    expect(footer).toHaveTextContent('0.1.0');
+    expect(within(screen.getByTestId(testIds.tabMasthead)).queryByTestId(testIds.homeVersion)).toBeNull();
+    await flushVirtualizedList();
+  });
+
+  it('adds the publish date on Home for signed-in and signed-out visitors', async () => {
+    mockAppConfig.version = '0.1.214';
+    mockAppConfig.buildTimestampUtc = '2026-08-29T13:40:12Z';
+
+    const signedOut = renderHome();
+    await waitFor(() => expect(screen.getByTestId(testIds.homeVersion)).toHaveTextContent('0.1.214 · 29 Aug 2026'));
+    expect(within(screen.getByTestId(testIds.tabMasthead)).queryByText('0.1.214 · 29 Aug 2026')).toBeNull();
+    await flushVirtualizedList();
+    signedOut.unmount();
+
+    mockSession.isSignedIn = true;
+    mockSession.accessToken = 'token';
+    fetchInboxMock.mockResolvedValue(pagedResponse([], 1, 0));
+    renderHome();
+    await waitFor(() => expect(screen.getByText('Your messages')).toBeOnTheScreen());
+    expect(screen.getByTestId(testIds.homeVersion)).toHaveTextContent('0.1.214 · 29 Aug 2026');
     await flushVirtualizedList();
   });
 });

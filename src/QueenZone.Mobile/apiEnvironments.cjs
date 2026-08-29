@@ -86,6 +86,54 @@ function rewriteLoopbackForAndroid(apiBaseUrl, platform) {
 }
 
 /**
+ * User-facing store Version prefix (CFBundleShortVersionString / versionName).
+ * Flip 0.1 → 1.0 (or 1.1) here; the next publish is `{prefix}.{run}` on
+ * TestFlight, Play, and Home. Do not hand-edit app.json per upload.
+ *
+ * @type {string}
+ */
+const marketingVersionPrefix = '0.1';
+
+/**
+ * @param {string | undefined | null} prefix
+ * @returns {string}
+ */
+function assertMarketingVersionPrefix(prefix) {
+  const value = (prefix ?? '').trim();
+  if (!/^[0-9]+\.[0-9]+$/.test(value)) {
+    throw new Error(
+      `Marketing version prefix must be N.N (two integers, got "${prefix}").`,
+    );
+  }
+  return value;
+}
+
+/**
+ * Store Version / Home string.
+ *
+ * Publish (run number present): `{prefix}.{run}` e.g. `0.1.847`.
+ * Local / unsigned CI / Maestro (no run number): `{prefix}.0` e.g. `0.1.0`.
+ *
+ * @param {{ prefix?: string | null, runNumber?: string | number | null }} [input]
+ * @returns {string}
+ */
+function resolveMarketingVersion(input = {}) {
+  const prefix = assertMarketingVersionPrefix(
+    input.prefix ?? marketingVersionPrefix,
+  );
+  const raw = `${input.runNumber ?? ''}`.trim();
+  if (!raw) {
+    return `${prefix}.0`;
+  }
+  if (!/^[0-9]+$/.test(raw) || Number(raw) < 1) {
+    throw new Error(
+      `Marketing version run number must be a positive integer (got "${input.runNumber}").`,
+    );
+  }
+  return `${prefix}.${String(Number(raw))}`;
+}
+
+/**
  * iOS CFBundleVersion / Expo `ios.buildNumber`.
  *
  * App Store Connect rejects uploads when CFBundleVersion is not greater than
@@ -117,9 +165,11 @@ function resolveIosBuildNumber(input = {}) {
 
 module.exports = {
   defaultApiBaseUrls,
+  marketingVersionPrefix,
   normalizeApiBaseUrl,
   resolveApiBaseUrl,
   resolveAppEnvironment,
   resolveIosBuildNumber,
+  resolveMarketingVersion,
   rewriteLoopbackForAndroid,
 };

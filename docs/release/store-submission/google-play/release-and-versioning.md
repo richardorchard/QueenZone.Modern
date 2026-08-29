@@ -15,9 +15,7 @@ The Play publishing service account can release to testing tracks but deliberate
 ## Current internal version scheme
 
 - `versionCode`: GitHub Actions run number.
-- `versionName`: `0.1.0-internal.<run number>`.
-
-This is suitable for internal testing. Before the first public release, change the release workflow/configuration deliberately so the selected production AAB uses the public version name—recommended `1.0`—while retaining a strictly increasing integer `versionCode`.
+- `versionName`: `{prefix}.{run}` from `marketingVersionPrefix` in `src/QueenZone.Mobile/apiEnvironments.cjs` (default `0.1`, so `0.1.847`). The 1.x flip is changing that one prefix; integer `versionCode` keeps increasing.
 
 ## Recommended promotion sequence
 
