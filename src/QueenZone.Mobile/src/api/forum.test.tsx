@@ -15,15 +15,22 @@ import {
   watchForumTopic,
 } from './forum';
 import { jsonResponse } from '../test/fixtures';
+import { reportApiFailure } from '../config/sentry';
 
 jest.mock('../config', () => ({
   apiV1Url: (path: string) => `http://qz.test/api/v1${path.startsWith('/') ? path : `/${path}`}`,
 }));
 
+jest.mock('../config/sentry', () => ({
+  reportApiFailure: jest.fn(),
+}));
+
 const fetchMock = jest.fn<Promise<Response>, [RequestInfo | URL, RequestInit?]>();
+const reportApiFailureMock = reportApiFailure as jest.MockedFunction<typeof reportApiFailure>;
 
 beforeEach(() => {
   fetchMock.mockReset();
+  reportApiFailureMock.mockReset();
   global.fetch = fetchMock as unknown as typeof fetch;
 });
 
@@ -63,21 +70,107 @@ describe('read endpoints', () => {
   });
 });
 
+function pdfBlobResponse() {
+  return new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46]), {
+    status: 200,
+    headers: { 'Content-Type': 'application/pdf' },
+  });
+}
+
 describe('createForumTopic and createForumReply', () => {
-  it('POSTs the title/body with a Bearer token', async () => {
+  it('POSTs JSON title/body when no file is attached', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ id: 1, starterPostId: 2, title: 'Hi', detailPath: '/t/1' }));
     await createForumTopic(4, { title: 'Hi', body: 'Hello' }, 'tok');
     const { url, init } = lastCall();
     expect(url).toBe('http://qz.test/api/v1/forum/categories/4/topics');
     expect(init.method).toBe('POST');
     expect(init.body).toBe(JSON.stringify({ title: 'Hi', body: 'Hello' }));
-    expect(init.headers).toMatchObject({ Authorization: 'Bearer tok' });
+    expect(init.headers).toMatchObject({ Authorization: 'Bearer tok', 'Content-Type': 'application/json' });
 
     fetchMock.mockResolvedValueOnce(jsonResponse({ id: 9, topicId: 10, detailPath: '/t/10' }));
     await createForumReply(10, { body: 'Reply' }, 'tok');
     const reply = lastCall();
     expect(reply.url).toBe('http://qz.test/api/v1/forum/topics/10/posts');
     expect(reply.init.body).toBe(JSON.stringify({ body: 'Reply' }));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('POSTs multipart when a file is attached', async () => {
+    fetchMock
+      .mockResolvedValueOnce(pdfBlobResponse())
+      .mockResolvedValueOnce(jsonResponse({ id: 9, topicId: 10, detailPath: '/t/10' }));
+
+    await createForumReply(
+      10,
+      {
+        body: 'Reply',
+        file: { uri: 'file:///tmp/notes.pdf', name: 'notes.pdf', type: 'application/pdf' },
+      },
+      'tok',
+    );
+
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe('file:///tmp/notes.pdf');
+    const { url, init } = lastCall();
+    expect(url).toBe('http://qz.test/api/v1/forum/topics/10/posts');
+    expect(init.method).toBe('POST');
+    expect(init.headers).toMatchObject({ Authorization: 'Bearer tok' });
+    expect(init.headers).not.toHaveProperty('Content-Type');
+    const form = init.body as FormData;
+    expect(form.get('body')).toBe('Reply');
+    expect(form.get('file')).toBeInstanceOf(Blob);
+    expect(form.get('title')).toBeNull();
+  });
+
+  it('POSTs multipart title/body/file for a new topic', async () => {
+    fetchMock
+      .mockResolvedValueOnce(pdfBlobResponse())
+      .mockResolvedValueOnce(jsonResponse({ id: 1, starterPostId: 2, title: 'Hi', detailPath: '/t/1' }));
+
+    await createForumTopic(
+      4,
+      {
+        title: 'Hi',
+        body: 'Hello',
+        file: { uri: 'file:///tmp/notes.pdf', name: 'notes.pdf', type: 'application/pdf' },
+      },
+      'tok',
+    );
+
+    const { url, init } = lastCall();
+    expect(url).toBe('http://qz.test/api/v1/forum/categories/4/topics');
+    const form = init.body as FormData;
+    expect(form.get('title')).toBe('Hi');
+    expect(form.get('body')).toBe('Hello');
+    expect(form.get('file')).toBeInstanceOf(Blob);
+    expect(init.headers).not.toHaveProperty('Content-Type');
+  });
+
+  it('maps a failed local file read to local-file and reports it', async () => {
+    const cause = new TypeError('Network request failed');
+    fetchMock.mockRejectedValueOnce(cause);
+
+    await expect(
+      createForumReply(
+        10,
+        {
+          body: 'Reply',
+          file: { uri: 'file:///tmp/notes.pdf', name: 'notes.pdf', type: 'application/pdf' },
+        },
+        'tok',
+      ),
+    ).rejects.toMatchObject({
+      kind: 'local-file',
+      message: 'Could not read the selected photo. Try choosing it again.',
+    });
+
+    expect(reportApiFailureMock).toHaveBeenCalledWith({
+      kind: 'local-file',
+      status: 0,
+      method: 'POST',
+      path: '/forum/topics/10/posts',
+      cause,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -48,6 +48,9 @@ export const testIds = {
   forumThreadAttachment: 'forum-thread-attachment',
   forumThreadAttachmentViewer: 'forum-thread-attachment-viewer',
   forumNewThread: 'forum-new-thread',
+  forumComposerAttachPhotos: 'forum-composer-attach-photos',
+  forumComposerAttachFiles: 'forum-composer-attach-files',
+  forumComposerAttachment: 'forum-composer-attachment',
 
   profileSignedOut: 'profile-signed-out',
   profileSignedIn: 'profile-signed-in',
