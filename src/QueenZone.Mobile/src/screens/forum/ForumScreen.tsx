@@ -5,8 +5,9 @@ import { FlatList, Platform, Pressable, RefreshControl, StyleSheet, Text, View }
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Plus } from 'lucide-react-native';
 import { fetchForumCategories, fetchForumStats, type ForumCategoryListItem } from '../../api';
-import { usePagedContent } from '../../hooks/usePagedContent';
 import { useDetailQuery } from '../../hooks/useDetailQuery';
+import { usePagedContent } from '../../hooks/usePagedContent';
+import { nestedTabParams } from '../../navigation/nestedTab';
 import type { ForumStackParamList, RootTabParamList } from '../../navigation/types';
 import { useSession } from '../../session/SessionContext';
 import { openForumComposer } from '../../session/signInNavigation';
@@ -61,6 +62,7 @@ export function ForumScreen({ navigation }: Props) {
     <View>
       <TabRootMasthead
         onSearch={() => navigation.navigate('Search')}
+        onMessagesPress={() => navigation.navigate('HomeTab', nestedTabParams('Inbox'))}
         onProfilePress={() => navigation.navigate('HomeTab', { screen: 'Profile' })}
       />
       <PageTitleBlock eyebrow="Community" title="Forum" />

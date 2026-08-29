@@ -8,6 +8,12 @@ public sealed class QuoteEntity
 
     public string WhoSaid { get; set; } = string.Empty;
 
+    public string? Context { get; set; }
+
+    public QuoteSourceType? SourceType { get; set; }
+
+    public string? SourceKey { get; set; }
+
     public DateTime CreatedAt { get; set; }
 
     public bool IsPublished { get; set; }

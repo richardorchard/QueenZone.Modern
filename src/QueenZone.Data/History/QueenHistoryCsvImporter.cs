@@ -32,7 +32,7 @@ public sealed class QueenHistoryCsvImporter(QueenZoneDbContext dbContext)
             .Where(item => sourceTypes.Contains(item.SourceType) && sourceKeys.Contains(item.SourceKey))
             .ToListAsync(cancellationToken);
         var existingBySource = existing.ToDictionary(
-            item => BuildSourceKey(item.SourceType, item.SourceKey),
+            item => CsvImportRowParsing.BuildSourceKey(item.SourceType, item.SourceKey),
             StringComparer.OrdinalIgnoreCase);
 
         var created = 0;
@@ -41,7 +41,7 @@ public sealed class QueenHistoryCsvImporter(QueenZoneDbContext dbContext)
 
         foreach (var row in rows)
         {
-            if (existingBySource.TryGetValue(BuildSourceKey(row.SourceType, row.SourceKey), out var entity))
+            if (existingBySource.TryGetValue(CsvImportRowParsing.BuildSourceKey(row.SourceType, row.SourceKey), out var entity))
             {
                 if (Apply(entity, row, importedAtUtc, isNew: false))
                 {
@@ -61,7 +61,7 @@ public sealed class QueenHistoryCsvImporter(QueenZoneDbContext dbContext)
             };
             Apply(entity, row, importedAtUtc, isNew: true);
             dbContext.QueenHistoryEvents.Add(entity);
-            existingBySource[BuildSourceKey(row.SourceType, row.SourceKey)] = entity;
+            existingBySource[CsvImportRowParsing.BuildSourceKey(row.SourceType, row.SourceKey)] = entity;
             created++;
         }
 
@@ -113,12 +113,12 @@ public sealed class QueenHistoryCsvImporter(QueenZoneDbContext dbContext)
 
     private static QueenHistoryCsvImportRow ParseRow(string[] fields, int rowNumber)
     {
-        var title = Required(fields[0], rowNumber, "Title");
-        var summary = Required(fields[1], rowNumber, "Summary");
-        var precision = ParseEnum<QueenHistoryDatePrecision>(fields[3], rowNumber, "DatePrecision");
-        var category = ParseEnum<QueenHistoryEventCategory>(fields[4], rowNumber, "Category");
-        var sourceType = ParseEnum<QueenHistoryEventSourceType>(fields[6], rowNumber, "SourceType");
-        var sourceKey = Required(fields[7], rowNumber, "SourceKey");
+        var title = CsvImportRowParsing.Required(fields[0], rowNumber, "Title");
+        var summary = CsvImportRowParsing.Required(fields[1], rowNumber, "Summary");
+        var precision = CsvImportRowParsing.ParseEnum<QueenHistoryDatePrecision>(fields[3], rowNumber, "DatePrecision");
+        var category = CsvImportRowParsing.ParseEnum<QueenHistoryEventCategory>(fields[4], rowNumber, "Category");
+        var sourceType = CsvImportRowParsing.ParseEnum<QueenHistoryEventSourceType>(fields[6], rowNumber, "SourceType");
+        var sourceKey = CsvImportRowParsing.Required(fields[7], rowNumber, "SourceKey");
         var sourceUrl = string.IsNullOrWhiteSpace(fields[8]) ? null : fields[8].Trim();
 
         if (title.Length > 200)
@@ -164,9 +164,6 @@ public sealed class QueenHistoryCsvImporter(QueenZoneDbContext dbContext)
             sourceUrl);
     }
 
-    private static string BuildSourceKey(QueenHistoryEventSourceType sourceType, string sourceKey) =>
-        $"{sourceType}:{sourceKey}";
-
     private static bool Apply(
         QueenHistoryEventEntity entity,
         QueenHistoryCsvImportRow row,
@@ -204,22 +201,6 @@ public sealed class QueenHistoryCsvImporter(QueenZoneDbContext dbContext)
         entity.UpdatedAt = importedAtUtc;
         return true;
     }
-
-    private static string Required(string? value, int rowNumber, string column)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            throw new InvalidOperationException($"Row {rowNumber} {column} is required.");
-        }
-
-        return value.Trim();
-    }
-
-    private static TEnum ParseEnum<TEnum>(string value, int rowNumber, string column)
-        where TEnum : struct =>
-        Enum.TryParse<TEnum>(value, ignoreCase: true, out var parsed)
-            ? parsed
-            : throw new InvalidOperationException($"Row {rowNumber} {column} has unsupported value '{value}'.");
 
     private static DateTime ParseEventDate(string value, QueenHistoryDatePrecision precision, int rowNumber)
     {

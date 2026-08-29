@@ -26,6 +26,8 @@ public static class PublicQueryCacheKeys
 
     public const string PhotoVersion = Prefix + ":photo:version";
 
+    public const string HistoryVersion = Prefix + ":history:version";
+
     public const string PhotoCategoriesSegment = Prefix + ":photo:categories";
 
     public const string PhotoCategoryPageSegment = Prefix + ":photo:category-page";
@@ -52,11 +54,11 @@ public static class PublicQueryCacheKeys
         string? sizeFilter = null) =>
         $"{PhotoCategoryPageSegment}:v{version}:{catId}:{page}:{pageSize}:size={sizeFilter ?? string.Empty}";
 
-    public static string OnThisDay(DateOnly date, int count) =>
-        $"{Prefix}:history:on-this-day:{date:yyyyMMdd}:{count}";
+    public static string OnThisDay(string version, DateOnly date, int count) =>
+        $"{Prefix}:history:on-this-day:v{version}:{date:yyyyMMdd}:{count}";
 
-    public static string AroundThisDay(DateOnly date, int dayWindow, int count) =>
-        $"{Prefix}:history:around-this-day:{date:yyyyMMdd}:{dayWindow}:{count}";
+    public static string AroundThisDay(string version, DateOnly date, int dayWindow, int count) =>
+        $"{Prefix}:history:around-this-day:v{version}:{date:yyyyMMdd}:{dayWindow}:{count}";
 
     public static string ForumRecentThreads(int count) =>
         $"{ForumRecentThreadsSegment}:{count}";

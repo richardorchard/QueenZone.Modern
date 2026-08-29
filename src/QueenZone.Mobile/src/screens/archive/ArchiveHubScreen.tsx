@@ -6,6 +6,7 @@ import {
   archiveDestinations,
   type ArchiveDestination,
 } from '../../content/sample';
+import { nestedTabParams } from '../../navigation/nestedTab';
 import type { ArchiveStackParamList, RootTabParamList } from '../../navigation/types';
 import { useTheme } from '../../theme';
 import { ArchiveFooter } from '../../ui/ArchiveFooter';
@@ -61,6 +62,7 @@ export function ArchiveHubScreen({ navigation }: Props) {
         <View>
           <TabRootMasthead
             onSearch={() => navigation.navigate('Search')}
+            onMessagesPress={() => navigation.navigate('HomeTab', nestedTabParams('Inbox'))}
             onProfilePress={() => navigation.navigate('HomeTab', { screen: 'Profile' })}
           />
           <PageTitleBlock

@@ -2218,6 +2218,11 @@ namespace QueenZone.Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("QuoteId"));
 
+                    b.Property<string>("Context")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)")
+                        .HasColumnName("CONTEXT");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2")
                         .HasColumnName("CREATE_DATE");
@@ -2226,10 +2231,20 @@ namespace QueenZone.Data.Migrations
                         .HasColumnType("tinyint")
                         .HasColumnName("DISPLAY");
 
+                    b.Property<string>("SourceKey")
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)")
+                        .HasColumnName("SOURCE_KEY");
+
+                    b.Property<string>("SourceType")
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("SOURCE_TYPE");
+
                     b.Property<string>("Text")
                         .IsRequired()
-                        .HasMaxLength(455)
-                        .HasColumnType("nvarchar(455)")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)")
                         .HasColumnName("QUEEN_QUOTE");
 
                     b.Property<string>("WhoSaid")
@@ -2239,6 +2254,11 @@ namespace QueenZone.Data.Migrations
                         .HasColumnName("WHO_SAID");
 
                     b.HasKey("QuoteId");
+
+                    b.HasIndex("SourceType", "SourceKey")
+                        .IsUnique()
+                        .HasDatabaseName("IX_QUEEN_QUOTE_T_Source")
+                        .HasFilter("[SOURCE_TYPE] IS NOT NULL AND [SOURCE_KEY] IS NOT NULL");
 
                     b.ToTable("QUEEN_QUOTE_T", null, t =>
                         {

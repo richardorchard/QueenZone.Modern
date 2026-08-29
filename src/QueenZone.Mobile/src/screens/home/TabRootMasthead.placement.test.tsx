@@ -19,6 +19,7 @@ import {
 import { fetchConversation } from '../../api/messages';
 import { newsDetailFixture, newsItemFixture, pagedResponse } from '../../test/fixtures';
 import { createMockSession } from '../../test/mockSession';
+import { nestedTabParams } from '../../navigation/nestedTab';
 import { fakeNavigation, flushVirtualizedList, renderWithProviders } from '../../test/render';
 import { testIds } from '../../test/testIds';
 import { ArchiveHubScreen } from '../archive/ArchiveHubScreen';
@@ -253,6 +254,7 @@ describe('TabRootMasthead placement', () => {
     await user.press(screen.getByTestId(testIds.homeProfile));
     expect(homeNav.navigate).toHaveBeenCalledWith('Search');
     expect(homeNav.navigate).toHaveBeenCalledWith('Profile');
+    expect(screen.queryByTestId(testIds.homeMessages)).not.toBeOnTheScreen();
     home.unmount();
 
     const otherNav = fakeNavigation();
@@ -287,6 +289,55 @@ describe('TabRootMasthead placement', () => {
       await user.press(screen.getByTestId(testIds.homeProfile));
       expect(otherNav.navigate).toHaveBeenCalledWith('Search');
       expect(otherNav.navigate).toHaveBeenCalledWith('HomeTab', { screen: 'Profile' });
+      expect(screen.queryByTestId(testIds.homeMessages)).not.toBeOnTheScreen();
+      view.unmount();
+    }
+  });
+
+  it('opens Inbox from the signed-in messages icon on each tab-root masthead', async () => {
+    mockSession.isSignedIn = true;
+    mockSession.accessToken = 'tok';
+    const user = userEvent.setup();
+
+    const homeNav = fakeNavigation();
+    const home = renderWithProviders(
+      <HomeScreen navigation={homeNav as never} route={{ key: 'home', name: 'Home' } as never} />,
+      { navigation: false },
+    );
+    await user.press(screen.getByTestId(testIds.homeMessages));
+    expect(homeNav.navigate).toHaveBeenCalledWith('Inbox');
+    home.unmount();
+
+    const otherNav = fakeNavigation();
+    const screens = [
+      <NewsIndexScreen
+        key="news"
+        navigation={otherNav as never}
+        route={{ key: 'news', name: 'NewsIndex' } as never}
+      />,
+      <PhotosScreen
+        key="photos"
+        navigation={otherNav as never}
+        route={{ key: 'photos', name: 'PhotoIndex' } as never}
+      />,
+      <ArchiveHubScreen
+        key="archive"
+        navigation={otherNav as never}
+        route={{ key: 'archive', name: 'ArchiveHub' } as never}
+      />,
+      <ForumScreen
+        key="forum"
+        navigation={otherNav as never}
+        route={{ key: 'forum', name: 'ForumIndex' } as never}
+      />,
+    ];
+
+    for (const screenNode of screens) {
+      otherNav.navigate.mockClear();
+      const view = renderWithProviders(screenNode, { navigation: false });
+      await waitFor(() => expect(screen.getByTestId(testIds.tabMasthead)).toBeOnTheScreen());
+      await user.press(screen.getByTestId(testIds.homeMessages));
+      expect(otherNav.navigate).toHaveBeenCalledWith('HomeTab', nestedTabParams('Inbox'));
       view.unmount();
     }
   });
