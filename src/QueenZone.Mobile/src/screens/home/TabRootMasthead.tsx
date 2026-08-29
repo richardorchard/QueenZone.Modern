@@ -55,7 +55,7 @@ export function TabRootMasthead({ onProfilePress, onSearch, onMessagesPress, top
             color: c.textPrimary,
           }}
         >
-          Queenzone
+          Queenzone.org
         </Text>
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
