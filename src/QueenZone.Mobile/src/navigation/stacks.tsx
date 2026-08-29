@@ -114,7 +114,12 @@ export function PhotosStack() {
         component={PhotosScreen}
         options={({ navigation }) => ({
           title: 'Photography',
-          headerRight: () => <SearchIdentityHeaderRight navigation={navigation} />,
+          headerRight: () => (
+            <SearchIdentityHeaderRight
+              navigation={navigation}
+              onSearch={() => navigation.navigate('Search')}
+            />
+          ),
         })}
       />
       <Photos.Screen name="PhotoCategory" component={PhotoCategoryScreen} options={{ title: 'Collection' }} />
@@ -142,7 +147,12 @@ export function ArchiveStack() {
         component={ArchiveHubScreen}
         options={({ navigation }) => ({
           title: 'Archive',
-          headerRight: () => <SearchIdentityHeaderRight navigation={navigation} />,
+          headerRight: () => (
+            <SearchIdentityHeaderRight
+              navigation={navigation}
+              onSearch={() => navigation.navigate('Search')}
+            />
+          ),
         })}
       />
       <Archive.Screen name="Articles" component={ArticlesIndexScreen} options={{ title: 'Articles' }} />

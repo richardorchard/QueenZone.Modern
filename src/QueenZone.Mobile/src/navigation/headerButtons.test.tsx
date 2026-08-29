@@ -99,7 +99,9 @@ describe('header dismiss controls', () => {
     expect(screen.getByTestId(testIds.tabIdentityHeader)).toBeOnTheScreen();
     expect(screen.queryByTestId(testIds.tabMasthead)).not.toBeOnTheScreen();
 
+    await user.press(screen.getByTestId(testIds.forumNewThread));
     await user.press(screen.getByTestId(testIds.homeMessages));
+    expect(navigation.navigate).toHaveBeenCalledWith('Composer', {});
     expect(navigation.navigate).toHaveBeenCalledWith('HomeTab', nestedTabParams('Inbox'));
   });
 
@@ -108,9 +110,13 @@ describe('header dismiss controls', () => {
     mockSession.accessToken = 'tok';
     const navigation = { navigate: jest.fn() };
     const user = userEvent.setup();
-    renderWithProviders(<SearchIdentityHeaderRight navigation={navigation as never} />, {
-      navigation: false,
-    });
+    renderWithProviders(
+      <SearchIdentityHeaderRight
+        navigation={navigation}
+        onSearch={() => navigation.navigate('Search')}
+      />,
+      { navigation: false },
+    );
 
     expect(screen.getByLabelText('Search')).toBeOnTheScreen();
     expect(screen.getByTestId(testIds.tabIdentityHeader)).toBeOnTheScreen();

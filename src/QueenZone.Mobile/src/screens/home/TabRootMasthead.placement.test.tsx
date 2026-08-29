@@ -105,6 +105,23 @@ const fetchConversationMock = fetchConversation as jest.MockedFunction<typeof fe
 
 const conversationId = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
 
+function tabRootHeaders(navigation: ReturnType<typeof fakeNavigation>) {
+  return [
+    <NewsIndexHeaderRight key="news" navigation={navigation as never} />,
+    <SearchIdentityHeaderRight
+      key="photos"
+      navigation={navigation}
+      onSearch={() => navigation.navigate('Search')}
+    />,
+    <SearchIdentityHeaderRight
+      key="archive"
+      navigation={navigation}
+      onSearch={() => navigation.navigate('Search')}
+    />,
+    <ForumIndexHeaderRight key="forum" navigation={navigation as never} />,
+  ];
+}
+
 describe('TabRootMasthead placement', () => {
   beforeEach(() => {
     mockSession.isSignedIn = false;
@@ -259,12 +276,7 @@ describe('TabRootMasthead placement', () => {
 
   it('hangs identity on the four tab-root native headers', async () => {
     const navigation = fakeNavigation();
-    const headers = [
-      <NewsIndexHeaderRight key="news" navigation={navigation as never} />,
-      <SearchIdentityHeaderRight key="photos" navigation={navigation as never} />,
-      <SearchIdentityHeaderRight key="archive" navigation={navigation as never} />,
-      <ForumIndexHeaderRight key="forum" navigation={navigation as never} />,
-    ];
+    const headers = tabRootHeaders(navigation);
 
     for (const header of headers) {
       const view = renderWithProviders(header, { navigation: false });
@@ -289,12 +301,7 @@ describe('TabRootMasthead placement', () => {
     home.unmount();
 
     const otherNav = fakeNavigation();
-    const headers = [
-      <NewsIndexHeaderRight key="news" navigation={otherNav as never} />,
-      <SearchIdentityHeaderRight key="photos" navigation={otherNav as never} />,
-      <SearchIdentityHeaderRight key="archive" navigation={otherNav as never} />,
-      <ForumIndexHeaderRight key="forum" navigation={otherNav as never} />,
-    ];
+    const headers = tabRootHeaders(otherNav);
 
     for (const header of headers) {
       otherNav.navigate.mockClear();
@@ -323,12 +330,7 @@ describe('TabRootMasthead placement', () => {
     home.unmount();
 
     const otherNav = fakeNavigation();
-    const headers = [
-      <NewsIndexHeaderRight key="news" navigation={otherNav as never} />,
-      <SearchIdentityHeaderRight key="photos" navigation={otherNav as never} />,
-      <SearchIdentityHeaderRight key="archive" navigation={otherNav as never} />,
-      <ForumIndexHeaderRight key="forum" navigation={otherNav as never} />,
-    ];
+    const headers = tabRootHeaders(otherNav);
 
     for (const header of headers) {
       otherNav.navigate.mockClear();

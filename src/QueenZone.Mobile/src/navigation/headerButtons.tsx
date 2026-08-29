@@ -8,7 +8,7 @@ import { testIds } from '../test/testIds';
 import { IconButton } from '../ui/IconButton';
 import { openSuggestNews } from '../share/news/NewsShare';
 import { TabIdentityHeaderRight, tabIdentityHandlers } from './TabIdentityHeaderRight';
-import type { ArchiveStackParamList, ForumStackParamList, NewsStackParamList, PhotosStackParamList } from './types';
+import type { ForumStackParamList, NewsStackParamList } from './types';
 
 export function HeaderBackButton({
   onPress,
@@ -146,14 +146,14 @@ export function ForumIndexHeaderRight({
 
 export function SearchIdentityHeaderRight({
   navigation,
+  onSearch,
 }: {
-  navigation:
-    | NativeStackNavigationProp<PhotosStackParamList, 'PhotoIndex'>
-    | NativeStackNavigationProp<ArchiveStackParamList, 'ArchiveHub'>;
+  navigation: object;
+  onSearch: () => void;
 }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-      <SearchHeaderButton onPress={() => navigation.navigate('Search')} />
+      <SearchHeaderButton onPress={onSearch} />
       <TabIdentityHeaderRight {...tabIdentityHandlers(navigation)} />
     </View>
   );
