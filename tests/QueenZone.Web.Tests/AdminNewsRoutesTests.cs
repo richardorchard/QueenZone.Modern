@@ -772,16 +772,32 @@ public sealed class AdminNewsRoutesTests : IClassFixture<QueenZoneWebApplication
         Assert.Contains("data-gallery-picker-dialog", body);
         Assert.Contains("/admin/news/gallery-picker", body);
         Assert.Contains("/js/admin/article-gallery-picker.js", body);
+        Assert.Contains("The gallery original is not changed.", body);
     }
 
     [Fact]
-    public async Task GalleryPickerScript_assigns_cdn_preview_through_encodeUri()
+    public async Task GalleryPickerScript_dispatches_same_origin_original_for_crop()
     {
         var script = await CreateClient().GetStringAsync("/js/admin/article-gallery-picker.js");
 
-        Assert.Contains("https://cdn.queenzone.org/", script);
-        Assert.Contains("encodeURI", script);
+        Assert.Contains("queenzone:article-gallery-crop", script);
+        Assert.Contains("/admin/news/gallery-original/", script);
         Assert.DoesNotContain("preview.src = imageUrl", script);
+        Assert.DoesNotContain("galleryIdInput.value = picId", script);
+    }
+
+    [Fact]
+    public async Task ArticleImageCropScript_loads_gallery_original_as_blob_object_url()
+    {
+        var script = await CreateClient().GetStringAsync("/js/admin/article-image-crop.js");
+
+        Assert.Contains("queenzone:article-gallery-crop", script);
+        Assert.Contains("asBlobObjectUrl", script);
+        Assert.Contains("encodeURI", script);
+        Assert.Contains("createObjectURL", script);
+        Assert.Contains("/admin/news/gallery-original/", script);
+        Assert.DoesNotContain("stageImg.src = originalUrl", script);
+        Assert.DoesNotContain("preview.src = originalUrl", script);
     }
 
     [Fact]
@@ -809,6 +825,7 @@ public sealed class AdminNewsRoutesTests : IClassFixture<QueenZoneWebApplication
         Assert.Contains("https://cdn.queenzone.org/brian-may/img-101-t.jpg", body);
         Assert.Contains("data-gallery-pick", body);
         Assert.Contains("data-pic-id=\"101\"", body);
+        Assert.Contains("data-original-url=\"/admin/news/gallery-original/101\"", body);
         Assert.Contains("name=\"catId\"", body);
         Assert.Contains("name=\"q\"", body);
         Assert.Contains("Soundcheck, Wembley", body);
@@ -848,7 +865,7 @@ public sealed class AdminNewsRoutesTests : IClassFixture<QueenZoneWebApplication
     }
 
     [Fact]
-    public async Task CreateArticle_with_gallery_pick_sets_ref_without_upload()
+    public async Task CreateArticle_with_gallery_pick_and_crop_copies_into_ugc_articles()
     {
         var store = new SharedNewsStore();
         var appFactory = CreateFactory(store);
@@ -862,28 +879,66 @@ public sealed class AdminNewsRoutesTests : IClassFixture<QueenZoneWebApplication
             {
                 ["title"] = "Library photo article",
                 ["excerpt"] = "Uses a gallery pick.",
-                ["body"] = "No new blob.",
+                ["body"] = "Copied into ugc-articles.",
                 ["publishedAt"] = "2026-06-14",
                 ["imageBlobKey"] = "editors/me/should-be-replaced.webp",
-                ["imageGalleryPicId"] = "101"
+                ["imageGalleryPicId"] = "101",
+                ["cropX"] = "0",
+                ["cropY"] = "0",
+                ["cropWidth"] = "600",
+                ["cropHeight"] = "400"
             });
 
         Assert.Equal(HttpStatusCode.Redirect, createResponse.StatusCode);
         var articleId = AdminHttpTestHelpers.ParseNewsIdFromEditRedirect(createResponse);
         var article = store.GetArticle(articleId);
         Assert.NotNull(article);
-        Assert.Equal("gallery:101", article.ImageBlobKey);
-        Assert.Equal(101, article.ImageGalleryPicId);
+        Assert.False(string.IsNullOrWhiteSpace(article.ImageBlobKey));
+        Assert.False(NewsArticleImage.IsGalleryReference(article.ImageBlobKey));
+        Assert.Null(article.ImageGalleryPicId);
 
         var blobs = appFactory.Services.GetRequiredService<IBlobUploadService>();
+        Assert.NotNull(await blobs.OpenReadAsync(BlobUploadContainers.Articles, article.ImageBlobKey!));
+        Assert.NotNull(await blobs.OpenReadAsync(
+            BlobUploadContainers.Articles,
+            UgcProxyPaths.ToThumbBlobName(article.ImageBlobKey!)));
         Assert.Null(await blobs.OpenReadAsync(BlobUploadContainers.Articles, "editors/me/should-be-replaced.webp"));
 
+        var gallery = appFactory.Services.GetRequiredService<IGalleryPhotoBlobService>();
+        await using var original = await gallery.OpenReadAsync("brian-may", "img-101.jpg");
+        Assert.NotNull(original);
+
+        var previewUrl = NewsArticleImage.ResolveDisplayUrl(article.ImageBlobKey, article.ImageGalleryPicId);
         var editBody = await client.GetStringAsync($"/admin/news/{articleId}/edit");
-        Assert.Contains("value=\"gallery:101\"", editBody);
-        Assert.Contains("value=\"101\"", editBody);
-        Assert.Contains("https://cdn.queenzone.org/brian-may/img-101.jpg", editBody);
+        Assert.Contains(previewUrl, editBody);
         Assert.Contains("alt=\"Article image\"", editBody);
         Assert.DoesNotContain(NewsArticleImage.PlaceholderPath, editBody);
+        Assert.DoesNotContain("value=\"gallery:101\"", editBody);
+    }
+
+    [Fact]
+    public async Task CreateArticle_rejects_gallery_pick_without_crop()
+    {
+        var store = new SharedNewsStore();
+        var client = CreateClient(AdminEmail, store);
+
+        var response = await PostArticleAsync(
+            client,
+            "/admin/news/new",
+            "/admin/news",
+            new Dictionary<string, string>
+            {
+                ["title"] = "Uncropped library photo",
+                ["excerpt"] = "Should stay a draft form.",
+                ["body"] = "Plain text body.",
+                ["publishedAt"] = "2026-06-14",
+                ["imageGalleryPicId"] = "101"
+            });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("Apply a 3:2 crop", body);
+        Assert.Empty(store.GetAllArticles());
     }
 
     [Fact]
@@ -946,20 +1001,153 @@ public sealed class AdminNewsRoutesTests : IClassFixture<QueenZoneWebApplication
             new Dictionary<string, string>
             {
                 ["title"] = "Swap to library",
-                ["excerpt"] = "Now a gallery pick.",
+                ["excerpt"] = "Now a cropped gallery copy.",
                 ["body"] = "Then becomes a gallery pick.",
                 ["publishedAt"] = "2026-06-14",
                 ["imageBlobKey"] = previous,
-                ["imageGalleryPicId"] = "102"
+                ["imageGalleryPicId"] = "102",
+                ["cropX"] = "0",
+                ["cropY"] = "0",
+                ["cropWidth"] = "600",
+                ["cropHeight"] = "400"
             });
 
         Assert.Equal(HttpStatusCode.Redirect, saveResponse.StatusCode);
         var updated = store.GetArticle(articleId);
         Assert.NotNull(updated);
-        Assert.Equal("gallery:102", updated.ImageBlobKey);
-        Assert.Equal(102, updated.ImageGalleryPicId);
+        Assert.False(NewsArticleImage.IsGalleryReference(updated.ImageBlobKey));
+        Assert.Null(updated.ImageGalleryPicId);
+        Assert.NotEqual(previous, updated.ImageBlobKey);
         Assert.Null(await blobs.OpenReadAsync(BlobUploadContainers.Articles, previous));
         Assert.Null(await blobs.OpenReadAsync(BlobUploadContainers.Articles, UgcProxyPaths.ToThumbBlobName(previous)));
+        Assert.NotNull(await blobs.OpenReadAsync(BlobUploadContainers.Articles, updated.ImageBlobKey!));
+
+        var gallery = appFactory.Services.GetRequiredService<IGalleryPhotoBlobService>();
+        await using var original = await gallery.OpenReadAsync("brian-may", "img-102.jpg");
+        Assert.NotNull(original);
+    }
+
+    [Fact]
+    public async Task CreateArticle_rejects_invalid_gallery_crop()
+    {
+        var store = new SharedNewsStore();
+        var client = CreateClient(AdminEmail, store);
+
+        var response = await PostArticleAsync(
+            client,
+            "/admin/news/new",
+            "/admin/news",
+            new Dictionary<string, string>
+            {
+                ["title"] = "Bad gallery crop",
+                ["excerpt"] = "Should stay a draft form.",
+                ["body"] = "Plain text body.",
+                ["publishedAt"] = "2026-06-14",
+                ["imageGalleryPicId"] = "101",
+                ["cropX"] = "0",
+                ["cropY"] = "0",
+                ["cropWidth"] = "100",
+                ["cropHeight"] = "100"
+            });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("selected crop is invalid", body);
+        Assert.Empty(store.GetAllArticles());
+    }
+
+    [Fact]
+    public async Task CreateArticle_rejects_too_small_gallery_crop()
+    {
+        var store = new SharedNewsStore();
+        var client = CreateClient(AdminEmail, store);
+
+        var response = await PostArticleAsync(
+            client,
+            "/admin/news/new",
+            "/admin/news",
+            new Dictionary<string, string>
+            {
+                ["title"] = "Tiny gallery crop",
+                ["excerpt"] = "Should stay a draft form.",
+                ["body"] = "Plain text body.",
+                ["publishedAt"] = "2026-06-14",
+                ["imageGalleryPicId"] = "101",
+                ["cropX"] = "0",
+                ["cropY"] = "0",
+                ["cropWidth"] = "300",
+                ["cropHeight"] = "200"
+            });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("selected crop is too small", body);
+        Assert.Empty(store.GetAllArticles());
+    }
+
+    [Fact]
+    public async Task EditArticle_keeps_existing_gallery_pointer_without_new_crop()
+    {
+        var store = new SharedNewsStore(
+        [
+            new AdminNewsArticle(
+                4402,
+                "Legacy gallery pick",
+                "legacy-gallery-pick",
+                "Excerpt",
+                "Body",
+                new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc),
+                null,
+                false,
+                DateTime.UtcNow,
+                DateTime.UtcNow,
+                AdminEmail,
+                "gallery:101",
+                101)
+        ]);
+        var client = CreateClient(AdminEmail, store);
+
+        var saveResponse = await PostArticleAsync(
+            client,
+            "/admin/news/4402/edit",
+            "/admin/news/4402",
+            new Dictionary<string, string>
+            {
+                ["title"] = "Legacy gallery pick",
+                ["excerpt"] = "Title-only edit.",
+                ["body"] = "Body",
+                ["publishedAt"] = "2026-06-01",
+                ["imageBlobKey"] = "gallery:101",
+                ["imageGalleryPicId"] = "101"
+            });
+
+        Assert.Equal(HttpStatusCode.Redirect, saveResponse.StatusCode);
+        var updated = store.GetArticle(4402);
+        Assert.NotNull(updated);
+        Assert.Equal("gallery:101", updated.ImageBlobKey);
+        Assert.Equal(101, updated.ImageGalleryPicId);
+    }
+
+    [Fact]
+    public async Task GalleryOriginal_requires_admin_and_streams_seed_original()
+    {
+        var anonymous = CreateClient();
+        var anonymousResponse = await anonymous.GetAsync("/admin/news/gallery-original/101");
+        Assert.Equal(HttpStatusCode.Unauthorized, anonymousResponse.StatusCode);
+
+        var stranger = CreateClient("stranger@example.com");
+        var forbidden = await stranger.GetAsync("/admin/news/gallery-original/101");
+        Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
+
+        var missing = await CreateClient(AdminEmail).GetAsync("/admin/news/gallery-original/99999");
+        Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
+
+        var client = CreateClient(AdminEmail);
+        var response = await client.GetAsync("/admin/news/gallery-original/101");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("image/jpeg", response.Content.Headers.ContentType?.MediaType);
+        var bytes = await response.Content.ReadAsByteArrayAsync();
+        Assert.True(bytes.Length > 0);
     }
 
     [Fact]

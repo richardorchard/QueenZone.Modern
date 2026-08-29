@@ -23,6 +23,8 @@
     var cropY = root.querySelector("[data-crop-y]");
     var cropWidth = root.querySelector("[data-crop-width]");
     var cropHeight = root.querySelector("[data-crop-height]");
+    var blobKeyInput = form.querySelector("[data-article-image-blob-key]");
+    var galleryIdInput = form.querySelector("[data-article-image-gallery-id]");
     if (!form || !input || !dialog || !stageImg || !zoomInput) {
       return;
     }
@@ -37,11 +39,15 @@
     var cropApplied = false;
     var baseRatio = 1;
     var syncingZoom = false;
+    var pendingGalleryPick = null;
+    var gallerySnapshot = null;
 
     input.addEventListener("change", function () {
       clearError();
       resetCropFields();
       cropApplied = false;
+      pendingGalleryPick = null;
+      gallerySnapshot = null;
       destroyCropper();
       var file = input.files && input.files[0];
       if (!file) {
@@ -101,6 +107,17 @@
       cropWidth.value = String(crop.width);
       cropHeight.value = String(crop.height);
       cropApplied = true;
+      if (pendingGalleryPick) {
+        if (galleryIdInput) {
+          galleryIdInput.value = pendingGalleryPick.picId;
+        }
+
+        if (blobKeyInput) {
+          blobKeyInput.value = "gallery:" + pendingGalleryPick.picId;
+        }
+
+        gallerySnapshot = null;
+      }
       if (preview) {
         assignBlobImageSrc(preview, objectUrl);
         preview.alt = "Article image";
@@ -124,18 +141,84 @@
       cancelSelection();
     });
 
-    form.addEventListener("submit", function (event) {
-      if (!input.files || !input.files[0] || cropApplied) {
+    root.addEventListener("queenzone:article-gallery-crop", function (event) {
+      var detail = event.detail || {};
+      var originalUrl = asGalleryOriginalUrl(detail.originalUrl || "");
+      var picId = detail.picId || "";
+      if (!originalUrl || !picId) {
         return;
       }
 
-      event.preventDefault();
-      if (typeof dialog.showModal === "function") {
-        dialog.showModal();
+      clearError();
+      gallerySnapshot = {
+        blobKey: blobKeyInput ? blobKeyInput.value : "",
+        galleryId: galleryIdInput ? galleryIdInput.value : "",
+        cropX: cropX.value,
+        cropY: cropY.value,
+        cropWidth: cropWidth.value,
+        cropHeight: cropHeight.value,
+        cropApplied: cropApplied
+      };
+      pendingGalleryPick = { picId: picId, title: detail.title || "Article image" };
+      resetCropFields();
+      cropApplied = false;
+      destroyCropper();
+      input.value = "";
+
+      fetch(originalUrl, { credentials: "same-origin", headers: { "X-Requested-With": "fetch" } })
+        .then(function (response) {
+          if (!response.ok) {
+            throw new Error("Could not load that gallery photo for cropping.");
+          }
+
+          return response.blob();
+        })
+        .then(function (blob) {
+          revokeObjectUrl();
+          objectUrl = asBlobObjectUrl(URL.createObjectURL(blob));
+          if (!objectUrl) {
+            throw new Error("Could not load that gallery photo for cropping.");
+          }
+
+          stageImg.onload = function () {
+            if (typeof dialog.showModal === "function") {
+              dialog.showModal();
+            }
+
+            startCropper();
+          };
+          assignBlobImageSrc(stageImg, objectUrl);
+        })
+        .catch(function () {
+          pendingGalleryPick = null;
+          restoreGallerySnapshot();
+          showError("Could not load that gallery photo for cropping.");
+        });
+    });
+
+    form.addEventListener("submit", function (event) {
+      if (input.files && input.files[0] && !cropApplied) {
+        event.preventDefault();
+        if (typeof dialog.showModal === "function") {
+          dialog.showModal();
+        }
+
+        if (!cropper) {
+          startCropper();
+        }
+
+        return;
       }
 
-      if (!cropper) {
-        startCropper();
+      if (pendingGalleryPick && !cropApplied) {
+        event.preventDefault();
+        if (typeof dialog.showModal === "function") {
+          dialog.showModal();
+        }
+
+        if (!cropper) {
+          startCropper();
+        }
       }
     });
 
@@ -227,10 +310,40 @@
     function cancelSelection() {
       destroyCropper();
       input.value = "";
-      resetCropFields();
-      cropApplied = false;
+      if (pendingGalleryPick) {
+        pendingGalleryPick = null;
+        restoreGallerySnapshot();
+      }
+      else {
+        resetCropFields();
+        cropApplied = false;
+      }
+
       revokeObjectUrl();
       dialog.close();
+    }
+
+    function restoreGallerySnapshot() {
+      if (!gallerySnapshot) {
+        resetCropFields();
+        cropApplied = false;
+        return;
+      }
+
+      if (blobKeyInput) {
+        blobKeyInput.value = gallerySnapshot.blobKey;
+      }
+
+      if (galleryIdInput) {
+        galleryIdInput.value = gallerySnapshot.galleryId;
+      }
+
+      cropX.value = gallerySnapshot.cropX;
+      cropY.value = gallerySnapshot.cropY;
+      cropWidth.value = gallerySnapshot.cropWidth;
+      cropHeight.value = gallerySnapshot.cropHeight;
+      cropApplied = gallerySnapshot.cropApplied;
+      gallerySnapshot = null;
     }
 
     function resetCropFields() {
@@ -270,6 +383,10 @@
   // Only browser blob: URLs may reach img.src; encodeURI is the XSS sanitizer CodeQL recognizes.
   function asBlobObjectUrl(url) {
     return typeof url === "string" && url.indexOf("blob:") === 0 ? url : "";
+  }
+
+  function asGalleryOriginalUrl(url) {
+    return typeof url === "string" && url.indexOf("/admin/news/gallery-original/") === 0 ? url : "";
   }
 
   function assignBlobImageSrc(image, url) {

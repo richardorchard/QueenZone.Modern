@@ -1,17 +1,21 @@
 using System.Security.Claims;
 using QueenZone.Data;
 using QueenZone.Storage;
+using QueenZone.Web.Pages.Admin.News;
 
 namespace QueenZone.Web;
 
 /// <summary>
 /// Stores article card images in <see cref="BlobUploadContainers.Articles"/>.
 /// Replaced ugc-articles blobs are deleted only after the caller persists the new key.
-/// Gallery / PIC references are never deleted.
+/// Gallery / PIC references are never deleted. A new gallery pick is copied+cropped
+/// into ugc-articles; the PIC original is read only.
 /// </summary>
 public sealed class NewsArticleImageService(
     IBlobUploadService blobUploadService,
-    MemberUploadQuotaService uploadQuota)
+    MemberUploadQuotaService uploadQuota,
+    IAdminPhotoRepository adminPhotoRepository,
+    IGalleryPhotoBlobService galleryPhotoBlobService)
 {
     public sealed record ApplyResult(AdminNewsDraft Draft, string? Error);
 
@@ -21,11 +25,27 @@ public sealed class NewsArticleImageService(
         AdminNewsDraft draft,
         ClaimsPrincipal user,
         bool persist,
+        CancellationToken cancellationToken = default) =>
+        await TryApplyAsync(file, crop, draft, user, persist, persistedGalleryPicId: null, cancellationToken);
+
+    public async Task<ApplyResult> TryApplyAsync(
+        IFormFile? file,
+        NewsArticleImageCrop? crop,
+        AdminNewsDraft draft,
+        ClaimsPrincipal user,
+        bool persist,
+        int? persistedGalleryPicId,
         CancellationToken cancellationToken = default)
     {
         if (file is null || file.Length <= 0)
         {
-            return new ApplyResult(draft, null);
+            return await TryApplyGalleryPickAsync(
+                crop,
+                draft,
+                user,
+                persist,
+                persistedGalleryPicId,
+                cancellationToken);
         }
 
         NewsArticleImageProcessor.ProcessedArticleImage processed;
@@ -44,6 +64,70 @@ public sealed class NewsArticleImageService(
             return new ApplyResult(draft, ex.Message);
         }
 
+        return await PersistProcessedAsync(processed, draft, user, persist, cancellationToken);
+    }
+
+    private async Task<ApplyResult> TryApplyGalleryPickAsync(
+        NewsArticleImageCrop? crop,
+        AdminNewsDraft draft,
+        ClaimsPrincipal user,
+        bool persist,
+        int? persistedGalleryPicId,
+        CancellationToken cancellationToken)
+    {
+        if (draft.ImageGalleryPicId is not int picId)
+        {
+            return new ApplyResult(draft, null);
+        }
+
+        if (crop is null)
+        {
+            if (persistedGalleryPicId == picId)
+            {
+                return new ApplyResult(draft, null);
+            }
+
+            return new ApplyResult(draft, "Apply a 3:2 crop before saving this gallery photo.");
+        }
+
+        var original = await NewsArticleGalleryPicker.OpenOriginalAsync(
+            adminPhotoRepository,
+            galleryPhotoBlobService,
+            picId,
+            cancellationToken);
+        if (original is null)
+        {
+            return new ApplyResult(draft, "That gallery photo could not be read.");
+        }
+
+        await using (original.Stream)
+        {
+            NewsArticleImageProcessor.ProcessedArticleImage processed;
+            try
+            {
+                processed = await NewsArticleImageProcessor.ProcessRequiredCropAsync(
+                    original.Stream,
+                    original.FileName,
+                    crop.Value,
+                    NewsArticleImageProcessor.MaxUploadBytes,
+                    cancellationToken);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return new ApplyResult(draft, ex.Message);
+            }
+
+            return await PersistProcessedAsync(processed, draft, user, persist, cancellationToken);
+        }
+    }
+
+    private async Task<ApplyResult> PersistProcessedAsync(
+        NewsArticleImageProcessor.ProcessedArticleImage processed,
+        AdminNewsDraft draft,
+        ClaimsPrincipal user,
+        bool persist,
+        CancellationToken cancellationToken)
+    {
         await using (processed.FullImage)
         await using (processed.Thumbnail)
         {
