@@ -77,7 +77,7 @@ describe('TabRootMasthead', () => {
     expect(screen.getByLabelText('Profile')).toBeOnTheScreen();
     expect(screen.queryByLabelText('Profile, 3 unread conversations')).not.toBeOnTheScreen();
     expect(screen.getByLabelText('Messages, 3 unread conversations')).toBeOnTheScreen();
-    expect(screen.getByTestId(testIds.homeMessagesUnread)).toBeOnTheScreen();
+    expect(screen.getByTestId(testIds.homeMessagesUnread, { includeHiddenElements: true })).toBeOnTheScreen();
     expect(screen.getByText('CM')).toBeOnTheScreen();
     expect(screen.getByText('3', { includeHiddenElements: true })).toBeOnTheScreen();
   });

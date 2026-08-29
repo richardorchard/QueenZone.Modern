@@ -4,7 +4,11 @@
  * fail closed. The OEM Files sheet is not the journey gate.
  */
 
-import { isSmokeAuthEnabled, smokeAuthScheme, type SmokeAuthGate } from './smokeAuth';
+/** Same shape as `SmokeAuthGate` in smokeAuth.ts — no runtime import (node:test). */
+type SmokeAttachGate = {
+  dev?: boolean;
+  appEnv?: string;
+};
 
 export const smokeAttachHost = 'smoke-attach';
 export const smokeAttachFileName = 'attach.txt';
@@ -19,8 +23,9 @@ export type SmokeAttachAsset = {
 
 let pending: SmokeAttachAsset | null = null;
 
-export function isSmokeAttachEnabled(env: SmokeAuthGate = {}): boolean {
-  return isSmokeAuthEnabled(env);
+export function isSmokeAttachEnabled(env: SmokeAttachGate = {}): boolean {
+  const dev = env.dev ?? (typeof __DEV__ !== 'undefined' ? __DEV__ : false);
+  return dev === true && env.appEnv === 'development';
 }
 
 export function parseSmokeAttachAsset(url: string): SmokeAttachAsset | null {
@@ -33,7 +38,7 @@ export function parseSmokeAttachAsset(url: string): SmokeAttachAsset | null {
   const path = parsed.pathname.replace(/^\/+/, '');
   const isAttach =
     hostOrPath === smokeAttachHost || path === smokeAttachHost || parsed.pathname === `/${smokeAttachHost}`;
-  if (parsed.protocol !== `${smokeAuthScheme}:` || !isAttach) {
+  if (parsed.protocol !== 'queenzone:' || !isAttach) {
     return null;
   }
 
@@ -65,7 +70,7 @@ export function buildSmokeAttachUrl(
   if (type) {
     params.set('type', type);
   }
-  return `${smokeAuthScheme}://${smokeAttachHost}?${params.toString()}`;
+  return `queenzone://${smokeAttachHost}?${params.toString()}`;
 }
 
 export function defaultSmokeAttachAsset(platform: string): SmokeAttachAsset {
