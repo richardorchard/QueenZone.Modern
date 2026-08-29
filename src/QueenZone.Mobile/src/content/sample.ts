@@ -86,7 +86,7 @@ export const onThisDay = {
 export const archiveDestinations: ArchiveDestination[] = [
   {
     id: 'stories',
-    title: 'Stories',
+    title: 'Articles',
     kicker: 'Long-form',
     kickerRole: 'restored',
     meta: ['104 features', 'Editorial'],

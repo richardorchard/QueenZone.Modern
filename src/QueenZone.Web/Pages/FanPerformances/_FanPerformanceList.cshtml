@@ -6,10 +6,19 @@
 }
 else
 {
+  @if (Model.CanPlayCatalog)
+  {
+    <div class="qz-stage-queue">
+      <button type="button" class="qz-button qz-button--outline" data-qz-stage-play-all>Play All</button>
+      <button type="button" class="qz-button qz-button--outline" data-qz-stage-shuffle-all>Shuffle Play All</button>
+      <p class="qz-meta qz-stage-now-playing" data-qz-stage-now-playing hidden aria-live="polite"></p>
+    </div>
+    <script type="application/json" data-qz-stage-catalog>@Html.Raw(Model.CatalogJson)</script>
+  }
   <ol class="qz-stage-list" data-qz-stage-list>
     @foreach (var performance in Model.Items)
     {
-      <li class="qz-stage-row">
+      <li class="qz-stage-row" data-qz-stage-id="@performance.Id">
         <div class="qz-card__kicker"><time datetime="@performance.DateAdded.ToString("yyyy-MM-dd")">@performance.DateAdded.ToString("dd MMMM yyyy")</time></div>
         <div class="qz-stage-row__track">
           @if (performance.AudioPlayPath is not null)
@@ -17,6 +26,7 @@ else
             <button type="button"
                     class="qz-stage-play"
                     data-qz-stage-play
+                    data-qz-stage-id="@performance.Id"
                     data-title="@performance.Title"
                     aria-pressed="false"
                     aria-label="Play @performance.Title">

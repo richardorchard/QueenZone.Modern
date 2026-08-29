@@ -202,6 +202,51 @@ describe('PhotoViewerScreen', () => {
     expect(navigation.setParams).not.toHaveBeenCalled();
   });
 
+  it('keeps size on previous and next when the detail path still carries it', async () => {
+    const navigation = fakeNavigation();
+    fetchPhoto.mockResolvedValueOnce(
+      photoDetail({
+        detailPath: '/photography/brian-may/101?size=desktop',
+        previous: { picId: 100, detailPath: '/photography/brian-may/100?size=desktop' },
+        next: { picId: 102, detailPath: '/photography/brian-may/102?size=desktop' },
+      }),
+    );
+    renderWithProviders(
+      <PhotoViewerScreen
+        navigation={navigation as never}
+        route={
+          {
+            key: 'viewer',
+            name: 'PhotoViewer',
+            params: { slug: 'brian-may', picId: 101, size: 'desktop' },
+          } as never
+        }
+      />,
+      { navigation: false },
+    );
+    await waitFor(() => expect(screen.getByText('Live Aid')).toBeOnTheScreen());
+    expect(fetchPhoto).toHaveBeenCalledWith(
+      'brian-may',
+      101,
+      expect.objectContaining({ size: 'desktop' }),
+    );
+    expect(navigation.setParams).not.toHaveBeenCalled();
+
+    const user = userEvent.setup();
+    await user.press(screen.getByRole('button', { name: 'Previous image' }));
+    expect(navigation.setParams).toHaveBeenCalledWith({
+      slug: 'brian-may',
+      picId: 100,
+      size: 'desktop',
+    });
+    await user.press(screen.getByRole('button', { name: 'Next image' }));
+    expect(navigation.setParams).toHaveBeenCalledWith({
+      slug: 'brian-may',
+      picId: 102,
+      size: 'desktop',
+    });
+  });
+
   it('closes and steps through previous and next from the chrome buttons', async () => {
     const { navigation } = await loadPhoto();
     const user = userEvent.setup();

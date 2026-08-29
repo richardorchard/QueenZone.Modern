@@ -47,4 +47,24 @@ describe('ArticleRow', () => {
     expect(onOpen).toHaveBeenCalledTimes(1);
     expect(onPlay).toHaveBeenCalledTimes(1);
   });
+
+  it('includes decorative leading in the row press target', async () => {
+    const onPress = jest.fn();
+    renderWithProviders(
+      <ArticleRow
+        title="Queen headline"
+        subtitle="Excerpt"
+        meta="15 Jan 2024"
+        leading={<Text testID="news-thumb">Thumb</Text>}
+        leadingInteractive={false}
+        onPress={onPress}
+        accessibilityLabel="Open Queen headline"
+      />,
+      { navigation: false },
+    );
+
+    const user = userEvent.setup();
+    await user.press(screen.getByTestId('news-thumb'));
+    expect(onPress).toHaveBeenCalledTimes(1);
+  });
 });

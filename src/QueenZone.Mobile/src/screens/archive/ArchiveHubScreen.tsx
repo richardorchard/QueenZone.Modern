@@ -25,7 +25,7 @@ export function ArchiveHubScreen({ navigation }: Props) {
   const open = (row: ArchiveDestination) => {
     switch (row.id) {
       case 'stories':
-        navigation.navigate('Stories');
+        navigation.navigate('Articles');
         return;
       case 'timeline':
         navigation.navigate('Timeline');

@@ -43,7 +43,7 @@ export type PhotosStackParamList = {
 
 export type ArchiveStackParamList = {
   ArchiveHub: undefined;
-  Stories: undefined;
+  Articles: undefined;
   Biography: undefined;
   BiographyChapter: { id: number };
   Discography: undefined;
