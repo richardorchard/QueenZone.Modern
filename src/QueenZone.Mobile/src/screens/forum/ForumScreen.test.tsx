@@ -78,7 +78,7 @@ describe('ForumScreen', () => {
     await waitFor(() => expect(screen.getByTestId(testIds.forumScreen)).toBeOnTheScreen());
     await waitFor(() => expect(screen.getByText('Threads')).toBeOnTheScreen());
 
-    expect(screen.getByText('Boards')).toBeOnTheScreen();
+    expect(screen.getAllByText('Boards').length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText('Posts')).toBeOnTheScreen();
     expect(screen.getByText(formatForumCount(7))).toBeOnTheScreen();
     expect(screen.getByText(formatForumCount(12600))).toBeOnTheScreen();
