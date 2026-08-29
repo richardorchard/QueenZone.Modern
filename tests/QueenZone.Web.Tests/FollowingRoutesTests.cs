@@ -93,7 +93,7 @@ public sealed class FollowingRoutesTests : IClassFixture<WebApplicationFactory<P
         Assert.Equal(1, recorder.FeedPageCalls);
         Assert.Equal(0, recorder.SinglePageCalls);
         Assert.Equal(
-            [aliceId, bobId],
+            new[] { aliceId, bobId }.OrderBy(id => id).ToArray(),
             recorder.LastFeedAuthorIds.OrderBy(id => id).ToArray());
     }
 
