@@ -60,6 +60,22 @@ public sealed class NewsArticleImageProcessorTests
     }
 
     [Fact]
+    public void ResolveCrop_required_rejects_missing_or_invalid_instead_of_center_crop()
+    {
+        var missing = Assert.Throws<InvalidOperationException>(() =>
+            NewsArticleImageProcessor.ResolveCrop(900, 600, null, requireRequestedCrop: true));
+        Assert.Contains("Apply a 3:2 crop", missing.Message, StringComparison.OrdinalIgnoreCase);
+
+        var invalid = Assert.Throws<InvalidOperationException>(() =>
+            NewsArticleImageProcessor.ResolveCrop(
+                900,
+                600,
+                new NewsArticleImageCrop(0, 0, 100, 100),
+                requireRequestedCrop: true));
+        Assert.Contains("invalid", invalid.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void ResolveCrop_rejects_in_bounds_card_crop_below_minimum()
     {
         var ex = Assert.Throws<InvalidOperationException>(() =>
@@ -70,6 +86,20 @@ public sealed class NewsArticleImageProcessorTests
 
         Assert.Contains("too small", ex.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("400", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ProcessRequiredCropAsync_rejects_wrong_aspect_instead_of_center_crop()
+    {
+        await using var source = await CreatePngAsync(900, 600);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            NewsArticleImageProcessor.ProcessRequiredCropAsync(
+                source,
+                "wide.png",
+                new NewsArticleImageCrop(0, 0, 100, 100)));
+
+        Assert.Contains("invalid", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

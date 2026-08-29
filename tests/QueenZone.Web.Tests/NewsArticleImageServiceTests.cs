@@ -4,7 +4,9 @@ using Microsoft.Extensions.Caching.Memory;
 using QueenZone.Data;
 using QueenZone.Storage;
 using QueenZone.Web;
+using QueenZone.Web.Pages.Admin.News;
 using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Jpeg;
 using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.PixelFormats;
 
@@ -76,7 +78,11 @@ public sealed class NewsArticleImageServiceTests
     public async Task Replacing_gallery_reference_does_not_delete_gallery_or_pic_paths()
     {
         var blobs = new RecordingBlobUploadService();
-        var service = new NewsArticleImageService(blobs, CreateDisabledQuota());
+        var service = new NewsArticleImageService(
+            blobs,
+            CreateDisabledQuota(),
+            CreatePhotos(),
+            new NullGalleryPhotoBlobService());
         var draft = new AdminNewsDraft(
             "Title",
             null,
@@ -143,9 +149,114 @@ public sealed class NewsArticleImageServiceTests
     }
 
     [Fact]
+    public async Task TryApplyAsync_gallery_pick_with_crop_copies_to_ugc_articles_and_nulls_pic_id()
+    {
+        var gallery = await SeededRecordingGalleryAsync(101, 900, 600);
+        var originalBefore = await ReadGalleryBytesAsync(gallery, 101);
+        var service = new NewsArticleImageService(
+            CreateBlobs(out var backend),
+            CreateDisabledQuota(),
+            CreatePhotos(),
+            gallery);
+        var draft = NewsArticleImage.WithGalleryPick(
+            new AdminNewsDraft("Title", null, "Excerpt", "Body", DateTime.UtcNow.Date, null),
+            101);
+
+        var result = await service.TryApplyAsync(
+            file: null,
+            new NewsArticleImageCrop(150, 0, 600, 400),
+            draft,
+            CreateUser(),
+            persist: true);
+
+        Assert.Null(result.Error);
+        Assert.False(string.IsNullOrWhiteSpace(result.Draft.ImageBlobKey));
+        Assert.False(NewsArticleImage.IsGalleryReference(result.Draft.ImageBlobKey));
+        Assert.Null(result.Draft.ImageGalleryPicId);
+        Assert.True(backend.Exists(BlobUploadContainers.Articles, result.Draft.ImageBlobKey!));
+        Assert.Empty(gallery.Uploads);
+        Assert.Empty(gallery.Deletes);
+        Assert.Equal(originalBefore, await ReadGalleryBytesAsync(gallery, 101));
+    }
+
+    [Fact]
+    public async Task TryApplyAsync_new_gallery_pick_without_crop_is_rejected()
+    {
+        var service = CreateService(out _, out _);
+        var draft = NewsArticleImage.WithGalleryPick(
+            new AdminNewsDraft("Title", null, "Excerpt", "Body", DateTime.UtcNow.Date, null),
+            101);
+
+        var result = await service.TryApplyAsync(file: null, crop: null, draft, CreateUser(), persist: true);
+
+        Assert.Contains("Apply a 3:2 crop", result.Error, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("gallery:101", result.Draft.ImageBlobKey);
+        Assert.Equal(101, result.Draft.ImageGalleryPicId);
+    }
+
+    [Fact]
+    public async Task TryApplyAsync_unchanged_persisted_gallery_pointer_skips_copy()
+    {
+        var gallery = new RecordingGalleryPhotoBlobService(new NullGalleryPhotoBlobService());
+        var service = new NewsArticleImageService(
+            CreateBlobs(out var backend),
+            CreateDisabledQuota(),
+            CreatePhotos(),
+            gallery);
+        var draft = NewsArticleImage.WithGalleryPick(
+            new AdminNewsDraft("Title", null, "Excerpt", "Body", DateTime.UtcNow.Date, null),
+            101);
+
+        var result = await service.TryApplyAsync(
+            file: null,
+            crop: null,
+            draft,
+            CreateUser(),
+            persist: true,
+            persistedGalleryPicId: 101);
+
+        Assert.Null(result.Error);
+        Assert.Equal("gallery:101", result.Draft.ImageBlobKey);
+        Assert.Equal(101, result.Draft.ImageGalleryPicId);
+        Assert.Empty(gallery.Uploads);
+        Assert.Empty(gallery.Deletes);
+        Assert.False(backend.Exists(BlobUploadContainers.Articles, "editors/editor-test.local"));
+    }
+
+    [Fact]
+    public async Task TryApplyAsync_invalid_gallery_crop_is_rejected()
+    {
+        var gallery = await SeededRecordingGalleryAsync(101, 900, 600);
+        var service = new NewsArticleImageService(
+            CreateBlobs(out _),
+            CreateDisabledQuota(),
+            CreatePhotos(),
+            gallery);
+        var draft = NewsArticleImage.WithGalleryPick(
+            new AdminNewsDraft("Title", null, "Excerpt", "Body", DateTime.UtcNow.Date, null),
+            101);
+
+        var result = await service.TryApplyAsync(
+            file: null,
+            new NewsArticleImageCrop(0, 0, 100, 100),
+            draft,
+            CreateUser(),
+            persist: true);
+
+        Assert.Contains("invalid", result.Error, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("gallery:101", result.Draft.ImageBlobKey);
+        Assert.Empty(gallery.Uploads);
+        Assert.Empty(gallery.Deletes);
+    }
+
+    [Fact]
     public async Task TryApplyAsync_returns_error_when_blob_upload_fails()
     {
-        var service = new NewsArticleImageService(new ThrowingBlobUploadService(), CreateDisabledQuota());
+        var service = new NewsArticleImageService(
+            new ThrowingBlobUploadService(),
+            CreateDisabledQuota(),
+            CreatePhotos(),
+            new NullGalleryPhotoBlobService());
         var draft = new AdminNewsDraft("Title", null, "Excerpt", "Body", DateTime.UtcNow.Date, null);
         await using var png = await CreatePngAsync(600, 400);
 
@@ -164,11 +275,50 @@ public sealed class NewsArticleImageServiceTests
         out IBlobUploadService blobs,
         out InMemoryBlobStorageBackend backend)
     {
+        blobs = CreateBlobs(out backend);
+        return new NewsArticleImageService(blobs, CreateDisabledQuota(), CreatePhotos(), new NullGalleryPhotoBlobService());
+    }
+
+    private static IBlobUploadService CreateBlobs(out InMemoryBlobStorageBackend backend)
+    {
         backend = new InMemoryBlobStorageBackend();
-        blobs = new AzureBlobUploadService(
+        return new AzureBlobUploadService(
             backend,
             Microsoft.Extensions.Options.Options.Create(new BlobUploadOptions()));
-        return new NewsArticleImageService(blobs, CreateDisabledQuota());
+    }
+
+    private static IAdminPhotoRepository CreatePhotos() =>
+        new InMemoryAdminPhotoRepository(new SharedPhotoStore(SamplePhotoData.CreateSeedCategories()));
+
+    private static async Task<RecordingGalleryPhotoBlobService> SeededRecordingGalleryAsync(
+        int picId,
+        int width,
+        int height)
+    {
+        var inner = new NullGalleryPhotoBlobService();
+        var photos = CreatePhotos();
+        var photo = await photos.GetByIdAsync(picId);
+        Assert.NotNull(photo);
+        Assert.True(NewsArticleGalleryPicker.TryResolveBlobLocation(photo.LegacyUrl, out var container, out var blobName));
+        using var image = new Image<Rgba32>(width, height);
+        await using var stream = new MemoryStream();
+        await image.SaveAsync(stream, new JpegEncoder());
+        stream.Position = 0;
+        await inner.UploadAsync(container, blobName, stream, "image/jpeg");
+        return new RecordingGalleryPhotoBlobService(inner);
+    }
+
+    private static async Task<byte[]> ReadGalleryBytesAsync(IGalleryPhotoBlobService gallery, int picId)
+    {
+        var photos = CreatePhotos();
+        var photo = await photos.GetByIdAsync(picId);
+        Assert.NotNull(photo);
+        Assert.True(NewsArticleGalleryPicker.TryResolveBlobLocation(photo.LegacyUrl, out var container, out var blobName));
+        await using var stream = await gallery.OpenReadAsync(container, blobName);
+        Assert.NotNull(stream);
+        using var copy = new MemoryStream();
+        await stream.CopyToAsync(copy);
+        return copy.ToArray();
     }
 
     private static MemberUploadQuotaService CreateDisabledQuota() =>
@@ -241,6 +391,46 @@ public sealed class NewsArticleImageServiceTests
             string blobName,
             CancellationToken cancellationToken = default) =>
             Task.FromResult<BlobContent?>(null);
+    }
+
+    private sealed class RecordingGalleryPhotoBlobService(IGalleryPhotoBlobService inner) : IGalleryPhotoBlobService
+    {
+        public List<string> Uploads { get; } = [];
+
+        public List<string> Deletes { get; } = [];
+
+        public bool IsConfigured => inner.IsConfigured;
+
+        public Task UploadAsync(
+            string containerName,
+            string blobName,
+            Stream content,
+            string contentType,
+            CancellationToken cancellationToken = default)
+        {
+            Uploads.Add(containerName + "/" + blobName);
+            return inner.UploadAsync(containerName, blobName, content, contentType, cancellationToken);
+        }
+
+        public Task<Stream?> OpenReadAsync(
+            string containerName,
+            string blobName,
+            CancellationToken cancellationToken = default) =>
+            inner.OpenReadAsync(containerName, blobName, cancellationToken);
+
+        public Task DeleteAsync(
+            string containerName,
+            string blobName,
+            CancellationToken cancellationToken = default)
+        {
+            Deletes.Add(containerName + "/" + blobName);
+            return inner.DeleteAsync(containerName, blobName, cancellationToken);
+        }
+
+        public Task<IReadOnlyList<GalleryBlobDescriptor>> ListBlobsAsync(
+            string containerName,
+            CancellationToken cancellationToken = default) =>
+            inner.ListBlobsAsync(containerName, cancellationToken);
     }
 
     private sealed class ThrowingBlobUploadService : IBlobUploadService

@@ -9,10 +9,7 @@
     var dialog = host.querySelector("[data-gallery-picker-dialog]");
     var panel = host.querySelector("[data-gallery-picker-panel]");
     var closeButton = host.querySelector("[data-gallery-picker-close]");
-    var blobKeyInput = host.querySelector("[data-article-image-blob-key]");
-    var galleryIdInput = host.querySelector("[data-article-image-gallery-id]");
     var fileInput = root.querySelector("[data-article-image-input]");
-    var preview = root.querySelector("[data-article-image-preview]");
     if (!openButton || !dialog || !panel) {
       return;
     }
@@ -62,37 +59,25 @@
       }
 
       var picId = pick.getAttribute("data-pic-id");
-      var imageUrl = pick.getAttribute("data-image-url");
+      var originalUrl = pick.getAttribute("data-original-url") || "";
       var title = pick.getAttribute("data-title") || "Article image";
-      if (!picId) {
+      if (!picId || !asGalleryOriginalUrl(originalUrl)) {
         return;
-      }
-
-      if (galleryIdInput) {
-        galleryIdInput.value = picId;
-      }
-
-      if (blobKeyInput) {
-        blobKeyInput.value = "gallery:" + picId;
       }
 
       if (fileInput) {
         fileInput.value = "";
       }
 
-      resetCropFields(root);
-
-      if (assignGalleryPreviewSrc(preview, imageUrl)) {
-        preview.alt = title;
-        preview.style.objectPosition = "";
-      }
-
-      var caption = root.querySelector(".admin-article-image figcaption");
-      if (caption) {
-        caption.remove();
-      }
-
       dialog.close();
+      root.dispatchEvent(new CustomEvent("queenzone:article-gallery-crop", {
+        bubbles: true,
+        detail: {
+          picId: picId,
+          originalUrl: originalUrl,
+          title: title
+        }
+      }));
     });
   }
 
@@ -120,29 +105,9 @@
       });
   }
 
-  // data-image-url is a modeled taint step (js/xss-through-dom).
-  // Only public photo CDN URLs may reach img.src; encodeURI is the XSS sanitizer
-  // CodeQL recognizes.
-  function asGalleryPreviewUrl(url) {
-    return typeof url === "string" && url.indexOf("https://cdn.queenzone.org/") === 0 ? url : "";
-  }
-
-  function assignGalleryPreviewSrc(image, url) {
-    var safeUrl = asGalleryPreviewUrl(url);
-    if (!image || !safeUrl) {
-      return false;
-    }
-
-    image.src = encodeURI(safeUrl);
-    return true;
-  }
-
-  function resetCropFields(root) {
-    ["data-crop-x", "data-crop-y", "data-crop-width", "data-crop-height"].forEach(function (name) {
-      var field = root.querySelector("[" + name + "]");
-      if (field) {
-        field.value = "";
-      }
-    });
+  // data-original-url is a modeled taint step (js/xss-through-dom).
+  // Only the same-origin PIC original route may be fetched for the crop dialog.
+  function asGalleryOriginalUrl(url) {
+    return typeof url === "string" && url.indexOf("/admin/news/gallery-original/") === 0 ? url : "";
   }
 })();

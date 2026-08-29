@@ -326,6 +326,7 @@ public static class QueenZoneWebServiceCollectionExtensions
         {
             services.AddQueenZoneInMemoryData();
             services.AddHostedService<Search.SearchIndexSeedHostedService>();
+            services.AddHostedService<SampleGalleryImageSeedHostedService>();
             return services;
         }
 
@@ -347,6 +348,7 @@ public static class QueenZoneWebServiceCollectionExtensions
         {
             services.AddQueenZoneInMemoryData();
             services.AddHostedService<Search.SearchIndexSeedHostedService>();
+            services.AddHostedService<SampleGalleryImageSeedHostedService>();
         }
 
         return services;

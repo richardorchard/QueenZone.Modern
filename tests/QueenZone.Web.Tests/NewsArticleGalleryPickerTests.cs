@@ -1,6 +1,10 @@
 using Microsoft.AspNetCore.Http;
 using QueenZone.Data;
+using QueenZone.Storage;
 using QueenZone.Web.Pages.Admin.News;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Jpeg;
+using SixLabors.ImageSharp.PixelFormats;
 
 namespace QueenZone.Web.Tests;
 
@@ -49,6 +53,38 @@ public sealed class NewsArticleGalleryPickerTests
         Assert.Equal(
             "/admin/news/gallery-picker?catId=9&q=Wembley&pageNumber=2",
             NewsArticleGalleryPicker.BuildPath(9, "Wembley", 2));
+        Assert.Equal("/admin/news/gallery-original/101", NewsArticleGalleryPicker.BuildOriginalPath(101));
+    }
+
+    [Fact]
+    public void TryResolveBlobLocation_uses_legacy_pic_path()
+    {
+        Assert.True(NewsArticleGalleryPicker.TryResolveBlobLocation("/Brian_May/img-101.jpg", out var container, out var blobName));
+        Assert.Equal("brian-may", container);
+        Assert.Equal("img-101.jpg", blobName);
+    }
+
+    [Fact]
+    public async Task OpenOriginalAsync_reads_pic_bytes_without_writing()
+    {
+        var photos = new InMemoryAdminPhotoRepository(new SharedPhotoStore(SamplePhotoData.CreateSeedCategories()));
+        var gallery = new NullGalleryPhotoBlobService();
+        using var image = new Image<Rgba32>(600, 400);
+        await using var jpeg = new MemoryStream();
+        await image.SaveAsync(jpeg, new JpegEncoder());
+        jpeg.Position = 0;
+        await gallery.UploadAsync("brian-may", "img-101.jpg", jpeg, "image/jpeg");
+
+        var opened = await NewsArticleGalleryPicker.OpenOriginalAsync(photos, gallery, 101);
+        Assert.NotNull(opened);
+        Assert.Equal("image/jpeg", opened.ContentType);
+        Assert.Equal("img-101.jpg", opened.FileName);
+        await using (opened.Stream)
+        {
+            Assert.True(opened.Stream.Length > 0);
+        }
+
+        Assert.Null(await NewsArticleGalleryPicker.OpenOriginalAsync(photos, gallery, 99999));
     }
 
     [Fact]

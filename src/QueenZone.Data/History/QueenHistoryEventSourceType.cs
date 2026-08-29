@@ -8,4 +8,5 @@ public enum QueenHistoryEventSourceType
     Discography,
     Curated,
     Wikipedia,
+    AsItBeganBook,
 }
