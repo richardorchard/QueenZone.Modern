@@ -1,5 +1,6 @@
 import { screen, userEvent, waitFor } from '@testing-library/react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { Keyboard } from 'react-native';
 import { fetchPhotoCategories } from '../../api';
 import { ApiError } from '../../api/errors';
 import { createPhotoSubmission } from '../../api/photoSubmissions';
@@ -191,6 +192,50 @@ describe('PhotoSubmitScreen', () => {
       }),
       'tok',
     );
+  });
+
+  it('dismisses the keyboard after a library pick so submit stays reachable', async () => {
+    const user = userEvent.setup();
+    const dismiss = jest.spyOn(Keyboard, 'dismiss');
+    mockSession.isSignedIn = true;
+    mockSession.accessToken = 'tok';
+    fetchCategories.mockResolvedValue(pagedResponse([categoryFixture()], 1, 1));
+    (ImagePicker.requestMediaLibraryPermissionsAsync as jest.Mock).mockResolvedValue({ granted: true });
+    (ImagePicker.launchImageLibraryAsync as jest.Mock).mockResolvedValue({
+      canceled: false,
+      assets: [{ uri: 'file:///tmp/crowd.jpg', fileName: 'crowd.jpg', mimeType: 'image/jpeg', fileSize: 12_000 }],
+    });
+
+    renderSubmit();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Brian May' })).toBeOnTheScreen());
+    await user.type(screen.getByLabelText('Title'), 'Wembley');
+    await user.press(screen.getByRole('button', { name: 'Choose from library' }));
+
+    await waitFor(() => expect(dismiss).toHaveBeenCalled());
+    expect(screen.getByRole('button', { name: 'Submit for review' })).toBeOnTheScreen();
+    dismiss.mockRestore();
+  });
+
+  it('dismisses the keyboard after a camera pick so submit stays reachable', async () => {
+    const user = userEvent.setup();
+    const dismiss = jest.spyOn(Keyboard, 'dismiss');
+    mockSession.isSignedIn = true;
+    mockSession.accessToken = 'tok';
+    fetchCategories.mockResolvedValue(pagedResponse([categoryFixture()], 1, 1));
+    (ImagePicker.requestCameraPermissionsAsync as jest.Mock).mockResolvedValue({ granted: true });
+    (ImagePicker.launchCameraAsync as jest.Mock).mockResolvedValue({
+      canceled: false,
+      assets: [{ uri: 'file:///tmp/stage.jpg', fileName: 'stage.jpg', mimeType: 'image/jpeg', fileSize: 12_000 }],
+    });
+
+    renderSubmit();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Brian May' })).toBeOnTheScreen());
+    await user.type(screen.getByLabelText('Title'), 'Live');
+    await user.press(screen.getByRole('button', { name: 'Take photo' }));
+
+    await waitFor(() => expect(dismiss).toHaveBeenCalled());
+    expect(screen.getByRole('button', { name: 'Submit for review' })).toBeOnTheScreen();
+    dismiss.mockRestore();
   });
 
   it('shows a retry action when photo categories fail to load', async () => {

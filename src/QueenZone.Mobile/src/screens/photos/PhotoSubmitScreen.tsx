@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -47,6 +48,7 @@ function PhotoSubmitForm({ navigation }: Pick<Props, 'navigation'>) {
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
   const { accessToken } = useSession();
+  const scrollRef = useRef<ScrollView>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [suggestedCategory, setSuggestedCategory] = useState('');
@@ -60,6 +62,13 @@ function PhotoSubmitForm({ navigation }: Pick<Props, 'navigation'>) {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [confirmation, setConfirmation] = useState<PhotoSubmissionCreated | null>(null);
+
+  const revealSubmitAfterPicker = useCallback(() => {
+    Keyboard.dismiss();
+    requestAnimationFrame(() => {
+      scrollRef.current?.scrollToEnd({ animated: true });
+    });
+  }, []);
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -99,6 +108,7 @@ function PhotoSubmitForm({ navigation }: Pick<Props, 'navigation'>) {
   }, []);
 
   const pickPhoto = useCallback(async (fromCamera: boolean) => {
+    Keyboard.dismiss();
     setSubmitError(null);
     const permission = fromCamera
       ? await ImagePicker.requestCameraPermissionsAsync()
@@ -109,6 +119,7 @@ function PhotoSubmitForm({ navigation }: Pick<Props, 'navigation'>) {
           ? 'Camera permission is required to take a photo.'
           : 'Photo library permission is required to choose a photo.',
       );
+      revealSubmitAfterPicker();
       return;
     }
 
@@ -122,21 +133,25 @@ function PhotoSubmitForm({ navigation }: Pick<Props, 'navigation'>) {
         ? await ImagePicker.launchCameraAsync(pickerOptions)
         : await ImagePicker.launchImageLibraryAsync(pickerOptions);
       if (picked.canceled || !picked.assets[0]) {
+        revealSubmitAfterPicker();
         return;
       }
 
       const mapped = photoFromPickerAsset(picked.assets[0]);
       if ('error' in mapped) {
         setSubmitError(mapped.error);
+        revealSubmitAfterPicker();
         return;
       }
 
       setPhoto(mapped.photo);
       setFileSize(mapped.fileSize);
+      revealSubmitAfterPicker();
     } catch {
       setSubmitError(fromCamera ? 'The camera is not available on this device.' : 'Could not open the photo library.');
+      revealSubmitAfterPicker();
     }
-  }, []);
+  }, [revealSubmitAfterPicker]);
 
   const submit = useCallback(async () => {
     const validation = validatePhotoSubmit({
@@ -197,11 +212,14 @@ function PhotoSubmitForm({ navigation }: Pick<Props, 'navigation'>) {
   return (
     <KeyboardAvoidingView
       style={[styles.flex, { backgroundColor: c.surfacePage }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior="padding"
+      keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
     >
       <ScrollView
+        ref={scrollRef}
         style={styles.flex}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + space.xxl }]}
       >
         <Text style={[type.eyebrow, { color: c.accentPrimary }]}>{photoSubmitCopy.eyebrow}</Text>
