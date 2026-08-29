@@ -3,9 +3,11 @@ import type { ConfigContext, ExpoConfig } from 'expo/config';
 // CommonJS shared module — Expo loads app.config via require(), not Metro.
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const {
+  marketingVersionPrefix,
   resolveApiBaseUrl,
   resolveAppEnvironment,
   resolveIosBuildNumber,
+  resolveMarketingVersion,
 } = require('./apiEnvironments.cjs') as typeof import('./apiEnvironments.cjs');
 
 /**
@@ -16,6 +18,7 @@ const {
  *   EXPO_PUBLIC_APP_ENV=staging|production|development
  *   EXPO_PUBLIC_API_BASE_URL=https://localhost:7162
  *   IOS_BUILD_NUMBER=<positive integer> (TestFlight CFBundleVersion; see GITHUB_RUN_NUMBER)
+ *   GITHUB_RUN_NUMBER=<positive integer> (store Version `{prefix}.{run}` + integer build)
  */
 export default ({ config }: ConfigContext): ExpoConfig => {
   const appEnv = resolveAppEnvironment(
@@ -30,10 +33,15 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     githubRunNumber: process.env.GITHUB_RUN_NUMBER,
     fallback: config.ios?.buildNumber,
   });
+  const version = resolveMarketingVersion({
+    prefix: marketingVersionPrefix,
+    runNumber: process.env.GITHUB_RUN_NUMBER,
+  });
   return {
     ...config,
     name: config.name ?? 'QueenZone',
     slug: config.slug ?? 'queenzone-mobile',
+    version,
     android: {
       ...(typeof config.android === 'object' && config.android !== null
         ? config.android

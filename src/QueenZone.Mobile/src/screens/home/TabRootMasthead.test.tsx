@@ -47,6 +47,7 @@ describe('TabRootMasthead', () => {
     renderMasthead();
 
     expect(screen.getByTestId(testIds.tabMasthead)).toBeOnTheScreen();
+    expect(screen.queryByTestId(testIds.homeVersion)).toBeNull();
     expect(screen.getByLabelText('Profile')).toBeOnTheScreen();
     expect(screen.getByText('·')).toBeOnTheScreen();
     expect(screen.queryByTestId(testIds.homeMessages)).not.toBeOnTheScreen();

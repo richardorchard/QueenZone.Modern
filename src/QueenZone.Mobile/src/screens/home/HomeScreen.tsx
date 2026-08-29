@@ -26,6 +26,8 @@ import { nestedTabParams } from '../../navigation/nestedTab';
 import type { HomeStackParamList, RootTabParamList } from '../../navigation/types';
 import { useSession } from '../../session/SessionContext';
 import { openSignIn } from '../../session/signInNavigation';
+import { getAppConfig } from '../../config/appConfig';
+import { formatHomeFooter } from '../../config/buildMetadata';
 import { fonts, radius, space, type, useTheme } from '../../theme';
 import { ArchiveFooter } from '../../ui/ArchiveFooter';
 import { ArchiveImage } from '../../ui/ArchiveImage';
@@ -541,6 +543,20 @@ export function HomeScreen({ navigation }: Props) {
           ) : null}
 
           <ArchiveFooter />
+          <Text
+            testID={testIds.homeVersion}
+            style={[
+              type.caption,
+              {
+                color: c.textMuted,
+                textAlign: 'center',
+                paddingHorizontal: space.xl,
+                paddingBottom: space.xl,
+              },
+            ]}
+          >
+            {formatHomeFooter(getAppConfig())}
+          </Text>
         </>
       }
     />
