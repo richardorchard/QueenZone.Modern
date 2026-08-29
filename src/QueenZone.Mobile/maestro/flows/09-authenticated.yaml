@@ -21,4 +21,4 @@ appId: org.queenzone.mobile
     timeout: 20000
 - assertNotVisible:
     id: member-gate
-- assertVisible: You have no private messages yet.
+- assertVisible: Contract Other

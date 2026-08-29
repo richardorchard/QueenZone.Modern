@@ -17,6 +17,8 @@ export type ContractFixture = {
   suspendedMember: ContractMember;
   pollTopicId: number;
   pollOptionId: string;
+  attachTopicId: number;
+  discussionTopicId: number;
 };
 
 function fixturePath(): string {

@@ -256,12 +256,19 @@ describe('mobile API consumer contracts', { concurrency: false }, () => {
     assert.equal(patched.privateMessage, preferences.privateMessage);
     await patchNotificationPreferences(token, { news: preferences.news });
 
-    const emptyInbox = parseContract(
+    const seededInbox = parseContract(
       'GET /api/v1/me/messages',
       pagedSchema(inboxConversationSchema),
       await fetchInbox(token),
     );
-    assert.equal(emptyInbox.items.length, 0, 'Contract GET /api/v1/me/messages failed: expected field items to be empty before compose');
+    assert.ok(
+      seededInbox.items.length >= 1,
+      'Contract GET /api/v1/me/messages failed: expected the seeded unread conversation before compose',
+    );
+    assert.ok(
+      seededInbox.items.some((item) => item.otherParticipantDisplayName === fixture.otherMember.displayName),
+      'Contract GET /api/v1/me/messages failed: expected a conversation with Contract Other',
+    );
 
     const thread = parseContract(
       'POST /api/v1/me/messages',

@@ -1,26 +1,36 @@
-# Phase 1 device smoke (#872 Option A). Not a required PR check.
-# workflow_dispatch + weekday 04:00 UTC until pass rate and duration are known.
-# Phase 2: see docs/architecture/testing-policy.md — do not silently enable
-# branch protection for these job names.
+# Phase 1 device smoke (#872 Option A) plus on-demand journeys (#1071).
+# Not a required PR check. Do not silently enable branch protection.
+# Weekday 04:00 UTC stays smoke only. Journeys use dispatch and weekday 16:00 UTC.
 name: Mobile device smoke
 
 on:
   workflow_dispatch:
     inputs:
+      suite:
+        description: "Maestro suite to run (smoke stays the 9 #872 flows)"
+        required: false
+        type: choice
+        options:
+          - smoke
+          - journeys
+          - both
+        default: smoke
       prove_failure:
-        description: "Run the forced-assertion flow to prove failure artifacts"
+        description: "Run the forced-assertion flow to prove failure artifacts (smoke only)"
         required: false
         type: boolean
         default: false
   schedule:
     # After nightly-legacy-checks (03:00 UTC). Weekdays only for Phase 1 soak.
     - cron: "0 4 * * 1-5"
+    # Later weekday slot for journeys. Do not steal the 04:00 smoke slot.
+    - cron: "0 16 * * 1-5"
 
 permissions:
   contents: read
 
 concurrency:
-  group: mobile-device-smoke-${{ github.ref }}
+  group: mobile-device-${{ github.event.inputs.suite || github.event.schedule || 'smoke' }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -30,6 +40,10 @@ env:
 jobs:
   mobile-android-smoke:
     name: Mobile Android device smoke
+    if: >-
+      (github.event_name == 'schedule' && github.event.schedule == '0 4 * * 1-5')
+      || (github.event_name == 'workflow_dispatch'
+        && (github.event.inputs.suite == 'smoke' || github.event.inputs.suite == 'both'))
     runs-on: ubuntu-latest
     timeout-minutes: 90
     defaults:
@@ -141,6 +155,10 @@ jobs:
 
   mobile-ios-smoke:
     name: Mobile iOS device smoke
+    if: >-
+      (github.event_name == 'schedule' && github.event.schedule == '0 4 * * 1-5')
+      || (github.event_name == 'workflow_dispatch'
+        && (github.event.inputs.suite == 'smoke' || github.event.inputs.suite == 'both'))
     runs-on: macos-26
     timeout-minutes: 90
     defaults:
@@ -260,6 +278,243 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: mobile-ios-smoke-${{ github.run_id }}
+          path: |
+            src/QueenZone.Mobile/maestro-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  mobile-android-journeys:
+    name: Mobile Android device journeys
+    if: >-
+      (github.event_name == 'schedule' && github.event.schedule == '0 16 * * 1-5')
+      || (github.event_name == 'workflow_dispatch'
+        && (github.event.inputs.suite == 'journeys' || github.event.inputs.suite == 'both'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: src/QueenZone.Mobile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+          cache: true
+          cache-dependency-path: |
+            **/*.csproj
+            .config/dotnet-tools.json
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: src/QueenZone.Mobile/package-lock.json
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+        working-directory: .
+
+      - name: Install mobile JS
+        run: npm ci
+
+      - name: Build Testing web host
+        working-directory: .
+        run: |
+          unset ConnectionStrings__QueenZoneLegacy || true
+          unset ConnectionStrings__BlobStorage || true
+          unset ConnectionStrings__SqlServerTest || true
+          dotnet build src/QueenZone.Web/QueenZone.Web.csproj --configuration Release
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-smoke-${{ runner.os }}-${{ hashFiles('src/QueenZone.Mobile/package-lock.json') }}
+          restore-keys: |
+            gradle-smoke-${{ runner.os }}-
+
+      - name: Assemble Android Debug smoke APK
+        env:
+          EXPO_PUBLIC_APP_ENV: development
+          EXPO_PUBLIC_API_BASE_URL: http://10.0.2.2:5098
+          SENTRY_DISABLE_AUTO_UPLOAD: "true"
+        run: |
+          npx expo prebuild --platform android
+          cd android
+          ./gradlew assembleDebug
+
+      - name: Install Maestro
+        working-directory: .
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      - name: Run Android device journeys
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: |
+            unset ConnectionStrings__QueenZoneLegacy || true
+            unset ConnectionStrings__BlobStorage || true
+            unset ConnectionStrings__SqlServerTest || true
+            ./scripts/run-mobile-device-smoke.sh \
+              --platform android \
+              --suite journeys \
+              --skip-build \
+              --no-build \
+              --apk src/QueenZone.Mobile/android/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Upload Android journeys diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: mobile-android-journeys-${{ github.run_id }}
+          path: |
+            src/QueenZone.Mobile/maestro-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  mobile-ios-journeys:
+    name: Mobile iOS device journeys
+    if: >-
+      (github.event_name == 'schedule' && github.event.schedule == '0 16 * * 1-5')
+      || (github.event_name == 'workflow_dispatch'
+        && (github.event.inputs.suite == 'journeys' || github.event.inputs.suite == 'both'))
+    runs-on: macos-26
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: src/QueenZone.Mobile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Select latest available Xcode
+        working-directory: .
+        run: |
+          ls /Applications | grep -i Xcode
+          LATEST=$(ls -d /Applications/Xcode_*.app 2>/dev/null | sort -V | tail -n 1)
+          if [ -z "$LATEST" ]; then
+            echo "::error::No /Applications/Xcode_*.app found on this runner."
+            exit 1
+          fi
+          echo "Selecting $LATEST"
+          sudo xcode-select -s "$LATEST/Contents/Developer"
+          xcodebuild -version
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+          cache: true
+          cache-dependency-path: |
+            **/*.csproj
+            .config/dotnet-tools.json
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: src/QueenZone.Mobile/package-lock.json
+
+      - name: Install mobile JS
+        run: npm ci
+
+      - name: Cache CocoaPods
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/CocoaPods
+          key: cocoapods-smoke-${{ runner.os }}-${{ hashFiles('src/QueenZone.Mobile/package-lock.json') }}
+          restore-keys: |
+            cocoapods-smoke-${{ runner.os }}-
+
+      - name: Build Testing web host
+        working-directory: .
+        run: |
+          unset ConnectionStrings__QueenZoneLegacy || true
+          unset ConnectionStrings__BlobStorage || true
+          unset ConnectionStrings__SqlServerTest || true
+          dotnet build src/QueenZone.Web/QueenZone.Web.csproj --configuration Release
+
+      - name: Build iOS Simulator Debug smoke app
+        env:
+          EXPO_PUBLIC_APP_ENV: development
+          EXPO_PUBLIC_API_BASE_URL: http://127.0.0.1:5098
+          SENTRY_DISABLE_AUTO_UPLOAD: "true"
+        run: |
+          npx expo prebuild --platform ios --clean
+          cd ios
+          WORKSPACE=$(ls -d *.xcworkspace | head -n 1)
+          SCHEME=$(basename "$WORKSPACE" .xcworkspace)
+          xcodebuild \
+            -workspace "$WORKSPACE" \
+            -scheme "$SCHEME" \
+            -sdk iphonesimulator \
+            -configuration Debug \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Install Maestro
+        working-directory: .
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      - name: Boot iPhone Simulator
+        working-directory: .
+        run: |
+          UDID=$(xcrun simctl list devices available | grep iPhone | grep -oE '[0-9A-F-]{36}' | head -n 1)
+          if [ -z "$UDID" ]; then
+            echo "::error::No available iPhone Simulator runtime."
+            xcrun simctl list devices
+            exit 1
+          fi
+          echo "Booting $UDID"
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
+          echo "IOS_SIM_UDID=$UDID" >> "$GITHUB_ENV"
+
+      - name: Run iOS device journeys
+        working-directory: .
+        run: |
+          unset ConnectionStrings__QueenZoneLegacy || true
+          unset ConnectionStrings__BlobStorage || true
+          unset ConnectionStrings__SqlServerTest || true
+          APP=$(ls -d src/QueenZone.Mobile/ios/build/Build/Products/Debug-iphonesimulator/*.app | head -n 1)
+          ./scripts/run-mobile-device-smoke.sh \
+            --platform ios \
+            --suite journeys \
+            --skip-build \
+            --no-build \
+            --app "$APP"
+
+      - name: Upload iOS journeys diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: mobile-ios-journeys-${{ github.run_id }}
           path: |
             src/QueenZone.Mobile/maestro-results/
           if-no-files-found: ignore

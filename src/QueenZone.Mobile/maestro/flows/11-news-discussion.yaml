@@ -1,0 +1,33 @@
+appId: org.queenzone.mobile
+---
+# Published article 1003 already has ForumTopicId. No publish in this flow (#1073).
+- tapOn:
+    id: tab-news
+- extendedWaitUntil:
+    visible:
+      id: news-screen
+    timeout: 20000
+- tapOn:
+    id: news-story-1003
+- extendedWaitUntil:
+    visible:
+      id: news-story-screen
+    timeout: 20000
+- assertVisible: QueenZone modernisation begins
+- scrollUntilVisible:
+    element:
+      id: news-story-discussion-cta
+    direction: DOWN
+    timeout: 20000
+- tapOn:
+    id: news-story-discussion-cta
+- extendedWaitUntil:
+    visible:
+      id: forum-thread-screen
+    timeout: 20000
+- assertVisible: QueenZone modernisation begins
+- assertVisible:
+    id: forum-thread-reply
+- assertNotVisible:
+    id: news-story-screen
+- assertNotVisible: Write a reply
