@@ -4,6 +4,7 @@ import {
   font,
   foregroundStyle,
   lineLimit,
+  minimumScaleFactor,
   padding,
   truncationMode,
   widgetURL,
@@ -24,6 +25,9 @@ import type { WidgetProps } from './widgetCopy';
  * gallery snapshot never runs this JS — a missing JSC layout is a black
  * EmptyView in Release/TestFlight. The crest watermark lives in that native
  * view; Expo UI Image is SF Symbols only.
+ *
+ * JSC cannot import widgetCopy or read widgetFamily, so the small-ceiling
+ * numbers (17 / 9 / 0.65 / 6 / 2) are inlined here. Native picks 17 vs 22.
  */
 export type OnThisDayWidgetProps = WidgetProps;
 
@@ -53,32 +57,45 @@ function OnThisDayWidgetView(props: OnThisDayWidgetProps) {
         <Text
           modifiers={[
             foregroundStyle('#F2F1ED'),
-            font({ size: 13 }),
-            lineLimit(3),
+            font({ size: 17 }),
+            minimumScaleFactor(0.65),
+            lineLimit(6),
             truncationMode('tail'),
           ]}
         >
-          {`${props.formattedDate}: ${props.summary}`}
+          {props.summary}
+        </Text>
+      ) : null}
+      {showDay ? (
+        <Text modifiers={[foregroundStyle('#B8B6B0'), font({ size: 9 }), lineLimit(2), truncationMode('tail')]}>
+          {props.formattedDate}
         </Text>
       ) : null}
       {showQuote ? (
         <Text
           modifiers={[
             foregroundStyle('#B8B6B0'),
-            font({ size: 12 }),
-            lineLimit(3),
+            font({ size: 17 }),
+            minimumScaleFactor(0.65),
+            lineLimit(6),
             truncationMode('tail'),
           ]}
         >
-          {`“${props.quoteText}” — ${props.quoteWhoSaid}`}
+          {`“${props.quoteText}”`}
+        </Text>
+      ) : null}
+      {showQuote ? (
+        <Text modifiers={[foregroundStyle('#B8B6B0'), font({ size: 9 }), lineLimit(2), truncationMode('tail')]}>
+          {`— ${props.quoteWhoSaid}`}
         </Text>
       ) : null}
       {!hasDay && !hasQuote ? (
         <Text
           modifiers={[
             foregroundStyle('#B8B6B0'),
-            font({ size: 12 }),
-            lineLimit(3),
+            font({ size: 17 }),
+            minimumScaleFactor(0.65),
+            lineLimit(6),
             truncationMode('tail'),
           ]}
         >

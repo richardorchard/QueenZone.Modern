@@ -117,7 +117,7 @@ export async function syncHomeWidget(content: WidgetContent): Promise<void> {
     const { OnThisDayAndroidWidget } = require('./OnThisDayAndroidWidget') as typeof import('./OnThisDayAndroidWidget');
     await requestWidgetUpdate({
       widgetName: 'OnThisDayWidget',
-      renderWidget: () => <OnThisDayAndroidWidget {...props} />,
+      renderWidget: (info) => <OnThisDayAndroidWidget {...props} widgetWidth={info.width} />,
     });
     if (hasWidgetContent(content)) {
       await writeLastWidgetRefreshAt(Date.now());

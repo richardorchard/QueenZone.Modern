@@ -56,6 +56,20 @@ describe('applyOnThisDayNativeWidget', () => {
     assert.match(first, /crest-widget-watermark/);
     assert.match(first, /ZStack/);
     assert.match(first, /^import UIKit$/m);
+    assert.match(first, /@Environment\(\\\.widgetFamily\)/);
+    assert.match(first, /family == \.systemMedium \? 22 : 17/);
+    assert.match(first, /family == \.systemMedium \? 11 : 9/);
+    assert.match(first, /minimumScaleFactor\(0\.65\)/);
+    assert.match(first, /\.lineLimit\(6\)/);
+    assert.match(first, /\.lineLimit\(2\)/);
+    assert.match(first, /frame\(maxHeight: \.infinity, alignment: \.topLeading\)/);
+    assert.match(first, /Text\(summary\)/);
+    assert.match(first, /Text\(formattedDate\)/);
+    assert.match(first, /Text\("“\\(quoteText)”"\)/);
+    assert.match(first, /Text\("— \\(quoteWhoSaid)"\)/);
+    assert.equal(first.includes('.lineLimit(3)'), false);
+    assert.equal(first.includes('formattedDate): \\(summary)'), false);
+    assert.equal(first.includes('” — \\(quoteWhoSaid)'), false);
     assert.equal(first.includes(TAG), true);
 
     const second = applyOnThisDayNativeWidget(first);

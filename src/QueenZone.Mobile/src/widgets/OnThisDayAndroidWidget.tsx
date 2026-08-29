@@ -1,11 +1,18 @@
 'use no memo';
 import { FlexWidget, ImageWidget, OverlapWidget, TextWidget } from 'react-native-android-widget';
 import {
+  WIDGET_QUOTE_MAX_LINES,
+  WIDGET_QUOTE_SECONDARY_MAX_LINES,
   widgetActiveFace,
-  widgetDayText,
+  widgetDayPrimary,
+  widgetDaySecondary,
   widgetEmptyText,
   widgetEyebrow,
-  widgetQuoteText,
+  widgetFamilyFromWidth,
+  widgetPrimaryFontSize,
+  widgetQuotePrimary,
+  widgetQuoteSecondary,
+  widgetSecondaryPt,
   type WidgetProps,
 } from './widgetCopy';
 import { widgetDeepLinkUrl } from './widgetDeepLink';
@@ -14,7 +21,9 @@ import { widgetDeepLinkUrl } from './widgetDeepLink';
  * Props rendered into the widget's bitmap (the library rasterizes this tree, it does not
  * host live RN views). Same shape as OnThisDayWidget.ios.tsx.
  */
-export type OnThisDayAndroidWidgetProps = WidgetProps;
+export type OnThisDayAndroidWidgetProps = WidgetProps & {
+  widgetWidth?: number;
+};
 
 const gold = '#B89A4A';
 const cream = '#F2F1ED';
@@ -23,6 +32,10 @@ const cardBackground = '#181614';
 
 export function OnThisDayAndroidWidget(props: OnThisDayAndroidWidgetProps) {
   const face = widgetActiveFace(props);
+  const family = widgetFamilyFromWidth(props.widgetWidth);
+  const secondarySize = widgetSecondaryPt(family);
+  const dayPrimary = widgetDayPrimary(props);
+  const quotePrimary = widgetQuotePrimary(props);
 
   return (
     <OverlapWidget
@@ -58,7 +71,7 @@ export function OnThisDayAndroidWidget(props: OnThisDayAndroidWidgetProps) {
           height: 'match_parent',
           width: 'match_parent',
           flexDirection: 'column',
-          justifyContent: 'center',
+          justifyContent: 'flex-start',
           padding: 14,
         }}
       >
@@ -74,12 +87,52 @@ export function OnThisDayAndroidWidget(props: OnThisDayAndroidWidgetProps) {
           />
         )}
         {face === 'day' ? (
-          <TextWidget text={widgetDayText(props)} style={{ fontSize: 13, color: cream }} maxLines={3} />
+          <TextWidget
+            text={dayPrimary}
+            style={{
+              fontSize: widgetPrimaryFontSize(dayPrimary, family),
+              color: cream,
+              width: 'match_parent',
+            }}
+            maxLines={WIDGET_QUOTE_MAX_LINES}
+          />
+        ) : null}
+        {face === 'day' ? (
+          <TextWidget
+            text={widgetDaySecondary(props)}
+            style={{ fontSize: secondarySize, color: mutedCream, width: 'match_parent' }}
+            maxLines={WIDGET_QUOTE_SECONDARY_MAX_LINES}
+          />
         ) : null}
         {face === 'quote' ? (
-          <TextWidget text={widgetQuoteText(props)} style={{ fontSize: 12, color: mutedCream }} maxLines={3} />
+          <TextWidget
+            text={quotePrimary}
+            style={{
+              fontSize: widgetPrimaryFontSize(quotePrimary, family),
+              color: mutedCream,
+              width: 'match_parent',
+            }}
+            maxLines={WIDGET_QUOTE_MAX_LINES}
+          />
         ) : null}
-        {face == null ? <TextWidget text={widgetEmptyText} style={{ fontSize: 12, color: mutedCream }} /> : null}
+        {face === 'quote' ? (
+          <TextWidget
+            text={widgetQuoteSecondary(props)}
+            style={{ fontSize: secondarySize, color: mutedCream, width: 'match_parent' }}
+            maxLines={WIDGET_QUOTE_SECONDARY_MAX_LINES}
+          />
+        ) : null}
+        {face == null ? (
+          <TextWidget
+            text={widgetEmptyText}
+            style={{
+              fontSize: widgetPrimaryFontSize(widgetEmptyText, family),
+              color: mutedCream,
+              width: 'match_parent',
+            }}
+            maxLines={WIDGET_QUOTE_MAX_LINES}
+          />
+        ) : null}
       </FlexWidget>
     </OverlapWidget>
   );
