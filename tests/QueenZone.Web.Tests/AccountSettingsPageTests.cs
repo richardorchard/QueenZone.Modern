@@ -78,6 +78,8 @@ public sealed partial class AccountSettingsPageTests : IClassFixture<WebApplicat
         Assert.Contains("People I follow", body);
         Assert.Contains("Nobody", body);
         Assert.Contains("Save messaging privacy", body);
+        Assert.Contains("href=\"/following\"", body);
+        Assert.Contains(">Following</a>", body);
     }
 
     [Fact]
@@ -489,6 +491,8 @@ public sealed partial class AccountSettingsPageTests : IClassFixture<WebApplicat
 
         Assert.Contains("href=\"/account/settings\"", body);
         Assert.Contains(">Settings</a>", body);
+        Assert.Contains("href=\"/following\"", body);
+        Assert.Contains(">Following</a>", body);
         Assert.Contains("qz-avatar", body);
     }
 

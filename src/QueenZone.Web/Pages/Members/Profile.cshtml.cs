@@ -12,7 +12,7 @@ public sealed class ProfileModel(
     PrivateMessageService privateMessageService,
     MemberFollowService memberFollowService) : PageModel
 {
-    public const int ActivityPageSize = 20;
+    public const int ActivityPageSize = MemberPublicActivityPresentation.PageSize;
 
     public const string StatusMessageKey = "MemberProfileStatus";
 
@@ -81,7 +81,7 @@ public sealed class ProfileModel(
             return NotFound();
         }
 
-        Activity = activityPage.Items.Select(ToViewModel).ToList();
+        Activity = activityPage.Items.Select(MemberPublicActivityPresentation.ToViewModel).ToList();
         Pagination = ArchivePagination.BuildViewModel(
             "Member activity pagination",
             PageNumber,
@@ -186,36 +186,6 @@ public sealed class ProfileModel(
         return RedirectToPage(new { memberId });
     }
 
-    private static MemberActivityViewModel ToViewModel(MemberPublicActivityItem item)
-    {
-        var summary = NewsArticleContent.ToPlainText(item.Summary ?? string.Empty);
-        if (summary.Length > 220)
-        {
-            summary = summary[..217].TrimEnd() + "...";
-        }
-
-        return new MemberActivityViewModel(
-            item.Type,
-            item.Title,
-            summary,
-            item.PublishedAt,
-            GetHref(item));
-    }
-
-    private static string GetHref(MemberPublicActivityItem item) => item.Type switch
-    {
-        MemberPublicActivityType.ForumPost when item.ParentId is int topicId =>
-            $"{ForumRoutes.GetTopicCanonicalPath(topicId, item.Slug ?? item.Title)}#post-{item.ContentId}",
-        MemberPublicActivityType.Article when !string.IsNullOrWhiteSpace(item.Slug) =>
-            ArticlesRoutes.GetCommunityArticleDetailPath(item.Slug),
-        MemberPublicActivityType.News when item.ContentId is int newsId =>
-            NewsRoutes.GetNewsDetailPath(newsId, item.Title, item.Slug),
-        MemberPublicActivityType.Photo when !string.IsNullOrWhiteSpace(item.Category) =>
-            $"/photography?category={Uri.EscapeDataString(item.Category)}",
-        MemberPublicActivityType.Photo => "/photography",
-        _ => "/",
-    };
-
     private async Task<Guid?> GetCurrentMemberIdAsync()
     {
         var directId = ForumMember.GetMemberId(User);
@@ -228,10 +198,3 @@ public sealed class ProfileModel(
         return memberAuth.Succeeded ? ForumMember.GetMemberId(memberAuth.Principal) : null;
     }
 }
-
-public sealed record MemberActivityViewModel(
-    string Type,
-    string Title,
-    string Summary,
-    DateTimeOffset PublishedAt,
-    string Href);

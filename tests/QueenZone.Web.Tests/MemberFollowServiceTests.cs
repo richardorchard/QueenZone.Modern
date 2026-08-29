@@ -49,6 +49,17 @@ public sealed class MemberFollowServiceTests
         Assert.Contains("not found", followDeleted.ErrorMessage, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task ListFollowedIds_ReturnsFollowedMembers()
+    {
+        var (service, _, _, alice, bob) = CreateSystem();
+        Assert.Empty(await service.ListFollowedIdsAsync(alice.Id));
+
+        Assert.True((await service.FollowAsync(alice.Id, bob.Id)).Succeeded);
+        Assert.Equal([bob.Id], await service.ListFollowedIdsAsync(alice.Id));
+        Assert.Empty(await service.ListFollowedIdsAsync(bob.Id));
+    }
+
     private static (
         MemberFollowService Service,
         IMemberAccountRepository Members,

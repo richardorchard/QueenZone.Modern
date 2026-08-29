@@ -186,6 +186,7 @@
             <span class="qz-masthead__unread" aria-label="@unreadMessageCount unread conversations">@unreadMessageCount</span>
           }
         </a>
+        <a class="qz-masthead__signin" href="/following" aria-current="@(IsActive("/following") ? "page" : null)">Following</a>
         <a class="qz-masthead__signin" href="/account/settings" aria-current="@(IsActive("/account/settings") ? "page" : null)">Settings</a>
         <partial name="_MemberSignOut" />
       }
@@ -231,6 +232,7 @@
               <span class="qz-masthead__unread" aria-label="@unreadMessageCount unread conversations">@unreadMessageCount</span>
             }
           </a>
+          <a class="qz-masthead__signin qz-masthead__signin--mobile" href="/following" aria-current="@(IsActive("/following") ? "page" : null)">Following</a>
           <a class="qz-masthead__signin qz-masthead__signin--mobile" href="/account/settings" aria-current="@(IsActive("/account/settings") ? "page" : null)">Settings</a>
           <partial name="_MemberSignOut" view-data='@new ViewDataDictionary(ViewData) { { "SignOutExtraClass", "qz-masthead__signin--mobile" } }' />
         }
