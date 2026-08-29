@@ -25,7 +25,7 @@ export type TabName = PublicTabName | SignedInOnlyTabName;
 export const publicScreenNames = [
   'Home',
   'ArchiveHub',
-  'Stories',
+  'Articles',
   'AboutArchive',
   'Biography',
   'BiographyChapter',

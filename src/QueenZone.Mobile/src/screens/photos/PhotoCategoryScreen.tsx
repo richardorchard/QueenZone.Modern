@@ -28,11 +28,9 @@ import {
   photoCdnSource,
   photoCountLabel,
   photoRangeLabel,
-  photoSizeFromPath,
   photoSizePresets,
   photoThumbMeta,
   photoViewerParams,
-  resolvedPhotoSize,
   type PhotoSizeQuery,
 } from './photoGalleryMeta';
 
@@ -91,16 +89,6 @@ export function PhotoCategoryScreen({ navigation, route }: Props) {
   useLayoutEffect(() => {
     navigation.setOptions({ title: category?.name ?? name ?? 'Collection' });
   }, [category?.name, name, navigation]);
-
-  useEffect(() => {
-    if (!size || paged.loading || paged.items.length === 0) {
-      return;
-    }
-
-    if (resolvedPhotoSize(size, paged.items[0].detailPath) !== size) {
-      setSize('');
-    }
-  }, [size, paged.loading, paged.items]);
 
   const retry = useCallback(() => {
     setCategoryReloadToken((n) => n + 1);
@@ -189,10 +177,7 @@ export function PhotoCategoryScreen({ navigation, route }: Props) {
             accessibilityRole="button"
             accessibilityLabel={item.title}
             onPress={() =>
-              navigation.navigate(
-                'PhotoViewer',
-                photoViewerParams(item.categorySlug, item.picId, photoSizeFromPath(item.detailPath) ?? size),
-              )
+              navigation.navigate('PhotoViewer', photoViewerParams(item.categorySlug, item.picId, size))
             }
             style={{ width: tile, marginBottom: GAP }}
           >

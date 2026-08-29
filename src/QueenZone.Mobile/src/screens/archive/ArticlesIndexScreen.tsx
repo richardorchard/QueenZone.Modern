@@ -6,9 +6,9 @@ import { useTheme } from '../../theme';
 import { DestinationRow } from '../../ui/DestinationRow';
 import { PageTitleBlock } from '../../ui/PageTitleBlock';
 
-type Props = NativeStackScreenProps<ArchiveStackParamList, 'Stories'>;
+type Props = NativeStackScreenProps<ArchiveStackParamList, 'Articles'>;
 
-const stories = [
+const articles = [
   {
     id: 'lead',
     title: homeLead.title,
@@ -20,15 +20,15 @@ const stories = [
   ...featuredStories,
 ];
 
-export function StoriesIndexScreen({ navigation }: Props) {
+export function ArticlesIndexScreen({ navigation }: Props) {
   const { c } = useTheme();
   return (
     <FlatList
       style={{ flex: 1, backgroundColor: c.surfacePage }}
-      data={stories}
+      data={articles}
       keyExtractor={(item) => item.id}
       ListHeaderComponent={
-        <PageTitleBlock eyebrow="Long-form" title="Stories" subtitle="104 features · Editorial" />
+        <PageTitleBlock eyebrow="Long-form" title="Articles" subtitle="104 features · Editorial" />
       }
       renderItem={({ item }) => (
         <DestinationRow
