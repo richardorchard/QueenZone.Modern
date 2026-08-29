@@ -1,6 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Text.RegularExpressions;
-using System.Web;
 
 namespace QueenZone.Data;
 
@@ -192,7 +191,7 @@ public static partial class MemberSocialLinkUrl
         if (segments.Count == 1
             && segments[0].Equals("profile.php", StringComparison.OrdinalIgnoreCase))
         {
-            var id = HttpUtility.ParseQueryString(uri.Query).Get("id");
+            var id = GetQueryValue(uri, "id");
             if (string.IsNullOrWhiteSpace(id) || !FacebookProfileId().IsMatch(id))
             {
                 return false;
@@ -381,6 +380,29 @@ public static partial class MemberSocialLinkUrl
 
     private static string StripLeadingAt(string value) =>
         value.StartsWith('@') ? value[1..] : value;
+
+    private static string? GetQueryValue(Uri uri, string name)
+    {
+        var query = uri.Query.TrimStart('?');
+        if (query.Length == 0)
+        {
+            return null;
+        }
+
+        foreach (var part in query.Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var separator = part.IndexOf('=');
+            var key = Uri.UnescapeDataString(separator < 0 ? part : part[..separator]);
+            if (!key.Equals(name, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            return separator < 0 ? string.Empty : Uri.UnescapeDataString(part[(separator + 1)..].Replace('+', ' '));
+        }
+
+        return null;
+    }
 
     [GeneratedRegex("^[A-Za-z0-9_]{1,15}$")]
     private static partial Regex XHandle();

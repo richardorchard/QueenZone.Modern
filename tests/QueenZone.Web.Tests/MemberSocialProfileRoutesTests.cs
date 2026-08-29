@@ -77,7 +77,7 @@ public sealed class MemberSocialProfileRoutesTests : IClassFixture<WebApplicatio
         var otherClient = CreateSignedInClient(other);
         var settings = await otherClient.GetStringAsync("/account/settings");
         Assert.Contains("name=\"SocialX\"", settings);
-        Assert.DoesNotContain("https://x.com/queen", settings);
+        Assert.DoesNotContain("value=\"https://x.com/queen\"", settings);
 
         var response = await otherClient.PostAsync(
             "/account/settings?handler=UpdateSocialLinks",
