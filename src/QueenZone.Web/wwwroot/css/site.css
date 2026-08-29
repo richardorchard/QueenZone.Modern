@@ -4994,8 +4994,31 @@ a.qz-forum-post__author-link:focus-visible {
 }
 
 @media (max-width: 640px) {
+  header.qz-masthead .qz-masthead__inner {
+    gap: var(--space-2);
+    flex-wrap: nowrap;
+  }
+
+  header.qz-masthead .qz-brand {
+    min-width: 0;
+    gap: var(--space-1);
+  }
+
   header.qz-masthead .qz-brand > span {
-    display: none;
+    font-size: clamp(0.625rem, 2.6vw, 0.875rem);
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+  }
+
+  header.qz-masthead .qz-icon-button,
+  header.qz-masthead .qz-menu-button {
+    width: 2.25rem;
+    height: 2.25rem;
+  }
+
+  header.qz-masthead .qz-masthead__actions {
+    flex: 0 0 auto;
+    gap: var(--space-1);
   }
 }
 
