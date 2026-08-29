@@ -44,7 +44,7 @@ public sealed class SampleGalleryImageSeedHostedService(
                     var height = item.PictureHeight >= NewsArticleImageProcessor.MinCropHeight
                         ? item.PictureHeight
                         : 400;
-                    await using var jpeg = await CreateJpegAsync(width, height, cancellationToken);
+                    await using var jpeg = await CreateJpegAsync(width, height);
                     await galleryPhotoBlobService.UploadAsync(
                         container,
                         blobName,
@@ -62,11 +62,31 @@ public sealed class SampleGalleryImageSeedHostedService(
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
-    private static async Task<MemoryStream> CreateJpegAsync(int width, int height, CancellationToken cancellationToken)
+    private static async Task<MemoryStream> CreateJpegAsync(int width, int height)
     {
         using var image = new Image<Rgba32>(width, height);
+        image.ProcessPixelRows(accessor =>
+        {
+            for (var y = 0; y < height; y++)
+            {
+                var row = accessor.GetRowSpan(y);
+                for (var x = 0; x < width; x++)
+                {
+                    var left = x < width / 2;
+                    var top = y < height / 2;
+                    row[x] = (left, top) switch
+                    {
+                        (true, true) => new Rgba32(200, 40, 40),
+                        (false, true) => new Rgba32(40, 80, 200),
+                        (true, false) => new Rgba32(40, 180, 80),
+                        _ => new Rgba32(220, 180, 40),
+                    };
+                }
+            }
+        });
+
         var stream = new MemoryStream();
-        await image.SaveAsync(stream, new JpegEncoder(), cancellationToken);
+        await image.SaveAsync(stream, new JpegEncoder());
         stream.Position = 0;
         return stream;
     }
