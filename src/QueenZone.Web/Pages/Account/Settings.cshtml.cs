@@ -31,6 +31,36 @@ public sealed class SettingsModel(MemberAccountService memberAccountService) : P
     [BindProperty]
     public bool AdoptLegacyDisplayName { get; set; } = true;
 
+    [BindProperty]
+    [StringLength(MemberSocialLinkUrl.MaxInputLength)]
+    [Display(Name = "X")]
+    public string? SocialX { get; set; }
+
+    [BindProperty]
+    [StringLength(MemberSocialLinkUrl.MaxInputLength)]
+    [Display(Name = "Instagram")]
+    public string? SocialInstagram { get; set; }
+
+    [BindProperty]
+    [StringLength(MemberSocialLinkUrl.MaxInputLength)]
+    [Display(Name = "Facebook")]
+    public string? SocialFacebook { get; set; }
+
+    [BindProperty]
+    [StringLength(MemberSocialLinkUrl.MaxInputLength)]
+    [Display(Name = "YouTube")]
+    public string? SocialYouTube { get; set; }
+
+    [BindProperty]
+    [StringLength(MemberSocialLinkUrl.MaxInputLength)]
+    [Display(Name = "TikTok")]
+    public string? SocialTikTok { get; set; }
+
+    [BindProperty]
+    [StringLength(MemberSocialLinkUrl.MaxInputLength)]
+    [Display(Name = "Bluesky")]
+    public string? SocialBluesky { get; set; }
+
     /// <summary>
     /// Legacy USERS_T id chosen when claiming. Required when one or more free matches exist.
     /// </summary>
@@ -139,6 +169,48 @@ public sealed class SettingsModel(MemberAccountService memberAccountService) : P
         }
 
         TempData[SuccessMessageKey] = "Messaging privacy updated.";
+        return RedirectToPage();
+    }
+
+    public async Task<IActionResult> OnPostUpdateSocialLinksAsync(CancellationToken cancellationToken)
+    {
+        var memberId = await GetCurrentMemberIdAsync();
+        if (memberId is null)
+        {
+            return Redirect("/account/login");
+        }
+
+        var account = await memberAccountService.FindByIdAsync(memberId.Value, cancellationToken);
+        if (account is null)
+        {
+            return Redirect("/account/login");
+        }
+
+        var submitted = CaptureSocialInputs();
+        await PopulatePageAsync(account, cancellationToken);
+        ApplySocialInputs(submitted);
+        ViewData["Title"] = "Account settings";
+
+        var result = await memberAccountService.UpdateSocialLinksAsync(
+            memberId.Value,
+            submitted,
+            cancellationToken);
+        if (!result.Succeeded)
+        {
+            if (!string.IsNullOrWhiteSpace(result.Error))
+            {
+                ModelState.AddModelError(string.Empty, result.Error);
+            }
+
+            foreach (var fieldError in result.FieldErrors)
+            {
+                ModelState.AddModelError(SocialPropertyName(fieldError.Channel), fieldError.Message);
+            }
+
+            return Page();
+        }
+
+        TempData[SuccessMessageKey] = "Social profiles updated.";
         return RedirectToPage();
     }
 
@@ -294,7 +366,46 @@ public sealed class SettingsModel(MemberAccountService memberAccountService) : P
         LinkedProviders = await memberAccountService.ListExternalProvidersAsync(account.Id, cancellationToken);
         LegacyLink = await memberAccountService.GetLegacyLinkStateAsync(account, cancellationToken);
         ScheduledDeletionAt = account.DeletionRequestedAt?.AddDays(MemberAccountDeletionPolicy.RetentionDays);
+        ApplySocialInputs((await memberAccountService.ListSocialLinksAsync(account.Id, cancellationToken))
+            .ToDictionary(link => link.Channel, link => (string?)link.Url));
     }
+
+    private IReadOnlyDictionary<MemberSocialChannel, string?> CaptureSocialInputs() =>
+        new Dictionary<MemberSocialChannel, string?>
+        {
+            [MemberSocialChannel.X] = SocialX,
+            [MemberSocialChannel.Instagram] = SocialInstagram,
+            [MemberSocialChannel.Facebook] = SocialFacebook,
+            [MemberSocialChannel.YouTube] = SocialYouTube,
+            [MemberSocialChannel.TikTok] = SocialTikTok,
+            [MemberSocialChannel.Bluesky] = SocialBluesky,
+        };
+
+    private void ApplySocialInputs(IReadOnlyDictionary<MemberSocialChannel, string?> inputs)
+    {
+        SocialX = ValueOrNull(inputs, MemberSocialChannel.X);
+        SocialInstagram = ValueOrNull(inputs, MemberSocialChannel.Instagram);
+        SocialFacebook = ValueOrNull(inputs, MemberSocialChannel.Facebook);
+        SocialYouTube = ValueOrNull(inputs, MemberSocialChannel.YouTube);
+        SocialTikTok = ValueOrNull(inputs, MemberSocialChannel.TikTok);
+        SocialBluesky = ValueOrNull(inputs, MemberSocialChannel.Bluesky);
+    }
+
+    private static string? ValueOrNull(
+        IReadOnlyDictionary<MemberSocialChannel, string?> inputs,
+        MemberSocialChannel channel) =>
+        inputs.TryGetValue(channel, out var value) ? value : null;
+
+    private static string SocialPropertyName(MemberSocialChannel channel) => channel switch
+    {
+        MemberSocialChannel.X => nameof(SocialX),
+        MemberSocialChannel.Instagram => nameof(SocialInstagram),
+        MemberSocialChannel.Facebook => nameof(SocialFacebook),
+        MemberSocialChannel.YouTube => nameof(SocialYouTube),
+        MemberSocialChannel.TikTok => nameof(SocialTikTok),
+        MemberSocialChannel.Bluesky => nameof(SocialBluesky),
+        _ => nameof(SocialX),
+    };
 
     private async Task<Data.Entities.MemberAccount?> LoadCurrentAccountAsync(CancellationToken cancellationToken)
     {

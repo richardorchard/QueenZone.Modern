@@ -16,6 +16,18 @@
         <h2>@Model.Member.DisplayName</h2>
         <p class="qz-meta">Member since @Model.Member.CreatedAt.ToString("MMMM yyyy")</p>
 
+        @if (Model.SocialLinks.Count > 0)
+        {
+          <ul class="qz-member-profile__socials">
+            @foreach (var link in Model.SocialLinks)
+            {
+              <li>
+                <a href="@link.Url" rel="noopener noreferrer me" target="_blank">@link.Label</a>
+              </li>
+            }
+          </ul>
+        }
+
         @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
         {
           <p class="qz-account-notice qz-account-notice--success" role="status">@Model.StatusMessage</p>

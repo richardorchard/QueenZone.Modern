@@ -402,6 +402,58 @@ public sealed class MemberAccountService(
         return MemberAccountResult.Success(updated);
     }
 
+    public Task<IReadOnlyList<MemberSocialLink>> ListSocialLinksAsync(
+        Guid memberId,
+        CancellationToken cancellationToken = default) =>
+        memberAccountRepository.ListSocialLinksAsync(memberId, cancellationToken);
+
+    /// <summary>
+    /// Validates each channel independently. Empty input removes that row. Invalid input
+    /// is a field error and leaves every existing row untouched.
+    /// </summary>
+    public async Task<MemberSocialLinksUpdateResult> UpdateSocialLinksAsync(
+        Guid memberId,
+        IReadOnlyDictionary<MemberSocialChannel, string?> inputs,
+        CancellationToken cancellationToken = default)
+    {
+        var account = await memberAccountRepository.FindByIdAsync(memberId, cancellationToken);
+        if (account is null)
+        {
+            return MemberSocialLinksUpdateResult.Failure("Account not found.");
+        }
+
+        if (account.DeletionRequestedAt is not null)
+        {
+            return MemberSocialLinksUpdateResult.Failure(PendingDeletionEditError);
+        }
+
+        var fieldErrors = new List<MemberSocialLinkFieldError>();
+        var accepted = new List<MemberSocialLink>();
+        foreach (var channel in MemberSocialChannels.All)
+        {
+            inputs.TryGetValue(channel, out var raw);
+            if (!MemberSocialLinkUrl.TryNormalize(channel, raw, out var canonicalUrl, out var error))
+            {
+                fieldErrors.Add(new MemberSocialLinkFieldError(channel, error));
+                continue;
+            }
+
+            if (!string.IsNullOrWhiteSpace(canonicalUrl))
+            {
+                accepted.Add(new MemberSocialLink(channel, canonicalUrl));
+            }
+        }
+
+        if (fieldErrors.Count > 0)
+        {
+            var existing = await memberAccountRepository.ListSocialLinksAsync(memberId, cancellationToken);
+            return MemberSocialLinksUpdateResult.Invalid(existing, fieldErrors);
+        }
+
+        await memberAccountRepository.ReplaceSocialLinksAsync(memberId, accepted, cancellationToken);
+        return MemberSocialLinksUpdateResult.Success(accepted);
+    }
+
     /// <summary>
     /// Validates and processes an avatar upload, stores full + thumbnail WebP blobs, and
     /// updates <see cref="MemberAccount.AvatarUrl"/>. On DB failure the new blobs are deleted
@@ -671,6 +723,26 @@ public sealed record MemberAccountResult(bool Succeeded, MemberAccount? Account,
     public static MemberAccountResult Success(MemberAccount account) => new(true, account, null);
 
     public static MemberAccountResult Failure(string error) => new(false, null, error);
+}
+
+public sealed record MemberSocialLinkFieldError(MemberSocialChannel Channel, string Message);
+
+public sealed record MemberSocialLinksUpdateResult(
+    bool Succeeded,
+    string? Error,
+    IReadOnlyList<MemberSocialLink> Links,
+    IReadOnlyList<MemberSocialLinkFieldError> FieldErrors)
+{
+    public static MemberSocialLinksUpdateResult Success(IReadOnlyList<MemberSocialLink> links) =>
+        new(true, null, links, []);
+
+    public static MemberSocialLinksUpdateResult Failure(string error) =>
+        new(false, error, [], []);
+
+    public static MemberSocialLinksUpdateResult Invalid(
+        IReadOnlyList<MemberSocialLink> existing,
+        IReadOnlyList<MemberSocialLinkFieldError> fieldErrors) =>
+        new(false, null, existing, fieldErrors);
 }
 
 public enum LegacyAccountLinkKind

@@ -227,5 +227,16 @@ public sealed class MemberAccountDeletionHostedServiceTests
             DateTime cancelledAt,
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
+
+        public Task<IReadOnlyList<MemberSocialLink>> ListSocialLinksAsync(
+            Guid memberId,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task ReplaceSocialLinksAsync(
+            Guid memberId,
+            IReadOnlyList<MemberSocialLink> links,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 }

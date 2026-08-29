@@ -80,6 +80,163 @@ public sealed partial class AccountSettingsPageTests : IClassFixture<WebApplicat
         Assert.Contains("Save messaging privacy", body);
         Assert.Contains("href=\"/following\"", body);
         Assert.Contains(">Following</a>", body);
+        Assert.Contains("Social profiles", body);
+        Assert.Contains("Save social profiles", body);
+        Assert.Contains("name=\"SocialX\"", body);
+        Assert.Contains("name=\"SocialBluesky\"", body);
+    }
+
+    [Fact]
+    public async Task PostUpdateSocialLinks_SavesHandleAndUrl_AndReopensPrefills()
+    {
+        var client = await CreateSignedInMemberClientAsync(
+            email: "settings-socials@example.com",
+            displayName: "Social Fan",
+            subject: "google-settings-socials",
+            options: new WebApplicationFactoryClientOptions
+            {
+                HandleCookies = true,
+                AllowAutoRedirect = false,
+            });
+
+        var formPage = await client.GetStringAsync("/account/settings");
+        var response = await client.PostAsync(
+            "/account/settings?handler=UpdateSocialLinks",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(formPage),
+                ["SocialX"] = "@queen",
+                ["SocialYouTube"] = "https://www.youtube.com/@QueenOfficial",
+            }));
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        var updated = await client.GetStringAsync("/account/settings");
+        Assert.Contains("Social profiles updated.", updated);
+        Assert.Contains("value=\"https://x.com/queen\"", updated);
+        Assert.Contains("value=\"https://www.youtube.com/@QueenOfficial\"", updated);
+
+        using var scope = factory.Services.CreateScope();
+        var member = await scope.ServiceProvider
+            .GetRequiredService<IMemberAccountRepository>()
+            .FindByEmailAsync("settings-socials@example.com");
+        var links = await scope.ServiceProvider
+            .GetRequiredService<IMemberAccountRepository>()
+            .ListSocialLinksAsync(member!.Id);
+        Assert.Equal(
+            [
+                new MemberSocialLink(MemberSocialChannel.X, "https://x.com/queen"),
+                new MemberSocialLink(MemberSocialChannel.YouTube, "https://www.youtube.com/@QueenOfficial"),
+            ],
+            links);
+
+        var profile = await client.GetStringAsync($"/members/{member.Id}");
+        Assert.Contains("https://x.com/queen", profile);
+        Assert.Contains("https://www.youtube.com/@QueenOfficial", profile);
+        Assert.DoesNotContain("instagram.com", profile);
+    }
+
+    [Fact]
+    public async Task PostUpdateSocialLinks_FieldError_DoesNotWipeOtherChannels()
+    {
+        var client = await CreateSignedInMemberClientAsync(
+            email: "settings-socials-error@example.com",
+            displayName: "Social Error",
+            subject: "google-settings-socials-error",
+            options: new WebApplicationFactoryClientOptions
+            {
+                HandleCookies = true,
+                AllowAutoRedirect = false,
+            });
+
+        var formPage = await client.GetStringAsync("/account/settings");
+        var token = ExtractAntiforgeryToken(formPage);
+        var saved = await client.PostAsync(
+            "/account/settings?handler=UpdateSocialLinks",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = token,
+                ["SocialX"] = "@queen",
+                ["SocialInstagram"] = "queenofficial",
+            }));
+        Assert.Equal(HttpStatusCode.Redirect, saved.StatusCode);
+
+        var retryPage = await client.GetStringAsync("/account/settings");
+        var rejected = await client.PostAsync(
+            "/account/settings?handler=UpdateSocialLinks",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(retryPage),
+                ["SocialX"] = "@queen",
+                ["SocialInstagram"] = "queenofficial",
+                ["SocialYouTube"] = "javascript:alert(1)",
+            }));
+
+        Assert.Equal(HttpStatusCode.OK, rejected.StatusCode);
+        var body = await rejected.Content.ReadAsStringAsync();
+        Assert.Contains(MemberSocialLinkUrl.InvalidValueMessage, body);
+        Assert.Contains("javascript:alert(1)", body);
+
+        using var scope = factory.Services.CreateScope();
+        var member = await scope.ServiceProvider
+            .GetRequiredService<IMemberAccountRepository>()
+            .FindByEmailAsync("settings-socials-error@example.com");
+        var links = await scope.ServiceProvider
+            .GetRequiredService<IMemberAccountRepository>()
+            .ListSocialLinksAsync(member!.Id);
+        Assert.Equal(
+            [
+                new MemberSocialLink(MemberSocialChannel.X, "https://x.com/queen"),
+                new MemberSocialLink(MemberSocialChannel.Instagram, "https://www.instagram.com/queenofficial"),
+            ],
+            links);
+        Assert.DoesNotContain(links, link => link.Channel == MemberSocialChannel.YouTube);
+    }
+
+    [Fact]
+    public async Task PostUpdateSocialLinks_ClearRemovesRowFromProfile()
+    {
+        var client = await CreateSignedInMemberClientAsync(
+            email: "settings-socials-clear@example.com",
+            displayName: "Social Clear",
+            subject: "google-settings-socials-clear",
+            options: new WebApplicationFactoryClientOptions
+            {
+                HandleCookies = true,
+                AllowAutoRedirect = false,
+            });
+
+        var formPage = await client.GetStringAsync("/account/settings");
+        await client.PostAsync(
+            "/account/settings?handler=UpdateSocialLinks",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(formPage),
+                ["SocialX"] = "@queen",
+            }));
+
+        using var scope = factory.Services.CreateScope();
+        var member = await scope.ServiceProvider
+            .GetRequiredService<IMemberAccountRepository>()
+            .FindByEmailAsync("settings-socials-clear@example.com");
+        var before = await client.GetStringAsync($"/members/{member!.Id}");
+        Assert.Contains("https://x.com/queen", before);
+
+        var retryPage = await client.GetStringAsync("/account/settings");
+        await client.PostAsync(
+            "/account/settings?handler=UpdateSocialLinks",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(retryPage),
+                ["SocialX"] = string.Empty,
+            }));
+
+        var after = await client.GetStringAsync($"/members/{member.Id}");
+        Assert.DoesNotContain("https://x.com/queen", after);
+        Assert.DoesNotContain("qz-member-profile__socials", after);
+        var links = await scope.ServiceProvider
+            .GetRequiredService<IMemberAccountRepository>()
+            .ListSocialLinksAsync(member.Id);
+        Assert.Empty(links);
     }
 
     [Fact]

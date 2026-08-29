@@ -85,6 +85,8 @@ public sealed class QueenZoneDbContext : DbContext
 
     public DbSet<MemberFollowEntity> MemberFollows => Set<MemberFollowEntity>();
 
+    public DbSet<MemberSocialLinkEntity> MemberSocialLinks => Set<MemberSocialLinkEntity>();
+
     public DbSet<SearchDocumentEntity> SearchDocuments => Set<SearchDocumentEntity>();
 
     public DbSet<SearchReindexLeaseEntity> SearchReindexLeases => Set<SearchReindexLeaseEntity>();
@@ -1187,6 +1189,20 @@ public sealed class QueenZoneDbContext : DbContext
             entity.HasOne(watch => watch.MemberAccount)
                 .WithMany()
                 .HasForeignKey(watch => watch.MemberAccountId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<MemberSocialLinkEntity>(entity =>
+        {
+            entity.ToTable("MemberSocialLinks");
+            entity.HasKey(row => new { row.MemberId, row.Channel });
+
+            entity.Property(row => row.Channel).HasMaxLength(20).IsRequired();
+            entity.Property(row => row.Url).HasMaxLength(MemberSocialLinkUrl.MaxUrlLength).IsRequired();
+
+            entity.HasOne(row => row.Member)
+                .WithMany()
+                .HasForeignKey(row => row.MemberId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }

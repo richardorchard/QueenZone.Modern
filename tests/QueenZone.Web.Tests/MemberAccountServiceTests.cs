@@ -609,6 +609,70 @@ public sealed class MemberAccountServiceTests
     }
 
     [Fact]
+    public async Task UpdateSocialLinksAsync_FieldError_DoesNotPersistAnyChannel()
+    {
+        var repository = new InMemoryMemberAccountRepository();
+        var service = CreateService(memberAccountRepository: repository);
+        var registered = await service.RegisterAsync("social-service@example.com", "S3curePass!", "Social Service");
+
+        var saved = await service.UpdateSocialLinksAsync(
+            registered.Account!.Id,
+            new Dictionary<MemberSocialChannel, string?>
+            {
+                [MemberSocialChannel.X] = "@queen",
+                [MemberSocialChannel.Instagram] = "queenofficial",
+            });
+        Assert.True(saved.Succeeded);
+
+        var rejected = await service.UpdateSocialLinksAsync(
+            registered.Account.Id,
+            new Dictionary<MemberSocialChannel, string?>
+            {
+                [MemberSocialChannel.X] = "@queen",
+                [MemberSocialChannel.Instagram] = "queenofficial",
+                [MemberSocialChannel.YouTube] = "javascript:alert(1)",
+            });
+
+        Assert.False(rejected.Succeeded);
+        Assert.Equal(
+            [new MemberSocialLinkFieldError(MemberSocialChannel.YouTube, MemberSocialLinkUrl.InvalidValueMessage)],
+            rejected.FieldErrors);
+        Assert.Equal(
+            [
+                new MemberSocialLink(MemberSocialChannel.X, "https://x.com/queen"),
+                new MemberSocialLink(MemberSocialChannel.Instagram, "https://www.instagram.com/queenofficial"),
+            ],
+            await repository.ListSocialLinksAsync(registered.Account.Id));
+    }
+
+    [Fact]
+    public async Task UpdateSocialLinksAsync_PendingDeletion_RejectsAndKeepsRowsUntilAnonymise()
+    {
+        var repository = new InMemoryMemberAccountRepository();
+        var service = CreateService(memberAccountRepository: repository);
+        var registered = await service.RegisterAsync("social-delete@example.com", "S3curePass!", "Social Delete");
+        await service.UpdateSocialLinksAsync(
+            registered.Account!.Id,
+            new Dictionary<MemberSocialChannel, string?>
+            {
+                [MemberSocialChannel.X] = "queen",
+            });
+
+        var deleted = await service.RequestDeletionAsync(registered.Account.Id);
+        var update = await service.UpdateSocialLinksAsync(
+            registered.Account.Id,
+            new Dictionary<MemberSocialChannel, string?>
+            {
+                [MemberSocialChannel.X] = "stillhere",
+            });
+
+        Assert.True(deleted.Succeeded);
+        Assert.False(update.Succeeded);
+        Assert.Equal(MemberAccountService.PendingDeletionEditError, update.Error);
+        Assert.Empty(await repository.ListSocialLinksAsync(registered.Account.Id));
+    }
+
+    [Fact]
     public async Task RequestDeletionAsync_AnonymisesImmediately_AndCancellationRestoresIdentity()
     {
         var backend = new InMemoryBlobStorageBackend();
@@ -913,5 +977,16 @@ public sealed class MemberAccountServiceTests
             DateTime purgedAt,
             CancellationToken cancellationToken = default) =>
             inner.PurgeDeletedAccountsAsync(purgeBefore, purgedAt, cancellationToken);
+
+        public Task<IReadOnlyList<MemberSocialLink>> ListSocialLinksAsync(
+            Guid memberId,
+            CancellationToken cancellationToken = default) =>
+            inner.ListSocialLinksAsync(memberId, cancellationToken);
+
+        public Task ReplaceSocialLinksAsync(
+            Guid memberId,
+            IReadOnlyList<MemberSocialLink> links,
+            CancellationToken cancellationToken = default) =>
+            inner.ReplaceSocialLinksAsync(memberId, links, cancellationToken);
     }
 }
