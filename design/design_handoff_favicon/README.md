@@ -1,9 +1,9 @@
 # Queenzone Favicon — Implementation Handover
 
-Everything needed to ship the Queenzone site favicon. Drop these files on the server and paste the `<head>` snippet.
+Everything needed to ship the Queenzone site favicon. The website shares the native app's primary Cinzel “Q” mark so browser tabs, saved shortcuts and installed experiences use one identity.
 
 Files in this folder:
-- `favicon.svg` — scalable master (modern browsers; auto-crisp at any size)
+- `favicon.ico` — multi-resolution 16/32/48px browser icon
 - `favicon-32.png` — 32×32 (standard browser tab)
 - `favicon-16.png` — 16×16 (small tab / bookmark bar)
 - `apple-touch-icon.png` — 180×180 (iOS home-screen, also used by many PWA installs)
@@ -14,11 +14,11 @@ Files in this folder:
 
 ## 1. The mark
 
-An **antique-gold "Q" monogram on a rich-black rounded tile**, with a faint gold inner keyline. The full Queen crest is too intricate to read at 16px, so the favicon distils the brand to its initial — consistent with the design system's ~90% monochrome / gold-as-rarest-accent rule.
+A **pure-white Cinzel “Q” monogram on rich black `#111111`**, identical to the native app icon. The square source has no pre-rounded corners; browsers and operating systems apply their own masks where appropriate. The full Queen crest remains too intricate to read reliably at favicon sizes.
 
-- Tile: Rich Black `#111111` (`--qz-black`), 22%-radius rounded square.
-- Mark + keyline: Antique Gold `#B89A4A` (`--qz-gold`), with a subtle vertical gold gradient (`#D9BE6E → #B89A4A → #9C8038`) for a metallic read at large sizes.
-- Safe area: the Q sits within ~70% of the tile; the rest is padding so it survives platform masking.
+- Background: Rich Black `#111111` (`--qz-black`).
+- Mark: pure white, with no gradient, keyline, bevel or shadow.
+- Safe area and placement match the native app icon exactly.
 
 ---
 
@@ -27,13 +27,13 @@ An **antique-gold "Q" monogram on a rich-black rounded tile**, with a faint gold
 Place the five icon files at your web root (or a `/assets/` path) and add to `<head>`:
 
 ```html
-<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 ```
 
-Browsers that support SVG favicons use `favicon.svg`; the PNGs are the fallback. iOS/iPadOS use `apple-touch-icon.png`. Adjust the `href` paths to wherever you host the files.
+Browsers can use the multi-resolution ICO or explicit PNGs. iOS/iPadOS use `apple-touch-icon.png`. Adjust the `href` paths to wherever you host the files.
 
 ### Optional — PWA / Android install
 If the site has a web app manifest, reference the large icon:
@@ -49,14 +49,9 @@ If the site has a web app manifest, reference the large icon:
 }
 ```
 
-### Optional — legacy `favicon.ico`
-Modern browsers don't need one. If you support very old clients, generate a multi-resolution `favicon.ico` (16/32/48) from `favicon-512.png` with any icon tool (e.g. ImageMagick: `convert favicon-512.png -define icon:auto-resize=48,32,16 favicon.ico`) and add `<link rel="icon" href="/favicon.ico" sizes="any">`.
-
----
-
 ## 3. Regenerating / editing
 
-`favicon.svg` is the single source of truth — edit it and re-export the PNGs at 16/32/180/512. Keep the geometry inside the safe area and the colours on the two brand tokens (`#111111`, `#B89A4A`). If the brand ever wants a light-tab variant, invert to a black Q on a warm-white (`#F7F5F0`) tile rather than recolouring the gold.
+The native app icon at `src/QueenZone.Mobile/assets/icon.png` is the single source of truth. Flatten it onto `#111111`, remove alpha and export 16/32/180/512px PNGs plus a 16/32/48px ICO. Preserve the mark's geometry, scale and position exactly.
 
 ---
 
