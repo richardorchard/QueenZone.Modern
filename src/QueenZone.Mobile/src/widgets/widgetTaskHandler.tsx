@@ -5,7 +5,7 @@ import { refreshHomeWidget } from './widgetSync';
 
 async function renderCachedWidget(props: WidgetTaskHandlerProps): Promise<void> {
   const cached = await readCachedWidgetProps();
-  props.renderWidget(<OnThisDayAndroidWidget {...cached} />);
+  props.renderWidget(<OnThisDayAndroidWidget {...cached} widgetWidth={props.widgetInfo.width} />);
 }
 
 /**

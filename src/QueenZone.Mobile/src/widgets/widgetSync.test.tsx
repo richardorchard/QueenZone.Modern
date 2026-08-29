@@ -158,6 +158,10 @@ describe('syncHomeWidget', () => {
     expect(mockRequestWidgetUpdate).toHaveBeenCalledWith(
       expect.objectContaining({ widgetName: 'OnThisDayWidget' }),
     );
+    const renderWidget = mockRequestWidgetUpdate.mock.calls[0]?.[0]?.renderWidget as (
+      info: { width: number; height: number },
+    ) => unknown;
+    expect(() => renderWidget({ width: 180, height: 110 })).not.toThrow();
     expect(mockUpdateTimeline).not.toHaveBeenCalled();
     expect(writeRefreshAt).toHaveBeenCalled();
   });
