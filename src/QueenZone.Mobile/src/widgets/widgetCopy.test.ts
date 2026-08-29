@@ -2,14 +2,33 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   WIDGET_FACE_SLOT_MS,
+  WIDGET_QUOTE_LERP_LONG,
+  WIDGET_QUOTE_LERP_SHORT,
+  WIDGET_QUOTE_MAX_LINES,
+  WIDGET_QUOTE_MAX_PT_MEDIUM,
+  WIDGET_QUOTE_MAX_PT_SMALL,
+  WIDGET_QUOTE_MEDIUM_MIN_WIDTH,
+  WIDGET_QUOTE_MIN_SCALE,
+  WIDGET_QUOTE_SECONDARY_MAX_LINES,
+  WIDGET_QUOTE_SECONDARY_PT_MEDIUM,
+  WIDGET_QUOTE_SECONDARY_PT_SMALL,
   nextWidgetFaceSlotMs,
   widgetActiveFace,
+  widgetDayPrimary,
+  widgetDaySecondary,
   widgetDayText,
   widgetEmptyText,
   widgetEyebrow,
+  widgetFamilyFromWidth,
+  widgetGraphemeCount,
   widgetHasDay,
   widgetHasQuote,
+  widgetPrimaryCeilingPt,
+  widgetPrimaryFontSize,
+  widgetQuotePrimary,
+  widgetQuoteSecondary,
   widgetQuoteText,
+  widgetSecondaryPt,
 } from './widgetCopy.ts';
 
 const day = { formattedDate: '30 June 1980', summary: 'Queen released The Game.' };
@@ -53,5 +72,50 @@ describe('widgetCopy', () => {
     assert.equal(widgetDayText(day), '30 June 1980: Queen released The Game.');
     assert.equal(widgetQuoteText(quote), '“A kind of magic” — Freddie Mercury');
     assert.match(widgetEmptyText, /Open QueenZone/);
+  });
+
+  it('splits primary and secondary instead of concatenating in the view', () => {
+    assert.equal(widgetQuotePrimary(quote), '“A kind of magic”');
+    assert.equal(widgetQuoteSecondary(quote), '— Freddie Mercury');
+    assert.equal(widgetDayPrimary(day), 'Queen released The Game.');
+    assert.equal(widgetDaySecondary(day), '30 June 1980');
+    assert.notEqual(widgetQuotePrimary(quote), widgetQuoteText(quote));
+    assert.notEqual(widgetDayPrimary(day), widgetDayText(day));
+  });
+
+  it('publishes the shared primary/secondary type-scale band', () => {
+    assert.equal(WIDGET_QUOTE_MAX_PT_SMALL, 17);
+    assert.equal(WIDGET_QUOTE_MAX_PT_MEDIUM, 22);
+    assert.equal(WIDGET_QUOTE_MIN_SCALE, 0.65);
+    assert.equal(WIDGET_QUOTE_MAX_LINES, 6);
+    assert.equal(WIDGET_QUOTE_SECONDARY_PT_SMALL, 9);
+    assert.equal(WIDGET_QUOTE_SECONDARY_PT_MEDIUM, 11);
+    assert.equal(WIDGET_QUOTE_SECONDARY_MAX_LINES, 2);
+    assert.equal(widgetPrimaryCeilingPt('small'), 17);
+    assert.equal(widgetPrimaryCeilingPt('medium'), 22);
+    assert.equal(widgetSecondaryPt('small'), 9);
+    assert.equal(widgetSecondaryPt('medium'), 11);
+    assert.ok(WIDGET_QUOTE_SECONDARY_PT_SMALL < 17 * WIDGET_QUOTE_MIN_SCALE);
+    assert.ok(WIDGET_QUOTE_SECONDARY_PT_MEDIUM < 22 * WIDGET_QUOTE_MIN_SCALE);
+  });
+
+  it('picks the medium ceiling once the Android span is 4×2-wide', () => {
+    assert.equal(widgetFamilyFromWidth(undefined), 'small');
+    assert.equal(widgetFamilyFromWidth(WIDGET_QUOTE_MEDIUM_MIN_WIDTH - 1), 'small');
+    assert.equal(widgetFamilyFromWidth(WIDGET_QUOTE_MEDIUM_MIN_WIDTH), 'medium');
+  });
+
+  it('lerps Android primary size from grapheme count between floor and ceiling', () => {
+    const short = 'x'.repeat(WIDGET_QUOTE_LERP_SHORT);
+    const long = 'x'.repeat(WIDGET_QUOTE_LERP_LONG);
+    const mid = 'x'.repeat((WIDGET_QUOTE_LERP_SHORT + WIDGET_QUOTE_LERP_LONG) / 2);
+    assert.equal(widgetPrimaryFontSize(short, 'small'), 17);
+    assert.equal(widgetPrimaryFontSize(short, 'medium'), 22);
+    assert.equal(widgetPrimaryFontSize(long, 'small'), 17 * 0.65);
+    assert.equal(widgetPrimaryFontSize(long, 'medium'), 22 * 0.65);
+    assert.ok(widgetPrimaryFontSize(mid, 'small') < 17);
+    assert.ok(widgetPrimaryFontSize(mid, 'small') > 17 * 0.65);
+    assert.equal(widgetPrimaryFontSize(widgetEmptyText, 'small'), 17);
+    assert.ok(widgetGraphemeCount('Get drunk and sing along to Queen.') <= WIDGET_QUOTE_LERP_SHORT);
   });
 });

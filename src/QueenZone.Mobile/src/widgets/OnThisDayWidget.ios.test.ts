@@ -18,9 +18,14 @@ describe('OnThisDayWidget.ios referential freedom', () => {
       'widgetHasQuote',
       'widgetEyebrow',
       'widgetDayText',
+      'widgetDayPrimary',
+      'widgetDaySecondary',
       'widgetQuoteText',
+      'widgetQuotePrimary',
+      'widgetQuoteSecondary',
       'widgetEmptyText',
       'widgetDeepLinkUrl',
+      'WIDGET_QUOTE_MAX_PT_SMALL',
       'gold',
       'cream',
       'mutedCream',
@@ -40,5 +45,20 @@ describe('OnThisDayWidget.ios referential freedom', () => {
     assert.match(viewBody, /ON THIS DAY/);
     assert.match(viewBody, /QUEEN QUOTES/);
     assert.match(viewBody, /4 \* 60 \* 60 \* 1000/);
+  });
+
+  it('splits primary and secondary and uses the small-ceiling scale band', () => {
+    assert.equal(viewBody.includes('lineLimit(3)'), false);
+    assert.match(viewBody, /lineLimit\(6\)/);
+    assert.match(viewBody, /lineLimit\(2\)/);
+    assert.match(viewBody, /font\(\{ size: 17 \}\)/);
+    assert.match(viewBody, /font\(\{ size: 9 \}\)/);
+    assert.match(viewBody, /minimumScaleFactor\(0\.65\)/);
+    assert.match(viewBody, /props\.summary/);
+    assert.match(viewBody, /props\.formattedDate/);
+    assert.match(viewBody, /“\$\{props\.quoteText\}”/);
+    assert.match(viewBody, /— \$\{props\.quoteWhoSaid\}/);
+    assert.equal(viewBody.includes('${props.formattedDate}: ${props.summary}'), false);
+    assert.equal(viewBody.includes('” — ${props.quoteWhoSaid}'), false);
   });
 });
