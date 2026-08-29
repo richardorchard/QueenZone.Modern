@@ -31,6 +31,11 @@ public static class MobileApiContractHost
     public const string OtherMemberDisplayName = "Contract Other";
     public const string SuspendedMemberDisplayName = "Contract Suspended";
 
+    public const int PublishedNewsId = 1003;
+    public const string AttachTopicSubject = "Journey attach topic";
+    public const string DiscussionTopicSubject = "QueenZone modernisation begins";
+    public const string UnreadSeedBody = "Journey unread seed from Contract Other.";
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -112,6 +117,8 @@ public static class MobileApiContractHost
         var issuer = scope.ServiceProvider.GetRequiredService<MobileAuthTokenIssuer>();
         var forumWrite = scope.ServiceProvider.GetRequiredService<IForumWriteRepository>();
         var polls = scope.ServiceProvider.GetRequiredService<IForumPollRepository>();
+        var adminNews = scope.ServiceProvider.GetRequiredService<IAdminNewsRepository>();
+        var privateMessages = scope.ServiceProvider.GetRequiredService<IPrivateMessageRepository>();
 
         await EnsureMemberAsync(
             members,
@@ -155,6 +162,35 @@ public static class MobileApiContractHost
         var poll = await polls.GetPollWithResultsAsync(created.TopicId, MemberId, cancellationToken: cancellationToken)
             ?? throw new InvalidOperationException("Contract host poll seed did not materialize.");
 
+        var seededAt = DateTimeOffset.UtcNow;
+        var attach = await forumWrite.CreateThreadAsync(
+            new NewForumThread(
+                CategoryId: 1,
+                AuthorMemberId: MemberId,
+                AuthorDisplayName: MemberDisplayName,
+                Subject: AttachTopicSubject,
+                Body: "<p>Unlocked topic for the Maestro attach journey.</p>",
+                CreatedAt: seededAt),
+            cancellationToken);
+
+        var discussionTopicId = await EnsurePublishedNewsDiscussionAsync(
+            adminNews,
+            forumWrite,
+            seededAt,
+            cancellationToken);
+
+        var unread = await privateMessages.SendNewOrExistingAsync(
+            OtherMemberId,
+            MemberId,
+            UnreadSeedBody,
+            seededAt,
+            cancellationToken);
+        if (!unread.Succeeded)
+        {
+            throw new InvalidOperationException(
+                unread.ErrorMessage ?? "Contract host could not seed an unread inbox conversation.");
+        }
+
         return new MobileApiContractSeed(
             MemberToken: issuer.IssueAccessToken(MemberId, MemberEmail, MemberDisplayName),
             OtherMemberToken: issuer.IssueAccessToken(OtherMemberId, OtherMemberEmail, OtherMemberDisplayName),
@@ -163,7 +199,9 @@ public static class MobileApiContractHost
                 SuspendedMemberEmail,
                 SuspendedMemberDisplayName),
             PollTopicId: created.TopicId,
-            PollOptionId: poll.Options[0].OptionId);
+            PollOptionId: poll.Options[0].OptionId,
+            AttachTopicId: attach.TopicId,
+            DiscussionTopicId: discussionTopicId);
     }
 
     public static MobileApiContractFixture BuildFixture(string baseUrl, MobileApiContractSeed seed) =>
@@ -186,7 +224,9 @@ public static class MobileApiContractHost
                 SuspendedMemberDisplayName,
                 seed.SuspendedMemberToken),
             seed.PollTopicId,
-            seed.PollOptionId.ToString("D"));
+            seed.PollOptionId.ToString("D"),
+            seed.AttachTopicId,
+            seed.DiscussionTopicId);
 
     public static void WriteFixture(string path, MobileApiContractFixture fixture)
     {
@@ -205,6 +245,48 @@ public static class MobileApiContractHost
     public static MobileApiContractFixture ReadFixture(string path) =>
         JsonSerializer.Deserialize<MobileApiContractFixture>(File.ReadAllText(path), JsonOptions)
         ?? throw new InvalidOperationException($"Contract fixture at '{path}' was empty.");
+
+    private static async Task<int> EnsurePublishedNewsDiscussionAsync(
+        IAdminNewsRepository adminNews,
+        IForumWriteRepository forumWrite,
+        DateTimeOffset seededAt,
+        CancellationToken cancellationToken)
+    {
+        var article = await adminNews.GetByIdAsync(PublishedNewsId, cancellationToken)
+            ?? throw new InvalidOperationException($"Contract host news {PublishedNewsId} was not found.");
+        if (article.ForumTopicId is int linkedTopicId)
+        {
+            return linkedTopicId;
+        }
+
+        var discussion = await forumWrite.CreateThreadAsync(
+            new NewForumThread(
+                CategoryId: 1,
+                AuthorMemberId: OtherMemberId,
+                AuthorDisplayName: OtherMemberDisplayName,
+                Subject: DiscussionTopicSubject,
+                Body: "<p>Opening post for the published modernisation article.</p>",
+                CreatedAt: seededAt),
+            cancellationToken);
+        await forumWrite.CreatePostAsync(
+            new NewForumPost(
+                discussion.TopicId,
+                OtherMemberId,
+                OtherMemberDisplayName,
+                "<p>First reply so the story shows Join the discussion.</p>",
+                seededAt.AddMinutes(1)),
+            cancellationToken);
+
+        if (await adminNews.TrySetForumTopicIdAsync(PublishedNewsId, discussion.TopicId, cancellationToken))
+        {
+            return discussion.TopicId;
+        }
+
+        var linked = await adminNews.GetByIdAsync(PublishedNewsId, cancellationToken);
+        return linked?.ForumTopicId
+            ?? throw new InvalidOperationException(
+                $"Contract host could not link news {PublishedNewsId} to topic {discussion.TopicId}.");
+    }
 
     private static async Task EnsureMemberAsync(
         IMemberAccountRepository members,
@@ -269,7 +351,9 @@ public sealed record MobileApiContractSeed(
     string OtherMemberToken,
     string SuspendedMemberToken,
     int PollTopicId,
-    Guid PollOptionId);
+    Guid PollOptionId,
+    int AttachTopicId,
+    int DiscussionTopicId);
 
 public sealed record MobileApiContractMemberFixture(
     string Id,
@@ -284,7 +368,9 @@ public sealed record MobileApiContractFixture(
     MobileApiContractMemberFixture OtherMember,
     MobileApiContractMemberFixture SuspendedMember,
     int PollTopicId,
-    string PollOptionId);
+    string PollOptionId,
+    int AttachTopicId,
+    int DiscussionTopicId);
 
 /// <summary>
 /// Writes the contract fixture after the Testing host is listening. Registered only

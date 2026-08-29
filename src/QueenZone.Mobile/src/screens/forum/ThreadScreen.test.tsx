@@ -190,6 +190,7 @@ describe('ThreadScreen watch control', () => {
     mockSession.accessToken = 'tok';
     const { navigation } = renderThread();
     await waitFor(() => expect(screen.getByRole('button', { name: 'Reply' })).toBeOnTheScreen());
+    expect(screen.getByTestId(testIds.forumThreadReply)).toBeOnTheScreen();
 
     const user = userEvent.setup();
     await user.press(screen.getByRole('button', { name: 'Reply' }));
@@ -466,9 +467,11 @@ describe('ThreadScreen attachments', () => {
         '/api/v1/forum/attachments/legacy/1101',
         'tok',
         'opera-side-two-notes.pdf',
+        { present: false },
       ),
     );
     expect(openAttachment.mock.calls[0]?.[0]).not.toContain('/forum/attachment/legacy/');
+    expect(screen.getByTestId(testIds.forumThreadAttachmentOpened)).toBeOnTheScreen();
   });
 
   it('shows signed-out metadata without opening bytes', async () => {

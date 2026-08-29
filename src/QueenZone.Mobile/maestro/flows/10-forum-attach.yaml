@@ -1,0 +1,73 @@
+appId: org.queenzone.mobile
+---
+# Files first, then Debug inject. OEM Files sheet is not the gate (#1072).
+- openLink: ${SMOKE_AUTH_URL}
+- tapOn:
+    id: tab-forum
+- extendedWaitUntil:
+    visible:
+      id: forum-screen
+    timeout: 20000
+- tapOn:
+    id: forum-board-1
+- extendedWaitUntil:
+    visible:
+      id: forum-category-screen
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      id: forum-thread-${ATTACH_TOPIC_ID}
+    direction: DOWN
+    timeout: 20000
+- tapOn:
+    id: forum-thread-${ATTACH_TOPIC_ID}
+- extendedWaitUntil:
+    visible:
+      id: forum-thread-screen
+    timeout: 20000
+- assertVisible: Journey attach topic
+- tapOn:
+    id: forum-thread-reply
+- extendedWaitUntil:
+    visible:
+      id: forum-composer-attach-files
+    timeout: 20000
+- tapOn:
+    text: Write a reply
+- inputText: Journey attach reply
+- tapOn:
+    id: forum-composer-attach-files
+- extendedWaitUntil:
+    visible:
+      id: forum-composer-attach-inject
+    timeout: 15000
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - tapOn:
+          id: forum-composer-attach-inject
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - openLink: ${SMOKE_ATTACH_URL}
+- extendedWaitUntil:
+    visible: attach.txt
+    timeout: 15000
+- tapOn:
+    id: forum-composer-submit
+- extendedWaitUntil:
+    visible:
+      id: forum-thread-screen
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      text: attach.txt
+    direction: DOWN
+    timeout: 20000
+- tapOn: attach.txt
+- extendedWaitUntil:
+    visible:
+      id: forum-thread-attachment-opened
+    timeout: 20000

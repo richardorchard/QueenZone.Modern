@@ -18,7 +18,7 @@ param(
 
     [int] $Port = 5098,
 
-    [ValidateSet("launch", "tabs", "home", "news", "photos", "search", "forum", "profile", "auth")]
+    [ValidateSet("launch", "tabs", "home", "news", "photos", "search", "forum", "profile", "auth", "attach", "discussion", "unread")]
     [string] $Flow = "news"
 )
 
@@ -62,6 +62,9 @@ $FlowFiles = @{
     forum   = "src/QueenZone.Mobile/maestro/flows/07-forum.yaml"
     profile = "src/QueenZone.Mobile/maestro/flows/08-profile-signed-out.yaml"
     auth    = "src/QueenZone.Mobile/maestro/flows/09-authenticated.yaml"
+    attach  = "src/QueenZone.Mobile/maestro/flows/10-forum-attach.yaml"
+    discussion = "src/QueenZone.Mobile/maestro/flows/11-news-discussion.yaml"
+    unread  = "src/QueenZone.Mobile/maestro/flows/12-masthead-unread.yaml"
 }
 
 function Read-State {
@@ -241,10 +244,14 @@ switch ($Command) {
         }
         $results = Join-Path $RepoRoot "src\QueenZone.Mobile\maestro-results"
         New-Item -ItemType Directory -Force -Path $results | Out-Null
-        if ($Flow -eq "auth") {
+        if ($Flow -in @("auth", "attach", "unread")) {
             $token = [string] $fixture.member.accessToken
             $env:SMOKE_AUTH_URL = "queenzone://smoke-auth?accessToken=$([uri]::EscapeDataString($token))"
             Write-Output "SMOKE_AUTH_URL is set (length $($env:SMOKE_AUTH_URL.Length); token not printed)."
+        }
+        if ($Flow -eq "attach") {
+            $env:ATTACH_TOPIC_ID = [string] $fixture.attachTopicId
+            Write-Output "ATTACH_TOPIC_ID is set."
         }
         Write-Output "Running Maestro $flowRel"
         & maestro test $flowPath --format junit --output (Join-Path $results "junit.xml") --debug-output (Join-Path $results "debug") --flatten-debug-output

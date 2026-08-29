@@ -75,6 +75,48 @@ public sealed class MobileApiContractHostTests : IClassFixture<QueenZoneWebAppli
     }
 
     [Fact]
+    public async Task Seed_links_published_news_discussion_seeds_attach_topic_and_unread_inbox()
+    {
+        var seed = await MobileApiContractHost.SeedAsync(factory.Services);
+
+        using var member = factory.CreateAnonymousClient(allowAutoRedirect: false);
+        member.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", seed.MemberToken);
+
+        using var news = await member.GetAsync($"/api/v1/content/news/{MobileApiContractHost.PublishedNewsId}");
+        Assert.Equal(HttpStatusCode.OK, news.StatusCode);
+        var article = await news.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(seed.DiscussionTopicId, article.GetProperty("topicId").GetInt32());
+        Assert.True(article.GetProperty("discussionReplyCount").GetInt32() >= 1);
+
+        using var discussion = await member.GetAsync($"/api/v1/forum/topics/{seed.DiscussionTopicId}");
+        Assert.Equal(HttpStatusCode.OK, discussion.StatusCode);
+        var topic = await discussion.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(MobileApiContractHost.DiscussionTopicSubject, topic.GetProperty("title").GetString());
+        Assert.False(topic.GetProperty("isLocked").GetBoolean());
+
+        using var attach = await member.GetAsync($"/api/v1/forum/topics/{seed.AttachTopicId}");
+        Assert.Equal(HttpStatusCode.OK, attach.StatusCode);
+        var attachTopic = await attach.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(MobileApiContractHost.AttachTopicSubject, attachTopic.GetProperty("title").GetString());
+        Assert.False(attachTopic.GetProperty("isLocked").GetBoolean());
+
+        using var unreadResponse = await member.GetAsync("/api/v1/me/messages/unread-count");
+        Assert.Equal(HttpStatusCode.OK, unreadResponse.StatusCode);
+        var unread = await unreadResponse.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(unread.GetProperty("unreadConversationCount").GetInt32() >= 1);
+    }
+
+    [Fact]
+    public async Task Seed_is_idempotent_for_the_published_news_discussion_link()
+    {
+        var first = await MobileApiContractHost.SeedAsync(factory.Services);
+        var second = await MobileApiContractHost.SeedAsync(factory.Services);
+
+        Assert.Equal(first.DiscussionTopicId, second.DiscussionTopicId);
+        Assert.NotEqual(first.AttachTopicId, second.AttachTopicId);
+    }
+
+    [Fact]
     public async Task WriteFixture_is_camel_case_and_omits_secrets()
     {
         var seed = await MobileApiContractHost.SeedAsync(factory.Services);
@@ -95,6 +137,8 @@ public sealed class MobileApiContractHostTests : IClassFixture<QueenZoneWebAppli
             Assert.Equal("http://127.0.0.1:5099", roundTrip.BaseUrl);
             Assert.Equal(QueenZoneEnvironments.Testing, roundTrip.Environment);
             Assert.Equal(seed.PollTopicId, roundTrip.PollTopicId);
+            Assert.Equal(seed.AttachTopicId, roundTrip.AttachTopicId);
+            Assert.Equal(seed.DiscussionTopicId, roundTrip.DiscussionTopicId);
             Assert.Equal(MobileApiContractHost.MemberId.ToString("D"), roundTrip.Member.Id);
             Assert.False(string.IsNullOrWhiteSpace(roundTrip.Member.AccessToken));
         }
@@ -219,7 +263,7 @@ public sealed class MobileApiContractHostTests : IClassFixture<QueenZoneWebAppli
     [Fact]
     public void BuildFixture_rewrites_wildcard_hosts_to_loopback()
     {
-        var seed = new MobileApiContractSeed("a", "b", "c", 1, Guid.Parse("44444444-4444-4444-4444-444444444444"));
+        var seed = new MobileApiContractSeed("a", "b", "c", 1, Guid.Parse("44444444-4444-4444-4444-444444444444"), 2, 3);
         var wildcard = MobileApiContractHost.BuildFixture("http://0.0.0.0:5099/", seed);
         Assert.Equal("http://127.0.0.1:5099", wildcard.BaseUrl);
         var plus = MobileApiContractHost.BuildFixture("http://+:5146", seed);

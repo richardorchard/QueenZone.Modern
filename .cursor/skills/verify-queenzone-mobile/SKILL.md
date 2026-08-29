@@ -72,7 +72,7 @@ From the repository root, with the helper host still up and `SMOKE_AUTH_URL` onl
 pwsh -File .cursor/skills/verify-queenzone-mobile/scripts/control-queenzone-mobile.ps1 drive -Flow news
 ```
 
-That runs `src/QueenZone.Mobile/maestro/flows/04-news-story.yaml` against `org.queenzone.mobile`. Other `-Flow` values: `launch`, `tabs`, `home`, `news`, `photos`, `search`, `forum`, `profile`, `auth`.
+That runs `src/QueenZone.Mobile/maestro/flows/04-news-story.yaml` against `org.queenzone.mobile`. Other `-Flow` values: `launch`, `tabs`, `home`, `news`, `photos`, `search`, `forum`, `profile`, `auth`, `attach`, `discussion`, `unread`.
 
 Full CI-shaped suite (rebuilds and reinstalls the Debug binary):
 

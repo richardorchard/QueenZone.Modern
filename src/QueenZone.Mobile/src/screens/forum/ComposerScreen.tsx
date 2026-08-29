@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -20,8 +21,17 @@ import {
   type ForumCategoryListItem,
 } from '../../api';
 import type { ForumStackParamList } from '../../navigation/types';
+import { getAppConfig } from '../../config';
 import { MemberGate } from '../../session/MemberGate';
 import { useSession } from '../../session/SessionContext';
+import {
+  defaultSmokeAttachAsset,
+  isSmokeAttachEnabled,
+  parseSmokeAttachAsset,
+  smokeAttachFileName,
+  stashSmokeAttachAsset,
+  takePendingSmokeAttachAsset,
+} from '../../session/smokeAttach';
 import { testIds } from '../../test/testIds';
 import { fonts, radius, space, type, useTheme } from '../../theme';
 import { Button } from '../../ui/Button';
@@ -41,6 +51,13 @@ type Props = NativeStackScreenProps<ForumStackParamList, 'Composer'>;
 
 function messageFromUnknownError(err: unknown): string {
   return err instanceof ApiError ? err.message : 'Something went wrong.';
+}
+
+function smokeAttachAllowed(): boolean {
+  return isSmokeAttachEnabled({
+    dev: typeof __DEV__ !== 'undefined' ? __DEV__ : false,
+    appEnv: getAppConfig().appEnv,
+  });
 }
 
 export function ComposerScreen({ navigation, route }: Props) {
@@ -67,6 +84,8 @@ function ComposerForm({ navigation, route }: Props) {
   const [attachment, setAttachment] = useState<ComposerAttachment | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [awaitingInject, setAwaitingInject] = useState(false);
+  const awaitingInjectRef = useRef(false);
 
   useLayoutEffect(() => {
     navigation.setOptions({ title: copy.title });
@@ -109,7 +128,33 @@ function ComposerForm({ navigation, route }: Props) {
       return;
     }
     setAttachment(mapped);
+    awaitingInjectRef.current = false;
+    setAwaitingInject(false);
   }, []);
+
+  useEffect(() => {
+    if (!smokeAttachAllowed()) {
+      return;
+    }
+
+    const handleUrl = (url: string | null) => {
+      if (!url) {
+        return;
+      }
+      const asset = parseSmokeAttachAsset(url);
+      if (!asset) {
+        return;
+      }
+      if (awaitingInjectRef.current) {
+        applyPickedAsset(asset);
+        return;
+      }
+      stashSmokeAttachAsset(asset);
+    };
+
+    const subscription = Linking.addEventListener('url', ({ url }) => handleUrl(url));
+    return () => subscription.remove();
+  }, [applyPickedAsset]);
 
   const pickFromPhotos = useCallback(async () => {
     setSubmitError(null);
@@ -136,6 +181,17 @@ function ComposerForm({ navigation, route }: Props) {
 
   const pickFromFiles = useCallback(async () => {
     setSubmitError(null);
+    if (smokeAttachAllowed()) {
+      const pending = takePendingSmokeAttachAsset();
+      if (pending) {
+        applyPickedAsset(pending);
+        return;
+      }
+      awaitingInjectRef.current = true;
+      setAwaitingInject(true);
+      return;
+    }
+
     try {
       const picked = await DocumentPicker.getDocumentAsync({
         copyToCacheDirectory: true,
@@ -148,6 +204,12 @@ function ComposerForm({ navigation, route }: Props) {
     } catch {
       setSubmitError(composerAttachCopy.filesUnavailable);
     }
+  }, [applyPickedAsset]);
+
+  const injectSmokeAttach = useCallback(() => {
+    setSubmitError(null);
+    const pending = takePendingSmokeAttachAsset();
+    applyPickedAsset(pending ?? defaultSmokeAttachAsset(Platform.OS));
   }, [applyPickedAsset]);
 
   const submit = useCallback(async () => {
@@ -327,6 +389,15 @@ function ComposerForm({ navigation, route }: Props) {
                   void pickFromFiles();
                 }}
               />
+              {smokeAttachAllowed() && awaitingInject ? (
+                <Button
+                  label={`Inject ${smokeAttachFileName}`}
+                  size="sm"
+                  variant="outline"
+                  testID={testIds.forumComposerAttachInject}
+                  onPress={injectSmokeAttach}
+                />
+              ) : null}
               {attachment ? (
                 <Button
                   label={composerAttachCopy.remove}
@@ -350,6 +421,7 @@ function ComposerForm({ navigation, route }: Props) {
 
         <Button
           label={copy.action}
+          testID={testIds.forumComposerSubmit}
           onPress={() => {
             void submit();
           }}
