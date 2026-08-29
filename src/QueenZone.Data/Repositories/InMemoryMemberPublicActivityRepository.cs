@@ -6,18 +6,30 @@ public sealed class InMemoryMemberPublicActivityRepository(
     IPhotoSubmissionRepository photoSubmissionRepository,
     INewsSuggestionRepository newsSuggestionRepository) : IMemberPublicActivityRepository
 {
-    public async Task<MemberPublicActivityPage> GetPageAsync(
+    public Task<MemberPublicActivityPage> GetPageAsync(
         Guid memberId,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default) =>
+        GetFeedPageAsync([memberId], page, pageSize, cancellationToken);
+
+    public async Task<MemberPublicActivityPage> GetFeedPageAsync(
+        IReadOnlyCollection<Guid> memberIds,
         int page,
         int pageSize,
         CancellationToken cancellationToken = default)
     {
         page = Math.Max(page, 1);
         pageSize = Math.Clamp(pageSize, 1, 100);
+        var authorIds = memberIds.ToHashSet();
+        if (authorIds.Count == 0)
+        {
+            return new MemberPublicActivityPage([], 0, page, pageSize);
+        }
 
         var forumItems = forumWriteRepository.GetCreatedThreads()
             .SelectMany(thread => forumWriteRepository.GetPostsForTopic(thread.TopicId)
-                .Where(post => post.MemberId == memberId)
+                .Where(post => authorIds.Contains(post.MemberId))
                 .Select(post => new MemberPublicActivityItem(
                     MemberPublicActivityType.ForumPost,
                     thread.Subject,
@@ -25,43 +37,56 @@ public sealed class InMemoryMemberPublicActivityRepository(
                     post.CreatedAt,
                     post.PostId,
                     thread.TopicId,
-                    NewsSlug.Slugify(thread.Subject))));
+                    NewsSlug.Slugify(thread.Subject),
+                    AuthorId: post.MemberId,
+                    AuthorDisplayName: post.DisplayName)));
 
         var articleItems = (await articleSubmissionRepository.GetPublishedAsync(cancellationToken))
-            .Where(article => article.AuthorMemberId == memberId)
+            .Where(article => article.AuthorMemberId is Guid authorId && authorIds.Contains(authorId))
             .Select(article => new MemberPublicActivityItem(
                 MemberPublicActivityType.Article,
                 article.Title,
                 article.Excerpt,
                 article.PublishedAt,
-                Slug: article.Slug));
+                Slug: article.Slug,
+                AuthorId: article.AuthorMemberId,
+                AuthorDisplayName: article.AuthorDisplayName));
 
-        var photoPage = await photoSubmissionRepository.GetBySubmitterAsync(
-            memberId,
-            pageSize: int.MaxValue,
-            cancellationToken: cancellationToken);
-        var photoItems = photoPage.Items
-            .Where(photo => photo.Status == PhotoSubmissionStatus.Approved)
-            .Select(photo => new MemberPublicActivityItem(
-                MemberPublicActivityType.Photo,
-                photo.Title,
-                photo.Description,
-                photo.ReviewedAt ?? photo.SubmittedAt,
-                Category: photo.ApprovedCategory));
+        var photoItems = new List<MemberPublicActivityItem>();
+        var newsItems = new List<MemberPublicActivityItem>();
+        foreach (var authorId in authorIds)
+        {
+            var photoPage = await photoSubmissionRepository.GetBySubmitterAsync(
+                authorId,
+                pageSize: int.MaxValue,
+                cancellationToken: cancellationToken);
+            photoItems.AddRange(photoPage.Items
+                .Where(photo => photo.Status == PhotoSubmissionStatus.Approved)
+                .Select(photo => new MemberPublicActivityItem(
+                    MemberPublicActivityType.Photo,
+                    photo.Title,
+                    photo.Description,
+                    photo.ReviewedAt ?? photo.SubmittedAt,
+                    Category: photo.ApprovedCategory,
+                    AuthorId: photo.SubmitterMemberId,
+                    AuthorDisplayName: photo.SubmitterDisplayName)));
 
-        var newsPage = await newsSuggestionRepository.GetBySubmitterAsync(
-            memberId,
-            pageSize: int.MaxValue,
-            cancellationToken: cancellationToken);
-        var newsItems = newsPage.Items
-            .Where(news => news.Status == NewsSuggestionStatus.Promoted && news.PromotedNewsId is not null)
-            .Select(news => new MemberPublicActivityItem(
-                MemberPublicActivityType.News,
-                string.IsNullOrWhiteSpace(news.Title) ? "News contribution" : news.Title,
-                news.Notes,
-                news.ReviewedAt ?? news.SubmittedAt,
-                ContentId: news.PromotedNewsId,
-                Slug: NewsSlug.Slugify(news.Title ?? "news")));
+            var newsPage = await newsSuggestionRepository.GetBySubmitterAsync(
+                authorId,
+                pageSize: int.MaxValue,
+                cancellationToken: cancellationToken);
+            newsItems.AddRange(newsPage.Items
+                .Where(news => news.Status == NewsSuggestionStatus.Promoted && news.PromotedNewsId is not null)
+                .Select(news => new MemberPublicActivityItem(
+                    MemberPublicActivityType.News,
+                    string.IsNullOrWhiteSpace(news.Title) ? "News contribution" : news.Title,
+                    news.Notes,
+                    news.ReviewedAt ?? news.SubmittedAt,
+                    ContentId: news.PromotedNewsId,
+                    Slug: NewsSlug.Slugify(news.Title ?? "news"),
+                    AuthorId: news.SubmitterMemberId,
+                    AuthorDisplayName: news.SubmitterDisplayName)));
+        }
 
         var all = forumItems
             .Concat(articleItems)

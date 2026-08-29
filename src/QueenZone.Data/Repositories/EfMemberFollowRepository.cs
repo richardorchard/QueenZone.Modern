@@ -52,4 +52,16 @@ public sealed class EfMemberFollowRepository(QueenZoneDbContext dbContext) : IMe
             .ExecuteDeleteAsync(cancellationToken);
         return deleted > 0;
     }
+
+    public async Task<IReadOnlyList<Guid>> ListFollowedIdsAsync(
+        Guid followerMemberId,
+        CancellationToken cancellationToken = default)
+    {
+        var ids = await dbContext.MemberFollows
+            .AsNoTracking()
+            .Where(follow => follow.FollowerMemberId == followerMemberId)
+            .Select(follow => follow.FollowedMemberId)
+            .ToListAsync(cancellationToken);
+        return ids;
+    }
 }

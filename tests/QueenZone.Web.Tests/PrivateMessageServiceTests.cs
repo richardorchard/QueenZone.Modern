@@ -587,6 +587,20 @@ public sealed class PrivateMessageServiceTests
     }
 
     [Fact]
+    public async Task Block_UnfollowsTheBlockedMember()
+    {
+        var (service, _, _, follows, alice, bob) = CreateSystemWithFollows();
+        await follows.FollowAsync(alice.Id, bob.Id, DateTimeOffset.UtcNow);
+        await follows.FollowAsync(bob.Id, alice.Id, DateTimeOffset.UtcNow);
+        Assert.True(await follows.IsFollowingAsync(alice.Id, bob.Id));
+
+        Assert.True((await service.BlockAsync(alice.Id, bob.Id)).Succeeded);
+
+        Assert.False(await follows.IsFollowingAsync(alice.Id, bob.Id));
+        Assert.True(await follows.IsFollowingAsync(bob.Id, alice.Id));
+    }
+
+    [Fact]
     public async Task Unblock_RestoresMessaging()
     {
         var (service, _, _, alice, bob) = CreateSystem();

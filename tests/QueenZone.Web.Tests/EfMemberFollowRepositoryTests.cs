@@ -60,6 +60,30 @@ public sealed class EfMemberFollowRepositoryTests : IAsyncDisposable
         Assert.False(await repository.UnfollowAsync(aliceId, bobId));
     }
 
+    [Fact]
+    public async Task ListFollowedIdsAsync_ReturnsOnlyPeopleTheFollowerFollows()
+    {
+        var carolId = Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc");
+        dbContext.MemberAccounts.Add(new MemberAccount
+        {
+            Id = carolId,
+            Email = "carol-follow-ef@example.com",
+            NormalizedEmail = "CAROL-FOLLOW-EF@EXAMPLE.COM",
+            DisplayName = "Carol",
+            CreatedAt = DateTime.UtcNow,
+        });
+        await dbContext.SaveChangesAsync();
+
+        await repository.FollowAsync(aliceId, bobId, DateTimeOffset.Parse("2026-08-17T10:00:00Z"));
+        await repository.FollowAsync(aliceId, carolId, DateTimeOffset.Parse("2026-08-17T10:01:00Z"));
+        await repository.FollowAsync(bobId, aliceId, DateTimeOffset.Parse("2026-08-17T10:02:00Z"));
+
+        var aliceFollows = await repository.ListFollowedIdsAsync(aliceId);
+        Assert.Equal([bobId, carolId], aliceFollows.OrderBy(id => id).ToArray());
+        Assert.Equal([aliceId], await repository.ListFollowedIdsAsync(bobId));
+        Assert.Empty(await repository.ListFollowedIdsAsync(carolId));
+    }
+
     public async ValueTask DisposeAsync()
     {
         await dbContext.DisposeAsync();

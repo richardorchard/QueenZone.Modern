@@ -44,4 +44,9 @@ public sealed class MemberFollowService(
         Guid followedMemberId,
         CancellationToken cancellationToken = default) =>
         memberFollowRepository.UnfollowAsync(followerMemberId, followedMemberId, cancellationToken);
+
+    public Task<IReadOnlyList<Guid>> ListFollowedIdsAsync(
+        Guid followerMemberId,
+        CancellationToken cancellationToken = default) =>
+        memberFollowRepository.ListFollowedIdsAsync(followerMemberId, cancellationToken);
 }

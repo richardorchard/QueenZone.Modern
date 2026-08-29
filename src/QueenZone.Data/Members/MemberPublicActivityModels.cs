@@ -19,7 +19,9 @@ public sealed record MemberPublicActivityItem(
     int? ContentId = null,
     int? ParentId = null,
     string? Slug = null,
-    string? Category = null);
+    string? Category = null,
+    Guid? AuthorId = null,
+    string? AuthorDisplayName = null);
 
 public sealed record MemberPublicActivityPage(
     IReadOnlyList<MemberPublicActivityItem> Items,

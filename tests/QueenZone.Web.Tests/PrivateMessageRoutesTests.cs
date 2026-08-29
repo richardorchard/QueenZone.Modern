@@ -794,5 +794,12 @@ public sealed class PrivateMessageRoutesTests : IClassFixture<WebApplicationFact
             var pageItems = items.Skip((page - 1) * pageSize).Take(pageSize).ToList();
             return Task.FromResult(new MemberPublicActivityPage(pageItems, items.Count, page, pageSize));
         }
+
+        public Task<MemberPublicActivityPage> GetFeedPageAsync(
+            IReadOnlyCollection<Guid> memberIds,
+            int page,
+            int pageSize,
+            CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("Following feed should not N+1 through GetPageAsync.");
     }
 }

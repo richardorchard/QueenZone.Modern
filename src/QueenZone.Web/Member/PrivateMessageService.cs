@@ -300,6 +300,10 @@ public sealed class PrivateMessageService(
             blockedMemberId,
             timeProvider.GetUtcNow(),
             cancellationToken);
+        await memberFollowRepository.UnfollowAsync(
+            blockerMemberId,
+            blockedMemberId,
+            cancellationToken);
         return new PrivateMessageBlockResult(true, null);
     }
 
