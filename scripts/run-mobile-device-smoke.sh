@@ -232,7 +232,7 @@ push_attach_fixture() {
     adb shell mkdir -p /sdcard/Android/data/org.queenzone.mobile/files
     adb push "$src" /sdcard/Android/data/org.queenzone.mobile/files/attach.txt >/dev/null
     SMOKE_ATTACH_URL="$(
-      node -e 'process.stdout.write("queenzone://smoke-attach?uri=" + encodeURIComponent("file:///sdcard/Download/attach.txt") + "&name=attach.txt&type=text/plain")'
+      node -e 'process.stdout.write("queenzone://smoke-attach?uri=" + encodeURIComponent("file:///sdcard/Android/data/org.queenzone.mobile/files/attach.txt") + "&name=attach.txt&type=text/plain")'
     )"
   else
     local data

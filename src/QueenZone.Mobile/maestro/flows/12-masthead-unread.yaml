@@ -12,8 +12,9 @@ appId: org.queenzone.mobile
     visible:
       id: home-messages
     timeout: 20000
-- assertVisible:
-    id: home-messages-unread
+- extendedWaitUntil:
+    visible: Messages, 1 unread conversations
+    timeout: 20000
 - tapOn:
     id: home-messages
 - extendedWaitUntil:

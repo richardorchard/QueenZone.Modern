@@ -43,7 +43,7 @@ describe('smokeAttach', () => {
     assert.throws(() => buildSmokeAttachUrl('   '), /non-empty file URI/);
   });
 
-  it('defaults Android to the Downloads Files-area URI', () => {
+  it('defaults Android to the app-private files URI', () => {
     assert.deepEqual(defaultSmokeAttachAsset('android'), {
       uri: smokeAttachDefaultAndroidUri,
       name: smokeAttachFileName,
