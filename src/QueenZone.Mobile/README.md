@@ -441,6 +441,9 @@ port 5098, bakes a Debug binary, and runs `maestro/smoke.yaml`.
 
 # Prove a failed assertion uploads diagnostics
 ./scripts/run-mobile-device-smoke.sh --platform android --prove-failure
+
+# On-demand journeys (#1071); smoke.yaml stays 9 flows
+./scripts/run-mobile-device-smoke.sh --platform android --suite journeys
 ```
 
 Authenticated smoke injects the contract-host access token through
@@ -460,6 +463,13 @@ protection; record the date on #872. See
 [`docs/architecture/testing-policy.md`](../../docs/architecture/testing-policy.md).
 Failures upload `maestro-results/` (screenshots, JUnit, host/app logs).
 Maestro flows are not retried.
+
+On-demand journeys (`maestro/journeys.yaml`, #1071–#1074) are a
+**separate job pair** in the same workflow: `Mobile Android device
+journeys` / `Mobile iOS device journeys`. Dispatch with `suite=journeys`
+(or `both`), or wait for the weekday 16:00 UTC slot. Do not add those
+names to branch protection until soak. `smoke.yaml` stays exactly the
+9 #872 flows.
 
 The unsigned jobs are PR compile checks only. A separate manual workflow,
 [`publish-ios-testflight.yml`](../../.github/workflows/publish-ios-testflight.yml),

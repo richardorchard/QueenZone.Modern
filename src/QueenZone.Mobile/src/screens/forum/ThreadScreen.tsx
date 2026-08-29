@@ -32,6 +32,7 @@ import {
 import { getAppConfig } from '../../config';
 import { usePagedContent } from '../../hooks/usePagedContent';
 import type { ForumStackParamList } from '../../navigation/types';
+import { isSmokeAttachEnabled } from '../../session/smokeAttach';
 import { useSession } from '../../session/SessionContext';
 import { openForumComposer, openSignIn } from '../../session/signInNavigation';
 import { RichHtmlBody } from '../../ui/RichHtmlBody';
@@ -60,6 +61,13 @@ type Props = NativeStackScreenProps<ForumStackParamList, 'Thread'>;
 
 function messageFromUnknownError(err: unknown): string {
   return err instanceof ApiError ? err.message : 'Something went wrong.';
+}
+
+function smokeAttachAllowed(): boolean {
+  return isSmokeAttachEnabled({
+    dev: typeof __DEV__ !== 'undefined' ? __DEV__ : false,
+    appEnv: getAppConfig().appEnv,
+  });
 }
 
 export function ThreadScreen({ navigation, route }: Props) {
@@ -318,6 +326,7 @@ export function ThreadScreen({ navigation, route }: Props) {
       {canReply ? (
         <Button
           label={isSignedIn ? 'Reply' : 'Sign in to reply'}
+          testID={testIds.forumThreadReply}
           variant="outline"
           onPress={() =>
             openForumComposer(navigation, isSignedIn, {
@@ -404,6 +413,7 @@ function ForumAttachmentList({
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [errorKey, setErrorKey] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [opened, setOpened] = useState(false);
   const label = attachments.length === 1 ? 'Attachment' : 'Attachments';
 
   const openAttachment = useCallback(
@@ -425,7 +435,12 @@ function ForumAttachmentList({
           setViewer({ uri, label: attachment.fileName });
           return;
         }
-        await openForumAttachmentFile(attachment.downloadUrl, accessToken, attachment.fileName);
+        await openForumAttachmentFile(attachment.downloadUrl, accessToken, attachment.fileName, {
+          present: !smokeAttachAllowed(),
+        });
+        if (smokeAttachAllowed()) {
+          setOpened(true);
+        }
       } catch (err: unknown) {
         setErrorKey(key);
         setErrorMessage(err instanceof ApiError ? err.message : 'Unable to open this attachment.');
@@ -493,6 +508,11 @@ function ForumAttachmentList({
           </Pressable>
         );
       })}
+      {opened ? (
+        <Text testID={testIds.forumThreadAttachmentOpened} style={[type.caption, { color: c.textMuted }]}>
+          Attachment opened
+        </Text>
+      ) : null}
       <Modal
         visible={viewer != null}
         transparent

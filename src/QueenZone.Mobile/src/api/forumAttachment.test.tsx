@@ -120,6 +120,25 @@ describe('openForumAttachmentFile', () => {
       expect.objectContaining({ title: 'notes.txt', url: expect.stringMatching(/^data:text\/plain;base64,/) }),
     );
   });
+
+  it('skips the OEM share sheet when present is false', async () => {
+    fetchMock.mockResolvedValueOnce(
+      okResponse(
+        'text/plain',
+        [9, 8],
+        'http://qz.test/api/v1/forum/attachments/9001/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+      ),
+    );
+
+    await openForumAttachmentFile(
+      '/api/v1/forum/attachments/9001/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+      'tok',
+      'attach.txt',
+      { present: false },
+    );
+    expect(Linking.openURL).not.toHaveBeenCalled();
+    expect(Share.share).not.toHaveBeenCalled();
+  });
 });
 
 describe('openForumAttachmentImage', () => {
