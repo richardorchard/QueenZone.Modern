@@ -1,5 +1,5 @@
-import { Search } from 'lucide-react-native';
-import { Pressable, Text, View } from 'react-native';
+import { Mail, Search } from 'lucide-react-native';
+import { Platform, Pressable, Text, View } from 'react-native';
 import { media } from '../../content/media';
 import { useSession } from '../../session/SessionContext';
 import { fonts, space, useTheme } from '../../theme';
@@ -7,20 +7,23 @@ import { testIds } from '../../test/testIds';
 import { ArchiveImage } from '../../ui/ArchiveImage';
 import { IconButton } from '../../ui/IconButton';
 import { initials } from '../../ui/initials';
-import { profileA11yLabel } from '../messages/inboxMeta';
+import { usePressProps } from '../../ui/press';
+import { messagesA11yLabel } from '../messages/inboxMeta';
 import { useUnreadConversationCount } from '../messages/useUnreadConversationCount';
 
 type Props = {
   onProfilePress: () => void;
   onSearch?: () => void;
+  onMessagesPress?: () => void;
   topInset?: number;
 };
 
-export function TabRootMasthead({ onProfilePress, onSearch, topInset = 0 }: Props) {
+export function TabRootMasthead({ onProfilePress, onSearch, onMessagesPress, topInset = 0 }: Props) {
   const { c, mode } = useTheme();
   const { isSignedIn, displayName } = useSession();
   const unreadCount = useUnreadConversationCount();
   const avatar = isSignedIn ? initials(displayName) : '';
+  const messagesPress = usePressProps(true);
 
   return (
     <View
@@ -64,10 +67,54 @@ export function TabRootMasthead({ onProfilePress, onSearch, topInset = 0 }: Prop
             onPress={onSearch}
           />
         ) : null}
+        {isSignedIn && onMessagesPress ? (
+          <Pressable
+            testID={testIds.homeMessages}
+            accessibilityRole="button"
+            accessibilityLabel={messagesA11yLabel(unreadCount)}
+            onPress={onMessagesPress}
+            {...messagesPress}
+            style={({ pressed }) => [
+              { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22 },
+              Platform.OS === 'ios' && pressed ? { opacity: 0.6 } : null,
+            ]}
+          >
+            <Mail size={20} color={c.textPrimary} strokeWidth={1.5} />
+            {unreadCount > 0 ? (
+              <View
+                style={{
+                  position: 'absolute',
+                  top: 2,
+                  right: 2,
+                  minWidth: 16,
+                  height: 16,
+                  borderRadius: 8,
+                  paddingHorizontal: 4,
+                  backgroundColor: c.accentPrimary,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                importantForAccessibility="no"
+                accessibilityElementsHidden
+              >
+                <Text
+                  style={{
+                    fontFamily: fonts.bodyMedium,
+                    fontSize: 9,
+                    lineHeight: 11,
+                    color: c.textOnAccent,
+                  }}
+                >
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </Text>
+              </View>
+            ) : null}
+          </Pressable>
+        ) : null}
         <Pressable
           testID={testIds.homeProfile}
           accessibilityRole="button"
-          accessibilityLabel={profileA11yLabel(isSignedIn ? unreadCount : 0)}
+          accessibilityLabel="Profile"
           onPress={onProfilePress}
           style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
         >
@@ -87,35 +134,6 @@ export function TabRootMasthead({ onProfilePress, onSearch, topInset = 0 }: Prop
               {avatar || '·'}
             </Text>
           </View>
-          {isSignedIn && unreadCount > 0 ? (
-            <View
-              style={{
-                position: 'absolute',
-                top: 2,
-                right: 2,
-                minWidth: 16,
-                height: 16,
-                borderRadius: 8,
-                paddingHorizontal: 4,
-                backgroundColor: c.accentPrimary,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-              importantForAccessibility="no"
-              accessibilityElementsHidden
-            >
-              <Text
-                style={{
-                  fontFamily: fonts.bodyMedium,
-                  fontSize: 9,
-                  lineHeight: 11,
-                  color: c.textOnAccent,
-                }}
-              >
-                {unreadCount > 99 ? '99+' : unreadCount}
-              </Text>
-            </View>
-          ) : null}
         </Pressable>
       </View>
     </View>

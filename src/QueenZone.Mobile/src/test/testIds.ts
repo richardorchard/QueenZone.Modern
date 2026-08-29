@@ -9,6 +9,7 @@ export const testIds = {
   homeScreen: 'home-screen',
   homeHero: 'home-hero',
   homeSearch: 'home-search',
+  homeMessages: 'home-messages',
   homeProfile: 'home-profile',
   tabMasthead: 'tab-masthead',
 
