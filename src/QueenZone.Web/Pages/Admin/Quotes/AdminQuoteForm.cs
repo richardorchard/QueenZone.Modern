@@ -14,9 +14,13 @@ public sealed class AdminQuoteForm
     [FromForm(Name = "isPublished")]
     public bool IsPublished { get; init; }
 
+    [FromForm(Name = "context")]
+    public string? Context { get; init; }
+
     public AdminQuoteDraft ToDraft() =>
         new(
             (Text ?? string.Empty).Trim(),
             (WhoSaid ?? string.Empty).Trim(),
-            IsPublished);
+            IsPublished,
+            string.IsNullOrWhiteSpace(Context) ? null : Context.Trim());
 }

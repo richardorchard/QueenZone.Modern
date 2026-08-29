@@ -88,23 +88,29 @@ public sealed class PublicQueryCacheService(
     public Task<IReadOnlyList<QueenHistoryEvent>> GetOnThisDayAsync(
         DateOnly date,
         int count,
-        CancellationToken cancellationToken = default) =>
-        GetOrCreateAsync(
-            PublicQueryCacheKeys.OnThisDay(date, count),
+        CancellationToken cancellationToken = default)
+    {
+        var version = GetHistoryCacheVersion();
+        return GetOrCreateAsync(
+            PublicQueryCacheKeys.OnThisDay(version, date, count),
             options.Value.OnThisDayCacheDuration,
             () => queenHistoryRepository.GetOnThisDayAsync(date, count, cancellationToken),
             cancellationToken);
+    }
 
     public Task<IReadOnlyList<QueenHistoryEvent>> GetAroundThisDayAsync(
         DateOnly date,
         int dayWindow,
         int count,
-        CancellationToken cancellationToken = default) =>
-        GetOrCreateAsync(
-            PublicQueryCacheKeys.AroundThisDay(date, dayWindow, count),
+        CancellationToken cancellationToken = default)
+    {
+        var version = GetHistoryCacheVersion();
+        return GetOrCreateAsync(
+            PublicQueryCacheKeys.AroundThisDay(version, date, dayWindow, count),
             options.Value.OnThisDayCacheDuration,
             () => queenHistoryRepository.GetAroundThisDayAsync(date, dayWindow, count, cancellationToken),
             cancellationToken);
+    }
 
     public Task<IReadOnlyList<PhotoCategory>> GetPhotoCategoriesAsync(CancellationToken cancellationToken = default)
     {
@@ -189,9 +195,16 @@ public sealed class PublicQueryCacheService(
         cache.Set(PublicQueryCacheKeys.PhotoVersion, CreateCacheVersion(), VersionEntryOptions);
     }
 
+    public void InvalidateHistoryCache()
+    {
+        cache.Set(PublicQueryCacheKeys.HistoryVersion, CreateCacheVersion(), VersionEntryOptions);
+    }
+
     private string GetNewsCacheVersion() => GetOrInitVersion(PublicQueryCacheKeys.NewsVersion);
 
     private string GetPhotoCacheVersion() => GetOrInitVersion(PublicQueryCacheKeys.PhotoVersion);
+
+    private string GetHistoryCacheVersion() => GetOrInitVersion(PublicQueryCacheKeys.HistoryVersion);
 
     private string GetOrInitVersion(string key)
     {

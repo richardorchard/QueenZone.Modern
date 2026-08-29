@@ -19,5 +19,5 @@ public abstract class AdminQuotePageModel : PageModel
     }
 
     protected static AdminQuoteDraft ToDraft(QuoteItem quote) =>
-        new(quote.Text, quote.WhoSaid, quote.IsPublished);
+        new(quote.Text, quote.WhoSaid, quote.IsPublished, quote.Context);
 }

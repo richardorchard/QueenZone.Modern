@@ -44,14 +44,14 @@ Keys live in `PublicQueryCacheKeys`. Invalidation APIs live on `PublicQueryCache
 | Forum thread count | `public-query:forum:thread-count` | 30m | `InvalidateForumStatsCache` | Same | Same as forum categories | TTL |
 | Photo categories | `public-query:photo:categories:v{version}` | 30m (`PhotoCacheDuration`) | `InvalidatePhotoCache` | Bump `public-query:photo:version` | Admin photo writes (`Admin/Photos/*` via `InvalidatePublicPhotoCachesAsync`) | TTL |
 | Photo category page | `public-query:photo:category-page:v{version}:{catId}:{page}:{pageSize}` | 30m | `InvalidatePhotoCache` | Same photo version bump | Same as photo categories | TTL |
-| On this day | `public-query:history:on-this-day:{yyyyMMdd}:{count}` | 12h (`OnThisDayCacheDuration`) | *(none)* | — | — | TTL only |
-| Around this day | `public-query:history:around-this-day:{yyyyMMdd}:{dayWindow}:{count}` | 12h | *(none)* | — | — | TTL only |
+| On this day | `public-query:history:on-this-day:v{version}:{yyyyMMdd}:{count}` | 12h (`OnThisDayCacheDuration`) | `InvalidateHistoryCache` | Bump `public-query:history:version` | Admin timeline create / edit / delete / publish (`Admin/Timeline/*` via `InvalidatePublicHistoryCacheAsync`) | TTL |
+| Around this day | `public-query:history:around-this-day:v{version}:{yyyyMMdd}:{dayWindow}:{count}` | 12h | `InvalidateHistoryCache` | Same history version bump | Same as on this day | TTL |
 
 Related **output-cache** tags (anonymous HTML / sitemaps) are separate from this query cache. Editorial writes that change public HTML should also `EvictByTagAsync` for `PublicOutputCachePolicies.PublicHtmlTag` / `PublicSitemapTag` as already done from admin news, photo, and sitemap invalidation paths. See `PublicOutputCachePolicies` and issue [#321](https://github.com/richardorchard/QueenZone.Modern/issues/321).
 
 ### Contributor rules
 
-1. **Writes that change public aggregates must invalidate.** Admin or member writes that change data exposed through `PublicQueryCacheService` must call the matching invalidate API (or bump the matching versioned key family). Do not rely on TTL alone for editorial news, articles, photos, or forum stats.
+1. **Writes that change public aggregates must invalidate.** Admin or member writes that change data exposed through `PublicQueryCacheService` must call the matching invalidate API (or bump the matching versioned key family). Do not rely on TTL alone for editorial news, articles, photos, forum stats, or homepage history snippets.
 2. **New cached queries need a matrix row.** When adding a `GetOrCreateAsync` entry, add a key helper on `PublicQueryCacheKeys`, document the row above, and wire invalidation (or explicitly document TTL-only with rationale, as for queen-history snippets).
 3. **Prefer version bumps for open-ended key families.** News latest-count variants and photo category pages use version segments so callers can add new count/page shapes without updating every `Remove` call site.
 4. **Single-instance assumption.** Invalidation only affects the current process. Do not design multi-instance consistency on this cache until [`hosting-scale-and-cache.md`](hosting-scale-and-cache.md) allows scale-out and a shared cache product.
@@ -61,7 +61,7 @@ Related **output-cache** tags (anonymous HTML / sitemaps) are separate from this
 
 ```text
 # Invalidation APIs and call sites
-rg "Invalidate(News|Forum|Article|Photo)|InvalidateArticleCountCache|InvalidateForumStatsCache" src tests
+rg "Invalidate(News|Forum|Article|Photo|History)|InvalidateArticleCountCache|InvalidateForumStatsCache" src tests
 
 # Key conventions
 rg "PublicQueryCacheKeys" src

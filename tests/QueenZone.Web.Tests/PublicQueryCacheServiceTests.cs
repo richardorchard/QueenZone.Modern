@@ -349,6 +349,24 @@ public sealed class PublicQueryCacheServiceTests
     }
 
     [Fact]
+    public async Task InvalidateHistoryCache_causes_a_second_on_this_day_repo_hit()
+    {
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var historyRepository = new CountingQueenHistoryRepository();
+        var service = CreateService(memoryCache, historyRepository: historyRepository);
+
+        await service.GetOnThisDayAsync(new DateOnly(2026, 7, 6), 3);
+        await service.GetOnThisDayAsync(new DateOnly(2026, 7, 6), 3);
+        Assert.Equal(1, historyRepository.OnThisDayCallCount);
+
+        service.InvalidateHistoryCache();
+
+        await service.GetOnThisDayAsync(new DateOnly(2026, 7, 6), 3);
+
+        Assert.Equal(2, historyRepository.OnThisDayCallCount);
+    }
+
+    [Fact]
     public async Task PhotoCategoriesAndPagesAreCachedUntilInvalidated()
     {
         using var memoryCache = new MemoryCache(new MemoryCacheOptions());

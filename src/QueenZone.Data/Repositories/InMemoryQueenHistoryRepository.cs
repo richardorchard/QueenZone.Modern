@@ -1,13 +1,18 @@
 namespace QueenZone.Data;
 
-public sealed class InMemoryQueenHistoryRepository(IReadOnlyList<QueenHistoryEvent> events) : IQueenHistoryRepository
+public sealed class InMemoryQueenHistoryRepository(SharedQueenHistoryStore store) : IQueenHistoryRepository
 {
+    public InMemoryQueenHistoryRepository(IReadOnlyList<QueenHistoryEvent> events)
+        : this(new SharedQueenHistoryStore(events))
+    {
+    }
+
     public Task<IReadOnlyList<QueenHistoryEvent>> GetOnThisDayAsync(
         DateOnly date,
         int count,
         CancellationToken cancellationToken = default)
     {
-        var matches = events.Where(item =>
+        var matches = store.GetAll().Where(item =>
             item.EventDate.Month == date.Month &&
             item.EventDate.Day == date.Day);
 
@@ -17,7 +22,7 @@ public sealed class InMemoryQueenHistoryRepository(IReadOnlyList<QueenHistoryEve
     public Task<IReadOnlyList<QueenHistoryEvent>> GetAllPublishedAsync(
         CancellationToken cancellationToken = default)
     {
-        IReadOnlyList<QueenHistoryEvent> result = events.Where(e => e.IsPublished).ToList();
+        IReadOnlyList<QueenHistoryEvent> result = store.GetAll().Where(item => item.IsPublished).ToList();
         return Task.FromResult(result);
     }
 
@@ -27,7 +32,7 @@ public sealed class InMemoryQueenHistoryRepository(IReadOnlyList<QueenHistoryEve
         int count,
         CancellationToken cancellationToken = default)
     {
-        var matches = events
+        var matches = store.GetAll()
             .Where(item => item.IsPublished && item.DatePrecision == QueenHistoryDatePrecision.ExactDate)
             .Select(item => new
             {
