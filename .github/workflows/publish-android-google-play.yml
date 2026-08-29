@@ -194,7 +194,10 @@ jobs:
         run: |
           bundle=android/app/build/outputs/bundle/release/app-release.aab
           test -f "$bundle"
-          jarsigner -verify -strict "$bundle"
+          # No -strict: Android signing certs are self-signed by design (no CA
+          # chain), which jarsigner -strict treats as a hard failure (exit 4)
+          # even though the signature itself is valid.
+          jarsigner -verify "$bundle"
 
       - name: Upload bundle artifact
         uses: actions/upload-artifact@v7
