@@ -25,7 +25,6 @@ import {
   formatSubmittedAt,
   parseApproximateDate,
   parseApproximateYear,
-  photoCategoryMaxLength,
   photoDescriptionMaxLength,
   photoFromPickerAsset,
   photoSubmitCopy,
@@ -70,7 +69,7 @@ function PhotoSubmitForm({ navigation }: Pick<Props, 'navigation'>) {
     void fetchPhotoCategories({ page: 1, pageSize: 100, signal: controller.signal })
       .then((page) => setCategories(page.items))
       .catch(() => {
-        // Category chips are optional; the website datalist also allows a free-text value.
+        // Category chips are optional; a missing list still lets the member submit.
       });
     return () => controller.abort();
   }, []);
@@ -281,15 +280,6 @@ function PhotoSubmitForm({ navigation }: Pick<Props, 'navigation'>) {
                 })}
               </View>
             ) : null}
-            <TextInput
-              value={suggestedCategory}
-              onChangeText={setSuggestedCategory}
-              maxLength={photoCategoryMaxLength}
-              accessibilityLabel="Suggested category"
-              placeholder="Category name"
-              placeholderTextColor={c.textMuted}
-              style={[styles.input, { color: c.textPrimary, borderColor: c.border, backgroundColor: c.surfaceCard }]}
-            />
 
             <FieldLabel color={c.textMuted}>Approximate year (optional)</FieldLabel>
             <TextInput
