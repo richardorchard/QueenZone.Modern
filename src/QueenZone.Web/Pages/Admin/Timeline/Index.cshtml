@@ -86,7 +86,7 @@ else
               <form method="post" action="/admin/timeline?handler=TogglePublish" style="display:inline">
                 <input type="hidden" name="@AdminTimelinePageModel.AntiforgeryTokenFieldName" value="@antiforgeryToken">
                 <input type="hidden" name="id" value="@item.Id">
-                <input type="hidden" name="isPublished" value="@item.IsPublished">
+                <input type="hidden" name="isPublished" value="@(item.IsPublished ? "true" : "false")">
                 <button type="submit">@(item.IsPublished ? "Unpublish" : "Publish")</button>
               </form>
               <form method="post" action="/admin/timeline?handler=Delete" style="display:inline" onsubmit="return confirm('Delete this timeline event?');">

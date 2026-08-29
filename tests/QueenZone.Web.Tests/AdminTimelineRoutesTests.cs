@@ -95,6 +95,32 @@ public sealed class AdminTimelineRoutesTests : IClassFixture<QueenZoneWebApplica
     }
 
     [Fact]
+    public async Task PostCreate_checked_publish_box_stays_published()
+    {
+        var store = new SharedQueenHistoryStore();
+        var client = CreateWriteClient(store);
+        var title = $"WAF published checkbox {Guid.NewGuid():N}";
+        var formPage = await client.GetStringAsync("/admin/timeline/new");
+        var fields = new List<KeyValuePair<string, string>>
+        {
+            new("__RequestVerificationToken", AdminHttpTestHelpers.ExtractAntiforgeryToken(formPage)),
+            new("title", title),
+            new("summary", "Created by AdminTimelineRoutesTests."),
+            new("eventDate", DateTime.UtcNow.ToString("yyyy-MM-dd")),
+            new("datePrecision", nameof(QueenHistoryDatePrecision.ExactDate)),
+            new("category", nameof(QueenHistoryEventCategory.Other)),
+            new("importance", "50"),
+            new("sourceUrl", string.Empty),
+            new("isPublished", "true"),
+        };
+
+        var create = await client.PostAsync("/admin/timeline", new FormUrlEncodedContent(fields));
+        Assert.Equal(HttpStatusCode.Redirect, create.StatusCode);
+        Assert.True(store.GetAll().Single(item => item.Title == title).IsPublished);
+        Assert.Contains(title, await client.GetStringAsync("/timeline"));
+    }
+
+    [Fact]
     public async Task PostCreate_validation_error_redisplays_the_form()
     {
         var client = CreateWriteClient(new SharedQueenHistoryStore());
