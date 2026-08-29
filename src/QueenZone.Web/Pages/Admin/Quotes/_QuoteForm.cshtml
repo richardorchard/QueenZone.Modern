@@ -30,6 +30,10 @@
     <input type="text" name="whoSaid" value="@Model.Draft.WhoSaid" maxlength="@QuoteValidation.MaxWhoSaidLength" required>
   </label>
   <label>
+    Context <span class="admin-form-hint">(optional)</span>
+    <input type="text" name="context" value="@Model.Draft.Context" maxlength="@QuoteValidation.MaxContextLength">
+  </label>
+  <label>
     <input type="hidden" name="isPublished" value="false">
     <input type="checkbox" name="isPublished" value="true" checked="@Model.Draft.IsPublished">
     Published (visible on the homepage)

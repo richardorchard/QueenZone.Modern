@@ -50,6 +50,7 @@ public sealed class EfQuoteRepository(QueenZoneDbContext dbContext) : IQuoteRepo
         {
             Text = draft.Text,
             WhoSaid = draft.WhoSaid,
+            Context = draft.Context,
             CreatedAt = DateTime.UtcNow,
             IsPublished = draft.IsPublished,
         };
@@ -67,6 +68,7 @@ public sealed class EfQuoteRepository(QueenZoneDbContext dbContext) : IQuoteRepo
                 setters => setters
                     .SetProperty(quote => quote.Text, draft.Text)
                     .SetProperty(quote => quote.WhoSaid, draft.WhoSaid)
+                    .SetProperty(quote => quote.Context, draft.Context)
                     .SetProperty(quote => quote.IsPublished, draft.IsPublished),
                 cancellationToken);
 
@@ -103,5 +105,5 @@ public sealed class EfQuoteRepository(QueenZoneDbContext dbContext) : IQuoteRepo
     }
 
     private static QuoteItem Map(QuoteEntity row) =>
-        new(row.QuoteId, row.Text, row.WhoSaid, row.CreatedAt, row.IsPublished);
+        new(row.QuoteId, row.Text, row.WhoSaid, row.CreatedAt, row.IsPublished, row.Context);
 }

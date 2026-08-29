@@ -5,4 +5,5 @@ public sealed record QuoteItem(
     string Text,
     string WhoSaid,
     DateTime CreatedAt,
-    bool IsPublished);
+    bool IsPublished,
+    string? Context = null);
