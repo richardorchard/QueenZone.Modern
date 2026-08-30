@@ -53,14 +53,25 @@ Caveats:
    files matching the site's import schemas:
    - `new_quotes.csv` — `Text,WhoSaid,Context,SourceType,SourceKey`
    - `new_history_events.csv` — `Title,Summary,EventDate,DatePrecision,Category,Importance,SourceType,SourceKey,SourceUrl`
-   - `new_trivia.md` — bulleted dateless facts, one line of page/reason context each
+   - `new_trivia_facts.csv` — `Fact,Category,SourceContext`. Trivia is a single
+     standalone fact, not a question/answer pair (see epic #1096) — write each row
+     as a self-contained sentence, not a prompt expecting a reveal. A raw
+     `new_trivia.md` with page-numbered research notes behind those rows is fine
+     to keep alongside it, but the CSV is the canonical, schema-shaped deliverable.
    Use a new `SourceType` literal per book (e.g. `VisualDocumentaryBook`), and add
    the matching enum member to `QuoteSourceType` and `QueenHistoryEventSourceType`
    (`src/QueenZone.Data/Quotes/QuoteSourceType.cs`,
    `src/QueenZone.Data/History/QueenHistoryEventSourceType.cs`) before import — no
-   migration needed, these aren't DB-backed lookups.
+   migration needed, these aren't DB-backed lookups. Trivia has no entity/importer
+   yet (tracked in #1099) — its CSV is staged for whenever that ships.
 5. Never write directly to `./data/*.csv` or run the importers as part of this
    pass — it's a curation step for a human to review first.
+6. Quote candidates carry real copyright weight (they're substantial excerpts
+   from a commercially published book) in a way history-event summaries and
+   trivia facts don't — those are your own paraphrased facts/dates, not the
+   author's prose. Don't bulk-merge quote candidates into `data/queen_quotes.csv`
+   without the human explicitly reviewing volume and length first; history
+   events and trivia facts are lower-risk to merge once dedup'd.
 
 See `docs/backlog/visual-documentary-extraction/` for a worked example (from
 *Queen: A Visual Documentary*, Ken Dean & Chris Charlesworth).
