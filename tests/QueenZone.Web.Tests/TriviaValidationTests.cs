@@ -64,4 +64,28 @@ public sealed class TriviaValidationTests
 
         Assert.Contains(errors, error => error.Contains("Source must be", StringComparison.Ordinal));
     }
+
+    [Fact]
+    public void ValidateSuggestion_accepts_optional_source_note()
+    {
+        var errors = TriviaValidation.ValidateSuggestion(
+            "Brian May is an astrophysicist.",
+            "Band",
+            TriviaDifficulty.Medium,
+            "From the official biography.");
+
+        Assert.Empty(errors);
+    }
+
+    [Fact]
+    public void ValidateSuggestion_rejects_source_note_over_the_max_length()
+    {
+        var errors = TriviaValidation.ValidateSuggestion(
+            "A fact.",
+            null,
+            null,
+            new string('n', TriviaValidation.MaxSourceNoteLength + 1));
+
+        Assert.Contains(errors, error => error.Contains("Source or context note", StringComparison.Ordinal));
+    }
 }

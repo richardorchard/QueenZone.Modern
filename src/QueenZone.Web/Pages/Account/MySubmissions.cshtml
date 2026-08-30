@@ -3,7 +3,7 @@
 @using QueenZone.Data
 @using QueenZone.Storage
 
-<partial name="_PageHero" model='@(("Members", "My submissions", "Track photos, news suggestions, and articles you have submitted.", ""))' />
+<partial name="_PageHero" model='@(("Members", "My submissions", "Track photos, news suggestions, articles, and trivia facts you have submitted.", ""))' />
 
 <section class="qz-section">
   <div class="qz-container qz-prose">
@@ -13,6 +13,8 @@
       <a href="/submit/news">Suggest news</a>
       ·
       <a href="/submit/article">Write an article</a>
+      ·
+      <a href="/submit/trivia">Suggest trivia</a>
       ·
       <a href="/account/settings">Account settings</a>
     </p>
@@ -27,6 +29,9 @@
       <a class="qz-submissions-tabs__tab @(Model.ActiveTab == MySubmissionsModel.TabArticles ? "is-active" : null)"
          href="@Model.GetTabHref(MySubmissionsModel.TabArticles)"
          aria-current="@(Model.ActiveTab == MySubmissionsModel.TabArticles ? "page" : null)">Articles</a>
+      <a class="qz-submissions-tabs__tab @(Model.ActiveTab == MySubmissionsModel.TabTrivia ? "is-active" : null)"
+         href="@Model.GetTabHref(MySubmissionsModel.TabTrivia)"
+         aria-current="@(Model.ActiveTab == MySubmissionsModel.TabTrivia ? "page" : null)">Trivia</a>
     </nav>
 
     @if (Model.ActiveTab == MySubmissionsModel.TabPhotos)
@@ -68,6 +73,44 @@
                   else if (!string.IsNullOrWhiteSpace(item.ReviewNotes))
                   {
                     <span>@item.ReviewNotes</span>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    }
+    else if (Model.ActiveTab == MySubmissionsModel.TabTrivia)
+    {
+      <h2 class="visually-hidden">Trivia</h2>
+      @if (Model.TriviaSubmissions.Count == 0)
+      {
+        <p>You have not suggested any trivia facts yet. <a href="/submit/trivia">Suggest a trivia fact</a></p>
+      }
+      else
+      {
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Fact</th>
+              <th>Status</th>
+              <th>Submitted</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            @foreach (var item in Model.TriviaSubmissions)
+            {
+              <tr>
+                <td>@item.Text</td>
+                <td><partial name="_SubmissionStatusBadge" model="item.Status" /></td>
+                <td>@item.SubmittedAt.ToString("u")</td>
+                <td>
+                  @if (item.Status == TriviaFactSubmissionStatus.Rejected
+                       && !string.IsNullOrWhiteSpace(item.RejectionReason))
+                  {
+                    <span>@item.RejectionReason</span>
                   }
                 </td>
               </tr>

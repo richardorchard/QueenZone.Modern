@@ -10,6 +10,8 @@ public static class TriviaValidation
 
     public const int MaxSourceLength = 500;
 
+    public const int MaxSourceNoteLength = 1000;
+
     public static readonly IReadOnlyList<string> AllowedDifficulties = ["easy", "medium", "hard"];
 
     public static IReadOnlyList<string> ValidateDraft(AdminTriviaDraft draft)
@@ -39,6 +41,22 @@ public static class TriviaValidation
         if (draft.Source is { Length: > MaxSourceLength })
         {
             errors.Add($"Source must be {MaxSourceLength} characters or fewer.");
+        }
+
+        return errors;
+    }
+
+    public static IReadOnlyList<string> ValidateSuggestion(
+        string text,
+        string? category,
+        string? difficulty,
+        string? sourceNote)
+    {
+        var errors = ValidateDraft(new AdminTriviaDraft(text, false, category, difficulty)).ToList();
+
+        if (sourceNote is { Length: > MaxSourceNoteLength })
+        {
+            errors.Add($"Source or context note must be {MaxSourceNoteLength} characters or fewer.");
         }
 
         return errors;

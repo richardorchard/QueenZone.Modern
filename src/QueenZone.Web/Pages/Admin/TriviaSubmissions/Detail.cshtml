@@ -1,0 +1,118 @@
+@page "/admin/trivia-submissions/{id:guid}"
+@model DetailModel
+@using QueenZone.Data
+
+@{
+  var submission = Model.Submission!;
+  var canAct = submission.Status is TriviaFactSubmissionStatus.Pending;
+  var publishedSource = string.IsNullOrWhiteSpace(submission.SourceNote)
+      ? string.Empty
+      : submission.SourceNote.Length <= TriviaValidation.MaxSourceLength
+          ? submission.SourceNote
+          : submission.SourceNote[..TriviaValidation.MaxSourceLength];
+}
+
+<div class="admin-shell">
+  <h1>Review trivia suggestion</h1>
+  <p><a href="/admin/trivia-submissions">Back to queue</a></p>
+
+  @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+  {
+    <p class="qz-account-notice @(Model.StatusMessageKind == "error" ? "qz-account-notice--error" : "qz-account-notice--success")" role="status">
+      @Model.StatusMessage
+    </p>
+  }
+
+  <dl>
+    <dt>Fact</dt>
+    <dd>@submission.Text</dd>
+    <dt>Submitter</dt>
+    <dd>@(submission.SubmitterDisplayName ?? "Unknown") @(string.IsNullOrWhiteSpace(submission.SubmitterEmail) ? "" : $"({submission.SubmitterEmail})")</dd>
+    <dt>Status</dt>
+    <dd>@submission.Status</dd>
+    <dt>Submitted</dt>
+    <dd>@submission.SubmittedAt.ToString("u")</dd>
+    <dt>Suggested category</dt>
+    <dd>@(submission.Category ?? "—")</dd>
+    <dt>Suggested difficulty</dt>
+    <dd>@(submission.Difficulty ?? "—")</dd>
+    <dt>Source or context note</dt>
+    <dd>@(string.IsNullOrWhiteSpace(submission.SourceNote) ? "—" : submission.SourceNote)</dd>
+    <dt>Review notes</dt>
+    <dd>@(submission.ReviewNotes ?? "—")</dd>
+    <dt>Rejection reason</dt>
+    <dd>@(submission.RejectionReason ?? "—")</dd>
+    @if (submission.PromotedTriviaId is int triviaId)
+    {
+      <dt>Published fact</dt>
+      <dd><a href="/admin/trivia/@triviaId/edit">Fact #@triviaId</a></dd>
+    }
+  </dl>
+
+  @if (canAct)
+  {
+    <section>
+      <h2>Approve and publish</h2>
+      <form method="post" action="/admin/trivia-submissions/@submission.Id/approve" class="admin-inline-form">
+        @Html.AntiForgeryToken()
+        <label>
+          Fact text
+          <textarea name="text" maxlength="@TriviaValidation.MaxTextLength" rows="4" required>@submission.Text</textarea>
+        </label>
+        <label>
+          Category <span class="admin-form-hint">(optional)</span>
+          <input name="category" value="@(submission.Category ?? "")" maxlength="@TriviaValidation.MaxCategoryLength" />
+        </label>
+        <label>
+          Difficulty <span class="admin-form-hint">(optional)</span>
+          <select name="difficulty">
+            @if (string.IsNullOrWhiteSpace(submission.Difficulty))
+            {
+              <option value="" selected>(none)</option>
+            }
+            else
+            {
+              <option value="">(none)</option>
+            }
+            @foreach (var difficulty in TriviaValidation.AllowedDifficulties)
+            {
+              if (string.Equals(submission.Difficulty, difficulty, StringComparison.Ordinal))
+              {
+                <option value="@difficulty" selected>@difficulty</option>
+              }
+              else
+              {
+                <option value="@difficulty">@difficulty</option>
+              }
+            }
+          </select>
+        </label>
+        <label>
+          Published source <span class="admin-form-hint">(optional)</span>
+          <input name="source" value="@publishedSource" maxlength="@TriviaValidation.MaxSourceLength" />
+        </label>
+        <label>
+          Internal review notes
+          <input name="reviewNotes" maxlength="500" />
+        </label>
+        <button type="submit">Approve and publish</button>
+      </form>
+    </section>
+
+    <section>
+      <h2>Reject</h2>
+      <form method="post" action="/admin/trivia-submissions/@submission.Id/reject" class="admin-inline-form" onsubmit="return confirm('Reject this suggestion?');">
+        @Html.AntiForgeryToken()
+        <label>
+          Rejection reason (shown to submitter)
+          <input name="rejectionReason" required maxlength="500" />
+        </label>
+        <label>
+          Internal review notes
+          <input name="reviewNotes" maxlength="500" />
+        </label>
+        <button type="submit">Reject</button>
+      </form>
+    </section>
+  }
+</div>
