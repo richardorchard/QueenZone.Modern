@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
   Modal,
@@ -36,7 +37,13 @@ import { getAppConfig } from '../../config';
 import { usePagedContent } from '../../hooks/usePagedContent';
 import type { ForumStackParamList } from '../../navigation/types';
 import { resolvePushMemberId } from '../../notifications/pushMemberId';
-import { useOfflineQueue, type OfflineQueueItem } from '../../offlineQueue';
+import {
+  flushOfflineQueue,
+  removeOfflineItem,
+  updateOfflineItem,
+  useOfflineQueue,
+  type OfflineQueueItem,
+} from '../../offlineQueue';
 import { isSmokeAttachEnabled } from '../../session/smokeAttach';
 import { useSession } from '../../session/SessionContext';
 import { openForumComposer, openSignIn } from '../../session/signInNavigation';
@@ -489,16 +496,52 @@ function ForumPostRow({
         <RichHtmlBody html={post.body} horizontalInset={space.xl} />
       </View>
       {post.queueState ? (
-        <Text
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={
+            post.queueState === 'sending'
+              ? 'Sending…'
+              : post.queueState === 'needs_attention'
+                ? 'Needs attention'
+                : 'Queued'
+          }
           testID={testIds.pendingForumPost}
-          style={[type.caption, { color: c.accentPrimary, marginTop: space.xs }]}
+          onPress={() => {
+            if (post.queueState !== 'needs_attention' || !post.operationId) {
+              return;
+            }
+            Alert.alert('This reply could not be sent.', undefined, [
+              { text: 'Dismiss', style: 'cancel' },
+              {
+                text: 'Discard',
+                style: 'destructive',
+                onPress: () => {
+                  void removeOfflineItem(post.operationId!);
+                },
+              },
+              {
+                text: 'Retry',
+                onPress: () => {
+                  void updateOfflineItem(post.operationId!, {
+                    state: 'queued',
+                    nextRetryAt: new Date().toISOString(),
+                    lastError: null,
+                  }).then(() => {
+                    void flushOfflineQueue();
+                  });
+                },
+              },
+            ]);
+          }}
         >
-          {post.queueState === 'sending'
-            ? 'Sending…'
-            : post.queueState === 'needs_attention'
-              ? 'Needs attention'
-              : 'Queued'}
-        </Text>
+          <Text style={[type.caption, { color: c.accentPrimary, marginTop: space.xs }]}>
+            {post.queueState === 'sending'
+              ? 'Sending…'
+              : post.queueState === 'needs_attention'
+                ? 'Needs attention'
+                : 'Queued'}
+          </Text>
+        </Pressable>
       ) : null}
       {post.attachments.length > 0 ? (
         <ForumAttachmentList

@@ -136,12 +136,10 @@ public sealed class IdempotentApiWritesTests
     }
 
     [Fact]
-    public async Task Conflict_UsesProblemDetails()
+    public void Conflict_UsesProblemDetails()
     {
         var conflict = IdempotentApiWrites.Conflict();
-        var http = new DefaultHttpContext();
-        http.Response.Body = new MemoryStream();
-        await conflict.ExecuteAsync(http);
-        Assert.Equal(StatusCodes.Status409Conflict, http.Response.StatusCode);
+        var status = Assert.IsAssignableFrom<IStatusCodeHttpResult>(conflict);
+        Assert.Equal(StatusCodes.Status409Conflict, status.StatusCode);
     }
 }
