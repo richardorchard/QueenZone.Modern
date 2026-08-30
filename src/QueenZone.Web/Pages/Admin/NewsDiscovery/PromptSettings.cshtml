@@ -11,8 +11,9 @@
   </p>
 
   <p class="admin-status admin-status--info">
-    Guidance is an overlay for future NewsAgent runs only. Publishing does not rewrite existing candidates, AI results, or drafts.
-    The worker may take up to 60 seconds to pick up a published change. Compiled JSON schema, evidence, quotation, media-link, and safety rules stay in code.
+    The text below is the editorial guidance used by future NewsAgent runs only. Publishing does not rewrite existing candidates, AI results, or drafts.
+    The worker may take up to 60 seconds to pick up a published change. It starts pre-filled with the built-in default &mdash; edit it freely and save to fully replace that default.
+    The JSON output format, evidence, quotation, media-link, and safety rules always stay fixed in code and are added automatically; they cannot be changed here.
   </p>
 
   @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
@@ -52,7 +53,7 @@
         <input type="hidden" name="type" value="@guidance.Type" />
         <input type="hidden" name="rowVersion" value="@guidance.DraftRowVersion" />
         <label>
-          Working draft (plain text, max 4000 characters)
+          Editorial guidance (plain text, max 4000 characters). Pre-filled with the built-in default &mdash; edit and save to replace it.
           <textarea name="content" rows="8" maxlength="4000">@guidance.DraftContent</textarea>
         </label>
         <button type="submit">Save draft</button>
@@ -80,10 +81,11 @@
       </form>
 
       <details>
-        <summary>Composed preview (compiled rules plus overlay delimiter)</summary>
+        <summary>Composed preview (fixed rules plus editorial guidance)</summary>
         <p class="admin-muted">
-          Read-only preview. The compiled system prompt is not editable here.
-          Overlay is appended after the compiled rules between
+          Read-only preview of the exact system prompt the worker will send. The fixed JSON/safety rules above are
+          not editable here. Your saved guidance (or the built-in default, if nothing is published) is placed after
+          them, between
           --- BEGIN ADMIN EDITORIAL GUIDANCE (untrusted) ---
           and
           --- END ADMIN EDITORIAL GUIDANCE ---.

@@ -107,6 +107,21 @@ public sealed class NewsDraftPromptTests
         Assert.Contains("Media link policy (mandatory)", messages[0].Content, StringComparison.Ordinal);
         Assert.Contains("Never invent a quote", messages[0].Content, StringComparison.Ordinal);
         Assert.Contains(NewsAgentEditorialGuidance.ConstraintFooter, messages[0].Content, StringComparison.Ordinal);
+
+        // The overlay fully replaces the default editorial guidance (voice/tone), but
+        // never the fixed quote/media-link/attribution contract.
+        Assert.DoesNotContain("knowledgeable Queen fan", messages[0].Content, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void BuildMessages_without_guidance_uses_default_editorial_guidance()
+    {
+        var (candidate, source, evidence) = CreatePromptContext();
+        var messages = NewsDraftPrompt.BuildMessages(candidate, source, evidence);
+
+        Assert.Contains("knowledgeable Queen fan", messages[0].Content, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(NewsDraftPrompt.BuildDefaultEditorialGuidance(), messages[0].Content, StringComparison.Ordinal);
+        Assert.Contains(NewsDraftPrompt.BuildFixedContract(), messages[0].Content, StringComparison.Ordinal);
     }
 
     private static (NewsCandidate Candidate, NewsDiscoverySource Source, IReadOnlyList<NewsCandidateEvidence> Evidence) CreatePromptContext()

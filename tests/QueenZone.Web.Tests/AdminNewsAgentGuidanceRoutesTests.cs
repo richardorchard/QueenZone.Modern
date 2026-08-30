@@ -72,13 +72,21 @@ public sealed partial class AdminNewsAgentGuidanceRoutesTests : IClassFixture<We
         Assert.Contains("action=\"/admin/news-discovery/prompt-settings?handler=Publish\"", page, StringComparison.Ordinal);
         Assert.Contains("action=\"/admin/news-discovery/prompt-settings?handler=RestoreDefault\"", page, StringComparison.Ordinal);
         Assert.DoesNotContain("<script>alert(1)</script>", page, StringComparison.Ordinal);
+        // With no draft or published overlay yet, each textarea is pre-filled with that
+        // type's own default editorial guidance so there is real text to tune - not blank.
         var overlayTextareas = OverlayTextareaRegex().Matches(page);
         Assert.Equal(2, overlayTextareas.Count);
-        foreach (Match textarea in overlayTextareas)
-        {
-            Assert.DoesNotContain("You triage discovered news items", textarea.Groups["content"].Value, StringComparison.Ordinal);
-            Assert.DoesNotContain("You draft QueenZone news articles", textarea.Groups["content"].Value, StringComparison.Ordinal);
-        }
+        var triageTextarea = overlayTextareas[0].Groups["content"].Value;
+        var draftTextarea = overlayTextareas[1].Groups["content"].Value;
+        Assert.Contains("You triage discovered news items", triageTextarea, StringComparison.Ordinal);
+        Assert.DoesNotContain("You draft QueenZone news articles", triageTextarea, StringComparison.Ordinal);
+        Assert.Contains("You draft QueenZone news articles", draftTextarea, StringComparison.Ordinal);
+        Assert.DoesNotContain("You triage discovered news items", draftTextarea, StringComparison.Ordinal);
+
+        // The fixed JSON/safety contract is always added in code and must never be
+        // shown as editable overlay text.
+        Assert.DoesNotContain("Respond with JSON only", triageTextarea, StringComparison.Ordinal);
+        Assert.DoesNotContain("Respond with JSON only", draftTextarea, StringComparison.Ordinal);
 
         var save = await PostAsync(client, "/admin/news-discovery/prompt-settings?handler=SaveDraft", new Dictionary<string, string>
         {
