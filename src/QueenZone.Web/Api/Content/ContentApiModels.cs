@@ -152,6 +152,17 @@ public sealed record LiveActivitySummaryDto(int NewForumRepliesToday);
 public sealed record QuoteDto(int Id, string Text, string WhoSaid, string? Context);
 
 /// <summary>
+/// Shape for <c>/api/v1/content/trivia/random</c>. Optional <see cref="Category"/>,
+/// <see cref="Difficulty"/>, and <see cref="Source"/> are omitted when blank.
+/// </summary>
+public sealed record TriviaDto(
+    int Id,
+    string Text,
+    string? Category = null,
+    string? Difficulty = null,
+    string? Source = null);
+
+/// <summary>
 /// Shape for <c>GET /api/v1/content/home-poll</c> and the website Index block.
 /// JSON <c>null</c> when no poll is current. Counts and percentages are public.
 /// </summary>

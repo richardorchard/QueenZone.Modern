@@ -37,6 +37,7 @@ public static class PublicOutputCachePolicies
         "/help",
         "/contact",
         "/forum/attachment",
+        "/trivia",
     ];
 
     public static bool IsPublicReadOnlyRequest(HttpContext httpContext)
