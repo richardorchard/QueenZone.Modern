@@ -114,6 +114,11 @@ export function fetchRandomQuote(signal?: AbortSignal): Promise<RandomQuote | nu
   return fetchJson('/content/quotes/random', { signal });
 }
 
+/** A published quote by id. 404 when missing or unpublished. */
+export function fetchQuoteById(id: number, signal?: AbortSignal): Promise<RandomQuote> {
+  return fetchJson(`/content/quotes/${id}`, { signal });
+}
+
 export function fetchFreddieTributePage(
   query: PageQuery = {},
 ): Promise<ApiPagedResponse<FreddieTribute>> {

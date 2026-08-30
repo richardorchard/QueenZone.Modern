@@ -106,6 +106,7 @@ describe('widgetTaskHandler', () => {
       summary: 'Queen released The Game.',
       quoteText: 'New quote',
       quoteWhoSaid: 'Brian May',
+      quoteId: 2,
     });
     expect(props.renderWidget).toHaveBeenCalled();
   });
@@ -163,6 +164,7 @@ describe('widgetTaskHandler', () => {
       summary: undefined,
       quoteText: 'Rolled quote',
       quoteWhoSaid: 'Roger Taylor',
+      quoteId: 3,
     });
     expect(props.renderWidget).toHaveBeenCalled();
     jest.spyOn(Date, 'now').mockRestore();

@@ -15,7 +15,7 @@ import {
   widgetSecondaryPt,
   type WidgetProps,
 } from './widgetCopy';
-import { widgetDeepLinkUrl } from './widgetDeepLink';
+import { widgetFaceDeepLinkUrl } from './widgetDeepLink';
 
 /**
  * Props rendered into the widget's bitmap (the library rasterizes this tree, it does not
@@ -40,7 +40,7 @@ export function OnThisDayAndroidWidget(props: OnThisDayAndroidWidgetProps) {
   return (
     <OverlapWidget
       clickAction="OPEN_URI"
-      clickActionData={{ uri: widgetDeepLinkUrl }}
+      clickActionData={{ uri: widgetFaceDeepLinkUrl(face, props.quoteId) }}
       accessibilityLabel="QueenZone on this day widget"
       style={{
         height: 'match_parent',
