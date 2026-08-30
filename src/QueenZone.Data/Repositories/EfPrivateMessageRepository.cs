@@ -347,16 +347,14 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
         var preview = TruncatePreview(body);
         // Explicit transactions must run through the configured execution strategy so Azure SQL
         // can retry the entire unit of work rather than rejecting a user-started transaction.
-        var strategy = dbContext.Database.CreateExecutionStrategy();
-        return await strategy.ExecuteAsync(async () =>
-        {
-            await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
-            try
+        // Join an ambient idempotency transaction when present so the receipt commits with the message.
+        return await QueenZoneDbTransactions.ExecuteAsync(
+            dbContext,
+            async innerCt =>
             {
-                var conversation = await LockConversationForWriteAsync(conversationId, cancellationToken);
+                var conversation = await LockConversationForWriteAsync(conversationId, innerCt);
                 if (conversation is null)
                 {
-                    await transaction.RollbackAsync(cancellationToken);
                     return new PrivateMessageSendResult(false, null, "Conversation not found.");
                 }
 
@@ -368,12 +366,12 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
                     Body = body,
                     CreatedAt = sentAt,
                 };
-                await PrepareMessageSortKeyAsync(message, cancellationToken);
+                await PrepareMessageSortKeyAsync(message, innerCt);
                 dbContext.PrivateMessages.Add(message);
 
-                await ReactivateParticipantAsync(conversationId, conversation.MemberLowId, cancellationToken);
-                await ReactivateParticipantAsync(conversationId, conversation.MemberHighId, cancellationToken);
-                await dbContext.SaveChangesAsync(cancellationToken);
+                await ReactivateParticipantAsync(conversationId, conversation.MemberLowId, innerCt);
+                await ReactivateParticipantAsync(conversationId, conversation.MemberHighId, innerCt);
+                await dbContext.SaveChangesAsync(innerCt);
 
                 await UpdateConversationSummaryForInsertedMessageAsync(
                     conversationId,
@@ -381,18 +379,11 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
                     preview,
                     senderMemberId,
                     message.SortKey,
-                    cancellationToken);
+                    innerCt);
 
-                await transaction.CommitAsync(cancellationToken);
                 return new PrivateMessageSendResult(true, conversationId, null);
-            }
-            catch
-            {
-                await transaction.RollbackAsync(CancellationToken.None);
-                dbContext.ChangeTracker.Clear();
-                throw;
-            }
-        });
+            },
+            cancellationToken);
     }
 
     private async Task<Guid> SendOnceAsync(
@@ -405,13 +396,12 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
     {
         var (low, high) = OrderPair(senderMemberId, recipientMemberId);
         // See ReplyAsync: retry the complete transaction when SQL Server reports a transient fault.
-        var strategy = dbContext.Database.CreateExecutionStrategy();
-        return await strategy.ExecuteAsync(async () =>
-        {
-            await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
-            try
+        // Join an ambient idempotency transaction when present so the receipt commits with the message.
+        return await QueenZoneDbTransactions.ExecuteAsync(
+            dbContext,
+            async innerCt =>
             {
-                var conversation = await LockConversationForWriteAsync(low, high, cancellationToken);
+                var conversation = await LockConversationForWriteAsync(low, high, innerCt);
 
                 if (conversation is null)
                 {
@@ -454,9 +444,9 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
                         Body = body,
                         CreatedAt = sentAt,
                     };
-                    await PrepareMessageSortKeyAsync(firstMessage, cancellationToken);
+                    await PrepareMessageSortKeyAsync(firstMessage, innerCt);
                     dbContext.PrivateMessages.Add(firstMessage);
-                    await dbContext.SaveChangesAsync(cancellationToken);
+                    await dbContext.SaveChangesAsync(innerCt);
 
                     // Sender has seen their own first message; align SortKey cursor with LastReadAt.
                     // Tip SortKey is only known after IDENTITY (SQL Server) or in-process assignment (SQLite).
@@ -464,21 +454,20 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
                     var senderParticipant = await dbContext.PrivateConversationParticipants
                         .SingleAsync(
                             p => p.ConversationId == conversation.Id && p.MemberId == senderMemberId,
-                            cancellationToken);
+                            innerCt);
                     senderParticipant.LastReadSortKey = firstMessage.SortKey;
                     senderParticipant.LastReadAt = sentAt;
-                    await dbContext.SaveChangesAsync(cancellationToken);
+                    await dbContext.SaveChangesAsync(innerCt);
 
-                    await transaction.CommitAsync(cancellationToken);
                     return conversation.Id;
                 }
 
                 var conversationId = conversation.Id;
 
-                await EnsureParticipantAsync(conversationId, senderMemberId, cancellationToken);
-                await EnsureParticipantAsync(conversationId, recipientMemberId, cancellationToken);
-                await ReactivateParticipantAsync(conversationId, senderMemberId, cancellationToken);
-                await ReactivateParticipantAsync(conversationId, recipientMemberId, cancellationToken);
+                await EnsureParticipantAsync(conversationId, senderMemberId, innerCt);
+                await EnsureParticipantAsync(conversationId, recipientMemberId, innerCt);
+                await ReactivateParticipantAsync(conversationId, senderMemberId, innerCt);
+                await ReactivateParticipantAsync(conversationId, recipientMemberId, innerCt);
 
                 var message = new PrivateMessageEntity
                 {
@@ -488,9 +477,9 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
                     Body = body,
                     CreatedAt = sentAt,
                 };
-                await PrepareMessageSortKeyAsync(message, cancellationToken);
+                await PrepareMessageSortKeyAsync(message, innerCt);
                 dbContext.PrivateMessages.Add(message);
-                await dbContext.SaveChangesAsync(cancellationToken);
+                await dbContext.SaveChangesAsync(innerCt);
 
                 await UpdateConversationSummaryForInsertedMessageAsync(
                     conversationId,
@@ -498,18 +487,11 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
                     preview,
                     senderMemberId,
                     message.SortKey,
-                    cancellationToken);
+                    innerCt);
 
-                await transaction.CommitAsync(cancellationToken);
                 return conversationId;
-            }
-            catch
-            {
-                await transaction.RollbackAsync(CancellationToken.None);
-                dbContext.ChangeTracker.Clear();
-                throw;
-            }
-        });
+            },
+            cancellationToken);
     }
 
     private async Task<PrivateConversationEntity?> LockConversationForWriteAsync(

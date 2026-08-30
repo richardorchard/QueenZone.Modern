@@ -106,41 +106,47 @@ public sealed class EfNewsAgentGuidanceRepository(QueenZoneDbContext dbContext) 
         CancellationToken cancellationToken = default)
     {
         var email = NormalizeEmail(publisherEmail);
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
-        try
+        // Explicit transactions must run through the configured execution strategy so Azure SQL
+        // can retry the entire unit of work rather than rejecting a user-started transaction.
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
         {
-            var draft = await dbContext.NewsAgentGuidanceRevisions
-                .SingleOrDefaultAsync(
-                    item => item.Type == type && item.Status == NewsAgentGuidanceStatus.Draft,
-                    cancellationToken)
-                ?? throw new InvalidOperationException($"No draft guidance exists for {NewsAgentGuidanceText.ToStorageType(type)}.");
-
-            EnsureRowVersion(draft, expectedRowVersion);
-
-            var published = await dbContext.NewsAgentGuidanceRevisions
-                .SingleOrDefaultAsync(
-                    item => item.Type == type && item.Status == NewsAgentGuidanceStatus.Published,
-                    cancellationToken);
-            if (published is not null)
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+            try
             {
-                published.Status = NewsAgentGuidanceStatus.Superseded;
+                var draft = await dbContext.NewsAgentGuidanceRevisions
+                    .SingleOrDefaultAsync(
+                        item => item.Type == type && item.Status == NewsAgentGuidanceStatus.Draft,
+                        cancellationToken)
+                    ?? throw new InvalidOperationException($"No draft guidance exists for {NewsAgentGuidanceText.ToStorageType(type)}.");
+
+                EnsureRowVersion(draft, expectedRowVersion);
+
+                var published = await dbContext.NewsAgentGuidanceRevisions
+                    .SingleOrDefaultAsync(
+                        item => item.Type == type && item.Status == NewsAgentGuidanceStatus.Published,
+                        cancellationToken);
+                if (published is not null)
+                {
+                    published.Status = NewsAgentGuidanceStatus.Superseded;
+                }
+
+                var now = DateTime.UtcNow;
+                draft.Status = NewsAgentGuidanceStatus.Published;
+                draft.PublishedAt = now;
+                draft.PublishedByEmail = email;
+                AssignRowVersionIfNeeded(draft);
+
+                await SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+                return Map(draft)!;
             }
-
-            var now = DateTime.UtcNow;
-            draft.Status = NewsAgentGuidanceStatus.Published;
-            draft.PublishedAt = now;
-            draft.PublishedByEmail = email;
-            AssignRowVersionIfNeeded(draft);
-
-            await SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-            return Map(draft)!;
-        }
-        catch
-        {
-            await transaction.RollbackAsync(cancellationToken);
-            throw;
-        }
+            catch
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                throw;
+            }
+        });
     }
 
     public async Task<NewsAgentGuidanceRevision> RollbackAsync(
@@ -188,43 +194,49 @@ public sealed class EfNewsAgentGuidanceRepository(QueenZoneDbContext dbContext) 
         CancellationToken cancellationToken)
     {
         var email = NormalizeEmail(publisherEmail);
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
-        try
+        // Explicit transactions must run through the configured execution strategy so Azure SQL
+        // can retry the entire unit of work rather than rejecting a user-started transaction.
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
         {
-            var published = await dbContext.NewsAgentGuidanceRevisions
-                .SingleOrDefaultAsync(
-                    item => item.Type == type && item.Status == NewsAgentGuidanceStatus.Published,
-                    cancellationToken);
-            if (published is not null)
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+            try
             {
-                published.Status = NewsAgentGuidanceStatus.Superseded;
+                var published = await dbContext.NewsAgentGuidanceRevisions
+                    .SingleOrDefaultAsync(
+                        item => item.Type == type && item.Status == NewsAgentGuidanceStatus.Published,
+                        cancellationToken);
+                if (published is not null)
+                {
+                    published.Status = NewsAgentGuidanceStatus.Superseded;
+                }
+
+                var now = DateTime.UtcNow;
+                var created = new NewsAgentGuidanceRevisionEntity
+                {
+                    Type = type,
+                    RevisionNumber = await NextRevisionNumberAsync(type, cancellationToken),
+                    Content = sanitizedContent,
+                    ContentHash = contentHash,
+                    Status = NewsAgentGuidanceStatus.Published,
+                    CreatedAt = now,
+                    CreatedByEmail = email,
+                    PublishedAt = now,
+                    PublishedByEmail = email
+                };
+                AssignRowVersionIfNeeded(created);
+                dbContext.NewsAgentGuidanceRevisions.Add(created);
+
+                await SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+                return Map(created)!;
             }
-
-            var now = DateTime.UtcNow;
-            var created = new NewsAgentGuidanceRevisionEntity
+            catch
             {
-                Type = type,
-                RevisionNumber = await NextRevisionNumberAsync(type, cancellationToken),
-                Content = sanitizedContent,
-                ContentHash = contentHash,
-                Status = NewsAgentGuidanceStatus.Published,
-                CreatedAt = now,
-                CreatedByEmail = email,
-                PublishedAt = now,
-                PublishedByEmail = email
-            };
-            AssignRowVersionIfNeeded(created);
-            dbContext.NewsAgentGuidanceRevisions.Add(created);
-
-            await SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-            return Map(created)!;
-        }
-        catch
-        {
-            await transaction.RollbackAsync(cancellationToken);
-            throw;
-        }
+                await transaction.RollbackAsync(cancellationToken);
+                throw;
+            }
+        });
     }
 
     private async Task<int> NextRevisionNumberAsync(NewsAgentGuidanceType type, CancellationToken cancellationToken)

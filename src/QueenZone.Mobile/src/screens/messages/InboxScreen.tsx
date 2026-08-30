@@ -1,11 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
+import { Alert, FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { archiveConversation, fetchInbox, type InboxConversation } from '../../api/messages';
 import { getContentCache, inboxCacheKey } from '../../cache';
 import { usePagedContent } from '../../hooks/usePagedContent';
 import type { HomeStackParamList } from '../../navigation/types';
+import { resolvePushMemberId } from '../../notifications/pushMemberId';
+import {
+  flushOfflineQueue,
+  removeOfflineItem,
+  updateOfflineItem,
+  useOfflineQueue,
+  type OfflineQueueItem,
+} from '../../offlineQueue';
 import { MemberGate } from '../../session/MemberGate';
 import { useSession } from '../../session/SessionContext';
 import { radius, space, type, useTheme } from '../../theme';
@@ -22,6 +30,32 @@ import {
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'Inbox'>;
 
+function overlayQueuedComposes(
+  items: InboxConversation[],
+  queueItems: OfflineQueueItem[],
+): InboxConversation[] {
+  const pending = queueItems.filter((item) => item.kind === 'message.compose');
+  if (pending.length === 0) {
+    return items;
+  }
+  const extra = pending.map((item) => ({
+    conversationId: `pending:${item.operationId}`,
+    otherParticipantId: 'recipientMemberId' in item.target ? item.target.recipientMemberId : '',
+    otherParticipantDisplayName:
+      item.state === 'needs_attention'
+        ? 'Needs attention'
+        : item.state === 'sending'
+          ? 'Sending…'
+          : 'Queued message',
+    lastMessagePreview: item.payload.body,
+    lastMessageAt: item.createdAt,
+    hasUnread: false,
+    unreadCount: 0,
+    detailPath: '',
+  }));
+  return [...extra, ...items];
+}
+
 export function InboxScreen({ navigation }: Props) {
   return (
     <MemberGate title="Messages">
@@ -33,6 +67,8 @@ export function InboxScreen({ navigation }: Props) {
 function InboxList({ navigation }: Pick<Props, 'navigation'>) {
   const { c } = useTheme();
   const { accessToken, profile } = useSession();
+  const memberId = accessToken ? resolvePushMemberId(accessToken, profile?.memberId) : null;
+  const queueItems = useOfflineQueue(memberId);
   const skipNextFocusRefresh = useRef(true);
   const [archivingId, setArchivingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -96,7 +132,10 @@ function InboxList({ navigation }: Pick<Props, 'navigation'>) {
   }, [cacheKey, paged.page, paged.loading, paged.error, paged.items]);
 
   const showingCacheOnly = paged.loading && paged.items.length === 0 && !!cachedItems && cachedItems.length > 0;
-  const displayItems = showingCacheOnly ? cachedItems : paged.items;
+  const displayItems = overlayQueuedComposes(
+    showingCacheOnly ? cachedItems : paged.items,
+    queueItems,
+  );
 
   const handleArchive = useCallback(
     async (conversationId: string) => {
@@ -176,8 +215,43 @@ function InboxList({ navigation }: Pick<Props, 'navigation'>) {
         <InboxRow
           item={item}
           archiving={archivingId === item.conversationId}
-          onPress={() => navigation.navigate('Conversation', { id: item.conversationId })}
+          onPress={() => {
+            if (item.conversationId.startsWith('pending:')) {
+              const operationId = item.conversationId.slice('pending:'.length);
+              Alert.alert(
+                item.otherParticipantDisplayName,
+                item.lastMessagePreview,
+                [
+                  { text: 'Dismiss', style: 'cancel' },
+                  {
+                    text: 'Discard',
+                    style: 'destructive',
+                    onPress: () => {
+                      void removeOfflineItem(operationId);
+                    },
+                  },
+                  {
+                    text: 'Retry',
+                    onPress: () => {
+                      void updateOfflineItem(operationId, {
+                        state: 'queued',
+                        nextRetryAt: new Date().toISOString(),
+                        lastError: null,
+                      }).then(() => {
+                        void flushOfflineQueue();
+                      });
+                    },
+                  },
+                ],
+              );
+              return;
+            }
+            navigation.navigate('Conversation', { id: item.conversationId });
+          }}
           onArchive={() => {
+            if (item.conversationId.startsWith('pending:')) {
+              return;
+            }
             void handleArchive(item.conversationId);
           }}
         />

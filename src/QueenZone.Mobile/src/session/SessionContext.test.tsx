@@ -27,6 +27,10 @@ jest.mock('../config/appConfig', () => ({
   getAppConfig: () => mockAppConfig,
 }));
 
+jest.mock('expo-network', () => ({
+  addNetworkStateListener: jest.fn(() => ({ remove: jest.fn() })),
+}));
+
 jest.mock('../api/client', () => {
   const actual = jest.requireActual('../api/client') as typeof import('../api/client');
   return {
