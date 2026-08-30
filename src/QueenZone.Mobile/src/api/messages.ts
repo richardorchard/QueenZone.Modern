@@ -2,6 +2,7 @@ import { getContentCache } from '../cache/defaultCache';
 import type { ContentCache } from '../cache/contentCache';
 import { conversationCacheKey } from '../cache/keys';
 import { withOfflineCacheResult, type CachedResult } from '../cache/withOfflineCache';
+import { resolvePushMemberId } from '../notifications/pushMemberId';
 import { fetchJson, sendJson } from './client';
 import type { ApiPagedResponse } from './types';
 import type { PageQuery } from './content';
@@ -174,7 +175,11 @@ export type ConversationReadQuery = PageQuery & {
   cache?: ContentCache;
   /** Pull-to-refresh: write-through on success, never serve a cached snapshot. */
   networkOnly?: boolean;
-  /** Signed-in profile.memberId. Required to cache; never the Bearer token. */
+  /**
+   * Signed-in profile.memberId when `/me` has loaded. If omitted, the access
+   * token `sub` is used so a process-death restore can still hit the cache
+   * when `/me` is offline. Never the Bearer token.
+   */
   memberId?: string | null;
 };
 
@@ -183,7 +188,7 @@ export async function fetchConversationResult(
   conversationId: string,
   query: ConversationReadQuery = {},
 ): Promise<CachedResult<ConversationDetail>> {
-  const memberId = query.memberId?.trim() ?? '';
+  const memberId = resolvePushMemberId(accessToken, query.memberId) ?? '';
   const fetchFresh = () =>
     fetchJson<ConversationDetail>(messagesConversationPath(conversationId), {
       query: pageParams(query),

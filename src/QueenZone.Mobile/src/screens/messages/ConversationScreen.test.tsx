@@ -458,5 +458,33 @@ describe('ConversationScreen', () => {
     expect(screen.getByTestId(testIds.offlineBanner)).toBeOnTheScreen();
     expect(fetchConversationMock).not.toHaveBeenCalled();
   });
+
+  it('hydrates from cache using the JWT sub when /me profile is unavailable', async () => {
+    const encode = (value: object) => Buffer.from(JSON.stringify(value)).toString('base64url');
+    const accessToken = `${encode({ alg: 'none', typ: 'JWT' })}.${encode({ sub: 'member-from-jwt' })}.sig`;
+    mockSession.profile = null;
+    mockSession.accessToken = accessToken;
+    const snapshot = conversationDetail([
+      {
+        id: theirMessageId,
+        senderMemberId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+        senderDisplayName: 'Bob',
+        body: 'Hello from cache',
+        createdAt: '2026-08-19T12:00:00.000Z',
+        isMine: false,
+        sortKey: 1,
+        reportedByViewer: false,
+      },
+    ]);
+    fetchConversationResultMock.mockResolvedValue(asCache(snapshot));
+
+    renderConversation();
+    await waitFor(() => expect(screen.getByText('Hello from cache')).toBeOnTheScreen());
+    expect(fetchConversationResultMock).toHaveBeenCalledWith(
+      accessToken,
+      conversationId,
+      expect.objectContaining({ memberId: 'member-from-jwt' }),
+    );
+  });
 });
 

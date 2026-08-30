@@ -26,6 +26,7 @@ import {
   type ConversationMessage,
 } from '../../api/messages';
 import type { HomeStackParamList } from '../../navigation/types';
+import { resolvePushMemberId } from '../../notifications/pushMemberId';
 import { MemberGate } from '../../session/MemberGate';
 import { useSession } from '../../session/SessionContext';
 import { fonts, palette, radius, space, type, useTheme } from '../../theme';
@@ -82,7 +83,7 @@ function ConversationThread({ navigation, route }: Props) {
   const { accessToken, profile } = useSession();
   const listRef = useRef<FlatList<ThreadListItem<ConversationMessage>>>(null);
   const conversationId = parseConversationId(route.params.id);
-  const memberId = profile?.memberId ?? null;
+  const memberId = accessToken ? resolvePushMemberId(accessToken, profile?.memberId) : null;
   const [detail, setDetail] = useState<ConversationDetail | null>(null);
   const [source, setSource] = useState<CacheSource>('network');
   const [cachedAt, setCachedAt] = useState<string | null>(null);
