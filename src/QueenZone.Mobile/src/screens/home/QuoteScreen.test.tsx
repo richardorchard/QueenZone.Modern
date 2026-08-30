@@ -79,6 +79,7 @@ describe('QuoteScreen', () => {
     renderQuote(navigation, 0);
 
     await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('Home'));
-    expect(fetchQuote).toHaveBeenCalled();
+    expect(fetchQuote).not.toHaveBeenCalled();
+    expect(screen.queryByTestId(testIds.quoteScreen)).toBeNull();
   });
 });

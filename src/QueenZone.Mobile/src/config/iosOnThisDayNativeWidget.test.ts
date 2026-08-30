@@ -49,7 +49,7 @@ describe('applyOnThisDayNativeWidget', () => {
     assert.match(first, /struct OnThisDayNativeEntryView/);
     assert.match(first, /Open QueenZone to load today's story\./);
     assert.match(first, /queenzone:\/\/home/);
-    assert.match(first, /queenzone:\/\/quotes\/\\(quoteId)/);
+    assert.equal(first.includes('queenzone://quotes/\\(quoteId)'), true);
     assert.match(first, /intProp\("quoteId"\)/);
     assert.match(first, /containerBackground/);
     assert.match(first, /foregroundColor/);

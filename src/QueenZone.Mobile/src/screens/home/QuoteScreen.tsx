@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { fetchQuoteById } from '../../api';
+import { ApiError, fetchQuoteById } from '../../api';
 import { useDetailQuery } from '../../hooks/useDetailQuery';
 import { HeaderBackButton } from '../../navigation/headerButtons';
 import type { HomeStackParamList } from '../../navigation/types';
@@ -19,7 +19,15 @@ function quoteContext(value: string | null | undefined): string | null {
 export function QuoteScreen({ navigation, route }: Props) {
   const { c } = useTheme();
   const { id } = route.params;
-  const loadQuote = useCallback((signal: AbortSignal) => fetchQuoteById(id, signal), [id]);
+  const loadQuote = useCallback(
+    (signal: AbortSignal) => {
+      if (!Number.isInteger(id) || id <= 0) {
+        return Promise.reject(new ApiError(404, 'Not Found'));
+      }
+      return fetchQuoteById(id, signal);
+    },
+    [id],
+  );
   const { data: quote, error, loading } = useDetailQuery(loadQuote);
 
   useLayoutEffect(() => {

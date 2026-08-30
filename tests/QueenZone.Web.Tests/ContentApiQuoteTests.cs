@@ -59,6 +59,7 @@ public sealed class ContentApiQuoteTests : IClassFixture<QueenZoneWebApplication
         using var response = await client.GetAsync($"{ContentApiEndpoints.RootPath}/quotes/11");
 
         var payload = await ReadRandomQuoteJsonAsync<QuoteDto>(response);
+        Assert.NotNull(payload);
         Assert.Equal(11, payload.Id);
         Assert.Equal("A kind of magic", payload.Text);
         Assert.Equal("Freddie Mercury", payload.WhoSaid);
@@ -75,6 +76,7 @@ public sealed class ContentApiQuoteTests : IClassFixture<QueenZoneWebApplication
         using var response = await client.GetAsync($"{ContentApiEndpoints.RootPath}/quotes/12");
 
         var payload = await ReadRandomQuoteJsonAsync<QuoteDto>(response);
+        Assert.NotNull(payload);
         Assert.Equal(12, payload.Id);
         Assert.Null(payload.Context);
     }
