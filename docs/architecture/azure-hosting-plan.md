@@ -71,11 +71,11 @@ Production, Staging, and Preview persist ASP.NET Core Data Protection keys to
 `/home/ASP.NET/DataProtection-Keys` on Linux App Service
 (`D:\home\ASP.NET\DataProtection-Keys` on Windows App Service). This is the
 [standard Azure Apps key-ring location](https://learn.microsoft.com/aspnet/core/security/data-protection/configuration/default-settings)
-on the App Service persistent home share, outside the read-only
-`/home/site/wwwroot` package mounted by `WEBSITE_RUN_FROM_PACKAGE=1`. Using the
-existing standard location avoids abandoning keys that the framework may already
-have written implicitly. Cookie authentication and antiforgery tokens therefore
-remain valid across app recycles and deployments on the current App Service.
+on the App Service persistent home share, outside `/home/site/wwwroot`, which
+every deploy overwrites. Using the existing standard location avoids abandoning
+keys that the framework may already have written implicitly. Cookie
+authentication and antiforgery tokens therefore remain valid across app
+recycles and deployments on the current App Service.
 
 `DataProtection__KeysPath` may override the location, but it must be an absolute path
 outside `wwwroot`. Startup creates the directory and fails immediately if the mount or
@@ -173,9 +173,29 @@ Probe paths are answered by a short-circuit registered as the first middleware a
 
 Do not point `WEBSITE_WARMUP_PATH` back at `/warmup` just because this budget is now bounded. The platform gate should stay cheap (#673).
 
-Do **not** set `WEBSITE_RUN_FROM_PACKAGE` through Kudu `POST /api/settings`. That call returns 204 but does not persist an ARM application setting; after #660 OneDeploy reported success while the worker kept serving the previous extracted `wwwroot`.
+`WEBSITE_RUN_FROM_PACKAGE=1` (mount the OneDeploy zip read-only instead of
+extracting it) was removed: it repeatedly served stale builds after a
+successful deploy — a worker could pass the post-deploy build-stamp smoke
+check and then revert to the previous build minutes later with no further
+restart logged, consistent with the old worker not draining cleanly during
+the read-only mount handoff. Plain extract-mode deploys, the current default,
+do not have this failure mode. `configure-app-settings` now actively deletes
+the setting if it reappears live, so it must stay absent.
 
-`WEBSITE_RUN_FROM_PACKAGE`, `WEBSITE_WARMUP_PATH`, and `WEBSITE_WARMUP_STATUSES` are owned by ARM (#666): `deploy.yml`'s `configure-app-settings` job logs in via `azure/login` with a dedicated OIDC identity (GitHub environment `deploy`, Website Contributor scoped to the `queenzone-dev` site only — not the resource group, and separate from the `dev` environment's Bitwarden publish-profile identity), then runs `az webapp config appsettings set` before the zip deploy runs. With `WEBSITE_RUN_FROM_PACKAGE=1` set through ARM, OneDeploy mounts the zip read-only (`is_readonly: true`) instead of extracting it. That mount does swap the package, but after #688 skipping the extra Kudu `POST /api/app/restart` left `/warmup` on HTTP 500 and `/` flaking (run 31812172927). Deploy still recycles via Kudu after the push, then polls `/warmup` **and** `data-build-version` on `/` (the PR-head short SHA baked into the CI publish artifact); post-deploy smoke repeats the stamp check on the content-route suite. A standalone Kudu-side delete of the key does not clear the ARM setting; ARM is the only writer.
+`WEBSITE_WARMUP_PATH` and `WEBSITE_WARMUP_STATUSES` are owned by ARM (#666):
+`deploy.yml`'s `configure-app-settings` job logs in via `azure/login` with a
+dedicated OIDC identity (GitHub environment `deploy`, Website Contributor
+scoped to the `queenzone-dev` site only — not the resource group, and
+separate from the `dev` environment's Bitwarden publish-profile identity),
+then runs `az webapp config appsettings set` before the zip deploy runs. Do
+**not** write ARM Application Settings through Kudu `POST /api/settings` —
+that call returns 204 but does not persist them; after #660 OneDeploy
+reported success while the worker kept serving the previous extracted
+`wwwroot`. Deploy still recycles via Kudu after the push (#688: skipping this
+left `/warmup` on HTTP 500 and `/` flaking), then polls `/warmup` **and**
+`data-build-version` on `/` (the PR-head short SHA baked into the CI publish
+artifact); post-deploy smoke repeats the stamp check on the content-route
+suite.
 
 Enable **Always On** for the App Service when available on the active SKU so the single B1 worker is not unloaded after idle periods. Always On prevents idle cold starts; `WEBSITE_WARMUP_PATH` controls the platform startup ping when the app process/container starts. Keep the GitHub Actions post-deploy smoke route suite in place after `/warmup` passes, because real public pages still prove routing, Razor rendering, and output-cache behavior on the custom domain.
 

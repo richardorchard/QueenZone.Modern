@@ -3171,8 +3171,8 @@ a.qz-forum-post__author-link:focus-visible {
   margin-bottom: 1rem;
 }
 
-.admin-form input,
-.admin-form textarea {
+.admin-form input:not([hidden]),
+.admin-form textarea:not([hidden]) {
   display: block;
   margin-top: 0.35rem;
   width: 100%;

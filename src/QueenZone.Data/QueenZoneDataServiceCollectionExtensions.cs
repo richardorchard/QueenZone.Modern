@@ -36,6 +36,7 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddScoped<IBiographyRepository, EfBiographyRepository>();
         services.AddScoped<IQuoteRepository, EfQuoteRepository>();
         services.AddScoped<ITriviaRepository, EfTriviaRepository>();
+        services.AddScoped<ITriviaFactSubmissionRepository, EfTriviaFactSubmissionRepository>();
         if (forumDataOptions.UseModernForumReads)
         {
             services.AddScoped<IForumRepository, ModernForumRepository>();
@@ -108,6 +109,12 @@ public static class QueenZoneDataServiceCollectionExtensions
         var triviaStore = new SharedTriviaStore(SampleTriviaData.CreateSeedFacts());
         services.AddSingleton(triviaStore);
         services.AddSingleton<ITriviaRepository>(_ => new InMemoryTriviaRepository(triviaStore));
+        services.AddSingleton<ITriviaFactSubmissionRepository>(sp =>
+        {
+            var members = sp.GetRequiredService<IMemberAccountRepository>();
+            return new InMemoryTriviaFactSubmissionRepository(id =>
+                members.FindByIdAsync(id).GetAwaiter().GetResult());
+        });
         var forumWriteRepository = new InMemoryForumWriteRepository();
         var forumAttachmentRepository = new InMemoryForumAttachmentRepository();
         var forumPollRepository = new InMemoryForumPollRepository();

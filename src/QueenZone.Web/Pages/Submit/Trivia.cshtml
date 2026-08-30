@@ -1,0 +1,53 @@
+@page "/submit/trivia"
+@model TriviaModel
+@using QueenZone.Data
+
+<partial name="_PageHero" model='@(("Community", "Suggest a trivia fact", "Share a Queen fact for the trivia rotation. Editors review every suggestion before it goes live.", ""))' />
+
+<section class="qz-section">
+  <div class="qz-container qz-prose">
+    <p>
+      Suggestions are reviewed by editors before they appear as published trivia.
+      <a href="/account/my-submissions?tab=trivia">View your submissions</a>
+    </p>
+
+    <div asp-validation-summary="ModelOnly" class="qz-account-notice qz-account-notice--error"></div>
+
+    <form method="post" class="qz-account-form">
+      @Html.AntiForgeryToken()
+
+      <label class="qz-account-form__field">
+        <span>Trivia fact</span>
+        <textarea asp-for="Text" rows="4" maxlength="@TriviaValidation.MaxTextLength" required></textarea>
+        <span asp-validation-for="Text" class="qz-account-form__field-error"></span>
+      </label>
+
+      <label class="qz-account-form__field">
+        <span>Category <span class="qz-account-form__optional">(optional)</span></span>
+        <input asp-for="Category" maxlength="@TriviaValidation.MaxCategoryLength" />
+        <span asp-validation-for="Category" class="qz-account-form__field-error"></span>
+      </label>
+
+      <label class="qz-account-form__field">
+        <span>Difficulty <span class="qz-account-form__optional">(optional)</span></span>
+        <select asp-for="Difficulty">
+          <option value="">(none)</option>
+          @foreach (var difficulty in TriviaValidation.AllowedDifficulties)
+          {
+            <option value="@difficulty">@difficulty</option>
+          }
+        </select>
+        <span asp-validation-for="Difficulty" class="qz-account-form__field-error"></span>
+      </label>
+
+      <label class="qz-account-form__field">
+        <span>Source or context <span class="qz-account-form__optional">(optional)</span></span>
+        <textarea asp-for="SourceNote" rows="3" maxlength="@TriviaValidation.MaxSourceNoteLength"></textarea>
+        <span asp-validation-for="SourceNote" class="qz-account-form__field-error"></span>
+        <span class="qz-account-form__help">Where you heard this, or any extra context for the editor.</span>
+      </label>
+
+      <button type="submit" class="qz-button">Submit for review</button>
+    </form>
+  </div>
+</section>

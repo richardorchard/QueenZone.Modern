@@ -177,13 +177,17 @@ jobs:
             --project src/QueenZone.Data/QueenZone.Data.csproj \
             --startup-project src/QueenZone.Web/QueenZone.Web.csproj
 
-  # Kudu POST /api/settings cannot persist WEBSITE_RUN_FROM_PACKAGE as an ARM
-  # Application Setting — it returns 204 but OneDeploy still extracts instead
-  # of mounting the zip, so the worker keeps serving the previous build
-  # (#660, #664). These keys must be written through ARM (az CLI / azure/login),
-  # never through scripts/Invoke-AppServiceKudu.py. Uses a dedicated OIDC
-  # identity scoped to Website Contributor on queenzone-dev only (#666) —
-  # separate from the `dev` environment's Bitwarden publish-profile identity.
+  # WEBSITE_RUN_FROM_PACKAGE=1 (mount the zip read-only rather than extracting
+  # it) was removed after it repeatedly served stale builds post-deploy: a
+  # worker could pass the post-deploy build-stamp smoke check and then revert
+  # to the previous build minutes later with no further restart logged,
+  # consistent with the old worker not draining cleanly during the mount
+  # handoff. Plain extract-mode deploys do not have this failure mode.
+  # WEBSITE_WARMUP_PATH is still ARM-owned here (Kudu POST /api/settings
+  # cannot persist ARM Application Settings — it returns 204 but does not
+  # take effect, #660/#664), through a dedicated OIDC identity scoped to
+  # Website Contributor on queenzone-dev only (#666), never through
+  # scripts/Invoke-AppServiceKudu.py.
   #
   # WEBSITE_WARMUP_PATH points at /health, not /warmup. Azure's own container
   # startup probe must succeed within WEBSITES_CONTAINER_START_TIME_LIMIT
@@ -235,9 +239,8 @@ jobs:
       # every call, whether or not the values actually changed — and this
       # job runs on every code deploy, not just the first flip. Writing
       # unconditionally would pay a 90s settle wait (see below) on every
-      # deploy forever, which is more than the ~39s extract time run-from-
-      # package was meant to save (#666). Only write, and only wait, when
-      # the live settings actually differ from the desired ones.
+      # deploy forever. Only write, and only wait, when the live settings
+      # actually differ from the desired ones.
       - name: Check and set required application settings via ARM
         id: apply-settings
         env:
@@ -249,19 +252,26 @@ jobs:
           fi
 
           desired=$(printf '%s\n' \
-            "WEBSITE_RUN_FROM_PACKAGE=1" \
             "WEBSITE_WARMUP_PATH=/health" | sort)
 
           current=$(az webapp config appsettings list \
             --name queenzone-dev \
             --resource-group Queenzone-RG \
-            --query "[?name=='WEBSITE_RUN_FROM_PACKAGE' || name=='WEBSITE_WARMUP_PATH'].[join('=', [name, value])]" \
+            --query "[?name=='WEBSITE_WARMUP_PATH'].[join('=', [name, value])]" \
             -o tsv | tr -d '\r' | sort)
 
           strict_warmup_status=$(az webapp config appsettings list \
             --name queenzone-dev \
             --resource-group Queenzone-RG \
             --query "[?name=='WEBSITE_WARMUP_STATUSES'].value | [0]" \
+            -o tsv | tr -d '\r')
+
+          # Kept absent by design (see comment above): a stale WEBSITE_RUN_FROM_PACKAGE=1
+          # from before this removal must not linger and re-enable the read-only mount.
+          run_from_package=$(az webapp config appsettings list \
+            --name queenzone-dev \
+            --resource-group Queenzone-RG \
+            --query "[?name=='WEBSITE_RUN_FROM_PACKAGE'].value | [0]" \
             -o tsv | tr -d '\r')
 
           current_mobile_auth_signing_key=$(az webapp config appsettings list \
@@ -280,11 +290,20 @@ jobs:
             changed=true
           fi
 
+          if [ -n "$run_from_package" ]; then
+            az webapp config appsettings delete \
+              --name queenzone-dev \
+              --resource-group Queenzone-RG \
+              --setting-names WEBSITE_RUN_FROM_PACKAGE \
+              --output none
+            changed=true
+          fi
+
           if [ "$current" != "$desired" ]; then
             az webapp config appsettings set \
               --name queenzone-dev \
               --resource-group Queenzone-RG \
-              --settings WEBSITE_RUN_FROM_PACKAGE=1 WEBSITE_WARMUP_PATH=/health \
+              --settings WEBSITE_WARMUP_PATH=/health \
               --output none
             changed=true
           fi
@@ -363,10 +382,10 @@ jobs:
           publish-profile: ${{ steps.bitwarden-secrets.outputs.AZURE_WEBAPP_PUBLISH_PROFILE }}
           package: publish
 
-      # ARM WEBSITE_RUN_FROM_PACKAGE=1 does swap the zip (run 31812172927 served
-      # the new data-build-version) but does not leave a worker that can finish
-      # /warmup. Skipping this restart after #688 left /warmup on HTTP 500 empty
-      # and / flaking until the deploy job was cancelled. Keep the stamp check.
+      # An explicit Kudu restart after the zip push is required for a worker
+      # that can finish /warmup — skipping it after #688 left /warmup on HTTP
+      # 500 empty and / flaking until the deploy job was cancelled. Keep the
+      # stamp check as the strict readiness gate regardless of extract mode.
       - name: Recycle App Service
         env:
           AZURE_WEBAPP_PUBLISH_PROFILE: ${{ steps.bitwarden-secrets.outputs.AZURE_WEBAPP_PUBLISH_PROFILE }}
