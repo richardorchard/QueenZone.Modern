@@ -7,6 +7,7 @@ import { FlatList, Pressable, RefreshControl, ScrollView, Text, View } from 'rea
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   fetchForumRecentThreads,
+  fetchHomePoll,
   fetchInbox,
   fetchLiveActivity,
   fetchNewsPage,
@@ -41,6 +42,7 @@ import { SectionErrorBlock } from '../../ui/ScreenStates';
 import { SectionHeader } from '../../ui/SectionHeader';
 import { testIds } from '../../test/testIds';
 import { syncHomeWidget } from '../../widgets/widgetSync';
+import { HomePollCard } from './HomePollCard';
 import { TabRootMasthead } from './TabRootMasthead';
 import {
   formatForumThreadMeta,
@@ -87,6 +89,9 @@ export function HomeScreen({ navigation }: Props) {
   );
   const onThisDay = useHomeSection(useCallback((signal) => fetchOnThisDay(signal), []));
   const quote = useHomeSection(useCallback((signal) => fetchRandomQuote(signal), []));
+  const poll = useHomeSection(
+    useCallback((signal) => fetchHomePoll(signal, accessToken), [accessToken]),
+  );
   const liveActivity = useHomeSection(useCallback((signal) => fetchLiveActivity(signal), []));
   const messages = useHomeSection(
     useCallback(
@@ -128,6 +133,7 @@ export function HomeScreen({ navigation }: Props) {
     gallery.refresh,
     onThisDay.refresh,
     quote.refresh,
+    poll.refresh,
     liveActivity.refresh,
     messages.refresh,
   ]);
@@ -150,6 +156,7 @@ export function HomeScreen({ navigation }: Props) {
   const totalNewsCount = news.view.kind === 'content' ? news.view.data.totalCount : 0;
   const onThisDayEvent = onThisDay.view.kind === 'content' ? onThisDay.view.data : null;
   const featuredQuote = quote.view.kind === 'content' ? quote.view.data : null;
+  const homePoll = poll.view.kind === 'content' ? poll.view.data : null;
   const onThisDayQuote = featuredQuote
     ? { text: featuredQuote.text, whoSaid: featuredQuote.whoSaid }
     : null;
@@ -548,6 +555,16 @@ export function HomeScreen({ navigation }: Props) {
                   ? () => navigation.navigate('Quote', { id: featuredQuote.id })
                   : undefined
               }
+            />
+          ) : null}
+
+          {homePoll ? (
+            <HomePollCard
+              poll={homePoll}
+              isSignedIn={isSignedIn}
+              accessToken={accessToken}
+              onVoted={() => poll.refresh()}
+              onSignIn={() => openSignIn(navigation, { tab: 'HomeTab', screen: 'Home' })}
             />
           ) : null}
 

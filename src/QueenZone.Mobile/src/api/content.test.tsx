@@ -15,8 +15,10 @@ import {
   fetchPhotoCategory,
   fetchPhotoCategoryItems,
   fetchPhotoDetail,
+  fetchHomePoll,
   fetchQuoteById,
   fetchRandomQuote,
+  voteHomePoll,
   fetchTimelinePage,
 } from './content';
 import { fanPerformanceFixture, jsonResponse } from '../test/fixtures';
@@ -121,6 +123,54 @@ describe('fetchRandomQuote', () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ id: 5, text: 'A kind of magic', whoSaid: 'Freddie Mercury' }));
     const quote = await fetchRandomQuote();
     expect(quote).toMatchObject({ id: 5, text: 'A kind of magic', whoSaid: 'Freddie Mercury' });
+  });
+});
+
+describe('fetchHomePoll', () => {
+  it('requests the current home poll and returns null when none is live', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(null));
+    const poll = await fetchHomePoll();
+    expect(lastUrl()).toBe('http://qz.test/api/v1/content/home-poll');
+    expect(poll).toBeNull();
+  });
+
+  it('forwards a bearer token so the viewer choice can be marked', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        id: 'poll-1',
+        question: 'Best album?',
+        options: [],
+        totalVotes: 0,
+        isClosed: false,
+        viewerHasVoted: false,
+        selectedOptionId: null,
+      }),
+    );
+    await fetchHomePoll(undefined, 'member-token');
+    const init = fetchMock.mock.calls.at(-1)?.[1] as RequestInit;
+    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer member-token');
+  });
+});
+
+describe('voteHomePoll', () => {
+  it('posts the option id to the home-poll votes path', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        id: 'poll-1',
+        question: 'Best album?',
+        options: [],
+        totalVotes: 1,
+        isClosed: false,
+        viewerHasVoted: true,
+        selectedOptionId: 'opt-1',
+      }),
+    );
+    await voteHomePoll('opt-1', 'member-token');
+    expect(lastUrl()).toBe('http://qz.test/api/v1/content/home-poll/votes');
+    const init = fetchMock.mock.calls.at(-1)?.[1] as RequestInit;
+    expect(init.method).toBe('POST');
+    expect(init.body).toBe(JSON.stringify({ optionId: 'opt-1' }));
+    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer member-token');
   });
 });
 
