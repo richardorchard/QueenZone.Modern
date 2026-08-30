@@ -293,24 +293,26 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const isSignedIn = session.isSignedIn;
   const accessToken = session.accessToken;
+  const memberId = session.profile?.memberId ?? null;
 
   // #850: request push permission and register the device once signed in
   // (not before) — never on cold start. Best-effort throughout; see
-  // notifications/pushRegistration.ts.
+  // notifications/pushRegistration.ts. Pass memberId so a same-device
+  // account switch re-registers (#1094).
   useEffect(() => {
     if (!isSignedIn || !accessToken) {
       return;
     }
 
-    void syncPushRegistration(accessToken);
+    void syncPushRegistration(accessToken, memberId);
 
     const tokenSubscription = Notifications.addPushTokenListener(() => {
-      void syncPushRegistration(accessToken);
+      void syncPushRegistration(accessToken, memberId);
     });
 
     const appStateSubscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
-        void refreshPushRegistration(accessToken);
+        void refreshPushRegistration(accessToken, memberId);
       }
     });
 
@@ -318,7 +320,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       tokenSubscription.remove();
       appStateSubscription.remove();
     };
-  }, [isSignedIn, accessToken]);
+  }, [isSignedIn, accessToken, memberId]);
 
   const refreshProfile = useCallback(async () => {
     const token = await ensureAccessToken();
@@ -361,13 +363,19 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       applySmokeSession,
       signOut: async () => {
         const token = sessionRef.current.accessToken;
+        const signedOutMemberId = sessionRef.current.profile?.memberId ?? null;
         const refresh = refreshTokenRef.current;
         const apiBaseUrl = getAppConfig().apiBaseUrl;
         // Clear the device session first. Remote logout/revoke/push unregister
         // can hang (React Native fetch often ignores AbortSignal) or crash the
         // process; awaiting them first left the member signed in after a kill.
         await clearLocal();
-        startRemoteSignOut({ accessToken: token, refreshToken: refresh, apiBaseUrl });
+        startRemoteSignOut({
+          accessToken: token,
+          refreshToken: refresh,
+          apiBaseUrl,
+          memberId: signedOutMemberId,
+        });
       },
       refreshProfile,
       ensureAccessToken,
@@ -399,10 +407,11 @@ function startRemoteSignOut(input: {
   accessToken: string | null;
   refreshToken: string | null;
   apiBaseUrl: string;
+  memberId: string | null;
 }): void {
   const tasks: Promise<unknown>[] = [];
   if (input.accessToken) {
-    tasks.push(clearPushRegistration(input.accessToken));
+    tasks.push(clearPushRegistration(input.accessToken, input.memberId));
     tasks.push(logoutRemote(input.apiBaseUrl, input.accessToken));
   }
   if (input.refreshToken) {
