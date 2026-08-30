@@ -1,6 +1,6 @@
 ---
 name: orchestrate-epic
-description: QueenZone overlay for the issue-queue protocol. Use for "work on #757" or "work on #15 #16 #17" in this repo. Pin as a Custom Mode. Do not auto-apply to ordinary single-task chats.
+description: Cursor Custom Mode only. QueenZone overlay for the issue-queue protocol. Use in Cursor after pinning /orchestrate-epic. Do not auto-apply in Grok or other non-Cursor agents; they implement in-chat per AGENTS.md.
 disable-model-invocation: true
 icon: git-branch
 color: purple
@@ -9,6 +9,8 @@ color: purple
 # Orchestrate issues (QueenZone)
 
 You are the parent coordinator. Do not implement issues yourself.
+
+This skill runs **only** in Cursor with `/orchestrate-epic` pinned. Grok, Claude, Codex, and Composer must not load it because the user listed issue numbers; they implement as a single agent per `AGENTS.md`.
 
 The portable protocol is the **issue-queue** Cursor plugin (`/orchestrate-issues`). This skill is the QueenZone pin: overlay plus a local copy of the loop so a clone of this repo works without the plugin. **Do not also pin `/orchestrate-issues` in this chat.**
 

@@ -36,6 +36,7 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddScoped<IBiographyRepository, EfBiographyRepository>();
         services.AddScoped<IQuoteRepository, EfQuoteRepository>();
         services.AddScoped<ITriviaRepository, EfTriviaRepository>();
+        services.AddScoped<ITriviaFactSubmissionRepository, EfTriviaFactSubmissionRepository>();
         if (forumDataOptions.UseModernForumReads)
         {
             services.AddScoped<IForumRepository, ModernForumRepository>();
@@ -85,6 +86,10 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddScoped<ITopicWatchRepository, EfTopicWatchRepository>();
         services.AddScoped<ITopicWatchLookup>(sp => sp.GetRequiredService<ITopicWatchRepository>());
         services.AddScoped<ILiveActivityQueryService, EfLiveActivityQueryService>();
+        services.AddScoped<IIdempotencyStore>(sp =>
+            new EfIdempotencyStore(
+                sp.GetRequiredService<QueenZoneDbContext>(),
+                sp.GetService<TimeProvider>() ?? TimeProvider.System));
 
         return services;
     }
@@ -104,6 +109,12 @@ public static class QueenZoneDataServiceCollectionExtensions
         var triviaStore = new SharedTriviaStore(SampleTriviaData.CreateSeedFacts());
         services.AddSingleton(triviaStore);
         services.AddSingleton<ITriviaRepository>(_ => new InMemoryTriviaRepository(triviaStore));
+        services.AddSingleton<ITriviaFactSubmissionRepository>(sp =>
+        {
+            var members = sp.GetRequiredService<IMemberAccountRepository>();
+            return new InMemoryTriviaFactSubmissionRepository(id =>
+                members.FindByIdAsync(id).GetAwaiter().GetResult());
+        });
         var forumWriteRepository = new InMemoryForumWriteRepository();
         var forumAttachmentRepository = new InMemoryForumAttachmentRepository();
         var forumPollRepository = new InMemoryForumPollRepository();
@@ -198,6 +209,8 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddSingleton<INotificationPreferenceRepository, InMemoryNotificationPreferenceRepository>();
         services.AddSingleton<ITopicWatchRepository, InMemoryTopicWatchRepository>();
         services.AddSingleton<ITopicWatchLookup>(sp => sp.GetRequiredService<ITopicWatchRepository>());
+        services.AddSingleton<IIdempotencyStore>(sp =>
+            new InMemoryIdempotencyStore(sp.GetService<TimeProvider>() ?? TimeProvider.System));
 
         return services;
     }

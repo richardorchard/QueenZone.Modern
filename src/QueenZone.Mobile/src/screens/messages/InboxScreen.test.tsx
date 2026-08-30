@@ -23,6 +23,13 @@ jest.mock('../../cache', () => ({
   getContentCache: jest.fn(),
 }));
 
+jest.mock('../../offlineQueue', () => ({
+  useOfflineQueue: jest.fn(() => []),
+  flushOfflineQueue: jest.fn(),
+  removeOfflineItem: jest.fn(),
+  updateOfflineItem: jest.fn(),
+}));
+
 jest.mock('@react-navigation/native', () => {
   const actual = jest.requireActual('@react-navigation/native');
   return {

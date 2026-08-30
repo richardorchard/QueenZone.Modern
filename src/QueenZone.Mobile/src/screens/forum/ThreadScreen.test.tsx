@@ -16,6 +16,7 @@ import {
 import type { CachedResult } from '../../api';
 import { ApiError } from '../../api/client';
 import { pagedResponse } from '../../test/fixtures';
+import { useOfflineQueue } from '../../offlineQueue';
 import { createMockSession } from '../../test/mockSession';
 import { fakeNavigation, flushVirtualizedList, renderWithProviders } from '../../test/render';
 import { testIds } from '../../test/testIds';
@@ -45,6 +46,15 @@ const mockSession = createMockSession();
 jest.mock('../../session/SessionContext', () => ({
   useSession: () => mockSession,
 }));
+
+jest.mock('../../offlineQueue', () => ({
+  useOfflineQueue: jest.fn(() => []),
+  flushOfflineQueue: jest.fn(),
+  removeOfflineItem: jest.fn(),
+  updateOfflineItem: jest.fn(),
+}));
+
+const useOfflineQueueMock = useOfflineQueue as jest.MockedFunction<typeof useOfflineQueue>;
 
 jest.mock('../../config', () => ({
   getAppConfig: () => ({ apiBaseUrl: 'http://qz.test', appEnv: 'development', version: '0.1.0' }),
@@ -545,6 +555,8 @@ describe('ThreadScreen offline snapshot', () => {
   beforeEach(() => {
     mockSession.isSignedIn = true;
     mockSession.accessToken = 'tok';
+    mockSession.profile = { memberId: 'member-1' } as never;
+    useOfflineQueueMock.mockReturnValue([]);
     fetchTopicResult.mockResolvedValue(asCache(cachedTopic));
     fetchPostsResult.mockResolvedValue(asCache(cachedPosts));
     fetchPoll.mockResolvedValue({} as never);
@@ -563,7 +575,7 @@ describe('ThreadScreen offline snapshot', () => {
     expect(screen.getByTestId(testIds.offlineBanner)).toBeOnTheScreen();
     expect(screen.getByLabelText(/Offline · last updated/)).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Watch topic' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Reply' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Reply' })).toBeEnabled();
     expect(screen.queryByText('Best studio album?')).toBeNull();
     expect(fetchWatch).not.toHaveBeenCalled();
     expect(fetchPoll).not.toHaveBeenCalled();
@@ -582,6 +594,31 @@ describe('ThreadScreen offline snapshot', () => {
     expect(screen.getByText('brightonrock')).toBeOnTheScreen();
     expect(screen.getByTestId(testIds.offlineBanner)).toBeOnTheScreen();
     expect(screen.queryByText('Unable to load')).toBeNull();
+  });
+
+  it('overlays a queued forum reply on the cached snapshot', async () => {
+    useOfflineQueueMock.mockReturnValue([
+      {
+        schemaVersion: 1,
+        operationId: 'op-forum',
+        memberId: 'member-1',
+        kind: 'forum.reply',
+        target: { topicId: 1002 },
+        payload: { body: 'Queued forum reply' },
+        createdAt: '2024-06-01T10:05:00.000Z',
+        updatedAt: '2024-06-01T10:05:00.000Z',
+        attemptCount: 0,
+        nextRetryAt: '2024-06-01T10:05:00.000Z',
+        state: 'queued',
+        lastError: null,
+      },
+    ]);
+
+    renderThread();
+    await waitFor(() => expect(screen.getByText('Hello from cache')).toBeOnTheScreen());
+    expect(screen.getByText('Queued forum reply')).toBeOnTheScreen();
+    expect(screen.getByTestId(testIds.pendingForumPost)).toBeOnTheScreen();
+    expect(screen.getByLabelText('Queued')).toBeOnTheScreen();
   });
 });
 

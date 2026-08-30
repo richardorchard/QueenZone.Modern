@@ -74,6 +74,7 @@ public static class MessagesApiEndpoints
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status429TooManyRequests);
 
         group.MapGet("/messages/{conversationId:guid}", GetConversationAsync)
@@ -92,6 +93,7 @@ public static class MessagesApiEndpoints
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status429TooManyRequests);
 
         group.MapPost("/messages/{conversationId:guid}/archive", ArchiveConversationAsync)
@@ -403,6 +405,7 @@ public static class MessagesApiEndpoints
         HttpContext httpContext,
         ClaimsPrincipal user,
         PrivateMessageService privateMessageService,
+        IIdempotencyStore idempotencyStore,
         ComposeMessageRequest? request,
         CancellationToken cancellationToken)
     {
@@ -428,37 +431,56 @@ public static class MessagesApiEndpoints
                 detail: "Choose a recipient.");
         }
 
-        var result = await privateMessageService.ComposeAsync(
-            memberId,
+        var payloadHash = IdempotentApiWrites.MessageComposePayload(
             request.RecipientMemberId.Value,
-            request.Body,
-            cancellationToken);
-        if (!result.Succeeded || result.ConversationId is null)
-        {
-            return MapSendFailure(result);
-        }
-
-        var mapped = await MapConversationAsync(
-            privateMessageService,
-            result.ConversationId.Value,
+            request.Body);
+        var executed = await IdempotentApiWrites.ExecuteAsync(
+            httpContext.Request,
             memberId,
-            markRead: true,
-            page: null,
-            pageSize: PrivateMessageLimits.ConversationPageSize,
-            cancellationToken);
-        if (mapped is null)
-        {
-            return ConversationNotFound();
-        }
+            IdempotencyOperationKinds.MessageCompose,
+            payloadHash,
+            idempotencyStore,
+            async ct =>
+            {
+                var result = await privateMessageService.ComposeAsync(
+                    memberId,
+                    request.RecipientMemberId.Value,
+                    request.Body,
+                    ct);
+                if (!result.Succeeded || result.ConversationId is null)
+                {
+                    return new IdempotentWrite(MapSendFailure(result), null);
+                }
 
+                var mapped = await MapConversationAsync(
+                    privateMessageService,
+                    result.ConversationId.Value,
+                    memberId,
+                    markRead: true,
+                    page: null,
+                    pageSize: PrivateMessageLimits.ConversationPageSize,
+                    ct);
+                if (mapped is null)
+                {
+                    return new IdempotentWrite(ConversationNotFound(), null);
+                }
+
+                return IdempotentApiWrites.Created(
+                    httpContext.Request,
+                    mapped.DetailPath,
+                    mapped,
+                    payloadHash);
+            },
+            cancellationToken);
         httpContext.Response.Headers.CacheControl = "no-store";
-        return Results.Created(mapped.DetailPath, mapped);
+        return executed;
     }
 
     internal static async Task<IResult> CreateReplyAsync(
         HttpContext httpContext,
         ClaimsPrincipal user,
         PrivateMessageService privateMessageService,
+        IIdempotencyStore idempotencyStore,
         Guid conversationId,
         ConversationReplyRequest? request,
         CancellationToken cancellationToken)
@@ -477,31 +499,47 @@ public static class MessagesApiEndpoints
                 detail: "A JSON body is required.");
         }
 
-        var result = await privateMessageService.ReplyAsync(
-            conversationId,
+        var payloadHash = IdempotentApiWrites.MessageReplyPayload(conversationId, request.Body);
+        var executed = await IdempotentApiWrites.ExecuteAsync(
+            httpContext.Request,
             memberId,
-            request.Body,
-            cancellationToken);
-        if (!result.Succeeded)
-        {
-            return MapSendFailure(result);
-        }
+            IdempotencyOperationKinds.MessageReply,
+            payloadHash,
+            idempotencyStore,
+            async ct =>
+            {
+                var result = await privateMessageService.ReplyAsync(
+                    conversationId,
+                    memberId,
+                    request.Body,
+                    ct);
+                if (!result.Succeeded)
+                {
+                    return new IdempotentWrite(MapSendFailure(result), null);
+                }
 
-        var mapped = await MapConversationAsync(
-            privateMessageService,
-            conversationId,
-            memberId,
-            markRead: true,
-            page: null,
-            pageSize: PrivateMessageLimits.ConversationPageSize,
-            cancellationToken);
-        if (mapped is null)
-        {
-            return ConversationNotFound();
-        }
+                var mapped = await MapConversationAsync(
+                    privateMessageService,
+                    conversationId,
+                    memberId,
+                    markRead: true,
+                    page: null,
+                    pageSize: PrivateMessageLimits.ConversationPageSize,
+                    ct);
+                if (mapped is null)
+                {
+                    return new IdempotentWrite(ConversationNotFound(), null);
+                }
 
+                return IdempotentApiWrites.Created(
+                    httpContext.Request,
+                    mapped.DetailPath,
+                    mapped,
+                    payloadHash);
+            },
+            cancellationToken);
         httpContext.Response.Headers.CacheControl = "no-store";
-        return Results.Created(mapped.DetailPath, mapped);
+        return executed;
     }
 
     internal static async Task<IResult> ReportMessageAsync(
