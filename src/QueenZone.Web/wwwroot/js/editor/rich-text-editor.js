@@ -473,6 +473,85 @@
     );
   }
 
+  /**
+   * Converts an HTML string to a Quill Delta across the object-argument (Quill 2)
+   * and legacy string-argument clipboard.convert() signatures.
+   */
+  function htmlToDelta(quill, html) {
+    try {
+      return quill.clipboard.convert({ html: html });
+    } catch (e) {
+      return quill.clipboard.convert(html);
+    }
+  }
+
+  /**
+   * Adds a "Code view" toggle that swaps the Quill editor for a plain textarea
+   * bound to the same underlying HTML, so an editor can view or hand-edit the
+   * raw markup without a separate read-only preview elsewhere on the page.
+   */
+  function initCodeView(quill, root, sync) {
+    var mount = root.querySelector(".qz-rte-mount");
+    var toolbar = root.querySelector(".ql-toolbar");
+    var code = document.createElement("textarea");
+    code.className = "qz-rte-code";
+    code.hidden = true;
+    code.setAttribute("aria-label", "HTML source");
+    root.appendChild(code);
+
+    var button = document.createElement("button");
+    button.type = "button";
+    button.className = "qz-button qz-button--outline qz-rte-code-toggle";
+    button.setAttribute("data-qz-rte-code-toggle", "1");
+    button.textContent = "Code view";
+
+    var active = false;
+
+    function enter() {
+      active = true;
+      code.value = quill.root.innerHTML === "<p><br></p>" ? "" : quill.root.innerHTML;
+      mount.hidden = true;
+      if (toolbar) {
+        toolbar.hidden = true;
+      }
+      code.hidden = false;
+      button.textContent = "Rich text view";
+      code.focus();
+    }
+
+    function exit() {
+      active = false;
+      quill.setContents(htmlToDelta(quill, code.value), "user");
+      sync();
+      code.hidden = true;
+      mount.hidden = false;
+      if (toolbar) {
+        toolbar.hidden = false;
+      }
+      button.textContent = "Code view";
+    }
+
+    button.addEventListener("click", function () {
+      if (active) {
+        exit();
+      } else {
+        enter();
+      }
+    });
+
+    return {
+      toggleButton: button,
+      active: function () {
+        return active;
+      },
+      exit: function () {
+        if (active) {
+          exit();
+        }
+      },
+    };
+  }
+
   function initOne(root) {
     if (root.getAttribute("data-qz-rte-ready") === "1") {
       return;
@@ -533,9 +612,17 @@
     }
 
     quill.on("text-change", sync);
+
+    var codeView = root.getAttribute("data-code-view") === "1"
+      ? initCodeView(quill, root, sync)
+      : null;
+
     var form = textarea.closest("form");
     if (form) {
       form.addEventListener("submit", function (e) {
+        if (codeView && codeView.active()) {
+          codeView.exit();
+        }
         sync();
         if (getInflight(root) > 0) {
           e.preventDefault();
@@ -554,6 +641,9 @@
       attach.setAttribute("data-qz-rte-attach", "1");
       attach.textContent = "Attach file";
       actions.appendChild(attach);
+      if (codeView) {
+        actions.appendChild(codeView.toggleButton);
+      }
       field.appendChild(actions);
     }
 

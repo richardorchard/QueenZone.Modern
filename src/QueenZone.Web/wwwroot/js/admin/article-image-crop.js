@@ -244,7 +244,7 @@
           baseRatio = imageData.width / Math.max(imageData.naturalWidth, 1);
           zoomInput.min = String(baseRatio);
           zoomInput.max = String(maxAllowedRatio(baseRatio));
-          zoomInput.step = "0.01";
+          zoomInput.step = "any";
           zoomInput.value = String(baseRatio);
         },
         zoom: function (event) {

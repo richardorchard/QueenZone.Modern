@@ -11,6 +11,7 @@
   var container = ViewData["UploadContainer"] as string ?? BlobUploadContainers.Forum;
   var label = ViewData["EditorLabel"] as string ?? "Body";
   var rows = ViewData["TextareaRows"] as int? ?? 12;
+  var showCodeView = ViewData["ShowCodeView"] as bool? ?? false;
   // Ensures the antiforgery cookie is present for subsequent fetch() uploads.
   var token = (ViewData["AntiforgeryToken"] as string)
     ?? Antiforgery.GetAndStoreTokens(Context).RequestToken
@@ -32,7 +33,8 @@
        data-container="@container"
        data-max-bytes="@maxBytes"
        data-uploads-inflight="0"
-       data-af-token="@token">
+       data-af-token="@token"
+       data-code-view="@(showCodeView ? "1" : "0")">
     <div class="qz-rte-mount" aria-label="@label editor"></div>
     <div class="qz-rte-progress" hidden aria-live="polite" aria-busy="false">
       <span class="qz-rte-progress__spinner" aria-hidden="true"></span>

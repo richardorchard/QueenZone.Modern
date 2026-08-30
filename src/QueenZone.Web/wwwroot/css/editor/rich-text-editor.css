@@ -169,3 +169,20 @@
   /* Fallback if JS disabled: keep visible enough for progressive enhancement */
   width: 100%;
 }
+
+.qz-rte-code {
+  display: block;
+  width: 100%;
+  min-height: 12rem;
+  padding: 0.75rem;
+  border: none;
+  box-sizing: border-box;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.qz-rte-code[hidden] {
+  display: none;
+}
