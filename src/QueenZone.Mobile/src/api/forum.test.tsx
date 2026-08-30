@@ -15,6 +15,13 @@ import {
   voteForumTopicPoll,
   watchForumTopic,
 } from './forum';
+import {
+  ContentCache,
+  createMemoryStorage,
+  forumTopicCacheKey,
+  forumTopicPostsCacheKey,
+  setContentCacheForTests,
+} from '../cache';
 import { jsonResponse } from '../test/fixtures';
 import { reportApiFailure } from '../config/sentry';
 
@@ -33,6 +40,10 @@ beforeEach(() => {
   fetchMock.mockReset();
   reportApiFailureMock.mockReset();
   global.fetch = fetchMock as unknown as typeof fetch;
+});
+
+afterEach(() => {
+  setContentCacheForTests(null);
 });
 
 function lastCall() {
@@ -72,6 +83,20 @@ describe('read endpoints', () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ items: [] }));
     await fetchForumTopicPosts(10, { page: 2 });
     expect(lastCall().url).toBe('http://qz.test/api/v1/forum/topics/10/posts?page=2');
+  });
+
+  it('caches topic headers and opened post pages under public keys', async () => {
+    const cache = new ContentCache({ storage: createMemoryStorage() });
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ id: 10, title: 'Hello', forumId: 1, forumName: 'The Music', postCount: 2, hasPoll: false, isLocked: false }),
+    );
+    await fetchForumTopic(10, undefined, { cache });
+    expect(await cache.get(forumTopicCacheKey(10))).toMatchObject({ id: 10, title: 'Hello' });
+
+    const page1 = { items: [{ id: 1 }, { id: 2 }], page: 1, pageSize: 15, totalCount: 2, totalPages: 1 };
+    fetchMock.mockResolvedValueOnce(jsonResponse(page1));
+    await fetchForumTopicPosts(10, { page: 1, cache });
+    expect(await cache.get(forumTopicPostsCacheKey(10, 1))).toMatchObject(page1);
   });
 });
 

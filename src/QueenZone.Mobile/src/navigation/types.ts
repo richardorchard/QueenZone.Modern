@@ -54,6 +54,7 @@ export type ArchiveStackParamList = {
   FanPerformances: undefined;
   FanPerformanceDetail: { id: number };
   Story: { id: number };
+  Trivia: undefined;
   AboutArchive: undefined;
   Search: undefined;
 };

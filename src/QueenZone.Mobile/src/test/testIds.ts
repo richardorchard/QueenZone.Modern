@@ -49,6 +49,9 @@ export const testIds = {
   photoViewerScreen: 'photo-viewer-screen',
 
   archiveHubScreen: 'archive-hub-screen',
+  triviaScreen: 'trivia-screen',
+  triviaNext: 'trivia-next',
+  triviaMeta: 'trivia-meta',
   searchScreen: 'search-screen',
   searchInput: 'search-input',
 
@@ -60,6 +63,7 @@ export const testIds = {
   forumThreadAttachment: 'forum-thread-attachment',
   forumThreadAttachmentViewer: 'forum-thread-attachment-viewer',
   forumThreadAttachmentOpened: 'forum-thread-attachment-opened',
+  offlineBanner: 'offline-banner',
   forumNewThread: 'forum-new-thread',
   forumComposerAttachPhotos: 'forum-composer-attach-photos',
   forumComposerAttachFiles: 'forum-composer-attach-files',

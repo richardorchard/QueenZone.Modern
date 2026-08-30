@@ -2,7 +2,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError } from '../api/client';
 import type { ApiPagedResponse } from '../api/types';
 
-type Fetcher<T> = (page: number, signal: AbortSignal) => Promise<ApiPagedResponse<T>>;
+export type PagedFetchMode = 'load' | 'refresh' | 'more';
+
+type Fetcher<T> = (
+  page: number,
+  signal: AbortSignal,
+  mode: PagedFetchMode,
+) => Promise<ApiPagedResponse<T>>;
 
 type PagedState<T> = {
   items: T[];
@@ -139,7 +145,7 @@ export function usePagedContent<T>(
     setTotalCount(0);
 
     fetcherRef
-      .current(1, signal)
+      .current(1, signal, 'load')
       .then((response) => {
         if (!coordinator.isCurrent(generation) || signal.aborted) {
           return;
@@ -170,7 +176,7 @@ export function usePagedContent<T>(
     setLoadingMore(false);
     setError(null);
     fetcherRef
-      .current(1, signal)
+      .current(1, signal, 'refresh')
       .then((response) => {
         if (!coordinator.isCurrent(generation) || signal.aborted) {
           return;
@@ -207,7 +213,7 @@ export function usePagedContent<T>(
     loadingMoreRef.current = true;
     setLoadingMore(true);
     fetcherRef
-      .current(nextPage, signal)
+      .current(nextPage, signal, 'more')
       .then((response) => {
         if (!coordinator.isCurrent(generation) || signal.aborted) {
           return;

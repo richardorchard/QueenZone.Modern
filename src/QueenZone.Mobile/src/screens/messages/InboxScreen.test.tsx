@@ -1,7 +1,7 @@
 import { act, screen, userEvent, waitFor } from '@testing-library/react-native';
 import { archiveConversation, fetchInbox } from '../../api/messages';
 import { ApiError } from '../../api/client';
-import { getMessagesCache } from '../../cache/messagesCache';
+import { getContentCache } from '../../cache';
 import { pagedResponse } from '../../test/fixtures';
 import { createMockSession } from '../../test/mockSession';
 import { fakeNavigation, renderWithProviders } from '../../test/render';
@@ -18,8 +18,9 @@ jest.mock('../../api/messages', () => ({
   archiveConversation: jest.fn(),
 }));
 
-jest.mock('../../cache/messagesCache', () => ({
-  getMessagesCache: jest.fn(),
+jest.mock('../../cache', () => ({
+  ...jest.requireActual('../../cache'),
+  getContentCache: jest.fn(),
 }));
 
 jest.mock('@react-navigation/native', () => {
@@ -32,9 +33,9 @@ jest.mock('@react-navigation/native', () => {
 
 const fetchInboxMock = fetchInbox as jest.MockedFunction<typeof fetchInbox>;
 const archiveConversationMock = archiveConversation as jest.MockedFunction<typeof archiveConversation>;
-const getMessagesCacheMock = getMessagesCache as jest.MockedFunction<typeof getMessagesCache>;
+const getContentCacheMock = getContentCache as jest.MockedFunction<typeof getContentCache>;
 
-function fakeMessagesCache() {
+function fakeContentCache() {
   return {
     get: jest.fn().mockResolvedValue(null),
     put: jest.fn().mockResolvedValue(undefined),
@@ -54,9 +55,9 @@ describe('InboxScreen', () => {
     mockSession.profile = null;
     fetchInboxMock.mockReset();
     archiveConversationMock.mockReset();
-    getMessagesCacheMock.mockReset();
-    getMessagesCacheMock.mockReturnValue(
-      fakeMessagesCache() as unknown as ReturnType<typeof getMessagesCache>,
+    getContentCacheMock.mockReset();
+    getContentCacheMock.mockReturnValue(
+      fakeContentCache() as unknown as ReturnType<typeof getContentCache>,
     );
   });
 
@@ -192,7 +193,7 @@ describe('InboxScreen', () => {
     mockSession.isSignedIn = true;
     mockSession.accessToken = 'tok';
     mockSession.profile = { memberId: 'member-1' } as never;
-    const cache = fakeMessagesCache();
+    const cache = fakeContentCache();
     cache.get.mockResolvedValue([
       {
         conversationId: 'convo-cached',
@@ -205,7 +206,7 @@ describe('InboxScreen', () => {
         detailPath: '/messages/convo-cached',
       },
     ]);
-    getMessagesCacheMock.mockReturnValue(cache as unknown as ReturnType<typeof getMessagesCache>);
+    getContentCacheMock.mockReturnValue(cache as unknown as ReturnType<typeof getContentCache>);
     let resolveFetch: (value: Awaited<ReturnType<typeof fetchInbox>>) => void = () => {};
     fetchInboxMock.mockReturnValueOnce(
       new Promise((resolve) => {
@@ -214,7 +215,7 @@ describe('InboxScreen', () => {
     );
     renderInbox();
 
-    expect(cache.get).toHaveBeenCalledWith('inbox:member-1');
+    expect(cache.get).toHaveBeenCalledWith('messages:member:member-1:inbox');
     await waitFor(() => expect(screen.getByText('Cached Carol')).toBeOnTheScreen());
 
     await act(async () => {
@@ -227,8 +228,8 @@ describe('InboxScreen', () => {
     mockSession.isSignedIn = true;
     mockSession.accessToken = 'tok';
     mockSession.profile = { memberId: 'member-1' } as never;
-    const cache = fakeMessagesCache();
-    getMessagesCacheMock.mockReturnValue(cache as unknown as ReturnType<typeof getMessagesCache>);
+    const cache = fakeContentCache();
+    getContentCacheMock.mockReturnValue(cache as unknown as ReturnType<typeof getContentCache>);
     fetchInboxMock.mockResolvedValueOnce(
       pagedResponse(
         [
@@ -251,7 +252,7 @@ describe('InboxScreen', () => {
     await waitFor(() => expect(screen.getByText('Brian')).toBeOnTheScreen());
     await waitFor(() =>
       expect(cache.put).toHaveBeenCalledWith(
-        'inbox:member-1',
+        'messages:member:member-1:inbox',
         expect.arrayContaining([expect.objectContaining({ conversationId: 'convo-1' })]),
       ),
     );

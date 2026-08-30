@@ -14,24 +14,26 @@ import {
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Flag, MoreHorizontal } from 'lucide-react-native';
-import { ApiError } from '../../api/client';
+import { ApiError, isOfflineFailure, isTimeoutFailure } from '../../api/client';
+import type { CacheSource } from '../../api';
 import {
   archiveConversation,
   blockConversationParticipant,
-  fetchConversation,
+  fetchConversationResult,
   replyToConversation,
   reportConversationMessage,
   type ConversationDetail,
   type ConversationMessage,
 } from '../../api/messages';
-import { getMessagesCache } from '../../cache/messagesCache';
 import type { HomeStackParamList } from '../../navigation/types';
+import { resolvePushMemberId } from '../../notifications/pushMemberId';
 import { MemberGate } from '../../session/MemberGate';
 import { useSession } from '../../session/SessionContext';
 import { fonts, palette, radius, space, type, useTheme } from '../../theme';
 import { Button } from '../../ui/Button';
 import { IconButton } from '../../ui/IconButton';
-import { ErrorBlock, LoadingBlock } from '../../ui/ScreenStates';
+import { ErrorBlock, LoadingBlock, OfflineBanner } from '../../ui/ScreenStates';
+import { testIds } from '../../test/testIds';
 import {
   buildThreadItems,
   conversationBodyMaxLength,
@@ -63,6 +65,10 @@ function messageFromUnknownError(err: unknown): string {
   return err instanceof ApiError ? err.message : 'Something went wrong.';
 }
 
+function isStaleReadFailure(err: unknown): boolean {
+  return isOfflineFailure(err) || isTimeoutFailure(err);
+}
+
 export function ConversationScreen({ navigation, route }: Props) {
   return (
     <MemberGate title="Conversation">
@@ -77,8 +83,12 @@ function ConversationThread({ navigation, route }: Props) {
   const { accessToken, profile } = useSession();
   const listRef = useRef<FlatList<ThreadListItem<ConversationMessage>>>(null);
   const conversationId = parseConversationId(route.params.id);
-  const cacheKey = profile && conversationId ? `conversation:${profile.memberId}:${conversationId}` : null;
+  const memberId = accessToken ? resolvePushMemberId(accessToken, profile?.memberId) : null;
   const [detail, setDetail] = useState<ConversationDetail | null>(null);
+  const [source, setSource] = useState<CacheSource>('network');
+  const [cachedAt, setCachedAt] = useState<string | null>(null);
+  const detailRef = useRef<ConversationDetail | null>(null);
+  detailRef.current = detail;
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -174,15 +184,16 @@ function ConversationThread({ navigation, route }: Props) {
           </Text>
         </View>
       ),
-      headerRight: () => (
-        <IconButton
-          icon={MoreHorizontal}
-          accessibilityLabel="More options"
-          onPress={openOverflowMenu}
-        />
-      ),
+      headerRight: () =>
+        source === 'cache' ? null : (
+          <IconButton
+            icon={MoreHorizontal}
+            accessibilityLabel="More options"
+            onPress={openOverflowMenu}
+          />
+        ),
     });
-  }, [c.textPrimary, correspondentName, navigation, openOverflowMenu]);
+  }, [c.textPrimary, correspondentName, navigation, openOverflowMenu, source]);
 
   const load = useCallback(
     async (signal: AbortSignal, mode: 'initial' | 'refresh') => {
@@ -202,20 +213,25 @@ function ConversationThread({ navigation, route }: Props) {
       setError(null);
 
       try {
-        const next = await fetchConversation(accessToken, conversationId, {
+        const next = await fetchConversationResult(accessToken, conversationId, {
           pageSize: conversationPageSize,
           signal,
+          memberId,
+          networkOnly: mode === 'refresh',
         });
         if (signal.aborted) {
           return;
         }
-        setDetail(next);
+        setDetail(next.data);
+        setSource(next.source);
+        setCachedAt(next.cachedAt);
         requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: false }));
-        if (cacheKey) {
-          void getMessagesCache().put(cacheKey, next).catch(() => {});
-        }
       } catch (err: unknown) {
         if (signal.aborted || (err instanceof Error && err.name === 'AbortError')) {
+          return;
+        }
+        if (mode === 'refresh' && detailRef.current && isStaleReadFailure(err)) {
+          setSource('cache');
           return;
         }
         setDetail(null);
@@ -227,28 +243,8 @@ function ConversationThread({ navigation, route }: Props) {
         }
       }
     },
-    [accessToken, conversationId, cacheKey],
+    [accessToken, conversationId, memberId],
   );
-
-  // Render the last-seen version of this conversation immediately (e.g. from a
-  // push-notification tap) while the fresh fetch below runs in the background.
-  useEffect(() => {
-    if (!cacheKey) {
-      return;
-    }
-    let cancelled = false;
-    getMessagesCache()
-      .get<ConversationDetail>(cacheKey)
-      .then((cached) => {
-        if (!cancelled && cached) {
-          setDetail((current) => current ?? cached);
-        }
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [cacheKey]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -331,10 +327,13 @@ function ConversationThread({ navigation, route }: Props) {
     return <ErrorBlock message={error} onRetry={() => setReloadToken((n) => n + 1)} />;
   }
 
-  const canSendReply = detail?.canSendReply === true;
-  const notice = detail
-    ? sendingBlockedNotice(detail.hasBlockedOtherParticipant, canSendReply)
-    : null;
+  const offlineSnapshot = source === 'cache';
+  const canSendReply = detail?.canSendReply === true && !offlineSnapshot;
+  const notice = offlineSnapshot
+    ? null
+    : detail
+      ? sendingBlockedNotice(detail.hasBlockedOtherParticipant, detail.canSendReply === true)
+      : null;
   const threadItems = buildThreadItems(detail?.messages ?? []);
 
   return (
@@ -357,6 +356,11 @@ function ConversationThread({ navigation, route }: Props) {
             tintColor={c.accentPrimary}
           />
         }
+        ListHeaderComponent={
+          offlineSnapshot ? (
+            <OfflineBanner cachedAt={cachedAt} testID={testIds.offlineBanner} />
+          ) : null
+        }
         contentContainerStyle={styles.thread}
         renderItem={({ item }) =>
           item.kind === 'divider' ? (
@@ -370,6 +374,7 @@ function ConversationThread({ navigation, route }: Props) {
               reportReason={reportReason}
               reportError={reportingMessageId === item.message.id ? reportError : null}
               reportBusy={reportBusy}
+              interactionsEnabled={!offlineSnapshot}
               onStartReport={() => {
                 setReportingMessageId(item.message.id);
                 setReportReason('');
@@ -488,6 +493,7 @@ function MessageBubble({
   reportReason,
   reportError,
   reportBusy,
+  interactionsEnabled,
   onStartReport,
   onCancelReport,
   onChangeReason,
@@ -500,6 +506,7 @@ function MessageBubble({
   reportReason: string;
   reportError: string | null;
   reportBusy: boolean;
+  interactionsEnabled: boolean;
   onStartReport: () => void;
   onCancelReport: () => void;
   onChangeReason: (value: string) => void;
@@ -543,7 +550,7 @@ function MessageBubble({
             <Flag size={11} strokeWidth={2} color={palette.gold} />
             <Text style={styles.reportedLabel}>REPORTED</Text>
           </View>
-        ) : reporting ? (
+        ) : !interactionsEnabled ? null : reporting ? (
           <View style={styles.reportForm}>
             <TextInput
               value={reportReason}

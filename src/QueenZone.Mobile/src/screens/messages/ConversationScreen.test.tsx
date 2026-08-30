@@ -1,14 +1,16 @@
-import { Alert } from 'react-native';
-import { screen, userEvent, waitFor } from '@testing-library/react-native';
+import { Alert, RefreshControl } from 'react-native';
+import { fireEvent, screen, userEvent, waitFor } from '@testing-library/react-native';
 import { ApiError } from '../../api/client';
+import type { CachedResult } from '../../api';
 import {
   archiveConversation,
   blockConversationParticipant,
   fetchConversation,
+  fetchConversationResult,
   replyToConversation,
   reportConversationMessage,
 } from '../../api/messages';
-import { getMessagesCache } from '../../cache/messagesCache';
+import { testIds } from '../../test/testIds';
 import { createMockSession } from '../../test/mockSession';
 import { fakeNavigation, flushVirtualizedList, renderWithProviders } from '../../test/render';
 import { ConversationScreen } from './ConversationScreen';
@@ -23,17 +25,27 @@ jest.mock('../../session/SessionContext', () => ({
 
 jest.mock('../../api/messages', () => ({
   fetchConversation: jest.fn(),
+  fetchConversationResult: jest.fn(),
   replyToConversation: jest.fn(),
   reportConversationMessage: jest.fn(),
   archiveConversation: jest.fn(),
   blockConversationParticipant: jest.fn(),
 }));
 
-jest.mock('../../cache/messagesCache', () => ({
-  getMessagesCache: jest.fn(),
-}));
-
 const fetchConversationMock = fetchConversation as jest.MockedFunction<typeof fetchConversation>;
+const fetchConversationResultMock = fetchConversationResult as jest.MockedFunction<
+  typeof fetchConversationResult
+>;
+
+const NETWORK_CACHED_AT = '2026-08-19T12:00:00.000Z';
+
+function asNetwork<T>(data: T): CachedResult<T> {
+  return { data, source: 'network', cachedAt: NETWORK_CACHED_AT };
+}
+
+function asCache<T>(data: T): CachedResult<T> {
+  return { data, source: 'cache', cachedAt: NETWORK_CACHED_AT };
+}
 const replyToConversationMock = replyToConversation as jest.MockedFunction<typeof replyToConversation>;
 const reportConversationMessageMock = reportConversationMessage as jest.MockedFunction<
   typeof reportConversationMessage
@@ -42,14 +54,6 @@ const archiveConversationMock = archiveConversation as jest.MockedFunction<typeo
 const blockConversationParticipantMock = blockConversationParticipant as jest.MockedFunction<
   typeof blockConversationParticipant
 >;
-const getMessagesCacheMock = getMessagesCache as jest.MockedFunction<typeof getMessagesCache>;
-
-function fakeMessagesCache() {
-  return {
-    get: jest.fn().mockResolvedValue(null),
-    put: jest.fn().mockResolvedValue(undefined),
-  };
-}
 
 function renderConversation() {
   return renderWithProviders(
@@ -92,16 +96,16 @@ describe('ConversationScreen', () => {
   beforeEach(() => {
     mockSession.isSignedIn = true;
     mockSession.accessToken = 'tok';
-    mockSession.profile = { memberId: 'member-1' } as never;
+    mockSession.profile = { memberId: 'member-1' };
     fetchConversationMock.mockReset();
+    fetchConversationResultMock.mockReset();
+    fetchConversationResultMock.mockImplementation(async (token, id, query) =>
+      asNetwork(await fetchConversationMock(token, id, query)),
+    );
     replyToConversationMock.mockReset();
     reportConversationMessageMock.mockReset();
     archiveConversationMock.mockReset();
     blockConversationParticipantMock.mockReset();
-    getMessagesCacheMock.mockReset();
-    getMessagesCacheMock.mockReturnValue(
-      fakeMessagesCache() as unknown as ReturnType<typeof getMessagesCache>,
-    );
   });
 
   afterEach(async () => {
@@ -401,64 +405,86 @@ describe('ConversationScreen', () => {
     alertSpy.mockRestore();
   }, 15000);
 
-  it('persists the freshly loaded conversation to the cache', async () => {
-    const cache = fakeMessagesCache();
-    getMessagesCacheMock.mockReturnValue(cache as unknown as ReturnType<typeof getMessagesCache>);
-    fetchConversationMock.mockResolvedValue(
-      conversationDetail([
-        {
-          id: theirMessageId,
-          senderMemberId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-          senderDisplayName: 'Bob',
-          body: 'Hello',
-          createdAt: '2026-08-19T12:00:00.000Z',
-          isMine: false,
-          sortKey: 1,
-          reportedByViewer: false,
-        },
-      ]),
-    );
+  it('shows a cached conversation with an offline banner and hides reply, report, archive, and block', async () => {
+    const snapshot = conversationDetail([
+      {
+        id: theirMessageId,
+        senderMemberId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+        senderDisplayName: 'Bob',
+        body: 'Hello from cache',
+        createdAt: '2026-08-19T12:00:00.000Z',
+        isMine: false,
+        sortKey: 1,
+        reportedByViewer: false,
+      },
+    ]);
+    fetchConversationResultMock.mockResolvedValue(asCache(snapshot));
 
     renderConversation();
-    await waitFor(() => expect(screen.getByText('Hello')).toBeOnTheScreen());
-    await waitFor(() =>
-      expect(cache.put).toHaveBeenCalledWith(
-        `conversation:member-1:${conversationId}`,
-        expect.objectContaining({ conversationId }),
-      ),
-    );
+    await waitFor(() => expect(screen.getByText('Hello from cache')).toBeOnTheScreen());
+    expect(screen.getByTestId(testIds.offlineBanner)).toBeOnTheScreen();
+    expect(screen.queryByLabelText('Reply')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Send reply' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Report message' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Archive conversation' })).toBeNull();
+    expect(fetchConversationMock).not.toHaveBeenCalled();
+    expect(fetchConversationResultMock).toHaveBeenCalledTimes(1);
   });
 
-  it('renders the cached conversation instantly while the fresh fetch is still in flight', async () => {
-    const cache = fakeMessagesCache();
-    cache.get.mockResolvedValue(
-      conversationDetail([
-        {
-          id: theirMessageId,
-          senderMemberId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-          senderDisplayName: 'Bob',
-          body: 'From last visit',
-          createdAt: '2026-08-19T12:00:00.000Z',
-          isMine: false,
-          sortKey: 1,
-          reportedByViewer: false,
-        },
-      ]),
-    );
-    getMessagesCacheMock.mockReturnValue(cache as unknown as ReturnType<typeof getMessagesCache>);
-    let resolveFetch: (value: Awaited<ReturnType<typeof fetchConversation>>) => void = () => {};
-    fetchConversationMock.mockReturnValueOnce(
-      new Promise((resolve) => {
-        resolveFetch = resolve;
-      }),
-    );
+  it('does not GET the conversation again when pull-to-refresh fails offline', async () => {
+    const snapshot = conversationDetail([
+      {
+        id: theirMessageId,
+        senderMemberId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+        senderDisplayName: 'Bob',
+        body: 'Hello from cache',
+        createdAt: '2026-08-19T12:00:00.000Z',
+        isMine: false,
+        sortKey: 1,
+        reportedByViewer: false,
+      },
+    ]);
+    fetchConversationResultMock.mockResolvedValueOnce(asCache(snapshot));
 
     renderConversation();
+    await waitFor(() => expect(screen.getByText('Hello from cache')).toBeOnTheScreen());
+    expect(fetchConversationResultMock).toHaveBeenCalledTimes(1);
 
-    expect(cache.get).toHaveBeenCalledWith(`conversation:member-1:${conversationId}`);
-    await waitFor(() => expect(screen.getByText('From last visit')).toBeOnTheScreen());
+    fetchConversationResultMock.mockRejectedValueOnce(ApiError.offline());
+    fireEvent(screen.UNSAFE_getByType(RefreshControl), 'refresh');
 
-    resolveFetch(conversationDetail([]));
-    await waitFor(() => expect(screen.queryByText('From last visit')).toBeNull());
+    await waitFor(() => expect(fetchConversationResultMock).toHaveBeenCalledTimes(2));
+    expect(screen.getByText('Hello from cache')).toBeOnTheScreen();
+    expect(screen.getByTestId(testIds.offlineBanner)).toBeOnTheScreen();
+    expect(fetchConversationMock).not.toHaveBeenCalled();
+  });
+
+  it('hydrates from cache using the JWT sub when /me profile is unavailable', async () => {
+    const encode = (value: object) => Buffer.from(JSON.stringify(value)).toString('base64url');
+    const accessToken = `${encode({ alg: 'none', typ: 'JWT' })}.${encode({ sub: 'member-from-jwt' })}.sig`;
+    mockSession.profile = null;
+    mockSession.accessToken = accessToken;
+    const snapshot = conversationDetail([
+      {
+        id: theirMessageId,
+        senderMemberId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+        senderDisplayName: 'Bob',
+        body: 'Hello from cache',
+        createdAt: '2026-08-19T12:00:00.000Z',
+        isMine: false,
+        sortKey: 1,
+        reportedByViewer: false,
+      },
+    ]);
+    fetchConversationResultMock.mockResolvedValue(asCache(snapshot));
+
+    renderConversation();
+    await waitFor(() => expect(screen.getByText('Hello from cache')).toBeOnTheScreen());
+    expect(fetchConversationResultMock).toHaveBeenCalledWith(
+      accessToken,
+      conversationId,
+      expect.objectContaining({ memberId: 'member-from-jwt' }),
+    );
   });
 });
+

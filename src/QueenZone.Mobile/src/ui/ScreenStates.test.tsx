@@ -1,6 +1,7 @@
 import { screen, userEvent } from '@testing-library/react-native';
-import { EmptyBlock, ErrorBlock, LoadingBlock } from './ScreenStates';
+import { EmptyBlock, ErrorBlock, LoadingBlock, OfflineBanner, formatOfflineUpdatedLabel } from './ScreenStates';
 import { renderWithProviders } from '../test/render';
+import { testIds } from '../test/testIds';
 
 describe('ScreenStates', () => {
   it('exposes a labelled loading progressbar', () => {
@@ -23,5 +24,17 @@ describe('ScreenStates', () => {
   it('renders empty copy', () => {
     renderWithProviders(<EmptyBlock message="No news articles yet." />, { navigation: false });
     expect(screen.getByText('No news articles yet.')).toBeOnTheScreen();
+  });
+
+  it('formats and renders the offline snapshot banner', () => {
+    expect(formatOfflineUpdatedLabel('2024-06-01T10:00:00.000Z')).toBe(
+      'Offline · last updated 2024-06-01 10:00 UTC',
+    );
+    expect(formatOfflineUpdatedLabel(null)).toBe('Offline');
+    renderWithProviders(<OfflineBanner cachedAt="2024-06-01T10:00:00.000Z" testID={testIds.offlineBanner} />, {
+      navigation: false,
+    });
+    expect(screen.getByTestId(testIds.offlineBanner)).toBeOnTheScreen();
+    expect(screen.getByText('Offline · last updated 2024-06-01 10:00 UTC')).toBeOnTheScreen();
   });
 });

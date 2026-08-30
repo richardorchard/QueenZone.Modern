@@ -6,6 +6,8 @@ import {
   fetchForumTopic,
   fetchForumTopicPoll,
   fetchForumTopicPosts,
+  fetchForumTopicPostsResult,
+  fetchForumTopicResult,
   fetchForumTopicWatch,
   fetchInbox,
   fetchLiveActivity,
@@ -17,7 +19,7 @@ import {
   fetchQuoteById,
   fetchRandomQuote,
 } from '../../api';
-import { fetchConversation } from '../../api/messages';
+import { fetchConversation, fetchConversationResult } from '../../api/messages';
 import { newsDetailFixture, newsItemFixture, pagedResponse } from '../../test/fixtures';
 import {
   ForumIndexHeaderRight,
@@ -49,7 +51,9 @@ jest.mock('../../api', () => {
     fetchForumCategories: jest.fn(),
     fetchForumStats: jest.fn(),
     fetchForumTopic: jest.fn(),
+    fetchForumTopicResult: jest.fn(),
     fetchForumTopicPosts: jest.fn(),
+    fetchForumTopicPostsResult: jest.fn(),
     fetchForumTopicPoll: jest.fn(),
     fetchForumTopicWatch: jest.fn(),
     fetchPhotoCategories: jest.fn(),
@@ -66,6 +70,7 @@ jest.mock('../../api/messages', () => {
   return {
     ...actual,
     fetchConversation: jest.fn(),
+    fetchConversationResult: jest.fn(),
     fetchUnreadConversationCount: jest.fn(),
   };
 });
@@ -96,7 +101,11 @@ const fetchForum = fetchForumRecentThreads as jest.MockedFunction<typeof fetchFo
 const fetchForumCats = fetchForumCategories as jest.MockedFunction<typeof fetchForumCategories>;
 const fetchForumIndexStats = fetchForumStats as jest.MockedFunction<typeof fetchForumStats>;
 const fetchTopic = fetchForumTopic as jest.MockedFunction<typeof fetchForumTopic>;
+const fetchTopicResult = fetchForumTopicResult as jest.MockedFunction<typeof fetchForumTopicResult>;
 const fetchPosts = fetchForumTopicPosts as jest.MockedFunction<typeof fetchForumTopicPosts>;
+const fetchPostsResult = fetchForumTopicPostsResult as jest.MockedFunction<
+  typeof fetchForumTopicPostsResult
+>;
 const fetchPoll = fetchForumTopicPoll as jest.MockedFunction<typeof fetchForumTopicPoll>;
 const fetchWatch = fetchForumTopicWatch as jest.MockedFunction<typeof fetchForumTopicWatch>;
 const fetchPhotos = fetchPhotoCategories as jest.MockedFunction<typeof fetchPhotoCategories>;
@@ -106,6 +115,9 @@ const fetchQuoteDetail = fetchQuoteById as jest.MockedFunction<typeof fetchQuote
 const fetchLive = fetchLiveActivity as jest.MockedFunction<typeof fetchLiveActivity>;
 const fetchInboxMock = fetchInbox as jest.MockedFunction<typeof fetchInbox>;
 const fetchConversationMock = fetchConversation as jest.MockedFunction<typeof fetchConversation>;
+const fetchConversationResultMock = fetchConversationResult as jest.MockedFunction<
+  typeof fetchConversationResult
+>;
 
 const conversationId = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
 
@@ -152,7 +164,7 @@ describe('TabRootMasthead placement', () => {
       ),
     );
     fetchForumIndexStats.mockResolvedValue({ boardCount: 1, threadCount: 12, postCount: 12 });
-    fetchTopic.mockResolvedValue({
+    const topic = {
       id: 1002,
       title: 'Ranking every studio album',
       forumId: 1,
@@ -162,27 +174,29 @@ describe('TabRootMasthead placement', () => {
       postCount: 1,
       hasPoll: false,
       isLocked: false,
-    });
-    fetchPosts.mockResolvedValue(
-      pagedResponse(
-        [
-          {
-            id: 1,
-            body: '<p>Hello</p>',
-            postedAt: '2024-06-01T10:00:00.000Z',
-            authorUsername: 'brightonrock',
-            signature: null,
-            authorMemberSince: null,
-            authorMemberId: null,
-            editedAt: null,
-            editCount: 0,
-            attachments: [],
-          },
-        ],
-        1,
-        1,
-      ),
+    };
+    const posts = pagedResponse(
+      [
+        {
+          id: 1,
+          body: '<p>Hello</p>',
+          postedAt: '2024-06-01T10:00:00.000Z',
+          authorUsername: 'brightonrock',
+          signature: null,
+          authorMemberSince: null,
+          authorMemberId: null,
+          editedAt: null,
+          editCount: 0,
+          attachments: [],
+        },
+      ],
+      1,
+      1,
     );
+    fetchTopic.mockResolvedValue(topic);
+    fetchTopicResult.mockResolvedValue({ data: topic, source: 'network', cachedAt: '2024-06-01T10:00:00.000Z' });
+    fetchPosts.mockResolvedValue(posts);
+    fetchPostsResult.mockResolvedValue({ data: posts, source: 'network', cachedAt: '2024-06-01T10:00:00.000Z' });
     fetchPoll.mockResolvedValue({} as never);
     fetchWatch.mockResolvedValue({ watching: false });
     fetchPhotos.mockResolvedValue(pagedResponse([], 1, 0));
@@ -196,7 +210,7 @@ describe('TabRootMasthead placement', () => {
     });
     fetchLive.mockResolvedValue({ newForumRepliesToday: 0 });
     fetchInboxMock.mockResolvedValue(pagedResponse([], 1, 0));
-    fetchConversationMock.mockResolvedValue({
+    const conversation = {
       conversationId,
       otherParticipantId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
       otherParticipantDisplayName: 'Bob',
@@ -218,6 +232,12 @@ describe('TabRootMasthead placement', () => {
       detailPath: `/messages/${conversationId}`,
       canSendReply: true,
       hasBlockedOtherParticipant: false,
+    };
+    fetchConversationMock.mockResolvedValue(conversation);
+    fetchConversationResultMock.mockResolvedValue({
+      data: conversation,
+      source: 'network',
+      cachedAt: '2026-01-01T00:00:00.000Z',
     });
   });
 

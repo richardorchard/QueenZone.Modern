@@ -57,6 +57,14 @@ public static class ContentApiMapper
     public static QuoteDto ToQuoteDto(QuoteItem quote) =>
         new(quote.Id, quote.Text, quote.WhoSaid, string.IsNullOrWhiteSpace(quote.Context) ? null : quote.Context);
 
+    public static TriviaDto ToTriviaDto(TriviaFactItem fact) =>
+        new(
+            fact.Id,
+            fact.Text,
+            string.IsNullOrWhiteSpace(fact.Category) ? null : fact.Category,
+            string.IsNullOrWhiteSpace(fact.Difficulty) ? null : fact.Difficulty,
+            string.IsNullOrWhiteSpace(fact.Source) ? null : fact.Source);
+
     public static HomePollDto ToHomePollDto(HomePollResults poll) =>
         new(
             poll.PollId,

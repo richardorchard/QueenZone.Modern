@@ -328,6 +328,15 @@ export type RandomQuote = {
   context?: string | null;
 };
 
+/** Shape for `/api/v1/content/trivia/random`. Optional fields are omitted when blank. */
+export type RandomTrivia = {
+  id: number;
+  text: string;
+  category?: string | null;
+  difficulty?: string | null;
+  source?: string | null;
+};
+
 /** Shape for `GET /api/v1/content/home-poll`. Null when no poll is current. */
 export type HomePoll = {
   id: string;

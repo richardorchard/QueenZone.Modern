@@ -2521,6 +2521,45 @@ namespace QueenZone.Data.Migrations
                     b.ToTable("SearchReindexRunRequests", (string)null);
                 });
 
+            modelBuilder.Entity("QueenZone.Data.Entities.TriviaFactEntity", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Category")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Difficulty")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<bool>("IsPublished")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Source")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IsPublished", "Category")
+                        .HasDatabaseName("IX_TriviaFacts_Published_Category");
+
+                    b.ToTable("TriviaFacts", (string)null);
+                });
+
             modelBuilder.Entity("QueenZone.Data.Entities.ArticleSubmissionEntity", b =>
                 {
                     b.HasOne("QueenZone.Data.Entities.MemberAccount", "Author")

@@ -3,7 +3,7 @@ import { FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { archiveConversation, fetchInbox, type InboxConversation } from '../../api/messages';
-import { getMessagesCache } from '../../cache/messagesCache';
+import { getContentCache, inboxCacheKey } from '../../cache';
 import { usePagedContent } from '../../hooks/usePagedContent';
 import type { HomeStackParamList } from '../../navigation/types';
 import { MemberGate } from '../../session/MemberGate';
@@ -36,7 +36,7 @@ function InboxList({ navigation }: Pick<Props, 'navigation'>) {
   const skipNextFocusRefresh = useRef(true);
   const [archivingId, setArchivingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const cacheKey = profile ? `inbox:${profile.memberId}` : null;
+  const cacheKey = profile ? inboxCacheKey(profile.memberId) : null;
   const [cachedItems, setCachedItems] = useState<InboxConversation[] | null>(null);
 
   useEffect(() => {
@@ -44,7 +44,7 @@ function InboxList({ navigation }: Pick<Props, 'navigation'>) {
       return;
     }
     let cancelled = false;
-    getMessagesCache()
+    getContentCache()
       .get<InboxConversation[]>(cacheKey)
       .then((cached) => {
         if (!cancelled && cached && cached.length > 0) {
@@ -92,7 +92,7 @@ function InboxList({ navigation }: Pick<Props, 'navigation'>) {
     if (!cacheKey || paged.page !== 1 || paged.loading || paged.error) {
       return;
     }
-    void getMessagesCache().put(cacheKey, paged.items).catch(() => {});
+    void getContentCache().put(cacheKey, paged.items).catch(() => {});
   }, [cacheKey, paged.page, paged.loading, paged.error, paged.items]);
 
   const showingCacheOnly = paged.loading && paged.items.length === 0 && !!cachedItems && cachedItems.length > 0;

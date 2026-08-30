@@ -112,6 +112,8 @@ public sealed class QueenZoneDbContext : DbContext
 
     public DbSet<QuoteEntity> Quotes => Set<QuoteEntity>();
 
+    public DbSet<TriviaFactEntity> TriviaFacts => Set<TriviaFactEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<QuoteEntity>(entity =>
@@ -138,6 +140,22 @@ public sealed class QueenZoneDbContext : DbContext
                 .IsUnique()
                 .HasFilter("[SOURCE_TYPE] IS NOT NULL AND [SOURCE_KEY] IS NOT NULL")
                 .HasDatabaseName("IX_QUEEN_QUOTE_T_Source");
+        });
+
+        modelBuilder.Entity<TriviaFactEntity>(entity =>
+        {
+            entity.ToTable("TriviaFacts");
+            entity.HasKey(fact => fact.Id);
+
+            entity.Property(fact => fact.Text).HasMaxLength(TriviaValidation.MaxTextLength).IsRequired();
+            entity.Property(fact => fact.Category).HasMaxLength(TriviaValidation.MaxCategoryLength);
+            entity.Property(fact => fact.Difficulty).HasMaxLength(TriviaValidation.MaxDifficultyLength);
+            entity.Property(fact => fact.Source).HasMaxLength(TriviaValidation.MaxSourceLength);
+            entity.Property(fact => fact.IsPublished).IsRequired();
+            entity.Property(fact => fact.CreatedAt).IsRequired();
+
+            entity.HasIndex(fact => new { fact.IsPublished, fact.Category })
+                .HasDatabaseName("IX_TriviaFacts_Published_Category");
         });
 
         modelBuilder.Entity<NewsTableRow>(entity =>
