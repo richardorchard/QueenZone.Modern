@@ -141,6 +141,14 @@ export const archiveDestinations: ArchiveDestination[] = [
     image: media.hero,
   },
   {
+    id: 'trivia',
+    title: 'Trivia',
+    kicker: 'Queen facts',
+    kickerRole: 'archive',
+    meta: ['Random facts'],
+    image: media.studio,
+  },
+  {
     id: 'about',
     title: 'Queenzone.com, preserved',
     kicker: 'The old site',
