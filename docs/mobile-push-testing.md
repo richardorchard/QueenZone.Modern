@@ -214,8 +214,8 @@ forum or news.
    **receiver**.
 2. Allow notifications when the OS prompt appears. Sign-in is what registers
    the FCM token with `https://www.queenzone.org`. If you previously denied
-   the prompt, enable QueenZone in Android Settings → Apps → Notifications,
-   then foreground the app so it can register.
+   the prompt, enable QueenZone in Settings → Apps → QueenZone →
+   Notifications, then foreground the app so it can register.
 3. Background the app (Home or lock). Foreground still shows an in-app banner,
    but the first proof should be a system notification.
 4. On a second account (website or another device), open
