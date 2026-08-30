@@ -80,6 +80,9 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
         var totalPages = totalCount <= 0 ? 1 : (totalCount + pageSize - 1) / pageSize;
         page = Math.Min(page, totalPages);
 
+        // Unread count is folded into this projection (a correlated scalar subquery SQL Server
+        // executes as an APPLY within the same SELECT) so the page and its unread counts come back
+        // in one round trip instead of two.
         var pageRows = await dbContext.PrivateConversationParticipants
             .AsNoTracking()
             .Where(p => p.MemberId == memberId && p.IsArchived == isArchived && !p.IsRemoved)
@@ -87,9 +90,8 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
             .ThenByDescending(p => p.ConversationId)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .Select(p => new InboxPageRow(
+            .Select(p => new InboxPageRowWithUnread(
                 p.ConversationId,
-                p.LastReadSortKey,
                 p.Conversation!.LastMessagePreview,
                 p.Conversation.LastMessageAt,
                 p.Conversation.MemberLowId == memberId
@@ -97,11 +99,14 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
                     : (p.Conversation.MemberLow != null ? p.Conversation.MemberLow.DisplayName : string.Empty),
                 p.Conversation.MemberLowId == memberId
                     ? p.Conversation.MemberHighId
-                    : p.Conversation.MemberLowId))
+                    : p.Conversation.MemberLowId,
+                dbContext.PrivateMessages.Count(m =>
+                    m.ConversationId == p.ConversationId
+                    && m.SenderMemberId != memberId
+                    && (p.LastReadSortKey == null || m.SortKey > p.LastReadSortKey))))
             .ToListAsync(cancellationToken);
 
-        var unreadByConversation = await CountUnreadForPageSqlAsync(memberId, pageRows, cancellationToken);
-        return new PrivateInboxPage(MapInbox(pageRows, unreadByConversation), totalCount, page, pageSize);
+        return new PrivateInboxPage(MapInboxWithUnread(pageRows), totalCount, page, pageSize);
     }
 
     public Task<int> CountUnreadConversationsAsync(
@@ -120,25 +125,21 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
     {
         pageSize = Math.Clamp(pageSize, 1, PrivateMessageLimits.MaxConversationPageSize);
 
+        // Participant and conversation (with both member navigations) in one round trip, via the
+        // participant's Conversation navigation, instead of two separate SingleOrDefaultAsync calls.
         var participant = await dbContext.PrivateConversationParticipants
             .AsNoTracking()
+            .Include(p => p.Conversation!.MemberLow)
+            .Include(p => p.Conversation!.MemberHigh)
             .SingleOrDefaultAsync(
                 p => p.ConversationId == conversationId && p.MemberId == memberId,
                 cancellationToken);
-        if (participant is null)
+        if (participant?.Conversation is null)
         {
             return null;
         }
 
-        var conversation = await dbContext.PrivateConversations
-            .AsNoTracking()
-            .Include(c => c.MemberLow)
-            .Include(c => c.MemberHigh)
-            .SingleOrDefaultAsync(c => c.Id == conversationId, cancellationToken);
-        if (conversation is null)
-        {
-            return null;
-        }
+        var conversation = participant.Conversation;
 
         var otherId = conversation.MemberLowId == memberId
             ? conversation.MemberHighId
@@ -590,13 +591,19 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
         Guid memberId,
         CancellationToken cancellationToken)
     {
-        return await dbContext.PrivateConversationParticipants
-            .AsNoTracking()
-            .Where(p => p.MemberId == memberId && !p.IsArchived && !p.IsRemoved)
-            .Where(p => dbContext.PrivateMessages.Any(m =>
-                m.ConversationId == p.ConversationId
+        // Join + Distinct/Count instead of a per-row correlated Any() subquery, matching the
+        // batched aggregate join CountUnreadForPageSqlAsync already uses.
+        return await (
+            from m in dbContext.PrivateMessages.AsNoTracking()
+            join p in dbContext.PrivateConversationParticipants.AsNoTracking()
+                on m.ConversationId equals p.ConversationId
+            where p.MemberId == memberId
+                && !p.IsArchived
+                && !p.IsRemoved
                 && m.SenderMemberId != memberId
-                && (p.LastReadSortKey == null || m.SortKey > p.LastReadSortKey)))
+                && (p.LastReadSortKey == null || m.SortKey > p.LastReadSortKey)
+            select m.ConversationId)
+            .Distinct()
             .CountAsync(cancellationToken);
     }
 
@@ -723,6 +730,19 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
                     unread > 0,
                     unread);
             })
+            .ToList();
+
+    private static IReadOnlyList<PrivateConversationListItem> MapInboxWithUnread(
+        IReadOnlyList<InboxPageRowWithUnread> pageRows) =>
+        pageRows
+            .Select(r => new PrivateConversationListItem(
+                r.ConversationId,
+                r.OtherId,
+                string.IsNullOrWhiteSpace(r.OtherDisplayName) ? "Unknown member" : r.OtherDisplayName,
+                r.Preview,
+                r.LastMessageAt,
+                r.UnreadCount > 0,
+                r.UnreadCount))
             .ToList();
 
     private async Task EnsureParticipantAsync(
@@ -1343,6 +1363,14 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
         DateTimeOffset LastMessageAt,
         string OtherDisplayName,
         Guid OtherId);
+
+    private sealed record InboxPageRowWithUnread(
+        Guid ConversationId,
+        string Preview,
+        DateTimeOffset LastMessageAt,
+        string OtherDisplayName,
+        Guid OtherId,
+        int UnreadCount);
 
     private sealed record ConversationMessageRow(
         Guid Id,
