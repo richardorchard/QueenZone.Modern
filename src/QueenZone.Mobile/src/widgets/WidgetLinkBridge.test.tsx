@@ -27,6 +27,11 @@ const homeDestination = {
   params: { screen: 'Home', initial: false },
 };
 
+const quoteDestination = {
+  screen: 'HomeTab',
+  params: { screen: 'Quote', params: { id: 9 }, initial: false },
+};
+
 describe('WidgetLinkBridge', () => {
   beforeEach(() => {
     resetInitialWidgetUrlConsumption();
@@ -35,6 +40,20 @@ describe('WidgetLinkBridge', () => {
     addEventListener.mockReset();
     getInitialURL.mockResolvedValue(null);
     addEventListener.mockReturnValue({ remove: jest.fn() } as never);
+  });
+
+  it('opens the quote screen from a cold-start quote URL', async () => {
+    getInitialURL.mockResolvedValue('queenzone://quotes/9');
+    renderWithProviders(<WidgetLinkBridge />);
+
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('Tabs', quoteDestination));
+  });
+
+  it('opens Home from a quote URL with a missing or non-integer id', async () => {
+    getInitialURL.mockResolvedValue('queenzone://quotes/abc');
+    renderWithProviders(<WidgetLinkBridge />);
+
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('Tabs', homeDestination));
   });
 
   it('opens Home when launched from the widget URL', async () => {

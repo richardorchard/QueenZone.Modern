@@ -7,6 +7,10 @@ export const testIds = {
   tabForum: 'tab-forum',
 
   homeScreen: 'home-screen',
+  homeQuote: 'home-quote',
+  quoteScreen: 'quote-screen',
+  quoteBack: 'quote-back',
+  quoteContext: 'quote-context',
   homeHero: 'home-hero',
   homeVersion: 'home-version',
   homeSearch: 'home-search',

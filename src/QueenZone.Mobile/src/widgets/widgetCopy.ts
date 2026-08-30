@@ -3,6 +3,7 @@ export type WidgetProps = {
   summary?: string;
   quoteText?: string;
   quoteWhoSaid?: string;
+  quoteId?: number;
 };
 
 export type WidgetFace = 'day' | 'quote';

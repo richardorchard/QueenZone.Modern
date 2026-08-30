@@ -47,11 +47,13 @@ export function isSameLocalCalendarDay(leftMs: number, rightMs: number): boolean
 }
 
 function toWidgetProps(content: WidgetContent): OnThisDayAndroidWidgetProps {
+  const quoteId = content.quote && content.quote.id > 0 ? content.quote.id : undefined;
   return {
     formattedDate: content.onThisDay?.formattedDate,
     summary: content.onThisDay?.summary,
     quoteText: content.quote?.text,
     quoteWhoSaid: content.quote?.whoSaid,
+    ...(quoteId != null ? { quoteId } : {}),
   };
 }
 
@@ -59,7 +61,12 @@ function quoteFromProps(props: OnThisDayAndroidWidgetProps): RandomQuote | null 
   if (!props.quoteText || !props.quoteWhoSaid) {
     return null;
   }
-  return { id: 0, text: props.quoteText, whoSaid: props.quoteWhoSaid };
+  const quoteId = Number(props.quoteId);
+  return {
+    id: Number.isInteger(quoteId) && quoteId > 0 ? quoteId : 0,
+    text: props.quoteText,
+    whoSaid: props.quoteWhoSaid,
+  };
 }
 
 function dayFromProps(props: OnThisDayAndroidWidgetProps): TimelineEvent | null {

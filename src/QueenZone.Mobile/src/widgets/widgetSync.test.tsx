@@ -88,6 +88,7 @@ const widgetProps = {
   summary: 'Queen released The Game.',
   quoteText: 'A kind of magic',
   quoteWhoSaid: 'Freddie Mercury',
+  quoteId: 9,
 };
 
 describe('syncHomeWidget', () => {
@@ -211,6 +212,27 @@ describe('refreshHomeWidget', () => {
     expect(mockRequestWidgetUpdate).not.toHaveBeenCalled();
   });
 
+  it('restores the cached quote id so the next snapshot can deep-link', async () => {
+    Object.defineProperty(Platform, 'OS', { value: 'android' });
+    readCached.mockResolvedValue({
+      quoteText: 'A kind of magic',
+      quoteWhoSaid: 'Freddie Mercury',
+      quoteId: 9,
+    });
+    fetchDay.mockResolvedValue(content.onThisDay);
+    fetchQuote.mockRejectedValue(new Error('offline'));
+
+    await expect(refreshHomeWidget()).resolves.toBe(true);
+
+    expect(writeCached).toHaveBeenCalledWith({
+      formattedDate: '30 June 1980',
+      summary: 'Queen released The Game.',
+      quoteText: 'A kind of magic',
+      quoteWhoSaid: 'Freddie Mercury',
+      quoteId: 9,
+    });
+  });
+
   it('keeps the last good quote when the quote fetch fails', async () => {
     Object.defineProperty(Platform, 'OS', { value: 'android' });
     readCached.mockResolvedValue({
@@ -248,6 +270,7 @@ describe('refreshHomeWidget', () => {
       summary: 'Queen released The Game.',
       quoteText: 'New quote',
       quoteWhoSaid: 'Brian May',
+      quoteId: 2,
     });
     jest.spyOn(Date, 'now').mockRestore();
   });

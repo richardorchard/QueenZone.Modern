@@ -52,6 +52,7 @@ describe('shouldHideTabBar', () => {
   it('hides the tab bar on immersive and pushed-detail routes', () => {
     for (const name of [
       'Story',
+      'Quote',
       'BiographyChapter',
       'Album',
       'Thread',

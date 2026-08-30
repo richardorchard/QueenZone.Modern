@@ -33,6 +33,7 @@ export {
   fetchPhotoCategory,
   fetchPhotoCategoryItems,
   fetchPhotoDetail,
+  fetchQuoteById,
   fetchRandomQuote,
   fetchTimelinePage,
 } from './content';

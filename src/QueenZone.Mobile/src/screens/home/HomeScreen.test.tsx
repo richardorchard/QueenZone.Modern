@@ -391,6 +391,16 @@ describe('HomeScreen', () => {
     await flushVirtualizedList();
   });
 
+  it('opens the Quote screen from the Queen Quotes card', async () => {
+    fetchQuote.mockResolvedValue({ id: 9, text: 'A kind of magic', whoSaid: 'Freddie Mercury' });
+    const { navigation } = renderHome();
+
+    await waitFor(() => expect(screen.getByTestId(testIds.homeQuote)).toBeOnTheScreen());
+    fireEvent.press(screen.getByTestId(testIds.homeQuote));
+    expect(navigation.navigate).toHaveBeenCalledWith('Quote', { id: 9 });
+    await flushVirtualizedList();
+  });
+
   it('shows the Queen Quotes card when there is no on-this-day event', async () => {
     fetchDay.mockResolvedValue(null);
     fetchQuote.mockResolvedValue({ id: 9, text: 'A kind of magic', whoSaid: 'Freddie Mercury' });

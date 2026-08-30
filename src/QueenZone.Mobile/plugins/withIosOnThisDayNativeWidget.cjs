@@ -32,6 +32,7 @@ struct OnThisDayNativeEntryView: View {
   private var summary: String { stringProp("summary") }
   private var quoteText: String { stringProp("quoteText") }
   private var quoteWhoSaid: String { stringProp("quoteWhoSaid") }
+  private var quoteId: Int { intProp("quoteId") }
   private var hasDay: Bool { !formattedDate.isEmpty && !summary.isEmpty }
   private var hasQuote: Bool { !quoteText.isEmpty && !quoteWhoSaid.isEmpty }
   private var showDay: Bool {
@@ -103,7 +104,7 @@ struct OnThisDayNativeEntryView: View {
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
       .padding(14)
     }
-    .widgetURL(URL(string: "queenzone://home"))
+    .widgetURL(tapURL)
 
     if #available(iOS 17.0, *) {
       card.containerBackground(
@@ -115,8 +116,28 @@ struct OnThisDayNativeEntryView: View {
     }
   }
 
+  private var tapURL: URL? {
+    if showQuote && quoteId > 0 {
+      return URL(string: "queenzone://quotes/\\(quoteId)")
+    }
+    return URL(string: "queenzone://home")
+  }
+
   private func stringProp(_ key: String) -> String {
     (entry.props?[key] as? String) ?? ""
+  }
+
+  private func intProp(_ key: String) -> Int {
+    if let number = entry.props?[key] as? Int {
+      return number
+    }
+    if let number = entry.props?[key] as? Double {
+      return Int(number)
+    }
+    if let text = entry.props?[key] as? String, let number = Int(text) {
+      return number
+    }
+    return 0
   }
 }
 `.trim();
@@ -193,7 +214,7 @@ function withIosOnThisDayNativeWidget(config) {
 const plugin = createRunOncePlugin(
   withIosOnThisDayNativeWidget,
   'withIosOnThisDayNativeWidget',
-  '1.2.0',
+  '1.3.0',
 );
 
 plugin.applyOnThisDayNativeWidget = applyOnThisDayNativeWidget;

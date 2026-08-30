@@ -14,6 +14,7 @@ import {
   fetchNewsYearRange,
   fetchOnThisDay,
   fetchPhotoCategories,
+  fetchQuoteById,
   fetchRandomQuote,
 } from '../../api';
 import { fetchConversation } from '../../api/messages';
@@ -35,6 +36,7 @@ import { NewsIndexScreen } from '../news/NewsIndexScreen';
 import { NewsStoryScreen } from '../news/NewsStoryScreen';
 import { PhotosScreen } from '../photos/PhotosScreen';
 import { HomeScreen } from './HomeScreen';
+import { QuoteScreen } from './QuoteScreen';
 
 jest.mock('../../api', () => {
   const actual = jest.requireActual('../../api');
@@ -53,6 +55,7 @@ jest.mock('../../api', () => {
     fetchPhotoCategories: jest.fn(),
     fetchOnThisDay: jest.fn(),
     fetchRandomQuote: jest.fn(),
+    fetchQuoteById: jest.fn(),
     fetchLiveActivity: jest.fn(),
     fetchInbox: jest.fn(),
   };
@@ -99,6 +102,7 @@ const fetchWatch = fetchForumTopicWatch as jest.MockedFunction<typeof fetchForum
 const fetchPhotos = fetchPhotoCategories as jest.MockedFunction<typeof fetchPhotoCategories>;
 const fetchDay = fetchOnThisDay as jest.MockedFunction<typeof fetchOnThisDay>;
 const fetchQuote = fetchRandomQuote as jest.MockedFunction<typeof fetchRandomQuote>;
+const fetchQuoteDetail = fetchQuoteById as jest.MockedFunction<typeof fetchQuoteById>;
 const fetchLive = fetchLiveActivity as jest.MockedFunction<typeof fetchLiveActivity>;
 const fetchInboxMock = fetchInbox as jest.MockedFunction<typeof fetchInbox>;
 const fetchConversationMock = fetchConversation as jest.MockedFunction<typeof fetchConversation>;
@@ -184,6 +188,12 @@ describe('TabRootMasthead placement', () => {
     fetchPhotos.mockResolvedValue(pagedResponse([], 1, 0));
     fetchDay.mockResolvedValue(null);
     fetchQuote.mockResolvedValue(null);
+    fetchQuoteDetail.mockResolvedValue({
+      id: 9,
+      text: 'A kind of magic',
+      whoSaid: 'Freddie Mercury',
+      context: 'Live Aid, 1985',
+    });
     fetchLive.mockResolvedValue({ newForumRepliesToday: 0 });
     fetchInboxMock.mockResolvedValue(pagedResponse([], 1, 0));
     fetchConversationMock.mockResolvedValue({
@@ -341,7 +351,7 @@ describe('TabRootMasthead placement', () => {
     }
   });
 
-  it('is absent on Story, Thread, and Conversation', async () => {
+  it('is absent on Story, Quote, Thread, and Conversation', async () => {
     const navigation = fakeNavigation();
 
     const story = renderWithProviders(
@@ -355,6 +365,18 @@ describe('TabRootMasthead placement', () => {
     expect(screen.queryByTestId(testIds.tabMasthead)).not.toBeOnTheScreen();
     expect(screen.queryByTestId(testIds.tabIdentityHeader)).not.toBeOnTheScreen();
     story.unmount();
+
+    const quote = renderWithProviders(
+      <QuoteScreen
+        navigation={navigation as never}
+        route={{ key: 'quote', name: 'Quote', params: { id: 9 } } as never}
+      />,
+      { navigation: false },
+    );
+    await waitFor(() => expect(screen.getByTestId(testIds.quoteScreen)).toBeOnTheScreen());
+    expect(screen.queryByTestId(testIds.tabMasthead)).not.toBeOnTheScreen();
+    expect(screen.queryByTestId(testIds.tabIdentityHeader)).not.toBeOnTheScreen();
+    quote.unmount();
 
     const thread = renderWithProviders(
       <ThreadScreen

@@ -55,7 +55,7 @@ public static class ContentApiMapper
     }
 
     public static QuoteDto ToQuoteDto(QuoteItem quote) =>
-        new(quote.Id, quote.Text, quote.WhoSaid);
+        new(quote.Id, quote.Text, quote.WhoSaid, string.IsNullOrWhiteSpace(quote.Context) ? null : quote.Context);
 
     public static TimelineEventDto ToTimelineEvent(QueenHistoryEvent historyEvent) =>
         new(
