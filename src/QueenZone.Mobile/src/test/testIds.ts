@@ -8,6 +8,9 @@ export const testIds = {
 
   homeScreen: 'home-screen',
   homeQuote: 'home-quote',
+  homePoll: 'home-poll',
+  homePollVote: 'home-poll-vote',
+  homePollSignIn: 'home-poll-sign-in',
   quoteScreen: 'quote-screen',
   quoteBack: 'quote-back',
   quoteContext: 'quote-context',

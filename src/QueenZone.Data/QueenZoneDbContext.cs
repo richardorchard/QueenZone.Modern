@@ -35,6 +35,12 @@ public sealed class QueenZoneDbContext : DbContext
 
     public DbSet<ForumPollVoteEntity> ForumPollVotes => Set<ForumPollVoteEntity>();
 
+    public DbSet<HomePollEntity> HomePolls => Set<HomePollEntity>();
+
+    public DbSet<HomePollOptionEntity> HomePollOptions => Set<HomePollOptionEntity>();
+
+    public DbSet<HomePollVoteEntity> HomePollVotes => Set<HomePollVoteEntity>();
+
     public DbSet<NewsDiscoverySourceEntity> NewsDiscoverySources => Set<NewsDiscoverySourceEntity>();
 
     public DbSet<NewsCandidateEntity> NewsCandidates => Set<NewsCandidateEntity>();
@@ -1204,6 +1210,49 @@ public sealed class QueenZoneDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(row => row.MemberId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<HomePollEntity>(entity =>
+        {
+            entity.ToTable("HomePolls");
+            entity.HasKey(poll => poll.Id);
+            entity.Property(poll => poll.Question).HasMaxLength(HomePollValidation.QuestionMaxLength).IsRequired();
+            entity.Property(poll => poll.CreatedAt).IsRequired();
+            entity.HasIndex(poll => poll.IsCurrent)
+                .IsUnique()
+                .HasFilter("[IsCurrent] = 1")
+                .HasDatabaseName("UX_HomePolls_IsCurrent");
+            entity.HasMany(poll => poll.Options)
+                .WithOne(option => option.Poll)
+                .HasForeignKey(option => option.PollId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasMany(poll => poll.Votes)
+                .WithOne(vote => vote.Poll)
+                .HasForeignKey(vote => vote.PollId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<HomePollOptionEntity>(entity =>
+        {
+            entity.ToTable("HomePollOptions");
+            entity.HasKey(option => option.Id);
+            entity.Property(option => option.OptionText).HasMaxLength(HomePollValidation.OptionMaxLength).IsRequired();
+            entity.HasIndex(option => new { option.PollId, option.DisplayOrder })
+                .HasDatabaseName("IX_HomePollOptions_PollId_DisplayOrder");
+        });
+
+        modelBuilder.Entity<HomePollVoteEntity>(entity =>
+        {
+            entity.ToTable("HomePollVotes");
+            entity.HasKey(vote => vote.Id);
+            entity.Property(vote => vote.VotedAt).IsRequired();
+            entity.HasIndex(vote => new { vote.PollId, vote.MemberAccountId })
+                .IsUnique()
+                .HasDatabaseName("UQ_HomePollVotes_Poll_Member");
+            entity.HasOne(vote => vote.Option)
+                .WithMany(option => option.Votes)
+                .HasForeignKey(vote => vote.OptionId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
     }
 }
