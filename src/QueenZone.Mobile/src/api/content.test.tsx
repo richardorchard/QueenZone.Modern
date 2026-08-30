@@ -15,6 +15,7 @@ import {
   fetchPhotoCategory,
   fetchPhotoCategoryItems,
   fetchPhotoDetail,
+  fetchQuoteById,
   fetchRandomQuote,
   fetchTimelinePage,
 } from './content';
@@ -120,6 +121,22 @@ describe('fetchRandomQuote', () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ id: 5, text: 'A kind of magic', whoSaid: 'Freddie Mercury' }));
     const quote = await fetchRandomQuote();
     expect(quote).toMatchObject({ id: 5, text: 'A kind of magic', whoSaid: 'Freddie Mercury' });
+  });
+});
+
+describe('fetchQuoteById', () => {
+  it('requests the published quote by id', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ id: 5, text: 'A kind of magic', whoSaid: 'Freddie Mercury', context: 'Live Aid' }),
+    );
+    const quote = await fetchQuoteById(5);
+    expect(lastUrl()).toBe('http://qz.test/api/v1/content/quotes/5');
+    expect(quote).toMatchObject({
+      id: 5,
+      text: 'A kind of magic',
+      whoSaid: 'Freddie Mercury',
+      context: 'Live Aid',
+    });
   });
 });
 

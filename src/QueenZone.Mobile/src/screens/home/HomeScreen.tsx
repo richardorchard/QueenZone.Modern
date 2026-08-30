@@ -149,10 +149,10 @@ export function HomeScreen({ navigation }: Props) {
   const latestNews = newsItems.slice(1, 4);
   const totalNewsCount = news.view.kind === 'content' ? news.view.data.totalCount : 0;
   const onThisDayEvent = onThisDay.view.kind === 'content' ? onThisDay.view.data : null;
-  const onThisDayQuote =
-    quote.view.kind === 'content' && quote.view.data
-      ? { text: quote.view.data.text, whoSaid: quote.view.data.whoSaid }
-      : null;
+  const featuredQuote = quote.view.kind === 'content' ? quote.view.data : null;
+  const onThisDayQuote = featuredQuote
+    ? { text: featuredQuote.text, whoSaid: featuredQuote.whoSaid }
+    : null;
   const showOnThisDay =
     visibleSections.has('onThisDay') && onThisDayIsVisible(onThisDayEvent);
   const showQueenQuotes =
@@ -538,8 +538,17 @@ export function HomeScreen({ navigation }: Props) {
             />
           ) : null}
 
-          {showQueenQuotes && onThisDayQuote ? (
-            <FeatureBlock eyebrow={queenQuotesEyebrow()} quote={onThisDayQuote} />
+          {showQueenQuotes && onThisDayQuote && featuredQuote ? (
+            <FeatureBlock
+              testID={testIds.homeQuote}
+              eyebrow={queenQuotesEyebrow()}
+              quote={onThisDayQuote}
+              onPress={
+                featuredQuote.id > 0
+                  ? () => navigation.navigate('Quote', { id: featuredQuote.id })
+                  : undefined
+              }
+            />
           ) : null}
 
           <ArchiveFooter />
