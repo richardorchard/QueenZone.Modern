@@ -12,6 +12,7 @@ public sealed class MySubmissionsModel(
     IPhotoSubmissionRepository photoSubmissionRepository,
     INewsSuggestionRepository newsSuggestionRepository,
     IArticleSubmissionRepository articleSubmissionRepository,
+    ITriviaFactSubmissionRepository triviaFactSubmissionRepository,
     INewsRepository newsRepository) : PageModel
 {
     public const int PageSize = 10;
@@ -19,6 +20,7 @@ public sealed class MySubmissionsModel(
     public const string TabPhotos = "photos";
     public const string TabNews = "news";
     public const string TabArticles = "articles";
+    public const string TabTrivia = "trivia";
 
     public string ActiveTab { get; private set; } = TabPhotos;
 
@@ -29,6 +31,8 @@ public sealed class MySubmissionsModel(
     public IReadOnlyList<NewsSuggestionRow> NewsSuggestions { get; private set; } = [];
 
     public IReadOnlyList<ArticleSubmission> ArticleSubmissions { get; private set; } = [];
+
+    public IReadOnlyList<TriviaFactSubmission> TriviaSubmissions { get; private set; } = [];
 
     public ArchivePaginationViewModel? Pagination { get; private set; }
 
@@ -58,6 +62,14 @@ public sealed class MySubmissionsModel(
                     var result = await articleSubmissionRepository.GetDraftsForMemberAsync(
                         memberId.Value, CurrentPage, PageSize, cancellationToken);
                     ArticleSubmissions = result.Items;
+                    Pagination = BuildPagination(result.TotalCount);
+                    break;
+                }
+            case TabTrivia:
+                {
+                    var result = await triviaFactSubmissionRepository.GetBySubmitterAsync(
+                        memberId.Value, CurrentPage, PageSize, cancellationToken);
+                    TriviaSubmissions = result.Items;
                     Pagination = BuildPagination(result.TotalCount);
                     break;
                 }
@@ -121,6 +133,7 @@ public sealed class MySubmissionsModel(
         {
             TabNews => TabNews,
             TabArticles => TabArticles,
+            TabTrivia => TabTrivia,
             _ => TabPhotos,
         };
 

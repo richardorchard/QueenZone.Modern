@@ -16,21 +16,23 @@ public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForu
     {
         // Explicit transactions under EnableRetryOnFailure must run inside the execution strategy
         // so Azure SQL transient failures can retry the whole unit of work (see QueenZoneSqlServerOptions).
-        var strategy = dbContext.Database.CreateExecutionStrategy();
-        return strategy.ExecuteAsync(async () =>
+        // Join an ambient idempotency transaction when present so the receipt commits with the thread.
+        return QueenZoneDbTransactions.ExecuteAsync(
+            dbContext,
+            IsolationLevel.ReadCommitted,
+            async innerCt =>
         {
             var now = ToUtcDateTime(thread.CreatedAt);
-            await using var transaction = await dbContext.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
 
             var category = await dbContext.ModernForumCategories
-                .SingleOrDefaultAsync(item => item.LegacyForumId == thread.CategoryId && !item.IsSynthetic, cancellationToken);
+                .SingleOrDefaultAsync(item => item.LegacyForumId == thread.CategoryId && !item.IsSynthetic, innerCt);
             if (category is null)
             {
                 throw new InvalidOperationException("Forum category not found.");
             }
 
-            var topicId = await AllocateNextTopicIdAsync(cancellationToken);
-            var postId = await AllocateNextPostIdAsync(cancellationToken);
+            var topicId = await AllocateNextTopicIdAsync(innerCt);
+            var postId = await AllocateNextPostIdAsync(innerCt);
 
             var forumThread = new ModernForumThreadEntity
             {
@@ -85,7 +87,7 @@ public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForu
             category.LastActivityAt = now;
             category.UpdatedAt = now;
 
-            await dbContext.SaveChangesAsync(cancellationToken);
+            await dbContext.SaveChangesAsync(innerCt);
 
             await ApplyCreateThreadStatsAsync(
                 forumThread.Id,
@@ -93,30 +95,30 @@ public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForu
                 category.Id,
                 now,
                 titleCountsForSitemap: !string.IsNullOrWhiteSpace(forumThread.Title),
-                cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-
+                innerCt);
             return new ForumThreadCreateResult(topicId, postId);
-        });
+        },
+            cancellationToken);
     }
 
     public Task<int> CreatePostAsync(NewForumPost post, CancellationToken cancellationToken = default)
     {
-        var strategy = dbContext.Database.CreateExecutionStrategy();
-        return strategy.ExecuteAsync(async () =>
+        return QueenZoneDbTransactions.ExecuteAsync(
+            dbContext,
+            IsolationLevel.ReadCommitted,
+            async innerCt =>
         {
             var now = ToUtcDateTime(post.CreatedAt);
-            await using var transaction = await dbContext.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
 
             var thread = await dbContext.ModernForumThreads
                 .Include(item => item.Category)
-                .SingleOrDefaultAsync(item => item.LegacyTopicId == post.TopicId, cancellationToken);
+                .SingleOrDefaultAsync(item => item.LegacyTopicId == post.TopicId, innerCt);
             if (thread is null)
             {
                 throw new InvalidOperationException("Forum thread not found.");
             }
 
-            var postId = await AllocateNextPostIdAsync(cancellationToken);
+            var postId = await AllocateNextPostIdAsync(innerCt);
             dbContext.ModernForumPosts.Add(new ModernForumPostEntity
             {
                 LegacyPostId = postId,
@@ -145,12 +147,11 @@ public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForu
                 thread.Category.UpdatedAt = now;
             }
 
-            await dbContext.SaveChangesAsync(cancellationToken);
-            await ApplyCreatePostStatsAsync(thread.Id, thread.LegacyTopicId, now, cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-
+            await dbContext.SaveChangesAsync(innerCt);
+            await ApplyCreatePostStatsAsync(thread.Id, thread.LegacyTopicId, now, innerCt);
             return postId;
-        });
+        },
+            cancellationToken);
     }
 
     public async Task<ForumEditablePost?> GetPostAsync(int postId, CancellationToken cancellationToken = default)

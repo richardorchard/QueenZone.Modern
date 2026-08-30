@@ -114,6 +114,13 @@ public sealed class QueenZoneDbContext : DbContext
 
     public DbSet<TriviaFactEntity> TriviaFacts => Set<TriviaFactEntity>();
 
+    public DbSet<TriviaFactSubmissionEntity> TriviaFactSubmissions => Set<TriviaFactSubmissionEntity>();
+
+    public DbSet<TriviaFactSubmissionAuditLogEntity> TriviaFactSubmissionAuditLogs =>
+        Set<TriviaFactSubmissionAuditLogEntity>();
+
+    public DbSet<IdempotencyReceiptEntity> IdempotencyReceipts => Set<IdempotencyReceiptEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<QuoteEntity>(entity =>
@@ -156,6 +163,57 @@ public sealed class QueenZoneDbContext : DbContext
 
             entity.HasIndex(fact => new { fact.IsPublished, fact.Category })
                 .HasDatabaseName("IX_TriviaFacts_Published_Category");
+        });
+
+        modelBuilder.Entity<TriviaFactSubmissionEntity>(entity =>
+        {
+            entity.ToTable("TriviaFactSubmissions");
+            entity.HasKey(submission => submission.Id);
+
+            entity.Property(submission => submission.Text)
+                .HasMaxLength(TriviaValidation.MaxTextLength)
+                .IsRequired();
+            entity.Property(submission => submission.Category).HasMaxLength(TriviaValidation.MaxCategoryLength);
+            entity.Property(submission => submission.Difficulty).HasMaxLength(TriviaValidation.MaxDifficultyLength);
+            entity.Property(submission => submission.SourceNote).HasMaxLength(TriviaValidation.MaxSourceNoteLength);
+            entity.Property(submission => submission.Status).HasMaxLength(50).IsRequired();
+            entity.Property(submission => submission.SubmittedAt).IsRequired();
+            entity.Property(submission => submission.ReviewerEmail).HasMaxLength(256);
+            entity.Property(submission => submission.ReviewNotes).HasMaxLength(500);
+            entity.Property(submission => submission.RejectionReason).HasMaxLength(500);
+
+            entity.HasIndex(submission => new { submission.Status, submission.SubmittedAt })
+                .IsDescending(false, true)
+                .HasDatabaseName("IX_TriviaFactSubmissions_Status_SubmittedAt");
+
+            entity.HasIndex(submission => new { submission.SubmitterMemberId, submission.SubmittedAt })
+                .IsDescending(false, true)
+                .HasDatabaseName("IX_TriviaFactSubmissions_Submitter_SubmittedAt");
+
+            entity.HasOne(submission => submission.Submitter)
+                .WithMany()
+                .HasForeignKey(submission => submission.SubmitterMemberId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<TriviaFactSubmissionAuditLogEntity>(entity =>
+        {
+            entity.ToTable("TriviaFactSubmissionAuditLog");
+            entity.HasKey(log => log.Id);
+
+            entity.Property(log => log.Action).HasMaxLength(50).IsRequired();
+            entity.Property(log => log.ActorEmail).HasMaxLength(256).IsRequired();
+            entity.Property(log => log.OccurredAt).IsRequired();
+            entity.Property(log => log.Details).HasMaxLength(2000);
+
+            entity.HasIndex(log => new { log.TriviaFactSubmissionId, log.OccurredAt })
+                .IsDescending(false, true)
+                .HasDatabaseName("IX_TriviaFactSubmissionAuditLog_Submission_OccurredAt");
+
+            entity.HasOne(log => log.Submission)
+                .WithMany(submission => submission.AuditLogs)
+                .HasForeignKey(log => log.TriviaFactSubmissionId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<NewsTableRow>(entity =>
@@ -1271,6 +1329,27 @@ public sealed class QueenZoneDbContext : DbContext
                 .WithMany(option => option.Votes)
                 .HasForeignKey(vote => vote.OptionId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<IdempotencyReceiptEntity>(entity =>
+        {
+            entity.ToTable("IdempotencyReceipts");
+            entity.HasKey(row => row.Id);
+            entity.Property(row => row.OperationKind)
+                .HasMaxLength(IdempotencyLimits.OperationKindMaxLength)
+                .IsRequired();
+            entity.Property(row => row.PayloadHash)
+                .HasMaxLength(IdempotencyLimits.PayloadHashLength)
+                .IsRequired();
+            entity.Property(row => row.Location).HasMaxLength(IdempotencyLimits.LocationMaxLength);
+            entity.Property(row => row.ResponseBodyJson).IsRequired();
+            entity.Property(row => row.CreatedAt).IsRequired();
+            entity.Property(row => row.ExpiresAt).IsRequired();
+            entity.HasIndex(row => new { row.MemberId, row.OperationKind, row.OperationId })
+                .IsUnique()
+                .HasDatabaseName("UX_IdempotencyReceipts_Member_Kind_Operation");
+            entity.HasIndex(row => row.ExpiresAt)
+                .HasDatabaseName("IX_IdempotencyReceipts_ExpiresAt");
         });
     }
 }

@@ -21,7 +21,7 @@
           "ARM_TENANT_ID"
         ],
         "opentofuTreatment": "outside",
-        "notes": "OIDC identity QueenZone Deploy; Website Contributor on site queenzone-dev only. Writes WEBSITE_RUN_FROM_PACKAGE and WEBSITE_WARMUP_PATH via ARM. Sibling of OpenTofu plan/apply, not an OpenTofu principal."
+        "notes": "OIDC identity QueenZone Deploy; Website Contributor on site queenzone-dev only. Writes WEBSITE_WARMUP_PATH via ARM (also deletes WEBSITE_WARMUP_STATUSES/WEBSITE_RUN_FROM_PACKAGE if either reappears live). Sibling of OpenTofu plan/apply, not an OpenTofu principal."
       },
       {
         "name": "opentofu-plan",
@@ -179,7 +179,6 @@
     "Admin__AllowedEmails__1",
     "SCM_DO_BUILD_DURING_DEPLOYMENT",
     "ENABLE_ORYX_BUILD",
-    "WEBSITE_RUN_FROM_PACKAGE",
     "WEBSITE_WARMUP_PATH"
   ],
   "appServiceSettingsArmOwned": [
@@ -187,12 +186,6 @@
       "name": "MobileAuth__SigningKey",
       "owner": "Bitwarden; deploy.yml configure-app-settings reconciles via ARM",
       "notes": "Secret value is never recorded. Required for mobile PKCE token issuance."
-    },
-    {
-      "name": "WEBSITE_RUN_FROM_PACKAGE",
-      "value": "1",
-      "owner": "deploy.yml configure-app-settings via ARM",
-      "notes": "Non-secret. Added after the 2026-08-12 audit."
     },
     {
       "name": "WEBSITE_WARMUP_PATH",
@@ -206,6 +199,11 @@
       "name": "WEBSITE_WARMUP_STATUSES",
       "owner": "deploy.yml configure-app-settings via ARM (deleted if present)",
       "notes": "Must stay unset. Requiring 200 crash-looped the B1 worker (#684)."
+    },
+    {
+      "name": "WEBSITE_RUN_FROM_PACKAGE",
+      "owner": "deploy.yml configure-app-settings via ARM (deleted if present)",
+      "notes": "Added after the 2026-08-12 audit to mount the OneDeploy zip read-only; removed after it repeatedly served stale builds post-deploy with no further restart logged. Must stay unset."
     }
   ],
   "accessRestrictions": {

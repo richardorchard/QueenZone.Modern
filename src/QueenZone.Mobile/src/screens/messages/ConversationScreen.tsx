@@ -27,6 +27,14 @@ import {
 } from '../../api/messages';
 import type { HomeStackParamList } from '../../navigation/types';
 import { resolvePushMemberId } from '../../notifications/pushMemberId';
+import {
+  enqueueMessageReply,
+  flushOfflineQueue,
+  removeOfflineItem,
+  updateOfflineItem,
+  useOfflineQueue,
+  type OfflineQueueItem,
+} from '../../offlineQueue';
 import { MemberGate } from '../../session/MemberGate';
 import { useSession } from '../../session/SessionContext';
 import { fonts, palette, radius, space, type, useTheme } from '../../theme';
@@ -50,6 +58,57 @@ import {
 } from './inboxMeta';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'Conversation'>;
+
+type DisplayMessage = ConversationMessage & {
+  queueState?: OfflineQueueItem['state'];
+  queueError?: string | null;
+};
+
+function overlayQueuedMessages(
+  detail: ConversationDetail | null,
+  queueItems: OfflineQueueItem[],
+  conversationId: string | null,
+  memberId: string | null,
+): DisplayMessage[] {
+  const messages: DisplayMessage[] = [...(detail?.messages ?? [])];
+  if (!conversationId || !memberId) {
+    return messages;
+  }
+  const pending = queueItems.filter(
+    (item) =>
+      item.kind === 'message.reply' &&
+      'conversationId' in item.target &&
+      item.target.conversationId === conversationId,
+  );
+  for (const item of pending) {
+    if (messages.some((message) => message.id === item.operationId)) {
+      continue;
+    }
+    messages.push({
+      id: item.operationId,
+      senderMemberId: memberId,
+      senderDisplayName: 'You',
+      body: item.payload.body,
+      createdAt: item.createdAt,
+      isMine: true,
+      sortKey: Number.MAX_SAFE_INTEGER,
+      reportedByViewer: false,
+      queueState: item.state,
+      queueError: item.lastError,
+    });
+  }
+  return messages;
+}
+
+function queueStatusLabel(state: OfflineQueueItem['state']): string {
+  if (state === 'sending') {
+    return 'Sending…';
+  }
+  if (state === 'needs_attention') {
+    return 'Needs attention';
+  }
+  return 'Queued';
+}
 
 /**
  * Thread list sits one step darker than the header/composer chrome — a new
@@ -84,6 +143,7 @@ function ConversationThread({ navigation, route }: Props) {
   const listRef = useRef<FlatList<ThreadListItem<ConversationMessage>>>(null);
   const conversationId = parseConversationId(route.params.id);
   const memberId = accessToken ? resolvePushMemberId(accessToken, profile?.memberId) : null;
+  const queueItems = useOfflineQueue(memberId);
   const [detail, setDetail] = useState<ConversationDetail | null>(null);
   const [source, setSource] = useState<CacheSource>('network');
   const [cachedAt, setCachedAt] = useState<string | null>(null);
@@ -263,19 +323,46 @@ function ConversationThread({ navigation, route }: Props) {
       return;
     }
 
+    if (!memberId) {
+      setSubmitError('Sign in to continue.');
+      return;
+    }
+
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const next = await replyToConversation(accessToken, conversationId, draft.trim());
-      setDetail(next);
+      const queued = await enqueueMessageReply({
+        memberId,
+        conversationId,
+        body: draft.trim(),
+      });
+      void flushOfflineQueue();
       setDraft('');
       requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
+      try {
+        const next = await replyToConversation(
+          accessToken,
+          conversationId,
+          queued.payload.body,
+          undefined,
+          queued.operationId,
+        );
+        await removeOfflineItem(queued.operationId);
+        setDetail(next);
+        setSource('network');
+        setCachedAt(new Date().toISOString());
+      } catch (err: unknown) {
+        if (isOfflineFailure(err) || isTimeoutFailure(err)) {
+          return;
+        }
+        throw err;
+      }
     } catch (err: unknown) {
       setSubmitError(messageFromUnknownError(err));
     } finally {
       setSubmitting(false);
     }
-  }, [accessToken, conversationId, draft]);
+  }, [accessToken, conversationId, draft, memberId]);
 
   const submitReport = useCallback(
     async (messageId: string) => {
@@ -328,13 +415,12 @@ function ConversationThread({ navigation, route }: Props) {
   }
 
   const offlineSnapshot = source === 'cache';
-  const canSendReply = detail?.canSendReply === true && !offlineSnapshot;
-  const notice = offlineSnapshot
-    ? null
-    : detail
-      ? sendingBlockedNotice(detail.hasBlockedOtherParticipant, detail.canSendReply === true)
-      : null;
-  const threadItems = buildThreadItems(detail?.messages ?? []);
+  const canSendReply = detail?.canSendReply === true;
+  const notice = detail
+    ? sendingBlockedNotice(detail.hasBlockedOtherParticipant, detail.canSendReply === true)
+    : null;
+  const pendingMessages = overlayQueuedMessages(detail, queueItems, conversationId, memberId);
+  const threadItems = buildThreadItems(pendingMessages);
 
   return (
     <KeyboardAvoidingView
@@ -367,14 +453,14 @@ function ConversationThread({ navigation, route }: Props) {
             <DateDivider label={item.label} />
           ) : (
             <MessageBubble
-              item={item.message}
+              item={item.message as DisplayMessage}
               correspondentName={correspondentName}
               isFirstOfRun={item.isFirstOfRun}
               reporting={reportingMessageId === item.message.id}
               reportReason={reportReason}
               reportError={reportingMessageId === item.message.id ? reportError : null}
               reportBusy={reportBusy}
-              interactionsEnabled={!offlineSnapshot}
+              interactionsEnabled={!offlineSnapshot && !(item.message as DisplayMessage).queueState}
               onStartReport={() => {
                 setReportingMessageId(item.message.id);
                 setReportReason('');
@@ -411,8 +497,8 @@ function ConversationThread({ navigation, route }: Props) {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Archive conversation"
-              accessibilityState={{ disabled: archiving, busy: archiving }}
-              disabled={archiving}
+              accessibilityState={{ disabled: archiving || offlineSnapshot, busy: archiving }}
+              disabled={archiving || offlineSnapshot}
               onPress={confirmArchive}
               hitSlop={8}
               style={[styles.archiveTap, archiving ? { opacity: 0.5 } : null]}
@@ -499,7 +585,7 @@ function MessageBubble({
   onChangeReason,
   onSubmitReport,
 }: {
-  item: ConversationMessage;
+  item: DisplayMessage;
   correspondentName: string;
   isFirstOfRun: boolean;
   reporting: boolean;
@@ -527,6 +613,44 @@ function MessageBubble({
         <View style={[styles.bubble, styles.outgoingBubble]}>
           <Text style={styles.outgoingText}>{item.body}</Text>
         </View>
+        {item.queueState ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={queueStatusLabel(item.queueState)}
+            testID={testIds.pendingMessage}
+            onPress={() => {
+              if (item.queueState !== 'needs_attention') {
+                return;
+              }
+              Alert.alert(item.queueError ?? 'This message could not be sent.', undefined, [
+                { text: 'Dismiss', style: 'cancel' },
+                {
+                  text: 'Discard',
+                  style: 'destructive',
+                  onPress: () => {
+                    void removeOfflineItem(item.id);
+                  },
+                },
+                {
+                  text: 'Retry',
+                  onPress: () => {
+                    void updateOfflineItem(item.id, {
+                      state: 'queued',
+                      nextRetryAt: new Date().toISOString(),
+                      lastError: null,
+                    }).then(() => {
+                      void flushOfflineQueue();
+                    });
+                  },
+                },
+              ]);
+            }}
+          >
+            <Text style={[styles.attribution, { color: palette.gold }]}>
+              {queueStatusLabel(item.queueState)}
+            </Text>
+          </Pressable>
+        ) : null}
       </View>
     );
   }

@@ -8,7 +8,8 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { AppState, Linking } from 'react-native';
+import { Alert, AppState, Linking } from 'react-native';
+import { addNetworkStateListener } from 'expo-network';
 import * as Notifications from 'expo-notifications';
 import { getAppConfig } from '../config/appConfig';
 import { ApiError, fetchJson } from '../api/client';
@@ -23,6 +24,13 @@ import {
   smokeAuthRefreshPlaceholder,
 } from './smokeAuth';
 import { purgePrivateContentCache } from '../cache';
+import { resolvePushMemberId } from '../notifications/pushMemberId';
+import {
+  configureOfflineQueueAuth,
+  countPendingOfflineItems,
+  discardOfflineQueue,
+  flushOfflineQueue,
+} from '../offlineQueue';
 import { clearStoredSession, readStoredSession, writeStoredSession } from './tokenStore';
 
 export type Session = {
@@ -242,12 +250,43 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [applyProfile, applyTokenState, clearLocal, refreshWithStoredGrant]);
 
   useEffect(() => {
-    const subscription = AppState.addEventListener('change', (state) => {
+    configureOfflineQueueAuth({
+      getAccessToken: () => sessionRef.current.accessToken,
+      getMemberId: () =>
+        sessionRef.current.accessToken
+          ? resolvePushMemberId(sessionRef.current.accessToken, sessionRef.current.profile?.memberId)
+          : null,
+      refreshAccessToken: ensureAccessToken,
+    });
+    return () => configureOfflineQueueAuth(null);
+  }, [ensureAccessToken]);
+
+  useEffect(() => {
+    const flushIfSignedIn = () => {
+      if (!sessionRef.current.accessToken) {
+        return;
+      }
+      void ensureAccessToken().then((token) => {
+        if (token) {
+          void flushOfflineQueue();
+        }
+      });
+    };
+
+    const appState = AppState.addEventListener('change', (state) => {
       if (state === 'active' && refreshTokenRef.current) {
-        void ensureAccessToken();
+        flushIfSignedIn();
       }
     });
-    return () => subscription.remove();
+    const network = addNetworkStateListener((state) => {
+      if (state.isInternetReachable === true || state.isConnected === true) {
+        flushIfSignedIn();
+      }
+    });
+    return () => {
+      appState.remove();
+      network.remove();
+    };
   }, [ensureAccessToken]);
 
   const applySmokeSession = useCallback(
@@ -294,6 +333,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const isSignedIn = session.isSignedIn;
   const accessToken = session.accessToken;
   const memberId = session.profile?.memberId ?? null;
+  const isRestoring = session.isRestoring;
+
+  useEffect(() => {
+    if (!isRestoring && isSignedIn && accessToken) {
+      void flushOfflineQueue();
+    }
+  }, [isRestoring, isSignedIn, accessToken]);
 
   // #850: request push permission and register the device once signed in
   // (not before) — never on cold start. Best-effort throughout; see
@@ -363,7 +409,27 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       applySmokeSession,
       signOut: async () => {
         const token = sessionRef.current.accessToken;
-        const signedOutMemberId = sessionRef.current.profile?.memberId ?? null;
+        const signedOutMemberId =
+          (token ? resolvePushMemberId(token, sessionRef.current.profile?.memberId) : null) ??
+          sessionRef.current.profile?.memberId ??
+          null;
+        const pending = await countPendingOfflineItems(signedOutMemberId);
+        if (pending > 0) {
+          const confirmed = await new Promise<boolean>((resolve) => {
+            Alert.alert(
+              'Discard pending sends?',
+              'Messages and replies waiting to send will be deleted.',
+              [
+                { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+                { text: 'Sign out', style: 'destructive', onPress: () => resolve(true) },
+              ],
+            );
+          });
+          if (!confirmed) {
+            return;
+          }
+          await discardOfflineQueue(signedOutMemberId);
+        }
         const refresh = refreshTokenRef.current;
         const apiBaseUrl = getAppConfig().apiBaseUrl;
         // Clear the device session first. Remote logout/revoke/push unregister

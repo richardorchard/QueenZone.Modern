@@ -478,6 +478,173 @@ public sealed class MessagesApiTests : IClassFixture<QueenZoneWebApplicationFact
     }
 
     [Fact]
+    public async Task Reply_WithoutIdempotencyKey_KeepsOneShotBehavior()
+    {
+        var (aliceId, bobId) = await SeedConversationPairAsync(
+            "api-idemp-once-alice@example.com",
+            "API Idem Once Alice",
+            "api-idemp-once-bob@example.com",
+            "API Idem Once Bob");
+        var service = factory.Services.GetRequiredService<PrivateMessageService>();
+        var sent = await service.ComposeAsync(aliceId, bobId, "Start");
+        var conversationId = sent.ConversationId!.Value;
+        var path = MessagesApiEndpoints.ConversationPath(conversationId);
+        using var bob = CreateBearerClient(bobId, "API Idem Once Bob", "api-idemp-once-bob@example.com");
+
+        using var first = await bob.PostAsJsonAsync(path, new { body = "Same reply twice." });
+        using var second = await bob.PostAsJsonAsync(path, new { body = "Same reply twice." });
+
+        Assert.Equal(HttpStatusCode.Created, first.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, second.StatusCode);
+        var firstDto = await first.Content.ReadFromJsonAsync<ConversationDetailDto>(JsonOptions);
+        var secondDto = await second.Content.ReadFromJsonAsync<ConversationDetailDto>(JsonOptions);
+        Assert.Equal(2, firstDto!.TotalCount);
+        Assert.Equal(3, secondDto!.TotalCount);
+    }
+
+    [Fact]
+    public async Task Reply_ReplaysOriginalSuccess_ForSameKeyAndPayload()
+    {
+        var (aliceId, bobId) = await SeedConversationPairAsync(
+            "api-idemp-reply-alice@example.com",
+            "API Idem Reply Alice",
+            "api-idemp-reply-bob@example.com",
+            "API Idem Reply Bob");
+        var service = factory.Services.GetRequiredService<PrivateMessageService>();
+        var sent = await service.ComposeAsync(aliceId, bobId, "Start");
+        var conversationId = sent.ConversationId!.Value;
+        var path = MessagesApiEndpoints.ConversationPath(conversationId);
+        using var bob = CreateBearerClient(bobId, "API Idem Reply Bob", "api-idemp-reply-bob@example.com");
+        SetIdempotencyKey(bob, Guid.NewGuid());
+
+        using var first = await bob.PostAsJsonAsync(path, new { body = "Idempotent PM reply." });
+        using var second = await bob.PostAsJsonAsync(path, new { body = "Idempotent PM reply." });
+
+        Assert.Equal(HttpStatusCode.Created, first.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, second.StatusCode);
+        var firstDto = await first.Content.ReadFromJsonAsync<ConversationDetailDto>(JsonOptions);
+        var secondDto = await second.Content.ReadFromJsonAsync<ConversationDetailDto>(JsonOptions);
+        Assert.Equal(firstDto!.TotalCount, secondDto!.TotalCount);
+        Assert.Equal(2, firstDto.TotalCount);
+        Assert.Equal(first.Headers.Location?.OriginalString, second.Headers.Location?.OriginalString);
+        Assert.Equal($"/messages/{conversationId:D}", first.Headers.Location?.OriginalString);
+    }
+
+    [Fact]
+    public async Task Reply_SameKeyDifferentPayload_ReturnsConflict()
+    {
+        var (aliceId, bobId) = await SeedConversationPairAsync(
+            "api-idemp-conflict-alice@example.com",
+            "API Idem Conflict Alice",
+            "api-idemp-conflict-bob@example.com",
+            "API Idem Conflict Bob");
+        var service = factory.Services.GetRequiredService<PrivateMessageService>();
+        var sent = await service.ComposeAsync(aliceId, bobId, "Start");
+        var conversationId = sent.ConversationId!.Value;
+        var path = MessagesApiEndpoints.ConversationPath(conversationId);
+        using var bob = CreateBearerClient(bobId, "API Idem Conflict Bob", "api-idemp-conflict-bob@example.com");
+        SetIdempotencyKey(bob, Guid.NewGuid());
+
+        using var first = await bob.PostAsJsonAsync(path, new { body = "Original PM." });
+        using var conflict = await bob.PostAsJsonAsync(path, new { body = "Different PM." });
+
+        Assert.Equal(HttpStatusCode.Created, first.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, conflict.StatusCode);
+        var problem = await conflict.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(IdempotentApiWrites.ConflictDetail, problem.GetProperty("detail").GetString());
+    }
+
+    [Fact]
+    public async Task Reply_ConcurrentDuplicateKey_SerializesToOneMessage()
+    {
+        var (aliceId, bobId) = await SeedConversationPairAsync(
+            "api-idemp-race-alice@example.com",
+            "API Idem Race Alice",
+            "api-idemp-race-bob@example.com",
+            "API Idem Race Bob");
+        var service = factory.Services.GetRequiredService<PrivateMessageService>();
+        var sent = await service.ComposeAsync(aliceId, bobId, "Start");
+        var conversationId = sent.ConversationId!.Value;
+        var path = MessagesApiEndpoints.ConversationPath(conversationId);
+        var key = Guid.NewGuid();
+        using var firstClient = CreateBearerClient(bobId, "API Idem Race Bob", "api-idemp-race-bob@example.com");
+        using var secondClient = CreateBearerClient(bobId, "API Idem Race Bob", "api-idemp-race-bob@example.com");
+        SetIdempotencyKey(firstClient, key);
+        SetIdempotencyKey(secondClient, key);
+        var body = new { body = "Concurrent PM reply." };
+
+        var firstTask = firstClient.PostAsJsonAsync(path, body);
+        var secondTask = secondClient.PostAsJsonAsync(path, body);
+        using var first = await firstTask;
+        using var second = await secondTask;
+
+        Assert.Equal(HttpStatusCode.Created, first.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, second.StatusCode);
+        var firstDto = await first.Content.ReadFromJsonAsync<ConversationDetailDto>(JsonOptions);
+        var secondDto = await second.Content.ReadFromJsonAsync<ConversationDetailDto>(JsonOptions);
+        Assert.Equal(firstDto!.TotalCount, secondDto!.TotalCount);
+        Assert.Equal(2, firstDto.TotalCount);
+    }
+
+    [Fact]
+    public async Task Reply_ExpiredKey_IsTreatedAsNewWrite()
+    {
+        var (aliceId, bobId) = await SeedConversationPairAsync(
+            "api-idemp-expired-alice@example.com",
+            "API Idem Expired Alice",
+            "api-idemp-expired-bob@example.com",
+            "API Idem Expired Bob");
+        var service = factory.Services.GetRequiredService<PrivateMessageService>();
+        var sent = await service.ComposeAsync(aliceId, bobId, "Start");
+        var conversationId = sent.ConversationId!.Value;
+        var key = Guid.NewGuid();
+        var store = Assert.IsType<InMemoryIdempotencyStore>(
+            factory.Services.GetRequiredService<IIdempotencyStore>());
+        store.SeedExpired(
+            bobId,
+            IdempotencyOperationKinds.MessageReply,
+            key,
+            new IdempotencyReceipt(201, "/messages/old", "{}", "stale"),
+            DateTimeOffset.UtcNow.AddMinutes(-5));
+
+        using var bob = CreateBearerClient(bobId, "API Idem Expired Bob", "api-idemp-expired-bob@example.com");
+        SetIdempotencyKey(bob, key);
+        using var response = await bob.PostAsJsonAsync(
+            MessagesApiEndpoints.ConversationPath(conversationId),
+            new { body = "Expired key should send again." });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var detail = await response.Content.ReadFromJsonAsync<ConversationDetailDto>(JsonOptions);
+        Assert.Equal(2, detail!.TotalCount);
+        Assert.NotEqual("/messages/old", response.Headers.Location?.OriginalString);
+    }
+
+    [Fact]
+    public async Task Compose_ReplaysOriginalSuccess_ForSameKeyAndPayload()
+    {
+        var (aliceId, bobId) = await SeedConversationPairAsync(
+            "api-idemp-compose-alice@example.com",
+            "API Idem Compose Alice",
+            "api-idemp-compose-bob@example.com",
+            "API Idem Compose Bob");
+        using var alice = CreateBearerClient(aliceId, "API Idem Compose Alice", "api-idemp-compose-alice@example.com");
+        SetIdempotencyKey(alice, Guid.NewGuid());
+        var payload = new { recipientMemberId = bobId, body = "Idempotent first message." };
+
+        using var first = await alice.PostAsJsonAsync(MessagesApiEndpoints.Path, payload);
+        using var second = await alice.PostAsJsonAsync(MessagesApiEndpoints.Path, payload);
+
+        Assert.Equal(HttpStatusCode.Created, first.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, second.StatusCode);
+        var firstDto = await first.Content.ReadFromJsonAsync<ConversationDetailDto>(JsonOptions);
+        var secondDto = await second.Content.ReadFromJsonAsync<ConversationDetailDto>(JsonOptions);
+        Assert.Equal(firstDto!.ConversationId, secondDto!.ConversationId);
+        Assert.Equal(firstDto.TotalCount, secondDto.TotalCount);
+        Assert.Equal(1, firstDto.TotalCount);
+        Assert.Equal(first.Headers.Location?.OriginalString, second.Headers.Location?.OriginalString);
+    }
+
+    [Fact]
     public async Task Reply_ReturnsNotFound_ForNonParticipant()
     {
         var (aliceId, bobId) = await SeedConversationPairAsync(
@@ -957,6 +1124,11 @@ public sealed class MessagesApiTests : IClassFixture<QueenZoneWebApplicationFact
 
     private HttpClient CreateBearerClient(Guid memberId, string displayName, string email) =>
         CreateBearerClient(factory, memberId, displayName, email);
+
+    private static void SetIdempotencyKey(HttpClient client, Guid key) =>
+        client.DefaultRequestHeaders.TryAddWithoutValidation(
+            IdempotentApiWrites.HeaderName,
+            key.ToString("D"));
 
     private static HttpClient CreateBearerClient(
         QueenZoneWebApplicationFactory source,

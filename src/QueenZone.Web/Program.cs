@@ -97,9 +97,11 @@ var app = builder.Build();
 // probe paths were excluded from the authenticated pipeline, on requests that reached
 // "Now listening" and ran a background query fine, then went silent for the platform's
 // full startup-probe timeout — consistent with something earlier in the pipeline (a
-// leading static-file existence check against the newly read-only, zip-mounted wwwroot
-// under WEBSITE_RUN_FROM_PACKAGE is the leading suspect) blocking before the health
-// endpoint's own handler ever ran.
+// leading static-file existence check against the then-read-only, zip-mounted wwwroot
+// under WEBSITE_RUN_FROM_PACKAGE, since removed, was the leading suspect) blocking
+// before the health endpoint's own handler ever ran. Keeping the short-circuit here
+// regardless: it is still the cheapest, most robust way to guarantee probe paths never
+// wait on anything later in the pipeline.
 app.Use(async (context, next) =>
 {
     if (await QueenZoneHealthEndpoints.TryHandleProbeAsync(context))
