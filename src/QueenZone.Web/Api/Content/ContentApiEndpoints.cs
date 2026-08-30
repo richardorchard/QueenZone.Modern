@@ -66,6 +66,12 @@ public static class ContentApiEndpoints
             .WithSummary("A single random published quote, matching the homepage widget. Intended for the mobile app's homescreen widget.")
             .Produces<QuoteDto?>();
 
+        group.MapGet("/quotes/{id:int}", GetQuoteDetailAsync)
+            .WithName("GetContentQuoteDetail")
+            .WithSummary("A single published quote by id. Unpublished or missing quotes return 404.")
+            .Produces<QuoteDto>()
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
         group.MapGet("/biography", GetBiographyChaptersAsync)
             .WithName("GetContentBiographyChapters")
             .WithSummary("Paged list of biography chapters, in reading order.")
@@ -250,6 +256,23 @@ public static class ContentApiEndpoints
         return payload is null
             ? Results.Content("null", "application/json")
             : Results.Ok(payload);
+    }
+
+    internal static async Task<IResult> GetQuoteDetailAsync(
+        IQuoteRepository quoteRepository,
+        int id,
+        CancellationToken cancellationToken)
+    {
+        var quote = await quoteRepository.GetByIdAsync(id, cancellationToken);
+        if (quote is null || !quote.IsPublished)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status404NotFound,
+                title: "Not Found",
+                detail: $"No published quote with id '{id}'.");
+        }
+
+        return Results.Ok(ContentApiMapper.ToQuoteDto(quote));
     }
 
     internal static async Task<IResult> GetBiographyChaptersAsync(

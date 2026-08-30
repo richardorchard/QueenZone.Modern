@@ -2,6 +2,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { testIds } from '../test/testIds';
 import { dark } from '../theme';
 import { HomeScreen } from '../screens/home/HomeScreen';
+import { QuoteScreen } from '../screens/home/QuoteScreen';
 
 import { ProfileScreen } from '../screens/account/ProfileScreen';
 import { SettingsScreen } from '../screens/account/SettingsScreen';
@@ -64,6 +65,7 @@ export function HomeStack() {
   return (
     <Home.Navigator screenOptions={stackScreenOptions}>
       <Home.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
+      <Home.Screen name="Quote" component={QuoteScreen} />
       <Home.Screen name="Story" component={NewsStoryScreen} />
       <Home.Screen name="Search" component={SearchRouteScreen} />
       <Home.Screen

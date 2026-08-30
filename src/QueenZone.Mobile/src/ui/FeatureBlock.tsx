@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { media } from '../content/media';
 import { fonts, radius, space, type, useTheme } from '../theme';
 import { Button } from './Button';
@@ -12,11 +12,22 @@ type Props = {
   quote?: { text: string; whoSaid: string };
   actionLabel?: string;
   onAction?: () => void;
+  onPress?: () => void;
+  testID?: string;
 };
 
-export function FeatureBlock({ eyebrow, numeral, body, quote, actionLabel, onAction }: Props) {
+export function FeatureBlock({
+  eyebrow,
+  numeral,
+  body,
+  quote,
+  actionLabel,
+  onAction,
+  onPress,
+  testID,
+}: Props) {
   const { c } = useTheme();
-  return (
+  const card = (
     <View
       style={{
         marginTop: space.xxl,
@@ -80,5 +91,20 @@ export function FeatureBlock({ eyebrow, numeral, body, quote, actionLabel, onAct
         </View>
       ) : null}
     </View>
+  );
+
+  if (!onPress) {
+    return card;
+  }
+
+  return (
+    <Pressable
+      testID={testID}
+      accessibilityRole="button"
+      accessibilityLabel={eyebrow}
+      onPress={onPress}
+    >
+      {card}
+    </Pressable>
   );
 }

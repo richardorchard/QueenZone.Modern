@@ -25,7 +25,7 @@ public sealed class ActionModel(
             return NotFound();
         }
 
-        await forumWriteRepository.HidePostsByMemberAsync(id, cancellationToken);
+        await forumWriteRepository.HideAuthorForumContentAsync(id, updated.DisplayName, cancellationToken);
         await mobileAuthGrantRepository.RevokeAllRefreshTokensForMemberAsync(id, DateTime.UtcNow, cancellationToken);
 
         return RedirectWithMessage(
@@ -42,9 +42,25 @@ public sealed class ActionModel(
             return NotFound();
         }
 
-        await forumWriteRepository.UnhidePostsByMemberAsync(id, cancellationToken);
+        await forumWriteRepository.UnhideAuthorForumContentAsync(id, updated.DisplayName, cancellationToken);
 
         return RedirectWithMessage(id, "Member reinstated and their forum posts restored.", "success");
+    }
+
+    public async Task<IActionResult> OnPostHideForumContentAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var member = await memberAccountRepository.FindByIdAsync(id, cancellationToken);
+        if (member is null) return NotFound();
+        await forumWriteRepository.HideAuthorForumContentAsync(id, member.DisplayName, cancellationToken);
+        return RedirectWithMessage(id, $"All forum content by {member.DisplayName} is hidden.", "success");
+    }
+
+    public async Task<IActionResult> OnPostUnhideForumContentAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var member = await memberAccountRepository.FindByIdAsync(id, cancellationToken);
+        if (member is null) return NotFound();
+        await forumWriteRepository.UnhideAuthorForumContentAsync(id, member.DisplayName, cancellationToken);
+        return RedirectWithMessage(id, $"All forum content by {member.DisplayName} is visible.", "success");
     }
 
     private IActionResult RedirectWithMessage(Guid id, string message, string kind)

@@ -39,6 +39,9 @@ function OnThisDayWidgetView(props: OnThisDayWidgetProps) {
   const slot = Math.floor(Date.now() / (4 * 60 * 60 * 1000));
   const showDay = hasDay && hasQuote ? slot % 2 === 0 : hasDay;
   const showQuote = hasDay && hasQuote ? slot % 2 !== 0 : hasQuote;
+  const quoteId = Number(props.quoteId);
+  const tapUrl =
+    showQuote && quoteId > 0 ? `queenzone://quotes/${quoteId}` : 'queenzone://home';
 
   return (
     <VStack
@@ -47,7 +50,7 @@ function OnThisDayWidgetView(props: OnThisDayWidgetProps) {
       modifiers={[
         padding({ all: 14 }),
         containerBackground('#181614', 'widget'),
-        widgetURL('queenzone://home'),
+        widgetURL(tapUrl),
       ]}
     >
       <Text modifiers={[foregroundStyle('#B89A4A'), font({ size: 10, weight: 'semibold' })]}>

@@ -22,13 +22,18 @@ public interface IForumWriteRepository
 
     Task<int> CountApprovedPostsByMemberAsync(Guid memberId, CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// Hides topics started by the given member and every post they wrote. Rows are retained so
-    /// <see cref="UnhidePostsByMemberAsync"/> can restore them on reinstatement.
-    /// </summary>
-    Task HidePostsByMemberAsync(Guid memberId, CancellationToken cancellationToken = default);
+    Task<ForumAuthorContentSummary> GetAuthorForumContentSummaryAsync(
+        Guid? memberId, string displayName, CancellationToken cancellationToken = default) =>
+        Task.FromResult(new ForumAuthorContentSummary(memberId, displayName, 0, 0, false));
 
-    Task UnhidePostsByMemberAsync(Guid memberId, CancellationToken cancellationToken = default);
+    Task<ForumAuthorContentSummary?> FindNoAccountForumAuthorAsync(
+        string displayName, CancellationToken cancellationToken = default) => Task.FromResult<ForumAuthorContentSummary?>(null);
+
+    Task HideAuthorForumContentAsync(
+        Guid? memberId, string displayName, CancellationToken cancellationToken = default);
+
+    Task UnhideAuthorForumContentAsync(
+        Guid? memberId, string displayName, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Finds a category by URL slug first, then by case-insensitive name, or

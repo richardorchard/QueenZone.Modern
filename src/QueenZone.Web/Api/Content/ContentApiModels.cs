@@ -146,10 +146,10 @@ public sealed record FreddieTributeDto(
 public sealed record LiveActivitySummaryDto(int NewForumRepliesToday);
 
 /// <summary>
-/// Shape for <c>/api/v1/content/quotes/random</c>, backing the homepage widget and the
-/// mobile app's homescreen widget.
+/// Shape for <c>/api/v1/content/quotes/random</c> and <c>/api/v1/content/quotes/{id}</c>.
+/// <see cref="Context"/> is the existing <c>QUEEN_QUOTE_T.CONTEXT</c> column (nullable).
 /// </summary>
-public sealed record QuoteDto(int Id, string Text, string WhoSaid);
+public sealed record QuoteDto(int Id, string Text, string WhoSaid, string? Context);
 
 /// <summary>
 /// Category card for <c>/api/v1/content/photos/categories</c> and

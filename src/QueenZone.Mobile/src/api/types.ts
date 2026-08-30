@@ -320,11 +320,12 @@ export type LiveActivitySummary = {
   newForumRepliesToday: number;
 };
 
-/** Shape for `/api/v1/content/quotes/random`, a single random published quote. */
+/** Shape for `/api/v1/content/quotes/random` and `/api/v1/content/quotes/{id}`. */
 export type RandomQuote = {
   id: number;
   text: string;
   whoSaid: string;
+  context?: string | null;
 };
 
 /** One hit from `GET /api/v1/search`. `id` is parsed from numeric source keys. */

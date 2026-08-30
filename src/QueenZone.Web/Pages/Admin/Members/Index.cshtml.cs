@@ -3,7 +3,9 @@ using QueenZone.Data.Entities;
 
 namespace QueenZone.Web.Pages.Admin.Members;
 
-public sealed class IndexModel(IMemberAccountRepository memberAccountRepository) : AdminMembersPageModel
+public sealed class IndexModel(
+    IMemberAccountRepository memberAccountRepository,
+    IForumWriteRepository forumWriteRepository) : AdminMembersPageModel
 {
     private const int PageSize = 50;
 
@@ -17,6 +19,8 @@ public sealed class IndexModel(IMemberAccountRepository memberAccountRepository)
 
     public int TotalPages => TotalCount == 0 ? 1 : (int)Math.Ceiling(TotalCount / (double)PageSize);
 
+    public ForumAuthorContentSummary? NoAccountAuthor { get; private set; }
+
     public async Task OnGetAsync(string? query, int pageNumber = 1, CancellationToken cancellationToken = default)
     {
         Query = string.IsNullOrWhiteSpace(query) ? null : query.Trim();
@@ -25,6 +29,10 @@ public sealed class IndexModel(IMemberAccountRepository memberAccountRepository)
         var result = await memberAccountRepository.SearchMembersAsync(Query, PageNumber, PageSize, cancellationToken);
         Members = result.Members;
         TotalCount = result.TotalCount;
+        if (TotalCount == 0 && Query is not null)
+        {
+            NoAccountAuthor = await forumWriteRepository.FindNoAccountForumAuthorAsync(Query, cancellationToken);
+        }
         ViewData["Title"] = "Members";
     }
 }
