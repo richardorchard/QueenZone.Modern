@@ -92,8 +92,13 @@ export function reselectRoot(
       navigate: (name: keyof RootTabParamList, params: { screen: string }) => void;
     };
   }) => ({
-    tabPress: () => {
-      if (options?.always || navigation.isFocused()) {
+    tabPress: (e: { preventDefault: () => void }) => {
+      if (options?.always) {
+        e.preventDefault();
+        navigation.navigate(tabName, { screen });
+        return;
+      }
+      if (navigation.isFocused()) {
         navigation.navigate(tabName, { screen });
       }
     },
