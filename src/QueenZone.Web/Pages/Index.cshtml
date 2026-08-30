@@ -97,6 +97,74 @@
   </section>
 }
 
+@if (Model.HomePoll is not null)
+{
+  var poll = Model.HomePoll;
+  <section class="qz-section" id="home-poll" aria-label="QueenZone poll">
+    <div class="qz-container">
+      <div class="qz-home-poll">
+        <p class="qz-home-poll__eyebrow">Poll</p>
+        <h2 class="qz-home-poll__question">@poll.Question</h2>
+        <p class="qz-home-poll__meta">
+          @(poll.IsClosed ? "Closed" : "Open")
+          · @poll.TotalVotes.ToString("N0") vote@(poll.TotalVotes == 1 ? "" : "s")
+        </p>
+        @if (!string.IsNullOrWhiteSpace(Model.HomePollError))
+        {
+          <p class="qz-home-poll__error">@Model.HomePollError</p>
+        }
+        @if (Model.HomePollViewerCanVote)
+        {
+          <form method="post" asp-page-handler="Vote" class="qz-home-poll__vote-form">
+            @Html.AntiForgeryToken()
+            <ul class="qz-home-poll__options">
+              @foreach (var option in poll.Options)
+              {
+                <li>
+                  <button type="submit" name="optionId" value="@option.OptionId" class="qz-home-poll__option-button">
+                    <span class="qz-home-poll__option-text">@option.OptionText</span>
+                    <span class="qz-home-poll__option-tally">@option.VoteCount · @option.Percentage.ToString("0.#")%</span>
+                  </button>
+                  <div class="qz-home-poll__bar" role="img" aria-label="@option.Percentage.ToString("0.#") percent">
+                    <span class="qz-home-poll__bar-fill" style="width: @(option.Percentage.ToString(System.Globalization.CultureInfo.InvariantCulture))%"></span>
+                  </div>
+                </li>
+              }
+            </ul>
+            <p class="qz-home-poll__hint">Votes are final and cannot be changed.</p>
+          </form>
+        }
+        else
+        {
+          <ul class="qz-home-poll__results">
+            @foreach (var option in poll.Options)
+            {
+              var selected = poll.SelectedOptionId == option.OptionId;
+              <li class="qz-home-poll__result@(selected ? " qz-home-poll__result--selected" : "")">
+                <div class="qz-home-poll__result-head">
+                  <span class="qz-home-poll__option-text">@option.OptionText</span>
+                  <span class="qz-home-poll__option-tally">@option.VoteCount · @option.Percentage.ToString("0.#")%</span>
+                </div>
+                <div class="qz-home-poll__bar" role="img" aria-label="@option.Percentage.ToString("0.#") percent">
+                  <span class="qz-home-poll__bar-fill" style="width: @(option.Percentage.ToString(System.Globalization.CultureInfo.InvariantCulture))%"></span>
+                </div>
+                @if (selected)
+                {
+                  <p class="qz-home-poll__your-vote">Your vote</p>
+                }
+              </li>
+            }
+          </ul>
+          @if (!poll.ViewerHasVoted && !poll.IsClosed)
+          {
+            <p class="qz-home-poll__hint"><a href="/account/login?returnUrl=@Uri.EscapeDataString("/#home-poll")">Sign in to vote</a></p>
+          }
+        }
+      </div>
+    </div>
+  </section>
+}
+
 <section class="qz-section qz-band-dark">
   <partial name="_PictureImage" model="@("/design-system/assets/crest-white.png", "", false, "qz-band-dark__crest")" />
   <div class="qz-container">

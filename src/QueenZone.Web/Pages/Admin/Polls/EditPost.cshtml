@@ -1,0 +1,13 @@
+@page "/admin/polls/{id:guid}"
+@model EditPostModel
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@{
+  ViewData["AntiforgeryToken"] = Antiforgery.GetAndStoreTokens(HttpContext).RequestToken;
+}
+
+<div class="admin-shell">
+@if (Model.Form is not null)
+{
+  <partial name="_PollForm" model="Model.Form" />
+}
+</div>
