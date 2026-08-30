@@ -1,0 +1,44 @@
+@page "/admin/trivia-submissions"
+@model IndexModel
+
+<div class="admin-shell">
+  <h1>Trivia submissions</h1>
+  <p>
+    <a href="/admin">Back to admin</a>
+    ·
+    <a href="/admin/trivia">Published trivia</a>
+  </p>
+
+  @if (Model.Submissions.Count == 0)
+  {
+    <p>No trivia suggestions awaiting review.</p>
+  }
+  else
+  {
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Fact</th>
+          <th>Submitter</th>
+          <th>Suggested category</th>
+          <th>Submitted</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @foreach (var item in Model.Submissions)
+        {
+          <tr>
+            <td>@item.Text</td>
+            <td>@item.SubmitterDisplayName</td>
+            <td>@(item.Category ?? "—")</td>
+            <td>@item.SubmittedAt.ToString("u")</td>
+            <td><partial name="_SubmissionStatusBadge" model="item.Status" /></td>
+            <td><a href="/admin/trivia-submissions/@item.Id">Review</a></td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+</div>
