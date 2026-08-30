@@ -1,0 +1,92 @@
+@page "/admin/polls"
+@model IndexModel
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@{
+  var antiforgeryToken = Antiforgery.GetAndStoreTokens(HttpContext).RequestToken;
+}
+
+<div class="admin-shell">
+@if (Model.CreateForm is not null)
+{
+  ViewData["AntiforgeryToken"] = antiforgeryToken;
+  <partial name="_PollForm" model="Model.CreateForm" />
+}
+else
+{
+  <h1>Home polls</h1>
+
+  @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+  {
+    <p class="admin-status admin-status--@Model.StatusMessageKind">@Model.StatusMessage</p>
+  }
+
+  <p>
+    <a href="/admin/polls/new">Add poll</a>
+  </p>
+
+  @if (Model.Polls.Count == 0)
+  {
+    <p>No polls yet. New polls stay unpublished until you publish one to Home.</p>
+  }
+  else
+  {
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Question</th>
+          <th>Status</th>
+          <th>Votes</th>
+          <th>Created</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        @foreach (var poll in Model.Polls)
+        {
+          <tr>
+            <td class="admin-title-cell">@poll.Question</td>
+            <td>@AdminPollPageModel.StatusLabel(poll)</td>
+            <td>@poll.VoteCount</td>
+            <td>@poll.CreatedAt.UtcDateTime.ToString("dd MMMM yyyy")</td>
+            <td class="admin-actions">
+              <a href="/admin/polls/@poll.Id/edit">@(poll.VoteCount == 0 ? "Edit" : "View")</a>
+              @if (!poll.IsCurrent)
+              {
+                <form method="post" action="/admin/polls?handler=Publish" style="display:inline">
+                  <input type="hidden" name="@AdminPollPageModel.AntiforgeryTokenFieldName" value="@antiforgeryToken">
+                  <input type="hidden" name="id" value="@poll.Id">
+                  <button type="submit">Publish</button>
+                </form>
+              }
+              @if (poll.IsCurrent && poll.ClosedAt is null)
+              {
+                <form method="post" action="/admin/polls?handler=Close" style="display:inline">
+                  <input type="hidden" name="@AdminPollPageModel.AntiforgeryTokenFieldName" value="@antiforgeryToken">
+                  <input type="hidden" name="id" value="@poll.Id">
+                  <button type="submit">Close</button>
+                </form>
+              }
+              @if (poll.IsCurrent)
+              {
+                <form method="post" action="/admin/polls?handler=Hide" style="display:inline">
+                  <input type="hidden" name="@AdminPollPageModel.AntiforgeryTokenFieldName" value="@antiforgeryToken">
+                  <input type="hidden" name="id" value="@poll.Id">
+                  <button type="submit">Hide</button>
+                </form>
+              }
+              @if (poll.VoteCount == 0)
+              {
+                <form method="post" action="/admin/polls?handler=Delete" style="display:inline" onsubmit="return confirm('Delete this poll?');">
+                  <input type="hidden" name="@AdminPollPageModel.AntiforgeryTokenFieldName" value="@antiforgeryToken">
+                  <input type="hidden" name="id" value="@poll.Id">
+                  <button type="submit">Delete</button>
+                </form>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+}
+</div>

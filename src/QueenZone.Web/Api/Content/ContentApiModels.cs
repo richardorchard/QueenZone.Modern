@@ -152,6 +152,23 @@ public sealed record LiveActivitySummaryDto(int NewForumRepliesToday);
 public sealed record QuoteDto(int Id, string Text, string WhoSaid, string? Context);
 
 /// <summary>
+/// Shape for <c>GET /api/v1/content/home-poll</c> and the website Index block.
+/// JSON <c>null</c> when no poll is current. Counts and percentages are public.
+/// </summary>
+public sealed record HomePollDto(
+    Guid Id,
+    string Question,
+    IReadOnlyList<HomePollOptionDto> Options,
+    int TotalVotes,
+    bool IsClosed,
+    bool ViewerHasVoted,
+    Guid? SelectedOptionId);
+
+public sealed record HomePollOptionDto(Guid Id, string Text, int Count, double Percentage);
+
+public sealed record HomePollVoteRequestDto(Guid? OptionId);
+
+/// <summary>
 /// Category card for <c>/api/v1/content/photos/categories</c> and
 /// <c>/api/v1/content/photos/categories/{slug}</c>. Cover URLs are CDN
 /// (<c>cdn.queenzone.org</c>) via <see cref="QueenZone.Data.PhotoImageUrl"/>.

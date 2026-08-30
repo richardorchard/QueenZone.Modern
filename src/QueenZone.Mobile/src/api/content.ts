@@ -1,5 +1,5 @@
 import { fetchJsonWithOfflineCache } from '../cache';
-import { fetchJson } from './client';
+import { fetchJson, sendJson } from './client';
 import type {
   AlbumDetail,
   AlbumListItem,
@@ -7,6 +7,7 @@ import type {
   BiographyChapterDetail,
   BiographyChapterListItem,
   FreddieTribute,
+  HomePoll,
   LiveActivitySummary,
   NewsDetail,
   NewsListItem,
@@ -117,6 +118,28 @@ export function fetchRandomQuote(signal?: AbortSignal): Promise<RandomQuote | nu
 /** A published quote by id. 404 when missing or unpublished. */
 export function fetchQuoteById(id: number, signal?: AbortSignal): Promise<RandomQuote> {
   return fetchJson(`/content/quotes/${id}`, { signal });
+}
+
+/** The current Home poll, or null when none is live. Optional Bearer marks the viewer's choice. */
+export function fetchHomePoll(
+  signal?: AbortSignal,
+  accessToken?: string | null,
+): Promise<HomePoll | null> {
+  return fetchJson('/content/home-poll', { signal, accessToken });
+}
+
+/** Cast one ballot. Caller must refetch `fetchHomePoll` — do not optimistic-increment. */
+export function voteHomePoll(
+  optionId: string,
+  accessToken: string,
+  signal?: AbortSignal,
+): Promise<HomePoll> {
+  return sendJson('/content/home-poll/votes', {
+    method: 'POST',
+    body: { optionId },
+    accessToken,
+    signal,
+  });
 }
 
 export function fetchFreddieTributePage(
