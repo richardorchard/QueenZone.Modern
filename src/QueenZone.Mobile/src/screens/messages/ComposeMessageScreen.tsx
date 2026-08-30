@@ -11,13 +11,15 @@ import {
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ApiError } from '../../api/client';
+import { ApiError, isOfflineFailure, isTimeoutFailure } from '../../api/client';
 import {
   composeMessage,
   searchRecipients,
   type MessageRecipient,
 } from '../../api/messages';
 import type { HomeStackParamList } from '../../navigation/types';
+import { resolvePushMemberId } from '../../notifications/pushMemberId';
+import { enqueueMessageCompose, flushOfflineQueue, removeOfflineItem } from '../../offlineQueue';
 import { MemberGate } from '../../session/MemberGate';
 import { useSession } from '../../session/SessionContext';
 import { fonts, radius, space, type, useTheme } from '../../theme';
@@ -41,7 +43,7 @@ export function ComposeMessageScreen({ navigation }: Props) {
 function ComposeForm({ navigation }: Pick<Props, 'navigation'>) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
-  const { accessToken } = useSession();
+  const { accessToken, profile } = useSession();
   const searchSeq = useRef(0);
   const [query, setQuery] = useState('');
   const [matches, setMatches] = useState<MessageRecipient[]>([]);
@@ -113,17 +115,44 @@ function ComposeForm({ navigation }: Pick<Props, 'navigation'>) {
       return;
     }
 
+    const memberId = resolvePushMemberId(accessToken, profile?.memberId);
+    if (!memberId) {
+      setSubmitError('Sign in to continue.');
+      return;
+    }
+
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const detail = await composeMessage(accessToken, recipient.memberId, draft.trim());
-      navigation.replace('Conversation', { id: detail.conversationId });
+      const queued = await enqueueMessageCompose({
+        memberId,
+        recipientMemberId: recipient.memberId,
+        body: draft.trim(),
+      });
+      void flushOfflineQueue();
+      try {
+        const detail = await composeMessage(
+          accessToken,
+          recipient.memberId,
+          draft.trim(),
+          undefined,
+          queued.operationId,
+        );
+        await removeOfflineItem(queued.operationId);
+        navigation.replace('Conversation', { id: detail.conversationId });
+      } catch (err: unknown) {
+        if (isOfflineFailure(err) || isTimeoutFailure(err)) {
+          navigation.goBack();
+          return;
+        }
+        throw err;
+      }
     } catch (err: unknown) {
       setSubmitError(messageFromUnknownError(err));
     } finally {
       setSubmitting(false);
     }
-  }, [accessToken, draft, navigation, recipient]);
+  }, [accessToken, draft, navigation, profile?.memberId, recipient]);
 
   return (
     <KeyboardAvoidingView

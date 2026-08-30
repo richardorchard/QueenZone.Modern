@@ -61,6 +61,8 @@ export const testIds = {
   forumThreadAttachmentViewer: 'forum-thread-attachment-viewer',
   forumThreadAttachmentOpened: 'forum-thread-attachment-opened',
   offlineBanner: 'offline-banner',
+  pendingMessage: 'pending-message',
+  pendingForumPost: 'pending-forum-post',
   forumNewThread: 'forum-new-thread',
   forumComposerAttachPhotos: 'forum-composer-attach-photos',
   forumComposerAttachFiles: 'forum-composer-attach-files',

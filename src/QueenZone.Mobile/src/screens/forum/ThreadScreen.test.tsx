@@ -563,7 +563,7 @@ describe('ThreadScreen offline snapshot', () => {
     expect(screen.getByTestId(testIds.offlineBanner)).toBeOnTheScreen();
     expect(screen.getByLabelText(/Offline · last updated/)).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Watch topic' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Reply' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Reply' })).toBeEnabled();
     expect(screen.queryByText('Best studio album?')).toBeNull();
     expect(fetchWatch).not.toHaveBeenCalled();
     expect(fetchPoll).not.toHaveBeenCalled();

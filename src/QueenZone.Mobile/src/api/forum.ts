@@ -142,6 +142,7 @@ async function postForumWrite<T>(
   file: UploadFilePart | undefined,
   accessToken: string,
   signal?: AbortSignal,
+  idempotencyKey?: string,
 ): Promise<T> {
   if (!file) {
     return sendJson(path, {
@@ -149,6 +150,7 @@ async function postForumWrite<T>(
       body: fields,
       accessToken,
       signal,
+      idempotencyKey,
     });
   }
 
@@ -172,7 +174,7 @@ async function postForumWrite<T>(
     throw err;
   }
 
-  return sendMultipart(path, form, { accessToken, signal });
+  return sendMultipart(path, form, { accessToken, signal, idempotencyKey });
 }
 
 export function createForumTopic(
@@ -180,6 +182,7 @@ export function createForumTopic(
   input: ForumTopicWrite,
   accessToken: string,
   signal?: AbortSignal,
+  idempotencyKey?: string,
 ): Promise<ForumTopicCreated> {
   return postForumWrite(
     `/forum/categories/${categoryId}/topics`,
@@ -187,6 +190,7 @@ export function createForumTopic(
     input.file,
     accessToken,
     signal,
+    idempotencyKey,
   );
 }
 
@@ -195,6 +199,7 @@ export function createForumReply(
   input: ForumReplyWrite,
   accessToken: string,
   signal?: AbortSignal,
+  idempotencyKey?: string,
 ): Promise<ForumPostCreated> {
   return postForumWrite(
     `/forum/topics/${topicId}/posts`,
@@ -202,6 +207,7 @@ export function createForumReply(
     input.file,
     accessToken,
     signal,
+    idempotencyKey,
   );
 }
 

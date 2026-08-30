@@ -2,6 +2,7 @@ import { screen, userEvent, waitFor } from '@testing-library/react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { ApiError, createForumReply, createForumTopic, fetchForumCategories } from '../../api';
+import { enqueueForumReply } from '../../offlineQueue';
 import { resetSmokeAttachPending, stashSmokeAttachAsset } from '../../session/smokeAttach';
 import { pagedResponse } from '../../test/fixtures';
 import { createMockSession } from '../../test/mockSession';
@@ -35,6 +36,11 @@ jest.mock('../../api', () => {
   };
 });
 
+jest.mock('../../offlineQueue', () => ({
+  enqueueForumReply: jest.fn(),
+  flushOfflineQueue: jest.fn(),
+}));
+
 jest.mock('expo-image-picker', () => ({
   requestMediaLibraryPermissionsAsync: jest.fn(),
   launchImageLibraryAsync: jest.fn(),
@@ -46,6 +52,7 @@ jest.mock('expo-document-picker', () => ({
 }));
 
 const createForumReplyMock = createForumReply as jest.MockedFunction<typeof createForumReply>;
+const enqueueForumReplyMock = enqueueForumReply as jest.MockedFunction<typeof enqueueForumReply>;
 const createForumTopicMock = createForumTopic as jest.MockedFunction<typeof createForumTopic>;
 const fetchForumCategoriesMock = fetchForumCategories as jest.MockedFunction<typeof fetchForumCategories>;
 
@@ -76,7 +83,10 @@ describe('ComposerScreen', () => {
     resetSmokeAttachPending();
     mockSession.isSignedIn = true;
     mockSession.accessToken = 'tok';
+    mockSession.profile = { memberId: 'member-1' } as never;
     createForumReplyMock.mockReset();
+    enqueueForumReplyMock.mockReset();
+    enqueueForumReplyMock.mockResolvedValue({ operationId: 'op-1' } as never);
     createForumTopicMock.mockReset();
     fetchForumCategoriesMock.mockReset();
     (ImagePicker.requestMediaLibraryPermissionsAsync as jest.Mock).mockReset();
@@ -98,11 +108,6 @@ describe('ComposerScreen', () => {
   });
 
   it('publishes a reply and goes back', async () => {
-    createForumReplyMock.mockResolvedValueOnce({
-      id: 88,
-      topicId: 1002,
-      detailPath: '/forum/topic/1002',
-    });
     const { navigation } = renderComposer({ threadId: 1002, threadTitle: 'Ranking every studio album' });
 
     await waitFor(() => expect(screen.getByLabelText('Reply body')).toBeOnTheScreen());
@@ -111,9 +116,14 @@ describe('ComposerScreen', () => {
     await user.press(screen.getByRole('button', { name: 'Post reply' }));
 
     await waitFor(() =>
-      expect(createForumReplyMock).toHaveBeenCalledWith(1002, { body: 'A reply from mobile' }, 'tok'),
+      expect(enqueueForumReplyMock).toHaveBeenCalledWith({
+        memberId: 'member-1',
+        topicId: 1002,
+        body: 'A reply from mobile',
+      }),
     );
     expect(navigation.goBack).toHaveBeenCalled();
+    expect(createForumReplyMock).not.toHaveBeenCalled();
     expect(createForumTopicMock).not.toHaveBeenCalled();
   });
 
@@ -337,8 +347,13 @@ describe('ComposerScreen', () => {
     await user.type(screen.getByLabelText('Reply body'), 'A reply from mobile');
     await user.press(screen.getByRole('button', { name: 'Post reply' }));
     await waitFor(() =>
-      expect(createForumReplyMock).toHaveBeenCalledWith(1002, { body: 'A reply from mobile' }, 'tok'),
+      expect(enqueueForumReplyMock).toHaveBeenCalledWith({
+        memberId: 'member-1',
+        topicId: 1002,
+        body: 'A reply from mobile',
+      }),
     );
+    expect(createForumReplyMock).not.toHaveBeenCalled();
   });
 
   it('ignores a canceled picker and reports a library that cannot open', async () => {
@@ -398,8 +413,7 @@ describe('ComposerScreen', () => {
     );
   });
 
-  it('keeps the composer on screen when publish fails', async () => {
-    createForumReplyMock.mockRejectedValueOnce(new ApiError(500, 'The server had a problem.'));
+  it('queues a text reply even when later sending may fail', async () => {
     const { navigation } = renderComposer({ threadId: 1002, threadTitle: 'Ranking every studio album' });
 
     await waitFor(() => expect(screen.getByLabelText('Reply body')).toBeOnTheScreen());
@@ -407,8 +421,7 @@ describe('ComposerScreen', () => {
     await user.type(screen.getByLabelText('Reply body'), 'A reply from mobile');
     await user.press(screen.getByRole('button', { name: 'Post reply' }));
 
-    await waitFor(() => expect(screen.getByText('The server had a problem.')).toBeOnTheScreen());
-    expect(navigation.goBack).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: 'Post reply' })).toBeOnTheScreen();
+    await waitFor(() => expect(enqueueForumReplyMock).toHaveBeenCalled());
+    expect(navigation.goBack).toHaveBeenCalled();
   });
 });

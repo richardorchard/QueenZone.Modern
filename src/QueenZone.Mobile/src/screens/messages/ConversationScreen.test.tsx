@@ -10,6 +10,7 @@ import {
   replyToConversation,
   reportConversationMessage,
 } from '../../api/messages';
+import { enqueueMessageReply, useOfflineQueue } from '../../offlineQueue';
 import { testIds } from '../../test/testIds';
 import { createMockSession } from '../../test/mockSession';
 import { fakeNavigation, flushVirtualizedList, renderWithProviders } from '../../test/render';
@@ -32,6 +33,22 @@ jest.mock('../../api/messages', () => ({
   blockConversationParticipant: jest.fn(),
 }));
 
+jest.mock('../../offlineQueue', () => ({
+  enqueueMessageReply: jest.fn(async (input: { body: string; memberId: string; conversationId: string }) => ({
+    operationId: 'op-queued',
+    payload: { body: input.body },
+    memberId: input.memberId,
+    kind: 'message.reply',
+    target: { conversationId: input.conversationId },
+    state: 'queued',
+    lastError: null,
+  })),
+  useOfflineQueue: jest.fn(() => []),
+  removeOfflineItem: jest.fn(),
+  updateOfflineItem: jest.fn(),
+  flushOfflineQueue: jest.fn(),
+}));
+
 const fetchConversationMock = fetchConversation as jest.MockedFunction<typeof fetchConversation>;
 const fetchConversationResultMock = fetchConversationResult as jest.MockedFunction<
   typeof fetchConversationResult
@@ -47,6 +64,8 @@ function asCache<T>(data: T): CachedResult<T> {
   return { data, source: 'cache', cachedAt: NETWORK_CACHED_AT };
 }
 const replyToConversationMock = replyToConversation as jest.MockedFunction<typeof replyToConversation>;
+const enqueueMessageReplyMock = enqueueMessageReply as jest.MockedFunction<typeof enqueueMessageReply>;
+const useOfflineQueueMock = useOfflineQueue as jest.MockedFunction<typeof useOfflineQueue>;
 const reportConversationMessageMock = reportConversationMessage as jest.MockedFunction<
   typeof reportConversationMessage
 >;
@@ -103,6 +122,8 @@ describe('ConversationScreen', () => {
       asNetwork(await fetchConversationMock(token, id, query)),
     );
     replyToConversationMock.mockReset();
+    enqueueMessageReplyMock.mockClear();
+    useOfflineQueueMock.mockReturnValue([]);
     reportConversationMessageMock.mockReset();
     archiveConversationMock.mockReset();
     blockConversationParticipantMock.mockReset();
@@ -272,7 +293,18 @@ describe('ConversationScreen', () => {
     await user.press(screen.getByRole('button', { name: 'Send reply' }));
 
     await waitFor(() => expect(screen.getByText('Hello Bob')).toBeOnTheScreen());
-    expect(replyToConversationMock).toHaveBeenCalledWith('tok', conversationId, 'Hello Bob');
+    expect(enqueueMessageReplyMock).toHaveBeenCalledWith({
+      memberId: 'member-1',
+      conversationId,
+      body: 'Hello Bob',
+    });
+    expect(replyToConversationMock).toHaveBeenCalledWith(
+      'tok',
+      conversationId,
+      'Hello Bob',
+      undefined,
+      'op-queued',
+    );
     expect(screen.getByLabelText('Reply').props.value).toBe('');
   });
 
@@ -405,7 +437,7 @@ describe('ConversationScreen', () => {
     alertSpy.mockRestore();
   }, 15000);
 
-  it('shows a cached conversation with an offline banner and hides reply, report, archive, and block', async () => {
+  it('shows a cached conversation with an offline banner and hides report, archive, and block', async () => {
     const snapshot = conversationDetail([
       {
         id: theirMessageId,
@@ -423,12 +455,50 @@ describe('ConversationScreen', () => {
     renderConversation();
     await waitFor(() => expect(screen.getByText('Hello from cache')).toBeOnTheScreen());
     expect(screen.getByTestId(testIds.offlineBanner)).toBeOnTheScreen();
-    expect(screen.queryByLabelText('Reply')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Send reply' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Send reply' })).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Archive conversation' })).toBeDisabled();
     expect(screen.queryByRole('button', { name: 'Report message' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Archive conversation' })).toBeNull();
     expect(fetchConversationMock).not.toHaveBeenCalled();
     expect(fetchConversationResultMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows a queued reply on a cached snapshot when the send is offline', async () => {
+    const snapshot = conversationDetail([
+      {
+        id: theirMessageId,
+        senderMemberId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+        senderDisplayName: 'Bob',
+        body: 'Hello from cache',
+        createdAt: '2026-08-19T12:00:00.000Z',
+        isMine: false,
+        sortKey: 1,
+        reportedByViewer: false,
+      },
+    ]);
+    fetchConversationResultMock.mockResolvedValue(asCache(snapshot));
+    replyToConversationMock.mockRejectedValueOnce(ApiError.offline());
+    useOfflineQueueMock.mockReturnValue([
+      {
+        schemaVersion: 1,
+        operationId: 'op-queued',
+        memberId: 'member-1',
+        kind: 'message.reply',
+        target: { conversationId },
+        payload: { body: 'Queued hello' },
+        createdAt: '2026-08-19T12:05:00.000Z',
+        updatedAt: '2026-08-19T12:05:00.000Z',
+        attemptCount: 0,
+        nextRetryAt: '2026-08-19T12:05:00.000Z',
+        state: 'queued',
+        lastError: null,
+      },
+    ]);
+
+    renderConversation();
+    await waitFor(() => expect(screen.getByText('Hello from cache')).toBeOnTheScreen());
+    expect(screen.getByText('Queued hello')).toBeOnTheScreen();
+    expect(screen.getByTestId(testIds.pendingMessage)).toBeOnTheScreen();
+    expect(screen.getByLabelText('Queued')).toBeOnTheScreen();
   });
 
   it('does not GET the conversation again when pull-to-refresh fails offline', async () => {

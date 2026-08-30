@@ -15,6 +15,7 @@ export class ApiError extends Error {
   readonly kind: ApiFailureKind;
   readonly status: number;
   readonly problem: ProblemDetails | null;
+  retryAfterMs: number | null;
 
   constructor(
     status: number,
@@ -28,6 +29,7 @@ export class ApiError extends Error {
     this.status = status;
     this.problem = problem;
     this.kind = kind ?? (status === 0 ? 'offline' : 'http');
+    this.retryAfterMs = null;
   }
 
   static timeout(cause?: unknown): ApiError {

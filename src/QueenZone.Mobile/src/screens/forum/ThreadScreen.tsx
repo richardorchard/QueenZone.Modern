@@ -35,6 +35,8 @@ import {
 import { getAppConfig } from '../../config';
 import { usePagedContent } from '../../hooks/usePagedContent';
 import type { ForumStackParamList } from '../../navigation/types';
+import { resolvePushMemberId } from '../../notifications/pushMemberId';
+import { useOfflineQueue, type OfflineQueueItem } from '../../offlineQueue';
 import { isSmokeAttachEnabled } from '../../session/smokeAttach';
 import { useSession } from '../../session/SessionContext';
 import { openForumComposer, openSignIn } from '../../session/signInNavigation';
@@ -79,7 +81,9 @@ function smokeAttachAllowed(): boolean {
 
 export function ThreadScreen({ navigation, route }: Props) {
   const { c } = useTheme();
-  const { isSignedIn, accessToken } = useSession();
+  const { isSignedIn, accessToken, profile } = useSession();
+  const memberId = accessToken ? resolvePushMemberId(accessToken, profile?.memberId) : null;
+  const queueItems = useOfflineQueue(memberId);
   const { id: rawId, title } = route.params;
   const id = parseTopicId(rawId);
   const [topic, setTopic] = useState<ForumTopicDetail | null>(null);
@@ -381,7 +385,6 @@ export function ThreadScreen({ navigation, route }: Props) {
           label={isSignedIn ? 'Reply' : 'Sign in to reply'}
           testID={testIds.forumThreadReply}
           variant="outline"
-          disabled={offlineSnapshot}
           onPress={() =>
             openForumComposer(navigation, isSignedIn, {
               threadId: id ?? undefined,
@@ -400,8 +403,8 @@ export function ThreadScreen({ navigation, route }: Props) {
     <FlatList
       testID={testIds.forumThreadScreen}
       style={[styles.list, { backgroundColor: c.surfacePage }]}
-      data={paged.items}
-      keyExtractor={(item) => String(item.id)}
+      data={overlayQueuedPosts(paged.items, queueItems, id)}
+      keyExtractor={(item) => item.operationId ?? String(item.id)}
       ListHeaderComponent={header}
       ListEmptyComponent={<EmptyBlock message="No posts are available in this thread yet." />}
       ListFooterComponent={footer}
@@ -422,13 +425,49 @@ export function ThreadScreen({ navigation, route }: Props) {
   );
 }
 
+type DisplayPost = ForumPost & {
+  queueState?: OfflineQueueItem['state'];
+  operationId?: string;
+};
+
+function overlayQueuedPosts(
+  posts: ForumPost[],
+  queueItems: OfflineQueueItem[],
+  topicId: number | null,
+): DisplayPost[] {
+  const rows: DisplayPost[] = posts.map((post) => ({ ...post }));
+  if (topicId == null) {
+    return rows;
+  }
+  for (const item of queueItems) {
+    if (item.kind !== 'forum.reply' || !('topicId' in item.target) || item.target.topicId !== topicId) {
+      continue;
+    }
+    rows.push({
+      id: 0,
+      body: item.payload.body,
+      postedAt: item.createdAt,
+      authorUsername: 'You',
+      signature: null,
+      authorMemberSince: null,
+      authorMemberId: item.memberId,
+      editedAt: null,
+      editCount: 0,
+      attachments: [],
+      queueState: item.state,
+      operationId: item.operationId,
+    });
+  }
+  return rows;
+}
+
 function ForumPostRow({
   post,
   isSignedIn,
   accessToken,
   interactionsEnabled,
 }: {
-  post: ForumPost;
+  post: DisplayPost;
   isSignedIn: boolean;
   accessToken: string | null;
   interactionsEnabled: boolean;
@@ -449,6 +488,18 @@ function ForumPostRow({
       <View style={styles.body}>
         <RichHtmlBody html={post.body} horizontalInset={space.xl} />
       </View>
+      {post.queueState ? (
+        <Text
+          testID={testIds.pendingForumPost}
+          style={[type.caption, { color: c.accentPrimary, marginTop: space.xs }]}
+        >
+          {post.queueState === 'sending'
+            ? 'Sending…'
+            : post.queueState === 'needs_attention'
+              ? 'Needs attention'
+              : 'Queued'}
+        </Text>
+      ) : null}
       {post.attachments.length > 0 ? (
         <ForumAttachmentList
           attachments={post.attachments}
