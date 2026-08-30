@@ -276,9 +276,10 @@ CI also collects coverage from the deterministic test suite (merged across Web.T
 
 | Piece | Role |
 | --- | --- |
-| `scripts/Get-WebTestShardFilter.ps1` | Discovers `*Tests` classes, assigns them with greedy weight balance (case count × host kind: EF-WAF 20, Production WAF 10, other WAF 5, SQLite unit 2, unit 1), emits an xUnit `--filter` |
+| `scripts/Get-WebTestShardFilter.ps1` | Discovers `*Tests` classes and assigns them with greedy balance. Checked-in observed class durations take precedence; new classes fall back to case count × host-kind heuristics. Emits an xUnit `--filter`. |
 | `scripts/Invoke-WebTestsShard.ps1` | Runs one shard's filtered Web.Tests (`-SmallProjectsOnly` runs just the Tools/Storage/NewsAgent projects instead) |
-| `.github/workflows/ci.yml` jobs `test` + `small-projects-tests` + `coverage` | Matrix `shard: [0, 1]` for Web.Tests, a separate parallel job for the small projects, then merge Cobertura and run the coverage gate |
+| `scripts/Update-WebTestDurations.ps1` | Merges shard TRX timings into a noise-damped class-duration map. CI uploads the suggested map for periodic review and commit. |
+| `.github/workflows/ci.yml` jobs `test` + `small-projects-tests` + `coverage` | Matrix `shard: [0, 1, 2]` for Web.Tests, a separate parallel job for the small projects, then merge Cobertura, update observed timings, and run the coverage gate |
 
 The `build` job uploads `src/**/bin/Release`, `tests/**/bin/Release`, and `src/QueenZone.Web/obj/Release`. Keep PDBs — Coverlet maps executed lines from them, so a `--no-build` shard without symbols collapses global coverage. Keep `*.xml` — NewsAgent tests copy fixture XML into the output directory and `--no-build` shards read those files from disk. Shards must keep the QueenZone.Web `obj` tree — ASP.NET Core’s `WebApplicationFactory` resolves compressed static web assets under `src/QueenZone.Web/obj/.../compressed/`. Uploading only `bin` causes `DirectoryNotFoundException` in Development-environment host tests (for example `StaticAssetCacheHeadersTests`). Other project `obj` trees are not required for `--no-build` shard runs.
 
@@ -288,10 +289,11 @@ The `build` job uploads `src/**/bin/Release`, `tests/**/bin/Release`, and `src/Q
 
 ```powershell
 powershell -File ./scripts/Get-WebTestShardFilter.ps1 -SelfTest
-powershell -File ./scripts/Get-WebTestShardFilter.ps1 -ShardCount 2 -List
+powershell -File ./scripts/Get-WebTestShardFilter.ps1 -ShardCount 3 -List
 dotnet build QueenZone.sln --configuration Release
-powershell -File ./scripts/Invoke-WebTestsShard.ps1 -ShardIndex 0 -ShardCount 2 -NoBuild -NoRestore
-powershell -File ./scripts/Invoke-WebTestsShard.ps1 -ShardIndex 1 -ShardCount 2 -NoBuild -NoRestore
+powershell -File ./scripts/Invoke-WebTestsShard.ps1 -ShardIndex 0 -ShardCount 3 -NoBuild -NoRestore
+powershell -File ./scripts/Invoke-WebTestsShard.ps1 -ShardIndex 1 -ShardCount 3 -NoBuild -NoRestore
+powershell -File ./scripts/Invoke-WebTestsShard.ps1 -ShardIndex 2 -ShardCount 3 -NoBuild -NoRestore
 powershell -File ./scripts/Invoke-WebTestsShard.ps1 -SmallProjectsOnly -NoBuild -NoRestore
 ```
 
@@ -401,9 +403,9 @@ These four **GitHub check names** (the job `name:` values in `ci.yml`) must be r
 - `Mobile iOS build`
 - `Mobile API consumer contracts`
 
-**Live `main` required contexts** (queried 2026-08-24; mobile names are **not** in this list yet): `build`, `test (0)`, `test (1)`, `sql-server-tests`, `coverage`, `smoke-test`, `e2e-test`, `Verify formatting`, `Small test projects (Tools/Storage/NewsAgent)`. Do not treat YAML as proof that mobile checks are required. After merge, add the four mobile names above and re-query Settings → Branches → `main` → Status checks to confirm.
+**Required-context migration:** after this workflow reaches `main`, add `test (2)` to protected `main`. Keep `test (0)` and `test (1)`. A workflow file cannot update branch protection itself.
 
-Android and iOS are equal: a mobile PR cannot treat either native compile as optional. Non-mobile PRs are not left pending: `ci.yml` emits skip-success stubs (`mobile-js-ok`, `mobile-android-ok`, `mobile-ios-ok`) with those exact check names, the same idea as `test-docs-ok`. `mobile-api-contracts-ok` is the matching stub for `Mobile API consumer contracts`.
+Android and iOS are equal: when native inputs change, both native compile jobs run. Pure TypeScript/TSX changes run the JS, coverage, Doctor, and relevant contract checks without recompiling either native project. Other PRs receive skip-success stubs (`mobile-js-ok`, `mobile-android-ok`, `mobile-ios-ok`) with the exact required check names. `mobile-api-contracts-ok` is the matching stub for `Mobile API consumer contracts`.
 
 **Layers (do not collapse these):**
 
@@ -464,12 +466,12 @@ Pull requests that do not change the website skip `build` / `test` / coverage / 
 - **Non-web** when **every** changed file is under `docs/`, `infra/`, `design/`, `.github/` (except `.github/workflows/ci.yml`), a root `*.md`, `LICENSE`, `THIRD-PARTY-NOTICES.md`, or `src/QueenZone.Mobile/`.
 - Changing `ci.yml` itself still runs the full .NET suite.
 - `src/` (except the mobile client), `tests/`, `scripts/`, project files, and `wwwroot` stay on the full web path.
-- A mobile-only PR still runs `mobile-js` (npm advisory gate, typecheck, discovered unit tests with coverage, the #871 coverage gate, pinned Expo Doctor), plus `mobile-android` and `mobile-ios` native compile builds (unsigned debug APK / Simulator build, uploaded as 1-day workflow artifacts). Changing `scripts/Test-MobileCoverageGate.mjs` or `scripts/mobile-coverage-floors.json` also sets `mobile=true`. Those three check names are intended to be required on `main` (#870); a human must enable them in branch protection after merge. Non-mobile PRs get skip-success stubs so they are not left pending.
-- `mobile_api_contracts=true` is **independent of** `mobile=true`. Server-only `/api/v1` changes (and json-api docs, mobile `src/api` / config / session helpers, the contract host/scripts, or `ci.yml`) run `mobile-api-contracts` without Android/iOS native compilation. A UI-only mobile change still compiles native jobs and does **not** start the contract host.
+- A mobile-only PR runs `mobile-js` (npm advisory gate, typecheck, discovered unit tests with coverage, the #871 coverage gate, pinned Expo Doctor). `mobile_native=true` additionally runs both native compiles when package manifests, Expo app configuration, native config plugins, generated native icons/splash assets, native widget entry points, Google services configuration, or `ci.yml` changes. Other TypeScript/TSX changes skip both compiles. Changing `scripts/Test-MobileCoverageGate.mjs` or `scripts/mobile-coverage-floors.json` sets `mobile=true` but not `mobile_native=true`.
+- `mobile_api_contracts=true` is **independent of** `mobile=true` and `mobile_native=true`. Server-only `/api/v1` changes (and json-api docs, mobile `src/api` / config / session helpers, the contract host/scripts, or `ci.yml`) run `mobile-api-contracts` without requiring Android/iOS compilation.
 - Mixed mobile + web PRs run both pipelines. Mixed API + mobile client PRs run contracts **and** native jobs.
 - Deploy uses the same classifier so an infra-only or mobile-only merge does not zip-deploy unchanged website binaries. Mixed web+mobile merges still deploy the website; `resolve-ci-run` must not wait for Mobile iOS/Android to finish the overall `ci.yml` conclusion (see `scripts/Resolve-CiPublishRun.sh`).
 
-Skipped non-matrix jobs still report under their required check names, which GitHub treats as satisfied. The `test` matrix is different: skipping it entirely would report a single `test` check and never create the required `test (0)` / `test (1)` checks, leaving the PR blocked forever. `ci.yml` therefore runs a lightweight `test-docs-ok` matrix on non-web PRs that emits success for those exact names without running the .NET suite. The three mobile jobs similarly emit skip-success stubs (`mobile-js-ok`, `mobile-android-ok`, `mobile-ios-ok`) on non-mobile PRs so required mobile contexts are not left pending. `mobile-api-contracts-ok` does the same for the `Mobile API consumer contracts` check name when contract paths are unchanged.
+Skipped non-matrix jobs still report under their required check names, which GitHub treats as satisfied. The `test` matrix is different: skipping it entirely would report a single `test` check and never create the required `test (0)` / `test (1)` / `test (2)` checks, leaving the PR blocked forever. `ci.yml` therefore runs a lightweight `test-docs-ok` matrix on non-web PRs that emits success for those exact names without running the .NET suite. Mobile jobs similarly emit skip-success stubs when their JS or native inputs are unchanged. `mobile-api-contracts-ok` does the same for `Mobile API consumer contracts` when contract paths are unchanged.
 
 ### EF migration consistency
 
