@@ -203,6 +203,16 @@ powershell -File .\scripts\Probe-NewsAgentUrlIngestion.ps1 -Full    # fetch + tr
 
 Both modes delete their requests, heartbeats, candidates, evidence, AI runs, and drafts before returning. The full probe never publishes. Report whether it was run or skipped.
 
+When a change touches news-agent editorial guidance publish, rollback, or restore-default (`EfNewsAgentGuidanceRepository`), prefer the opt-in execution-strategy probe — Sqlite/in-memory providers never configure a retrying execution strategy, so only a real SQL Server connection with retry-on-failure enabled can catch a method that opens a transaction directly instead of routing it through `Database.CreateExecutionStrategy()`:
+
+```powershell
+$env:ConnectionStrings__QueenZoneLegacy = "Server=localhost\SQLEXPRESS;Database=queenzone_legacy_sync;Integrated Security=True;TrustServerCertificate=True"
+$env:RUN_NEWS_AGENT_GUIDANCE_PROBE = "true"
+powershell -File .\scripts\Probe-NewsAgentGuidance.ps1
+```
+
+`ConnectionStrings__QueenZoneLegacy` must point to `queenzone_legacy_sync` on the local SQL Express instance. The script rejects Azure SQL and remote servers. It runs `EfNewsAgentGuidanceLiveProbeTests`, which publishes, rolls back, and restores the compiled default for the Triage guidance type, then restores whatever draft/published rows it found there beforehand. Report whether it was run or skipped.
+
 ### Pull request CI gates (must pass before merge)
 
 GitHub Actions workflow `.github/workflows/ci.yml` blocks merge when these fail:
