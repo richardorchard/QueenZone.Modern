@@ -45,6 +45,8 @@ public abstract class ForumTopicPageModel : PageModel
 
     public bool IsWatching { get; private set; }
 
+    public bool IsAdmin { get; private set; }
+
     protected AuthenticateResult? MemberAuth { get; set; }
 
     protected async Task<IActionResult> LoadTopicPageAsync(
@@ -90,8 +92,10 @@ public abstract class ForumTopicPageModel : PageModel
 
         MemberAuth = await ResolveMemberAuthAsync();
         var memberId = ForumMember.GetMemberId(MemberAuth?.Principal);
-        var isAdmin = MemberAuth?.Principal is not null
-            && ForumPollEndpoints.IsAdmin(MemberAuth.Principal, adminOptions);
+        var isAdmin = ForumPollEndpoints.IsAdmin(User, adminOptions)
+            || (MemberAuth?.Principal is not null
+                && ForumPollEndpoints.IsAdmin(MemberAuth.Principal, adminOptions));
+        IsAdmin = isAdmin;
         var utcNow = timeProvider.GetUtcNow();
         CanWatch = memberId is not null;
         IsWatching = memberId is not null
@@ -119,6 +123,7 @@ public abstract class ForumTopicPageModel : PageModel
         ];
 
         ViewData["Title"] = ForumRoutes.GetTopicPageTitle(header, page);
+        ViewData["IsAdmin"] = IsAdmin;
         ViewData["CanonicalPath"] = ForumRoutes.GetTopicCanonicalPath(header, page);
         ViewData["Description"] = PageMetaDescription.ForForumTopic(
             Posts.Count > 0 ? Posts[0].Body : null,

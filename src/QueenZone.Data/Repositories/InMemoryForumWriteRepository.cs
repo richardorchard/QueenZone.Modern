@@ -121,6 +121,7 @@ public sealed class InMemoryForumWriteRepository : IForumWriteRepository
                 subject,
                 post.Body,
                 post.MemberId,
+                post.DisplayName,
                 post.CreatedAt,
                 post.EditedAt,
                 post.EditCount,
@@ -227,15 +228,36 @@ public sealed class InMemoryForumWriteRepository : IForumWriteRepository
         }
     }
 
-    public Task HidePostsByMemberAsync(Guid memberId, CancellationToken cancellationToken = default)
+    public Task<ForumAuthorContentSummary> GetAuthorForumContentSummaryAsync(
+        Guid? memberId, string displayName, CancellationToken cancellationToken = default)
     {
         lock (sync)
         {
-            var startedTopicIds = posts
-                .GroupBy(post => post.TopicId)
-                .Where(topicPosts => topicPosts.OrderBy(post => post.PostId).First().MemberId == memberId)
-                .Select(topicPosts => topicPosts.Key)
-                .ToHashSet();
+            var matching = MatchingPosts(memberId, displayName).ToList();
+            var started = StartedTopicIds(matching);
+            var matchingThreads = threads.Where(thread => started.Contains(thread.TopicId)).ToList();
+            return Task.FromResult(new ForumAuthorContentSummary(
+                memberId, displayName.Trim(), matching.Count, matchingThreads.Count,
+                matching.Count + matchingThreads.Count > 0
+                    && matching.All(post => post.IsHidden)
+                    && matchingThreads.All(thread => thread.IsHidden)));
+        }
+    }
+
+    public async Task<ForumAuthorContentSummary?> FindNoAccountForumAuthorAsync(
+        string displayName, CancellationToken cancellationToken = default)
+    {
+        var summary = await GetAuthorForumContentSummaryAsync(null, displayName, cancellationToken);
+        return summary.PostCount == 0 ? null : summary;
+    }
+
+    public Task HideAuthorForumContentAsync(
+        Guid? memberId, string displayName, CancellationToken cancellationToken = default)
+    {
+        lock (sync)
+        {
+            var matching = MatchingPosts(memberId, displayName).ToList();
+            var startedTopicIds = StartedTopicIds(matching);
             for (var i = 0; i < threads.Count; i++)
             {
                 if (startedTopicIds.Contains(threads[i].TopicId))
@@ -246,7 +268,7 @@ public sealed class InMemoryForumWriteRepository : IForumWriteRepository
 
             for (var i = 0; i < posts.Count; i++)
             {
-                if (posts[i].MemberId == memberId)
+                if (matching.Contains(posts[i]))
                 {
                     posts[i] = posts[i] with { IsHidden = true };
                 }
@@ -256,15 +278,13 @@ public sealed class InMemoryForumWriteRepository : IForumWriteRepository
         }
     }
 
-    public Task UnhidePostsByMemberAsync(Guid memberId, CancellationToken cancellationToken = default)
+    public Task UnhideAuthorForumContentAsync(
+        Guid? memberId, string displayName, CancellationToken cancellationToken = default)
     {
         lock (sync)
         {
-            var startedTopicIds = posts
-                .GroupBy(post => post.TopicId)
-                .Where(topicPosts => topicPosts.OrderBy(post => post.PostId).First().MemberId == memberId)
-                .Select(topicPosts => topicPosts.Key)
-                .ToHashSet();
+            var matching = MatchingPosts(memberId, displayName).ToList();
+            var startedTopicIds = StartedTopicIds(matching);
             for (var i = 0; i < threads.Count; i++)
             {
                 if (startedTopicIds.Contains(threads[i].TopicId))
@@ -275,7 +295,7 @@ public sealed class InMemoryForumWriteRepository : IForumWriteRepository
 
             for (var i = 0; i < posts.Count; i++)
             {
-                if (posts[i].MemberId == memberId)
+                if (matching.Contains(posts[i]))
                 {
                     posts[i] = posts[i] with { IsHidden = false };
                 }
@@ -283,6 +303,23 @@ public sealed class InMemoryForumWriteRepository : IForumWriteRepository
 
             return Task.CompletedTask;
         }
+    }
+
+    private IEnumerable<InMemoryForumWritePost> MatchingPosts(Guid? memberId, string displayName)
+    {
+        var name = displayName.Trim();
+        return posts.Where(post => memberId.HasValue
+            ? post.MemberId == memberId.Value
+            : string.Equals(post.DisplayName.Trim(), name, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private HashSet<int> StartedTopicIds(IEnumerable<InMemoryForumWritePost> matching)
+    {
+        var matchingSet = matching.ToHashSet();
+        return posts.GroupBy(post => post.TopicId)
+            .Where(group => matchingSet.Contains(group.OrderBy(post => post.PostId).First()))
+            .Select(group => group.Key)
+            .ToHashSet();
     }
 
     public Task<int> EnsureCategoryAsync(

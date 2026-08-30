@@ -340,10 +340,10 @@ public sealed class ForumWriteRoutesTests : IClassFixture<WebApplicationFactory<
         public Task<int> CountApprovedPostsByMemberAsync(Guid memberId, CancellationToken cancellationToken = default) =>
             Task.FromResult(0);
 
-        public Task HidePostsByMemberAsync(Guid memberId, CancellationToken cancellationToken = default) =>
+        public Task HideAuthorForumContentAsync(Guid? memberId, string displayName, CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
 
-        public Task UnhidePostsByMemberAsync(Guid memberId, CancellationToken cancellationToken = default) =>
+        public Task UnhideAuthorForumContentAsync(Guid? memberId, string displayName, CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
 
         public Task<int> EnsureCategoryAsync(

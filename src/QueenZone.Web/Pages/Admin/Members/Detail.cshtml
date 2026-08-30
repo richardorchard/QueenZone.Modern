@@ -1,5 +1,9 @@
 @page "/admin/members/{id:guid}"
 @model DetailModel
+@{
+  var hideConfirmMessage = System.Text.Json.JsonSerializer.Serialize(
+    $"Hide all posts and threads started by {Model.Member!.DisplayName}? Other people's posts stay.");
+}
 
 <div class="admin-shell">
   <h1>@Model.Member!.DisplayName</h1>
@@ -33,6 +37,25 @@
       }
     </dd>
   </dl>
+
+  <section class="admin-form">
+    <h2>Forum content</h2>
+    <p><strong>@Model.ForumContent!.PostCount</strong> posts and <strong>@Model.ForumContent.ThreadCount</strong> started threads match this author.</p>
+    @if (Model.ForumContent.IsHidden)
+    {
+      <form method="post" action="/admin/members/@Model.Member.Id/UnhideForumContent">
+        @Html.AntiForgeryToken()
+        <button type="submit" class="qz-button">Unhide all posts and threads</button>
+      </form>
+    }
+    else if (Model.ForumContent.PostCount + Model.ForumContent.ThreadCount > 0)
+    {
+      <form method="post" action="/admin/members/@Model.Member.Id/HideForumContent" onsubmit="return confirm(@hideConfirmMessage);">
+        @Html.AntiForgeryToken()
+        <button type="submit" class="qz-button qz-button--danger">Hide all posts and threads</button>
+      </form>
+    }
+  </section>
 
   @if (Model.Member.IsSuspended)
   {

@@ -64,10 +64,10 @@ public sealed class ForumPostRateLimiterTests
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
-        public Task HidePostsByMemberAsync(Guid memberId, CancellationToken cancellationToken = default) =>
+        public Task HideAuthorForumContentAsync(Guid? memberId, string displayName, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
-        public Task UnhidePostsByMemberAsync(Guid memberId, CancellationToken cancellationToken = default) =>
+        public Task UnhideAuthorForumContentAsync(Guid? memberId, string displayName, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
         public Task<int> EnsureCategoryAsync(
