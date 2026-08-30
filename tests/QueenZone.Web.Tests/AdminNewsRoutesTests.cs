@@ -832,6 +832,19 @@ public sealed class AdminNewsRoutesTests : IClassFixture<QueenZoneWebApplication
     }
 
     [Fact]
+    public async Task GalleryPicker_includes_photos_with_unbackfilled_legacy_dimensions()
+    {
+        var client = CreateClient(AdminEmail);
+
+        var category = await client.GetStringAsync("/admin/news/gallery-picker?catId=9");
+
+        Assert.Contains("img-101.jpg", category);
+        Assert.Contains("img-102.jpg", category);
+        Assert.Contains("img-103.jpg", category);
+        Assert.DoesNotContain("No photos matched", category);
+    }
+
+    [Fact]
     public async Task GalleryPicker_filters_by_category_and_search()
     {
         var client = CreateClient(AdminEmail);
