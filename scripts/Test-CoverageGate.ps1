@@ -1,5 +1,5 @@
 param(
-    [Parameter(Mandatory = $true)]
+    [Parameter()]
     [string]$Reports,
 
     [double]$GlobalLineThreshold = 51,
@@ -8,10 +8,16 @@ param(
 
     [string]$BaseRef = $env:GITHUB_BASE_REF,
 
-    [string]$HeadRef = "HEAD"
+    [string]$HeadRef = "HEAD",
+
+    [switch]$SelfTest
 )
 
 $ErrorActionPreference = "Stop"
+
+if (-not $SelfTest -and [string]::IsNullOrWhiteSpace($Reports)) {
+    throw "Reports is required unless -SelfTest is specified."
+}
 
 function Get-RepoRelativePath {
     param([string]$Path)
@@ -115,10 +121,200 @@ function Get-ChangedLines {
     return $changedLines
 }
 
-$reportFiles = Get-ChildItem -Path $Reports -Recurse -Filter "coverage.cobertura.xml" -File
-if ($reportFiles.Count -eq 0) {
-    throw "No Cobertura coverage reports found under '$Reports'."
+# Coverlet writes UTF-8 coverage.cobertura.xml under a GUID folder. The TRX
+# logger (same TestResults dir) also copies that file into the VSTest
+# `_runner_*/In/*` attachment inbox as UTF-16, which contains NUL bytes and
+# cannot be loaded as XML. ReportGenerator skips those copies; this gate
+# must too, and must never feed .trx or other non-cobertura XML to [xml].
+function Read-CoberturaDocument {
+    param([string]$Path)
+
+    $fileName = [System.IO.Path]::GetFileName($Path)
+    if (-not $fileName.Equals("coverage.cobertura.xml", [StringComparison]::OrdinalIgnoreCase)) {
+        Write-Host "Skipping non-cobertura file: $Path"
+        return $null
+    }
+
+    $bytes = [System.IO.File]::ReadAllBytes($Path)
+    if ($bytes.Length -eq 0) {
+        Write-Host "Skipping empty coverage file: $Path"
+        return $null
+    }
+
+    foreach ($byte in $bytes) {
+        if ($byte -eq 0) {
+            Write-Host "Skipping coverage file with NUL bytes (likely a TRX attachment copy): $Path"
+            return $null
+        }
+    }
+
+    $text = [System.Text.Encoding]::UTF8.GetString($bytes)
+    if ($text.Length -gt 0 -and [int][char]$text[0] -eq 0xFEFF) {
+        $text = $text.Substring(1)
+    }
+
+    try {
+        $document = [xml]$text
+    }
+    catch {
+        Write-Host "Skipping unreadable coverage file '${Path}': $($_.Exception.Message)"
+        return $null
+    }
+
+    if ($null -eq $document.coverage) {
+        Write-Host "Skipping XML that is not a Cobertura coverage document: $Path"
+        return $null
+    }
+
+    return $document
 }
+
+function Get-CoberturaDocuments {
+    param([string]$ReportsPath)
+
+    $reportFiles = @(Get-ChildItem -Path $ReportsPath -Recurse -Filter "coverage.cobertura.xml" -File)
+    $documents = New-Object System.Collections.Generic.List[object]
+
+    foreach ($reportFile in $reportFiles) {
+        $document = Read-CoberturaDocument -Path $reportFile.FullName
+        if ($null -ne $document) {
+            $documents.Add([pscustomobject]@{
+                    File = $reportFile
+                    Xml  = $document
+                }) | Out-Null
+        }
+    }
+
+    return $documents
+}
+
+function New-SampleCoberturaXml {
+    param(
+        [string]$SourceRoot,
+        [string]$FileName = "src/QueenZone.Web/CoverageGateSample.cs"
+    )
+
+    return @"
+<?xml version="1.0" encoding="utf-8"?>
+<coverage line-rate="1" branch-rate="1" version="1.9" timestamp="1" lines-covered="2" lines-valid="2" branches-covered="0" branches-valid="0">
+  <sources>
+    <source>$SourceRoot</source>
+  </sources>
+  <packages>
+    <package name="QueenZone.Web" line-rate="1" branch-rate="1" complexity="1">
+      <classes>
+        <class name="QueenZone.Web.CoverageGateSample" filename="$FileName" line-rate="1" branch-rate="1" complexity="1">
+          <lines>
+            <line number="10" hits="1" branch="false" />
+            <line number="11" hits="1" branch="false" />
+          </lines>
+        </class>
+      </classes>
+    </package>
+  </packages>
+</coverage>
+"@
+}
+
+function Invoke-CoverageGateSelfTest {
+    $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("qz-coverage-gate-" + [guid]::NewGuid().ToString("N"))
+    New-Item -ItemType Directory -Path $tempRoot | Out-Null
+
+    try {
+        $validDir = Join-Path $tempRoot (New-Guid).ToString("D")
+        $trxInboxDir = Join-Path $tempRoot "_runnervmgx7h7_2026-08-30_13_18_42/In/runnervmgx7h7"
+        $junkDir = Join-Path $tempRoot "not-cobertura"
+        New-Item -ItemType Directory -Path $validDir, $trxInboxDir, $junkDir | Out-Null
+
+        $validXml = New-SampleCoberturaXml -SourceRoot $tempRoot
+        $validPath = Join-Path $validDir "coverage.cobertura.xml"
+        [System.IO.File]::WriteAllText($validPath, $validXml, [System.Text.UTF8Encoding]::new($false))
+
+        $nulCopyPath = Join-Path $trxInboxDir "coverage.cobertura.xml"
+        [System.IO.File]::WriteAllText($nulCopyPath, $validXml, [System.Text.Encoding]::Unicode)
+
+        $trxPath = Join-Path $tempRoot "QueenZone.Web.Tests-shard-0.trx"
+        [System.IO.File]::WriteAllText($trxPath, "<TestRun></TestRun>", [System.Text.Encoding]::Unicode)
+
+        $wrongRootPath = Join-Path $junkDir "coverage.cobertura.xml"
+        [System.IO.File]::WriteAllText($wrongRootPath, "<TestRun></TestRun>", [System.Text.UTF8Encoding]::new($false))
+
+        if ($null -ne (Read-CoberturaDocument -Path $trxPath)) {
+            throw "Self-test failed: TRX files must be ignored."
+        }
+
+        if ($null -ne (Read-CoberturaDocument -Path $nulCopyPath)) {
+            throw "Self-test failed: cobertura copies that contain NUL bytes must be ignored."
+        }
+
+        if ($null -ne (Read-CoberturaDocument -Path $wrongRootPath)) {
+            throw "Self-test failed: non-cobertura XML named coverage.cobertura.xml must be ignored."
+        }
+
+        $validDocument = Read-CoberturaDocument -Path $validPath
+        if ($null -eq $validDocument -or $null -eq $validDocument.coverage) {
+            throw "Self-test failed: valid UTF-8 cobertura was not loaded."
+        }
+
+        $loaded = @(Get-CoberturaDocuments -ReportsPath $tempRoot)
+        if ($loaded.Count -ne 1) {
+            throw "Self-test failed: expected 1 valid cobertura document, found $($loaded.Count)."
+        }
+
+        if ($loaded[0].File.FullName -ne $validPath) {
+            throw "Self-test failed: loaded unexpected report '$($loaded[0].File.FullName)'."
+        }
+
+        $emptyRoot = Join-Path $tempRoot "empty-only"
+        New-Item -ItemType Directory -Path $emptyRoot | Out-Null
+        $emptyOnly = @(Get-CoberturaDocuments -ReportsPath $emptyRoot)
+        if ($emptyOnly.Count -ne 0) {
+            throw "Self-test failed: empty reports directory should yield no documents."
+        }
+
+        $pwsh = Get-Command pwsh -ErrorAction SilentlyContinue
+        if ($null -eq $pwsh) {
+            $pwsh = Get-Command powershell
+        }
+
+        $gateOutput = & $pwsh.Source -NoProfile -File $PSCommandPath -Reports $tempRoot -GlobalLineThreshold 0 -ChangedLineThreshold 0 -BaseRef "" 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            throw "Self-test failed: coverage gate should accept a mixed TestResults dir that still has one valid cobertura. Output:`n$($gateOutput | Out-String)"
+        }
+
+        $gateText = @($gateOutput) -join [Environment]::NewLine
+        if ($gateText -notmatch 'union of 1 reports') {
+            throw "Self-test failed: expected the gate to union exactly one valid report. Output:`n$gateText"
+        }
+
+        $emptyOutput = & $pwsh.Source -NoProfile -File $PSCommandPath -Reports $emptyRoot -GlobalLineThreshold 0 -ChangedLineThreshold 0 -BaseRef "" 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            throw "Self-test failed: expected the gate to throw when no valid cobertura exists."
+        }
+
+        $emptyText = @($emptyOutput) -join [Environment]::NewLine
+        if ($emptyText -notmatch 'No valid Cobertura coverage reports') {
+            throw "Self-test failed: empty reports dir produced unexpected error. Output:`n$emptyText"
+        }
+
+        Write-Host "Test-CoverageGate.ps1 self-test passed."
+    }
+    finally {
+        Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+if ($SelfTest) {
+    Invoke-CoverageGateSelfTest
+    exit 0
+}
+
+$loadedReports = @(Get-CoberturaDocuments -ReportsPath $Reports)
+if ($loadedReports.Count -eq 0) {
+    throw "No valid Cobertura coverage reports found under '$Reports'."
+}
+
+$reportFiles = @($loadedReports | ForEach-Object { $_.File })
 
 # Merge line hits across reports by file path. Do NOT sum each report's lines-valid /
 # lines-covered: coverlet emits overlapping assemblies (e.g. QueenZone.Data from both
@@ -126,8 +322,8 @@ if ($reportFiles.Count -eq 0) {
 # global coverage when a sparse report includes a large shared surface.
 $coveredLinesByFile = @{}
 
-foreach ($reportFile in $reportFiles) {
-    [xml]$coverage = Get-Content -LiteralPath $reportFile.FullName
+foreach ($loadedReport in $loadedReports) {
+    $coverage = $loadedReport.Xml
 
     $sources = @($coverage.coverage.sources.source | ForEach-Object {
         if ($_ -is [string]) {
