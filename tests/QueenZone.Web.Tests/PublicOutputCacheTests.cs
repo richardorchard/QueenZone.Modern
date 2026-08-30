@@ -125,6 +125,7 @@ public sealed class PublicOutputCacheTests : IClassFixture<WebApplicationFactory
     [InlineData("GET", "/account/login", false)]
     [InlineData("GET", "/account/member-probe", false)]
     [InlineData("GET", "/health", false)]
+    [InlineData("GET", "/trivia", false)]
     public void PublicReadOnlyPolicyIncludesOnlyAnonymousPublicGetAndHeadRoutes(
         string method,
         string path,

@@ -6,9 +6,9 @@ namespace QueenZone.Web;
 
 /// <summary>
 /// Public, read-only <c>/api/v1/content/*</c> routes for the mobile app
-/// (issues #726 / #743 / #747). News, biography, discography, timeline,
-/// Freddie Tribute, photo galleries, and fan-performance listings require
-/// no authentication: that content is public on the website today.
+/// (issues #726 / #743 / #747 / #1100). News, biography, discography, timeline,
+/// Freddie Tribute, photo galleries, fan-performance listings, and random
+/// trivia require no authentication: that content is public on the website today.
 /// Fan-performance audio at <c>/api/v1/content/fan-performances/{id}/audio</c>
 /// requires <see cref="MemberAuthenticationSchemes.MobileMemberPolicy"/> and
 /// reuses <see cref="FanPerformanceEndpoints.ServeAudioAsync"/> — the same
@@ -66,6 +66,11 @@ public static class ContentApiEndpoints
             .WithName("GetContentRandomQuote")
             .WithSummary("A single random published quote, matching the homepage widget. Intended for the mobile app's homescreen widget.")
             .Produces<QuoteDto?>();
+
+        group.MapGet("/trivia/random", GetRandomTriviaAsync)
+            .WithName("GetContentRandomTrivia")
+            .WithSummary("A single random published trivia fact, matching the /trivia page. JSON null when none is published.")
+            .Produces<TriviaDto?>();
 
         group.MapGet("/quotes/{id:int}", GetQuoteDetailAsync)
             .WithName("GetContentQuoteDetail")
@@ -271,6 +276,19 @@ public static class ContentApiEndpoints
 
         // ASP.NET Core Ok(null) / Json(null) write an empty 200. The contract is JSON null.
         QuoteDto? payload = quote is null ? null : ContentApiMapper.ToQuoteDto(quote);
+        return payload is null
+            ? Results.Content("null", "application/json")
+            : Results.Ok(payload);
+    }
+
+    internal static async Task<IResult> GetRandomTriviaAsync(
+        ITriviaRepository triviaRepository,
+        CancellationToken cancellationToken)
+    {
+        var fact = await triviaRepository.GetRandomPublishedAsync(cancellationToken);
+
+        // ASP.NET Core Ok(null) / Json(null) write an empty 200. The contract is JSON null.
+        TriviaDto? payload = fact is null ? null : ContentApiMapper.ToTriviaDto(fact);
         return payload is null
             ? Results.Content("null", "application/json")
             : Results.Ok(payload);

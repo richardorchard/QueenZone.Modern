@@ -1649,6 +1649,32 @@ body.qz-menu-lock .qz-masthead {
   opacity: 0.7;
 }
 
+.qz-trivia {
+  margin: 0 auto;
+  max-width: 46rem;
+  text-align: center;
+}
+
+.qz-trivia__text {
+  font-size: var(--text-2xl, 1.5rem);
+  line-height: 1.4;
+  margin: 0 0 var(--space-3);
+}
+
+.qz-trivia__meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-3);
+  font-size: var(--text-base, 1rem);
+  opacity: 0.7;
+  margin: 0 0 var(--space-5);
+}
+
+.qz-trivia__next {
+  margin: var(--space-5) 0 0;
+}
+
 .qz-home-poll {
   margin: 0 auto;
   max-width: 46rem;
