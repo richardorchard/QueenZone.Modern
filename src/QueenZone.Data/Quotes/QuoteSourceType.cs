@@ -4,4 +4,5 @@ public enum QuoteSourceType
 {
     Curated,
     AsItBeganBook,
+    VisualDocumentaryBook,
 }
