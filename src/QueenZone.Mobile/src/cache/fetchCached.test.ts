@@ -69,4 +69,19 @@ describe('fetchJsonWithOfflineCache', () => {
     assert.deepEqual(result, { id: 42, title: 'cached' });
     assert.equal(fetchJsonMock.mock.calls.length, 1);
   });
+
+  it('serves the cached payload when fetchJson times out', async () => {
+    const cache = new ContentCache({ storage: createMemoryStorage() });
+    await cache.put('news:42', { id: 42, title: 'cached' });
+    fetchJsonMock.mock.mockImplementation(async () => {
+      throw ApiError.timeout();
+    });
+
+    const result = await fetchJsonWithOfflineCache('/content/news/42', {
+      cacheKey: 'news:42',
+      cache,
+    });
+
+    assert.deepEqual(result, { id: 42, title: 'cached' });
+  });
 });

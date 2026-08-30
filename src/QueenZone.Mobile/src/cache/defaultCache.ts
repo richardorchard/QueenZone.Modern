@@ -1,14 +1,15 @@
 import { createAsyncStorageAdapter } from './asyncStorageAdapter';
-import { ContentCache } from './contentCache';
+import { CONTENT_CACHE_MAX_ENTRIES, ContentCache } from './contentCache';
+import { PRIVATE_CACHE_KEY_PREFIX, privateMemberCachePrefix } from './keys';
 
 let shared: ContentCache | null = null;
 
-/** Process-wide content cache backed by AsyncStorage (max 40 detail entries). */
+/** Process-wide content cache backed by AsyncStorage. */
 export function getContentCache(): ContentCache {
   if (!shared) {
     shared = new ContentCache({
       storage: createAsyncStorageAdapter(),
-      maxEntries: 40,
+      maxEntries: CONTENT_CACHE_MAX_ENTRIES,
     });
   }
   return shared;
@@ -17,4 +18,14 @@ export function getContentCache(): ContentCache {
 /** Test helper to replace or clear the singleton. */
 export function setContentCacheForTests(cache: ContentCache | null): void {
   shared = cache;
+}
+
+/** Drop conversation snapshots. Public forum cache is left in place. */
+export async function purgePrivateContentCache(memberId?: string | null): Promise<void> {
+  try {
+    const prefix = memberId ? privateMemberCachePrefix(memberId) : PRIVATE_CACHE_KEY_PREFIX;
+    await getContentCache().purgePrefix(prefix);
+  } catch {
+    // Sign-out still has to finish if the device store is unavailable.
+  }
 }

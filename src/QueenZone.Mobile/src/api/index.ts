@@ -52,14 +52,17 @@ export {
   fetchForumRecentThreads,
   fetchForumStats,
   fetchForumTopic,
+  fetchForumTopicResult,
   fetchForumTopicPoll,
   fetchForumTopicPosts,
+  fetchForumTopicPostsResult,
   fetchForumTopicWatch,
   unwatchForumTopic,
   voteForumTopicPoll,
   watchForumTopic,
 } from './forum';
-export type { ForumReplyWrite, ForumTopicWrite } from './forum';
+export type { CachedResult, ForumReplyWrite, ForumTopicWrite, OfflineReadOptions } from './forum';
+export type { CacheSource } from '../cache/withOfflineCache';
 export {
   fetchForumAttachment,
   isCookieGatedForumAttachmentPath,
@@ -76,6 +79,7 @@ export {
 export type { NewsSuggestionWrite } from './newsSuggestions';
 export {
   fetchConversation,
+  fetchConversationResult,
   fetchInbox,
   fetchUnreadConversationCount,
   replyToConversation,
