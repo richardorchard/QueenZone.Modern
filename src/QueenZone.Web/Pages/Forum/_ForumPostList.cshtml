@@ -2,6 +2,7 @@
 @inject UgcHtml UgcHtml
 @{
   var canReply = ViewData["CanReply"] as bool? ?? false;
+  var isAdmin = ViewData["IsAdmin"] as bool? ?? false;
 }
 
 @if (Model.Count == 0)
@@ -91,7 +92,7 @@ else
             <footer class="qz-forum-post__signature qz-meta">@post.Signature</footer>
           }
         </div>
-        @if ((post.IsAuthor && post.CanEdit) || post.CanMessage || canReply)
+        @if ((post.IsAuthor && post.CanEdit) || post.CanMessage || canReply || isAdmin)
         {
           <div class="qz-forum-post__actions">
             @if (canReply)
@@ -117,6 +118,10 @@ else
                 </svg>
                 <span class="visually-hidden">Message @post.AuthorUsername</span>
               </a>
+            }
+            @if (isAdmin)
+            {
+              <a class="qz-button qz-button--danger" href="/forum/post/@post.Id/hide-author">Hide all by this author</a>
             }
           </div>
         }

@@ -35,6 +35,7 @@ public sealed record ForumEditablePost(
     string TopicSubject,
     string Body,
     Guid? AuthorMemberId,
+    string AuthorDisplayName,
     DateTimeOffset PostedAt,
     DateTimeOffset? EditedAt,
     int EditCount,
@@ -53,3 +54,10 @@ public sealed record ForumPostUpdateResult(
     ForumPostUpdateStatus Status,
     int TopicId = 0,
     string TopicSubject = "");
+
+public sealed record ForumAuthorContentSummary(
+    Guid? MemberId,
+    string DisplayName,
+    int PostCount,
+    int ThreadCount,
+    bool IsHidden);
