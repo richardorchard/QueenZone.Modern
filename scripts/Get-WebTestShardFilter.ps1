@@ -21,6 +21,10 @@
 .PARAMETER TestsRoot
   Path to QueenZone.Web.Tests sources. Defaults to repo-relative tests/QueenZone.Web.Tests.
 
+.PARAMETER DurationsPath
+  Optional JSON map of test class names to observed milliseconds. When present,
+  measured durations replace heuristic weights for known classes.
+
 .PARAMETER List
   Print class-to-shard assignment instead of a filter string.
 
@@ -31,10 +35,10 @@
   Run fixture-based assertions against the weight and assignment helpers, then exit.
 
 .EXAMPLE
-  pwsh -File ./scripts/Get-WebTestShardFilter.ps1 -ShardIndex 0 -ShardCount 2
+  pwsh -File ./scripts/Get-WebTestShardFilter.ps1 -ShardIndex 0 -ShardCount 3
 
 .EXAMPLE
-  pwsh -File ./scripts/Get-WebTestShardFilter.ps1 -ShardCount 2 -List
+  pwsh -File ./scripts/Get-WebTestShardFilter.ps1 -ShardCount 3 -List
 #>
 [CmdletBinding()]
 param(
@@ -44,10 +48,13 @@ param(
 
     [Parameter()]
     [ValidateRange(1, 64)]
-    [int] $ShardCount = 2,
+    [int] $ShardCount = 3,
 
     [Parameter()]
     [string] $TestsRoot = "",
+
+    [Parameter()]
+    [string] $DurationsPath = "",
 
     [Parameter()]
     [switch] $List,
@@ -61,6 +68,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+$script:ObservedDurations = @{}
 
 # Per-case multipliers. A flat WAF=5 / unit=1 (one weight per class) kept
 # class counts even but parked every Admin*EfRoutes host on shard 1 via
@@ -242,11 +250,21 @@ function Get-ShardAssignments {
         [int] $Count
     )
 
-    $loads = @(for ($i = 0; $i -lt $Count; $i++) { 0 })
+    $loads = @(for ($i = 0; $i -lt $Count; $i++) { [long]0 })
     $buckets = @(for ($i = 0; $i -lt $Count; $i++) { New-Object System.Collections.Generic.List[object] })
 
     # Heaviest first, then name — deterministic and packs expensive hosts first.
-    $ordered = $Classes | Sort-Object @{ Expression = "Weight"; Descending = $true }, Name
+    $weightedClasses = @(
+        foreach ($class in $Classes) {
+            $effectiveWeight = [long]$class.Weight * 1000
+            if ($script:ObservedDurations.ContainsKey($class.Name)) {
+                $effectiveWeight = [Math]::Max(1, [long]$script:ObservedDurations[$class.Name])
+            }
+            $class | Add-Member -NotePropertyName EffectiveWeight -NotePropertyValue $effectiveWeight -Force -PassThru
+        }
+    )
+
+    $ordered = $weightedClasses | Sort-Object @{ Expression = "EffectiveWeight"; Descending = $true }, Name
     foreach ($class in $ordered) {
         $best = 0
         for ($i = 1; $i -lt $Count; $i++) {
@@ -256,7 +274,7 @@ function Get-ShardAssignments {
         }
 
         $buckets[$best].Add($class) | Out-Null
-        $loads[$best] += $class.Weight
+        $loads[$best] += $class.EffectiveWeight
     }
 
     for ($i = 0; $i -lt $Count; $i++) {
@@ -400,8 +418,8 @@ public sealed class SqliteUnitTests
 
         $loads = @($assignments | ForEach-Object { $_.Load })
         $spread = [Math]::Abs($loads[0] - $loads[1])
-        if ($spread -gt 20) {
-            throw "Self-test failed: shard loads $($loads[0]) vs $($loads[1]) differ by more than 20."
+        if ($spread -gt 20000) {
+            throw "Self-test failed: shard loads $($loads[0]) vs $($loads[1]) differ by more than 20000."
         }
     }
     finally {
@@ -423,6 +441,19 @@ if ($ShardIndex -ge $ShardCount) {
 if ([string]::IsNullOrWhiteSpace($TestsRoot)) {
     $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
     $TestsRoot = Join-Path $repoRoot "tests/QueenZone.Web.Tests"
+}
+
+if ([string]::IsNullOrWhiteSpace($DurationsPath)) {
+    $DurationsPath = Join-Path $PSScriptRoot "web-test-class-durations.json"
+}
+if (Test-Path -LiteralPath $DurationsPath -PathType Leaf) {
+    $durationJson = Get-Content -LiteralPath $DurationsPath -Raw | ConvertFrom-Json -AsHashtable
+    foreach ($entry in $durationJson.GetEnumerator()) {
+        if ($entry.Value -isnot [int] -and $entry.Value -isnot [long]) {
+            throw "Observed duration for '$($entry.Key)' must be an integer number of milliseconds."
+        }
+        $script:ObservedDurations[$entry.Key] = [long]$entry.Value
+    }
 }
 
 $TestsRoot = (Resolve-Path -LiteralPath $TestsRoot).Path
@@ -449,7 +480,7 @@ if ($List) {
         Write-Host ("Shard {0}: classes={1} waf={2} unit={3} cases={4} weight={5}" -f `
                 $assignment.ShardIndex, $assignment.Classes.Count, $waf, $unit, $cases, $assignment.Load)
         foreach ($class in $assignment.Classes) {
-            Write-Host ("  [{0}] {1} (cases={2} w={3})" -f $class.Kind, $class.Name, $class.Cases, $class.Weight)
+            Write-Host ("  [{0}] {1} (cases={2} heuristic={3} effective-ms={4})" -f $class.Kind, $class.Name, $class.Cases, $class.Weight, $class.EffectiveWeight)
         }
     }
 
