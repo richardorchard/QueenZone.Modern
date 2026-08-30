@@ -55,6 +55,19 @@ public sealed class PhotoSubmissionServiceTests
     }
 
     [Fact]
+    public async Task SubmitAsync_records_measured_image_dimensions()
+    {
+        var service = CreateService(out _);
+        await using var png = await CreatePngAsync();
+        var result = await service.SubmitAsync(
+            Guid.NewGuid(), "Dimensions", null, null, null, null, png, "a.png");
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(40, result.Submission!.ImageWidthPx);
+        Assert.Equal(40, result.Submission.ImageHeightPx);
+    }
+
+    [Fact]
     public async Task SubmitAsync_surfaces_blob_upload_errors()
     {
         var repository = new InMemoryPhotoSubmissionRepository();
