@@ -213,11 +213,13 @@ describe('SessionProvider', () => {
     await waitFor(() => expect(screen.getByText('signed-in')).toBeOnTheScreen());
     await waitFor(() => expect(screen.getByText('Freddie')).toBeOnTheScreen());
     expect(signInWithProvider).toHaveBeenCalledWith('http://qz.test', 'Google');
-    await waitFor(() => expect(syncPushRegistration).toHaveBeenCalledWith(authTokensFixture().accessToken));
+    await waitFor(() =>
+      expect(syncPushRegistration).toHaveBeenCalledWith(authTokensFixture().accessToken, 'member-1'),
+    );
 
     await user.press(screen.getByText('do-sign-out'));
     await waitFor(() => expect(screen.getByText('signed-out')).toBeOnTheScreen());
-    expect(clearPushRegistration).toHaveBeenCalledWith(authTokensFixture().accessToken);
+    expect(clearPushRegistration).toHaveBeenCalledWith(authTokensFixture().accessToken, 'member-1');
     expect(logoutRemote).toHaveBeenCalled();
     expect(revokeRefreshToken).toHaveBeenCalled();
     expect(clearStored).toHaveBeenCalled();
@@ -284,7 +286,58 @@ describe('SessionProvider', () => {
     });
     renderSession();
     await waitFor(() => expect(screen.getByText('signed-in')).toBeOnTheScreen());
-    await waitFor(() => expect(syncPushRegistration).toHaveBeenCalledWith(authTokensFixture().accessToken));
+    await waitFor(() =>
+      expect(syncPushRegistration).toHaveBeenCalledWith(authTokensFixture().accessToken, 'member-1'),
+    );
+  });
+
+  it('re-registers push after signing out and back in as a different member (#1094)', async () => {
+    const user = userEvent.setup();
+    readStored.mockResolvedValue(null);
+    signInWithProvider
+      .mockResolvedValueOnce(authTokensFixture({ accessToken: 'token-a' }))
+      .mockResolvedValueOnce(authTokensFixture({ accessToken: 'token-b' }));
+    fetchJsonMock
+      .mockResolvedValueOnce(memberProfilePayload({ memberId: 'member-a', displayName: 'Alice' }))
+      .mockResolvedValueOnce(memberProfilePayload({ memberId: 'member-b', displayName: 'Bob' }));
+
+    renderSession();
+    await waitFor(() => expect(screen.getByText('signed-out')).toBeOnTheScreen());
+
+    await user.press(screen.getByText('do-sign-in'));
+    await waitFor(() => expect(screen.getByText('Alice')).toBeOnTheScreen());
+    await waitFor(() => expect(syncPushRegistration).toHaveBeenCalledWith('token-a', 'member-a'));
+
+    await user.press(screen.getByText('do-sign-out'));
+    await waitFor(() => expect(screen.getByText('signed-out')).toBeOnTheScreen());
+    expect(clearPushRegistration).toHaveBeenCalledWith('token-a', 'member-a');
+
+    syncPushRegistration.mockClear();
+    await user.press(screen.getByText('do-sign-in'));
+    await waitFor(() => expect(screen.getByText('Bob')).toBeOnTheScreen());
+    await waitFor(() => expect(syncPushRegistration).toHaveBeenCalledWith('token-b', 'member-b'));
+  });
+
+  it('re-registers push when signing in as a different member without signing out first', async () => {
+    const user = userEvent.setup();
+    readStored.mockResolvedValue(null);
+    signInWithProvider
+      .mockResolvedValueOnce(authTokensFixture({ accessToken: 'token-a' }))
+      .mockResolvedValueOnce(authTokensFixture({ accessToken: 'token-b' }));
+    fetchJsonMock
+      .mockResolvedValueOnce(memberProfilePayload({ memberId: 'member-a', displayName: 'Alice' }))
+      .mockResolvedValueOnce(memberProfilePayload({ memberId: 'member-b', displayName: 'Bob' }));
+
+    renderSession();
+    await waitFor(() => expect(screen.getByText('signed-out')).toBeOnTheScreen());
+
+    await user.press(screen.getByText('do-sign-in'));
+    await waitFor(() => expect(screen.getByText('Alice')).toBeOnTheScreen());
+    await waitFor(() => expect(syncPushRegistration).toHaveBeenCalledWith('token-a', 'member-a'));
+
+    await user.press(screen.getByText('do-sign-in'));
+    await waitFor(() => expect(screen.getByText('Bob')).toBeOnTheScreen());
+    await waitFor(() => expect(syncPushRegistration).toHaveBeenCalledWith('token-b', 'member-b'));
   });
 
   it('stays signed out when the provider hop is cancelled', async () => {
