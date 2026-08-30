@@ -16,21 +16,23 @@ public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForu
     {
         // Explicit transactions under EnableRetryOnFailure must run inside the execution strategy
         // so Azure SQL transient failures can retry the whole unit of work (see QueenZoneSqlServerOptions).
-        var strategy = dbContext.Database.CreateExecutionStrategy();
-        return strategy.ExecuteAsync(async () =>
+        // Join an ambient idempotency transaction when present so the receipt commits with the thread.
+        return QueenZoneDbTransactions.ExecuteAsync(
+            dbContext,
+            IsolationLevel.ReadCommitted,
+            async innerCt =>
         {
             var now = ToUtcDateTime(thread.CreatedAt);
-            await using var transaction = await dbContext.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
 
             var category = await dbContext.ModernForumCategories
-                .SingleOrDefaultAsync(item => item.LegacyForumId == thread.CategoryId && !item.IsSynthetic, cancellationToken);
+                .SingleOrDefaultAsync(item => item.LegacyForumId == thread.CategoryId && !item.IsSynthetic, innerCt);
             if (category is null)
             {
                 throw new InvalidOperationException("Forum category not found.");
             }
 
-            var topicId = await AllocateNextTopicIdAsync(cancellationToken);
-            var postId = await AllocateNextPostIdAsync(cancellationToken);
+            var topicId = await AllocateNextTopicIdAsync(innerCt);
+            var postId = await AllocateNextPostIdAsync(innerCt);
 
             var forumThread = new ModernForumThreadEntity
             {
@@ -85,7 +87,7 @@ public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForu
             category.LastActivityAt = now;
             category.UpdatedAt = now;
 
-            await dbContext.SaveChangesAsync(cancellationToken);
+            await dbContext.SaveChangesAsync(innerCt);
 
             await ApplyCreateThreadStatsAsync(
                 forumThread.Id,
@@ -93,30 +95,30 @@ public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForu
                 category.Id,
                 now,
                 titleCountsForSitemap: !string.IsNullOrWhiteSpace(forumThread.Title),
-                cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-
+                innerCt);
             return new ForumThreadCreateResult(topicId, postId);
-        });
+        },
+            cancellationToken);
     }
 
     public Task<int> CreatePostAsync(NewForumPost post, CancellationToken cancellationToken = default)
     {
-        var strategy = dbContext.Database.CreateExecutionStrategy();
-        return strategy.ExecuteAsync(async () =>
+        return QueenZoneDbTransactions.ExecuteAsync(
+            dbContext,
+            IsolationLevel.ReadCommitted,
+            async innerCt =>
         {
             var now = ToUtcDateTime(post.CreatedAt);
-            await using var transaction = await dbContext.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
 
             var thread = await dbContext.ModernForumThreads
                 .Include(item => item.Category)
-                .SingleOrDefaultAsync(item => item.LegacyTopicId == post.TopicId, cancellationToken);
+                .SingleOrDefaultAsync(item => item.LegacyTopicId == post.TopicId, innerCt);
             if (thread is null)
             {
                 throw new InvalidOperationException("Forum thread not found.");
             }
 
-            var postId = await AllocateNextPostIdAsync(cancellationToken);
+            var postId = await AllocateNextPostIdAsync(innerCt);
             dbContext.ModernForumPosts.Add(new ModernForumPostEntity
             {
                 LegacyPostId = postId,
@@ -145,12 +147,11 @@ public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForu
                 thread.Category.UpdatedAt = now;
             }
 
-            await dbContext.SaveChangesAsync(cancellationToken);
-            await ApplyCreatePostStatsAsync(thread.Id, thread.LegacyTopicId, now, cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-
+            await dbContext.SaveChangesAsync(innerCt);
+            await ApplyCreatePostStatsAsync(thread.Id, thread.LegacyTopicId, now, innerCt);
             return postId;
-        });
+        },
+            cancellationToken);
     }
 
     public async Task<ForumEditablePost?> GetPostAsync(int postId, CancellationToken cancellationToken = default)
@@ -301,12 +302,13 @@ public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForu
     {
         var name = displayName.Trim();
         var posts = AuthorPosts(memberId, name);
-        var threadIds = StartedThreadIds(memberId, name);
         var postCount = await posts.CountAsync(cancellationToken);
-        var threadCount = await dbContext.ModernForumThreads.CountAsync(thread => threadIds.Contains(thread.Id), cancellationToken);
         var visiblePosts = await posts.AnyAsync(post => !post.IsHidden, cancellationToken);
-        var visibleThreads = await dbContext.ModernForumThreads.AnyAsync(
-            thread => threadIds.Contains(thread.Id) && !thread.IsHidden, cancellationToken);
+
+        var threadIds = await StartedThreadIds(memberId, name, cancellationToken);
+        var threadCount = threadIds.Count;
+        var visibleThreads = threadIds.Count > 0 && await dbContext.ModernForumThreads
+            .AnyAsync(thread => threadIds.Contains(thread.Id) && !thread.IsHidden, cancellationToken);
         return new ForumAuthorContentSummary(memberId, name, postCount, threadCount,
             postCount + threadCount > 0 && !visiblePosts && !visibleThreads);
     }
@@ -325,7 +327,7 @@ public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForu
         CancellationToken cancellationToken = default)
     {
         var name = displayName.Trim();
-        var startedThreadIds = StartedThreadIds(memberId, name);
+        var startedThreadIds = await StartedThreadIds(memberId, name, cancellationToken);
 
         await dbContext.ModernForumThreads
             .Where(thread => startedThreadIds.Contains(thread.Id) && !thread.IsHidden)
@@ -344,7 +346,7 @@ public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForu
         CancellationToken cancellationToken = default)
     {
         var name = displayName.Trim();
-        var startedThreadIds = StartedThreadIds(memberId, name);
+        var startedThreadIds = await StartedThreadIds(memberId, name, cancellationToken);
 
         await dbContext.ModernForumThreads
             .Where(thread => startedThreadIds.Contains(thread.Id) && thread.IsHidden)
@@ -357,32 +359,69 @@ public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForu
         await RefreshReadStatsIfSqlServerAsync(cancellationToken);
     }
 
+    // SQL Server's column collation (SQL_Latin1_General_CP1_CI_AS) is already case-insensitive
+    // and imported display names are already trimmed, so on SQL Server we compare directly
+    // against the raw column: wrapping it in Trim()/ToUpper() makes the predicate non-sargable,
+    // forcing a full scan of the 1M+ row forum archive on every search miss. SQLite (used by the
+    // in-memory test suite) defaults to a case-sensitive binary collation, so it still needs the
+    // explicit ToUpper() for correctness — those tables are tiny in tests, so it costs nothing there.
+    private bool UseSargableDisplayNameComparison => dbContext.Database.IsSqlServer();
+
     private IQueryable<ModernForumPostEntity> AuthorPosts(Guid? memberId, string displayName)
     {
-        var normalizedName = displayName.Trim().ToUpperInvariant();
+        var name = displayName.Trim();
+        if (UseSargableDisplayNameComparison)
+        {
+            return dbContext.ModernForumPosts.Where(post => memberId.HasValue
+                ? post.AuthorMemberId == memberId.Value
+                    || (post.AuthorMemberId == null && post.AuthorDisplayName == name)
+                : post.AuthorMemberId == null && post.AuthorDisplayName == name);
+        }
+
+        var normalizedName = name.ToUpperInvariant();
         return dbContext.ModernForumPosts.Where(post => memberId.HasValue
             ? post.AuthorMemberId == memberId.Value
-                || (post.AuthorMemberId == null && post.AuthorDisplayName.Trim().ToUpper() == normalizedName)
-            : post.AuthorMemberId == null && post.AuthorDisplayName.Trim().ToUpper() == normalizedName);
+                || (post.AuthorMemberId == null && post.AuthorDisplayName.ToUpper() == normalizedName)
+            : post.AuthorMemberId == null && post.AuthorDisplayName.ToUpper() == normalizedName);
     }
 
-    private IQueryable<long> StartedThreadIds(Guid? memberId, string displayName)
+    // Materializes each stage instead of composing one deeply nested query: embedding these
+    // correlated-subquery-heavy pieces via .Contains() against unmaterialized IQueryables (as
+    // before) let SQL Server's optimizer fall back to a plan that re-scanned the 1M+ row forum
+    // archive per candidate, timing out on the production database. Running each stage as its
+    // own simple, sargable query and combining the (small) id lists in memory keeps every
+    // individual query fast.
+    private async Task<IReadOnlyList<long>> StartedThreadIds(
+        Guid? memberId, string displayName, CancellationToken cancellationToken)
     {
-        var normalizedName = displayName.Trim().ToUpperInvariant();
-        var matchingStarterPostIds = AuthorPosts(memberId, displayName)
+        var name = displayName.Trim();
+
+        // Thread ids where the author's own post is that thread's starter post.
+        var matchingStarterThreadIds = await AuthorPosts(memberId, displayName)
             .Where(post => !dbContext.ModernForumPosts.Any(earlier =>
                 earlier.ThreadId == post.ThreadId && earlier.LegacyPostId < post.LegacyPostId))
-            .Select(post => post.ThreadId);
-        var unlinkedStarterPostIds = dbContext.ModernForumPosts
-            .Where(post => post.AuthorMemberId == null
-                && !dbContext.ModernForumPosts.Any(earlier =>
+            .Select(post => post.ThreadId)
+            .ToListAsync(cancellationToken);
+
+        // Narrow to threads whose recorded starter name matches (the much smaller
+        // ModernForumThreads table, ~90K rows) before checking which of those threads have an
+        // unlinked starter post, instead of scanning every unlinked post in the 1M+ row forum
+        // archive to find starters and only filtering by name afterward.
+        var candidateThreadIdsQuery = UseSargableDisplayNameComparison
+            ? dbContext.ModernForumThreads.Where(thread => thread.StartedByDisplayName == name)
+            : dbContext.ModernForumThreads.Where(thread => thread.StartedByDisplayName.ToUpper() == name.ToUpperInvariant());
+        var candidateThreadIds = await candidateThreadIdsQuery.Select(thread => thread.Id).ToListAsync(cancellationToken);
+
+        var unlinkedStarterThreadIds = candidateThreadIds.Count == 0
+            ? []
+            : await dbContext.ModernForumPosts
+                .Where(post => post.AuthorMemberId == null && candidateThreadIds.Contains(post.ThreadId))
+                .Where(post => !dbContext.ModernForumPosts.Any(earlier =>
                     earlier.ThreadId == post.ThreadId && earlier.LegacyPostId < post.LegacyPostId))
-            .Select(post => post.ThreadId);
-        return dbContext.ModernForumThreads
-            .Where(thread => matchingStarterPostIds.Contains(thread.Id)
-                || (unlinkedStarterPostIds.Contains(thread.Id)
-                    && thread.StartedByDisplayName.Trim().ToUpper() == normalizedName))
-            .Select(thread => thread.Id);
+                .Select(post => post.ThreadId)
+                .ToListAsync(cancellationToken);
+
+        return matchingStarterThreadIds.Union(unlinkedStarterThreadIds).ToList();
     }
 
     private Task RefreshReadStatsIfSqlServerAsync(CancellationToken cancellationToken) =>

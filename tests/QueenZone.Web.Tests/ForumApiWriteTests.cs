@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using QueenZone.Data;
 using QueenZone.Data.Entities;
+using QueenZone.Web;
 
 namespace QueenZone.Web.Tests;
 
@@ -250,6 +251,170 @@ public sealed class ForumApiWriteTests : IClassFixture<QueenZoneWebApplicationFa
         var problem = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Contains("not allowed", problem.GetProperty("detail").GetString(), StringComparison.OrdinalIgnoreCase);
     }
+
+    [Fact]
+    public async Task Reply_WithoutIdempotencyKey_KeepsOneShotBehavior()
+    {
+        var memberId = Guid.NewGuid();
+        using var client = CreateBearerClient(memberId);
+
+        using var first = await client.PostAsJsonAsync(
+            $"{ForumApiEndpoints.RootPath}/topics/1002/posts",
+            new { body = "First one-shot reply." });
+        using var second = await client.PostAsJsonAsync(
+            $"{ForumApiEndpoints.RootPath}/topics/1002/posts",
+            new { body = "First one-shot reply." });
+
+        Assert.Equal(HttpStatusCode.Created, first.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, second.StatusCode);
+        var firstDto = await first.Content.ReadFromJsonAsync<ForumPostCreatedDto>(JsonOptions);
+        var secondDto = await second.Content.ReadFromJsonAsync<ForumPostCreatedDto>(JsonOptions);
+        Assert.NotEqual(firstDto!.Id, secondDto!.Id);
+    }
+
+    [Fact]
+    public async Task Reply_ReplaysOriginalSuccess_ForSameKeyAndPayload()
+    {
+        var memberId = Guid.NewGuid();
+        using var client = CreateBearerClient(memberId);
+        var key = Guid.NewGuid();
+        SetIdempotencyKey(client, key);
+
+        using var first = await client.PostAsJsonAsync(
+            $"{ForumApiEndpoints.RootPath}/topics/1002/posts",
+            new { body = "Idempotent forum reply." });
+        using var second = await client.PostAsJsonAsync(
+            $"{ForumApiEndpoints.RootPath}/topics/1002/posts",
+            new { body = "Idempotent forum reply." });
+
+        Assert.Equal(HttpStatusCode.Created, first.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, second.StatusCode);
+        var firstDto = await first.Content.ReadFromJsonAsync<ForumPostCreatedDto>(JsonOptions);
+        var secondDto = await second.Content.ReadFromJsonAsync<ForumPostCreatedDto>(JsonOptions);
+        Assert.Equal(firstDto!.Id, secondDto!.Id);
+        Assert.Equal(firstDto.DetailPath, secondDto.DetailPath);
+        Assert.Equal(first.Headers.Location?.OriginalString, second.Headers.Location?.OriginalString);
+        Assert.Equal(firstDto.DetailPath, first.Headers.Location?.OriginalString);
+    }
+
+    [Fact]
+    public async Task Reply_SameKeyDifferentPayload_ReturnsConflict()
+    {
+        var memberId = Guid.NewGuid();
+        using var client = CreateBearerClient(memberId);
+        var key = Guid.NewGuid();
+        SetIdempotencyKey(client, key);
+
+        using var first = await client.PostAsJsonAsync(
+            $"{ForumApiEndpoints.RootPath}/topics/1002/posts",
+            new { body = "Original idempotent body." });
+        using var conflict = await client.PostAsJsonAsync(
+            $"{ForumApiEndpoints.RootPath}/topics/1002/posts",
+            new { body = "A different idempotent body." });
+
+        Assert.Equal(HttpStatusCode.Created, first.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, conflict.StatusCode);
+        Assert.Equal("application/problem+json", conflict.Content.Headers.ContentType?.MediaType);
+        var problem = await conflict.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(IdempotentApiWrites.ConflictDetail, problem.GetProperty("detail").GetString());
+    }
+
+    [Fact]
+    public async Task Reply_ConcurrentDuplicateKey_SerializesToOnePost()
+    {
+        var memberId = Guid.NewGuid();
+        var key = Guid.NewGuid();
+        using var firstClient = CreateBearerClient(memberId);
+        using var secondClient = CreateBearerClient(memberId);
+        SetIdempotencyKey(firstClient, key);
+        SetIdempotencyKey(secondClient, key);
+        var body = new { body = "Concurrent idempotent reply." };
+
+        var firstTask = firstClient.PostAsJsonAsync(
+            $"{ForumApiEndpoints.RootPath}/topics/1002/posts",
+            body);
+        var secondTask = secondClient.PostAsJsonAsync(
+            $"{ForumApiEndpoints.RootPath}/topics/1002/posts",
+            body);
+        using var first = await firstTask;
+        using var second = await secondTask;
+
+        Assert.Equal(HttpStatusCode.Created, first.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, second.StatusCode);
+        var firstDto = await first.Content.ReadFromJsonAsync<ForumPostCreatedDto>(JsonOptions);
+        var secondDto = await second.Content.ReadFromJsonAsync<ForumPostCreatedDto>(JsonOptions);
+        Assert.Equal(firstDto!.Id, secondDto!.Id);
+    }
+
+    [Fact]
+    public async Task Reply_InvalidIdempotencyKey_IsBadRequest()
+    {
+        using var client = CreateBearerClient(Guid.NewGuid());
+        client.DefaultRequestHeaders.TryAddWithoutValidation(IdempotentApiWrites.HeaderName, "not-a-uuid");
+
+        using var response = await client.PostAsJsonAsync(
+            $"{ForumApiEndpoints.RootPath}/topics/1002/posts",
+            new { body = "Should not persist." });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(IdempotentApiWrites.InvalidKeyDetail, problem.GetProperty("detail").GetString());
+    }
+
+    [Fact]
+    public async Task Reply_ExpiredKey_IsTreatedAsNewWrite()
+    {
+        var memberId = Guid.NewGuid();
+        var key = Guid.NewGuid();
+        var store = Assert.IsType<InMemoryIdempotencyStore>(
+            factory.Services.GetRequiredService<IIdempotencyStore>());
+        store.SeedExpired(
+            memberId,
+            IdempotencyOperationKinds.ForumCreateReply,
+            key,
+            new IdempotencyReceipt(201, "/old", """{"id":1}""", "stale"),
+            DateTimeOffset.UtcNow.AddMinutes(-5));
+
+        using var client = CreateBearerClient(memberId);
+        SetIdempotencyKey(client, key);
+        using var response = await client.PostAsJsonAsync(
+            $"{ForumApiEndpoints.RootPath}/topics/1002/posts",
+            new { body = "Expired key should create a new post." });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var created = await response.Content.ReadFromJsonAsync<ForumPostCreatedDto>(JsonOptions);
+        Assert.True(created!.Id > 1);
+        Assert.NotEqual("/old", response.Headers.Location?.OriginalString);
+    }
+
+    [Fact]
+    public async Task CreateTopic_ReplaysOriginalSuccess_ForSameKeyAndPayload()
+    {
+        var memberId = Guid.NewGuid();
+        using var client = CreateBearerClient(memberId);
+        var key = Guid.NewGuid();
+        SetIdempotencyKey(client, key);
+        var payload = new { title = "Idempotent topic title", body = "Starter post body here." };
+
+        using var first = await client.PostAsJsonAsync(
+            $"{ForumApiEndpoints.RootPath}/categories/1/topics",
+            payload);
+        using var second = await client.PostAsJsonAsync(
+            $"{ForumApiEndpoints.RootPath}/categories/1/topics",
+            payload);
+
+        Assert.Equal(HttpStatusCode.Created, first.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, second.StatusCode);
+        var firstDto = await first.Content.ReadFromJsonAsync<ForumTopicCreatedDto>(JsonOptions);
+        var secondDto = await second.Content.ReadFromJsonAsync<ForumTopicCreatedDto>(JsonOptions);
+        Assert.Equal(firstDto!.Id, secondDto!.Id);
+        Assert.Equal(first.Headers.Location?.OriginalString, second.Headers.Location?.OriginalString);
+    }
+
+    private static void SetIdempotencyKey(HttpClient client, Guid key) =>
+        client.DefaultRequestHeaders.TryAddWithoutValidation(
+            IdempotentApiWrites.HeaderName,
+            key.ToString("D"));
 
     private HttpClient CreateBearerClient(Guid memberId, string displayName = "Forum Fan") =>
         CreateBearerClient(factory, memberId, displayName);

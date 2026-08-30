@@ -103,6 +103,23 @@ describe('sendJson and sendMultipart', () => {
     });
   });
 
+  it('sends Idempotency-Key without logging the Bearer token', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ id: 1 }));
+    await sendJson('/forum/topics/1/posts', {
+      body: { body: 'hi' },
+      accessToken: 'super-secret',
+      idempotencyKey: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+    });
+    const { init } = lastCall();
+    expect(init.headers).toEqual({
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer super-secret',
+      'Idempotency-Key': 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+    });
+    expect(JSON.stringify(init.headers)).not.toContain('super-secret-in-logs');
+  });
+
   it('does not set Content-Type for multipart', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ id: 9 }));
     const form = new FormData();

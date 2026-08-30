@@ -17,6 +17,7 @@ public sealed class ForumDataRegistrationTests
         using var scope = provider.CreateScope();
 
         Assert.IsType<ModernForumRepository>(scope.ServiceProvider.GetRequiredService<IForumRepository>());
+        Assert.IsType<EfIdempotencyStore>(scope.ServiceProvider.GetRequiredService<IIdempotencyStore>());
     }
 
     [Fact]
@@ -64,5 +65,6 @@ public sealed class ForumDataRegistrationTests
 
         Assert.Null(provider.GetService<IDbContextFactory<QueenZoneDbContext>>());
         Assert.Null(provider.GetService<QueenZoneDbContext>());
+        Assert.IsType<InMemoryIdempotencyStore>(provider.GetRequiredService<IIdempotencyStore>());
     }
 }
