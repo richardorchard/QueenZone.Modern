@@ -31,10 +31,8 @@ public sealed class HomePollIndexRoutesTests
         Assert.Contains("Sign in to vote", guestHtml, StringComparison.Ordinal);
         Assert.Contains("0 · 0%", guestHtml, StringComparison.Ordinal);
 
-        var guestToken = AdminHttpTestHelpers.ExtractAntiforgeryToken(guestHtml);
         using var guestVote = await guest.PostAsync("/?handler=Vote", new FormUrlEncodedContent(new Dictionary<string, string>
         {
-            ["__RequestVerificationToken"] = guestToken,
             ["optionId"] = optionId.ToString(),
         }));
         Assert.True(
