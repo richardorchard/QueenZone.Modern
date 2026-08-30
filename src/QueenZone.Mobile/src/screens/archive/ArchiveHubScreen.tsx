@@ -44,6 +44,9 @@ export function ArchiveHubScreen({ navigation }: Props) {
       case 'recently-restored':
         navigation.navigate('PhotosTab', { screen: 'PhotoIndex' });
         return;
+      case 'trivia':
+        navigation.navigate('Trivia');
+        return;
       case 'about':
         navigation.navigate('AboutArchive');
         return;

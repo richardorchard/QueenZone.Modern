@@ -22,6 +22,7 @@ import {
   smokeAuthExpiresInSeconds,
   smokeAuthRefreshPlaceholder,
 } from './smokeAuth';
+import { purgePrivateContentCache } from '../cache';
 import { clearStoredSession, readStoredSession, writeStoredSession } from './tokenStore';
 
 export type Session = {
@@ -80,6 +81,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const sessionRef = useRef(session);
   const refreshTokenRef = useRef(refreshToken);
   const expiresAtRef = useRef(expiresAt);
+  const memberIdRef = useRef<string | null>(null);
   sessionRef.current = session;
   refreshTokenRef.current = refreshToken;
   expiresAtRef.current = expiresAt;
@@ -100,6 +102,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const applyProfile = useCallback((accessToken: string, profile: MemberProfile | null) => {
+    const previousId = memberIdRef.current;
+    const nextId = profile?.memberId ?? null;
+    if (previousId && nextId && previousId !== nextId) {
+      void purgePrivateContentCache(previousId);
+    }
+    memberIdRef.current = nextId;
     setSession(() => {
       const next = sessionFromAccessToken(accessToken, {
         displayName: profile?.displayName ?? null,
@@ -122,6 +130,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   );
 
   const clearLocal = useCallback(async () => {
+    memberIdRef.current = null;
+    await purgePrivateContentCache();
     try {
       await clearStoredSession();
     } catch {

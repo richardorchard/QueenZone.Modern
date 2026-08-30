@@ -105,6 +105,8 @@ public sealed class EditPostModel(
         }
 
         await auditRepository.AppendAsync(id, "edit", EditorEmail, $"Updated \"{draft.Title}\"", cancellationToken);
+        TempData[AdminNewsMessages.MessageKey] = "Article saved.";
+        TempData[AdminNewsMessages.MessageKindKey] = "success";
         return Redirect($"/admin/news/{id}/edit");
     }
 }

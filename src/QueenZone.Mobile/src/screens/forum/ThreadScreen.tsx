@@ -14,16 +14,19 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   ApiError,
   closeForumTopicPoll,
-  fetchForumTopic,
   fetchForumTopicPoll,
-  fetchForumTopicPosts,
+  fetchForumTopicPostsResult,
+  fetchForumTopicResult,
   fetchForumTopicWatch,
   isCookieGatedForumAttachmentPath,
+  isOfflineFailure,
+  isTimeoutFailure,
   openForumAttachmentFile,
   openForumAttachmentImage,
   unwatchForumTopic,
   voteForumTopicPoll,
   watchForumTopic,
+  type CacheSource,
   type ForumAttachment,
   type ForumPoll,
   type ForumPost,
@@ -37,7 +40,7 @@ import { useSession } from '../../session/SessionContext';
 import { openForumComposer, openSignIn } from '../../session/signInNavigation';
 import { RichHtmlBody } from '../../ui/RichHtmlBody';
 import { Button } from '../../ui/Button';
-import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from '../../ui/ScreenStates';
+import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock, OfflineBanner } from '../../ui/ScreenStates';
 import { resolveContentUrl } from '../../ui/html/resolveContentUrl';
 import { usePressProps, pressedStyle } from '../../ui/press';
 import { testIds } from '../../test/testIds';
@@ -63,6 +66,10 @@ function messageFromUnknownError(err: unknown): string {
   return err instanceof ApiError ? err.message : 'Something went wrong.';
 }
 
+function isStaleReadFailure(err: unknown): boolean {
+  return isOfflineFailure(err) || isTimeoutFailure(err);
+}
+
 function smokeAttachAllowed(): boolean {
   return isSmokeAttachEnabled({
     dev: typeof __DEV__ !== 'undefined' ? __DEV__ : false,
@@ -78,20 +85,42 @@ export function ThreadScreen({ navigation, route }: Props) {
   const [topic, setTopic] = useState<ForumTopicDetail | null>(null);
   const [topicError, setTopicError] = useState<string | null>(null);
   const [topicReloadToken, setTopicReloadToken] = useState(0);
+  const [topicSource, setTopicSource] = useState<CacheSource>('network');
+  const [topicCachedAt, setTopicCachedAt] = useState<string | null>(null);
+  const [postsSource, setPostsSource] = useState<CacheSource>('network');
+  const [postsCachedAt, setPostsCachedAt] = useState<string | null>(null);
   const [poll, setPoll] = useState<ForumPoll | null>(null);
   const [pollBusy, setPollBusy] = useState(false);
   const [pollError, setPollError] = useState<string | null>(null);
   const [watching, setWatching] = useState(false);
   const [watchBusy, setWatchBusy] = useState(false);
   const [watchError, setWatchError] = useState<string | null>(null);
+  const topicRef = useRef<ForumTopicDetail | null>(null);
+  const topicNetworkOnlyRef = useRef(false);
+  topicRef.current = topic;
 
   const paged = usePagedContent<ForumPost>(
     useCallback(
-      (page, signal) => {
+      async (page, signal, mode) => {
         if (id === null) {
-          return Promise.resolve({ items: [], page: 1, pageSize: forumPostsPageSize, totalCount: 0, totalPages: 0 });
+          return { items: [], page: 1, pageSize: forumPostsPageSize, totalCount: 0, totalPages: 0 };
         }
-        return fetchForumTopicPosts(id, { page, pageSize: forumPostsPageSize, signal });
+        try {
+          const result = await fetchForumTopicPostsResult(id, {
+            page,
+            pageSize: forumPostsPageSize,
+            signal,
+            networkOnly: mode === 'refresh',
+          });
+          setPostsSource(result.source);
+          setPostsCachedAt(result.cachedAt);
+          return result.data;
+        } catch (err: unknown) {
+          if (mode === 'refresh' && isStaleReadFailure(err)) {
+            setPostsSource('cache');
+          }
+          throw err;
+        }
       },
       [id],
     ),
@@ -106,10 +135,21 @@ export function ThreadScreen({ navigation, route }: Props) {
       return;
     }
     const controller = new AbortController();
+    const networkOnly = topicNetworkOnlyRef.current;
+    topicNetworkOnlyRef.current = false;
     setTopicError(null);
-    fetchForumTopic(id, controller.signal)
-      .then(async (item) => {
-        setTopic(item);
+    fetchForumTopicResult(id, controller.signal, { networkOnly })
+      .then(async (result) => {
+        setTopic(result.data);
+        setTopicSource(result.source);
+        setTopicCachedAt(result.cachedAt);
+        if (result.source === 'cache') {
+          setWatching(false);
+          setWatchError(null);
+          setPoll(null);
+          setPollError(null);
+          return;
+        }
         if (accessToken) {
           try {
             const watch = await fetchForumTopicWatch(id, accessToken, controller.signal);
@@ -128,7 +168,7 @@ export function ThreadScreen({ navigation, route }: Props) {
           setWatching(false);
           setWatchError(null);
         }
-        if (!shouldLoadPoll(item.hasPoll)) {
+        if (!shouldLoadPoll(result.data.hasPoll)) {
           setPoll(null);
           setPollError(null);
           return;
@@ -153,6 +193,10 @@ export function ThreadScreen({ navigation, route }: Props) {
         if (err instanceof Error && err.name === 'AbortError') {
           return;
         }
+        if (networkOnly && topicRef.current && isStaleReadFailure(err)) {
+          setTopicSource('cache');
+          return;
+        }
         setTopic(null);
         setPoll(null);
         setTopicError(messageFromUnknownError(err));
@@ -164,7 +208,10 @@ export function ThreadScreen({ navigation, route }: Props) {
     navigation.setOptions({ title: topic?.title ?? title ?? 'Thread' });
   }, [navigation, topic?.title, title]);
 
-  const retryTopic = useCallback(() => setTopicReloadToken((n) => n + 1), []);
+  const retryTopic = useCallback(() => {
+    topicNetworkOnlyRef.current = false;
+    setTopicReloadToken((n) => n + 1);
+  }, []);
 
   const retry = useCallback(() => {
     retryTopic();
@@ -172,9 +219,10 @@ export function ThreadScreen({ navigation, route }: Props) {
   }, [retryTopic, paged]);
 
   const refresh = useCallback(() => {
-    retryTopic();
+    topicNetworkOnlyRef.current = true;
+    setTopicReloadToken((n) => n + 1);
     paged.refresh();
-  }, [retryTopic, paged]);
+  }, [paged]);
 
   const skipFocusRefresh = useRef(true);
   useEffect(() => {
@@ -258,7 +306,10 @@ export function ThreadScreen({ navigation, route }: Props) {
     return <LoadingBlock label="Loading thread…" />;
   }
 
-  if (topicError) {
+  const offlineSnapshot = topicSource === 'cache' || postsSource === 'cache';
+  const snapshotCachedAt = postsCachedAt ?? topicCachedAt;
+
+  if (topicError && !topic) {
     return <ErrorBlock message={topicError} onRetry={retry} />;
   }
 
@@ -272,6 +323,7 @@ export function ThreadScreen({ navigation, route }: Props) {
 
   const header = (
     <View style={styles.header}>
+      {offlineSnapshot ? <OfflineBanner cachedAt={snapshotCachedAt} testID={testIds.offlineBanner} /> : null}
       <Text style={[type.eyebrow, { color: c.accentPrimary }]}>{topic?.forumName ?? 'Forum'}</Text>
       <Text
         style={[type.articleTitle, { color: c.textPrimary, marginTop: space.sm }]}
@@ -289,6 +341,7 @@ export function ThreadScreen({ navigation, route }: Props) {
           variant="outline"
           size="sm"
           loading={watchBusy}
+          disabled={offlineSnapshot}
           onPress={toggleWatch}
         />
         <Text style={[type.caption, { color: c.textMuted, marginTop: space.sm }]}>
@@ -298,7 +351,7 @@ export function ThreadScreen({ navigation, route }: Props) {
           <Text style={[type.caption, { color: c.textMuted, marginTop: space.sm }]}>{watchError}</Text>
         ) : null}
       </View>
-      {poll ? (
+      {poll && !offlineSnapshot ? (
         <View style={styles.poll}>
           <ForumPollCard
             poll={poll}
@@ -328,6 +381,7 @@ export function ThreadScreen({ navigation, route }: Props) {
           label={isSignedIn ? 'Reply' : 'Sign in to reply'}
           testID={testIds.forumThreadReply}
           variant="outline"
+          disabled={offlineSnapshot}
           onPress={() =>
             openForumComposer(navigation, isSignedIn, {
               threadId: id ?? undefined,
@@ -357,7 +411,12 @@ export function ThreadScreen({ navigation, route }: Props) {
       onEndReached={paged.loadMore}
       onEndReachedThreshold={0.4}
       renderItem={({ item }) => (
-        <ForumPostRow post={item} isSignedIn={isSignedIn} accessToken={accessToken} />
+        <ForumPostRow
+          post={item}
+          isSignedIn={isSignedIn}
+          accessToken={accessToken}
+          interactionsEnabled={!offlineSnapshot}
+        />
       )}
     />
   );
@@ -367,10 +426,12 @@ function ForumPostRow({
   post,
   isSignedIn,
   accessToken,
+  interactionsEnabled,
 }: {
   post: ForumPost;
   isSignedIn: boolean;
   accessToken: string | null;
+  interactionsEnabled: boolean;
 }) {
   const { c } = useTheme();
   const posted = formatPostTimestamp(post.postedAt);
@@ -389,7 +450,12 @@ function ForumPostRow({
         <RichHtmlBody html={post.body} horizontalInset={space.xl} />
       </View>
       {post.attachments.length > 0 ? (
-        <ForumAttachmentList attachments={post.attachments} isSignedIn={isSignedIn} accessToken={accessToken} />
+        <ForumAttachmentList
+          attachments={post.attachments}
+          isSignedIn={isSignedIn}
+          accessToken={accessToken}
+          interactionsEnabled={interactionsEnabled}
+        />
       ) : null}
       {post.signature ? (
         <Text style={[type.caption, { color: c.textMuted, marginTop: space.md }]}>{post.signature}</Text>
@@ -402,10 +468,12 @@ function ForumAttachmentList({
   attachments,
   isSignedIn,
   accessToken,
+  interactionsEnabled,
 }: {
   attachments: ForumAttachment[];
   isSignedIn: boolean;
   accessToken: string | null;
+  interactionsEnabled: boolean;
 }) {
   const { c } = useTheme();
   const press = usePressProps();
@@ -418,6 +486,9 @@ function ForumAttachmentList({
 
   const openAttachment = useCallback(
     async (attachment: ForumAttachment) => {
+      if (!interactionsEnabled) {
+        return;
+      }
       const action = attachmentAction(attachment, isSignedIn);
       if (action === 'none') {
         return;
@@ -448,7 +519,7 @@ function ForumAttachmentList({
         setBusyKey(null);
       }
     },
-    [accessToken, isSignedIn],
+    [accessToken, interactionsEnabled, isSignedIn],
   );
 
   return (
@@ -458,7 +529,7 @@ function ForumAttachmentList({
         const preview = imagePreviewUrl(attachment);
         const previewUri = preview ? resolveContentUrl(preview, getAppConfig().apiBaseUrl) : null;
         const caption = attachmentMeta(attachment);
-        const action = attachmentAction(attachment, isSignedIn);
+        const action = interactionsEnabled ? attachmentAction(attachment, isSignedIn) : 'none';
         const key = `${attachment.downloadUrl}-${attachment.fileName}`;
         const meta = (
           <View style={styles.attachmentMeta} accessibilityLabel={`${attachment.fileName}. ${caption}`}>

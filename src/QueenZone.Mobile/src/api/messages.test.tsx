@@ -1,6 +1,7 @@
 import {
   composeMessage,
   fetchConversation,
+  fetchConversationResult,
   fetchInbox,
   fetchUnreadConversationCount,
   replyToConversation,
@@ -8,6 +9,12 @@ import {
   searchRecipients,
 } from './messages';
 import { jsonResponse } from '../test/fixtures';
+import { ContentCache, conversationCacheKey, createMemoryStorage } from '../cache';
+
+function accessJwt(payload: object): string {
+  const encode = (value: object) => Buffer.from(JSON.stringify(value)).toString('base64url');
+  return `${encode({ alg: 'none', typ: 'JWT' })}.${encode(payload)}.sig`;
+}
 
 jest.mock('../config', () => ({
   apiV1Url: (path: string) => `http://qz.test/api/v1${path.startsWith('/') ? path : `/${path}`}`,
@@ -82,6 +89,43 @@ describe('fetchConversation and replyToConversation', () => {
     expect(url).toBe('http://qz.test/api/v1/me/messages/c1');
     expect(init.method).toBe('POST');
     expect(init.body).toBe(JSON.stringify({ body: 'hello' }));
+  });
+
+  it('caches the opened conversation under memberId, never the Bearer token', async () => {
+    const cache = new ContentCache({ storage: createMemoryStorage() });
+    const payload = {
+      conversationId: 'c1',
+      messages: [],
+      page: 1,
+      pageSize: 50,
+      totalCount: 0,
+      totalPages: 0,
+    };
+    fetchMock.mockResolvedValueOnce(jsonResponse(payload));
+    await fetchConversation('secret-token', 'c1', { memberId: 'member-a', cache });
+    expect(await cache.get(conversationCacheKey('member-a', 'c1'))).toMatchObject(payload);
+    expect(await cache.get(conversationCacheKey('member-b', 'c1'))).toBeNull();
+    expect((await cache.listCacheKeys()).join(',')).not.toContain('secret-token');
+  });
+
+  it('returns a cached conversation from the JWT sub when /me memberId is missing and the network is offline', async () => {
+    const cache = new ContentCache({ storage: createMemoryStorage() });
+    const memberId = 'jwt-member';
+    const payload = {
+      conversationId: 'c1',
+      messages: [{ id: 'm1', body: 'hello from cache' }],
+      page: 1,
+      pageSize: 50,
+      totalCount: 1,
+      totalPages: 1,
+    };
+    await cache.put(conversationCacheKey(memberId, 'c1'), payload);
+    fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
+
+    const result = await fetchConversationResult(accessJwt({ sub: memberId }), 'c1', { cache });
+
+    expect(result.source).toBe('cache');
+    expect(result.data).toMatchObject(payload);
   });
 });
 

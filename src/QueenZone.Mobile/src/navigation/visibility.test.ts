@@ -42,6 +42,7 @@ describe('member-only screens', () => {
     assert.equal(isMemberOnlyScreen('Thread'), false);
     assert.equal(isMemberOnlyScreen('FanPerformances'), false);
     assert.equal(isMemberOnlyScreen('FanPerformanceDetail'), false);
+    assert.equal(isMemberOnlyScreen('Trivia'), false);
     assert.equal(isMemberOnlyScreen('Contact'), false);
     assert.equal(isMemberOnlyScreen('Profile'), false);
     assert.equal(isMemberOnlyScreen('SuggestNews'), false);
@@ -86,6 +87,7 @@ describe('shouldHideTabBar', () => {
       'Timeline',
       'FreddieTribute',
       'FanPerformances',
+      'Trivia',
       'AboutArchive',
     ]) {
       assert.equal(shouldHideTabBar(name), false, name);
@@ -94,7 +96,7 @@ describe('shouldHideTabBar', () => {
 });
 
 describe('archive hub destinations', () => {
-  it('lists the eight approved archive rows', () => {
+  it('lists the archive hub rows including Trivia', () => {
     assert.deepEqual([...ARCHIVE_HUB_IDS], [
       'stories',
       'timeline',
@@ -103,8 +105,9 @@ describe('archive hub destinations', () => {
       'tribute',
       'fan-performances',
       'recently-restored',
+      'trivia',
       'about',
     ]);
-    assert.equal(ARCHIVE_HUB_IDS.length, 8);
+    assert.equal(ARCHIVE_HUB_IDS.length, 9);
   });
 });

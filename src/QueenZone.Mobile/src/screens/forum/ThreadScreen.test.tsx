@@ -1,8 +1,11 @@
+import { RefreshControl } from 'react-native';
 import { fireEvent, screen, userEvent, waitFor, within } from '@testing-library/react-native';
 import {
   fetchForumTopic,
   fetchForumTopicPoll,
   fetchForumTopicPosts,
+  fetchForumTopicPostsResult,
+  fetchForumTopicResult,
   fetchForumTopicWatch,
   openForumAttachmentFile,
   openForumAttachmentImage,
@@ -10,6 +13,7 @@ import {
   voteForumTopicPoll,
   watchForumTopic,
 } from '../../api';
+import type { CachedResult } from '../../api';
 import { ApiError } from '../../api/client';
 import { pagedResponse } from '../../test/fixtures';
 import { createMockSession } from '../../test/mockSession';
@@ -22,7 +26,9 @@ jest.mock('../../api', () => {
   return {
     ...actual,
     fetchForumTopic: jest.fn(),
+    fetchForumTopicResult: jest.fn(),
     fetchForumTopicPosts: jest.fn(),
+    fetchForumTopicPostsResult: jest.fn(),
     fetchForumTopicPoll: jest.fn(),
     fetchForumTopicWatch: jest.fn(),
     watchForumTopic: jest.fn(),
@@ -45,7 +51,64 @@ jest.mock('../../config', () => ({
 }));
 
 const fetchTopic = fetchForumTopic as jest.MockedFunction<typeof fetchForumTopic>;
+const fetchTopicResult = fetchForumTopicResult as jest.MockedFunction<typeof fetchForumTopicResult>;
 const fetchPosts = fetchForumTopicPosts as jest.MockedFunction<typeof fetchForumTopicPosts>;
+const fetchPostsResult = fetchForumTopicPostsResult as jest.MockedFunction<
+  typeof fetchForumTopicPostsResult
+>;
+
+const NETWORK_CACHED_AT = '2024-06-01T10:00:00.000Z';
+
+function asNetwork<T>(data: T): CachedResult<T> {
+  return { data, source: 'network', cachedAt: NETWORK_CACHED_AT };
+}
+
+function asCache<T>(data: T, cachedAt = NETWORK_CACHED_AT): CachedResult<T> {
+  return { data, source: 'cache', cachedAt };
+}
+
+const defaultTopic = {
+  id: 1002,
+  title: 'Ranking every studio album',
+  forumId: 1,
+  forumName: 'The Music',
+  categoryPath: '/forum/1/the-music',
+  detailPath: '/forum/topic/1002/ranking-every-studio-album',
+  postCount: 1,
+  hasPoll: false,
+  isLocked: false,
+};
+
+const defaultPosts = pagedResponse(
+  [
+    {
+      id: 1,
+      body: '<p>Hello</p>',
+      postedAt: '2024-06-01T10:00:00.000Z',
+      authorUsername: 'brightonrock',
+      signature: null,
+      authorMemberSince: null,
+      authorMemberId: null,
+      editedAt: null,
+      editCount: 0,
+      attachments: [],
+    },
+  ],
+  1,
+  1,
+);
+
+function mockNetworkTopic(topic = defaultTopic, posts = defaultPosts) {
+  fetchTopic.mockResolvedValue(topic);
+  fetchPosts.mockResolvedValue(posts);
+  fetchTopicResult.mockResolvedValue(asNetwork(topic));
+  fetchPostsResult.mockResolvedValue(asNetwork(posts));
+}
+
+function mockNetworkPosts(posts: ReturnType<typeof pagedResponse>) {
+  fetchPosts.mockResolvedValue(posts);
+  fetchPostsResult.mockResolvedValue(asNetwork(posts));
+}
 const fetchPoll = fetchForumTopicPoll as jest.MockedFunction<typeof fetchForumTopicPoll>;
 const fetchWatch = fetchForumTopicWatch as jest.MockedFunction<typeof fetchForumTopicWatch>;
 const watchTopic = watchForumTopic as jest.MockedFunction<typeof watchForumTopic>;
@@ -77,37 +140,7 @@ describe('ThreadScreen watch control', () => {
   beforeEach(() => {
     mockSession.isSignedIn = false;
     mockSession.accessToken = null;
-    fetchTopic.mockResolvedValue({
-      id: 1002,
-      title: 'Ranking every studio album',
-      forumId: 1,
-      forumName: 'The Music',
-      categoryPath: '/forum/1/the-music',
-      detailPath: '/forum/topic/1002/ranking-every-studio-album',
-      postCount: 1,
-      hasPoll: false,
-      isLocked: false,
-    });
-    fetchPosts.mockResolvedValue(
-      pagedResponse(
-        [
-          {
-            id: 1,
-            body: '<p>Hello</p>',
-            postedAt: '2024-06-01T10:00:00.000Z',
-            authorUsername: 'brightonrock',
-            signature: null,
-            authorMemberSince: null,
-            authorMemberId: null,
-            editedAt: null,
-            editCount: 0,
-            attachments: [],
-          },
-        ],
-        1,
-        1,
-      ),
-    );
+    mockNetworkTopic();
     fetchPoll.mockResolvedValue({} as never);
     fetchWatch.mockResolvedValue({ watching: false });
     watchTopic.mockResolvedValue({ watching: true });
@@ -146,39 +179,19 @@ describe('ThreadScreen watch control', () => {
   });
 
   it('shows a topic error and retries', async () => {
-    fetchTopic.mockRejectedValueOnce(new ApiError(500, 'The server had a problem.'));
-    fetchTopic.mockResolvedValueOnce({
-      id: 1002,
-      title: 'Ranking every studio album',
-      forumId: 1,
-      forumName: 'The Music',
-      categoryPath: '/forum/1/the-music',
-      detailPath: '/forum/topic/1002/ranking-every-studio-album',
-      postCount: 1,
-      hasPoll: false,
-      isLocked: false,
-    });
+    fetchTopicResult.mockRejectedValueOnce(new ApiError(500, 'The server had a problem.'));
+    fetchTopicResult.mockResolvedValueOnce(asNetwork(defaultTopic));
     renderThread();
     await waitFor(() => expect(screen.getByText('The server had a problem.')).toBeOnTheScreen());
 
     const user = userEvent.setup();
     await user.press(screen.getByRole('button', { name: 'Try again' }));
-    await waitFor(() => expect(fetchTopic).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(fetchTopicResult).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(screen.getByText('brightonrock')).toBeOnTheScreen());
   });
 
   it('hides Reply when the topic is locked', async () => {
-    fetchTopic.mockResolvedValue({
-      id: 1002,
-      title: 'Ranking every studio album',
-      forumId: 1,
-      forumName: 'The Music',
-      categoryPath: '/forum/1/the-music',
-      detailPath: '/forum/topic/1002/ranking-every-studio-album',
-      postCount: 1,
-      hasPoll: false,
-      isLocked: true,
-    });
+    mockNetworkTopic({ ...defaultTopic, isLocked: true });
     renderThread();
     await waitFor(() => expect(screen.getByText('This topic is locked.')).toBeOnTheScreen());
     expect(screen.queryByRole('button', { name: 'Reply' })).toBeNull();
@@ -204,17 +217,7 @@ describe('ThreadScreen watch control', () => {
   it('wires a poll vote to voteForumTopicPoll', async () => {
     mockSession.isSignedIn = true;
     mockSession.accessToken = 'tok';
-    fetchTopic.mockResolvedValue({
-      id: 1002,
-      title: 'Ranking every studio album',
-      forumId: 1,
-      forumName: 'The Music',
-      categoryPath: '/forum/1/the-music',
-      detailPath: '/forum/topic/1002/ranking-every-studio-album',
-      postCount: 1,
-      hasPoll: true,
-      isLocked: false,
-    });
+    mockNetworkTopic({ ...defaultTopic, hasPoll: true });
     const openPoll = {
       pollId: 'poll-1',
       topicId: 1002,
@@ -296,17 +299,7 @@ describe('ThreadScreen attachments', () => {
   beforeEach(() => {
     mockSession.isSignedIn = false;
     mockSession.accessToken = null;
-    fetchTopic.mockResolvedValue({
-      id: 1002,
-      title: 'Ranking every studio album',
-      forumId: 1,
-      forumName: 'The Music',
-      categoryPath: '/forum/1/the-music',
-      detailPath: '/forum/topic/1002/ranking-every-studio-album',
-      postCount: 1,
-      hasPoll: false,
-      isLocked: false,
-    });
+    mockNetworkTopic();
     fetchPoll.mockResolvedValue({} as never);
     fetchWatch.mockResolvedValue({ watching: false });
     openAttachment.mockReset();
@@ -322,7 +315,7 @@ describe('ThreadScreen attachments', () => {
   it('lets a signed-in member open an image with no thumbnail in the in-app viewer', async () => {
     mockSession.isSignedIn = true;
     mockSession.accessToken = 'tok';
-    fetchPosts.mockResolvedValue(
+    mockNetworkPosts(
       pagedResponse(
         [
           {
@@ -366,7 +359,7 @@ describe('ThreadScreen attachments', () => {
   it('keeps a thumbed image inline and does not fetch the original', async () => {
     mockSession.isSignedIn = true;
     mockSession.accessToken = 'tok';
-    fetchPosts.mockResolvedValue(
+    mockNetworkPosts(
       pagedResponse(
         [
           {
@@ -405,7 +398,7 @@ describe('ThreadScreen attachments', () => {
     mockSession.isSignedIn = true;
     mockSession.accessToken = 'tok';
     openImage.mockRejectedValueOnce(new ApiError(401, 'Sign in to continue.'));
-    fetchPosts.mockResolvedValue(
+    mockNetworkPosts(
       pagedResponse(
         [
           {
@@ -437,7 +430,7 @@ describe('ThreadScreen attachments', () => {
   it('lets a signed-in member download a non-image attachment', async () => {
     mockSession.isSignedIn = true;
     mockSession.accessToken = 'tok';
-    fetchPosts.mockResolvedValue(
+    mockNetworkPosts(
       pagedResponse(
         [
           {
@@ -475,7 +468,7 @@ describe('ThreadScreen attachments', () => {
   });
 
   it('shows signed-out metadata without opening bytes', async () => {
-    fetchPosts.mockResolvedValue(
+    mockNetworkPosts(
       pagedResponse(
         [
           {
@@ -506,3 +499,89 @@ describe('ThreadScreen attachments', () => {
     expect(openImage).not.toHaveBeenCalled();
   });
 });
+
+const cachedTopic = {
+  id: 1002,
+  title: 'Ranking every studio album',
+  forumId: 1,
+  forumName: 'The Music',
+  categoryPath: '/forum/1/the-music',
+  detailPath: '/forum/topic/1002/ranking-every-studio-album',
+  postCount: 1,
+  hasPoll: true,
+  isLocked: false,
+};
+
+const cachedPosts = pagedResponse(
+  [
+    {
+      id: 1,
+      body: '<p>Hello from cache</p>',
+      postedAt: '2024-06-01T10:00:00.000Z',
+      authorUsername: 'brightonrock',
+      signature: null,
+      authorMemberSince: null,
+      authorMemberId: null,
+      editedAt: null,
+      editCount: 0,
+      attachments: [
+        {
+          fileName: 'anoto-setlist-scan.jpg',
+          url: '/forum/attachment/legacy/1002',
+          downloadUrl: '/api/v1/forum/attachments/legacy/1002',
+          extension: 'JPG',
+          formattedSize: '129.1 KB',
+          isImage: true,
+          thumbnailUrl: null,
+        },
+      ],
+    },
+  ],
+  1,
+  1,
+);
+
+describe('ThreadScreen offline snapshot', () => {
+  beforeEach(() => {
+    mockSession.isSignedIn = true;
+    mockSession.accessToken = 'tok';
+    fetchTopicResult.mockResolvedValue(asCache(cachedTopic));
+    fetchPostsResult.mockResolvedValue(asCache(cachedPosts));
+    fetchPoll.mockResolvedValue({} as never);
+    fetchWatch.mockResolvedValue({ watching: true });
+    openAttachment.mockReset();
+    openImage.mockReset();
+  });
+
+  afterEach(async () => {
+    await flushVirtualizedList();
+  });
+
+  it('shows the cached thread with an offline banner and disables reply, watch, poll, and attach', async () => {
+    renderThread();
+    await waitFor(() => expect(screen.getByText('brightonrock')).toBeOnTheScreen());
+    expect(screen.getByTestId(testIds.offlineBanner)).toBeOnTheScreen();
+    expect(screen.getByLabelText(/Offline · last updated/)).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Watch topic' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Reply' })).toBeDisabled();
+    expect(screen.queryByText('Best studio album?')).toBeNull();
+    expect(fetchWatch).not.toHaveBeenCalled();
+    expect(fetchPoll).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: /anoto-setlist-scan.jpg/ })).toBeNull();
+  });
+
+  it('keeps the cached snapshot when pull-to-refresh fails offline', async () => {
+    renderThread();
+    await waitFor(() => expect(screen.getByText('brightonrock')).toBeOnTheScreen());
+
+    fetchTopicResult.mockRejectedValueOnce(ApiError.offline());
+    fetchPostsResult.mockRejectedValueOnce(ApiError.offline());
+    fireEvent(screen.UNSAFE_getByType(RefreshControl), 'refresh');
+
+    await waitFor(() => expect(fetchTopicResult).toHaveBeenCalledTimes(2));
+    expect(screen.getByText('brightonrock')).toBeOnTheScreen();
+    expect(screen.getByTestId(testIds.offlineBanner)).toBeOnTheScreen();
+    expect(screen.queryByText('Unable to load')).toBeNull();
+  });
+});
+

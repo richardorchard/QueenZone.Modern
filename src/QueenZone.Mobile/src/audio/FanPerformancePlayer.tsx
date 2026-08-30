@@ -18,6 +18,7 @@ import { useSession } from '../session/SessionContext';
 import type { FanPerformance } from '../api';
 import { fanPerformanceAudioPath } from './formatDuration';
 import { audioSessionMode, lockScreenMetadata, lockScreenOptions } from './lockScreen';
+import { resolveLockScreenArtworkUrl } from './lockScreenArtwork';
 
 type PlayerState = {
   current: FanPerformance | null;
@@ -67,7 +68,10 @@ export function FanPerformancePlayerProvider({ children }: { children: ReactNode
     (track: FanPerformance) => {
       const generation = ++loadGenerationRef.current;
       void (async () => {
-        const token = await ensureAccessToken();
+        const [token, artworkUrl] = await Promise.all([
+          ensureAccessToken(),
+          resolveLockScreenArtworkUrl().catch(() => undefined),
+        ]);
         if (generation !== loadGenerationRef.current) {
           return;
         }
@@ -84,7 +88,9 @@ export function FanPerformancePlayerProvider({ children }: { children: ReactNode
           headers: { Authorization: `Bearer ${token}` },
           name: track.title,
         });
-        player.setActiveForLockScreen(true, lockScreenMetadata(track), { ...lockScreenOptions });
+        player.setActiveForLockScreen(true, lockScreenMetadata(track, artworkUrl), {
+          ...lockScreenOptions,
+        });
         player.play();
       })();
     },

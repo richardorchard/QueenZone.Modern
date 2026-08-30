@@ -68,6 +68,33 @@ Before raising instance count above 1:
 
 Until then, **assume single instance** in all performance and caching designs.
 
+## Mobile offline snapshot budget (device cache, #764 / #762)
+
+This is **not** a production B1 traffic study and it does **not** add Redis, output-cache, or new API caching headers. `#764` asked for payload size vs the current B1 budget before growing the mobile read cache; `#762` reuses the existing device `ContentCache` (AsyncStorage, not SecureStore) for previously opened forum threads and conversations.
+
+Opening those screens today:
+
+| Action | Requests that become the offline snapshot | Extra live requests (not cached) |
+| --- | --- | --- |
+| Open a forum thread | `GET /api/v1/forum/topics/{id}` + `GET /api/v1/forum/topics/{id}/posts` page 1 | Watch, poll viewer/vote, attachment download |
+| Open a conversation | `GET /api/v1/me/messages/{id}` (marks read; cache only after this real open) | Reply / report / archive / block |
+
+Current page sizes (same clamps as the website): `forumPostsPageSize` = 15 (`ForumRoutes.PostsPageSize`), `conversationPageSize` = 50 (`PrivateMessageLimits.ConversationPageSize`).
+
+Representative UTF-8 JSON sizes from the in-memory Testing fixtures / WAF sample shapes (topic `1002` “Ranking every studio album”, a 15-row posts page, a 50-message conversation). Not live Azure traffic:
+
+| Payload | Approx. bytes |
+| --- | --- |
+| Forum topic header | ~230 |
+| Forum posts page (`pageSize` 15, short sample bodies) | ~5 KB |
+| Thread open (header + page 1) | ~5.5 KB |
+| Conversation (`pageSize` 50, short sample bodies) | ~14 KB |
+| News/biography/discography detail (existing cache) | hundreds of bytes to a few KB |
+
+`ContentCache` is one LRU map for archive details **and** these snapshots. A 40-entry cap is enough for ~20 archive details, but 15 recently opened threads (topic + page 1 = 30 entries) plus a handful of conversations would evict news/biography/discography. The device cap is therefore **80** entries: about 20 archive details, 20 threads (topic + first page, plus a few extra opened pages), and ~10 conversations. At the sizes above that is well under 1 MB of JSON, so it does not pressure B1 — the bytes live on the phone, and the server still serves one topic + one posts page (or one conversation) per open.
+
+Do not cache watch state, poll viewer/vote state, attachment bytes, or fan-performance audio in this store.
+
 ## Related docs
 
 - [`azure-hosting-plan.md`](azure-hosting-plan.md) — overall Azure shape  

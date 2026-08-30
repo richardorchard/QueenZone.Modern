@@ -52,7 +52,7 @@ describe('usePagedContent', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.items).toEqual(['a', 'b']);
     expect(result.current.hasMore).toBe(true);
-    expect(fetcher).toHaveBeenCalledWith(1, expect.any(AbortSignal));
+    expect(fetcher).toHaveBeenCalledWith(1, expect.any(AbortSignal), 'load');
 
     fetcher.mockResolvedValueOnce(pagedResponse(['c'], 2, 2));
     await act(async () => {
@@ -66,6 +66,7 @@ describe('usePagedContent', () => {
       result.current.refresh();
     });
     await waitFor(() => expect(result.current.items).toEqual(['z']));
+    expect(fetcher).toHaveBeenLastCalledWith(1, expect.any(AbortSignal), 'refresh');
   });
 
   it('suppresses duplicate load-more while a request is in flight or at the end', async () => {
