@@ -8,6 +8,7 @@ import {
   replyToConversation,
   reportConversationMessage,
 } from '../../api/messages';
+import { getMessagesCache } from '../../cache/messagesCache';
 import { createMockSession } from '../../test/mockSession';
 import { fakeNavigation, flushVirtualizedList, renderWithProviders } from '../../test/render';
 import { ConversationScreen } from './ConversationScreen';
@@ -28,6 +29,10 @@ jest.mock('../../api/messages', () => ({
   blockConversationParticipant: jest.fn(),
 }));
 
+jest.mock('../../cache/messagesCache', () => ({
+  getMessagesCache: jest.fn(),
+}));
+
 const fetchConversationMock = fetchConversation as jest.MockedFunction<typeof fetchConversation>;
 const replyToConversationMock = replyToConversation as jest.MockedFunction<typeof replyToConversation>;
 const reportConversationMessageMock = reportConversationMessage as jest.MockedFunction<
@@ -37,6 +42,14 @@ const archiveConversationMock = archiveConversation as jest.MockedFunction<typeo
 const blockConversationParticipantMock = blockConversationParticipant as jest.MockedFunction<
   typeof blockConversationParticipant
 >;
+const getMessagesCacheMock = getMessagesCache as jest.MockedFunction<typeof getMessagesCache>;
+
+function fakeMessagesCache() {
+  return {
+    get: jest.fn().mockResolvedValue(null),
+    put: jest.fn().mockResolvedValue(undefined),
+  };
+}
 
 function renderConversation() {
   return renderWithProviders(
@@ -79,11 +92,16 @@ describe('ConversationScreen', () => {
   beforeEach(() => {
     mockSession.isSignedIn = true;
     mockSession.accessToken = 'tok';
+    mockSession.profile = { memberId: 'member-1' } as never;
     fetchConversationMock.mockReset();
     replyToConversationMock.mockReset();
     reportConversationMessageMock.mockReset();
     archiveConversationMock.mockReset();
     blockConversationParticipantMock.mockReset();
+    getMessagesCacheMock.mockReset();
+    getMessagesCacheMock.mockReturnValue(
+      fakeMessagesCache() as unknown as ReturnType<typeof getMessagesCache>,
+    );
   });
 
   afterEach(async () => {
@@ -382,4 +400,65 @@ describe('ConversationScreen', () => {
     );
     alertSpy.mockRestore();
   }, 15000);
+
+  it('persists the freshly loaded conversation to the cache', async () => {
+    const cache = fakeMessagesCache();
+    getMessagesCacheMock.mockReturnValue(cache as unknown as ReturnType<typeof getMessagesCache>);
+    fetchConversationMock.mockResolvedValue(
+      conversationDetail([
+        {
+          id: theirMessageId,
+          senderMemberId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+          senderDisplayName: 'Bob',
+          body: 'Hello',
+          createdAt: '2026-08-19T12:00:00.000Z',
+          isMine: false,
+          sortKey: 1,
+          reportedByViewer: false,
+        },
+      ]),
+    );
+
+    renderConversation();
+    await waitFor(() => expect(screen.getByText('Hello')).toBeOnTheScreen());
+    await waitFor(() =>
+      expect(cache.put).toHaveBeenCalledWith(
+        `conversation:member-1:${conversationId}`,
+        expect.objectContaining({ conversationId }),
+      ),
+    );
+  });
+
+  it('renders the cached conversation instantly while the fresh fetch is still in flight', async () => {
+    const cache = fakeMessagesCache();
+    cache.get.mockResolvedValue(
+      conversationDetail([
+        {
+          id: theirMessageId,
+          senderMemberId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+          senderDisplayName: 'Bob',
+          body: 'From last visit',
+          createdAt: '2026-08-19T12:00:00.000Z',
+          isMine: false,
+          sortKey: 1,
+          reportedByViewer: false,
+        },
+      ]),
+    );
+    getMessagesCacheMock.mockReturnValue(cache as unknown as ReturnType<typeof getMessagesCache>);
+    let resolveFetch: (value: Awaited<ReturnType<typeof fetchConversation>>) => void = () => {};
+    fetchConversationMock.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveFetch = resolve;
+      }),
+    );
+
+    renderConversation();
+
+    expect(cache.get).toHaveBeenCalledWith(`conversation:member-1:${conversationId}`);
+    await waitFor(() => expect(screen.getByText('From last visit')).toBeOnTheScreen());
+
+    resolveFetch(conversationDetail([]));
+    await waitFor(() => expect(screen.queryByText('From last visit')).toBeNull());
+  });
 });

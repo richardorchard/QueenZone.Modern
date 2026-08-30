@@ -1,6 +1,7 @@
-import { screen, userEvent, waitFor } from '@testing-library/react-native';
+import { act, screen, userEvent, waitFor } from '@testing-library/react-native';
 import { archiveConversation, fetchInbox } from '../../api/messages';
 import { ApiError } from '../../api/client';
+import { getMessagesCache } from '../../cache/messagesCache';
 import { pagedResponse } from '../../test/fixtures';
 import { createMockSession } from '../../test/mockSession';
 import { fakeNavigation, renderWithProviders } from '../../test/render';
@@ -17,6 +18,10 @@ jest.mock('../../api/messages', () => ({
   archiveConversation: jest.fn(),
 }));
 
+jest.mock('../../cache/messagesCache', () => ({
+  getMessagesCache: jest.fn(),
+}));
+
 jest.mock('@react-navigation/native', () => {
   const actual = jest.requireActual('@react-navigation/native');
   return {
@@ -27,6 +32,14 @@ jest.mock('@react-navigation/native', () => {
 
 const fetchInboxMock = fetchInbox as jest.MockedFunction<typeof fetchInbox>;
 const archiveConversationMock = archiveConversation as jest.MockedFunction<typeof archiveConversation>;
+const getMessagesCacheMock = getMessagesCache as jest.MockedFunction<typeof getMessagesCache>;
+
+function fakeMessagesCache() {
+  return {
+    get: jest.fn().mockResolvedValue(null),
+    put: jest.fn().mockResolvedValue(undefined),
+  };
+}
 
 function renderInbox() {
   return renderWithProviders(
@@ -38,8 +51,13 @@ describe('InboxScreen', () => {
   beforeEach(() => {
     mockSession.isSignedIn = false;
     mockSession.accessToken = null;
+    mockSession.profile = null;
     fetchInboxMock.mockReset();
     archiveConversationMock.mockReset();
+    getMessagesCacheMock.mockReset();
+    getMessagesCacheMock.mockReturnValue(
+      fakeMessagesCache() as unknown as ReturnType<typeof getMessagesCache>,
+    );
   });
 
   it('gates unsigned visitors', () => {
@@ -168,5 +186,74 @@ describe('InboxScreen', () => {
     renderInbox();
     await waitFor(() => expect(screen.getByText('Unable to load')).toBeOnTheScreen());
     expect(screen.getByRole('button', { name: 'Try again' })).toBeOnTheScreen();
+  });
+
+  it('renders a cached inbox instantly while the fresh fetch is still in flight', async () => {
+    mockSession.isSignedIn = true;
+    mockSession.accessToken = 'tok';
+    mockSession.profile = { memberId: 'member-1' } as never;
+    const cache = fakeMessagesCache();
+    cache.get.mockResolvedValue([
+      {
+        conversationId: 'convo-cached',
+        otherParticipantId: 'member-9',
+        otherParticipantDisplayName: 'Cached Carol',
+        lastMessagePreview: 'From last visit',
+        lastMessageAt: '2024-01-15T12:00:00.000Z',
+        hasUnread: false,
+        unreadCount: 0,
+        detailPath: '/messages/convo-cached',
+      },
+    ]);
+    getMessagesCacheMock.mockReturnValue(cache as unknown as ReturnType<typeof getMessagesCache>);
+    let resolveFetch: (value: Awaited<ReturnType<typeof fetchInbox>>) => void = () => {};
+    fetchInboxMock.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveFetch = resolve;
+      }),
+    );
+    renderInbox();
+
+    expect(cache.get).toHaveBeenCalledWith('inbox:member-1');
+    await waitFor(() => expect(screen.getByText('Cached Carol')).toBeOnTheScreen());
+
+    await act(async () => {
+      resolveFetch(pagedResponse([], 1, 0));
+    });
+    await waitFor(() => expect(screen.getByText('You have no private messages yet.')).toBeOnTheScreen());
+  });
+
+  it('persists the freshly loaded first page to the cache', async () => {
+    mockSession.isSignedIn = true;
+    mockSession.accessToken = 'tok';
+    mockSession.profile = { memberId: 'member-1' } as never;
+    const cache = fakeMessagesCache();
+    getMessagesCacheMock.mockReturnValue(cache as unknown as ReturnType<typeof getMessagesCache>);
+    fetchInboxMock.mockResolvedValueOnce(
+      pagedResponse(
+        [
+          {
+            conversationId: 'convo-1',
+            otherParticipantId: 'member-2',
+            otherParticipantDisplayName: 'Brian',
+            lastMessagePreview: 'See you at Wembley',
+            lastMessageAt: '2024-01-15T12:00:00.000Z',
+            hasUnread: false,
+            unreadCount: 0,
+            detailPath: '/messages/convo-1',
+          },
+        ],
+        1,
+        1,
+      ),
+    );
+    renderInbox();
+    await waitFor(() => expect(screen.getByText('Brian')).toBeOnTheScreen());
+    await waitFor(() =>
+      expect(cache.put).toHaveBeenCalledWith(
+        'inbox:member-1',
+        expect.arrayContaining([expect.objectContaining({ conversationId: 'convo-1' })]),
+      ),
+    );
   });
 });
