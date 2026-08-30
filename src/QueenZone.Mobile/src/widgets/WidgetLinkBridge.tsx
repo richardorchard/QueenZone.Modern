@@ -8,8 +8,8 @@ import {
   type WidgetNavigation,
 } from './widgetDeepLink';
 
-/** Handles taps on the OS home screen widget — iOS `widgetURL` and Android `OPEN_URI`
- * open Home, where the on-this-day event and/or quote actually render. */
+/** Handles taps on the OS home screen widget — iOS `widgetURL` and Android `OPEN_URI`.
+ * Quote face with an id opens the in-app quote page; On This Day stays Home. */
 export function WidgetLinkBridge() {
   const navigation = useNavigation<WidgetNavigation>();
   const navigationRef = useRef(navigation);
@@ -18,7 +18,7 @@ export function WidgetLinkBridge() {
   useEffect(() => {
     function handleUrl(url: string) {
       if (isWidgetDeepLinkUrl(url)) {
-        openWidgetDestination(navigationRef.current);
+        openWidgetDestination(navigationRef.current, url);
       }
     }
 

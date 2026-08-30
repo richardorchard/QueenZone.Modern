@@ -181,6 +181,46 @@ public sealed class EfMemberAccountRepositoryTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task SocialLinks_AreUniquePerMemberAndChannel_AndAnonymiseDeletesRows()
+    {
+        var account = await SeedAccountAsync("socials-ef@example.com", "EF Socials");
+        var other = await SeedAccountAsync("socials-other@example.com", "Other Socials");
+        await repository.ReplaceSocialLinksAsync(account.Id,
+        [
+            new MemberSocialLink(MemberSocialChannel.X, "https://x.com/queen"),
+            new MemberSocialLink(MemberSocialChannel.TikTok, "https://www.tiktok.com/@queen"),
+        ]);
+        await repository.ReplaceSocialLinksAsync(other.Id,
+        [
+            new MemberSocialLink(MemberSocialChannel.X, "https://x.com/other"),
+        ]);
+
+        var listed = await repository.ListSocialLinksAsync(account.Id);
+        Assert.Equal(
+            [
+                new MemberSocialLink(MemberSocialChannel.X, "https://x.com/queen"),
+                new MemberSocialLink(MemberSocialChannel.TikTok, "https://www.tiktok.com/@queen"),
+            ],
+            listed);
+
+        dbContext.ChangeTracker.Clear();
+        dbContext.MemberSocialLinks.Add(new MemberSocialLinkEntity
+        {
+            MemberId = account.Id,
+            Channel = "x",
+            Url = "https://x.com/duplicate",
+        });
+        await Assert.ThrowsAsync<DbUpdateException>(() => dbContext.SaveChangesAsync());
+        dbContext.ChangeTracker.Clear();
+
+        await repository.RequestDeletionAsync(account.Id, DateTime.UtcNow);
+        Assert.Empty(await repository.ListSocialLinksAsync(account.Id));
+        Assert.Equal(
+            [new MemberSocialLink(MemberSocialChannel.X, "https://x.com/other")],
+            await repository.ListSocialLinksAsync(other.Id));
+    }
+
+    [Fact]
     public async Task RequestDeletionAsync_AnonymisesImmediately_CancelRestores_AndPurgeMakesPermanent()
     {
         var account = await SeedAccountAsync("delete-me@example.com", "Delete Me");

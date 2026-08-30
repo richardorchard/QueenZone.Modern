@@ -87,21 +87,34 @@ export async function openForumAttachmentImage(
   return fetched.dataUri;
 }
 
+export type OpenForumAttachmentFileOptions = {
+  signal?: AbortSignal;
+  /** When false, skip the OEM share / Linking sheet after a successful Bearer fetch. */
+  present?: boolean;
+};
+
 /** Open a non-image after a Bearer fetch. Follows a public CDN redirect; otherwise shares the bytes. */
 export async function openForumAttachmentFile(
   downloadUrl: string,
   accessToken: string,
   fileName: string,
-  signal?: AbortSignal,
+  options?: OpenForumAttachmentFileOptions,
 ): Promise<void> {
-  const fetched = await fetchForumAttachment(downloadUrl, accessToken, signal);
+  const present = options?.present ?? true;
+  const fetched = await fetchForumAttachment(downloadUrl, accessToken, options?.signal);
   if (
     fetched.finalUrl &&
     !isCookieGatedForumAttachmentPath(fetched.finalUrl) &&
     /^https?:\/\//i.test(fetched.finalUrl) &&
     !/\/api\/v1\/forum\/attachments(?:\/|$)/i.test(fetched.finalUrl)
   ) {
-    await Linking.openURL(fetched.finalUrl);
+    if (present) {
+      await Linking.openURL(fetched.finalUrl);
+    }
+    return;
+  }
+
+  if (!present) {
     return;
   }
 

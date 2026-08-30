@@ -10,7 +10,6 @@ import { newsArticleListImageSource, newsArticlePlaceholder } from '../../conten
 import { newsDecades } from '../../content/sample';
 import { useNewsListEpochRefresh } from '../../hooks/useNewsListEpochRefresh';
 import { usePagedContent } from '../../hooks/usePagedContent';
-import { nestedTabParams } from '../../navigation/nestedTab';
 import type { NewsStackParamList, RootTabParamList } from '../../navigation/types';
 import { radius, space, useTheme } from '../../theme';
 import { ArticleRow } from '../../ui/ArticleRow';
@@ -20,7 +19,6 @@ import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from '../../u
 import { testIds } from '../../test/testIds';
 import { PageTitleBlock } from '../../ui/PageTitleBlock';
 import { YearRail } from '../../ui/YearRail';
-import { TabRootMasthead } from '../home/TabRootMasthead';
 
 /** Compact 3:2 listing thumb — matches the website card crop, not a full-bleed hero. */
 const NEWS_LIST_THUMB_WIDTH = 84;
@@ -123,12 +121,7 @@ export function NewsIndexScreen({ navigation, route }: Props) {
 
   const header = (
     <View>
-      <TabRootMasthead
-        onSearch={() => navigation.navigate('Search')}
-        onMessagesPress={() => navigation.navigate('HomeTab', nestedTabParams('Inbox'))}
-        onProfilePress={() => navigation.navigate('HomeTab', { screen: 'Profile' })}
-      />
-      <PageTitleBlock eyebrow="The archive" title="News" subtitle={countLine} />
+      <PageTitleBlock eyebrow="The archive" subtitle={countLine} />
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}

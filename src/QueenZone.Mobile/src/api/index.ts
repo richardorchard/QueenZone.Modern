@@ -33,7 +33,10 @@ export {
   fetchPhotoCategory,
   fetchPhotoCategoryItems,
   fetchPhotoDetail,
+  fetchQuoteById,
   fetchRandomQuote,
+  fetchHomePoll,
+  voteHomePoll,
   fetchTimelinePage,
 } from './content';
 export { fetchSearchPage } from './search';
@@ -62,7 +65,7 @@ export {
   openForumAttachmentFile,
   openForumAttachmentImage,
 } from './forumAttachment';
-export type { ForumAttachmentBytes } from './forumAttachment';
+export type { ForumAttachmentBytes, OpenForumAttachmentFileOptions } from './forumAttachment';
 export { createPhotoSubmission } from './photoSubmissions';
 export {
   createNewsSuggestion,

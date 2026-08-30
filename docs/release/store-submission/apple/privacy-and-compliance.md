@@ -2,6 +2,8 @@
 
 This is a conservative draft based on the source tree and production configuration. Re-audit it against the exact release build immediately before submission.
 
+**Confirmed 2026-08-30:** the app is ad-free, includes no Google Analytics or other analytics SDK, and Sentry is the only third-party data-processing SDK present. No Advertising or Tracking data types apply; App Tracking Transparency is not required. This aligns with the data types table below as drafted.
+
 ## App privacy label
 
 Answer **Yes, data is collected**. Do not declare tracking unless the final app or an included SDK combines QueenZone data with third-party data for advertising or measurement across other companies' apps/sites.

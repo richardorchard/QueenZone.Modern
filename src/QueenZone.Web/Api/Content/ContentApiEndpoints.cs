@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authentication;
 using QueenZone.Data;
 using QueenZone.Storage;
 
@@ -65,6 +66,29 @@ public static class ContentApiEndpoints
             .WithName("GetContentRandomQuote")
             .WithSummary("A single random published quote, matching the homepage widget. Intended for the mobile app's homescreen widget.")
             .Produces<QuoteDto?>();
+
+        group.MapGet("/quotes/{id:int}", GetQuoteDetailAsync)
+            .WithName("GetContentQuoteDetail")
+            .WithSummary("A single published quote by id. Unpublished or missing quotes return 404.")
+            .Produces<QuoteDto>()
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapGet("/home-poll", GetHomePollAsync)
+            .WithName("GetContentHomePoll")
+            .WithSummary("The current Home poll with public results. JSON null when none is live. Optional Bearer marks the viewer's choice.")
+            .Produces<HomePollDto?>();
+
+        group.MapPost("/home-poll/votes", VoteHomePollAsync)
+            .WithName("VoteContentHomePoll")
+            .WithSummary("Cast one ballot on the current Home poll. Votes are final.")
+            .RequireAuthorization(MemberAuthenticationSchemes.MobileMemberPolicy)
+            .Accepts<HomePollVoteRequestDto>("application/json")
+            .Produces<HomePollDto>()
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
 
         group.MapGet("/biography", GetBiographyChaptersAsync)
             .WithName("GetContentBiographyChapters")
@@ -250,6 +274,77 @@ public static class ContentApiEndpoints
         return payload is null
             ? Results.Content("null", "application/json")
             : Results.Ok(payload);
+    }
+
+    internal static async Task<IResult> GetHomePollAsync(
+        HttpContext httpContext,
+        IHomePollRepository homePollRepository,
+        CancellationToken cancellationToken)
+    {
+        var poll = await homePollRepository.GetCurrentAsync(
+            await TryGetViewerMemberIdAsync(httpContext),
+            cancellationToken);
+
+        // ASP.NET Core Ok(null) / Json(null) write an empty 200. The contract is JSON null.
+        HomePollDto? payload = poll is null ? null : ContentApiMapper.ToHomePollDto(poll);
+        return payload is null
+            ? Results.Content("null", "application/json")
+            : Results.Ok(payload);
+    }
+
+    internal static async Task<IResult> VoteHomePollAsync(
+        HttpContext httpContext,
+        HomePollVoteRequestDto? request,
+        HomePollVoteService voteService,
+        IHomePollRepository homePollRepository,
+        CancellationToken cancellationToken)
+    {
+        var memberId = ForumMember.GetMemberId(httpContext.User);
+        if (memberId is null)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status401Unauthorized,
+                title: "Unauthorized");
+        }
+
+        if (request?.OptionId is not Guid optionId || optionId == Guid.Empty)
+        {
+            return ForumPollVoteMapper.ToProblemResult(
+                new ForumPollVoteException(
+                    ForumPollVoteException.InvalidOptions,
+                    "Select an option."));
+        }
+
+        try
+        {
+            await voteService.CastVoteAsync(memberId.Value, optionId, cancellationToken);
+        }
+        catch (ForumPollVoteException ex)
+        {
+            return ForumPollVoteMapper.ToProblemResult(ex);
+        }
+
+        var poll = await homePollRepository.GetCurrentAsync(memberId, cancellationToken);
+        return poll is null
+            ? Results.Content("null", "application/json")
+            : Results.Ok(ContentApiMapper.ToHomePollDto(poll));
+    }
+
+    internal static async Task<IResult> GetQuoteDetailAsync(
+        IQuoteRepository quoteRepository,
+        int id,
+        CancellationToken cancellationToken)
+    {
+        var quote = await quoteRepository.GetByIdAsync(id, cancellationToken);
+        if (quote is null || !quote.IsPublished)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status404NotFound,
+                title: "Not Found",
+                detail: $"No published quote with id '{id}'.");
+        }
+
+        return Results.Ok(ContentApiMapper.ToQuoteDto(quote));
     }
 
     internal static async Task<IResult> GetBiographyChaptersAsync(
@@ -522,6 +617,21 @@ public static class ContentApiEndpoints
             fanPerformanceRepository,
             blobUploadService,
             cancellationToken);
+
+    private static async Task<Guid?> TryGetViewerMemberIdAsync(HttpContext httpContext)
+    {
+        if (httpContext.Request.Headers.ContainsKey("Authorization"))
+        {
+            var bearer = await httpContext.AuthenticateAsync(MemberAuthenticationSchemes.MembersBearer);
+            if (bearer.Succeeded)
+            {
+                return ForumMember.GetMemberId(bearer.Principal);
+            }
+        }
+
+        var member = await httpContext.AuthenticateMemberAsync();
+        return member.Succeeded ? ForumMember.GetMemberId(member.Principal) : null;
+    }
 
     private static IResult PhotoCategoryNotFound(string slug) =>
         Results.Problem(

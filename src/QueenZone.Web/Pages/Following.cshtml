@@ -1,0 +1,43 @@
+@page "/following"
+@model FollowingModel
+
+<partial name="_PageHero" model='@(("Community", "Following", "Public contributions from people you follow.", ""))' />
+
+<section class="qz-section">
+  <div class="qz-container qz-prose">
+    <div class="qz-member-activity">
+      @if (!string.IsNullOrWhiteSpace(Model.EmptyMessage))
+      {
+        <p>@Model.EmptyMessage</p>
+      }
+      else
+      {
+        <ol class="qz-member-activity__list">
+          @foreach (var item in Model.Activity)
+          {
+            <li class="qz-member-activity__item">
+              <p class="qz-meta">
+                @if (item.AuthorProfileHref is not null)
+                {
+                  <a class="qz-attribution-link" href="@item.AuthorProfileHref">@(item.AuthorDisplayName ?? "Member")</a>
+                  <text> · </text>
+                }
+                <span class="qz-member-activity__type">@item.Type</span>
+                · <time datetime="@item.PublishedAt.ToString("O")">@item.PublishedAt.ToString("dd MMMM yyyy")</time>
+              </p>
+              <h3><a href="@item.Href">@item.Title</a></h3>
+              @if (!string.IsNullOrWhiteSpace(item.Summary))
+              {
+                <p>@item.Summary</p>
+              }
+            </li>
+          }
+        </ol>
+        @if (Model.Pagination is not null)
+        {
+          <partial name="_ArchivePagination" model="Model.Pagination" />
+        }
+      }
+    </div>
+  </div>
+</section>

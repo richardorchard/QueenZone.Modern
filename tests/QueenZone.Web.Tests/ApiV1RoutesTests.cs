@@ -89,6 +89,12 @@ public sealed class ApiV1RoutesTests : IClassFixture<QueenZoneWebApplicationFact
         Assert.True(paths.TryGetProperty("/api/v1/", out _) || paths.TryGetProperty("/api/v1", out _));
         Assert.True(paths.TryGetProperty("/api/v1/auth/token", out _));
         Assert.True(paths.TryGetProperty("/api/v1/auth/session", out _));
+        Assert.True(paths.TryGetProperty("/api/v1/content/quotes/random", out _));
+        Assert.True(paths.TryGetProperty("/api/v1/content/quotes/{id}", out _));
+        Assert.True(paths.TryGetProperty("/api/v1/content/home-poll", out _));
+        Assert.True(paths.GetProperty("/api/v1/content/home-poll").TryGetProperty("get", out _));
+        Assert.True(paths.TryGetProperty("/api/v1/content/home-poll/votes", out _));
+        Assert.True(paths.GetProperty("/api/v1/content/home-poll/votes").TryGetProperty("post", out _));
         Assert.True(paths.TryGetProperty("/api/v1/content/photos/categories", out _));
         Assert.True(paths.TryGetProperty("/api/v1/content/photos/categories/{slug}", out _));
         Assert.True(paths.TryGetProperty("/api/v1/content/photos/categories/{slug}/items", out _));

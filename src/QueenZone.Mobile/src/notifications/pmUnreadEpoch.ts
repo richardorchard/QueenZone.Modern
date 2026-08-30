@@ -2,7 +2,7 @@ import type { NotificationDestination } from './payload';
 
 /**
  * Private-message unread generation. A privateMessage receive increments it
- * so a mounted/focused tab-root masthead can refetch
+ * so a mounted/focused Home masthead or tab-root identity header can refetch
  * GET /api/v1/me/messages/unread-count. This is not the news list epoch.
  */
 let generation = 0;

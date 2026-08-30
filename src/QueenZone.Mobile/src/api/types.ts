@@ -320,11 +320,30 @@ export type LiveActivitySummary = {
   newForumRepliesToday: number;
 };
 
-/** Shape for `/api/v1/content/quotes/random`, a single random published quote. */
+/** Shape for `/api/v1/content/quotes/random` and `/api/v1/content/quotes/{id}`. */
 export type RandomQuote = {
   id: number;
   text: string;
   whoSaid: string;
+  context?: string | null;
+};
+
+/** Shape for `GET /api/v1/content/home-poll`. Null when no poll is current. */
+export type HomePoll = {
+  id: string;
+  question: string;
+  options: HomePollOption[];
+  totalVotes: number;
+  isClosed: boolean;
+  viewerHasVoted: boolean;
+  selectedOptionId: string | null;
+};
+
+export type HomePollOption = {
+  id: string;
+  text: string;
+  count: number;
+  percentage: number;
 };
 
 /** One hit from `GET /api/v1/search`. `id` is parsed from numeric source keys. */

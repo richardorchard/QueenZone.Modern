@@ -4,6 +4,7 @@ import {
   font,
   foregroundStyle,
   lineLimit,
+  minimumScaleFactor,
   padding,
   truncationMode,
   widgetURL,
@@ -24,6 +25,9 @@ import type { WidgetProps } from './widgetCopy';
  * gallery snapshot never runs this JS — a missing JSC layout is a black
  * EmptyView in Release/TestFlight. The crest watermark lives in that native
  * view; Expo UI Image is SF Symbols only.
+ *
+ * JSC cannot import widgetCopy or read widgetFamily, so the small-ceiling
+ * numbers (17 / 9 / 0.65 / 6 / 2) are inlined here. Native picks 17 vs 22.
  */
 export type OnThisDayWidgetProps = WidgetProps;
 
@@ -35,6 +39,9 @@ function OnThisDayWidgetView(props: OnThisDayWidgetProps) {
   const slot = Math.floor(Date.now() / (4 * 60 * 60 * 1000));
   const showDay = hasDay && hasQuote ? slot % 2 === 0 : hasDay;
   const showQuote = hasDay && hasQuote ? slot % 2 !== 0 : hasQuote;
+  const quoteId = Number(props.quoteId);
+  const tapUrl =
+    showQuote && quoteId > 0 ? `queenzone://quotes/${quoteId}` : 'queenzone://home';
 
   return (
     <VStack
@@ -43,7 +50,7 @@ function OnThisDayWidgetView(props: OnThisDayWidgetProps) {
       modifiers={[
         padding({ all: 14 }),
         containerBackground('#181614', 'widget'),
-        widgetURL('queenzone://home'),
+        widgetURL(tapUrl),
       ]}
     >
       <Text modifiers={[foregroundStyle('#B89A4A'), font({ size: 10, weight: 'semibold' })]}>
@@ -53,32 +60,45 @@ function OnThisDayWidgetView(props: OnThisDayWidgetProps) {
         <Text
           modifiers={[
             foregroundStyle('#F2F1ED'),
-            font({ size: 13 }),
-            lineLimit(3),
+            font({ size: 17 }),
+            minimumScaleFactor(0.65),
+            lineLimit(6),
             truncationMode('tail'),
           ]}
         >
-          {`${props.formattedDate}: ${props.summary}`}
+          {props.summary}
+        </Text>
+      ) : null}
+      {showDay ? (
+        <Text modifiers={[foregroundStyle('#B8B6B0'), font({ size: 9 }), lineLimit(2), truncationMode('tail')]}>
+          {props.formattedDate}
         </Text>
       ) : null}
       {showQuote ? (
         <Text
           modifiers={[
             foregroundStyle('#B8B6B0'),
-            font({ size: 12 }),
-            lineLimit(3),
+            font({ size: 17 }),
+            minimumScaleFactor(0.65),
+            lineLimit(6),
             truncationMode('tail'),
           ]}
         >
-          {`“${props.quoteText}” — ${props.quoteWhoSaid}`}
+          {`“${props.quoteText}”`}
+        </Text>
+      ) : null}
+      {showQuote ? (
+        <Text modifiers={[foregroundStyle('#B8B6B0'), font({ size: 9 }), lineLimit(2), truncationMode('tail')]}>
+          {`— ${props.quoteWhoSaid}`}
         </Text>
       ) : null}
       {!hasDay && !hasQuote ? (
         <Text
           modifiers={[
             foregroundStyle('#B8B6B0'),
-            font({ size: 12 }),
-            lineLimit(3),
+            font({ size: 17 }),
+            minimumScaleFactor(0.65),
+            lineLimit(6),
             truncationMode('tail'),
           ]}
         >

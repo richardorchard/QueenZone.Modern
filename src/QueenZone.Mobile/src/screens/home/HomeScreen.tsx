@@ -7,6 +7,7 @@ import { FlatList, Pressable, RefreshControl, ScrollView, Text, View } from 'rea
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   fetchForumRecentThreads,
+  fetchHomePoll,
   fetchInbox,
   fetchLiveActivity,
   fetchNewsPage,
@@ -26,6 +27,8 @@ import { nestedTabParams } from '../../navigation/nestedTab';
 import type { HomeStackParamList, RootTabParamList } from '../../navigation/types';
 import { useSession } from '../../session/SessionContext';
 import { openSignIn } from '../../session/signInNavigation';
+import { getAppConfig } from '../../config/appConfig';
+import { formatHomeFooter } from '../../config/buildMetadata';
 import { fonts, radius, space, type, useTheme } from '../../theme';
 import { ArchiveFooter } from '../../ui/ArchiveFooter';
 import { ArchiveImage } from '../../ui/ArchiveImage';
@@ -39,6 +42,7 @@ import { SectionErrorBlock } from '../../ui/ScreenStates';
 import { SectionHeader } from '../../ui/SectionHeader';
 import { testIds } from '../../test/testIds';
 import { syncHomeWidget } from '../../widgets/widgetSync';
+import { HomePollCard } from './HomePollCard';
 import { TabRootMasthead } from './TabRootMasthead';
 import {
   formatForumThreadMeta,
@@ -85,6 +89,9 @@ export function HomeScreen({ navigation }: Props) {
   );
   const onThisDay = useHomeSection(useCallback((signal) => fetchOnThisDay(signal), []));
   const quote = useHomeSection(useCallback((signal) => fetchRandomQuote(signal), []));
+  const poll = useHomeSection(
+    useCallback((signal) => fetchHomePoll(signal, accessToken), [accessToken]),
+  );
   const liveActivity = useHomeSection(useCallback((signal) => fetchLiveActivity(signal), []));
   const messages = useHomeSection(
     useCallback(
@@ -126,6 +133,7 @@ export function HomeScreen({ navigation }: Props) {
     gallery.refresh,
     onThisDay.refresh,
     quote.refresh,
+    poll.refresh,
     liveActivity.refresh,
     messages.refresh,
   ]);
@@ -147,10 +155,11 @@ export function HomeScreen({ navigation }: Props) {
   const latestNews = newsItems.slice(1, 4);
   const totalNewsCount = news.view.kind === 'content' ? news.view.data.totalCount : 0;
   const onThisDayEvent = onThisDay.view.kind === 'content' ? onThisDay.view.data : null;
-  const onThisDayQuote =
-    quote.view.kind === 'content' && quote.view.data
-      ? { text: quote.view.data.text, whoSaid: quote.view.data.whoSaid }
-      : null;
+  const featuredQuote = quote.view.kind === 'content' ? quote.view.data : null;
+  const homePoll = poll.view.kind === 'content' ? poll.view.data : null;
+  const onThisDayQuote = featuredQuote
+    ? { text: featuredQuote.text, whoSaid: featuredQuote.whoSaid }
+    : null;
   const showOnThisDay =
     visibleSections.has('onThisDay') && onThisDayIsVisible(onThisDayEvent);
   const showQueenQuotes =
@@ -536,11 +545,44 @@ export function HomeScreen({ navigation }: Props) {
             />
           ) : null}
 
-          {showQueenQuotes && onThisDayQuote ? (
-            <FeatureBlock eyebrow={queenQuotesEyebrow()} quote={onThisDayQuote} />
+          {showQueenQuotes && onThisDayQuote && featuredQuote ? (
+            <FeatureBlock
+              testID={testIds.homeQuote}
+              eyebrow={queenQuotesEyebrow()}
+              quote={onThisDayQuote}
+              onPress={
+                featuredQuote.id > 0
+                  ? () => navigation.navigate('Quote', { id: featuredQuote.id })
+                  : undefined
+              }
+            />
+          ) : null}
+
+          {homePoll ? (
+            <HomePollCard
+              poll={homePoll}
+              isSignedIn={isSignedIn}
+              accessToken={accessToken}
+              onVoted={() => poll.refresh()}
+              onSignIn={() => openSignIn(navigation, { tab: 'HomeTab', screen: 'Home' })}
+            />
           ) : null}
 
           <ArchiveFooter />
+          <Text
+            testID={testIds.homeVersion}
+            style={[
+              type.caption,
+              {
+                color: c.textMuted,
+                textAlign: 'center',
+                paddingHorizontal: space.xl,
+                paddingBottom: space.xl,
+              },
+            ]}
+          >
+            {formatHomeFooter(getAppConfig())}
+          </Text>
         </>
       }
     />

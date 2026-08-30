@@ -56,6 +56,50 @@ public sealed class EfMemberAccountRepository(QueenZoneDbContext dbContext) : IM
             .OrderBy(provider => provider)
             .ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<MemberSocialLink>> ListSocialLinksAsync(
+        Guid memberId,
+        CancellationToken cancellationToken = default)
+    {
+        var rows = await dbContext.MemberSocialLinks
+            .AsNoTracking()
+            .Where(row => row.MemberId == memberId)
+            .ToListAsync(cancellationToken);
+
+        return MemberSocialChannels.All
+            .Select(channel =>
+            {
+                var key = MemberSocialChannels.ToKey(channel);
+                var row = rows.FirstOrDefault(candidate =>
+                    string.Equals(candidate.Channel, key, StringComparison.Ordinal));
+                return row is null ? null : new MemberSocialLink(channel, row.Url);
+            })
+            .OfType<MemberSocialLink>()
+            .ToList();
+    }
+
+    public async Task ReplaceSocialLinksAsync(
+        Guid memberId,
+        IReadOnlyList<MemberSocialLink> links,
+        CancellationToken cancellationToken = default)
+    {
+        var existing = await dbContext.MemberSocialLinks
+            .Where(row => row.MemberId == memberId)
+            .ToListAsync(cancellationToken);
+        dbContext.MemberSocialLinks.RemoveRange(existing);
+
+        foreach (var link in links)
+        {
+            dbContext.MemberSocialLinks.Add(new MemberSocialLinkEntity
+            {
+                MemberId = memberId,
+                Channel = MemberSocialChannels.ToKey(link.Channel),
+                Url = link.Url,
+            });
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task<MemberAccount?> UpdateDisplayNameAsync(Guid memberId, string displayName, CancellationToken cancellationToken = default)
     {
         // Load tracked so change detection persists the new name.
@@ -322,6 +366,7 @@ public sealed class EfMemberAccountRepository(QueenZoneDbContext dbContext) : IM
             account.AvatarUrl = null;
             account.DeletionRequestedAt = requestedAt;
 
+            await DeleteSocialLinksAsync(memberId, cancellationToken);
             await AnonymiseRetainedAttributionAsync(memberId, requestedAt, clearMemberLink: false, cancellationToken);
 
             dbContext.MemberAccountDeletionAuditLogs.Add(new MemberAccountDeletionAuditLogEntity
@@ -431,6 +476,9 @@ public sealed class EfMemberAccountRepository(QueenZoneDbContext dbContext) : IM
             }
 
             var memberIds = accounts.Select(account => account.Id).ToList();
+            await dbContext.MemberSocialLinks
+                .Where(row => memberIds.Contains(row.MemberId))
+                .ExecuteDeleteAsync(cancellationToken);
             var avatarBlobPaths = accounts
                 .Select(account => account.DeletionRecoveryAvatarUrl)
                 .Where(path => !string.IsNullOrWhiteSpace(path))
@@ -567,6 +615,11 @@ public sealed class EfMemberAccountRepository(QueenZoneDbContext dbContext) : IM
                 setters => setters.SetProperty(document => document.AuthorDisplayName, displayName),
                 cancellationToken);
     }
+
+    private Task<int> DeleteSocialLinksAsync(Guid memberId, CancellationToken cancellationToken) =>
+        dbContext.MemberSocialLinks
+            .Where(row => row.MemberId == memberId)
+            .ExecuteDeleteAsync(cancellationToken);
 
     private static string Normalize(string email) => email.Trim().ToUpperInvariant();
 }

@@ -55,7 +55,7 @@ export function TabRootMasthead({ onProfilePress, onSearch, onMessagesPress, top
             color: c.textPrimary,
           }}
         >
-          Queenzone
+          Queenzone.org
         </Text>
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -82,6 +82,7 @@ export function TabRootMasthead({ onProfilePress, onSearch, onMessagesPress, top
             <Mail size={20} color={c.textPrimary} strokeWidth={1.5} />
             {unreadCount > 0 ? (
               <View
+                testID={testIds.homeMessagesUnread}
                 style={{
                   position: 'absolute',
                   top: 2,

@@ -2,11 +2,22 @@ import { screen, userEvent, waitFor } from '@testing-library/react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { ApiError, createForumReply, createForumTopic, fetchForumCategories } from '../../api';
+import { resetSmokeAttachPending, stashSmokeAttachAsset } from '../../session/smokeAttach';
 import { pagedResponse } from '../../test/fixtures';
 import { createMockSession } from '../../test/mockSession';
 import { fakeNavigation, renderWithProviders } from '../../test/render';
 import { testIds } from '../../test/testIds';
 import { ComposerScreen } from './ComposerScreen';
+
+const mockAppConfig = {
+  apiBaseUrl: 'http://qz.test',
+  appEnv: 'production' as string,
+  version: '0.1.0',
+};
+
+jest.mock('../../config', () => ({
+  getAppConfig: () => mockAppConfig,
+}));
 
 const mockSession = createMockSession();
 
@@ -61,6 +72,8 @@ function renderComposer(
 
 describe('ComposerScreen', () => {
   beforeEach(() => {
+    mockAppConfig.appEnv = 'production';
+    resetSmokeAttachPending();
     mockSession.isSignedIn = true;
     mockSession.accessToken = 'tok';
     createForumReplyMock.mockReset();
@@ -177,6 +190,38 @@ describe('ComposerScreen', () => {
     );
     expect(ImagePicker.launchImageLibraryAsync).not.toHaveBeenCalled();
     expect(DocumentPicker.getDocumentAsync).not.toHaveBeenCalled();
+  });
+
+  it('injects attach.txt after Files without opening the OEM picker in Debug', async () => {
+    mockAppConfig.appEnv = 'development';
+    renderComposer({ threadId: 1002, threadTitle: 'Ranking every studio album' });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Files' })).toBeOnTheScreen());
+
+    const user = userEvent.setup();
+    await user.press(screen.getByTestId(testIds.forumComposerAttachFiles));
+    expect(DocumentPicker.getDocumentAsync).not.toHaveBeenCalled();
+    expect(ImagePicker.requestMediaLibraryPermissionsAsync).not.toHaveBeenCalled();
+    expect(ImagePicker.launchImageLibraryAsync).not.toHaveBeenCalled();
+    await user.press(screen.getByTestId(testIds.forumComposerAttachInject));
+    await waitFor(() => expect(screen.getByTestId(testIds.forumComposerAttachment)).toBeOnTheScreen());
+    expect(screen.getByText('attach.txt')).toBeOnTheScreen();
+  });
+
+  it('consumes a pending smoke-attach file when Files is tapped in Debug', async () => {
+    mockAppConfig.appEnv = 'development';
+    stashSmokeAttachAsset({
+      uri: 'file:///tmp/attach.txt',
+      name: 'attach.txt',
+      mimeType: 'text/plain',
+    });
+    renderComposer({ threadId: 1002, threadTitle: 'Ranking every studio album' });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Files' })).toBeOnTheScreen());
+
+    const user = userEvent.setup();
+    await user.press(screen.getByTestId(testIds.forumComposerAttachFiles));
+    await waitFor(() => expect(screen.getByText('attach.txt')).toBeOnTheScreen());
+    expect(DocumentPicker.getDocumentAsync).not.toHaveBeenCalled();
+    expect(screen.queryByTestId(testIds.forumComposerAttachInject)).toBeNull();
   });
 
   it('does not ask for photo permission when Files is tapped', async () => {

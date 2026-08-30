@@ -55,7 +55,23 @@ public static class ContentApiMapper
     }
 
     public static QuoteDto ToQuoteDto(QuoteItem quote) =>
-        new(quote.Id, quote.Text, quote.WhoSaid);
+        new(quote.Id, quote.Text, quote.WhoSaid, string.IsNullOrWhiteSpace(quote.Context) ? null : quote.Context);
+
+    public static HomePollDto ToHomePollDto(HomePollResults poll) =>
+        new(
+            poll.PollId,
+            poll.Question,
+            poll.Options
+                .Select(option => new HomePollOptionDto(
+                    option.OptionId,
+                    option.OptionText,
+                    option.VoteCount,
+                    option.Percentage))
+                .ToList(),
+            poll.TotalVotes,
+            poll.IsClosed,
+            poll.ViewerHasVoted,
+            poll.SelectedOptionId);
 
     public static TimelineEventDto ToTimelineEvent(QueenHistoryEvent historyEvent) =>
         new(

@@ -59,4 +59,18 @@ public sealed class InMemoryMemberFollowRepository : IMemberFollowRepository
             return Task.FromResult(removed > 0);
         }
     }
+
+    public Task<IReadOnlyList<Guid>> ListFollowedIdsAsync(
+        Guid followerMemberId,
+        CancellationToken cancellationToken = default)
+    {
+        lock (gate)
+        {
+            IReadOnlyList<Guid> ids = follows
+                .Where(follow => follow.FollowerMemberId == followerMemberId)
+                .Select(follow => follow.FollowedMemberId)
+                .ToList();
+            return Task.FromResult(ids);
+        }
+    }
 }

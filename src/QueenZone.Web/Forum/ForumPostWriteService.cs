@@ -391,7 +391,8 @@ public sealed class ForumPostWriteService(
             return;
         }
 
-        await forumWriteRepository.HidePostsByMemberAsync(memberId, cancellationToken);
+        await forumWriteRepository.HideAuthorForumContentAsync(
+            memberId, suspended.DisplayName, cancellationToken);
         logger.LogWarning(
             "Auto-suspended member {MemberId}: link posted {ElapsedSeconds:0}s after registration.",
             memberId,

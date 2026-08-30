@@ -146,10 +146,27 @@ public sealed record FreddieTributeDto(
 public sealed record LiveActivitySummaryDto(int NewForumRepliesToday);
 
 /// <summary>
-/// Shape for <c>/api/v1/content/quotes/random</c>, backing the homepage widget and the
-/// mobile app's homescreen widget.
+/// Shape for <c>/api/v1/content/quotes/random</c> and <c>/api/v1/content/quotes/{id}</c>.
+/// <see cref="Context"/> is the existing <c>QUEEN_QUOTE_T.CONTEXT</c> column (nullable).
 /// </summary>
-public sealed record QuoteDto(int Id, string Text, string WhoSaid);
+public sealed record QuoteDto(int Id, string Text, string WhoSaid, string? Context);
+
+/// <summary>
+/// Shape for <c>GET /api/v1/content/home-poll</c> and the website Index block.
+/// JSON <c>null</c> when no poll is current. Counts and percentages are public.
+/// </summary>
+public sealed record HomePollDto(
+    Guid Id,
+    string Question,
+    IReadOnlyList<HomePollOptionDto> Options,
+    int TotalVotes,
+    bool IsClosed,
+    bool ViewerHasVoted,
+    Guid? SelectedOptionId);
+
+public sealed record HomePollOptionDto(Guid Id, string Text, int Count, double Percentage);
+
+public sealed record HomePollVoteRequestDto(Guid? OptionId);
 
 /// <summary>
 /// Category card for <c>/api/v1/content/photos/categories</c> and

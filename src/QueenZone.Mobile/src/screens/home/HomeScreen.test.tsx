@@ -1,19 +1,33 @@
-import { act, fireEvent, screen, userEvent, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, screen, userEvent, waitFor, within } from '@testing-library/react-native';
 import { RefreshControl } from 'react-native';
 import {
   fetchForumRecentThreads,
+  fetchHomePoll,
   fetchInbox,
   fetchLiveActivity,
   fetchNewsPage,
   fetchOnThisDay,
   fetchPhotoCategories,
   fetchRandomQuote,
+  voteHomePoll,
 } from '../../api';
 import { deferred, newsItemFixture, pagedResponse } from '../../test/fixtures';
 import { createMockSession } from '../../test/mockSession';
 import { fakeNavigation, flushVirtualizedList, renderWithProviders } from '../../test/render';
 import { bumpNewsListEpoch } from '../../notifications/newsListEpoch';
+import { testIds } from '../../test/testIds';
 import { HomeScreen } from './HomeScreen';
+
+const mockAppConfig = {
+  appEnv: 'development' as const,
+  apiBaseUrl: 'http://qz.test',
+  version: '0.1.0',
+  buildTimestampUtc: undefined as string | undefined,
+};
+
+jest.mock('../../config/appConfig', () => ({
+  getAppConfig: () => mockAppConfig,
+}));
 
 jest.mock('../../api', () => {
   const actual = jest.requireActual('../../api');
@@ -24,6 +38,8 @@ jest.mock('../../api', () => {
     fetchPhotoCategories: jest.fn(),
     fetchOnThisDay: jest.fn(),
     fetchRandomQuote: jest.fn(),
+    fetchHomePoll: jest.fn(),
+    voteHomePoll: jest.fn(),
     fetchLiveActivity: jest.fn(),
     fetchInbox: jest.fn(),
   };
@@ -54,6 +70,8 @@ const fetchForum = fetchForumRecentThreads as jest.MockedFunction<typeof fetchFo
 const fetchPhotos = fetchPhotoCategories as jest.MockedFunction<typeof fetchPhotoCategories>;
 const fetchDay = fetchOnThisDay as jest.MockedFunction<typeof fetchOnThisDay>;
 const fetchQuote = fetchRandomQuote as jest.MockedFunction<typeof fetchRandomQuote>;
+const fetchPoll = fetchHomePoll as jest.MockedFunction<typeof fetchHomePoll>;
+const votePoll = voteHomePoll as jest.MockedFunction<typeof voteHomePoll>;
 const fetchLive = fetchLiveActivity as jest.MockedFunction<typeof fetchLiveActivity>;
 const fetchInboxMock = fetchInbox as jest.MockedFunction<typeof fetchInbox>;
 
@@ -84,6 +102,8 @@ describe('HomeScreen', () => {
   beforeEach(() => {
     mockSession.isSignedIn = false;
     mockSession.accessToken = null;
+    mockAppConfig.version = '0.1.0';
+    mockAppConfig.buildTimestampUtc = undefined;
     fetchNews.mockResolvedValue(
       pagedResponse(
         [
@@ -108,6 +128,8 @@ describe('HomeScreen', () => {
     fetchPhotos.mockResolvedValue(pagedResponse([], 1, 0));
     fetchDay.mockResolvedValue(null);
     fetchQuote.mockResolvedValue(null);
+    fetchPoll.mockResolvedValue(null);
+    votePoll.mockReset();
     fetchLive.mockResolvedValue({ newForumRepliesToday: 0 });
     mockSyncHomeWidget.mockClear();
     fetchInboxMock.mockReset();
@@ -207,6 +229,7 @@ describe('HomeScreen', () => {
     const photoCalls = fetchPhotos.mock.calls.length;
     const dayCalls = fetchDay.mock.calls.length;
     const quoteCalls = fetchQuote.mock.calls.length;
+    const pollCalls = fetchPoll.mock.calls.length;
     const liveCalls = fetchLive.mock.calls.length;
     const inboxCalls = fetchInboxMock.mock.calls.length;
 
@@ -223,6 +246,7 @@ describe('HomeScreen', () => {
     expect(fetchPhotos.mock.calls.length).toBe(photoCalls + 1);
     expect(fetchDay.mock.calls.length).toBe(dayCalls + 1);
     expect(fetchQuote.mock.calls.length).toBe(quoteCalls + 1);
+    expect(fetchPoll.mock.calls.length).toBe(pollCalls + 1);
     expect(fetchLive.mock.calls.length).toBe(liveCalls + 1);
     expect(fetchInboxMock.mock.calls.length).toBe(inboxCalls);
 
@@ -377,6 +401,16 @@ describe('HomeScreen', () => {
     await flushVirtualizedList();
   });
 
+  it('opens the Quote screen from the Queen Quotes card', async () => {
+    fetchQuote.mockResolvedValue({ id: 9, text: 'A kind of magic', whoSaid: 'Freddie Mercury' });
+    const { navigation } = renderHome();
+
+    await waitFor(() => expect(screen.getByTestId(testIds.homeQuote)).toBeOnTheScreen());
+    fireEvent.press(screen.getByTestId(testIds.homeQuote));
+    expect(navigation.navigate).toHaveBeenCalledWith('Quote', { id: 9 });
+    await flushVirtualizedList();
+  });
+
   it('shows the Queen Quotes card when there is no on-this-day event', async () => {
     fetchDay.mockResolvedValue(null);
     fetchQuote.mockResolvedValue({ id: 9, text: 'A kind of magic', whoSaid: 'Freddie Mercury' });
@@ -390,4 +424,106 @@ describe('HomeScreen', () => {
     expect(screen.queryByRole('button', { name: 'View timeline' })).not.toBeOnTheScreen();
     await flushVirtualizedList();
   });
+
+  it('shows the baked version after the last section, not in the masthead', async () => {
+    renderHome();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Live Aid remembered' })).toBeOnTheScreen());
+
+    const footer = screen.getByTestId(testIds.homeVersion);
+    expect(footer).toBeOnTheScreen();
+    expect(footer).toHaveTextContent('0.1.0');
+    expect(within(screen.getByTestId(testIds.tabMasthead)).queryByTestId(testIds.homeVersion)).toBeNull();
+    await flushVirtualizedList();
+  });
+
+  it('adds the publish date on Home for signed-in and signed-out visitors', async () => {
+    mockAppConfig.version = '0.1.214';
+    mockAppConfig.buildTimestampUtc = '2026-08-29T13:40:12Z';
+
+    const signedOut = renderHome();
+    await waitFor(() => expect(screen.getByTestId(testIds.homeVersion)).toHaveTextContent('0.1.214 · 29 Aug 2026'));
+    expect(within(screen.getByTestId(testIds.tabMasthead)).queryByText('0.1.214 · 29 Aug 2026')).toBeNull();
+    await flushVirtualizedList();
+    signedOut.unmount();
+
+    mockSession.isSignedIn = true;
+    mockSession.accessToken = 'token';
+    fetchInboxMock.mockResolvedValue(pagedResponse([], 1, 0));
+    renderHome();
+    await waitFor(() => expect(screen.getByText('Your messages')).toBeOnTheScreen());
+    expect(screen.getByTestId(testIds.homeVersion)).toHaveTextContent('0.1.214 · 29 Aug 2026');
+    await flushVirtualizedList();
+  });
+
+  it('hides the home poll card when the API returns null', async () => {
+    renderHome();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Live Aid remembered' })).toBeOnTheScreen());
+    expect(screen.queryByTestId(testIds.homePoll)).toBeNull();
+    await flushVirtualizedList();
+  });
+
+  it('shows the current home poll with public results and a sign-in link for guests', async () => {
+    fetchPoll.mockResolvedValue(openHomePoll());
+    renderHome();
+
+    await waitFor(() => expect(screen.getByTestId(testIds.homePoll)).toBeOnTheScreen());
+    expect(screen.getByText('Best Queen album?')).toBeOnTheScreen();
+    expect(screen.getByText('A Night at the Opera')).toBeOnTheScreen();
+    expect(screen.getByText('4 · 80%')).toBeOnTheScreen();
+    expect(screen.getByTestId(testIds.homePollSignIn)).toBeOnTheScreen();
+    expect(screen.queryByTestId(`${testIds.homePollVote}-opt-1`)).toBeNull();
+    await flushVirtualizedList();
+  });
+
+  it('lets a signed-in member vote once and then refetches results', async () => {
+    mockSession.isSignedIn = true;
+    mockSession.accessToken = 'member-token';
+    fetchInboxMock.mockResolvedValue(pagedResponse([], 1, 0));
+    fetchPoll.mockResolvedValue(openHomePoll());
+    votePoll.mockResolvedValue(votedHomePoll());
+
+    renderHome();
+    await waitFor(() => expect(screen.getByTestId(`${testIds.homePollVote}-opt-1`)).toBeOnTheScreen());
+
+    fetchPoll.mockResolvedValue(votedHomePoll());
+    fireEvent.press(screen.getByTestId(`${testIds.homePollVote}-opt-1`));
+
+    await waitFor(() => expect(votePoll).toHaveBeenCalledWith('opt-1', 'member-token'));
+    await waitFor(() => {
+      expect(screen.getByText('Your vote')).toBeOnTheScreen();
+      expect(screen.getByText('5 · 83.3%')).toBeOnTheScreen();
+    });
+    expect(fetchPoll.mock.calls.length).toBeGreaterThan(1);
+    await flushVirtualizedList();
+  });
 });
+
+function openHomePoll() {
+  return {
+    id: 'poll-1',
+    question: 'Best Queen album?',
+    options: [
+      { id: 'opt-1', text: 'A Night at the Opera', count: 4, percentage: 80 },
+      { id: 'opt-2', text: 'News of the World', count: 1, percentage: 20 },
+    ],
+    totalVotes: 5,
+    isClosed: false,
+    viewerHasVoted: false,
+    selectedOptionId: null,
+  };
+}
+
+function votedHomePoll() {
+  return {
+    id: 'poll-1',
+    question: 'Best Queen album?',
+    options: [
+      { id: 'opt-1', text: 'A Night at the Opera', count: 5, percentage: 83.3 },
+      { id: 'opt-2', text: 'News of the World', count: 1, percentage: 16.7 },
+    ],
+    totalVotes: 6,
+    isClosed: false,
+    viewerHasVoted: true,
+    selectedOptionId: 'opt-1',
+  };
+}

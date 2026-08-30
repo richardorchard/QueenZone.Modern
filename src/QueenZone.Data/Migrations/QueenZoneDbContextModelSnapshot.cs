@@ -370,6 +370,96 @@ namespace QueenZone.Data.Migrations
                     b.ToTable("HelpRequests", (string)null);
                 });
 
+            modelBuilder.Entity("QueenZone.Data.Entities.HomePollEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("ClosedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("CreatedByMemberId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsCurrent")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTimeOffset?>("PublishedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Question")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IsCurrent")
+                        .IsUnique()
+                        .HasDatabaseName("UX_HomePolls_IsCurrent")
+                        .HasFilter("[IsCurrent] = 1");
+
+                    b.ToTable("HomePolls", (string)null);
+                });
+
+            modelBuilder.Entity("QueenZone.Data.Entities.HomePollOptionEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("int");
+
+                    b.Property<string>("OptionText")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid>("PollId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PollId", "DisplayOrder")
+                        .HasDatabaseName("IX_HomePollOptions_PollId_DisplayOrder");
+
+                    b.ToTable("HomePollOptions", (string)null);
+                });
+
+            modelBuilder.Entity("QueenZone.Data.Entities.HomePollVoteEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("MemberAccountId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("OptionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("PollId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("VotedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OptionId");
+
+                    b.HasIndex("PollId", "MemberAccountId")
+                        .IsUnique()
+                        .HasDatabaseName("UQ_HomePollVotes_Poll_Member");
+
+                    b.ToTable("HomePollVotes", (string)null);
+                });
+
             modelBuilder.Entity("QueenZone.Data.Entities.MemberAccount", b =>
                 {
                     b.Property<Guid>("Id")
@@ -576,6 +666,25 @@ namespace QueenZone.Data.Migrations
                         .HasDatabaseName("IX_MemberMessageBlocks_Blocker_Blocked");
 
                     b.ToTable("MemberMessageBlocks", (string)null);
+                });
+
+            modelBuilder.Entity("QueenZone.Data.Entities.MemberSocialLinkEntity", b =>
+                {
+                    b.Property<Guid>("MemberId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Channel")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Url")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.HasKey("MemberId", "Channel");
+
+                    b.ToTable("MemberSocialLinks", (string)null);
                 });
 
             modelBuilder.Entity("QueenZone.Data.Entities.MemberTopicWatchEntity", b =>
@@ -2496,6 +2605,36 @@ namespace QueenZone.Data.Migrations
                     b.Navigation("Member");
                 });
 
+            modelBuilder.Entity("QueenZone.Data.Entities.HomePollOptionEntity", b =>
+                {
+                    b.HasOne("QueenZone.Data.Entities.HomePollEntity", "Poll")
+                        .WithMany("Options")
+                        .HasForeignKey("PollId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Poll");
+                });
+
+            modelBuilder.Entity("QueenZone.Data.Entities.HomePollVoteEntity", b =>
+                {
+                    b.HasOne("QueenZone.Data.Entities.HomePollOptionEntity", "Option")
+                        .WithMany("Votes")
+                        .HasForeignKey("OptionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("QueenZone.Data.Entities.HomePollEntity", "Poll")
+                        .WithMany("Votes")
+                        .HasForeignKey("PollId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Option");
+
+                    b.Navigation("Poll");
+                });
+
             modelBuilder.Entity("QueenZone.Data.Entities.MemberExternalLogin", b =>
                 {
                     b.HasOne("QueenZone.Data.Entities.MemberAccount", null)
@@ -2541,6 +2680,17 @@ namespace QueenZone.Data.Migrations
                     b.Navigation("Blocked");
 
                     b.Navigation("Blocker");
+                });
+
+            modelBuilder.Entity("QueenZone.Data.Entities.MemberSocialLinkEntity", b =>
+                {
+                    b.HasOne("QueenZone.Data.Entities.MemberAccount", "Member")
+                        .WithMany()
+                        .HasForeignKey("MemberId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Member");
                 });
 
             modelBuilder.Entity("QueenZone.Data.Entities.MemberTopicWatchEntity", b =>
@@ -2807,6 +2957,18 @@ namespace QueenZone.Data.Migrations
                 });
 
             modelBuilder.Entity("QueenZone.Data.Entities.ForumPollOptionEntity", b =>
+                {
+                    b.Navigation("Votes");
+                });
+
+            modelBuilder.Entity("QueenZone.Data.Entities.HomePollEntity", b =>
+                {
+                    b.Navigation("Options");
+
+                    b.Navigation("Votes");
+                });
+
+            modelBuilder.Entity("QueenZone.Data.Entities.HomePollOptionEntity", b =>
                 {
                     b.Navigation("Votes");
                 });

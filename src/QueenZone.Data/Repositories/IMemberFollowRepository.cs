@@ -27,4 +27,11 @@ public interface IMemberFollowRepository
         Guid followerMemberId,
         Guid followedMemberId,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Member ids <paramref name="followerMemberId"/> currently follows.
+    /// </summary>
+    Task<IReadOnlyList<Guid>> ListFollowedIdsAsync(
+        Guid followerMemberId,
+        CancellationToken cancellationToken = default);
 }

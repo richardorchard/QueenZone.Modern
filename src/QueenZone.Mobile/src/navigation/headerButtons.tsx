@@ -7,6 +7,7 @@ import { fonts, useTheme } from '../theme';
 import { testIds } from '../test/testIds';
 import { IconButton } from '../ui/IconButton';
 import { openSuggestNews } from '../share/news/NewsShare';
+import { TabIdentityHeaderRight, tabIdentityHandlers } from './TabIdentityHeaderRight';
 import type { ForumStackParamList, NewsStackParamList } from './types';
 
 export function HeaderBackButton({
@@ -121,6 +122,7 @@ export function NewsIndexHeaderRight({
     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
       <SuggestNewsHeaderButton onPress={() => openSuggestNews(navigation)} />
       <SearchHeaderButton onPress={() => navigation.navigate('Search')} />
+      <TabIdentityHeaderRight {...tabIdentityHandlers(navigation)} />
     </View>
   );
 }
@@ -132,9 +134,27 @@ export function ForumIndexHeaderRight({
 }) {
   const { isSignedIn } = useSession();
   return (
-    <ForumHeaderRight
-      onSearch={() => navigation.navigate('Search')}
-      onCompose={() => openForumComposer(navigation, isSignedIn, {})}
-    />
+    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+      <ForumHeaderRight
+        onSearch={() => navigation.navigate('Search')}
+        onCompose={() => openForumComposer(navigation, isSignedIn, {})}
+      />
+      <TabIdentityHeaderRight {...tabIdentityHandlers(navigation)} />
+    </View>
+  );
+}
+
+export function SearchIdentityHeaderRight({
+  navigation,
+  onSearch,
+}: {
+  navigation: object;
+  onSearch: () => void;
+}) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+      <SearchHeaderButton onPress={onSearch} />
+      <TabIdentityHeaderRight {...tabIdentityHandlers(navigation)} />
+    </View>
   );
 }

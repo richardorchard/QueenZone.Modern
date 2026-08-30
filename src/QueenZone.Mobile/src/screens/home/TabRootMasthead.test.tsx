@@ -47,6 +47,8 @@ describe('TabRootMasthead', () => {
     renderMasthead();
 
     expect(screen.getByTestId(testIds.tabMasthead)).toBeOnTheScreen();
+    expect(screen.getByText('Queenzone.org')).toBeOnTheScreen();
+    expect(screen.queryByTestId(testIds.homeVersion)).toBeNull();
     expect(screen.getByLabelText('Profile')).toBeOnTheScreen();
     expect(screen.getByText('·')).toBeOnTheScreen();
     expect(screen.queryByTestId(testIds.homeMessages)).not.toBeOnTheScreen();
@@ -63,6 +65,7 @@ describe('TabRootMasthead', () => {
     expect(screen.getByLabelText('Profile')).toBeOnTheScreen();
     expect(screen.getByLabelText('Messages')).toBeOnTheScreen();
     expect(screen.getByText('CM')).toBeOnTheScreen();
+    expect(screen.queryByTestId(testIds.homeMessagesUnread)).not.toBeOnTheScreen();
     expect(screen.queryByText('3')).not.toBeOnTheScreen();
     expect(screen.queryByText('99+')).not.toBeOnTheScreen();
   });
@@ -76,6 +79,7 @@ describe('TabRootMasthead', () => {
     expect(screen.getByLabelText('Profile')).toBeOnTheScreen();
     expect(screen.queryByLabelText('Profile, 3 unread conversations')).not.toBeOnTheScreen();
     expect(screen.getByLabelText('Messages, 3 unread conversations')).toBeOnTheScreen();
+    expect(screen.getByTestId(testIds.homeMessagesUnread, { includeHiddenElements: true })).toBeOnTheScreen();
     expect(screen.getByText('CM')).toBeOnTheScreen();
     expect(screen.getByText('3', { includeHiddenElements: true })).toBeOnTheScreen();
   });

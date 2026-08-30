@@ -14,12 +14,18 @@ import {
   fetchNewsYearRange,
   fetchOnThisDay,
   fetchPhotoCategories,
+  fetchQuoteById,
   fetchRandomQuote,
 } from '../../api';
 import { fetchConversation } from '../../api/messages';
 import { newsDetailFixture, newsItemFixture, pagedResponse } from '../../test/fixtures';
-import { createMockSession } from '../../test/mockSession';
+import {
+  ForumIndexHeaderRight,
+  NewsIndexHeaderRight,
+  SearchIdentityHeaderRight,
+} from '../../navigation/headerButtons';
 import { nestedTabParams } from '../../navigation/nestedTab';
+import { createMockSession } from '../../test/mockSession';
 import { fakeNavigation, flushVirtualizedList, renderWithProviders } from '../../test/render';
 import { testIds } from '../../test/testIds';
 import { ArchiveHubScreen } from '../archive/ArchiveHubScreen';
@@ -30,6 +36,7 @@ import { NewsIndexScreen } from '../news/NewsIndexScreen';
 import { NewsStoryScreen } from '../news/NewsStoryScreen';
 import { PhotosScreen } from '../photos/PhotosScreen';
 import { HomeScreen } from './HomeScreen';
+import { QuoteScreen } from './QuoteScreen';
 
 jest.mock('../../api', () => {
   const actual = jest.requireActual('../../api');
@@ -48,6 +55,7 @@ jest.mock('../../api', () => {
     fetchPhotoCategories: jest.fn(),
     fetchOnThisDay: jest.fn(),
     fetchRandomQuote: jest.fn(),
+    fetchQuoteById: jest.fn(),
     fetchLiveActivity: jest.fn(),
     fetchInbox: jest.fn(),
   };
@@ -94,11 +102,29 @@ const fetchWatch = fetchForumTopicWatch as jest.MockedFunction<typeof fetchForum
 const fetchPhotos = fetchPhotoCategories as jest.MockedFunction<typeof fetchPhotoCategories>;
 const fetchDay = fetchOnThisDay as jest.MockedFunction<typeof fetchOnThisDay>;
 const fetchQuote = fetchRandomQuote as jest.MockedFunction<typeof fetchRandomQuote>;
+const fetchQuoteDetail = fetchQuoteById as jest.MockedFunction<typeof fetchQuoteById>;
 const fetchLive = fetchLiveActivity as jest.MockedFunction<typeof fetchLiveActivity>;
 const fetchInboxMock = fetchInbox as jest.MockedFunction<typeof fetchInbox>;
 const fetchConversationMock = fetchConversation as jest.MockedFunction<typeof fetchConversation>;
 
 const conversationId = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
+
+function tabRootHeaders(navigation: ReturnType<typeof fakeNavigation>) {
+  return [
+    <NewsIndexHeaderRight key="news" navigation={navigation as never} />,
+    <SearchIdentityHeaderRight
+      key="photos"
+      navigation={navigation}
+      onSearch={() => navigation.navigate('Search')}
+    />,
+    <SearchIdentityHeaderRight
+      key="archive"
+      navigation={navigation}
+      onSearch={() => navigation.navigate('Search')}
+    />,
+    <ForumIndexHeaderRight key="forum" navigation={navigation as never} />,
+  ];
+}
 
 describe('TabRootMasthead placement', () => {
   beforeEach(() => {
@@ -162,6 +188,12 @@ describe('TabRootMasthead placement', () => {
     fetchPhotos.mockResolvedValue(pagedResponse([], 1, 0));
     fetchDay.mockResolvedValue(null);
     fetchQuote.mockResolvedValue(null);
+    fetchQuoteDetail.mockResolvedValue({
+      id: 9,
+      text: 'A kind of magic',
+      whoSaid: 'Freddie Mercury',
+      context: 'Live Aid, 1985',
+    });
     fetchLive.mockResolvedValue({ newForumRepliesToday: 0 });
     fetchInboxMock.mockResolvedValue(pagedResponse([], 1, 0));
     fetchConversationMock.mockResolvedValue({
@@ -193,7 +225,7 @@ describe('TabRootMasthead placement', () => {
     await flushVirtualizedList();
   });
 
-  it('renders on Home, NewsIndex, PhotoIndex, ArchiveHub, and ForumIndex', async () => {
+  it('keeps the full masthead on Home and peels it from the other tab roots', async () => {
     const navigation = fakeNavigation();
 
     const home = renderWithProviders(
@@ -201,6 +233,7 @@ describe('TabRootMasthead placement', () => {
       { navigation: false },
     );
     expect(screen.getByTestId(testIds.tabMasthead)).toBeOnTheScreen();
+    expect(screen.queryByTestId(testIds.tabIdentityHeader)).not.toBeOnTheScreen();
     home.unmount();
 
     const news = renderWithProviders(
@@ -210,7 +243,9 @@ describe('TabRootMasthead placement', () => {
       />,
       { navigation: false },
     );
-    await waitFor(() => expect(screen.getByTestId(testIds.tabMasthead)).toBeOnTheScreen());
+    await waitFor(() => expect(screen.getByTestId(testIds.newsScreen)).toBeOnTheScreen());
+    expect(screen.queryByTestId(testIds.tabMasthead)).not.toBeOnTheScreen();
+    expect(screen.queryByTestId(testIds.tabIdentityHeader)).not.toBeOnTheScreen();
     news.unmount();
 
     const photos = renderWithProviders(
@@ -220,7 +255,9 @@ describe('TabRootMasthead placement', () => {
       />,
       { navigation: false },
     );
-    await waitFor(() => expect(screen.getByTestId(testIds.tabMasthead)).toBeOnTheScreen());
+    await waitFor(() => expect(screen.getByTestId(testIds.photosScreen)).toBeOnTheScreen());
+    expect(screen.queryByTestId(testIds.tabMasthead)).not.toBeOnTheScreen();
+    expect(screen.queryByTestId(testIds.tabIdentityHeader)).not.toBeOnTheScreen();
     photos.unmount();
 
     const archive = renderWithProviders(
@@ -230,7 +267,9 @@ describe('TabRootMasthead placement', () => {
       />,
       { navigation: false },
     );
-    expect(screen.getByTestId(testIds.tabMasthead)).toBeOnTheScreen();
+    expect(screen.getByTestId(testIds.archiveHubScreen)).toBeOnTheScreen();
+    expect(screen.queryByTestId(testIds.tabMasthead)).not.toBeOnTheScreen();
+    expect(screen.queryByTestId(testIds.tabIdentityHeader)).not.toBeOnTheScreen();
     archive.unmount();
 
     renderWithProviders(
@@ -240,10 +279,24 @@ describe('TabRootMasthead placement', () => {
       />,
       { navigation: false },
     );
-    await waitFor(() => expect(screen.getByTestId(testIds.tabMasthead)).toBeOnTheScreen());
+    await waitFor(() => expect(screen.getByTestId(testIds.forumScreen)).toBeOnTheScreen());
+    expect(screen.queryByTestId(testIds.tabMasthead)).not.toBeOnTheScreen();
+    expect(screen.queryByTestId(testIds.tabIdentityHeader)).not.toBeOnTheScreen();
   });
 
-  it('opens search and Profile from each tab-root masthead', async () => {
+  it('hangs identity on the four tab-root native headers', async () => {
+    const navigation = fakeNavigation();
+    const headers = tabRootHeaders(navigation);
+
+    for (const header of headers) {
+      const view = renderWithProviders(header, { navigation: false });
+      expect(screen.getByTestId(testIds.tabIdentityHeader)).toBeOnTheScreen();
+      expect(screen.queryByTestId(testIds.tabMasthead)).not.toBeOnTheScreen();
+      view.unmount();
+    }
+  });
+
+  it('opens search and Profile from Home masthead and the four tab-root headers', async () => {
     const user = userEvent.setup();
     const homeNav = fakeNavigation();
     const home = renderWithProviders(
@@ -258,34 +311,12 @@ describe('TabRootMasthead placement', () => {
     home.unmount();
 
     const otherNav = fakeNavigation();
-    const screens = [
-      <NewsIndexScreen
-        key="news"
-        navigation={otherNav as never}
-        route={{ key: 'news', name: 'NewsIndex' } as never}
-      />,
-      <PhotosScreen
-        key="photos"
-        navigation={otherNav as never}
-        route={{ key: 'photos', name: 'PhotoIndex' } as never}
-      />,
-      <ArchiveHubScreen
-        key="archive"
-        navigation={otherNav as never}
-        route={{ key: 'archive', name: 'ArchiveHub' } as never}
-      />,
-      <ForumScreen
-        key="forum"
-        navigation={otherNav as never}
-        route={{ key: 'forum', name: 'ForumIndex' } as never}
-      />,
-    ];
+    const headers = tabRootHeaders(otherNav);
 
-    for (const screenNode of screens) {
+    for (const header of headers) {
       otherNav.navigate.mockClear();
-      const view = renderWithProviders(screenNode, { navigation: false });
-      await waitFor(() => expect(screen.getByTestId(testIds.tabMasthead)).toBeOnTheScreen());
-      await user.press(screen.getByTestId(testIds.homeSearch));
+      const view = renderWithProviders(header, { navigation: false });
+      await user.press(screen.getByLabelText('Search'));
       await user.press(screen.getByTestId(testIds.homeProfile));
       expect(otherNav.navigate).toHaveBeenCalledWith('Search');
       expect(otherNav.navigate).toHaveBeenCalledWith('HomeTab', { screen: 'Profile' });
@@ -294,7 +325,7 @@ describe('TabRootMasthead placement', () => {
     }
   });
 
-  it('opens Inbox from the signed-in messages icon on each tab-root masthead', async () => {
+  it('opens Inbox from the signed-in messages icon on Home and the four tab-root headers', async () => {
     mockSession.isSignedIn = true;
     mockSession.accessToken = 'tok';
     const user = userEvent.setup();
@@ -309,40 +340,18 @@ describe('TabRootMasthead placement', () => {
     home.unmount();
 
     const otherNav = fakeNavigation();
-    const screens = [
-      <NewsIndexScreen
-        key="news"
-        navigation={otherNav as never}
-        route={{ key: 'news', name: 'NewsIndex' } as never}
-      />,
-      <PhotosScreen
-        key="photos"
-        navigation={otherNav as never}
-        route={{ key: 'photos', name: 'PhotoIndex' } as never}
-      />,
-      <ArchiveHubScreen
-        key="archive"
-        navigation={otherNav as never}
-        route={{ key: 'archive', name: 'ArchiveHub' } as never}
-      />,
-      <ForumScreen
-        key="forum"
-        navigation={otherNav as never}
-        route={{ key: 'forum', name: 'ForumIndex' } as never}
-      />,
-    ];
+    const headers = tabRootHeaders(otherNav);
 
-    for (const screenNode of screens) {
+    for (const header of headers) {
       otherNav.navigate.mockClear();
-      const view = renderWithProviders(screenNode, { navigation: false });
-      await waitFor(() => expect(screen.getByTestId(testIds.tabMasthead)).toBeOnTheScreen());
+      const view = renderWithProviders(header, { navigation: false });
       await user.press(screen.getByTestId(testIds.homeMessages));
       expect(otherNav.navigate).toHaveBeenCalledWith('HomeTab', nestedTabParams('Inbox'));
       view.unmount();
     }
   });
 
-  it('is absent on Story, Thread, and Conversation', async () => {
+  it('is absent on Story, Quote, Thread, and Conversation', async () => {
     const navigation = fakeNavigation();
 
     const story = renderWithProviders(
@@ -354,7 +363,20 @@ describe('TabRootMasthead placement', () => {
     );
     await waitFor(() => expect(screen.getByTestId(testIds.newsStoryScreen)).toBeOnTheScreen());
     expect(screen.queryByTestId(testIds.tabMasthead)).not.toBeOnTheScreen();
+    expect(screen.queryByTestId(testIds.tabIdentityHeader)).not.toBeOnTheScreen();
     story.unmount();
+
+    const quote = renderWithProviders(
+      <QuoteScreen
+        navigation={navigation as never}
+        route={{ key: 'quote', name: 'Quote', params: { id: 9 } } as never}
+      />,
+      { navigation: false },
+    );
+    await waitFor(() => expect(screen.getByTestId(testIds.quoteScreen)).toBeOnTheScreen());
+    expect(screen.queryByTestId(testIds.tabMasthead)).not.toBeOnTheScreen();
+    expect(screen.queryByTestId(testIds.tabIdentityHeader)).not.toBeOnTheScreen();
+    quote.unmount();
 
     const thread = renderWithProviders(
       <ThreadScreen
@@ -371,6 +393,7 @@ describe('TabRootMasthead placement', () => {
     );
     await waitFor(() => expect(screen.getByTestId(testIds.forumThreadScreen)).toBeOnTheScreen());
     expect(screen.queryByTestId(testIds.tabMasthead)).not.toBeOnTheScreen();
+    expect(screen.queryByTestId(testIds.tabIdentityHeader)).not.toBeOnTheScreen();
     thread.unmount();
 
     mockSession.isSignedIn = true;
@@ -383,5 +406,6 @@ describe('TabRootMasthead placement', () => {
     );
     await waitFor(() => expect(screen.getByText('Hello')).toBeOnTheScreen());
     expect(screen.queryByTestId(testIds.tabMasthead)).not.toBeOnTheScreen();
+    expect(screen.queryByTestId(testIds.tabIdentityHeader)).not.toBeOnTheScreen();
   });
 });

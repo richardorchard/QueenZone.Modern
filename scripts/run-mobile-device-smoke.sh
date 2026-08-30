@@ -8,6 +8,7 @@
 #   ./scripts/run-mobile-device-smoke.sh --platform ios
 #   ./scripts/run-mobile-device-smoke.sh --platform android --skip-build --apk path/to/app-debug.apk
 #   ./scripts/run-mobile-device-smoke.sh --platform android --prove-failure
+#   ./scripts/run-mobile-device-smoke.sh --platform android --suite journeys
 #
 # Maestro flows are not retried. A single emulator/simulator boot failure is
 # the runner's problem (android-emulator-runner / simctl), not a test retry.
@@ -21,6 +22,7 @@ skip_build=false
 skip_host=false
 no_build_host=false
 prove_failure=false
+suite="smoke"
 apk=""
 app=""
 port="${SMOKE_PORT:-5098}"
@@ -54,6 +56,10 @@ while [ "$#" -gt 0 ]; do
       prove_failure=true
       shift
       ;;
+    --suite)
+      suite="${2:-}"
+      shift 2
+      ;;
     --apk)
       apk="${2:-}"
       shift 2
@@ -84,6 +90,16 @@ done
 
 if [ "$platform" != "android" ] && [ "$platform" != "ios" ]; then
   echo "--platform android|ios is required." >&2
+  exit 2
+fi
+
+if [ "$suite" != "smoke" ] && [ "$suite" != "journeys" ]; then
+  echo "--suite smoke|journeys is required (default smoke)." >&2
+  exit 2
+fi
+
+if [ "$prove_failure" = true ] && [ "$suite" != "smoke" ]; then
+  echo "--prove-failure is only valid with --suite smoke." >&2
   exit 2
 fi
 
@@ -179,6 +195,63 @@ export_smoke_auth_url() {
   echo "SMOKE_AUTH_URL is set (length ${#SMOKE_AUTH_URL}; token not printed)."
 }
 
+export_journey_env() {
+  if [ ! -f "$fixture" ]; then
+    echo "Contract fixture $fixture is missing; cannot export journey IDs." >&2
+    exit 1
+  fi
+
+  ATTACH_TOPIC_ID="$(
+    node -e '
+      const fs = require("fs");
+      const fixture = JSON.parse(fs.readFileSync(process.env.QUEENZONE_MOBILE_CONTRACT_FIXTURE, "utf8"));
+      if (fixture.environment !== "Testing") {
+        throw new Error("Journeys refuse a non-Testing fixture environment: " + fixture.environment);
+      }
+      const id = fixture.attachTopicId;
+      if (!Number.isInteger(id) || id <= 0) {
+        throw new Error("Contract fixture is missing attachTopicId.");
+      }
+      process.stdout.write(String(id));
+    '
+  )"
+  export ATTACH_TOPIC_ID
+  echo "ATTACH_TOPIC_ID is set."
+}
+
+push_attach_fixture() {
+  local src="$root/src/QueenZone.Mobile/maestro/fixtures/attach.txt"
+  if [ ! -f "$src" ]; then
+    echo "Missing attach fixture at $src" >&2
+    exit 1
+  fi
+
+  if [ "$platform" = "android" ]; then
+    adb shell mkdir -p /sdcard/Download
+    adb push "$src" /sdcard/Download/attach.txt >/dev/null
+    adb shell mkdir -p /sdcard/Android/data/org.queenzone.mobile/files
+    adb push "$src" /sdcard/Android/data/org.queenzone.mobile/files/attach.txt >/dev/null
+    SMOKE_ATTACH_URL="$(
+      node -e 'process.stdout.write("queenzone://smoke-attach?uri=" + encodeURIComponent("file:///sdcard/Android/data/org.queenzone.mobile/files/attach.txt") + "&name=attach.txt&type=text/plain")'
+    )"
+  else
+    local data
+    data="$(xcrun simctl get_app_container booted org.queenzone.mobile data)"
+    if [ -z "$data" ] || [ ! -d "$data" ]; then
+      echo "Could not resolve the iOS Simulator data container for org.queenzone.mobile." >&2
+      exit 1
+    fi
+    mkdir -p "$data/Documents"
+    cp "$src" "$data/Documents/attach.txt"
+    SMOKE_ATTACH_URL="$(
+      node -e 'process.stdout.write("queenzone://smoke-attach?uri=" + encodeURIComponent(process.argv[1]) + "&name=attach.txt&type=text/plain")' \
+        "file://${data}/Documents/attach.txt"
+    )"
+  fi
+  export SMOKE_ATTACH_URL
+  echo "SMOKE_ATTACH_URL is set (length ${#SMOKE_ATTACH_URL}; path not printed)."
+}
+
 build_android() {
   (
     cd src/QueenZone.Mobile
@@ -229,6 +302,9 @@ else
 fi
 
 export_smoke_auth_url
+if [ "$suite" = "journeys" ]; then
+  export_journey_env
+fi
 
 if [ "$skip_build" != true ]; then
   if [ "$platform" = "android" ]; then
@@ -266,6 +342,10 @@ else
   xcrun simctl install booted "$app"
 fi
 
+if [ "$suite" = "journeys" ]; then
+  push_attach_fixture
+fi
+
 if ! command -v maestro >/dev/null; then
   echo "Maestro is not on PATH. Install with: curl -Ls \"https://get.maestro.mobile.dev\" | bash" >&2
   exit 1
@@ -275,16 +355,28 @@ flow="src/QueenZone.Mobile/maestro/smoke.yaml"
 if [ "$prove_failure" = true ]; then
   flow="src/QueenZone.Mobile/maestro/prove-failure.yaml"
   echo "Running forced-assertion flow to prove failure artifacts."
+elif [ "$suite" = "journeys" ]; then
+  flow="src/QueenZone.Mobile/maestro/journeys.yaml"
+  echo "Running on-demand Maestro journeys (#1071)."
 fi
 
 echo "Running Maestro ($flow). Flows are not retried."
 set +e
-maestro test "$flow" \
-  --format junit \
-  --output "$results_dir/junit.xml" \
-  --debug-output "$results_dir/debug" \
-  --flatten-debug-output \
+maestro_args=(
+  test "$flow"
+  --format junit
+  --output "$results_dir/junit.xml"
+  --debug-output "$results_dir/debug"
+  --flatten-debug-output
   -e "SMOKE_AUTH_URL=${SMOKE_AUTH_URL}"
+)
+if [ "$suite" = "journeys" ]; then
+  maestro_args+=(
+    -e "SMOKE_ATTACH_URL=${SMOKE_ATTACH_URL}"
+    -e "ATTACH_TOPIC_ID=${ATTACH_TOPIC_ID}"
+  )
+fi
+maestro "${maestro_args[@]}"
 maestro_status=$?
 set -e
 

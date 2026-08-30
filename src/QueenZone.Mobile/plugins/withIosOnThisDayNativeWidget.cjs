@@ -10,6 +10,7 @@
  *
  * When both halves are present the native view shows one face at a time on a
  * 4-hour UTC slot (`entry.date`), matching `widgetActiveFace` in widgetCopy.ts.
+ * Primary/secondary type-scale literals match widgetCopy.ts (17/22, 0.65, 6, 9/11, 2).
  */
 const fs = require('fs');
 const path = require('path');
@@ -25,11 +26,13 @@ const CREST_SOURCE_RELATIVE = path.join('assets', 'archive', CREST_ASSET_NAME);
 const NATIVE_VIEW_SOURCE = `
 struct OnThisDayNativeEntryView: View {
   var entry: WidgetsTimelineEntry
+  @Environment(\\.widgetFamily) private var family
 
   private var formattedDate: String { stringProp("formattedDate") }
   private var summary: String { stringProp("summary") }
   private var quoteText: String { stringProp("quoteText") }
   private var quoteWhoSaid: String { stringProp("quoteWhoSaid") }
+  private var quoteId: Int { intProp("quoteId") }
   private var hasDay: Bool { !formattedDate.isEmpty && !summary.isEmpty }
   private var hasQuote: Bool { !quoteText.isEmpty && !quoteWhoSaid.isEmpty }
   private var showDay: Bool {
@@ -45,6 +48,8 @@ struct OnThisDayNativeEntryView: View {
     }
     return hasQuote
   }
+  private var primaryCeiling: CGFloat { family == .systemMedium ? 22 : 17 }
+  private var secondaryPt: CGFloat { family == .systemMedium ? 11 : 9 }
 
   var body: some View {
     let card = ZStack(alignment: .bottomTrailing) {
@@ -61,28 +66,45 @@ struct OnThisDayNativeEntryView: View {
           .font(.system(size: 10, weight: .semibold))
           .foregroundColor(Color(red: 184 / 255, green: 154 / 255, blue: 74 / 255))
         if showDay {
-          Text("\\(formattedDate): \\(summary)")
-            .font(.system(size: 13))
+          Text(summary)
+            .font(.system(size: primaryCeiling))
             .foregroundColor(Color(red: 242 / 255, green: 241 / 255, blue: 237 / 255))
-            .lineLimit(3)
+            .minimumScaleFactor(0.65)
+            .lineLimit(6)
+            .truncationMode(.tail)
+            .frame(maxHeight: .infinity, alignment: .topLeading)
+          Text(formattedDate)
+            .font(.system(size: secondaryPt))
+            .foregroundColor(Color(red: 184 / 255, green: 182 / 255, blue: 176 / 255))
+            .lineLimit(2)
         }
         if showQuote {
-          Text("“\\(quoteText)” — \\(quoteWhoSaid)")
-            .font(.system(size: 12))
+          Text("“\\(quoteText)”")
+            .font(.system(size: primaryCeiling))
             .foregroundColor(Color(red: 184 / 255, green: 182 / 255, blue: 176 / 255))
-            .lineLimit(3)
+            .minimumScaleFactor(0.65)
+            .lineLimit(6)
+            .truncationMode(.tail)
+            .frame(maxHeight: .infinity, alignment: .topLeading)
+          Text("— \\(quoteWhoSaid)")
+            .font(.system(size: secondaryPt))
+            .foregroundColor(Color(red: 184 / 255, green: 182 / 255, blue: 176 / 255))
+            .lineLimit(2)
         }
         if !hasDay && !hasQuote {
           Text("Open QueenZone to load today's story.")
-            .font(.system(size: 12))
+            .font(.system(size: primaryCeiling))
             .foregroundColor(Color(red: 184 / 255, green: 182 / 255, blue: 176 / 255))
-            .lineLimit(3)
+            .minimumScaleFactor(0.65)
+            .lineLimit(6)
+            .truncationMode(.tail)
+            .frame(maxHeight: .infinity, alignment: .topLeading)
         }
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
       .padding(14)
     }
-    .widgetURL(URL(string: "queenzone://home"))
+    .widgetURL(tapURL)
 
     if #available(iOS 17.0, *) {
       card.containerBackground(
@@ -94,8 +116,28 @@ struct OnThisDayNativeEntryView: View {
     }
   }
 
+  private var tapURL: URL? {
+    if showQuote && quoteId > 0 {
+      return URL(string: "queenzone://quotes/\\(quoteId)")
+    }
+    return URL(string: "queenzone://home")
+  }
+
   private func stringProp(_ key: String) -> String {
     (entry.props?[key] as? String) ?? ""
+  }
+
+  private func intProp(_ key: String) -> Int {
+    if let number = entry.props?[key] as? Int {
+      return number
+    }
+    if let number = entry.props?[key] as? Double {
+      return Int(number)
+    }
+    if let text = entry.props?[key] as? String, let number = Int(text) {
+      return number
+    }
+    return 0
   }
 }
 `.trim();
@@ -172,7 +214,7 @@ function withIosOnThisDayNativeWidget(config) {
 const plugin = createRunOncePlugin(
   withIosOnThisDayNativeWidget,
   'withIosOnThisDayNativeWidget',
-  '1.1.0',
+  '1.3.0',
 );
 
 plugin.applyOnThisDayNativeWidget = applyOnThisDayNativeWidget;

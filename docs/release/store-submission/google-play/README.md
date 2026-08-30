@@ -25,5 +25,5 @@ Do not select **Send for review**, start production rollout or change managed pu
 - Final reviewer contact and dedicated test credentials.
 - Product-owner confirmation of target age groups, content-rights answers and news-app declaration.
 - Final Data safety reconciliation against the release AAB and Sentry configuration.
-- Production `versionName` decision; the existing workflow intentionally uploads `0.1.0-internal.<run>` to the internal track.
+- Production listing review; internal-track `versionName` is `{prefix}.{run}` (`0.1` until the committed prefix flips to `1.0`).
 

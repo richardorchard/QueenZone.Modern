@@ -140,6 +140,189 @@ public sealed class EfMemberPublicActivityRepositoryTests : IAsyncDisposable
         Assert.DoesNotContain(result.Items, item => item.Summary != null && item.Summary.Contains("Hidden spam", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public async Task GetFeedPageAsync_EmptyIds_DoesNotReturnActivity()
+    {
+        SeedMember(memberId, "Solo");
+        SeedForumPost(memberId, "Solo", 1, 101, 201, "Solo topic", DateTime.Parse("2026-08-03T08:00:00Z"));
+        await dbContext.SaveChangesAsync();
+
+        var result = await new EfMemberPublicActivityRepository(dbContext)
+            .GetFeedPageAsync([], 1, 20);
+
+        Assert.Equal(0, result.TotalCount);
+        Assert.Empty(result.Items);
+    }
+
+    [Fact]
+    public async Task GetFeedPageAsync_FiltersAuthorIdIn_AndMixesNewestFirst()
+    {
+        var aliceId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        var bobId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+        var carolId = Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc");
+        SeedMember(aliceId, "Alice");
+        SeedMember(bobId, "Bob");
+        SeedMember(carolId, "Carol");
+        SeedForumPost(aliceId, "Alice", 1, 101, 201, "Alice forum", DateTime.Parse("2026-08-03T12:00:00Z"));
+        SeedForumPost(bobId, "Bob", 2, 102, 202, "Bob forum", DateTime.Parse("2026-08-03T10:00:00Z"));
+        SeedForumPost(carolId, "Carol", 3, 103, 203, "Carol forum", DateTime.Parse("2026-08-03T14:00:00Z"));
+        dbContext.ArticleSubmissions.Add(ArticleFor(bobId, "Bob article", ArticleSubmissionStatus.Published, DateTimeOffset.Parse("2026-08-03T11:00:00Z")));
+        dbContext.PhotoSubmissions.Add(PhotoFor(aliceId, "Alice photo", PhotoSubmissionStatus.Approved, DateTimeOffset.Parse("2026-08-03T09:00:00Z")));
+        dbContext.NewsSuggestions.Add(NewsFor(carolId, "Carol news", NewsSuggestionStatus.Promoted, 301, DateTimeOffset.Parse("2026-08-03T13:00:00Z")));
+        await dbContext.SaveChangesAsync();
+
+        var result = await new EfMemberPublicActivityRepository(dbContext)
+            .GetFeedPageAsync([aliceId, bobId], 1, 20);
+
+        Assert.Equal(4, result.TotalCount);
+        Assert.Equal(
+            ["Alice forum", "Bob article", "Bob forum", "Alice photo"],
+            result.Items.Select(item => item.Title).ToArray());
+        Assert.DoesNotContain(result.Items, item => item.Title.Contains("Carol", StringComparison.Ordinal));
+        Assert.Equal(aliceId, result.Items[0].AuthorId);
+        Assert.Equal("Alice", result.Items[0].AuthorDisplayName);
+        Assert.Equal(bobId, result.Items[1].AuthorId);
+    }
+
+    [Fact]
+    public async Task GetFeedPageAsync_PaginatesAcrossAuthors()
+    {
+        var aliceId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        var bobId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+        SeedMember(aliceId, "Alice");
+        SeedMember(bobId, "Bob");
+        for (var index = 0; index < 21; index++)
+        {
+            var authorId = index % 2 == 0 ? aliceId : bobId;
+            var authorName = index % 2 == 0 ? "Alice" : "Bob";
+            SeedForumPost(
+                authorId,
+                authorName,
+                index + 1,
+                200 + index,
+                300 + index,
+                $"Topic {index}",
+                DateTime.Parse("2026-08-03T08:00:00Z").AddMinutes(-index));
+        }
+
+        await dbContext.SaveChangesAsync();
+        var repository = new EfMemberPublicActivityRepository(dbContext);
+
+        var first = await repository.GetFeedPageAsync([aliceId, bobId], 1, 20);
+        var second = await repository.GetFeedPageAsync([aliceId, bobId], 2, 20);
+
+        Assert.Equal(21, first.TotalCount);
+        Assert.Equal(20, first.Items.Count);
+        Assert.Equal("Topic 0", first.Items[0].Title);
+        Assert.DoesNotContain(first.Items, item => item.Title == "Topic 20");
+        Assert.Equal(["Topic 20"], second.Items.Select(item => item.Title).ToArray());
+    }
+
+    private void SeedMember(Guid id, string displayName)
+    {
+        var email = $"{displayName.ToLowerInvariant()}-{id:N}@example.com";
+        dbContext.MemberAccounts.Add(new MemberAccount
+        {
+            Id = id,
+            Email = email,
+            NormalizedEmail = email.ToUpperInvariant(),
+            DisplayName = displayName,
+            CreatedAt = DateTime.UtcNow,
+        });
+    }
+
+    private void SeedForumPost(
+        Guid authorId,
+        string authorName,
+        int id,
+        int topicId,
+        int postId,
+        string title,
+        DateTime postedAt)
+    {
+        dbContext.ModernForumThreads.Add(new ModernForumThreadEntity
+        {
+            Id = id,
+            LegacyTopicId = topicId,
+            LegacyForumId = 1,
+            CategoryId = 1,
+            Title = title,
+        });
+        dbContext.ModernForumPosts.Add(new ModernForumPostEntity
+        {
+            Id = id,
+            LegacyPostId = postId,
+            LegacyThreadTopicId = topicId,
+            ThreadId = id,
+            LegacyForumId = 1,
+            AuthorMemberId = authorId,
+            AuthorDisplayName = authorName,
+            BodyHtml = title,
+            PostedAt = postedAt,
+        });
+    }
+
+    private static ArticleSubmissionEntity ArticleFor(
+        Guid authorId,
+        string title,
+        string status,
+        DateTimeOffset? publishedAt)
+    {
+        return new ArticleSubmissionEntity
+        {
+            Id = Guid.NewGuid(),
+            AuthorMemberId = authorId,
+            Title = title,
+            Slug = NewsSlug.Slugify(title),
+            Body = "Body",
+            Status = status,
+            PublishedAt = publishedAt,
+        };
+    }
+
+    private static PhotoSubmissionEntity PhotoFor(
+        Guid authorId,
+        string title,
+        string status,
+        DateTimeOffset? reviewedAt)
+    {
+        return new PhotoSubmissionEntity
+        {
+            Id = Guid.NewGuid(),
+            SubmitterMemberId = authorId,
+            Title = title,
+            BlobPath = $"original/{Guid.NewGuid():N}.jpg",
+            WebOptimizedBlobPath = $"web/{Guid.NewGuid():N}.webp",
+            ThumbnailBlobPath = $"thumb/{Guid.NewGuid():N}.webp",
+            OriginalFileName = "photo.jpg",
+            MimeType = "image/jpeg",
+            Status = status,
+            SubmittedAt = DateTimeOffset.Parse("2026-08-01T08:00:00Z"),
+            ReviewedAt = reviewedAt,
+        };
+    }
+
+    private static NewsSuggestionEntity NewsFor(
+        Guid authorId,
+        string title,
+        string status,
+        int? newsId,
+        DateTimeOffset? reviewedAt)
+    {
+        return new NewsSuggestionEntity
+        {
+            Id = Guid.NewGuid(),
+            SubmitterMemberId = authorId,
+            Url = $"https://example.com/{Guid.NewGuid():N}",
+            UrlHash = Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N"),
+            Title = title,
+            Status = status,
+            SubmittedAt = DateTimeOffset.Parse("2026-08-01T08:00:00Z"),
+            ReviewedAt = reviewedAt,
+            PromotedNewsId = newsId,
+        };
+    }
+
     private ArticleSubmissionEntity Article(string title, string status, DateTimeOffset? publishedAt) => new()
     {
         Id = Guid.NewGuid(),

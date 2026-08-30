@@ -1,0 +1,14 @@
+@page "/forum/post/{postId:int}/hide-author"
+@model HideAuthorModel
+
+<section class="qz-section">
+  <div class="qz-container qz-content-narrow">
+    <h1>Hide all forum content by @Model.Post!.AuthorDisplayName?</h1>
+    <p>This will hide <strong>@Model.Summary!.PostCount posts</strong> and <strong>@Model.Summary.ThreadCount started threads</strong>. Other people's posts stay visible.</p>
+    <form method="post">
+      @Html.AntiForgeryToken()
+      <button type="submit" class="qz-button qz-button--danger">Hide all posts and threads</button>
+      <a class="qz-button" href="@Model.ReturnPath">Cancel</a>
+    </form>
+  </div>
+</section>

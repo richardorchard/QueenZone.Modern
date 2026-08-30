@@ -2,6 +2,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { testIds } from '../test/testIds';
 import { dark } from '../theme';
 import { HomeScreen } from '../screens/home/HomeScreen';
+import { QuoteScreen } from '../screens/home/QuoteScreen';
 
 import { ProfileScreen } from '../screens/account/ProfileScreen';
 import { SettingsScreen } from '../screens/account/SettingsScreen';
@@ -37,7 +38,7 @@ import { ForumScreen } from '../screens/forum/ForumScreen';
 import { CategoryScreen } from '../screens/forum/CategoryScreen';
 import { ThreadScreen } from '../screens/forum/ThreadScreen';
 import { ComposerScreen } from '../screens/forum/ComposerScreen';
-import { ForumIndexHeaderRight, HeaderBackButton, NewsIndexHeaderRight, SearchHeaderButton } from './headerButtons';
+import { ForumIndexHeaderRight, HeaderBackButton, NewsIndexHeaderRight, SearchIdentityHeaderRight } from './headerButtons';
 import type {
   ArchiveStackParamList,
   ForumStackParamList,
@@ -64,6 +65,7 @@ export function HomeStack() {
   return (
     <Home.Navigator screenOptions={stackScreenOptions}>
       <Home.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
+      <Home.Screen name="Quote" component={QuoteScreen} />
       <Home.Screen name="Story" component={NewsStoryScreen} />
       <Home.Screen name="Search" component={SearchRouteScreen} />
       <Home.Screen
@@ -114,7 +116,12 @@ export function PhotosStack() {
         component={PhotosScreen}
         options={({ navigation }) => ({
           title: 'Photography',
-          headerRight: () => <SearchHeaderButton onPress={() => navigation.navigate('Search')} />,
+          headerRight: () => (
+            <SearchIdentityHeaderRight
+              navigation={navigation}
+              onSearch={() => navigation.navigate('Search')}
+            />
+          ),
         })}
       />
       <Photos.Screen name="PhotoCategory" component={PhotoCategoryScreen} options={{ title: 'Collection' }} />
@@ -142,7 +149,12 @@ export function ArchiveStack() {
         component={ArchiveHubScreen}
         options={({ navigation }) => ({
           title: 'Archive',
-          headerRight: () => <SearchHeaderButton onPress={() => navigation.navigate('Search')} />,
+          headerRight: () => (
+            <SearchIdentityHeaderRight
+              navigation={navigation}
+              onSearch={() => navigation.navigate('Search')}
+            />
+          ),
         })}
       />
       <Archive.Screen name="Articles" component={ArticlesIndexScreen} options={{ title: 'Articles' }} />

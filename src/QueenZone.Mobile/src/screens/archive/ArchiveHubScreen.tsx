@@ -1,19 +1,17 @@
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { FlatList, View } from 'react-native';
+import { FlatList } from 'react-native';
 import {
   archiveDestinations,
   type ArchiveDestination,
 } from '../../content/sample';
-import { nestedTabParams } from '../../navigation/nestedTab';
 import type { ArchiveStackParamList, RootTabParamList } from '../../navigation/types';
 import { useTheme } from '../../theme';
 import { ArchiveFooter } from '../../ui/ArchiveFooter';
 import { DestinationRow } from '../../ui/DestinationRow';
 import { testIds } from '../../test/testIds';
 import { PageTitleBlock } from '../../ui/PageTitleBlock';
-import { TabRootMasthead } from '../home/TabRootMasthead';
 
 type Props = CompositeScreenProps<
   NativeStackScreenProps<ArchiveStackParamList, 'ArchiveHub'>,
@@ -59,18 +57,11 @@ export function ArchiveHubScreen({ navigation }: Props) {
       data={archiveDestinations}
       keyExtractor={(item) => item.id}
       ListHeaderComponent={
-        <View>
-          <TabRootMasthead
-            onSearch={() => navigation.navigate('Search')}
-            onMessagesPress={() => navigation.navigate('HomeTab', nestedTabParams('Inbox'))}
-            onProfilePress={() => navigation.navigate('HomeTab', { screen: 'Profile' })}
-          />
-          <PageTitleBlock
-            eyebrow="The Queenzone.com archive"
-            title="Explore the archive"
-            subtitle="Four thousand articles, a hundred long-form features, tens of thousands of photographs and the community's own history — preserved and catalogued."
-          />
-        </View>
+        <PageTitleBlock
+          eyebrow="The Queenzone.com archive"
+          title="Explore the archive"
+          subtitle="Four thousand articles, a hundred long-form features, tens of thousands of photographs and the community's own history — preserved and catalogued."
+        />
       }
       ListFooterComponent={<ArchiveFooter />}
       renderItem={({ item }) => (

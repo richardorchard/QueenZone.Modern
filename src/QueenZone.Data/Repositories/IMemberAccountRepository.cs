@@ -122,4 +122,18 @@ public interface IMemberAccountRepository
         DateTime purgeBefore,
         DateTime purgedAt,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<MemberSocialLink>> ListSocialLinksAsync(
+        Guid memberId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Replaces the member's social-link rows with <paramref name="links"/>.
+    /// Pass an empty list to remove every channel. Callers must not send
+    /// duplicate channels; the unique (<c>MemberId</c>, <c>Channel</c>) key rejects them.
+    /// </summary>
+    Task ReplaceSocialLinksAsync(
+        Guid memberId,
+        IReadOnlyList<MemberSocialLink> links,
+        CancellationToken cancellationToken = default);
 }
