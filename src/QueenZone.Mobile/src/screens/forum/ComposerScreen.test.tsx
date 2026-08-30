@@ -39,6 +39,7 @@ jest.mock('../../api', () => {
 jest.mock('../../offlineQueue', () => ({
   enqueueForumReply: jest.fn(),
   flushOfflineQueue: jest.fn(),
+  removeOfflineItem: jest.fn(),
 }));
 
 jest.mock('expo-image-picker', () => ({
@@ -86,7 +87,10 @@ describe('ComposerScreen', () => {
     mockSession.profile = { memberId: 'member-1' } as never;
     createForumReplyMock.mockReset();
     enqueueForumReplyMock.mockReset();
-    enqueueForumReplyMock.mockResolvedValue({ operationId: 'op-1' } as never);
+    enqueueForumReplyMock.mockImplementation(async (input) => ({
+      operationId: 'op-1',
+      payload: { body: input.body },
+    }));
     createForumTopicMock.mockReset();
     fetchForumCategoriesMock.mockReset();
     (ImagePicker.requestMediaLibraryPermissionsAsync as jest.Mock).mockReset();
@@ -122,8 +126,14 @@ describe('ComposerScreen', () => {
         body: 'A reply from mobile',
       }),
     );
+    expect(createForumReplyMock).toHaveBeenCalledWith(
+      1002,
+      { body: 'A reply from mobile' },
+      'tok',
+      undefined,
+      'op-1',
+    );
     expect(navigation.goBack).toHaveBeenCalled();
-    expect(createForumReplyMock).not.toHaveBeenCalled();
     expect(createForumTopicMock).not.toHaveBeenCalled();
   });
 
@@ -353,7 +363,13 @@ describe('ComposerScreen', () => {
         body: 'A reply from mobile',
       }),
     );
-    expect(createForumReplyMock).not.toHaveBeenCalled();
+    expect(createForumReplyMock).toHaveBeenCalledWith(
+      1002,
+      { body: 'A reply from mobile' },
+      'tok',
+      undefined,
+      'op-1',
+    );
   });
 
   it('ignores a canceled picker and reports a library that cannot open', async () => {

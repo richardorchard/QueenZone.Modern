@@ -33,6 +33,31 @@ type QueueSenders = {
 let auth: OfflineQueueAuth | null = null;
 let flushing = false;
 let senders: QueueSenders | null = null;
+let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+export function clearOfflineQueueRetryTimer(): void {
+  if (retryTimer) {
+    clearTimeout(retryTimer);
+    retryTimer = null;
+  }
+}
+
+async function armRetryTimer(memberId: string): Promise<void> {
+  clearOfflineQueueRetryTimer();
+  const upcoming = (await listOfflineQueue(memberId))
+    .filter((item) => item.state === 'queued')
+    .map((item) => Date.parse(item.nextRetryAt))
+    .filter((stamp) => Number.isFinite(stamp))
+    .sort((a, b) => a - b)[0];
+  if (upcoming == null) {
+    return;
+  }
+  const delay = Math.min(Math.max(0, upcoming - Date.now()), 5 * 60_000);
+  retryTimer = setTimeout(() => {
+    retryTimer = null;
+    void flushOfflineQueue();
+  }, delay);
+}
 
 export function setOfflineQueueSendersForTests(next: QueueSenders | null): void {
   senders = next;
@@ -111,8 +136,9 @@ export async function flushOfflineQueue(): Promise<void> {
   }
 
   flushing = true;
+  let memberId: string | null = null;
   try {
-    const memberId = currentAuth.getMemberId();
+    memberId = currentAuth.getMemberId();
     if (!memberId) {
       return;
     }
@@ -165,5 +191,8 @@ export async function flushOfflineQueue(): Promise<void> {
     }
   } finally {
     flushing = false;
+    if (memberId) {
+      void armRetryTimer(memberId);
+    }
   }
 }

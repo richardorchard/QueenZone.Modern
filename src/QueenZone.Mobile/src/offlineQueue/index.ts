@@ -12,7 +12,12 @@ import {
   type OfflineQueueTarget,
 } from './types';
 
-export { configureOfflineQueueAuth, flushOfflineQueue, setOfflineQueueSendersForTests } from './flusher';
+export {
+  clearOfflineQueueRetryTimer,
+  configureOfflineQueueAuth,
+  flushOfflineQueue,
+  setOfflineQueueSendersForTests,
+} from './flusher';
 export { newOperationId } from './ids';
 export {
   countPendingOfflineItems,
@@ -81,12 +86,14 @@ export function enqueueMessageCompose(input: {
   memberId: string;
   recipientMemberId: string;
   body: string;
+  operationId?: string;
 }): Promise<OfflineQueueItem> {
   return enqueue({
     memberId: input.memberId,
     kind: 'message.compose',
     target: { recipientMemberId: input.recipientMemberId },
     body: input.body,
+    operationId: input.operationId,
   });
 }
 

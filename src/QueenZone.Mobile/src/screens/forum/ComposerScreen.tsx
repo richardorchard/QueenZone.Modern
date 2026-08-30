@@ -18,12 +18,14 @@ import {
   createForumReply,
   createForumTopic,
   fetchForumCategories,
+  isOfflineFailure,
+  isTimeoutFailure,
   type ForumCategoryListItem,
 } from '../../api';
 import type { ForumStackParamList } from '../../navigation/types';
 import { getAppConfig } from '../../config';
 import { resolvePushMemberId } from '../../notifications/pushMemberId';
-import { enqueueForumReply, flushOfflineQueue } from '../../offlineQueue';
+import { enqueueForumReply, flushOfflineQueue, removeOfflineItem } from '../../offlineQueue';
 import { MemberGate } from '../../session/MemberGate';
 import { useSession } from '../../session/SessionContext';
 import {
@@ -247,12 +249,26 @@ function ComposerForm({ navigation, route }: Props) {
             setSubmitError('Sign in to publish.');
             return;
           }
-          await enqueueForumReply({
+          const queued = await enqueueForumReply({
             memberId,
             topicId: route.params.threadId,
             body: body.trim(),
           });
           void flushOfflineQueue();
+          try {
+            await createForumReply(
+              route.params.threadId,
+              { body: queued.payload.body },
+              accessToken,
+              undefined,
+              queued.operationId,
+            );
+            await removeOfflineItem(queued.operationId);
+          } catch (err: unknown) {
+            if (!isOfflineFailure(err) && !isTimeoutFailure(err)) {
+              throw err;
+            }
+          }
         }
         navigation.goBack();
         return;

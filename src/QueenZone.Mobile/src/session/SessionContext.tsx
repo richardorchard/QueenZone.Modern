@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import { Alert, AppState, Linking } from 'react-native';
+import { addNetworkStateListener } from 'expo-network';
 import * as Notifications from 'expo-notifications';
 import { getAppConfig } from '../config/appConfig';
 import { ApiError, fetchJson } from '../api/client';
@@ -261,16 +262,31 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [ensureAccessToken]);
 
   useEffect(() => {
-    const subscription = AppState.addEventListener('change', (state) => {
+    const flushIfSignedIn = () => {
+      if (!sessionRef.current.accessToken) {
+        return;
+      }
+      void ensureAccessToken().then((token) => {
+        if (token) {
+          void flushOfflineQueue();
+        }
+      });
+    };
+
+    const appState = AppState.addEventListener('change', (state) => {
       if (state === 'active' && refreshTokenRef.current) {
-        void ensureAccessToken().then((token) => {
-          if (token) {
-            void flushOfflineQueue();
-          }
-        });
+        flushIfSignedIn();
       }
     });
-    return () => subscription.remove();
+    const network = addNetworkStateListener((state) => {
+      if (state.isInternetReachable === true || state.isConnected === true) {
+        flushIfSignedIn();
+      }
+    });
+    return () => {
+      appState.remove();
+      network.remove();
+    };
   }, [ensureAccessToken]);
 
   const applySmokeSession = useCallback(

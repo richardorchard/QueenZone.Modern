@@ -45,6 +45,7 @@ function ComposeForm({ navigation }: Pick<Props, 'navigation'>) {
   const insets = useSafeAreaInsets();
   const { accessToken, profile } = useSession();
   const searchSeq = useRef(0);
+  const composeOperationId = useRef<string | null>(null);
   const [query, setQuery] = useState('');
   const [matches, setMatches] = useState<MessageRecipient[]>([]);
   const [searching, setSearching] = useState(false);
@@ -128,7 +129,9 @@ function ComposeForm({ navigation }: Pick<Props, 'navigation'>) {
         memberId,
         recipientMemberId: recipient.memberId,
         body: draft.trim(),
+        operationId: composeOperationId.current ?? undefined,
       });
+      composeOperationId.current = queued.operationId;
       void flushOfflineQueue();
       try {
         const detail = await composeMessage(
@@ -139,6 +142,7 @@ function ComposeForm({ navigation }: Pick<Props, 'navigation'>) {
           queued.operationId,
         );
         await removeOfflineItem(queued.operationId);
+        composeOperationId.current = null;
         navigation.replace('Conversation', { id: detail.conversationId });
       } catch (err: unknown) {
         if (isOfflineFailure(err) || isTimeoutFailure(err)) {
