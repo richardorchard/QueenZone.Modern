@@ -57,6 +57,7 @@
     ViewData["EditorValue"] = Model.Draft.Body;
     ViewData["UploadContainer"] = BlobUploadContainers.News;
     ViewData["EditorLabel"] = "Body";
+    ViewData["ShowCodeView"] = true;
   }
   <partial name="_RichTextEditor" />
   <label>
@@ -120,7 +121,7 @@
       </div>
       <label class="admin-article-crop__zoom">
         Zoom
-        <input type="range" min="1" max="3" step="0.01" value="1" data-article-image-zoom>
+        <input type="range" min="1" max="3" step="any" value="1" data-article-image-zoom>
       </label>
       <div class="admin-form-actions">
         <button type="button" data-article-image-apply>Use this crop</button>
