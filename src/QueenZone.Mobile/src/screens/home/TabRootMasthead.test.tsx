@@ -47,6 +47,7 @@ describe('TabRootMasthead', () => {
     renderMasthead();
 
     expect(screen.getByTestId(testIds.tabMasthead)).toBeOnTheScreen();
+    expect(screen.getByText('Queenzone.org')).toBeOnTheScreen();
     expect(screen.queryByTestId(testIds.homeVersion)).toBeNull();
     expect(screen.getByLabelText('Profile')).toBeOnTheScreen();
     expect(screen.getByText('·')).toBeOnTheScreen();
