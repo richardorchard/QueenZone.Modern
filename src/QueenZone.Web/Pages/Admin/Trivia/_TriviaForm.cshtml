@@ -1,0 +1,71 @@
+@model QueenZone.Web.Pages.Admin.Trivia.TriviaFormViewModel
+@using QueenZone.Data
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@{
+  var antiforgeryToken = (ViewData["AntiforgeryToken"] as string)
+    ?? Antiforgery.GetAndStoreTokens(Context).RequestToken;
+}
+
+<div class="admin-form-panel">
+<h1>@Model.Title</h1>
+
+@if (Model.Errors is { Count: > 0 })
+{
+  <ul class="admin-errors">
+    @foreach (var error in Model.Errors)
+    {
+      <li>@error</li>
+    }
+  </ul>
+}
+
+<form method="post" action="@Model.Action" class="admin-form">
+  <input type="hidden" name="@AdminTriviaPageModel.AntiforgeryTokenFieldName" value="@antiforgeryToken">
+  <label>
+    Fact
+    <textarea name="text" maxlength="@TriviaValidation.MaxTextLength" rows="4" required>@Model.Draft.Text</textarea>
+  </label>
+  <label>
+    Category <span class="admin-form-hint">(optional)</span>
+    <input type="text" name="category" value="@Model.Draft.Category" maxlength="@TriviaValidation.MaxCategoryLength">
+  </label>
+  <label>
+    Difficulty <span class="admin-form-hint">(optional)</span>
+    <select name="difficulty">
+      @if (string.IsNullOrWhiteSpace(Model.Draft.Difficulty))
+      {
+        <option value="" selected>(none)</option>
+      }
+      else
+      {
+        <option value="">(none)</option>
+      }
+      @foreach (var difficulty in TriviaValidation.AllowedDifficulties)
+      {
+        if (string.Equals(Model.Draft.Difficulty, difficulty, StringComparison.Ordinal))
+        {
+          <option value="@difficulty" selected>@difficulty</option>
+        }
+        else
+        {
+          <option value="@difficulty">@difficulty</option>
+        }
+      }
+    </select>
+  </label>
+  <label>
+    Source / context <span class="admin-form-hint">(optional)</span>
+    <input type="text" name="source" value="@Model.Draft.Source" maxlength="@TriviaValidation.MaxSourceLength">
+  </label>
+  <label>
+    <input type="hidden" name="isPublished" value="false">
+    <input type="checkbox" name="isPublished" value="true" checked="@Model.Draft.IsPublished">
+    Published (visible in the public trivia rotation)
+  </label>
+
+  <div class="admin-form-actions">
+    <button type="submit">Save</button>
+    <a href="/admin/trivia">Cancel</a>
+  </div>
+</form>
+</div>

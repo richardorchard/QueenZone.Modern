@@ -1,0 +1,10 @@
+@page "/admin/trivia/new"
+@model NewModel
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@{
+  ViewData["AntiforgeryToken"] = Antiforgery.GetAndStoreTokens(HttpContext).RequestToken;
+}
+
+<div class="admin-shell">
+  <partial name="_TriviaForm" model="Model.Form" />
+</div>
