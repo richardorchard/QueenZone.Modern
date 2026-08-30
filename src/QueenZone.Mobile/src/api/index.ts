@@ -35,6 +35,7 @@ export {
   fetchPhotoDetail,
   fetchQuoteById,
   fetchRandomQuote,
+  fetchRandomTrivia,
   fetchHomePoll,
   voteHomePoll,
   fetchTimelinePage,

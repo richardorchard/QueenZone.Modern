@@ -33,6 +33,7 @@ public sealed class PageSeoTests : IClassFixture<WebApplicationFactory<Program>>
     [InlineData("/forum", "<title>Forum | QueenZone</title>", "Read-only Queenzone forum archive")]
     [InlineData("/biography", "<title>QueenZone biography</title>", "The story of Queen")]
     [InlineData("/timeline", "<title>Queen History Timeline", "Five decades of Queen history")]
+    [InlineData("/trivia", "<title>Queen Trivia | QueenZone</title>", "A random Queen trivia fact")]
     public async Task PublicPage_HasExpectedTitleAndDescription(string path, string expectedTitleTag, string expectedDescriptionFragment)
     {
         var client = factory.CreateClient();

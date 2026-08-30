@@ -67,6 +67,7 @@ public sealed class AbsoluteCanonicalUrlTests : IClassFixture<WebApplicationFact
     [InlineData("/discography", "https://preview.queenzone.test/discography")]
     [InlineData("/fan-performances", "https://preview.queenzone.test/fan-performances")]
     [InlineData("/timeline", "https://preview.queenzone.test/timeline")]
+    [InlineData("/trivia", "https://preview.queenzone.test/trivia")]
     [InlineData("/articles", "https://preview.queenzone.test/articles")]
     [InlineData("/privacy", "https://preview.queenzone.test/privacy")]
     public async Task PublicSectionIndexesEmitSelfReferentialCanonical(string path, string expectedCanonical)

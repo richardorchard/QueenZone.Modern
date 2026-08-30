@@ -41,6 +41,7 @@ public sealed class PublicOutputCachePoliciesTests
     [InlineData("/help")]
     [InlineData("/contact")]
     [InlineData("/error")]
+    [InlineData("/trivia")]
     public void IsPublicReadOnlyRequest_excludes_non_html_surfaces(string path)
     {
         var context = CreateContext(path, authenticated: false, "Production");

@@ -1,0 +1,49 @@
+@page "/trivia"
+@model IndexModel
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@{
+  var antiforgeryToken = Antiforgery.GetAndStoreTokens(HttpContext).RequestToken;
+}
+
+<partial name="_PageHero" model='@(("Queen Facts", "Trivia", "A random published fact from the Queenzone archive.", ""))' />
+
+<section class="qz-section">
+  <div class="qz-container">
+    <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
+
+    @if (Model.Fact is not null)
+    {
+      var fact = Model.Fact;
+      <article class="qz-trivia" aria-live="polite">
+        <p class="qz-trivia__text">@fact.Text</p>
+        @if (!string.IsNullOrWhiteSpace(fact.Category)
+             || !string.IsNullOrWhiteSpace(fact.Difficulty)
+             || !string.IsNullOrWhiteSpace(fact.Source))
+        {
+          <footer class="qz-trivia__meta">
+            @if (!string.IsNullOrWhiteSpace(fact.Category))
+            {
+              <span>@fact.Category</span>
+            }
+            @if (!string.IsNullOrWhiteSpace(fact.Difficulty))
+            {
+              <span>@fact.Difficulty</span>
+            }
+            @if (!string.IsNullOrWhiteSpace(fact.Source))
+            {
+              <span>@fact.Source</span>
+            }
+          </footer>
+        }
+        <form method="post" action="/trivia?handler=Next" class="qz-trivia__next">
+          <input type="hidden" name="__RequestVerificationToken" value="@antiforgeryToken">
+          <button type="submit" class="qz-button qz-button--cta">Next fact</button>
+        </form>
+      </article>
+    }
+    else
+    {
+      <p>No trivia facts have been published yet.</p>
+    }
+  </div>
+</section>

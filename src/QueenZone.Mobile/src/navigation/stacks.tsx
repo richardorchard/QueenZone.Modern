@@ -26,6 +26,7 @@ import { FanPerformancesScreen } from '../screens/archive/FanPerformancesScreen'
 import { FanPerformanceDetailScreen } from '../screens/archive/FanPerformanceDetailScreen';
 import { StoryScreen } from '../screens/archive/StoryScreen';
 import { AboutArchiveScreen } from '../screens/archive/AboutArchiveScreen';
+import { TriviaScreen } from '../screens/archive/TriviaScreen';
 import { SearchRouteScreen } from '../screens/archive/SearchScreen';
 import { NewsIndexScreen } from '../screens/news/NewsIndexScreen';
 import { NewsStoryScreen } from '../screens/news/NewsStoryScreen';
@@ -179,6 +180,7 @@ export function ArchiveStack() {
         options={{ title: 'Fan performance' }}
       />
       <Archive.Screen name="Story" component={StoryScreen} />
+      <Archive.Screen name="Trivia" component={TriviaScreen} options={{ title: 'Trivia' }} />
       <Archive.Screen
         name="AboutArchive"
         component={AboutArchiveScreen}

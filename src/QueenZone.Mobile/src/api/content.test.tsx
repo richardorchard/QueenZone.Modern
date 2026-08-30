@@ -18,6 +18,7 @@ import {
   fetchHomePoll,
   fetchQuoteById,
   fetchRandomQuote,
+  fetchRandomTrivia,
   voteHomePoll,
   fetchTimelinePage,
 } from './content';
@@ -123,6 +124,35 @@ describe('fetchRandomQuote', () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ id: 5, text: 'A kind of magic', whoSaid: 'Freddie Mercury' }));
     const quote = await fetchRandomQuote();
     expect(quote).toMatchObject({ id: 5, text: 'A kind of magic', whoSaid: 'Freddie Mercury' });
+  });
+});
+
+describe('fetchRandomTrivia', () => {
+  it('requests the random trivia fact and returns null when none are published', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(null));
+    const fact = await fetchRandomTrivia();
+    expect(lastUrl()).toBe('http://qz.test/api/v1/content/trivia/random');
+    expect(fact).toBeNull();
+  });
+
+  it('returns the parsed trivia body', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        id: 12,
+        text: 'The first Queen album was recorded in 1972.',
+        category: 'Studio',
+        difficulty: 'Easy',
+        source: 'Queen archive',
+      }),
+    );
+    const fact = await fetchRandomTrivia();
+    expect(fact).toMatchObject({
+      id: 12,
+      text: 'The first Queen album was recorded in 1972.',
+      category: 'Studio',
+      difficulty: 'Easy',
+      source: 'Queen archive',
+    });
   });
 });
 

@@ -163,11 +163,11 @@ Draft generation uses prompt version `draft-v4`, which requires exact band-membe
 
 ### Editorial guidance overlay (admin-editable)
 
-Admins can publish a short plain-text overlay for triage and draft runs from `/admin/news-discovery/prompt-settings`. This is **not** the compiled system prompt.
+Admins can publish a plain-text editorial guidance overlay for triage and draft runs from `/admin/news-discovery/prompt-settings`. This is **not** the full compiled system prompt.
 
-- Compiled rules stay in `NewsTriagePrompt` (`triage-v2`) and `NewsDraftPrompt` (`draft-v4`): JSON schema, evidence, quotation, media-link, preservation, and safety.
-- Published overlay text is appended after those rules in a delimited untrusted block. Empty, missing, or invalid published guidance uses the compiled default (current behaviour).
-- Revisions live in the EF table `NewsAgentGuidanceRevisions`. There is no seed. After migration, both types have no published row, so workers keep today's compiled prompts.
+- Each prompt is split into a fixed contract (`NewsTriagePrompt.BuildFixedContract()` / `NewsDraftPrompt.BuildFixedContract()`) and a default editorial guidance (`...BuildDefaultEditorialGuidance()`). The fixed contract — JSON schema, evidence, quotation, media-link, and safety rules — always stays in code and is never overridable from the admin UI.
+- The prompt-settings textarea is pre-filled with the built-in default editorial guidance (voice/tone for drafts, preservation policy for triage) so there is real text to tune, not a blank box. Saving replaces that default outright: whatever is published is used verbatim as the editorial guidance section, appended after the fixed contract in a delimited block. Empty, missing, or invalid published guidance falls back to the built-in default (current behaviour).
+- Revisions live in the EF table `NewsAgentGuidanceRevisions`. There is no seed. After migration, both types have no published row, so workers use the built-in default editorial guidance alongside the fixed contract.
 - **Restore compiled default** publishes a new empty revision (`Content` `""`). History stays. The worker treats empty content as no overlay.
 - Web and worker are separate processes. Published guidance is cached in-process with an **absolute 60 second** TTL. The web host may evict its cache on publish; the worker still waits up to 60 seconds. That TTL is the propagation contract.
 - If the database is down or a published row is invalid, the provider returns an empty snapshot (compiled default) and logs the guidance type plus fallback reason, never the guidance text.
