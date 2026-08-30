@@ -1,8 +1,9 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { archiveConversation, fetchInbox, type InboxConversation } from '../../api/messages';
+import { getMessagesCache } from '../../cache/messagesCache';
 import { usePagedContent } from '../../hooks/usePagedContent';
 import type { HomeStackParamList } from '../../navigation/types';
 import { MemberGate } from '../../session/MemberGate';
@@ -31,10 +32,31 @@ export function InboxScreen({ navigation }: Props) {
 
 function InboxList({ navigation }: Pick<Props, 'navigation'>) {
   const { c } = useTheme();
-  const { accessToken } = useSession();
+  const { accessToken, profile } = useSession();
   const skipNextFocusRefresh = useRef(true);
   const [archivingId, setArchivingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const cacheKey = profile ? `inbox:${profile.memberId}` : null;
+  const [cachedItems, setCachedItems] = useState<InboxConversation[] | null>(null);
+
+  useEffect(() => {
+    if (!cacheKey) {
+      return;
+    }
+    let cancelled = false;
+    getMessagesCache()
+      .get<InboxConversation[]>(cacheKey)
+      .then((cached) => {
+        if (!cancelled && cached && cached.length > 0) {
+          setCachedItems(cached);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [cacheKey]);
+
   const paged = usePagedContent<InboxConversation>(
     useCallback(
       (page, signal) => {
@@ -64,6 +86,17 @@ function InboxList({ navigation }: Pick<Props, 'navigation'>) {
       paged.refresh();
     }, [paged.refresh]),
   );
+
+  // Persist the freshest first page so the next cold start can render instantly.
+  useEffect(() => {
+    if (!cacheKey || paged.page !== 1 || paged.loading || paged.error) {
+      return;
+    }
+    void getMessagesCache().put(cacheKey, paged.items).catch(() => {});
+  }, [cacheKey, paged.page, paged.loading, paged.error, paged.items]);
+
+  const showingCacheOnly = paged.loading && paged.items.length === 0 && !!cachedItems && cachedItems.length > 0;
+  const displayItems = showingCacheOnly ? cachedItems : paged.items;
 
   const handleArchive = useCallback(
     async (conversationId: string) => {
@@ -103,7 +136,7 @@ function InboxList({ navigation }: Pick<Props, 'navigation'>) {
     </View>
   );
 
-  if (paged.loading && paged.items.length === 0) {
+  if (paged.loading && displayItems.length === 0) {
     return (
       <View style={{ flex: 1, backgroundColor: c.surfacePage }}>
         {header}
@@ -112,7 +145,7 @@ function InboxList({ navigation }: Pick<Props, 'navigation'>) {
     );
   }
 
-  if (paged.error && paged.items.length === 0) {
+  if (paged.error && displayItems.length === 0) {
     return (
       <View style={{ flex: 1, backgroundColor: c.surfacePage }}>
         {header}
@@ -125,14 +158,14 @@ function InboxList({ navigation }: Pick<Props, 'navigation'>) {
     <FlatList
       testID={testIds.inboxScreen}
       style={{ flex: 1, backgroundColor: c.surfacePage }}
-      data={paged.items}
+      data={displayItems}
       keyExtractor={(item) => item.conversationId}
       ListHeaderComponent={header}
       ListEmptyComponent={<EmptyBlock message="You have no private messages yet." />}
       ListFooterComponent={<ListFooterLoading visible={paged.loadingMore} />}
       refreshControl={
         <RefreshControl
-          refreshing={paged.refreshing}
+          refreshing={paged.refreshing || showingCacheOnly}
           onRefresh={paged.refresh}
           tintColor={c.accentPrimary}
         />

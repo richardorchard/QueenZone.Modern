@@ -24,6 +24,7 @@ import {
   type ConversationDetail,
   type ConversationMessage,
 } from '../../api/messages';
+import { getMessagesCache } from '../../cache/messagesCache';
 import type { HomeStackParamList } from '../../navigation/types';
 import { MemberGate } from '../../session/MemberGate';
 import { useSession } from '../../session/SessionContext';
@@ -73,9 +74,10 @@ export function ConversationScreen({ navigation, route }: Props) {
 function ConversationThread({ navigation, route }: Props) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
-  const { accessToken } = useSession();
+  const { accessToken, profile } = useSession();
   const listRef = useRef<FlatList<ThreadListItem<ConversationMessage>>>(null);
   const conversationId = parseConversationId(route.params.id);
+  const cacheKey = profile && conversationId ? `conversation:${profile.memberId}:${conversationId}` : null;
   const [detail, setDetail] = useState<ConversationDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -209,6 +211,9 @@ function ConversationThread({ navigation, route }: Props) {
         }
         setDetail(next);
         requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: false }));
+        if (cacheKey) {
+          void getMessagesCache().put(cacheKey, next).catch(() => {});
+        }
       } catch (err: unknown) {
         if (signal.aborted || (err instanceof Error && err.name === 'AbortError')) {
           return;
@@ -222,8 +227,28 @@ function ConversationThread({ navigation, route }: Props) {
         }
       }
     },
-    [accessToken, conversationId],
+    [accessToken, conversationId, cacheKey],
   );
+
+  // Render the last-seen version of this conversation immediately (e.g. from a
+  // push-notification tap) while the fresh fetch below runs in the background.
+  useEffect(() => {
+    if (!cacheKey) {
+      return;
+    }
+    let cancelled = false;
+    getMessagesCache()
+      .get<ConversationDetail>(cacheKey)
+      .then((cached) => {
+        if (!cancelled && cached) {
+          setDetail((current) => current ?? cached);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [cacheKey]);
 
   useEffect(() => {
     const controller = new AbortController();
