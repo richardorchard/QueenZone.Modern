@@ -789,6 +789,10 @@ jobs:
       - name: Add coverage summary
         run: cat coverage-report/SummaryGithub.md >> $GITHUB_STEP_SUMMARY
 
+      - name: Self-test coverage gate loader
+        shell: pwsh
+        run: ./scripts/Test-CoverageGate.ps1 -SelfTest
+
       - name: Enforce coverage gate
         shell: pwsh
         run: ./scripts/Test-CoverageGate.ps1 -Reports ./TestResults -GlobalLineThreshold 51 -ChangedLineThreshold 70
@@ -836,11 +840,10 @@ jobs:
           script: |
             const names = new Set([
               `build-binaries-${context.runId}`,
-              `coverage-raw-${context.runId}-shard-0`,
-              `coverage-raw-${context.runId}-shard-1`,
-              `coverage-raw-${context.runId}-shard-small`,
-              `coverage-raw-${context.runId}-shard-sqlserver`,
             ]);
+            // Prefix match so shard-2 (and later shards) are deleted, not
+            // only the original shard-0/1 plus small/sqlserver leftovers.
+            const coverageRawPrefix = `coverage-raw-${context.runId}-shard-`;
             const artifacts = await github.paginate(
               github.rest.actions.listWorkflowRunArtifacts,
               {
@@ -850,7 +853,7 @@ jobs:
                 per_page: 100,
               });
             for (const artifact of artifacts) {
-              if (!names.has(artifact.name)) {
+              if (!names.has(artifact.name) && !artifact.name.startsWith(coverageRawPrefix)) {
                 continue;
               }
               await github.rest.actions.deleteArtifact({
