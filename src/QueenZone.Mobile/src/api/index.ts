@@ -35,6 +35,8 @@ export {
   fetchPhotoDetail,
   fetchQuoteById,
   fetchRandomQuote,
+  fetchHomePoll,
+  voteHomePoll,
   fetchTimelinePage,
 } from './content';
 export { fetchSearchPage } from './search';
