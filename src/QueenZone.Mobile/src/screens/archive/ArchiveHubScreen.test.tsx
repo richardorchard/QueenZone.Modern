@@ -36,4 +36,24 @@ describe('ArchiveHubScreen', () => {
     await user.press(screen.getByRole('button', { name: /Queen facts\. Trivia\./ }));
     expect(navigation.navigate).toHaveBeenCalledWith('Trivia');
   });
+
+  it('opens Timeline in-stack from the listing row', async () => {
+    const user = userEvent.setup();
+    const navigation = fakeNavigation();
+    renderWithProviders(
+      <ArchiveHubScreen
+        navigation={navigation as never}
+        route={{ key: 'archive', name: 'ArchiveHub' } as never}
+      />,
+      { navigation: false },
+    );
+    await flushVirtualizedList();
+
+    await user.press(screen.getByRole('button', { name: /History\. Timeline\./ }));
+    expect(navigation.navigate).toHaveBeenCalledWith('Timeline');
+    expect(navigation.navigate).not.toHaveBeenCalledWith(
+      'ArchiveTab',
+      expect.objectContaining({ screen: 'Timeline' }),
+    );
+  });
 });

@@ -78,7 +78,12 @@ function hideTabBarIfDetail(
   };
 }
 
-function reselectRoot(tabName: keyof RootTabParamList, screen: string) {
+/** Archive uses `{ always: true }` so a later tab press lands on ArchiveHub, not leftover Timeline. */
+export function reselectRoot(
+  tabName: keyof RootTabParamList,
+  screen: string,
+  options?: { always?: boolean },
+) {
   return ({
     navigation,
   }: {
@@ -88,7 +93,7 @@ function reselectRoot(tabName: keyof RootTabParamList, screen: string) {
     };
   }) => ({
     tabPress: () => {
-      if (navigation.isFocused()) {
+      if (options?.always || navigation.isFocused()) {
         navigation.navigate(tabName, { screen });
       }
     },
@@ -163,7 +168,7 @@ function MainTabs() {
           tabBarIcon: tabIcon(Archive),
           ...hideTabBarIfDetail(c, route, 'ArchiveHub'),
         })}
-        listeners={reselectRoot('ArchiveTab', 'ArchiveHub')}
+        listeners={reselectRoot('ArchiveTab', 'ArchiveHub', { always: true })}
       />
       <Tab.Screen
         name="ForumTab"

@@ -29,6 +29,21 @@ describe('goBackOrFallback', () => {
     assert.deepEqual(calls, ['back']);
   });
 
+  it('falls back to ArchiveHub, never Home, from a Timeline-only stack', () => {
+    const calls: string[] = [];
+    const navigation = {
+      canGoBack: () => false,
+      goBack: () => {
+        calls.push('back');
+      },
+      navigate: (name: 'ArchiveHub') => {
+        calls.push(name);
+      },
+    };
+    goBackOrFallback(navigation, 'ArchiveHub');
+    assert.deepEqual(calls, ['ArchiveHub']);
+  });
+
   it('opens the tab root when the detail screen is the only route', () => {
     const navigation = {
       canGoBack: () => false,

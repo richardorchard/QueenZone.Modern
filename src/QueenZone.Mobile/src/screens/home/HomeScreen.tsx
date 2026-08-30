@@ -541,7 +541,7 @@ export function HomeScreen({ navigation }: Props) {
               numeral={onThisDayEvent.formattedDate.toUpperCase()}
               body={onThisDayEvent.summary}
               actionLabel="View timeline"
-              onAction={() => navigation.navigate('ArchiveTab', { screen: 'Timeline' })}
+              onAction={() => navigation.navigate('ArchiveTab', nestedTabParams('Timeline'))}
             />
           ) : null}
 
