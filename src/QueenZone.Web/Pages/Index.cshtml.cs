@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using QueenZone.Data;
 
@@ -7,6 +8,8 @@ public sealed class IndexModel(
     PublicQueryCacheService publicQueryCache,
     NewsDiscussionComposer newsDiscussion,
     IQuoteRepository quoteRepository,
+    IHomePollRepository homePollRepository,
+    HomePollVoteService homePollVoteService,
     TimeProvider timeProvider) : PageModel
 {
     /// <summary>Stock archive images cycled deterministically per article, since legacy
@@ -32,6 +35,12 @@ public sealed class IndexModel(
     public IReadOnlyList<PhotoCategory> FeaturedGalleryCategories { get; private set; } = [];
 
     public QuoteItem? FeaturedQuote { get; private set; }
+
+    public HomePollResults? HomePoll { get; private set; }
+
+    public bool HomePollViewerCanVote { get; private set; }
+
+    public string? HomePollError { get; private set; }
 
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
@@ -67,6 +76,38 @@ public sealed class IndexModel(
             .ToList();
 
         FeaturedQuote = await quoteRepository.GetRandomPublishedAsync(cancellationToken);
+        await LoadHomePollAsync(cancellationToken);
+        HomePollError = TempData["HomePollError"] as string;
+    }
+
+    public async Task<IActionResult> OnPostVoteAsync(Guid optionId, CancellationToken cancellationToken)
+    {
+        var memberAuth = await HttpContext.AuthenticateMemberAsync();
+        var memberId = ForumMember.GetMemberId(memberAuth.Principal);
+        if (memberId is null)
+        {
+            return Unauthorized();
+        }
+
+        try
+        {
+            await homePollVoteService.CastVoteAsync(memberId.Value, optionId, cancellationToken);
+        }
+        catch (ForumPollVoteException ex)
+        {
+            TempData["HomePollError"] = ex.Message;
+        }
+
+        return Redirect("/#home-poll");
+    }
+
+    private async Task LoadHomePollAsync(CancellationToken cancellationToken)
+    {
+        var memberAuth = await HttpContext.AuthenticateMemberAsync();
+        var memberId = ForumMember.GetMemberId(memberAuth.Principal);
+        HomePoll = await homePollRepository.GetCurrentAsync(memberId, cancellationToken);
+        HomePollViewerCanVote = memberId is not null
+            && HomePoll is { IsClosed: false, ViewerHasVoted: false };
     }
 }
 

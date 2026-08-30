@@ -1,0 +1,61 @@
+@model QueenZone.Web.Pages.Admin.Polls.PollFormViewModel
+@using QueenZone.Data
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@{
+  var antiforgeryToken = (ViewData["AntiforgeryToken"] as string)
+    ?? Antiforgery.GetAndStoreTokens(Context).RequestToken;
+  var optionSlots = new List<string>(Model.Draft.Options);
+  while (optionSlots.Count < HomePollValidation.MinOptions)
+  {
+    optionSlots.Add(string.Empty);
+  }
+  if (!Model.OptionsLocked && optionSlots.Count < HomePollValidation.MaxOptions)
+  {
+    optionSlots.Add(string.Empty);
+  }
+}
+
+<div class="admin-form-panel">
+<h1>@Model.Title</h1>
+
+@if (Model.Errors is { Count: > 0 })
+{
+  <ul class="admin-errors">
+    @foreach (var error in Model.Errors)
+    {
+      <li>@error</li>
+    }
+  </ul>
+}
+
+@if (Model.OptionsLocked)
+{
+  <p>This poll has votes. Question and options are locked. You can still publish, close, or hide it from the list.</p>
+}
+
+<form method="post" action="@Model.Action" class="admin-form">
+  <input type="hidden" name="@AdminPollPageModel.AntiforgeryTokenFieldName" value="@antiforgeryToken">
+  <label>
+    Question
+    <input type="text" name="question" value="@Model.Draft.Question" maxlength="@HomePollValidation.QuestionMaxLength" required @(Model.OptionsLocked ? "readonly" : null)>
+  </label>
+  <fieldset>
+    <legend>Options (2–10)</legend>
+    @for (var index = 0; index < optionSlots.Count; index++)
+    {
+      <label>
+        Option @(index + 1)
+        <input type="text" name="optionTexts" value="@optionSlots[index]" maxlength="@HomePollValidation.OptionMaxLength" @(Model.OptionsLocked ? "readonly" : null)>
+      </label>
+    }
+  </fieldset>
+
+  <div class="admin-form-actions">
+    @if (!Model.OptionsLocked)
+    {
+      <button type="submit">Save</button>
+    }
+    <a href="/admin/polls">Back to polls</a>
+  </div>
+</form>
+</div>

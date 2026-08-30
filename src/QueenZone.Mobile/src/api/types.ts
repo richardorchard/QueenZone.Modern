@@ -328,6 +328,24 @@ export type RandomQuote = {
   context?: string | null;
 };
 
+/** Shape for `GET /api/v1/content/home-poll`. Null when no poll is current. */
+export type HomePoll = {
+  id: string;
+  question: string;
+  options: HomePollOption[];
+  totalVotes: number;
+  isClosed: boolean;
+  viewerHasVoted: boolean;
+  selectedOptionId: string | null;
+};
+
+export type HomePollOption = {
+  id: string;
+  text: string;
+  count: number;
+  percentage: number;
+};
+
 /** One hit from `GET /api/v1/search`. `id` is parsed from numeric source keys. */
 export type SearchResult = {
   contentType: string;
