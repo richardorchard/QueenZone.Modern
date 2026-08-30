@@ -16,6 +16,7 @@ This repository is the modern QueenZone rebuild. The project is archive-first: i
 - `docs/decisions/0009-react-native-for-mobile-app.md` and `docs/decisions/0011-mobile-project-location-and-build-tooling.md` are the mobile client tech and project-location decisions. `docs/decisions/0012-react-navigation-app-shell.md` is the React Navigation shell and public vs member tab boundary.
 - `docs/mobile-development-environment.md` is the shared Windows/macOS native toolchain (Node 24, JDK 17, Android SDK 36).
 - `docs/backlog/migration-backlog.md` tracks migration work.
+- `docs/backlog/book-content-extraction-approach.md` is the standard approach for pulling new quote/event/trivia candidates out of book PDFs for `queen_quotes.csv` / `queen_history_events.csv` — use `pdftotext`, not vision-based PDF reading.
 - `docs/sql/data-api-builder-mcp.md` explains the local SQL MCP setup for read-only legacy database investigation.
 - `docs/agent-bitwarden-secrets.md` is the multi-machine Bitwarden Secrets Manager (`bws`) setup for local agents (Windows vs macOS).
 - `.cursor/agents/` and `.cursor/skills/orchestrate-epic/` are the QueenZone overlay for the sequential GitHub issue queue (planner / implementer / verifier / reviewer). Pin `/orchestrate-epic` as a Custom Mode. The portable protocol is the **issue-queue** Cursor plugin (`~/.cursor/plugins/local/issue-queue`, skill `/orchestrate-issues`). This repo keeps copies so a clone works without the plugin. Sequential only: one issue, one subagent at a time; one review plus one response, then PR.

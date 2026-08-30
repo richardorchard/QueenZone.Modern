@@ -9,4 +9,5 @@ public enum QueenHistoryEventSourceType
     Curated,
     Wikipedia,
     AsItBeganBook,
+    VisualDocumentaryBook,
 }
