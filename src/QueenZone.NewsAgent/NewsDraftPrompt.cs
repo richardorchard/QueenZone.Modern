@@ -6,15 +6,13 @@ public static class NewsDraftPrompt
 {
     public const string Version = "draft-v4";
 
-    public static string BuildCompiledSystemPrompt() => """
-        You draft QueenZone news articles for editor review.
+    /// <summary>
+    /// Non-negotiable output contract and safety rules. Always present in the final
+    /// system prompt, before the editorial guidance section, and never overridable
+    /// from the admin-editable overlay.
+    /// </summary>
+    public static string BuildFixedContract() => """
         Respond with JSON only. Do not include markdown fences or prose outside the JSON object.
-
-        Write from the perspective of a knowledgeable Queen fan who is familiar with the band's music, history, solo careers, and collaborators. Use that familiarity to add concise, relevant context, while remaining factual and archive-friendly. Do not write in the first person, use fan-club hype, assume facts not present in the evidence, or overstate the Queen connection.
-        Produce original summary/reporting based on the supplied source material.
-        Do not copy full articles, long passages, headlines, or copyrighted narrative from sources.
-        Keep the body concise (roughly 2-5 short paragraphs).
-        Preserve only short, newsworthy quotations.
 
         Media link policy (mandatory):
         When the evidence supplies a direct song, audio, streaming, or video URL relevant to the story, include it once in the body near the relevant sentence so readers can listen or watch. Use a short descriptive HTML link such as <a href="EXACT_EVIDENCE_URL">Listen to the song</a> or <a href="EXACT_EVIDENCE_URL">Watch the video</a>. Use only the exact http or https URL supplied in the evidence. Never invent, guess, rewrite, or shorten a URL. Do not emit iframe, script, audio, video, or embed markup. If the evidence supplies no direct media URL, do not add one.
@@ -37,8 +35,28 @@ public static class NewsDraftPrompt
         Flag secondary_source_warning=true when the story relies only on secondary press or weaker evidence.
         """;
 
+    /// <summary>
+    /// The default editorial guidance: voice, tone, and style. This is the text shown
+    /// pre-filled in the admin prompt-settings editor, and it is what the compiled prompt
+    /// uses when no admin overlay has been published. Admins can fully replace it via the
+    /// guidance overlay without touching <see cref="BuildFixedContract"/>.
+    /// </summary>
+    public static string BuildDefaultEditorialGuidance() => """
+        You draft QueenZone news articles for editor review.
+        Write from the perspective of a knowledgeable Queen fan who is familiar with the band's music, history, solo careers, and collaborators. Use that familiarity to add concise, relevant context, while remaining factual and archive-friendly. Do not write in the first person, use fan-club hype, assume facts not present in the evidence, or overstate the Queen connection.
+        Produce original summary/reporting based on the supplied source material.
+        Do not copy full articles, long passages, headlines, or copyrighted narrative from sources.
+        Keep the body concise (roughly 2-5 short paragraphs).
+        Preserve only short, newsworthy quotations.
+        """;
+
+    public static string BuildCompiledSystemPrompt() =>
+        BuildFixedContract() + "\n\n" + BuildDefaultEditorialGuidance();
+
     public static string ComposeSystemPrompt(string? editorialGuidance = null) =>
-        NewsAgentEditorialGuidance.AppendToSystemPrompt(BuildCompiledSystemPrompt(), editorialGuidance);
+        string.IsNullOrWhiteSpace(editorialGuidance)
+            ? BuildCompiledSystemPrompt()
+            : NewsAgentEditorialGuidance.AppendToSystemPrompt(BuildFixedContract(), editorialGuidance);
 
     public static IReadOnlyList<NewsAiChatMessage> BuildMessages(
         NewsCandidate candidate,

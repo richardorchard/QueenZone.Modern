@@ -151,6 +151,9 @@ public sealed class PromptSettingsModel(
         var compiledPrompt = type == NewsAgentGuidanceType.Triage
             ? NewsTriagePrompt.BuildCompiledSystemPrompt()
             : NewsDraftPrompt.BuildCompiledSystemPrompt();
+        var defaultEditorialGuidance = type == NewsAgentGuidanceType.Triage
+            ? NewsTriagePrompt.BuildDefaultEditorialGuidance()
+            : NewsDraftPrompt.BuildDefaultEditorialGuidance();
         var previewGuidance = draft?.Content ?? published?.Content;
         var composedPreview = type == NewsAgentGuidanceType.Triage
             ? NewsTriagePrompt.ComposeSystemPrompt(previewGuidance)
@@ -164,6 +167,7 @@ public sealed class PromptSettingsModel(
             history,
             published is null || string.IsNullOrWhiteSpace(published.Content),
             compiledPrompt,
+            defaultEditorialGuidance,
             composedPreview,
             NewsAgentGuidanceDiff.Compare(published?.Content, draft?.Content));
     }
@@ -194,6 +198,7 @@ public sealed record NewsAgentGuidanceSectionViewModel(
     IReadOnlyList<NewsAgentGuidanceRevision> History,
     bool UsingCompiledDefault,
     string CompiledSystemPrompt,
+    string DefaultEditorialGuidance,
     string ComposedPreview,
     IReadOnlyList<NewsAgentGuidanceDiffLine> Diff)
 {
@@ -207,9 +212,16 @@ public sealed record NewsAgentGuidanceSectionViewModel(
             true,
             string.Empty,
             string.Empty,
+            string.Empty,
             []);
 
-    public string DraftContent => Draft?.Content ?? Published?.Content ?? string.Empty;
+    /// <summary>
+    /// Value shown in the editable textarea. Falls back to the built-in default editorial
+    /// guidance (not the full compiled prompt, which also includes the fixed JSON/safety
+    /// contract) so a fresh page shows real text to tune, and saving it unedited is a no-op
+    /// rather than duplicating content into the overlay.
+    /// </summary>
+    public string DraftContent => Draft?.Content ?? (string.IsNullOrWhiteSpace(Published?.Content) ? DefaultEditorialGuidance : Published.Content);
 
     public string DraftRowVersion =>
         Draft is null ? string.Empty : Convert.ToBase64String(Draft.RowVersion);
