@@ -75,6 +75,7 @@ public static class ForumApiEndpoints
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status429TooManyRequests);
 
         group.MapGet("/topics/{id:int}", GetTopicAsync)
@@ -99,6 +100,7 @@ public static class ForumApiEndpoints
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status429TooManyRequests);
 
         group.MapGet("/topics/{id:int}/poll", GetTopicPollAsync)
@@ -317,6 +319,7 @@ public static class ForumApiEndpoints
         ClaimsPrincipal user,
         int id,
         ForumPostWriteService writeService,
+        IIdempotencyStore idempotencyStore,
         CancellationToken cancellationToken)
     {
         var memberId = ForumMember.GetMemberId(user);
@@ -328,27 +331,42 @@ public static class ForumApiEndpoints
         }
 
         var (title, body, files) = await ReadWriteRequestAsync(request, cancellationToken);
-        var outcome = await writeService.CreateTopicAsync(
+        var payloadHash = IdempotentApiWrites.ForumPayload(id, title, body, files);
+        return await IdempotentApiWrites.ExecuteAsync(
+            request,
             memberId.Value,
-            user.Identity?.Name,
-            id,
-            title,
-            body,
-            files,
-            poll: null,
+            IdempotencyOperationKinds.ForumCreateTopic,
+            payloadHash,
+            idempotencyStore,
+            async ct =>
+            {
+                var outcome = await writeService.CreateTopicAsync(
+                    memberId.Value,
+                    user.Identity?.Name,
+                    id,
+                    title,
+                    body,
+                    files,
+                    poll: null,
+                    ct);
+
+                if (!outcome.Succeeded)
+                {
+                    return new IdempotentWrite(MapWriteFailure(outcome, categoryId: id, topicId: null), null);
+                }
+
+                var dto = new ForumTopicCreatedDto(
+                    outcome.TopicId,
+                    outcome.PostId,
+                    outcome.Title,
+                    ForumRoutes.GetTopicCanonicalPath(outcome.TopicId, outcome.Title));
+                return IdempotentApiWrites.Created(
+                    request,
+                    $"{RootPath}/topics/{outcome.TopicId}",
+                    dto,
+                    payloadHash);
+            },
             cancellationToken);
-
-        if (outcome.Succeeded)
-        {
-            var dto = new ForumTopicCreatedDto(
-                outcome.TopicId,
-                outcome.PostId,
-                outcome.Title,
-                ForumRoutes.GetTopicCanonicalPath(outcome.TopicId, outcome.Title));
-            return Results.Created($"{RootPath}/topics/{outcome.TopicId}", dto);
-        }
-
-        return MapWriteFailure(outcome, categoryId: id, topicId: null);
     }
 
     internal static async Task<IResult> CreateReplyAsync(
@@ -356,6 +374,7 @@ public static class ForumApiEndpoints
         ClaimsPrincipal user,
         int id,
         ForumPostWriteService writeService,
+        IIdempotencyStore idempotencyStore,
         CancellationToken cancellationToken)
     {
         var memberId = ForumMember.GetMemberId(user);
@@ -367,26 +386,37 @@ public static class ForumApiEndpoints
         }
 
         var (_, body, files) = await ReadWriteRequestAsync(request, cancellationToken);
-        var outcome = await writeService.CreateReplyAsync(
+        var payloadHash = IdempotentApiWrites.ForumPayload(id, title: null, body, files);
+        return await IdempotentApiWrites.ExecuteAsync(
+            request,
             memberId.Value,
-            user.Identity?.Name,
-            id,
-            body,
-            files,
+            IdempotencyOperationKinds.ForumCreateReply,
+            payloadHash,
+            idempotencyStore,
+            async ct =>
+            {
+                var outcome = await writeService.CreateReplyAsync(
+                    memberId.Value,
+                    user.Identity?.Name,
+                    id,
+                    body,
+                    files,
+                    ct);
+
+                if (!outcome.Succeeded)
+                {
+                    return new IdempotentWrite(MapWriteFailure(outcome, categoryId: null, topicId: id), null);
+                }
+
+                var detailPath = ForumRoutes.GetTopicCanonicalPath(outcome.TopicId, outcome.Title)
+                    + $"#post-{outcome.PostId}";
+                var dto = new ForumPostCreatedDto(
+                    outcome.PostId,
+                    outcome.TopicId,
+                    detailPath);
+                return IdempotentApiWrites.Created(request, detailPath, dto, payloadHash);
+            },
             cancellationToken);
-
-        if (outcome.Succeeded)
-        {
-            var detailPath = ForumRoutes.GetTopicCanonicalPath(outcome.TopicId, outcome.Title)
-                + $"#post-{outcome.PostId}";
-            var dto = new ForumPostCreatedDto(
-                outcome.PostId,
-                outcome.TopicId,
-                detailPath);
-            return Results.Created(detailPath, dto);
-        }
-
-        return MapWriteFailure(outcome, categoryId: null, topicId: id);
     }
 
     internal static async Task<IResult> GetTopicPollAsync(

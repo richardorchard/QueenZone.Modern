@@ -221,12 +221,14 @@ export function replyToConversation(
   conversationId: string,
   body: string,
   signal?: AbortSignal,
+  idempotencyKey?: string,
 ): Promise<ConversationDetail> {
   return sendJson(messagesConversationPath(conversationId), {
     method: 'POST',
     body: { body },
     accessToken,
     signal,
+    idempotencyKey,
   });
 }
 
@@ -235,12 +237,14 @@ export function composeMessage(
   recipientMemberId: string,
   body: string,
   signal?: AbortSignal,
+  idempotencyKey?: string,
 ): Promise<ConversationDetail> {
   return sendJson(messagesApiPath, {
     method: 'POST',
     body: { recipientMemberId, body },
     accessToken,
     signal,
+    idempotencyKey,
   });
 }
 

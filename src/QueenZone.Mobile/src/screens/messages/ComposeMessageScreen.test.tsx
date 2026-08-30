@@ -1,6 +1,7 @@
 import { act, screen, userEvent, waitFor } from '@testing-library/react-native';
 import { ApiError } from '../../api/client';
 import { composeMessage, searchRecipients } from '../../api/messages';
+import { enqueueMessageCompose } from '../../offlineQueue';
 import { createMockSession } from '../../test/mockSession';
 import { fakeNavigation, flushVirtualizedList, renderWithProviders } from '../../test/render';
 import { ComposeMessageScreen } from './ComposeMessageScreen';
@@ -16,6 +17,18 @@ jest.mock('../../session/SessionContext', () => ({
 jest.mock('../../api/messages', () => ({
   searchRecipients: jest.fn(),
   composeMessage: jest.fn(),
+}));
+
+jest.mock('../../offlineQueue', () => ({
+  enqueueMessageCompose: jest.fn(async (input: { body: string; memberId: string; recipientMemberId: string }) => ({
+    operationId: 'op-compose',
+    payload: { body: input.body },
+    memberId: input.memberId,
+    kind: 'message.compose',
+    target: { recipientMemberId: input.recipientMemberId },
+  })),
+  removeOfflineItem: jest.fn(),
+  flushOfflineQueue: jest.fn(),
 }));
 
 const searchRecipientsMock = searchRecipients as jest.MockedFunction<typeof searchRecipients>;
@@ -44,6 +57,7 @@ describe('ComposeMessageScreen', () => {
   beforeEach(() => {
     mockSession.isSignedIn = true;
     mockSession.accessToken = 'tok';
+    mockSession.profile = { memberId: 'member-1' } as never;
     searchRecipientsMock.mockReset();
     composeMessageMock.mockReset();
     searchRecipientsMock.mockResolvedValue([recipient]);
@@ -88,7 +102,15 @@ describe('ComposeMessageScreen', () => {
     await user.type(screen.getByLabelText('Message body'), 'Hello Bob');
     await user.press(screen.getByRole('button', { name: 'Send message' }));
 
-    await waitFor(() => expect(composeMessageMock).toHaveBeenCalledWith('tok', recipient.memberId, 'Hello Bob'));
+    await waitFor(() =>
+      expect(composeMessageMock).toHaveBeenCalledWith(
+        'tok',
+        recipient.memberId,
+        'Hello Bob',
+        undefined,
+        'op-compose',
+      ),
+    );
     expect(navigation.replace).toHaveBeenCalledWith('Conversation', { id: conversationId });
   });
 

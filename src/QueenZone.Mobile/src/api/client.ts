@@ -19,18 +19,21 @@ export type FetchJsonOptions = {
   accessToken?: string | null;
 };
 
+export type SendJsonOptions = FetchJsonOptions & {
+  method?: 'POST' | 'PATCH' | 'PUT' | 'DELETE';
+  body?: unknown;
+  accessToken?: string | null;
+  /** Optional UUID replayed on retry. Never a Bearer token. */
+  idempotencyKey?: string;
+};
+
 export type SendMultipartOptions = FetchJsonOptions & {
   /**
    * `auto` uses XMLHttpRequest on React Native (iOS fetch+FormData throws)
    * and fetch everywhere else. Tests may force either transport.
    */
   transport?: 'auto' | 'fetch' | 'xhr';
-};
-
-export type SendJsonOptions = FetchJsonOptions & {
-  method?: 'POST' | 'PATCH' | 'PUT' | 'DELETE';
-  body?: unknown;
-  accessToken?: string | null;
+  idempotencyKey?: string;
 };
 
 const GET_ATTEMPT_MS = 12_000;
@@ -237,6 +240,33 @@ function authHeaders(accessToken?: string | null): Record<string, string> {
   return headers;
 }
 
+function withIdempotencyKey(
+  headers: Record<string, string>,
+  idempotencyKey?: string,
+): Record<string, string> {
+  const key = idempotencyKey?.trim();
+  if (key) {
+    headers['Idempotency-Key'] = key;
+  }
+  return headers;
+}
+
+function retryAfterMsFrom(response: Response): number | null {
+  const raw = response.headers.get('Retry-After');
+  if (!raw) {
+    return null;
+  }
+  const seconds = Number(raw);
+  if (Number.isFinite(seconds) && seconds >= 0) {
+    return Math.min(seconds, 3600) * 1000;
+  }
+  const date = Date.parse(raw);
+  if (!Number.isNaN(date)) {
+    return Math.max(0, date - Date.now());
+  }
+  return null;
+}
+
 async function request<T>(input: {
   method: HttpMethod;
   path: string;
@@ -306,6 +336,7 @@ async function request<T>(input: {
           messageFromProblem(response.status, problem, fallback),
           problem,
         );
+        httpError.retryAfterMs = retryAfterMsFrom(response);
         lastError = httpError;
         if (
           input.policy.maxAttempts > 1 &&
@@ -358,7 +389,7 @@ export async function fetchJson<T>(path: string, options: FetchJsonOptions = {})
  * `accessToken` is present. Throws {@link ApiError} for non-2xx responses.
  */
 export async function sendJson<T>(path: string, options: SendJsonOptions = {}): Promise<T> {
-  const headers = authHeaders(options.accessToken);
+  const headers = withIdempotencyKey(authHeaders(options.accessToken), options.idempotencyKey);
   if (options.body !== undefined) {
     headers['Content-Type'] = 'application/json';
   }
@@ -400,7 +431,7 @@ export async function sendMultipart<T>(
       const result = await postFormWithXhr({
         url,
         formData,
-        headers: authHeaders(options.accessToken),
+        headers: withIdempotencyKey(authHeaders(options.accessToken), options.idempotencyKey),
         timeoutMs: MULTIPART_POLICY.attemptTimeoutMs,
         signal: options.signal,
       });
@@ -418,7 +449,7 @@ export async function sendMultipart<T>(
     method: 'POST',
     path,
     url: buildUrl(path, options.query),
-    headers: authHeaders(options.accessToken),
+    headers: withIdempotencyKey(authHeaders(options.accessToken), options.idempotencyKey),
     body: formData,
     signal: options.signal,
     policy: MULTIPART_POLICY,

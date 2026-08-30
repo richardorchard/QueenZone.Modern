@@ -18,10 +18,14 @@ import {
   createForumReply,
   createForumTopic,
   fetchForumCategories,
+  isOfflineFailure,
+  isTimeoutFailure,
   type ForumCategoryListItem,
 } from '../../api';
 import type { ForumStackParamList } from '../../navigation/types';
 import { getAppConfig } from '../../config';
+import { resolvePushMemberId } from '../../notifications/pushMemberId';
+import { enqueueForumReply, flushOfflineQueue, removeOfflineItem } from '../../offlineQueue';
 import { MemberGate } from '../../session/MemberGate';
 import { useSession } from '../../session/SessionContext';
 import {
@@ -70,7 +74,7 @@ export function ComposerScreen({ navigation, route }: Props) {
 
 function ComposerForm({ navigation, route }: Props) {
   const { c } = useTheme();
-  const { accessToken } = useSession();
+  const { accessToken, profile } = useSession();
   const mode = composerMode(route.params);
   const copy = composerCopy(mode);
   const [title, setTitle] = useState('');
@@ -233,11 +237,39 @@ function ComposerForm({ navigation, route }: Props) {
     setSubmitError(null);
     try {
       if (mode === 'reply' && route.params?.threadId != null) {
-        await createForumReply(
-          route.params.threadId,
-          { body: body.trim(), ...(attachment ? { file: attachment } : {}) },
-          accessToken,
-        );
+        if (attachment) {
+          await createForumReply(
+            route.params.threadId,
+            { body: body.trim(), file: attachment },
+            accessToken,
+          );
+        } else {
+          const memberId = resolvePushMemberId(accessToken, profile?.memberId);
+          if (!memberId) {
+            setSubmitError('Sign in to publish.');
+            return;
+          }
+          const queued = await enqueueForumReply({
+            memberId,
+            topicId: route.params.threadId,
+            body: body.trim(),
+          });
+          void flushOfflineQueue();
+          try {
+            await createForumReply(
+              route.params.threadId,
+              { body: queued.payload.body },
+              accessToken,
+              undefined,
+              queued.operationId,
+            );
+            await removeOfflineItem(queued.operationId);
+          } catch (err: unknown) {
+            if (!isOfflineFailure(err) && !isTimeoutFailure(err)) {
+              throw err;
+            }
+          }
+        }
         navigation.goBack();
         return;
       }
@@ -258,7 +290,18 @@ function ComposerForm({ navigation, route }: Props) {
     } finally {
       setSubmitting(false);
     }
-  }, [accessToken, attachment, body, categoryId, mode, navigation, route.params?.isLocked, route.params?.threadId, title]);
+  }, [
+    accessToken,
+    attachment,
+    body,
+    categoryId,
+    mode,
+    navigation,
+    profile?.memberId,
+    route.params?.isLocked,
+    route.params?.threadId,
+    title,
+  ]);
 
   const context =
     mode === 'reply'
