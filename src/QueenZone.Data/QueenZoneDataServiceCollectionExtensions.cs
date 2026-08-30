@@ -84,6 +84,10 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddScoped<ITopicWatchRepository, EfTopicWatchRepository>();
         services.AddScoped<ITopicWatchLookup>(sp => sp.GetRequiredService<ITopicWatchRepository>());
         services.AddScoped<ILiveActivityQueryService, EfLiveActivityQueryService>();
+        services.AddScoped<IIdempotencyStore>(sp =>
+            new EfIdempotencyStore(
+                sp.GetRequiredService<QueenZoneDbContext>(),
+                sp.GetService<TimeProvider>() ?? TimeProvider.System));
 
         return services;
     }
@@ -194,6 +198,8 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddSingleton<INotificationPreferenceRepository, InMemoryNotificationPreferenceRepository>();
         services.AddSingleton<ITopicWatchRepository, InMemoryTopicWatchRepository>();
         services.AddSingleton<ITopicWatchLookup>(sp => sp.GetRequiredService<ITopicWatchRepository>());
+        services.AddSingleton<IIdempotencyStore>(sp =>
+            new InMemoryIdempotencyStore(sp.GetService<TimeProvider>() ?? TimeProvider.System));
 
         return services;
     }
