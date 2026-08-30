@@ -163,9 +163,9 @@ No storage lifecycle policy exists. Soft delete is 7 days for blobs and containe
 
 ## App Service application setting names (values not recorded)
 
-Present on `queenzone-dev` at the 2026-08-28 refresh (`az webapp config appsettings list`, names only except the two non-secret deploy keys below):
+Present on `queenzone-dev` at the 2026-08-28 refresh (`az webapp config appsettings list`, names only except the one non-secret deploy key below):
 
-`APPLICATIONINSIGHTS_CONNECTION_STRING`, `Authentication__Apple__ClientId/TeamId/KeyId/PrivateKey`, `Authentication__Discord__ClientId/Secret`, `Authentication__Facebook__ClientId/Secret`, `Authentication__GitHub__ClientId/Secret`, `Authentication__Google__ClientId/Secret`, `Authentication__Microsoft__ClientId/Secret`, `MobileAuth__SigningKey`, `PushNotifications__Apns__TeamId`, `PushNotifications__Apns__KeyId`, `PushNotifications__Apns__PrivateKeyPem`, `PushNotifications__Apns__Environment`, `PushNotifications__Fcm__ProjectId`, `PushNotifications__Fcm__ServiceAccountJson`, `BlobUpload__PublicBaseUrl`, `ConnectionStrings__BlobStorage`, `ConnectionStrings__QueenZoneLegacy`, `DIAGNOSTICS_AZUREBLOBRETENTIONINDAYS`, `OPENROUTER_API_KEY`, `WEBSITE_HEALTHCHECK_MAXPINGFAILURES`, `WEBSITE_HTTPLOGGING_RETENTION_DAYS`, `Analytics__GoogleAnalyticsServiceAccountJson`, `Analytics__TrafficCacheMinutes`, `Analytics__GoogleAnalyticsPropertyId`, `AzureAd__Instance`, `AzureAd__TenantId`, `AzureAd__ClientId`, `AzureAd__ClientSecret`, `AzureAd__CallbackPath`, `Admin__AllowedEmails__0`, `Admin__AllowedEmails__1`, `SCM_DO_BUILD_DURING_DEPLOYMENT`, `ENABLE_ORYX_BUILD`, `WEBSITE_RUN_FROM_PACKAGE`, `WEBSITE_WARMUP_PATH`.
+`APPLICATIONINSIGHTS_CONNECTION_STRING`, `Authentication__Apple__ClientId/TeamId/KeyId/PrivateKey`, `Authentication__Discord__ClientId/Secret`, `Authentication__Facebook__ClientId/Secret`, `Authentication__GitHub__ClientId/Secret`, `Authentication__Google__ClientId/Secret`, `Authentication__Microsoft__ClientId/Secret`, `MobileAuth__SigningKey`, `PushNotifications__Apns__TeamId`, `PushNotifications__Apns__KeyId`, `PushNotifications__Apns__PrivateKeyPem`, `PushNotifications__Apns__Environment`, `PushNotifications__Fcm__ProjectId`, `PushNotifications__Fcm__ServiceAccountJson`, `BlobUpload__PublicBaseUrl`, `ConnectionStrings__BlobStorage`, `ConnectionStrings__QueenZoneLegacy`, `DIAGNOSTICS_AZUREBLOBRETENTIONINDAYS`, `OPENROUTER_API_KEY`, `WEBSITE_HEALTHCHECK_MAXPINGFAILURES`, `WEBSITE_HTTPLOGGING_RETENTION_DAYS`, `Analytics__GoogleAnalyticsServiceAccountJson`, `Analytics__TrafficCacheMinutes`, `Analytics__GoogleAnalyticsPropertyId`, `AzureAd__Instance`, `AzureAd__TenantId`, `AzureAd__ClientId`, `AzureAd__ClientSecret`, `AzureAd__CallbackPath`, `Admin__AllowedEmails__0`, `Admin__AllowedEmails__1`, `SCM_DO_BUILD_DURING_DEPLOYMENT`, `ENABLE_ORYX_BUILD`, `WEBSITE_WARMUP_PATH`. `WEBSITE_RUN_FROM_PACKAGE` was removed (see below) and must stay absent.
 
 
 Ownership of App Service settings is decided in [ADR 0008](../decisions/0008-app-service-settings-ownership.md)
@@ -181,16 +181,16 @@ These are **not** Bitwarden secrets, and they are **not** OpenTofu-managed eithe
 mechanism that predates and is unaffected by ADR 0008. Do **not** write them through Kudu `POST /api/settings`
 (that was the #664 no-op). ADR 0008 rejected importing any subset of the App Service `app_settings` map into
 OpenTofu (its "Option C") — AzureRM has no resource/API that safely manages a subset without risking the
-unmanaged remainder, so these three keys stay owned by `deploy.yml`'s targeted ARM writes, not by OpenTofu.
+unmanaged remainder, so this key stays owned by `deploy.yml`'s targeted ARM writes, not by OpenTofu.
 
 The same targeted ARM job also reconciles the secret `MobileAuth__SigningKey` from Bitwarden. Its value is never
 recorded in this inventory or OpenTofu state.
 
 | Name | Live value | Owner | Notes |
 | --- | --- | --- | --- |
-| `WEBSITE_RUN_FROM_PACKAGE` | `1` | ARM via `deploy.yml` | Mount the OneDeploy zip read-only. Added after the 2026-08-12 audit. |
 | `WEBSITE_WARMUP_PATH` | `/health` | ARM via `deploy.yml` | Platform container-start probe. Must stay on `/health`, **not** `/warmup` (#673). `/warmup` remains the deploy-time readiness gate. |
 | `WEBSITE_WARMUP_STATUSES` | **absent** | ARM via `deploy.yml` (deleted if present) | Must stay unset. Requiring `200` crash-looped the B1 worker when App Service used an internal Host header (#684). |
+| `WEBSITE_RUN_FROM_PACKAGE` | **absent** | ARM via `deploy.yml` (deleted if present) | Added after the 2026-08-12 audit to mount the OneDeploy zip read-only; removed after it repeatedly served stale builds post-deploy (a worker could pass the build-stamp smoke check and then revert to the previous build minutes later with no further restart logged). Plain extract-mode deploys do not have this failure mode. |
 
 Site health-check path remains `/health`. Remaining secret settings (SQL, Entra, member OAuth, APNs, FCM, blob, OpenRouter, Insights, admin emails) stay Bitwarden/operator-owned.
 
@@ -248,7 +248,7 @@ Documented for [#622](https://github.com/richardorchard/QueenZone.Modern/issues/
 | [#583](https://github.com/richardorchard/QueenZone.Modern/issues/583) | Anonymous `/ugc` proxy sensitivity — private containers must stay private |
 | [#584](https://github.com/richardorchard/QueenZone.Modern/issues/584) | Upload API container narrowing — affects which containers exist and who may write |
 | [#428](https://github.com/richardorchard/QueenZone.Modern/issues/428) | Cloudflare proxy / origin restriction history — current live state already restricts App Service to Cloudflare IPs |
-| [#618](https://github.com/richardorchard/QueenZone.Modern/issues/618) | Secret-safe App Service configuration ownership. Live state is already a split: `deploy.yml` ARM-owns `WEBSITE_RUN_FROM_PACKAGE` / `WEBSITE_WARMUP_PATH` and keeps `WEBSITE_WARMUP_STATUSES` absent; Bitwarden still owns secrets. |
+| [#618](https://github.com/richardorchard/QueenZone.Modern/issues/618) | Secret-safe App Service configuration ownership. Live state is already a split: `deploy.yml` ARM-owns `WEBSITE_WARMUP_PATH` and keeps `WEBSITE_WARMUP_STATUSES` / `WEBSITE_RUN_FROM_PACKAGE` absent; Bitwarden still owns secrets. |
 | [#666](https://github.com/richardorchard/QueenZone.Modern/issues/666) | ARM Application Settings for run-from-package and warmup; dedicated `deploy` OIDC identity. Explicitly left OpenTofu out of the settings map. |
 
 ## Follow-ups (non-blocking for #624)

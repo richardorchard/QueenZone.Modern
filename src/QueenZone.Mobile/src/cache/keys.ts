@@ -20,6 +20,15 @@ export function conversationCacheKey(memberId: string, conversationId: string): 
   return `messages:member:${memberId}:conversation:${conversationId}`;
 }
 
+/**
+ * Inbox first-page snapshot, so the list can render instantly on cold start
+ * while a fresh fetch runs in the background. Purged on sign-out and member
+ * switch, same as {@link conversationCacheKey}.
+ */
+export function inboxCacheKey(memberId: string): string {
+  return `messages:member:${memberId}:inbox`;
+}
+
 export function privateMemberCachePrefix(memberId: string): string {
   return `messages:member:${memberId}:`;
 }
