@@ -16,6 +16,7 @@ export {
   forumTopicCacheKey,
   forumTopicPostsCacheKey,
   forumTopicPostsKeyPrefix,
+  inboxCacheKey,
   PRIVATE_CACHE_KEY_PREFIX,
   privateMemberCachePrefix,
 } from './keys';
