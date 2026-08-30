@@ -198,6 +198,76 @@ public sealed class AdminMembersRoutesTests : IClassFixture<WebApplicationFactor
         Assert.Contains("Buy cheap watches here", topicsAfterReinstate);
     }
 
+    [Fact]
+    public async Task HideForumContent_DoesNotSuspendMember_AndUnhideRestoresContent()
+    {
+        const string email = "hide-only@example.com";
+        await CreateSignedInMemberClientAsync(email, "Hide Only Spammer", "google-hide-only");
+        var memberId = await GetMemberIdForEmailAsync(email);
+        var forum = factory.Services.GetRequiredService<IForumWriteRepository>();
+        await forum.CreateThreadAsync(new NewForumThread(
+            1, memberId, "Hide Only Spammer", "Hide-only spam", "<p>spam</p>", DateTimeOffset.UtcNow));
+
+        var admin = CreateAdminClient(AdminEmail);
+        var detail = await admin.GetStringAsync($"/admin/members/{memberId}");
+        Assert.Contains("Hide all posts and threads", detail);
+        var hide = await admin.PostAsync($"/admin/members/{memberId}/HideForumContent",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(detail),
+            }));
+        Assert.Equal(HttpStatusCode.Redirect, hide.StatusCode);
+        Assert.False((await factory.Services.GetRequiredService<IMemberAccountRepository>().FindByIdAsync(memberId))!.IsSuspended);
+        Assert.DoesNotContain("Hide-only spam", await factory.CreateClient().GetStringAsync("/api/v1/forum/categories/1/topics"));
+
+        var hiddenDetail = await admin.GetStringAsync($"/admin/members/{memberId}");
+        var unhide = await admin.PostAsync($"/admin/members/{memberId}/UnhideForumContent",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(hiddenDetail),
+            }));
+        Assert.Equal(HttpStatusCode.Redirect, unhide.StatusCode);
+        Assert.Contains("Hide-only spam", await factory.CreateClient().GetStringAsync("/api/v1/forum/categories/1/topics"));
+    }
+
+    [Fact]
+    public async Task ThreadHideAuthor_IsAdminOnly_AndHidesAllAuthorsContent()
+    {
+        await CreateSignedInMemberClientAsync("thread-spammer@example.com", "Thread Spammer", "google-thread-spammer");
+        var spammerId = await GetMemberIdForEmailAsync("thread-spammer@example.com");
+        var forum = factory.Services.GetRequiredService<IForumWriteRepository>();
+        var spam = await forum.CreateThreadAsync(new NewForumThread(
+            1, spammerId, "Thread Spammer", "Thread action spam", "<p>spam</p>", DateTimeOffset.UtcNow));
+        var second = await forum.CreateThreadAsync(new NewForumThread(
+            1, spammerId, "Thread Spammer", "Second spam thread", "<p>more spam</p>", DateTimeOffset.UtcNow));
+
+        var ordinary = await CreateSignedInMemberClientAsync("ordinary@example.com", "Ordinary", "google-ordinary-hide");
+        var ordinaryPage = await ordinary.GetStringAsync($"/forum/topic/{spam.TopicId}/thread-action-spam");
+        var forbidden = await ordinary.PostAsync($"/forum/post/{spam.StarterPostId}/hide-author",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(ordinaryPage),
+            }));
+        Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
+
+        var admin = CreateAdminClient(AdminEmail);
+        var adminPage = await admin.GetStringAsync($"/forum/topic/{spam.TopicId}/thread-action-spam");
+        Assert.Contains("Hide all by this author", adminPage);
+        var confirmation = await admin.GetStringAsync($"/forum/post/{spam.StarterPostId}/hide-author");
+        Assert.Contains("2 posts", confirmation);
+        Assert.Contains("2 started threads", confirmation);
+        var hidden = await admin.PostAsync($"/forum/post/{spam.StarterPostId}/hide-author",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(confirmation),
+            }));
+        Assert.Equal(HttpStatusCode.Redirect, hidden.StatusCode);
+        var topics = await factory.CreateClient().GetStringAsync("/api/v1/forum/categories/1/topics");
+        Assert.DoesNotContain("Thread action spam", topics);
+        Assert.DoesNotContain("Second spam thread", topics);
+        _ = second;
+    }
+
     private HttpClient CreateAdminClient(string? email = null)
     {
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
