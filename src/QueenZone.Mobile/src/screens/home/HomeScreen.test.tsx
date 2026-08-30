@@ -357,6 +357,19 @@ describe('HomeScreen', () => {
     await flushVirtualizedList();
   });
 
+  it('opens View timeline with ArchiveHub seeded under Timeline', async () => {
+    fetchDay.mockResolvedValue(onThisDayFixture());
+    const { navigation } = renderHome();
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'View timeline' })).toBeOnTheScreen());
+    fireEvent.press(screen.getByRole('button', { name: 'View timeline' }));
+    expect(navigation.navigate).toHaveBeenCalledWith('ArchiveTab', {
+      screen: 'Timeline',
+      initial: false,
+    });
+    await flushVirtualizedList();
+  });
+
   it('keeps the On this day card when no quote is published', async () => {
     fetchDay.mockResolvedValue(onThisDayFixture());
     fetchQuote.mockResolvedValue(null);

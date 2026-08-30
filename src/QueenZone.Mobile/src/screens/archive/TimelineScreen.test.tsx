@@ -1,8 +1,10 @@
-import { screen, waitFor } from '@testing-library/react-native';
+import type { ReactNode } from 'react';
+import { screen, userEvent, waitFor } from '@testing-library/react-native';
 import { fetchTimelinePage } from '../../api';
 import type { TimelineEvent } from '../../api/types';
 import { pagedResponse } from '../../test/fixtures';
 import { fakeNavigation, renderWithProviders } from '../../test/render';
+import { testIds } from '../../test/testIds';
 import { TimelineScreen } from './TimelineScreen';
 
 jest.mock('../../api', () => {
@@ -54,4 +56,48 @@ describe('TimelineScreen', () => {
       expanded: false,
     });
   });
+
+  it('pops back to the archive listing when the stack has history', async () => {
+    const navigation = fakeNavigation();
+    navigation.canGoBack.mockReturnValue(true);
+    renderTimeline(navigation);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Live Aid' })).toBeOnTheScreen());
+
+    const user = userEvent.setup();
+    renderWithProviders(<>{lastHeaderLeft(navigation)()}</>, { navigation: false });
+    await user.press(screen.getByTestId(testIds.timelineBack));
+    expect(navigation.goBack).toHaveBeenCalledTimes(1);
+    expect(navigation.navigate).not.toHaveBeenCalled();
+  });
+
+  it('falls back to ArchiveHub when Timeline is the only route', async () => {
+    const navigation = fakeNavigation();
+    navigation.canGoBack.mockReturnValue(false);
+    renderTimeline(navigation);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Live Aid' })).toBeOnTheScreen());
+
+    const user = userEvent.setup();
+    renderWithProviders(<>{lastHeaderLeft(navigation)()}</>, { navigation: false });
+    await user.press(screen.getByTestId(testIds.timelineBack));
+    expect(navigation.goBack).not.toHaveBeenCalled();
+    expect(navigation.navigate).toHaveBeenCalledWith('ArchiveHub');
+  });
 });
+
+function lastHeaderLeft(navigation: ReturnType<typeof fakeNavigation>) {
+  const calls = navigation.setOptions.mock.calls;
+  expect(calls.length).toBeGreaterThan(0);
+  const options = calls[calls.length - 1]?.[0] as { headerLeft?: () => ReactNode };
+  expect(options.headerLeft).toEqual(expect.any(Function));
+  return options.headerLeft!;
+}
+
+function renderTimeline(navigation = fakeNavigation()) {
+  return renderWithProviders(
+    <TimelineScreen
+      navigation={navigation as never}
+      route={{ key: 'timeline', name: 'Timeline', params: { focusId: 12 } } as never}
+    />,
+    { navigation: false },
+  );
+}

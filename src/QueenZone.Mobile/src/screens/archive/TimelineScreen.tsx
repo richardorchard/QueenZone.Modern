@@ -1,9 +1,12 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useState } from 'react';
 import { FlatList, Linking, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { fetchTimelinePage, type TimelineEvent } from '../../api';
 import { usePagedContent } from '../../hooks/usePagedContent';
+import { HeaderBackButton } from '../../navigation/headerButtons';
+import { goBackOrFallback } from '../../navigation/nestedTab';
 import type { ArchiveStackParamList } from '../../navigation/types';
+import { testIds } from '../../test/testIds';
 import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from '../../ui/ScreenStates';
 import { space, type, useTheme } from '../../theme';
 
@@ -23,9 +26,21 @@ function decadeLabel(iso: string): string {
   return `${start}s`;
 }
 
-export function TimelineScreen({ route }: Props) {
+export function TimelineScreen({ navigation, route }: Props) {
   const { c } = useTheme();
   const [expandedId, setExpandedId] = useState<number | null>(route.params?.focusId ?? null);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerLeft: () => (
+        <HeaderBackButton
+          testID={testIds.timelineBack}
+          onPress={() => goBackOrFallback(navigation, 'ArchiveHub')}
+        />
+      ),
+    });
+  }, [navigation]);
+
   const paged = usePagedContent<TimelineEvent>(
     useCallback((page, signal) => fetchTimelinePage({ page, pageSize: 100, signal }), []),
     100,
