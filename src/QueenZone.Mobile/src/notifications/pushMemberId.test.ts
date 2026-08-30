@@ -36,4 +36,11 @@ describe('readJwtSubject', () => {
     assert.equal(readJwtSubject('a.not-json.sig'), null);
     assert.equal(readJwtSubject('a.b'), null);
   });
+
+  it('returns null when the payload is not an object', () => {
+    const encode = (value: string) => Buffer.from(value).toString('base64url');
+    const header = encode(JSON.stringify({ alg: 'none', typ: 'JWT' }));
+    assert.equal(readJwtSubject(`${header}.${encode('true')}.sig`), null);
+    assert.equal(readJwtSubject(`${header}.${encode('null')}.sig`), null);
+  });
 });

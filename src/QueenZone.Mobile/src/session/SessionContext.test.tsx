@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { AppState, Text } from 'react-native';
+import * as Notifications from 'expo-notifications';
 import { act, screen, waitFor, userEvent } from '@testing-library/react-native';
 import { ApiError, fetchJson } from '../api/client';
 import { authTokensFixture, memberProfilePayload } from '../test/fixtures';
@@ -289,6 +290,29 @@ describe('SessionProvider', () => {
     await waitFor(() =>
       expect(syncPushRegistration).toHaveBeenCalledWith(authTokensFixture().accessToken, 'member-1'),
     );
+  });
+
+  it('re-syncs push with the current member when the native token rotates', async () => {
+    readStored.mockResolvedValue({
+      ...authTokensFixture(),
+      expiresAt: Date.now() + 60_000,
+    });
+    let onToken: (() => void) | undefined;
+    jest.spyOn(Notifications, 'addPushTokenListener').mockImplementation((listener) => {
+      onToken = () => listener({ data: 'rotated', type: 'ios' });
+      return { remove: jest.fn() };
+    });
+
+    renderSession();
+    await waitFor(() =>
+      expect(syncPushRegistration).toHaveBeenCalledWith(authTokensFixture().accessToken, 'member-1'),
+    );
+
+    syncPushRegistration.mockClear();
+    await act(async () => {
+      onToken?.();
+    });
+    expect(syncPushRegistration).toHaveBeenCalledWith(authTokensFixture().accessToken, 'member-1');
   });
 
   it('re-registers push after signing out and back in as a different member (#1094)', async () => {
