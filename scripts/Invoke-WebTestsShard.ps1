@@ -39,10 +39,10 @@
   Pass --no-restore to dotnet test.
 
 .EXAMPLE
-  pwsh -File ./scripts/Invoke-WebTestsShard.ps1 -ShardIndex 0 -ShardCount 2 -IncludeSmallProjects
+  pwsh -File ./scripts/Invoke-WebTestsShard.ps1 -ShardIndex 0 -ShardCount 3 -IncludeSmallProjects
 
 .EXAMPLE
-  pwsh -File ./scripts/Invoke-WebTestsShard.ps1 -ShardIndex 1 -ShardCount 2 -CollectCoverage
+  pwsh -File ./scripts/Invoke-WebTestsShard.ps1 -ShardIndex 1 -ShardCount 3 -CollectCoverage
 #>
 [CmdletBinding()]
 param(
@@ -52,7 +52,7 @@ param(
 
     [Parameter()]
     [ValidateRange(1, 64)]
-    [int] $ShardCount = 2,
+    [int] $ShardCount = 3,
 
     [Parameter()]
     [string] $Configuration = "Release",
@@ -98,10 +98,12 @@ function Invoke-DotNetTest {
         $args += @("--filter", $Filter)
     }
     if ($CollectCoverage) {
+        $projectName = [System.IO.Path]::GetFileNameWithoutExtension($Project)
         $args += @(
             "--collect:XPlat Code Coverage",
             "--settings", "coverlet.runsettings",
-            "--results-directory", $ResultsDirectory
+            "--results-directory", $ResultsDirectory,
+            "--logger", "trx;LogFilePrefix=$projectName-shard-$ShardIndex"
         )
     }
 
