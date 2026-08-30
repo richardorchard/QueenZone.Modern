@@ -17,6 +17,7 @@ import type {
   PhotoListItem,
   FanPerformance,
   RandomQuote,
+  RandomTrivia,
   TimelineEvent,
 } from './types';
 
@@ -118,6 +119,11 @@ export function fetchRandomQuote(signal?: AbortSignal): Promise<RandomQuote | nu
 /** A published quote by id. 404 when missing or unpublished. */
 export function fetchQuoteById(id: number, signal?: AbortSignal): Promise<RandomQuote> {
   return fetchJson(`/content/quotes/${id}`, { signal });
+}
+
+/** A single random published trivia fact, or null when none are published. */
+export function fetchRandomTrivia(signal?: AbortSignal): Promise<RandomTrivia | null> {
+  return fetchJson('/content/trivia/random', { signal });
 }
 
 /** The current Home poll, or null when none is live. Optional Bearer marks the viewer's choice. */

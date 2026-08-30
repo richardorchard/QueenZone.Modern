@@ -49,6 +49,9 @@ export const testIds = {
   photoViewerScreen: 'photo-viewer-screen',
 
   archiveHubScreen: 'archive-hub-screen',
+  triviaScreen: 'trivia-screen',
+  triviaNext: 'trivia-next',
+  triviaMeta: 'trivia-meta',
   searchScreen: 'search-screen',
   searchInput: 'search-input',
 

@@ -1,4 +1,4 @@
-/** Spec §4.3b — the eight Archive hub destinations. No media requires. */
+/** Spec §4.3b Archive hub destinations, plus Trivia (#1101). No media requires. */
 export const ARCHIVE_HUB_IDS = [
   'stories',
   'timeline',
@@ -7,6 +7,7 @@ export const ARCHIVE_HUB_IDS = [
   'tribute',
   'fan-performances',
   'recently-restored',
+  'trivia',
   'about',
 ] as const;
 

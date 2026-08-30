@@ -20,4 +20,20 @@ describe('ArchiveHubScreen', () => {
     await user.press(screen.getByRole('button', { name: /Long-form\. Articles\./ }));
     expect(navigation.navigate).toHaveBeenCalledWith('Articles');
   });
+
+  it('opens the Trivia route from the Queen facts row', async () => {
+    const user = userEvent.setup();
+    const navigation = fakeNavigation();
+    renderWithProviders(
+      <ArchiveHubScreen
+        navigation={navigation as never}
+        route={{ key: 'archive', name: 'ArchiveHub' } as never}
+      />,
+      { navigation: false },
+    );
+    await flushVirtualizedList();
+
+    await user.press(screen.getByRole('button', { name: /Queen facts\. Trivia\./ }));
+    expect(navigation.navigate).toHaveBeenCalledWith('Trivia');
+  });
 });

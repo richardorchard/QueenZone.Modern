@@ -35,6 +35,7 @@ export const publicScreenNames = [
   'FreddieTribute',
   'FanPerformances',
   'FanPerformanceDetail',
+  'Trivia',
   'Story',
   'Quote',
   'Search',
