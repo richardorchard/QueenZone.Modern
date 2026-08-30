@@ -5,7 +5,14 @@ import { createMockSession } from '../test/mockSession';
 import { fanPerformanceFixture } from '../test/fixtures';
 import { renderWithProviders } from '../test/render';
 import { lockScreenAlbumTitle, lockScreenMetadata, lockScreenOptions } from './lockScreen';
+import { resolveLockScreenArtworkUrl } from './lockScreenArtwork';
 import { FanPerformancePlayerProvider, useFanPerformancePlayer } from './FanPerformancePlayer';
+
+const bundledArtworkUrl = 'file:///app/assets/icon.png';
+
+jest.mock('./lockScreenArtwork', () => ({
+  resolveLockScreenArtworkUrl: jest.fn(async () => 'file:///app/assets/icon.png'),
+}));
 
 const mockPlayer = {
   replace: jest.fn(),
@@ -137,13 +144,33 @@ describe('FanPerformancePlayerProvider', () => {
     }));
     expect(mockPlayer.setActiveForLockScreen).toHaveBeenCalledWith(
       true,
-      lockScreenMetadata(trackA),
+      lockScreenMetadata(trackA, bundledArtworkUrl),
       { ...lockScreenOptions },
     );
     expect(order).toEqual(['lock', 'play']);
     expect(screen.getByTestId('current')).toHaveTextContent(trackA.title);
     expect(JSON.stringify(mockPlayer.setActiveForLockScreen.mock.calls[0])).not.toContain('member-token');
-    expect(lockScreenMetadata(trackA).albumTitle).toBe(lockScreenAlbumTitle);
+    expect(JSON.stringify(mockPlayer.setActiveForLockScreen.mock.calls[0])).not.toContain('http');
+    expect(JSON.stringify(mockPlayer.setActiveForLockScreen.mock.calls[0])).not.toContain('blob:');
+    expect(lockScreenMetadata(trackA, bundledArtworkUrl).albumTitle).toBe(lockScreenAlbumTitle);
+    expect(lockScreenMetadata(trackA, bundledArtworkUrl).artworkUrl).toBe(bundledArtworkUrl);
+  });
+
+  it('plays without artwork when the bundled icon cannot be resolved', async () => {
+    (resolveLockScreenArtworkUrl as jest.Mock).mockRejectedValueOnce(new Error('asset missing'));
+    const user = userEvent.setup();
+    renderPlayer();
+    await user.press(screen.getByTestId('play-a'));
+
+    await waitFor(() =>
+      expect(mockPlayer.setActiveForLockScreen).toHaveBeenCalledWith(
+        true,
+        lockScreenMetadata(trackA),
+        { ...lockScreenOptions },
+      ),
+    );
+    expect(mockPlayer.play).toHaveBeenCalled();
+    expect(JSON.stringify(mockPlayer.setActiveForLockScreen.mock.calls[0])).not.toContain('artworkUrl');
   });
 
   it('refuses to load without a member token', async () => {
@@ -191,7 +218,7 @@ describe('FanPerformancePlayerProvider', () => {
     await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent(trackB.title));
     expect(mockPlayer.setActiveForLockScreen).toHaveBeenCalledWith(
       true,
-      lockScreenMetadata(trackB),
+      lockScreenMetadata(trackB, bundledArtworkUrl),
       { ...lockScreenOptions },
     );
     expect(mockPlayer.clearLockScreenControls).not.toHaveBeenCalled();
