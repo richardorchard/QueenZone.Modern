@@ -2,13 +2,21 @@ import type { KeyValueStorage } from './storage';
 
 export type ContentCacheOptions = {
   storage: KeyValueStorage;
-  /** Hard cap on stored detail payloads (LRU eviction). Default 40. */
+  /** Hard cap on stored detail payloads (LRU eviction). Default 80. */
   maxEntries?: number;
   /** Prefix for entry keys. Default `qz:content:`. */
   keyPrefix?: string;
+  /** Envelope schema. Mismatched or missing versions self-delete. */
+  schemaVersion?: number;
+};
+
+export type CacheRecord<T> = {
+  payload: T;
+  cachedAt: string;
 };
 
 type StoredEnvelope = {
+  schemaVersion: number;
   accessedAt: string;
   /** Monotonic tie-breaker when `accessedAt` collides within the same ms. */
   accessSeq: number;
@@ -16,23 +24,48 @@ type StoredEnvelope = {
   payloadJson: string;
 };
 
-const DEFAULT_MAX_ENTRIES = 40;
-const DEFAULT_PREFIX = 'qz:content:';
+/** First versioned envelope. Unversioned rows from the archive-only cache self-delete. */
+export const CONTENT_CACHE_SCHEMA_VERSION = 1;
 
 /**
- * Bounded offline store for previously opened archive detail JSON.
+ * Device LRU cap after #764 sizing: archive details plus forum topic/page
+ * snapshots and member-scoped conversations. See hosting-scale-and-cache.md.
+ */
+export const CONTENT_CACHE_MAX_ENTRIES = 80;
+
+const DEFAULT_PREFIX = 'qz:content:';
+
+function isStoredEnvelope(value: unknown): value is StoredEnvelope {
+  if (value === null || typeof value !== 'object') {
+    return false;
+  }
+  const envelope = value as StoredEnvelope;
+  return (
+    typeof envelope.schemaVersion === 'number' &&
+    typeof envelope.accessedAt === 'string' &&
+    typeof envelope.accessSeq === 'number' &&
+    typeof envelope.cachedAt === 'string' &&
+    typeof envelope.payloadJson === 'string'
+  );
+}
+
+/**
+ * Bounded offline store for previously opened detail JSON.
  * Evicts least-recently-accessed entries when over {@link ContentCacheOptions.maxEntries}.
+ * Conversation bodies live here (AsyncStorage), never in SecureStore.
  */
 export class ContentCache {
   private readonly storage: KeyValueStorage;
   private readonly maxEntries: number;
   private readonly keyPrefix: string;
+  private readonly schemaVersion: number;
   private accessSeq = 0;
 
   constructor(options: ContentCacheOptions) {
     this.storage = options.storage;
-    this.maxEntries = options.maxEntries ?? DEFAULT_MAX_ENTRIES;
+    this.maxEntries = options.maxEntries ?? CONTENT_CACHE_MAX_ENTRIES;
     this.keyPrefix = options.keyPrefix ?? DEFAULT_PREFIX;
+    this.schemaVersion = options.schemaVersion ?? CONTENT_CACHE_SCHEMA_VERSION;
   }
 
   entryKey(cacheKey: string): string {
@@ -40,42 +73,49 @@ export class ContentCache {
   }
 
   async get<T>(cacheKey: string): Promise<T | null> {
-    const raw = await this.storage.getItem(this.entryKey(cacheKey));
+    const record = await this.read<T>(cacheKey);
+    return record ? record.payload : null;
+  }
+
+  async read<T>(cacheKey: string): Promise<CacheRecord<T> | null> {
+    const storageKey = this.entryKey(cacheKey);
+    const raw = await this.storage.getItem(storageKey);
     if (!raw) {
       return null;
     }
 
-    let envelope: StoredEnvelope;
+    let parsed: unknown;
     try {
-      envelope = JSON.parse(raw) as StoredEnvelope;
+      parsed = JSON.parse(raw);
     } catch {
-      await this.storage.removeItem(this.entryKey(cacheKey));
+      await this.storage.removeItem(storageKey);
       return null;
     }
 
-    if (typeof envelope.payloadJson !== 'string') {
-      await this.storage.removeItem(this.entryKey(cacheKey));
+    if (!isStoredEnvelope(parsed) || parsed.schemaVersion !== this.schemaVersion) {
+      await this.storage.removeItem(storageKey);
       return null;
     }
 
     let payload: T;
     try {
-      payload = JSON.parse(envelope.payloadJson) as T;
+      payload = JSON.parse(parsed.payloadJson) as T;
     } catch {
-      await this.storage.removeItem(this.entryKey(cacheKey));
+      await this.storage.removeItem(storageKey);
       return null;
     }
 
     const now = new Date().toISOString();
-    envelope.accessedAt = now;
-    envelope.accessSeq = ++this.accessSeq;
-    await this.storage.setItem(this.entryKey(cacheKey), JSON.stringify(envelope));
-    return payload;
+    parsed.accessedAt = now;
+    parsed.accessSeq = ++this.accessSeq;
+    await this.storage.setItem(storageKey, JSON.stringify(parsed));
+    return { payload, cachedAt: parsed.cachedAt };
   }
 
-  async put<T>(cacheKey: string, payload: T): Promise<void> {
+  async put<T>(cacheKey: string, payload: T): Promise<string> {
     const now = new Date().toISOString();
     const envelope: StoredEnvelope = {
+      schemaVersion: this.schemaVersion,
       accessedAt: now,
       accessSeq: ++this.accessSeq,
       cachedAt: now,
@@ -83,6 +123,23 @@ export class ContentCache {
     };
     await this.storage.setItem(this.entryKey(cacheKey), JSON.stringify(envelope));
     await this.evictIfNeeded();
+    return now;
+  }
+
+  async remove(cacheKey: string): Promise<void> {
+    await this.storage.removeItem(this.entryKey(cacheKey));
+  }
+
+  /**
+   * Delete stored entries whose logical cache key starts with `cacheKeyPrefix`
+   * (the prefix after {@link ContentCacheOptions.keyPrefix}).
+   */
+  async purgePrefix(cacheKeyPrefix: string): Promise<void> {
+    const storagePrefix = this.entryKey(cacheKeyPrefix);
+    const keys = (await this.listEntryKeys()).filter((key) => key.startsWith(storagePrefix));
+    if (keys.length > 0) {
+      await this.storage.multiRemove(keys);
+    }
   }
 
   async clear(): Promise<void> {
@@ -95,6 +152,11 @@ export class ContentCache {
   /** Test/helper: number of stored detail entries. */
   async size(): Promise<number> {
     return (await this.listEntryKeys()).length;
+  }
+
+  async listCacheKeys(): Promise<string[]> {
+    const keys = await this.listEntryKeys();
+    return keys.map((key) => key.slice(this.keyPrefix.length));
   }
 
   private async listEntryKeys(): Promise<string[]> {

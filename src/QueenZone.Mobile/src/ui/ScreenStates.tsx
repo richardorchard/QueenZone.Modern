@@ -65,6 +65,39 @@ export function SectionErrorBlock({ message, onRetry }: StateProps) {
   );
 }
 
+/** Stable label for cached/offline snapshots. `cachedAt` is an ISO timestamp. */
+export function formatOfflineUpdatedLabel(cachedAt: string | null | undefined): string {
+  if (!cachedAt) {
+    return 'Offline';
+  }
+  const date = new Date(cachedAt);
+  if (Number.isNaN(date.getTime())) {
+    return 'Offline';
+  }
+  return `Offline · last updated ${date.toISOString().slice(0, 16).replace('T', ' ')} UTC`;
+}
+
+export function OfflineBanner({
+  cachedAt,
+  testID,
+}: {
+  cachedAt: string | null | undefined;
+  testID?: string;
+}) {
+  const { c } = useTheme();
+  const label = formatOfflineUpdatedLabel(cachedAt);
+  return (
+    <View
+      testID={testID}
+      accessibilityRole="text"
+      accessibilityLabel={label}
+      style={[styles.offlineBanner, { backgroundColor: c.surfaceCard, borderColor: c.hairline }]}
+    >
+      <Text style={[type.caption, { color: c.textSecondary }]}>{label}</Text>
+    </View>
+  );
+}
+
 export function EmptyBlock({ message }: { message: string }) {
   const { c } = useTheme();
   return (
@@ -112,5 +145,12 @@ const styles = StyleSheet.create({
   },
   footerSpacer: {
     height: space.xxl,
+  },
+  offlineBanner: {
+    marginBottom: space.sm,
+    paddingHorizontal: space.md,
+    paddingVertical: space.sm,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: radius.xs,
   },
 });

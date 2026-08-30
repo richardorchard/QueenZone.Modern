@@ -1,3 +1,8 @@
+import { getContentCache } from '../cache/defaultCache';
+import type { ContentCache } from '../cache/contentCache';
+import { forumTopicCacheKey, forumTopicPostsCacheKey } from '../cache/keys';
+import { invalidateIncompatiblePostPages } from '../cache/pagedCache';
+import { withOfflineCacheResult, type CachedResult } from '../cache/withOfflineCache';
 import { reportApiFailure } from '../config/sentry';
 import { fetchJson, sendJson, sendMultipart } from './client';
 import type {
@@ -16,6 +21,14 @@ import type {
 import type { PageQuery } from './content';
 import { isLocalFileFailure } from './errors';
 import { appendUploadFile, type UploadFilePart } from './uploadFile';
+
+export type OfflineReadOptions = {
+  cache?: ContentCache;
+  /** Pull-to-refresh: write-through on success, never serve a cached snapshot. */
+  networkOnly?: boolean;
+};
+
+export type { CachedResult };
 
 function pageParams({ page, pageSize }: PageQuery) {
   return {
@@ -60,18 +73,56 @@ export function fetchForumCategoryTopics(
   });
 }
 
-export function fetchForumTopic(id: number, signal?: AbortSignal): Promise<ForumTopicDetail> {
-  return fetchJson(`/forum/topics/${id}`, { signal });
+export async function fetchForumTopicResult(
+  id: number,
+  signal?: AbortSignal,
+  options: OfflineReadOptions = {},
+): Promise<CachedResult<ForumTopicDetail>> {
+  const cache = options.cache ?? getContentCache();
+  return withOfflineCacheResult(
+    cache,
+    forumTopicCacheKey(id),
+    () => fetchJson(`/forum/topics/${id}`, { signal }),
+    { fallback: options.networkOnly !== true, invalidateOn: [404] },
+  );
 }
 
-export function fetchForumTopicPosts(
+export async function fetchForumTopic(
+  id: number,
+  signal?: AbortSignal,
+  options?: OfflineReadOptions,
+): Promise<ForumTopicDetail> {
+  return (await fetchForumTopicResult(id, signal, options)).data;
+}
+
+export async function fetchForumTopicPostsResult(
   topicId: number,
-  query: PageQuery = {},
+  query: PageQuery & OfflineReadOptions = {},
+): Promise<CachedResult<ApiPagedResponse<ForumPost>>> {
+  const page = query.page ?? 1;
+  const cache = query.cache ?? getContentCache();
+  return withOfflineCacheResult(
+    cache,
+    forumTopicPostsCacheKey(topicId, page),
+    async () => {
+      const data = await fetchJson<ApiPagedResponse<ForumPost>>(`/forum/topics/${topicId}/posts`, {
+        query: pageParams(query),
+        signal: query.signal,
+      });
+      if (page === 1) {
+        await invalidateIncompatiblePostPages(cache, topicId, data);
+      }
+      return data;
+    },
+    { fallback: query.networkOnly !== true, invalidateOn: [404] },
+  );
+}
+
+export async function fetchForumTopicPosts(
+  topicId: number,
+  query: PageQuery & OfflineReadOptions = {},
 ): Promise<ApiPagedResponse<ForumPost>> {
-  return fetchJson(`/forum/topics/${topicId}/posts`, {
-    query: pageParams(query),
-    signal: query.signal,
-  });
+  return (await fetchForumTopicPostsResult(topicId, query)).data;
 }
 
 export type ForumTopicWrite = {

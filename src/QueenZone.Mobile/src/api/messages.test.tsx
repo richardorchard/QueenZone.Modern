@@ -8,6 +8,7 @@ import {
   searchRecipients,
 } from './messages';
 import { jsonResponse } from '../test/fixtures';
+import { ContentCache, conversationCacheKey, createMemoryStorage } from '../cache';
 
 jest.mock('../config', () => ({
   apiV1Url: (path: string) => `http://qz.test/api/v1${path.startsWith('/') ? path : `/${path}`}`,
@@ -82,6 +83,23 @@ describe('fetchConversation and replyToConversation', () => {
     expect(url).toBe('http://qz.test/api/v1/me/messages/c1');
     expect(init.method).toBe('POST');
     expect(init.body).toBe(JSON.stringify({ body: 'hello' }));
+  });
+
+  it('caches the opened conversation under memberId, never the Bearer token', async () => {
+    const cache = new ContentCache({ storage: createMemoryStorage() });
+    const payload = {
+      conversationId: 'c1',
+      messages: [],
+      page: 1,
+      pageSize: 50,
+      totalCount: 0,
+      totalPages: 0,
+    };
+    fetchMock.mockResolvedValueOnce(jsonResponse(payload));
+    await fetchConversation('secret-token', 'c1', { memberId: 'member-a', cache });
+    expect(await cache.get(conversationCacheKey('member-a', 'c1'))).toMatchObject(payload);
+    expect(await cache.get(conversationCacheKey('member-b', 'c1'))).toBeNull();
+    expect((await cache.listCacheKeys()).join(',')).not.toContain('secret-token');
   });
 });
 

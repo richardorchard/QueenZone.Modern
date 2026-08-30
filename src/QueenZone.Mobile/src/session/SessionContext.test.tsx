@@ -8,6 +8,13 @@ import { SessionProvider, useSession } from './SessionContext';
 import * as oauth from './oauth';
 import * as tokenStore from './tokenStore';
 import * as notifications from '../notifications';
+import {
+  ContentCache,
+  conversationCacheKey,
+  createMemoryStorage,
+  forumTopicCacheKey,
+  setContentCacheForTests,
+} from '../cache';
 
 const mockAppConfig = {
   apiBaseUrl: 'http://qz.test',
@@ -469,5 +476,55 @@ describe('SessionProvider', () => {
     } finally {
       dateNow.mockRestore();
     }
+  });
+});
+
+describe('SessionProvider private cache isolation', () => {
+  let cache: ContentCache;
+
+  beforeEach(async () => {
+    cache = new ContentCache({ storage: createMemoryStorage() });
+    setContentCacheForTests(cache);
+    await cache.put(conversationCacheKey('member-1', 'c1'), { body: 'secret from A' });
+    await cache.put(forumTopicCacheKey(1002), { id: 1002 });
+  });
+
+  afterEach(() => {
+    setContentCacheForTests(null);
+  });
+
+  it('purges conversations on sign-out and leaves the public forum cache', async () => {
+    const user = userEvent.setup();
+    readStored.mockResolvedValue({
+      ...authTokensFixture(),
+      expiresAt: Date.now() + 60_000,
+    });
+    renderSession();
+    await waitFor(() => expect(screen.getByText('signed-in')).toBeOnTheScreen());
+
+    await user.press(screen.getByText('do-sign-out'));
+    await waitFor(() => expect(screen.getByText('signed-out')).toBeOnTheScreen());
+
+    expect(await cache.get(conversationCacheKey('member-1', 'c1'))).toBeNull();
+    expect(await cache.get(forumTopicCacheKey(1002))).toEqual({ id: 1002 });
+  });
+
+  it('purges member A conversations when session restore establishes member B', async () => {
+    const user = userEvent.setup();
+    readStored.mockResolvedValue({
+      ...authTokensFixture(),
+      expiresAt: Date.now() + 60_000,
+    });
+    renderSession();
+    await waitFor(() => expect(screen.getByText('Freddie')).toBeOnTheScreen());
+
+    signInWithProvider.mockResolvedValue(authTokensFixture({ accessToken: 'next' }));
+    fetchJsonMock.mockResolvedValue(memberProfilePayload({ memberId: 'member-2', displayName: 'Brian' }));
+    await user.press(screen.getByText('do-sign-in'));
+    await waitFor(() => expect(screen.getByText('Brian')).toBeOnTheScreen());
+
+    expect(await cache.get(conversationCacheKey('member-1', 'c1'))).toBeNull();
+    expect(await cache.get(conversationCacheKey('member-2', 'c1'))).toBeNull();
+    expect(await cache.get(forumTopicCacheKey(1002))).toEqual({ id: 1002 });
   });
 });

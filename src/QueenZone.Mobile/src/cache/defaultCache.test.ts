@@ -20,8 +20,11 @@ register(
 );
 
 const { ContentCache } = await import('./contentCache.ts');
-const { getContentCache, setContentCacheForTests } = await import('./defaultCache.ts');
+const { getContentCache, purgePrivateContentCache, setContentCacheForTests } = await import(
+  './defaultCache.ts'
+);
 const { createMemoryStorage } = await import('./storage.ts');
+const { conversationCacheKey, forumTopicCacheKey } = await import('./keys.ts');
 
 describe('getContentCache', () => {
   afterEach(() => {
@@ -52,5 +55,16 @@ describe('getContentCache', () => {
     const created = getContentCache();
     assert.notEqual(created, replacement);
     assert.notEqual(created, injected);
+  });
+
+  it('purges private conversation keys without dropping public forum cache', async () => {
+    const injected = new ContentCache({ storage: createMemoryStorage() });
+    await injected.put(conversationCacheKey('member-a', 'c1'), { id: 'c1' });
+    await injected.put(forumTopicCacheKey(1), { id: 1 });
+    setContentCacheForTests(injected);
+
+    await purgePrivateContentCache();
+    assert.equal(await injected.get(conversationCacheKey('member-a', 'c1')), null);
+    assert.deepEqual(await injected.get(forumTopicCacheKey(1)), { id: 1 });
   });
 });

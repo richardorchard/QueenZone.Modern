@@ -1,15 +1,65 @@
 import assert from 'node:assert/strict';
+import { register } from 'node:module';
 import { describe, it } from 'node:test';
+import { pathToFileURL } from 'node:url';
 import { ApiError } from '../api/errors.ts';
-import { ContentCache } from './contentCache.ts';
-import { withOfflineCache } from './withOfflineCache.ts';
-import { createMemoryStorage } from './storage.ts';
+
+register(
+  `data:text/javascript,${encodeURIComponent(`
+    export async function resolve(specifier, context, nextResolve) {
+      if (specifier.startsWith('.') && !/\\\\.(?:[cm]?[jt]s|json)$/.test(specifier)) {
+        try {
+          return await nextResolve(specifier + '.ts', context);
+        } catch {
+          return nextResolve(specifier, context);
+        }
+      }
+      return nextResolve(specifier, context);
+    }
+  `)}`,
+  pathToFileURL('./'),
+);
+
+const { CONTENT_CACHE_SCHEMA_VERSION, ContentCache } = await import('./contentCache.ts');
+const { withOfflineCache, withOfflineCacheResult } = await import('./withOfflineCache.ts');
+const { createMemoryStorage } = await import('./storage.ts');
+const {
+  conversationCacheKey,
+  forumTopicCacheKey,
+  forumTopicPostsCacheKey,
+  PRIVATE_CACHE_KEY_PREFIX,
+} = await import('./keys.ts');
+const { invalidateIncompatiblePostPages, pagedTailIncompatible } = await import('./pagedCache.ts');
+
+function pagedPosts(
+  ids: number[],
+  page: number,
+  totalCount: number,
+  totalPages: number,
+) {
+  return {
+    items: ids.map((id) => ({ id })),
+    page,
+    pageSize: 15,
+    totalCount,
+    totalPages,
+  };
+}
 
 describe('ContentCache', () => {
   it('stores and returns payloads', async () => {
     const cache = new ContentCache({ storage: createMemoryStorage() });
     await cache.put('news:1', { id: 1, title: 'Hello' });
     assert.deepEqual(await cache.get('news:1'), { id: 1, title: 'Hello' });
+  });
+
+  it('returns provenance from read()', async () => {
+    const cache = new ContentCache({ storage: createMemoryStorage() });
+    const cachedAt = await cache.put('news:1', { id: 1 });
+    const record = await cache.read<{ id: number }>('news:1');
+    assert.ok(record);
+    assert.deepEqual(record.payload, { id: 1 });
+    assert.equal(record.cachedAt, cachedAt);
   });
 
   it('returns null for missing keys', async () => {
@@ -40,6 +90,29 @@ describe('ContentCache', () => {
     assert.equal(await storage.getItem('qz:content:bad'), null);
   });
 
+  it('drops old-schema and unversioned envelopes', async () => {
+    const storage = createMemoryStorage({
+      'qz:content:legacy': JSON.stringify({
+        accessedAt: '2024-01-01T00:00:00.000Z',
+        accessSeq: 1,
+        cachedAt: '2024-01-01T00:00:00.000Z',
+        payloadJson: '{"id":1}',
+      }),
+      'qz:content:v0': JSON.stringify({
+        schemaVersion: 0,
+        accessedAt: '2024-01-01T00:00:00.000Z',
+        accessSeq: 1,
+        cachedAt: '2024-01-01T00:00:00.000Z',
+        payloadJson: '{"id":1}',
+      }),
+    });
+    const cache = new ContentCache({ storage, schemaVersion: CONTENT_CACHE_SCHEMA_VERSION });
+    assert.equal(await cache.get('legacy'), null);
+    assert.equal(await cache.get('v0'), null);
+    assert.equal(await storage.getItem('qz:content:legacy'), null);
+    assert.equal(await storage.getItem('qz:content:v0'), null);
+  });
+
   it('clears all prefixed entries', async () => {
     const storage = createMemoryStorage({ other: 'keep' });
     const cache = new ContentCache({ storage });
@@ -48,39 +121,61 @@ describe('ContentCache', () => {
     assert.equal(await cache.size(), 0);
     assert.equal(await storage.getItem('other'), 'keep');
   });
+
+  it('purges a logical key prefix and leaves other namespaces', async () => {
+    const cache = new ContentCache({ storage: createMemoryStorage() });
+    await cache.put(forumTopicCacheKey(1), { id: 1 });
+    await cache.put(conversationCacheKey('member-a', 'c1'), { id: 'c1' });
+    await cache.put(conversationCacheKey('member-b', 'c2'), { id: 'c2' });
+
+    await cache.purgePrefix(PRIVATE_CACHE_KEY_PREFIX);
+
+    assert.deepEqual(await cache.get(forumTopicCacheKey(1)), { id: 1 });
+    assert.equal(await cache.get(conversationCacheKey('member-a', 'c1')), null);
+    assert.equal(await cache.get(conversationCacheKey('member-b', 'c2')), null);
+  });
 });
 
 describe('withOfflineCache', () => {
-  it('writes through on successful fetch', async () => {
+  it('writes through on successful fetch with network provenance', async () => {
     const cache = new ContentCache({ storage: createMemoryStorage() });
-    const result = await withOfflineCache(cache, 'news:1', async () => ({ id: 1, title: 'fresh' }));
-    assert.deepEqual(result, { id: 1, title: 'fresh' });
+    const result = await withOfflineCacheResult(cache, 'news:1', async () => ({
+      id: 1,
+      title: 'fresh',
+    }));
+    assert.equal(result.source, 'network');
+    assert.equal(typeof result.cachedAt, 'string');
+    assert.deepEqual(result.data, { id: 1, title: 'fresh' });
     assert.deepEqual(await cache.get('news:1'), { id: 1, title: 'fresh' });
+    assert.deepEqual(await withOfflineCache(cache, 'news:1', async () => ({ id: 1, title: 'fresh' })), {
+      id: 1,
+      title: 'fresh',
+    });
   });
 
-  it('serves the last cached payload when the network is unreachable', async () => {
+  it('serves the last snapshot when the network is unreachable', async () => {
     const cache = new ContentCache({ storage: createMemoryStorage() });
-    await cache.put('news:1', { id: 1, title: 'cached' });
+    const cachedAt = await cache.put('news:1', { id: 1, title: 'cached' });
 
-    const result = await withOfflineCache(cache, 'news:1', async () => {
+    const result = await withOfflineCacheResult(cache, 'news:1', async () => {
       throw new ApiError(0, 'Unable to reach QueenZone. Check your connection and try again.');
     });
 
-    assert.deepEqual(result, { id: 1, title: 'cached' });
+    assert.equal(result.source, 'cache');
+    assert.equal(result.cachedAt, cachedAt);
+    assert.deepEqual(result.data, { id: 1, title: 'cached' });
   });
 
-  it('does not fall back for a timeout', async () => {
+  it('serves the last snapshot on timeout', async () => {
     const cache = new ContentCache({ storage: createMemoryStorage() });
     await cache.put('news:1', { id: 1, title: 'cached' });
 
-    await assert.rejects(
-      () =>
-        withOfflineCache(cache, 'news:1', async () => {
-          throw ApiError.timeout();
-        }),
-      (err: unknown) => err instanceof ApiError && err.kind === 'timeout',
-    );
-    assert.deepEqual(await cache.get('news:1'), { id: 1, title: 'cached' });
+    const result = await withOfflineCacheResult(cache, 'news:1', async () => {
+      throw ApiError.timeout();
+    });
+
+    assert.equal(result.source, 'cache');
+    assert.deepEqual(result.data, { id: 1, title: 'cached' });
   });
 
   it('does not fall back for HTTP errors', async () => {
@@ -94,6 +189,110 @@ describe('withOfflineCache', () => {
         }),
       (err: unknown) => err instanceof ApiError && err.status === 404,
     );
+    assert.deepEqual(await cache.get('news:1'), { id: 1, title: 'cached' });
+  });
+
+  it('does not fall back for malformed responses', async () => {
+    const cache = new ContentCache({ storage: createMemoryStorage() });
+    await cache.put('news:1', { id: 1, title: 'cached' });
+
+    await assert.rejects(
+      () =>
+        withOfflineCache(cache, 'news:1', async () => {
+          throw ApiError.malformed(200);
+        }),
+      (err: unknown) => err instanceof ApiError && err.kind === 'malformed',
+    );
+    assert.deepEqual(await cache.get('news:1'), { id: 1, title: 'cached' });
+  });
+
+  it('invalidates private keys on 401/403/404', async () => {
+    const cache = new ContentCache({ storage: createMemoryStorage() });
+    const key = conversationCacheKey('member-a', 'c1');
+    await cache.put(key, { id: 'c1' });
+
+    await assert.rejects(
+      () =>
+        withOfflineCache(
+          cache,
+          key,
+          async () => {
+            throw new ApiError(401, 'Sign in to continue.');
+          },
+          { invalidateOn: [401, 403, 404] },
+        ),
+      (err: unknown) => err instanceof ApiError && err.status === 401,
+    );
+    assert.equal(await cache.get(key), null);
+
+    await cache.put(key, { id: 'c1' });
+    await assert.rejects(
+      () =>
+        withOfflineCache(
+          cache,
+          key,
+          async () => {
+            throw new ApiError(403, 'Forbidden.');
+          },
+          { invalidateOn: [401, 403, 404] },
+        ),
+      (err: unknown) => err instanceof ApiError && err.status === 403,
+    );
+    assert.equal(await cache.get(key), null);
+
+    await cache.put(key, { id: 'c1' });
+    await assert.rejects(
+      () =>
+        withOfflineCache(
+          cache,
+          key,
+          async () => {
+            throw new ApiError(404, 'Not found.');
+          },
+          { invalidateOn: [401, 403, 404] },
+        ),
+      (err: unknown) => err instanceof ApiError && err.status === 404,
+    );
+    assert.equal(await cache.get(key), null);
+  });
+
+  it('invalidates a public topic on 404 only', async () => {
+    const cache = new ContentCache({ storage: createMemoryStorage() });
+    const key = forumTopicCacheKey(1002);
+    await cache.put(key, { id: 1002 });
+
+    await assert.rejects(
+      () =>
+        withOfflineCache(
+          cache,
+          key,
+          async () => {
+            throw new ApiError(404, 'Not found.');
+          },
+          { invalidateOn: [404] },
+        ),
+      (err: unknown) => err instanceof ApiError && err.status === 404,
+    );
+    assert.equal(await cache.get(key), null);
+  });
+
+  it('does not fall back when fallback is disabled (pull-to-refresh)', async () => {
+    const cache = new ContentCache({ storage: createMemoryStorage() });
+    await cache.put('news:1', { id: 1, title: 'cached' });
+
+    await assert.rejects(
+      () =>
+        withOfflineCache(
+          cache,
+          'news:1',
+          async () => {
+            throw ApiError.offline();
+          },
+          { fallback: false },
+        ),
+      (err: unknown) => err instanceof ApiError && err.kind === 'offline',
+    );
+    assert.deepEqual(await cache.get('news:1'), { id: 1, title: 'cached' });
   });
 
   it('rethrows when offline and nothing is cached', async () => {
@@ -115,10 +314,61 @@ describe('withOfflineCache', () => {
     abort.name = 'AbortError';
 
     await assert.rejects(
-      () => withOfflineCache(cache, 'news:1', async () => {
-        throw abort;
-      }),
+      () =>
+        withOfflineCache(cache, 'news:1', async () => {
+          throw abort;
+        }),
       (err: unknown) => err instanceof Error && err.name === 'AbortError',
     );
+  });
+});
+
+describe('paged reconstruction', () => {
+  it('reconstructs opened post pages in order without duplication', async () => {
+    const cache = new ContentCache({ storage: createMemoryStorage() });
+    await cache.put(forumTopicPostsCacheKey(1002, 1), pagedPosts([1, 2, 3], 1, 6, 2));
+    await cache.put(forumTopicPostsCacheKey(1002, 2), pagedPosts([4, 5, 6], 2, 6, 2));
+
+    const page1 = await cache.get<ReturnType<typeof pagedPosts>>(forumTopicPostsCacheKey(1002, 1));
+    const page2 = await cache.get<ReturnType<typeof pagedPosts>>(forumTopicPostsCacheKey(1002, 2));
+    const ids = [...(page1?.items ?? []), ...(page2?.items ?? [])].map((item) => item.id);
+    assert.deepEqual(ids, [1, 2, 3, 4, 5, 6]);
+    assert.equal(new Set(ids).size, ids.length);
+  });
+
+  it('invalidates an incompatible tail after a page-1 refresh', async () => {
+    const cache = new ContentCache({ storage: createMemoryStorage() });
+    await cache.put(forumTopicPostsCacheKey(1002, 1), pagedPosts([1, 2, 3], 1, 6, 2));
+    await cache.put(forumTopicPostsCacheKey(1002, 2), pagedPosts([4, 5, 6], 2, 6, 2));
+
+    const nextPage1 = pagedPosts([1, 2, 3], 1, 7, 3);
+    assert.equal(pagedTailIncompatible(pagedPosts([1, 2, 3], 1, 6, 2), nextPage1), true);
+    await invalidateIncompatiblePostPages(cache, 1002, nextPage1);
+    await cache.put(forumTopicPostsCacheKey(1002, 1), nextPage1);
+
+    assert.deepEqual(await cache.get(forumTopicPostsCacheKey(1002, 1)), nextPage1);
+    assert.equal(await cache.get(forumTopicPostsCacheKey(1002, 2)), null);
+  });
+
+  it('keeps a compatible tail when page-1 tip and totalCount are unchanged', async () => {
+    const cache = new ContentCache({ storage: createMemoryStorage() });
+    const page1 = pagedPosts([1, 2, 3], 1, 6, 2);
+    await cache.put(forumTopicPostsCacheKey(1002, 1), page1);
+    await cache.put(forumTopicPostsCacheKey(1002, 2), pagedPosts([4, 5, 6], 2, 6, 2));
+
+    await invalidateIncompatiblePostPages(cache, 1002, page1);
+    assert.ok(await cache.get(forumTopicPostsCacheKey(1002, 2)));
+  });
+});
+
+describe('member isolation', () => {
+  it('does not expose member A conversations to member B', async () => {
+    const cache = new ContentCache({ storage: createMemoryStorage() });
+    await cache.put(conversationCacheKey('member-a', 'c1'), { body: 'secret from A' });
+
+    assert.equal(await cache.get(conversationCacheKey('member-b', 'c1')), null);
+    assert.deepEqual(await cache.get(conversationCacheKey('member-a', 'c1')), {
+      body: 'secret from A',
+    });
   });
 });
