@@ -77,10 +77,12 @@ public sealed partial class MySubmissionsPageTests : IClassFixture<WebApplicatio
         await SubmitPhotoAsync(owner, "Owner exclusive photo");
         await SubmitNewsAsync(owner, "https://example.com/owner-exclusive-news-story", "Owner news");
         await SubmitArticleAsync(owner, "Owner exclusive article");
+        await SubmitTriviaAsync(owner, "Owner exclusive trivia fact about Queen.");
 
         await SubmitPhotoAsync(other, "Other member photo secret");
         await SubmitNewsAsync(other, "https://example.com/other-member-news-secret", "Other news");
         await SubmitArticleAsync(other, "Other member article secret");
+        await SubmitTriviaAsync(other, "Other member trivia secret about a rumour.");
 
         var ownerPhotos = await owner.GetStringAsync("/account/my-submissions?tab=photos");
         Assert.Contains("Owner exclusive photo", ownerPhotos);
@@ -95,6 +97,10 @@ public sealed partial class MySubmissionsPageTests : IClassFixture<WebApplicatio
         Assert.Contains("Owner exclusive article", ownerArticles);
         Assert.Contains("Continue editing", ownerArticles);
         Assert.DoesNotContain("Other member article secret", ownerArticles);
+
+        var ownerTrivia = await owner.GetStringAsync("/account/my-submissions?tab=trivia");
+        Assert.Contains("Owner exclusive trivia fact about Queen.", ownerTrivia);
+        Assert.DoesNotContain("Other member trivia secret about a rumour.", ownerTrivia);
 
         var otherPhotos = await other.GetStringAsync("/account/my-submissions?tab=photos");
         Assert.Contains("Other member photo secret", otherPhotos);
@@ -153,6 +159,20 @@ public sealed partial class MySubmissionsPageTests : IClassFixture<WebApplicatio
         });
 
         var response = await client.PostAsync("/submit/news", content);
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+    }
+
+    private async Task SubmitTriviaAsync(HttpClient client, string text)
+    {
+        var formPage = await client.GetStringAsync("/submit/trivia");
+        using var content = new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = ExtractAntiforgeryToken(formPage),
+            ["Text"] = text,
+            ["Category"] = "Band",
+        });
+
+        var response = await client.PostAsync("/submit/trivia", content);
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
     }
 

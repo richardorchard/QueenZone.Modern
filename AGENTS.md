@@ -19,7 +19,7 @@ This repository is the modern QueenZone rebuild. The project is archive-first: i
 - `docs/backlog/book-content-extraction-approach.md` is the standard approach for pulling new quote/event/trivia candidates out of book PDFs for `queen_quotes.csv` / `queen_history_events.csv` — use `pdftotext`, not vision-based PDF reading.
 - `docs/sql/data-api-builder-mcp.md` explains the local SQL MCP setup for read-only legacy database investigation.
 - `docs/agent-bitwarden-secrets.md` is the multi-machine Bitwarden Secrets Manager (`bws`) setup for local agents (Windows vs macOS).
-- `.cursor/agents/` and `.cursor/skills/orchestrate-epic/` are the QueenZone overlay for the sequential GitHub issue queue (planner / implementer / verifier / reviewer). Pin `/orchestrate-epic` as a Custom Mode. The portable protocol is the **issue-queue** Cursor plugin (`~/.cursor/plugins/local/issue-queue`, skill `/orchestrate-issues`). This repo keeps copies so a clone works without the plugin. Sequential only: one issue, one subagent at a time; one review plus one response, then PR.
+- `.cursor/agents/` and `.cursor/skills/orchestrate-epic/` are the **Cursor-only** issue-queue overlay (planner / implementer / verifier / reviewer). Pin `/orchestrate-epic` as a Custom Mode in Cursor. Grok and other non-Cursor agents do not use that loop — they stay a single agent in the current chat (see [Grok and other non-Cursor agents](#grok-and-other-non-cursor-agents)). The portable protocol is the **issue-queue** Cursor plugin (`~/.cursor/plugins/local/issue-queue`, skill `/orchestrate-issues`). This repo keeps copies so a clone works without the plugin.
 
 Keep durable workflow guidance in this file and keep user-facing setup guidance in `README.md`.
 
@@ -97,15 +97,25 @@ For multi-session work, use `docs/agent-handoff-cheatsheet.md`.
 
 Fill in the template's `## Issues` section with a real GitHub closing keyword — `Closes #123`, `Fixes #123`, or `Resolves #123` — for every issue the PR fully resolves. GitHub only auto-closes an issue on merge when one of those keywords appears; a prose mention like "Implements #123" or a bare `[#123](...)` link anywhere else in the PR body (including `## Summary`) does not trigger it and leaves the issue open after merge. Use `Relates to #123` for issues the PR only touches without resolving. The `pr-issue-link-check` CI job fails the PR if it references an issue number without a recognized closing or relating keyword, so use the correct keyword up front rather than fixing it after the check fails.
 
+## Grok and other non-Cursor agents
+
+Grok, Claude, Codex, Composer, and any agent that is **not** a Cursor chat with `/orchestrate-epic` pinned work as a **single agent in this chat**.
+
+- Do not load `/orchestrate-epic` or `/orchestrate-issues` because the user listed issue numbers (`761, 762 and 763`, `work on #15 #16 #17`).
+- Do not spawn the planner / implementer / verifier / reviewer / orchestrator subagent loop. Do not act as a parent coordinator that refuses to implement.
+- Implement, test, commit, and open PRs yourself. If given several issues, do them **one at a time** in this same chat (finish or PR one, then the next). Use that agent's branch prefix (`grok/`, `claude/`, `codex/`, …).
+
 ## Cursor issue-queue orchestration
+
+This section applies **only** when `/orchestrate-epic` is pinned as a Custom Mode in Cursor (or `/orchestrator` is invoked there). It does not apply to Grok.
 
 Cursor custom subagents are markdown files in `.cursor/agents/` (`planner`, `implementer`, `verifier`, `reviewer`, `orchestrator`). The QueenZone spawn protocol lives in `.cursor/skills/orchestrate-epic/SKILL.md` (overlay: surfaces, tests, `cursor/` branches, no worktrees). Pin that skill as a Custom Mode (`/orchestrate-epic`, then Alt+Enter on Windows or Option+Enter on Mac), or invoke `/orchestrator`. Do not also pin `/orchestrate-issues` in the same QueenZone chat.
 
 The same loop is packaged as the **issue-queue** Cursor plugin for other repos: clone or copy `~/.cursor/plugins/local/issue-queue` onto the machine, reload Cursor, pin `/orchestrate-issues`. Product rules stay in that repo's `AGENTS.md`. Change the loop in the plugin first, then copy it into the QueenZone overlay.
 
-Use `/orchestrate-epic` here for **one issue** (`work on #757`), an epic's children, or an explicit list (`work on #15 #16 #17`). Skip planner when the queue has a single issue. The parent keeps a scoreboard and loops **one issue at a time** through implementer → verifier → reviewer → (one implementer response if the review requested changes) → PR so child context does not accumulate in the parent chat. Reviewer runs once per issue; do not send the same ticket back for a second review. Do not run sibling implementers in parallel. Share the parent checkout; do not isolate a git worktree per issue (that re-runs `dotnet restore` via `.cursor/worktrees.json` and is the usual cause of a slow queue). Website and `src/QueenZone.Mobile` are both in scope; do not mix those surfaces in one implementer unless the issue requires both. Child branches use `cursor/` unless the prompt names another agent.
+In that Custom Mode, use `/orchestrate-epic` for **one issue** (`work on #757`), an epic's children, or an explicit list (`work on #15 #16 #17`). Skip planner when the queue has a single issue. The parent keeps a scoreboard and loops **one issue at a time** through implementer → verifier → reviewer → (one implementer response if the review requested changes) → PR so child context does not accumulate in the parent chat. Reviewer runs once per issue; do not send the same ticket back for a second review. Do not run sibling implementers in parallel. Share the parent checkout; do not isolate a git worktree per issue (that re-runs `dotnet restore` via `.cursor/worktrees.json` and is the usual cause of a slow queue). Website and `src/QueenZone.Mobile` are both in scope; do not mix those surfaces in one implementer unless the issue requires both. Child branches use `cursor/` unless the prompt names another agent.
 
-Grok 4.6 effort: parent high (xhigh only if the split is messy), planner high, implementer medium, verifier high, reviewer high.
+Grok 4.6 effort when that Cursor mode is pinned: parent high (xhigh only if the split is messy), planner high, implementer medium, verifier high, reviewer high.
 
 ## Testing Expectations
 
@@ -202,6 +212,16 @@ powershell -File .\scripts\Probe-NewsAgentUrlIngestion.ps1 -Full    # fetch + tr
 ```
 
 Both modes delete their requests, heartbeats, candidates, evidence, AI runs, and drafts before returning. The full probe never publishes. Report whether it was run or skipped.
+
+When a change touches news-agent editorial guidance publish, rollback, or restore-default (`EfNewsAgentGuidanceRepository`), prefer the opt-in execution-strategy probe — Sqlite/in-memory providers never configure a retrying execution strategy, so only a real SQL Server connection with retry-on-failure enabled can catch a method that opens a transaction directly instead of routing it through `Database.CreateExecutionStrategy()`:
+
+```powershell
+$env:ConnectionStrings__QueenZoneLegacy = "Server=localhost\SQLEXPRESS;Database=queenzone_legacy_sync;Integrated Security=True;TrustServerCertificate=True"
+$env:RUN_NEWS_AGENT_GUIDANCE_PROBE = "true"
+powershell -File .\scripts\Probe-NewsAgentGuidance.ps1
+```
+
+`ConnectionStrings__QueenZoneLegacy` must point to `queenzone_legacy_sync` on the local SQL Express instance. The script rejects Azure SQL and remote servers. It runs `EfNewsAgentGuidanceLiveProbeTests`, which publishes, rolls back, and restores the compiled default for the Triage guidance type, then restores whatever draft/published rows it found there beforehand. Report whether it was run or skipped.
 
 ### Pull request CI gates (must pass before merge)
 
