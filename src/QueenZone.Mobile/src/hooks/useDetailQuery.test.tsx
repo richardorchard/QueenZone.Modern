@@ -53,9 +53,12 @@ describe('useDetailQuery', () => {
     const first = deferred<string>();
     const second = deferred<string>();
     const fetcher = jest.fn().mockReturnValueOnce(first.promise);
-    const { result, rerender } = renderHook(({ fn }) => useDetailQuery(fn), {
-      initialProps: { fn: fetcher },
-    });
+    const { result, rerender } = renderHook(
+      ({ fn }: { fn: (signal: AbortSignal) => Promise<string> }) => useDetailQuery(fn),
+      {
+        initialProps: { fn: fetcher },
+      },
+    );
 
     const nextFetcher = jest.fn().mockReturnValueOnce(second.promise);
     rerender({ fn: nextFetcher });
@@ -76,9 +79,12 @@ describe('useDetailQuery', () => {
     const first = deferred<string>();
     const second = deferred<string>();
     const fetcher = jest.fn().mockReturnValueOnce(first.promise);
-    const { result, rerender } = renderHook(({ fn }) => useDetailQuery(fn), {
-      initialProps: { fn: fetcher },
-    });
+    const { result, rerender } = renderHook(
+      ({ fn }: { fn: (signal: AbortSignal) => Promise<string> }) => useDetailQuery(fn),
+      {
+        initialProps: { fn: fetcher },
+      },
+    );
 
     const nextFetcher = jest.fn().mockReturnValueOnce(second.promise);
     rerender({ fn: nextFetcher });
@@ -95,9 +101,12 @@ describe('useDetailQuery', () => {
   it('does not commit an AbortError from a superseded load', async () => {
     const first = deferred<string>();
     const fetcher = jest.fn().mockReturnValueOnce(first.promise);
-    const { result, rerender } = renderHook(({ fn }) => useDetailQuery(fn), {
-      initialProps: { fn: fetcher },
-    });
+    const { result, rerender } = renderHook(
+      ({ fn }: { fn: (signal: AbortSignal) => Promise<string> }) => useDetailQuery(fn),
+      {
+        initialProps: { fn: fetcher },
+      },
+    );
 
     const next = jest.fn().mockResolvedValueOnce('fresh');
     rerender({ fn: next });

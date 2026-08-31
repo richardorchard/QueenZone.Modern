@@ -1,6 +1,7 @@
 import { act, screen, userEvent, waitFor } from '@testing-library/react-native';
 import { ApiError } from '../../api/client';
 import { composeMessage, searchRecipients } from '../../api/messages';
+import { conversationDetailFixture, memberProfileFixture } from '../../test/fixtures';
 import { createMockSession } from '../../test/mockSession';
 import { fakeNavigation, flushVirtualizedList, renderWithProviders } from '../../test/render';
 import { ComposeMessageScreen } from './ComposeMessageScreen';
@@ -56,11 +57,11 @@ describe('ComposeMessageScreen', () => {
   beforeEach(() => {
     mockSession.isSignedIn = true;
     mockSession.accessToken = 'tok';
-    mockSession.profile = { memberId: 'member-1' } as never;
+    mockSession.profile = memberProfileFixture({ memberId: 'member-1' });
     searchRecipientsMock.mockReset();
     composeMessageMock.mockReset();
     searchRecipientsMock.mockResolvedValue([recipient]);
-    composeMessageMock.mockResolvedValue({ conversationId } as never);
+    composeMessageMock.mockResolvedValue(conversationDetailFixture({ conversationId }));
   });
 
   afterEach(async () => {

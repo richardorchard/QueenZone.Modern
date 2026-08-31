@@ -6,14 +6,17 @@ namespace QueenZone.Web.Pages.Account;
 
 public sealed class LogoutModel : PageModel
 {
-    public async Task<IActionResult> OnPostAsync()
+    public async Task<IActionResult> OnPostAsync(CancellationToken cancellationToken)
     {
+        // SignOutAsync has no token; finish sign-out even if the request is aborted.
+        _ = cancellationToken;
         await SignOutMemberAsync();
         return RedirectToSignedOutLogin();
     }
 
-    public async Task<IActionResult> OnGetAsync()
+    public async Task<IActionResult> OnGetAsync(CancellationToken cancellationToken)
     {
+        _ = cancellationToken;
         await SignOutMemberAsync();
         return RedirectToSignedOutLogin();
     }

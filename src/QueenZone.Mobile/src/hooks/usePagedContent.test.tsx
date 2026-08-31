@@ -193,9 +193,12 @@ describe('usePagedContent', () => {
     const fetcher = jest.fn();
     fetcher.mockReturnValueOnce(first.promise);
     fetcher.mockResolvedValueOnce(pagedResponse(['fresh'], 1, 1));
-    const { result, rerender } = renderHook(({ key }) => usePagedContent(fetcher, 20, key), {
-      initialProps: { key: 'one' },
-    });
+    const { result, rerender } = renderHook(
+      ({ key }: { key: string }) => usePagedContent(fetcher, 20, key),
+      {
+        initialProps: { key: 'one' },
+      },
+    );
     expect(result.current.loading).toBe(true);
     const firstSignal = fetcher.mock.calls[0][1] as AbortSignal;
     rerender({ key: 'two' });
@@ -212,9 +215,12 @@ describe('usePagedContent', () => {
     fetcher.mockResolvedValueOnce(pagedResponse(['seed'], 1, 1));
     fetcher.mockReturnValueOnce(refreshPending.promise);
     fetcher.mockResolvedValueOnce(pagedResponse(['reset'], 1, 1));
-    const { result, rerender } = renderHook(({ key }) => usePagedContent(fetcher, 20, key), {
-      initialProps: { key: 'one' },
-    });
+    const { result, rerender } = renderHook(
+      ({ key }: { key: string }) => usePagedContent(fetcher, 20, key),
+      {
+        initialProps: { key: 'one' },
+      },
+    );
     await waitFor(() => expect(result.current.items).toEqual(['seed']));
 
     await act(async () => {

@@ -74,8 +74,8 @@ describe('TimelineScreen', () => {
   });
 
   it('pages until the focused event appears, then expands that row', async () => {
-    fetchTimeline.mockImplementation(async ({ page }) => {
-      if (page === 1) {
+    fetchTimeline.mockImplementation(async (query = {}) => {
+      if ((query.page ?? 1) === 1) {
         return pagedResponse([eventFixture({ id: 10, title: 'Another' })], 1, 2);
       }
       return pagedResponse([eventFixture()], 2, 2);
