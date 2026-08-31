@@ -1,4 +1,3 @@
-import { nestedTabParams } from '../navigation/nestedTab';
 import type { WidgetFace } from './widgetCopy';
 
 /** Opened by a quote face that has no usable id. */
@@ -161,7 +160,9 @@ export function openWidgetDestination(navigation: WidgetNavigation, url?: string
     navigation.navigate('Tabs', {
       screen: 'ArchiveTab',
       params:
-        eventId != null ? nestedTabParams('Timeline', { focusId: eventId }) : nestedTabParams('Timeline'),
+        eventId != null
+          ? { screen: 'Timeline', params: { focusId: eventId }, initial: false }
+          : { screen: 'Timeline', initial: false },
     });
     return;
   }

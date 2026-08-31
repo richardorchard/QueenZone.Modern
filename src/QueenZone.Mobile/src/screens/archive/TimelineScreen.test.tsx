@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { FlatList } from 'react-native';
 import { screen, userEvent, waitFor } from '@testing-library/react-native';
 import { fetchTimelinePage } from '../../api';
 import type { TimelineEvent } from '../../api/types';
@@ -37,6 +38,11 @@ describe('TimelineScreen', () => {
     fetchTimeline.mockResolvedValue(
       pagedResponse([eventFixture(), eventFixture({ id: 10, title: 'Another' })], 1, 1),
     );
+    jest.spyOn(FlatList.prototype, 'scrollToIndex').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   it('expands the event passed as focusId from search', async () => {
@@ -55,6 +61,11 @@ describe('TimelineScreen', () => {
     expect(screen.getByRole('button', { name: 'Another' }).props.accessibilityState).toEqual({
       expanded: false,
     });
+    await waitFor(() =>
+      expect(FlatList.prototype.scrollToIndex).toHaveBeenCalledWith(
+        expect.objectContaining({ index: expect.any(Number) }),
+      ),
+    );
   });
 
   it('pages until the focused event appears, then expands that row', async () => {
@@ -82,6 +93,11 @@ describe('TimelineScreen', () => {
     expect(screen.getByRole('button', { name: 'Another' }).props.accessibilityState).toEqual({
       expanded: false,
     });
+    await waitFor(() =>
+      expect(FlatList.prototype.scrollToIndex).toHaveBeenCalledWith(
+        expect.objectContaining({ index: expect.any(Number) }),
+      ),
+    );
   });
 
   it('leaves the list unexpanded when the focused event is never found', async () => {
@@ -100,6 +116,7 @@ describe('TimelineScreen', () => {
       expanded: false,
     });
     expect(screen.queryByText('Wembley Stadium.')).toBeNull();
+    expect(FlatList.prototype.scrollToIndex).not.toHaveBeenCalled();
   });
 
   it('pops back to the archive listing when the stack has history', async () => {
