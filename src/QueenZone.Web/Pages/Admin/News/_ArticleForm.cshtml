@@ -87,16 +87,15 @@
     }
     <input type="hidden" name="imageBlobKey" value="@Model.Draft.ImageBlobKey" data-article-image-blob-key>
     <input type="hidden" name="imageGalleryPicId" value="@Model.Draft.ImageGalleryPicId" data-article-image-gallery-id>
-    <div class="qz-field">
+    <div class="qz-field"
+         data-article-image-crop
+         data-aspect-width="@NewsArticleImageProcessor.CardAspectWidth"
+         data-aspect-height="@NewsArticleImageProcessor.CardAspectHeight"
+         data-min-crop-width="@NewsArticleImageProcessor.MinCropWidth"
+         data-min-crop-height="@NewsArticleImageProcessor.MinCropHeight"
+         data-max-bytes="@articleImageMaxBytes">
       <label class="qz-label" for="article-image-file">Article image</label>
-      <div class="qz-dropzone"
-           data-article-image-crop
-           data-gallery-picker
-           data-aspect-width="@NewsArticleImageProcessor.CardAspectWidth"
-           data-aspect-height="@NewsArticleImageProcessor.CardAspectHeight"
-           data-min-crop-width="@NewsArticleImageProcessor.MinCropWidth"
-           data-min-crop-height="@NewsArticleImageProcessor.MinCropHeight"
-           data-max-bytes="@articleImageMaxBytes">
+      <div class="qz-dropzone" data-gallery-picker>
         <figure class="admin-article-image qz-dropzone-media">
           <img src="@previewImageUrl"
                alt="@(hasArticleImage ? "Article image" : "No article image")"
