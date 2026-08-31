@@ -55,6 +55,35 @@ public sealed record NewsDetailDto(
 /// archive has no published articles.
 /// </summary>
 public sealed record NewsYearRangeDto(int? MinYear, int? MaxYear);
+
+/// <summary>
+/// List-card shape for <c>/api/v1/content/articles</c>. Long-form editorial archive
+/// only (<see cref="QueenZone.Data.ArticleItem"/>) — not news and not community
+/// submissions. No images or forum topic.
+/// </summary>
+public sealed record ArticleListItemDto(
+    int Id,
+    string Title,
+    string Excerpt,
+    DateTime PublishedAt,
+    string DetailPath,
+    string? CategoryName = null);
+
+/// <summary>
+/// Detail shape for <c>/api/v1/content/articles/{id}</c>.
+/// <c>Body</c> is sanitized HTML via <see cref="ArticleContent.FormatBody"/>.
+/// <c>Source</c> is a string: a public http(s) URL or plain attribution text.
+/// </summary>
+public sealed record ArticleDetailDto(
+    int Id,
+    string Title,
+    string Excerpt,
+    string Body,
+    DateTime PublishedAt,
+    string? Source,
+    string? CategoryName,
+    string DetailPath);
+
 /// <summary>
 /// List-card shape for <c>/api/v1/content/timeline</c>. No detail endpoint: the website
 /// has no single-event page, only the one continuous timeline list.

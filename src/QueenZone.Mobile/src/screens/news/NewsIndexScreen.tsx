@@ -7,7 +7,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { fetchNewsPage, fetchNewsYearRange, formatPublishedDate, type NewsListItem, type NewsYearRange } from '../../api';
 import { getAppConfig } from '../../config';
 import { newsArticleListImageSource, newsArticlePlaceholder } from '../../content/newsArticleImage';
-import { newsDecades } from '../../content/sample';
+import { newsDecades } from '../../content/newsDecades';
 import { useNewsListEpochRefresh } from '../../hooks/useNewsListEpochRefresh';
 import { usePagedContent } from '../../hooks/usePagedContent';
 import type { NewsStackParamList, RootTabParamList } from '../../navigation/types';

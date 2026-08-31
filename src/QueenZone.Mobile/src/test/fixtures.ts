@@ -3,6 +3,8 @@ import type { MemberProfile } from '../api/me';
 import type { AuthTokens } from '../api/auth';
 import type {
   ApiPagedResponse,
+  ArticleDetail,
+  ArticleListItem,
   FanPerformance,
   ForumAttachment,
   ForumPost,
@@ -91,6 +93,32 @@ export function newsDetailFixture(overrides: Partial<NewsDetail> = {}): NewsDeta
     publishedAt: '2024-01-15T12:00:00.000Z',
     sourceUrl: null,
     detailPath: '/news/42',
+    ...overrides,
+  };
+}
+
+export function articleItemFixture(overrides: Partial<ArticleListItem> = {}): ArticleListItem {
+  return {
+    id: 101,
+    title: 'Inside the Making of Bohemian Rhapsody',
+    excerpt: 'Six weeks, three studios and a chorus recorded more than 180 times.',
+    publishedAt: '2024-03-12T00:00:00.000Z',
+    detailPath: '/articles/101/inside-the-making-of-bohemian-rhapsody',
+    categoryName: 'Recording',
+    ...overrides,
+  };
+}
+
+export function articleDetailFixture(overrides: Partial<ArticleDetail> = {}): ArticleDetail {
+  return {
+    id: 101,
+    title: 'Inside the Making of Bohemian Rhapsody',
+    excerpt: 'Six weeks, three studios and a chorus recorded more than 180 times.',
+    body: '<p>Six weeks, three studios and a chorus recorded more than 180 times.</p>',
+    publishedAt: '2024-03-12T00:00:00.000Z',
+    source: 'Queenzone archive',
+    categoryName: 'Recording',
+    detailPath: '/articles/101/inside-the-making-of-bohemian-rhapsody',
     ...overrides,
   };
 }

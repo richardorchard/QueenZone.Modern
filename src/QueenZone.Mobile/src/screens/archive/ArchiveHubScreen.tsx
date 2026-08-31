@@ -5,7 +5,8 @@ import { FlatList } from 'react-native';
 import {
   archiveDestinations,
   type ArchiveDestination,
-} from '../../content/sample';
+} from '../../content/archiveHub';
+import { media } from '../../content/media';
 import type { ArchiveStackParamList, RootTabParamList } from '../../navigation/types';
 import { useTheme } from '../../theme';
 import { ArchiveFooter } from '../../ui/ArchiveFooter';
@@ -73,7 +74,7 @@ export function ArchiveHubScreen({ navigation }: Props) {
           kicker={item.kicker}
           kickerRole={item.kickerRole}
           meta={item.meta}
-          image={item.image}
+          image={media[item.image]}
           onPress={() => open(item)}
         />
       )}

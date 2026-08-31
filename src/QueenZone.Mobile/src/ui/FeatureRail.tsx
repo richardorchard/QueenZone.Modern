@@ -1,10 +1,19 @@
 import { Pressable, ScrollView, Text } from 'react-native';
-import type { FeatureItem } from '../content/sample';
 import { radius, space, type, useTheme } from '../theme';
 import { ArchiveImage } from './ArchiveImage';
-import { Badge } from './Badge';
+import { Badge, type BadgeRole } from './Badge';
 import { MetaLine } from './MetaLine';
 import { usePressProps } from './press';
+
+export type FeatureItem = {
+  id: string;
+  title: string;
+  kicker: string;
+  kickerRole: BadgeRole;
+  meta: string[];
+  image: number;
+  storyId?: number;
+};
 
 type Props = {
   items: FeatureItem[];
