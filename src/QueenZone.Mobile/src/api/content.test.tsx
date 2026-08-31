@@ -1,5 +1,7 @@
 import {
   fetchAlbumDetail,
+  fetchArticleDetail,
+  fetchArticlesPage,
   fetchBiographyChapter,
   fetchBiographyPage,
   fetchDiscographyPage,
@@ -63,6 +65,19 @@ describe('fetchNewsDetail', () => {
     const detail = await fetchNewsDetail(42);
     expect(lastUrl()).toBe('http://qz.test/api/v1/content/news/42');
     expect(detail).toMatchObject({ id: 42, title: 'Story' });
+  });
+});
+
+describe('fetchArticlesPage and fetchArticleDetail', () => {
+  it('builds the list and article-detail URLs', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ items: [] }));
+    await fetchArticlesPage({ page: 2, pageSize: 20 });
+    expect(lastUrl()).toBe('http://qz.test/api/v1/content/articles?page=2&pageSize=20');
+
+    fetchMock.mockResolvedValueOnce(jsonResponse({ id: 101, title: 'Inside the Making of Bohemian Rhapsody' }));
+    const detail = await fetchArticleDetail(101);
+    expect(lastUrl()).toBe('http://qz.test/api/v1/content/articles/101');
+    expect(detail).toMatchObject({ id: 101, title: 'Inside the Making of Bohemian Rhapsody' });
   });
 });
 

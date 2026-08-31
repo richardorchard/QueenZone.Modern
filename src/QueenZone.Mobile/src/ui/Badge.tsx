@@ -1,6 +1,7 @@
 import { Text } from 'react-native';
-import type { BadgeRole } from '../content/sample';
 import { type, useTheme } from '../theme';
+
+export type BadgeRole = 'restored' | 'anniversary' | 'featured' | 'archive' | 'community';
 
 export function Badge({ label, role }: { label: string; role: BadgeRole }) {
   const { c } = useTheme();

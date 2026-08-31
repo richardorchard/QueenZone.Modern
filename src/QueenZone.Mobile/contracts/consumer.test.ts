@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { ApiError, fetchJson, sendJson, sendMultipart } from '../src/api/client.ts';
 import {
+  fetchArticleDetail,
+  fetchArticlesPage,
   fetchFanPerformancesPage,
   fetchNewsDetail,
   fetchNewsPage,
@@ -43,6 +45,8 @@ import {
   forumTopicWatchSchema,
   inboxConversationSchema,
   memberProfileSchema,
+  articleDetailSchema,
+  articleListItemSchema,
   newsDetailSchema,
   newsListItemSchema,
   newsSuggestionCreatedSchema,
@@ -106,6 +110,32 @@ describe('mobile API consumer contracts', { concurrency: false }, () => {
     assert.match(detail.body, /ugc\/news\//);
     const relativeMedia = resolveMediaUrl(fixture.baseUrl, '/ugc/news/sample-crest.jpg');
     assert.equal(relativeMedia, `${fixture.baseUrl}/ugc/news/sample-crest.jpg`);
+  });
+
+  it('reads a paged articles list and a published article detail', async () => {
+    const page = parseContract(
+      'GET /api/v1/content/articles',
+      pagedSchema(articleListItemSchema),
+      await fetchArticlesPage({ page: 1, pageSize: 20 }),
+    );
+    expectedField('GET /api/v1/content/articles', 'items', page.items, Array.isArray, 'a non-empty array');
+    assert.ok(page.items.length > 0, 'Contract GET /api/v1/content/articles failed: expected field items to be non-empty');
+    assert.equal(page.page, 1);
+    assert.equal(page.pageSize, 20);
+    assert.ok(page.totalCount >= page.items.length);
+    assert.ok(page.totalPages >= 1);
+    assert.equal(page.items[0]?.id, 101);
+    assert.match(page.items[0]?.detailPath ?? '', /^\/articles\/101\//);
+    assert.ok(!page.items.some((item) => item.id === 9001));
+
+    const detail = parseContract(
+      'GET /api/v1/content/articles/101',
+      articleDetailSchema,
+      await fetchArticleDetail(101),
+    );
+    assert.equal(detail.id, 101);
+    assert.equal(detail.title, 'Inside the Making of Bohemian Rhapsody');
+    assert.match(detail.body, /studios/i);
   });
 
   it('searches the shared SearchDocument index', async () => {
