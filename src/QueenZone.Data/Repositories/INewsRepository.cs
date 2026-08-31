@@ -26,6 +26,14 @@ public interface INewsRepository
 
     Task<NewsItem?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Published articles whose ids are in <paramref name="ids"/>, in a single round trip.
+    /// Missing and unpublished ids are omitted. Duplicate ids are ignored.
+    /// </summary>
+    Task<IReadOnlyList<NewsItem>> GetByIdsAsync(
+        IReadOnlyCollection<int> ids,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<SitemapContentEntry>> GetPublishedSitemapEntriesAsync(CancellationToken cancellationToken = default);
 
     Task<NewsSearchPage> SearchAsync(string query, int page, int pageSize, CancellationToken cancellationToken = default);

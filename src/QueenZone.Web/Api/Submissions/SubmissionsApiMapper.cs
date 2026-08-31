@@ -60,18 +60,14 @@ public static class SubmissionsApiMapper
     public static IReadOnlyList<ArticleSubmissionItemDto> ToArticles(IEnumerable<ArticleSubmission> items) =>
         items.Select(ToArticle).ToList();
 
-    public static async Task<string?> ResolvePublishedNewsPathAsync(
-        NewsSuggestion suggestion,
-        INewsRepository newsRepository,
-        CancellationToken cancellationToken)
+    public static string? ResolvePublishedNewsPath(NewsSuggestion suggestion, NewsItem? news)
     {
         if (suggestion.Status != NewsSuggestionStatus.Promoted
-            || suggestion.PromotedNewsId is not int newsId)
+            || suggestion.PromotedNewsId is not int)
         {
             return null;
         }
 
-        var news = await newsRepository.GetByIdAsync(newsId, cancellationToken);
         if (news is not { IsPublished: true })
         {
             return null;

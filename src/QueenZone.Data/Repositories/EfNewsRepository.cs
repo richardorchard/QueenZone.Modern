@@ -180,6 +180,48 @@ public sealed class EfNewsRepository : INewsRepository
         return (await AddSubmissionAttributionAsync([Map(row)], cancellationToken))[0];
     }
 
+    public async Task<IReadOnlyList<NewsItem>> GetByIdsAsync(
+        IReadOnlyCollection<int> ids,
+        CancellationToken cancellationToken = default)
+    {
+        if (ids.Count == 0)
+        {
+            return [];
+        }
+
+        var distinctIds = ids.Distinct().ToArray();
+        var sql = ExpandIdEqualityToInList(byIdSql, distinctIds.Length);
+        var parameters = Array.ConvertAll(distinctIds, static id => (object)id);
+        var rows = await dbContext.Database
+            .SqlQueryRaw<NewsRow>(sql, parameters)
+            .ToListAsync(cancellationToken);
+        return await AddSubmissionAttributionAsync(rows.Select(Map).ToList(), cancellationToken);
+    }
+
+    /// <summary>
+    /// Rewrites the single-id <c>Id = {0}</c> predicate into a parameterized
+    /// <c>Id IN ({0}, {1}, …)</c> list so a page of ids is one round trip.
+    /// </summary>
+    internal static string ExpandIdEqualityToInList(string byIdSql, int idCount)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(idCount, 1);
+        const string marker = "Id = {0}";
+        var index = byIdSql.LastIndexOf(marker, StringComparison.Ordinal);
+        if (index < 0)
+        {
+            throw new InvalidOperationException(
+                "News by-id SQL must contain an 'Id = {0}' predicate to expand into a batch IN list.");
+        }
+
+        var placeholders = string.Join(", ", Enumerable.Range(0, idCount).Select(i => "{" + i + "}"));
+        return string.Concat(
+            byIdSql[..index],
+            "Id IN (",
+            placeholders,
+            ")",
+            byIdSql[(index + marker.Length)..]);
+    }
+
     public async Task<IReadOnlyList<SitemapContentEntry>> GetPublishedSitemapEntriesAsync(
         CancellationToken cancellationToken = default) =>
         await dbContext.Database
