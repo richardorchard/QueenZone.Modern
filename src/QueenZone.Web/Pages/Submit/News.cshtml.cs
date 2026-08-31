@@ -26,8 +26,9 @@ public sealed class NewsModel(NewsSuggestionService newsSuggestionService) : Pag
     [Display(Name = "Notes for the editor")]
     public string? Notes { get; set; }
 
-    public async Task<IActionResult> OnGetAsync()
+    public async Task<IActionResult> OnGetAsync(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (await GetCurrentMemberIdAsync() is null)
         {
             return Redirect("/account/login");

@@ -31,8 +31,9 @@ public sealed class TriviaModel(ITriviaFactSubmissionRepository triviaFactSubmis
     [Display(Name = "Source or context")]
     public string? SourceNote { get; set; }
 
-    public async Task<IActionResult> OnGetAsync()
+    public async Task<IActionResult> OnGetAsync(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (await GetCurrentMemberIdAsync() is null)
         {
             return Redirect("/account/login");
