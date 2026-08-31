@@ -32,6 +32,16 @@ const quoteDestination = {
   params: { screen: 'Quote', params: { id: 9 }, initial: false },
 };
 
+const timelineFocusDestination = {
+  screen: 'ArchiveTab',
+  params: { screen: 'Timeline', params: { focusId: 12 }, initial: false },
+};
+
+const timelineListDestination = {
+  screen: 'ArchiveTab',
+  params: { screen: 'Timeline', initial: false },
+};
+
 describe('WidgetLinkBridge', () => {
   beforeEach(() => {
     resetInitialWidgetUrlConsumption();
@@ -63,11 +73,18 @@ describe('WidgetLinkBridge', () => {
     await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('Tabs', homeDestination));
   });
 
-  it('still opens Home from the older timeline widget URL', async () => {
+  it('opens Timeline with focusId from a cold-start day-face URL', async () => {
+    getInitialURL.mockResolvedValue('queenzone://timeline/12');
+    renderWithProviders(<WidgetLinkBridge />);
+
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('Tabs', timelineFocusDestination));
+  });
+
+  it('opens the Timeline list from a day-face URL with no usable id', async () => {
     getInitialURL.mockResolvedValue('queenzone://timeline');
     renderWithProviders(<WidgetLinkBridge />);
 
-    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('Tabs', homeDestination));
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('Tabs', timelineListDestination));
   });
 
   it('opens Home from a later url event', async () => {

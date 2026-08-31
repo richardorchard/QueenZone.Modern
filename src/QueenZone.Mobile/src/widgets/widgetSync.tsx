@@ -48,12 +48,14 @@ export function isSameLocalCalendarDay(leftMs: number, rightMs: number): boolean
 
 function toWidgetProps(content: WidgetContent): OnThisDayAndroidWidgetProps {
   const quoteId = content.quote && content.quote.id > 0 ? content.quote.id : undefined;
+  const eventId = content.onThisDay && content.onThisDay.id > 0 ? content.onThisDay.id : undefined;
   return {
     formattedDate: content.onThisDay?.formattedDate,
     summary: content.onThisDay?.summary,
     quoteText: content.quote?.text,
     quoteWhoSaid: content.quote?.whoSaid,
     ...(quoteId != null ? { quoteId } : {}),
+    ...(eventId != null ? { eventId } : {}),
   };
 }
 
@@ -73,8 +75,9 @@ function dayFromProps(props: OnThisDayAndroidWidgetProps): TimelineEvent | null 
   if (!props.formattedDate || !props.summary) {
     return null;
   }
+  const eventId = Number(props.eventId);
   return {
-    id: 0,
+    id: Number.isInteger(eventId) && eventId > 0 ? eventId : 0,
     title: '',
     summary: props.summary,
     eventDate: '',

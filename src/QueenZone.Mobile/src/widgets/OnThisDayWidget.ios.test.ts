@@ -38,7 +38,10 @@ describe('OnThisDayWidget.ios referential freedom', () => {
   it('inlines the home deep link, card colors, and empty-state copy', () => {
     assert.match(viewBody, /queenzone:\/\/home/);
     assert.match(viewBody, /queenzone:\/\/quotes\/\$\{quoteId\}/);
+    assert.match(viewBody, /queenzone:\/\/timeline\/\$\{eventId\}/);
+    assert.match(viewBody, /queenzone:\/\/timeline/);
     assert.match(viewBody, /props\.quoteId/);
+    assert.match(viewBody, /props\.eventId/);
     assert.match(viewBody, /#181614/);
     assert.match(viewBody, /#B89A4A/);
     assert.match(viewBody, /#F2F1ED/);

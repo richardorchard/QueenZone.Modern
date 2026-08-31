@@ -107,6 +107,7 @@ describe('widgetTaskHandler', () => {
       quoteText: 'New quote',
       quoteWhoSaid: 'Brian May',
       quoteId: 2,
+      eventId: 1,
     });
     expect(props.renderWidget).toHaveBeenCalled();
   });
@@ -144,6 +145,7 @@ describe('widgetTaskHandler', () => {
       summary: 'Queen released The Game.',
       quoteText: 'A kind of magic',
       quoteWhoSaid: 'Freddie Mercury',
+      eventId: 1,
     });
     expect(props.renderWidget).toHaveBeenCalled();
   });

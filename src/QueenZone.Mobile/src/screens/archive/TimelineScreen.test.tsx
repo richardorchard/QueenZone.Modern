@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { FlatList } from 'react-native';
 import { screen, userEvent, waitFor } from '@testing-library/react-native';
 import { fetchTimelinePage } from '../../api';
 import type { TimelineEvent } from '../../api/types';
@@ -37,6 +38,11 @@ describe('TimelineScreen', () => {
     fetchTimeline.mockResolvedValue(
       pagedResponse([eventFixture(), eventFixture({ id: 10, title: 'Another' })], 1, 1),
     );
+    jest.spyOn(FlatList.prototype, 'scrollToIndex').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   it('expands the event passed as focusId from search', async () => {
@@ -55,6 +61,62 @@ describe('TimelineScreen', () => {
     expect(screen.getByRole('button', { name: 'Another' }).props.accessibilityState).toEqual({
       expanded: false,
     });
+    await waitFor(() =>
+      expect(FlatList.prototype.scrollToIndex).toHaveBeenCalledWith(
+        expect.objectContaining({ index: expect.any(Number) }),
+      ),
+    );
+  });
+
+  it('pages until the focused event appears, then expands that row', async () => {
+    fetchTimeline.mockImplementation(async ({ page }) => {
+      if (page === 1) {
+        return pagedResponse([eventFixture({ id: 10, title: 'Another' })], 1, 2);
+      }
+      return pagedResponse([eventFixture()], 2, 2);
+    });
+
+    renderWithProviders(
+      <TimelineScreen
+        navigation={fakeNavigation() as never}
+        route={{ key: 'timeline', name: 'Timeline', params: { focusId: 12 } } as never}
+      />,
+      { navigation: false },
+    );
+
+    await waitFor(() => expect(fetchTimeline).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Live Aid' })).toBeOnTheScreen());
+    expect(screen.getByRole('button', { name: 'Live Aid' }).props.accessibilityState).toEqual({
+      expanded: true,
+    });
+    expect(screen.getByText('Wembley Stadium.')).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Another' }).props.accessibilityState).toEqual({
+      expanded: false,
+    });
+    await waitFor(() =>
+      expect(FlatList.prototype.scrollToIndex).toHaveBeenCalledWith(
+        expect.objectContaining({ index: expect.any(Number) }),
+      ),
+    );
+  });
+
+  it('leaves the list unexpanded when the focused event is never found', async () => {
+    fetchTimeline.mockResolvedValue(pagedResponse([eventFixture({ id: 10, title: 'Another' })], 1, 1));
+
+    renderWithProviders(
+      <TimelineScreen
+        navigation={fakeNavigation() as never}
+        route={{ key: 'timeline', name: 'Timeline', params: { focusId: 99 } } as never}
+      />,
+      { navigation: false },
+    );
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Another' })).toBeOnTheScreen());
+    expect(screen.getByRole('button', { name: 'Another' }).props.accessibilityState).toEqual({
+      expanded: false,
+    });
+    expect(screen.queryByText('Wembley Stadium.')).toBeNull();
+    expect(FlatList.prototype.scrollToIndex).not.toHaveBeenCalled();
   });
 
   it('pops back to the archive listing when the stack has history', async () => {

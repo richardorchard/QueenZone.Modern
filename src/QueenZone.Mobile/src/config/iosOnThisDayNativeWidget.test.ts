@@ -50,7 +50,10 @@ describe('applyOnThisDayNativeWidget', () => {
     assert.match(first, /Open QueenZone to load today's story\./);
     assert.match(first, /queenzone:\/\/home/);
     assert.equal(first.includes('queenzone://quotes/\\(quoteId)'), true);
+    assert.equal(first.includes('queenzone://timeline/\\(eventId)'), true);
+    assert.match(first, /queenzone:\/\/timeline"/);
     assert.match(first, /intProp\("quoteId"\)/);
+    assert.match(first, /intProp\("eventId"\)/);
     assert.match(first, /containerBackground/);
     assert.match(first, /foregroundColor/);
     assert.match(first, /QUEEN QUOTES/);

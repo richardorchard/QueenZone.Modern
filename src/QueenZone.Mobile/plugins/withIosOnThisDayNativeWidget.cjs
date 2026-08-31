@@ -33,6 +33,7 @@ struct OnThisDayNativeEntryView: View {
   private var quoteText: String { stringProp("quoteText") }
   private var quoteWhoSaid: String { stringProp("quoteWhoSaid") }
   private var quoteId: Int { intProp("quoteId") }
+  private var eventId: Int { intProp("eventId") }
   private var hasDay: Bool { !formattedDate.isEmpty && !summary.isEmpty }
   private var hasQuote: Bool { !quoteText.isEmpty && !quoteWhoSaid.isEmpty }
   private var showDay: Bool {
@@ -120,7 +121,13 @@ struct OnThisDayNativeEntryView: View {
     if showQuote && quoteId > 0 {
       return URL(string: "queenzone://quotes/\\(quoteId)")
     }
-    return URL(string: "queenzone://home")
+    if showDay && eventId > 0 {
+      return URL(string: "queenzone://timeline/\\(eventId)")
+    }
+    if showQuote {
+      return URL(string: "queenzone://home")
+    }
+    return URL(string: "queenzone://timeline")
   }
 
   private func stringProp(_ key: String) -> String {
@@ -214,7 +221,7 @@ function withIosOnThisDayNativeWidget(config) {
 const plugin = createRunOncePlugin(
   withIosOnThisDayNativeWidget,
   'withIosOnThisDayNativeWidget',
-  '1.3.0',
+  '1.4.0',
 );
 
 plugin.applyOnThisDayNativeWidget = applyOnThisDayNativeWidget;

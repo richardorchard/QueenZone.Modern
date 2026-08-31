@@ -1,5 +1,5 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useCallback, useLayoutEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Linking, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { fetchTimelinePage, type TimelineEvent } from '../../api';
 import { usePagedContent } from '../../hooks/usePagedContent';
@@ -17,6 +17,8 @@ type DecadeSection = {
   events: TimelineEvent[];
 };
 
+type TimelineRow = { kind: 'decade'; decade: string } | { kind: 'event'; event: TimelineEvent };
+
 function decadeLabel(iso: string): string {
   const year = new Date(iso).getFullYear();
   if (Number.isNaN(year)) {
@@ -26,9 +28,16 @@ function decadeLabel(iso: string): string {
   return `${start}s`;
 }
 
+function usableFocusId(value: number | undefined): number | null {
+  return value != null && value > 0 ? value : null;
+}
+
 export function TimelineScreen({ navigation, route }: Props) {
   const { c } = useTheme();
-  const [expandedId, setExpandedId] = useState<number | null>(route.params?.focusId ?? null);
+  const focusId = usableFocusId(route.params?.focusId);
+  const [expandedId, setExpandedId] = useState<number | null>(focusId);
+  const listRef = useRef<FlatList<TimelineRow>>(null);
+  const didScrollFocus = useRef(false);
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -46,6 +55,24 @@ export function TimelineScreen({ navigation, route }: Props) {
     100,
   );
 
+  useEffect(() => {
+    if (focusId == null) {
+      return;
+    }
+    if (paged.loading || paged.loadingMore) {
+      return;
+    }
+    if (paged.items.some((event) => event.id === focusId)) {
+      setExpandedId(focusId);
+      return;
+    }
+    if (paged.hasMore) {
+      paged.loadMore();
+      return;
+    }
+    setExpandedId(null);
+  }, [focusId, paged.hasMore, paged.items, paged.loadMore, paged.loading, paged.loadingMore]);
+
   const sections = useMemo(() => {
     const map = new Map<string, TimelineEvent[]>();
     for (const event of paged.items) {
@@ -57,6 +84,34 @@ export function TimelineScreen({ navigation, route }: Props) {
     return Array.from(map.entries()).map(([decade, events]) => ({ decade, events }) satisfies DecadeSection);
   }, [paged.items]);
 
+  const rows = useMemo(() => {
+    const next: TimelineRow[] = [];
+    for (const section of sections) {
+      next.push({ kind: 'decade', decade: section.decade });
+      for (const event of section.events) {
+        next.push({ kind: 'event', event });
+      }
+    }
+    return next;
+  }, [sections]);
+
+  const focusIndex = useMemo(() => {
+    if (focusId == null) {
+      return -1;
+    }
+    return rows.findIndex((row) => row.kind === 'event' && row.event.id === focusId);
+  }, [focusId, rows]);
+
+  useEffect(() => {
+    if (focusIndex < 0 || didScrollFocus.current) {
+      return;
+    }
+    didScrollFocus.current = true;
+    requestAnimationFrame(() => {
+      listRef.current?.scrollToIndex({ index: focusIndex, animated: true, viewPosition: 0.25 });
+    });
+  }, [focusIndex]);
+
   if (paged.loading && paged.items.length === 0) {
     return <LoadingBlock label="Loading timeline…" />;
   }
@@ -67,9 +122,10 @@ export function TimelineScreen({ navigation, route }: Props) {
 
   return (
     <FlatList
+      ref={listRef}
       style={[styles.list, { backgroundColor: c.surfacePage }]}
-      data={sections}
-      keyExtractor={(section) => section.decade}
+      data={rows}
+      keyExtractor={(row) => (row.kind === 'decade' ? `decade:${row.decade}` : `event:${row.event.id}`)}
       ListEmptyComponent={<EmptyBlock message="No timeline events yet." />}
       ListFooterComponent={<ListFooterLoading visible={paged.loadingMore} />}
       refreshControl={
@@ -81,61 +137,67 @@ export function TimelineScreen({ navigation, route }: Props) {
       }
       onEndReached={paged.loadMore}
       onEndReachedThreshold={0.4}
-      renderItem={({ item: section }) => (
-        <View>
-          <Text
-            style={[
-              type.eyebrow,
-              {
-                color: c.accentArchive,
-                paddingHorizontal: space.xl,
-                paddingTop: space.xxl,
-                paddingBottom: space.md,
-              },
+      onScrollToIndexFailed={({ index }) => {
+        setTimeout(() => {
+          listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.25 });
+        }, 80);
+      }}
+      renderItem={({ item: row }) => {
+        if (row.kind === 'decade') {
+          return (
+            <Text
+              style={[
+                type.eyebrow,
+                {
+                  color: c.accentArchive,
+                  paddingHorizontal: space.xl,
+                  paddingTop: space.xxl,
+                  paddingBottom: space.md,
+                },
+              ]}
+            >
+              {row.decade}
+            </Text>
+          );
+        }
+
+        const event = row.event;
+        const expanded = expandedId === event.id;
+        return (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ expanded }}
+            accessibilityLabel={event.title}
+            onPress={() => setExpandedId(expanded ? null : event.id)}
+            style={({ pressed }) => [
+              styles.row,
+              { borderTopColor: c.hairline, opacity: pressed ? 0.72 : 1 },
             ]}
           >
-            {section.decade}
-          </Text>
-          {section.events.map((event) => {
-            const expanded = expandedId === event.id;
-            return (
-              <Pressable
-                key={event.id}
-                accessibilityRole="button"
-                accessibilityState={{ expanded }}
-                accessibilityLabel={event.title}
-                onPress={() => setExpandedId(expanded ? null : event.id)}
-                style={({ pressed }) => [
-                  styles.row,
-                  { borderTopColor: c.hairline, opacity: pressed ? 0.72 : 1 },
-                ]}
-              >
-                <Text style={[type.meta, { color: c.textMuted }]}>{event.formattedDate}</Text>
-                <Text style={[type.listTitle, { color: c.textPrimary, marginTop: space.xs }]}>
-                  {event.title}
-                </Text>
-                <Text style={[type.meta, { color: c.accentArchive, marginTop: space.xs }]}>
-                  {event.categoryLabel}
-                </Text>
-                {expanded ? (
-                  <View style={styles.detail}>
-                    <Text style={[type.body, { color: c.textSecondary }]}>{event.summary}</Text>
-                    {event.sourceUrl ? (
-                      <Pressable
-                        accessibilityRole="link"
-                        onPress={() => Linking.openURL(event.sourceUrl!)}
-                        style={styles.source}
-                      >
-                        <Text style={[type.button, { color: c.accentPrimary }]}>Source</Text>
-                      </Pressable>
-                    ) : null}
-                  </View>
+            <Text style={[type.meta, { color: c.textMuted }]}>{event.formattedDate}</Text>
+            <Text style={[type.listTitle, { color: c.textPrimary, marginTop: space.xs }]}>
+              {event.title}
+            </Text>
+            <Text style={[type.meta, { color: c.accentArchive, marginTop: space.xs }]}>
+              {event.categoryLabel}
+            </Text>
+            {expanded ? (
+              <View style={styles.detail}>
+                <Text style={[type.body, { color: c.textSecondary }]}>{event.summary}</Text>
+                {event.sourceUrl ? (
+                  <Pressable
+                    accessibilityRole="link"
+                    onPress={() => Linking.openURL(event.sourceUrl!)}
+                    style={styles.source}
+                  >
+                    <Text style={[type.button, { color: c.accentPrimary }]}>Source</Text>
+                  </Pressable>
                 ) : null}
-              </Pressable>
-            );
-          })}
-        </View>
-      )}
+              </View>
+            ) : null}
+          </Pressable>
+        );
+      }}
     />
   );
 }
