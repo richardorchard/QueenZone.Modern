@@ -238,7 +238,7 @@ GitHub Actions workflow `.github/workflows/ci.yml` blocks merge when these fail:
 | **Smoke test** | Published app responds on `/health`, `/`, `/news` (starts after `build`, overlaps coverage) | Yes |
 | **EF migrations (Azure SQL)** | When migration-related paths change: `has-pending-model-changes` + `database update` against the deploy SQL Server | Yes (job runs only for those PRs) |
 | **Playwright e2e** | Self-hosted runner selected by the `e2e` label (Windows or macOS) | Yes (required PR merge gate; not rerun by deploy) |
-| **Mobile JS** | `npm ci`, `scripts/check-npm-advisories.mjs` (high/critical fail-closed; see `src/QueenZone.Mobile/npm-advisory-allowlist.md`), typecheck, `npm run test:coverage`, `scripts/Test-MobileCoverageGate.mjs`, and Expo Doctor in `src/QueenZone.Mobile` when that tree (or the mobile coverage scripts) changes | Runs when mobile files change; skipped otherwise (non-matrix skip is treated as passing) |
+| **Mobile JS** | `npm ci`, `scripts/check-npm-advisories.mjs` (high/critical fail-closed; see `src/QueenZone.Mobile/npm-advisory-allowlist.md`), typecheck, `npm run lint`, `npm run test:coverage`, `scripts/Test-MobileCoverageGate.mjs`, and Expo Doctor in `src/QueenZone.Mobile` when that tree (or the mobile coverage scripts) changes | Runs when mobile files change; skipped otherwise (non-matrix skip is treated as passing) |
 | **Mobile Android build** | Unsigned debug APK via `expo prebuild` + `gradlew assembleDebug`, uploaded as a 1-day workflow artifact | Runs when mobile files change (or `workflow_dispatch`) |
 | **Mobile iOS build** | Unsigned Simulator build via `expo prebuild` + `xcodebuild`; prefers an idle self-hosted `ios-build` Mac and falls back to `macos-26`; zipped and uploaded as a 1-day artifact | Runs when mobile files change (or `workflow_dispatch`) |
 
@@ -308,7 +308,7 @@ npm ci
 npm run preflight
 ```
 
-`npm run preflight` is typecheck + unit tests + Expo Doctor. Doctor's package-version check consults Expo's current SDK list, so a lockfile that passed this morning can fail CI the same afternoon when Expo publishes a patch (`npx expo install <package>`). Do not skip Doctor on mobile PRs.
+`npm run preflight` is typecheck + lint + unit tests + Expo Doctor. Doctor's package-version check consults Expo's current SDK list, so a lockfile that passed this morning can fail CI the same afternoon when Expo publishes a patch (`npx expo install <package>`). Do not skip Doctor on mobile PRs.
 
 When the PR also changes production TypeScript/TSX, run the mobile coverage gate (floors in `scripts/mobile-coverage-floors.json`; do not copy the web C# 51%/70% numbers):
 

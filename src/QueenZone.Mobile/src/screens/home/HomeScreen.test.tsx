@@ -56,6 +56,7 @@ jest.mock('../messages/useUnreadConversationCount', () => ({
 }));
 
 jest.mock('expo-linear-gradient', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Jest CJS mock factory.
   const { View } = require('react-native');
   return { LinearGradient: View };
 });

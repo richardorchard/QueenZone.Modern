@@ -1,4 +1,4 @@
-import { act, fireEvent, screen, userEvent, waitFor } from '@testing-library/react-native';
+import { act, screen, userEvent, waitFor } from '@testing-library/react-native';
 import { fetchPhotoDetail } from '../../api';
 import { ApiError } from '../../api/client';
 import type { PhotoDetail } from '../../api/types';

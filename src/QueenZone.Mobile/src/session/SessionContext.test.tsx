@@ -498,7 +498,7 @@ describe('SessionProvider', () => {
     const user = userEvent.setup();
     const now = 1_700_000_000_000;
     const dateNow = jest.spyOn(Date, 'now').mockReturnValue(now);
-    const appStateHandlers: Array<(state: string) => void> = [];
+    const appStateHandlers: ((state: string) => void)[] = [];
     jest.spyOn(AppState, 'addEventListener').mockImplementation((type, handler) => {
       if (type === 'change') {
         appStateHandlers.push(handler as (state: string) => void);

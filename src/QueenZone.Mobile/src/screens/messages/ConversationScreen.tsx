@@ -163,7 +163,7 @@ function ConversationThread({ navigation, route }: Props) {
   const [reloadToken, setReloadToken] = useState(0);
   const [archiving, setArchiving] = useState(false);
   const [archiveError, setArchiveError] = useState<string | null>(null);
-  const [blocking, setBlocking] = useState(false);
+  const [, setBlocking] = useState(false);
   const [blockError, setBlockError] = useState<string | null>(null);
 
   const correspondentName = detail?.otherParticipantDisplayName ?? 'Conversation';

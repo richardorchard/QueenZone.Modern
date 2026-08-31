@@ -166,6 +166,7 @@ export function usePagedContent<T>(
       });
 
     return () => coordinator.invalidate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- generation-guard omit: applyPageMeta is a local helper; listing it would retrigger the load effect.
   }, [coordinator, reloadToken, pageSize, resetKey]);
 
   const refresh = useCallback(() => {
@@ -199,6 +200,7 @@ export function usePagedContent<T>(
         setLoading(false);
         setRefreshing(false);
       });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- generation-guard omit: applyPageMeta is a local helper; listing it would recreate refresh each render.
   }, [coordinator]);
 
   const loadMore = useCallback(() => {
@@ -230,6 +232,7 @@ export function usePagedContent<T>(
         loadingMoreRef.current = false;
         setLoadingMore(false);
       });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- generation-guard omit: applyPageMeta is a local helper; listing it would recreate loadMore each render.
   }, [coordinator]);
 
   return {

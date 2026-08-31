@@ -19,8 +19,8 @@ export type PhotoSubmissionFields = {
 
 export function photoSubmissionFieldEntries(
   input: PhotoSubmissionFields,
-): Array<[string, string]> {
-  const fields: Array<[string, string]> = [['title', input.title.trim()]];
+): [string, string][] {
+  const fields: [string, string][] = [['title', input.title.trim()]];
   const description = input.description?.trim();
   if (description) {
     fields.push(['description', description]);

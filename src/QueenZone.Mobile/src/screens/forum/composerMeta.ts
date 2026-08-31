@@ -8,7 +8,7 @@ export type ComposerAttachment = UploadFilePart;
 
 /** Same as PhotoSubmitScreen: originals only, Compatible conversion is added at the call site. */
 export const forumImagePickerOptions = {
-  mediaTypes: ['images'] as Array<'images'>,
+  mediaTypes: ['images'] as 'images'[],
   quality: 1 as const,
   allowsEditing: false as const,
 };

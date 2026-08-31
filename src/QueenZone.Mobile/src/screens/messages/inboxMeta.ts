@@ -180,7 +180,7 @@ export type ThreadListItem<M extends ThreadMessageLike = ThreadMessageLike> =
  * Flattens a conversation's oldest-first messages into date dividers plus
  * grouped message runs (design handoff §"Message list" grouping rules).
  */
-export function buildThreadItems<M extends ThreadMessageLike>(messages: ReadonlyArray<M>): ThreadListItem<M>[] {
+export function buildThreadItems<M extends ThreadMessageLike>(messages: readonly M[]): ThreadListItem<M>[] {
   const items: ThreadListItem<M>[] = [];
   let lastDayKey: string | null = null;
   let lastAuthor: string | null = null;

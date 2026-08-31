@@ -7,7 +7,7 @@
  * Aligns with ASP.NET environments: Development / Staging / Production.
  * Local QueenZone.Web defaults to http://localhost:5146 (launchSettings "http").
  */
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- CJS loaded by Expo app.config and shared with the RN app.
 const impl = require('../../apiEnvironments.cjs') as {
   defaultApiBaseUrls: Record<AppEnvironment, string>;
   marketingVersionPrefix: string;

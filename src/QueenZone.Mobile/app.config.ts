@@ -1,13 +1,13 @@
 import type { ConfigContext, ExpoConfig } from 'expo/config';
 
 // CommonJS shared module — Expo loads app.config via require(), not Metro.
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 const {
   marketingVersionPrefix,
   resolveApiBaseUrl,
   resolveAppEnvironment,
   resolveIosBuildNumber,
   resolveMarketingVersion,
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- CJS loaded by Expo, not Metro.
 } = require('./apiEnvironments.cjs') as typeof import('./apiEnvironments.cjs');
 
 /**

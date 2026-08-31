@@ -123,7 +123,7 @@ export async function syncHomeWidget(content: WidgetContent): Promise<void> {
   if (Platform.OS === 'android') {
     // eslint-disable-next-line @typescript-eslint/no-require-imports -- lazy so iOS bundles never touch the Android-only widget module.
     const { requestWidgetUpdate } = require('react-native-android-widget') as typeof import('react-native-android-widget');
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- platform-gated: Android widget component must not load on iOS.
     const { OnThisDayAndroidWidget } = require('./OnThisDayAndroidWidget') as typeof import('./OnThisDayAndroidWidget');
     await requestWidgetUpdate({
       widgetName: 'OnThisDayWidget',

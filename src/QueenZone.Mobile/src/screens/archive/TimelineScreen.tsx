@@ -71,6 +71,7 @@ export function TimelineScreen({ navigation, route }: Props) {
       return;
     }
     setExpandedId(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- omit the whole paged object; named fields are already listed.
   }, [focusId, paged.hasMore, paged.items, paged.loadMore, paged.loading, paged.loadingMore]);
 
   const sections = useMemo(() => {
