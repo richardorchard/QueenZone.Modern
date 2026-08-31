@@ -97,17 +97,58 @@ public sealed class EfArticleSubmissionRepository(QueenZoneDbContext dbContext) 
             .Where(a => a.AuthorMemberId == memberId);
 
         var totalCount = await query.CountAsync(ct);
-        var rows = await query
-            .Include(a => a.Author)
-            .ToListAsync(ct);
+        var skip = (page - 1) * pageSize;
 
-        var items = rows
-            .OrderByDescending(a => a.SubmittedAt ?? DateTimeOffset.MinValue)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .Select(Map)
-            .ToList();
+        if (IsSqliteDatabase())
+        {
+            var sqliteRows = await query
+                .Select(a => new
+                {
+                    a.Id,
+                    a.AuthorMemberId,
+                    a.Title,
+                    a.Slug,
+                    a.Excerpt,
+                    a.Body,
+                    a.CoverImageBlobPath,
+                    a.Tags,
+                    a.Status,
+                    a.SubmittedAt,
+                    a.PublishedAt,
+                    a.ReviewerEmail,
+                    a.ReviewNotes,
+                    a.RejectionReason,
+                    DisplayName = a.Author != null ? a.Author.DisplayName : null,
+                    Email = a.Author != null ? a.Author.Email : null,
+                })
+                .ToListAsync(ct);
+            var sqliteItems = sqliteRows
+                .OrderByDescending(a => a.SubmittedAt ?? DateTimeOffset.MinValue)
+                .ThenBy(a => a.Id)
+                .Skip(skip)
+                .Take(pageSize)
+                .Select(a => new ArticleSubmission(
+                    a.Id,
+                    a.AuthorMemberId,
+                    a.Title,
+                    a.Slug,
+                    a.Excerpt,
+                    a.Body,
+                    a.CoverImageBlobPath,
+                    a.Tags,
+                    a.Status,
+                    a.SubmittedAt,
+                    a.PublishedAt,
+                    a.ReviewerEmail,
+                    a.ReviewNotes,
+                    a.RejectionReason,
+                    a.DisplayName,
+                    a.Email))
+                .ToList();
+            return new SubmissionListPage<ArticleSubmission>(sqliteItems, totalCount);
+        }
 
+        var items = await MemberDraftsSqlQuery(skip, pageSize, memberId).ToListAsync(ct);
         return new SubmissionListPage<ArticleSubmission>(items, totalCount);
     }
 
@@ -119,37 +160,46 @@ public sealed class EfArticleSubmissionRepository(QueenZoneDbContext dbContext) 
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 100);
 
-        var rows = await dbContext.ArticleSubmissions
+        var skip = (page - 1) * pageSize;
+        var filtered = dbContext.ArticleSubmissions
             .AsNoTracking()
             .Where(a =>
                 a.Status == ArticleSubmissionStatus.Submitted
                 || a.Status == ArticleSubmissionStatus.UnderReview
-                || a.Status == ArticleSubmissionStatus.ApprovedForPublishing)
-            .Select(a => new
-            {
-                a.Id,
-                a.Title,
-                a.Status,
-                a.SubmittedAt,
-                a.PublishedAt,
-                a.Body,
-                DisplayName = a.Author != null ? a.Author.DisplayName : string.Empty,
-            })
-            .ToListAsync(ct);
+                || a.Status == ArticleSubmissionStatus.ApprovedForPublishing);
 
-        return rows
-            .OrderByDescending(a => a.SubmittedAt ?? DateTimeOffset.MinValue)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .Select(a => new ArticleSubmissionListItem(
-                a.Id,
-                a.Title,
-                a.Status,
-                string.IsNullOrWhiteSpace(a.DisplayName) ? "Unknown member" : a.DisplayName,
-                a.SubmittedAt,
-                a.PublishedAt,
-                EstimateWordCount(a.Body)))
-            .ToList();
+        if (IsSqliteDatabase())
+        {
+            var sqliteRows = await filtered
+                .Select(a => new
+                {
+                    a.Id,
+                    a.Title,
+                    a.Status,
+                    a.SubmittedAt,
+                    a.PublishedAt,
+                    BodyLength = a.Body.Length,
+                    DisplayName = a.Author != null ? a.Author.DisplayName : string.Empty,
+                })
+                .ToListAsync(ct);
+
+            return sqliteRows
+                .OrderByDescending(a => a.SubmittedAt ?? DateTimeOffset.MinValue)
+                .ThenBy(a => a.Id)
+                .Skip(skip)
+                .Take(pageSize)
+                .Select(a => new ArticleSubmissionListItem(
+                    a.Id,
+                    a.Title,
+                    a.Status,
+                    string.IsNullOrWhiteSpace(a.DisplayName) ? "Unknown member" : a.DisplayName,
+                    a.SubmittedAt,
+                    a.PublishedAt,
+                    a.BodyLength / 5))
+                .ToList();
+        }
+
+        return await PendingQueueQuery(skip, pageSize).ToListAsync(ct);
     }
 
     public async Task<ArticleSubmission?> GetByIdAsync(Guid id, CancellationToken ct = default)
@@ -447,6 +497,52 @@ public sealed class EfArticleSubmissionRepository(QueenZoneDbContext dbContext) 
         var trimmed = value.Trim();
         return trimmed.Length <= maxLength ? trimmed : trimmed[..maxLength];
     }
+
+    internal IQueryable<ArticleSubmissionListItem> PendingQueueQuery(int skip, int take) =>
+        dbContext.ArticleSubmissions
+            .AsNoTracking()
+            .Where(a =>
+                a.Status == ArticleSubmissionStatus.Submitted
+                || a.Status == ArticleSubmissionStatus.UnderReview
+                || a.Status == ArticleSubmissionStatus.ApprovedForPublishing)
+            .OrderByDescending(a => a.SubmittedAt ?? DateTimeOffset.MinValue)
+            .ThenBy(a => a.Id)
+            .Skip(skip)
+            .Take(take)
+            .Select(a => new ArticleSubmissionListItem(
+                a.Id,
+                a.Title,
+                a.Status,
+                a.Author != null ? a.Author.DisplayName : "Unknown member",
+                a.SubmittedAt,
+                a.PublishedAt,
+                a.Body.Length / 5));
+
+    internal IQueryable<ArticleSubmission> MemberDraftsSqlQuery(int skip, int take, Guid memberId) =>
+        dbContext.ArticleSubmissions
+            .AsNoTracking()
+            .Where(a => a.AuthorMemberId == memberId)
+            .OrderByDescending(a => a.SubmittedAt ?? DateTimeOffset.MinValue)
+            .ThenBy(a => a.Id)
+            .Skip(skip)
+            .Take(take)
+            .Select(a => new ArticleSubmission(
+                a.Id,
+                a.AuthorMemberId,
+                a.Title,
+                a.Slug,
+                a.Excerpt,
+                a.Body,
+                a.CoverImageBlobPath,
+                a.Tags,
+                a.Status,
+                a.SubmittedAt,
+                a.PublishedAt,
+                a.ReviewerEmail,
+                a.ReviewNotes,
+                a.RejectionReason,
+                a.Author != null ? a.Author.DisplayName : null,
+                a.Author != null ? a.Author.Email : null));
 
     private static ArticleSubmission Map(ArticleSubmissionEntity entity) =>
         new(
