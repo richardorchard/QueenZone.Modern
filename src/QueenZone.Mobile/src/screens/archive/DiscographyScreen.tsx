@@ -13,8 +13,7 @@ type Props = NativeStackScreenProps<ArchiveStackParamList, 'Discography'>;
 export function DiscographyScreen({ navigation }: Props) {
   const { c } = useTheme();
   const paged = usePagedContent<AlbumListItem>(
-    useCallback((page, signal) => fetchDiscographyPage({ page, pageSize: 50, signal }), []),
-    50,
+    useCallback((page, signal) => fetchDiscographyPage({ page, pageSize: 20, signal }), []),
   );
 
   return (

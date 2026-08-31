@@ -10,8 +10,7 @@ type Props = NativeStackScreenProps<ArchiveStackParamList, 'Biography'>;
 
 export function BiographyScreen({ navigation }: Props) {
   const paged = usePagedContent<BiographyChapterListItem>(
-    useCallback((page, signal) => fetchBiographyPage({ page, pageSize: 50, signal }), []),
-    50,
+    useCallback((page, signal) => fetchBiographyPage({ page, pageSize: 20, signal }), []),
   );
 
   return (

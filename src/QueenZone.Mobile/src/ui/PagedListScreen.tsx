@@ -19,10 +19,16 @@ type OwnedListProp =
   | 'onEndReachedThreshold'
   | 'refreshControl'
   | 'ListFooterComponent'
-  | 'ListEmptyComponent';
+  | 'ListEmptyComponent'
+  | 'getItemLayout';
 
 /** Shared infinite-scroll trigger. Owned here so list screens cannot drift. */
 const END_REACHED_THRESHOLD = 0.4;
+
+/** Text-list defaults. Image grids override through extra FlatList props. */
+const DEFAULT_WINDOW_SIZE = 10;
+const DEFAULT_MAX_TO_RENDER_PER_BATCH = 10;
+const DEFAULT_INITIAL_NUM_TO_RENDER = 10;
 
 export type PagedListScreenProps<T> = {
   paged: PagedState<T>;
@@ -32,6 +38,11 @@ export type PagedListScreenProps<T> = {
   emptyMessage: string;
   /** Extra footer content after the owned loading spinner (e.g. Search `ArchiveFooter`). */
   footerAfter?: ReactNode;
+  /**
+   * Fixed row height. When set, owns `getItemLayout`.
+   * Omit for variable-height rows — a wrong layout overlaps worse than stock.
+   */
+  itemHeight?: number;
 } & Omit<FlatListProps<T>, OwnedListProp>;
 
 function renderListHeader(header: FlatListProps<unknown>['ListHeaderComponent']): ReactNode {
@@ -54,6 +65,7 @@ export function PagedListScreen<T>({
   footerAfter,
   style,
   ListHeaderComponent,
+  itemHeight,
   ...listProps
 }: PagedListScreenProps<T>) {
   const { c } = useTheme();
@@ -79,6 +91,9 @@ export function PagedListScreen<T>({
 
   return (
     <FlatList
+      windowSize={DEFAULT_WINDOW_SIZE}
+      maxToRenderPerBatch={DEFAULT_MAX_TO_RENDER_PER_BATCH}
+      initialNumToRender={DEFAULT_INITIAL_NUM_TO_RENDER}
       {...listProps}
       style={listStyle}
       data={paged.items}
@@ -101,6 +116,15 @@ export function PagedListScreen<T>({
       }
       onEndReached={paged.loadMore}
       onEndReachedThreshold={END_REACHED_THRESHOLD}
+      getItemLayout={
+        itemHeight != null
+          ? (_data, index) => ({
+              length: itemHeight,
+              offset: itemHeight * index,
+              index,
+            })
+          : undefined
+      }
     />
   );
 }
