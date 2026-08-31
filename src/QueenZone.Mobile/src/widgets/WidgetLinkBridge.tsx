@@ -9,7 +9,7 @@ import {
 } from './widgetDeepLink';
 
 /** Handles taps on the OS home screen widget — iOS `widgetURL` and Android `OPEN_URI`.
- * Quote face with an id opens the in-app quote page; On This Day stays Home. */
+ * Quote face with an id opens the quote page; day face opens Timeline (focus when id is present). */
 export function WidgetLinkBridge() {
   const navigation = useNavigation<WidgetNavigation>();
   const navigationRef = useRef(navigation);

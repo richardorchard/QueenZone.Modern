@@ -89,6 +89,7 @@ const widgetProps = {
   quoteText: 'A kind of magic',
   quoteWhoSaid: 'Freddie Mercury',
   quoteId: 9,
+  eventId: 1,
 };
 
 describe('syncHomeWidget', () => {
@@ -150,6 +151,21 @@ describe('syncHomeWidget', () => {
     ]);
     jest.spyOn(Date, 'now').mockRestore();
     jest.spyOn(Math, 'random').mockRestore();
+  });
+
+  it('omits eventId when the on-this-day row has no usable id', async () => {
+    Object.defineProperty(Platform, 'OS', { value: 'android' });
+    await syncHomeWidget({
+      onThisDay: { ...content.onThisDay, id: 0 },
+      quote: content.quote,
+    });
+    expect(writeCached).toHaveBeenCalledWith({
+      formattedDate: '30 June 1980',
+      summary: 'Queen released The Game.',
+      quoteText: 'A kind of magic',
+      quoteWhoSaid: 'Freddie Mercury',
+      quoteId: 9,
+    });
   });
 
   it('caches props and requests an Android update', async () => {
@@ -230,7 +246,37 @@ describe('refreshHomeWidget', () => {
       quoteText: 'A kind of magic',
       quoteWhoSaid: 'Freddie Mercury',
       quoteId: 9,
+      eventId: 1,
     });
+  });
+
+  it('restores the cached event id so the next snapshot can deep-link', async () => {
+    Object.defineProperty(Platform, 'OS', { value: 'android' });
+    const now = 1_700_000_000_000;
+    jest.spyOn(Date, 'now').mockReturnValue(now);
+    readRefreshAt.mockResolvedValue(now - 4 * 60 * 60 * 1000);
+    readCached.mockResolvedValue({
+      formattedDate: '30 June 1980',
+      summary: 'Queen released The Game.',
+      eventId: 1,
+      quoteText: 'A kind of magic',
+      quoteWhoSaid: 'Freddie Mercury',
+      quoteId: 9,
+    });
+    fetchQuote.mockResolvedValue({ id: 2, text: 'New quote', whoSaid: 'Brian May' });
+
+    await expect(refreshHomeWidget()).resolves.toBe(true);
+
+    expect(fetchDay).not.toHaveBeenCalled();
+    expect(writeCached).toHaveBeenCalledWith({
+      formattedDate: '30 June 1980',
+      summary: 'Queen released The Game.',
+      quoteText: 'New quote',
+      quoteWhoSaid: 'Brian May',
+      quoteId: 2,
+      eventId: 1,
+    });
+    jest.spyOn(Date, 'now').mockRestore();
   });
 
   it('keeps the last good quote when the quote fetch fails', async () => {
@@ -249,6 +295,7 @@ describe('refreshHomeWidget', () => {
       summary: 'Queen released The Game.',
       quoteText: 'A kind of magic',
       quoteWhoSaid: 'Freddie Mercury',
+      eventId: 1,
     });
     expect(mockRequestWidgetUpdate).toHaveBeenCalled();
   });
@@ -271,6 +318,7 @@ describe('refreshHomeWidget', () => {
       quoteText: 'New quote',
       quoteWhoSaid: 'Brian May',
       quoteId: 2,
+      eventId: 1,
     });
     jest.spyOn(Date, 'now').mockRestore();
   });

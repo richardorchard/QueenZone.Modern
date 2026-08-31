@@ -5,10 +5,13 @@ import {
   isWidgetDeepLinkUrl,
   openWidgetDestination,
   parseWidgetQuoteId,
+  parseWidgetTimelineId,
   resetInitialWidgetUrlConsumption,
   widgetDeepLinkUrl,
   widgetFaceDeepLinkUrl,
   widgetQuoteDeepLinkUrl,
+  widgetTimelineDeepLinkUrl,
+  widgetTimelineListDeepLinkUrl,
 } from './widgetDeepLink.ts';
 
 describe('widgetDeepLink', () => {
@@ -22,6 +25,7 @@ describe('widgetDeepLink', () => {
     assert.equal(isWidgetDeepLinkUrl('queenzone://home/'), true);
     assert.equal(isWidgetDeepLinkUrl('queenzone://timeline'), true);
     assert.equal(isWidgetDeepLinkUrl('queenzone://timeline/'), true);
+    assert.equal(isWidgetDeepLinkUrl('queenzone://timeline/12'), true);
     assert.equal(isWidgetDeepLinkUrl('queenzone://quotes/9'), true);
     assert.equal(isWidgetDeepLinkUrl('queenzone://quotes/9/'), true);
   });
@@ -34,12 +38,17 @@ describe('widgetDeepLink', () => {
   });
 
   it('builds quote-face vs day-face URLs from the shown slot', () => {
-    assert.equal(widgetFaceDeepLinkUrl('day', 9), 'queenzone://home');
-    assert.equal(widgetFaceDeepLinkUrl('quote', 9), 'queenzone://quotes/9');
+    assert.equal(widgetFaceDeepLinkUrl('day', 9, 12), 'queenzone://timeline/12');
+    assert.equal(widgetFaceDeepLinkUrl('day', 9), 'queenzone://timeline');
+    assert.equal(widgetFaceDeepLinkUrl('day', 9, 0), 'queenzone://timeline');
+    assert.equal(widgetFaceDeepLinkUrl('quote', 9, 12), 'queenzone://quotes/9');
     assert.equal(widgetQuoteDeepLinkUrl(9), 'queenzone://quotes/9');
+    assert.equal(widgetTimelineDeepLinkUrl(12), 'queenzone://timeline/12');
+    assert.equal(widgetTimelineListDeepLinkUrl, 'queenzone://timeline');
     assert.equal(widgetFaceDeepLinkUrl('quote', 0), 'queenzone://home');
     assert.equal(widgetFaceDeepLinkUrl('quote'), 'queenzone://home');
-    assert.equal(widgetFaceDeepLinkUrl(null, 9), 'queenzone://home');
+    assert.equal(widgetFaceDeepLinkUrl(null, 9, 12), 'queenzone://timeline/12');
+    assert.equal(widgetFaceDeepLinkUrl(null, 9), 'queenzone://timeline');
   });
 
   it('parses a positive integer quote id and rejects missing or invalid ids', () => {
@@ -50,6 +59,18 @@ describe('widgetDeepLink', () => {
     assert.equal(parseWidgetQuoteId('queenzone://quotes/'), null);
     assert.equal(parseWidgetQuoteId('queenzone://quotes'), null);
     assert.equal(parseWidgetQuoteId('queenzone://home'), null);
+    assert.equal(parseWidgetQuoteId('queenzone://timeline/12'), null);
+  });
+
+  it('parses a positive integer timeline id and rejects missing or invalid ids', () => {
+    assert.equal(parseWidgetTimelineId('queenzone://timeline/12'), 12);
+    assert.equal(parseWidgetTimelineId('queenzone://timeline/12/'), 12);
+    assert.equal(parseWidgetTimelineId('queenzone://timeline/0'), null);
+    assert.equal(parseWidgetTimelineId('queenzone://timeline/abc'), null);
+    assert.equal(parseWidgetTimelineId('queenzone://timeline/'), null);
+    assert.equal(parseWidgetTimelineId('queenzone://timeline'), null);
+    assert.equal(parseWidgetTimelineId('queenzone://home'), null);
+    assert.equal(parseWidgetTimelineId('queenzone://quotes/9'), null);
   });
 
   it('navigates through the Tabs root into HomeTab/Home', () => {
@@ -74,6 +95,32 @@ describe('widgetDeepLink', () => {
     openWidgetDestination({ navigate: navigate as never }, 'queenzone://quotes/9');
   });
 
+  it('navigates a day-face URL onto Archive Timeline with that focusId', () => {
+    const navigate = (name: string, params: unknown) => {
+      assert.equal(name, 'Tabs');
+      assert.deepEqual(params, {
+        screen: 'ArchiveTab',
+        params: { screen: 'Timeline', params: { focusId: 12 }, initial: false },
+      });
+    };
+    openWidgetDestination({ navigate: navigate as never }, 'queenzone://timeline/12');
+  });
+
+  it('navigates a no-id day-face URL onto Timeline without focus params', () => {
+    const destinations: unknown[] = [];
+    const navigate = (_name: string, params: unknown) => {
+      destinations.push(params);
+    };
+    openWidgetDestination({ navigate: navigate as never }, 'queenzone://timeline');
+    openWidgetDestination({ navigate: navigate as never }, 'queenzone://timeline/0');
+    openWidgetDestination({ navigate: navigate as never }, 'queenzone://timeline/abc');
+    assert.deepEqual(destinations, [
+      { screen: 'ArchiveTab', params: { screen: 'Timeline', initial: false } },
+      { screen: 'ArchiveTab', params: { screen: 'Timeline', initial: false } },
+      { screen: 'ArchiveTab', params: { screen: 'Timeline', initial: false } },
+    ]);
+  });
+
   it('falls back to Home when the quote id is missing or not an integer', () => {
     const destinations: unknown[] = [];
     const navigate = (_name: string, params: unknown) => {
@@ -89,7 +136,8 @@ describe('widgetDeepLink', () => {
 
   it('consumes the launch widget URL once and leaves other schemes alone', () => {
     assert.equal(consumeInitialWidgetUrl('queenzone://smoke-auth?access_token=x'), null);
-    assert.equal(consumeInitialWidgetUrl('queenzone://quotes/9'), 'queenzone://quotes/9');
+    assert.equal(consumeInitialWidgetUrl('queenzone://timeline/12'), 'queenzone://timeline/12');
+    assert.equal(consumeInitialWidgetUrl('queenzone://timeline/12'), null);
     assert.equal(consumeInitialWidgetUrl('queenzone://quotes/9'), null);
     assert.equal(consumeInitialWidgetUrl('queenzone://home'), null);
   });

@@ -1,7 +1,11 @@
+import { nestedTabParams } from '../navigation/nestedTab';
 import type { WidgetFace } from './widgetCopy';
 
-/** Opened by the On This Day face and by a quote face that has no usable id. */
+/** Opened by a quote face that has no usable id. */
 export const widgetDeepLinkUrl = 'queenzone://home';
+
+/** Day face with no usable event id — Timeline list, no expand. */
+export const widgetTimelineListDeepLinkUrl = 'queenzone://timeline';
 
 const widgetHomeHosts = new Set(['home', 'timeline']);
 
@@ -17,12 +21,22 @@ export function widgetQuoteDeepLinkUrl(id: number): string {
   return `queenzone://quotes/${id}`;
 }
 
-/** Face-specific tap URL. Quote face with a real id opens that quote; everything else is Home. */
-export function widgetFaceDeepLinkUrl(face: WidgetFace | null, quoteId?: number): string {
-  if (face === 'quote' && quoteId != null && quoteId > 0) {
-    return widgetQuoteDeepLinkUrl(quoteId);
+export function widgetTimelineDeepLinkUrl(id: number): string {
+  return `queenzone://timeline/${id}`;
+}
+
+/** Face-specific tap URL. Quote face with a real id opens that quote; day face opens Timeline. */
+export function widgetFaceDeepLinkUrl(face: WidgetFace | null, quoteId?: number, eventId?: number): string {
+  if (face === 'quote') {
+    if (quoteId != null && quoteId > 0) {
+      return widgetQuoteDeepLinkUrl(quoteId);
+    }
+    return widgetDeepLinkUrl;
   }
-  return widgetDeepLinkUrl;
+  if (eventId != null && eventId > 0) {
+    return widgetTimelineDeepLinkUrl(eventId);
+  }
+  return widgetTimelineListDeepLinkUrl;
 }
 
 export function parseWidgetQuoteId(url: string): number | null {
@@ -45,7 +59,36 @@ export function parseWidgetQuoteId(url: string): number | null {
   }
 }
 
-/** True for Home, the older Timeline URL, and quote-by-id (`queenzone://quotes/{id}`). */
+export function parseWidgetTimelineId(url: string): number | null {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'queenzone:') {
+      return null;
+    }
+    if (widgetHost(parsed) !== 'timeline') {
+      return null;
+    }
+    const segment = widgetPathSegment(parsed);
+    if (!/^\d+$/.test(segment)) {
+      return null;
+    }
+    const id = Number(segment);
+    return id > 0 ? id : null;
+  } catch {
+    return null;
+  }
+}
+
+function isWidgetTimelineUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'queenzone:' && widgetHost(parsed) === 'timeline';
+  } catch {
+    return false;
+  }
+}
+
+/** True for Home, Timeline (list or by id), and quote-by-id (`queenzone://quotes/{id}`). */
 export function isWidgetDeepLinkUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
@@ -91,8 +134,16 @@ export type WidgetQuoteDestination = {
   params: { screen: 'Quote'; params: { id: number }; initial: false };
 };
 
+export type WidgetTimelineDestination = {
+  screen: 'ArchiveTab';
+  params: { screen: 'Timeline'; params?: { focusId: number }; initial: false };
+};
+
 export type WidgetNavigation = {
-  navigate: (name: 'Tabs', params: WidgetHomeDestination | WidgetQuoteDestination) => void;
+  navigate: (
+    name: 'Tabs',
+    params: WidgetHomeDestination | WidgetQuoteDestination | WidgetTimelineDestination,
+  ) => void;
 };
 
 export function openWidgetDestination(navigation: WidgetNavigation, url?: string): void {
@@ -101,6 +152,16 @@ export function openWidgetDestination(navigation: WidgetNavigation, url?: string
     navigation.navigate('Tabs', {
       screen: 'HomeTab',
       params: { screen: 'Quote', params: { id: quoteId }, initial: false },
+    });
+    return;
+  }
+
+  if (url && isWidgetTimelineUrl(url)) {
+    const eventId = parseWidgetTimelineId(url);
+    navigation.navigate('Tabs', {
+      screen: 'ArchiveTab',
+      params:
+        eventId != null ? nestedTabParams('Timeline', { focusId: eventId }) : nestedTabParams('Timeline'),
     });
     return;
   }
