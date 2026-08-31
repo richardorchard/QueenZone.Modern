@@ -35,7 +35,11 @@ describe('notificationNavigateParams', () => {
     assert.equal(newsList.screen, 'NewsTab');
     assert.equal(newsList.params.screen, 'NewsIndex');
     assert.equal(newsList.params.initial, false);
-    assert.equal(typeof newsList.params.params?.refreshAt, 'number');
+    const listingParams =
+      newsList.params.params && typeof newsList.params.params === 'object'
+        ? (newsList.params.params as Record<string, unknown>)
+        : undefined;
+    assert.equal(typeof listingParams?.refreshAt, 'number');
   });
 });
 

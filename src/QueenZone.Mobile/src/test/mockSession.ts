@@ -1,3 +1,5 @@
+import type { MemberProfile } from '../api/me';
+
 /** Mutable session stub for Jest. Variable must stay `mock*` so factories can close over it. */
 
 export function createMockSession() {
@@ -6,7 +8,7 @@ export function createMockSession() {
     isRestoring: false,
     displayName: null as string | null,
     accessToken: null as string | null,
-    profile: null as unknown,
+    profile: null as MemberProfile | null,
     signIn: jest.fn(),
     signOut: jest.fn(),
     refreshProfile: jest.fn(),

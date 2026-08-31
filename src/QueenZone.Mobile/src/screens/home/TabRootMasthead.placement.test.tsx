@@ -20,7 +20,13 @@ import {
   fetchRandomQuote,
 } from '../../api';
 import { fetchConversation, fetchConversationResult } from '../../api/messages';
-import { newsDetailFixture, newsItemFixture, pagedResponse } from '../../test/fixtures';
+import {
+  conversationDetailFixture,
+  conversationMessageFixture,
+  newsDetailFixture,
+  newsItemFixture,
+  pagedResponse,
+} from '../../test/fixtures';
 import {
   ForumIndexHeaderRight,
   NewsIndexHeaderRight,
@@ -211,29 +217,18 @@ describe('TabRootMasthead placement', () => {
     });
     fetchLive.mockResolvedValue({ newForumRepliesToday: 0 });
     fetchInboxMock.mockResolvedValue(pagedResponse([], 1, 0));
-    const conversation = {
+    const conversation = conversationDetailFixture({
       conversationId,
       otherParticipantId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
       otherParticipantDisplayName: 'Bob',
       messages: [
-        {
-          id: '11111111-2222-3333-4444-555555555555',
-          senderMemberId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-          senderDisplayName: 'Bob',
-          body: 'Hello',
+        conversationMessageFixture({
           createdAt: '2026-01-01T00:00:00.000Z',
-          isMine: false,
-          sortKey: 1,
-        },
+        }),
       ],
-      page: 1,
-      pageSize: 50,
       totalCount: 1,
-      totalPages: 1,
       detailPath: `/messages/${conversationId}`,
-      canSendReply: true,
-      hasBlockedOtherParticipant: false,
-    };
+    });
     fetchConversationMock.mockResolvedValue(conversation);
     fetchConversationResultMock.mockResolvedValue({
       data: conversation,

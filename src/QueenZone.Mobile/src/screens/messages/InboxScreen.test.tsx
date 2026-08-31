@@ -2,7 +2,7 @@ import { act, screen, userEvent, waitFor } from '@testing-library/react-native';
 import { archiveConversation, fetchInbox } from '../../api/messages';
 import { ApiError } from '../../api/client';
 import { getContentCache } from '../../cache';
-import { pagedResponse } from '../../test/fixtures';
+import { inboxConversationFixture, memberProfileFixture, pagedResponse } from '../../test/fixtures';
 import { createMockSession } from '../../test/mockSession';
 import { fakeNavigation, renderWithProviders } from '../../test/render';
 import { InboxScreen } from './InboxScreen';
@@ -89,16 +89,10 @@ describe('InboxScreen', () => {
     fetchInboxMock.mockResolvedValueOnce(
       pagedResponse(
         [
-          {
-            conversationId: 'convo-1',
-            otherParticipantId: 'member-2',
-            otherParticipantDisplayName: 'Brian',
-            lastMessagePreview: 'See you at Wembley',
-            lastMessageAt: '2024-01-15T12:00:00.000Z',
+          inboxConversationFixture({
             hasUnread: true,
             unreadCount: 2,
-            detailPath: '/messages/convo-1',
-          },
+          }),
         ],
         1,
         1,
@@ -131,22 +125,7 @@ describe('InboxScreen', () => {
     mockSession.isSignedIn = true;
     mockSession.accessToken = 'tok';
     fetchInboxMock.mockResolvedValue(
-      pagedResponse(
-        [
-          {
-            conversationId: 'convo-1',
-            otherParticipantId: 'member-2',
-            otherParticipantDisplayName: 'Brian',
-            lastMessagePreview: 'See you at Wembley',
-            lastMessageAt: '2024-01-15T12:00:00.000Z',
-            hasUnread: false,
-            unreadCount: 0,
-            detailPath: '/messages/convo-1',
-          },
-        ],
-        1,
-        1,
-      ),
+      pagedResponse([inboxConversationFixture()], 1, 1),
     );
     archiveConversationMock.mockResolvedValueOnce(undefined);
     renderInbox();
@@ -165,16 +144,13 @@ describe('InboxScreen', () => {
     fetchInboxMock.mockResolvedValueOnce(
       pagedResponse(
         [
-          {
+          inboxConversationFixture({
             conversationId: 'convo-2',
             otherParticipantId: 'member-3',
             otherParticipantDisplayName: 'John',
             lastMessagePreview: '<script>alert(1)</script> https://example.com',
-            lastMessageAt: '2024-01-15T12:00:00.000Z',
-            hasUnread: false,
-            unreadCount: 0,
             detailPath: '/messages/convo-2',
-          },
+          }),
         ],
         1,
         1,
@@ -199,19 +175,16 @@ describe('InboxScreen', () => {
   it('renders a cached inbox instantly while the fresh fetch is still in flight', async () => {
     mockSession.isSignedIn = true;
     mockSession.accessToken = 'tok';
-    mockSession.profile = { memberId: 'member-1' } as never;
+    mockSession.profile = memberProfileFixture({ memberId: 'member-1' });
     const cache = fakeContentCache();
     cache.get.mockResolvedValue([
-      {
+      inboxConversationFixture({
         conversationId: 'convo-cached',
         otherParticipantId: 'member-9',
         otherParticipantDisplayName: 'Cached Carol',
         lastMessagePreview: 'From last visit',
-        lastMessageAt: '2024-01-15T12:00:00.000Z',
-        hasUnread: false,
-        unreadCount: 0,
         detailPath: '/messages/convo-cached',
-      },
+      }),
     ]);
     getContentCacheMock.mockReturnValue(cache as unknown as ReturnType<typeof getContentCache>);
     let resolveFetch: (value: Awaited<ReturnType<typeof fetchInbox>>) => void = () => {};
@@ -234,27 +207,10 @@ describe('InboxScreen', () => {
   it('persists the freshly loaded first page to the cache', async () => {
     mockSession.isSignedIn = true;
     mockSession.accessToken = 'tok';
-    mockSession.profile = { memberId: 'member-1' } as never;
+    mockSession.profile = memberProfileFixture({ memberId: 'member-1' });
     const cache = fakeContentCache();
     getContentCacheMock.mockReturnValue(cache as unknown as ReturnType<typeof getContentCache>);
-    fetchInboxMock.mockResolvedValueOnce(
-      pagedResponse(
-        [
-          {
-            conversationId: 'convo-1',
-            otherParticipantId: 'member-2',
-            otherParticipantDisplayName: 'Brian',
-            lastMessagePreview: 'See you at Wembley',
-            lastMessageAt: '2024-01-15T12:00:00.000Z',
-            hasUnread: false,
-            unreadCount: 0,
-            detailPath: '/messages/convo-1',
-          },
-        ],
-        1,
-        1,
-      ),
-    );
+    fetchInboxMock.mockResolvedValueOnce(pagedResponse([inboxConversationFixture()], 1, 1));
     renderInbox();
     await waitFor(() => expect(screen.getByText('Brian')).toBeOnTheScreen());
     await waitFor(() =>

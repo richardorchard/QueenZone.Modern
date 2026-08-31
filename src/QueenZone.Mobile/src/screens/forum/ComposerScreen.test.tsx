@@ -4,7 +4,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { ApiError, createForumReply, createForumTopic, fetchForumCategories } from '../../api';
 import { enqueueForumReply } from '../../offlineQueue';
 import { resetSmokeAttachPending, stashSmokeAttachAsset } from '../../session/smokeAttach';
-import { pagedResponse } from '../../test/fixtures';
+import { memberProfileFixture, offlineQueueItemFixture, pagedResponse } from '../../test/fixtures';
 import { createMockSession } from '../../test/mockSession';
 import { fakeNavigation, renderWithProviders } from '../../test/render';
 import { testIds } from '../../test/testIds';
@@ -84,13 +84,18 @@ describe('ComposerScreen', () => {
     resetSmokeAttachPending();
     mockSession.isSignedIn = true;
     mockSession.accessToken = 'tok';
-    mockSession.profile = { memberId: 'member-1' } as never;
+    mockSession.profile = memberProfileFixture({ memberId: 'member-1' });
     createForumReplyMock.mockReset();
     enqueueForumReplyMock.mockReset();
-    enqueueForumReplyMock.mockImplementation(async (input) => ({
-      operationId: 'op-1',
-      payload: { body: input.body },
-    }));
+    enqueueForumReplyMock.mockImplementation(async (input) =>
+      offlineQueueItemFixture({
+        operationId: 'op-1',
+        memberId: input.memberId,
+        kind: 'forum.reply',
+        target: { topicId: input.topicId },
+        payload: { body: input.body },
+      }),
+    );
     createForumTopicMock.mockReset();
     fetchForumCategoriesMock.mockReset();
     (ImagePicker.requestMediaLibraryPermissionsAsync as jest.Mock).mockReset();

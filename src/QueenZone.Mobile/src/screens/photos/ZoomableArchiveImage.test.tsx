@@ -56,7 +56,7 @@ function pinchTo(scale: number, focalX = 200, focalY = 400) {
   act(() => {
     pinch.handlers.onBegin?.();
     pinch.handlers.onUpdate?.({ scale, focalX, focalY });
-    pinch.handlers.onEnd?.();
+    pinch.handlers.onEnd?.({});
   });
 }
 

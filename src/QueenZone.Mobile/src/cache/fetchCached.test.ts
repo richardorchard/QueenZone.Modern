@@ -4,7 +4,7 @@ import { afterEach, describe, it, mock } from 'node:test';
 import { pathToFileURL } from 'node:url';
 import { ApiError } from '../api/errors.ts';
 
-const fetchJsonMock = mock.fn();
+const fetchJsonMock = mock.fn<(...args: unknown[]) => Promise<unknown>>();
 (globalThis as { __qzFetchJsonMock?: typeof fetchJsonMock }).__qzFetchJsonMock = fetchJsonMock;
 
 register(

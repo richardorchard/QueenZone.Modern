@@ -8,10 +8,15 @@ beforeEach(() => {
   global.fetch = fetchMock as unknown as typeof fetch;
 });
 
-function jpegResponse(bytes: Uint8Array = new Uint8Array([0xff, 0xd8, 0xff])): Response {
-  return new Response(bytes, {
+function jpegResponse(
+  bytes: Uint8Array = new Uint8Array([0xff, 0xd8, 0xff]),
+  contentType = 'image/jpeg',
+): Response {
+  const body = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(body).set(bytes);
+  return new Response(body, {
     status: 200,
-    headers: { 'Content-Type': 'image/jpeg' },
+    headers: { 'Content-Type': contentType },
   });
 }
 
@@ -72,7 +77,7 @@ describe('readUploadFileBlob', () => {
       blob: async () => {
         throw abort;
       },
-    } as Response);
+    } as unknown as Response);
     await expect(
       readUploadFileBlob({
         uri: 'file:///tmp/photo.jpg',
@@ -89,7 +94,7 @@ describe('readUploadFileBlob', () => {
       blob: async () => {
         throw cause;
       },
-    } as Response);
+    } as unknown as Response);
     await expect(
       readUploadFileBlob({
         uri: 'file:///tmp/photo.jpg',
@@ -111,12 +116,7 @@ describe('readUploadFileBlob', () => {
   });
 
   it('retags a blob when the picker MIME differs', async () => {
-    fetchMock.mockResolvedValueOnce(
-      new Response(new Uint8Array([0xff, 0xd8, 0xff]), {
-        status: 200,
-        headers: { 'Content-Type': 'application/octet-stream' },
-      }),
-    );
+    fetchMock.mockResolvedValueOnce(jpegResponse(undefined, 'application/octet-stream'));
     const blob = await readUploadFileBlob({
       uri: 'file:///tmp/photo.jpg',
       name: 'photo.jpg',

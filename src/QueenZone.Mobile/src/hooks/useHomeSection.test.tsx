@@ -146,9 +146,12 @@ describe('useHomeSection', () => {
   it('reloads when the fetcher identity changes', async () => {
     const first = jest.fn().mockResolvedValue('one');
     const second = jest.fn().mockResolvedValue('two');
-    const { result, rerender } = renderHook(({ fn }) => useHomeSection(fn), {
-      initialProps: { fn: first },
-    });
+    const { result, rerender } = renderHook(
+      ({ fn }: { fn: (signal: AbortSignal) => Promise<string> }) => useHomeSection(fn),
+      {
+        initialProps: { fn: first },
+      },
+    );
     await waitFor(() => expect(result.current.view).toEqual({ kind: 'content', data: 'one' }));
 
     rerender({ fn: second });
