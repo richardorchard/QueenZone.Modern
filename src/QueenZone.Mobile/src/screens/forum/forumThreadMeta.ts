@@ -1,3 +1,5 @@
+import { isCookieGatedForumAttachmentPath } from '../../api/forumAttachmentPath';
+
 export type AttachmentMetaInput = {
   extension: string;
   formattedSize: string;
@@ -74,21 +76,25 @@ export function attachmentMeta(item: AttachmentMetaInput): string {
 }
 
 /**
- * Inline only when the website would: `isImage` plus a stored thumbnail.
- * Do not fall back to `/forum/attachment/...` — that path is member-gated and
- * React Native Image would hit it without auth.
+ * Inline only a stored thumbnail that is not cookie-gated.
+ * Empty or `/forum/attachment/...` → no Image. Do not fall back to
+ * `url` / `downloadUrl` — those paths are member-gated and React Native
+ * Image would hit them without auth.
  */
 export function imagePreviewUrl(item: AttachmentPreviewInput): string | null {
   if (!item.isImage) {
     return null;
   }
   const thumb = item.thumbnailUrl?.trim() ?? '';
-  return thumb.length > 0 ? thumb : null;
+  if (thumb.length === 0 || isCookieGatedForumAttachmentPath(thumb)) {
+    return null;
+  }
+  return thumb;
 }
 
 /**
- * Signed-in, no stored thumb: open the original via Bearer `downloadUrl`.
- * Thumb present stays inline. Signed-out stays metadata-only.
+ * Signed-in image always opens via Bearer `downloadUrl` (thumb or not).
+ * Signed-in non-image stays `open-file`. Signed-out stays metadata-only.
  */
 export function attachmentAction(
   item: AttachmentPreviewInput,
@@ -98,7 +104,7 @@ export function attachmentAction(
     return 'none';
   }
   if (item.isImage) {
-    return imagePreviewUrl(item) ? 'none' : 'view-image';
+    return 'view-image';
   }
   return 'open-file';
 }

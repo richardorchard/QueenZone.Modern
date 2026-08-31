@@ -132,21 +132,29 @@ public static class ForumApiMapper
 
     /// <summary>
     /// Cookie path <c>/forum/attachment/...</c> → Bearer alias
-    /// <c>/api/v1/forum/attachments/...</c>. Unknown shapes are left unchanged.
+    /// <c>/api/v1/forum/attachments/...</c>. Absolute cookie URLs are reduced
+    /// to their path first. Unknown shapes (including the website <c>Url</c>
+    /// already being an API path) are left unchanged.
     /// </summary>
     public static string ToAttachmentDownloadUrl(string cookieUrl)
     {
         const string legacyPrefix = "/forum/attachment/legacy/";
         const string modernPrefix = "/forum/attachment/";
 
-        if (cookieUrl.StartsWith(legacyPrefix, StringComparison.Ordinal))
+        var path = cookieUrl;
+        if (Uri.TryCreate(cookieUrl, UriKind.Absolute, out var absolute))
         {
-            return $"{ForumApiEndpoints.RootPath}/attachments/legacy/{cookieUrl[legacyPrefix.Length..]}";
+            path = absolute.AbsolutePath;
         }
 
-        if (cookieUrl.StartsWith(modernPrefix, StringComparison.Ordinal))
+        if (path.StartsWith(legacyPrefix, StringComparison.Ordinal))
         {
-            return $"{ForumApiEndpoints.RootPath}/attachments/{cookieUrl[modernPrefix.Length..]}";
+            return $"{ForumApiEndpoints.RootPath}/attachments/legacy/{path[legacyPrefix.Length..]}";
+        }
+
+        if (path.StartsWith(modernPrefix, StringComparison.Ordinal))
+        {
+            return $"{ForumApiEndpoints.RootPath}/attachments/{path[modernPrefix.Length..]}";
         }
 
         return cookieUrl;

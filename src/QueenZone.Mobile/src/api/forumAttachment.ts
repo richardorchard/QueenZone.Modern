@@ -2,6 +2,7 @@ import { Linking, Share } from 'react-native';
 import { getAppConfig } from '../config';
 import { resolveContentUrl } from '../ui/html/resolveContentUrl';
 import { ApiError } from './client';
+import { isCookieGatedForumAttachmentPath } from './forumAttachmentPath';
 
 export type ForumAttachmentBytes = {
   finalUrl: string;
@@ -9,17 +10,7 @@ export type ForumAttachmentBytes = {
   dataUri: string;
 };
 
-/** Cookie-gated website path. Never load this in Image / WebView / Linking. */
-export function isCookieGatedForumAttachmentPath(path: string | null | undefined): boolean {
-  const trimmed = path?.trim() ?? '';
-  if (!trimmed) {
-    return false;
-  }
-  return (
-    /\/forum\/attachment(?:\/|$)/i.test(trimmed) &&
-    !/\/api\/v1\/forum\/attachments(?:\/|$)/i.test(trimmed)
-  );
-}
+export { isCookieGatedForumAttachmentPath } from './forumAttachmentPath';
 
 /**
  * Bearer GET of `downloadUrl`. Refuses the cookie-gated `/forum/attachment/...` path.

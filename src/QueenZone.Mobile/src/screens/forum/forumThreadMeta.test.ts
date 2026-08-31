@@ -91,9 +91,25 @@ describe('forum thread meta', () => {
       }),
       null,
     );
+    assert.equal(
+      imagePreviewUrl({
+        isImage: true,
+        thumbnailUrl: '/forum/attachment/legacy/1002',
+        url: '/forum/attachment/legacy/1002',
+      }),
+      null,
+    );
+    assert.equal(
+      imagePreviewUrl({
+        isImage: true,
+        thumbnailUrl: '/forum/attachment/1/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+        url: '/api/v1/forum/attachments/1/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+      }),
+      null,
+    );
   });
 
-  it('opens signed-in attachments without a thumb and stays inert when signed out', () => {
+  it('opens signed-in images with or without a thumb and stays inert when signed out', () => {
     const legacyJpg = {
       isImage: true,
       thumbnailUrl: null,
@@ -111,7 +127,7 @@ describe('forum thread meta', () => {
     };
     assert.equal(attachmentAction(legacyJpg, true), 'view-image');
     assert.equal(attachmentAction(legacyJpg, false), 'none');
-    assert.equal(attachmentAction(thumbed, true), 'none');
+    assert.equal(attachmentAction(thumbed, true), 'view-image');
     assert.equal(attachmentAction(pdf, true), 'open-file');
     assert.equal(attachmentAction(pdf, false), 'none');
   });
