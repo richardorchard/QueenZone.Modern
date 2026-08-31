@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { ARCHIVE_HUB_IDS } from '../content/archiveHub.ts';
+import { ARCHIVE_HUB_IDS, archiveDestinations } from '../content/archiveHub.ts';
 import {
   getVisibleTabNames,
   isMemberOnlyScreen,
@@ -109,5 +109,9 @@ describe('archive hub destinations', () => {
       'about',
     ]);
     assert.equal(ARCHIVE_HUB_IDS.length, 9);
+    assert.deepEqual(
+      archiveDestinations.map((row) => row.id),
+      [...ARCHIVE_HUB_IDS],
+    );
   });
 });

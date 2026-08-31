@@ -33,6 +33,18 @@ module.exports = defineConfig([
       // Expo/flat recommended leaves exhaustive-deps as warn; this gate is error-first (#1140).
       'react-hooks/exhaustive-deps': 'error',
       'react-hooks/rules-of-hooks': 'error',
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/content/sample', '**/content/sample.*'],
+              message:
+                'src/content/sample.ts was removed (#1147). Use src/content/archiveHub.ts or src/content/newsDecades.ts for static config; leftover fixture data is src/test/fixtures/sample.ts.',
+            },
+          ],
+        },
+      ],
       // eslint-plugin-react-hooks@7 recommended also ships React Compiler rules.
       // Those would force SessionContext / query-hook rewrites (#1143). Out of this PR.
       'react-hooks/static-components': 'off',
@@ -49,6 +61,28 @@ module.exports = defineConfig([
       'react-hooks/unsupported-syntax': 'off',
       'react-hooks/config': 'off',
       'react-hooks/gating': 'off',
+    },
+  },
+  {
+    files: ['src/screens/**/*.{ts,tsx}', 'src/ui/**/*.{ts,tsx}'],
+    ignores: ['**/*.test.ts', '**/*.test.tsx'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/content/sample', '**/content/sample.*'],
+              message:
+                'src/content/sample.ts was removed (#1147). Use src/content/archiveHub.ts or src/content/newsDecades.ts for static config; leftover fixture data is src/test/fixtures/sample.ts.',
+            },
+            {
+              group: ['**/test/fixtures/**'],
+              message: 'Do not import test fixtures from production screens or UI (#1147).',
+            },
+          ],
+        },
+      ],
     },
   },
 ]);
