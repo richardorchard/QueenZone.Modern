@@ -11,7 +11,8 @@ public sealed record QueenHistoryEvent(
     QueenHistoryEventSourceType SourceType,
     string SourceKey,
     string? SourceUrl,
-    bool IsPublished)
+    bool IsPublished,
+    byte[]? RowVersion = null)
 {
     public string FormattedDate => EventDate.ToString("dd MMM yyyy", System.Globalization.CultureInfo.InvariantCulture);
 }

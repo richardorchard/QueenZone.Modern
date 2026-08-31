@@ -15,9 +15,13 @@ public sealed class InMemoryAdminQueenHistoryRepository(SharedQueenHistoryStore 
     public Task<int> CreateAsync(AdminQueenHistoryDraft draft, CancellationToken cancellationToken = default) =>
         Task.FromResult(store.Create(draft));
 
-    public Task UpdateAsync(int id, AdminQueenHistoryDraft draft, CancellationToken cancellationToken = default)
+    public Task UpdateAsync(
+        int id,
+        AdminQueenHistoryDraft draft,
+        byte[]? expectedRowVersion = null,
+        CancellationToken cancellationToken = default)
     {
-        if (!store.Update(id, draft))
+        if (!store.Update(id, draft, expectedRowVersion))
         {
             throw new InvalidOperationException($"Queen history event {id} was not found.");
         }
@@ -25,9 +29,9 @@ public sealed class InMemoryAdminQueenHistoryRepository(SharedQueenHistoryStore 
         return Task.CompletedTask;
     }
 
-    public Task DeleteAsync(int id, CancellationToken cancellationToken = default)
+    public Task DeleteAsync(int id, byte[]? expectedRowVersion = null, CancellationToken cancellationToken = default)
     {
-        if (!store.Delete(id))
+        if (!store.Delete(id, expectedRowVersion))
         {
             throw new InvalidOperationException($"Queen history event {id} was not found.");
         }
@@ -35,9 +39,13 @@ public sealed class InMemoryAdminQueenHistoryRepository(SharedQueenHistoryStore 
         return Task.CompletedTask;
     }
 
-    public Task SetPublishedAsync(int id, bool isPublished, CancellationToken cancellationToken = default)
+    public Task SetPublishedAsync(
+        int id,
+        bool isPublished,
+        byte[]? expectedRowVersion = null,
+        CancellationToken cancellationToken = default)
     {
-        if (!store.SetPublished(id, isPublished))
+        if (!store.SetPublished(id, isPublished, expectedRowVersion))
         {
             throw new InvalidOperationException($"Queen history event {id} was not found.");
         }

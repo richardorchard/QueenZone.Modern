@@ -19,7 +19,7 @@ public sealed class AdminNewsWriteService(
         CancellationToken cancellationToken = default)
     {
         var firstPublish = !article.IsPublished;
-        await adminNewsRepository.PublishAsync(article.Id, editorEmail, cancellationToken);
+        await adminNewsRepository.PublishAsync(article.Id, editorEmail, article.UpdatedAt, cancellationToken);
         if (!firstPublish)
         {
             return;

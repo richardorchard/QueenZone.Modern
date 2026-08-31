@@ -99,6 +99,45 @@ public sealed class ForumApiWriteTests : IClassFixture<QueenZoneWebApplicationFa
     }
 
     [Fact]
+    public async Task Patch_post_returns_409_when_the_row_changed()
+    {
+        var memberId = Guid.NewGuid();
+        await SeedMemberAsync(memberId, "Conflict Poster");
+        using var client = CreateBearerClient(memberId, "Conflict Poster");
+
+        using var createdResponse = await client.PostAsJsonAsync(
+            $"{ForumApiEndpoints.RootPath}/categories/1/topics",
+            new { title = "Concurrency topic title", body = "Original body for the starter post." });
+        var created = await createdResponse.Content.ReadFromJsonAsync<ForumTopicCreatedDto>(JsonOptions);
+        Assert.NotNull(created);
+
+        using var scope = factory.Services.CreateScope();
+        var posts = scope.ServiceProvider.GetRequiredService<IForumWriteRepository>();
+        var post = await posts.GetPostAsync(created!.StarterPostId);
+        Assert.NotNull(post);
+
+        var first = await posts.UpdatePostAsync(
+            created.StarterPostId,
+            memberId,
+            "First writer saved this body.",
+            isAdmin: false,
+            editWindowMinutes: 60,
+            post!.UpdatedAt);
+        Assert.Equal(ForumPostUpdateStatus.Success, first.Status);
+
+        using var conflict = await client.PatchAsJsonAsync(
+            $"{ForumApiEndpoints.RootPath}/topics/{created.Id}/posts/{created.StarterPostId}",
+            new { body = "Stale overwrite from the app.", updatedAt = post.UpdatedAt });
+        Assert.Equal(HttpStatusCode.Conflict, conflict.StatusCode);
+        Assert.Equal("application/problem+json", conflict.Content.Headers.ContentType?.MediaType);
+        var problem = await conflict.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(OptimisticConcurrencyException.UserMessage, problem.GetProperty("detail").GetString());
+
+        var current = await posts.GetPostAsync(created.StarterPostId);
+        Assert.Equal("First writer saved this body.", current!.Body);
+    }
+
+    [Fact]
     public async Task Create_topic_rejects_short_title_and_empty_sanitized_body()
     {
         using var client = CreateBearerClient(Guid.NewGuid());
@@ -465,6 +504,7 @@ public sealed class ForumApiWriteTests : IClassFixture<QueenZoneWebApplicationFa
             string sanitisedBody,
             bool isAdmin,
             int editWindowMinutes,
+            DateTimeOffset? expectedUpdatedAt = null,
             CancellationToken cancellationToken = default) =>
             Task.FromResult(new ForumPostUpdateResult(ForumPostUpdateStatus.Forbidden));
 

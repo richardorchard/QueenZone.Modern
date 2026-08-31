@@ -45,6 +45,18 @@ public sealed class AdminNewsForm
     [FromForm(Name = "cropHeight")]
     public string? CropHeight { get; init; }
 
+    [FromForm(Name = "expectedUpdatedAt")]
+    public string? ExpectedUpdatedAt { get; init; }
+
+    public DateTime? ParseExpectedUpdatedAt() =>
+        DateTime.TryParse(
+            ExpectedUpdatedAt,
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.RoundtripKind,
+            out var parsed)
+            ? parsed.ToUniversalTime()
+            : null;
+
     public NewsArticleImageCrop? ToCrop()
     {
         if (!TryParseCropPart(CropX, out var x)

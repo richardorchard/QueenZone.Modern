@@ -16,17 +16,34 @@ internal sealed class FailingCreateAdminNewsRepository(InMemoryAdminNewsReposito
     public Task<int> CreateDraftAsync(AdminNewsDraft draft, string editorEmail, CancellationToken cancellationToken = default) =>
         Task.FromException<int>(createException);
 
-    public Task UpdateAsync(int id, AdminNewsDraft draft, string editorEmail, CancellationToken cancellationToken = default) =>
-        inner.UpdateAsync(id, draft, editorEmail, cancellationToken);
+    public Task UpdateAsync(
+        int id,
+        AdminNewsDraft draft,
+        string editorEmail,
+        DateTime? expectedUpdatedAt = null,
+        CancellationToken cancellationToken = default) =>
+        inner.UpdateAsync(id, draft, editorEmail, expectedUpdatedAt, cancellationToken);
 
-    public Task PublishAsync(int id, string editorEmail, CancellationToken cancellationToken = default) =>
-        inner.PublishAsync(id, editorEmail, cancellationToken);
+    public Task PublishAsync(
+        int id,
+        string editorEmail,
+        DateTime? expectedUpdatedAt = null,
+        CancellationToken cancellationToken = default) =>
+        inner.PublishAsync(id, editorEmail, expectedUpdatedAt, cancellationToken);
 
-    public Task UnpublishAsync(int id, string editorEmail, CancellationToken cancellationToken = default) =>
-        inner.UnpublishAsync(id, editorEmail, cancellationToken);
+    public Task UnpublishAsync(
+        int id,
+        string editorEmail,
+        DateTime? expectedUpdatedAt = null,
+        CancellationToken cancellationToken = default) =>
+        inner.UnpublishAsync(id, editorEmail, expectedUpdatedAt, cancellationToken);
 
-    public Task DeleteAsync(int id, string editorEmail, CancellationToken cancellationToken = default) =>
-        inner.DeleteAsync(id, editorEmail, cancellationToken);
+    public Task DeleteAsync(
+        int id,
+        string editorEmail,
+        DateTime? expectedUpdatedAt = null,
+        CancellationToken cancellationToken = default) =>
+        inner.DeleteAsync(id, editorEmail, expectedUpdatedAt, cancellationToken);
 
     public Task<bool> IsSlugInUseAsync(string slug, int? excludeNewsId = null, CancellationToken cancellationToken = default) =>
         inner.IsSlugInUseAsync(slug, excludeNewsId, cancellationToken);
@@ -49,16 +66,33 @@ internal sealed class FailingDeleteAdminNewsRepository(InMemoryAdminNewsReposito
     public Task<int> CreateDraftAsync(AdminNewsDraft draft, string editorEmail, CancellationToken cancellationToken = default) =>
         inner.CreateDraftAsync(draft, editorEmail, cancellationToken);
 
-    public Task UpdateAsync(int id, AdminNewsDraft draft, string editorEmail, CancellationToken cancellationToken = default) =>
-        inner.UpdateAsync(id, draft, editorEmail, cancellationToken);
+    public Task UpdateAsync(
+        int id,
+        AdminNewsDraft draft,
+        string editorEmail,
+        DateTime? expectedUpdatedAt = null,
+        CancellationToken cancellationToken = default) =>
+        inner.UpdateAsync(id, draft, editorEmail, expectedUpdatedAt, cancellationToken);
 
-    public Task PublishAsync(int id, string editorEmail, CancellationToken cancellationToken = default) =>
-        inner.PublishAsync(id, editorEmail, cancellationToken);
+    public Task PublishAsync(
+        int id,
+        string editorEmail,
+        DateTime? expectedUpdatedAt = null,
+        CancellationToken cancellationToken = default) =>
+        inner.PublishAsync(id, editorEmail, expectedUpdatedAt, cancellationToken);
 
-    public Task UnpublishAsync(int id, string editorEmail, CancellationToken cancellationToken = default) =>
-        inner.UnpublishAsync(id, editorEmail, cancellationToken);
+    public Task UnpublishAsync(
+        int id,
+        string editorEmail,
+        DateTime? expectedUpdatedAt = null,
+        CancellationToken cancellationToken = default) =>
+        inner.UnpublishAsync(id, editorEmail, expectedUpdatedAt, cancellationToken);
 
-    public Task DeleteAsync(int id, string editorEmail, CancellationToken cancellationToken = default) =>
+    public Task DeleteAsync(
+        int id,
+        string editorEmail,
+        DateTime? expectedUpdatedAt = null,
+        CancellationToken cancellationToken = default) =>
         Task.FromException(deleteException);
 
     public Task<bool> IsSlugInUseAsync(string slug, int? excludeNewsId = null, CancellationToken cancellationToken = default) =>

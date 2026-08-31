@@ -183,6 +183,52 @@ public sealed class AdminTimelineRoutesTests : IClassFixture<QueenZoneWebApplica
     }
 
     [Fact]
+    public async Task PostEdit_stale_row_version_reloads_current_values()
+    {
+        var store = new SharedQueenHistoryStore();
+        var client = CreateWriteClient(store);
+        var original = $"WAF conflict source {Guid.NewGuid():N}";
+        var create = await PostCreateAsync(client, original, isPublished: true);
+        Assert.Equal(HttpStatusCode.Redirect, create.StatusCode);
+        var id = store.GetAll().Single(item => item.Title == original).Id;
+
+        var editPage = await client.GetStringAsync($"/admin/timeline/{id}/edit");
+        var token = AdminHttpTestHelpers.ExtractAntiforgeryToken(editPage);
+        var staleRowVersion = store.GetById(id)!.RowVersion!;
+        store.Update(id, new AdminQueenHistoryDraft(
+            "Someone else saved this",
+            "Updated by another admin.",
+            new DateTime(1985, 7, 13, 0, 0, 0, DateTimeKind.Utc),
+            QueenHistoryDatePrecision.ExactDate,
+            QueenHistoryEventCategory.Concert,
+            90,
+            null,
+            true));
+
+        var fields = new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = token,
+            ["title"] = "Stale overwrite",
+            ["summary"] = "Should not win.",
+            ["eventDate"] = "1985-07-13",
+            ["datePrecision"] = nameof(QueenHistoryDatePrecision.ExactDate),
+            ["category"] = nameof(QueenHistoryEventCategory.Concert),
+            ["importance"] = "90",
+            ["sourceUrl"] = string.Empty,
+            ["isPublished"] = "true",
+            ["rowVersion"] = Convert.ToBase64String(staleRowVersion),
+        };
+
+        using var save = await client.PostAsync($"/admin/timeline/{id}", new FormUrlEncodedContent(fields));
+        Assert.Equal(HttpStatusCode.OK, save.StatusCode);
+        var body = await save.Content.ReadAsStringAsync();
+        Assert.Contains(OptimisticConcurrencyException.UserMessage, body, StringComparison.Ordinal);
+        Assert.Contains("Someone else saved this", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("Stale overwrite", body, StringComparison.Ordinal);
+        Assert.Equal("Someone else saved this", store.GetById(id)!.Title);
+    }
+
+    [Fact]
     public async Task PostDelete_removes_created_event()
     {
         var store = new SharedQueenHistoryStore();

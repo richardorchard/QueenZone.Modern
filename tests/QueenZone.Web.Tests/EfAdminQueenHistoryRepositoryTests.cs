@@ -67,6 +67,22 @@ public sealed class EfAdminQueenHistoryRepositoryTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task Stale_row_version_throws_optimistic_concurrency()
+    {
+        var id = await repository.CreateAsync(Draft("Concurrency event"));
+        var created = await repository.GetByIdAsync(id);
+        Assert.NotNull(created?.RowVersion);
+
+        await repository.UpdateAsync(id, Draft("First writer"), created!.RowVersion);
+
+        await Assert.ThrowsAsync<OptimisticConcurrencyException>(() =>
+            repository.UpdateAsync(id, Draft("Second writer"), created.RowVersion));
+
+        var current = await repository.GetByIdAsync(id);
+        Assert.Equal("First writer", current!.Title);
+    }
+
+    [Fact]
     public async Task Missing_update_and_delete_throw()
     {
         await Assert.ThrowsAsync<InvalidOperationException>(() =>

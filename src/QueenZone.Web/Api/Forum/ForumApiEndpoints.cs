@@ -103,6 +103,18 @@ public static class ForumApiEndpoints
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status429TooManyRequests);
 
+        group.MapPatch("/topics/{id:int}/posts/{postId:int}", UpdatePostAsync)
+            .WithName("UpdateForumPost")
+            .WithSummary("Edit a public forum post. Same owner/admin and edit-window rules as /forum/post/{id}/edit.")
+            .RequireAuthorization(MemberAuthenticationSchemes.MobileMemberPolicy)
+            .Accepts<ForumPostUpdateRequestDto>("application/json")
+            .Produces<ForumPostCreatedDto>()
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
         group.MapGet("/topics/{id:int}/poll", GetTopicPollAsync)
             .WithName("GetForumTopicPoll")
             .WithSummary("Poll on a public topic. Same vote-vs-results flags as the website topic page.")
@@ -417,6 +429,80 @@ public static class ForumApiEndpoints
                 return IdempotentApiWrites.Created(request, detailPath, dto, payloadHash);
             },
             cancellationToken);
+    }
+
+    internal static async Task<IResult> UpdatePostAsync(
+        ClaimsPrincipal user,
+        int id,
+        int postId,
+        ForumPostUpdateRequestDto request,
+        IForumWriteRepository forumWriteRepository,
+        UgcHtml ugcHtml,
+        Microsoft.Extensions.Options.IOptions<ForumOptions> forumOptions,
+        CancellationToken cancellationToken)
+    {
+        var memberId = ForumMember.GetMemberId(user);
+        if (memberId is null)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status401Unauthorized,
+                title: "Unauthorized");
+        }
+
+        var sanitizedBody = ugcHtml.Sanitize(request.Body ?? string.Empty);
+        if (string.IsNullOrWhiteSpace(sanitizedBody))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Bad Request",
+                detail: "Body is required.");
+        }
+
+        var existing = await forumWriteRepository.GetPostAsync(postId, cancellationToken);
+        if (existing is null || existing.TopicId != id)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status404NotFound,
+                title: "Not Found",
+                detail: $"No public forum post with id '{postId}'.");
+        }
+
+        var result = await forumWriteRepository.UpdatePostAsync(
+            postId,
+            memberId.Value,
+            sanitizedBody,
+            isAdmin: false,
+            forumOptions.Value.PostEditWindowMinutes,
+            request.UpdatedAt,
+            cancellationToken);
+
+        return result.Status switch
+        {
+            ForumPostUpdateStatus.Success => Results.Ok(new ForumPostCreatedDto(
+                postId,
+                result.TopicId,
+                ForumRoutes.GetTopicCanonicalPath(result.TopicId, result.TopicSubject) + $"#post-{postId}")),
+            ForumPostUpdateStatus.NotFound => Results.Problem(
+                statusCode: StatusCodes.Status404NotFound,
+                title: "Not Found",
+                detail: $"No public forum post with id '{postId}'."),
+            ForumPostUpdateStatus.ConcurrencyConflict => Results.Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                title: "Conflict",
+                detail: OptimisticConcurrencyException.UserMessage),
+            ForumPostUpdateStatus.EditWindowExpired => Results.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "Forbidden",
+                detail: "This post can no longer be edited."),
+            ForumPostUpdateStatus.EditingDisabled => Results.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "Forbidden",
+                detail: "Post editing is currently disabled."),
+            _ => Results.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "Forbidden",
+                detail: "You do not have permission to edit this post."),
+        };
     }
 
     internal static async Task<IResult> GetTopicPollAsync(

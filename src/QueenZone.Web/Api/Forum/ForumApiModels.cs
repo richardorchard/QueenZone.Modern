@@ -134,6 +134,13 @@ public sealed record ForumPostCreatedDto(
     int TopicId,
     string DetailPath);
 
+public sealed record ForumPostUpdateRequestDto
+{
+    public string? Body { get; init; }
+
+    public DateTimeOffset? UpdatedAt { get; init; }
+}
+
 /// <summary>
 /// Poll card for <c>/api/v1/forum/topics/{id}/poll</c>. Same fields the website
 /// renders in <c>_ForumPoll.cshtml</c> (question, close state, vote vs results).

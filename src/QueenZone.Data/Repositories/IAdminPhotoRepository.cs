@@ -22,9 +22,19 @@ public interface IAdminPhotoRepository
 
     Task<int> CreateAsync(AdminPhotoCreateRequest request, string editorEmail, CancellationToken cancellationToken = default);
 
-    Task UpdateAsync(int picId, AdminPhotoUpdateRequest request, string editorEmail, CancellationToken cancellationToken = default);
+    Task UpdateAsync(
+        int picId,
+        AdminPhotoUpdateRequest request,
+        string editorEmail,
+        AdminPhotoConcurrencyToken? expected = null,
+        CancellationToken cancellationToken = default);
 
-    Task SetVisibilityAsync(int picId, bool isVisible, string editorEmail, CancellationToken cancellationToken = default);
+    Task SetVisibilityAsync(
+        int picId,
+        bool isVisible,
+        string editorEmail,
+        bool? expectedIsVisible = null,
+        CancellationToken cancellationToken = default);
 
     Task UpdateAssetsAsync(int picId, AdminPhotoAssetUpdate assets, string editorEmail, CancellationToken cancellationToken = default);
 

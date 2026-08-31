@@ -14,6 +14,7 @@ public interface IForumWriteRepository
         string sanitisedBody,
         bool isAdmin,
         int editWindowMinutes,
+        DateTimeOffset? expectedUpdatedAt = null,
         CancellationToken cancellationToken = default);
 
     Task<ForumWriteThread?> GetThreadAsync(int topicId, CancellationToken cancellationToken = default);

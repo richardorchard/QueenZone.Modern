@@ -153,6 +153,41 @@ public sealed class InMemoryForumWriteRepositoryTests
     }
 
     [Fact]
+    public async Task UpdatePostAsync_rejects_stale_updated_at()
+    {
+        var repository = new InMemoryForumWriteRepository();
+        var memberId = Guid.NewGuid();
+        var created = await repository.CreateThreadAsync(new NewForumThread(
+            1,
+            memberId,
+            "Forum Fan",
+            "Editable topic",
+            "<p>Original</p>",
+            DateTimeOffset.UtcNow));
+        var original = await repository.GetPostAsync(created.StarterPostId);
+
+        var first = await repository.UpdatePostAsync(
+            created.StarterPostId,
+            memberId,
+            "<p>First writer</p>",
+            isAdmin: false,
+            editWindowMinutes: 60,
+            original!.UpdatedAt);
+        Assert.Equal(ForumPostUpdateStatus.Success, first.Status);
+
+        var stale = await repository.UpdatePostAsync(
+            created.StarterPostId,
+            memberId,
+            "<p>Stale overwrite</p>",
+            isAdmin: false,
+            editWindowMinutes: 60,
+            original.UpdatedAt);
+        Assert.Equal(ForumPostUpdateStatus.ConcurrencyConflict, stale.Status);
+        var post = await repository.GetPostAsync(created.StarterPostId);
+        Assert.Equal("<p>First writer</p>", post!.Body);
+    }
+
+    [Fact]
     public async Task UpdatePostAsync_RejectsNonOwnerWhoIsNotAdmin()
     {
         var repository = new InMemoryForumWriteRepository();

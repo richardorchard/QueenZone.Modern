@@ -45,6 +45,7 @@ public sealed class ForumPostRateLimiterTests
             string sanitisedBody,
             bool isAdmin,
             int editWindowMinutes,
+            DateTimeOffset? expectedUpdatedAt = null,
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 

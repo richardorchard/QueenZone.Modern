@@ -125,7 +125,8 @@ public sealed class InMemoryForumWriteRepository : IForumWriteRepository
                 post.CreatedAt,
                 post.EditedAt,
                 post.EditCount,
-                Math.Max(1, position)));
+                Math.Max(1, position),
+                post.UpdatedAt ?? post.CreatedAt));
         }
     }
 
@@ -135,6 +136,7 @@ public sealed class InMemoryForumWriteRepository : IForumWriteRepository
         string sanitisedBody,
         bool isAdmin,
         int editWindowMinutes,
+        DateTimeOffset? expectedUpdatedAt = null,
         CancellationToken cancellationToken = default)
     {
         lock (sync)
@@ -176,11 +178,21 @@ public sealed class InMemoryForumWriteRepository : IForumWriteRepository
                 return Task.FromResult(new ForumPostUpdateResult(ForumPostUpdateStatus.Forbidden, post.TopicId, subject));
             }
 
+            if (expectedUpdatedAt is DateTimeOffset expected
+                && (post.UpdatedAt ?? post.CreatedAt) != expected)
+            {
+                return Task.FromResult(new ForumPostUpdateResult(
+                    ForumPostUpdateStatus.ConcurrencyConflict,
+                    post.TopicId,
+                    subject));
+            }
+
             posts[index] = post with
             {
                 Body = sanitisedBody,
                 EditedAt = utcNow,
                 EditCount = post.EditCount + 1,
+                UpdatedAt = utcNow,
             };
 
             return Task.FromResult(new ForumPostUpdateResult(ForumPostUpdateStatus.Success, post.TopicId, subject));
@@ -394,4 +406,5 @@ public sealed record InMemoryForumWritePost(
     DateTimeOffset CreatedAt,
     DateTimeOffset? EditedAt = null,
     int EditCount = 0,
-    bool IsHidden = false);
+    bool IsHidden = false,
+    DateTimeOffset? UpdatedAt = null);

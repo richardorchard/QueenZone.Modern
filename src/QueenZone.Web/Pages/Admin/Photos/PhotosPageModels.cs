@@ -171,6 +171,12 @@ public sealed class EditPostModel(
         DateTime dateTime,
         int catId,
         IFormFile? replaceFile,
+        string? expectedTitle,
+        string? expectedKeywords,
+        int? expectedYear,
+        DateTime? expectedDateTime,
+        int? expectedCatId,
+        bool? expectedIsVisible,
         CancellationToken cancellationToken = default)
     {
         var existing = await adminPhotoRepository.GetByIdAsync(id, cancellationToken);
@@ -188,10 +194,24 @@ public sealed class EditPostModel(
 
         try
         {
+            AdminPhotoConcurrencyToken? expected = expectedTitle is not null
+                && expectedYear is int yearToken
+                && expectedDateTime is DateTime dateToken
+                && expectedCatId is int catToken
+                && expectedIsVisible is bool visibleToken
+                ? new AdminPhotoConcurrencyToken(
+                    expectedTitle,
+                    expectedKeywords,
+                    yearToken,
+                    dateToken,
+                    catToken,
+                    visibleToken)
+                : null;
             await adminPhotoRepository.UpdateAsync(
                 id,
                 new AdminPhotoUpdateRequest(title, keywords, year, dateTime, catId),
                 EditorEmail,
+                expected,
                 cancellationToken);
 
             if (replaceFile is { Length: > 0 })
@@ -228,7 +248,7 @@ public sealed class ActionModel(
 
     public async Task<IActionResult> OnPostHideAsync(int id, CancellationToken cancellationToken)
     {
-        await adminPhotoRepository.SetVisibilityAsync(id, false, EditorEmail, cancellationToken);
+        await adminPhotoRepository.SetVisibilityAsync(id, false, EditorEmail, cancellationToken: cancellationToken);
         await InvalidatePublicPhotoCachesAsync(publicQueryCache, coreSitemapService, outputCacheStore, cancellationToken);
         TempData[MessageKey] = "Photo hidden from public gallery.";
         TempData[MessageKindKey] = "success";
@@ -237,7 +257,7 @@ public sealed class ActionModel(
 
     public async Task<IActionResult> OnPostShowAsync(int id, CancellationToken cancellationToken)
     {
-        await adminPhotoRepository.SetVisibilityAsync(id, true, EditorEmail, cancellationToken);
+        await adminPhotoRepository.SetVisibilityAsync(id, true, EditorEmail, cancellationToken: cancellationToken);
         await InvalidatePublicPhotoCachesAsync(publicQueryCache, coreSitemapService, outputCacheStore, cancellationToken);
         TempData[MessageKey] = "Photo is now visible.";
         TempData[MessageKindKey] = "success";
