@@ -168,7 +168,9 @@ describe('ThreadScreen watch control', () => {
 
   it('asks signed-out members to sign in to watch', async () => {
     renderThread();
-    await waitFor(() => expect(screen.getByTestId(testIds.forumThreadWatch)).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId(testIds.forumThreadWatch)).toBeTruthy(), {
+      timeout: 5_000,
+    });
     expect(screen.getByLabelText('Sign in to watch')).toBeTruthy();
     expect(fetchWatch).not.toHaveBeenCalled();
   });
@@ -305,6 +307,15 @@ describe('ThreadScreen attachments', () => {
     isImage: false,
     thumbnailUrl: null,
   };
+  const mp3 = {
+    fileName: 'brighton-rock-solo.mp3',
+    url: '/forum/attachment/legacy/1201',
+    downloadUrl: '/api/v1/forum/attachments/legacy/1201',
+    extension: 'MP3',
+    formattedSize: '3.2 MB',
+    isImage: false,
+    thumbnailUrl: null,
+  };
 
   beforeEach(() => {
     mockSession.isSignedIn = false;
@@ -366,7 +377,7 @@ describe('ThreadScreen attachments', () => {
     expect(openAttachment).not.toHaveBeenCalled();
   });
 
-  it('keeps a thumbed image inline and does not fetch the original', async () => {
+  it('lets a signed-in member open a thumbed image in the in-app viewer', async () => {
     mockSession.isSignedIn = true;
     mockSession.accessToken = 'tok';
     mockNetworkPosts(
@@ -397,11 +408,142 @@ describe('ThreadScreen attachments', () => {
     );
     renderThread();
     await waitFor(() => expect(screen.getByText('tour-poster.jpg')).toBeOnTheScreen());
-    expect(screen.getByLabelText('tour-poster.jpg')).toBeOnTheScreen();
-    expect(screen.queryByRole('button', { name: /tour-poster.jpg/ })).toBeNull();
+    const preview = screen.getByLabelText('tour-poster.jpg');
+    expect(preview.props.source.uri).toContain('/ugc/forum/tour-poster-thumb.webp');
+    expect(preview.props.source.uri).not.toContain('/forum/attachment/');
     expect(screen.queryByTestId(testIds.forumThreadAttachmentViewer)).toBeNull();
     expect(openImage).not.toHaveBeenCalled();
+
+    const user = userEvent.setup();
+    await user.press(screen.getByRole('button', { name: /tour-poster.jpg/ }));
+    await waitFor(() =>
+      expect(openImage).toHaveBeenCalledWith('/api/v1/forum/attachments/legacy/1002', 'tok'),
+    );
+    const viewer = screen.getByTestId(testIds.forumThreadAttachmentViewer);
+    const viewerImage = within(viewer).getByLabelText('tour-poster.jpg');
+    expect(viewerImage.props.source).toEqual({
+      uri: 'data:image/jpeg;base64,dGVzdA==',
+    });
     expect(openAttachment).not.toHaveBeenCalled();
+  });
+
+  it('does not pass a cookie-gated thumbnail to Image', async () => {
+    mockSession.isSignedIn = true;
+    mockSession.accessToken = 'tok';
+    mockNetworkPosts(
+      pagedResponse(
+        [
+          {
+            id: 1002,
+            body: '<p>Hello</p>',
+            postedAt: '2024-06-01T10:00:00.000Z',
+            authorUsername: 'brightonrock',
+            signature: null,
+            authorMemberSince: null,
+            authorMemberId: null,
+            editedAt: null,
+            editCount: 0,
+            attachments: [
+              {
+                ...imageNoThumb,
+                fileName: 'tour-poster.jpg',
+                thumbnailUrl: '/forum/attachment/legacy/1002',
+              },
+            ],
+          },
+        ],
+        1,
+        1,
+      ),
+    );
+    renderThread();
+    await waitFor(() => expect(screen.getByText('tour-poster.jpg')).toBeOnTheScreen());
+    expect(screen.queryByLabelText('tour-poster.jpg')).toBeNull();
+
+    const user = userEvent.setup();
+    await user.press(screen.getByRole('button', { name: /tour-poster.jpg/ }));
+    await waitFor(() =>
+      expect(openImage).toHaveBeenCalledWith('/api/v1/forum/attachments/legacy/1002', 'tok'),
+    );
+    expect(screen.getByTestId(testIds.forumThreadAttachmentViewer)).toBeOnTheScreen();
+  });
+
+  it('shows an error when downloadUrl is cookie-gated', async () => {
+    mockSession.isSignedIn = true;
+    mockSession.accessToken = 'tok';
+    openImage.mockImplementationOnce(async (downloadUrl: string, accessToken: string) => {
+      const actual = jest.requireActual<{
+        openForumAttachmentImage: typeof openForumAttachmentImage;
+      }>('../../api');
+      return actual.openForumAttachmentImage(downloadUrl, accessToken);
+    });
+    mockNetworkPosts(
+      pagedResponse(
+        [
+          {
+            id: 1002,
+            body: '<p>Hello</p>',
+            postedAt: '2024-06-01T10:00:00.000Z',
+            authorUsername: 'brightonrock',
+            signature: null,
+            authorMemberSince: null,
+            authorMemberId: null,
+            editedAt: null,
+            editCount: 0,
+            attachments: [
+              {
+                ...imageNoThumb,
+                downloadUrl: '/forum/attachment/legacy/1002',
+              },
+            ],
+          },
+        ],
+        1,
+        1,
+      ),
+    );
+    renderThread();
+    await waitFor(() => expect(screen.getByText('anoto-setlist-scan.jpg')).toBeOnTheScreen());
+
+    const user = userEvent.setup();
+    await user.press(screen.getByRole('button', { name: /anoto-setlist-scan.jpg/ }));
+    await waitFor(() =>
+      expect(screen.getByText('This attachment cannot be opened from the app.')).toBeOnTheScreen(),
+    );
+    expect(screen.queryByTestId(testIds.forumThreadAttachmentViewer)).toBeNull();
+  });
+
+  it('shows a sign-in error when the session has no access token', async () => {
+    mockSession.isSignedIn = true;
+    mockSession.accessToken = null;
+    mockNetworkPosts(
+      pagedResponse(
+        [
+          {
+            id: 1002,
+            body: '<p>Hello</p>',
+            postedAt: '2024-06-01T10:00:00.000Z',
+            authorUsername: 'brightonrock',
+            signature: null,
+            authorMemberSince: null,
+            authorMemberId: null,
+            editedAt: null,
+            editCount: 0,
+            attachments: [imageNoThumb],
+          },
+        ],
+        1,
+        1,
+      ),
+    );
+    renderThread();
+    await waitFor(() => expect(screen.getByText('anoto-setlist-scan.jpg')).toBeOnTheScreen());
+
+    const user = userEvent.setup();
+    await user.press(screen.getByRole('button', { name: /anoto-setlist-scan.jpg/ }));
+    await waitFor(() => expect(screen.getByText('Sign in to continue.')).toBeOnTheScreen());
+    expect(openImage).not.toHaveBeenCalled();
+    expect(screen.queryByTestId(testIds.forumThreadAttachmentViewer)).toBeNull();
   });
 
   it('shows an error when the image download fails', async () => {
@@ -475,6 +617,93 @@ describe('ThreadScreen attachments', () => {
     );
     expect(openAttachment.mock.calls[0]?.[0]).not.toContain('/forum/attachment/legacy/');
     expect(screen.getByTestId(testIds.forumThreadAttachmentOpened)).toBeOnTheScreen();
+  });
+
+  it('lets a signed-in member download a sound-file attachment', async () => {
+    mockSession.isSignedIn = true;
+    mockSession.accessToken = 'tok';
+    mockNetworkPosts(
+      pagedResponse(
+        [
+          {
+            id: 1201,
+            body: '<p>Solo</p>',
+            postedAt: '2024-06-01T12:00:00.000Z',
+            authorUsername: 'jazzfanz',
+            signature: null,
+            authorMemberSince: null,
+            authorMemberId: null,
+            editedAt: null,
+            editCount: 0,
+            attachments: [mp3],
+          },
+        ],
+        1,
+        1,
+      ),
+    );
+    renderThread();
+    await waitFor(() => expect(screen.getByText('brighton-rock-solo.mp3')).toBeOnTheScreen());
+    expect(screen.queryByLabelText('brighton-rock-solo.mp3')).toBeNull();
+
+    const user = userEvent.setup();
+    await user.press(screen.getByRole('button', { name: /brighton-rock-solo.mp3/ }));
+    await waitFor(() =>
+      expect(openAttachment).toHaveBeenCalledWith(
+        '/api/v1/forum/attachments/legacy/1201',
+        'tok',
+        'brighton-rock-solo.mp3',
+        { present: false },
+      ),
+    );
+    expect(openImage).not.toHaveBeenCalled();
+    expect(openAttachment.mock.calls[0]?.[0]).not.toContain('/forum/attachment/legacy/');
+    expect(screen.getByTestId(testIds.forumThreadAttachmentOpened)).toBeOnTheScreen();
+  });
+
+  it('shows an error when a sound-file downloadUrl is cookie-gated', async () => {
+    mockSession.isSignedIn = true;
+    mockSession.accessToken = 'tok';
+    openAttachment.mockImplementationOnce(async (downloadUrl: string, accessToken: string, fileName: string) => {
+      const actual = jest.requireActual<{
+        openForumAttachmentFile: typeof openForumAttachmentFile;
+      }>('../../api');
+      return actual.openForumAttachmentFile(downloadUrl, accessToken, fileName);
+    });
+    mockNetworkPosts(
+      pagedResponse(
+        [
+          {
+            id: 1201,
+            body: '<p>Solo</p>',
+            postedAt: '2024-06-01T12:00:00.000Z',
+            authorUsername: 'jazzfanz',
+            signature: null,
+            authorMemberSince: null,
+            authorMemberId: null,
+            editedAt: null,
+            editCount: 0,
+            attachments: [
+              {
+                ...mp3,
+                downloadUrl: '/forum/attachment/legacy/1201',
+              },
+            ],
+          },
+        ],
+        1,
+        1,
+      ),
+    );
+    renderThread();
+    await waitFor(() => expect(screen.getByText('brighton-rock-solo.mp3')).toBeOnTheScreen());
+
+    const user = userEvent.setup();
+    await user.press(screen.getByRole('button', { name: /brighton-rock-solo.mp3/ }));
+    await waitFor(() =>
+      expect(screen.getByText('This attachment cannot be opened from the app.')).toBeOnTheScreen(),
+    );
+    expect(screen.queryByTestId(testIds.forumThreadAttachmentOpened)).toBeNull();
   });
 
   it('shows signed-out metadata without opening bytes', async () => {

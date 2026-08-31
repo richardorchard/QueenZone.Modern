@@ -269,7 +269,17 @@ public sealed class ForumApiTests : IClassFixture<QueenZoneWebApplicationFactory
         Assert.Equal(
             "/api/v1/forum/attachments/9001/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
             ForumApiMapper.ToAttachmentDownloadUrl("/forum/attachment/9001/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"));
+        Assert.Equal(
+            "/api/v1/forum/attachments/legacy/1002",
+            ForumApiMapper.ToAttachmentDownloadUrl("https://www.queenzone.org/forum/attachment/legacy/1002"));
+        Assert.Equal(
+            "/api/v1/forum/attachments/9001/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+            ForumApiMapper.ToAttachmentDownloadUrl(
+                "https://www.queenzone.org/forum/attachment/9001/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"));
         Assert.Equal("/already-absolute", ForumApiMapper.ToAttachmentDownloadUrl("/already-absolute"));
+        Assert.Equal(
+            "/api/v1/forum/attachments/legacy/1002",
+            ForumApiMapper.ToAttachmentDownloadUrl("/api/v1/forum/attachments/legacy/1002"));
         var mappedPosts = ForumApiMapper.ToPosts([post], ugcHtml);
         Assert.Equal(postDto.Id, mappedPosts[0].Id);
         Assert.Equal(postDto.Body, mappedPosts[0].Body);

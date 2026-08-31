@@ -19,7 +19,6 @@ import {
   fetchForumTopicPostsResult,
   fetchForumTopicResult,
   fetchForumTopicWatch,
-  isCookieGatedForumAttachmentPath,
   isOfflineFailure,
   isTimeoutFailure,
   openForumAttachmentFile,
@@ -587,14 +586,14 @@ function ForumAttachmentList({
       if (action === 'none') {
         return;
       }
-      if (!accessToken || isCookieGatedForumAttachmentPath(attachment.downloadUrl)) {
-        return;
-      }
       const key = `${attachment.downloadUrl}-${attachment.fileName}`;
       setErrorKey(null);
       setErrorMessage(null);
       setBusyKey(key);
       try {
+        if (!accessToken) {
+          throw ApiError.http(401, 'Sign in to continue.');
+        }
         if (action === 'view-image') {
           const uri = await openForumAttachmentImage(attachment.downloadUrl, accessToken);
           setViewer({ uri, label: attachment.fileName });
