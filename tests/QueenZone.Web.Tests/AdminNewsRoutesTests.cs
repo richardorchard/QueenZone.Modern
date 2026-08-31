@@ -758,6 +758,8 @@ public sealed class AdminNewsRoutesTests : IClassFixture<QueenZoneWebApplication
         var body = await client.GetStringAsync("/admin/news/new");
 
         Assert.Contains("enctype=\"multipart/form-data\"", body);
+        Assert.Contains("data-busy-submit", body);
+        Assert.Contains("data-busy-label=\"Saving…\"", body);
         Assert.Contains("name=\"articleImage\"", body);
         Assert.Contains("data-article-image-crop", body);
         Assert.Contains($"data-min-crop-width=\"{NewsArticleImageProcessor.MinCropWidth}\"", body);
@@ -810,6 +812,7 @@ public sealed class AdminNewsRoutesTests : IClassFixture<QueenZoneWebApplication
         Assert.Contains("data-article-image-zoom disabled", editBody);
         Assert.Contains("zoomInput.disabled = false", script);
         Assert.Contains("zoomInput.disabled = true", script);
+        Assert.Contains("}, true);", script);
     }
 
     [Fact]

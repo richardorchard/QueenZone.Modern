@@ -221,7 +221,7 @@
           startCropper();
         }
       }
-    });
+    }, true);
 
     function startCropper() {
       destroyCropper();

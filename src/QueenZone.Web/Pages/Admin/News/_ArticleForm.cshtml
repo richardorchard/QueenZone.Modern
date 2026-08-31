@@ -36,7 +36,12 @@
   </ul>
 }
 
-<form method="post" action="@Model.Action" class="admin-form" enctype="multipart/form-data">
+<form method="post"
+      action="@Model.Action"
+      class="admin-form"
+      enctype="multipart/form-data"
+      data-busy-submit
+      data-busy-label="Saving…">
   <input type="hidden" name="@AdminNewsPageModel.AntiforgeryTokenFieldName" value="@antiforgeryToken">
   <label>
     Title

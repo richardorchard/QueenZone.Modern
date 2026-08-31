@@ -80,6 +80,18 @@ public class EditorWorkflowTests : E2EPageTest
         await Page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
         await Expect(Page).ToHaveURLAsync(new Regex("/admin/news/\\d+/edit"));
 
+        var save = Page.Locator("form[data-busy-submit] button[type=submit]");
+        await Page.EvaluateAsync("""
+            () => {
+              const form = document.querySelector("form.admin-form");
+              form.addEventListener("submit", event => event.preventDefault(), { once: true });
+              form.requestSubmit();
+            }
+            """);
+        await Expect(save).ToHaveTextAsync("Saving…");
+        await Expect(save).ToBeDisabledAsync();
+        await Page.ReloadAsync();
+
         await Page.GetByLabel("Article image").SetInputFilesAsync(imagePath);
         await Expect(Page.Locator("[data-article-image-dialog]")).ToBeVisibleAsync();
         await Page.GetByRole(AriaRole.Button, new() { Name = "Use this crop" }).ClickAsync();
