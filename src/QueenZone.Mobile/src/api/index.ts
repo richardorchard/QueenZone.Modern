@@ -17,6 +17,8 @@ export type { FetchJsonOptions, SendJsonOptions, SendMultipartOptions } from './
 export { uploadMemberAvatar, memberAvatarPath } from './memberAvatar';
 export {
   fetchAlbumDetail,
+  fetchArticleDetail,
+  fetchArticlesPage,
   fetchBiographyChapter,
   fetchBiographyPage,
   fetchDiscographyPage,

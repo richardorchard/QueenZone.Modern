@@ -6,9 +6,10 @@ namespace QueenZone.Web;
 
 /// <summary>
 /// Public, read-only <c>/api/v1/content/*</c> routes for the mobile app
-/// (issues #726 / #743 / #747 / #1100). News, biography, discography, timeline,
-/// Freddie Tribute, photo galleries, fan-performance listings, and random
-/// trivia require no authentication: that content is public on the website today.
+/// (issues #726 / #743 / #747 / #1100 / #1186). News, long-form articles,
+/// biography, discography, timeline, Freddie Tribute, photo galleries,
+/// fan-performance listings, and random trivia require no authentication:
+/// that content is public on the website today.
 /// Fan-performance audio at <c>/api/v1/content/fan-performances/{id}/audio</c>
 /// requires <see cref="MemberAuthenticationSchemes.MobileMemberPolicy"/> and
 /// reuses <see cref="FanPerformanceEndpoints.ServeAudioAsync"/> — the same
@@ -46,6 +47,17 @@ public static class ContentApiEndpoints
             .WithName("GetContentNewsYearRange")
             .WithSummary("Earliest/latest published years across the news archive, for the year-rail scrubber's tick marks.")
             .Produces<NewsYearRangeDto>();
+
+        group.MapGet("/articles", GetArticlesListAsync)
+            .WithName("GetContentArticlesList")
+            .WithSummary("Paged list of published long-form archive articles. Editorial archive only — not news and not community submissions.")
+            .Produces<ApiPagedResponse<ArticleListItemDto>>();
+
+        group.MapGet("/articles/{id:int}", GetArticleDetailAsync)
+            .WithName("GetContentArticleDetail")
+            .WithSummary("A single published long-form archive article.")
+            .Produces<ArticleDetailDto>()
+            .ProducesProblem(StatusCodes.Status404NotFound);
 
         group.MapGet("/timeline", GetTimelineEventsAsync)
             .WithName("GetContentTimelineEvents")
@@ -213,6 +225,42 @@ public static class ContentApiEndpoints
         }
 
         return Results.Ok(await newsDiscussion.ToDetailAsync(item, cancellationToken));
+    }
+
+    internal static async Task<IResult> GetArticlesListAsync(
+        IArticlesRepository articlesRepository,
+        int? page,
+        int? pageSize,
+        CancellationToken cancellationToken)
+    {
+        var request = ApiPagination.Normalize(page, pageSize, ArticlesRoutes.ArchivePageSize);
+        var items = await articlesRepository.GetArchivePageAsync(request.Page, request.PageSize, cancellationToken);
+        var totalCount = await articlesRepository.GetPublishedCountAsync(cancellationToken);
+
+        var response = ApiPagedResponse<ArticleListItemDto>.Create(
+            ContentApiMapper.ToArticleListItems(items),
+            request.Page,
+            request.PageSize,
+            totalCount);
+
+        return Results.Ok(response);
+    }
+
+    internal static async Task<IResult> GetArticleDetailAsync(
+        IArticlesRepository articlesRepository,
+        int id,
+        CancellationToken cancellationToken)
+    {
+        var item = await articlesRepository.GetByIdAsync(id, cancellationToken);
+        if (item is null)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status404NotFound,
+                title: "Not Found",
+                detail: $"No published article with id '{id}'.");
+        }
+
+        return Results.Ok(ContentApiMapper.ToArticleDetail(item));
     }
 
     internal static async Task<IResult> GetTimelineEventsAsync(

@@ -58,6 +58,28 @@ export type NewsYearRange = {
   maxYear: number | null;
 };
 
+/** List-card shape for `/api/v1/content/articles`. Editorial archive, not news. */
+export type ArticleListItem = {
+  id: number;
+  title: string;
+  excerpt: string;
+  publishedAt: string;
+  detailPath: string;
+  categoryName?: string | null;
+};
+
+/** Detail shape for `/api/v1/content/articles/{id}`. `source` is a URL or plain text. */
+export type ArticleDetail = {
+  id: number;
+  title: string;
+  excerpt: string;
+  body: string;
+  publishedAt: string;
+  source: string | null;
+  categoryName: string | null;
+  detailPath: string;
+};
+
 export type BiographyChapterListItem = {
   id: number;
   title: string;

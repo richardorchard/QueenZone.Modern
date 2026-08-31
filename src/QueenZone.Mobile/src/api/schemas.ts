@@ -72,6 +72,26 @@ export const newsDiscussionPreviewSchema = z.object({
   excerpt: z.string(),
 });
 
+export const articleListItemSchema = z.object({
+  id: z.number().int(),
+  title: z.string().min(1),
+  excerpt: z.string(),
+  publishedAt: isoDateTime,
+  detailPath: z.string().min(1),
+  categoryName: z.string().nullish(),
+});
+
+export const articleDetailSchema = z.object({
+  id: z.number().int(),
+  title: z.string().min(1),
+  excerpt: z.string(),
+  body: z.string().min(1),
+  publishedAt: isoDateTime,
+  source: z.string().nullable(),
+  categoryName: z.string().nullable(),
+  detailPath: z.string().min(1),
+});
+
 export const newsDetailSchema = z.object({
   id: z.number().int(),
   title: z.string().min(1),
