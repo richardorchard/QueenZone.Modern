@@ -125,10 +125,17 @@ describe('forum thread meta', () => {
       thumbnailUrl: null,
       url: '/forum/attachment/legacy/1101',
     };
+    const mp3 = {
+      isImage: false,
+      thumbnailUrl: null,
+      url: '/forum/attachment/legacy/1201',
+    };
     assert.equal(attachmentAction(legacyJpg, true), 'view-image');
     assert.equal(attachmentAction(legacyJpg, false), 'none');
     assert.equal(attachmentAction(thumbed, true), 'view-image');
     assert.equal(attachmentAction(pdf, true), 'open-file');
     assert.equal(attachmentAction(pdf, false), 'none');
+    assert.equal(attachmentAction(mp3, true), 'open-file');
+    assert.equal(attachmentAction(mp3, false), 'none');
   });
 });

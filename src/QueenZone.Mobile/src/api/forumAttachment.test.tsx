@@ -101,6 +101,24 @@ describe('openForumAttachmentFile', () => {
     expect(Share.share).not.toHaveBeenCalled();
   });
 
+  it('opens a sound-file CDN redirect after the Bearer fetch', async () => {
+    fetchMock.mockResolvedValueOnce(
+      okResponse('audio/mpeg', [1], 'https://cdn2.queenzone.org/attachments/solo.mp3'),
+    );
+
+    await openForumAttachmentFile('/api/v1/forum/attachments/legacy/1201', 'tok', 'solo.mp3');
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://qz.test/api/v1/forum/attachments/legacy/1201',
+      expect.objectContaining({
+        method: 'GET',
+        redirect: 'follow',
+        headers: expect.objectContaining({ Authorization: 'Bearer tok' }),
+      }),
+    );
+    expect(Linking.openURL).toHaveBeenCalledWith('https://cdn2.queenzone.org/attachments/solo.mp3');
+    expect(Share.share).not.toHaveBeenCalled();
+  });
+
   it('shares streamed bytes when the API does not redirect', async () => {
     fetchMock.mockResolvedValueOnce(
       okResponse(

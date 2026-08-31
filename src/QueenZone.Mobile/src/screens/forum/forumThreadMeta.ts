@@ -100,7 +100,8 @@ export function imagePreviewUrl(item: AttachmentPreviewInput): string | null {
 
 /**
  * Signed-in image always opens via Bearer `downloadUrl` (thumb or not).
- * Signed-in non-image stays `open-file`. Signed-out stays metadata-only.
+ * Signed-in non-image (PDF, sound, anything else) stays `open-file`.
+ * Signed-out stays metadata-only.
  */
 export function attachmentAction(
   item: AttachmentPreviewInput,
