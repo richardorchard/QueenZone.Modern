@@ -1,7 +1,7 @@
 import { FlatList, RefreshControl, Text } from 'react-native';
 import { fireEvent, screen, userEvent } from '@testing-library/react-native';
 import type { PagedState } from '../hooks/usePagedContent';
-import { renderWithProviders } from '../test/render';
+import { flushVirtualizedList, renderWithProviders } from '../test/render';
 import { dark } from '../theme';
 import { PagedListScreen } from './PagedListScreen';
 
@@ -39,6 +39,10 @@ function renderList(paged: PagedState<Item>) {
 }
 
 describe('PagedListScreen', () => {
+  afterEach(async () => {
+    await flushVirtualizedList();
+  });
+
   it('shows the loading gate before the first page arrives', () => {
     renderList(pagedState({ loading: true }));
     expect(screen.getByLabelText('Loading items…')).toBeOnTheScreen();
@@ -91,6 +95,27 @@ describe('PagedListScreen', () => {
     expect(loadMore).toHaveBeenCalledTimes(1);
     fireEvent(refreshControl, 'refresh');
     expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders a function ListHeaderComponent on the loading gate', () => {
+    function Header() {
+      return <Text>Decade chips</Text>;
+    }
+
+    renderWithProviders(
+      <PagedListScreen
+        paged={pagedState({ loading: true })}
+        loadingLabel="Loading items…"
+        emptyMessage="No items yet."
+        keyExtractor={(item) => String(item.id)}
+        renderItem={({ item }) => <Text>{item.title}</Text>}
+        ListHeaderComponent={Header}
+      />,
+      { navigation: false },
+    );
+
+    expect(screen.getByText('Decade chips')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Loading items…')).toBeOnTheScreen();
   });
 
   it('keeps the list visible when a later refresh or error happens with items', () => {
