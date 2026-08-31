@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -10,6 +10,7 @@ import {
   StyleSheet,
   Text,
   View,
+  type ListRenderItem,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
@@ -83,6 +84,15 @@ function smokeAttachAllowed(): boolean {
     dev: typeof __DEV__ !== 'undefined' ? __DEV__ : false,
     appEnv: getAppConfig().appEnv,
   });
+}
+
+type DisplayPost = ForumPost & {
+  queueState?: OfflineQueueItem['state'];
+  operationId?: string;
+};
+
+function postKeyExtractor(item: DisplayPost): string {
+  return item.operationId ?? String(item.id);
 }
 
 export function ThreadScreen({ navigation, route }: Props) {
@@ -305,6 +315,34 @@ export function ThreadScreen({ navigation, route }: Props) {
       .finally(() => setWatchBusy(false));
   }, [accessToken, id, navigation, watching]);
 
+  const openReply = useCallback(() => {
+    if (id === null) {
+      return;
+    }
+    openForumComposer(navigation, isSignedIn, {
+      threadId: id,
+      threadTitle: topic?.title ?? title,
+      isLocked: topic?.isLocked,
+    });
+  }, [id, isSignedIn, navigation, title, topic?.isLocked, topic?.title]);
+
+  const listData = useMemo(
+    () => overlayQueuedPosts(paged.items, queueItems, id),
+    [id, paged.items, queueItems],
+  );
+
+  const renderItem = useCallback<ListRenderItem<DisplayPost>>(
+    ({ item }) => (
+      <ForumPostRow
+        post={item}
+        isSignedIn={isSignedIn}
+        accessToken={accessToken}
+        interactionsEnabled={topicSource !== 'cache' && postsSource !== 'cache'}
+      />
+    ),
+    [accessToken, isSignedIn, postsSource, topicSource],
+  );
+
   if (id === null) {
     return (
       <ErrorBlock message={topicError ?? 'This discussion is not available in the archive yet.'} />
@@ -383,58 +421,31 @@ export function ThreadScreen({ navigation, route }: Props) {
 
   const canReply = topicReplyAllowed(topic);
 
-  const footer = (
-    <View style={styles.reply}>
-      <ListFooterLoading visible={paged.loadingMore} />
-      {canReply ? (
-        <Button
-          label={isSignedIn ? 'Reply' : 'Sign in to reply'}
-          testID={testIds.forumThreadReply}
-          variant="outline"
-          onPress={() =>
-            openForumComposer(navigation, isSignedIn, {
-              threadId: id ?? undefined,
-              threadTitle: topic?.title ?? title,
-              isLocked: topic?.isLocked,
-            })
-          }
-        />
-      ) : (
-        <Text style={[type.caption, { color: c.textMuted }]}>This topic is locked.</Text>
-      )}
-    </View>
-  );
-
   return (
     <FlatList
       testID={testIds.forumThreadScreen}
       style={[styles.list, { backgroundColor: c.surfacePage }]}
-      data={overlayQueuedPosts(paged.items, queueItems, id)}
-      keyExtractor={(item) => item.operationId ?? String(item.id)}
+      data={listData}
+      keyExtractor={postKeyExtractor}
       ListHeaderComponent={header}
       ListEmptyComponent={<EmptyBlock message="No posts are available in this thread yet." />}
-      ListFooterComponent={footer}
+      ListFooterComponent={
+        <ThreadReplyFooter
+          canReply={canReply}
+          isSignedIn={isSignedIn}
+          loadingMore={paged.loadingMore}
+          onReply={openReply}
+        />
+      }
       refreshControl={
         <RefreshControl refreshing={paged.refreshing} onRefresh={refresh} tintColor={c.accentPrimary} />
       }
       onEndReached={paged.loadMore}
       onEndReachedThreshold={0.4}
-      renderItem={({ item }) => (
-        <ForumPostRow
-          post={item}
-          isSignedIn={isSignedIn}
-          accessToken={accessToken}
-          interactionsEnabled={!offlineSnapshot}
-        />
-      )}
+      renderItem={renderItem}
     />
   );
 }
-
-type DisplayPost = ForumPost & {
-  queueState?: OfflineQueueItem['state'];
-  operationId?: string;
-};
 
 function overlayQueuedPosts(
   posts: ForumPost[],
@@ -467,7 +478,36 @@ function overlayQueuedPosts(
   return rows;
 }
 
-function ForumPostRow({
+const ThreadReplyFooter = memo(function ThreadReplyFooter({
+  canReply,
+  isSignedIn,
+  loadingMore,
+  onReply,
+}: {
+  canReply: boolean;
+  isSignedIn: boolean;
+  loadingMore: boolean;
+  onReply: () => void;
+}) {
+  const { c } = useTheme();
+  return (
+    <View style={styles.reply}>
+      <ListFooterLoading visible={loadingMore} />
+      {canReply ? (
+        <Button
+          label={isSignedIn ? 'Reply' : 'Sign in to reply'}
+          testID={testIds.forumThreadReply}
+          variant="outline"
+          onPress={onReply}
+        />
+      ) : (
+        <Text style={[type.caption, { color: c.textMuted }]}>This topic is locked.</Text>
+      )}
+    </View>
+  );
+});
+
+const ForumPostRow = memo(function ForumPostRow({
   post,
   isSignedIn,
   accessToken,
@@ -555,7 +595,7 @@ function ForumPostRow({
       ) : null}
     </View>
   );
-}
+});
 
 function ForumAttachmentList({
   attachments,

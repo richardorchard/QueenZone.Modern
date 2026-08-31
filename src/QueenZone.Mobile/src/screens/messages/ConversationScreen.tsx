@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -10,6 +10,7 @@ import {
   Text,
   TextInput,
   View,
+  type ListRenderItem,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -44,18 +45,16 @@ import { ErrorBlock, LoadingBlock, OfflineBanner } from '../../ui/ScreenStates';
 import { testIds } from '../../test/testIds';
 import {
   buildThreadItems,
-  conversationBodyMaxLength,
   conversationPageSize,
-  formatDateDividerLabel,
   formatMessageClockTime,
   initialsFor,
   parseConversationId,
   reportReasonMaxLength,
   sendingBlockedNotice,
-  validateReplyBody,
   validateReportReason,
   type ThreadListItem,
 } from './inboxMeta';
+import { ConversationComposer } from './ConversationComposer';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'Conversation'>;
 
@@ -128,6 +127,15 @@ function isStaleReadFailure(err: unknown): boolean {
   return isOfflineFailure(err) || isTimeoutFailure(err);
 }
 
+function threadKeyExtractor(item: ThreadListItem<DisplayMessage>): string {
+  return item.id;
+}
+
+/** Test-only. Production leaves this unset so bubble commits stay uninstrumented. */
+export const messageBubbleRenderProbe: { current: (() => void) | null } = {
+  current: null,
+};
+
 export function ConversationScreen({ navigation, route }: Props) {
   return (
     <MemberGate title="Conversation">
@@ -140,7 +148,7 @@ function ConversationThread({ navigation, route }: Props) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const { accessToken, profile } = useSession();
-  const listRef = useRef<FlatList<ThreadListItem<ConversationMessage>>>(null);
+  const listRef = useRef<FlatList<ThreadListItem<DisplayMessage>>>(null);
   const conversationId = parseConversationId(route.params.id);
   const memberId = accessToken ? resolvePushMemberId(accessToken, profile?.memberId) : null;
   const queueItems = useOfflineQueue(memberId);
@@ -153,19 +161,13 @@ function ConversationThread({ navigation, route }: Props) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
-  const [draft, setDraft] = useState('');
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [reportingMessageId, setReportingMessageId] = useState<string | null>(null);
-  const [reportReason, setReportReason] = useState('');
-  const [reportError, setReportError] = useState<string | null>(null);
-  const [reportBusy, setReportBusy] = useState(false);
   const [archiving, setArchiving] = useState(false);
   const [archiveError, setArchiveError] = useState<string | null>(null);
   const [blocking, setBlocking] = useState(false);
   const [blockError, setBlockError] = useState<string | null>(null);
 
   const correspondentName = detail?.otherParticipantDisplayName ?? 'Conversation';
+  const offlineSnapshot = source === 'cache';
 
   const handleArchive = useCallback(async () => {
     if (!accessToken || !conversationId) {
@@ -312,98 +314,88 @@ function ConversationThread({ navigation, route }: Props) {
     return () => controller.abort();
   }, [load, reloadToken]);
 
-  const submit = useCallback(async () => {
-    const validation = validateReplyBody(draft);
-    if (validation) {
-      setSubmitError(validation);
-      return;
-    }
-    if (!accessToken || !conversationId) {
-      setSubmitError('Sign in to continue.');
-      return;
-    }
+  const sendReply = useCallback(
+    async (body: string) => {
+      if (!accessToken || !conversationId || !memberId) {
+        throw new Error('Sign in to continue.');
+      }
 
-    if (!memberId) {
-      setSubmitError('Sign in to continue.');
-      return;
-    }
-
-    setSubmitting(true);
-    setSubmitError(null);
-    try {
       const queued = await enqueueMessageReply({
         memberId,
         conversationId,
-        body: draft.trim(),
+        body,
       });
       void flushOfflineQueue();
-      setDraft('');
       requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
-      try {
-        const next = await replyToConversation(
-          accessToken,
-          conversationId,
-          queued.payload.body,
-          undefined,
-          queued.operationId,
-        );
-        await removeOfflineItem(queued.operationId);
-        setDetail(next);
-        setSource('network');
-        setCachedAt(new Date().toISOString());
-      } catch (err: unknown) {
-        if (isOfflineFailure(err) || isTimeoutFailure(err)) {
-          return;
+
+      void (async () => {
+        try {
+          const next = await replyToConversation(
+            accessToken,
+            conversationId,
+            queued.payload.body,
+            undefined,
+            queued.operationId,
+          );
+          await removeOfflineItem(queued.operationId);
+          setDetail(next);
+          setSource('network');
+          setCachedAt(new Date().toISOString());
+        } catch (err: unknown) {
+          if (isOfflineFailure(err) || isTimeoutFailure(err)) {
+            return;
+          }
         }
-        throw err;
-      }
-    } catch (err: unknown) {
-      setSubmitError(messageFromUnknownError(err));
-    } finally {
-      setSubmitting(false);
-    }
-  }, [accessToken, conversationId, draft, memberId]);
+      })();
+    },
+    [accessToken, conversationId, memberId],
+  );
 
   const submitReport = useCallback(
-    async (messageId: string) => {
-      const validation = validateReportReason(reportReason);
-      if (validation) {
-        setReportError(validation);
-        return;
-      }
+    async (messageId: string, reason?: string) => {
       if (!accessToken || !conversationId) {
-        setReportError('Sign in to continue.');
-        return;
+        throw new Error('Sign in to continue.');
       }
-
-      setReportBusy(true);
-      setReportError(null);
-      try {
-        await reportConversationMessage(
-          accessToken,
-          conversationId,
-          messageId,
-          reportReason.trim() || undefined,
-        );
-        setDetail((current) =>
-          current
-            ? {
-                ...current,
-                messages: current.messages.map((item) =>
-                  item.id === messageId ? { ...item, reportedByViewer: true } : item,
-                ),
-              }
-            : current,
-        );
-        setReportingMessageId(null);
-        setReportReason('');
-      } catch (err: unknown) {
-        setReportError(messageFromUnknownError(err));
-      } finally {
-        setReportBusy(false);
-      }
+      await reportConversationMessage(accessToken, conversationId, messageId, reason);
+      setDetail((current) =>
+        current
+          ? {
+              ...current,
+              messages: current.messages.map((item) =>
+                item.id === messageId ? { ...item, reportedByViewer: true } : item,
+              ),
+            }
+          : current,
+      );
     },
-    [accessToken, conversationId, reportReason],
+    [accessToken, conversationId],
+  );
+
+  const refresh = useCallback(() => {
+    const controller = new AbortController();
+    void load(controller.signal, 'refresh');
+  }, [load]);
+
+  const pendingMessages = useMemo(
+    () => overlayQueuedMessages(detail, queueItems, conversationId, memberId),
+    [conversationId, detail, memberId, queueItems],
+  );
+  const threadItems = useMemo(() => buildThreadItems(pendingMessages), [pendingMessages]);
+
+  const renderItem = useCallback<ListRenderItem<ThreadListItem<DisplayMessage>>>(
+    ({ item }) =>
+      item.kind === 'divider' ? (
+        <DateDivider label={item.label} />
+      ) : (
+        <MessageBubble
+          item={item.message}
+          correspondentName={correspondentName}
+          isFirstOfRun={item.isFirstOfRun}
+          interactionsEnabled={!offlineSnapshot && !item.message.queueState}
+          onSubmitReport={submitReport}
+        />
+      ),
+    [correspondentName, offlineSnapshot, submitReport],
   );
 
   if (loading && !detail) {
@@ -414,13 +406,10 @@ function ConversationThread({ navigation, route }: Props) {
     return <ErrorBlock message={error} onRetry={() => setReloadToken((n) => n + 1)} />;
   }
 
-  const offlineSnapshot = source === 'cache';
   const canSendReply = detail?.canSendReply === true;
   const notice = detail
     ? sendingBlockedNotice(detail.hasBlockedOtherParticipant, detail.canSendReply === true)
     : null;
-  const pendingMessages = overlayQueuedMessages(detail, queueItems, conversationId, memberId);
-  const threadItems = buildThreadItems(pendingMessages);
 
   return (
     <KeyboardAvoidingView
@@ -431,14 +420,11 @@ function ConversationThread({ navigation, route }: Props) {
         ref={listRef}
         style={[styles.flex, { backgroundColor: threadListBackground }]}
         data={threadItems}
-        keyExtractor={(item) => item.id}
+        keyExtractor={threadKeyExtractor}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={() => {
-              const controller = new AbortController();
-              void load(controller.signal, 'refresh');
-            }}
+            onRefresh={refresh}
             tintColor={c.accentPrimary}
           />
         }
@@ -448,98 +434,19 @@ function ConversationThread({ navigation, route }: Props) {
           ) : null
         }
         contentContainerStyle={styles.thread}
-        renderItem={({ item }) =>
-          item.kind === 'divider' ? (
-            <DateDivider label={item.label} />
-          ) : (
-            <MessageBubble
-              item={item.message as DisplayMessage}
-              correspondentName={correspondentName}
-              isFirstOfRun={item.isFirstOfRun}
-              reporting={reportingMessageId === item.message.id}
-              reportReason={reportReason}
-              reportError={reportingMessageId === item.message.id ? reportError : null}
-              reportBusy={reportBusy}
-              interactionsEnabled={!offlineSnapshot && !(item.message as DisplayMessage).queueState}
-              onStartReport={() => {
-                setReportingMessageId(item.message.id);
-                setReportReason('');
-                setReportError(null);
-              }}
-              onCancelReport={() => {
-                setReportingMessageId(null);
-                setReportReason('');
-                setReportError(null);
-              }}
-              onChangeReason={setReportReason}
-              onSubmitReport={() => {
-                void submitReport(item.message.id);
-              }}
-            />
-          )
-        }
+        renderItem={renderItem}
       />
       {canSendReply ? (
-        <View
-          style={[
-            styles.composer,
-            {
-              borderTopColor: c.hairline,
-              backgroundColor: c.surfacePage,
-              paddingBottom: Math.max(insets.bottom, space.md),
-            },
-          ]}
-        >
-          <View style={styles.composerContext}>
-            <Text style={[styles.attribution, { color: 'rgba(255,255,255,0.45)' }]} numberOfLines={1}>
-              REPLYING TO {correspondentName.toUpperCase()}
-            </Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Archive conversation"
-              accessibilityState={{ disabled: archiving || offlineSnapshot, busy: archiving }}
-              disabled={archiving || offlineSnapshot}
-              onPress={confirmArchive}
-              hitSlop={8}
-              style={[styles.archiveTap, archiving ? { opacity: 0.5 } : null]}
-            >
-              <Text style={[styles.attribution, { color: palette.gold }]}>
-                {archiving ? 'ARCHIVING…' : 'ARCHIVE'}
-              </Text>
-            </Pressable>
-          </View>
-          <TextInput
-            value={draft}
-            onChangeText={setDraft}
-            placeholder="Write a reply"
-            placeholderTextColor="rgba(255,255,255,0.45)"
-            accessibilityLabel="Reply"
-            multiline
-            textAlignVertical="top"
-            enterKeyHint="send"
-            autoCapitalize="sentences"
-            maxLength={conversationBodyMaxLength}
-            editable={!submitting}
-            style={styles.field}
-          />
-          {submitError ? (
-            <Text style={[type.caption, { color: c.textSecondary }]}>{submitError}</Text>
-          ) : null}
-          {archiveError ? (
-            <Text style={[type.caption, { color: c.textSecondary }]}>{archiveError}</Text>
-          ) : null}
-          {blockError ? (
-            <Text style={[type.caption, { color: c.textSecondary }]}>{blockError}</Text>
-          ) : null}
-          <Button
-            label="Send reply"
-            onPress={() => {
-              void submit();
-            }}
-            loading={submitting}
-            disabled={!accessToken || draft.trim().length === 0}
-          />
-        </View>
+        <ConversationComposer
+          correspondentName={correspondentName}
+          canSend={Boolean(accessToken)}
+          archiving={archiving}
+          archiveDisabled={offlineSnapshot}
+          archiveError={archiveError}
+          blockError={blockError}
+          onArchive={confirmArchive}
+          onSend={sendReply}
+        />
       ) : notice ? (
         <View
           style={[
@@ -561,7 +468,7 @@ function ConversationThread({ navigation, route }: Props) {
   );
 }
 
-function DateDivider({ label }: { label: string }) {
+const DateDivider = memo(function DateDivider({ label }: { label: string }) {
   return (
     <View style={styles.dividerRow}>
       <View style={styles.dividerRule} />
@@ -569,35 +476,58 @@ function DateDivider({ label }: { label: string }) {
       <View style={styles.dividerRule} />
     </View>
   );
-}
+});
 
-function MessageBubble({
+const MessageBubble = memo(function MessageBubble({
   item,
   correspondentName,
   isFirstOfRun,
-  reporting,
-  reportReason,
-  reportError,
-  reportBusy,
   interactionsEnabled,
-  onStartReport,
-  onCancelReport,
-  onChangeReason,
   onSubmitReport,
 }: {
   item: DisplayMessage;
   correspondentName: string;
   isFirstOfRun: boolean;
-  reporting: boolean;
-  reportReason: string;
-  reportError: string | null;
-  reportBusy: boolean;
   interactionsEnabled: boolean;
-  onStartReport: () => void;
-  onCancelReport: () => void;
-  onChangeReason: (value: string) => void;
-  onSubmitReport: () => void;
+  onSubmitReport: (messageId: string, reason?: string) => Promise<void>;
 }) {
+  messageBubbleRenderProbe.current?.();
+  const [reporting, setReporting] = useState(false);
+  const [reportReason, setReportReason] = useState('');
+  const [reportError, setReportError] = useState<string | null>(null);
+  const [reportBusy, setReportBusy] = useState(false);
+
+  const startReport = useCallback(() => {
+    setReporting(true);
+    setReportReason('');
+    setReportError(null);
+  }, []);
+
+  const cancelReport = useCallback(() => {
+    setReporting(false);
+    setReportReason('');
+    setReportError(null);
+  }, []);
+
+  const submitReport = useCallback(async () => {
+    const validation = validateReportReason(reportReason);
+    if (validation) {
+      setReportError(validation);
+      return;
+    }
+    setReportBusy(true);
+    setReportError(null);
+    try {
+      await onSubmitReport(item.id, reportReason.trim() || undefined);
+      setReporting(false);
+      setReportReason('');
+    } catch (err: unknown) {
+      setReportError(messageFromUnknownError(err));
+    } finally {
+      setReportBusy(false);
+    }
+  }, [item.id, onSubmitReport, reportReason]);
+
   const time = formatMessageClockTime(item.createdAt);
   const attribution = item.isMine
     ? `YOU · ${time}`
@@ -678,7 +608,7 @@ function MessageBubble({
           <View style={styles.reportForm}>
             <TextInput
               value={reportReason}
-              onChangeText={onChangeReason}
+              onChangeText={setReportReason}
               placeholder="Optional reason"
               placeholderTextColor="rgba(255,255,255,0.45)"
               accessibilityLabel="Optional reason"
@@ -693,17 +623,19 @@ function MessageBubble({
               <Button
                 label="Submit report"
                 size="sm"
-                onPress={onSubmitReport}
+                onPress={() => {
+                  void submitReport();
+                }}
                 loading={reportBusy}
               />
-              <Button label="Cancel" size="sm" variant="ghost" onPress={onCancelReport} disabled={reportBusy} />
+              <Button label="Cancel" size="sm" variant="ghost" onPress={cancelReport} disabled={reportBusy} />
             </View>
           </View>
         ) : (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Report message"
-            onPress={onStartReport}
+            onPress={startReport}
             hitSlop={8}
           >
             <Text style={styles.reportTrigger}>Report message</Text>
@@ -712,7 +644,7 @@ function MessageBubble({
       </View>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
@@ -769,21 +701,5 @@ const styles = StyleSheet.create({
     color: palette.white,
   },
   reportActions: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
-  composer: { paddingHorizontal: space.base, paddingTop: space.md, borderTopWidth: StyleSheet.hairlineWidth, gap: 10 },
-  composerContext: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  archiveTap: { minHeight: 44, justifyContent: 'center' },
   notice: { paddingHorizontal: space.base, paddingTop: space.md, borderTopWidth: StyleSheet.hairlineWidth },
-  field: {
-    minHeight: 44,
-    maxHeight: 120,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: radius.md,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontFamily: fonts.body,
-    fontSize: 16,
-    color: palette.white,
-  },
 });
