@@ -1,5 +1,5 @@
-import { useCallback, useRef, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
+import { memo, useCallback, useRef, useState } from 'react';
+import { FlatList, Pressable, RefreshControl, Text, View, type ListRenderItem } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { fetchArchivedInbox, unarchiveConversation, type InboxConversation } from '../../api/messages';
@@ -15,6 +15,10 @@ import { testIds } from '../../test/testIds';
 import { formatMessageTimestamp, inboxPageSize, inboxRowA11yLabel, unreadBadgeLabel } from './inboxMeta';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'Archived'>;
+
+function archivedKeyExtractor(item: InboxConversation): string {
+  return item.conversationId;
+}
 
 export function ArchivedScreen({ navigation }: Props) {
   return (
@@ -79,6 +83,25 @@ function ArchivedList({ navigation }: Pick<Props, 'navigation'>) {
     [accessToken, paged.refresh],
   );
 
+  const openConversation = useCallback(
+    (conversationId: string) => {
+      navigation.navigate('Conversation', { id: conversationId });
+    },
+    [navigation],
+  );
+
+  const renderItem = useCallback<ListRenderItem<InboxConversation>>(
+    ({ item }) => (
+      <ArchivedRow
+        item={item}
+        unarchiving={unarchivingId === item.conversationId}
+        onPress={openConversation}
+        onUnarchive={handleUnarchive}
+      />
+    ),
+    [handleUnarchive, openConversation, unarchivingId],
+  );
+
   const header = (
     <View>
       <PageTitleBlock
@@ -117,7 +140,7 @@ function ArchivedList({ navigation }: Pick<Props, 'navigation'>) {
       testID={testIds.archivedScreen}
       style={{ flex: 1, backgroundColor: c.surfacePage }}
       data={paged.items}
-      keyExtractor={(item) => item.conversationId}
+      keyExtractor={archivedKeyExtractor}
       ListHeaderComponent={header}
       ListEmptyComponent={<EmptyBlock message="You have no archived conversations." />}
       ListFooterComponent={<ListFooterLoading visible={paged.loadingMore} />}
@@ -130,21 +153,12 @@ function ArchivedList({ navigation }: Pick<Props, 'navigation'>) {
       }
       onEndReached={paged.loadMore}
       onEndReachedThreshold={0.4}
-      renderItem={({ item }) => (
-        <ArchivedRow
-          item={item}
-          unarchiving={unarchivingId === item.conversationId}
-          onPress={() => navigation.navigate('Conversation', { id: item.conversationId })}
-          onUnarchive={() => {
-            void handleUnarchive(item.conversationId);
-          }}
-        />
-      )}
+      renderItem={renderItem}
     />
   );
 }
 
-function ArchivedRow({
+const ArchivedRow = memo(function ArchivedRow({
   item,
   unarchiving,
   onPress,
@@ -152,8 +166,8 @@ function ArchivedRow({
 }: {
   item: InboxConversation;
   unarchiving: boolean;
-  onPress: () => void;
-  onUnarchive: () => void;
+  onPress: (conversationId: string) => void;
+  onUnarchive: (conversationId: string) => Promise<void>;
 }) {
   const { c } = useTheme();
   const unread = unreadBadgeLabel(item.unreadCount);
@@ -162,7 +176,7 @@ function ArchivedRow({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={inboxRowA11yLabel(item)}
-        onPress={onPress}
+        onPress={() => onPress(item.conversationId)}
         style={({ pressed }) => [
           { paddingVertical: space.base, paddingHorizontal: space.xl, gap: 6, opacity: pressed ? 0.72 : 1 },
         ]}
@@ -181,8 +195,16 @@ function ArchivedRow({
         </Text>
       </Pressable>
       <View style={{ paddingHorizontal: space.xl, paddingBottom: space.md }}>
-        <Button label="Unarchive" size="sm" variant="ghost" onPress={onUnarchive} loading={unarchiving} />
+        <Button
+          label="Unarchive"
+          size="sm"
+          variant="ghost"
+          onPress={() => {
+            void onUnarchive(item.conversationId);
+          }}
+          loading={unarchiving}
+        />
       </View>
     </View>
   );
-}
+});
