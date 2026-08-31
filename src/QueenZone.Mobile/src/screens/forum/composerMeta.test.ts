@@ -90,7 +90,7 @@ describe('attachmentFromPickerAsset', () => {
   });
 
   it('guesses type from the name when the picker only has octet-stream', () => {
-    const guessed: Array<[string, string]> = [
+    const guessed: [string, string][] = [
       ['scan.PDF', 'application/pdf'],
       ['crowd.jpg', 'image/jpeg'],
       ['crowd.jpeg', 'image/jpeg'],

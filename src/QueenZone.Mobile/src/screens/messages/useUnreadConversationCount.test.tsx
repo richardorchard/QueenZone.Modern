@@ -17,6 +17,7 @@ jest.mock('../../session/SessionContext', () => ({
 
 jest.mock('@react-navigation/native', () => {
   const actual = jest.requireActual('@react-navigation/native');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Jest CJS mock factory.
   const { useEffect } = require('react');
   return {
     ...actual,

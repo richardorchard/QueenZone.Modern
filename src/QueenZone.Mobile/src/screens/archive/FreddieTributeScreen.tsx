@@ -1,5 +1,5 @@
 import { memo, useCallback, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View, type ListRenderItem } from 'react-native';
+import { FlatList, Pressable, RefreshControl, StyleSheet, Text, type ListRenderItem } from 'react-native';
 import { fetchFreddieTributePage, type FreddieTribute } from '../../api';
 import { usePagedContent } from '../../hooks/usePagedContent';
 import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from '../../ui/ScreenStates';

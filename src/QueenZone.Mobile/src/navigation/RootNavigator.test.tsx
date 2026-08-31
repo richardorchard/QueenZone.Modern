@@ -27,9 +27,17 @@ jest.mock('../widgets/WidgetLinkBridge', () => ({
 }));
 
 jest.mock('./stacks', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Jest CJS mock factory.
   const React = require('react');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Jest CJS mock factory.
   const { Text } = require('react-native');
-  const stub = (label: string) => () => React.createElement(Text, null, label);
+  const stub = (label: string) => {
+    function Stub() {
+      return React.createElement(Text, null, label);
+    }
+    Stub.displayName = label;
+    return Stub;
+  };
   return {
     HomeStack: stub('Home stack'),
     NewsStack: stub('News stack'),

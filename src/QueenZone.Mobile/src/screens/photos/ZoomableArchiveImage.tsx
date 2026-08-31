@@ -95,6 +95,7 @@ export function ZoomableArchiveImage({
     savedTranslateX.value = 0;
     savedTranslateY.value = 0;
     setZoomed(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Reanimated shared values are refs, not render deps.
   }, [resetKey]);
 
   const announceAndTrackZoom = useCallback((nextScale: number) => {
@@ -293,6 +294,7 @@ export function ZoomableArchiveImage({
         zoomed ? zoomPan : galleryPan,
       ),
     );
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Reanimated shared values are refs, not render deps.
   }, [announceAndTrackZoom, handleGalleryPanEnd, toggleChrome, zoomed]);
 
   const animatedStyle = useAnimatedStyle(() => ({

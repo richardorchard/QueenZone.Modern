@@ -10,7 +10,7 @@ const listeners = new Set<() => void>();
 
 function getStorage(): KeyValueStorage {
   if (!storage) {
-    // Lazy so Node unit tests never load React Native AsyncStorage.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- lazy so Node unit tests never load React Native AsyncStorage.
     const loaded = require('../cache/asyncStorageAdapter') as typeof import('../cache/asyncStorageAdapter');
     storage = loaded.createAsyncStorageAdapter();
   }

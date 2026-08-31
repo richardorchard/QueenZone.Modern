@@ -84,7 +84,7 @@ function renderConversation() {
 }
 
 function conversationDetail(
-  messages: Array<{
+  messages: {
     id: string;
     senderMemberId: string;
     senderDisplayName: string;
@@ -93,7 +93,7 @@ function conversationDetail(
     isMine: boolean;
     sortKey: number;
     reportedByViewer?: boolean;
-  }>,
+  }[],
   overrides: { canSendReply?: boolean; hasBlockedOtherParticipant?: boolean } = {},
 ) {
   return {

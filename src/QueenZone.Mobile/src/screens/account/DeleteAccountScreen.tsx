@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ScrollView, Text, TextInput, View } from 'react-native';
+import { ScrollView, Text, TextInput } from 'react-native';
 import { fetchJson, sendJson } from '../../api/client';
 import { ApiError } from '../../api/errors';
 import {

@@ -6,7 +6,7 @@ function createFakeAsyncStorage(initial: Record<string, string> = {}) {
   const map = new Map<string, string>(Object.entries(initial));
   const calls = {
     getItem: [] as string[],
-    setItem: [] as Array<[string, string]>,
+    setItem: [] as [string, string][],
     removeItem: [] as string[],
     getAllKeys: 0,
     multiRemove: [] as string[][],

@@ -5,7 +5,6 @@ import { useCallback } from 'react';
 import { FlatList, Pressable, RefreshControl, Text, useWindowDimensions, View } from 'react-native';
 import { fetchPhotoCategories, type PhotoCategoryListItem } from '../../api';
 import { usePagedContent } from '../../hooks/usePagedContent';
-import { nestedTabParams } from '../../navigation/nestedTab';
 import type { PhotosStackParamList, RootTabParamList } from '../../navigation/types';
 import { useSession } from '../../session/SessionContext';
 import { openPhotoSubmit } from '../../session/signInNavigation';

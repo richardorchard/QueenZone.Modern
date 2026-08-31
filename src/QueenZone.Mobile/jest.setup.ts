@@ -1,6 +1,7 @@
 import { cleanup } from '@testing-library/react-native';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Jest CJS mock factory.
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
 );
 
@@ -29,8 +30,10 @@ jest.mock('expo-splash-screen', () => ({
   hideAsync: jest.fn(async () => {}),
 }));
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- Jest CJS mock factory.
 jest.mock('react-native-reanimated', () => require('./jest.reanimated.mock.js'));
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- Jest CJS mock factory.
 jest.mock('react-native-gesture-handler', () => require('./jest.gesture-handler.mock.js'));
 
 jest.mock('expo-share-intent', () => ({
@@ -92,12 +95,15 @@ jest.mock('expo-notifications', () => ({
 }));
 
 jest.mock('expo-image', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Jest CJS mock factory.
   const { View } = require('react-native');
   return { Image: View };
 });
 
 jest.mock('lucide-react-native', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Jest CJS mock factory.
   const React = require('react');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Jest CJS mock factory.
   const { View } = require('react-native');
   const Icon = () => React.createElement(View);
   return new Proxy(
