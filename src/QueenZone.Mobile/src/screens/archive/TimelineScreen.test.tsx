@@ -4,7 +4,7 @@ import { screen, userEvent, waitFor } from '@testing-library/react-native';
 import { fetchTimelinePage } from '../../api';
 import type { TimelineEvent } from '../../api/types';
 import { pagedResponse } from '../../test/fixtures';
-import { fakeNavigation, renderWithProviders } from '../../test/render';
+import { fakeNavigation, flushVirtualizedList, renderWithProviders } from '../../test/render';
 import { testIds } from '../../test/testIds';
 import { TimelineScreen } from './TimelineScreen';
 
@@ -41,8 +41,9 @@ describe('TimelineScreen', () => {
     jest.spyOn(FlatList.prototype, 'scrollToIndex').mockImplementation(() => undefined);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     jest.restoreAllMocks();
+    await flushVirtualizedList();
   });
 
   it('expands the event passed as focusId from search', async () => {
@@ -69,8 +70,8 @@ describe('TimelineScreen', () => {
   });
 
   it('pages until the focused event appears, then expands that row', async () => {
-    fetchTimeline.mockImplementation(async ({ page }) => {
-      if (page === 1) {
+    fetchTimeline.mockImplementation(async (query = {}) => {
+      if ((query.page ?? 1) === 1) {
         return pagedResponse([eventFixture({ id: 10, title: 'Another' })], 1, 2);
       }
       return pagedResponse([eventFixture()], 2, 2);

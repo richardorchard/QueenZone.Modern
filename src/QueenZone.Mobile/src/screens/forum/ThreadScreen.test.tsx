@@ -14,8 +14,15 @@ import {
   watchForumTopic,
 } from '../../api';
 import type { CachedResult } from '../../api';
+import type { ApiPagedResponse, ForumPost } from '../../api/types';
 import { ApiError } from '../../api/client';
-import { pagedResponse } from '../../test/fixtures';
+import {
+  forumAttachmentFixture,
+  forumPostFixture,
+  forumTopicDetailFixture,
+  memberProfileFixture,
+  pagedResponse,
+} from '../../test/fixtures';
 import { useOfflineQueue } from '../../offlineQueue';
 import { createMockSession } from '../../test/mockSession';
 import { fakeNavigation, flushVirtualizedList, renderWithProviders } from '../../test/render';
@@ -77,7 +84,7 @@ function asCache<T>(data: T, cachedAt = NETWORK_CACHED_AT): CachedResult<T> {
   return { data, source: 'cache', cachedAt };
 }
 
-const defaultTopic = {
+const defaultTopic = forumTopicDetailFixture({
   id: 1002,
   title: 'Ranking every studio album',
   forumId: 1,
@@ -87,26 +94,9 @@ const defaultTopic = {
   postCount: 1,
   hasPoll: false,
   isLocked: false,
-};
+});
 
-const defaultPosts = pagedResponse(
-  [
-    {
-      id: 1,
-      body: '<p>Hello</p>',
-      postedAt: '2024-06-01T10:00:00.000Z',
-      authorUsername: 'brightonrock',
-      signature: null,
-      authorMemberSince: null,
-      authorMemberId: null,
-      editedAt: null,
-      editCount: 0,
-      attachments: [],
-    },
-  ],
-  1,
-  1,
-);
+const defaultPosts = pagedResponse([forumPostFixture()], 1, 1);
 
 function mockNetworkTopic(topic = defaultTopic, posts = defaultPosts) {
   fetchTopic.mockResolvedValue(topic);
@@ -115,7 +105,7 @@ function mockNetworkTopic(topic = defaultTopic, posts = defaultPosts) {
   fetchPostsResult.mockResolvedValue(asNetwork(posts));
 }
 
-function mockNetworkPosts(posts: ReturnType<typeof pagedResponse>) {
+function mockNetworkPosts(posts: ApiPagedResponse<ForumPost>) {
   fetchPosts.mockResolvedValue(posts);
   fetchPostsResult.mockResolvedValue(asNetwork(posts));
 }
@@ -289,16 +279,8 @@ describe('ThreadScreen watch control', () => {
 });
 
 describe('ThreadScreen attachments', () => {
-  const imageNoThumb = {
-    fileName: 'anoto-setlist-scan.jpg',
-    url: '/forum/attachment/legacy/1002',
-    downloadUrl: '/api/v1/forum/attachments/legacy/1002',
-    extension: 'JPG',
-    formattedSize: '129.1 KB',
-    isImage: true,
-    thumbnailUrl: null,
-  };
-  const pdf = {
+  const imageNoThumb = forumAttachmentFixture();
+  const pdf = forumAttachmentFixture({
     fileName: 'opera-side-two-notes.pdf',
     url: '/forum/attachment/legacy/1101',
     downloadUrl: '/api/v1/forum/attachments/legacy/1101',
@@ -306,8 +288,8 @@ describe('ThreadScreen attachments', () => {
     formattedSize: '47.0 KB',
     isImage: false,
     thumbnailUrl: null,
-  };
-  const mp3 = {
+  });
+  const mp3 = forumAttachmentFixture({
     fileName: 'brighton-rock-solo.mp3',
     url: '/forum/attachment/legacy/1201',
     downloadUrl: '/api/v1/forum/attachments/legacy/1201',
@@ -315,7 +297,7 @@ describe('ThreadScreen attachments', () => {
     formattedSize: '3.2 MB',
     isImage: false,
     thumbnailUrl: null,
-  };
+  });
 
   beforeEach(() => {
     mockSession.isSignedIn = false;
@@ -743,7 +725,7 @@ describe('ThreadScreen attachments', () => {
   });
 });
 
-const cachedTopic = {
+const cachedTopic = forumTopicDetailFixture({
   id: 1002,
   title: 'Ranking every studio album',
   forumId: 1,
@@ -753,32 +735,14 @@ const cachedTopic = {
   postCount: 1,
   hasPoll: true,
   isLocked: false,
-};
+});
 
 const cachedPosts = pagedResponse(
   [
-    {
-      id: 1,
+    forumPostFixture({
       body: '<p>Hello from cache</p>',
-      postedAt: '2024-06-01T10:00:00.000Z',
-      authorUsername: 'brightonrock',
-      signature: null,
-      authorMemberSince: null,
-      authorMemberId: null,
-      editedAt: null,
-      editCount: 0,
-      attachments: [
-        {
-          fileName: 'anoto-setlist-scan.jpg',
-          url: '/forum/attachment/legacy/1002',
-          downloadUrl: '/api/v1/forum/attachments/legacy/1002',
-          extension: 'JPG',
-          formattedSize: '129.1 KB',
-          isImage: true,
-          thumbnailUrl: null,
-        },
-      ],
-    },
+      attachments: [forumAttachmentFixture()],
+    }),
   ],
   1,
   1,
@@ -788,7 +752,7 @@ describe('ThreadScreen offline snapshot', () => {
   beforeEach(() => {
     mockSession.isSignedIn = true;
     mockSession.accessToken = 'tok';
-    mockSession.profile = { memberId: 'member-1' } as never;
+    mockSession.profile = memberProfileFixture({ memberId: 'member-1' });
     useOfflineQueueMock.mockReturnValue([]);
     fetchTopicResult.mockResolvedValue(asCache(cachedTopic));
     fetchPostsResult.mockResolvedValue(asCache(cachedPosts));

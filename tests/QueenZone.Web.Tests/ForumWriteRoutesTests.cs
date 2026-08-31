@@ -31,6 +31,19 @@ public sealed class ForumWriteRoutesTests : IClassFixture<WebApplicationFactory<
     }
 
     [Fact]
+    public async Task NewThreadGet_HidesEmptyValidationSummaryWithoutHidingErrors()
+    {
+        var client = CreateMemberClient(factory, Guid.NewGuid());
+
+        var page = await client.GetStringAsync("/forum/c/the-music/new-thread");
+        var css = await client.GetStringAsync("/css/site.css");
+
+        Assert.Contains("validation-summary-valid", page);
+        Assert.Contains(".validation-summary-valid", css);
+        Assert.Matches(@"\.validation-summary-valid\s*\{\s*display:\s*none;\s*\}", css);
+    }
+
+    [Fact]
     public async Task ValidNewThreadPost_CreatesThreadAndRedirectsToExistingTopicRoute()
     {
         var client = CreateMemberClient(factory, Guid.NewGuid());
@@ -202,6 +215,7 @@ public sealed class ForumWriteRoutesTests : IClassFixture<WebApplicationFactory<
 
         var body = await response.Content.ReadAsStringAsync();
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("validation-summary-errors", body);
         Assert.Contains("Body is required.", body);
     }
 

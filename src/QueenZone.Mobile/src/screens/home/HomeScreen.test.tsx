@@ -11,7 +11,7 @@ import {
   fetchRandomQuote,
   voteHomePoll,
 } from '../../api';
-import { deferred, newsItemFixture, pagedResponse } from '../../test/fixtures';
+import { deferred, forumRecentThreadFixture, newsItemFixture, pagedResponse } from '../../test/fixtures';
 import { createMockSession } from '../../test/mockSession';
 import { fakeNavigation, flushVirtualizedList, renderWithProviders } from '../../test/render';
 import { bumpNewsListEpoch } from '../../notifications/newsListEpoch';
@@ -115,17 +115,7 @@ describe('HomeScreen', () => {
         1,
       ),
     );
-    fetchForum.mockResolvedValue([
-      {
-        topicId: 1002,
-        title: 'Ranking every studio album',
-        categoryId: 1,
-        categoryName: 'General',
-        replyCount: 12,
-        lastActivityAt: '2026-01-01T00:00:00.000Z',
-        detailPath: '/forum/topic/1002/ranking-every-studio-album',
-      },
-    ]);
+    fetchForum.mockResolvedValue([forumRecentThreadFixture()]);
     fetchPhotos.mockResolvedValue(pagedResponse([], 1, 0));
     fetchDay.mockResolvedValue(null);
     fetchQuote.mockResolvedValue(null);

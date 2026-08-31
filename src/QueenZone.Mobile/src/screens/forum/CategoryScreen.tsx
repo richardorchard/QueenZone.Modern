@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useState } from 'react';
-import { FlatList, RefreshControl, StyleSheet, Text, View, type ListRenderItem } from 'react-native';
+import { StyleSheet, Text, View, type ListRenderItem } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   ApiError,
@@ -14,7 +14,8 @@ import type { ForumStackParamList } from '../../navigation/types';
 import { useSession } from '../../session/SessionContext';
 import { openForumComposer } from '../../session/signInNavigation';
 import { ArticleRow } from '../../ui/ArticleRow';
-import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from '../../ui/ScreenStates';
+import { PagedListScreen } from '../../ui/PagedListScreen';
+import { ErrorBlock, LoadingBlock } from '../../ui/ScreenStates';
 import { testIds } from '../../test/testIds';
 import { space, type, useTheme } from '../../theme';
 import { formatForumCount, topicMeta } from './forumListMeta';
@@ -142,8 +143,7 @@ export function CategoryScreen({ navigation, route }: Props) {
     </View>
   );
 
-  const categoryPending = !category && !categoryError;
-  if ((paged.loading && paged.items.length === 0) || categoryPending) {
+  if (!category && !categoryError) {
     return <LoadingBlock label="Loading topics…" />;
   }
 
@@ -151,35 +151,20 @@ export function CategoryScreen({ navigation, route }: Props) {
     return <ErrorBlock message={categoryError} onRetry={retry} />;
   }
 
-  if (paged.error && paged.items.length === 0) {
-    return <ErrorBlock message={paged.error} onRetry={retry} />;
-  }
-
   return (
-    <FlatList
+    <PagedListScreen
       testID={testIds.forumCategoryScreen}
-      style={[styles.list, { backgroundColor: c.surfacePage }]}
-      data={paged.items}
+      paged={{ ...paged, refresh, reload: retry }}
       keyExtractor={topicKeyExtractor}
+      loadingLabel="Loading topics…"
+      emptyMessage="No topics are available in this board yet."
       ListHeaderComponent={header}
-      ListEmptyComponent={<EmptyBlock message="No topics are available in this board yet." />}
-      ListFooterComponent={<ListFooterLoading visible={paged.loadingMore} />}
-      refreshControl={
-        <RefreshControl
-          refreshing={paged.refreshing}
-          onRefresh={refresh}
-          tintColor={c.accentPrimary}
-        />
-      }
-      onEndReached={paged.loadMore}
-      onEndReachedThreshold={0.4}
       renderItem={renderItem}
     />
   );
 }
 
 const styles = StyleSheet.create({
-  list: { flex: 1 },
   header: {
     paddingHorizontal: space.xl,
     paddingTop: space.base,

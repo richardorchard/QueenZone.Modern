@@ -64,6 +64,7 @@ describe('DiscographyScreen', () => {
   it('renders list thumbs through ArchiveImage with low priority and album recycling keys', async () => {
     const { navigation } = renderDiscography();
     await waitFor(() => expect(screen.getByText('A Night at the Opera')).toBeOnTheScreen());
+    expect(fetchPage).toHaveBeenCalledWith(expect.objectContaining({ page: 1, pageSize: 20 }));
 
     const thumb = screen.getByLabelText('A Night at the Opera');
     expect(thumb.props.source).toEqual({

@@ -56,8 +56,9 @@ public sealed class IndexModel(HelpRequestService helpRequestService) : PageMode
         (HelpRequestTopic.Other, HelpRequestTopic.DisplayName(HelpRequestTopic.Other)),
     ];
 
-    public async Task OnGetAsync()
+    public async Task OnGetAsync(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         await PopulateSignedInStateAsync();
         FormStamp = helpRequestService.IssueFormStamp();
         ViewData["Title"] = "Contact — Queenzone";

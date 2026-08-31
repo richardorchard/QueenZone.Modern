@@ -1,5 +1,5 @@
 import { memo, useCallback, useRef, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, Text, View, type ListRenderItem } from 'react-native';
+import { Pressable, Text, View, type ListRenderItem } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { fetchArchivedInbox, unarchiveConversation, type InboxConversation } from '../../api/messages';
@@ -10,7 +10,7 @@ import { useSession } from '../../session/SessionContext';
 import { space, type, useTheme } from '../../theme';
 import { Button } from '../../ui/Button';
 import { PageTitleBlock } from '../../ui/PageTitleBlock';
-import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from '../../ui/ScreenStates';
+import { PagedListScreen } from '../../ui/PagedListScreen';
 import { testIds } from '../../test/testIds';
 import { formatMessageTimestamp, inboxPageSize, inboxRowA11yLabel, unreadBadgeLabel } from './inboxMeta';
 
@@ -119,42 +119,14 @@ function ArchivedList({ navigation }: Pick<Props, 'navigation'>) {
     </View>
   );
 
-  if (paged.loading && paged.items.length === 0) {
-    return (
-      <View style={{ flex: 1, backgroundColor: c.surfacePage }}>
-        {header}
-        <LoadingBlock label="Loading archived messages…" />
-      </View>
-    );
-  }
-
-  if (paged.error && paged.items.length === 0) {
-    return (
-      <View style={{ flex: 1, backgroundColor: c.surfacePage }}>
-        {header}
-        <ErrorBlock message={paged.error} onRetry={paged.reload} />
-      </View>
-    );
-  }
-
   return (
-    <FlatList
+    <PagedListScreen
       testID={testIds.archivedScreen}
-      style={{ flex: 1, backgroundColor: c.surfacePage }}
-      data={paged.items}
+      paged={paged}
       keyExtractor={archivedKeyExtractor}
+      loadingLabel="Loading archived messages…"
+      emptyMessage="You have no archived conversations."
       ListHeaderComponent={header}
-      ListEmptyComponent={<EmptyBlock message="You have no archived conversations." />}
-      ListFooterComponent={<ListFooterLoading visible={paged.loadingMore} />}
-      refreshControl={
-        <RefreshControl
-          refreshing={paged.refreshing}
-          onRefresh={paged.refresh}
-          tintColor={c.accentPrimary}
-        />
-      }
-      onEndReached={paged.loadMore}
-      onEndReachedThreshold={0.4}
       renderItem={renderItem}
     />
   );
