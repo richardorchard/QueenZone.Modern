@@ -86,6 +86,11 @@ describe('PagedListScreen', () => {
 
     const list = screen.UNSAFE_getByType(FlatList);
     expect(list.props.onEndReachedThreshold).toBe(0.4);
+    expect(list.props.windowSize).toBe(10);
+    expect(list.props.maxToRenderPerBatch).toBe(10);
+    expect(list.props.initialNumToRender).toBe(10);
+    expect(list.props.removeClippedSubviews).toBeUndefined();
+    expect(list.props.getItemLayout).toBeUndefined();
     expect(list.props.data).toEqual([{ id: 1, title: 'Live Aid' }]);
 
     const refreshControl = screen.UNSAFE_getByType(RefreshControl);
@@ -116,6 +121,47 @@ describe('PagedListScreen', () => {
 
     expect(screen.getByText('Decade chips')).toBeOnTheScreen();
     expect(screen.getByLabelText('Loading items…')).toBeOnTheScreen();
+  });
+
+  it('lets callers override the text-list virtualization numbers', () => {
+    renderWithProviders(
+      <PagedListScreen
+        paged={pagedState({ items: [{ id: 1, title: 'Live Aid' }] })}
+        loadingLabel="Loading items…"
+        emptyMessage="No items yet."
+        keyExtractor={(item) => String(item.id)}
+        renderItem={({ item }) => <Text>{item.title}</Text>}
+        windowSize={7}
+        maxToRenderPerBatch={12}
+        initialNumToRender={12}
+        removeClippedSubviews
+      />,
+      { navigation: false },
+    );
+
+    const list = screen.UNSAFE_getByType(FlatList);
+    expect(list.props.windowSize).toBe(7);
+    expect(list.props.maxToRenderPerBatch).toBe(12);
+    expect(list.props.initialNumToRender).toBe(12);
+    expect(list.props.removeClippedSubviews).toBe(true);
+  });
+
+  it('owns getItemLayout from itemHeight', () => {
+    renderWithProviders(
+      <PagedListScreen
+        paged={pagedState({ items: [{ id: 1, title: 'Live Aid' }] })}
+        loadingLabel="Loading items…"
+        emptyMessage="No items yet."
+        keyExtractor={(item) => String(item.id)}
+        renderItem={({ item }) => <Text>{item.title}</Text>}
+        itemHeight={48}
+      />,
+      { navigation: false },
+    );
+
+    const list = screen.UNSAFE_getByType(FlatList);
+    expect(list.props.getItemLayout(null, 0)).toEqual({ length: 48, offset: 0, index: 0 });
+    expect(list.props.getItemLayout(null, 3)).toEqual({ length: 48, offset: 144, index: 3 });
   });
 
   it('keeps the list visible when a later refresh or error happens with items', () => {
