@@ -1,5 +1,3 @@
-import { isCookieGatedForumAttachmentPath } from '../../api/forumAttachmentPath';
-
 export type AttachmentMetaInput = {
   extension: string;
   formattedSize: string;
@@ -86,7 +84,15 @@ export function imagePreviewUrl(item: AttachmentPreviewInput): string | null {
     return null;
   }
   const thumb = item.thumbnailUrl?.trim() ?? '';
-  if (thumb.length === 0 || isCookieGatedForumAttachmentPath(thumb)) {
+  if (thumb.length === 0) {
+    return null;
+  }
+  // Same rule as isCookieGatedForumAttachmentPath — keep this file import-free
+  // so the node:test suite can load it without React Native.
+  if (
+    /\/forum\/attachment(?:\/|$)/i.test(thumb) &&
+    !/\/api\/v1\/forum\/attachments(?:\/|$)/i.test(thumb)
+  ) {
     return null;
   }
   return thumb;
