@@ -138,6 +138,52 @@ public sealed class ForumApiWriteTests : IClassFixture<QueenZoneWebApplicationFa
     }
 
     [Fact]
+    public async Task Patch_post_validates_auth_body_and_topic()
+    {
+        var memberId = Guid.NewGuid();
+        await SeedMemberAsync(memberId, "Patch Poster");
+        using var client = CreateBearerClient(memberId, "Patch Poster");
+        using var createdResponse = await client.PostAsJsonAsync(
+            $"{ForumApiEndpoints.RootPath}/categories/1/topics",
+            new { title = "Patch validation topic", body = "Starter body for patch checks." });
+        var created = await createdResponse.Content.ReadFromJsonAsync<ForumTopicCreatedDto>(JsonOptions);
+        Assert.NotNull(created);
+
+        using var anonymous = factory.CreateAnonymousClient(allowAutoRedirect: false);
+        using var unauthorized = await anonymous.PatchAsJsonAsync(
+            $"{ForumApiEndpoints.RootPath}/topics/{created!.Id}/posts/{created.StarterPostId}",
+            new { body = "No token" });
+        Assert.Equal(HttpStatusCode.Unauthorized, unauthorized.StatusCode);
+
+        using var emptyBody = await client.PatchAsJsonAsync(
+            $"{ForumApiEndpoints.RootPath}/topics/{created.Id}/posts/{created.StarterPostId}",
+            new { body = "   " });
+        Assert.Equal(HttpStatusCode.BadRequest, emptyBody.StatusCode);
+
+        using var missing = await client.PatchAsJsonAsync(
+            $"{ForumApiEndpoints.RootPath}/topics/{created.Id}/posts/999999",
+            new { body = "Missing post body." });
+        Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
+
+        using var wrongTopic = await client.PatchAsJsonAsync(
+            $"{ForumApiEndpoints.RootPath}/topics/1/posts/{created.StarterPostId}",
+            new { body = "Wrong topic body." });
+        Assert.Equal(HttpStatusCode.NotFound, wrongTopic.StatusCode);
+
+        using var scope = factory.Services.CreateScope();
+        var posts = scope.ServiceProvider.GetRequiredService<IForumWriteRepository>();
+        var original = await posts.GetPostAsync(created.StarterPostId);
+        using var ok = await client.PatchAsJsonAsync(
+            $"{ForumApiEndpoints.RootPath}/topics/{created.Id}/posts/{created.StarterPostId}",
+            new { body = "Patched from the app.", updatedAt = original!.UpdatedAt });
+        Assert.Equal(HttpStatusCode.OK, ok.StatusCode);
+        var payload = await ok.Content.ReadFromJsonAsync<ForumPostCreatedDto>(JsonOptions);
+        Assert.Equal(created.StarterPostId, payload!.Id);
+        Assert.Contains($"#post-{created.StarterPostId}", payload.DetailPath, StringComparison.Ordinal);
+        Assert.Equal("Patched from the app.", (await posts.GetPostAsync(created.StarterPostId))!.Body);
+    }
+
+    [Fact]
     public async Task Create_topic_rejects_short_title_and_empty_sanitized_body()
     {
         using var client = CreateBearerClient(Guid.NewGuid());

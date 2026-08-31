@@ -48,6 +48,16 @@ public sealed class AdminTimelineFormTests
     }
 
     [Fact]
+    public void ParseRowVersion_accepts_base64_and_rejects_invalid_values()
+    {
+        var token = Convert.ToBase64String([1, 2, 3, 4]);
+        Assert.Equal([1, 2, 3, 4], new AdminTimelineForm { RowVersion = token }.ParseRowVersion());
+        Assert.Null(new AdminTimelineForm().ParseRowVersion());
+        Assert.Null(new AdminTimelineForm { RowVersion = " " }.ParseRowVersion());
+        Assert.Null(new AdminTimelineForm { RowVersion = "not-base64" }.ParseRowVersion());
+    }
+
+    [Fact]
     public void ToDraft_treats_null_fields_as_empty()
     {
         var form = new AdminTimelineForm

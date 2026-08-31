@@ -61,6 +61,37 @@ public sealed class AdminFreddieTributeRoutesTests
         Assert.Contains("9002", adminAfterDelete);
     }
 
+    [Fact]
+    public async Task Hide_with_stale_visibility_token_does_not_change_the_row()
+    {
+        await using var factory = CreateFactory();
+        var client = AdminHttpTestHelpers.CreateClient(factory, AdminHttpTestHelpers.AdminEmail);
+        var indexPage = await client.GetStringAsync("/admin/freddie-tributes");
+        var fields = new Dictionary<string, string>
+        {
+            [AdminFreddieTributesPageModel.AntiforgeryTokenFieldName] =
+                AdminHttpTestHelpers.ExtractAntiforgeryToken(indexPage),
+            ["expectedIsVisible"] = "false",
+        };
+
+        var response = await client.PostAsync("/admin/freddie-tributes/9001/hide", new FormUrlEncodedContent(fields));
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        var admin = await client.GetStringAsync("/admin/freddie-tributes");
+        Assert.Contains(OptimisticConcurrencyException.UserMessage, admin);
+        Assert.Contains("Prune me from the public page", await client.GetStringAsync("/freddie-mercury-tribute"));
+    }
+
+    [Fact]
+    public void Delete_with_stale_visibility_token_leaves_the_row()
+    {
+        var store = new SharedFreddieTributeStore(
+        [
+            new FreddieTribute(1, "Name", "Thought", "UK", "24 November 2001", "09:01"),
+        ]);
+        Assert.Throws<OptimisticConcurrencyException>(() => store.Delete(1, expectedIsVisible: false));
+        Assert.NotNull(store.GetById(1));
+    }
+
     private static WebApplicationFactory<Program> CreateFactory() =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {

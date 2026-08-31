@@ -83,6 +83,44 @@ public sealed class EfAdminQueenHistoryRepositoryTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task SetPublishedAsync_toggles_and_rejects_stale_row_version()
+    {
+        var id = await repository.CreateAsync(Draft("Publish toggle", importance: 5));
+        var created = await repository.GetByIdAsync(id);
+        Assert.True(created!.IsPublished);
+
+        await repository.SetPublishedAsync(id, false, created.RowVersion);
+        var unpublished = await repository.GetByIdAsync(id);
+        Assert.False(unpublished!.IsPublished);
+
+        await Assert.ThrowsAsync<OptimisticConcurrencyException>(() =>
+            repository.SetPublishedAsync(id, true, created.RowVersion));
+        Assert.False((await repository.GetByIdAsync(id))!.IsPublished);
+    }
+
+    [Fact]
+    public async Task Concurrent_contexts_surface_save_changes_concurrency()
+    {
+        var options = new DbContextOptionsBuilder<QueenZoneDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        await using var secondContext = new QueenZoneDbContext(options);
+        var second = new EfAdminQueenHistoryRepository(secondContext);
+
+        var id = await repository.CreateAsync(Draft("Shared row"));
+        var firstLoaded = await repository.GetByIdAsync(id);
+        var secondLoaded = await second.GetByIdAsync(id);
+        Assert.NotNull(firstLoaded?.RowVersion);
+        Assert.NotNull(secondLoaded?.RowVersion);
+
+        await repository.UpdateAsync(id, Draft("First context"), firstLoaded!.RowVersion);
+
+        await Assert.ThrowsAsync<OptimisticConcurrencyException>(() =>
+            second.UpdateAsync(id, Draft("Second context"), secondLoaded!.RowVersion));
+        Assert.Equal("First context", (await repository.GetByIdAsync(id))!.Title);
+    }
+
+    [Fact]
     public async Task Missing_update_and_delete_throw()
     {
         await Assert.ThrowsAsync<InvalidOperationException>(() =>

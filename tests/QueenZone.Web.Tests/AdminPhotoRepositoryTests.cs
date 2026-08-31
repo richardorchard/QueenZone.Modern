@@ -65,6 +65,53 @@ public sealed class InMemoryAdminPhotoRepositoryTests
     }
 
     [Fact]
+    public async Task Update_and_visibility_reject_stale_concurrency_token()
+    {
+        var store = new SharedPhotoStore(SamplePhotoData.CreateSeedCategories());
+        var admin = new InMemoryAdminPhotoRepository(store);
+        var createdId = await admin.CreateAsync(
+            new AdminPhotoCreateRequest(
+                CatId: 9,
+                Title: "Token photo",
+                Keywords: "token",
+                Year: 1990,
+                DateTime: new DateTime(1990, 1, 2),
+                IsVisible: true,
+                LegacyUrl: "/Brian_May/token.jpg",
+                LegacyThumbUrl: "/Brian_May/token_t.webp",
+                ThumbWidth: 400,
+                ThumbHeight: 400,
+                PictureWidth: 1200,
+                PictureHeight: 800),
+            "admin@test.local");
+        var created = await admin.GetByIdAsync(createdId);
+        var stale = new AdminPhotoConcurrencyToken(
+            created!.Title,
+            created.Keywords,
+            created.Year,
+            created.DateTime,
+            created.CatId,
+            created.IsVisible);
+
+        await admin.UpdateAsync(
+            createdId,
+            new AdminPhotoUpdateRequest("Changed", "live", 1991, new DateTime(1991, 2, 3), 9),
+            "admin@test.local");
+
+        await Assert.ThrowsAsync<OptimisticConcurrencyException>(() =>
+            admin.UpdateAsync(
+                createdId,
+                new AdminPhotoUpdateRequest("Stale", "live", 1991, new DateTime(1991, 2, 3), 9),
+                "admin@test.local",
+                stale));
+        await admin.SetVisibilityAsync(createdId, false, "admin@test.local", expectedIsVisible: true);
+        await Assert.ThrowsAsync<OptimisticConcurrencyException>(() =>
+            admin.SetVisibilityAsync(createdId, true, "admin@test.local", expectedIsVisible: true));
+        Assert.Equal("Changed", (await admin.GetByIdAsync(createdId))!.Title);
+        Assert.False((await admin.GetByIdAsync(createdId))!.IsVisible);
+    }
+
+    [Fact]
     public async Task SearchFilter_MatchesTitleAndKeywords()
     {
         var store = new SharedPhotoStore(SamplePhotoData.CreateSeedCategories());
