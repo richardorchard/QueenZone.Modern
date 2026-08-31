@@ -1,6 +1,5 @@
 using System.Security.Claims;
 using QueenZone.Data;
-using QueenZone.Data.Entities;
 
 namespace QueenZone.Web;
 
@@ -68,22 +67,10 @@ public static class DevicesApiEndpoints
 
         var now = DateTime.UtcNow;
         var stored = await deviceTokenRepository.UpsertAsync(
-            new DeviceTokenEntity
-            {
-                Id = Guid.NewGuid(),
-                DeviceId = deviceId,
-                MemberAccountId = memberId,
-                Platform = request.Platform.Value,
-                Token = token,
-                CreatedAt = now,
-                UpdatedAt = now,
-            },
+            DeviceTokenMapper.ToEntity(memberId, deviceId, request.Platform.Value, token, now),
             cancellationToken);
 
-        return Results.Ok(new DeviceRegisteredResponse(
-            stored.DeviceId,
-            stored.Platform,
-            ToUtc(stored.UpdatedAt)));
+        return Results.Ok(DeviceTokenMapper.ToRegisteredResponse(stored));
     }
 
     internal static async Task<IResult> UnregisterDeviceAsync(
@@ -124,9 +111,6 @@ public static class DevicesApiEndpoints
         failure = null;
         return memberId.Value;
     }
-
-    private static DateTimeOffset ToUtc(DateTime value) =>
-        new(DateTime.SpecifyKind(value, DateTimeKind.Utc));
 
     private static IResult BadRequest(string detail) =>
         Results.Problem(
