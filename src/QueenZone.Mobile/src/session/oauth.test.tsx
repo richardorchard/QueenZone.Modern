@@ -30,7 +30,7 @@ const openAuth = WebBrowser.openAuthSessionAsync as jest.MockedFunction<
 >;
 const fetchMock = jest.fn<Promise<Response>, [RequestInfo | URL, RequestInit?]>();
 
-const linkingHandlers: Array<(event: { url: string }) => void> = [];
+const linkingHandlers: ((event: { url: string }) => void)[] = [];
 
 beforeEach(() => {
   fetchMock.mockReset();

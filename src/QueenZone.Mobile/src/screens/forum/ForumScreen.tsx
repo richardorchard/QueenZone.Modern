@@ -50,6 +50,7 @@ export function ForumScreen({ navigation }: Props) {
   const refresh = useCallback(() => {
     forumStats.reload();
     paged.refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- omit whole paged/forumStats objects; named fields are already listed.
   }, [forumStats.reload, paged.refresh]);
 
   const compose = () => {

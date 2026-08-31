@@ -6,7 +6,7 @@ export type PullToRefreshHandle = {
 };
 
 export function usePullToRefresh(
-  tasks: ReadonlyArray<() => Promise<void>>,
+  tasks: readonly (() => Promise<void>)[],
 ): PullToRefreshHandle {
   const [refreshing, setRefreshing] = useState(false);
   const epochRef = useRef(0);

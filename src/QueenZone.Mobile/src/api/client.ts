@@ -404,7 +404,7 @@ export async function sendJson<T>(path: string, options: SendJsonOptions = {}): 
   });
 }
 
-function useXhrTransport(options: SendMultipartOptions): boolean {
+function shouldUseXhrTransport(options: SendMultipartOptions): boolean {
   if (options.transport === 'xhr') {
     return true;
   }
@@ -425,7 +425,7 @@ export async function sendMultipart<T>(
   formData: FormData,
   options: SendMultipartOptions = {},
 ): Promise<T> {
-  if (useXhrTransport(options)) {
+  if (shouldUseXhrTransport(options)) {
     const url = buildUrl(path, options.query);
     try {
       const result = await postFormWithXhr({

@@ -61,6 +61,7 @@ function ArchivedList({ navigation }: Pick<Props, 'navigation'>) {
         return;
       }
       paged.refresh();
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- omit the whole paged object; refresh identity is the listed dep.
     }, [paged.refresh]),
   );
 
@@ -80,6 +81,7 @@ function ArchivedList({ navigation }: Pick<Props, 'navigation'>) {
         setUnarchivingId(null);
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- omit the whole paged object; refresh identity is the listed dep.
     [accessToken, paged.refresh],
   );
 

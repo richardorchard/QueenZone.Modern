@@ -46,7 +46,7 @@ jobs:
             >> "$GITHUB_OUTPUT"
 
   # JS preflight + coverage gate for src/QueenZone.Mobile (#871 Option A).
-  # After npm ci: #837 advisory gate, typecheck, discovered unit tests with
+  # After npm ci: #837 advisory gate, typecheck, lint, discovered unit tests with
   # coverage, pinned Expo Doctor, then the documented mobile coverage floors.
   # Native Android/iOS compile builds run in mobile-android/mobile-ios below.
   # Mixed web+mobile PRs run this alongside the .NET suite; mobile-only PRs
@@ -89,6 +89,9 @@ jobs:
 
       - name: Typecheck
         run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
 
       - name: Unit tests with coverage
         id: mobile-coverage-collect

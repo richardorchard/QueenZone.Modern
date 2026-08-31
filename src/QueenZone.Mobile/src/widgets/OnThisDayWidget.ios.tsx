@@ -109,7 +109,7 @@ function OnThisDayWidgetView(props: OnThisDayWidgetProps) {
             truncationMode('tail'),
           ]}
         >
-          Open QueenZone to load today's story.
+          {"Open QueenZone to load today's story."}
         </Text>
       ) : null}
     </VStack>
