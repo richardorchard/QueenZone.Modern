@@ -50,7 +50,10 @@ public class EditorWorkflowTests : E2EPageTest
 
         await Page.GetByRole(AriaRole.Button, new() { Name = "Publish" }).ClickAsync();
         await Expect(Page).ToHaveURLAsync(new Regex(".*/admin/news/?$"));
-        await Expect(Page.GetByText(SeededDraftTitle)).ToBeVisibleAsync();
+        // Use a link locator, not GetByText: the row's delete-confirmation dialog also
+        // names the article in its body text, which would make a plain text locator
+        // resolve to two elements even while the dialog is closed.
+        await Expect(Page.GetByRole(AriaRole.Link, new() { Name = SeededDraftTitle })).ToBeVisibleAsync();
 
         await Page.GotoAsync("/news");
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "News", Level = 1 })).ToBeVisibleAsync();
@@ -81,9 +84,11 @@ public class EditorWorkflowTests : E2EPageTest
         await Expect(Page).ToHaveURLAsync(new Regex("/admin/news/\\d+/edit"));
 
         var save = Page.Locator("form[data-busy-submit] button[type=submit]");
-        await Page.EvaluateAsync("""
-            () => {
-              const form = document.querySelector("form.admin-form");
+        // Locator.EvaluateAsync waits for the element to be attached before running, unlike a raw
+        // Page.EvaluateAsync — needed here because the redirect from the previous Save can still
+        // be resolving when this runs, and a bare document.querySelector would race it.
+        await Page.Locator("form.admin-form").EvaluateAsync("""
+            (form) => {
               form.addEventListener("submit", event => event.preventDefault(), { once: true });
               form.requestSubmit();
             }

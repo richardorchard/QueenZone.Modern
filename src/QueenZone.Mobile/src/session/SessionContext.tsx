@@ -1,5 +1,6 @@
 import {
   createContext,
+  memo,
   useCallback,
   useContext,
   useEffect,
@@ -41,7 +42,7 @@ export type Session = {
   profile: MemberProfile | null;
 };
 
-type SessionContextValue = Session & {
+export type SessionActions = {
   signIn: (provider: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<MemberProfile | null>;
@@ -50,7 +51,18 @@ type SessionContextValue = Session & {
   applySmokeSession: (accessToken: string) => Promise<boolean>;
 };
 
-const SessionContext = createContext<SessionContextValue | undefined>(undefined);
+type SessionContextValue = Session & SessionActions;
+
+const SessionStateContext = createContext<Session | undefined>(undefined);
+const SessionActionsContext = createContext<SessionActions | undefined>(undefined);
+
+const SessionProviderChildren = memo(function SessionProviderChildren({
+  children,
+}: {
+  children: ReactNode;
+}) {
+  return children;
+});
 
 const signedOut: Session = {
   isSignedIn: false,
@@ -399,74 +411,101 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
   }, [applyProfile, applyTokens, clearLocal, ensureAccessToken]);
 
-  const value = useMemo<SessionContextValue>(
-    () => ({
-      ...session,
-      signIn: async (provider: string) => {
-        const tokens = await signInWithProvider(getAppConfig().apiBaseUrl, provider);
-        await applyTokens(tokens);
-      },
-      applySmokeSession,
-      signOut: async () => {
-        const token = sessionRef.current.accessToken;
-        const signedOutMemberId =
-          (token ? resolvePushMemberId(token, sessionRef.current.profile?.memberId) : null) ??
-          sessionRef.current.profile?.memberId ??
-          null;
-        const pending = await countPendingOfflineItems(signedOutMemberId);
-        if (pending > 0) {
-          const confirmed = await new Promise<boolean>((resolve) => {
-            Alert.alert(
-              'Discard pending sends?',
-              'Messages and replies waiting to send will be deleted.',
-              [
-                { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
-                { text: 'Sign out', style: 'destructive', onPress: () => resolve(true) },
-              ],
-            );
-          });
-          if (!confirmed) {
-            return;
-          }
-          await discardOfflineQueue(signedOutMemberId);
-        }
-        const refresh = refreshTokenRef.current;
-        const apiBaseUrl = getAppConfig().apiBaseUrl;
-        // Clear the device session first. Remote logout/revoke/push unregister
-        // can hang (React Native fetch often ignores AbortSignal) or crash the
-        // process; awaiting them first left the member signed in after a kill.
-        await clearLocal();
-        startRemoteSignOut({
-          accessToken: token,
-          refreshToken: refresh,
-          apiBaseUrl,
-          memberId: signedOutMemberId,
-        });
-      },
-      refreshProfile,
-      ensureAccessToken,
-      setAccessToken: (accessToken) =>
-        setSession((current) =>
-          sessionFromAccessToken(accessToken, {
-            isRestoring: current.isRestoring,
-            displayName: current.displayName,
-            profile: current.profile,
-          }),
-        ),
-    }),
-    [applySmokeSession, applyTokens, clearLocal, ensureAccessToken, refreshProfile, session],
+  const signIn = useCallback(
+    async (provider: string) => {
+      const tokens = await signInWithProvider(getAppConfig().apiBaseUrl, provider);
+      await applyTokens(tokens);
+    },
+    [applyTokens],
   );
 
-  return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
+  const signOut = useCallback(async () => {
+    // Current tokens/profile are read via sessionRef / refreshTokenRef so this
+    // callback identity stays stable across token refresh and /me.
+    const token = sessionRef.current.accessToken;
+    const signedOutMemberId =
+      (token ? resolvePushMemberId(token, sessionRef.current.profile?.memberId) : null) ??
+      sessionRef.current.profile?.memberId ??
+      null;
+    const pending = await countPendingOfflineItems(signedOutMemberId);
+    if (pending > 0) {
+      const confirmed = await new Promise<boolean>((resolve) => {
+        Alert.alert(
+          'Discard pending sends?',
+          'Messages and replies waiting to send will be deleted.',
+          [
+            { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+            { text: 'Sign out', style: 'destructive', onPress: () => resolve(true) },
+          ],
+        );
+      });
+      if (!confirmed) {
+        return;
+      }
+      await discardOfflineQueue(signedOutMemberId);
+    }
+    const refresh = refreshTokenRef.current;
+    const apiBaseUrl = getAppConfig().apiBaseUrl;
+    // Clear the device session first. Remote logout/revoke/push unregister
+    // can hang (React Native fetch often ignores AbortSignal) or crash the
+    // process; awaiting them first left the member signed in after a kill.
+    await clearLocal();
+    startRemoteSignOut({
+      accessToken: token,
+      refreshToken: refresh,
+      apiBaseUrl,
+      memberId: signedOutMemberId,
+    });
+  }, [clearLocal]);
+
+  const setAccessToken = useCallback((accessToken: string | null) => {
+    setSession((current) =>
+      sessionFromAccessToken(accessToken, {
+        isRestoring: current.isRestoring,
+        displayName: current.displayName,
+        profile: current.profile,
+      }),
+    );
+  }, []);
+
+  const actions = useMemo<SessionActions>(
+    () => ({
+      signIn,
+      applySmokeSession,
+      signOut,
+      refreshProfile,
+      ensureAccessToken,
+      setAccessToken,
+    }),
+    [applySmokeSession, ensureAccessToken, refreshProfile, setAccessToken, signIn, signOut],
+  );
+
+  return (
+    <SessionActionsContext.Provider value={actions}>
+      <SessionStateContext.Provider value={session}>
+        <SessionProviderChildren>{children}</SessionProviderChildren>
+      </SessionStateContext.Provider>
+    </SessionActionsContext.Provider>
+  );
 }
 
 export function useSession(): SessionContextValue {
-  const value = useContext(SessionContext);
-  if (!value) {
+  const session = useContext(SessionStateContext);
+  const actions = useContext(SessionActionsContext);
+  if (!session || !actions) {
     throw new Error('useSession must be used inside SessionProvider');
   }
 
-  return value;
+  return { ...session, ...actions };
+}
+
+export function useSessionActions(): SessionActions {
+  const actions = useContext(SessionActionsContext);
+  if (!actions) {
+    throw new Error('useSessionActions must be used inside SessionProvider');
+  }
+
+  return actions;
 }
 
 function startRemoteSignOut(input: {

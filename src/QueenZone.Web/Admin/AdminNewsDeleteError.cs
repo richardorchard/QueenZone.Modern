@@ -1,7 +1,7 @@
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 
-namespace QueenZone.Web.Pages.Admin.News;
+namespace QueenZone.Web;
 
 internal static class AdminNewsDeleteError
 {

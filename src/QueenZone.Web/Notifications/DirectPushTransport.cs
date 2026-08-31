@@ -4,7 +4,6 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using QueenZone.Data.Entities;
 
 namespace QueenZone.Web;
 
@@ -30,7 +29,7 @@ internal sealed class DirectPushTransport(
     private readonly ApnsJwtFactory apnsJwtFactory = new();
 
     public async Task SendAsync(
-        IReadOnlyList<DeviceTokenEntity> tokens,
+        IReadOnlyList<PushDeviceToken> tokens,
         PushNotificationPayload payload,
         CancellationToken cancellationToken = default)
     {
@@ -39,8 +38,8 @@ internal sealed class DirectPushTransport(
             return;
         }
 
-        var apns = tokens.Where(token => token.Platform == DevicePushPlatform.Apns).ToList();
-        var fcm = tokens.Where(token => token.Platform == DevicePushPlatform.Fcm).ToList();
+        var apns = tokens.Where(token => token.Platform == PushDevicePlatform.Apns).ToList();
+        var fcm = tokens.Where(token => token.Platform == PushDevicePlatform.Fcm).ToList();
 
         if (apns.Count > 0)
         {
@@ -54,7 +53,7 @@ internal sealed class DirectPushTransport(
     }
 
     private async Task SendApnsAsync(
-        IReadOnlyList<DeviceTokenEntity> tokens,
+        IReadOnlyList<PushDeviceToken> tokens,
         PushNotificationPayload payload,
         CancellationToken cancellationToken)
     {
@@ -97,7 +96,7 @@ internal sealed class DirectPushTransport(
         string host,
         string topic,
         string jwt,
-        DeviceTokenEntity device,
+        PushDeviceToken device,
         string body,
         string category,
         CancellationToken cancellationToken)
@@ -138,7 +137,7 @@ internal sealed class DirectPushTransport(
     }
 
     private async Task SendFcmAsync(
-        IReadOnlyList<DeviceTokenEntity> tokens,
+        IReadOnlyList<PushDeviceToken> tokens,
         PushNotificationPayload payload,
         CancellationToken cancellationToken)
     {
@@ -175,7 +174,7 @@ internal sealed class DirectPushTransport(
         HttpClient client,
         string url,
         string accessToken,
-        DeviceTokenEntity device,
+        PushDeviceToken device,
         PushNotificationPayload payload,
         CancellationToken cancellationToken)
     {

@@ -2,7 +2,6 @@ using System.Net;
 using System.Security.Cryptography;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using QueenZone.Data.Entities;
 using QueenZone.Web;
 
 namespace QueenZone.Web.Tests;
@@ -18,8 +17,8 @@ public sealed class DirectPushTransportTests
         const string secret = "device-token-must-not-appear";
 
         await transport.SendAsync(
-            [DeviceTokenTestData.Token(memberId, DevicePushPlatform.Apns, secret),
-                DeviceTokenTestData.Token(memberId, DevicePushPlatform.Fcm, secret + "-fcm")],
+            [DeviceTokenTestData.PushToken(memberId, PushDevicePlatform.Apns, secret),
+                DeviceTokenTestData.PushToken(memberId, PushDevicePlatform.Fcm, secret + "-fcm")],
             PushNotificationPayload.News(1, "Title"));
 
         Assert.Empty(handler.Requests);
@@ -36,9 +35,9 @@ public sealed class DirectPushTransportTests
 
         await transport.SendAsync(
             [
-                DeviceTokenTestData.Token(alice, DevicePushPlatform.Apns, "apns-alice"),
-                DeviceTokenTestData.Token(alice, DevicePushPlatform.Fcm, "fcm-alice"),
-                DeviceTokenTestData.Token(bob, DevicePushPlatform.Apns, "apns-bob"),
+                DeviceTokenTestData.PushToken(alice, PushDevicePlatform.Apns, "apns-alice"),
+                DeviceTokenTestData.PushToken(alice, PushDevicePlatform.Fcm, "fcm-alice"),
+                DeviceTokenTestData.PushToken(bob, PushDevicePlatform.Apns, "apns-bob"),
             ],
             PushNotificationPayload.ForumReply(10, 20, "Topic"));
 
@@ -56,9 +55,9 @@ public sealed class DirectPushTransportTests
         var handler = new RecordingHttpMessageHandler();
         var transport = CreateTransport(handler, CreateConfiguredOptions(), accessToken: "ya29.test");
         var tokens = Enumerable.Range(0, 501)
-            .Select(index => DeviceTokenTestData.Token(
+            .Select(index => DeviceTokenTestData.PushToken(
                 Guid.NewGuid(),
-                DevicePushPlatform.Fcm,
+                PushDevicePlatform.Fcm,
                 $"fcm-{index}"))
             .ToList();
 
@@ -82,7 +81,7 @@ public sealed class DirectPushTransportTests
         var memberId = Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
 
         await transport.SendAsync(
-            [DeviceTokenTestData.Token(memberId, DevicePushPlatform.Apns, secret)],
+            [DeviceTokenTestData.PushToken(memberId, PushDevicePlatform.Apns, secret)],
             PushNotificationPayload.PrivateMessage(Guid.NewGuid()));
 
         Assert.Contains(

@@ -64,7 +64,7 @@ public sealed class NotificationDispatcher(
                 return;
             }
 
-            await pushTransport.SendAsync(tokens, payload, cancellationToken);
+            await pushTransport.SendAsync(DeviceTokenMapper.ToPushTokens(tokens), payload, cancellationToken);
         }
         catch (Exception ex)
         {
