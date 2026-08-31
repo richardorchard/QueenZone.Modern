@@ -7,20 +7,24 @@
   <p class="admin-status admin-status--@Model.StatusMessageKind">@Model.StatusMessage</p>
 }
 
-<p>
-  <a href="/admin/news/new">Create article</a>
-  <span aria-hidden="true"> · </span>
-  <a href="/admin/news-discovery">Review discovered candidates</a>
-  ·
-  <a href="/admin/news-suggestions">Review news suggestions</a>
-  ·
-  <a href="/admin/photo-submissions">Review photo submissions</a>
-</p>
-
-@if (Model.TotalCount > 0)
-{
-  <p class="admin-list-range">Showing @Model.RangeStart&ndash;@Model.RangeEnd of @Model.TotalCount articles</p>
-}
+<div class="qz-table-bar">
+  <div class="qz-table-bar__count">
+    @if (Model.TotalCount > 0)
+    {
+      @:Showing @Model.RangeStart&ndash;@Model.RangeEnd of @Model.TotalCount articles
+    }
+    else
+    {
+      @:No news articles yet
+    }
+  </div>
+  <div class="qz-table-bar__controls">
+    <a class="qz-button qz-button--outline qz-button--sm" href="/admin/news/new">Create article</a>
+    <a class="qz-button qz-button--ghost qz-button--sm" href="/admin/news-discovery">Review discovered candidates</a>
+    <a class="qz-button qz-button--ghost qz-button--sm" href="/admin/news-suggestions">Review news suggestions</a>
+    <a class="qz-button qz-button--ghost qz-button--sm" href="/admin/photo-submissions">Review photo submissions</a>
+  </div>
+</div>
 
 @if (Model.Articles.Count == 0)
 {
@@ -28,39 +32,53 @@
 }
 else
 {
-  <table class="admin-table">
-    <thead>
-      <tr>
-        <th>Title</th>
-        <th>Status</th>
-        <th>Published</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      @foreach (var article in Model.Articles)
-      {
-        <tr>
-          <td class="admin-title-cell">@article.Title</td>
-          <td>@(article.IsPublished ? "Published" : "Draft")</td>
-          <td>@article.PublishedAt.ToString("dd MMM yyyy")</td>
-          <td class="admin-actions">
-            <a href="/admin/news/@article.Id/edit">Edit</a>
-            <a href="/admin/news/@article.Id/preview">Preview</a>
-            @if (article.IsPublished)
-            {
-              <partial name="_PostAction" model="@(new PostActionViewModel($"/admin/news/{article.Id}/unpublish", "Unpublish", AntiforgeryToken: Model.AntiforgeryToken))" />
-            }
-            else
-            {
-              <partial name="_PostAction" model="@(new PostActionViewModel($"/admin/news/{article.Id}/publish", "Publish", AntiforgeryToken: Model.AntiforgeryToken))" />
-            }
-            <partial name="_PostAction" model="@(new PostActionViewModel($"/admin/news/{article.Id}/delete", "Delete", Confirm: true, AntiforgeryToken: Model.AntiforgeryToken))" />
-          </td>
-        </tr>
-      }
-    </tbody>
-  </table>
+  <div class="qz-table-shell">
+    <div class="qz-table-scroll">
+      <table class="admin-table--qz">
+        <thead>
+          <tr>
+            <th>Title</th>
+            <th>Status</th>
+            <th>Published</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @foreach (var article in Model.Articles)
+          {
+            <tr>
+              <td class="admin-title-cell"><a href="/admin/news/@article.Id/edit">@article.Title</a></td>
+              <td>
+                @if (article.IsPublished)
+                {
+                  <span class="qz-status is-published">Published</span>
+                }
+                else
+                {
+                  <span class="qz-status is-draft">Draft</span>
+                }
+              </td>
+              <td>@article.PublishedAt.ToString("dd MMM yyyy")</td>
+              <td>
+                <div class="qz-row-actions">
+                  <a class="qz-button qz-button--ghost qz-button--row" href="/admin/news/@article.Id/edit">Edit</a>
+                  @if (article.IsPublished)
+                  {
+                    <partial name="_PostAction" model="@(new PostActionViewModel($"/admin/news/{article.Id}/unpublish", "Unpublish", AntiforgeryToken: Model.AntiforgeryToken))" />
+                  }
+                  else
+                  {
+                    <partial name="_PostAction" model="@(new PostActionViewModel($"/admin/news/{article.Id}/publish", "Publish", AntiforgeryToken: Model.AntiforgeryToken))" />
+                  }
+                  <partial name="_PostAction" model="@(new PostActionViewModel($"/admin/news/{article.Id}/delete", "Delete", Confirm: true, AntiforgeryToken: Model.AntiforgeryToken, ConfirmItemName: article.Title, IsDanger: true))" />
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
 
   <partial name="_ArchivePagination" model="Model.Pagination" />
 }

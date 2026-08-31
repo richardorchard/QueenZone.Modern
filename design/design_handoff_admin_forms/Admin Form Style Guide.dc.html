@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/queenzone-design-system-6c12e8ec-2c2c-448b-858b-dbeb24fd8c3c/tokens/fonts.css">
+  <link rel="stylesheet" href="_ds/queenzone-design-system-6c12e8ec-2c2c-448b-858b-dbeb24fd8c3c/tokens/colors.css">
+  <link rel="stylesheet" href="_ds/queenzone-design-system-6c12e8ec-2c2c-448b-858b-dbeb24fd8c3c/tokens/typography.css">
+  <link rel="stylesheet" href="_ds/queenzone-design-system-6c12e8ec-2c2c-448b-858b-dbeb24fd8c3c/tokens/spacing.css">
+  <link rel="stylesheet" href="_ds/queenzone-design-system-6c12e8ec-2c2c-448b-858b-dbeb24fd8c3c/tokens/base.css">
+  <link rel="stylesheet" href="_ds/queenzone-design-system-6c12e8ec-2c2c-448b-858b-dbeb24fd8c3c/styles.css">
+  <script src="_ds/queenzone-design-system-6c12e8ec-2c2c-448b-858b-dbeb24fd8c3c/_ds_bundle.js"></script>
+  <style>
+    body { margin: 0; background: #FFFFFF; }
+    a { color: #244A8F; }
+    a:hover { color: #1B3A72; }
+    .qz-adm-input { width: 100%; height: 40px; padding: 0 12px; font: 400 15px/1.4 var(--font-body); color: #2B2B2B; background: #FFFFFF; border: 1px solid #D6D6D2; border-radius: 2px; outline: none; transition: border-color 180ms cubic-bezier(0.22,0.61,0.36,1), box-shadow 180ms cubic-bezier(0.22,0.61,0.36,1); }
+    .qz-adm-input:focus { border-color: #244A8F; box-shadow: 0 0 0 3px rgba(36,74,143,0.45); }
+    .qz-adm-input::placeholder { color: #B4B4AF; }
+    textarea.qz-adm-input { height: auto; padding: 10px 12px; resize: vertical; }
+    select.qz-adm-input { appearance: none; background-image: linear-gradient(45deg, transparent 50%, #5F5F5B 50%), linear-gradient(135deg, #5F5F5B 50%, transparent 50%); background-position: calc(100% - 18px) 17px, calc(100% - 13px) 17px; background-size: 5px 5px, 5px 5px; background-repeat: no-repeat; }
+    .qz-adm-input[aria-invalid="true"] { border-color: #6B1F33; }
+    .qz-ghost { display: inline-flex; align-items: center; justify-content: center; height: 32px; padding: 0 12px; font: 500 13px/1 var(--font-body); letter-spacing: 0.04em; text-transform: uppercase; color: #3D3D3B; background: transparent; border: 1px solid transparent; border-radius: 3px; cursor: pointer; transition: background 180ms cubic-bezier(0.22,0.61,0.36,1), color 180ms cubic-bezier(0.22,0.61,0.36,1); }
+    .qz-ghost:hover { background: #F2F1ED; }
+    .qz-ghost.is-danger:hover { background: #F6ECEE; color: #6B1F33; }
+    @media (max-width: 720px) { .qz-ghost { height: 44px; padding: 0 14px; } .qz-adm-input { height: 48px; font-size: 16px; } }
+  </style>
+</helmet>
+
+<div style="font-family: var(--font-body); color: #2B2B2B; background: #FFFFFF; min-height: 100vh;">
+
+  <header style="background: #111111; color: #FFFFFF; padding: 72px 40px 64px;">
+    <div style="max-width: 1180px; margin: 0 auto;">
+      <div style="font-family: var(--font-titling); font-size: 11px; font-weight: 600; letter-spacing: 0.22em; text-transform: uppercase; color: #B89A4A; margin-bottom: 20px;">Queenzone Design System · Addendum</div>
+      <h1 style="font-family: var(--font-display); font-weight: 500; font-size: 60px; line-height: 1.04; letter-spacing: -0.015em; color: #FFFFFF; margin: 0 0 20px; max-width: 16ch;">Forms &amp; admin controls</h1>
+      <p style="max-width: 62ch; font-size: 18px; line-height: 1.7; color: rgba(255,255,255,0.66); margin: 0;">The public archive is editorial. The admin is a workroom — the same tokens, spoken more quietly. This chapter fixes the controls the core system never specified: labels, selects, checkboxes, file pickers, validation, data tables, and how every one of them behaves on a phone.</p>
+      <div style="display: flex; flex-wrap: wrap; gap: 32px; margin-top: 40px; padding-top: 28px; border-top: 1px solid rgba(255,255,255,0.16);">
+        <div>
+          <div style="font-family: var(--font-titling); font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase; color: rgba(255,255,255,0.5); margin-bottom: 6px;">Field height</div>
+          <div style="font-family: var(--font-display); font-size: 28px; color: #FFFFFF;">40px</div>
+        </div>
+        <div>
+          <div style="font-family: var(--font-titling); font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase; color: rgba(255,255,255,0.5); margin-bottom: 6px;">Touch minimum</div>
+          <div style="font-family: var(--font-display); font-size: 28px; color: #FFFFFF;">44px</div>
+        </div>
+        <div>
+          <div style="font-family: var(--font-titling); font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase; color: rgba(255,255,255,0.5); margin-bottom: 6px;">Field radius</div>
+          <div style="font-family: var(--font-display); font-size: 28px; color: #FFFFFF;">2px</div>
+        </div>
+        <div>
+          <div style="font-family: var(--font-titling); font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase; color: rgba(255,255,255,0.5); margin-bottom: 6px;">Table breakpoint</div>
+          <div style="font-family: var(--font-display); font-size: 28px; color: #FFFFFF;">720px</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div style="display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 56px; max-width: 1180px; margin: 0 auto; padding: 64px 40px 120px;">
+
+    <nav style="position: sticky; top: 40px; align-self: start; display: flex; flex-direction: column; gap: 10px; padding-right: 8px;">
+      <div style="font-family: var(--font-titling); font-size: 10px; font-weight: 600; letter-spacing: 0.22em; text-transform: uppercase; color: #8A8A85; margin-bottom: 6px;">Contents</div>
+      <a href="#s1" style="font-size: 14px; color: #3D3D3B; padding: 3px 0;">01 · Principles</a>
+      <a href="#s2" style="font-size: 14px; color: #3D3D3B; padding: 3px 0;">02 · Buttons</a>
+      <a href="#s3" style="font-size: 14px; color: #3D3D3B; padding: 3px 0;">03 · Text fields</a>
+      <a href="#s4" style="font-size: 14px; color: #3D3D3B; padding: 3px 0;">04 · Choice controls</a>
+      <a href="#s5" style="font-size: 14px; color: #3D3D3B; padding: 3px 0;">05 · File &amp; image</a>
+      <a href="#s6" style="font-size: 14px; color: #3D3D3B; padding: 3px 0;">06 · Labels &amp; validation</a>
+      <a href="#s7" style="font-size: 14px; color: #3D3D3B; padding: 3px 0;">07 · Form layout</a>
+      <a href="#s8" style="font-size: 14px; color: #3D3D3B; padding: 3px 0;">08 · Data tables</a>
+      <a href="#s9" style="font-size: 14px; color: #3D3D3B; padding: 3px 0;">09 · Destructive actions</a>
+      <a href="#s10" style="font-size: 14px; color: #3D3D3B; padding: 3px 0;">10 · Mobile</a>
+    </nav>
+
+    <main style="display: flex; flex-direction: column; gap: 88px; min-width: 0;">
+
+      <section id="s1" style="scroll-margin-top: 32px;">
+        <div style="font-family: var(--font-titling); font-size: 11px; font-weight: 600; letter-spacing: 0.22em; text-transform: uppercase; color: #8A8A85; margin-bottom: 14px;">01 · Principles</div>
+        <h2 style="font-family: var(--font-display); font-weight: 500; font-size: 38px; line-height: 1.12; letter-spacing: -0.015em; margin: 0 0 16px;">A quieter skin, the same system</h2>
+        <p style="max-width: 68ch; font-size: 17px; line-height: 1.7; color: #3D3D3B; margin: 0 0 32px;">Admin screens use the identical colour, type and spacing tokens as the public archive, with three deliberate reductions: no display type below page titles, no accent colour except where it carries meaning, and no editorial flourish — no crest watermarks, no dark bands, no scrims.</p>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1px; background: #E8E8E8; border: 1px solid #E8E8E8;">
+          <div style="background: #FFFFFF; padding: 26px 24px;">
+            <div style="font-family: var(--font-display); font-size: 21px; margin-bottom: 8px;">Never a browser default</div>
+            <p style="font-size: 15px; line-height: 1.65; color: #5F5F5B; margin: 0;">Every native control is restyled. An unstyled <code style="font-size: 13px; background: #F2F1ED; padding: 1px 5px;">&lt;input type="file"&gt;</code> or 22px submit button breaks the archive's promise of care.</p>
+          </div>
+          <div style="background: #FFFFFF; padding: 26px 24px;">
+            <div style="font-family: var(--font-display); font-size: 21px; margin-bottom: 8px;">One primary per view</div>
+            <p style="font-size: 15px; line-height: 1.65; color: #5F5F5B; margin: 0;">A screen has a single filled button — Save, Publish, Post. Everything else is secondary, ghost or a link.</p>
+          </div>
+          <div style="background: #FFFFFF; padding: 26px 24px;">
+            <div style="font-family: var(--font-display); font-size: 21px; margin-bottom: 8px;">Accent by meaning</div>
+            <p style="font-size: 15px; line-height: 1.65; color: #5F5F5B; margin: 0;">Blue for focus and links. Burgundy for destructive and error. Gold never appears in admin.</p>
+          </div>
+          <div style="background: #FFFFFF; padding: 26px 24px;">
+            <div style="font-family: var(--font-display); font-size: 21px; margin-bottom: 8px;">Editing is content work</div>
+            <p style="font-size: 15px; line-height: 1.65; color: #5F5F5B; margin: 0;">Fields holding published prose are set at the reading measure — 680px — not stretched to the viewport.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="s2" style="scroll-margin-top: 32px;">
+        <div style="font-family: var(--font-titling); font-size: 11px; font-weight: 600; letter-spacing: 0.22em; text-transform: uppercase; color: #8A8A85; margin-bottom: 14px;">02 · Buttons</div>
+        <h2 style="font-family: var(--font-display); font-weight: 500; font-size: 38px; line-height: 1.12; letter-spacing: -0.015em; margin: 0 0 16px;">Sizes and variants</h2>
+        <p style="max-width: 68ch; font-size: 17px; line-height: 1.7; color: #3D3D3B; margin: 0 0 32px;">Admin standardises on the DS <strong>md</strong> size — 12/24 padding, rendering 43px tall. Use <strong>sm</strong> (8/16, 34px) inside dense table rows and <strong>lg</strong> (16/34, 51px) only for a full-width mobile submit. The DS <code style="font-size: 14px; background: #F2F1ED; padding: 1px 5px;">Button</code> component supplies all five variants; do not hand-roll a sixth.</p>
+
+        <div style="border: 1px solid #E8E8E8; border-radius: 3px; overflow: hidden;">
+          <div style="padding: 40px; background: #FFFFFF; display: flex; flex-wrap: wrap; align-items: center; gap: 14px;">
+            <x-import component-from-global-scope="QueenzoneDesignSystem_6c12e8.Button" variant="primary" hint-size="120px,40px">Save</x-import>
+            <x-import component-from-global-scope="QueenzoneDesignSystem_6c12e8.Button" variant="cta" hint-size="120px,40px">Publish</x-import>
+            <x-import component-from-global-scope="QueenzoneDesignSystem_6c12e8.Button" variant="secondary" hint-size="120px,40px">Cancel</x-import>
+            <x-import component-from-global-scope="QueenzoneDesignSystem_6c12e8.Button" variant="ghost" hint-size="120px,40px">Preview</x-import>
+            <x-import component-from-global-scope="QueenzoneDesignSystem_6c12e8.Button" variant="editorial" hint-size="120px,40px">Delete</x-import>
+            <x-import component-from-global-scope="QueenzoneDesignSystem_6c12e8.Button" variant="secondary" disabled="{{ true }}" hint-size="120px,40px">Disabled</x-import>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1px; background: #E8E8E8; border-top: 1px solid #E8E8E8;">
+            <div style="background: #F7F6F3; padding: 18px 20px;">
+              <div style="font-family: var(--font-titling); font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: #8A8A85; margin-bottom: 6px;">Primary</div>
+              <div style="font-size: 14px; line-height: 1.55; color: #3D3D3B;">Black. The one committing action — Save, Post reply.</div>
+            </div>
+            <div style="background: #F7F6F3; padding: 18px 20px;">
+              <div style="font-family: var(--font-titling); font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: #8A8A85; margin-bottom: 6px;">CTA</div>
+              <div style="font-size: 14px; line-height: 1.55; color: #3D3D3B;">Royal Blue. Reserved for Publish — the act that makes content public.</div>
+            </div>
+            <div style="background: #F7F6F3; padding: 18px 20px;">
+              <div style="font-family: var(--font-titling); font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: #8A8A85; margin-bottom: 6px;">Secondary</div>
+              <div style="font-size: 14px; line-height: 1.55; color: #3D3D3B;">Hairline outline. Cancel, Unpublish, Choose from gallery.</div>
+            </div>
+            <div style="background: #F7F6F3; padding: 18px 20px;">
+              <div style="font-family: var(--font-titling); font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: #8A8A85; margin-bottom: 6px;">Ghost</div>
+              <div style="font-size: 14px; line-height: 1.55; color: #3D3D3B;">No chrome until hover. Table row actions and toolbars.</div>
+            </div>
+            <div style="background: #F7F6F3; padding: 18px 20px;">
+              <div style="font-family: var(--font-titling); font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: #8A8A85; margin-bottom: 6px;">Editorial</div>
+              <div style="font-size: 14px; line-height: 1.55; color: #3D3D3B;">Burgundy. Destructive confirmation only — never a listing row.</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 32px; margin-top: 36px;">
+          <div>
+            <h3 style="font-family: var(--font-display); font-size: 22px; margin: 0 0 14px;">Measurements</h3>
+            <div style="display: grid; grid-template-columns: auto 1fr; gap: 0 20px; font-size: 15px; line-height: 2.1;">
+              <div style="color: #8A8A85;">sm</div><div>padding 8px 16px · 13px type · 34px tall</div>
+              <div style="color: #8A8A85;">md</div><div>padding 12px 24px · 14px type · 43px tall</div>
+              <div style="color: #8A8A85;">lg</div><div>padding 16px 34px · 15px type · 51px tall</div>
+              <div style="color: #8A8A85;">Ghost row</div><div>Admin override: fixed 32px, padding 0 12px (table rows only)</div>
+              <div style="color: #8A8A85;">Label</div><div>Uppercase, 0.04em tracking, weight 500</div>
+              <div style="color: #8A8A85;">Radius</div><div>3px</div>
+              <div style="color: #8A8A85;">Press</div><div>translateY(1px), 180ms</div>
+            </div>
+          </div>
+          <div>
+            <h3 style="font-family: var(--font-display); font-size: 22px; margin: 0 0 14px;">Grouping</h3>
+            <ul style="margin: 0; padding-left: 18px; font-size: 15px; line-height: 1.8; color: #3D3D3B;">
+              <li>Gap between buttons in a group: <strong>12px</strong>. Never rely on source whitespace.</li>
+              <li>Order left to right: primary, secondary, then ghost/link. Destructive sits apart, right-aligned or separated by <strong>32px</strong>.</li>
+              <li>Never mix a button and a bare text link in the same group — promote the link to ghost.</li>
+              <li>Full width only below 720px, and only for the primary.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="s3" style="scroll-margin-top: 32px;">
+        <div style="font-family: var(--font-titling); font-size: 11px; font-weight: 600; letter-spacing: 0.22em; text-transform: uppercase; color: #8A8A85; margin-bottom: 14px;">03 · Text fields</div>
+        <h2 style="font-family: var(--font-display); font-weight: 500; font-size: 38px; line-height: 1.12; letter-spacing: -0.015em; margin: 0 0 16px;">Inputs, textareas, selects</h2>
+        <p style="max-width: 68ch; font-size: 17px; line-height: 1.7; color: #3D3D3B; margin: 0 0 32px;">One field per row. Width is set by the content it holds, not by the container — a subject line takes the full column, a date takes 180px. Fields are never left at their native browser width.</p>
+
+        <div style="border: 1px solid #E8E8E8; border-radius: 3px; background: #FFFFFF; padding: 40px;">
+          <div style="max-width: 680px; display: flex; flex-direction: column; gap: 24px;">
+            <div>
+              <label style="display: block; font-size: 13px; font-weight: 600; letter-spacing: 0.02em; color: #2B2B2B; margin-bottom: 7px;">Subject</label>
+              <input class="qz-adm-input" type="text" placeholder="A short, descriptive thread title">
+              <div style="font-size: 13px; line-height: 1.5; color: #8A8A85; margin-top: 7px;">Shown in the forum index. 80 characters maximum.</div>
+            </div>
+            <div>
+              <label style="display: block; font-size: 13px; font-weight: 600; letter-spacing: 0.02em; color: #2B2B2B; margin-bottom: 7px;">Standfirst</label>
+              <textarea class="qz-adm-input" rows="3" placeholder="One sentence that sets the scene."></textarea>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 200px; gap: 20px;">
+              <div>
+                <label style="display: block; font-size: 13px; font-weight: 600; letter-spacing: 0.02em; color: #2B2B2B; margin-bottom: 7px;">Category</label>
+                <select class="qz-adm-input">
+                  <option>News</option>
+                  <option>Feature</option>
+                  <option>Photography</option>
+                </select>
+              </div>
+              <div>
+                <label style="display: block; font-size: 13px; font-weight: 600; letter-spacing: 0.02em; color: #2B2B2B; margin-bottom: 7px;">Publish date</label>
+                <input class="qz-adm-input" type="text" value="31 August 2026">
+              </div>
+            </div>
+            <div>
+              <label style="display: block; font-size: 13px; font-weight: 600; letter-spacing: 0.02em; color: #2B2B2B; margin-bottom: 7px;">Slug</label>
+              <input class="qz-adm-input" type="text" value="queen-budapest-roundhouse" aria-invalid="true">
+              <div style="display: flex; align-items: center; gap: 7px; font-size: 13px; line-height: 1.5; color: #6B1F33; margin-top: 7px;">
+                <span style="display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px; border-radius: 999px; background: #6B1F33; color: #FFFFFF; font-size: 10px; font-weight: 700; flex: none;">!</span>
+                <span>This slug is already used by an article from 2019.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 32px; margin-top: 36px;">
+          <div>
+            <h3 style="font-family: var(--font-display); font-size: 22px; margin: 0 0 14px;">Measurements</h3>
+            <div style="display: grid; grid-template-columns: auto 1fr; gap: 0 20px; font-size: 15px; line-height: 2.1;">
+              <div style="color: #8A8A85;">Height</div><div>40px (48px below 720px)</div>
+              <div style="color: #8A8A85;">Padding</div><div>0 12px</div>
+              <div style="color: #8A8A85;">Type</div><div>Inter 15px / 1.4 (16px on mobile — stops iOS zoom)</div>
+              <div style="color: #8A8A85;">Border</div><div>1px #D6D6D2, radius 2px</div>
+              <div style="color: #8A8A85;">Focus</div><div>Border #244A8F + 3px rgba(36,74,143,0.45) ring</div>
+              <div style="color: #8A8A85;">Invalid</div><div>Border #6B1F33, message below</div>
+              <div style="color: #8A8A85;">Disabled</div><div>Background #F2F1ED, text #8A8A85</div>
+              <div style="color: #8A8A85;">Textarea</div><div>Min 3 rows, vertical resize only</div>
+            </div>
+          </div>
+          <div>
+            <h3 style="font-family: var(--font-display); font-size: 22px; margin: 0 0 14px;">Rules</h3>
+            <ul style="margin: 0; padding-left: 18px; font-size: 15px; line-height: 1.8; color: #3D3D3B;">
+              <li>Labels sit above the field, never beside it — the inline <em>Subject ▭</em> pattern in the current forum form is wrong at every width.</li>
+              <li>Placeholders are examples, never substitutes for a label.</li>
+              <li>Selects use the same shell as inputs with a 5px chevron 18px from the right edge.</li>
+              <li>Field column caps at 680px. Beyond that, add a second column — don't stretch.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="s4" style="scroll-margin-top: 32px;">
+        <div style="font-family: var(--font-titling); font-size: 11px; font-weight: 600; letter-spacing: 0.22em; text-transform: uppercase; color: #8A8A85; margin-bottom: 14px;">04 · Choice controls</div>
+        <h2 style="font-family: var(--font-display); font-weight: 500; font-size: 38px; line-height: 1.12; letter-spacing: -0.015em; margin: 0 0 16px;">Checkboxes, radios, toggles</h2>
+        <p style="max-width: 68ch; font-size: 17px; line-height: 1.7; color: #3D3D3B; margin: 0 0 32px;">The whole row is the target — control, label and description — never the 13px box alone. Use a checkbox for independent options, radios for one-of-few, and a toggle only where the change takes effect immediately.</p>
+
+        <div style="border: 1px solid #E8E8E8; border-radius: 3px; background: #FFFFFF; padding: 40px; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 44px;">
+          <div>
+            <div style="font-family: var(--font-titling); font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: #8A8A85; margin-bottom: 18px;">Checkbox</div>
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <label style="display: flex; gap: 12px; align-items: flex-start; padding: 8px 0; cursor: pointer; min-height: 44px;">
+                <span style="flex: none; width: 18px; height: 18px; margin-top: 2px; border: 1px solid #111111; background: #111111; border-radius: 2px; display: inline-flex; align-items: center; justify-content: center;">
+                  <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6.4 4.6 9 10 3.2"></path></svg>
+                </span>
+                <span>
+                  <span style="display: block; font-size: 15px; color: #2B2B2B;">Pin to the archive index</span>
+                  <span style="display: block; font-size: 13px; color: #8A8A85; margin-top: 2px;">Appears above dated entries.</span>
+                </span>
+              </label>
+              <label style="display: flex; gap: 12px; align-items: flex-start; padding: 8px 0; cursor: pointer; min-height: 44px;">
+                <span style="flex: none; width: 18px; height: 18px; margin-top: 2px; border: 1px solid #D6D6D2; background: #FFFFFF; border-radius: 2px;"></span>
+                <span>
+                  <span style="display: block; font-size: 15px; color: #2B2B2B;">Allow comments</span>
+                  <span style="display: block; font-size: 13px; color: #8A8A85; margin-top: 2px;">Members may reply to this article.</span>
+                </span>
+              </label>
+            </div>
+          </div>
+          <div>
+            <div style="font-family: var(--font-titling); font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: #8A8A85; margin-bottom: 18px;">Radio</div>
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <label style="display: flex; gap: 12px; align-items: center; padding: 8px 0; cursor: pointer; min-height: 44px;">
+                <span style="flex: none; width: 18px; height: 18px; border: 1px solid #111111; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center;">
+                  <span style="width: 9px; height: 9px; border-radius: 999px; background: #111111;"></span>
+                </span>
+                <span style="font-size: 15px; color: #2B2B2B;">Publish immediately</span>
+              </label>
+              <label style="display: flex; gap: 12px; align-items: center; padding: 8px 0; cursor: pointer; min-height: 44px;">
+                <span style="flex: none; width: 18px; height: 18px; border: 1px solid #D6D6D2; border-radius: 999px;"></span>
+                <span style="font-size: 15px; color: #2B2B2B;">Schedule for a date</span>
+              </label>
+              <label style="display: flex; gap: 12px; align-items: center; padding: 8px 0; cursor: pointer; min-height: 44px;">
+                <span style="flex: none; width: 18px; height: 18px; border: 1px solid #D6D6D2; border-radius: 999px;"></span>
+                <span style="font-size: 15px; color: #2B2B2B;">Keep as draft</span>
+              </label>
+            </div>
+          </div>
+          <div>
+            <div style="font-family: var(--font-titling); font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: #8A8A85; margin-bottom: 18px;">Toggle</div>
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <label style="display: flex; gap: 14px; align-items: center; justify-content: space-between; padding: 8px 0; cursor: pointer; min-height: 44px; max-width: 260px;">
+                <span style="font-size: 15px; color: #2B2B2B;">Thread locked</span>
+                <span style="flex: none; width: 40px; height: 22px; border-radius: 999px; background: #111111; padding: 3px; display: inline-flex; justify-content: flex-end;">
+                  <span style="width: 16px; height: 16px; border-radius: 999px; background: #FFFFFF;"></span>
+                </span>
+              </label>
+              <label style="display: flex; gap: 14px; align-items: center; justify-content: space-between; padding: 8px 0; cursor: pointer; min-height: 44px; max-width: 260px;">
+                <span style="font-size: 15px; color: #2B2B2B;">Notify moderators</span>
+                <span style="flex: none; width: 40px; height: 22px; border-radius: 999px; background: #D6D6D2; padding: 3px; display: inline-flex;">
+                  <span style="width: 16px; height: 16px; border-radius: 999px; background: #FFFFFF;"></span>
+                </span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: auto 1fr; gap: 0 20px; font-size: 15px; line-height: 2.1; margin-top: 32px; max-width: 640px;">
+          <div style="color: #8A8A85;">Box</div><div>18px, 1px #D6D6D2, radius 2px (checkbox) / pill (radio)</div>
+          <div style="color: #8A8A85;">Checked</div><div>Fill #111111, white 2px tick — not blue</div>
+          <div style="color: #8A8A85;">Gap</div><div>12px control-to-label; 4px between rows</div>
+          <div style="color: #8A8A85;">Row</div><div>Minimum 44px tall, entire row clickable</div>
+          <div style="color: #8A8A85;">Toggle</div><div>40 × 22px track, 16px knob, 320ms ease</div>
+        </div>
+      </section>
+
+      <section id="s5" style="scroll-margin-top: 32px;">
+        <div style="font-family: var(--font-titling); font-size: 11px; font-weight: 600; letter-spacing: 0.22em; text-transform: uppercase; color: #8A8A85; margin-bottom: 14px;">05 · File &amp; image</div>
+        <h2 style="font-family: var(--font-display); font-weight: 500; font-size: 38px; line-height: 1.12; letter-spacing: -0.015em; margin: 0 0 16px;">Upload and gallery picker</h2>
+        <p style="max-width: 68ch; font-size: 17px; line-height: 1.7; color: #3D3D3B; margin: 0 0 32px;">The native <code style="font-size: 14px; background: #F2F1ED; padding: 1px 5px;">Choose file</code> control is always hidden. In its place: a dropzone showing the current image, the two ways to supply one, and the constraints stated before the user picks — not after they fail.</p>
+
+        <div style="border: 1px solid #E8E8E8; border-radius: 3px; background: #FFFFFF; padding: 40px;">
+          <div style="max-width: 680px;">
+            <label style="display: block; font-size: 13px; font-weight: 600; letter-spacing: 0.02em; color: #2B2B2B; margin-bottom: 7px;">Article image</label>
+            <div style="display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 20px; align-items: start; border: 1px dashed #D6D6D2; border-radius: 3px; padding: 16px; background: #FBFBFA;">
+              <div style="width: 100%; aspect-ratio: 3 / 2; background: #111111; border-radius: 2px; display: flex; align-items: center; justify-content: center;">
+                <span style="font-family: var(--font-display); font-size: 40px; color: #B89A4A;">Q</span>
+              </div>
+              <div style="display: flex; flex-direction: column; justify-content: center; gap: 14px;">
+                <div style="font-size: 15px; line-height: 1.6; color: #3D3D3B;">Drop an image here, or</div>
+                <div style="display: flex; flex-wrap: wrap; gap: 12px;">
+                  <x-import component-from-global-scope="QueenzoneDesignSystem_6c12e8.Button" variant="secondary" size="sm" hint-size="120px,32px">Choose file</x-import>
+                  <x-import component-from-global-scope="QueenzoneDesignSystem_6c12e8.Button" variant="ghost" size="sm" hint-size="150px,32px">Choose from gallery</x-import>
+                </div>
+                <div style="font-size: 13px; line-height: 1.55; color: #8A8A85;">JPEG, PNG or WebP · max 10 MB · cropped to the 3:2 news-card frame. Gallery originals are never modified.</div>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px; margin-top: 14px; font-size: 13px; color: #8A8A85;">
+              <div style="flex: 1; height: 3px; background: #E8E8E8; border-radius: 999px; overflow: hidden;">
+                <div style="width: 64%; height: 100%; background: #244A8F;"></div>
+              </div>
+              <span>Uploading · 64%</span>
+            </div>
+          </div>
+        </div>
+
+        <ul style="margin: 32px 0 0; padding-left: 18px; font-size: 15px; line-height: 1.8; color: #3D3D3B; max-width: 68ch;">
+          <li>Placeholder state uses the crest-on-black 3:2 frame, with the caption "No article image yet — listings will use this placeholder."</li>
+          <li>Once an image exists, the dropzone becomes the thumbnail plus Replace and Remove ghost buttons.</li>
+          <li>Constraints (format, size, crop) live under the control, not in an error dialog.</li>
+          <li>On mobile the two columns stack; the preview goes full width above the buttons.</li>
+        </ul>
+      </section>
+
+      <section id="s6" style="scroll-margin-top: 32px;">
+        <div style="font-family: var(--font-titling); font-size: 11px; font-weight: 600; letter-spacing: 0.22em; text-transform: uppercase; color: #8A8A85; margin-bottom: 14px;">06 · Labels &amp; validation</div>
+        <h2 style="font-family: var(--font-display); font-weight: 500; font-size: 38px; line-height: 1.12; letter-spacing: -0.015em; margin: 0 0 16px;">Saying what went wrong</h2>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 32px;">
+          <div>
+            <h3 style="font-family: var(--font-display); font-size: 22px; margin: 0 0 14px;">Anatomy</h3>
+            <div style="display: grid; grid-template-columns: auto 1fr; gap: 0 20px; font-size: 15px; line-height: 2.1;">
+              <div style="color: #8A8A85;">Label</div><div>Inter 13px / 600, sentence case, 7px above field</div>
+              <div style="color: #8A8A85;">Optional</div><div>"(optional)" in #8A8A85 — mark the optional, not the required</div>
+              <div style="color: #8A8A85;">Help</div><div>13px #8A8A85, 7px below, before any error</div>
+              <div style="color: #8A8A85;">Error</div><div>13px #6B1F33 with a filled dot marker</div>
+              <div style="color: #8A8A85;">Timing</div><div>Validate on blur; clear the moment it is fixed</div>
+              <div style="color: #8A8A85;">Summary</div><div>On submit, a burgundy-hairline banner at the top listing failed fields as anchor links</div>
+            </div>
+          </div>
+          <div>
+            <h3 style="font-family: var(--font-display); font-size: 22px; margin: 0 0 14px;">Message tone</h3>
+            <p style="font-size: 15px; line-height: 1.7; color: #3D3D3B; margin: 0 0 18px;">Editorial voice applies here too: plain, specific, never scolding, never jocular.</p>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <div style="border-left: 2px solid #244A8F; padding: 10px 0 10px 14px; font-size: 15px; line-height: 1.6;">"This slug is already used by an article from 2019."</div>
+              <div style="border-left: 2px solid #D6D6D2; padding: 10px 0 10px 14px; font-size: 15px; line-height: 1.6; color: #8A8A85; text-decoration: line-through; text-decoration-color: #D6D6D2;">"Oops! Something went wrong."</div>
+            </div>
+            <div style="margin-top: 24px; border: 1px solid #E8E8E8; border-left: 2px solid #6B1F33; background: #F6ECEE; padding: 16px 18px;">
+              <div style="font-size: 14px; font-weight: 600; color: #6B1F33; margin-bottom: 6px;">Two fields need attention</div>
+              <div style="font-size: 14px; line-height: 1.7;"><a href="#s3">Slug</a> · <a href="#s3">Publish date</a></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="s7" style="scroll-margin-top: 32px;">
+        <div style="font-family: var(--font-titling); font-size: 11px; font-weight: 600; letter-spacing: 0.22em; text-transform: uppercase; color: #8A8A85; margin-bottom: 14px;">07 · Form layout</div>
+        <h2 style="font-family: var(--font-display); font-weight: 500; font-size: 38px; line-height: 1.12; letter-spacing: -0.015em; margin: 0 0 16px;">Rhythm and structure</h2>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 32px;">
+          <div>
+            <div style="display: grid; grid-template-columns: auto 1fr; gap: 0 20px; font-size: 15px; line-height: 2.1;">
+              <div style="color: #8A8A85;">Column</div><div>680px maximum for editing prose</div>
+              <div style="color: #8A8A85;">Field gap</div><div>24px between fields</div>
+              <div style="color: #8A8A85;">Group gap</div><div>48px between fieldsets, with a hairline rule</div>
+              <div style="color: #8A8A85;">Legend</div><div>Cinzel eyebrow, 11px, 0.22em tracking</div>
+              <div style="color: #8A8A85;">Actions</div><div>32px above; left-aligned on desktop, sticky footer on mobile</div>
+              <div style="color: #8A8A85;">Page title</div><div>Cormorant 38px — the only display type on the screen</div>
+            </div>
+          </div>
+          <div>
+            <ul style="margin: 0; padding-left: 18px; font-size: 15px; line-height: 1.8; color: #3D3D3B;">
+              <li>Fieldsets carry an eyebrow legend and a hairline: <em>Content</em>, <em>Image</em>, <em>Publication</em>, <em>Advanced</em>.</li>
+              <li>Rarely-used settings sit in a collapsed <em>Advanced</em> group, closed by default.</li>
+              <li>Save / Cancel / Preview live in one group with 12px gaps — the current mix of a button, a bare pipe and two links is not a pattern.</li>
+              <li>Unsaved changes: a warning on navigation away, never a silent loss.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="s8" style="scroll-margin-top: 32px;">
+        <div style="font-family: var(--font-titling); font-size: 11px; font-weight: 600; letter-spacing: 0.22em; text-transform: uppercase; color: #8A8A85; margin-bottom: 14px;">08 · Data tables</div>
+        <h2 style="font-family: var(--font-display); font-weight: 500; font-size: 38px; line-height: 1.12; letter-spacing: -0.015em; margin: 0 0 16px;">Listings and row actions</h2>
+        <p style="max-width: 68ch; font-size: 17px; line-height: 1.7; color: #3D3D3B; margin: 0 0 32px;">Rows are hairline-separated, generous, and quiet. Actions are small ghost buttons that reveal their chrome on row hover — visible enough to find, invisible enough not to compete with 5,280 titles.</p>
+
+        <div style="border: 1px solid #E8E8E8; border-radius: 3px; background: #FFFFFF; overflow: hidden;">
+          <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; padding: 20px 24px; border-bottom: 1px solid #E8E8E8;">
+            <div style="font-size: 14px; color: #5F5F5B;">Showing 1–50 of 5,280 articles</div>
+            <div style="display: flex; gap: 12px;">
+              <input class="qz-adm-input" type="text" placeholder="Search titles" style="width: 220px; height: 32px; font-size: 14px;">
+              <select class="qz-adm-input" style="width: 140px; height: 32px; font-size: 14px; background-position: calc(100% - 18px) 13px, calc(100% - 13px) 13px;">
+                <option>All statuses</option>
+                <option>Published</option>
+                <option>Draft</option>
+              </select>
+            </div>
+          </div>
+          <div style="overflow-x: auto;">
+          <div style="min-width: 760px;">
+          <div style="display: grid; grid-template-columns: minmax(240px,1fr) 110px 120px 200px; gap: 20px; padding: 12px 24px; border-bottom: 1px solid #E8E8E8; background: #F7F6F3; font-family: var(--font-titling); font-size: 10px; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; color: #5F5F5B;">
+            <div>Title</div><div>Status</div><div>Published</div><div>Actions</div>
+          </div>
+          <div style="display: grid; grid-template-columns: minmax(240px,1fr) 110px 120px 200px; gap: 20px; align-items: center; padding: 16px 24px; border-bottom: 1px solid #E8E8E8;" style-hover="background: #FBFBFA;">
+            <div style="font-size: 15px; line-height: 1.5; color: #2B2B2B;">New Details and Extended Trailer Released for 'Queen Budapest: The Roundhouse'</div>
+            <div><span style="display: inline-flex; align-items: center; height: 22px; padding: 0 9px; border-radius: 2px; background: #ECF0F7; color: #244A8F; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;">Published</span></div>
+            <div style="font-size: 14px; color: #5F5F5B;">31 Aug 2026</div>
+            <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+              <button class="qz-ghost" type="button">Edit</button>
+              <button class="qz-ghost" type="button">Unpublish</button>
+              <button class="qz-ghost is-danger" type="button">Delete</button>
+            </div>
+          </div>
+          <div style="display: grid; grid-template-columns: minmax(240px,1fr) 110px 120px 200px; gap: 20px; align-items: center; padding: 16px 24px; border-bottom: 1px solid #E8E8E8;" style-hover="background: #FBFBFA;">
+            <div style="font-size: 15px; line-height: 1.5; color: #2B2B2B;">Barry Mitchell, Early Queen Bassist, Has Died</div>
+            <div><span style="display: inline-flex; align-items: center; height: 22px; padding: 0 9px; border-radius: 2px; background: #ECF0F7; color: #244A8F; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;">Published</span></div>
+            <div style="font-size: 14px; color: #5F5F5B;">30 Aug 2026</div>
+            <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+              <button class="qz-ghost" type="button">Edit</button>
+              <button class="qz-ghost" type="button">Unpublish</button>
+              <button class="qz-ghost is-danger" type="button">Delete</button>
+            </div>
+          </div>
+          <div style="display: grid; grid-template-columns: minmax(240px,1fr) 110px 120px 200px; gap: 20px; align-items: center; padding: 16px 24px;" style-hover="background: #FBFBFA;">
+            <div style="font-size: 15px; line-height: 1.5; color: #2B2B2B;">Freddie Mercury's Piano to Be Auctioned, Owned by Producer Reinhold Mack</div>
+            <div><span style="display: inline-flex; align-items: center; height: 22px; padding: 0 9px; border-radius: 2px; background: #F2F1ED; color: #5F5F5B; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;">Draft</span></div>
+            <div style="font-size: 14px; color: #5F5F5B;">22 Aug 2026</div>
+            <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+              <button class="qz-ghost" type="button">Edit</button>
+              <button class="qz-ghost" type="button">Publish</button>
+              <button class="qz-ghost is-danger" type="button">Delete</button>
+            </div>
+          </div>
+          </div>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 32px; margin-top: 36px;">
+          <div>
+            <h3 style="font-family: var(--font-display); font-size: 22px; margin: 0 0 14px;">Measurements</h3>
+            <div style="display: grid; grid-template-columns: auto 1fr; gap: 0 20px; font-size: 15px; line-height: 2.1;">
+              <div style="color: #8A8A85;">Row</div><div>Minimum 56px, 16px vertical padding</div>
+              <div style="color: #8A8A85;">Header</div><div>Cinzel 10px, 0.2em tracking, on #F7F6F3</div>
+              <div style="color: #8A8A85;">Separator</div><div>1px #E8E8E8 — no zebra striping</div>
+              <div style="color: #8A8A85;">Hover</div><div>Row background #FBFBFA</div>
+              <div style="color: #8A8A85;">Actions</div><div>32px ghost buttons, 4px gaps</div>
+              <div style="color: #8A8A85;">Status</div><div>22px pill: blue tint published, grey draft, burgundy tint flagged</div>
+            </div>
+          </div>
+          <div>
+            <h3 style="font-family: var(--font-display); font-size: 22px; margin: 0 0 14px;">Rules</h3>
+            <ul style="margin: 0; padding-left: 18px; font-size: 15px; line-height: 1.8; color: #3D3D3B;">
+              <li>Title is the only link in the row — it opens the editor. Drop the separate "Edit / Preview" text-link pair.</li>
+              <li>Maximum three visible actions; anything further goes in an overflow menu.</li>
+              <li>Delete is last, separated, and burgundy on hover only.</li>
+              <li>Filters and count sit in a bar above the header row, never floating above the page title.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="s9" style="scroll-margin-top: 32px;">
+        <div style="font-family: var(--font-titling); font-size: 11px; font-weight: 600; letter-spacing: 0.22em; text-transform: uppercase; color: #8A8A85; margin-bottom: 14px;">09 · Destructive actions</div>
+        <h2 style="font-family: var(--font-display); font-weight: 500; font-size: 38px; line-height: 1.12; letter-spacing: -0.015em; margin: 0 0 16px;">Deleting from an archive</h2>
+        <p style="max-width: 68ch; font-size: 17px; line-height: 1.7; color: #3D3D3B; margin: 0 0 32px;">This archive exists because material was nearly lost once. Deletion is therefore always confirmed, always names the item, and — wherever the data model allows — is a soft delete that can be restored.</p>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 32px; align-items: start;">
+          <div style="background: #F7F6F3; padding: 40px; display: flex; justify-content: center;">
+            <div style="width: 100%; max-width: 420px; background: #FFFFFF; border: 1px solid #E8E8E8; box-shadow: 0 4px 12px rgba(17,17,17,0.08), 0 18px 48px rgba(17,17,17,0.10); border-radius: 3px; padding: 28px;">
+              <div style="font-family: var(--font-display); font-size: 26px; line-height: 1.2; margin-bottom: 12px;">Delete this article?</div>
+              <p style="font-size: 15px; line-height: 1.65; color: #5F5F5B; margin: 0 0 22px;">"Barry Mitchell, Early Queen Bassist, Has Died" will be removed from the public archive and moved to the trash for 30 days.</p>
+              <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                <x-import component-from-global-scope="QueenzoneDesignSystem_6c12e8.Button" variant="secondary" hint-size="110px,40px">Cancel</x-import>
+                <x-import component-from-global-scope="QueenzoneDesignSystem_6c12e8.Button" variant="editorial" hint-size="110px,40px">Delete</x-import>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div style="display: grid; grid-template-columns: auto 1fr; gap: 0 20px; font-size: 15px; line-height: 2.1;">
+              <div style="color: #8A8A85;">Trigger</div><div>Ghost button, burgundy on hover only</div>
+              <div style="color: #8A8A85;">Dialog</div><div>420px, scrim rgba(17,17,17,0.62), Cormorant 26px title</div>
+              <div style="color: #8A8A85;">Body</div><div>Names the item and states what actually happens</div>
+              <div style="color: #8A8A85;">Confirm</div><div>Editorial burgundy, labelled with the verb — never "OK"</div>
+              <div style="color: #8A8A85;">Focus</div><div>Opens on Cancel; Esc closes</div>
+              <div style="color: #8A8A85;">After</div><div>Hairline toast with an Undo link, 8 seconds</div>
+            </div>
+            <p style="font-size: 15px; line-height: 1.7; color: #3D3D3B; margin: 24px 0 0;">Irreversible deletions — purging trash, removing a member's post history — additionally require typing the item's name. Bulk deletion always states the count.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="s10" style="scroll-margin-top: 32px;">
+        <div style="font-family: var(--font-titling); font-size: 11px; font-weight: 600; letter-spacing: 0.22em; text-transform: uppercase; color: #8A8A85; margin-bottom: 14px;">10 · Mobile</div>
+        <h2 style="font-family: var(--font-display); font-weight: 500; font-size: 38px; line-height: 1.12; letter-spacing: -0.015em; margin: 0 0 16px;">Below 720px</h2>
+        <p style="max-width: 68ch; font-size: 17px; line-height: 1.7; color: #3D3D3B; margin: 0 0 32px;">Admin is used from a phone — moderating a thread on a train, approving a photo submission. Every control grows to a 44px minimum target, fields go to 16px type so iOS does not zoom, and the listing table stops being a table.</p>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 40px; align-items: start;">
+          <div>
+            <div style="font-family: var(--font-titling); font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: #8A8A85; margin-bottom: 16px;">Rows collapse into stacked cards</div>
+            <div style="width: 100%; max-width: 375px; border: 1px solid #D6D6D2; border-radius: 4px; overflow: hidden; background: #FFFFFF;">
+              <div style="padding: 16px; border-bottom: 1px solid #E8E8E8; display: flex; flex-direction: column; gap: 10px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+                  <span style="display: inline-flex; align-items: center; height: 22px; padding: 0 9px; border-radius: 2px; background: #ECF0F7; color: #244A8F; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;">Published</span>
+                  <span style="font-size: 13px; color: #8A8A85;">31 Aug 2026</span>
+                </div>
+                <div style="font-size: 16px; line-height: 1.4; color: #2B2B2B;">New Details and Extended Trailer Released for 'Queen Budapest: The Roundhouse'</div>
+                <div style="display: flex; gap: 8px; padding-top: 4px;">
+                  <button class="qz-ghost" type="button" style="flex: 1; border-color: #D6D6D2;">Edit</button>
+                  <button class="qz-ghost" type="button" style="flex: 1; border-color: #D6D6D2;">Unpublish</button>
+                  <button class="qz-ghost is-danger" type="button" style="width: 44px; padding: 0;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg>
+                  </button>
+                </div>
+              </div>
+              <div style="padding: 16px; display: flex; flex-direction: column; gap: 10px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+                  <span style="display: inline-flex; align-items: center; height: 22px; padding: 0 9px; border-radius: 2px; background: #F2F1ED; color: #5F5F5B; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;">Draft</span>
+                  <span style="font-size: 13px; color: #8A8A85;">22 Aug 2026</span>
+                </div>
+                <div style="font-size: 16px; line-height: 1.4; color: #2B2B2B;">Freddie Mercury's Piano to Be Auctioned, Owned by Producer Reinhold Mack</div>
+                <div style="display: flex; gap: 8px; padding-top: 4px;">
+                  <button class="qz-ghost" type="button" style="flex: 1; border-color: #D6D6D2;">Edit</button>
+                  <button class="qz-ghost" type="button" style="flex: 1; border-color: #D6D6D2;">Publish</button>
+                  <button class="qz-ghost is-danger" type="button" style="width: 44px; padding: 0;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div style="font-family: var(--font-titling); font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: #8A8A85; margin-bottom: 16px;">Form with sticky action bar</div>
+            <div style="width: 100%; max-width: 375px; border: 1px solid #D6D6D2; border-radius: 4px; overflow: hidden; background: #FFFFFF;">
+              <div style="padding: 16px; display: flex; flex-direction: column; gap: 18px;">
+                <div>
+                  <label style="display: block; font-size: 13px; font-weight: 600; color: #2B2B2B; margin-bottom: 7px;">Subject</label>
+                  <input type="text" placeholder="Thread title" style="width: 100%; height: 48px; padding: 0 12px; font: 400 16px/1.4 var(--font-body); color: #2B2B2B; background: #FFFFFF; border: 1px solid #D6D6D2; border-radius: 2px; outline: none;">
+                </div>
+                <div>
+                  <label style="display: block; font-size: 13px; font-weight: 600; color: #2B2B2B; margin-bottom: 7px;">Body</label>
+                  <textarea rows="4" placeholder="Write your post" style="width: 100%; padding: 12px; font: 400 16px/1.6 var(--font-body); color: #2B2B2B; border: 1px solid #D6D6D2; border-radius: 2px; outline: none; resize: vertical;"></textarea>
+                </div>
+              </div>
+              <div style="display: flex; gap: 12px; padding: 12px 16px; border-top: 1px solid #E8E8E8; background: rgba(255,255,255,0.92);">
+                <button type="button" style="flex: none; height: 48px; padding: 0 18px; font: 500 14px/1 var(--font-body); letter-spacing: 0.04em; text-transform: uppercase; color: #2B2B2B; background: transparent; border: 1px solid #D6D6D2; border-radius: 3px;">Cancel</button>
+                <button type="button" style="flex: 1; height: 48px; font: 500 14px/1 var(--font-body); letter-spacing: 0.04em; text-transform: uppercase; color: #FFFFFF; background: #111111; border: 1px solid #111111; border-radius: 3px;">Post thread</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: auto 1fr; gap: 0 20px; font-size: 15px; line-height: 2.1; margin-top: 36px; max-width: 720px;">
+          <div style="color: #8A8A85;">Breakpoint</div><div>720px — tables become cards, two-column field rows stack</div>
+          <div style="color: #8A8A85;">Targets</div><div>44px minimum, 48px for primary form controls</div>
+          <div style="color: #8A8A85;">Field type</div><div>16px — never smaller, or iOS zooms on focus</div>
+          <div style="color: #8A8A85;">Actions</div><div>Sticky bottom bar: primary fills, cancel keeps its label width</div>
+          <div style="color: #8A8A85;">Destructive</div><div>Icon-only at 44 × 44px, confirmation full-screen rather than a dialog</div>
+          <div style="color: #8A8A85;">Gutter</div><div>16px page padding; cards run edge to edge</div>
+        </div>
+      </section>
+
+      <footer style="border-top: 1px solid #E8E8E8; padding-top: 28px; font-size: 14px; line-height: 1.7; color: #8A8A85;">Queenzone Design System · Forms &amp; admin controls. Extends the core Button, Input, Badge and Tag components — it does not replace them.</footer>
+
+    </main>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

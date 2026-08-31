@@ -4,4 +4,6 @@ public sealed record PostActionViewModel(
     string Action,
     string Label,
     bool Confirm = false,
-    string? AntiforgeryToken = null);
+    string? AntiforgeryToken = null,
+    string? ConfirmItemName = null,
+    bool IsDanger = false);

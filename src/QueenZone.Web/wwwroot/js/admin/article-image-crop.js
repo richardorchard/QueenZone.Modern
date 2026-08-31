@@ -1,6 +1,19 @@
 (function () {
   "use strict";
 
+  // The native file input is always visually hidden (design spec); wire the
+  // "Choose file" button to it independently of the cropper below so picking
+  // a file still works even if Cropper.js fails to load.
+  document.querySelectorAll("[data-article-image-choose]").forEach(function (button) {
+    var root = button.closest("[data-article-image-crop]");
+    var input = root && root.querySelector("[data-article-image-input]");
+    if (input) {
+      button.addEventListener("click", function () {
+        input.click();
+      });
+    }
+  });
+
   if (typeof Cropper !== "function") {
     return;
   }

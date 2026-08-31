@@ -718,3 +718,39 @@
 
   list.classList.add("is-enhanced");
 })();
+
+// Admin Form Style Guide: styled destructive-confirmation dialog.
+// Opens on the trigger button, focuses Cancel first, and returns focus
+// to the trigger on close (native <dialog> handles Esc + focus trap).
+(() => {
+  const openButtons = document.querySelectorAll("[data-confirm-dialog-open]");
+  if (openButtons.length === 0) {
+    return;
+  }
+
+  openButtons.forEach((trigger) => {
+    const dialogId = trigger.getAttribute("data-confirm-dialog-open");
+    const dialog = dialogId ? document.getElementById(dialogId) : null;
+    if (!(dialog instanceof HTMLDialogElement)) {
+      return;
+    }
+
+    trigger.addEventListener("click", () => {
+      dialog.showModal();
+      const cancelButton = dialog.querySelector("[data-confirm-dialog-cancel]");
+      if (cancelButton instanceof HTMLElement) {
+        cancelButton.focus();
+      }
+    });
+
+    dialog.querySelectorAll("[data-confirm-dialog-cancel]").forEach((cancelButton) => {
+      cancelButton.addEventListener("click", () => {
+        dialog.close();
+      });
+    });
+
+    dialog.addEventListener("close", () => {
+      trigger.focus();
+    });
+  });
+})();

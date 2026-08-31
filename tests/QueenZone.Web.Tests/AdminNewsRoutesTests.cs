@@ -774,7 +774,7 @@ public sealed class AdminNewsRoutesTests : IClassFixture<QueenZoneWebApplication
         Assert.Contains("data-gallery-picker-dialog", body);
         Assert.Contains("/admin/news/gallery-picker", body);
         Assert.Contains("/js/admin/article-gallery-picker.js", body);
-        Assert.Contains("The gallery original is not changed.", body);
+        Assert.Contains("Gallery originals are never modified.", body);
     }
 
     [Fact]
