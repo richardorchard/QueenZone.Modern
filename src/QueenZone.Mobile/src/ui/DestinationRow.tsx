@@ -1,9 +1,8 @@
 import { ChevronRight } from 'lucide-react-native';
 import { Platform, Pressable, Text, View } from 'react-native';
-import type { BadgeRole } from '../content/sample';
 import { radius, space, type, useTheme } from '../theme';
 import { ArchiveImage } from './ArchiveImage';
-import { Badge } from './Badge';
+import { Badge, type BadgeRole } from './Badge';
 import { MetaLine } from './MetaLine';
 import { usePressProps } from './press';
 

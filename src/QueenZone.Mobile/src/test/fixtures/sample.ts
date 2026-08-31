@@ -1,37 +1,7 @@
-import type { ArchiveDestinationId } from './archiveHub';
-import { media } from './media';
-
-export type { ArchiveDestinationId };
-
-export type BadgeRole = 'restored' | 'anniversary' | 'featured' | 'archive' | 'community';
-
-export type FeatureItem = {
-  id: string;
-  title: string;
-  kicker: string;
-  kickerRole: BadgeRole;
-  meta: string[];
-  image: number;
-  storyId?: number;
-};
-
-export type ArchiveDestination = {
-  id: ArchiveDestinationId;
-  title: string;
-  kicker: string;
-  kickerRole: BadgeRole;
-  meta: string[];
-  image: number;
-};
-
-export type SampleThread = {
-  id: string;
-  title: string;
-  authorInitial: string;
-  author: string;
-  board: string;
-  replies: string;
-};
+import { archiveDestinations } from '../../content/archiveHub';
+import { media } from '../../content/media';
+import type { FeatureItem } from '../../ui/FeatureRail';
+import type { ThreadRowItem } from '../../ui/ThreadRow';
 
 export type SamplePhoto = {
   id: string;
@@ -83,84 +53,9 @@ export const onThisDay = {
   actionLabel: 'Read the entry',
 } as const;
 
-export const archiveDestinations: ArchiveDestination[] = [
-  {
-    id: 'stories',
-    title: 'Articles',
-    kicker: 'Long-form',
-    kickerRole: 'restored',
-    meta: ['104 features', 'Editorial'],
-    image: media.portrait,
-  },
-  {
-    id: 'timeline',
-    title: 'Timeline',
-    kicker: 'History',
-    kickerRole: 'archive',
-    meta: ['1970 — 1991', '480 entries'],
-    image: media.stage,
-  },
-  {
-    id: 'biography',
-    title: 'Biography',
-    kicker: 'The band',
-    kickerRole: 'community',
-    meta: ['Nine chapters'],
-    image: media.studio,
-  },
-  {
-    id: 'discography',
-    title: 'Discography',
-    kicker: 'Records',
-    kickerRole: 'community',
-    meta: ['15 studio albums', 'Sleeves & tracklists'],
-    image: media.studio,
-  },
-  {
-    id: 'tribute',
-    title: 'Freddie Mercury — a tribute',
-    kicker: 'In memoriam',
-    kickerRole: 'featured',
-    meta: ['1946 — 1991', "Members' memories"],
-    image: media.portrait,
-  },
-  {
-    id: 'fan-performances',
-    title: 'Fan performances',
-    kicker: 'Community',
-    kickerRole: 'community',
-    meta: ['212 submissions', 'Video & audio'],
-    image: media.crowd,
-  },
-  {
-    id: 'recently-restored',
-    title: 'Recently restored',
-    kicker: 'Preserved',
-    kickerRole: 'restored',
-    meta: ['1,240 photographs', '340 articles'],
-    image: media.hero,
-  },
-  {
-    id: 'trivia',
-    title: 'Trivia',
-    kicker: 'Queen facts',
-    kickerRole: 'archive',
-    meta: ['Random facts'],
-    image: media.studio,
-  },
-  {
-    id: 'about',
-    title: 'Queenzone.com, preserved',
-    kicker: 'The old site',
-    kickerRole: 'community',
-    meta: ['How the archive was rebuilt'],
-    image: media.crowd,
-  },
-];
-
 export const archiveShort = archiveDestinations.slice(0, 4);
 
-export const sampleThreads: SampleThread[] = [
+export const sampleThreads: ThreadRowItem[] = [
   {
     id: 'magic-tour',
     title: 'Which 1986 Magic Tour night is the definitive one?',
@@ -227,18 +122,6 @@ export const samplePhotos: SamplePhoto[] = [
 ];
 
 export const photoCategories = ['ALL', 'LIVE', 'STUDIO', 'PORTRAITS', 'BACKSTAGE'] as const;
-
-/**
- * News runs roughly 2006-present (unlike biography/discography's much longer timeline), so its
- * decade chips cover a different span. `decadeStart` is `null` for "ALL" and otherwise the first
- * year of a 10-year server-side filter window (see `fetchNewsPage`'s `decade` param, issue #838).
- */
-export const newsDecades = [
-  { label: 'ALL', decadeStart: null },
-  { label: '2020s', decadeStart: 2020 },
-  { label: '2010s', decadeStart: 2010 },
-  { label: '2000s', decadeStart: 2000 },
-] as const;
 
 export const searchSuggestions = [
   { title: 'The day Queen stole Live Aid', tag: 'Story · 8 min read', editorial: true, target: 'story' as const },

@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { newsDetailSchema, newsListItemSchema, notificationPreferencesSchema, parseContract, searchResultSchema } from './schemas.ts';
+import {
+  articleDetailSchema,
+  articleListItemSchema,
+  newsDetailSchema,
+  newsListItemSchema,
+  notificationPreferencesSchema,
+  parseContract,
+  searchResultSchema,
+} from './schemas.ts';
 
 describe('parseContract', () => {
   it('names the endpoint and missing field when a payload is incompatible', () => {
@@ -8,6 +16,32 @@ describe('parseContract', () => {
       () => parseContract('GET /api/v1/content/news', newsListItemSchema, { id: 1, excerpt: '', publishedAt: '2026-01-01', detailPath: '/news/1' }),
       /Contract GET \/api\/v1\/content\/news failed: title:/,
     );
+  });
+
+  it('accepts a complete article list item and detail', () => {
+    const item = parseContract('GET /api/v1/content/articles', articleListItemSchema, {
+      id: 101,
+      title: 'Inside the Making of Bohemian Rhapsody',
+      excerpt: 'Excerpt',
+      publishedAt: '2024-03-12T00:00:00',
+      detailPath: '/articles/101/inside-the-making-of-bohemian-rhapsody',
+      categoryName: 'Recording',
+    });
+    assert.equal(item.id, 101);
+    assert.equal(item.categoryName, 'Recording');
+
+    const detail = parseContract('GET /api/v1/content/articles/101', articleDetailSchema, {
+      id: 101,
+      title: 'Inside the Making of Bohemian Rhapsody',
+      excerpt: 'Excerpt',
+      body: '<p>Body</p>',
+      publishedAt: '2024-03-12T00:00:00',
+      source: 'Queenzone archive',
+      categoryName: 'Recording',
+      detailPath: '/articles/101/inside-the-making-of-bohemian-rhapsody',
+    });
+    assert.equal(detail.source, 'Queenzone archive');
+    assert.equal(detail.body, '<p>Body</p>');
   });
 
   it('accepts a complete news list item', () => {
