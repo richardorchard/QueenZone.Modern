@@ -1,10 +1,10 @@
 import type { ReactNode } from 'react';
 import { FlatList } from 'react-native';
-import { act, screen, userEvent, waitFor } from '@testing-library/react-native';
+import { screen, userEvent, waitFor } from '@testing-library/react-native';
 import { fetchTimelinePage } from '../../api';
 import type { TimelineEvent } from '../../api/types';
 import { pagedResponse } from '../../test/fixtures';
-import { fakeNavigation, renderWithProviders } from '../../test/render';
+import { fakeNavigation, flushVirtualizedList, renderWithProviders } from '../../test/render';
 import { testIds } from '../../test/testIds';
 import { TimelineScreen } from './TimelineScreen';
 
@@ -34,7 +34,6 @@ function eventFixture(overrides: Partial<TimelineEvent> = {}): TimelineEvent {
 
 describe('TimelineScreen', () => {
   beforeEach(() => {
-    jest.useFakeTimers();
     fetchTimeline.mockReset();
     fetchTimeline.mockResolvedValue(
       pagedResponse([eventFixture(), eventFixture({ id: 10, title: 'Another' })], 1, 1),
@@ -42,12 +41,9 @@ describe('TimelineScreen', () => {
     jest.spyOn(FlatList.prototype, 'scrollToIndex').mockImplementation(() => undefined);
   });
 
-  afterEach(() => {
-    act(() => {
-      jest.runOnlyPendingTimers();
-    });
-    jest.useRealTimers();
+  afterEach(async () => {
     jest.restoreAllMocks();
+    await flushVirtualizedList();
   });
 
   it('expands the event passed as focusId from search', async () => {
@@ -130,7 +126,7 @@ describe('TimelineScreen', () => {
     renderTimeline(navigation);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Live Aid' })).toBeOnTheScreen());
 
-    const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+    const user = userEvent.setup();
     renderWithProviders(<>{lastHeaderLeft(navigation)()}</>, { navigation: false });
     await user.press(screen.getByTestId(testIds.timelineBack));
     expect(navigation.goBack).toHaveBeenCalledTimes(1);
@@ -143,7 +139,7 @@ describe('TimelineScreen', () => {
     renderTimeline(navigation);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Live Aid' })).toBeOnTheScreen());
 
-    const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+    const user = userEvent.setup();
     renderWithProviders(<>{lastHeaderLeft(navigation)()}</>, { navigation: false });
     await user.press(screen.getByTestId(testIds.timelineBack));
     expect(navigation.goBack).not.toHaveBeenCalled();
