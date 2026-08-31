@@ -5,8 +5,7 @@ import { createNewsShareController, type NewsShareController } from './session';
 let sharedController: NewsShareController | null = null;
 
 function createDefaultStore() {
-  // Lazy require keeps Node unit tests free of the native AsyncStorage binding.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- lazy so Node unit tests never load the native AsyncStorage binding.
   const AsyncStorage = require('@react-native-async-storage/async-storage').default as {
     getItem(key: string): Promise<string | null>;
     setItem(key: string, value: string): Promise<void>;

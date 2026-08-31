@@ -14,7 +14,7 @@ import { enqueueMessageReply, useOfflineQueue } from '../../offlineQueue';
 import { testIds } from '../../test/testIds';
 import { createMockSession } from '../../test/mockSession';
 import { fakeNavigation, flushVirtualizedList, renderWithProviders } from '../../test/render';
-import { ConversationScreen } from './ConversationScreen';
+import { ConversationScreen, messageBubbleRenderProbe } from './ConversationScreen';
 
 const conversationId = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
 const theirMessageId = '11111111-2222-3333-4444-555555555555';
@@ -84,7 +84,7 @@ function renderConversation() {
 }
 
 function conversationDetail(
-  messages: Array<{
+  messages: {
     id: string;
     senderMemberId: string;
     senderDisplayName: string;
@@ -93,7 +93,7 @@ function conversationDetail(
     isMine: boolean;
     sortKey: number;
     reportedByViewer?: boolean;
-  }>,
+  }[],
   overrides: { canSendReply?: boolean; hasBlockedOtherParticipant?: boolean } = {},
 ) {
   return {
@@ -130,6 +130,7 @@ describe('ConversationScreen', () => {
   });
 
   afterEach(async () => {
+    messageBubbleRenderProbe.current = null;
     await flushVirtualizedList();
   });
 
@@ -266,6 +267,38 @@ describe('ConversationScreen', () => {
       ).toBeOnTheScreen(),
     );
     expect(screen.queryByText('Unable to send message.')).toBeNull();
+  });
+
+  it('does not re-render message rows when typing a reply', async () => {
+    fetchConversationMock.mockResolvedValue(
+      conversationDetail([
+        {
+          id: theirMessageId,
+          senderMemberId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+          senderDisplayName: 'Bob',
+          body: 'Hello',
+          createdAt: '2026-08-19T12:00:00.000Z',
+          isMine: false,
+          sortKey: 1,
+          reportedByViewer: false,
+        },
+      ]),
+    );
+
+    let bubbleRenders = 0;
+    messageBubbleRenderProbe.current = () => {
+      bubbleRenders += 1;
+    };
+
+    renderConversation();
+    await waitFor(() => expect(screen.getByText('Hello')).toBeOnTheScreen());
+    const afterLoad = bubbleRenders;
+    expect(afterLoad).toBeGreaterThan(0);
+
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText('Reply'), 'x');
+    expect(screen.getByLabelText('Reply').props.value).toBe('x');
+    expect(bubbleRenders).toBe(afterLoad);
   });
 
   it('sends a reply and clears the draft', async () => {

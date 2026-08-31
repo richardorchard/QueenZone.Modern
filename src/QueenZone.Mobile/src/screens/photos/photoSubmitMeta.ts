@@ -26,7 +26,7 @@ export const photoSubmitCopy = {
 
 /** Keep originals for the archive; the screen adds Compatible representation to avoid HEIC. */
 export const archiveImagePickerOptions = {
-  mediaTypes: ['images'] as Array<'images'>,
+  mediaTypes: ['images'] as 'images'[],
   quality: 1 as const,
   allowsEditing: false as const,
 };

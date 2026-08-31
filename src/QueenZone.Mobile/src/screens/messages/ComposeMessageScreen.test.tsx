@@ -1,7 +1,6 @@
 import { act, screen, userEvent, waitFor } from '@testing-library/react-native';
 import { ApiError } from '../../api/client';
 import { composeMessage, searchRecipients } from '../../api/messages';
-import { enqueueMessageCompose } from '../../offlineQueue';
 import { createMockSession } from '../../test/mockSession';
 import { fakeNavigation, flushVirtualizedList, renderWithProviders } from '../../test/render';
 import { ComposeMessageScreen } from './ComposeMessageScreen';

@@ -2,7 +2,7 @@ import type { ContentCache } from './contentCache';
 import { forumTopicPostsCacheKey, forumTopicPostsKeyPrefix } from './keys';
 
 type PagedPosts = {
-  items: Array<{ id: number }>;
+  items: { id: number }[];
   totalCount: number;
   totalPages: number;
 };

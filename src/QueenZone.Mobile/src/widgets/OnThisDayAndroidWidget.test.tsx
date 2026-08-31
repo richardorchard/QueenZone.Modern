@@ -16,6 +16,7 @@ import {
 } from './widgetCopy';
 
 jest.mock('react-native-android-widget', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Jest CJS mock factory.
   const { View, Text } = require('react-native') as typeof import('react-native');
   return {
     FlexWidget: View,

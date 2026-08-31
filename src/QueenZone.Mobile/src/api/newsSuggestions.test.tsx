@@ -1,4 +1,3 @@
-import { ApiError } from './errors';
 import { createNewsSuggestion } from './newsSuggestions';
 import { jsonResponse } from '../test/fixtures';
 

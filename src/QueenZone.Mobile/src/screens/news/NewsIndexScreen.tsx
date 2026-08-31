@@ -1,8 +1,8 @@
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import { Image } from 'expo-image';
-import { useCallback, useEffect, useState } from 'react';
-import { FlatList, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { memo, useCallback, useEffect, useState } from 'react';
+import { FlatList, RefreshControl, ScrollView, StyleSheet, View, type ListRenderItem } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { fetchNewsPage, fetchNewsYearRange, formatPublishedDate, type NewsListItem, type NewsYearRange } from '../../api';
 import { getAppConfig } from '../../config';
@@ -33,7 +33,11 @@ export function newsListResetKey(listKey: string, refreshAt: number | undefined)
   return refreshAt === undefined ? listKey : `${listKey}:${refreshAt}`;
 }
 
-function NewsListThumbnail({ item }: { item: NewsListItem }) {
+function newsKeyExtractor(item: NewsListItem): string {
+  return String(item.id);
+}
+
+const NewsListThumbnail = memo(function NewsListThumbnail({ item }: { item: NewsListItem }) {
   const { c } = useTheme();
   const apiBaseUrl = getAppConfig().apiBaseUrl;
   const source = newsArticleListImageSource({
@@ -71,7 +75,28 @@ function NewsListThumbnail({ item }: { item: NewsListItem }) {
       />
     </View>
   );
-}
+});
+
+const NewsIndexRow = memo(function NewsIndexRow({
+  item,
+  onOpen,
+}: {
+  item: NewsListItem;
+  onOpen: (id: number) => void;
+}) {
+  return (
+    <ArticleRow
+      title={item.title}
+      subtitle={item.excerpt}
+      meta={formatPublishedDate(item.publishedAt)}
+      leading={<NewsListThumbnail item={item} />}
+      leadingInteractive={false}
+      onPress={() => onOpen(item.id)}
+      accessibilityLabel={`Open ${item.title}`}
+      testID={`news-story-${item.id}`}
+    />
+  );
+});
 
 export function NewsIndexScreen({ navigation, route }: Props) {
   const { c } = useTheme();
@@ -113,6 +138,18 @@ export function NewsIndexScreen({ navigation, route }: Props) {
   const selectYear = useCallback((year: number) => {
     setSelectedYear(year);
   }, []);
+
+  const openStory = useCallback(
+    (id: number) => {
+      navigation.navigate('Story', { id });
+    },
+    [navigation],
+  );
+
+  const renderItem = useCallback<ListRenderItem<NewsListItem>>(
+    ({ item }) => <NewsIndexRow item={item} onOpen={openStory} />,
+    [openStory],
+  );
 
   const countLine =
     paged.totalCount > 0
@@ -169,7 +206,7 @@ export function NewsIndexScreen({ navigation, route }: Props) {
         testID={testIds.newsScreen}
         style={[styles.list, { backgroundColor: c.surfacePage }]}
         data={paged.items}
-        keyExtractor={(item) => String(item.id)}
+        keyExtractor={newsKeyExtractor}
         ListHeaderComponent={header}
         ListEmptyComponent={<EmptyBlock message={emptyMessage} />}
         ListFooterComponent={<ListFooterLoading visible={paged.loadingMore} />}
@@ -178,18 +215,7 @@ export function NewsIndexScreen({ navigation, route }: Props) {
         }
         onEndReached={paged.loadMore}
         onEndReachedThreshold={0.4}
-        renderItem={({ item }) => (
-          <ArticleRow
-            title={item.title}
-            subtitle={item.excerpt}
-            meta={formatPublishedDate(item.publishedAt)}
-            leading={<NewsListThumbnail item={item} />}
-            leadingInteractive={false}
-            onPress={() => navigation.navigate('Story', { id: item.id })}
-            accessibilityLabel={`Open ${item.title}`}
-            testID={`news-story-${item.id}`}
-          />
-        )}
+        renderItem={renderItem}
       />
       <YearRail
         minYear={yearRange?.minYear ?? null}

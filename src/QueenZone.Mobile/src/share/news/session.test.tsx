@@ -126,7 +126,7 @@ describe('news share session', () => {
   });
 
   it('maps submit errors for 400, 409, 429, 401, and network', async () => {
-    const cases: Array<{ error: unknown; code: string }> = [
+    const cases: { error: unknown; code: string }[] = [
       { error: new ApiError(400, 'Bad Request'), code: 'invalid' },
       { error: new ApiError(409, 'Conflict'), code: 'duplicate' },
       { error: new ApiError(429, 'Too Many Requests'), code: 'quota' },

@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, FlatList, Pressable, RefreshControl, Text, View, type ListRenderItem } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { archiveConversation, fetchInbox, type InboxConversation } from '../../api/messages';
@@ -54,6 +54,10 @@ function overlayQueuedComposes(
     detailPath: '',
   }));
   return [...extra, ...items];
+}
+
+function inboxKeyExtractor(item: InboxConversation): string {
+  return item.conversationId;
 }
 
 export function InboxScreen({ navigation }: Props) {
@@ -120,6 +124,7 @@ function InboxList({ navigation }: Pick<Props, 'navigation'>) {
         return;
       }
       paged.refresh();
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- omit the whole paged object; refresh identity is the listed dep.
     }, [paged.refresh]),
   );
 
@@ -132,9 +137,10 @@ function InboxList({ navigation }: Pick<Props, 'navigation'>) {
   }, [cacheKey, paged.page, paged.loading, paged.error, paged.items]);
 
   const showingCacheOnly = paged.loading && paged.items.length === 0 && !!cachedItems && cachedItems.length > 0;
-  const displayItems = overlayQueuedComposes(
-    showingCacheOnly ? cachedItems : paged.items,
-    queueItems,
+  const sourceItems = showingCacheOnly && cachedItems ? cachedItems : paged.items;
+  const displayItems = useMemo(
+    () => overlayQueuedComposes(sourceItems, queueItems),
+    [queueItems, sourceItems],
   );
 
   const handleArchive = useCallback(
@@ -153,7 +159,63 @@ function InboxList({ navigation }: Pick<Props, 'navigation'>) {
         setArchivingId(null);
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- omit the whole paged object; refresh identity is the listed dep.
     [accessToken, paged.refresh],
+  );
+
+  const openConversation = useCallback(
+    (item: InboxConversation) => {
+      if (item.conversationId.startsWith('pending:')) {
+        const operationId = item.conversationId.slice('pending:'.length);
+        Alert.alert(item.otherParticipantDisplayName, item.lastMessagePreview, [
+          { text: 'Dismiss', style: 'cancel' },
+          {
+            text: 'Discard',
+            style: 'destructive',
+            onPress: () => {
+              void removeOfflineItem(operationId);
+            },
+          },
+          {
+            text: 'Retry',
+            onPress: () => {
+              void updateOfflineItem(operationId, {
+                state: 'queued',
+                nextRetryAt: new Date().toISOString(),
+                lastError: null,
+              }).then(() => {
+                void flushOfflineQueue();
+              });
+            },
+          },
+        ]);
+        return;
+      }
+      navigation.navigate('Conversation', { id: item.conversationId });
+    },
+    [navigation],
+  );
+
+  const archiveItem = useCallback(
+    (conversationId: string) => {
+      if (conversationId.startsWith('pending:')) {
+        return;
+      }
+      void handleArchive(conversationId);
+    },
+    [handleArchive],
+  );
+
+  const renderItem = useCallback<ListRenderItem<InboxConversation>>(
+    ({ item }) => (
+      <InboxRow
+        item={item}
+        archiving={archivingId === item.conversationId}
+        onPress={openConversation}
+        onArchive={archiveItem}
+      />
+    ),
+    [archivingId, archiveItem, openConversation],
   );
 
   const header = (
@@ -198,7 +260,7 @@ function InboxList({ navigation }: Pick<Props, 'navigation'>) {
       testID={testIds.inboxScreen}
       style={{ flex: 1, backgroundColor: c.surfacePage }}
       data={displayItems}
-      keyExtractor={(item) => item.conversationId}
+      keyExtractor={inboxKeyExtractor}
       ListHeaderComponent={header}
       ListEmptyComponent={<EmptyBlock message="You have no private messages yet." />}
       ListFooterComponent={<ListFooterLoading visible={paged.loadingMore} />}
@@ -211,56 +273,12 @@ function InboxList({ navigation }: Pick<Props, 'navigation'>) {
       }
       onEndReached={paged.loadMore}
       onEndReachedThreshold={0.4}
-      renderItem={({ item }) => (
-        <InboxRow
-          item={item}
-          archiving={archivingId === item.conversationId}
-          onPress={() => {
-            if (item.conversationId.startsWith('pending:')) {
-              const operationId = item.conversationId.slice('pending:'.length);
-              Alert.alert(
-                item.otherParticipantDisplayName,
-                item.lastMessagePreview,
-                [
-                  { text: 'Dismiss', style: 'cancel' },
-                  {
-                    text: 'Discard',
-                    style: 'destructive',
-                    onPress: () => {
-                      void removeOfflineItem(operationId);
-                    },
-                  },
-                  {
-                    text: 'Retry',
-                    onPress: () => {
-                      void updateOfflineItem(operationId, {
-                        state: 'queued',
-                        nextRetryAt: new Date().toISOString(),
-                        lastError: null,
-                      }).then(() => {
-                        void flushOfflineQueue();
-                      });
-                    },
-                  },
-                ],
-              );
-              return;
-            }
-            navigation.navigate('Conversation', { id: item.conversationId });
-          }}
-          onArchive={() => {
-            if (item.conversationId.startsWith('pending:')) {
-              return;
-            }
-            void handleArchive(item.conversationId);
-          }}
-        />
-      )}
+      renderItem={renderItem}
     />
   );
 }
 
-function InboxRow({
+const InboxRow = memo(function InboxRow({
   item,
   archiving,
   onPress,
@@ -268,8 +286,8 @@ function InboxRow({
 }: {
   item: InboxConversation;
   archiving: boolean;
-  onPress: () => void;
-  onArchive: () => void;
+  onPress: (item: InboxConversation) => void;
+  onArchive: (conversationId: string) => void;
 }) {
   const { c } = useTheme();
   const unread = unreadBadgeLabel(item.unreadCount);
@@ -278,7 +296,7 @@ function InboxRow({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={inboxRowA11yLabel(item)}
-        onPress={onPress}
+        onPress={() => onPress(item)}
         style={({ pressed }) => [
           {
             paddingVertical: space.base,
@@ -319,8 +337,14 @@ function InboxRow({
         <Text style={[type.meta, { color: c.textMuted }]}>{formatMessageTimestamp(item.lastMessageAt)}</Text>
       </Pressable>
       <View style={{ paddingHorizontal: space.xl, paddingBottom: space.md }}>
-        <Button label="Archive" size="sm" variant="ghost" onPress={onArchive} loading={archiving} />
+        <Button
+          label="Archive"
+          size="sm"
+          variant="ghost"
+          onPress={() => onArchive(item.conversationId)}
+          loading={archiving}
+        />
       </View>
     </View>
   );
-}
+});

@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
-import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { memo, useCallback, useEffect, useLayoutEffect, useState } from 'react';
+import { FlatList, RefreshControl, StyleSheet, Text, View, type ListRenderItem } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   ApiError,
@@ -23,6 +23,29 @@ type Props = NativeStackScreenProps<ForumStackParamList, 'Category'>;
 
 /** Matches the website category page (`ForumRoutes.TopicsPageSize`). */
 const topicPageSize = 25;
+
+function topicKeyExtractor(item: ForumTopicListItem): string {
+  return String(item.id);
+}
+
+const CategoryTopicRow = memo(function CategoryTopicRow({
+  item,
+  onOpen,
+}: {
+  item: ForumTopicListItem;
+  onOpen: (id: number, title: string) => void;
+}) {
+  return (
+    <ArticleRow
+      title={item.title}
+      subtitle={item.authorUsername}
+      meta={topicMeta(item)}
+      onPress={() => onOpen(item.id, item.title)}
+      accessibilityLabel={`Open thread ${item.title}`}
+      testID={`forum-thread-${item.id}`}
+    />
+  );
+});
 
 function messageFromUnknownError(err: unknown): string {
   return err instanceof ApiError ? err.message : 'Something went wrong.';
@@ -91,6 +114,18 @@ export function CategoryScreen({ navigation, route }: Props) {
     paged.refresh();
   }, [retryCategory, paged]);
 
+  const openThread = useCallback(
+    (topicId: number, topicTitle: string) => {
+      navigation.navigate('Thread', { id: topicId, title: topicTitle });
+    },
+    [navigation],
+  );
+
+  const renderItem = useCallback<ListRenderItem<ForumTopicListItem>>(
+    ({ item }) => <CategoryTopicRow item={item} onOpen={openThread} />,
+    [openThread],
+  );
+
   const stats = [
     paged.totalCount > 0 ? `${formatForumCount(paged.totalCount)} threads` : null,
     category ? `${formatForumCount(category.postCount)} posts` : null,
@@ -125,7 +160,7 @@ export function CategoryScreen({ navigation, route }: Props) {
       testID={testIds.forumCategoryScreen}
       style={[styles.list, { backgroundColor: c.surfacePage }]}
       data={paged.items}
-      keyExtractor={(item) => String(item.id)}
+      keyExtractor={topicKeyExtractor}
       ListHeaderComponent={header}
       ListEmptyComponent={<EmptyBlock message="No topics are available in this board yet." />}
       ListFooterComponent={<ListFooterLoading visible={paged.loadingMore} />}
@@ -138,16 +173,7 @@ export function CategoryScreen({ navigation, route }: Props) {
       }
       onEndReached={paged.loadMore}
       onEndReachedThreshold={0.4}
-      renderItem={({ item }) => (
-        <ArticleRow
-          title={item.title}
-          subtitle={item.authorUsername}
-          meta={topicMeta(item)}
-          onPress={() => navigation.navigate('Thread', { id: item.id, title: item.title })}
-          accessibilityLabel={`Open thread ${item.title}`}
-          testID={`forum-thread-${item.id}`}
-        />
-      )}
+      renderItem={renderItem}
     />
   );
 }

@@ -12,6 +12,7 @@ jest.mock('expo-constants', () => {
 });
 
 function expoExtra(): Record<string, unknown> {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- isolateModules needs a runtime require, not a static import.
   return require('expo-constants').default.expoConfig.extra as Record<string, unknown>;
 }
 
@@ -22,6 +23,7 @@ function expoExtra(): Record<string, unknown> {
 function loadSentryModule(): typeof import('./sentry') {
   let mod!: typeof import('./sentry');
   jest.isolateModules(() => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- isolateModules needs a runtime require, not a static import.
     mod = require('./sentry');
   });
   return mod;

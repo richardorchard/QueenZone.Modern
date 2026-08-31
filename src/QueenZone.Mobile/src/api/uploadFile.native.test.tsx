@@ -2,6 +2,7 @@ jest.mock('./nativeUpload', () => ({
   shouldUseNativeMultipartUpload: () => true,
 }));
 
+// eslint-disable-next-line import/first -- Jest mock must hoist before the module under test.
 import { appendUploadFile } from './uploadFile';
 
 describe('appendUploadFile on native', () => {

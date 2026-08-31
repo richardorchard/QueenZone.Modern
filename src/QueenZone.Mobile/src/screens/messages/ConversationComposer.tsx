@@ -1,0 +1,153 @@
+import { memo, useCallback, useState } from 'react';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ApiError } from '../../api/client';
+import { fonts, palette, radius, space, type, useTheme } from '../../theme';
+import { Button } from '../../ui/Button';
+import { conversationBodyMaxLength, validateReplyBody } from './inboxMeta';
+
+function messageFromUnknownError(err: unknown): string {
+  return err instanceof ApiError ? err.message : 'Something went wrong.';
+}
+
+type Props = {
+  correspondentName: string;
+  canSend: boolean;
+  archiving: boolean;
+  archiveDisabled?: boolean;
+  archiveError: string | null;
+  blockError: string | null;
+  onArchive: () => void;
+  onSend: (body: string) => Promise<void>;
+};
+
+/**
+ * Owns reply-draft state so keystrokes never re-render the conversation list.
+ */
+export const ConversationComposer = memo(function ConversationComposer({
+  correspondentName,
+  canSend,
+  archiving,
+  archiveDisabled = false,
+  archiveError,
+  blockError,
+  onArchive,
+  onSend,
+}: Props) {
+  const { c } = useTheme();
+  const insets = useSafeAreaInsets();
+  const [draft, setDraft] = useState('');
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const submit = useCallback(async () => {
+    const validation = validateReplyBody(draft);
+    if (validation) {
+      setSubmitError(validation);
+      return;
+    }
+
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      await onSend(draft.trim());
+      setDraft('');
+    } catch (err: unknown) {
+      setSubmitError(messageFromUnknownError(err));
+    } finally {
+      setSubmitting(false);
+    }
+  }, [draft, onSend]);
+
+  return (
+    <View
+      style={[
+        styles.composer,
+        {
+          borderTopColor: c.hairline,
+          backgroundColor: c.surfacePage,
+          paddingBottom: Math.max(insets.bottom, space.md),
+        },
+      ]}
+    >
+      <View style={styles.composerContext}>
+        <Text style={[styles.attribution, { color: 'rgba(255,255,255,0.45)' }]} numberOfLines={1}>
+          REPLYING TO {correspondentName.toUpperCase()}
+        </Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Archive conversation"
+          accessibilityState={{ disabled: archiving || archiveDisabled, busy: archiving }}
+          disabled={archiving || archiveDisabled}
+          onPress={onArchive}
+          hitSlop={8}
+          style={[styles.archiveTap, archiving ? { opacity: 0.5 } : null]}
+        >
+          <Text style={[styles.attribution, { color: palette.gold }]}>
+            {archiving ? 'ARCHIVING…' : 'ARCHIVE'}
+          </Text>
+        </Pressable>
+      </View>
+      <TextInput
+        value={draft}
+        onChangeText={setDraft}
+        placeholder="Write a reply"
+        placeholderTextColor="rgba(255,255,255,0.45)"
+        accessibilityLabel="Reply"
+        multiline
+        textAlignVertical="top"
+        enterKeyHint="send"
+        autoCapitalize="sentences"
+        maxLength={conversationBodyMaxLength}
+        editable={!submitting}
+        style={styles.field}
+      />
+      {submitError ? (
+        <Text style={[type.caption, { color: c.textSecondary }]}>{submitError}</Text>
+      ) : null}
+      {archiveError ? (
+        <Text style={[type.caption, { color: c.textSecondary }]}>{archiveError}</Text>
+      ) : null}
+      {blockError ? (
+        <Text style={[type.caption, { color: c.textSecondary }]}>{blockError}</Text>
+      ) : null}
+      <Button
+        label="Send reply"
+        onPress={() => {
+          void submit();
+        }}
+        loading={submitting}
+        disabled={!canSend || draft.trim().length === 0}
+      />
+    </View>
+  );
+});
+
+const styles = StyleSheet.create({
+  composer: {
+    paddingHorizontal: space.base,
+    paddingTop: space.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    gap: 10,
+  },
+  composerContext: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  archiveTap: { minHeight: 44, justifyContent: 'center' },
+  attribution: {
+    fontFamily: fonts.titling,
+    fontSize: 9.5,
+    letterSpacing: 1.9,
+  },
+  field: {
+    minHeight: 44,
+    maxHeight: 120,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: radius.md,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontFamily: fonts.body,
+    fontSize: 16,
+    color: palette.white,
+  },
+});

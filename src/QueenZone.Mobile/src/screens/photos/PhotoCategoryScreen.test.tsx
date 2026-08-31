@@ -1,8 +1,7 @@
 import { screen, userEvent, waitFor } from '@testing-library/react-native';
 import { fetchPhotoCategory, fetchPhotoCategoryItems } from '../../api';
 import { ApiError } from '../../api/client';
-import type { PhotoCategoryListItem, PhotoListItem } from '../../api/types';
-import type { ApiPagedResponse } from '../../api/types';
+import type { ApiPagedResponse, PhotoCategoryListItem, PhotoListItem } from '../../api/types';
 import { pagedResponse } from '../../test/fixtures';
 import { fakeNavigation, flushVirtualizedList, renderWithProviders } from '../../test/render';
 import { testIds } from '../../test/testIds';
