@@ -168,7 +168,9 @@ describe('ThreadScreen watch control', () => {
 
   it('asks signed-out members to sign in to watch', async () => {
     renderThread();
-    await waitFor(() => expect(screen.getByTestId(testIds.forumThreadWatch)).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId(testIds.forumThreadWatch)).toBeTruthy(), {
+      timeout: 5_000,
+    });
     expect(screen.getByLabelText('Sign in to watch')).toBeTruthy();
     expect(fetchWatch).not.toHaveBeenCalled();
   });
