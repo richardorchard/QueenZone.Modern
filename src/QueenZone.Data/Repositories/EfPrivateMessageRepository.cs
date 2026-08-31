@@ -1104,7 +1104,7 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
                     r.CreatedAt))
                 .ToListAsync(cancellationToken);
 
-            var ordered = allRows.OrderByDescending(r => r.CreatedAt).ToList();
+            var ordered = allRows.OrderByDescending(r => r.CreatedAt).ThenBy(r => r.Id).ToList();
             var pagedItems = ordered.Skip((page - 1) * pageSize).Take(pageSize).ToList();
             return new PrivateMessageReportListPage(pagedItems, ordered.Count, statusFilter);
         }
@@ -1112,6 +1112,7 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
         var totalCount = await query.CountAsync(cancellationToken);
         var items = await query
             .OrderByDescending(r => r.CreatedAt)
+            .ThenBy(r => r.Id)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(r => new PrivateMessageReportListItem(

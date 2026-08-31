@@ -214,6 +214,27 @@ public sealed class EfNewsSuggestionRepositoryTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task GetBySubmitterAsync_PagesWithoutEarlierRows()
+    {
+        for (var i = 0; i < 3; i++)
+        {
+            await repository.CreateAsync(NewSuggestion(
+                NewsCandidateDedupe.ComputeUrlHash($"https://example.com/page-{i}"),
+                $"https://example.com/page-{i}"));
+        }
+
+        var page1 = await repository.GetBySubmitterAsync(memberId, page: 1, pageSize: 2);
+        var page2 = await repository.GetBySubmitterAsync(memberId, page: 2, pageSize: 2);
+
+        Assert.Equal(3, page1.TotalCount);
+        Assert.Equal(2, page1.Items.Count);
+        Assert.Single(page2.Items);
+        Assert.Contains("page-2", page1.Items[0].Url, StringComparison.Ordinal);
+        Assert.Contains("page-0", page2.Items[0].Url, StringComparison.Ordinal);
+        Assert.DoesNotContain(page2.Items, item => page1.Items.Any(firstPage => firstPage.Id == item.Id));
+    }
+
+    [Fact]
     public async Task GetByIdAsync_ReturnsNull_WhenMissing()
     {
         Assert.Null(await repository.GetByIdAsync(Guid.NewGuid()));
