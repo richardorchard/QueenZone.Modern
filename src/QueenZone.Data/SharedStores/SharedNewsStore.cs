@@ -78,7 +78,7 @@ public sealed class SharedNewsStore
         }
     }
 
-    public bool Update(int id, AdminNewsDraft draft, string editorEmail)
+    public bool Update(int id, AdminNewsDraft draft, string editorEmail, DateTime? expectedUpdatedAt = null)
     {
         lock (sync)
         {
@@ -89,6 +89,7 @@ public sealed class SharedNewsStore
             }
 
             var existing = articles[index];
+            EnsureUpdatedAt(existing, expectedUpdatedAt);
             articles[index] = existing with
             {
                 Title = draft.Title,
@@ -106,7 +107,7 @@ public sealed class SharedNewsStore
         }
     }
 
-    public bool SetPublished(int id, bool isPublished, string editorEmail)
+    public bool SetPublished(int id, bool isPublished, string editorEmail, DateTime? expectedUpdatedAt = null)
     {
         lock (sync)
         {
@@ -117,6 +118,7 @@ public sealed class SharedNewsStore
             }
 
             var existing = articles[index];
+            EnsureUpdatedAt(existing, expectedUpdatedAt);
             var timestamp = DateTime.UtcNow;
             articles[index] = existing with
             {
@@ -129,7 +131,7 @@ public sealed class SharedNewsStore
         }
     }
 
-    public bool Delete(int id)
+    public bool Delete(int id, DateTime? expectedUpdatedAt = null)
     {
         lock (sync)
         {
@@ -139,8 +141,22 @@ public sealed class SharedNewsStore
                 return false;
             }
 
+            EnsureUpdatedAt(articles[index], expectedUpdatedAt);
             articles.RemoveAt(index);
             return true;
+        }
+    }
+
+    private static void EnsureUpdatedAt(AdminNewsArticle existing, DateTime? expectedUpdatedAt)
+    {
+        if (expectedUpdatedAt is null)
+        {
+            return;
+        }
+
+        if (existing.UpdatedAt != expectedUpdatedAt)
+        {
+            throw new OptimisticConcurrencyException();
         }
     }
 

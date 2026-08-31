@@ -10,8 +10,17 @@ public interface IAdminFreddieTributeRepository
 
     Task<AdminFreddieTributeItem?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
 
-    Task SetVisibilityAsync(int id, bool isVisible, string editorEmail, CancellationToken cancellationToken = default);
+    Task SetVisibilityAsync(
+        int id,
+        bool isVisible,
+        string editorEmail,
+        bool? expectedIsVisible = null,
+        CancellationToken cancellationToken = default);
 
-    Task DeleteAsync(int id, string editorEmail, CancellationToken cancellationToken = default);
+    Task DeleteAsync(
+        int id,
+        string editorEmail,
+        bool? expectedIsVisible = null,
+        CancellationToken cancellationToken = default);
 }
 

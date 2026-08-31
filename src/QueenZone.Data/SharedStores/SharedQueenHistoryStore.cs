@@ -86,12 +86,13 @@ public sealed class SharedQueenHistoryStore
                 QueenHistoryEventSourceType.Curated,
                 $"curated:{Guid.NewGuid():N}",
                 draft.SourceUrl,
-                draft.IsPublished));
+                draft.IsPublished,
+                QueenZoneConcurrency.NewClientRowVersion()));
             return id;
         }
     }
 
-    public bool Update(int id, AdminQueenHistoryDraft draft)
+    public bool Update(int id, AdminQueenHistoryDraft draft, byte[]? expectedRowVersion = null)
     {
         lock (sync)
         {
@@ -101,6 +102,7 @@ public sealed class SharedQueenHistoryStore
                 return false;
             }
 
+            EnsureRowVersion(events[index], expectedRowVersion);
             events[index] = events[index] with
             {
                 Title = draft.Title,
@@ -111,20 +113,29 @@ public sealed class SharedQueenHistoryStore
                 Importance = draft.Importance,
                 SourceUrl = draft.SourceUrl,
                 IsPublished = draft.IsPublished,
+                RowVersion = QueenZoneConcurrency.NewClientRowVersion(),
             };
             return true;
         }
     }
 
-    public bool Delete(int id)
+    public bool Delete(int id, byte[]? expectedRowVersion = null)
     {
         lock (sync)
         {
-            return events.RemoveAll(item => item.Id == id) > 0;
+            var existing = events.SingleOrDefault(item => item.Id == id);
+            if (existing is null)
+            {
+                return false;
+            }
+
+            EnsureRowVersion(existing, expectedRowVersion);
+            events.Remove(existing);
+            return true;
         }
     }
 
-    public bool SetPublished(int id, bool isPublished)
+    public bool SetPublished(int id, bool isPublished, byte[]? expectedRowVersion = null)
     {
         lock (sync)
         {
@@ -134,8 +145,26 @@ public sealed class SharedQueenHistoryStore
                 return false;
             }
 
-            events[index] = events[index] with { IsPublished = isPublished };
+            EnsureRowVersion(events[index], expectedRowVersion);
+            events[index] = events[index] with
+            {
+                IsPublished = isPublished,
+                RowVersion = QueenZoneConcurrency.NewClientRowVersion(),
+            };
             return true;
+        }
+    }
+
+    private static void EnsureRowVersion(QueenHistoryEvent existing, byte[]? expectedRowVersion)
+    {
+        if (expectedRowVersion is null)
+        {
+            return;
+        }
+
+        if (!QueenZoneConcurrency.RowVersionEquals(existing.RowVersion, expectedRowVersion))
+        {
+            throw new OptimisticConcurrencyException();
         }
     }
 }

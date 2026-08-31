@@ -96,6 +96,7 @@
               {
                 <form method="post" action="/admin/freddie-tributes/@item.Id/hide" class="admin-inline-form">
                   <input type="hidden" name="@AdminFreddieTributesPageModel.AntiforgeryTokenFieldName" value="@antiforgeryToken" />
+                  <input type="hidden" name="expectedIsVisible" value="true" />
                   <button type="submit">Hide</button>
                 </form>
               }
@@ -103,11 +104,13 @@
               {
                 <form method="post" action="/admin/freddie-tributes/@item.Id/show" class="admin-inline-form">
                   <input type="hidden" name="@AdminFreddieTributesPageModel.AntiforgeryTokenFieldName" value="@antiforgeryToken" />
+                  <input type="hidden" name="expectedIsVisible" value="false" />
                   <button type="submit">Restore</button>
                 </form>
               }
               <form method="post" action="/admin/freddie-tributes/@item.Id/delete" class="admin-inline-form">
                 <input type="hidden" name="@AdminFreddieTributesPageModel.AntiforgeryTokenFieldName" value="@antiforgeryToken" />
+                <input type="hidden" name="expectedIsVisible" value="@(item.IsVisible ? "true" : "false")" />
                 <button type="submit" class="admin-danger-action">Delete</button>
               </form>
             </td>

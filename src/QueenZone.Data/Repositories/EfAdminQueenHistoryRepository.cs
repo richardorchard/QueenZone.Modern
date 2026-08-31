@@ -68,62 +68,86 @@ public sealed class EfAdminQueenHistoryRepository(QueenZoneDbContext dbContext) 
             CreatedAt = now,
             UpdatedAt = now,
         };
+        AssignClientRowVersion(row);
 
         dbContext.QueenHistoryEvents.Add(row);
         await dbContext.SaveChangesAsync(cancellationToken);
         return row.Id;
     }
 
-    public async Task UpdateAsync(int id, AdminQueenHistoryDraft draft, CancellationToken cancellationToken = default)
+    public async Task UpdateAsync(
+        int id,
+        AdminQueenHistoryDraft draft,
+        byte[]? expectedRowVersion = null,
+        CancellationToken cancellationToken = default)
     {
-        var now = DateTime.UtcNow;
-        var updated = await dbContext.QueenHistoryEvents
-            .Where(item => item.Id == id)
-            .ExecuteUpdateAsync(
-                setters => setters
-                    .SetProperty(item => item.Title, draft.Title)
-                    .SetProperty(item => item.Summary, draft.Summary)
-                    .SetProperty(item => item.EventDate, draft.EventDate)
-                    .SetProperty(item => item.DatePrecision, draft.DatePrecision)
-                    .SetProperty(item => item.Category, draft.Category)
-                    .SetProperty(item => item.Importance, draft.Importance)
-                    .SetProperty(item => item.SourceUrl, draft.SourceUrl)
-                    .SetProperty(item => item.IsPublished, draft.IsPublished)
-                    .SetProperty(item => item.UpdatedAt, now),
-                cancellationToken);
+        var row = await GetTrackedAsync(id, cancellationToken);
+        EnsureRowVersion(row, expectedRowVersion);
+        row.Title = draft.Title;
+        row.Summary = draft.Summary;
+        row.EventDate = draft.EventDate;
+        row.DatePrecision = draft.DatePrecision;
+        row.Category = draft.Category;
+        row.Importance = draft.Importance;
+        row.SourceUrl = draft.SourceUrl;
+        row.IsPublished = draft.IsPublished;
+        row.UpdatedAt = DateTime.UtcNow;
+        AssignClientRowVersion(row);
+        await QueenZoneConcurrency.SaveChangesAsync(dbContext, cancellationToken);
+    }
 
-        if (updated == 0)
+    public async Task DeleteAsync(int id, byte[]? expectedRowVersion = null, CancellationToken cancellationToken = default)
+    {
+        var row = await GetTrackedAsync(id, cancellationToken);
+        EnsureRowVersion(row, expectedRowVersion);
+        dbContext.QueenHistoryEvents.Remove(row);
+        await QueenZoneConcurrency.SaveChangesAsync(dbContext, cancellationToken);
+    }
+
+    public async Task SetPublishedAsync(
+        int id,
+        bool isPublished,
+        byte[]? expectedRowVersion = null,
+        CancellationToken cancellationToken = default)
+    {
+        var row = await GetTrackedAsync(id, cancellationToken);
+        EnsureRowVersion(row, expectedRowVersion);
+        row.IsPublished = isPublished;
+        row.UpdatedAt = DateTime.UtcNow;
+        AssignClientRowVersion(row);
+        await QueenZoneConcurrency.SaveChangesAsync(dbContext, cancellationToken);
+    }
+
+    private async Task<QueenHistoryEventEntity> GetTrackedAsync(int id, CancellationToken cancellationToken)
+    {
+        var row = await dbContext.QueenHistoryEvents
+            .SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
+        if (row is null)
         {
             throw new InvalidOperationException($"Queen history event {id} was not found.");
         }
+
+        return row;
     }
 
-    public async Task DeleteAsync(int id, CancellationToken cancellationToken = default)
+    private void AssignClientRowVersion(QueenHistoryEventEntity entity)
     {
-        var deleted = await dbContext.QueenHistoryEvents
-            .Where(item => item.Id == id)
-            .ExecuteDeleteAsync(cancellationToken);
-
-        if (deleted == 0)
+        if (!dbContext.Database.IsSqlServer())
         {
-            throw new InvalidOperationException($"Queen history event {id} was not found.");
+            entity.RowVersion = QueenZoneConcurrency.NewClientRowVersion();
         }
     }
 
-    public async Task SetPublishedAsync(int id, bool isPublished, CancellationToken cancellationToken = default)
+    private static void EnsureRowVersion(QueenHistoryEventEntity entity, byte[]? expectedRowVersion)
     {
-        var now = DateTime.UtcNow;
-        var updated = await dbContext.QueenHistoryEvents
-            .Where(item => item.Id == id)
-            .ExecuteUpdateAsync(
-                setters => setters
-                    .SetProperty(item => item.IsPublished, isPublished)
-                    .SetProperty(item => item.UpdatedAt, now),
-                cancellationToken);
-
-        if (updated == 0)
+        if (expectedRowVersion is null)
         {
-            throw new InvalidOperationException($"Queen history event {id} was not found.");
+            return;
+        }
+
+        if (!QueenZoneConcurrency.RowVersionEquals(entity.RowVersion, expectedRowVersion))
+        {
+            throw new OptimisticConcurrencyException();
         }
     }
 
@@ -139,5 +163,6 @@ public sealed class EfAdminQueenHistoryRepository(QueenZoneDbContext dbContext) 
             row.SourceType,
             row.SourceKey,
             row.SourceUrl,
-            row.IsPublished);
+            row.IsPublished,
+            row.RowVersion);
 }

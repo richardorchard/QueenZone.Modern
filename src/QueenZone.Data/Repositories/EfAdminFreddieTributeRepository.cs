@@ -146,28 +146,44 @@ public sealed class EfAdminFreddieTributeRepository : IAdminFreddieTributeReposi
         int id,
         bool isVisible,
         string editorEmail,
+        bool? expectedIsVisible = null,
         CancellationToken cancellationToken = default)
     {
-        var affected = await dbContext.Database.ExecuteSqlRawAsync(
-            "UPDATE dbo.FREDDIE_T SET DISPLAY = {0} WHERE ID = {1}",
-            [isVisible ? 1 : 0, id],
-            cancellationToken);
-        if (affected == 0)
-        {
-            throw new InvalidOperationException($"Freddie tribute {id} was not found.");
-        }
+        var sql = expectedIsVisible is bool expected
+            ? "UPDATE dbo.FREDDIE_T SET DISPLAY = {0} WHERE ID = {1} AND DISPLAY = {2}"
+            : "UPDATE dbo.FREDDIE_T SET DISPLAY = {0} WHERE ID = {1}";
+        object[] parameters = expectedIsVisible is bool expectedDisplay
+            ? [isVisible ? 1 : 0, id, expectedDisplay ? 1 : 0]
+            : [isVisible ? 1 : 0, id];
+        var affected = await dbContext.Database.ExecuteSqlRawAsync(sql, parameters, cancellationToken);
+        await EnsureTributeWriteAsync(id, affected, cancellationToken);
     }
 
-    public async Task DeleteAsync(int id, string editorEmail, CancellationToken cancellationToken = default)
+    public async Task DeleteAsync(
+        int id,
+        string editorEmail,
+        bool? expectedIsVisible = null,
+        CancellationToken cancellationToken = default)
     {
-        var affected = await dbContext.Database.ExecuteSqlRawAsync(
-            "DELETE FROM dbo.FREDDIE_T WHERE ID = {0}",
-            [id],
-            cancellationToken);
-        if (affected == 0)
+        var sql = expectedIsVisible is bool
+            ? "DELETE FROM dbo.FREDDIE_T WHERE ID = {0} AND DISPLAY = {1}"
+            : "DELETE FROM dbo.FREDDIE_T WHERE ID = {0}";
+        object[] parameters = expectedIsVisible is bool expectedDisplay
+            ? [id, expectedDisplay ? 1 : 0]
+            : [id];
+        var affected = await dbContext.Database.ExecuteSqlRawAsync(sql, parameters, cancellationToken);
+        await EnsureTributeWriteAsync(id, affected, cancellationToken);
+    }
+
+    private async Task EnsureTributeWriteAsync(int id, int affected, CancellationToken cancellationToken)
+    {
+        if (affected > 0)
         {
-            throw new InvalidOperationException($"Freddie tribute {id} was not found.");
+            return;
         }
+
+        var exists = await GetByIdAsync(id, cancellationToken) is not null;
+        QueenZoneConcurrency.EnsureUpdated(affected, exists, $"Freddie tribute {id} was not found.");
     }
 
     private static AdminFreddieTributeItem Map(AdminFreddieTributeRow row) =>

@@ -23,6 +23,9 @@ public sealed class EditPostModel(
     [Required]
     public string Body { get; set; } = string.Empty;
 
+    [BindProperty]
+    public DateTimeOffset? ExpectedUpdatedAt { get; set; }
+
     public ForumEditablePost? Post { get; private set; }
 
     public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
@@ -99,6 +102,7 @@ public sealed class EditPostModel(
             sanitizedBody,
             isAdmin,
             forumOptions.PostEditWindowMinutes,
+            ExpectedUpdatedAt,
             cancellationToken);
 
         switch (result.Status)
@@ -110,6 +114,17 @@ public sealed class EditPostModel(
                 var page = ((existing.PositionInThread - 1) / ForumRoutes.PostsPageSize) + 1;
                 var redirectPath = ForumRoutes.GetTopicCanonicalPath(result.TopicId, result.TopicSubject, page);
                 return Redirect(redirectPath + $"#post-{postId}");
+            case ForumPostUpdateStatus.ConcurrencyConflict:
+                ErrorMessage = OptimisticConcurrencyException.UserMessage;
+                var current = await forumWriteRepository.GetPostAsync(postId, cancellationToken);
+                if (current is not null)
+                {
+                    Post = current;
+                    Body = current.Body;
+                    PopulatePage(current);
+                }
+
+                break;
             case ForumPostUpdateStatus.EditWindowExpired:
                 ErrorMessage = "This post can no longer be edited.";
                 break;

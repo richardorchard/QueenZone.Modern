@@ -55,6 +55,14 @@ public sealed record AdminPhotoUpdateRequest(
     DateTime DateTime,
     int CatId);
 
+public sealed record AdminPhotoConcurrencyToken(
+    string Title,
+    string? Keywords,
+    int Year,
+    DateTime DateTime,
+    int CatId,
+    bool IsVisible);
+
 public sealed record AdminPhotoAssetUpdate(
     string LegacyUrl,
     string LegacyThumbUrl,

@@ -115,78 +115,97 @@ public sealed class EfAdminNewsRepository : IAdminNewsRepository
         return row.NewsId;
     }
 
-    public async Task UpdateAsync(int id, AdminNewsDraft draft, string editorEmail, CancellationToken cancellationToken = default)
+    public async Task UpdateAsync(
+        int id,
+        AdminNewsDraft draft,
+        string editorEmail,
+        DateTime? expectedUpdatedAt = null,
+        CancellationToken cancellationToken = default)
     {
-        var updated = await dbContext.NewsRows
-            .Where(row => row.NewsId == id)
-            .ExecuteUpdateAsync(
-                setters => setters
-                    .SetProperty(row => row.Title, draft.Title)
-                    .SetProperty(row => row.Excerpt, draft.Excerpt)
-                    .SetProperty(row => row.Body, draft.Body)
-                    .SetProperty(row => row.PublishedAt, draft.PublishedAt)
-                    .SetProperty(row => row.SourceUrl, draft.SourceUrl)
-                    .SetProperty(row => row.Slug, NewsSlug.Resolve(draft.Title, draft.Slug))
-                    .SetProperty(row => row.UpdatedAt, DateTime.UtcNow)
-                    .SetProperty(row => row.EditorEmail, editorEmail)
-                    .SetProperty(row => row.ImageBlobKey, draft.ImageBlobKey)
-                    .SetProperty(row => row.ImageGalleryPicId, draft.ImageGalleryPicId),
-                cancellationToken);
+        var query = ConcurrencyQuery(id, expectedUpdatedAt);
+        var updated = await query.ExecuteUpdateAsync(
+            setters => setters
+                .SetProperty(row => row.Title, draft.Title)
+                .SetProperty(row => row.Excerpt, draft.Excerpt)
+                .SetProperty(row => row.Body, draft.Body)
+                .SetProperty(row => row.PublishedAt, draft.PublishedAt)
+                .SetProperty(row => row.SourceUrl, draft.SourceUrl)
+                .SetProperty(row => row.Slug, NewsSlug.Resolve(draft.Title, draft.Slug))
+                .SetProperty(row => row.UpdatedAt, DateTime.UtcNow)
+                .SetProperty(row => row.EditorEmail, editorEmail)
+                .SetProperty(row => row.ImageBlobKey, draft.ImageBlobKey)
+                .SetProperty(row => row.ImageGalleryPicId, draft.ImageGalleryPicId),
+            cancellationToken);
 
-        if (updated == 0)
-        {
-            throw new InvalidOperationException($"News article {id} was not found.");
-        }
+        await EnsureNewsWriteAsync(id, updated, cancellationToken);
     }
 
-    public async Task PublishAsync(int id, string editorEmail, CancellationToken cancellationToken = default)
+    public async Task PublishAsync(
+        int id,
+        string editorEmail,
+        DateTime? expectedUpdatedAt = null,
+        CancellationToken cancellationToken = default)
     {
         var timestamp = DateTime.UtcNow;
         var publishedAt = timestamp.Date;
 
-        var updated = await dbContext.NewsRows
-            .Where(row => row.NewsId == id)
-            .ExecuteUpdateAsync(
-                setters => setters
-                    .SetProperty(row => row.IsPublished, true)
-                    .SetProperty(row => row.PublishedAt, publishedAt)
-                    .SetProperty(row => row.UpdatedAt, timestamp)
-                    .SetProperty(row => row.EditorEmail, editorEmail),
-                cancellationToken);
+        var updated = await ConcurrencyQuery(id, expectedUpdatedAt).ExecuteUpdateAsync(
+            setters => setters
+                .SetProperty(row => row.IsPublished, true)
+                .SetProperty(row => row.PublishedAt, publishedAt)
+                .SetProperty(row => row.UpdatedAt, timestamp)
+                .SetProperty(row => row.EditorEmail, editorEmail),
+            cancellationToken);
 
-        if (updated == 0)
-        {
-            throw new InvalidOperationException($"News article {id} was not found.");
-        }
+        await EnsureNewsWriteAsync(id, updated, cancellationToken);
     }
 
-    public async Task UnpublishAsync(int id, string editorEmail, CancellationToken cancellationToken = default)
+    public async Task UnpublishAsync(
+        int id,
+        string editorEmail,
+        DateTime? expectedUpdatedAt = null,
+        CancellationToken cancellationToken = default)
     {
-        var updated = await dbContext.NewsRows
-            .Where(row => row.NewsId == id)
-            .ExecuteUpdateAsync(
-                setters => setters
-                    .SetProperty(row => row.IsPublished, false)
-                    .SetProperty(row => row.UpdatedAt, DateTime.UtcNow)
-                    .SetProperty(row => row.EditorEmail, editorEmail),
-                cancellationToken);
+        var updated = await ConcurrencyQuery(id, expectedUpdatedAt).ExecuteUpdateAsync(
+            setters => setters
+                .SetProperty(row => row.IsPublished, false)
+                .SetProperty(row => row.UpdatedAt, DateTime.UtcNow)
+                .SetProperty(row => row.EditorEmail, editorEmail),
+            cancellationToken);
 
-        if (updated == 0)
-        {
-            throw new InvalidOperationException($"News article {id} was not found.");
-        }
+        await EnsureNewsWriteAsync(id, updated, cancellationToken);
     }
 
-    public async Task DeleteAsync(int id, string editorEmail, CancellationToken cancellationToken = default)
+    public async Task DeleteAsync(
+        int id,
+        string editorEmail,
+        DateTime? expectedUpdatedAt = null,
+        CancellationToken cancellationToken = default)
     {
-        var deleted = await dbContext.NewsRows
-            .Where(row => row.NewsId == id)
-            .ExecuteDeleteAsync(cancellationToken);
+        var deleted = await ConcurrencyQuery(id, expectedUpdatedAt).ExecuteDeleteAsync(cancellationToken);
+        await EnsureNewsWriteAsync(id, deleted, cancellationToken);
+    }
 
-        if (deleted == 0)
+    private IQueryable<NewsTableRow> ConcurrencyQuery(int id, DateTime? expectedUpdatedAt)
+    {
+        var query = dbContext.NewsRows.Where(row => row.NewsId == id);
+        if (expectedUpdatedAt is DateTime expected)
         {
-            throw new InvalidOperationException($"News article {id} was not found.");
+            query = query.Where(row => row.UpdatedAt == expected);
         }
+
+        return query;
+    }
+
+    private async Task EnsureNewsWriteAsync(int id, int affected, CancellationToken cancellationToken)
+    {
+        if (affected > 0)
+        {
+            return;
+        }
+
+        var exists = await dbContext.NewsRows.AnyAsync(row => row.NewsId == id, cancellationToken);
+        QueenZoneConcurrency.EnsureUpdated(affected, exists, $"News article {id} was not found.");
     }
 
     public async Task<bool> IsSlugInUseAsync(string slug, int? excludeNewsId = null, CancellationToken cancellationToken = default)

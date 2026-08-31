@@ -121,6 +121,39 @@ public sealed class ForumEditRoutesTests : IClassFixture<WebApplicationFactory<P
         Assert.DoesNotContain($"href=\"/forum/post/{postId}/edit\"", html);
     }
 
+    [Fact]
+    public async Task EditPost_stale_updated_at_reloads_current_body()
+    {
+        var memberId = Guid.NewGuid();
+        var postId = await CreateOwnedPostAsync(memberId, "Original body");
+        var client = CreateMemberClient(memberId);
+        var form = await client.GetStringAsync($"/forum/post/{postId}/edit");
+        var token = ExtractAntiforgeryToken(form);
+        var expectedUpdatedAt = Regex.Match(form, "name=\"expectedUpdatedAt\" value=\"([^\"]+)\"").Groups[1].Value;
+        Assert.False(string.IsNullOrWhiteSpace(expectedUpdatedAt));
+
+        var first = await client.PostAsync($"/forum/post/{postId}/edit", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = token,
+            ["Body"] = "<p>First writer</p>",
+            ["ExpectedUpdatedAt"] = expectedUpdatedAt,
+        }));
+        Assert.Equal(HttpStatusCode.Redirect, first.StatusCode);
+
+        var formAgain = await client.GetStringAsync($"/forum/post/{postId}/edit");
+        var tokenAgain = ExtractAntiforgeryToken(formAgain);
+        var response = await client.PostAsync($"/forum/post/{postId}/edit", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = tokenAgain,
+            ["Body"] = "<p>Stale overwrite</p>",
+            ["ExpectedUpdatedAt"] = expectedUpdatedAt,
+        }));
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+        Assert.Contains(OptimisticConcurrencyException.UserMessage, html);
+    }
+
     private async Task<int> CreateOwnedPostAsync(Guid memberId, string body)
     {
         var client = CreateMemberClient(memberId);

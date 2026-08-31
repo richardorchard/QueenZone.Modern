@@ -39,7 +39,8 @@ public sealed record ForumEditablePost(
     DateTimeOffset PostedAt,
     DateTimeOffset? EditedAt,
     int EditCount,
-    int PositionInThread = 1);
+    int PositionInThread = 1,
+    DateTimeOffset? UpdatedAt = null);
 
 public enum ForumPostUpdateStatus
 {
@@ -48,6 +49,7 @@ public enum ForumPostUpdateStatus
     Forbidden,
     EditWindowExpired,
     EditingDisabled,
+    ConcurrencyConflict,
 }
 
 public sealed record ForumPostUpdateResult(

@@ -10,13 +10,30 @@ public interface IAdminNewsRepository
 
     Task<int> CreateDraftAsync(AdminNewsDraft draft, string editorEmail, CancellationToken cancellationToken = default);
 
-    Task UpdateAsync(int id, AdminNewsDraft draft, string editorEmail, CancellationToken cancellationToken = default);
+    Task UpdateAsync(
+        int id,
+        AdminNewsDraft draft,
+        string editorEmail,
+        DateTime? expectedUpdatedAt = null,
+        CancellationToken cancellationToken = default);
 
-    Task PublishAsync(int id, string editorEmail, CancellationToken cancellationToken = default);
+    Task PublishAsync(
+        int id,
+        string editorEmail,
+        DateTime? expectedUpdatedAt = null,
+        CancellationToken cancellationToken = default);
 
-    Task UnpublishAsync(int id, string editorEmail, CancellationToken cancellationToken = default);
+    Task UnpublishAsync(
+        int id,
+        string editorEmail,
+        DateTime? expectedUpdatedAt = null,
+        CancellationToken cancellationToken = default);
 
-    Task DeleteAsync(int id, string editorEmail, CancellationToken cancellationToken = default);
+    Task DeleteAsync(
+        int id,
+        string editorEmail,
+        DateTime? expectedUpdatedAt = null,
+        CancellationToken cancellationToken = default);
 
     Task<bool> IsSlugInUseAsync(string slug, int? excludeNewsId = null, CancellationToken cancellationToken = default);
 

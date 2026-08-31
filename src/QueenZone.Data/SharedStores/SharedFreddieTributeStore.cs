@@ -50,7 +50,7 @@ public sealed class SharedFreddieTributeStore(IEnumerable<FreddieTribute> seedTr
         }
     }
 
-    public bool SetVisibility(int id, bool isVisible)
+    public bool SetVisibility(int id, bool isVisible, bool? expectedIsVisible = null)
     {
         lock (gate)
         {
@@ -60,12 +60,17 @@ public sealed class SharedFreddieTributeStore(IEnumerable<FreddieTribute> seedTr
                 return false;
             }
 
+            if (expectedIsVisible is bool expected && tribute.IsVisible != expected)
+            {
+                throw new OptimisticConcurrencyException();
+            }
+
             tribute.IsVisible = isVisible;
             return true;
         }
     }
 
-    public bool Delete(int id)
+    public bool Delete(int id, bool? expectedIsVisible = null)
     {
         lock (gate)
         {
@@ -73,6 +78,11 @@ public sealed class SharedFreddieTributeStore(IEnumerable<FreddieTribute> seedTr
             if (index < 0)
             {
                 return false;
+            }
+
+            if (expectedIsVisible is bool expected && tributes[index].IsVisible != expected)
+            {
+                throw new OptimisticConcurrencyException();
             }
 
             tributes.RemoveAt(index);

@@ -43,6 +43,10 @@
       data-busy-submit
       data-busy-label="Saving…">
   <input type="hidden" name="@AdminNewsPageModel.AntiforgeryTokenFieldName" value="@antiforgeryToken">
+  @if (Model.Article?.UpdatedAt is DateTime updatedAt)
+  {
+    <input type="hidden" name="expectedUpdatedAt" value="@updatedAt.ToUniversalTime().ToString("o")">
+  }
   <label>
     Title
     <input type="text" name="title" value="@Model.Draft.Title" maxlength="@NewsValidation.MaxTitleLength" required>
