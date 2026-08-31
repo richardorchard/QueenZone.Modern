@@ -3,7 +3,7 @@ import { fetchJson, sendJson } from '../../api/client';
 import { ApiError } from '../../api/errors';
 import { memberProfilePayload } from '../../test/fixtures';
 import { createMockSession } from '../../test/mockSession';
-import { fakeNavigation, renderWithProviders } from '../../test/render';
+import { renderWithProviders } from '../../test/render';
 import { DeleteAccountScreen } from './DeleteAccountScreen';
 
 const mockSession = createMockSession();
@@ -31,12 +31,7 @@ const deletionProfile = memberProfilePayload({
 });
 
 function renderDeleteAccount() {
-  return renderWithProviders(
-    <DeleteAccountScreen
-      navigation={fakeNavigation() as never}
-      route={{ key: 'delete-account', name: 'DeleteAccount' } as never}
-    />,
-  );
+  return renderWithProviders(<DeleteAccountScreen />);
 }
 
 describe('DeleteAccountScreen', () => {

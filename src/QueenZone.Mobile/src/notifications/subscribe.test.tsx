@@ -35,7 +35,7 @@ function notification(data: Record<string, unknown>, identifier = 'req-1') {
         data,
       },
     },
-  } as Notifications.Notification;
+  } as unknown as Notifications.Notification;
 }
 
 function response(data: Record<string, unknown>, identifier = 'req-1'): Notifications.NotificationResponse {
@@ -66,7 +66,7 @@ function iosNotification(contract: Record<string, unknown>, identifier = 'req-1'
         },
       },
     },
-  } as Notifications.Notification;
+  } as unknown as Notifications.Notification;
 }
 
 function iosResponse(contract: Record<string, unknown>, identifier = 'req-1'): Notifications.NotificationResponse {
@@ -106,7 +106,7 @@ describe('tapFromResponse', () => {
           },
         },
       },
-    } as Notifications.NotificationResponse;
+    } as unknown as Notifications.NotificationResponse;
     expect(tapFromResponse(mixed)).toEqual({
       identifier: 'mixed',
       destination: { category: 'news', articleId: 88 },
@@ -162,7 +162,7 @@ describe('noticeFromNotification', () => {
         identifier: 'req-2',
         content: { title: null, body: '   ', data: { category: 'news', articleId: '88' } },
       },
-    } as Notifications.Notification;
+    } as unknown as Notifications.Notification;
     expect(noticeFromNotification(bare)).toEqual({
       identifier: 'req-2',
       title: 'New QueenZone article',
