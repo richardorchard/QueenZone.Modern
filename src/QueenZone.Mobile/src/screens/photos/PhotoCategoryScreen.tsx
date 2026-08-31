@@ -1,9 +1,7 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import {
-  FlatList,
   Pressable,
-  RefreshControl,
   ScrollView,
   Text,
   useWindowDimensions,
@@ -21,7 +19,8 @@ import type { PhotosStackParamList } from '../../navigation/types';
 import { space, type, useTheme } from '../../theme';
 import { ArchiveImage } from '../../ui/ArchiveImage';
 import { Chip } from '../../ui/Chip';
-import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from '../../ui/ScreenStates';
+import { PagedListScreen } from '../../ui/PagedListScreen';
+import { ErrorBlock, LoadingBlock } from '../../ui/ScreenStates';
 import { testIds } from '../../test/testIds';
 import {
   photoCategoryPageSize,
@@ -95,24 +94,25 @@ export function PhotoCategoryScreen({ navigation, route }: Props) {
     paged.reload();
   }, [paged]);
 
-  if ((paged.loading && paged.items.length === 0) || (!category && !categoryError && !paged.error)) {
+  if (!category && !categoryError && !paged.error) {
     return <LoadingBlock label="Loading collection…" />;
   }
 
-  if (paged.error && paged.items.length === 0) {
-    return <ErrorBlock message={paged.error} onRetry={retry} />;
-  }
-
-  if (categoryError && !category && paged.items.length === 0) {
+  if (categoryError && !category && paged.items.length === 0 && !paged.loading && !paged.error) {
     return <ErrorBlock message={categoryError} onRetry={retry} />;
   }
 
   return (
-    <FlatList
+    <PagedListScreen
       testID={testIds.photoCategoryScreen}
-      style={{ flex: 1, backgroundColor: c.surfacePage }}
-      data={paged.items}
+      paged={{ ...paged, reload: retry }}
       keyExtractor={(item) => String(item.picId)}
+      loadingLabel="Loading collection…"
+      emptyMessage={
+        size
+          ? `No images match ${photoSizePresets.find((preset) => preset.query === size)?.label ?? 'this filter'}.`
+          : 'No images are available in this collection yet.'
+      }
       numColumns={COLS}
       ListHeaderComponent={
         <View>
@@ -146,25 +146,6 @@ export function PhotoCategoryScreen({ navigation, route }: Props) {
       }
       columnWrapperStyle={{ gap: GAP, paddingHorizontal: GAP }}
       contentContainerStyle={{ paddingBottom: space.section }}
-      ListEmptyComponent={
-        <EmptyBlock
-          message={
-            size
-              ? `No images match ${photoSizePresets.find((preset) => preset.query === size)?.label ?? 'this filter'}.`
-              : 'No images are available in this collection yet.'
-          }
-        />
-      }
-      ListFooterComponent={<ListFooterLoading visible={paged.loadingMore} />}
-      refreshControl={
-        <RefreshControl
-          refreshing={paged.refreshing}
-          onRefresh={paged.refresh}
-          tintColor={c.accentPrimary}
-        />
-      }
-      onEndReached={paged.loadMore}
-      onEndReachedThreshold={0.4}
       windowSize={7}
       maxToRenderPerBatch={12}
       initialNumToRender={12}

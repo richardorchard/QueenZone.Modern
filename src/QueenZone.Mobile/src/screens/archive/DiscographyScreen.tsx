@@ -1,11 +1,11 @@
 import { useCallback } from 'react';
-import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { fetchDiscographyPage, type AlbumListItem } from '../../api';
 import { usePagedContent } from '../../hooks/usePagedContent';
 import type { ArchiveStackParamList } from '../../navigation/types';
 import { ArchiveImage } from '../../ui/ArchiveImage';
-import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from '../../ui/ScreenStates';
+import { PagedListScreen } from '../../ui/PagedListScreen';
 import { radius, space, type, useTheme } from '../../theme';
 
 type Props = NativeStackScreenProps<ArchiveStackParamList, 'Discography'>;
@@ -13,34 +13,15 @@ type Props = NativeStackScreenProps<ArchiveStackParamList, 'Discography'>;
 export function DiscographyScreen({ navigation }: Props) {
   const { c } = useTheme();
   const paged = usePagedContent<AlbumListItem>(
-    useCallback((page, signal) => fetchDiscographyPage({ page, pageSize: 50, signal }), []),
-    50,
+    useCallback((page, signal) => fetchDiscographyPage({ page, pageSize: 20, signal }), []),
   );
 
-  if (paged.loading && paged.items.length === 0) {
-    return <LoadingBlock label="Loading discography…" />;
-  }
-
-  if (paged.error && paged.items.length === 0) {
-    return <ErrorBlock message={paged.error} onRetry={paged.reload} />;
-  }
-
   return (
-    <FlatList
-      style={[styles.list, { backgroundColor: c.surfacePage }]}
-      data={paged.items}
+    <PagedListScreen
+      paged={paged}
       keyExtractor={(item) => String(item.albumId)}
-      ListEmptyComponent={<EmptyBlock message="No albums yet." />}
-      ListFooterComponent={<ListFooterLoading visible={paged.loadingMore} />}
-      refreshControl={
-        <RefreshControl
-          refreshing={paged.refreshing}
-          onRefresh={paged.refresh}
-          tintColor={c.accentPrimary}
-        />
-      }
-      onEndReached={paged.loadMore}
-      onEndReachedThreshold={0.4}
+      loadingLabel="Loading discography…"
+      emptyMessage="No albums yet."
       renderItem={({ item }) => (
         <Pressable
           accessibilityRole="button"
@@ -77,7 +58,6 @@ export function DiscographyScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  list: { flex: 1 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
