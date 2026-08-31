@@ -2,7 +2,7 @@ import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import { Image } from 'expo-image';
 import { memo, useCallback, useEffect, useState } from 'react';
-import { FlatList, RefreshControl, ScrollView, StyleSheet, View, type ListRenderItem } from 'react-native';
+import { ScrollView, StyleSheet, View, type ListRenderItem } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { fetchNewsPage, fetchNewsYearRange, formatPublishedDate, type NewsListItem, type NewsYearRange } from '../../api';
 import { getAppConfig } from '../../config';
@@ -15,7 +15,7 @@ import { radius, space, useTheme } from '../../theme';
 import { ArticleRow } from '../../ui/ArticleRow';
 import { Chip } from '../../ui/Chip';
 import { resolveContentUrl } from '../../ui/html/resolveContentUrl';
-import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from '../../ui/ScreenStates';
+import { PagedListScreen } from '../../ui/PagedListScreen';
 import { testIds } from '../../test/testIds';
 import { PageTitleBlock } from '../../ui/PageTitleBlock';
 import { YearRail } from '../../ui/YearRail';
@@ -99,7 +99,6 @@ const NewsIndexRow = memo(function NewsIndexRow({
 });
 
 export function NewsIndexScreen({ navigation, route }: Props) {
-  const { c } = useTheme();
   const [decade, setDecade] = useState<(typeof newsDecades)[number]>(newsDecades[0]);
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [yearRange, setYearRange] = useState<NewsYearRange | null>(null);
@@ -176,45 +175,22 @@ export function NewsIndexScreen({ navigation, route }: Props) {
     </View>
   );
 
-  if (paged.loading && paged.items.length === 0) {
-    return (
-      <View testID={testIds.newsScreen} style={[styles.list, { backgroundColor: c.surfacePage }]}>
-        {header}
-        <LoadingBlock label="Loading news…" />
-      </View>
-    );
-  }
-
-  if (paged.error && paged.items.length === 0) {
-    return (
-      <View style={[styles.list, { backgroundColor: c.surfacePage }]}>
-        {header}
-        <ErrorBlock message={paged.error} onRetry={paged.reload} />
-      </View>
-    );
-  }
-
-  const emptyMessage = selectedYear !== null
-    ? `No articles for ${selectedYear} yet.`
-    : decade.decadeStart === null
-      ? 'No news articles yet.'
-      : 'No articles for this decade yet.';
+  const emptyMessage =
+    selectedYear !== null
+      ? `No articles for ${selectedYear} yet.`
+      : decade.decadeStart === null
+        ? 'No news articles yet.'
+        : 'No articles for this decade yet.';
 
   return (
     <View style={styles.container}>
-      <FlatList
+      <PagedListScreen
         testID={testIds.newsScreen}
-        style={[styles.list, { backgroundColor: c.surfacePage }]}
-        data={paged.items}
+        paged={paged}
         keyExtractor={newsKeyExtractor}
+        loadingLabel="Loading news…"
+        emptyMessage={emptyMessage}
         ListHeaderComponent={header}
-        ListEmptyComponent={<EmptyBlock message={emptyMessage} />}
-        ListFooterComponent={<ListFooterLoading visible={paged.loadingMore} />}
-        refreshControl={
-          <RefreshControl refreshing={paged.refreshing} onRefresh={paged.refresh} tintColor={c.accentPrimary} />
-        }
-        onEndReached={paged.loadMore}
-        onEndReachedThreshold={0.4}
         renderItem={renderItem}
       />
       <YearRail
@@ -229,7 +205,6 @@ export function NewsIndexScreen({ navigation, route }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  list: { flex: 1 },
   thumbFrame: {
     width: NEWS_LIST_THUMB_WIDTH,
     height: NEWS_LIST_THUMB_HEIGHT,
