@@ -28,7 +28,7 @@ const photoPayload = {
       submittedAt: '2024-01-15T12:00:00.000Z',
       status: { status: 'pending', statusLabel: 'Pending review', statusTone: 'pending' },
       notes: null,
-      thumbnailPath: null,
+      thumbnailPath: '/ugc/photos/members/a/thumb.webp',
       promotedPicId: null,
     },
   ],
@@ -110,6 +110,11 @@ describe('MySubmissionsScreen', () => {
     renderSubmissions();
     await waitFor(() => expect(screen.getByText('Live in Montreal')).toBeOnTheScreen());
     expect(screen.getByText('Pending review')).toBeOnTheScreen();
+    const thumb = screen.getByLabelText('Live in Montreal');
+    expect(thumb.props.source).toEqual({ uri: 'http://qz.test/ugc/photos/members/a/thumb.webp' });
+    expect(thumb.props.priority).toBe('low');
+    expect(thumb.props.recyclingKey).toBe('photo-1');
+    expect(thumb.props.accessibilityIgnoresInvertColors).toBe(true);
     expect(fetchMock).toHaveBeenCalledWith(photosUrl, {
       headers: { Accept: 'application/json', Authorization: 'Bearer tok' },
     });

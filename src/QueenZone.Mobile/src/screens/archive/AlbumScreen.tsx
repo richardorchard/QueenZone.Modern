@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
-import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ApiError, fetchAlbumDetail, toPlainText, type AlbumDetail } from '../../api';
 import type { ArchiveStackParamList } from '../../navigation/types';
+import { ArchiveImage } from '../../ui/ArchiveImage';
 import { ErrorBlock, LoadingBlock } from '../../ui/ScreenStates';
 import { radius, space, type, useTheme } from '../../theme';
 
@@ -62,10 +63,12 @@ export function AlbumScreen({ navigation, route }: Props) {
     >
       <Text style={[type.eyebrow, { color: c.accentArchive }]}>Discography</Text>
       {album.coverUrl ? (
-        <Image
+        <ArchiveImage
           source={{ uri: album.coverUrl }}
           style={styles.cover}
-          accessibilityLabel={`${album.name} cover`}
+          priority="normal"
+          recyclingKey={String(id)}
+          label={`${album.name} cover`}
           accessibilityIgnoresInvertColors
         />
       ) : null}
