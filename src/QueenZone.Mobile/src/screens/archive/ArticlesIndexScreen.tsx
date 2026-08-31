@@ -1,45 +1,22 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { FlatList } from 'react-native';
-import { featuredStories, homeLead } from '../../content/sample';
+import { ScrollView } from 'react-native';
 import type { ArchiveStackParamList } from '../../navigation/types';
 import { useTheme } from '../../theme';
-import { DestinationRow } from '../../ui/DestinationRow';
 import { PageTitleBlock } from '../../ui/PageTitleBlock';
+import { EmptyBlock } from '../../ui/ScreenStates';
 
 type Props = NativeStackScreenProps<ArchiveStackParamList, 'Articles'>;
 
-const articles = [
-  {
-    id: 'lead',
-    title: homeLead.title,
-    kicker: homeLead.kicker,
-    kickerRole: 'restored' as const,
-    meta: [...homeLead.meta],
-    image: homeLead.image,
-  },
-  ...featuredStories,
-];
-
-export function ArticlesIndexScreen({ navigation }: Props) {
+/** Empty until the articles API lands (#1186). Do not point this at fetchNewsPage. */
+export function ArticlesIndexScreen(_props: Props) {
   const { c } = useTheme();
   return (
-    <FlatList
+    <ScrollView
       style={{ flex: 1, backgroundColor: c.surfacePage }}
-      data={articles}
-      keyExtractor={(item) => item.id}
-      ListHeaderComponent={
-        <PageTitleBlock eyebrow="Long-form" title="Articles" subtitle="104 features · Editorial" />
-      }
-      renderItem={({ item }) => (
-        <DestinationRow
-          title={item.title}
-          kicker={item.kicker}
-          kickerRole={item.kickerRole}
-          meta={item.meta}
-          image={item.image}
-          onPress={() => navigation.navigate('Story', { id: 0 })}
-        />
-      )}
-    />
+      contentContainerStyle={{ flexGrow: 1 }}
+    >
+      <PageTitleBlock eyebrow="Long-form" title="Articles" subtitle="104 features · Editorial" />
+      <EmptyBlock message="No articles yet." />
+    </ScrollView>
   );
 }
