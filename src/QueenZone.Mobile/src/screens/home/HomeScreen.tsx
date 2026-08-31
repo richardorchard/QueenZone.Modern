@@ -19,7 +19,7 @@ import {
   type NewsListItem,
   type PhotoCategoryListItem,
 } from '../../api';
-import { media } from '../../content/media';
+import { newsArticleListImageSource, type NewsArticleImageFields } from '../../content/newsArticleImage';
 import { useHomeSection } from '../../hooks/useHomeSection';
 import { useNewsListEpochRefresh } from '../../hooks/useNewsListEpochRefresh';
 import { usePullToRefresh } from '../../hooks/usePullToRefresh';
@@ -36,6 +36,7 @@ import { Chip } from '../../ui/Chip';
 import { Eyebrow } from '../../ui/Eyebrow';
 import { FeatureBlock } from '../../ui/FeatureBlock';
 import { HeroFeature } from '../../ui/HeroFeature';
+import { resolveContentUrl } from '../../ui/html/resolveContentUrl';
 import { initials } from '../../ui/initials';
 import { MetaLine } from '../../ui/MetaLine';
 import { SectionErrorBlock } from '../../ui/ScreenStates';
@@ -54,7 +55,6 @@ import {
   onThisDayIsVisible,
   queenQuotesEyebrow,
   queenQuotesIsVisible,
-  stockImageIndexForId,
   visibleSectionsForFilter,
   type HomeFilterKey,
 } from './homeMeta';
@@ -64,16 +64,24 @@ type Props = CompositeScreenProps<
   BottomTabScreenProps<RootTabParamList>
 >;
 
-const stockImages = [media.hero, media.stage, media.crowd, media.portrait, media.studio];
-
-function stockImageForId(id: number): number {
-  return stockImages[stockImageIndexForId(id, stockImages.length)];
+function homeArticleImage(
+  item: NewsArticleImageFields,
+  apiBaseUrl: string,
+): number | { uri: string } {
+  const source = newsArticleListImageSource({
+    thumbnailUrl: resolveContentUrl(item.thumbnailUrl, apiBaseUrl),
+    imageUrl: resolveContentUrl(item.imageUrl, apiBaseUrl),
+  });
+  if (typeof source === 'number') return source;
+  if (Array.isArray(source)) return { uri: source[0]?.uri ?? '' };
+  return { uri: source.uri ?? '' };
 }
 
 export function HomeScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
   const { isSignedIn, accessToken } = useSession();
+  const apiBaseUrl = getAppConfig().apiBaseUrl;
   const [filter, setFilter] = useState<HomeFilterKey>('all');
   const visibleSections = useMemo(() => visibleSectionsForFilter(filter), [filter]);
 
@@ -241,7 +249,7 @@ export function HomeScreen({ navigation }: Props) {
                     title: hero.title,
                     standfirst: hero.excerpt,
                     meta: [],
-                    image: stockImageForId(hero.id),
+                    image: homeArticleImage(hero, apiBaseUrl),
                   }}
                   onPress={() => openNewsStory(hero.id)}
                 />
@@ -295,7 +303,7 @@ export function HomeScreen({ navigation }: Props) {
                       </Text>
                     </View>
                     <ArchiveImage
-                      source={stockImageForId(item.id)}
+                      source={homeArticleImage(item, apiBaseUrl)}
                       label={item.title}
                       priority="low"
                       style={{ width: 76, height: 76, borderRadius: radius.xs }}
