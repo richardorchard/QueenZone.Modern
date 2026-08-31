@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace QueenZone.Web;
 
 public sealed class MemberAccountDeletionHostedService(
@@ -32,6 +34,9 @@ public sealed class MemberAccountDeletionHostedService(
 
         while (!stoppingToken.IsCancellationRequested)
         {
+            using var activity = QueenZoneTelemetry.ActivitySource.StartActivity(
+                "MemberAccountDeletion",
+                ActivityKind.Internal);
             try
             {
                 await using var scope = scopeFactory.CreateAsyncScope();

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using QueenZone.Data;
 
 namespace QueenZone.Web;
@@ -41,6 +42,9 @@ public sealed class PrivateMessageReportPurgeHostedService(
 
         while (!stoppingToken.IsCancellationRequested)
         {
+            using var activity = QueenZoneTelemetry.ActivitySource.StartActivity(
+                "PrivateMessageReportPurge",
+                ActivityKind.Internal);
             try
             {
                 await using var scope = scopeFactory.CreateAsyncScope();

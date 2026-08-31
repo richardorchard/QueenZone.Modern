@@ -229,6 +229,10 @@ app.UseWhen(
 
             await next();
         });
+        // After member-cookie fallback so User is populated; before authorization and
+        // rate limiting so those warnings inherit TraceId / MemberId. Probe paths never
+        // enter this UseWhen branch (#666); the middleware also no-ops IsProbePath.
+        branch.UseRequestLogScope();
         branch.UseAuthorization();
         // Short browser/CDN Cache-Control for anonymous public HTML (after auth so User is known).
         // OnStarting runs when the response starts so Content-Type and status are available.

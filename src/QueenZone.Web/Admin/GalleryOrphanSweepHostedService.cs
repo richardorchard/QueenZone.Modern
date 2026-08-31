@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.Extensions.Options;
 
 namespace QueenZone.Web;
@@ -35,6 +36,9 @@ public sealed class GalleryOrphanSweepHostedService(
                 continue;
             }
 
+            using var activity = QueenZoneTelemetry.ActivitySource.StartActivity(
+                "GalleryOrphanSweep",
+                ActivityKind.Internal);
             try
             {
                 await using var scope = scopeFactory.CreateAsyncScope();

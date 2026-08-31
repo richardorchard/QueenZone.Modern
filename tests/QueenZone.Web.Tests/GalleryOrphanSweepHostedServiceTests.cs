@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -74,6 +75,56 @@ public sealed class GalleryOrphanSweepHostedServiceTests
         Assert.Equal(0, recorder.ListCalls);
     }
 
+    [Fact]
+    public async Task Sweep_starts_GalleryOrphanSweep_activity_during_scoped_work()
+    {
+        var store = new SharedPhotoStore(SamplePhotoData.CreateSeedCategories());
+        var recorder = new RecordingSweepGalleryPhotoBlobService();
+        using var listener = QueenZoneActivityTestListener.Listen();
+        using var hosted = CreateHostedService(
+            store,
+            recorder,
+            startupDelay: TimeSpan.FromMilliseconds(20),
+            runInterval: Timeout.InfiniteTimeSpan);
+
+        await hosted.StartAsync(CancellationToken.None);
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(2);
+        while (recorder.ListCalls == 0 && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(20);
+        }
+
+        await hosted.StopAsync(CancellationToken.None);
+
+        Assert.True(recorder.ListCalls > 0);
+        var activity = Assert.Single(listener.Started, item => item.OperationName == "GalleryOrphanSweep");
+        Assert.Equal(ActivityKind.Internal, activity.Kind);
+        Assert.NotNull(recorder.ActivityDuringWork);
+        Assert.Equal("GalleryOrphanSweep", recorder.ActivityDuringWork.OperationName);
+        Assert.Equal(activity.Id, recorder.ActivityDuringWork.Id);
+    }
+
+    [Fact]
+    public async Task Disabled_option_does_not_start_an_activity()
+    {
+        var store = new SharedPhotoStore(SamplePhotoData.CreateSeedCategories());
+        var recorder = new RecordingSweepGalleryPhotoBlobService();
+        using var listener = QueenZoneActivityTestListener.Listen();
+        using var hosted = CreateHostedService(
+            store,
+            recorder,
+            startupDelay: TimeSpan.FromMilliseconds(20),
+            runInterval: TimeSpan.FromMilliseconds(20),
+            enabled: false);
+
+        await hosted.StartAsync(CancellationToken.None);
+        await Task.Delay(150);
+        await hosted.StopAsync(CancellationToken.None);
+
+        Assert.Equal(0, recorder.ListCalls);
+        Assert.DoesNotContain(listener.Started, item => item.OperationName == "GalleryOrphanSweep");
+    }
+
     private static GalleryOrphanSweepHostedService CreateHostedService(
         SharedPhotoStore store,
         RecordingSweepGalleryPhotoBlobService galleryPhotoBlobService,
@@ -105,6 +156,8 @@ public sealed class GalleryOrphanSweepHostedServiceTests
     {
         public int ListCalls;
 
+        public Activity? ActivityDuringWork;
+
         public bool IsConfigured => true;
 
         public Task UploadAsync(
@@ -129,6 +182,7 @@ public sealed class GalleryOrphanSweepHostedServiceTests
             CancellationToken cancellationToken = default)
         {
             Interlocked.Increment(ref ListCalls);
+            ActivityDuringWork = Activity.Current;
             return Task.FromResult<IReadOnlyList<GalleryBlobDescriptor>>([]);
         }
     }
