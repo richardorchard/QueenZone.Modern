@@ -114,7 +114,11 @@ public sealed class SharedPhotoStore
         }
     }
 
-    public bool Update(int picId, AdminPhotoUpdateRequest request, string editorEmail)
+    public bool Update(
+        int picId,
+        AdminPhotoUpdateRequest request,
+        string editorEmail,
+        AdminPhotoConcurrencyToken? expected = null)
     {
         lock (sync)
         {
@@ -128,6 +132,11 @@ public sealed class SharedPhotoStore
                 ?? throw new InvalidOperationException($"Category {request.CatId} was not found.");
 
             var existing = photos[index];
+            if (expected is not null && !Matches(existing, expected))
+            {
+                throw new OptimisticConcurrencyException();
+            }
+
             photos[index] = existing with
             {
                 CatId = request.CatId,
@@ -144,7 +153,7 @@ public sealed class SharedPhotoStore
         }
     }
 
-    public bool SetVisibility(int picId, bool isVisible, string editorEmail)
+    public bool SetVisibility(int picId, bool isVisible, string editorEmail, bool? expectedIsVisible = null)
     {
         lock (sync)
         {
@@ -152,6 +161,11 @@ public sealed class SharedPhotoStore
             if (index < 0)
             {
                 return false;
+            }
+
+            if (expectedIsVisible is bool expected && photos[index].IsVisible != expected)
+            {
+                throw new OptimisticConcurrencyException();
             }
 
             photos[index] = photos[index] with { IsVisible = isVisible };
@@ -258,6 +272,14 @@ public sealed class SharedPhotoStore
             DateTimeOffset.UtcNow,
             details));
     }
+
+    private static bool Matches(MutablePhoto existing, AdminPhotoConcurrencyToken expected) =>
+        string.Equals(existing.Title, expected.Title.Trim(), StringComparison.Ordinal)
+        && existing.CatId == expected.CatId
+        && existing.DateTime == expected.DateTime
+        && string.Equals(existing.Keywords ?? string.Empty, expected.Keywords?.Trim() ?? string.Empty, StringComparison.Ordinal)
+        && existing.Year == expected.Year
+        && existing.IsVisible == expected.IsVisible;
 
     private AdminPhotoItem ToAdminItem(MutablePhoto photo) =>
         new(

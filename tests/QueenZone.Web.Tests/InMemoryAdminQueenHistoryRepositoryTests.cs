@@ -40,8 +40,13 @@ public sealed class InMemoryAdminQueenHistoryRepositoryTests
         var repository = new InMemoryAdminQueenHistoryRepository(new SharedQueenHistoryStore());
         var id = await repository.CreateAsync(Draft("To delete"));
 
-        await repository.SetPublishedAsync(id, false);
+        var created = await repository.GetByIdAsync(id);
+        await repository.SetPublishedAsync(id, false, created!.RowVersion);
         var unpublished = await repository.GetByIdAsync(id);
+        await Assert.ThrowsAsync<OptimisticConcurrencyException>(() =>
+            repository.SetPublishedAsync(id, true, created.RowVersion));
+        await Assert.ThrowsAsync<OptimisticConcurrencyException>(() =>
+            repository.DeleteAsync(id, created.RowVersion));
         Assert.NotNull(unpublished);
         Assert.False(unpublished.IsPublished);
 

@@ -170,6 +170,7 @@ public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForu
                 post.PostedAt,
                 post.EditedAt,
                 post.EditCount,
+                post.UpdatedAt,
             })
             .SingleOrDefaultAsync(cancellationToken);
 
@@ -194,7 +195,8 @@ public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForu
             ToOffset(row.PostedAt),
             row.EditedAt.HasValue ? ToOffset(row.EditedAt) : null,
             row.EditCount,
-            Math.Max(1, position));
+            Math.Max(1, position),
+            ToOffset(row.UpdatedAt));
     }
 
     public async Task<ForumPostUpdateResult> UpdatePostAsync(
@@ -203,6 +205,7 @@ public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForu
         string sanitisedBody,
         bool isAdmin,
         int editWindowMinutes,
+        DateTimeOffset? expectedUpdatedAt = null,
         CancellationToken cancellationToken = default)
     {
         var post = await dbContext.ModernForumPosts
@@ -242,12 +245,36 @@ public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForu
             return new ForumPostUpdateResult(ForumPostUpdateStatus.Forbidden, post.LegacyThreadTopicId, post.Thread.Title);
         }
 
+        if (expectedUpdatedAt is DateTimeOffset expected
+            && ToOffset(post.UpdatedAt) != expected)
+        {
+            return new ForumPostUpdateResult(
+                ForumPostUpdateStatus.ConcurrencyConflict,
+                post.LegacyThreadTopicId,
+                post.Thread.Title);
+        }
+
         var now = DateTime.UtcNow;
+        if (expectedUpdatedAt is DateTimeOffset original)
+        {
+            dbContext.Entry(post).Property(item => item.UpdatedAt).OriginalValue = original.UtcDateTime;
+        }
+
         post.BodyHtml = TruncateBody(sanitisedBody);
         post.EditedAt = now;
         post.EditCount += 1;
         post.UpdatedAt = now;
-        await dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await QueenZoneConcurrency.SaveChangesAsync(dbContext, cancellationToken);
+        }
+        catch (OptimisticConcurrencyException)
+        {
+            return new ForumPostUpdateResult(
+                ForumPostUpdateStatus.ConcurrencyConflict,
+                post.LegacyThreadTopicId,
+                post.Thread.Title);
+        }
 
         return new ForumPostUpdateResult(ForumPostUpdateStatus.Success, post.LegacyThreadTopicId, post.Thread.Title);
     }

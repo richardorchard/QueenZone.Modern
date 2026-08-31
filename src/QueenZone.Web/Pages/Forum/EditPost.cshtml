@@ -38,6 +38,10 @@
             data-busy-submit
             data-busy-label="Saving…">
         @Html.AntiForgeryToken()
+        @if (Model.Post?.UpdatedAt is DateTimeOffset updatedAt)
+        {
+          <input type="hidden" name="expectedUpdatedAt" value="@updatedAt.UtcDateTime.ToString("o")" />
+        }
         <div asp-validation-summary="ModelOnly" class="qz-form__validation"></div>
         <partial name="_RichTextEditor" />
         <span asp-validation-for="Body" class="text-danger"></span>

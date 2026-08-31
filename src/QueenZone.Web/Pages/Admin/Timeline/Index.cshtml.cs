@@ -58,7 +58,7 @@ public sealed class IndexModel(
 
     public async Task<IActionResult> OnPostDeleteAsync(int id, CancellationToken cancellationToken)
     {
-        await historyRepository.DeleteAsync(id, cancellationToken);
+        await historyRepository.DeleteAsync(id, cancellationToken: cancellationToken);
         await InvalidatePublicHistoryCacheAsync(outputCacheStore, publicQueryCache, cancellationToken);
         TempData[MessageKey] = "Deleted timeline event.";
         TempData[MessageKindKey] = "success";
@@ -70,7 +70,7 @@ public sealed class IndexModel(
         bool isPublished,
         CancellationToken cancellationToken)
     {
-        await historyRepository.SetPublishedAsync(id, !isPublished, cancellationToken);
+        await historyRepository.SetPublishedAsync(id, !isPublished, cancellationToken: cancellationToken);
         await InvalidatePublicHistoryCacheAsync(outputCacheStore, publicQueryCache, cancellationToken);
         TempData[MessageKey] = !isPublished ? "Timeline event published." : "Timeline event unpublished.";
         TempData[MessageKindKey] = "success";

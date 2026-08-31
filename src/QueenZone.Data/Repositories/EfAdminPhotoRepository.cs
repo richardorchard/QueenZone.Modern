@@ -236,9 +236,10 @@ public sealed class EfAdminPhotoRepository(QueenZoneDbContext dbContext) : IAdmi
         int picId,
         AdminPhotoUpdateRequest request,
         string editorEmail,
+        AdminPhotoConcurrencyToken? expected = null,
         CancellationToken cancellationToken = default)
     {
-        const string sql = """
+        var sql = """
             UPDATE dbo.PIC_FILES_T
             SET Name = @Name,
                 Cat_ID = @CatId,
@@ -247,6 +248,17 @@ public sealed class EfAdminPhotoRepository(QueenZoneDbContext dbContext) : IAdmi
                 PICTURE_YEAR = @Year
             WHERE PIC_ID = @PicId
             """;
+        if (expected is not null)
+        {
+            sql += """
+                 AND Name = @ExpectedName
+                 AND Cat_ID = @ExpectedCatId
+                 AND Date_time = @ExpectedDateTime
+                 AND ISNULL(KEYWORDS, '') = @ExpectedKeywords
+                 AND PICTURE_YEAR = @ExpectedYear
+                 AND DISPLAY = @ExpectedDisplay
+                """;
+        }
 
         var rows = await EfSql.ExecuteNonQuerySqlAsync(
             dbContext,
@@ -259,13 +271,19 @@ public sealed class EfAdminPhotoRepository(QueenZoneDbContext dbContext) : IAdmi
                 command.Parameters.Add(EfSql.Input("@Keywords", string.IsNullOrWhiteSpace(request.Keywords) ? DBNull.Value : request.Keywords.Trim()));
                 command.Parameters.Add(EfSql.Input("@Year", request.Year));
                 command.Parameters.Add(EfSql.Input("@PicId", picId));
+                if (expected is not null)
+                {
+                    command.Parameters.Add(EfSql.Input("@ExpectedName", expected.Title.Trim()));
+                    command.Parameters.Add(EfSql.Input("@ExpectedCatId", expected.CatId));
+                    command.Parameters.Add(EfSql.Input("@ExpectedDateTime", expected.DateTime));
+                    command.Parameters.Add(EfSql.Input("@ExpectedKeywords", expected.Keywords?.Trim() ?? string.Empty));
+                    command.Parameters.Add(EfSql.Input("@ExpectedYear", expected.Year));
+                    command.Parameters.Add(EfSql.Input("@ExpectedDisplay", expected.IsVisible ? 1 : 0));
+                }
             },
             cancellationToken: cancellationToken);
 
-        if (rows != 1)
-        {
-            throw new InvalidOperationException($"Photo {picId} was not found.");
-        }
+        await EnsurePhotoWriteAsync(picId, rows, cancellationToken);
 
         await AppendAuditAsync(picId, "edit", editorEmail, $"Updated \"{request.Title.Trim()}\"", cancellationToken);
     }
@@ -274,13 +292,18 @@ public sealed class EfAdminPhotoRepository(QueenZoneDbContext dbContext) : IAdmi
         int picId,
         bool isVisible,
         string editorEmail,
+        bool? expectedIsVisible = null,
         CancellationToken cancellationToken = default)
     {
-        const string sql = """
+        var sql = """
             UPDATE dbo.PIC_FILES_T
             SET DISPLAY = @Display
             WHERE PIC_ID = @PicId
             """;
+        if (expectedIsVisible is bool expected)
+        {
+            sql += " AND DISPLAY = @ExpectedDisplay";
+        }
 
         var rows = await EfSql.ExecuteNonQuerySqlAsync(
             dbContext,
@@ -289,13 +312,14 @@ public sealed class EfAdminPhotoRepository(QueenZoneDbContext dbContext) : IAdmi
             {
                 command.Parameters.Add(EfSql.Input("@Display", isVisible ? 1 : 0));
                 command.Parameters.Add(EfSql.Input("@PicId", picId));
+                if (expectedIsVisible is bool expected)
+                {
+                    command.Parameters.Add(EfSql.Input("@ExpectedDisplay", expected ? 1 : 0));
+                }
             },
             cancellationToken: cancellationToken);
 
-        if (rows != 1)
-        {
-            throw new InvalidOperationException($"Photo {picId} was not found.");
-        }
+        await EnsurePhotoWriteAsync(picId, rows, cancellationToken);
 
         await AppendAuditAsync(picId, isVisible ? "show" : "hide", editorEmail, cancellationToken: cancellationToken);
     }
@@ -374,6 +398,17 @@ public sealed class EfAdminPhotoRepository(QueenZoneDbContext dbContext) : IAdmi
         }
 
         await AppendAuditAsync(picId, "regenerate-thumb", editorEmail, legacyThumbUrl, cancellationToken);
+    }
+
+    private async Task EnsurePhotoWriteAsync(int picId, int affected, CancellationToken cancellationToken)
+    {
+        if (affected == 1)
+        {
+            return;
+        }
+
+        var exists = await GetByIdAsync(picId, cancellationToken) is not null;
+        QueenZoneConcurrency.EnsureUpdated(affected, exists, $"Photo {picId} was not found.");
     }
 
     public async Task DeleteAsync(int picId, string editorEmail, CancellationToken cancellationToken = default)

@@ -31,7 +31,21 @@ public sealed class EditPostModel(
             return Page();
         }
 
-        await historyRepository.UpdateAsync(id, draft, cancellationToken);
+        try
+        {
+            await historyRepository.UpdateAsync(id, draft, form.ParseRowVersion(), cancellationToken);
+        }
+        catch (OptimisticConcurrencyException)
+        {
+            var current = await historyRepository.GetByIdAsync(id, cancellationToken) ?? existing;
+            ViewData["Title"] = "Edit timeline event";
+            Form = EditModel.BuildForm(
+                current,
+                ToDraft(current),
+                [OptimisticConcurrencyException.UserMessage]);
+            return Page();
+        }
+
         await IndexModel.InvalidatePublicHistoryCacheAsync(outputCacheStore, publicQueryCache, cancellationToken);
 
         TempData[MessageKey] = "Saved timeline event.";

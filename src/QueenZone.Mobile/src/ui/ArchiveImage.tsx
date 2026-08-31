@@ -9,6 +9,7 @@ type Props = {
   recyclingKey?: string;
   contentFit?: 'cover' | 'contain';
   priority?: 'low' | 'normal' | 'high';
+  accessibilityIgnoresInvertColors?: boolean;
 };
 
 /**
@@ -23,6 +24,7 @@ export function ArchiveImage({
   recyclingKey,
   contentFit = 'cover',
   priority = 'normal',
+  accessibilityIgnoresInvertColors,
 }: Props) {
   const key = recyclingKey ?? (typeof source === 'number' ? String(source) : source.uri);
   return (
@@ -35,6 +37,7 @@ export function ArchiveImage({
       cachePolicy="memory-disk"
       priority={priority}
       accessibilityLabel={label}
+      accessibilityIgnoresInvertColors={accessibilityIgnoresInvertColors}
     />
   );
 }

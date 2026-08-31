@@ -24,6 +24,10 @@
 
 <form method="post" action="@Model.Action" class="admin-form">
   <input type="hidden" name="@AdminTimelinePageModel.AntiforgeryTokenFieldName" value="@antiforgeryToken">
+  @if (Model.Event?.RowVersion is { Length: > 0 } rowVersion)
+  {
+    <input type="hidden" name="rowVersion" value="@Convert.ToBase64String(rowVersion)">
+  }
   <label>
     Title
     <input type="text" name="title" value="@Model.Draft.Title" maxlength="@QueenHistoryValidation.MaxTitleLength" required>

@@ -30,6 +30,26 @@ public sealed class AdminTimelineForm
     [FromForm(Name = "isPublished")]
     public bool IsPublished { get; init; }
 
+    [FromForm(Name = "rowVersion")]
+    public string? RowVersion { get; init; }
+
+    public byte[]? ParseRowVersion()
+    {
+        if (string.IsNullOrWhiteSpace(RowVersion))
+        {
+            return null;
+        }
+
+        try
+        {
+            return Convert.FromBase64String(RowVersion);
+        }
+        catch (FormatException)
+        {
+            return null;
+        }
+    }
+
     public AdminQueenHistoryDraft ToDraft()
     {
         DateTime eventDate = default;

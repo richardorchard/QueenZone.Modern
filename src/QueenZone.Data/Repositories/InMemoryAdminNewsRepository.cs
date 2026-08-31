@@ -24,9 +24,14 @@ public sealed class InMemoryAdminNewsRepository(SharedNewsStore store) : IAdminN
     public Task<int> CreateDraftAsync(AdminNewsDraft draft, string editorEmail, CancellationToken cancellationToken = default) =>
         Task.FromResult(store.CreateDraft(draft, editorEmail));
 
-    public Task UpdateAsync(int id, AdminNewsDraft draft, string editorEmail, CancellationToken cancellationToken = default)
+    public Task UpdateAsync(
+        int id,
+        AdminNewsDraft draft,
+        string editorEmail,
+        DateTime? expectedUpdatedAt = null,
+        CancellationToken cancellationToken = default)
     {
-        if (!store.Update(id, draft, editorEmail))
+        if (!store.Update(id, draft, editorEmail, expectedUpdatedAt))
         {
             throw new InvalidOperationException($"News article {id} was not found.");
         }
@@ -34,9 +39,13 @@ public sealed class InMemoryAdminNewsRepository(SharedNewsStore store) : IAdminN
         return Task.CompletedTask;
     }
 
-    public Task PublishAsync(int id, string editorEmail, CancellationToken cancellationToken = default)
+    public Task PublishAsync(
+        int id,
+        string editorEmail,
+        DateTime? expectedUpdatedAt = null,
+        CancellationToken cancellationToken = default)
     {
-        if (!store.SetPublished(id, true, editorEmail))
+        if (!store.SetPublished(id, true, editorEmail, expectedUpdatedAt))
         {
             throw new InvalidOperationException($"News article {id} was not found.");
         }
@@ -44,9 +53,13 @@ public sealed class InMemoryAdminNewsRepository(SharedNewsStore store) : IAdminN
         return Task.CompletedTask;
     }
 
-    public Task UnpublishAsync(int id, string editorEmail, CancellationToken cancellationToken = default)
+    public Task UnpublishAsync(
+        int id,
+        string editorEmail,
+        DateTime? expectedUpdatedAt = null,
+        CancellationToken cancellationToken = default)
     {
-        if (!store.SetPublished(id, false, editorEmail))
+        if (!store.SetPublished(id, false, editorEmail, expectedUpdatedAt))
         {
             throw new InvalidOperationException($"News article {id} was not found.");
         }
@@ -54,9 +67,13 @@ public sealed class InMemoryAdminNewsRepository(SharedNewsStore store) : IAdminN
         return Task.CompletedTask;
     }
 
-    public Task DeleteAsync(int id, string editorEmail, CancellationToken cancellationToken = default)
+    public Task DeleteAsync(
+        int id,
+        string editorEmail,
+        DateTime? expectedUpdatedAt = null,
+        CancellationToken cancellationToken = default)
     {
-        if (!store.Delete(id))
+        if (!store.Delete(id, expectedUpdatedAt))
         {
             throw new InvalidOperationException($"News article {id} was not found.");
         }

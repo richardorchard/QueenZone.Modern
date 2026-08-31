@@ -373,6 +373,7 @@ public sealed class QueenZoneDbContext : DbContext
             entity.Property(post => post.FileSize).HasMaxLength(12).IsUnicode(false);
             entity.Property(post => post.EditCount).HasDefaultValue(0);
             entity.Property(post => post.IsHidden).IsRequired().HasDefaultValue(false);
+            entity.Property(post => post.UpdatedAt).IsConcurrencyToken();
             entity.HasIndex(post => post.LegacyPostId)
                 .IsUnique()
                 .HasDatabaseName("UQ_ModernForumPost_LegacyPostId");
@@ -707,6 +708,17 @@ public sealed class QueenZoneDbContext : DbContext
             entity.Property(historyEvent => historyEvent.IsPublished).IsRequired();
             entity.Property(historyEvent => historyEvent.CreatedAt).IsRequired();
             entity.Property(historyEvent => historyEvent.UpdatedAt).IsRequired();
+            if (Database.IsSqlServer())
+            {
+                entity.Property(historyEvent => historyEvent.RowVersion).IsRowVersion();
+            }
+            else
+            {
+                entity.Property(historyEvent => historyEvent.RowVersion)
+                    .IsConcurrencyToken()
+                    .IsRequired()
+                    .ValueGeneratedNever();
+            }
 
             entity.HasIndex(historyEvent => new { historyEvent.IsPublished, historyEvent.DatePrecision, historyEvent.EventDate })
                 .HasDatabaseName("IX_QueenHistoryEvents_Published_Date");

@@ -57,7 +57,7 @@ public sealed class ActionModel(
             return ArticleNotFound(id);
         }
 
-        await adminNewsRepository.UnpublishAsync(id, EditorEmail, cancellationToken);
+        await adminNewsRepository.UnpublishAsync(id, EditorEmail, article.UpdatedAt, cancellationToken);
         await InvalidatePublicNewsCachesAsync(cancellationToken);
         await auditRepository.AppendAsync(id, "unpublish", EditorEmail, $"Unpublished \"{article.Title}\"", cancellationToken);
         await RemoveSearchIndexAsync(id, cancellationToken);
@@ -88,7 +88,7 @@ public sealed class ActionModel(
 
         try
         {
-            await adminNewsRepository.DeleteAsync(id, EditorEmail, cancellationToken);
+            await adminNewsRepository.DeleteAsync(id, EditorEmail, article.UpdatedAt, cancellationToken);
             await auditRepository.AppendAsync(id, "delete", EditorEmail, $"Deleted \"{article.Title}\"", cancellationToken);
             await RemoveSearchIndexAsync(id, cancellationToken);
             if (article.IsPublished)

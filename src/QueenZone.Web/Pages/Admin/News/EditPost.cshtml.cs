@@ -92,7 +92,25 @@ public sealed class EditPostModel(
             return Page();
         }
 
-        await adminNewsRepository.UpdateAsync(id, draft, EditorEmail, cancellationToken);
+        try
+        {
+            await adminNewsRepository.UpdateAsync(id, draft, EditorEmail, form.ParseExpectedUpdatedAt(), cancellationToken);
+        }
+        catch (OptimisticConcurrencyException)
+        {
+            var current = await adminNewsRepository.GetByIdAsync(id, cancellationToken) ?? existing;
+            ViewData["Title"] = "Edit article";
+            Form = EditModel.BuildForm(
+                current,
+                ToDraft(current),
+                [OptimisticConcurrencyException.UserMessage],
+                discoveryProvenance: null,
+                await NewsArticleGalleryPicker.ResolvePreviewUrlAsync(
+                    adminPhotoRepository,
+                    ToDraft(current),
+                    cancellationToken));
+            return Page();
+        }
         await articleImageService.TryDeletePreviousUgcArticlesAsync(
             existing.ImageBlobKey,
             draft.ImageBlobKey,

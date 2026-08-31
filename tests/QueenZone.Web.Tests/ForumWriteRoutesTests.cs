@@ -321,6 +321,7 @@ public sealed class ForumWriteRoutesTests : IClassFixture<WebApplicationFactory<
             string sanitisedBody,
             bool isAdmin,
             int editWindowMinutes,
+            DateTimeOffset? expectedUpdatedAt = null,
             CancellationToken cancellationToken = default) =>
             Task.FromResult(new ForumPostUpdateResult(ForumPostUpdateStatus.Forbidden));
 

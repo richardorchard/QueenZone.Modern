@@ -12,9 +12,14 @@ public sealed class InMemoryAdminFreddieTributeRepository(SharedFreddieTributeSt
     public Task<AdminFreddieTributeItem?> GetByIdAsync(int id, CancellationToken cancellationToken = default) =>
         Task.FromResult(store.GetById(id));
 
-    public Task SetVisibilityAsync(int id, bool isVisible, string editorEmail, CancellationToken cancellationToken = default)
+    public Task SetVisibilityAsync(
+        int id,
+        bool isVisible,
+        string editorEmail,
+        bool? expectedIsVisible = null,
+        CancellationToken cancellationToken = default)
     {
-        if (!store.SetVisibility(id, isVisible))
+        if (!store.SetVisibility(id, isVisible, expectedIsVisible))
         {
             throw new InvalidOperationException($"Freddie tribute {id} was not found.");
         }
@@ -22,9 +27,13 @@ public sealed class InMemoryAdminFreddieTributeRepository(SharedFreddieTributeSt
         return Task.CompletedTask;
     }
 
-    public Task DeleteAsync(int id, string editorEmail, CancellationToken cancellationToken = default)
+    public Task DeleteAsync(
+        int id,
+        string editorEmail,
+        bool? expectedIsVisible = null,
+        CancellationToken cancellationToken = default)
     {
-        if (!store.Delete(id))
+        if (!store.Delete(id, expectedIsVisible))
         {
             throw new InvalidOperationException($"Freddie tribute {id} was not found.");
         }

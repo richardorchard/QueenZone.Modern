@@ -49,9 +49,10 @@ public sealed class InMemoryAdminPhotoRepository(SharedPhotoStore store) : IAdmi
         int picId,
         AdminPhotoUpdateRequest request,
         string editorEmail,
+        AdminPhotoConcurrencyToken? expected = null,
         CancellationToken cancellationToken = default)
     {
-        if (!store.Update(picId, request, editorEmail))
+        if (!store.Update(picId, request, editorEmail, expected))
         {
             throw new InvalidOperationException($"Photo {picId} was not found.");
         }
@@ -63,9 +64,10 @@ public sealed class InMemoryAdminPhotoRepository(SharedPhotoStore store) : IAdmi
         int picId,
         bool isVisible,
         string editorEmail,
+        bool? expectedIsVisible = null,
         CancellationToken cancellationToken = default)
     {
-        if (!store.SetVisibility(picId, isVisible, editorEmail))
+        if (!store.SetVisibility(picId, isVisible, editorEmail, expectedIsVisible))
         {
             throw new InvalidOperationException($"Photo {picId} was not found.");
         }

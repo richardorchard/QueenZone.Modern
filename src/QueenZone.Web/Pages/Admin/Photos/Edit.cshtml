@@ -47,6 +47,12 @@
 
     <form class="admin-form" method="post" action="/admin/photos/@photo.PicId/save" enctype="multipart/form-data">
       <input type="hidden" name="@AdminPhotosPageModel.AntiforgeryTokenFieldName" value="@antiforgeryToken" />
+      <input type="hidden" name="expectedTitle" value="@photo.Title" />
+      <input type="hidden" name="expectedKeywords" value="@photo.Keywords" />
+      <input type="hidden" name="expectedYear" value="@photo.Year" />
+      <input type="hidden" name="expectedDateTime" value="@photo.DateTime.ToString("o")" />
+      <input type="hidden" name="expectedCatId" value="@photo.CatId" />
+      <input type="hidden" name="expectedIsVisible" value="@(photo.IsVisible ? "true" : "false")" />
 
       <label>
         Title
