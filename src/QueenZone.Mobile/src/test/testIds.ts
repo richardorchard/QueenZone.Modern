@@ -49,6 +49,7 @@ export const testIds = {
   photoViewerScreen: 'photo-viewer-screen',
 
   archiveHubScreen: 'archive-hub-screen',
+  articleStoryScreen: 'article-story-screen',
   timelineBack: 'timeline-back',
   triviaScreen: 'trivia-screen',
   triviaNext: 'trivia-next',

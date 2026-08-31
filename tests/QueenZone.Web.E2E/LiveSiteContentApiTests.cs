@@ -25,6 +25,8 @@ public class LiveSiteContentApiTests : RealDataPageTest
     [
         "/api/v1/content/news",
         "/api/v1/content/news/{id}",
+        "/api/v1/content/articles",
+        "/api/v1/content/articles/{id}",
         "/api/v1/content/biography",
         "/api/v1/content/biography/{id}",
         "/api/v1/content/discography",
@@ -54,6 +56,12 @@ public class LiveSiteContentApiTests : RealDataPageTest
         new(
             ListPath: "/api/v1/content/news",
             DetailPathTemplate: "/api/v1/content/news/{0}",
+            IdProperty: "id",
+            RequiredItemStrings: ["title", "publishedAt", "detailPath"],
+            RequiredDetailStrings: ["title", "body", "publishedAt", "detailPath"]),
+        new(
+            ListPath: "/api/v1/content/articles",
+            DetailPathTemplate: "/api/v1/content/articles/{0}",
             IdProperty: "id",
             RequiredItemStrings: ["title", "publishedAt", "detailPath"],
             RequiredDetailStrings: ["title", "body", "publishedAt", "detailPath"]),

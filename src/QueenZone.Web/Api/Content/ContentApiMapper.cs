@@ -54,6 +54,29 @@ public static class ContentApiMapper
         return replyCounts is not null && replyCounts.TryGetValue(id, out var count) ? count : 0;
     }
 
+    public static ArticleListItemDto ToArticleListItem(ArticleItem item) =>
+        new(
+            item.Id,
+            item.Title,
+            item.Excerpt,
+            item.PublishedAt,
+            ArticlesRoutes.GetArticleDetailPath(item),
+            item.CategoryName);
+
+    public static IReadOnlyList<ArticleListItemDto> ToArticleListItems(IEnumerable<ArticleItem> items) =>
+        items.Select(ToArticleListItem).ToList();
+
+    public static ArticleDetailDto ToArticleDetail(ArticleItem item) =>
+        new(
+            item.Id,
+            item.Title,
+            item.Excerpt,
+            ArticleContent.FormatBody(item.Body),
+            item.PublishedAt,
+            item.Source,
+            item.CategoryName,
+            ArticlesRoutes.GetArticleDetailPath(item));
+
     public static QuoteDto ToQuoteDto(QuoteItem quote) =>
         new(quote.Id, quote.Text, quote.WhoSaid, string.IsNullOrWhiteSpace(quote.Context) ? null : quote.Context);
 
