@@ -411,6 +411,8 @@ describe('ThreadScreen attachments', () => {
     const preview = screen.getByLabelText('tour-poster.jpg');
     expect(preview.props.source.uri).toContain('/ugc/forum/tour-poster-thumb.webp');
     expect(preview.props.source.uri).not.toContain('/forum/attachment/');
+    expect(preview.props.priority).toBe('low');
+    expect(preview.props.recyclingKey).toBe('/api/v1/forum/attachments/legacy/1002');
     expect(screen.queryByTestId(testIds.forumThreadAttachmentViewer)).toBeNull();
     expect(openImage).not.toHaveBeenCalled();
 
@@ -424,6 +426,8 @@ describe('ThreadScreen attachments', () => {
     expect(viewerImage.props.source).toEqual({
       uri: 'data:image/jpeg;base64,dGVzdA==',
     });
+    expect(viewerImage.props.contentFit).toBe('contain');
+    expect(viewerImage.props.source.uri).not.toContain('/forum/attachment/');
     expect(openAttachment).not.toHaveBeenCalled();
   });
 

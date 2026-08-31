@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Image,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -27,6 +26,7 @@ import {
 import { MemberGate } from '../../session/MemberGate';
 import { useSession } from '../../session/SessionContext';
 import { radius, space, type, useTheme, type ColorScheme } from '../../theme';
+import { ArchiveImage } from '../../ui/ArchiveImage';
 
 const kinds: { value: SubmissionKind; label: string }[] = [
   { value: 'photos', label: 'Photos' },
@@ -188,29 +188,35 @@ function MySubmissionsList() {
       ) : null}
 
       {kind === 'photos'
-        ? photos.map((item) => (
-            <View key={item.id} style={[styles.card, { borderColor: c.border, backgroundColor: c.surfaceCard }]}>
-              <View style={styles.photoRow}>
-                {resolveMediaUrl(apiBaseUrl, item.thumbnailPath) ? (
-                  <Image
-                    accessibilityIgnoresInvertColors
-                    source={{ uri: resolveMediaUrl(apiBaseUrl, item.thumbnailPath)! }}
-                    style={styles.thumb}
-                  />
-                ) : (
-                  <View style={[styles.thumb, { backgroundColor: c.surfaceRaised }]} />
-                )}
-                <View style={styles.cardBody}>
-                  <Text style={[type.cardTitle, { color: c.textPrimary }]}>{item.title}</Text>
-                  <StatusBadge tone={item.status.statusTone} label={item.status.statusLabel} />
-                  <Text style={[type.caption, { color: c.textMuted }]}>{formatWhen(item.submittedAt)}</Text>
-                  {item.notes ? (
-                    <Text style={[type.body, { color: c.textSecondary }]}>{item.notes}</Text>
-                  ) : null}
+        ? photos.map((item) => {
+            const thumbUri = resolveMediaUrl(apiBaseUrl, item.thumbnailPath);
+            return (
+              <View key={item.id} style={[styles.card, { borderColor: c.border, backgroundColor: c.surfaceCard }]}>
+                <View style={styles.photoRow}>
+                  {thumbUri ? (
+                    <ArchiveImage
+                      source={{ uri: thumbUri }}
+                      style={styles.thumb}
+                      priority="low"
+                      recyclingKey={item.id}
+                      label={item.title}
+                      accessibilityIgnoresInvertColors
+                    />
+                  ) : (
+                    <View style={[styles.thumb, { backgroundColor: c.surfaceRaised }]} />
+                  )}
+                  <View style={styles.cardBody}>
+                    <Text style={[type.cardTitle, { color: c.textPrimary }]}>{item.title}</Text>
+                    <StatusBadge tone={item.status.statusTone} label={item.status.statusLabel} />
+                    <Text style={[type.caption, { color: c.textMuted }]}>{formatWhen(item.submittedAt)}</Text>
+                    {item.notes ? (
+                      <Text style={[type.body, { color: c.textSecondary }]}>{item.notes}</Text>
+                    ) : null}
+                  </View>
                 </View>
               </View>
-            </View>
-          ))
+            );
+          })
         : null}
 
       {kind === 'news'

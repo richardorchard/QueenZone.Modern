@@ -1,9 +1,10 @@
 import { useCallback } from 'react';
-import { FlatList, Image, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { fetchDiscographyPage, type AlbumListItem } from '../../api';
 import { usePagedContent } from '../../hooks/usePagedContent';
 import type { ArchiveStackParamList } from '../../navigation/types';
+import { ArchiveImage } from '../../ui/ArchiveImage';
 import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from '../../ui/ScreenStates';
 import { radius, space, type, useTheme } from '../../theme';
 
@@ -48,7 +49,14 @@ export function DiscographyScreen({ navigation }: Props) {
           style={({ pressed }) => [styles.row, { borderTopColor: c.hairline, opacity: pressed ? 0.72 : 1 }]}
         >
           {item.thumbnailUrl ? (
-            <Image source={{ uri: item.thumbnailUrl }} style={styles.thumb} accessibilityIgnoresInvertColors />
+            <ArchiveImage
+              source={{ uri: item.thumbnailUrl }}
+              style={styles.thumb}
+              priority="low"
+              recyclingKey={String(item.albumId)}
+              label={item.name}
+              accessibilityIgnoresInvertColors
+            />
           ) : (
             <View style={[styles.thumb, { backgroundColor: c.surfaceCard, borderColor: c.hairline, borderWidth: 1 }]} />
           )}

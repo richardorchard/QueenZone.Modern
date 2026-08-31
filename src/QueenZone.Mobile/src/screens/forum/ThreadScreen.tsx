@@ -1,9 +1,9 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Image as ExpoImage } from 'expo-image';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
-  Image,
   Modal,
   Pressable,
   RefreshControl,
@@ -47,6 +47,7 @@ import {
 import { isSmokeAttachEnabled } from '../../session/smokeAttach';
 import { useSession } from '../../session/SessionContext';
 import { openForumComposer, openSignIn } from '../../session/signInNavigation';
+import { ArchiveImage } from '../../ui/ArchiveImage';
 import { RichHtmlBody } from '../../ui/RichHtmlBody';
 import { Button } from '../../ui/Button';
 import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock, OfflineBanner } from '../../ui/ScreenStates';
@@ -678,11 +679,12 @@ function ForumAttachmentList({
         const body = (
           <>
             {previewUri ? (
-              <Image
+              <ArchiveImage
                 source={{ uri: previewUri }}
                 style={[styles.thumb, { backgroundColor: c.surfaceCard, borderColor: c.hairline }]}
-                resizeMode="cover"
-                accessibilityLabel={attachment.fileName}
+                priority="low"
+                recyclingKey={attachment.downloadUrl}
+                label={attachment.fileName}
               />
             ) : null}
             {meta}
@@ -731,10 +733,10 @@ function ForumAttachmentList({
           accessibilityLabel="Close attachment"
         >
           {viewer ? (
-            <Image
+            <ExpoImage
               source={{ uri: viewer.uri }}
               style={styles.viewerImage}
-              resizeMode="contain"
+              contentFit="contain"
               accessibilityLabel={viewer.label}
             />
           ) : null}
