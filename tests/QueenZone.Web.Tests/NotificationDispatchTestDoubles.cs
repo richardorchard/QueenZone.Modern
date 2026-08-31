@@ -33,14 +33,14 @@ internal sealed class NoOpNotificationDispatcher : INotificationDispatcher
 
 internal sealed class RecordingPushTransport : IPushTransport
 {
-    public List<(IReadOnlyList<DeviceTokenEntity> Tokens, PushNotificationPayload Payload)> Sends { get; } = [];
+    public List<(IReadOnlyList<PushDeviceToken> Tokens, PushNotificationPayload Payload)> Sends { get; } = [];
 
     public Exception? ThrowOnSend { get; set; }
 
     public int TokenSendCount => Sends.Sum(send => send.Tokens.Count);
 
     public Task SendAsync(
-        IReadOnlyList<DeviceTokenEntity> tokens,
+        IReadOnlyList<PushDeviceToken> tokens,
         PushNotificationPayload payload,
         CancellationToken cancellationToken = default)
     {
@@ -108,7 +108,7 @@ internal static class DeviceTokenTestData
 {
     public static DeviceTokenEntity Token(
         Guid memberId,
-        DevicePushPlatform platform,
+        QueenZone.Data.Entities.DevicePushPlatform platform,
         string token,
         string? deviceId = null) =>
         new()
@@ -121,4 +121,10 @@ internal static class DeviceTokenTestData
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
         };
+
+    public static PushDeviceToken PushToken(
+        Guid memberId,
+        PushDevicePlatform platform,
+        string token) =>
+        new(memberId, platform, token);
 }

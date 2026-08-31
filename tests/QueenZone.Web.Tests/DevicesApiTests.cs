@@ -56,7 +56,7 @@ public sealed class DevicesApiTests : IClassFixture<QueenZoneWebApplicationFacto
         var dto = await response.Content.ReadFromJsonAsync<DeviceRegisteredResponse>(JsonOptions);
         Assert.NotNull(dto);
         Assert.Equal(deviceId, dto!.DeviceId);
-        Assert.Equal(DevicePushPlatform.Apns, dto.Platform);
+        Assert.Equal(PushDevicePlatform.Apns, dto.Platform);
 
         var stored = await FindDeviceAsync(deviceId);
         Assert.NotNull(stored);
@@ -143,7 +143,7 @@ public sealed class DevicesApiTests : IClassFixture<QueenZoneWebApplicationFacto
         Assert.NotNull(stored);
         Assert.Equal(memberId, stored!.MemberAccountId);
         Assert.Equal("token-new", stored.Token);
-        Assert.Equal(DevicePushPlatform.Fcm, stored.Platform);
+        Assert.Equal(QueenZone.Data.Entities.DevicePushPlatform.Fcm, stored.Platform);
     }
 
     [Theory]
@@ -164,6 +164,55 @@ public sealed class DevicesApiTests : IClassFixture<QueenZoneWebApplicationFacto
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
+    public async Task Register_ResponseJson_KeepsDeviceRegistrationWireShape()
+    {
+        var memberId = Guid.NewGuid();
+        await SeedMemberAsync(memberId, "Contract Fan", "device-contract@example.com");
+        using var client = CreateBearerClient(memberId, "Contract Fan", "device-contract@example.com");
+        var deviceId = $"device-{Guid.NewGuid()}";
+
+        using var response = await client.PostAsJsonAsync(
+            DevicesPath,
+            new { deviceId, platform = "apns", token = "token-contract" });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("application/json", response.Content.Headers.ContentType?.MediaType);
+        await using var stream = await response.Content.ReadAsStreamAsync();
+        using var doc = await JsonDocument.ParseAsync(stream);
+        var root = doc.RootElement;
+        Assert.Equal(JsonValueKind.Object, root.ValueKind);
+        Assert.Equal(
+            ["deviceId", "platform", "updatedAt"],
+            root.EnumerateObject().Select(property => property.Name).ToArray());
+        Assert.Equal(deviceId, root.GetProperty("deviceId").GetString());
+        Assert.Equal("apns", root.GetProperty("platform").GetString());
+        Assert.Equal(JsonValueKind.String, root.GetProperty("updatedAt").ValueKind);
+        Assert.False(root.TryGetProperty("token", out _));
+        Assert.False(root.TryGetProperty("memberAccountId", out _));
+        Assert.False(root.TryGetProperty("id", out _));
+    }
+
+    [Fact]
+    public async Task Register_RequestJson_AcceptsExistingDeviceIdPlatformTokenShape()
+    {
+        var memberId = Guid.NewGuid();
+        await SeedMemberAsync(memberId, "Shape Fan", "device-shape@example.com");
+        using var client = CreateBearerClient(memberId, "Shape Fan", "device-shape@example.com");
+        using var content = new StringContent(
+            """{"deviceId":"wire-device-1","platform":"fcm","token":"wire-token"}""",
+            System.Text.Encoding.UTF8,
+            "application/json");
+
+        using var response = await client.PostAsync(DevicesPath, content);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        await using var stream = await response.Content.ReadAsStreamAsync();
+        using var doc = await JsonDocument.ParseAsync(stream);
+        Assert.Equal("wire-device-1", doc.RootElement.GetProperty("deviceId").GetString());
+        Assert.Equal("fcm", doc.RootElement.GetProperty("platform").GetString());
     }
 
     [Fact]

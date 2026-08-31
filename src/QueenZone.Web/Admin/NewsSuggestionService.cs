@@ -1,4 +1,6 @@
 using System.Net;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using QueenZone.Data;
 using QueenZone.NewsAgent;
@@ -41,8 +43,14 @@ public abstract record SubmitOutcome
 
 public sealed class NewsSuggestionService(
     INewsSuggestionRepository newsSuggestionRepository,
-    IOptions<NewsSuggestionOptions> options)
+    IOptions<NewsSuggestionOptions> options,
+    IAdminNewsRepository? adminNewsRepository = null,
+    INewsAuditRepository? auditRepository = null,
+    IServiceProvider? serviceProvider = null,
+    ILogger<NewsSuggestionService>? logger = null)
 {
+    private readonly ILogger<NewsSuggestionService> log = logger ?? NullLogger<NewsSuggestionService>.Instance;
+
     public const string DuplicateActiveMessage =
         "This story has already been suggested — thank you, we are reviewing it.";
 
@@ -121,6 +129,79 @@ public sealed class NewsSuggestionService(
         {
             return new SubmitOutcome.DuplicateActive(DuplicateActiveMessage);
         }
+    }
+
+    public async Task<int> PromoteToAdminDraftAsync(
+        NewsSuggestion suggestion,
+        AdminNewsDraft adminDraft,
+        string editorEmail,
+        string? reviewNotes,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(suggestion);
+        ArgumentNullException.ThrowIfNull(adminDraft);
+        ArgumentException.ThrowIfNullOrWhiteSpace(editorEmail);
+        ArgumentNullException.ThrowIfNull(adminNewsRepository);
+        ArgumentNullException.ThrowIfNull(auditRepository);
+
+        var promotionStage = "creating the admin draft";
+        try
+        {
+            return await SqlBackedWriteTransaction.ExecuteAsync(
+                serviceProvider,
+                ct => PromoteToAdminDraftCoreAsync(
+                    suggestion,
+                    adminDraft,
+                    editorEmail,
+                    reviewNotes,
+                    stage => promotionStage = stage,
+                    ct),
+                cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException and not AdminNewsPromotionException)
+        {
+            log.LogError(
+                ex,
+                "Failed while {PromotionStage} for news suggestion {SuggestionId}",
+                promotionStage,
+                suggestion.Id);
+            throw new AdminNewsPromotionException(
+                $"Promotion failed while {promotionStage}. Check the app logs for details.");
+        }
+    }
+
+    private async Task<int> PromoteToAdminDraftCoreAsync(
+        NewsSuggestion suggestion,
+        AdminNewsDraft adminDraft,
+        string editorEmail,
+        string? reviewNotes,
+        Action<string> setStage,
+        CancellationToken ct)
+    {
+        var promotedNewsId = await adminNewsRepository!.CreateDraftAsync(adminDraft, editorEmail, ct);
+
+        setStage("updating the suggestion");
+        var promoted = await newsSuggestionRepository.PromoteAsync(
+            suggestion.Id,
+            promotedNewsId,
+            editorEmail,
+            reviewNotes,
+            ct);
+        if (promoted is null)
+        {
+            throw new AdminNewsPromotionException("Promotion failed while updating the suggestion.");
+        }
+
+        setStage("recording the promotion audit");
+        await auditRepository!.AppendAsync(
+            promotedNewsId,
+            "promote-from-suggestion",
+            editorEmail,
+            $"Promoted from member suggestion {suggestion.Id}. URL: {suggestion.Url}",
+            ct);
+
+        setStage("committing the promotion");
+        return promotedNewsId;
     }
 
     internal static string? ValidateUrl(string? url) => DescribeUrlProblem(url);

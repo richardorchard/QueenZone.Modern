@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using QueenZone.Web.Pages.Admin.News;
+using QueenZone.Web;
 
 namespace QueenZone.Web.Tests;
 

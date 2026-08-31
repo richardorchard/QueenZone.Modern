@@ -159,6 +159,97 @@ public sealed class NewsSuggestionServiceTests
     }
 
     [Fact]
+    public async Task PromoteToAdminDraftAsync_CreatesDraftUpdatesSuggestionAndAudits()
+    {
+        var newsStore = new SharedNewsStore();
+        var admin = new InMemoryAdminNewsRepository(newsStore);
+        var suggestions = new InMemoryNewsSuggestionRepository();
+        var created = await suggestions.CreateAsync(
+            new NewsSuggestion(
+                Guid.NewGuid(),
+                Guid.NewGuid(),
+                "https://example.com/promote-story",
+                NewsCandidateDedupe.ComputeUrlHash("https://example.com/promote-story"),
+                "Promote headline",
+                "Editor notes",
+                NewsSuggestionStatus.Pending,
+                DateTimeOffset.UtcNow,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null),
+            CancellationToken.None);
+        var service = new NewsSuggestionService(
+            suggestions,
+            Options.Create(new NewsSuggestionOptions()),
+            admin,
+            new InMemoryNewsAuditRepository(newsStore));
+        var adminDraft = NewsSuggestionPromoteDraft.Build(created);
+
+        var newsId = await service.PromoteToAdminDraftAsync(
+            created,
+            adminDraft,
+            "editor@test.local",
+            "Looks good");
+
+        var article = await admin.GetByIdAsync(newsId);
+        Assert.NotNull(article);
+        Assert.False(article!.IsPublished);
+        var updated = await suggestions.GetByIdAsync(created.Id);
+        Assert.Equal(NewsSuggestionStatus.Promoted, updated!.Status);
+        Assert.Equal(newsId, updated.PromotedNewsId);
+        var audit = Assert.Single(await new InMemoryNewsAuditRepository(newsStore).GetByNewsIdAsync(newsId));
+        Assert.Equal("promote-from-suggestion", audit.Action);
+        Assert.Contains(created.Id.ToString(), audit.Details, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task PromoteToAdminDraftAsync_Throws_WhenSuggestionPromoteReturnsNull()
+    {
+        var newsStore = new SharedNewsStore();
+        var inner = new InMemoryNewsSuggestionRepository();
+        var created = await inner.CreateAsync(
+            new NewsSuggestion(
+                Guid.NewGuid(),
+                Guid.NewGuid(),
+                "https://example.com/missing-promote",
+                NewsCandidateDedupe.ComputeUrlHash("https://example.com/missing-promote"),
+                "Headline",
+                null,
+                NewsSuggestionStatus.Pending,
+                DateTimeOffset.UtcNow,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null),
+            CancellationToken.None);
+        var suggestions = new ConfigurableNewsSuggestionRepository(inner)
+        {
+            PromoteHandler = (_, _, _, _, _) => Task.FromResult<NewsSuggestion?>(null),
+        };
+        var service = new NewsSuggestionService(
+            suggestions,
+            Options.Create(new NewsSuggestionOptions()),
+            new InMemoryAdminNewsRepository(newsStore),
+            new InMemoryNewsAuditRepository(newsStore));
+
+        var ex = await Assert.ThrowsAsync<AdminNewsPromotionException>(() =>
+            service.PromoteToAdminDraftAsync(
+                created,
+                NewsSuggestionPromoteDraft.Build(created),
+                "editor@test.local",
+                null));
+
+        Assert.Equal("Promotion failed while updating the suggestion.", ex.Message);
+    }
+
+    [Fact]
     public void ValidateUrl_RejectsOverlongUrl()
     {
         var error = NewsSuggestionService.ValidateUrl("https://example.com/" + new string('a', 2000));
