@@ -456,7 +456,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       apiBaseUrl,
       memberId: signedOutMemberId,
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- read via sessionRef
   }, [clearLocal]);
 
   const setAccessToken = useCallback((accessToken: string | null) => {

@@ -5,7 +5,7 @@ import { act, screen, waitFor, userEvent } from '@testing-library/react-native';
 import { ApiError, fetchJson } from '../api/client';
 import { authTokensFixture, memberProfilePayload } from '../test/fixtures';
 import { renderWithProviders } from '../test/render';
-import { SessionProvider, useSession, useSessionActions } from './SessionContext';
+import { SessionProvider, useSession, useSessionActions, type SessionActions } from './SessionContext';
 import * as oauth from './oauth';
 import * as tokenStore from './tokenStore';
 import * as notifications from '../notifications';
@@ -615,7 +615,7 @@ describe('SessionProvider actions context stability', () => {
     const user = userEvent.setup();
     const now = 1_700_000_000_000;
     const dateNow = jest.spyOn(Date, 'now').mockReturnValue(now);
-    const actionsSeen: ReturnType<typeof useSessionActions>[] = [];
+    const actionsSeen: SessionActions[] = [];
     let actionsOnlyRenders = 0;
 
     function ActionsOnlyChild() {
@@ -647,7 +647,7 @@ describe('SessionProvider actions context stability', () => {
       );
 
       await waitFor(() => expect(screen.getByText('signed-in')).toBeOnTheScreen());
-      expect(screen.getByText('anonymous')).toBeOnTheScreen());
+      expect(screen.getByText('anonymous')).toBeOnTheScreen();
       expect(screen.getByText('actions-only')).toBeOnTheScreen();
       const rendersAfterToken = actionsOnlyRenders;
       const actionsAfterToken = actionsSeen[actionsSeen.length - 1];
