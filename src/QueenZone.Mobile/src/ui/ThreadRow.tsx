@@ -1,11 +1,19 @@
 import { Platform, Pressable, Text, View } from 'react-native';
-import type { SampleThread } from '../content/sample';
 import { fonts, space, type, useTheme } from '../theme';
 import { MetaLine } from './MetaLine';
 import { usePressProps } from './press';
 
+export type ThreadRowItem = {
+  id: string;
+  title: string;
+  authorInitial: string;
+  author: string;
+  board: string;
+  replies: string;
+};
+
 type Props = {
-  item: SampleThread;
+  item: ThreadRowItem;
   onPress: () => void;
 };
 
