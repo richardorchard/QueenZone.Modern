@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace QueenZone.Data;
 
@@ -30,6 +31,11 @@ public static class QueenZoneDataServiceCollectionExtensions
                 }));
         services.AddScoped(sp =>
             sp.GetRequiredService<IDbContextFactory<QueenZoneDbContext>>().CreateDbContext());
+
+        // Warms the legacy NEWS_T column-availability probe cache before the app begins serving
+        // requests, so EfNewsRepository/EfAdminNewsRepository never block a request thread on it
+        // (issue #1161).
+        services.AddHostedService<NewsColumnAvailabilityWarmupService>();
 
         services.AddScoped<INewsRepository, EfNewsRepository>();
         services.AddScoped<IArticlesRepository, EfArticlesRepository>();

@@ -76,11 +76,36 @@ public static class LegacyNewsSchema
         return ColumnAvailabilityCache.GetOrAdd(connectionString, static cs => ProbeNewsColumnAvailability(cs));
     }
 
+    /// <summary>
+    /// Probes legacy <c>NEWS_T</c> column availability asynchronously and populates the process
+    /// cache, so that <see cref="GetNewsColumnAvailability"/> can return a cached value without
+    /// ever touching the database on a request thread. Intended to run once during host startup
+    /// (see <c>NewsColumnAvailabilityWarmupService</c>), before the app begins serving requests.
+    /// If this fails, the cache is left unpopulated and <see cref="GetNewsColumnAvailability"/>
+    /// falls back to probing synchronously on first use — a rare degraded path, not the norm.
+    /// </summary>
+    internal static async Task WarmupAsync(string connectionString, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
+        if (ColumnAvailabilityCache.ContainsKey(connectionString))
+        {
+            return;
+        }
+
+        var columns = await ProbeNewsColumnAvailabilityAsync(connectionString, cancellationToken);
+        ColumnAvailabilityCache.TryAdd(connectionString, columns);
+    }
+
     /// <summary>Test helper: clears process cache so probes can be re-tested in isolation.</summary>
     internal static void ClearColumnAvailabilityCacheForTests() => ColumnAvailabilityCache.Clear();
 
+    [ExcludeFromCodeCoverage] // SQL Server COL_LENGTH probe (cached).
+    private static NewsColumnAvailability ProbeNewsColumnAvailability(string connectionString) =>
+        ProbeNewsColumnAvailabilityAsync(connectionString, CancellationToken.None).GetAwaiter().GetResult();
+
     [ExcludeFromCodeCoverage] // SQL Server COL_LENGTH probe.
-    private static NewsColumnAvailability ProbeNewsColumnAvailability(string connectionString)
+    private static Task<NewsColumnAvailability> ProbeNewsColumnAvailabilityAsync(
+        string connectionString, CancellationToken cancellationToken)
     {
         const string sql = """
             SELECT
@@ -94,6 +119,6 @@ public static class LegacyNewsSchema
                 CAST(CASE WHEN COL_LENGTH('NEWS_T', 'FORUM_TOPIC_ID') IS NOT NULL THEN 1 ELSE 0 END AS bit) AS HasForumTopicIdColumn
             """;
 
-        return EfSql.QuerySingleSqlAsync<NewsColumnAvailability>(connectionString, sql).GetAwaiter().GetResult();
+        return EfSql.QuerySingleSqlAsync<NewsColumnAvailability>(connectionString, sql, cancellationToken);
     }
 }
