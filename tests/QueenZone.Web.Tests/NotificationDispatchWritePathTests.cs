@@ -337,7 +337,9 @@ public sealed class NotificationDispatchWritePathTests : IClassFixture<QueenZone
             "editor@test.local");
         Assert.Empty(transport.Sends);
 
-        await write.PublishAsync(draft, "editor@test.local");
+        var edited = await admin.GetByIdAsync(draftId);
+        Assert.NotNull(edited);
+        await write.PublishAsync(edited, "editor@test.local");
         Assert.Single(transport.Sends);
         Assert.Equal("news", transport.Sends[0].Payload.Category);
         Assert.Equal(draftId.ToString(), transport.Sends[0].Payload.Data["articleId"]);
