@@ -1,5 +1,6 @@
 import * as Crypto from 'expo-crypto';
 import * as WebBrowser from 'expo-web-browser';
+import type { WebBrowserResultType } from 'expo-web-browser';
 import { waitFor } from '@testing-library/react-native';
 import { Linking } from 'react-native';
 import {
@@ -39,7 +40,7 @@ beforeEach(() => {
   linkingHandlers.length = 0;
   jest.spyOn(Linking, 'addEventListener').mockImplementation((_type, handler) => {
     linkingHandlers.push(handler as (event: { url: string }) => void);
-    return { remove: jest.fn() } as ReturnType<typeof Linking.addEventListener>;
+    return { remove: jest.fn() } as unknown as ReturnType<typeof Linking.addEventListener>;
   });
 });
 
@@ -67,7 +68,7 @@ describe('signInWithProvider', () => {
   });
 
   it('maps cancel, missing code, state mismatch, and provider errors', async () => {
-    openAuth.mockResolvedValueOnce({ type: 'cancel' });
+    openAuth.mockResolvedValueOnce({ type: 'cancel' as WebBrowserResultType });
     await expect(signInWithProvider('http://qz.test', 'Google')).rejects.toThrow('Sign-in was cancelled.');
 
     openAuth.mockResolvedValueOnce({

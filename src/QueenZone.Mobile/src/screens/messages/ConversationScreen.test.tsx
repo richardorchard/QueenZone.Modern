@@ -10,7 +10,9 @@ import {
   replyToConversation,
   reportConversationMessage,
 } from '../../api/messages';
+import type { ConversationDetail, ConversationMessage } from '../../api/messages';
 import { enqueueMessageReply, useOfflineQueue } from '../../offlineQueue';
+import { conversationDetailFixture, memberProfileFixture } from '../../test/fixtures';
 import { testIds } from '../../test/testIds';
 import { createMockSession } from '../../test/mockSession';
 import { fakeNavigation, flushVirtualizedList, renderWithProviders } from '../../test/render';
@@ -84,38 +86,25 @@ function renderConversation() {
 }
 
 function conversationDetail(
-  messages: {
-    id: string;
-    senderMemberId: string;
-    senderDisplayName: string;
-    body: string;
-    createdAt: string;
-    isMine: boolean;
-    sortKey: number;
-    reportedByViewer?: boolean;
-  }[],
-  overrides: { canSendReply?: boolean; hasBlockedOtherParticipant?: boolean } = {},
-) {
-  return {
+  messages: ConversationMessage[],
+  overrides: Partial<Pick<ConversationDetail, 'canSendReply' | 'hasBlockedOtherParticipant'>> = {},
+): ConversationDetail {
+  return conversationDetailFixture({
     conversationId,
     otherParticipantId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
     otherParticipantDisplayName: 'Bob',
     messages,
-    page: 1,
-    pageSize: 50,
     totalCount: messages.length,
-    totalPages: 1,
     detailPath: `/messages/${conversationId}`,
-    canSendReply: overrides.canSendReply ?? true,
-    hasBlockedOtherParticipant: overrides.hasBlockedOtherParticipant ?? false,
-  };
+    ...overrides,
+  });
 }
 
 describe('ConversationScreen', () => {
   beforeEach(() => {
     mockSession.isSignedIn = true;
     mockSession.accessToken = 'tok';
-    mockSession.profile = { memberId: 'member-1' };
+    mockSession.profile = memberProfileFixture({ memberId: 'member-1' });
     fetchConversationMock.mockReset();
     fetchConversationResultMock.mockReset();
     fetchConversationResultMock.mockImplementation(async (token, id, query) =>
