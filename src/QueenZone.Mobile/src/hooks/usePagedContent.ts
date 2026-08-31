@@ -10,7 +10,7 @@ type Fetcher<T> = (
   mode: PagedFetchMode,
 ) => Promise<ApiPagedResponse<T>>;
 
-type PagedState<T> = {
+export type PagedState<T> = {
   items: T[];
   page: number;
   totalPages: number;

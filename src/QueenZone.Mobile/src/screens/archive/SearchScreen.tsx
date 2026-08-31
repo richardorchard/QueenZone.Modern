@@ -2,7 +2,7 @@ import { useNavigation } from '@react-navigation/native';
 import * as WebBrowser from 'expo-web-browser';
 import { Search } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
-import { FlatList, Platform, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
+import { Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { fetchSearchPage, formatPublishedDate } from '../../api';
 import type { SearchResult } from '../../api/types';
 import { getAppConfig } from '../../config/appConfig';
@@ -13,7 +13,7 @@ import { ArchiveFooter } from '../../ui/ArchiveFooter';
 import { ArticleRow } from '../../ui/ArticleRow';
 import { Chip } from '../../ui/Chip';
 import { Eyebrow } from '../../ui/Eyebrow';
-import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from '../../ui/ScreenStates';
+import { PagedListScreen } from '../../ui/PagedListScreen';
 import {
   searchMinQueryLength,
   searchQueryPresets,
@@ -36,7 +36,6 @@ function SearchResults({
   typeFilter: SearchTypeFilter;
   onOpen?: Props['onOpen'];
 }) {
-  const { c } = useTheme();
   const paged = usePagedContent<SearchResult>(
     useCallback(
       (page, signal) => fetchSearchPage({ q: query, type: typeFilter, page, pageSize: 20, signal }),
@@ -46,25 +45,18 @@ function SearchResults({
     `${query}|${typeFilter ?? ''}`,
   );
 
-  if (paged.loading && paged.items.length === 0) {
-    return <LoadingBlock label="Searching the archive…" />;
-  }
-
-  if (paged.error && paged.items.length === 0) {
-    return <ErrorBlock message={paged.error} onRetry={paged.reload} />;
-  }
-
   const countLine =
     paged.totalCount === 1
       ? `1 result for “${query}”`
       : `${paged.totalCount.toLocaleString('en-GB')} results for “${query}”`;
 
   return (
-    <FlatList
+    <PagedListScreen
       testID="search-results"
-      style={{ flex: 1 }}
-      data={paged.items}
+      paged={paged}
       keyExtractor={(item) => item.sourceKey}
+      loadingLabel="Searching the archive…"
+      emptyMessage={`No results found for “${query}”. Try different keywords.`}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
       ListHeaderComponent={
@@ -72,24 +64,7 @@ function SearchResults({
           <Eyebrow tone="muted">{paged.totalCount > 0 ? countLine : 'Results'}</Eyebrow>
         </View>
       }
-      ListEmptyComponent={
-        <EmptyBlock message={`No results found for “${query}”. Try different keywords.`} />
-      }
-      ListFooterComponent={
-        <>
-          <ListFooterLoading visible={paged.loadingMore} />
-          <ArchiveFooter />
-        </>
-      }
-      refreshControl={
-        <RefreshControl
-          refreshing={paged.refreshing}
-          onRefresh={paged.refresh}
-          tintColor={c.accentPrimary}
-        />
-      }
-      onEndReached={paged.loadMore}
-      onEndReachedThreshold={0.4}
+      footerAfter={<ArchiveFooter />}
       renderItem={({ item }) => (
         <ArticleRow
           testID={`search-result-${item.sourceKey.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}`}

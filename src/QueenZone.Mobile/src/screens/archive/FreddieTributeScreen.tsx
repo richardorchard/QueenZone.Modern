@@ -1,8 +1,8 @@
 import { memo, useCallback, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, StyleSheet, Text, type ListRenderItem } from 'react-native';
+import { Pressable, StyleSheet, Text, type ListRenderItem } from 'react-native';
 import { fetchFreddieTributePage, type FreddieTribute } from '../../api';
 import { usePagedContent } from '../../hooks/usePagedContent';
-import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from '../../ui/ScreenStates';
+import { PagedListScreen } from '../../ui/PagedListScreen';
 import { space, type, useTheme } from '../../theme';
 
 function metaLine(item: FreddieTribute): string {
@@ -55,7 +55,6 @@ const FreddieTributeRow = memo(function FreddieTributeRow({
 });
 
 export function FreddieTributeScreen() {
-  const { c } = useTheme();
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const paged = usePagedContent<FreddieTribute>(
     useCallback((page, signal) => fetchFreddieTributePage({ page, pageSize: 20, signal }), []),
@@ -76,37 +75,18 @@ export function FreddieTributeScreen() {
     [expandedId, toggleExpanded],
   );
 
-  if (paged.loading && paged.items.length === 0) {
-    return <LoadingBlock label="Loading tributes…" />;
-  }
-
-  if (paged.error && paged.items.length === 0) {
-    return <ErrorBlock message={paged.error} onRetry={paged.reload} />;
-  }
-
   return (
-    <FlatList
-      style={[styles.list, { backgroundColor: c.surfacePage }]}
-      data={paged.items}
+    <PagedListScreen
+      paged={paged}
       keyExtractor={tributeKeyExtractor}
-      ListEmptyComponent={<EmptyBlock message="No tributes yet." />}
-      ListFooterComponent={<ListFooterLoading visible={paged.loadingMore} />}
-      refreshControl={
-        <RefreshControl
-          refreshing={paged.refreshing}
-          onRefresh={paged.refresh}
-          tintColor={c.accentPrimary}
-        />
-      }
-      onEndReached={paged.loadMore}
-      onEndReachedThreshold={0.4}
+      loadingLabel="Loading tributes…"
+      emptyMessage="No tributes yet."
       renderItem={renderItem}
     />
   );
 }
 
 const styles = StyleSheet.create({
-  list: { flex: 1 },
   row: {
     paddingVertical: space.base,
     paddingHorizontal: space.xl,
