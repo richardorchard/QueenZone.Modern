@@ -532,6 +532,11 @@ public sealed class PublicQueryCacheServiceTests
         public Task<NewsItem?> GetByIdAsync(int id, CancellationToken cancellationToken = default) =>
             Task.FromResult<NewsItem?>(null);
 
+        public Task<IReadOnlyList<NewsItem>> GetByIdsAsync(
+            IReadOnlyCollection<int> ids,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<NewsItem>>([]);
+
         public Task<IReadOnlyList<SitemapContentEntry>> GetPublishedSitemapEntriesAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<SitemapContentEntry>>([]);
 

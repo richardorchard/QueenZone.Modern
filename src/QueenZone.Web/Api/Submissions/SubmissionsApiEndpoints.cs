@@ -90,12 +90,36 @@ public static class SubmissionsApiEndpoints
         var result = await newsSuggestionRepository.GetBySubmitterAsync(
             memberId, request.Page, request.PageSize, cancellationToken);
 
+        var promotedNewsIds = result.Items
+            .Where(suggestion => suggestion.Status == NewsSuggestionStatus.Promoted
+                && suggestion.PromotedNewsId is not null)
+            .Select(suggestion => suggestion.PromotedNewsId!.Value)
+            .Distinct()
+            .ToArray();
+
+        IReadOnlyDictionary<int, NewsItem> newsById;
+        if (promotedNewsIds.Length == 0)
+        {
+            newsById = new Dictionary<int, NewsItem>();
+        }
+        else
+        {
+            var newsItems = await newsRepository.GetByIdsAsync(promotedNewsIds, cancellationToken);
+            newsById = newsItems.ToDictionary(item => item.Id);
+        }
+
         var items = new List<NewsSuggestionItemDto>(result.Items.Count);
         foreach (var suggestion in result.Items)
         {
-            var publishedPath = await SubmissionsApiMapper.ResolvePublishedNewsPathAsync(
-                suggestion, newsRepository, cancellationToken);
-            items.Add(SubmissionsApiMapper.ToNews(suggestion, publishedPath));
+            NewsItem? news = null;
+            if (suggestion.PromotedNewsId is int newsId)
+            {
+                newsById.TryGetValue(newsId, out news);
+            }
+
+            items.Add(SubmissionsApiMapper.ToNews(
+                suggestion,
+                SubmissionsApiMapper.ResolvePublishedNewsPath(suggestion, news)));
         }
 
         httpContext.Response.Headers.CacheControl = "no-store";

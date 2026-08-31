@@ -38,6 +38,20 @@ internal sealed class FixedNewsRepository : INewsRepository
     public Task<NewsItem?> GetByIdAsync(int id, CancellationToken cancellationToken = default) =>
         Task.FromResult(publishedItems.SingleOrDefault(item => item.Id == id));
 
+    public Task<IReadOnlyList<NewsItem>> GetByIdsAsync(
+        IReadOnlyCollection<int> ids,
+        CancellationToken cancellationToken = default)
+    {
+        if (ids.Count == 0)
+        {
+            return Task.FromResult<IReadOnlyList<NewsItem>>([]);
+        }
+
+        var idSet = ids as ISet<int> ?? ids.ToHashSet();
+        return Task.FromResult<IReadOnlyList<NewsItem>>(
+            publishedItems.Where(item => idSet.Contains(item.Id)).ToList());
+    }
+
     public Task<IReadOnlyList<SitemapContentEntry>> GetPublishedSitemapEntriesAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<SitemapContentEntry>>(publishedItems
             .Select(item => new SitemapContentEntry(item.Id, item.Title, item.PublishedAt, item.Slug))

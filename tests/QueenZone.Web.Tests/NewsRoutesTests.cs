@@ -229,10 +229,16 @@ public sealed class NewsRoutesTests : IClassFixture<QueenZoneWebApplicationFacto
                 "admin@test.local"),
         ]);
 
-        var item = await new InMemoryNewsRepository(store, suggestions).GetByIdAsync(5200);
+        var repository = new InMemoryNewsRepository(store, suggestions);
+        var item = await repository.GetByIdAsync(5200);
+        var batched = await repository.GetByIdsAsync([5200, 404]);
+        Assert.Empty(await repository.GetByIdsAsync([]));
 
         Assert.Equal(memberId, item!.SubmitterMemberId);
         Assert.Equal("In-memory Contributor", item.SubmitterDisplayName);
+        var batchedItem = Assert.Single(batched);
+        Assert.Equal(memberId, batchedItem.SubmitterMemberId);
+        Assert.Equal("In-memory Contributor", batchedItem.SubmitterDisplayName);
     }
 
     [Fact]

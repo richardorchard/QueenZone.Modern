@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.Extensions.DependencyInjection;
 using QueenZone.Data;
 using QueenZone.Data.Entities;
@@ -164,6 +165,166 @@ public sealed class SubmissionsApiTests : IClassFixture<QueenZoneWebApplicationF
     }
 
     [Fact]
+    public async Task News_payload_json_matches_the_pre_batch_lookup_contract()
+    {
+        var submittedAt = new DateTimeOffset(2026, 6, 11, 9, 0, 0, TimeSpan.Zero);
+        var owner = await CreateMemberAsync("subs-news-json@example.com", "Json Fan");
+        var suggestions = factory.Services.GetRequiredService<INewsSuggestionRepository>();
+        var publishedId = Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
+        var missingId = Guid.Parse("bbbbbbbb-cccc-dddd-eeee-ffffffffffff");
+        var pendingId = Guid.Parse("cccccccc-dddd-eeee-ffff-aaaaaaaaaaaa");
+
+        await suggestions.CreateAsync(NewSuggestion(
+            owner.Id,
+            "https://example.com/json-published-news",
+            "Published news",
+            publishedId,
+            submittedAt));
+        await suggestions.PromoteAsync(publishedId, 1003, "admin@test.local", "Promoted");
+
+        await suggestions.CreateAsync(NewSuggestion(
+            owner.Id,
+            "https://example.com/json-missing-news",
+            "Missing news",
+            missingId,
+            submittedAt.AddMinutes(-1)));
+        await suggestions.PromoteAsync(missingId, 999_999, "admin@test.local", "Gone");
+
+        await suggestions.CreateAsync(NewSuggestion(
+            owner.Id,
+            "https://example.com/json-pending-news",
+            "Pending news",
+            pendingId,
+            submittedAt.AddMinutes(-2)));
+
+        using var client = CreateMemberClient(owner);
+        using var response = await client.GetAsync(SubmissionsApiEndpoints.NewsPath);
+        var actualJson = await response.Content.ReadAsStringAsync();
+
+        var publishedArticle = await factory.Services.GetRequiredService<INewsRepository>().GetByIdAsync(1003);
+        Assert.NotNull(publishedArticle);
+        var publishedPath = NewsRoutes.GetNewsDetailPath(publishedArticle!);
+        var expected = ApiPagedResponse<NewsSuggestionItemDto>.Create(
+            [
+                new NewsSuggestionItemDto(
+                    publishedId,
+                    "https://example.com/json-published-news",
+                    "https://example.com/json-published-news",
+                    "Published news",
+                    submittedAt,
+                    new SubmissionStatusDto(NewsSuggestionStatus.Promoted, "Promoted", "success"),
+                    "Promoted",
+                    1003,
+                    publishedPath),
+                new NewsSuggestionItemDto(
+                    missingId,
+                    "https://example.com/json-missing-news",
+                    "https://example.com/json-missing-news",
+                    "Missing news",
+                    submittedAt.AddMinutes(-1),
+                    new SubmissionStatusDto(NewsSuggestionStatus.Promoted, "Promoted", "success"),
+                    "Gone",
+                    999_999,
+                    null),
+                new NewsSuggestionItemDto(
+                    pendingId,
+                    "https://example.com/json-pending-news",
+                    "https://example.com/json-pending-news",
+                    "Pending news",
+                    submittedAt.AddMinutes(-2),
+                    new SubmissionStatusDto(NewsSuggestionStatus.Pending, "Pending", "pending"),
+                    null,
+                    null,
+                    null),
+            ],
+            page: 1,
+            pageSize: ApiPagination.DefaultPageSize,
+            totalCount: 3);
+        var expectedJson = JsonSerializer.Serialize(expected, JsonApiOptions);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(expectedJson, actualJson);
+    }
+
+    [Fact]
+    public async Task GetNewsAsync_loads_promoted_articles_with_one_batch_lookup()
+    {
+        var memberId = Guid.NewGuid();
+        var suggestions = new InMemoryNewsSuggestionRepository();
+        var news = new CountingBatchNewsRepository();
+        for (var i = 0; i < 8; i++)
+        {
+            var created = await suggestions.CreateAsync(NewSuggestion(
+                memberId,
+                $"https://example.com/batch-news-{i}",
+                $"Batch {i}"));
+            await suggestions.PromoteAsync(created.Id, 4100 + i, "admin@test.local", null);
+            news.Add(new NewsItem(
+                4100 + i,
+                $"Headline {i}",
+                "excerpt",
+                "body",
+                DateTime.UtcNow,
+                null,
+                true,
+                $"headline-{i}"));
+        }
+
+        var pending = await suggestions.CreateAsync(NewSuggestion(
+            memberId,
+            "https://example.com/batch-news-pending",
+            "Pending"));
+        var duplicatePromoted = await suggestions.CreateAsync(NewSuggestion(
+            memberId,
+            "https://example.com/batch-news-dup",
+            "Duplicate target"));
+        await suggestions.PromoteAsync(duplicatePromoted.Id, 4100, "admin@test.local", null);
+
+        var context = MemberHttpContext(memberId);
+        var result = await SubmissionsApiEndpoints.GetNewsAsync(
+            context,
+            suggestions,
+            news,
+            page: 1,
+            pageSize: 20,
+            CancellationToken.None);
+
+        var payload = Assert.IsType<Ok<ApiPagedResponse<NewsSuggestionItemDto>>>(result).Value;
+        Assert.Equal(1, news.GetByIdsCallCount);
+        Assert.Equal(0, news.GetByIdCallCount);
+        Assert.Equal(8, news.LastRequestedIds.Count);
+        Assert.Equal(10, payload!.TotalCount);
+        Assert.Equal(9, payload.Items.Count(item => item.PublishedPath is not null));
+        Assert.Contains(payload.Items, item => item.Id == pending.Id && item.PublishedPath is null);
+        Assert.Equal("no-store", context.Response.Headers.CacheControl.ToString());
+    }
+
+    [Fact]
+    public async Task GetNewsAsync_skips_the_news_lookup_when_the_page_has_no_promoted_ids()
+    {
+        var memberId = Guid.NewGuid();
+        var suggestions = new InMemoryNewsSuggestionRepository();
+        await suggestions.CreateAsync(NewSuggestion(
+            memberId,
+            "https://example.com/pending-only",
+            "Pending only"));
+        var news = new CountingBatchNewsRepository();
+        var context = MemberHttpContext(memberId);
+
+        var result = await SubmissionsApiEndpoints.GetNewsAsync(
+            context,
+            suggestions,
+            news,
+            page: 1,
+            pageSize: 20,
+            CancellationToken.None);
+
+        Assert.IsType<Ok<ApiPagedResponse<NewsSuggestionItemDto>>>(result);
+        Assert.Equal(0, news.GetByIdsCallCount);
+        Assert.Equal(0, news.GetByIdCallCount);
+    }
+
+    [Fact]
     public async Task List_clamps_invalid_paging_query_values()
     {
         var member = await CreateMemberAsync("subs-paging@example.com", "Paging Fan");
@@ -219,6 +380,19 @@ public sealed class SubmissionsApiTests : IClassFixture<QueenZoneWebApplicationF
         Assert.Equal(id, memberId);
     }
 
+    private static readonly JsonSerializerOptions JsonApiOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+    };
+
+    private static DefaultHttpContext MemberHttpContext(Guid memberId) =>
+        new()
+        {
+            User = new ClaimsPrincipal(new ClaimsIdentity(
+                [new Claim(ClaimTypes.NameIdentifier, memberId.ToString("D"))],
+                "test")),
+        };
+
     private HttpClient CreateMemberClient(MemberAccount member)
     {
         var token = factory.Services.GetRequiredService<MobileAuthTokenIssuer>()
@@ -257,16 +431,21 @@ public sealed class SubmissionsApiTests : IClassFixture<QueenZoneWebApplicationF
             800,
             600);
 
-    private static NewsSuggestion NewSuggestion(Guid memberId, string url, string title) =>
+    private static NewsSuggestion NewSuggestion(
+        Guid memberId,
+        string url,
+        string title,
+        Guid? id = null,
+        DateTimeOffset? submittedAt = null) =>
         new(
-            Guid.NewGuid(),
+            id ?? Guid.NewGuid(),
             memberId,
             url,
             NewsCandidateDedupe.ComputeUrlHash(NewsCandidateDedupe.NormalizeCanonicalUrl(url)),
             title,
             null,
             NewsSuggestionStatus.Pending,
-            DateTimeOffset.UtcNow,
+            submittedAt ?? DateTimeOffset.UtcNow,
             null,
             null,
             null,
@@ -274,4 +453,55 @@ public sealed class SubmissionsApiTests : IClassFixture<QueenZoneWebApplicationF
             null,
             "Fan",
             null);
+
+    private sealed class CountingBatchNewsRepository : INewsRepository
+    {
+        private readonly Dictionary<int, NewsItem> items = [];
+
+        public int GetByIdCallCount { get; private set; }
+
+        public int GetByIdsCallCount { get; private set; }
+
+        public IReadOnlyList<int> LastRequestedIds { get; private set; } = [];
+
+        public void Add(NewsItem item) => items[item.Id] = item;
+
+        public Task<IReadOnlyList<NewsItem>> GetLatestAsync(int count, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<NewsItem>>([]);
+
+        public Task<IReadOnlyList<NewsItem>> GetArchivePageAsync(
+            int page,
+            int pageSize,
+            NewsArchiveFilter filter = default,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<NewsItem>>([]);
+
+        public Task<int> GetPublishedCountAsync(NewsArchiveFilter filter = default, CancellationToken cancellationToken = default) =>
+            Task.FromResult(0);
+
+        public Task<NewsArchiveYearRange> GetArchiveYearRangeAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(new NewsArchiveYearRange(null, null));
+
+        public Task<NewsItem?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
+        {
+            GetByIdCallCount++;
+            return Task.FromResult(items.GetValueOrDefault(id));
+        }
+
+        public Task<IReadOnlyList<NewsItem>> GetByIdsAsync(
+            IReadOnlyCollection<int> ids,
+            CancellationToken cancellationToken = default)
+        {
+            GetByIdsCallCount++;
+            LastRequestedIds = ids.ToArray();
+            return Task.FromResult<IReadOnlyList<NewsItem>>(
+                ids.Distinct().Where(items.ContainsKey).Select(id => items[id]).ToList());
+        }
+
+        public Task<IReadOnlyList<SitemapContentEntry>> GetPublishedSitemapEntriesAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<SitemapContentEntry>>([]);
+
+        public Task<NewsSearchPage> SearchAsync(string query, int page, int pageSize, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new NewsSearchPage([], 0, page, pageSize));
+    }
 }

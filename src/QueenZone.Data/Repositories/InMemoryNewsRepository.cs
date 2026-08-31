@@ -29,10 +29,24 @@ public sealed class InMemoryNewsRepository(
 
     public async Task<NewsItem?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
-        var item = store.GetPublishedNewsItems().SingleOrDefault(item => item.Id == id);
-        return item is null
-            ? null
-            : (await AddSubmissionAttributionAsync([item], cancellationToken))[0];
+        var items = await GetByIdsAsync([id], cancellationToken);
+        return items.Count == 0 ? null : items[0];
+    }
+
+    public async Task<IReadOnlyList<NewsItem>> GetByIdsAsync(
+        IReadOnlyCollection<int> ids,
+        CancellationToken cancellationToken = default)
+    {
+        if (ids.Count == 0)
+        {
+            return [];
+        }
+
+        var idSet = ids as ISet<int> ?? ids.ToHashSet();
+        var items = store.GetPublishedNewsItems()
+            .Where(item => idSet.Contains(item.Id))
+            .ToList();
+        return await AddSubmissionAttributionAsync(items, cancellationToken);
     }
 
     public Task<IReadOnlyList<SitemapContentEntry>> GetPublishedSitemapEntriesAsync(CancellationToken cancellationToken = default) =>
