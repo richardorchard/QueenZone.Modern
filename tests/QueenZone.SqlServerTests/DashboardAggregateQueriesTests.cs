@@ -215,6 +215,112 @@ public sealed class DashboardAggregateQueriesTests : IAsyncLifetime
         };
     }
 
+    [Fact]
+    public async Task Pending_and_member_queues_page_in_sql_with_offset()
+    {
+        var member = Guid.NewGuid();
+        SeedMembers(member, "Pager", Guid.NewGuid(), "Other");
+        var now = new DateTimeOffset(2026, 8, 1, 12, 0, 0, TimeSpan.Zero);
+
+        var articleOldest = Guid.NewGuid();
+        var articleNewest = Guid.NewGuid();
+        dbContext.ArticleSubmissions.AddRange(
+            NewArticle(articleOldest, "Oldest article", now.AddDays(-2)),
+            NewArticle(Guid.NewGuid(), "Middle article", now.AddDays(-1)),
+            NewArticle(articleNewest, "Newest article", now));
+
+        var photoOldest = Guid.NewGuid();
+        dbContext.PhotoSubmissions.AddRange(
+            NewPhoto(photoOldest, "Oldest photo", now.AddDays(-2)),
+            NewPhoto(Guid.NewGuid(), "Middle photo", now.AddDays(-1)),
+            NewPhoto(Guid.NewGuid(), "Newest photo", now));
+
+        var newsOldest = Guid.NewGuid();
+        dbContext.NewsSuggestions.AddRange(
+            NewNews(newsOldest, "https://example.com/oldest", now.AddDays(-2)),
+            NewNews(Guid.NewGuid(), "https://example.com/middle", now.AddDays(-1)),
+            NewNews(Guid.NewGuid(), "https://example.com/newest", now));
+        await dbContext.SaveChangesAsync();
+
+        var articles = new EfArticleSubmissionRepository(dbContext);
+        var photos = new EfPhotoSubmissionRepository(dbContext);
+        var news = new EfNewsSuggestionRepository(dbContext);
+
+        AssertSqlPages(articles.PendingQueueQuery(2, 1).ToQueryString());
+        AssertSqlPages(articles.MemberDraftsSqlQuery(2, 1, member).ToQueryString());
+        AssertSqlPages(photos.PendingQueueQuery(2, 1).ToQueryString());
+        AssertSqlPages(photos.MemberQueueQuery(member, 2, 1).ToQueryString());
+        AssertSqlPages(news.PendingQueueQuery(2, 1).ToQueryString());
+        AssertSqlPages(news.MemberQueueQuery(member, 2, 1).ToQueryString());
+
+        var pendingArticles = await articles.GetPendingAsync(2, 2);
+        Assert.Single(pendingArticles);
+        Assert.Equal(articleOldest, pendingArticles[0].Id);
+        Assert.DoesNotContain(pendingArticles, item => item.Id == articleNewest);
+
+        var memberArticles = await articles.GetDraftsForMemberAsync(member, page: 2, pageSize: 2);
+        Assert.Single(memberArticles.Items);
+        Assert.Equal(articleOldest, memberArticles.Items[0].Id);
+
+        var pendingPhotos = await photos.GetPendingAsync(2, 2);
+        Assert.Single(pendingPhotos);
+        Assert.Equal(photoOldest, pendingPhotos[0].Id);
+
+        var memberPhotos = await photos.GetBySubmitterAsync(member, page: 2, pageSize: 2);
+        Assert.Single(memberPhotos.Items);
+        Assert.Equal(photoOldest, memberPhotos.Items[0].Id);
+
+        var pendingNews = await news.GetPendingAsync(2, 2);
+        Assert.Single(pendingNews);
+        Assert.Equal(newsOldest, pendingNews[0].Id);
+
+        var memberNews = await news.GetBySubmitterAsync(member, page: 2, pageSize: 2);
+        Assert.Single(memberNews.Items);
+        Assert.Equal(newsOldest, memberNews.Items[0].Id);
+
+        ArticleSubmissionEntity NewArticle(Guid id, string title, DateTimeOffset submittedAt) => new()
+        {
+            Id = id,
+            AuthorMemberId = member,
+            Title = title,
+            Slug = $"slug-{id:N}",
+            Body = new string('a', 400),
+            Status = ArticleSubmissionStatus.Submitted,
+            SubmittedAt = submittedAt,
+        };
+
+        PhotoSubmissionEntity NewPhoto(Guid id, string title, DateTimeOffset submittedAt) => new()
+        {
+            Id = id,
+            SubmitterMemberId = member,
+            Title = title,
+            BlobPath = $"{id:N}.webp",
+            WebOptimizedBlobPath = $"{id:N}-web.webp",
+            ThumbnailBlobPath = $"{id:N}-thumb.webp",
+            OriginalFileName = "original.jpg",
+            MimeType = "image/webp",
+            Status = PhotoSubmissionStatus.Pending,
+            SubmittedAt = submittedAt,
+        };
+
+        NewsSuggestionEntity NewNews(Guid id, string url, DateTimeOffset submittedAt) => new()
+        {
+            Id = id,
+            SubmitterMemberId = member,
+            Url = url,
+            UrlHash = id.ToString("N"),
+            Status = NewsSuggestionStatus.Pending,
+            SubmittedAt = submittedAt,
+        };
+    }
+
+    private static void AssertSqlPages(string sql)
+    {
+        Assert.Contains("OFFSET", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("FETCH", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("client evaluation", sql, StringComparison.OrdinalIgnoreCase);
+    }
+
     private void SeedMembers(Guid idA, string nameA, Guid idB, string nameB)
     {
         dbContext.MemberAccounts.AddRange(
