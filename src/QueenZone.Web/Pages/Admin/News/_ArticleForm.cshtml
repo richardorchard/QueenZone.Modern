@@ -38,7 +38,7 @@
 
 <form method="post"
       action="@Model.Action"
-      class="admin-form"
+      class="admin-form qz-form"
       enctype="multipart/form-data"
       data-busy-submit
       data-busy-label="Saving…">
@@ -47,105 +47,123 @@
   {
     <input type="hidden" name="expectedUpdatedAt" value="@updatedAt.ToUniversalTime().ToString("o")">
   }
-  <label>
-    Title
-    <input type="text" name="title" value="@Model.Draft.Title" maxlength="@NewsValidation.MaxTitleLength" required>
-  </label>
-  <label>
-    Slug
-    <input type="text" name="slug" value="@Model.Draft.Slug" placeholder="@NewsSlug.Resolve(Model.Draft.Title, null)" maxlength="@NewsSlug.MaxLength">
-  </label>
-  <p class="admin-help">Leave blank to auto-generate from the title.</p>
-  <label>
-    Excerpt
-    <input type="text" name="excerpt" value="@Model.Draft.Excerpt" maxlength="@NewsValidation.MaxExcerptLength" required>
-  </label>
-  @{
-    ViewData["TextareaId"] = "body";
-    ViewData["TextareaName"] = "body";
-    ViewData["EditorValue"] = Model.Draft.Body;
-    ViewData["UploadContainer"] = BlobUploadContainers.News;
-    ViewData["EditorLabel"] = "Body";
-    ViewData["ShowCodeView"] = true;
-  }
-  <partial name="_RichTextEditor" />
-  <label>
-    Publication date
-    <input type="date" name="publishedAt" value="@Model.Draft.PublishedAt.ToString("yyyy-MM-dd")" required>
-  </label>
-  <label>
-    Source URL
-    <input type="text" name="sourceUrl" value="@Model.Draft.SourceUrl" maxlength="@NewsValidation.MaxSourceUrlLength">
-  </label>
-  <input type="hidden" name="imageBlobKey" value="@Model.Draft.ImageBlobKey" data-article-image-blob-key>
-  <input type="hidden" name="imageGalleryPicId" value="@Model.Draft.ImageGalleryPicId" data-article-image-gallery-id>
-  @{
-    var previewImageUrl = !string.IsNullOrWhiteSpace(Model.PreviewImageUrl)
-      ? Model.PreviewImageUrl
-      : NewsArticleImage.ResolveDisplayUrl(Model.Draft.ImageBlobKey, Model.Draft.ImageGalleryPicId);
-    var hasArticleImage = !string.IsNullOrWhiteSpace(Model.PreviewImageUrl)
-      || NewsArticleImage.HasResolvedImage(Model.Draft.ImageBlobKey, Model.Draft.ImageGalleryPicId);
-  }
-  <div class="admin-article-image-upload"
-       data-article-image-crop
-       data-gallery-picker
-       data-aspect-width="@NewsArticleImageProcessor.CardAspectWidth"
-       data-aspect-height="@NewsArticleImageProcessor.CardAspectHeight"
-       data-min-crop-width="@NewsArticleImageProcessor.MinCropWidth"
-       data-min-crop-height="@NewsArticleImageProcessor.MinCropHeight"
-       data-max-bytes="@articleImageMaxBytes">
-    <figure class="admin-article-image">
-      <img src="@previewImageUrl"
-           alt="@(hasArticleImage ? "Article image" : "No article image")"
-           width="600"
-           height="400"
-           data-article-image-preview>
-      @if (!hasArticleImage)
-      {
-        <figcaption class="admin-help">No article image yet. Listings will use this placeholder.</figcaption>
+
+  <fieldset class="qz-fieldset">
+    <legend class="qz-legend">Content</legend>
+    <div class="qz-field">
+      <label class="qz-label" for="article-title">Title</label>
+      <input class="qz-input" id="article-title" type="text" name="title" value="@Model.Draft.Title" maxlength="@NewsValidation.MaxTitleLength" required>
+    </div>
+    <div class="qz-field">
+      <label class="qz-label" for="article-slug">Slug <span class="qz-label__optional">(optional)</span></label>
+      <input class="qz-input" id="article-slug" type="text" name="slug" value="@Model.Draft.Slug" placeholder="@NewsSlug.Resolve(Model.Draft.Title, null)" maxlength="@NewsSlug.MaxLength">
+      <p class="qz-help">Leave blank to auto-generate from the title.</p>
+    </div>
+    <div class="qz-field">
+      <label class="qz-label" for="article-excerpt">Excerpt</label>
+      <input class="qz-input" id="article-excerpt" type="text" name="excerpt" value="@Model.Draft.Excerpt" maxlength="@NewsValidation.MaxExcerptLength" required>
+    </div>
+    <div class="qz-field">
+      @{
+        ViewData["TextareaId"] = "body";
+        ViewData["TextareaName"] = "body";
+        ViewData["EditorValue"] = Model.Draft.Body;
+        ViewData["UploadContainer"] = BlobUploadContainers.News;
+        ViewData["EditorLabel"] = "Body";
+        ViewData["ShowCodeView"] = true;
       }
-    </figure>
-    <label>
-      Article image
-      <input type="file"
-             name="articleImage"
-             accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
-             data-article-image-input>
-    </label>
-    <p class="admin-help">JPEG, PNG, or WebP. Max 10&nbsp;MB. Crop to the 3:2 news-card frame before saving.</p>
-    <p>
-      <button type="button" data-gallery-picker-open data-gallery-picker-url="@NewsArticleGalleryPicker.Path">Choose from gallery</button>
-    </p>
-    <p class="admin-help">Or choose a library photo and crop it to the 3:2 card. The gallery original is not changed.</p>
-    <p class="admin-article-image-error" data-article-image-error hidden></p>
-    <input type="hidden" name="cropX" data-crop-x value="">
-    <input type="hidden" name="cropY" data-crop-y value="">
-    <input type="hidden" name="cropWidth" data-crop-width value="">
-    <input type="hidden" name="cropHeight" data-crop-height value="">
-    <dialog class="admin-article-crop" data-article-image-dialog>
-      <h2 class="admin-article-crop__title">Crop article image</h2>
-      <p class="admin-help">Drag to frame the 3:2 card. Zoom to tighten the crop.</p>
-      <div class="admin-article-crop__stage" data-article-image-stage>
-        <img alt="" data-article-image-stage-img>
+      <partial name="_RichTextEditor" />
+    </div>
+  </fieldset>
+
+  <fieldset class="qz-fieldset">
+    <legend class="qz-legend">Image</legend>
+    @{
+      var previewImageUrl = !string.IsNullOrWhiteSpace(Model.PreviewImageUrl)
+        ? Model.PreviewImageUrl
+        : NewsArticleImage.ResolveDisplayUrl(Model.Draft.ImageBlobKey, Model.Draft.ImageGalleryPicId);
+      var hasArticleImage = !string.IsNullOrWhiteSpace(Model.PreviewImageUrl)
+        || NewsArticleImage.HasResolvedImage(Model.Draft.ImageBlobKey, Model.Draft.ImageGalleryPicId);
+    }
+    <input type="hidden" name="imageBlobKey" value="@Model.Draft.ImageBlobKey" data-article-image-blob-key>
+    <input type="hidden" name="imageGalleryPicId" value="@Model.Draft.ImageGalleryPicId" data-article-image-gallery-id>
+    <div class="qz-field">
+      <label class="qz-label" for="article-image-file">Article image</label>
+      <div class="qz-dropzone"
+           data-article-image-crop
+           data-gallery-picker
+           data-aspect-width="@NewsArticleImageProcessor.CardAspectWidth"
+           data-aspect-height="@NewsArticleImageProcessor.CardAspectHeight"
+           data-min-crop-width="@NewsArticleImageProcessor.MinCropWidth"
+           data-min-crop-height="@NewsArticleImageProcessor.MinCropHeight"
+           data-max-bytes="@articleImageMaxBytes">
+        <figure class="admin-article-image qz-dropzone-media">
+          <img src="@previewImageUrl"
+               alt="@(hasArticleImage ? "Article image" : "No article image")"
+               width="600"
+               height="400"
+               data-article-image-preview>
+          @if (!hasArticleImage)
+          {
+            <figcaption class="qz-help">No article image yet — listings will use this placeholder.</figcaption>
+          }
+        </figure>
+        <div class="qz-dropzone-body">
+          <p class="qz-dropzone-hint">Drop an image here, or</p>
+          <div class="qz-dropzone-actions">
+            <button type="button" class="qz-button qz-button--outline qz-button--sm" data-article-image-choose>Choose file</button>
+            <button type="button" class="qz-button qz-button--ghost qz-button--sm" data-gallery-picker-open data-gallery-picker-url="@NewsArticleGalleryPicker.Path">Choose from gallery</button>
+          </div>
+          <p class="qz-help">JPEG, PNG or WebP &middot; max 10&nbsp;MB &middot; cropped to the 3:2 news-card frame. Gallery originals are never modified.</p>
+        </div>
+        <input id="article-image-file"
+               type="file"
+               name="articleImage"
+               accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+               data-article-image-input
+               class="visually-hidden">
       </div>
-      <label class="admin-article-crop__zoom">
-        Zoom
-        <input type="range" min="1" max="3" step="any" value="1" data-article-image-zoom disabled>
-      </label>
-      <div class="admin-form-actions">
-        <button type="button" data-article-image-apply>Use this crop</button>
-        <button type="button" data-article-image-cancel>Cancel</button>
-      </div>
-    </dialog>
-  </div>
+      <p class="qz-error" data-article-image-error hidden></p>
+      <input type="hidden" name="cropX" data-crop-x value="">
+      <input type="hidden" name="cropY" data-crop-y value="">
+      <input type="hidden" name="cropWidth" data-crop-width value="">
+      <input type="hidden" name="cropHeight" data-crop-height value="">
+      <dialog class="admin-article-crop" data-article-image-dialog>
+        <h2 class="admin-article-crop__title">Crop article image</h2>
+        <p class="qz-help">Drag to frame the 3:2 card. Zoom to tighten the crop.</p>
+        <div class="admin-article-crop__stage" data-article-image-stage>
+          <img alt="" data-article-image-stage-img>
+        </div>
+        <label class="admin-article-crop__zoom">
+          Zoom
+          <input type="range" min="1" max="3" step="any" value="1" data-article-image-zoom disabled>
+        </label>
+        <div class="admin-form-actions">
+          <button type="button" class="qz-button" data-article-image-apply>Use this crop</button>
+          <button type="button" class="qz-button qz-button--outline" data-article-image-cancel>Cancel</button>
+        </div>
+      </dialog>
+    </div>
+  </fieldset>
+
+  <fieldset class="qz-fieldset">
+    <legend class="qz-legend">Publication</legend>
+    <div class="qz-field">
+      <label class="qz-label" for="article-published-at">Publication date</label>
+      <input class="qz-input" id="article-published-at" type="date" name="publishedAt" value="@Model.Draft.PublishedAt.ToString("yyyy-MM-dd")" required style="width: 200px;">
+    </div>
+    <div class="qz-field">
+      <label class="qz-label" for="article-source-url">Source URL <span class="qz-label__optional">(optional)</span></label>
+      <input class="qz-input" id="article-source-url" type="text" name="sourceUrl" value="@Model.Draft.SourceUrl" maxlength="@NewsValidation.MaxSourceUrlLength">
+    </div>
+  </fieldset>
 
   <div class="admin-form-actions">
-    <button type="submit">Save</button>
-    <a href="/admin/news">Cancel</a>
+    <button type="submit" class="qz-button">Save</button>
+    <a class="qz-button qz-button--outline" href="/admin/news">Cancel</a>
     @if (Model.Article is not null)
     {
-      <span>|</span>
-      <a href="/admin/news/@Model.Article.Id/preview">Preview</a>
+      <a class="qz-button qz-button--ghost" href="/admin/news/@Model.Article.Id/preview">Preview</a>
     }
   </div>
 </form>

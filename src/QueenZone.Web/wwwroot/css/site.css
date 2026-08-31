@@ -1005,6 +1005,74 @@ body.qz-menu-lock .qz-masthead {
   }
 }
 
+/* Admin Form Style Guide (design/design_handoff_admin_forms) — button additions.
+   Extends the existing five .qz-button variants rather than adding a sixth. */
+.qz-button:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+
+.qz-button:active:not(:disabled):not(.is-busy) {
+  transform: translateY(1px);
+}
+
+.qz-button--sm {
+  padding: 0.5rem 1rem;
+  font-size: 0.8125rem;
+}
+
+.qz-button--lg {
+  padding: 1rem 2.125rem;
+  font-size: 0.9375rem;
+}
+
+.qz-button--block {
+  display: flex;
+  width: 100%;
+}
+
+/* Table row actions: fixed 32px ghost buttons, chrome only on hover/focus. */
+.qz-button--row {
+  height: 32px;
+  padding: 0 0.75rem;
+  border-color: transparent;
+  background: transparent;
+  color: var(--qz-grey-700);
+  font-size: 0.8125rem;
+}
+
+.qz-button--row:hover {
+  background: var(--qz-grey-100);
+  color: var(--qz-grey-700);
+}
+
+.qz-button--row.qz-button--row-danger:hover {
+  background: var(--qz-burgundy-tint);
+  color: var(--qz-burgundy);
+}
+
+@media (max-width: 720px) {
+  .qz-button--row {
+    height: 44px;
+    padding: 0 0.875rem;
+  }
+
+  .qz-button--row.is-icon {
+    width: 44px;
+    padding: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qz-button {
+    transition: none;
+  }
+
+  .qz-button:active:not(:disabled):not(.is-busy) {
+    transform: none;
+  }
+}
+
 .qz-account-form.is-submitting,
 .qz-form.is-submitting {
   opacity: 0.92;
@@ -1020,6 +1088,89 @@ body.qz-menu-lock .qz-masthead {
 .qz-account-form__status[hidden],
 .qz-form__busy-status[hidden] {
   display: none;
+}
+
+/* Admin Form Style Guide: labels sit above the field, never inline. */
+.qz-form__field {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: var(--space-5);
+}
+
+.qz-form__field > label {
+  display: block;
+  font: 600 0.8125rem/1.4 var(--font-body);
+  letter-spacing: 0.02em;
+  color: var(--text-primary);
+  margin-bottom: 7px;
+}
+
+.qz-form__field > input,
+.qz-form__field > select,
+.qz-form__field > textarea {
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  font: 400 15px/1.4 var(--font-body);
+  color: var(--text-primary);
+  background: var(--qz-white);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xs);
+  outline: none;
+  transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+}
+
+.qz-form__field > textarea {
+  height: auto;
+  min-height: 96px;
+  padding: 10px 12px;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.qz-form__field > input:focus,
+.qz-form__field > select:focus,
+.qz-form__field > textarea:focus {
+  border-color: var(--qz-blue);
+  box-shadow: var(--shadow-focus);
+}
+
+.qz-form__field .field-validation-error {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--qz-burgundy);
+  margin-top: 7px;
+}
+
+.qz-form__field .field-validation-error:empty {
+  display: none;
+}
+
+.qz-form__field.field-validation-error > input,
+.qz-form__field:has(.field-validation-error:not(:empty)) > input {
+  border-color: var(--qz-burgundy);
+}
+
+@media (max-width: 720px) {
+  .qz-form__field > input,
+  .qz-form__field > select,
+  .qz-form__field > textarea {
+    height: 48px;
+    font-size: 16px;
+  }
+
+  .qz-form__field > textarea {
+    height: auto;
+  }
+}
+
+@media (max-width: 720px) {
+  .qz-forum-compose .qz-form__actions .qz-button:first-child {
+    width: 100%;
+  }
 }
 
 .qz-form__actions {
@@ -2907,6 +3058,40 @@ a.qz-forum-post__author-link:focus-visible {
   max-width: var(--container-text);
 }
 
+.admin-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+}
+
+.admin-form-actions--secondary {
+  margin-top: var(--space-5);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--hairline);
+}
+
+.admin-form-actions .qz-button--row-danger {
+  margin-left: auto;
+}
+
+@media (max-width: 720px) {
+  .admin-form-actions {
+    position: sticky;
+    bottom: 0;
+    padding: 12px 0;
+    margin-top: var(--space-6);
+    border-top: 1px solid var(--border-default);
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(8px);
+  }
+
+  .admin-form-actions .qz-button:first-child {
+    flex: 1;
+  }
+}
+
 .admin-photo-preview {
   margin: 0 0 1.25rem;
 }
@@ -2934,15 +3119,15 @@ a.qz-forum-post__author-link:focus-visible {
 }
 
 .admin-article-image {
-  margin: 0 0 1.25rem;
+  margin: 0;
 }
 
 .admin-article-image img {
   display: block;
-  max-width: 320px;
   width: 100%;
   height: auto;
   aspect-ratio: 3 / 2;
+  border-radius: var(--radius-xs);
   object-fit: cover;
   background: var(--qz-black);
 }
@@ -3274,6 +3459,639 @@ a.qz-forum-post__author-link:focus-visible {
   white-space: pre-wrap;
   font-family: Consolas, monospace;
   margin: 0;
+}
+
+/* ============================================================
+   Admin Form Style Guide — design/design_handoff_admin_forms
+   Buttons above extend .qz-button. Everything else here is new:
+   field primitives, choice controls, dropzone, table row
+   treatment, status pills and the destructive-confirm dialog.
+   Same tokens as the public site, spoken more quietly.
+   ============================================================ */
+
+/* ---- Field, label, help, error ---- */
+.qz-field {
+  display: flex;
+  flex-direction: column;
+}
+
+.qz-label {
+  display: block;
+  font: 600 0.8125rem/1.4 var(--font-body);
+  letter-spacing: 0.02em;
+  color: var(--text-primary);
+  margin-bottom: 7px;
+}
+
+.qz-label__optional {
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.qz-help {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+  margin-top: 7px;
+}
+
+.qz-error {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--qz-burgundy);
+  margin-top: 7px;
+}
+
+.qz-error[hidden] {
+  display: none;
+}
+
+.qz-error::before {
+  content: "!";
+  flex: none;
+  width: 15px;
+  height: 15px;
+  border-radius: var(--radius-pill);
+  background: var(--qz-burgundy);
+  color: var(--qz-white);
+  font-size: 10px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.qz-error-summary {
+  border: 1px solid var(--border-default);
+  border-left: 2px solid var(--qz-burgundy);
+  background: var(--qz-burgundy-tint);
+  padding: 16px 18px;
+  margin-bottom: var(--space-5);
+}
+
+.qz-error-summary__title {
+  font: 600 0.875rem/1.4 var(--font-body);
+  color: var(--qz-burgundy);
+  margin: 0 0 6px;
+}
+
+.qz-error-summary ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: 0.875rem;
+}
+
+/* ---- Shared field shell: input, textarea, select ---- */
+.qz-input {
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  font: 400 15px/1.4 var(--font-body);
+  color: var(--text-primary);
+  background: var(--qz-white);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xs);
+  outline: none;
+  transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+}
+
+.qz-input::placeholder {
+  color: var(--qz-grey-400);
+}
+
+.qz-input:focus {
+  border-color: var(--qz-blue);
+  box-shadow: var(--shadow-focus);
+}
+
+.qz-input[aria-invalid="true"] {
+  border-color: var(--qz-burgundy);
+}
+
+.qz-input:disabled {
+  background: var(--qz-grey-100);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+textarea.qz-input {
+  height: auto;
+  min-height: 96px;
+  padding: 10px 12px;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+select.qz-input {
+  appearance: none;
+  padding-right: 34px;
+  background-image: linear-gradient(45deg, transparent 50%, var(--text-secondary) 50%),
+                    linear-gradient(135deg, var(--text-secondary) 50%, transparent 50%);
+  background-position: calc(100% - 18px) 17px, calc(100% - 13px) 17px;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+
+@media (max-width: 720px) {
+  .qz-input {
+    height: 48px;
+    font-size: 16px;
+  }
+
+  textarea.qz-input {
+    height: auto;
+    font-size: 16px;
+  }
+}
+
+/* ---- Fieldsets ---- */
+.qz-fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.qz-fieldset + .qz-fieldset {
+  margin-top: var(--space-7);
+  padding-top: var(--space-7);
+  border-top: 1px solid var(--hairline);
+}
+
+.qz-legend {
+  font-family: var(--font-titling);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  padding: 0;
+  margin: 0 0 var(--space-1);
+}
+
+.qz-fieldset--advanced {
+  padding: var(--space-4) 0 0;
+}
+
+.qz-fieldset--advanced > summary.qz-legend {
+  cursor: pointer;
+  list-style: none;
+}
+
+.qz-fieldset--advanced > summary.qz-legend::-webkit-details-marker {
+  display: none;
+}
+
+/* ---- Choice controls: checkbox, radio, toggle ---- */
+.qz-choice {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 8px 0;
+  min-height: 44px;
+  cursor: pointer;
+  position: relative;
+}
+
+.qz-choice + .qz-choice {
+  margin-top: var(--space-1);
+}
+
+.qz-choice input[type="checkbox"],
+.qz-choice input[type="radio"] {
+  position: absolute;
+  top: 8px;
+  left: 0;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  opacity: 0;
+}
+
+.qz-choice-box {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  border: 1px solid var(--border-strong);
+  background: var(--qz-white);
+  border-radius: var(--radius-xs);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+}
+
+.qz-choice-box.is-radio {
+  border-radius: var(--radius-pill);
+  margin-top: 0;
+}
+
+.qz-choice-box svg {
+  display: none;
+  width: 11px;
+  height: 11px;
+  stroke: var(--qz-white);
+}
+
+.qz-choice-box .qz-choice-dot {
+  display: none;
+  width: 9px;
+  height: 9px;
+  border-radius: var(--radius-pill);
+  background: var(--qz-white);
+}
+
+.qz-choice input:checked + .qz-choice-box {
+  background: var(--qz-black);
+  border-color: var(--qz-black);
+}
+
+.qz-choice input:checked + .qz-choice-box svg,
+.qz-choice input:checked + .qz-choice-box .qz-choice-dot {
+  display: block;
+}
+
+.qz-choice input:focus-visible + .qz-choice-box {
+  box-shadow: var(--shadow-focus);
+}
+
+.qz-choice-title {
+  font-size: 15px;
+  color: var(--text-primary);
+}
+
+.qz-choice-desc {
+  display: block;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.qz-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 8px 0;
+  min-height: 44px;
+  max-width: 320px;
+  cursor: pointer;
+}
+
+.qz-toggle-row input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.qz-toggle {
+  flex: none;
+  width: 40px;
+  height: 22px;
+  border-radius: var(--radius-pill);
+  background: var(--border-strong);
+  padding: 3px;
+  display: inline-flex;
+  transition: background var(--dur-base) var(--ease-out);
+}
+
+.qz-toggle span {
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-pill);
+  background: var(--qz-white);
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+.qz-toggle-row input:checked + .qz-toggle {
+  background: var(--qz-black);
+  justify-content: flex-end;
+}
+
+.qz-toggle-row input:focus-visible + .qz-toggle {
+  box-shadow: var(--shadow-focus);
+}
+
+/* ---- File / image dropzone ---- */
+.qz-dropzone {
+  position: relative;
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: start;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+  background: var(--qz-grey-50);
+}
+
+.qz-dropzone.is-dragover {
+  border-color: var(--qz-blue);
+  background: var(--qz-blue-tint);
+}
+
+.qz-dropzone-media {
+  margin: 0;
+}
+
+.qz-dropzone-media figcaption {
+  margin-top: 7px;
+}
+
+.qz-dropzone-body {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 14px;
+}
+
+.qz-dropzone-hint {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--qz-grey-700);
+  margin: 0;
+}
+
+.qz-dropzone-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.qz-progress {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.qz-progress-track {
+  flex: 1;
+  height: 3px;
+  background: var(--border-default);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.qz-progress-track span {
+  display: block;
+  height: 100%;
+  background: var(--qz-blue);
+}
+
+@media (max-width: 720px) {
+  .qz-dropzone {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---- Status pill ---- */
+.qz-status {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 9px;
+  border-radius: var(--radius-xs);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.qz-status.is-published {
+  background: var(--qz-blue-tint);
+  color: var(--qz-blue);
+}
+
+.qz-status.is-draft {
+  background: var(--qz-grey-100);
+  color: var(--text-secondary);
+}
+
+.qz-status.is-flagged {
+  background: var(--qz-burgundy-tint);
+  color: var(--qz-burgundy);
+}
+
+/* ---- Admin data table: filter bar, hover, header, mobile cards ---- */
+.qz-table-shell {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--qz-white);
+  overflow: hidden;
+}
+
+.qz-table-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border-default);
+}
+
+.qz-table-bar__count {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.qz-table-bar__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.qz-table-bar__controls .qz-input {
+  width: 220px;
+  height: 32px;
+  font-size: 0.875rem;
+}
+
+.qz-table-scroll {
+  overflow-x: auto;
+}
+
+.admin-table--qz {
+  min-width: 760px;
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.admin-table--qz th,
+.admin-table--qz td {
+  border-bottom: 1px solid var(--border-default);
+  padding: 16px 24px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.admin-table--qz thead th {
+  padding: 12px 24px;
+  background: var(--surface-raised);
+  font-family: var(--font-titling);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-default);
+}
+
+.admin-table--qz tbody tr {
+  min-height: 56px;
+}
+
+.admin-table--qz tbody tr:hover {
+  background: var(--qz-grey-50);
+}
+
+.admin-table--qz tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.admin-table--qz .admin-title-cell a {
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.admin-table--qz .admin-title-cell a:hover {
+  text-decoration: underline;
+}
+
+.qz-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+@media (max-width: 720px) {
+  /* Rows collapse into stacked cards: a meta row (status + date), the
+     title, then a full-width action row — matching the mobile card
+     layout in the spec while keeping a real <table> for a11y. */
+  .admin-table--qz,
+  .admin-table--qz thead,
+  .admin-table--qz tbody {
+    display: block;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .admin-table--qz thead {
+    display: none;
+  }
+
+  .admin-table--qz tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 12px;
+    padding: 16px;
+    border-bottom: 1px solid var(--border-default);
+  }
+
+  .admin-table--qz td {
+    display: block;
+    min-width: 0;
+    border-bottom: 0;
+    padding: 0;
+  }
+
+  .admin-table--qz .admin-title-cell {
+    order: 2;
+    flex: 0 0 100%;
+    font-size: 16px;
+    line-height: 1.4;
+    max-width: none;
+  }
+
+  .admin-table--qz td:has(.qz-status) {
+    order: 1;
+  }
+
+  .admin-table--qz td:has(.qz-status) ~ td:not(:has(.qz-row-actions)) {
+    order: 1;
+    margin-left: auto;
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
+  .admin-table--qz td:has(.qz-row-actions) {
+    order: 3;
+    flex: 0 0 100%;
+    padding-top: 4px;
+  }
+
+  .admin-table--qz .qz-row-actions {
+    gap: 8px;
+  }
+
+  .admin-table--qz .qz-row-actions .qz-button {
+    flex: 1;
+    border-color: var(--border-strong);
+  }
+}
+
+/* ---- Confirmation dialog ---- */
+.qz-dialog {
+  width: min(420px, calc(100vw - 32px));
+  background: var(--qz-white);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-lift);
+  padding: 28px;
+}
+
+.qz-dialog::backdrop {
+  background: var(--surface-overlay);
+}
+
+.qz-dialog h2 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 26px;
+  line-height: 1.2;
+  margin: 0 0 12px;
+}
+
+.qz-dialog p {
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--text-secondary);
+  margin: 0 0 22px;
+}
+
+.qz-dialog-actions {
+  display: flex;
+  gap: var(--space-3);
+  justify-content: flex-end;
+}
+
+@media (max-width: 720px) {
+  .qz-dialog[open] {
+    width: 100vw;
+    height: 100vh;
+    max-width: none;
+    max-height: none;
+    border-radius: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
 }
 
 .archive-pagination {

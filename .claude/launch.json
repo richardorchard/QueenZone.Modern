@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "queenzone-web",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "src/QueenZone.Web/QueenZone.Web.csproj"],
+      "port": 5146
+    }
+  ]
+}
