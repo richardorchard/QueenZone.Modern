@@ -89,13 +89,18 @@ public sealed class SubmissionsApiMapperTests
     }
 
     [Fact]
-    public async Task ResolvePublishedNewsPathAsync_OnlyReturnsPublishedPromotedArticles()
+    public void ResolvePublishedNewsPath_OnlyReturnsPublishedPromotedArticles()
     {
-        var news = new FixedNewsRepository(
-        [
-            new NewsItem(1003, "QueenZone modernisation begins", "excerpt", "body", DateTime.UtcNow, null, true, "modernisation"),
-            new NewsItem(9001, "Hidden", "excerpt", "body", DateTime.UtcNow, null, false),
-        ]);
+        var published = new NewsItem(
+            1003,
+            "QueenZone modernisation begins",
+            "excerpt",
+            "body",
+            DateTime.UtcNow,
+            null,
+            true,
+            "modernisation");
+        var unpublished = published with { Id = 9001, Title = "Hidden", IsPublished = false };
 
         var promoted = new NewsSuggestion(
             Guid.NewGuid(),
@@ -113,14 +118,15 @@ public sealed class SubmissionsApiMapperTests
             null,
             null,
             null);
-        var unpublished = promoted with { PromotedNewsId = 9001 };
+        var unpublishedSuggestion = promoted with { PromotedNewsId = 9001 };
         var pending = promoted with { Status = NewsSuggestionStatus.Pending, PromotedNewsId = null };
 
         Assert.Equal(
             NewsRoutes.GetNewsDetailPath(1003, "QueenZone modernisation begins", "modernisation"),
-            await SubmissionsApiMapper.ResolvePublishedNewsPathAsync(promoted, news, CancellationToken.None));
-        Assert.Null(await SubmissionsApiMapper.ResolvePublishedNewsPathAsync(unpublished, news, CancellationToken.None));
-        Assert.Null(await SubmissionsApiMapper.ResolvePublishedNewsPathAsync(pending, news, CancellationToken.None));
+            SubmissionsApiMapper.ResolvePublishedNewsPath(promoted, published));
+        Assert.Null(SubmissionsApiMapper.ResolvePublishedNewsPath(unpublishedSuggestion, unpublished));
+        Assert.Null(SubmissionsApiMapper.ResolvePublishedNewsPath(promoted, news: null));
+        Assert.Null(SubmissionsApiMapper.ResolvePublishedNewsPath(pending, published));
     }
 
     [Fact]

@@ -595,6 +595,7 @@ public sealed class EfPublicReadRepositoryTests : IAsyncDisposable
         Assert.Contains("{0}", news.ArchivePage, StringComparison.Ordinal);
         Assert.Contains("{1}", news.ArchivePage, StringComparison.Ordinal);
         Assert.Contains("{0}", news.ById, StringComparison.Ordinal);
+        Assert.Contains("Id = {0}", news.ById, StringComparison.Ordinal);
         Assert.Contains("/*list*/", news.Latest, StringComparison.Ordinal);
         Assert.Contains("/*detail*/", news.ById, StringComparison.Ordinal);
         Assert.DoesNotContain("/*detail*/", news.Latest, StringComparison.Ordinal);
@@ -723,7 +724,25 @@ public sealed class EfPublicReadRepositoryTests : IAsyncDisposable
         Assert.Equal(submitterMemberId, detail.SubmitterMemberId);
         Assert.Equal("News Submitter", detail.SubmitterDisplayName);
         Assert.Null(await repository.GetByIdAsync(404));
+
+        var batched = await repository.GetByIdsAsync([10, 11, 10, 404]);
+        Assert.Equal(2, batched.Count);
+        Assert.Contains(batched, item => item.Id == 10 && item.SubmitterMemberId == submitterMemberId);
+        Assert.Contains(batched, item => item.Id == 11);
+        Assert.Empty(await repository.GetByIdsAsync([]));
         Assert.Equal(2, (await repository.GetPublishedSitemapEntriesAsync()).Count);
+    }
+
+    [Fact]
+    public void ExpandIdEqualityToInList_rewrites_the_single_id_predicate()
+    {
+        const string byIdSql = "SELECT Id FROM NewsRows WHERE IsPublished = 1 AND Id = {0}";
+        Assert.Equal(
+            "SELECT Id FROM NewsRows WHERE IsPublished = 1 AND Id IN ({0}, {1}, {2})",
+            EfNewsRepository.ExpandIdEqualityToInList(byIdSql, 3));
+        Assert.Throws<ArgumentOutOfRangeException>(() => EfNewsRepository.ExpandIdEqualityToInList(byIdSql, 0));
+        Assert.Throws<InvalidOperationException>(() =>
+            EfNewsRepository.ExpandIdEqualityToInList("SELECT Id FROM NewsRows", 2));
     }
 
     [Fact]

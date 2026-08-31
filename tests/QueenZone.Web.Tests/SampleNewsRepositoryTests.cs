@@ -28,6 +28,15 @@ public sealed class SampleNewsRepositoryTests
     }
 
     [Fact]
+    public async Task GetByIdsAsync_returns_published_matches_and_omits_missing_and_unpublished()
+    {
+        var items = await repository.GetByIdsAsync([1003, 9001, 1003, 404, 1001]);
+
+        Assert.Equal([1003, 1001], items.Select(item => item.Id).ToArray());
+        Assert.Empty(await repository.GetByIdsAsync([]));
+    }
+
+    [Fact]
     public async Task SearchAsync_matches_rich_html_body_text()
     {
         var page = await repository.SearchAsync("sample-crest", 1, 20);
