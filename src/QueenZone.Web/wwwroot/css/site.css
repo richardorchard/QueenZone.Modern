@@ -607,6 +607,13 @@
   display: none;
 }
 
+/* ASP.NET renders an empty placeholder list item for valid summaries. The
+   site does not load jQuery Unobtrusive Validation, so hide the valid summary
+   server-side state without suppressing validation-summary-errors. */
+.validation-summary-valid {
+  display: none;
+}
+
 .qz-account-form__actions {
   display: flex;
   flex-wrap: wrap;
