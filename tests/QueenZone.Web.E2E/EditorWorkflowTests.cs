@@ -57,6 +57,37 @@ public class EditorWorkflowTests : E2EPageTest
         await Expect(Page.GetByRole(AriaRole.Link, new() { Name = SeededDraftTitle })).ToBeVisibleAsync();
     }
 
+    [Test]
+    public async Task AdminCanCropUploadedImageAndSaveArticle()
+    {
+        await GotoAdminAsync("/admin/news/new");
+        await Page.GetByLabel("Title").FillAsync($"Cropped image browser test {Guid.NewGuid():N}");
+        await Page.GetByLabel("Excerpt").FillAsync("Browser coverage for the cropped image save path.");
+        await Page.Locator(".ql-editor").FillAsync("Cropped image browser test body.");
+
+        var imagePath = Path.GetFullPath(
+            Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "design", "crest.jpg"));
+        await Page.GetByLabel("Article image").SetInputFilesAsync(imagePath);
+        await Expect(Page.Locator("[data-article-image-dialog]")).ToBeVisibleAsync();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Use this crop" }).ClickAsync();
+
+        var zoom = Page.Locator("[data-article-image-zoom]");
+        await Expect(zoom).ToBeDisabledAsync();
+        Assert.That(await Page.Locator("form.admin-form").EvaluateAsync<bool>("form => form.checkValidity()"), Is.True);
+
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
+        await Expect(Page).ToHaveURLAsync(new Regex("/admin/news/\\d+/edit"));
+
+        await Page.GetByLabel("Article image").SetInputFilesAsync(imagePath);
+        await Expect(Page.Locator("[data-article-image-dialog]")).ToBeVisibleAsync();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Use this crop" }).ClickAsync();
+        await Expect(Page.Locator("[data-article-image-zoom]")).ToBeDisabledAsync();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
+
+        await Expect(Page).ToHaveURLAsync(new Regex("/admin/news/\\d+/edit"));
+        await Expect(Page.GetByText("Article saved.")).ToBeVisibleAsync();
+    }
+
     private async Task GotoAdminAsync(string path)
     {
         var response = await Page.GotoAsync(path);

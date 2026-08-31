@@ -132,6 +132,7 @@
       }
 
       destroyCropper();
+      zoomInput.disabled = true;
       dialog.close();
     });
 
@@ -224,6 +225,7 @@
 
     function startCropper() {
       destroyCropper();
+      zoomInput.disabled = false;
       cropper = new Cropper(stageImg, {
         aspectRatio: aspectWidth / aspectHeight,
         viewMode: 2,
@@ -309,6 +311,7 @@
 
     function cancelSelection() {
       destroyCropper();
+      zoomInput.disabled = true;
       input.value = "";
       if (pendingGalleryPick) {
         pendingGalleryPick = null;
