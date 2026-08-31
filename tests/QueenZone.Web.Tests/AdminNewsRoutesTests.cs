@@ -758,6 +758,8 @@ public sealed class AdminNewsRoutesTests : IClassFixture<QueenZoneWebApplication
         var body = await client.GetStringAsync("/admin/news/new");
 
         Assert.Contains("enctype=\"multipart/form-data\"", body);
+        Assert.Contains("data-busy-submit", body);
+        Assert.Contains("data-busy-label=\"Saving…\"", body);
         Assert.Contains("name=\"articleImage\"", body);
         Assert.Contains("data-article-image-crop", body);
         Assert.Contains($"data-min-crop-width=\"{NewsArticleImageProcessor.MinCropWidth}\"", body);
@@ -798,6 +800,19 @@ public sealed class AdminNewsRoutesTests : IClassFixture<QueenZoneWebApplication
         Assert.Contains("/admin/news/gallery-original/", script);
         Assert.DoesNotContain("stageImg.src = originalUrl", script);
         Assert.DoesNotContain("preview.src = originalUrl", script);
+    }
+
+    [Fact]
+    public async Task ArticleImageCropZoom_is_disabled_outside_the_crop_dialog()
+    {
+        var client = CreateClient(AdminEmail);
+        var editBody = await client.GetStringAsync("/admin/news/new");
+        var script = await client.GetStringAsync("/js/admin/article-image-crop.js");
+
+        Assert.Contains("data-article-image-zoom disabled", editBody);
+        Assert.Contains("zoomInput.disabled = false", script);
+        Assert.Contains("zoomInput.disabled = true", script);
+        Assert.Contains("}, true);", script);
     }
 
     [Fact]

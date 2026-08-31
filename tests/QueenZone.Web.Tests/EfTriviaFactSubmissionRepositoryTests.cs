@@ -107,6 +107,41 @@ public sealed class EfTriviaFactSubmissionRepositoryTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task GetPendingAsync_pages_without_earlier_rows()
+    {
+        await repository.CreateAsync(NewSubmission(Guid.NewGuid(), "Oldest pending", "A"));
+        await repository.CreateAsync(NewSubmission(Guid.NewGuid(), "Middle pending", "B"));
+        var newest = await repository.CreateAsync(NewSubmission(Guid.NewGuid(), "Newest pending", "C"));
+
+        var page1 = await repository.GetPendingAsync(1, 2);
+        var page2 = await repository.GetPendingAsync(2, 2);
+
+        Assert.Equal(2, page1.Count);
+        Assert.Equal(newest.Id, page1[0].Id);
+        Assert.Single(page2);
+        Assert.Equal("Oldest pending", page2[0].Text);
+        Assert.DoesNotContain(page2, item => page1.Any(firstPage => firstPage.Id == item.Id));
+    }
+
+    [Fact]
+    public async Task GetBySubmitterAsync_pages_without_earlier_rows()
+    {
+        await repository.CreateAsync(NewSubmission(Guid.NewGuid(), "Fact 0", null));
+        await repository.CreateAsync(NewSubmission(Guid.NewGuid(), "Fact 1", null));
+        await repository.CreateAsync(NewSubmission(Guid.NewGuid(), "Fact 2", null));
+
+        var page1 = await repository.GetBySubmitterAsync(memberId, page: 1, pageSize: 2);
+        var page2 = await repository.GetBySubmitterAsync(memberId, page: 2, pageSize: 2);
+
+        Assert.Equal(3, page1.TotalCount);
+        Assert.Equal(2, page1.Items.Count);
+        Assert.Equal("Fact 2", page1.Items[0].Text);
+        Assert.Single(page2.Items);
+        Assert.Equal("Fact 0", page2.Items[0].Text);
+        Assert.DoesNotContain(page2.Items, item => page1.Items.Any(firstPage => firstPage.Id == item.Id));
+    }
+
+    [Fact]
     public async Task ApproveAsync_publishes_link_and_writes_audit()
     {
         var created = await repository.CreateAsync(NewSubmission(Guid.NewGuid(), "Approve me", "Band"));

@@ -164,6 +164,48 @@ public sealed class EfArticleSubmissionRepositoryTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task GetPendingAsync_PagesNewestFirstWithoutEarlierRows()
+    {
+        var body = new string('a', EfArticleSubmissionRepository.MinBodyVisibleChars);
+        var first = await repository.UpsertDraftAsync(Draft(null, "First submitted", body));
+        await repository.SubmitForReviewAsync(first.Id, memberId);
+        var second = await repository.UpsertDraftAsync(Draft(null, "Second submitted", body));
+        await repository.SubmitForReviewAsync(second.Id, memberId);
+        var third = await repository.UpsertDraftAsync(Draft(null, "Third submitted", body));
+        await repository.SubmitForReviewAsync(third.Id, memberId);
+
+        var page1 = await repository.GetPendingAsync(1, 2);
+        var page2 = await repository.GetPendingAsync(2, 2);
+
+        Assert.Equal(2, page1.Count);
+        Assert.Equal("Third submitted", page1[0].Title);
+        Assert.Single(page2);
+        Assert.Equal("First submitted", page2[0].Title);
+        Assert.DoesNotContain(page2, item => item.Id == page1[0].Id || item.Id == page1[1].Id);
+        Assert.All(page1.Concat(page2), item => Assert.True(item.WordCountEstimate >= 0));
+    }
+
+    [Fact]
+    public async Task GetDraftsForMemberAsync_PagesWithoutEarlierRows()
+    {
+        var body = new string('a', EfArticleSubmissionRepository.MinBodyVisibleChars);
+        var first = await repository.UpsertDraftAsync(Draft(null, "Draft one", body));
+        await repository.SubmitForReviewAsync(first.Id, memberId);
+        var second = await repository.UpsertDraftAsync(Draft(null, "Draft two", body));
+        await repository.SubmitForReviewAsync(second.Id, memberId);
+        var third = await repository.UpsertDraftAsync(Draft(null, "Draft three", body));
+        await repository.SubmitForReviewAsync(third.Id, memberId);
+
+        var page1 = await repository.GetDraftsForMemberAsync(memberId, page: 1, pageSize: 2);
+        var page2 = await repository.GetDraftsForMemberAsync(memberId, page: 2, pageSize: 2);
+
+        Assert.Equal(3, page1.TotalCount);
+        Assert.Equal(2, page1.Items.Count);
+        Assert.Single(page2.Items);
+        Assert.DoesNotContain(page2.Items, item => page1.Items.Any(firstPage => firstPage.Id == item.Id));
+    }
+
+    [Fact]
     public async Task GetByIdAsync_ReturnsSubmissionWithAuthor()
     {
         var saved = await repository.UpsertDraftAsync(Draft(null, "Lookup article", "Body text."));

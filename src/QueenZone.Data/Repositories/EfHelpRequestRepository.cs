@@ -71,7 +71,7 @@ public sealed class EfHelpRequestRepository(QueenZoneDbContext dbContext) : IHel
                 })
                 .ToListAsync(cancellationToken);
 
-            var ordered = allRows.OrderByDescending(row => row.SubmittedAt).ToList();
+            var ordered = allRows.OrderByDescending(row => row.SubmittedAt).ThenBy(row => row.Id).ToList();
             var items = ordered
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
@@ -92,6 +92,7 @@ public sealed class EfHelpRequestRepository(QueenZoneDbContext dbContext) : IHel
         var totalCount = await query.CountAsync(cancellationToken);
         var pageItems = await query
             .OrderByDescending(row => row.SubmittedAt)
+            .ThenBy(row => row.Id)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(row => new HelpRequestListItem(

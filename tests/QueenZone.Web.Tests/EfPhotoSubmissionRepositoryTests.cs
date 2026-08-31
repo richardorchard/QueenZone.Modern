@@ -143,6 +143,11 @@ public sealed class EfPhotoSubmissionRepositoryTests : IAsyncDisposable
         Assert.Equal(3, page.TotalCount);
         Assert.Equal(2, page.Items.Count);
         Assert.Equal("Shot 2", page.Items[0].Title);
+
+        var page2 = await repository.GetBySubmitterAsync(memberId, page: 2, pageSize: 2);
+        Assert.Single(page2.Items);
+        Assert.Equal("Shot 0", page2.Items[0].Title);
+        Assert.DoesNotContain(page2.Items, item => item.Title == "Shot 2" || item.Title == "Shot 1");
     }
 
     [Fact]
