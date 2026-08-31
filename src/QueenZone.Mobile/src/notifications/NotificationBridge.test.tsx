@@ -49,7 +49,7 @@ function notification(data: Record<string, unknown>, identifier: string, title =
       identifier,
       content: { title, body, data },
     },
-  } as Notifications.Notification;
+  } as unknown as Notifications.Notification;
 }
 
 function response(data: Record<string, unknown>, identifier: string): Notifications.NotificationResponse {
@@ -73,7 +73,7 @@ function iosNotification(contract: Record<string, unknown>, identifier: string, 
         },
       },
     },
-  } as Notifications.Notification;
+  } as unknown as Notifications.Notification;
 }
 
 function iosResponse(contract: Record<string, unknown>, identifier: string): Notifications.NotificationResponse {

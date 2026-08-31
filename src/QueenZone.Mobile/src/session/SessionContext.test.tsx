@@ -165,8 +165,9 @@ describe('SessionProvider', () => {
 
   it('rejects the smoke session when __DEV__ is false', async () => {
     const user = userEvent.setup();
-    const previous = (globalThis as { __DEV__: boolean }).__DEV__;
-    (globalThis as { __DEV__: boolean }).__DEV__ = false;
+    const runtime = globalThis as typeof globalThis & { __DEV__?: boolean };
+    const previous = runtime.__DEV__;
+    runtime.__DEV__ = false;
     try {
       readStored.mockResolvedValue(null);
       renderSession();
@@ -177,7 +178,7 @@ describe('SessionProvider', () => {
       expect(screen.getByText('signed-out')).toBeOnTheScreen();
       expect(writeStored).not.toHaveBeenCalled();
     } finally {
-      (globalThis as { __DEV__: boolean }).__DEV__ = previous;
+      runtime.__DEV__ = previous;
     }
   });
 
