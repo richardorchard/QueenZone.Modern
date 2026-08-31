@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { FlatList } from 'react-native';
-import { screen, userEvent, waitFor } from '@testing-library/react-native';
+import { act, screen, userEvent, waitFor } from '@testing-library/react-native';
 import { fetchTimelinePage } from '../../api';
 import type { TimelineEvent } from '../../api/types';
 import { pagedResponse } from '../../test/fixtures';
@@ -34,6 +34,7 @@ function eventFixture(overrides: Partial<TimelineEvent> = {}): TimelineEvent {
 
 describe('TimelineScreen', () => {
   beforeEach(() => {
+    jest.useFakeTimers();
     fetchTimeline.mockReset();
     fetchTimeline.mockResolvedValue(
       pagedResponse([eventFixture(), eventFixture({ id: 10, title: 'Another' })], 1, 1),
@@ -42,6 +43,10 @@ describe('TimelineScreen', () => {
   });
 
   afterEach(() => {
+    act(() => {
+      jest.runOnlyPendingTimers();
+    });
+    jest.useRealTimers();
     jest.restoreAllMocks();
   });
 
@@ -125,7 +130,7 @@ describe('TimelineScreen', () => {
     renderTimeline(navigation);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Live Aid' })).toBeOnTheScreen());
 
-    const user = userEvent.setup();
+    const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
     renderWithProviders(<>{lastHeaderLeft(navigation)()}</>, { navigation: false });
     await user.press(screen.getByTestId(testIds.timelineBack));
     expect(navigation.goBack).toHaveBeenCalledTimes(1);
@@ -138,7 +143,7 @@ describe('TimelineScreen', () => {
     renderTimeline(navigation);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Live Aid' })).toBeOnTheScreen());
 
-    const user = userEvent.setup();
+    const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
     renderWithProviders(<>{lastHeaderLeft(navigation)()}</>, { navigation: false });
     await user.press(screen.getByTestId(testIds.timelineBack));
     expect(navigation.goBack).not.toHaveBeenCalled();
