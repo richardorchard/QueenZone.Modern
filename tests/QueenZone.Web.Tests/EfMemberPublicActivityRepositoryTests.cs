@@ -144,7 +144,7 @@ public sealed class EfMemberPublicActivityRepositoryTests : IAsyncDisposable
     public async Task GetFeedPageAsync_EmptyIds_DoesNotReturnActivity()
     {
         SeedMember(memberId, "Solo");
-        SeedForumPost(memberId, "Solo", 1, 101, 201, "Solo topic", DateTime.Parse("2026-08-03T08:00:00Z"));
+        SeedForumPost(memberId, "Solo", 1, 101, 201, "Solo topic", DateTimeOffset.Parse("2026-08-03T08:00:00Z").UtcDateTime);
         await dbContext.SaveChangesAsync();
 
         var result = await new EfMemberPublicActivityRepository(dbContext)
@@ -163,9 +163,9 @@ public sealed class EfMemberPublicActivityRepositoryTests : IAsyncDisposable
         SeedMember(aliceId, "Alice");
         SeedMember(bobId, "Bob");
         SeedMember(carolId, "Carol");
-        SeedForumPost(aliceId, "Alice", 1, 101, 201, "Alice forum", DateTime.Parse("2026-08-03T12:00:00Z"));
-        SeedForumPost(bobId, "Bob", 2, 102, 202, "Bob forum", DateTime.Parse("2026-08-03T10:00:00Z"));
-        SeedForumPost(carolId, "Carol", 3, 103, 203, "Carol forum", DateTime.Parse("2026-08-03T14:00:00Z"));
+        SeedForumPost(aliceId, "Alice", 1, 101, 201, "Alice forum", DateTimeOffset.Parse("2026-08-03T12:00:00Z").UtcDateTime);
+        SeedForumPost(bobId, "Bob", 2, 102, 202, "Bob forum", DateTimeOffset.Parse("2026-08-03T10:00:00Z").UtcDateTime);
+        SeedForumPost(carolId, "Carol", 3, 103, 203, "Carol forum", DateTimeOffset.Parse("2026-08-03T14:00:00Z").UtcDateTime);
         dbContext.ArticleSubmissions.Add(ArticleFor(bobId, "Bob article", ArticleSubmissionStatus.Published, DateTimeOffset.Parse("2026-08-03T11:00:00Z")));
         dbContext.PhotoSubmissions.Add(PhotoFor(aliceId, "Alice photo", PhotoSubmissionStatus.Approved, DateTimeOffset.Parse("2026-08-03T09:00:00Z")));
         dbContext.NewsSuggestions.Add(NewsFor(carolId, "Carol news", NewsSuggestionStatus.Promoted, 301, DateTimeOffset.Parse("2026-08-03T13:00:00Z")));
@@ -202,7 +202,7 @@ public sealed class EfMemberPublicActivityRepositoryTests : IAsyncDisposable
                 200 + index,
                 300 + index,
                 $"Topic {index}",
-                DateTime.Parse("2026-08-03T08:00:00Z").AddMinutes(-index));
+                DateTimeOffset.Parse("2026-08-03T08:00:00Z").UtcDateTime.AddMinutes(-index));
         }
 
         await dbContext.SaveChangesAsync();
