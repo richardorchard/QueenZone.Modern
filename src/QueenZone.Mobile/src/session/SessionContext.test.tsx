@@ -5,7 +5,7 @@ import { act, screen, waitFor, userEvent } from '@testing-library/react-native';
 import { ApiError, fetchJson } from '../api/client';
 import { authTokensFixture, memberProfilePayload } from '../test/fixtures';
 import { renderWithProviders } from '../test/render';
-import { SessionProvider, useSession } from './SessionContext';
+import { SessionProvider, useSession, useSessionActions } from './SessionContext';
 import * as oauth from './oauth';
 import * as tokenStore from './tokenStore';
 import * as notifications from '../notifications';
@@ -607,5 +607,71 @@ describe('SessionProvider private cache isolation', () => {
     expect(await cache.get(conversationCacheKey('member-1', 'c1'))).toBeNull();
     expect(await cache.get(conversationCacheKey('member-2', 'c1'))).toBeNull();
     expect(await cache.get(forumTopicCacheKey(1002))).toEqual({ id: 1002 });
+  });
+});
+
+describe('SessionProvider actions context stability', () => {
+  it('keeps actions identity stable across a token refresh and a profile load', async () => {
+    const user = userEvent.setup();
+    const now = 1_700_000_000_000;
+    const dateNow = jest.spyOn(Date, 'now').mockReturnValue(now);
+    const actionsSeen: ReturnType<typeof useSessionActions>[] = [];
+    let actionsOnlyRenders = 0;
+
+    function ActionsOnlyChild() {
+      const actions = useSessionActions();
+      actionsOnlyRenders += 1;
+      actionsSeen.push(actions);
+      return <Text>actions-only</Text>;
+    }
+
+    let resolveProfile: (value: unknown) => void = () => {};
+    fetchJsonMock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveProfile = resolve;
+        }),
+    );
+    readStored.mockResolvedValue({
+      ...authTokensFixture(),
+      expiresAt: now + 60_000,
+    });
+
+    try {
+      renderWithProviders(
+        <SessionProvider>
+          <ActionsOnlyChild />
+          <Probe />
+        </SessionProvider>,
+        { navigation: false },
+      );
+
+      await waitFor(() => expect(screen.getByText('signed-in')).toBeOnTheScreen());
+      expect(screen.getByText('anonymous')).toBeOnTheScreen());
+      expect(screen.getByText('actions-only')).toBeOnTheScreen();
+      const rendersAfterToken = actionsOnlyRenders;
+      const actionsAfterToken = actionsSeen[actionsSeen.length - 1];
+      expect(rendersAfterToken).toBeGreaterThan(0);
+      expect(actionsAfterToken).toBeDefined();
+
+      fetchJsonMock.mockResolvedValue(memberProfilePayload());
+      await act(async () => {
+        resolveProfile(memberProfilePayload());
+      });
+      await waitFor(() => expect(screen.getByText('Freddie')).toBeOnTheScreen());
+      expect(actionsOnlyRenders).toBe(rendersAfterToken);
+      expect(actionsSeen[actionsSeen.length - 1]).toBe(actionsAfterToken);
+
+      refreshAccessToken.mockResolvedValue(authTokensFixture({ accessToken: 'access-token' }));
+      dateNow.mockReturnValue(now + 120_000);
+      await user.press(screen.getByText('do-ensure-token'));
+      await waitFor(() => expect(refreshAccessToken).toHaveBeenCalledWith('http://qz.test', 'refresh-token'));
+      expect(screen.getByText('signed-in')).toBeOnTheScreen();
+      expect(screen.getByText('access-token')).toBeOnTheScreen();
+      expect(actionsOnlyRenders).toBe(rendersAfterToken);
+      expect(actionsSeen[actionsSeen.length - 1]).toBe(actionsAfterToken);
+    } finally {
+      dateNow.mockRestore();
+    }
   });
 });
