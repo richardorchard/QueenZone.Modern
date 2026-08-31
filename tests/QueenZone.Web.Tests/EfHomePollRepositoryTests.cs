@@ -1,5 +1,7 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Storage;
 using QueenZone.Data;
 
 namespace QueenZone.Web.Tests;
@@ -32,6 +34,27 @@ public sealed class EfHomePollRepositoryTests : IAsyncDisposable
         var current = await repository.GetCurrentAsync(null);
         Assert.Equal(second, current!.PollId);
         Assert.Equal(1, await dbContext.HomePolls.CountAsync(poll => poll.IsCurrent));
+    }
+
+    [Fact]
+    public async Task Publish_uses_configured_retrying_execution_strategy_for_its_transaction()
+    {
+        await using var retryConnection = new SqliteConnection("DataSource=:memory:");
+        await retryConnection.OpenAsync();
+        var options = new DbContextOptionsBuilder<QueenZoneDbContext>()
+            .UseSqlite(retryConnection)
+            .ReplaceService<IExecutionStrategyFactory, TestRetryingExecutionStrategyFactory>()
+            .Options;
+        await using var retryContext = new QueenZoneDbContext(options);
+        await retryContext.Database.EnsureCreatedAsync();
+        var retryRepository = new EfHomePollRepository(retryContext, TimeProvider.System);
+        var pollId = await retryRepository.CreateAsync(
+            new AdminHomePollDraft("Retry-safe?", ["Yes", "No"]),
+            Guid.NewGuid());
+
+        await retryRepository.PublishAsync(pollId);
+
+        Assert.Equal(pollId, (await retryRepository.GetCurrentAsync(null))!.PollId);
     }
 
     [Fact]
@@ -109,5 +132,17 @@ public sealed class EfHomePollRepositoryTests : IAsyncDisposable
     {
         await dbContext.DisposeAsync();
         await connection.DisposeAsync();
+    }
+
+    private sealed class TestRetryingExecutionStrategyFactory(ExecutionStrategyDependencies dependencies)
+        : IExecutionStrategyFactory
+    {
+        public IExecutionStrategy Create() => new TestRetryingExecutionStrategy(dependencies);
+    }
+
+    private sealed class TestRetryingExecutionStrategy(ExecutionStrategyDependencies dependencies)
+        : ExecutionStrategy(dependencies, maxRetryCount: 1, maxRetryDelay: TimeSpan.Zero)
+    {
+        protected override bool ShouldRetryOn(Exception exception) => false;
     }
 }
