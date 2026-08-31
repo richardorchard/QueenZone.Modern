@@ -40,8 +40,15 @@ function OnThisDayWidgetView(props: OnThisDayWidgetProps) {
   const showDay = hasDay && hasQuote ? slot % 2 === 0 : hasDay;
   const showQuote = hasDay && hasQuote ? slot % 2 !== 0 : hasQuote;
   const quoteId = Number(props.quoteId);
+  const eventId = Number(props.eventId);
   const tapUrl =
-    showQuote && quoteId > 0 ? `queenzone://quotes/${quoteId}` : 'queenzone://home';
+    showQuote && quoteId > 0
+      ? `queenzone://quotes/${quoteId}`
+      : showDay && eventId > 0
+        ? `queenzone://timeline/${eventId}`
+        : showQuote
+          ? 'queenzone://home'
+          : 'queenzone://timeline';
 
   return (
     <VStack

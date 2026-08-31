@@ -4,6 +4,7 @@ export type WidgetProps = {
   quoteText?: string;
   quoteWhoSaid?: string;
   quoteId?: number;
+  eventId?: number;
 };
 
 export type WidgetFace = 'day' | 'quote';

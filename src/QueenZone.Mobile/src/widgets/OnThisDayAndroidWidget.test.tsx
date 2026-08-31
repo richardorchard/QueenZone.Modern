@@ -55,7 +55,7 @@ describe('OnThisDayAndroidWidget', () => {
     expect(source).not.toMatch(/widgetQuoteText/);
     expect(source).toMatch(/WIDGET_QUOTE_MAX_LINES/);
     expect(source).toMatch(/WIDGET_QUOTE_SECONDARY_MAX_LINES/);
-    expect(source).toMatch(/widgetFaceDeepLinkUrl/);
+    expect(source).toMatch(/widgetFaceDeepLinkUrl\(face, props\.quoteId, props\.eventId\)/);
     expect(source).not.toMatch(/uri: widgetDeepLinkUrl/);
   });
 

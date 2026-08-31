@@ -48,6 +48,25 @@ describe('RootNavigator', () => {
     expect(screen.getByText('Home stack')).toBeOnTheScreen();
   });
 
+  it('pressing Archive after a widget day-face tap lands on ArchiveHub, not leftover Timeline', () => {
+    const ref = createNavigationContainerRef();
+    renderWithProviders(
+      <NavigationContainer ref={ref}>
+        <ArchiveTabRaceTabs />
+      </NavigationContainer>,
+      { navigation: false },
+    );
+
+    fireEvent.press(screen.getByRole('button', { name: 'Open widget event' }));
+    expect(ref.getCurrentRoute()?.name).toBe('Timeline');
+
+    fireEvent.press(screen.getByLabelText('Home'));
+    expect(ref.getCurrentRoute()?.name).toBe('HomeTab');
+
+    fireEvent.press(screen.getByLabelText('Archive'));
+    expect(ref.getCurrentRoute()?.name).toBe('ArchiveHub');
+  });
+
   it('pressing Archive after Home View timeline lands on ArchiveHub, not leftover Timeline', () => {
     const ref = createNavigationContainerRef();
     renderWithProviders(
@@ -117,7 +136,14 @@ function ArchiveTabRaceTabs() {
 function HomeTabRaceScreen({
   navigation,
 }: {
-  navigation: { navigate: (name: 'ArchiveTab', params: ReturnType<typeof nestedTabParams<'Timeline'>>) => void };
+  navigation: {
+    navigate: (
+      name: 'ArchiveTab',
+      params:
+        | ReturnType<typeof nestedTabParams<'Timeline'>>
+        | ReturnType<typeof nestedTabParams<'Timeline', { focusId: number }>>,
+    ) => void;
+  };
 }) {
   return (
     <>
@@ -128,6 +154,13 @@ function HomeTabRaceScreen({
         onPress={() => navigation.navigate('ArchiveTab', nestedTabParams('Timeline'))}
       >
         <Text>View timeline</Text>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Open widget event"
+        onPress={() => navigation.navigate('ArchiveTab', nestedTabParams('Timeline', { focusId: 12 }))}
+      >
+        <Text>Open widget event</Text>
       </Pressable>
     </>
   );
