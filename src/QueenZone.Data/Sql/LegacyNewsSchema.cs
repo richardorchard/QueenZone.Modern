@@ -99,6 +99,13 @@ public static class LegacyNewsSchema
     /// <summary>Test helper: clears process cache so probes can be re-tested in isolation.</summary>
     internal static void ClearColumnAvailabilityCacheForTests() => ColumnAvailabilityCache.Clear();
 
+    /// <summary>
+    /// Test helper: seeds the process cache directly, so <see cref="WarmupAsync"/>'s short-circuit
+    /// behaviour (and callers built on top of it) can be exercised without a real SQL Server probe.
+    /// </summary>
+    internal static void SeedColumnAvailabilityCacheForTests(string connectionString, NewsColumnAvailability columns) =>
+        ColumnAvailabilityCache[connectionString] = columns;
+
     [ExcludeFromCodeCoverage] // SQL Server COL_LENGTH probe (cached).
     private static NewsColumnAvailability ProbeNewsColumnAvailability(string connectionString) =>
         ProbeNewsColumnAvailabilityAsync(connectionString, CancellationToken.None).GetAwaiter().GetResult();
