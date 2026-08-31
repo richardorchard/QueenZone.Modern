@@ -63,7 +63,9 @@ public class EditorWorkflowTests : E2EPageTest
         await GotoAdminAsync("/admin/news/new");
         await Page.GetByLabel("Title").FillAsync($"Cropped image browser test {Guid.NewGuid():N}");
         await Page.GetByLabel("Excerpt").FillAsync("Browser coverage for the cropped image save path.");
-        await Page.Locator(".ql-editor").FillAsync("Cropped image browser test body.");
+        await Page.GetByLabel("Body editor")
+            .Locator("[contenteditable=true]")
+            .FillAsync("Cropped image browser test body.");
 
         var imagePath = Path.GetFullPath(
             Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "design", "crest.jpg"));
