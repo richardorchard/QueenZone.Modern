@@ -4,6 +4,8 @@ import type {
   AlbumDetail,
   AlbumListItem,
   ApiPagedResponse,
+  ArticleDetail,
+  ArticleListItem,
   BiographyChapterDetail,
   BiographyChapterListItem,
   FreddieTribute,
@@ -58,6 +60,20 @@ export function fetchNewsDetail(id: number, signal?: AbortSignal): Promise<NewsD
   return fetchJsonWithOfflineCache(`/content/news/${id}`, {
     signal,
     cacheKey: `news:${id}`,
+  });
+}
+
+export function fetchArticlesPage(
+  query: PageQuery = {},
+): Promise<ApiPagedResponse<ArticleListItem>> {
+  return fetchJson('/content/articles', { query: pageParams(query), signal: query.signal });
+}
+
+/** Network-first; caches successful responses for offline re-open. */
+export function fetchArticleDetail(id: number, signal?: AbortSignal): Promise<ArticleDetail> {
+  return fetchJsonWithOfflineCache(`/content/articles/${id}`, {
+    signal,
+    cacheKey: `articles:${id}`,
   });
 }
 
