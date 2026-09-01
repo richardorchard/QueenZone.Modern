@@ -36,7 +36,7 @@ describe('BiographyScreen', () => {
     await flushVirtualizedList();
   });
 
-  it('requests the hook-default page size', async () => {
+  it('requests the hook-default page size and shows the chapter summary on the row', async () => {
     renderWithProviders(
       <BiographyScreen
         navigation={fakeNavigation() as never}
