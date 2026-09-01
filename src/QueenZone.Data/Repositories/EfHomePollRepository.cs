@@ -132,24 +132,28 @@ public sealed class EfHomePollRepository(QueenZoneDbContext dbContext, TimeProvi
 
     public async Task PublishAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var poll = await dbContext.HomePolls
-            .SingleOrDefaultAsync(item => item.Id == id, cancellationToken)
-            ?? throw new HomePollException(HomePollException.NotFound, "Poll was not found.");
-
-        var now = timeProvider.GetUtcNow();
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
-        var current = await dbContext.HomePolls
-            .Where(item => item.IsCurrent && item.Id != id)
-            .ToListAsync(cancellationToken);
-        foreach (var other in current)
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
         {
-            other.IsCurrent = false;
-        }
+            var poll = await dbContext.HomePolls
+                .SingleOrDefaultAsync(item => item.Id == id, cancellationToken)
+                ?? throw new HomePollException(HomePollException.NotFound, "Poll was not found.");
 
-        poll.IsCurrent = true;
-        poll.PublishedAt ??= now;
-        await dbContext.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
+            var now = timeProvider.GetUtcNow();
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+            var current = await dbContext.HomePolls
+                .Where(item => item.IsCurrent && item.Id != id)
+                .ToListAsync(cancellationToken);
+            foreach (var other in current)
+            {
+                other.IsCurrent = false;
+            }
+
+            poll.IsCurrent = true;
+            poll.PublishedAt ??= now;
+            await dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        });
     }
 
     public async Task CloseAsync(Guid id, CancellationToken cancellationToken = default)
