@@ -131,15 +131,21 @@ describe('tokenStore', () => {
     (SecureStore.getItemAsync as jest.Mock).mockRejectedValueOnce(raw);
     const rejected = readStoredSession();
     await expect(rejected).rejects.toBeInstanceOf(KeychainLockedError);
-    await expect(rejected).rejects.toSatisfy(isKeychainLockedError);
     await expect(rejected).rejects.not.toBe(raw);
+    await expect(rejected).rejects.toMatchObject({ name: 'KeychainLockedError' });
   });
 
   it('does not treat a locked keychain as a missing session', async () => {
     (SecureStore.getItemAsync as jest.Mock).mockRejectedValueOnce(keychainLockedError());
-    await expect(readStoredSession()).rejects.toSatisfy((error: unknown) => {
-      return isKeychainLockedError(error) && error != null;
-    });
+    let thrown: unknown;
+    try {
+      await readStoredSession();
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeDefined();
+    expect(thrown).not.toBeNull();
+    expect(isKeychainLockedError(thrown)).toBe(true);
   });
 
   it('surfaces a locked write as isKeychainLockedError instead of a raw Keychain throw', async () => {
