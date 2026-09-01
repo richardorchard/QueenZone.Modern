@@ -1,5 +1,5 @@
 import * as Notifications from 'expo-notifications';
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import type { DevicePushPlatform } from './api';
 
 export type DeviceTokenResult = {
@@ -50,8 +50,33 @@ export async function checkNotificationPermission(): Promise<boolean> {
   return status.granted;
 }
 
+/**
+ * APNs is unsafe until the app is in the foreground. After OAuth Safari
+ * dismiss / a permission prompt the process may still be inactive; wait
+ * for the next `active` rather than calling getDevicePushTokenAsync then (#1201).
+ * When already active, still leave the current turn so permission + token
+ * are never requested in the same tick as OAuth return.
+ */
+export function waitUntilAppActive(): Promise<void> {
+  if (AppState.currentState === 'active') {
+    return new Promise((resolve) => {
+      queueMicrotask(resolve);
+    });
+  }
+
+  return new Promise((resolve) => {
+    const subscription = AppState.addEventListener('change', (next) => {
+      if (next === 'active') {
+        subscription.remove();
+        resolve();
+      }
+    });
+  });
+}
+
 /** Native APNs/FCM token (never Expo's hosted push token — ADR 0014 rules out EAS). */
 export async function getDeviceToken(): Promise<DeviceTokenResult | null> {
+  await waitUntilAppActive();
   const native = await Notifications.getDevicePushTokenAsync();
   if (native.type === 'ios') {
     return { platform: 'apns', token: native.data };

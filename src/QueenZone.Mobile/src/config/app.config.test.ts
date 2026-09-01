@@ -16,6 +16,16 @@ describe('app.config marketing version', () => {
   });
 });
 
+describe('app.config Sentry Expo plugin', () => {
+  it('registers the official @sentry/react-native/expo plugin', () => {
+    const appJson = JSON.parse(
+      readFileSync(new URL('../../app.json', import.meta.url), 'utf8'),
+    ) as { expo: { plugins: unknown[] } };
+    assert.ok(appJson.expo.plugins.includes('@sentry/react-native/expo'));
+    assert.match(source, /'@sentry\/react-native\/expo'/);
+  });
+});
+
 describe('app.config android versionCode', () => {
   it('bakes android.versionCode from GITHUB_RUN_NUMBER at prebuild', () => {
     assert.match(

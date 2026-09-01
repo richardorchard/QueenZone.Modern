@@ -1,4 +1,4 @@
-import { ApiError, fetchJson, sendJson, sendMultipart } from './client';
+import { ApiError, classifyFetchFailure, fetchJson, sendJson, sendMultipart } from './client';
 import { jsonResponse } from '../test/fixtures';
 
 jest.mock('../config', () => ({
@@ -150,6 +150,16 @@ describe('sendJson and sendMultipart', () => {
     });
   });
 
+  it('maps Expo FetchRequestCanceledException on writes to abort, not offline', async () => {
+    const canceled = Object.assign(new Error('FetchRequestCanceledException'), {
+      name: 'FetchRequestCanceledException',
+    });
+    fetchMock.mockRejectedValueOnce(canceled);
+    await expect(sendJson('/notifications/devices', { body: {} })).rejects.toMatchObject({
+      name: 'AbortError',
+    });
+  });
+
   it('propagates AbortError on writes', async () => {
     const abort = Object.assign(new Error('aborted'), { name: 'AbortError' });
     fetchMock.mockRejectedValueOnce(abort);
@@ -228,6 +238,47 @@ describe('timeouts and GET retry', () => {
     await jest.advanceTimersByTimeAsync(168_000);
     await expectation;
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('classifyFetchFailure', () => {
+  const liveDeadline = { timedOut: () => false };
+  const timedOutDeadline = { timedOut: () => true };
+
+  it('maps Expo FetchRequestCanceledException to abort, not offline', () => {
+    const canceled = Object.assign(new Error('FetchRequestCanceledException'), {
+      name: 'FetchRequestCanceledException',
+    });
+    expect(classifyFetchFailure(canceled, liveDeadline)).toMatchObject({ name: 'AbortError' });
+    expect(classifyFetchFailure(canceled, liveDeadline)).not.toBeInstanceOf(ApiError);
+    expect(classifyFetchFailure('FetchRequestCanceledException', liveDeadline)).toMatchObject({
+      name: 'AbortError',
+    });
+  });
+
+  it('maps lost-connection to abort when the deadline aborted the fetch', () => {
+    const lost = Object.assign(new Error('The network connection was lost'), {
+      name: 'UnexpectedException',
+    });
+    expect(classifyFetchFailure(lost, timedOutDeadline)).toMatchObject({ name: 'AbortError' });
+    expect(classifyFetchFailure(lost, liveDeadline)).toMatchObject({ kind: 'offline' });
+  });
+
+  it('maps lost-connection to abort when the caller aborted', () => {
+    const lost = Object.assign(new Error('The network connection was lost'), {
+      name: 'UnexpectedException',
+    });
+    expect(classifyFetchFailure(lost, liveDeadline, AbortSignal.abort())).toMatchObject({
+      name: 'AbortError',
+    });
+  });
+
+  it('keeps a genuine write TypeError as offline', () => {
+    const cause = new TypeError('Network request failed');
+    expect(classifyFetchFailure(cause, liveDeadline)).toMatchObject({
+      kind: 'offline',
+      cause,
+    });
   });
 });
 

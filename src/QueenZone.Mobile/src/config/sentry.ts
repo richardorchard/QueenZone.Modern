@@ -14,6 +14,7 @@
  * register the NavigationContainer ref and get route-change spans.
  */
 import * as Sentry from '@sentry/react-native';
+import { isExpoFetchCanceled, isLostConnectionMessage } from '../api/errors';
 import { getAppConfig } from './appConfig';
 
 export const navigationIntegration = Sentry.reactNavigationIntegration();
@@ -40,6 +41,13 @@ export function reportApiFailure(event: {
   });
 
   if (event.method === 'GET') {
+    return;
+  }
+
+  // Expo fetch cancel / lost-connection on an aborted write is dying-process
+  // noise, not an error-level issue (#1201). Keep capturing real write
+  // TypeError: Network request failed and timeouts.
+  if (isExpoFetchCanceled(event.cause) || isLostConnectionMessage(event.cause)) {
     return;
   }
 
