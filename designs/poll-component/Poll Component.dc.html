@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/queenzone-design-system-6c12e8ec-2c2c-448b-858b-dbeb24fd8c3c/tokens/fonts.css">
+  <link rel="stylesheet" href="_ds/queenzone-design-system-6c12e8ec-2c2c-448b-858b-dbeb24fd8c3c/tokens/colors.css">
+  <link rel="stylesheet" href="_ds/queenzone-design-system-6c12e8ec-2c2c-448b-858b-dbeb24fd8c3c/tokens/typography.css">
+  <link rel="stylesheet" href="_ds/queenzone-design-system-6c12e8ec-2c2c-448b-858b-dbeb24fd8c3c/tokens/spacing.css">
+  <link rel="stylesheet" href="_ds/queenzone-design-system-6c12e8ec-2c2c-448b-858b-dbeb24fd8c3c/tokens/base.css">
+  <link rel="stylesheet" href="_ds/queenzone-design-system-6c12e8ec-2c2c-448b-858b-dbeb24fd8c3c/styles.css">
+  <script src="_ds/queenzone-design-system-6c12e8ec-2c2c-448b-858b-dbeb24fd8c3c/_ds_bundle.js"></script>
+  <style>
+    body { margin: 0; background: var(--qz-white); }
+    a { color: var(--link); }
+    a:hover { color: var(--link-hover); }
+  </style>
+</helmet>
+
+<div style="{{ pageStyle }}">
+
+  <div style="max-width:1280px;margin:0 auto;padding:72px 24px 40px;display:flex;align-items:flex-start;justify-content:space-between;gap:24px;flex-wrap:wrap">
+    <div style="max-width:680px">
+      <span style="display:block;font:600 11px/1 var(--font-titling);letter-spacing:var(--ls-eyebrow);text-transform:uppercase;color:{{ headerEyebrowColor }};margin-bottom:16px">Queenzone Design System</span>
+      <h1 style="font:var(--type-h1);color:{{ textPrimaryColor }};margin:0 0 14px">Poll component</h1>
+      <p style="font:var(--type-lead);color:{{ textSecondaryColor }};max-width:680px;margin:0">A community poll, built for the three contexts it appears in across the archive — a featured poll and a forum-thread poll, in every voting state, at desktop, mobile-web and mobile-app widths.</p>
+    </div>
+    <div style="display:flex;gap:8px;flex-shrink:0">
+      <x-import component-from-global-scope="QueenzoneDesignSystem_6c12e8.Tag" active="{{ isLight }}" onClick="{{ setLight }}" hint-size="auto,30px">Light</x-import>
+      <x-import component-from-global-scope="QueenzoneDesignSystem_6c12e8.Tag" active="{{ isDark }}" onClick="{{ setDark }}" hint-size="auto,30px">Dark</x-import>
+    </div>
+  </div>
+
+  <section style="padding:48px 0 56px;border-top:1px solid {{ sectionBorder }}">
+    <div style="max-width:1280px;margin:0 auto;padding:0 24px">
+      <div style="display:flex;align-items:baseline;gap:14px;margin-bottom:28px;flex-wrap:wrap">
+        <span style="font:600 11px/1 var(--font-titling);letter-spacing:var(--ls-eyebrow);text-transform:uppercase;color:{{ textPrimaryColor }}">Desktop</span>
+        <span style="font:400 13px/1.4 var(--font-body);color:{{ textSecondaryColor }}">Featured poll (single choice) &amp; a forum-thread poll (multiple choice, closed)</span>
+      </div>
+      <div style="display:flex;gap:32px;flex-wrap:wrap">
+        <div style="flex:1 1 420px;max-width:560px">
+          <dc-import name="Poll Card" context="standalone" choice-type="single" phase="before" dark="{{ isDark }}" question="Which Queen era defined the band for you?" options="{{ poll1.options }}" total-votes="{{ poll1.totalVotes }}" closes-text="Closes in 4 days" hint-size="420px,420px" style="width:100%"></dc-import>
+        </div>
+        <div style="flex:1 1 420px;max-width:560px">
+          <dc-import name="Poll Card" context="thread" choice-type="multiple" phase="closed" dark="{{ isDark }}" question="Which Live Aid moments still give you chills? Pick all that apply." options="{{ poll2.options }}" total-votes="{{ poll2.totalVotes }}" closed-text="Closed 12 Aug 2026" author-name="MercuryRising72" author-meta="Posted in Live Aid 1985 · 41 replies" user-vote-indices="{{ poll2.userVoteIndices }}" hint-size="420px,480px" style="width:100%"></dc-import>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section style="padding:48px 0 56px;border-top:1px solid {{ sectionBorder }};background:{{ section2Bg }}">
+    <div style="max-width:1280px;margin:0 auto;padding:0 24px">
+      <div style="display:flex;align-items:baseline;gap:14px;margin-bottom:28px;flex-wrap:wrap">
+        <span style="font:600 11px/1 var(--font-titling);letter-spacing:var(--ls-eyebrow);text-transform:uppercase;color:{{ textPrimaryColor }}">Mobile · web</span>
+        <span style="font:400 13px/1.4 var(--font-body);color:{{ textSecondaryColor }}">A forum-thread poll (single choice, interactive) &amp; a featured poll (multiple choice, closed)</span>
+      </div>
+      <div style="display:flex;gap:32px;flex-wrap:wrap;justify-content:center">
+        <div style="{{ phoneFrameStyle }}">
+          <div style="{{ browserBarStyle }}">
+            <svg width="9" height="14" viewBox="0 0 9 14" fill="none"><path d="M8 1 1 7l7 6" stroke="{{ iconStroke }}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+            <div style="{{ addressPillStyle }}">
+              <svg width="11" height="12" viewBox="0 0 24 24" fill="none"><rect x="4" y="10" width="16" height="10" rx="2" stroke="{{ iconStroke }}" stroke-width="2"></rect><path d="M7 10V7a5 5 0 0110 0v3" stroke="{{ iconStroke }}" stroke-width="2"></path></svg>
+              <span>queenzone.org</span>
+            </div>
+          </div>
+          <div style="{{ phoneContentStyle }}">
+            <dc-import name="Poll Card" context="thread" choice-type="single" phase="before" dark="{{ isDark }}" question="Should Queenzone revive the old fan-fiction forum board?" options="{{ poll3.options }}" total-votes="{{ poll3.totalVotes }}" closes-text="Closes in 2 days" author-name="PlatinumMoon" author-meta="Posted in Site Feedback · 18 replies" hint-size="100%,420px" style="width:100%"></dc-import>
+          </div>
+        </div>
+        <div style="{{ phoneFrameStyle }}">
+          <div style="{{ browserBarStyle }}">
+            <svg width="9" height="14" viewBox="0 0 9 14" fill="none"><path d="M8 1 1 7l7 6" stroke="{{ iconStroke }}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+            <div style="{{ addressPillStyle }}">
+              <svg width="11" height="12" viewBox="0 0 24 24" fill="none"><rect x="4" y="10" width="16" height="10" rx="2" stroke="{{ iconStroke }}" stroke-width="2"></rect><path d="M7 10V7a5 5 0 0110 0v3" stroke="{{ iconStroke }}" stroke-width="2"></path></svg>
+              <span>queenzone.org</span>
+            </div>
+          </div>
+          <div style="{{ phoneContentStyle }}">
+            <dc-import name="Poll Card" context="standalone" choice-type="multiple" phase="closed" dark="{{ isDark }}" question="Which reissues should the archive prioritise? Pick all that apply." options="{{ poll4.options }}" total-votes="{{ poll4.totalVotes }}" closed-text="Closed 5 Aug 2026" user-vote-indices="{{ poll4.userVoteIndices }}" hint-size="100%,480px" style="width:100%"></dc-import>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section style="padding:48px 0 80px;border-top:1px solid {{ sectionBorder }}">
+    <div style="max-width:1280px;margin:0 auto;padding:0 24px">
+      <div style="display:flex;align-items:baseline;gap:14px;margin-bottom:28px;flex-wrap:wrap">
+        <span style="font:600 11px/1 var(--font-titling);letter-spacing:var(--ls-eyebrow);text-transform:uppercase;color:{{ textPrimaryColor }}">Mobile · app</span>
+        <span style="font:400 13px/1.4 var(--font-body);color:{{ textSecondaryColor }}">A featured poll (multiple choice, interactive) &amp; a forum-thread poll (single choice, closed)</span>
+      </div>
+      <div style="display:flex;gap:40px;flex-wrap:wrap;justify-content:center">
+        <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" title="Community" dark="{{ isDark }}" hint-size="402px,874px">
+          <div style="{{ iosContentStyle }}">
+            <dc-import name="Poll Card" context="standalone" choice-type="multiple" phase="before" dark="{{ isDark }}" question="Which memorabilia should we feature next in the gallery? Pick all that apply." options="{{ poll5.options }}" total-votes="{{ poll5.totalVotes }}" closes-text="Closes in 6 hours" hint-size="100%,420px" style="width:100%"></dc-import>
+          </div>
+        </x-import>
+        <x-import component-from-global-scope="IOSDevice" title="Community" dark="{{ isDark }}" hint-size="402px,874px">
+          <div style="{{ iosContentStyle }}">
+            <dc-import name="Poll Card" context="thread" choice-type="single" phase="closed" dark="{{ isDark }}" question="Best Freddie Mercury vocal performance, in your view?" options="{{ poll6.options }}" total-votes="{{ poll6.totalVotes }}" closed-text="Closed 30 Aug 2026" author-name="ChampionsForever" author-meta="Posted in Vocal Analysis · 62 replies" user-vote-indices="{{ poll6.userVoteIndices }}" hint-size="100%,480px" style="width:100%"></dc-import>
+          </div>
+        </x-import>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { dark: false };
+  renderVals() {
+    const isDark = this.state.dark;
+    return {
+      isDark,
+      isLight: !isDark,
+      setDark: () => this.setState({ dark: true }),
+      setLight: () => this.setState({ dark: false }),
+      pageStyle: { background: isDark ? 'var(--qz-black)' : 'var(--qz-white)' },
+      sectionBorder: isDark ? 'var(--border-on-dark)' : 'var(--border-default)',
+      section2Bg: isDark ? 'rgba(255,255,255,0.03)' : 'var(--qz-warm-white)',
+      headerEyebrowColor: isDark ? 'var(--qz-gold)' : 'var(--qz-blue)',
+      textPrimaryColor: isDark ? 'var(--text-on-dark)' : 'var(--text-primary)',
+      textSecondaryColor: isDark ? 'var(--text-on-dark-muted)' : 'var(--text-secondary)',
+      iconStroke: isDark ? 'rgba(255,255,255,0.55)' : 'var(--qz-grey-600)',
+      iosContentStyle: {
+        padding: '16px 16px 32px', display: 'flex', flexDirection: 'column', gap: '20px',
+        background: isDark ? 'var(--qz-black)' : 'var(--qz-warm-white)',
+        minHeight: '100%', boxSizing: 'border-box',
+      },
+      poll1: { options: [
+        { label: 'Early years (1970–74)', pct: 18 },
+        { label: 'A Night at the Opera era', pct: 34 },
+        { label: 'News of the World – The Game era', pct: 29 },
+        { label: 'The Miracle / Innuendo era', pct: 19 },
+      ], totalVotes: 1842 },
+      poll2: { options: [
+        { label: 'The opening piano riff of Bohemian Rhapsody', pct: 61 },
+        { label: 'The crowd clap-along during Radio Ga Ga', pct: 47 },
+        { label: "Freddie's a cappella exchange with the crowd", pct: 73 },
+        { label: 'We Are the Champions closing the set', pct: 39 },
+      ], totalVotes: 2913, userVoteIndices: [0, 2] },
+      poll3: { options: [
+        { label: 'Yes — bring it back as-is', pct: 44 },
+        { label: 'Yes, but moderated', pct: 31 },
+        { label: 'No, better left archived', pct: 17 },
+        { label: 'Undecided', pct: 8 },
+      ], totalVotes: 674 },
+      poll4: { options: [
+        { label: 'A Night at the Opera — 50th anniversary', pct: 58 },
+        { label: 'Live at Wembley restoration', pct: 66 },
+        { label: 'Complete BBC sessions', pct: 42 },
+        { label: 'Hot Space remaster', pct: 21 },
+      ], totalVotes: 1203, userVoteIndices: [0, 3] },
+      poll5: { options: [
+        { label: 'Handwritten Bohemian Rhapsody lyric sheets', pct: 52 },
+        { label: 'Live Aid stage outfits', pct: 64 },
+        { label: 'Original tour posters', pct: 37 },
+        { label: 'Studio session photographs', pct: 45 },
+      ], totalVotes: 528 },
+      poll6: { options: [
+        { label: 'Somebody to Love (studio, 1976)', pct: 33 },
+        { label: 'Live Aid — Wembley, 1985', pct: 41 },
+        { label: 'The Show Must Go On (1991)', pct: 19 },
+        { label: 'Bohemian Rhapsody operatic section', pct: 7 },
+      ], totalVotes: 3421, userVoteIndices: [1] },
+      phoneFrameStyle: {
+        width: '360px', border: `1px solid ${isDark ? 'var(--border-on-dark)' : 'var(--border-strong)'}`,
+        borderRadius: '20px', overflow: 'hidden', boxShadow: isDark ? 'none' : 'var(--shadow-lift)',
+        background: isDark ? 'var(--qz-black)' : 'var(--qz-white)',
+      },
+      browserBarStyle: {
+        height: '46px', background: isDark ? 'rgba(255,255,255,0.06)' : 'var(--qz-grey-100)',
+        display: 'flex', alignItems: 'center', gap: '10px', padding: '0 14px',
+        borderBottom: `1px solid ${isDark ? 'var(--border-on-dark)' : 'var(--border-default)'}`,
+      },
+      addressPillStyle: {
+        flex: 1, background: isDark ? 'rgba(255,255,255,0.06)' : 'var(--qz-white)',
+        border: `1px solid ${isDark ? 'var(--border-on-dark)' : 'var(--border-default)'}`,
+        borderRadius: 'var(--radius-pill)', height: '28px', display: 'flex', alignItems: 'center',
+        gap: '6px', padding: '0 10px', font: '500 12px var(--font-body)',
+        color: isDark ? 'var(--text-on-dark-muted)' : 'var(--text-muted)',
+      },
+      phoneContentStyle: {
+        padding: '20px 16px 28px', background: isDark ? 'var(--qz-black)' : 'var(--qz-warm-white)',
+        minHeight: '480px',
+      },
+    };
+  }
+}
+</script>
+</body>
+</html>

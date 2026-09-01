@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { ForumPoll } from '../../api';
-import { radius, space, type, useTheme } from '../../theme';
+import { fonts, radius, space, type, useTheme } from '../../theme';
 import { Button } from '../../ui/Button';
 import {
   canCastPollVote,
@@ -74,7 +74,16 @@ export function ForumPollCard({
       style={[styles.card, { backgroundColor: c.surfaceCard, borderColor: c.border }]}
       accessibilityLabel={`Poll. ${poll.question}. ${status}`}
     >
-      <Text style={[type.eyebrow, { color: c.accentPrimary }]}>Poll</Text>
+      <View style={styles.headerRow}>
+        <Text style={[type.eyebrow, { color: c.accentPrimary }]}>Community Poll</Text>
+        {poll.isClosed ? (
+          <View style={[styles.badge, { backgroundColor: c.accentSpecial }]}>
+            <Text style={[type.eyebrow, { fontSize: 9, letterSpacing: 1, color: c.textOnAccent }]}>
+              Closed
+            </Text>
+          </View>
+        ) : null}
+      </View>
       <Text
         style={[type.cardTitle, { color: c.textPrimary, marginTop: space.sm }]}
         allowFontScaling
@@ -82,43 +91,70 @@ export function ForumPollCard({
       >
         {poll.question}
       </Text>
-      <Text style={[type.meta, { color: c.textMuted, marginTop: space.sm }]}>{status}</Text>
 
       {!canVote ? (
         <View style={styles.list}>
           {poll.options.map((option) => (
-            <View key={option.optionId} style={styles.result}>
-              <View style={styles.resultHead}>
-                <Text style={[type.listTitle, { color: c.textPrimary, flex: 1 }]}>
-                  {option.optionText}
-                </Text>
-                <Text style={[type.meta, { color: c.textMuted }]}>
-                  {formatPollResultMeta(option.voteCount, option.percentage)}
-                </Text>
-              </View>
+            <View
+              key={option.optionId}
+              style={[
+                styles.option,
+                styles.resultOption,
+                { borderColor: option.selectedByViewer ? c.accentPrimary : c.hairline },
+              ]}
+              accessibilityRole="text"
+              accessibilityLabel={`${option.optionText}, ${formatPollResultMeta(option.voteCount, option.percentage).replace(' · ', ', ')}${option.selectedByViewer ? ', your vote' : ''}`}
+            >
               <View
-                style={[styles.bar, { backgroundColor: c.border }]}
-                accessibilityRole="image"
-                accessibilityLabel={`${formatPollResultMeta(option.voteCount, option.percentage).replace(' · ', ', ')}`}
+                style={[
+                  styles.resultBar,
+                  {
+                    backgroundColor: option.selectedByViewer ? c.accentTintWeak : c.hairline,
+                    width: `${Math.max(0, Math.min(100, option.percentage))}%`,
+                  },
+                ]}
+              />
+              <View
+                style={[
+                  poll.isMultiChoice ? styles.box : styles.radio,
+                  { borderColor: option.selectedByViewer ? c.accentPrimary : c.borderStrong },
+                  option.selectedByViewer ? { backgroundColor: c.accentPrimary } : null,
+                ]}
               >
-                <View
-                  style={[
-                    styles.barFill,
-                    {
-                      backgroundColor: c.accentPrimary,
-                      width: `${Math.max(0, Math.min(100, option.percentage))}%`,
-                    },
-                  ]}
-                />
+                {option.selectedByViewer ? (
+                  <Text style={[styles.check, { color: c.textOnAccent }]}>✓</Text>
+                ) : null}
               </View>
-              {option.selectedByViewer ? (
-                <Text style={[type.meta, { color: c.textMuted, marginTop: space.xs }]}>Your vote</Text>
-              ) : null}
+              <Text
+                style={[
+                  type.listTitle,
+                  {
+                    color: c.textPrimary,
+                    flex: 1,
+                    fontFamily: option.selectedByViewer ? fonts.bodySemi : fonts.bodyMedium,
+                  },
+                ]}
+              >
+                {option.optionText}
+              </Text>
+              <Text
+                style={[
+                  type.meta,
+                  { color: option.selectedByViewer ? c.accentPrimary : c.textSecondary, textTransform: 'none', letterSpacing: 0 },
+                ]}
+              >
+                {formatPollResultMeta(option.voteCount, option.percentage)}
+              </Text>
             </View>
           ))}
         </View>
       ) : (
         <View style={styles.list}>
+          {poll.isMultiChoice ? (
+            <Text style={[type.caption, { color: c.textMuted, fontStyle: 'italic' }]}>
+              Select all that apply
+            </Text>
+          ) : null}
           {poll.options.map((option) => {
             const checked = selected.includes(option.optionId);
             return (
@@ -130,16 +166,21 @@ export function ForumPollCard({
                 onPress={() => toggle(option.optionId)}
                 style={[
                   styles.option,
-                  { borderColor: checked ? c.accentPrimary : c.hairline, backgroundColor: c.surfaceRaised },
+                  {
+                    borderColor: checked ? c.accentPrimary : c.hairline,
+                    backgroundColor: checked ? c.accentTintWeak : c.surfaceRaised,
+                  },
                 ]}
               >
                 <View
                   style={[
                     poll.isMultiChoice ? styles.box : styles.radio,
-                    { borderColor: c.borderStrong },
+                    { borderColor: checked ? c.accentPrimary : c.borderStrong },
                     checked ? { backgroundColor: c.accentPrimary, borderColor: c.accentPrimary } : null,
                   ]}
-                />
+                >
+                  {checked ? <Text style={[styles.check, { color: c.textOnAccent }]}>✓</Text> : null}
+                </View>
                 <Text style={[type.listTitle, { color: c.textPrimary, flex: 1 }]}>
                   {option.optionText}
                 </Text>
@@ -171,6 +212,10 @@ export function ForumPollCard({
       ) : null}
 
       {error ? <Text style={[type.caption, { color: c.danger }]}>{error}</Text> : null}
+
+      <View style={[styles.metaRow, { borderTopColor: c.hairline }]}>
+        <Text style={[type.meta, { color: c.textMuted }]}>{status}</Text>
+      </View>
     </View>
   );
 }
@@ -183,6 +228,16 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: radius.md,
     gap: space.sm,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  badge: {
+    paddingVertical: 3,
+    paddingHorizontal: space.sm,
+    borderRadius: radius.pill,
   },
   list: {
     marginTop: space.md,
@@ -197,34 +252,39 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: space.md,
   },
-  radio: {
-    width: 16,
-    height: 16,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-  },
-  box: {
-    width: 16,
-    height: 16,
-    borderRadius: radius.xs,
-    borderWidth: 1,
-  },
-  result: {
-    gap: space.xs,
-  },
-  resultHead: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: space.md,
-    alignItems: 'flex-start',
-  },
-  bar: {
-    height: 9,
-    borderRadius: radius.pill,
+  resultOption: {
     overflow: 'hidden',
   },
-  barFill: {
-    height: '100%',
+  resultBar: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+  },
+  radio: {
+    width: 18,
+    height: 18,
     borderRadius: radius.pill,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  box: {
+    width: 18,
+    height: 18,
+    borderRadius: radius.xs,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  check: {
+    fontSize: 11,
+    fontFamily: fonts.bodySemi,
+    lineHeight: 12,
+  },
+  metaRow: {
+    marginTop: space.sm,
+    paddingTop: space.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
 });
