@@ -16,19 +16,42 @@ namespace QueenZone.Data.Migrations;
 /// <para>
 /// BodyHtml is full-text indexed. ALTER COLUMN on that type fails while the index
 /// exists, so the index is dropped, the columns are altered, then the index is
-/// recreated (DROP/CREATE FULLTEXT INDEX cannot share a user transaction).
+/// recreated. DROP/CREATE FULLTEXT INDEX cannot share a user transaction, and a
+/// transactional ALTER after a committed DROP left FTS missing when the ALTER
+/// hit CommandTimeout=300. Every step uses <c>suppressTransaction: true</c>.
+/// </para>
+/// <para>
+/// Retry-safe sequence: restore FTS if missing (CREATE on the current column type),
+/// then DROP only if BodyHtml is still varchar, ALTER only if still varchar, CREATE
+/// if missing. A re-run after DROP-committed + ALTER-timeout restores search first.
+/// A re-run after a successful widen does not DROP FTS (columns are nvarchar).
 /// </para>
 /// <para>
 /// Size-of-data on ~1M posts: expect a long lock and transaction-log growth. Apply
-/// in the usual Azure SQL window (CI/deploy <c>dotnet ef database update</c>), not as
+/// via CI/deploy <c>dotnet ef database update</c> (design-time factory uses
+/// <see cref="QueenZoneSqlServerOptions.LongRunningCommandTimeoutSeconds"/>), not as
 /// a silent app boot. Keep the table collation; do not specify COLLATE.
 /// </para>
 /// </remarks>
 public partial class WidenModernForumPostHtmlToNvarcharMax : Migration
 {
+    private const string CreateBodyHtmlFullTextIndexSql = """
+        IF OBJECT_ID(N'dbo.ModernForumPost', N'U') IS NOT NULL
+           AND NOT EXISTS (SELECT 1 FROM sys.fulltext_indexes WHERE object_id = OBJECT_ID(N'dbo.ModernForumPost'))
+           AND EXISTS (SELECT 1 FROM sys.fulltext_catalogs WHERE name = N'FT_ForumCatalog')
+        BEGIN
+            CREATE FULLTEXT INDEX ON dbo.ModernForumPost (BodyHtml)
+                KEY INDEX PK_ModernForumPost
+                ON FT_ForumCatalog
+                WITH CHANGE_TRACKING AUTO;
+        END
+        """;
+
     /// <inheritdoc />
     protected override void Up(MigrationBuilder migrationBuilder)
     {
+        migrationBuilder.Sql(CreateBodyHtmlFullTextIndexSql, suppressTransaction: true);
+
         migrationBuilder.Sql("""
             IF OBJECT_ID(N'dbo.ModernForumPost', N'U') IS NOT NULL
                AND EXISTS (SELECT 1 FROM sys.fulltext_indexes WHERE object_id = OBJECT_ID(N'dbo.ModernForumPost'))
@@ -71,24 +94,16 @@ public partial class WidenModernForumPostHtmlToNvarcharMax : Migration
                         ALTER COLUMN SignatureHtml nvarchar(max) NULL;
                 END;
             END
-            """);
-
-        migrationBuilder.Sql("""
-            IF OBJECT_ID(N'dbo.ModernForumPost', N'U') IS NOT NULL
-               AND NOT EXISTS (SELECT 1 FROM sys.fulltext_indexes WHERE object_id = OBJECT_ID(N'dbo.ModernForumPost'))
-               AND EXISTS (SELECT 1 FROM sys.fulltext_catalogs WHERE name = N'FT_ForumCatalog')
-            BEGIN
-                CREATE FULLTEXT INDEX ON dbo.ModernForumPost (BodyHtml)
-                    KEY INDEX PK_ModernForumPost
-                    ON FT_ForumCatalog
-                    WITH CHANGE_TRACKING AUTO;
-            END
             """, suppressTransaction: true);
+
+        migrationBuilder.Sql(CreateBodyHtmlFullTextIndexSql, suppressTransaction: true);
     }
 
     /// <inheritdoc />
     protected override void Down(MigrationBuilder migrationBuilder)
     {
+        migrationBuilder.Sql(CreateBodyHtmlFullTextIndexSql, suppressTransaction: true);
+
         migrationBuilder.Sql("""
             IF OBJECT_ID(N'dbo.ModernForumPost', N'U') IS NOT NULL
                AND EXISTS (SELECT 1 FROM sys.fulltext_indexes WHERE object_id = OBJECT_ID(N'dbo.ModernForumPost'))
@@ -131,18 +146,8 @@ public partial class WidenModernForumPostHtmlToNvarcharMax : Migration
                         ALTER COLUMN SignatureHtml varchar(8000) NULL;
                 END;
             END
-            """);
-
-        migrationBuilder.Sql("""
-            IF OBJECT_ID(N'dbo.ModernForumPost', N'U') IS NOT NULL
-               AND NOT EXISTS (SELECT 1 FROM sys.fulltext_indexes WHERE object_id = OBJECT_ID(N'dbo.ModernForumPost'))
-               AND EXISTS (SELECT 1 FROM sys.fulltext_catalogs WHERE name = N'FT_ForumCatalog')
-            BEGIN
-                CREATE FULLTEXT INDEX ON dbo.ModernForumPost (BodyHtml)
-                    KEY INDEX PK_ModernForumPost
-                    ON FT_ForumCatalog
-                    WITH CHANGE_TRACKING AUTO;
-            END
             """, suppressTransaction: true);
+
+        migrationBuilder.Sql(CreateBodyHtmlFullTextIndexSql, suppressTransaction: true);
     }
 }
