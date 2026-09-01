@@ -277,6 +277,35 @@
   });
 })();
 
+// Poll component (design handoff: designs/poll-component/). Single-choice polls
+// cast the vote as soon as an option is picked — no separate submit step — so
+// auto-submit the form on radio change. Multi-choice keeps its own "Cast your
+// vote" button, enabled once at least one checkbox is checked; both degrade
+// gracefully without JS (the radio/checkbox form still posts normally).
+(() => {
+  document.querySelectorAll(".qz-poll__options").forEach((list) => {
+    const form = list.closest("form");
+    if (!form) {
+      return;
+    }
+
+    const radios = Array.from(list.querySelectorAll('input[type="radio"]'));
+    radios.forEach((radio) => {
+      radio.addEventListener("change", () => form.requestSubmit());
+    });
+
+    const checkboxes = Array.from(list.querySelectorAll('input[type="checkbox"]'));
+    const voteButton = form.querySelector(".qz-poll__vote-button");
+    if (checkboxes.length > 0 && voteButton) {
+      const syncDisabled = () => {
+        voteButton.disabled = !checkboxes.some((box) => box.checked);
+      };
+      checkboxes.forEach((box) => box.addEventListener("change", syncDisabled));
+      syncDisabled();
+    }
+  });
+})();
+
 // Progressive enhancement: use the OS share sheet on touch browsers that
 // expose navigator.share. Static platform links stay the no-JS / desktop
 // fallback — desktop Chrome also has share(), but the explicit X / Facebook

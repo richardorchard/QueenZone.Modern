@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/queenzone-design-system-6c12e8ec-2c2c-448b-858b-dbeb24fd8c3c/tokens/fonts.css">
+  <link rel="stylesheet" href="_ds/queenzone-design-system-6c12e8ec-2c2c-448b-858b-dbeb24fd8c3c/tokens/colors.css">
+  <link rel="stylesheet" href="_ds/queenzone-design-system-6c12e8ec-2c2c-448b-858b-dbeb24fd8c3c/tokens/typography.css">
+  <link rel="stylesheet" href="_ds/queenzone-design-system-6c12e8ec-2c2c-448b-858b-dbeb24fd8c3c/tokens/spacing.css">
+  <link rel="stylesheet" href="_ds/queenzone-design-system-6c12e8ec-2c2c-448b-858b-dbeb24fd8c3c/tokens/base.css">
+  <link rel="stylesheet" href="_ds/queenzone-design-system-6c12e8ec-2c2c-448b-858b-dbeb24fd8c3c/styles.css">
+  <script src="_ds/queenzone-design-system-6c12e8ec-2c2c-448b-858b-dbeb24fd8c3c/_ds_bundle.js"></script>
+</helmet>
+<div style="{{ cardStyle }}">
+  <div style="{{ headerRowStyle }}">
+    <sc-if value="{{ isThread }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="{{ avatarStyle }}">{{ authorInitial }}</div>
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <span style="{{ authorNameStyle }}">{{ authorName }}</span>
+          <span style="{{ authorMetaStyle }}">{{ authorMeta }}</span>
+        </div>
+      </div>
+    </sc-if>
+    <sc-if value="{{ isStandalone }}" hint-placeholder-val="{{ false }}">
+      <span style="{{ eyebrowStyle }}">Community Poll</span>
+    </sc-if>
+    <sc-if value="{{ isClosed }}" hint-placeholder-val="{{ false }}">
+      <x-import component-from-global-scope="QueenzoneDesignSystem_6c12e8.Badge" tone="{{ badgeTone }}" variant="{{ badgeVariant }}" hint-size="auto,22px">Closed</x-import>
+    </sc-if>
+  </div>
+
+  <div style="{{ questionStyle }}">{{ question }}</div>
+  <sc-if value="{{ showHelper }}" hint-placeholder-val="{{ false }}">
+    <div style="{{ helperStyle }}">Select all that apply</div>
+  </sc-if>
+
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <sc-for list="{{ rows }}" as="row" hint-placeholder-count="4">
+      <div onClick="{{ row.onClick }}" style="{{ row.rowStyle }}">
+        <div style="{{ row.barStyle }}"></div>
+        <div style="position:relative;z-index:1;display:flex;align-items:center;gap:12px;width:100%">
+          <div style="{{ row.indicatorStyle }}">
+            <sc-if value="{{ row.showCheck }}" hint-placeholder-val="{{ false }}">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>
+            </sc-if>
+          </div>
+          <div style="{{ row.labelStyle }}">{{ row.label }}</div>
+          <sc-if value="{{ row.showPct }}" hint-placeholder-val="{{ false }}">
+            <div style="{{ row.pctStyle }}">{{ row.pctText }}</div>
+          </sc-if>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+
+  <sc-if value="{{ showVoteButton }}" hint-placeholder-val="{{ false }}">
+    <div style="margin-top:16px">
+      <x-import component-from-global-scope="QueenzoneDesignSystem_6c12e8.Button" variant="cta" size="sm" full-width="{{ true }}" disabled="{{ voteDisabled }}" onClick="{{ submitMultiple }}" style="width:100%" hint-size="100%,38px">Cast your vote</x-import>
+    </div>
+  </sc-if>
+
+  <div style="{{ metaRowStyle }}">
+    <span style="{{ metaStyle }}">{{ leftMeta }}</span>
+    <span style="{{ metaStyle }}">{{ rightMeta }}</span>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:420,&quot;height&quot;:380},&quot;context&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;standalone&quot;,&quot;tsType&quot;:&quot;'standalone'|'thread'&quot;,&quot;options&quot;:[&quot;standalone&quot;,&quot;thread&quot;]},&quot;choiceType&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;single&quot;,&quot;tsType&quot;:&quot;'single'|'multiple'&quot;,&quot;options&quot;:[&quot;single&quot;,&quot;multiple&quot;]},&quot;phase&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;before&quot;,&quot;tsType&quot;:&quot;'before'|'after'|'closed'&quot;,&quot;options&quot;:[&quot;before&quot;,&quot;after&quot;,&quot;closed&quot;]},&quot;dark&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;question&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Which Queen era defined the band for you?&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;options&quot;:{&quot;editor&quot;:null,&quot;default&quot;:[{&quot;label&quot;:&quot;Early years (1970–74)&quot;,&quot;pct&quot;:18},{&quot;label&quot;:&quot;A Night at the Opera era&quot;,&quot;pct&quot;:34},{&quot;label&quot;:&quot;News of the World – The Game era&quot;,&quot;pct&quot;:29},{&quot;label&quot;:&quot;The Miracle / Innuendo era&quot;,&quot;pct&quot;:19}],&quot;tsType&quot;:&quot;{label:string,pct:number}[]&quot;},&quot;totalVotes&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:1842,&quot;tsType&quot;:&quot;number&quot;},&quot;closesText&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Closes in 4 days&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;closedText&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Closed 12 Aug 2026&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;authorName&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;authorMeta&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;userVoteIndices&quot;:{&quot;editor&quot;:null,&quot;default&quot;:[],&quot;tsType&quot;:&quot;number[]&quot;}}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { phase: props.phase || 'before', selected: [] };
+  }
+
+  handleOptionClick(i) {
+    if (this.state.phase !== 'before') return;
+    if (this.props.choiceType === 'multiple') {
+      this.setState(s => {
+        const has = s.selected.includes(i);
+        return { selected: has ? s.selected.filter(x => x !== i) : [...s.selected, i] };
+      });
+    } else {
+      this.setState({ selected: [i], phase: 'after' });
+    }
+  }
+
+  submitMultiple() {
+    if (this.state.selected.length === 0) return;
+    this.setState({ phase: 'after' });
+  }
+
+  renderVals() {
+    const {
+      context = 'standalone', choiceType = 'single', question = '', dark = false,
+      options = [], totalVotes = 0, closesText = '', closedText = '',
+      authorName = '', authorMeta = '', userVoteIndices = [],
+    } = this.props;
+    const phase = this.state.phase;
+    const isVoted = phase !== 'before';
+    const isClosed = phase === 'closed';
+    const votedIndices = this.state.selected.length ? this.state.selected : userVoteIndices;
+    const isDark = !!dark;
+
+    const textPrimary = isDark ? 'var(--text-on-dark)' : 'var(--text-primary)';
+    const textMuted = isDark ? 'var(--text-on-dark-muted)' : 'var(--text-muted)';
+    const borderDefault = isDark ? 'var(--border-on-dark)' : 'var(--border-default)';
+    const rowBg = isDark ? 'transparent' : 'var(--qz-white)';
+    const rowBgChecked = isDark ? 'rgba(36,74,143,0.32)' : 'var(--qz-blue-tint)';
+    const barOther = isDark ? 'rgba(255,255,255,0.08)' : 'var(--qz-grey-100)';
+    const indicatorMutedBorder = isDark ? 'rgba(255,255,255,0.35)' : 'var(--qz-grey-400)';
+
+    const metaStyle = {
+      font: '500 11.5px/1 var(--font-body)', letterSpacing: '0.06em',
+      textTransform: 'uppercase', color: textMuted,
+    };
+
+    const rows = options.map((o, i) => {
+      const preChecked = !isVoted && this.state.selected.includes(i);
+      const isMyVote = isVoted && votedIndices.includes(i);
+      const showCheck = preChecked || isMyVote;
+      const interactive = phase === 'before';
+      const shape = choiceType === 'single' ? '50%' : 'var(--radius-xs)';
+      return {
+        label: o.label,
+        onClick: interactive ? (() => this.handleOptionClick(i)) : undefined,
+        showPct: isVoted,
+        showCheck,
+        pctText: Math.round(o.pct) + '%',
+        pctStyle: {
+          font: '700 14px/1 var(--font-body)', fontVariantNumeric: 'tabular-nums',
+          color: isMyVote ? (isDark ? 'var(--qz-white)' : 'var(--qz-blue)') : (isDark ? 'var(--text-on-dark-muted)' : 'var(--text-secondary)'),
+          minWidth: '38px', textAlign: 'right', flexShrink: 0,
+        },
+        labelStyle: {
+          flex: 1, font: (isMyVote ? '600' : '400') + ' 15px/1.4 var(--font-body)',
+          color: textPrimary,
+        },
+        indicatorStyle: {
+          width: '18px', height: '18px', borderRadius: shape, flexShrink: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          border: `1.5px solid ${showCheck ? 'var(--qz-blue)' : indicatorMutedBorder}`,
+          background: showCheck ? 'var(--qz-blue)' : 'transparent',
+          transition: 'background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out)',
+        },
+        rowStyle: {
+          position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center',
+          padding: '13px 14px', borderRadius: 'var(--radius-sm)',
+          border: `1px solid ${isMyVote ? 'var(--qz-blue)' : borderDefault}`,
+          cursor: interactive ? 'pointer' : 'default',
+          background: preChecked ? rowBgChecked : rowBg,
+          transition: 'border-color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out)',
+        },
+        barStyle: isVoted ? {
+          position: 'absolute', left: 0, top: 0, bottom: 0, width: o.pct + '%',
+          background: isMyVote ? rowBgChecked : barOther,
+          transition: 'width var(--dur-slow) var(--ease-out)',
+        } : { display: 'none' },
+      };
+    });
+
+    return {
+      isThread: context === 'thread',
+      isStandalone: context === 'standalone',
+      isClosed,
+      authorInitial: (authorName || 'Q').charAt(0).toUpperCase(),
+      authorName,
+      authorMeta,
+      question,
+      rows,
+      showHelper: phase === 'before' && choiceType === 'multiple',
+      showVoteButton: phase === 'before' && choiceType === 'multiple',
+      voteDisabled: this.state.selected.length === 0,
+      submitMultiple: () => this.submitMultiple(),
+      leftMeta: totalVotes.toLocaleString() + ' votes',
+      rightMeta: isClosed ? closedText : (isVoted ? 'You voted' : closesText),
+      badgeTone: isDark ? 'special' : 'neutral',
+      badgeVariant: isDark ? 'solid' : 'outline',
+      cardStyle: {
+        background: isDark ? 'var(--qz-black)' : 'var(--qz-white)',
+        border: `1px solid ${borderDefault}`,
+        borderRadius: 'var(--radius-md)', boxShadow: isDark ? 'none' : 'var(--shadow-card)',
+        padding: '24px', width: '100%', boxSizing: 'border-box', fontFamily: 'var(--font-body)',
+      },
+      headerRowStyle: {
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        marginBottom: '14px', minHeight: '22px',
+      },
+      avatarStyle: {
+        width: '34px', height: '34px', borderRadius: '50%', flexShrink: 0,
+        background: isDark ? 'rgba(255,255,255,0.12)' : 'var(--qz-grey-200)',
+        color: textPrimary,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        font: '600 13px var(--font-body)',
+      },
+      authorNameStyle: { font: '600 13px/1.2 var(--font-body)', color: textPrimary },
+      authorMetaStyle: { font: '500 11px/1.2 var(--font-body)', color: textMuted, letterSpacing: '0.02em' },
+      eyebrowStyle: {
+        font: '600 11px/1 var(--font-titling)', letterSpacing: 'var(--ls-eyebrow)',
+        textTransform: 'uppercase', color: isDark ? 'var(--qz-gold)' : 'var(--qz-blue)',
+      },
+      questionStyle: { font: 'var(--type-h3)', color: textPrimary, marginBottom: '6px' },
+      helperStyle: { font: 'italic 400 13px/1.3 var(--font-body)', color: textMuted, marginBottom: '4px' },
+      metaRowStyle: {
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        marginTop: '16px', paddingTop: '14px', borderTop: `1px solid ${borderDefault}`,
+        gap: '12px',
+      },
+      metaStyle,
+    };
+  }
+}
+</script>
+</body>
+</html>
