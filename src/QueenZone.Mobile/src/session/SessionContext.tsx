@@ -108,6 +108,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const refreshTokenRef = useRef(refreshToken);
   const expiresAtRef = useRef(expiresAt);
   const memberIdRef = useRef<string | null>(null);
+  const refreshInFlightRef = useRef<Promise<string | null> | null>(null);
   sessionRef.current = session;
   refreshTokenRef.current = refreshToken;
   expiresAtRef.current = expiresAt;
@@ -197,28 +198,42 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setSession(next);
   }, []);
 
-  const refreshWithStoredGrant = useCallback(async (): Promise<string | null> => {
+  const refreshWithStoredGrant = useCallback((): Promise<string | null> => {
+    if (refreshInFlightRef.current) {
+      return refreshInFlightRef.current;
+    }
+
     const refresh = refreshTokenRef.current;
     if (!refresh) {
-      return sessionRef.current.accessToken;
+      return Promise.resolve(sessionRef.current.accessToken);
     }
 
-    let tokens: AuthTokens;
-    try {
-      tokens = await refreshAccessToken(getAppConfig().apiBaseUrl, refresh);
-    } catch {
-      await clearLocal();
-      return null;
-    }
+    const flight = (async () => {
+      let tokens: AuthTokens;
+      try {
+        tokens = await refreshAccessToken(getAppConfig().apiBaseUrl, refresh);
+      } catch {
+        await clearLocal();
+        return null;
+      }
 
-    try {
-      await applyTokens(tokens);
-    } catch {
-      // The refresh grant itself succeeded — the access token is good. A follow-up
-      // `/me` hiccup (a transient 401, an outage, ...) shouldn't sign the member out;
-      // it just means the profile stays stale until it can be fetched successfully.
-    }
-    return tokens.accessToken;
+      try {
+        await applyTokens(tokens);
+      } catch {
+        // The refresh grant itself succeeded — the access token is good. A follow-up
+        // `/me` hiccup (a transient 401, an outage, ...) shouldn't sign the member out;
+        // it just means the profile stays stale until it can be fetched successfully.
+      }
+      return tokens.accessToken;
+    })();
+
+    refreshInFlightRef.current = flight;
+    void flight.finally(() => {
+      if (refreshInFlightRef.current === flight) {
+        refreshInFlightRef.current = null;
+      }
+    });
+    return flight;
   }, [applyTokens, clearLocal]);
 
   const ensureAccessToken = useCallback(async (): Promise<string | null> => {
@@ -244,17 +259,25 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       }
 
       const shell = profileFromIdentityShell(stored.identity);
-      applyTokenState(stored, {
-        displayName: stored.identity?.displayName ?? null,
-        profile: shell,
-      });
       if (stored.identity?.memberId) {
         memberIdRef.current = stored.identity.memberId;
       }
 
+      // Seed the grant and start a single-flight /token before the signed-in
+      // shell is live so flushOfflineQueue / refreshProfile join this promise
+      // instead of presenting the same single-use refresh token twice.
+      refreshTokenRef.current = stored.refreshToken;
+      expiresAtRef.current = stored.expiresAt;
+      const pendingRefresh = stored.expiresAt <= Date.now() ? refreshWithStoredGrant() : null;
+
+      applyTokenState(stored, {
+        displayName: stored.identity?.displayName ?? null,
+        profile: shell,
+      });
+
       try {
-        if (stored.expiresAt <= Date.now()) {
-          const next = await refreshWithStoredGrant();
+        if (pendingRefresh) {
+          const next = await pendingRefresh;
           if (!next && !cancelled) {
             await clearLocal();
           }

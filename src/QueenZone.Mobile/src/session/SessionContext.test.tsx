@@ -215,18 +215,26 @@ describe('SessionProvider', () => {
 
   it('applies a cached identity shell before an expired-access refresh resolves', async () => {
     const refresh = deferred<ReturnType<typeof authTokensFixture>>();
+    let tokenCalls = 0;
+    refreshAccessToken.mockImplementation(async () => {
+      tokenCalls += 1;
+      if (tokenCalls > 1) {
+        throw new Error('invalid_grant');
+      }
+      return refresh.promise;
+    });
     readStored.mockResolvedValue({
       ...authTokensFixture(),
       expiresAt: Date.now() - 1_000,
       identity: { displayName: 'Freddie', memberId: 'member-1' },
     });
-    refreshAccessToken.mockReturnValue(refresh.promise);
     renderSession();
 
     await waitFor(() => expect(screen.getByText('signed-in')).toBeOnTheScreen());
     expect(screen.getByText('Freddie')).toBeOnTheScreen();
     expect(screen.getByText('FR')).toBeOnTheScreen();
     expect(screen.queryByText('restoring')).toBeNull();
+    expect(refreshAccessToken).toHaveBeenCalledTimes(1);
     expect(refreshAccessToken).toHaveBeenCalledWith('http://qz.test', 'refresh-token');
     expect(screen.getByText('access-token')).toBeOnTheScreen();
 
@@ -237,6 +245,44 @@ describe('SessionProvider', () => {
     expect(screen.getByText('Freddie')).toBeOnTheScreen();
     expect(screen.getByText('FR')).toBeOnTheScreen();
     expect(screen.getByText('signed-in')).toBeOnTheScreen();
+    expect(refreshAccessToken).toHaveBeenCalledTimes(1);
+    expect(clearStored).not.toHaveBeenCalled();
+  });
+
+  it('single-flights concurrent ensureAccessToken callers onto one /token', async () => {
+    const user = userEvent.setup();
+    const refresh = deferred<ReturnType<typeof authTokensFixture>>();
+    let tokenCalls = 0;
+    refreshAccessToken.mockImplementation(async () => {
+      tokenCalls += 1;
+      if (tokenCalls > 1) {
+        throw new Error('invalid_grant');
+      }
+      return refresh.promise;
+    });
+    readStored.mockResolvedValue({
+      ...authTokensFixture(),
+      expiresAt: Date.now() - 1_000,
+      identity: { displayName: 'Freddie', memberId: 'member-1' },
+    });
+    renderSession();
+
+    await waitFor(() => expect(screen.getByText('signed-in')).toBeOnTheScreen());
+    expect(screen.getByText('Freddie')).toBeOnTheScreen();
+    expect(screen.queryByText('restoring')).toBeNull();
+
+    await user.press(screen.getByText('do-ensure-token'));
+    await user.press(screen.getByText('do-ensure-token'));
+    expect(refreshAccessToken).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      refresh.resolve(authTokensFixture({ accessToken: 'next' }));
+    });
+    await waitFor(() => expect(screen.getByText('next')).toBeOnTheScreen());
+    expect(screen.getByText('signed-in')).toBeOnTheScreen();
+    expect(screen.getByText('Freddie')).toBeOnTheScreen();
+    expect(refreshAccessToken).toHaveBeenCalledTimes(1);
+    expect(clearStored).not.toHaveBeenCalled();
   });
 
   it('clears local state when refresh fails', async () => {
