@@ -57,6 +57,7 @@ function renderDetail() {
 describe('FanPerformanceDetailScreen', () => {
   beforeEach(() => {
     mockSession.accessToken = null;
+    mockSession.isSignedIn = false;
     mockSession.isRestoring = false;
     fetchDetail.mockResolvedValue(track);
     fetchPage.mockResolvedValue(pagedResponse([track]));
@@ -78,8 +79,20 @@ describe('FanPerformanceDetailScreen', () => {
 
   it('shows playback controls when a member token is present', async () => {
     mockSession.accessToken = 'member-token';
+    mockSession.isSignedIn = true;
     renderDetail();
     await waitFor(() => expect(screen.getByLabelText('Play')).toBeOnTheScreen());
+    expect(screen.queryByRole('button', { name: 'Sign in' })).toBeNull();
+  });
+
+  it('does not show restoring copy when a stored session is already signed in', async () => {
+    mockSession.isSignedIn = true;
+    mockSession.isRestoring = false;
+    mockSession.accessToken = 'expired-access';
+    renderDetail();
+    await waitFor(() => expect(screen.getByLabelText('Play')).toBeOnTheScreen());
+    expect(screen.queryByTestId('fan-performance-session-restoring')).toBeNull();
+    expect(screen.queryByText('Restoring your session…')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Sign in' })).toBeNull();
   });
 });

@@ -23,7 +23,7 @@ export function FanPerformanceDetailScreen({ navigation, route }: Props) {
 function FanPerformancePlayerPanel({ navigation, route }: Props) {
   const { c } = useTheme();
   const { id } = route.params;
-  const { accessToken, isRestoring } = useSession();
+  const { accessToken, isRestoring, isSignedIn } = useSession();
   const player = useFanPerformancePlayer();
   const [track, setTrack] = useState<FanPerformance | null>(null);
   const [queue, setQueue] = useState<FanPerformance[]>([]);
@@ -98,7 +98,7 @@ function FanPerformancePlayerPanel({ navigation, route }: Props) {
         <Text style={[type.body, { color: c.textSecondary, marginTop: space.xl }]}>{description}</Text>
       ) : null}
 
-      {accessToken ? (
+      {accessToken || isSignedIn ? (
         <View style={styles.player}>
           <Pressable
             accessibilityRole="adjustable"

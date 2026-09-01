@@ -54,6 +54,33 @@ describe('ProfileScreen', () => {
     expect(screen.queryByText('Join the archive')).toBeNull();
   });
 
+  it('shows last-known identity instead of the restoring gate when a session exists', () => {
+    mockSession.isSignedIn = true;
+    mockSession.isRestoring = false;
+    mockSession.displayName = 'Freddie';
+    mockSession.profile = memberProfileFixture({ email: '' });
+    mockSession.refreshProfile.mockResolvedValue(mockSession.profile);
+    renderProfile();
+    expect(screen.queryByTestId('profile-restoring')).toBeNull();
+    expect(screen.queryByText('Restoring your session…')).toBeNull();
+    expect(screen.getByText('Freddie')).toBeOnTheScreen();
+    expect(screen.getByText('FR')).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Sign out' })).toBeOnTheScreen();
+  });
+
+  it('does not full-screen restore when signed in even if isRestoring is still true', () => {
+    mockSession.isSignedIn = true;
+    mockSession.isRestoring = true;
+    mockSession.displayName = 'Freddie';
+    mockSession.profile = memberProfileFixture({ email: '' });
+    mockSession.refreshProfile.mockResolvedValue(mockSession.profile);
+    renderProfile();
+    expect(screen.queryByTestId('profile-restoring')).toBeNull();
+    expect(screen.queryByText('Restoring your session…')).toBeNull();
+    expect(screen.getByText('Freddie')).toBeOnTheScreen();
+    expect(screen.getByText('FR')).toBeOnTheScreen();
+  });
+
   it('shows member identity and sign out when signed in', async () => {
     mockSession.isSignedIn = true;
     mockSession.displayName = 'Freddie';
