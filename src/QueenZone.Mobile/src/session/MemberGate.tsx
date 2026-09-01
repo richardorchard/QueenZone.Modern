@@ -15,7 +15,7 @@ export function MemberGate({ title, children }: Props) {
   const { isSignedIn, isRestoring } = useSession();
   const navigation = useNavigation();
 
-  if (isRestoring) {
+  if (isRestoring && !isSignedIn) {
     return null;
   }
 

@@ -14,7 +14,7 @@ import { addNetworkStateListener } from 'expo-network';
 import * as Notifications from 'expo-notifications';
 import { getAppConfig } from '../config/appConfig';
 import { ApiError, fetchJson } from '../api/client';
-import { parseMemberProfile, type MemberProfile } from '../api/me';
+import { fallbackProfileLimits, parseMemberProfile, type MemberProfile } from '../api/me';
 import type { AuthTokens } from '../api/auth';
 import { clearPushRegistration, refreshPushRegistration, syncPushRegistration } from '../notifications';
 import { logoutRemote, refreshAccessToken, revokeRefreshToken, signInWithProvider } from './oauth';
@@ -32,7 +32,13 @@ import {
   discardOfflineQueue,
   flushOfflineQueue,
 } from '../offlineQueue';
-import { clearStoredSession, readStoredSession, writeStoredSession } from './tokenStore';
+import {
+  clearStoredSession,
+  readStoredSession,
+  writeStoredIdentityShell,
+  writeStoredSession,
+  type StoredIdentityShell,
+} from './tokenStore';
 
 export type Session = {
   isSignedIn: boolean;
@@ -102,35 +108,61 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const refreshTokenRef = useRef(refreshToken);
   const expiresAtRef = useRef(expiresAt);
   const memberIdRef = useRef<string | null>(null);
+  const refreshInFlightRef = useRef<Promise<string | null> | null>(null);
   sessionRef.current = session;
   refreshTokenRef.current = refreshToken;
   expiresAtRef.current = expiresAt;
 
-  const applyTokenState = useCallback((tokens: { accessToken: string; refreshToken: string; expiresAt: number }) => {
-    refreshTokenRef.current = tokens.refreshToken;
-    expiresAtRef.current = tokens.expiresAt;
-    setRefreshToken(tokens.refreshToken);
-    setExpiresAt(tokens.expiresAt);
-    setSession((current) => {
-      const next = sessionFromAccessToken(tokens.accessToken, {
-        displayName: current.accessToken === tokens.accessToken ? current.displayName : null,
-        profile: current.accessToken === tokens.accessToken ? current.profile : null,
+  const applyTokenState = useCallback(
+    (
+      tokens: { accessToken: string; refreshToken: string; expiresAt: number },
+      extras: Partial<Pick<Session, 'displayName' | 'profile'>> = {},
+    ) => {
+      refreshTokenRef.current = tokens.refreshToken;
+      expiresAtRef.current = tokens.expiresAt;
+      setRefreshToken(tokens.refreshToken);
+      setExpiresAt(tokens.expiresAt);
+      setSession((current) => {
+        const next = sessionFromAccessToken(tokens.accessToken, {
+          displayName: extras.displayName !== undefined ? extras.displayName : current.displayName,
+          profile: extras.profile !== undefined ? extras.profile : current.profile,
+        });
+        sessionRef.current = next;
+        return next;
       });
-      sessionRef.current = next;
-      return next;
-    });
-  }, []);
+    },
+    [],
+  );
 
   const applyProfile = useCallback((accessToken: string, profile: MemberProfile | null) => {
+    if (!profile) {
+      setSession((current) => {
+        const next = sessionFromAccessToken(accessToken, {
+          displayName: current.displayName,
+          profile: current.profile,
+        });
+        sessionRef.current = next;
+        return next;
+      });
+      return;
+    }
+
     const previousId = memberIdRef.current;
-    const nextId = profile?.memberId ?? null;
+    const nextId = profile.memberId;
     if (previousId && nextId && previousId !== nextId) {
       void purgePrivateContentCache(previousId);
     }
     memberIdRef.current = nextId;
+    void writeStoredIdentityShell({
+      displayName: profile.displayName,
+      memberId: profile.memberId,
+      avatarPath: profile.avatarPath,
+    }).catch(() => {
+      // Token grant is already stored. A shell write miss only delays initials until /me succeeds.
+    });
     setSession(() => {
       const next = sessionFromAccessToken(accessToken, {
-        displayName: profile?.displayName ?? null,
+        displayName: profile.displayName,
         profile,
       });
       sessionRef.current = next;
@@ -166,28 +198,42 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setSession(next);
   }, []);
 
-  const refreshWithStoredGrant = useCallback(async (): Promise<string | null> => {
+  const refreshWithStoredGrant = useCallback((): Promise<string | null> => {
+    if (refreshInFlightRef.current) {
+      return refreshInFlightRef.current;
+    }
+
     const refresh = refreshTokenRef.current;
     if (!refresh) {
-      return sessionRef.current.accessToken;
+      return Promise.resolve(sessionRef.current.accessToken);
     }
 
-    let tokens: AuthTokens;
-    try {
-      tokens = await refreshAccessToken(getAppConfig().apiBaseUrl, refresh);
-    } catch {
-      await clearLocal();
-      return null;
-    }
+    const flight = (async () => {
+      let tokens: AuthTokens;
+      try {
+        tokens = await refreshAccessToken(getAppConfig().apiBaseUrl, refresh);
+      } catch {
+        await clearLocal();
+        return null;
+      }
 
-    try {
-      await applyTokens(tokens);
-    } catch {
-      // The refresh grant itself succeeded — the access token is good. A follow-up
-      // `/me` hiccup (a transient 401, an outage, ...) shouldn't sign the member out;
-      // it just means the profile stays stale until it can be fetched successfully.
-    }
-    return tokens.accessToken;
+      try {
+        await applyTokens(tokens);
+      } catch {
+        // The refresh grant itself succeeded — the access token is good. A follow-up
+        // `/me` hiccup (a transient 401, an outage, ...) shouldn't sign the member out;
+        // it just means the profile stays stale until it can be fetched successfully.
+      }
+      return tokens.accessToken;
+    })();
+
+    refreshInFlightRef.current = flight;
+    void flight.finally(() => {
+      if (refreshInFlightRef.current === flight) {
+        refreshInFlightRef.current = null;
+      }
+    });
+    return flight;
   }, [applyTokens, clearLocal]);
 
   const ensureAccessToken = useCallback(async (): Promise<string | null> => {
@@ -212,23 +258,36 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      const shell = profileFromIdentityShell(stored.identity);
+      if (stored.identity?.memberId) {
+        memberIdRef.current = stored.identity.memberId;
+      }
+
+      // Seed the grant and start a single-flight /token before the signed-in
+      // shell is live so flushOfflineQueue / refreshProfile join this promise
+      // instead of presenting the same single-use refresh token twice.
+      refreshTokenRef.current = stored.refreshToken;
+      expiresAtRef.current = stored.expiresAt;
+      const pendingRefresh = stored.expiresAt <= Date.now() ? refreshWithStoredGrant() : null;
+
+      applyTokenState(stored, {
+        displayName: stored.identity?.displayName ?? null,
+        profile: shell,
+      });
+
       try {
-        const tokens =
-          stored.expiresAt > Date.now()
-            ? stored
-            : await writeStoredSession(
-                await refreshAccessToken(getAppConfig().apiBaseUrl, stored.refreshToken),
-              );
-        if (cancelled) {
+        if (pendingRefresh) {
+          const next = await pendingRefresh;
+          if (!next && !cancelled) {
+            await clearLocal();
+          }
           return;
         }
 
-        applyTokenState(tokens);
-
         try {
-          const profile = await loadProfile(tokens.accessToken);
+          const profile = await loadProfile(stored.accessToken);
           if (!cancelled) {
-            applyProfile(tokens.accessToken, profile);
+            applyProfile(stored.accessToken, profile);
           }
         } catch (err) {
           if (cancelled) {
@@ -539,4 +598,34 @@ async function loadProfile(accessToken: string): Promise<MemberProfile | null> {
 
     return null;
   }
+}
+
+function profileFromIdentityShell(identity: StoredIdentityShell | null | undefined): MemberProfile | null {
+  if (!identity) {
+    return null;
+  }
+
+  return {
+    memberId: identity.memberId,
+    email: '',
+    displayName: identity.displayName,
+    createdAt: '',
+    lastLoginAt: null,
+    hasAvatar: Boolean(identity.avatarPath),
+    avatarPath: identity.avatarPath ?? null,
+    avatarThumbPath: null,
+    messagePrivacy: 'members',
+    linkedProviders: [],
+    legacyLink: { kind: 'none', match: null, claimableMatches: [], unavailableMatches: [] },
+    scheduledDeletionAt: null,
+    limits: fallbackProfileLimits,
+    deletion: {
+      confirmationPhrase: 'DELETE',
+      confirmationHint: 'Type DELETE to schedule deletion of the account.',
+      requestedTitle: 'Account deletion scheduled',
+      requestedMessage:
+        'You have been signed out. You can sign back in and cancel deletion during the 30-day cooling-off period.',
+      whatHappens: [],
+    },
+  };
 }

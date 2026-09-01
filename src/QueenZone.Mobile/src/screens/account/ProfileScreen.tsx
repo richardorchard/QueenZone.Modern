@@ -53,7 +53,7 @@ export function ProfileScreen({ navigation }: Props) {
     }
   }, [signOut]);
 
-  if (isRestoring) {
+  if (isRestoring && !isSignedIn) {
     return (
       <View testID={testIds.profileRestoring} style={{ flex: 1, backgroundColor: c.surfacePage }}>
         <LoadingBlock label="Restoring your session…" />

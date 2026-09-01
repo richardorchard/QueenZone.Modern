@@ -71,4 +71,17 @@ describe('MemberGate', () => {
     expect(screen.getByText('inbox')).toBeOnTheScreen();
     expect(screen.queryByRole('button', { name: 'Sign in' })).toBeNull();
   });
+
+  it('renders children when a stored session is signed in even if restore is flagged', () => {
+    mockSession.isSignedIn = true;
+    mockSession.isRestoring = true;
+    renderWithProviders(
+      <MemberGate title="Messages">
+        <Text>inbox</Text>
+      </MemberGate>,
+      { navigation: false },
+    );
+    expect(screen.getByText('inbox')).toBeOnTheScreen();
+    expect(screen.queryByRole('button', { name: 'Sign in' })).toBeNull();
+  });
 });

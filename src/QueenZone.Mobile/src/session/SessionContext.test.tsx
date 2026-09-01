@@ -3,7 +3,8 @@ import { AppState, Text } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { act, screen, waitFor, userEvent } from '@testing-library/react-native';
 import { ApiError, fetchJson } from '../api/client';
-import { authTokensFixture, memberProfilePayload } from '../test/fixtures';
+import { authTokensFixture, deferred, memberProfilePayload } from '../test/fixtures';
+import { initials } from '../ui/initials';
 import { renderWithProviders } from '../test/render';
 import { SessionProvider, useSession, useSessionActions, type SessionActions } from './SessionContext';
 import * as oauth from './oauth';
@@ -52,6 +53,7 @@ jest.mock('./tokenStore', () => ({
     ...tokens,
     expiresAt: Date.now() + 60_000,
   })),
+  writeStoredIdentityShell: jest.fn(async () => {}),
   clearStoredSession: jest.fn(async () => {}),
 }));
 
@@ -64,6 +66,9 @@ jest.mock('../notifications', () => ({
 const fetchJsonMock = fetchJson as jest.MockedFunction<typeof fetchJson>;
 const readStored = tokenStore.readStoredSession as jest.MockedFunction<typeof tokenStore.readStoredSession>;
 const writeStored = tokenStore.writeStoredSession as jest.MockedFunction<typeof tokenStore.writeStoredSession>;
+const writeIdentity = tokenStore.writeStoredIdentityShell as jest.MockedFunction<
+  typeof tokenStore.writeStoredIdentityShell
+>;
 const clearStored = tokenStore.clearStoredSession as jest.MockedFunction<typeof tokenStore.clearStoredSession>;
 const signInWithProvider = oauth.signInWithProvider as jest.MockedFunction<typeof oauth.signInWithProvider>;
 const refreshAccessToken = oauth.refreshAccessToken as jest.MockedFunction<typeof oauth.refreshAccessToken>;
@@ -83,6 +88,7 @@ function Probe() {
     <>
       <Text>{session.isRestoring ? 'restoring' : session.isSignedIn ? 'signed-in' : 'signed-out'}</Text>
       <Text>{session.displayName ?? 'anonymous'}</Text>
+      <Text>{session.isSignedIn ? initials(session.displayName) || 'no-initials' : 'signed-out-avatar'}</Text>
       <Text>{session.accessToken ?? 'no-token'}</Text>
       <Text>{smokeResult}</Text>
       <Text
@@ -134,6 +140,7 @@ beforeEach(() => {
   // of whether an earlier test in this file spied on and restored the mock.
   jest.spyOn(AppState, 'addEventListener').mockImplementation(() => ({ remove: jest.fn() }));
   mockAppConfig.appEnv = 'development';
+  mockAppConfig.version = '0.1.0';
   fetchJsonMock.mockReset();
   readStored.mockReset();
   writeStored.mockReset();
@@ -141,6 +148,8 @@ beforeEach(() => {
     ...tokens,
     expiresAt: Date.now() + 60_000,
   }));
+  writeIdentity.mockReset();
+  writeIdentity.mockResolvedValue(undefined);
   clearStored.mockReset();
   signInWithProvider.mockReset();
   refreshAccessToken.mockReset();
@@ -204,15 +213,109 @@ describe('SessionProvider', () => {
     expect(refreshAccessToken).toHaveBeenCalledWith('http://qz.test', 'refresh-token');
   });
 
+  it('applies a cached identity shell before an expired-access refresh resolves', async () => {
+    const refresh = deferred<ReturnType<typeof authTokensFixture>>();
+    let tokenCalls = 0;
+    refreshAccessToken.mockImplementation(async () => {
+      tokenCalls += 1;
+      if (tokenCalls > 1) {
+        throw new Error('invalid_grant');
+      }
+      return refresh.promise;
+    });
+    readStored.mockResolvedValue({
+      ...authTokensFixture(),
+      expiresAt: Date.now() - 1_000,
+      identity: { displayName: 'Freddie', memberId: 'member-1' },
+    });
+    renderSession();
+
+    await waitFor(() => expect(screen.getByText('signed-in')).toBeOnTheScreen());
+    expect(screen.getByText('Freddie')).toBeOnTheScreen();
+    expect(screen.getByText('FR')).toBeOnTheScreen();
+    expect(screen.queryByText('restoring')).toBeNull();
+    expect(refreshAccessToken).toHaveBeenCalledTimes(1);
+    expect(refreshAccessToken).toHaveBeenCalledWith('http://qz.test', 'refresh-token');
+    expect(screen.getByText('access-token')).toBeOnTheScreen();
+
+    await act(async () => {
+      refresh.resolve(authTokensFixture({ accessToken: 'next' }));
+    });
+    await waitFor(() => expect(screen.getByText('next')).toBeOnTheScreen());
+    expect(screen.getByText('Freddie')).toBeOnTheScreen();
+    expect(screen.getByText('FR')).toBeOnTheScreen();
+    expect(screen.getByText('signed-in')).toBeOnTheScreen();
+    expect(refreshAccessToken).toHaveBeenCalledTimes(1);
+    expect(clearStored).not.toHaveBeenCalled();
+  });
+
+  it('single-flights concurrent ensureAccessToken callers onto one /token', async () => {
+    const user = userEvent.setup();
+    const refresh = deferred<ReturnType<typeof authTokensFixture>>();
+    let tokenCalls = 0;
+    refreshAccessToken.mockImplementation(async () => {
+      tokenCalls += 1;
+      if (tokenCalls > 1) {
+        throw new Error('invalid_grant');
+      }
+      return refresh.promise;
+    });
+    readStored.mockResolvedValue({
+      ...authTokensFixture(),
+      expiresAt: Date.now() - 1_000,
+      identity: { displayName: 'Freddie', memberId: 'member-1' },
+    });
+    renderSession();
+
+    await waitFor(() => expect(screen.getByText('signed-in')).toBeOnTheScreen());
+    expect(screen.getByText('Freddie')).toBeOnTheScreen();
+    expect(screen.queryByText('restoring')).toBeNull();
+
+    await user.press(screen.getByText('do-ensure-token'));
+    await user.press(screen.getByText('do-ensure-token'));
+    expect(refreshAccessToken).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      refresh.resolve(authTokensFixture({ accessToken: 'next' }));
+    });
+    await waitFor(() => expect(screen.getByText('next')).toBeOnTheScreen());
+    expect(screen.getByText('signed-in')).toBeOnTheScreen();
+    expect(screen.getByText('Freddie')).toBeOnTheScreen();
+    expect(refreshAccessToken).toHaveBeenCalledTimes(1);
+    expect(clearStored).not.toHaveBeenCalled();
+  });
+
   it('clears local state when refresh fails', async () => {
     readStored.mockResolvedValue({
       ...authTokensFixture(),
       expiresAt: Date.now() - 1_000,
+      identity: { displayName: 'Freddie', memberId: 'member-1' },
     });
     refreshAccessToken.mockRejectedValue(new Error('expired'));
     renderSession();
     await waitFor(() => expect(screen.getByText('signed-out')).toBeOnTheScreen());
     expect(clearStored).toHaveBeenCalled();
+    expect(screen.getByText('anonymous')).toBeOnTheScreen();
+    expect(screen.getByText('signed-out-avatar')).toBeOnTheScreen();
+  });
+
+  it('does not clear a stored grant when the app version changes', async () => {
+    const stored = {
+      ...authTokensFixture(),
+      expiresAt: Date.now() + 60_000,
+      identity: { displayName: 'Freddie', memberId: 'member-1' as const },
+    };
+    readStored.mockResolvedValue(stored);
+    mockAppConfig.version = '0.1.0';
+    const first = renderSession();
+    await waitFor(() => expect(screen.getByText('Freddie')).toBeOnTheScreen());
+    first.unmount();
+
+    mockAppConfig.version = '0.1.214';
+    renderSession();
+    await waitFor(() => expect(screen.getByText('signed-in')).toBeOnTheScreen());
+    expect(screen.getByText('Freddie')).toBeOnTheScreen();
+    expect(clearStored).not.toHaveBeenCalled();
   });
 
   it('signs in through the provider hop and can sign out', async () => {
@@ -236,6 +339,11 @@ describe('SessionProvider', () => {
     expect(logoutRemote).toHaveBeenCalled();
     expect(revokeRefreshToken).toHaveBeenCalled();
     expect(clearStored).toHaveBeenCalled();
+    expect(writeIdentity).toHaveBeenCalledWith({
+      displayName: 'Freddie',
+      memberId: 'member-1',
+      avatarPath: null,
+    });
   });
 
   it('signs out locally even when remote logout never completes', async () => {
@@ -544,7 +652,7 @@ describe('SessionProvider', () => {
         expiresAt: now + 60_000,
       });
       renderSession();
-      await waitFor(() => expect(screen.getByText('signed-in')).toBeOnTheScreen());
+      await waitFor(() => expect(screen.getByText('Freddie')).toBeOnTheScreen());
 
       refreshAccessToken.mockResolvedValue(authTokensFixture({ accessToken: 'next' }));
       fetchJsonMock.mockReset();
@@ -554,10 +662,33 @@ describe('SessionProvider', () => {
 
       await waitFor(() => expect(screen.getByText('next')).toBeOnTheScreen());
       expect(screen.getByText('signed-in')).toBeOnTheScreen();
+      expect(screen.getByText('Freddie')).toBeOnTheScreen();
+      expect(screen.getByText('FR')).toBeOnTheScreen();
       expect(clearStored).not.toHaveBeenCalled();
     } finally {
       dateNow.mockRestore();
     }
+  });
+
+  it('keeps a cached identity shell when /me fails after a successful refresh', async () => {
+    const refresh = deferred<ReturnType<typeof authTokensFixture>>();
+    readStored.mockResolvedValue({
+      ...authTokensFixture(),
+      expiresAt: Date.now() - 1_000,
+      identity: { displayName: 'Freddie', memberId: 'member-1', avatarPath: '/avatars/1.jpg' },
+    });
+    refreshAccessToken.mockReturnValue(refresh.promise);
+    fetchJsonMock.mockRejectedValue(new Error('offline'));
+    renderSession();
+
+    await waitFor(() => expect(screen.getByText('Freddie')).toBeOnTheScreen());
+    await act(async () => {
+      refresh.resolve(authTokensFixture({ accessToken: 'next' }));
+    });
+    await waitFor(() => expect(screen.getByText('next')).toBeOnTheScreen());
+    expect(screen.getByText('signed-in')).toBeOnTheScreen();
+    expect(screen.getByText('Freddie')).toBeOnTheScreen();
+    expect(clearStored).not.toHaveBeenCalled();
   });
 });
 
