@@ -112,7 +112,7 @@ public sealed class ActionModel(
                 await searchIndexService.RemoveAsync($"article:{updated.Slug}", cancellationToken);
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             logger.LogWarning(ex, "Best-effort search index sync failed for article submission {ArticleId}", updated.Id);
         }
