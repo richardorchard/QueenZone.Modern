@@ -347,7 +347,10 @@ public sealed class HealthEndpointsTests : IClassFixture<WebApplicationFactory<P
     {
         var services = new ServiceCollection();
         services.AddSingleton<IBlobUploadService>(new StubConfiguredBlobUploadService());
-        services.AddSingleton(new Azure.Storage.Blobs.BlobServiceClient(new Uri("https://127.0.0.1:1/")));
+        var clientOptions = new Azure.Storage.Blobs.BlobClientOptions();
+        clientOptions.Retry.MaxRetries = 0;
+        clientOptions.Retry.NetworkTimeout = TimeSpan.FromSeconds(5);
+        services.AddSingleton(new Azure.Storage.Blobs.BlobServiceClient(new Uri("https://127.0.0.1:1/"), clientOptions));
         await using var provider = services.BuildServiceProvider();
         var logger = new CollectingLogger<BlobReadyHealthCheck>();
         var check = new BlobReadyHealthCheck(
@@ -355,7 +358,7 @@ public sealed class HealthEndpointsTests : IClassFixture<WebApplicationFactory<P
             provider,
             logger);
 
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var result = await check.CheckHealthAsync(new HealthCheckContext(), timeout.Token);
 
         Assert.Equal(HealthStatus.Unhealthy, result.Status);
