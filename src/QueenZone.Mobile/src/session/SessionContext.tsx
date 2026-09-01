@@ -34,10 +34,12 @@ import {
 } from '../offlineQueue';
 import {
   clearStoredSession,
+  isKeychainLockedError,
   readStoredSession,
   writeStoredIdentityShell,
   writeStoredSession,
   type StoredIdentityShell,
+  type StoredSession,
 } from './tokenStore';
 
 export type Session = {
@@ -109,6 +111,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const expiresAtRef = useRef(expiresAt);
   const memberIdRef = useRef<string | null>(null);
   const refreshInFlightRef = useRef<Promise<string | null> | null>(null);
+  const pendingSessionWriteRef = useRef<AuthTokens | null>(null);
   sessionRef.current = session;
   refreshTokenRef.current = refreshToken;
   expiresAtRef.current = expiresAt;
@@ -172,7 +175,21 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const applyTokens = useCallback(
     async (tokens: AuthTokens): Promise<MemberProfile | null> => {
-      const stored = await writeStoredSession(tokens);
+      let stored: StoredSession;
+      try {
+        stored = await writeStoredSession(tokens);
+        pendingSessionWriteRef.current = null;
+      } catch (error) {
+        if (!isKeychainLockedError(error)) {
+          throw error;
+        }
+        // Persist later — a locked Keychain must not unhandled-reject a background refresh.
+        pendingSessionWriteRef.current = tokens;
+        stored = {
+          ...tokens,
+          expiresAt: Date.now() + Math.max(tokens.expiresIn - 30, 30) * 1000,
+        };
+      }
       applyTokenState(stored);
       const profile = await loadProfile(tokens.accessToken);
       applyProfile(tokens.accessToken, profile);
@@ -247,76 +264,107 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
-    void (async () => {
-      const stored = await readStoredSession();
-      if (cancelled) {
+    let inFlight = false;
+    let lockedPending = false;
+
+    const restore = async () => {
+      if (inFlight || cancelled) {
         return;
       }
-
-      if (!stored) {
-        setSession({ ...signedOut, isRestoring: false });
-        return;
-      }
-
-      const shell = profileFromIdentityShell(stored.identity);
-      if (stored.identity?.memberId) {
-        memberIdRef.current = stored.identity.memberId;
-      }
-
-      // Seed the grant and start a single-flight /token before the signed-in
-      // shell is live so flushOfflineQueue / refreshProfile join this promise
-      // instead of presenting the same single-use refresh token twice.
-      refreshTokenRef.current = stored.refreshToken;
-      expiresAtRef.current = stored.expiresAt;
-      const pendingRefresh = stored.expiresAt <= Date.now() ? refreshWithStoredGrant() : null;
-
-      applyTokenState(stored, {
-        displayName: stored.identity?.displayName ?? null,
-        profile: shell,
-      });
-
+      inFlight = true;
       try {
-        if (pendingRefresh) {
-          const next = await pendingRefresh;
-          if (!next && !cancelled) {
-            await clearLocal();
+        let stored: StoredSession | null;
+        try {
+          stored = await readStoredSession();
+        } catch (error) {
+          if (isKeychainLockedError(error)) {
+            // Keep isRestoring. A locked read is not sign-out and must not unhandled-reject.
+            lockedPending = true;
+            return;
           }
+          throw error;
+        }
+        lockedPending = false;
+        if (cancelled) {
           return;
         }
 
-        try {
-          const profile = await loadProfile(stored.accessToken);
-          if (!cancelled) {
-            applyProfile(stored.accessToken, profile);
-          }
-        } catch (err) {
-          if (cancelled) {
-            return;
-          }
+        if (!stored) {
+          setSession({ ...signedOut, isRestoring: false });
+          return;
+        }
 
-          const canRetryRefresh =
-            err instanceof ApiError && err.status === 401 && stored.expiresAt > Date.now();
-          if (canRetryRefresh) {
-            const next = await refreshWithStoredGrant();
+        const shell = profileFromIdentityShell(stored.identity);
+        if (stored.identity?.memberId) {
+          memberIdRef.current = stored.identity.memberId;
+        }
+
+        // Seed the grant and start a single-flight /token before the signed-in
+        // shell is live so flushOfflineQueue / refreshProfile join this promise
+        // instead of presenting the same single-use refresh token twice.
+        refreshTokenRef.current = stored.refreshToken;
+        expiresAtRef.current = stored.expiresAt;
+        const pendingRefresh = stored.expiresAt <= Date.now() ? refreshWithStoredGrant() : null;
+
+        applyTokenState(stored, {
+          displayName: stored.identity?.displayName ?? null,
+          profile: shell,
+        });
+
+        try {
+          if (pendingRefresh) {
+            const next = await pendingRefresh;
             if (!next && !cancelled) {
               await clearLocal();
             }
             return;
           }
 
-          if (err instanceof ApiError && err.status === 401) {
+          try {
+            const profile = await loadProfile(stored.accessToken);
+            if (!cancelled) {
+              applyProfile(stored.accessToken, profile);
+            }
+          } catch (err) {
+            if (cancelled) {
+              return;
+            }
+
+            const canRetryRefresh =
+              err instanceof ApiError && err.status === 401 && stored.expiresAt > Date.now();
+            if (canRetryRefresh) {
+              const next = await refreshWithStoredGrant();
+              if (!next && !cancelled) {
+                await clearLocal();
+              }
+              return;
+            }
+
+            if (err instanceof ApiError && err.status === 401) {
+              await clearLocal();
+            }
+          }
+        } catch {
+          if (!cancelled) {
             await clearLocal();
           }
         }
-      } catch {
-        if (!cancelled) {
-          await clearLocal();
-        }
+      } finally {
+        inFlight = false;
       }
-    })();
+    };
+
+    void restore();
+
+    const appState = AppState.addEventListener('change', (state) => {
+      if (state === 'active' && lockedPending && !cancelled) {
+        void restore();
+      }
+    });
 
     return () => {
       cancelled = true;
+      appState.remove();
     };
   }, [applyProfile, applyTokenState, clearLocal, refreshWithStoredGrant]);
 
@@ -344,9 +392,30 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       });
     };
 
+    const retryLockedWrite = () => {
+      const pending = pendingSessionWriteRef.current;
+      if (!pending) {
+        return;
+      }
+      void writeStoredSession(pending)
+        .then(() => {
+          if (pendingSessionWriteRef.current === pending) {
+            pendingSessionWriteRef.current = null;
+          }
+        })
+        .catch((error) => {
+          if (!isKeychainLockedError(error)) {
+            throw error;
+          }
+        });
+    };
+
     const appState = AppState.addEventListener('change', (state) => {
-      if (state === 'active' && refreshTokenRef.current) {
-        flushIfSignedIn();
+      if (state === 'active') {
+        retryLockedWrite();
+        if (refreshTokenRef.current) {
+          flushIfSignedIn();
+        }
       }
     });
     const network = addNetworkStateListener((state) => {

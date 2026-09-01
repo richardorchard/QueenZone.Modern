@@ -47,15 +47,19 @@ jest.mock('./oauth', () => ({
   logoutRemote: jest.fn(),
 }));
 
-jest.mock('./tokenStore', () => ({
-  readStoredSession: jest.fn(),
-  writeStoredSession: jest.fn(async (tokens: { accessToken: string; refreshToken: string; expiresIn: number }) => ({
-    ...tokens,
-    expiresAt: Date.now() + 60_000,
-  })),
-  writeStoredIdentityShell: jest.fn(async () => {}),
-  clearStoredSession: jest.fn(async () => {}),
-}));
+jest.mock('./tokenStore', () => {
+  const actual = jest.requireActual('./tokenStore') as typeof import('./tokenStore');
+  return {
+    readStoredSession: jest.fn(),
+    writeStoredSession: jest.fn(async (tokens: { accessToken: string; refreshToken: string; expiresIn: number }) => ({
+      ...tokens,
+      expiresAt: Date.now() + 60_000,
+    })),
+    writeStoredIdentityShell: jest.fn(async () => {}),
+    clearStoredSession: jest.fn(async () => {}),
+    isKeychainLockedError: actual.isKeychainLockedError,
+  };
+});
 
 jest.mock('../notifications', () => ({
   syncPushRegistration: jest.fn(async () => {}),
@@ -552,6 +556,94 @@ describe('SessionProvider', () => {
     await user.press(screen.getByText('clear-token'));
     expect(screen.getByText('signed-out')).toBeOnTheScreen();
     expect(screen.getByText('no-token')).toBeOnTheScreen();
+  });
+
+  it('does not sign out when a locked keychain blocks restore, and retries on active', async () => {
+    const locked = Object.assign(new Error('User interaction is not allowed'), {
+      name: 'KeyChainException',
+    });
+    const appStateHandlers: ((state: string) => void)[] = [];
+    jest.spyOn(AppState, 'addEventListener').mockImplementation((type, handler) => {
+      if (type === 'change') {
+        appStateHandlers.push(handler as (state: string) => void);
+      }
+      return { remove: jest.fn() };
+    });
+
+    readStored.mockRejectedValueOnce(locked);
+    readStored.mockResolvedValue({
+      ...authTokensFixture(),
+      expiresAt: Date.now() + 60_000,
+    });
+
+    renderSession();
+    await waitFor(() => expect(readStored).toHaveBeenCalledTimes(1));
+    expect(screen.getByText('restoring')).toBeOnTheScreen();
+    expect(screen.queryByText('signed-out')).toBeNull();
+    expect(clearStored).not.toHaveBeenCalled();
+
+    await act(async () => {
+      for (const handler of appStateHandlers) {
+        handler('active');
+      }
+    });
+    await waitFor(() => expect(screen.getByText('signed-in')).toBeOnTheScreen());
+    expect(screen.getByText('Freddie')).toBeOnTheScreen();
+    expect(clearStored).not.toHaveBeenCalled();
+  });
+
+  it('retries a locked session write when the app becomes active', async () => {
+    const user = userEvent.setup();
+    const now = 1_700_000_000_000;
+    const dateNow = jest.spyOn(Date, 'now').mockReturnValue(now);
+    const locked = Object.assign(new Error('User interaction is not allowed'), {
+      name: 'KeyChainException',
+    });
+    const appStateHandlers: ((state: string) => void)[] = [];
+    jest.spyOn(AppState, 'addEventListener').mockImplementation((type, handler) => {
+      if (type === 'change') {
+        appStateHandlers.push(handler as (state: string) => void);
+      }
+      return { remove: jest.fn() };
+    });
+
+    try {
+      readStored.mockResolvedValue({
+        ...authTokensFixture(),
+        expiresAt: now + 60_000,
+      });
+      renderSession();
+      await waitFor(() => expect(screen.getByText('signed-in')).toBeOnTheScreen());
+
+      writeStored.mockRejectedValueOnce(locked);
+      writeStored.mockImplementation(async (tokens) => ({
+        ...tokens,
+        expiresAt: now + 180_000,
+      }));
+      refreshAccessToken.mockResolvedValue(authTokensFixture({ accessToken: 'next' }));
+      dateNow.mockReturnValue(now + 120_000);
+      await user.press(screen.getByText('do-ensure-token'));
+
+      await waitFor(() => expect(screen.getByText('next')).toBeOnTheScreen());
+      expect(screen.getByText('signed-in')).toBeOnTheScreen();
+      expect(clearStored).not.toHaveBeenCalled();
+
+      writeStored.mockClear();
+      writeStored.mockImplementation(async (tokens) => ({
+        ...tokens,
+        expiresAt: now + 180_000,
+      }));
+      await act(async () => {
+        for (const handler of appStateHandlers) {
+          handler('active');
+        }
+      });
+      await waitFor(() => expect(writeStored).toHaveBeenCalled());
+      expect(clearStored).not.toHaveBeenCalled();
+      expect(screen.getByText('signed-in')).toBeOnTheScreen();
+    } finally {
+      dateNow.mockRestore();
+    }
   });
 
   it('stays signed in when profile load fails', async () => {
