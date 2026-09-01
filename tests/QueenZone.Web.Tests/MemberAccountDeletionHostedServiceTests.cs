@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -64,6 +65,36 @@ public sealed class MemberAccountDeletionHostedServiceTests
         Assert.Equal(0, repository.PurgeCalls);
     }
 
+    [Fact]
+    public async Task Purge_starts_MemberAccountDeletion_activity_during_scoped_work()
+    {
+        var repository = new RecordingPurgeRepository();
+        using var listener = QueenZoneActivityTestListener.Listen();
+        using var hosted = CreateHostedService(
+            repository,
+            startupDelay: TimeSpan.FromMilliseconds(20),
+            runInterval: Timeout.InfiniteTimeSpan);
+
+        await hosted.StartAsync(CancellationToken.None);
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(2);
+        while (repository.PurgeCalls == 0 && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(20);
+        }
+
+        Assert.Equal(1, repository.PurgeCalls);
+        var activity = Assert.Single(listener.Started, item => item.OperationName == "MemberAccountDeletion");
+        Assert.Equal(ActivityKind.Internal, activity.Kind);
+        Assert.NotNull(repository.ActivityDuringWork);
+        Assert.Equal("MemberAccountDeletion", repository.ActivityDuringWork.OperationName);
+        Assert.Equal(activity.Id, repository.ActivityDuringWork.Id);
+        await listener.WaitUntilStoppedAsync(activity);
+        Assert.True(activity.IsStopped);
+        Assert.Contains(listener.Stopped, item => item.Id == activity.Id);
+
+        await hosted.StopAsync(CancellationToken.None);
+    }
+
     private static MemberAccountDeletionHostedService CreateHostedService(
         RecordingPurgeRepository repository,
         TimeSpan startupDelay,
@@ -99,12 +130,15 @@ public sealed class MemberAccountDeletionHostedServiceTests
     {
         public int PurgeCalls;
 
+        public Activity? ActivityDuringWork;
+
         public Task<MemberAccountDeletionPurgeResult> PurgeDeletedAccountsAsync(
             DateTime purgeBefore,
             DateTime purgedAt,
             CancellationToken cancellationToken = default)
         {
             Interlocked.Increment(ref PurgeCalls);
+            ActivityDuringWork = Activity.Current;
             return Task.FromResult(new MemberAccountDeletionPurgeResult(0, []));
         }
 

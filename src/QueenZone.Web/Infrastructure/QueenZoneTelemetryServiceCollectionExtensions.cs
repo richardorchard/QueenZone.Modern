@@ -2,6 +2,7 @@ using Azure.Monitor.OpenTelemetry.AspNetCore;
 using Microsoft.Extensions.Logging;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 
 namespace QueenZone.Web;
 
@@ -43,7 +44,8 @@ public static class QueenZoneTelemetryServiceCollectionExtensions
                 options.TracesPerSecond = tracesPerSecond;
                 options.EnableLiveMetrics = enableLiveMetrics;
                 options.EnableTraceBasedLogsSampler = enableTraceBasedLogsSampler;
-            });
+            })
+            .WithTracing(tracing => tracing.AddSource(QueenZoneTelemetry.ActivitySourceName));
 
         return services;
     }

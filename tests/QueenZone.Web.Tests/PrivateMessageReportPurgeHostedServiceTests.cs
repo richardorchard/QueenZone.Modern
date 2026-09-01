@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using QueenZone.Data;
@@ -61,6 +62,36 @@ public sealed class PrivateMessageReportPurgeHostedServiceTests
         Assert.Equal(0, repository.PurgeCalls);
     }
 
+    [Fact]
+    public async Task Purge_starts_PrivateMessageReportPurge_activity_during_scoped_work()
+    {
+        var repository = new RecordingPrivateMessageRepository();
+        using var listener = QueenZoneActivityTestListener.Listen();
+        using var hosted = CreateHostedService(
+            repository,
+            startupDelay: TimeSpan.FromMilliseconds(20),
+            runInterval: Timeout.InfiniteTimeSpan);
+
+        await hosted.StartAsync(CancellationToken.None);
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(2);
+        while (repository.PurgeCalls == 0 && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(20);
+        }
+
+        Assert.Equal(1, repository.PurgeCalls);
+        var activity = Assert.Single(listener.Started, item => item.OperationName == "PrivateMessageReportPurge");
+        Assert.Equal(ActivityKind.Internal, activity.Kind);
+        Assert.NotNull(repository.ActivityDuringWork);
+        Assert.Equal("PrivateMessageReportPurge", repository.ActivityDuringWork.OperationName);
+        Assert.Equal(activity.Id, repository.ActivityDuringWork.Id);
+        await listener.WaitUntilStoppedAsync(activity);
+        Assert.True(activity.IsStopped);
+        Assert.Contains(listener.Stopped, item => item.Id == activity.Id);
+
+        await hosted.StopAsync(CancellationToken.None);
+    }
+
     private static PrivateMessageReportPurgeHostedService CreateHostedService(
         RecordingPrivateMessageRepository repository,
         TimeSpan startupDelay,
@@ -84,11 +115,14 @@ public sealed class PrivateMessageReportPurgeHostedServiceTests
     {
         public int PurgeCalls;
 
+        public Activity? ActivityDuringWork;
+
         public Task<int> PurgeExpiredReportsAsync(
             DateTimeOffset asOfUtc,
             CancellationToken cancellationToken = default)
         {
             Interlocked.Increment(ref PurgeCalls);
+            ActivityDuringWork = Activity.Current;
             return Task.FromResult(0);
         }
 
