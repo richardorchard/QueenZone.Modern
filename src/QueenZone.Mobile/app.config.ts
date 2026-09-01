@@ -17,6 +17,7 @@ const {
  * Override at start/build time:
  *   EXPO_PUBLIC_APP_ENV=staging|production|development
  *   EXPO_PUBLIC_API_BASE_URL=https://localhost:7162
+ *   ANDROID_VERSION_CODE=<positive integer> (Play versionCode; see GITHUB_RUN_NUMBER)
  *   IOS_BUILD_NUMBER=<positive integer> (TestFlight CFBundleVersion; see GITHUB_RUN_NUMBER)
  *   GITHUB_RUN_NUMBER=<positive integer> (store Version `{prefix}.{run}` + integer build)
  */
@@ -33,6 +34,19 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     githubRunNumber: process.env.GITHUB_RUN_NUMBER,
     fallback: config.ios?.buildNumber,
   });
+  // Same monotonic run-number scheme as ios.buildNumber (#1078 / #1195).
+  // Expo writes this into the generated Gradle project at prebuild; leaving
+  // it unset produced versionCode 1 and Play rejected the reused integer.
+  const androidVersionCode = Number(
+    resolveIosBuildNumber({
+      override: process.env.ANDROID_VERSION_CODE,
+      githubRunNumber: process.env.GITHUB_RUN_NUMBER,
+      fallback:
+        config.android?.versionCode != null
+          ? String(config.android.versionCode)
+          : undefined,
+    }),
+  );
   const version = resolveMarketingVersion({
     prefix: marketingVersionPrefix,
     runNumber: process.env.GITHUB_RUN_NUMBER,
@@ -47,6 +61,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         ? config.android
         : {}),
       googleServicesFile: './google-services.json',
+      versionCode: androidVersionCode,
     },
     ios: {
       ...(typeof config.ios === 'object' && config.ios !== null ? config.ios : {}),
