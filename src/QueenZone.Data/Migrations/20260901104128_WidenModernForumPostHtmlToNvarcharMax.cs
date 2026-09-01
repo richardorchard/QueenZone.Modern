@@ -1,0 +1,148 @@
+﻿using Microsoft.EntityFrameworkCore.Migrations;
+
+#nullable disable
+
+namespace QueenZone.Data.Migrations;
+
+/// <summary>
+/// Widens ModernForumPost.BodyHtml and SignatureHtml from varchar(8000) to nvarchar(max)
+/// so emoji (and other non-Latin-1 characters) survive INSERT. The existing
+/// <c>True ??</c> heart post is already replacement-corrupted and is not reconstructed.
+/// </summary>
+/// <remarks>
+/// ModernForumPost is ExcludeFromMigrations — this is hand-written SQL, same pattern as
+/// AddModernForumPostIsHidden, not a designer AlterColumn. nvarchar(8000) is illegal;
+/// nvarchar(4000) would fail or truncate existing 8k Latin rows.
+/// <para>
+/// BodyHtml is full-text indexed. ALTER COLUMN on that type fails while the index
+/// exists, so the index is dropped, the columns are altered, then the index is
+/// recreated (DROP/CREATE FULLTEXT INDEX cannot share a user transaction).
+/// </para>
+/// <para>
+/// Size-of-data on ~1M posts: expect a long lock and transaction-log growth. Apply
+/// in the usual Azure SQL window (CI/deploy <c>dotnet ef database update</c>), not as
+/// a silent app boot. Keep the table collation; do not specify COLLATE.
+/// </para>
+/// </remarks>
+public partial class WidenModernForumPostHtmlToNvarcharMax : Migration
+{
+    /// <inheritdoc />
+    protected override void Up(MigrationBuilder migrationBuilder)
+    {
+        migrationBuilder.Sql("""
+            IF OBJECT_ID(N'dbo.ModernForumPost', N'U') IS NOT NULL
+               AND EXISTS (SELECT 1 FROM sys.fulltext_indexes WHERE object_id = OBJECT_ID(N'dbo.ModernForumPost'))
+               AND EXISTS (
+                    SELECT 1
+                    FROM sys.columns c
+                    INNER JOIN sys.types t ON t.user_type_id = c.user_type_id
+                    WHERE c.object_id = OBJECT_ID(N'dbo.ModernForumPost')
+                      AND c.name = N'BodyHtml'
+                      AND t.name = N'varchar')
+            BEGIN
+                DROP FULLTEXT INDEX ON dbo.ModernForumPost;
+            END
+            """, suppressTransaction: true);
+
+        migrationBuilder.Sql("""
+            IF OBJECT_ID(N'dbo.ModernForumPost', N'U') IS NOT NULL
+            BEGIN
+                IF EXISTS (
+                    SELECT 1
+                    FROM sys.columns c
+                    INNER JOIN sys.types t ON t.user_type_id = c.user_type_id
+                    WHERE c.object_id = OBJECT_ID(N'dbo.ModernForumPost')
+                      AND c.name = N'BodyHtml'
+                      AND t.name = N'varchar')
+                BEGIN
+                    ALTER TABLE dbo.ModernForumPost
+                        ALTER COLUMN BodyHtml nvarchar(max) NOT NULL;
+                END;
+
+                IF EXISTS (
+                    SELECT 1
+                    FROM sys.columns c
+                    INNER JOIN sys.types t ON t.user_type_id = c.user_type_id
+                    WHERE c.object_id = OBJECT_ID(N'dbo.ModernForumPost')
+                      AND c.name = N'SignatureHtml'
+                      AND t.name = N'varchar')
+                BEGIN
+                    ALTER TABLE dbo.ModernForumPost
+                        ALTER COLUMN SignatureHtml nvarchar(max) NULL;
+                END;
+            END
+            """);
+
+        migrationBuilder.Sql("""
+            IF OBJECT_ID(N'dbo.ModernForumPost', N'U') IS NOT NULL
+               AND NOT EXISTS (SELECT 1 FROM sys.fulltext_indexes WHERE object_id = OBJECT_ID(N'dbo.ModernForumPost'))
+               AND EXISTS (SELECT 1 FROM sys.fulltext_catalogs WHERE name = N'FT_ForumCatalog')
+            BEGIN
+                CREATE FULLTEXT INDEX ON dbo.ModernForumPost (BodyHtml)
+                    KEY INDEX PK_ModernForumPost
+                    ON FT_ForumCatalog
+                    WITH CHANGE_TRACKING AUTO;
+            END
+            """, suppressTransaction: true);
+    }
+
+    /// <inheritdoc />
+    protected override void Down(MigrationBuilder migrationBuilder)
+    {
+        migrationBuilder.Sql("""
+            IF OBJECT_ID(N'dbo.ModernForumPost', N'U') IS NOT NULL
+               AND EXISTS (SELECT 1 FROM sys.fulltext_indexes WHERE object_id = OBJECT_ID(N'dbo.ModernForumPost'))
+               AND EXISTS (
+                    SELECT 1
+                    FROM sys.columns c
+                    INNER JOIN sys.types t ON t.user_type_id = c.user_type_id
+                    WHERE c.object_id = OBJECT_ID(N'dbo.ModernForumPost')
+                      AND c.name = N'BodyHtml'
+                      AND t.name = N'nvarchar')
+            BEGIN
+                DROP FULLTEXT INDEX ON dbo.ModernForumPost;
+            END
+            """, suppressTransaction: true);
+
+        migrationBuilder.Sql("""
+            IF OBJECT_ID(N'dbo.ModernForumPost', N'U') IS NOT NULL
+            BEGIN
+                IF EXISTS (
+                    SELECT 1
+                    FROM sys.columns c
+                    INNER JOIN sys.types t ON t.user_type_id = c.user_type_id
+                    WHERE c.object_id = OBJECT_ID(N'dbo.ModernForumPost')
+                      AND c.name = N'BodyHtml'
+                      AND t.name = N'nvarchar')
+                BEGIN
+                    ALTER TABLE dbo.ModernForumPost
+                        ALTER COLUMN BodyHtml varchar(8000) NOT NULL;
+                END;
+
+                IF EXISTS (
+                    SELECT 1
+                    FROM sys.columns c
+                    INNER JOIN sys.types t ON t.user_type_id = c.user_type_id
+                    WHERE c.object_id = OBJECT_ID(N'dbo.ModernForumPost')
+                      AND c.name = N'SignatureHtml'
+                      AND t.name = N'nvarchar')
+                BEGIN
+                    ALTER TABLE dbo.ModernForumPost
+                        ALTER COLUMN SignatureHtml varchar(8000) NULL;
+                END;
+            END
+            """);
+
+        migrationBuilder.Sql("""
+            IF OBJECT_ID(N'dbo.ModernForumPost', N'U') IS NOT NULL
+               AND NOT EXISTS (SELECT 1 FROM sys.fulltext_indexes WHERE object_id = OBJECT_ID(N'dbo.ModernForumPost'))
+               AND EXISTS (SELECT 1 FROM sys.fulltext_catalogs WHERE name = N'FT_ForumCatalog')
+            BEGIN
+                CREATE FULLTEXT INDEX ON dbo.ModernForumPost (BodyHtml)
+                    KEY INDEX PK_ModernForumPost
+                    ON FT_ForumCatalog
+                    WITH CHANGE_TRACKING AUTO;
+            END
+            """, suppressTransaction: true);
+    }
+}
