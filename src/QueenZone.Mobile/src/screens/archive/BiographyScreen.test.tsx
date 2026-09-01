@@ -36,7 +36,7 @@ describe('BiographyScreen', () => {
     await flushVirtualizedList();
   });
 
-  it('requests the hook-default page size', async () => {
+  it('requests the hook-default page size and shows the chapter summary on the row', async () => {
     renderWithProviders(
       <BiographyScreen
         navigation={fakeNavigation() as never}
@@ -46,6 +46,8 @@ describe('BiographyScreen', () => {
     );
 
     await waitFor(() => expect(screen.getByText('Early years')).toBeOnTheScreen());
+    expect(screen.getByText('Smile becomes Queen.')).toBeOnTheScreen();
+    expect(screen.getByText('Chapter 1')).toBeOnTheScreen();
     expect(fetchPage).toHaveBeenCalledWith(expect.objectContaining({ page: 1, pageSize: 20 }));
   });
 });

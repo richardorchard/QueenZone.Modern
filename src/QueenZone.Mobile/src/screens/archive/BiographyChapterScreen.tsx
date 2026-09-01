@@ -73,11 +73,6 @@ export function BiographyChapterScreen({ navigation, route }: Props) {
       <Text style={[type.meta, { color: c.textMuted, marginTop: space.md }]}>
         Chapter {chapter.displaySequence}
       </Text>
-      {chapter.summary ? (
-        <Text style={[type.standfirst, { color: c.textSecondary, marginTop: space.lg }]}>
-          {chapter.summary}
-        </Text>
-      ) : null}
       <Text style={[type.longform, { color: c.textPrimary, marginTop: space.xl }]}>{body}</Text>
       <View style={styles.nav}>
         {chapter.previous ? (
