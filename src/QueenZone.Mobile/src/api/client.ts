@@ -151,7 +151,9 @@ function isCallerAbort(err: unknown): err is Error & { name: 'AbortError' } {
 }
 
 function toAbortError(err: unknown): Error & { name: 'AbortError' } {
-  return isCallerAbort(err) ? err : Object.assign(new Error('Aborted'), { name: 'AbortError' });
+  return isCallerAbort(err)
+    ? err
+    : (Object.assign(new Error('Aborted'), { name: 'AbortError' as const }) as Error & { name: 'AbortError' });
 }
 
 function composeDeadline(caller: AbortSignal | undefined, timeoutMs: number): DeadlineHandle {

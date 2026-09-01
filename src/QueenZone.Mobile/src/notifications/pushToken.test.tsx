@@ -105,6 +105,9 @@ describe('pushToken', () => {
     });
 
     it('maps an iOS token to apns', async () => {
+      getDevicePushTokenAsync.mockResolvedValue({ type: 'ios', data: 'apns-token' });
+      await expect(getDeviceToken()).resolves.toEqual({ platform: 'apns', token: 'apns-token' });
+    });
 
     it('maps an Android token to fcm', async () => {
       getDevicePushTokenAsync.mockResolvedValue({ type: 'android', data: 'fcm-token' });
