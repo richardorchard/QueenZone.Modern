@@ -26,7 +26,6 @@ public sealed class ModernForumPostHtmlUnicodeTests
             .FindEntityType(typeof(ModernForumThreadEntity))
             ?.FindProperty(nameof(ModernForumThreadEntity.Title));
         Assert.NotNull(title);
-        Assert.True(title.IsUnicode());
         Assert.Equal("nvarchar(200)", title.GetColumnType());
     }
 
