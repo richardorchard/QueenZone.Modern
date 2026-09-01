@@ -1,6 +1,6 @@
 import { apiV1Url } from '../config';
 import { reportApiFailure } from '../config/sentry';
-import { ApiError, isOfflineFailure, isTimeoutFailure } from './errors';
+import { ApiError, isExpoFetchCanceled, isLostConnectionMessage, isOfflineFailure, isTimeoutFailure } from './errors';
 import {
   classifyXhrFailure,
   interpretMultipartXhrResult,
@@ -9,7 +9,13 @@ import {
 import { shouldUseNativeMultipartUpload } from './nativeUpload';
 import type { ProblemDetails } from './types';
 
-export { ApiError, isOfflineFailure, isTimeoutFailure } from './errors';
+export {
+  ApiError,
+  isExpoFetchCanceled,
+  isLostConnectionMessage,
+  isOfflineFailure,
+  isTimeoutFailure,
+} from './errors';
 export type { ApiFailureKind } from './errors';
 
 export type FetchJsonOptions = {
@@ -144,6 +150,10 @@ function isCallerAbort(err: unknown): err is Error & { name: 'AbortError' } {
   return err instanceof Error && err.name === 'AbortError';
 }
 
+function toAbortError(err: unknown): Error & { name: 'AbortError' } {
+  return isCallerAbort(err) ? err : Object.assign(new Error('Aborted'), { name: 'AbortError' });
+}
+
 function composeDeadline(caller: AbortSignal | undefined, timeoutMs: number): DeadlineHandle {
   const controller = new AbortController();
   let timedOut = false;
@@ -177,12 +187,23 @@ function composeDeadline(caller: AbortSignal | undefined, timeoutMs: number): De
   };
 }
 
-function classifyFetchFailure(err: unknown, deadline: DeadlineHandle, caller?: AbortSignal): unknown {
+export function classifyFetchFailure(
+  err: unknown,
+  deadline: Pick<DeadlineHandle, 'timedOut'>,
+  caller?: AbortSignal,
+): unknown {
   if (caller?.aborted) {
-    return isCallerAbort(err) ? err : Object.assign(new Error('Aborted'), { name: 'AbortError' });
+    return toAbortError(err);
   }
   if (isCallerAbort(err)) {
     return deadline.timedOut() ? ApiError.timeout(err) : err;
+  }
+  // Expo cancel is not AbortError. Treat it as abort, not ApiError.offline (#1201).
+  if (isExpoFetchCanceled(err)) {
+    return toAbortError(err);
+  }
+  if (isLostConnectionMessage(err) && deadline.timedOut()) {
+    return toAbortError(err);
   }
   return ApiError.offline(err);
 }

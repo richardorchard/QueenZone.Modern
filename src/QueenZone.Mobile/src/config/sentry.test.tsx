@@ -153,6 +153,40 @@ describe('reportApiFailure', () => {
     expect(Sentry.captureException).not.toHaveBeenCalled();
   });
 
+  it('does not captureException on Expo FetchRequestCanceledException writes', () => {
+    const { reportApiFailure } = loadSentryModule();
+    const cause = Object.assign(new Error('FetchRequestCanceledException'), {
+      name: 'FetchRequestCanceledException',
+    });
+    reportApiFailure({
+      kind: 'offline',
+      status: 0,
+      method: 'POST',
+      path: '/notifications/devices',
+      cause,
+    });
+
+    expect(Sentry.addBreadcrumb).toHaveBeenCalled();
+    expect(Sentry.captureException).not.toHaveBeenCalled();
+  });
+
+  it('does not captureException on lost-connection writes', () => {
+    const { reportApiFailure } = loadSentryModule();
+    const cause = Object.assign(new Error('The network connection was lost'), {
+      name: 'UnexpectedException',
+    });
+    reportApiFailure({
+      kind: 'offline',
+      status: 0,
+      method: 'POST',
+      path: '/notifications/devices',
+      cause,
+    });
+
+    expect(Sentry.addBreadcrumb).toHaveBeenCalled();
+    expect(Sentry.captureException).not.toHaveBeenCalled();
+  });
+
   it('captures the original fetch error on write offline failures', () => {
     const { reportApiFailure } = loadSentryModule();
     const cause = new TypeError('Network request failed');
@@ -176,6 +210,25 @@ describe('reportApiFailure', () => {
           kind: 'offline',
           path: '/member/photo-submissions',
         }),
+      }),
+    );
+  });
+
+  it('still captures write timeout failures', () => {
+    const { reportApiFailure } = loadSentryModule();
+    const cause = Object.assign(new Error('aborted'), { name: 'AbortError' });
+    reportApiFailure({
+      kind: 'timeout',
+      status: 0,
+      method: 'POST',
+      path: '/notifications/devices',
+      cause,
+    });
+
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      cause,
+      expect.objectContaining({
+        extra: expect.objectContaining({ kind: 'timeout' }),
       }),
     );
   });
