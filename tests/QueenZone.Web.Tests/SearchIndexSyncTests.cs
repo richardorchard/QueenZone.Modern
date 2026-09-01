@@ -139,6 +139,40 @@ public sealed class SearchIndexSyncTests : IClassFixture<WebApplicationFactory<P
         Assert.StartsWith("/forum/topic/", topicPath, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task PublishingNewsArticle_StillSucceeds_WhenSearchIndexFails()
+    {
+        var failingFactory = factory.WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<ISearchIndexService>();
+                services.AddSingleton<ISearchIndexService>(new ThrowingSearchIndexService());
+            });
+        });
+        var client = AdminHttpTestHelpers.CreateClient(failingFactory, AdminHttpTestHelpers.AdminEmail);
+
+        var createResponse = await AdminHttpTestHelpers.PostArticleAsync(
+            client,
+            "/admin/news/new",
+            "/admin/news",
+            new Dictionary<string, string>
+            {
+                ["title"] = "Search sync publish failure title",
+                ["excerpt"] = "Created to exercise search index sync failure.",
+                ["body"] = "Plain text body for search index sync failure.",
+                ["publishedAt"] = "2026-06-14",
+            });
+        var articleId = AdminHttpTestHelpers.ParseNewsIdFromEditRedirect(createResponse);
+
+        var publishResponse = await AdminHttpTestHelpers.PostNewsActionAsync(client, $"/admin/news/{articleId}/publish");
+        Assert.Equal(HttpStatusCode.Redirect, publishResponse.StatusCode);
+
+        var unpublishResponse = await AdminHttpTestHelpers.PostNewsActionAsync(client, $"/admin/news/{articleId}/unpublish");
+        Assert.Equal(HttpStatusCode.Redirect, unpublishResponse.StatusCode);
+    }
+
     private static async Task<string> PostNewThreadAsync(HttpClient client, string title)
     {
         var form = await client.GetStringAsync("/forum/c/the-music/new-thread");

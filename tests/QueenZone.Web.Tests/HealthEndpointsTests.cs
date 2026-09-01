@@ -342,6 +342,47 @@ public sealed class HealthEndpointsTests : IClassFixture<WebApplicationFactory<P
         Assert.Contains("not configured", result.Description, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task BlobReadyHealthCheck_failure_is_unhealthy_and_logged()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IBlobUploadService>(new StubConfiguredBlobUploadService());
+        services.AddSingleton(new Azure.Storage.Blobs.BlobServiceClient(new Uri("https://127.0.0.1:1/")));
+        await using var provider = services.BuildServiceProvider();
+        var logger = new CollectingLogger<BlobReadyHealthCheck>();
+        var check = new BlobReadyHealthCheck(
+            provider.GetRequiredService<IBlobUploadService>(),
+            provider,
+            logger);
+
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var result = await check.CheckHealthAsync(new HealthCheckContext(), timeout.Token);
+
+        Assert.Equal(HealthStatus.Unhealthy, result.Status);
+        Assert.Equal("Blob storage check failed.", result.Description);
+        Assert.Contains(logger.Entries, entry => entry.Exception is not null);
+    }
+
+    private sealed class StubConfiguredBlobUploadService : IBlobUploadService
+    {
+        public Task<BlobUploadResult> UploadAsync(
+            Stream content,
+            string originalFileName,
+            string containerName,
+            BlobUploadContext? context = null,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<BlobContent?> OpenReadAsync(
+            string containerName,
+            string blobName,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task DeleteAsync(string containerName, string blobName, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+    }
+
     private sealed class ThrowingNewsRepository : INewsRepository
     {
         public Task<IReadOnlyList<NewsItem>> GetLatestAsync(int count, CancellationToken cancellationToken = default) =>
