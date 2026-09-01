@@ -51,7 +51,9 @@ public sealed record PublishedArticleSubmission(
     DateTimeOffset PublishedAt,
     string? AuthorDisplayName,
     int WordCount,
-    Guid? AuthorMemberId = null)
+    Guid? AuthorMemberId = null,
+    string? Category = null,
+    string? Source = null)
 {
     public int ReadTimeMinutes => Math.Max(1, WordCount / 200);
 }

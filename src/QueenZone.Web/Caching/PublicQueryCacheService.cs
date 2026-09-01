@@ -187,6 +187,12 @@ public sealed class PublicQueryCacheService(
         cache.Remove(PublicQueryCacheKeys.LatestArticles(ArticlesRoutes.HomeFeaturedCount));
     }
 
+    public void InvalidateArticlesCache()
+    {
+        cache.Remove(PublicQueryCacheKeys.LatestArticles(ArticlesRoutes.HomeFeaturedCount));
+        InvalidateArticleCountCache();
+    }
+
     /// <summary>
     /// Bumps the photo cache version so category lists and paged grids refresh after admin writes.
     /// </summary>

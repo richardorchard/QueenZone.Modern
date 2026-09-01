@@ -21,6 +21,7 @@
         {
           <span>Submitted by <a class="qz-attribution-link" href="/members/@authorMemberId">@Model.Item.AuthorDisplayName</a> &middot; </span>
         }
+        else if (!string.IsNullOrWhiteSpace(Model.Item.AuthorDisplayName)) { <span>By @Model.Item.AuthorDisplayName &middot; </span> }
         <time datetime="@Model.Item.PublishedAt.ToString("yyyy-MM-dd")">@Model.Item.PublishedAt.ToString("dd MMMM yyyy")</time>
         <span> &middot; @Model.Item.ReadTimeMinutes min read</span>
       </div>
@@ -42,6 +43,11 @@
       <p class="lede">@Model.Item.Excerpt</p>
     }
     <article class="article-body">@Html.Raw(Model.FormattedBody)</article>
+    @if (!string.IsNullOrWhiteSpace(Model.Item.Source))
+    {
+      if (NewsArticleContent.IsSafePublicUrl(Model.Item.Source)) { <p class="article-source"><a href="@Model.Item.Source" rel="noopener noreferrer">Source</a></p> }
+      else { <p class="article-source">@Model.Item.Source</p> }
+    }
   </div>
 
   @if (!string.IsNullOrWhiteSpace(Model.Item.Tags))

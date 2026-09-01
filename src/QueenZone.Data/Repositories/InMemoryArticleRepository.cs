@@ -1,10 +1,10 @@
 namespace QueenZone.Data;
 
-public sealed class InMemoryArticleRepository(IArticleSubmissionRepository submissionRepository) : IArticleRepository
+public sealed class InMemoryArticleRepository(IArticleSubmissionRepository submissionRepository, IEditorialArticleRepository? editorialArticles = null) : IArticleRepository
 {
     public async Task<int> GetCountAsync(string? tag = null, CancellationToken ct = default)
     {
-        var all = await submissionRepository.GetPublishedAsync(ct);
+        var all = await GetAllAsync(ct);
         return string.IsNullOrWhiteSpace(tag)
             ? all.Count
             : all.Count(a => HasTag(a.Tags, tag));
@@ -16,7 +16,7 @@ public sealed class InMemoryArticleRepository(IArticleSubmissionRepository submi
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 100);
 
-        var all = await submissionRepository.GetPublishedAsync(ct);
+        var all = await GetAllAsync(ct);
         IEnumerable<PublishedArticleSubmission> filtered = string.IsNullOrWhiteSpace(tag)
             ? all
             : all.Where(a => HasTag(a.Tags, tag));
@@ -29,14 +29,14 @@ public sealed class InMemoryArticleRepository(IArticleSubmissionRepository submi
 
     public async Task<PublishedArticleSubmission?> GetBySlugAsync(string slug, CancellationToken ct = default)
     {
-        var all = await submissionRepository.GetPublishedAsync(ct);
+        var all = await GetAllAsync(ct);
         return all.FirstOrDefault(a => string.Equals(a.Slug, slug, StringComparison.OrdinalIgnoreCase));
     }
 
     public async Task<(PublishedArticleSubmission? Previous, PublishedArticleSubmission? Next)> GetAdjacentAsync(
         DateTimeOffset publishedAt, CancellationToken ct = default)
     {
-        var all = await submissionRepository.GetPublishedAsync(ct);
+        var all = await GetAllAsync(ct);
         // all is ordered descending by PublishedAt
         var prev = all.FirstOrDefault(a => a.PublishedAt < publishedAt);
         var next = all.LastOrDefault(a => a.PublishedAt > publishedAt);
@@ -44,7 +44,22 @@ public sealed class InMemoryArticleRepository(IArticleSubmissionRepository submi
     }
 
     public async Task<IReadOnlyList<PublishedArticleSubmission>> GetSitemapEntriesAsync(CancellationToken ct = default) =>
-        await submissionRepository.GetPublishedAsync(ct);
+        await GetAllAsync(ct);
+
+    private async Task<IReadOnlyList<PublishedArticleSubmission>> GetAllAsync(CancellationToken ct)
+    {
+        var all = (await submissionRepository.GetPublishedAsync(ct)).ToList();
+        if (editorialArticles is not null)
+        {
+            var editorials = await editorialArticles.GetPublishedStandaloneAsync(ct);
+            var promotedIds = editorials.Where(x => x.SourceSubmissionId is not null).Select(x => x.SourceSubmissionId!.Value).ToHashSet();
+            all.RemoveAll(x => promotedIds.Contains(x.Id));
+            all.AddRange(editorials.Select(x => new PublishedArticleSubmission(
+                x.Id, x.Title, x.Slug, x.Excerpt, x.Body, x.ImageBlobKey, x.Tags, x.PublishedAt,
+                x.AuthorName, EfArticleSubmissionRepository.EstimateWordCount(x.Body), Category: x.Category, Source: x.Source)));
+        }
+        return all.OrderByDescending(x => x.PublishedAt).ToList();
+    }
 
     private static bool HasTag(string? tags, string tag) =>
         !string.IsNullOrWhiteSpace(tags) &&

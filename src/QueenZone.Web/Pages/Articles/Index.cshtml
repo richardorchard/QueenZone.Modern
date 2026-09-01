@@ -25,6 +25,7 @@
         {
           <article class="qz-article-card">
             <a href="@ArticlesRoutes.GetCommunityArticleDetailPath(item.Slug)" class="qz-article-card__link">
+              @if (!string.IsNullOrWhiteSpace(item.CoverImageBlobPath)) { <img src="@NewsArticleImage.ResolveThumbnailUrl(item.CoverImageBlobPath, null)" alt="" class="qz-article-card__image" loading="lazy" /> }
               <div class="qz-article-card__body">
                 <div class="qz-card__kicker">
                   <time datetime="@item.PublishedAt.ToString("yyyy-MM-dd")">@item.PublishedAt.ToString("dd MMMM yyyy")</time>
@@ -41,6 +42,7 @@
             {
               <div class="qz-article-card__author">Submitted by <a class="qz-attribution-link" href="/members/@authorMemberId">@item.AuthorDisplayName</a></div>
             }
+            else if (!string.IsNullOrWhiteSpace(item.AuthorDisplayName)) { <div class="qz-article-card__author">By @item.AuthorDisplayName</div> }
             @if (!string.IsNullOrWhiteSpace(item.Tags))
             {
               <div class="qz-article-card__tags">

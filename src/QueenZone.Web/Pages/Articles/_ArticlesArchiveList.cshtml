@@ -10,6 +10,7 @@ else
     @foreach (var item in Model)
     {
       <li class="qz-news-row">
+        @if (!string.IsNullOrWhiteSpace(item.ThumbnailUrl)) { <img src="@item.ThumbnailUrl" alt="" width="180" height="120" loading="lazy" /> }
         <div>
           <div class="qz-card__kicker"><time datetime="@item.PublishedAt.ToString("yyyy-MM-dd")">@item.PublishedAt.ToString("dd MMMM yyyy")</time></div>
           <div class="qz-meta">@(string.IsNullOrWhiteSpace(item.CategoryName) ? "Article" : item.CategoryName)</div>
