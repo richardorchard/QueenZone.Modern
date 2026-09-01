@@ -12,16 +12,15 @@ type RecordedGesture = {
     onEnd?: (event: Record<string, unknown>) => void;
     onTouchesDown?: (event: Record<string, unknown>, state: { fail: () => void }) => void;
   };
+  config: Record<string, unknown>;
 };
-
-type ConfiguredGesture = RecordedGesture & { config: Record<string, unknown> };
 
 function recordedGestures(): {
   pinch: RecordedGesture;
   pan: RecordedGesture;
   zoomPan: RecordedGesture;
-  tap: ConfiguredGesture;
-  singleTap: ConfiguredGesture;
+  tap: RecordedGesture;
+  singleTap: RecordedGesture;
 } {
   return jest.requireMock('react-native-gesture-handler').getRecordedGestures();
 }
@@ -114,6 +113,18 @@ describe('ZoomableArchiveImage', () => {
     expect(onGallerySwipe).toHaveBeenCalledWith('next');
     act(() => recordedGestures().singleTap.handlers.onEnd?.({}));
     expect(onToggleChrome).toHaveBeenCalled();
+  });
+
+  it('runs pinch and double-tap on the JS thread like gallery swipe', () => {
+    // Jest cannot catch a native Reanimated worklet abort. Lock the workaround:
+    // pinch and double-tap stay on JS (same as galleryPan). zoomPan stays on
+    // the UI thread unless a later PR proves it fights pinch-on-JS.
+    renderZoom();
+    const { pinch, tap, pan, zoomPan } = recordedGestures();
+    expect(pinch.config.runOnJS).toBe(true);
+    expect(tap.config.runOnJS).toBe(true);
+    expect(pan.config.runOnJS).toBe(true);
+    expect(zoomPan.config.runOnJS).toBeUndefined();
   });
 
   it('caps the tap gestures to the tap-slop distance so a fast swipe cannot win the Exclusive race', () => {

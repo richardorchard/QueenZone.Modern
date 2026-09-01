@@ -17,6 +17,7 @@ import {
   photoSwipeTapSlopPx,
   type PhotoSwipeDirection,
 } from './photoGalleryMeta';
+import { runPhotoZoomOnJS } from './photoZoomGestures';
 import {
   clampPhotoPanTranslation,
   clampPhotoZoomScale,
@@ -173,7 +174,9 @@ export function ZoomableArchiveImage({
       translateY.value = clamped.y;
     };
 
-    const pinchGesture = Gesture.Pinch()
+    // Pinch stays on the JS thread: same Reanimated 4 iOS worklet abort class
+    // as gallery swipe. Shared-value writes from these JS handlers are allowed.
+    const pinchGesture = runPhotoZoomOnJS(Gesture.Pinch())
       .onBegin(() => {
         pinchStartScale.value = scale.value;
         pinchStartTranslateX.value = translateX.value;
@@ -240,41 +243,39 @@ export function ZoomableArchiveImage({
         savedTranslateY.value = translateY.value;
       });
 
-    const doubleTapGesture = Gesture.Tap()
-      .numberOfTaps(2)
-      .maxDuration(250)
-      .maxDistance(photoSwipeTapSlopPx)
-      .onEnd((event) => {
-        if (isPhotoZoomed(scale.value)) {
-          resetZoomAnimated(true);
-          return;
-        }
+    const doubleTapGesture = runPhotoZoomOnJS(
+      Gesture.Tap().numberOfTaps(2).maxDuration(250).maxDistance(photoSwipeTapSlopPx),
+    ).onEnd((event) => {
+      if (isPhotoZoomed(scale.value)) {
+        resetZoomAnimated(true);
+        return;
+      }
 
-        const newScale = photoZoomDoubleTapScale;
-        const focal = focalPhotoZoomTranslation(
-          0,
-          0,
-          photoZoomMinScale,
-          newScale,
-          event.x,
-          event.y,
-          containerSize(),
-        );
-        const clamped = clampPhotoPanTranslation(
-          focal.x,
-          focal.y,
-          newScale,
-          containerSize(),
-          imageSize(),
-        );
-        scale.value = withSpring(newScale, photoZoomSpringConfig);
-        savedScale.value = newScale;
-        translateX.value = withSpring(clamped.x, photoZoomSpringConfig);
-        translateY.value = withSpring(clamped.y, photoZoomSpringConfig);
-        savedTranslateX.value = clamped.x;
-        savedTranslateY.value = clamped.y;
-        runOnJS(announceAndTrackZoom)(newScale);
-      });
+      const newScale = photoZoomDoubleTapScale;
+      const focal = focalPhotoZoomTranslation(
+        0,
+        0,
+        photoZoomMinScale,
+        newScale,
+        event.x,
+        event.y,
+        containerSize(),
+      );
+      const clamped = clampPhotoPanTranslation(
+        focal.x,
+        focal.y,
+        newScale,
+        containerSize(),
+        imageSize(),
+      );
+      scale.value = withSpring(newScale, photoZoomSpringConfig);
+      savedScale.value = newScale;
+      translateX.value = withSpring(clamped.x, photoZoomSpringConfig);
+      translateY.value = withSpring(clamped.y, photoZoomSpringConfig);
+      savedTranslateX.value = clamped.x;
+      savedTranslateY.value = clamped.y;
+      runOnJS(announceAndTrackZoom)(newScale);
+    });
 
     // Cap movement so a swipe that lifts within the tap window (a fast flick)
     // fails this gesture instead of winning the Exclusive race and eating the

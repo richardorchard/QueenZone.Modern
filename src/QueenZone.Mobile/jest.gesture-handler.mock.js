@@ -57,7 +57,8 @@ function chain(kind) {
     failOffsetY() {
       return gesture;
     },
-    runOnJS() {
+    runOnJS(value) {
+      config.runOnJS = value;
       return gesture;
     },
     handlers,
