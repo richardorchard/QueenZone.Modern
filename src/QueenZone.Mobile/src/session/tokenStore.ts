@@ -7,6 +7,11 @@ const expiryKey = 'queenzone.mobile.accessExpiresAt';
 /** Sibling of the grant. Stable across store/TestFlight binaries — not version-namespaced. */
 const identityKey = 'queenzone.mobile.identityShell';
 
+/** Shared iOS accessibility for the four session keys. Do not add requireAuthentication. */
+const sessionStoreOptions: SecureStore.SecureStoreOptions = {
+  keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK,
+};
+
 export type StoredIdentityShell = {
   displayName: string;
   memberId: string;
@@ -18,34 +23,84 @@ export type StoredSession = AuthTokens & {
   identity?: StoredIdentityShell | null;
 };
 
-export async function readStoredSession(): Promise<StoredSession | null> {
-  const [accessToken, refreshToken, expiry, identityRaw] = await Promise.all([
-    SecureStore.getItemAsync(accessKey),
-    SecureStore.getItemAsync(refreshKey),
-    SecureStore.getItemAsync(expiryKey),
-    SecureStore.getItemAsync(identityKey),
-  ]);
-  if (!accessToken || !refreshToken) {
-    return null;
+export class KeychainLockedError extends Error {
+  constructor(cause?: unknown) {
+    super('User interaction is not allowed', cause === undefined ? undefined : { cause });
+    this.name = 'KeychainLockedError';
   }
+}
 
-  const expiresAt = expiry ? Number.parseInt(expiry, 10) : 0;
-  return {
-    accessToken,
-    refreshToken,
-    expiresIn: 900,
-    expiresAt: Number.isFinite(expiresAt) ? expiresAt : 0,
-    identity: parseIdentityShell(identityRaw),
-  };
+function errorText(error: unknown): { name: string; message: string } {
+  if (error instanceof Error) {
+    return { name: error.name, message: error.message };
+  }
+  return { name: '', message: typeof error === 'string' ? error : '' };
+}
+
+/** Locked-device / background Keychain — not a missing session and not a generic outage. */
+export function isKeychainLockedError(error: unknown): boolean {
+  if (error instanceof KeychainLockedError) {
+    return true;
+  }
+  const { name, message } = errorText(error);
+  const haystack = `${name} ${message}`;
+  return (
+    name === 'KeyChainException' ||
+    /KeyChainException/i.test(haystack) ||
+    /user interaction is not allowed/i.test(haystack) ||
+    /interaction[- ]not[- ]allowed/i.test(haystack)
+  );
+}
+
+function rethrowKeychainError(error: unknown): never {
+  if (isKeychainLockedError(error)) {
+    throw error instanceof KeychainLockedError ? error : new KeychainLockedError(error);
+  }
+  throw error;
+}
+
+/** Delete then set — SecItemUpdate cannot change accessibility (expo/expo#23924). */
+async function writeSessionItem(key: string, value: string): Promise<void> {
+  await SecureStore.deleteItemAsync(key, sessionStoreOptions);
+  await SecureStore.setItemAsync(key, value, sessionStoreOptions);
+}
+
+export async function readStoredSession(): Promise<StoredSession | null> {
+  try {
+    const [accessToken, refreshToken, expiry, identityRaw] = await Promise.all([
+      SecureStore.getItemAsync(accessKey, sessionStoreOptions),
+      SecureStore.getItemAsync(refreshKey, sessionStoreOptions),
+      SecureStore.getItemAsync(expiryKey, sessionStoreOptions),
+      SecureStore.getItemAsync(identityKey, sessionStoreOptions),
+    ]);
+    if (!accessToken || !refreshToken) {
+      return null;
+    }
+
+    const expiresAt = expiry ? Number.parseInt(expiry, 10) : 0;
+    return {
+      accessToken,
+      refreshToken,
+      expiresIn: 900,
+      expiresAt: Number.isFinite(expiresAt) ? expiresAt : 0,
+      identity: parseIdentityShell(identityRaw),
+    };
+  } catch (error) {
+    rethrowKeychainError(error);
+  }
 }
 
 export async function writeStoredSession(tokens: AuthTokens): Promise<StoredSession> {
   const expiresAt = Date.now() + Math.max(tokens.expiresIn - 30, 30) * 1000;
-  await Promise.all([
-    SecureStore.setItemAsync(accessKey, tokens.accessToken),
-    SecureStore.setItemAsync(refreshKey, tokens.refreshToken),
-    SecureStore.setItemAsync(expiryKey, String(expiresAt)),
-  ]);
+  try {
+    await Promise.all([
+      writeSessionItem(accessKey, tokens.accessToken),
+      writeSessionItem(refreshKey, tokens.refreshToken),
+      writeSessionItem(expiryKey, String(expiresAt)),
+    ]);
+  } catch (error) {
+    rethrowKeychainError(error);
+  }
   return { ...tokens, expiresAt };
 }
 
@@ -57,15 +112,19 @@ export async function writeStoredIdentityShell(shell: StoredIdentityShell): Prom
   if (shell.avatarPath) {
     payload.avatarPath = shell.avatarPath;
   }
-  await SecureStore.setItemAsync(identityKey, JSON.stringify(payload));
+  try {
+    await writeSessionItem(identityKey, JSON.stringify(payload));
+  } catch (error) {
+    rethrowKeychainError(error);
+  }
 }
 
 export async function clearStoredSession(): Promise<void> {
   await Promise.all([
-    SecureStore.deleteItemAsync(accessKey),
-    SecureStore.deleteItemAsync(refreshKey),
-    SecureStore.deleteItemAsync(expiryKey),
-    SecureStore.deleteItemAsync(identityKey),
+    SecureStore.deleteItemAsync(accessKey, sessionStoreOptions),
+    SecureStore.deleteItemAsync(refreshKey, sessionStoreOptions),
+    SecureStore.deleteItemAsync(expiryKey, sessionStoreOptions),
+    SecureStore.deleteItemAsync(identityKey, sessionStoreOptions),
   ]);
 }
 
