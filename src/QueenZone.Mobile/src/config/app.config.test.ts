@@ -15,3 +15,15 @@ describe('app.config marketing version', () => {
     assert.match(source, /slug: config\.slug \?\? 'queenzone-mobile',\s*version,/);
   });
 });
+
+describe('app.config android versionCode', () => {
+  it('bakes android.versionCode from GITHUB_RUN_NUMBER at prebuild', () => {
+    assert.match(
+      source,
+      /const androidVersionCode = Number\(\s*resolveIosBuildNumber\(\{/,
+    );
+    assert.match(source, /override: process\.env\.ANDROID_VERSION_CODE/);
+    assert.match(source, /githubRunNumber: process\.env\.GITHUB_RUN_NUMBER/);
+    assert.match(source, /versionCode: androidVersionCode/);
+  });
+});

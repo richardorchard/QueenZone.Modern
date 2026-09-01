@@ -24,6 +24,17 @@ describe('Play publish workflow', () => {
     assert.match(play, /android\.injected\.version\.code/);
     const prebuild = play.split('name: Generate Android project')[1] ?? '';
     assert.match(prebuild, /GITHUB_RUN_NUMBER: \$\{\{ github\.run_number \}\}/);
+    assert.match(prebuild, /ANDROID_VERSION_CODE: \$\{\{ github\.run_number \}\}/);
+  });
+
+  it('asserts AAB versionCode equals the run number before Play upload', () => {
+    const verify = play.split('name: Verify Android App Bundle')[1] ?? '';
+    const verifyBeforeUpload = verify.split('name: Upload to Google Play')[0] ?? '';
+    assert.match(verifyBeforeUpload, /bundletool/);
+    assert.match(verifyBeforeUpload, /dump manifest/);
+    assert.match(verifyBeforeUpload, /android:versionCode/);
+    assert.match(verifyBeforeUpload, /ANDROID_VERSION_CODE/);
+    assert.match(verifyBeforeUpload, /AAB versionCode=/);
   });
 });
 

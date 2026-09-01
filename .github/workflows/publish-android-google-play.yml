@@ -88,7 +88,10 @@ jobs:
         env:
           # Expo writes `version` / versionName at prebuild. Pass the run
           # number here so Home and Play share `{prefix}.{run}` (#1078).
+          # android.versionCode must also be baked here: Expo defaults to 1
+          # and -Pandroid.injected.version.code did not win (#1195).
           GITHUB_RUN_NUMBER: ${{ github.run_number }}
+          ANDROID_VERSION_CODE: ${{ github.run_number }}
           SENTRY_ORG: ${{ vars.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
         run: npx expo prebuild --platform android --clean --no-install
@@ -194,12 +197,31 @@ jobs:
 
       - name: Verify Android App Bundle
         run: |
+          set -euo pipefail
           bundle=android/app/build/outputs/bundle/release/app-release.aab
           test -f "$bundle"
           # No -strict: Android signing certs are self-signed by design (no CA
           # chain), which jarsigner -strict treats as a hard failure (exit 4)
           # even though the signature itself is valid.
           jarsigner -verify "$bundle"
+
+          # Play rejects reused versionCode. jarsigner does not dump it — same
+          # class of miss as IPA CFBundleVersion=1 before the TestFlight assert.
+          expected_code="${ANDROID_VERSION_CODE}"
+          bundletool_jar="$RUNNER_TEMP/bundletool.jar"
+          curl --fail --silent --show-error --location \
+            "https://github.com/google/bundletool/releases/download/1.18.1/bundletool-all-1.18.1.jar" \
+            --output "$bundletool_jar"
+          version_code=$(java -jar "$bundletool_jar" dump manifest \
+            --bundle="$bundle" \
+            --xpath=/manifest/@android:versionCode)
+          echo "AAB versionCode=${version_code} (expected ${expected_code})"
+          if [ "$version_code" != "$expected_code" ]; then
+            echo "::error::AAB versionCode is ${version_code}, expected ${expected_code}."
+            echo "Play Console rejects reused versionCode values."
+            echo "Ensure app.config.ts maps GITHUB_RUN_NUMBER to android.versionCode before prebuild."
+            exit 1
+          fi
 
       - name: Upload bundle artifact
         uses: actions/upload-artifact@v7
