@@ -64,3 +64,21 @@ export function isOfflineFailure(err: unknown): err is ApiError & { kind: 'offli
 export function isLocalFileFailure(err: unknown): err is ApiError & { kind: 'local-file' } {
   return err instanceof ApiError && err.kind === 'local-file';
 }
+
+function errorText(err: unknown): { name: string; message: string } {
+  if (err instanceof Error) {
+    return { name: err.name, message: err.message };
+  }
+  return { name: '', message: typeof err === 'string' ? err : '' };
+}
+
+/** Expo iOS fetch cancel — not a DOM AbortError, not a real offline failure. */
+export function isExpoFetchCanceled(err: unknown): boolean {
+  const { name, message } = errorText(err);
+  return name === 'FetchRequestCanceledException' || message.includes('FetchRequestCanceledException');
+}
+
+/** Expo wraps the same cancel as UnexpectedException + this message. */
+export function isLostConnectionMessage(err: unknown): boolean {
+  return /network connection was lost/i.test(errorText(err).message);
+}

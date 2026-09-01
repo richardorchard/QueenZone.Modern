@@ -87,7 +87,12 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       sentryDsn: (process.env.EXPO_PUBLIC_SENTRY_DSN ?? '').trim() || undefined,
     },
     plugins: [
-      ...(config.plugins ?? []),
+      // app.json registers @sentry/react-native/expo; keep a single configured
+      // copy here so org/project env still apply and the plugin is not doubled.
+      ...(config.plugins ?? []).filter((plugin) => {
+        const name = Array.isArray(plugin) ? plugin[0] : plugin;
+        return name !== '@sentry/react-native/expo' && name !== '@sentry/react-native';
+      }),
       // CNG: android/ is generated in CI. Force WorkManager 2.8.1 so
       // react-native-android-widget's work-runtime does not clash with a
       // transitive work-runtime-ktx 2.7.1 (duplicate OneTimeWorkRequestKt).
@@ -102,7 +107,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         // gitignored sentry.properties file. See publish-*.yml workflows.
         // CI unsigned builds set SENTRY_DISABLE_AUTO_UPLOAD=true so missing
         // org/token does not fail the Bundle RN script (#857).
-        '@sentry/react-native',
+        '@sentry/react-native/expo',
         {
           ...(process.env.SENTRY_ORG ? { organization: process.env.SENTRY_ORG } : {}),
           ...(process.env.SENTRY_PROJECT ? { project: process.env.SENTRY_PROJECT } : {}),

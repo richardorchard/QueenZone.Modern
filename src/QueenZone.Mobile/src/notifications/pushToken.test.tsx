@@ -1,10 +1,11 @@
 import * as Notifications from 'expo-notifications';
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import {
   checkNotificationPermission,
   ensureAndroidNotificationChannel,
   getDeviceToken,
   requestNotificationPermission,
+  waitUntilAppActive,
 } from './pushToken';
 
 const getPermissionsAsync = Notifications.getPermissionsAsync as jest.MockedFunction<
@@ -27,8 +28,13 @@ function permissionStatus(granted: boolean) {
 }
 
 describe('pushToken', () => {
+  beforeEach(() => {
+    Object.defineProperty(AppState, 'currentState', { value: 'active', configurable: true });
+  });
+
   afterEach(() => {
     Object.defineProperty(Platform, 'OS', { value: 'ios', configurable: true });
+    Object.defineProperty(AppState, 'currentState', { value: 'active', configurable: true });
   });
 
   describe('requestNotificationPermission', () => {
@@ -67,7 +73,37 @@ describe('pushToken', () => {
     });
   });
 
+  describe('waitUntilAppActive', () => {
+    it('does not subscribe when the app is already active', async () => {
+      const addSpy = jest.spyOn(AppState, 'addEventListener');
+      await waitUntilAppActive();
+      expect(addSpy).not.toHaveBeenCalled();
+      addSpy.mockRestore();
+    });
+  });
+
   describe('getDeviceToken', () => {
+    it('waits until AppState is active before talking to APNs', async () => {
+      Object.defineProperty(AppState, 'currentState', { value: 'background', configurable: true });
+      let onChange: ((state: string) => void) | undefined;
+      const remove = jest.fn();
+      const addSpy = jest.spyOn(AppState, 'addEventListener').mockImplementation((_type, handler) => {
+        onChange = handler as (state: string) => void;
+        return { remove };
+      });
+      getDevicePushTokenAsync.mockResolvedValue({ type: 'ios', data: 'apns-token' });
+
+      const pending = getDeviceToken();
+      await Promise.resolve();
+      expect(getDevicePushTokenAsync).not.toHaveBeenCalled();
+
+      onChange?.('active');
+      await expect(pending).resolves.toEqual({ platform: 'apns', token: 'apns-token' });
+      expect(remove).toHaveBeenCalled();
+      addSpy.mockRestore();
+      Object.defineProperty(AppState, 'currentState', { value: 'active', configurable: true });
+    });
+
     it('maps an iOS token to apns', async () => {
       getDevicePushTokenAsync.mockResolvedValue({ type: 'ios', data: 'apns-token' });
       await expect(getDeviceToken()).resolves.toEqual({ platform: 'apns', token: 'apns-token' });
