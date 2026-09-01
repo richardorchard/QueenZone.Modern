@@ -1,7 +1,22 @@
 name: OpenTofu plan
 
+# Two different trigger events, deliberately: the opentofu-plan GitHub
+# environment's deployment branch policy only trusts *protected* branches
+# (see docs/architecture/opentofu-state-and-identity.md), and for a plain
+# `pull_request` event, github.ref is the PR's own feature branch — which is
+# never protected, so the environment blocks the job outright before any
+# step runs (confirmed the hard way on PR #1208's first run). `pull_request_
+# target` runs with github.ref set to the base branch (main, protected),
+# which satisfies that policy, at the cost of needing an explicit checkout
+# of the PR head SHA below instead of the implicit default checkout.
 on:
   pull_request:
+    paths:
+      - "infra/**"
+      - ".github/workflows/opentofu-*.yml"
+      - "scripts/Test-OpenTofu*.ps1"
+      - ".opentofu-version"
+  pull_request_target:
     paths:
       - "infra/**"
       - ".github/workflows/opentofu-*.yml"
@@ -16,16 +31,20 @@ concurrency:
   # Safe to cancel — this workflow is entirely read-only (fmt/validate/plan).
   cancel-in-progress: true
 
-# Issue #625, step 8 of epic #615. Two jobs:
-#   fmt-validate - runs for every PR, including forks, with no cloud
-#     credentials (scripts/Test-OpenTofu.ps1, -backend=false).
-#   plan - only for same-repo PRs (never forks): a real read-only production
-#     plan using the opentofu-plan environment/OIDC identity (Reader on
-#     Queenzone-RG; see docs/architecture/opentofu-state-and-identity.md).
-#     Fails closed on any proposed delete/replace
-#     (scripts/Test-OpenTofuPlanSafety.ps1) and posts a redacted summary as a
-#     single, updated PR comment. No plan file is uploaded from this
-#     workflow — nothing to leak, and it never needs to.
+# Issue #625, step 8 of epic #615. Two jobs, each pinned to one of the two
+# trigger events above so they don't both fire twice per PR push:
+#   fmt-validate - the `pull_request` event only. Runs for every PR,
+#     including forks, with no cloud credentials
+#     (scripts/Test-OpenTofu.ps1, -backend=false).
+#   plan - the `pull_request_target` event only, and only for same-repo PRs
+#     (never forks): a real read-only production plan using the
+#     opentofu-plan environment/OIDC identity (Reader on Queenzone-RG).
+#     Explicitly checks out the PR's head SHA (pull_request_target's
+#     default checkout is the base branch, not the PR branch). Fails closed
+#     on any proposed delete/replace (scripts/Test-OpenTofuPlanSafety.ps1)
+#     and posts a redacted summary as a single, updated PR comment. No plan
+#     file is uploaded from this workflow — nothing to leak, and it never
+#     needs to.
 #
 # Apply is a separate workflow (opentofu-apply.yml) gated on the protected
 # opentofu-apply environment, entirely independent of this one and of
@@ -33,6 +52,7 @@ concurrency:
 jobs:
   fmt-validate:
     name: Format, safety, and local validate
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -54,13 +74,13 @@ jobs:
 
   plan:
     name: Production plan (read-only)
-    needs: fmt-validate
-    runs-on: ubuntu-latest
     # Untrusted forks never reach this job: the opentofu-plan GitHub
-    # environment only trusts OIDC exchanges from this repository's
-    # protected branches, but this check keeps a fork PR from even
-    # attempting the exchange (and failing loudly) in the first place.
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    # environment only trusts OIDC exchanges from workflow runs on this
+    # repository's protected branches (satisfied here via pull_request_target
+    # running with github.ref = main), and this same-repo check keeps a fork
+    # PR from even attempting the exchange in the first place.
+    if: github.event_name == 'pull_request_target' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
     environment: opentofu-plan
     permissions:
       id-token: write
@@ -74,8 +94,17 @@ jobs:
       ARM_USE_OIDC: "true"
 
     steps:
-      - name: Checkout
+      # Explicit PR-head checkout: pull_request_target otherwise checks out
+      # the base branch (main), which would plan the wrong configuration.
+      # This is safe here only because the job above already restricted
+      # this job to same-repository PRs — the workflow *definition* still
+      # comes from main (pull_request_target's own guarantee), but the HCL
+      # this step plans is untrusted-author-controlled the same way any
+      # same-repo PR already is.
+      - name: Checkout PR head
         uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Setup OpenTofu
         uses: opentofu/setup-opentofu@v2

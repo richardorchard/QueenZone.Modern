@@ -39,10 +39,17 @@ failing unpredictably later.
 | [`opentofu-drift.yml`](../../.github/workflows/opentofu-drift.yml) | Daily schedule, or manual dispatch | `opentofu-plan` (Reader) only | No — structurally incapable of applying |
 
 `opentofu-plan.yml`'s `fmt-validate` job runs for every PR, including forks,
-with no cloud credentials at all (`scripts/Test-OpenTofu.ps1`). Its `plan`
-job only runs for same-repository PRs — a fork PR cannot reach it, and even
-if it did, the `opentofu-plan` GitHub environment only trusts OIDC exchanges
-from this repository's protected branches.
+with no cloud credentials at all (`scripts/Test-OpenTofu.ps1`), triggered by
+the plain `pull_request` event. Its `plan` job only runs for same-repository
+PRs, triggered by `pull_request_target` instead: the `opentofu-plan`
+environment's deployment branch policy only trusts protected branches, and
+for a plain `pull_request` event `github.ref` is the PR's own (unprotected)
+feature branch — that combination blocks the job outright before any step
+runs (confirmed the hard way on the PR that introduced this workflow).
+`pull_request_target` runs with `github.ref` set to the protected base
+branch, satisfying that policy, at the cost of an explicit checkout of the
+PR head SHA in the job itself (its implicit default checkout is the base
+branch, not the PR branch).
 
 `opentofu-apply.yml`'s `apply` job applies the **exact binary plan artifact**
 produced by its own `plan` job in the same run — never a freshly generated
