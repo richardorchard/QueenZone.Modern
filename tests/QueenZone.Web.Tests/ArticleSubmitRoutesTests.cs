@@ -161,7 +161,6 @@ public sealed partial class ArticleSubmitRoutesTests : IClassFixture<WebApplicat
 
         var afterPublish = await isolated.CreateClient().GetStringAsync("/articles/101/edited-bohemian-rhapsody-feature");
         Assert.Contains("Updated archive article body", afterPublish);
-        Assert.Contains("Archive Editor", afterPublish);
         Assert.Contains("https://example.test/archive-source", afterPublish);
 
         token = AdminHttpTestHelpers.ExtractAntiforgeryToken(await admin.GetStringAsync(editPath));

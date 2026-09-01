@@ -9,10 +9,7 @@ public sealed record ArticleArchiveItem(
     string Excerpt,
     DateTime PublishedAt,
     string? CategoryName,
-    string DetailPath,
-    string? ImageUrl = null,
-    string? ThumbnailUrl = null,
-    string? AuthorName = null);
+    string DetailPath);
 
 /// <summary>
 /// Stable detail shape for public article pages.
@@ -25,7 +22,4 @@ public sealed record ArticleDetailItem(
     DateTime PublishedAt,
     string? Source,
     string? CategoryName,
-    string DetailPath,
-    string? ImageUrl = null,
-    string? AuthorName = null,
-    string? Tags = null);
+    string DetailPath);
