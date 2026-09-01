@@ -94,14 +94,17 @@ public sealed class GalleryOrphanSweepHostedServiceTests
             await Task.Delay(20);
         }
 
-        await hosted.StopAsync(CancellationToken.None);
-
         Assert.True(recorder.ListCalls > 0);
         var activity = Assert.Single(listener.Started, item => item.OperationName == "GalleryOrphanSweep");
         Assert.Equal(ActivityKind.Internal, activity.Kind);
         Assert.NotNull(recorder.ActivityDuringWork);
         Assert.Equal("GalleryOrphanSweep", recorder.ActivityDuringWork.OperationName);
         Assert.Equal(activity.Id, recorder.ActivityDuringWork.Id);
+        await listener.WaitUntilStoppedAsync(activity);
+        Assert.True(activity.IsStopped);
+        Assert.Contains(listener.Stopped, item => item.Id == activity.Id);
+
+        await hosted.StopAsync(CancellationToken.None);
     }
 
     [Fact]

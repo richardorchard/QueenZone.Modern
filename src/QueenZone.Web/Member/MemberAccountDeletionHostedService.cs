@@ -34,30 +34,32 @@ public sealed class MemberAccountDeletionHostedService(
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            using var activity = QueenZoneTelemetry.ActivitySource.StartActivity(
+            using (var activity = QueenZoneTelemetry.ActivitySource.StartActivity(
                 "MemberAccountDeletion",
-                ActivityKind.Internal);
-            try
+                ActivityKind.Internal))
             {
-                await using var scope = scopeFactory.CreateAsyncScope();
-                var service = scope.ServiceProvider.GetRequiredService<MemberAccountService>();
-                var purged = await service.PurgeDueDeletionsAsync(
-                    timeProvider.GetUtcNow().UtcDateTime,
-                    stoppingToken);
-                if (purged > 0)
+                try
                 {
-                    logger.LogInformation(
-                        "Purged personal data for {PurgedAccountCount} deleted member account(s).",
-                        purged);
+                    await using var scope = scopeFactory.CreateAsyncScope();
+                    var service = scope.ServiceProvider.GetRequiredService<MemberAccountService>();
+                    var purged = await service.PurgeDueDeletionsAsync(
+                        timeProvider.GetUtcNow().UtcDateTime,
+                        stoppingToken);
+                    if (purged > 0)
+                    {
+                        logger.LogInformation(
+                            "Purged personal data for {PurgedAccountCount} deleted member account(s).",
+                            purged);
+                    }
                 }
-            }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-            {
-                break;
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Member account deletion purge failed.");
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Member account deletion purge failed.");
+                }
             }
 
             await Task.Delay(RunInterval, timeProvider, stoppingToken);

@@ -43,6 +43,8 @@ public sealed class SearchIndexSeedHostedServiceTests
         Assert.NotNull(recorder.ActivityDuringWork);
         Assert.Equal("SearchIndexSeed", recorder.ActivityDuringWork.OperationName);
         Assert.Equal(activity.Id, recorder.ActivityDuringWork.Id);
+        Assert.True(activity.IsStopped);
+        Assert.Contains(listener.Stopped, item => item.Id == activity.Id);
     }
 
     private sealed class RecordingSearchIndexService : ISearchIndexService

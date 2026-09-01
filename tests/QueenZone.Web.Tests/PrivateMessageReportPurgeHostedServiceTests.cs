@@ -79,14 +79,17 @@ public sealed class PrivateMessageReportPurgeHostedServiceTests
             await Task.Delay(20);
         }
 
-        await hosted.StopAsync(CancellationToken.None);
-
         Assert.Equal(1, repository.PurgeCalls);
         var activity = Assert.Single(listener.Started, item => item.OperationName == "PrivateMessageReportPurge");
         Assert.Equal(ActivityKind.Internal, activity.Kind);
         Assert.NotNull(repository.ActivityDuringWork);
         Assert.Equal("PrivateMessageReportPurge", repository.ActivityDuringWork.OperationName);
         Assert.Equal(activity.Id, repository.ActivityDuringWork.Id);
+        await listener.WaitUntilStoppedAsync(activity);
+        Assert.True(activity.IsStopped);
+        Assert.Contains(listener.Stopped, item => item.Id == activity.Id);
+
+        await hosted.StopAsync(CancellationToken.None);
     }
 
     private static PrivateMessageReportPurgeHostedService CreateHostedService(

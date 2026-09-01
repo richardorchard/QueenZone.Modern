@@ -82,14 +82,17 @@ public sealed class MemberAccountDeletionHostedServiceTests
             await Task.Delay(20);
         }
 
-        await hosted.StopAsync(CancellationToken.None);
-
         Assert.Equal(1, repository.PurgeCalls);
         var activity = Assert.Single(listener.Started, item => item.OperationName == "MemberAccountDeletion");
         Assert.Equal(ActivityKind.Internal, activity.Kind);
         Assert.NotNull(repository.ActivityDuringWork);
         Assert.Equal("MemberAccountDeletion", repository.ActivityDuringWork.OperationName);
         Assert.Equal(activity.Id, repository.ActivityDuringWork.Id);
+        await listener.WaitUntilStoppedAsync(activity);
+        Assert.True(activity.IsStopped);
+        Assert.Contains(listener.Stopped, item => item.Id == activity.Id);
+
+        await hosted.StopAsync(CancellationToken.None);
     }
 
     private static MemberAccountDeletionHostedService CreateHostedService(

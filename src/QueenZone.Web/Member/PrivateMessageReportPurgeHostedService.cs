@@ -42,30 +42,32 @@ public sealed class PrivateMessageReportPurgeHostedService(
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            using var activity = QueenZoneTelemetry.ActivitySource.StartActivity(
+            using (var activity = QueenZoneTelemetry.ActivitySource.StartActivity(
                 "PrivateMessageReportPurge",
-                ActivityKind.Internal);
-            try
+                ActivityKind.Internal))
             {
-                await using var scope = scopeFactory.CreateAsyncScope();
-                var repository = scope.ServiceProvider.GetRequiredService<IPrivateMessageRepository>();
-                var purged = await repository.PurgeExpiredReportsAsync(
-                    timeProvider.GetUtcNow(),
-                    stoppingToken);
-                if (purged > 0)
+                try
                 {
-                    logger.LogInformation(
-                        "Purged {PurgedReportCount} private-message report(s) past the retention window.",
-                        purged);
+                    await using var scope = scopeFactory.CreateAsyncScope();
+                    var repository = scope.ServiceProvider.GetRequiredService<IPrivateMessageRepository>();
+                    var purged = await repository.PurgeExpiredReportsAsync(
+                        timeProvider.GetUtcNow(),
+                        stoppingToken);
+                    if (purged > 0)
+                    {
+                        logger.LogInformation(
+                            "Purged {PurgedReportCount} private-message report(s) past the retention window.",
+                            purged);
+                    }
                 }
-            }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-            {
-                break;
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Private-message report purge failed.");
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Private-message report purge failed.");
+                }
             }
 
             await Task.Delay(RunInterval, timeProvider, stoppingToken);
