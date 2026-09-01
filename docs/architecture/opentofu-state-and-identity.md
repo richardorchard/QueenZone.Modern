@@ -31,7 +31,7 @@ The non-secret backend settings are committed at [`infra/backend/production.back
 
 Neither workload identity is Owner or User Access Administrator. Contributor is limited to the QueenZone resource group and cannot change Azure RBAC. State access is a separate container-scoped data-plane assignment, not storage-account key access.
 
-Both GitHub environments accept protected branches only. The apply environment requires `richardorchard` approval. The federated subjects name the environments, so an untrusted fork or pull request cannot exchange its OIDC token unless it first passes the repository environment controls. The manual [`opentofu-backend-smoke.yml`](../../.github/workflows/opentofu-backend-smoke.yml) workflow verifies each identity without declaring or importing application resources. Full plan/apply automation belongs to #625.
+Both GitHub environments accept protected branches only. The apply environment requires `richardorchard` approval. The federated subjects name the environments, so an untrusted fork or pull request cannot exchange its OIDC token unless it first passes the repository environment controls. The manual [`opentofu-backend-smoke.yml`](../../.github/workflows/opentofu-backend-smoke.yml) workflow verifies each identity without declaring or importing application resources. Full plan/apply automation, drift detection, and the rest of the operational runbooks are in [`opentofu-ci-and-runbooks.md`](opentofu-ci-and-runbooks.md) (#625).
 
 ## Bootstrap and local backend migration
 
@@ -69,7 +69,7 @@ Store the values in the `Queenzone Development` Bitwarden Secrets Manager projec
 
 Those two OpenTofu token names are **not created yet**. Live Worker publishes use `CLOUDFLARE_WORKER_READWRITE` (Workers Scripts Edit). Inventory/ops reads use `CLOUDFLARE_API_TOKEN_READONLY`. Do not reuse the Worker token as the future OpenTofu apply token unless its zone/DNS/settings scopes are reviewed.
 
-The bootstrap does not create the OpenTofu tokens. Create them immediately before the first Cloudflare plan in #626, then wire their Bitwarden output names during #625.
+The bootstrap does not create the OpenTofu tokens. They are a blocking prerequisite for the plan/apply workflows in [`opentofu-ci-and-runbooks.md`](opentofu-ci-and-runbooks.md) — create them and wire their Bitwarden output names via the `BITWARDEN_OPENTOFU_PLAN_SECRETS`/`BITWARDEN_OPENTOFU_APPLY_SECRETS` repository variables before the first real plan or apply run.
 
 Rotation sequence:
 

@@ -280,10 +280,31 @@ After the database max size was increased to 5 GB, the corrected import complete
 
 The public site reads forum pages through `ModernForumRepository` by default (see **Modern forum read path configuration** above).
 
+## Infrastructure (OpenTofu)
+
+The Azure/Cloudflare infrastructure control plane (epic
+[#615](https://github.com/richardorchard/QueenZone.Modern/issues/615)) is
+managed by OpenTofu, entirely separate from application deploys above.
+
+- Contributor workflow (local validation, provider upgrades, first import,
+  state moves): [`architecture/opentofu-contributor-runbook.md`](architecture/opentofu-contributor-runbook.md)
+- Backend, workload identities, lock recovery, backup/restore, credential
+  rotation: [`architecture/opentofu-state-and-identity.md`](architecture/opentofu-state-and-identity.md)
+- CI (plan-on-PR, approval-gated apply, drift detection), rollback guidance
+  by resource class, cutover verification, and disaster-recovery linkage:
+  [`architecture/opentofu-ci-and-runbooks.md`](architecture/opentofu-ci-and-runbooks.md)
+- Live-estate inventory and ownership boundaries: [`architecture/opentofu-inventory.md`](architecture/opentofu-inventory.md)
+
+GitHub environments `opentofu-plan` (Reader) and `opentofu-apply`
+(Contributor, requires approval) are separate from the `deploy` environment
+used by `deploy.yml` — an OpenTofu apply never runs application code, and an
+application deploy never touches Azure/Cloudflare resource configuration.
+
 ## Quick Links
 
 - Primary agent instructions: [AGENTS.md](../AGENTS.md)
 - Claude entry point: [CLAUDE.md](../CLAUDE.md)
 - Testing policy: [docs/architecture/testing-policy.md](architecture/testing-policy.md)
 - SQL MCP setup: [docs/sql/data-api-builder-mcp.md](sql/data-api-builder-mcp.md)
+- OpenTofu CI and runbooks: [docs/architecture/opentofu-ci-and-runbooks.md](architecture/opentofu-ci-and-runbooks.md)
 - Migration backlog: [docs/backlog/migration-backlog.md](backlog/migration-backlog.md)

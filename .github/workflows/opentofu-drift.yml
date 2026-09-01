@@ -1,0 +1,150 @@
+name: OpenTofu drift check
+
+on:
+  schedule:
+    # 08:00 UTC daily — offset from the other nightly Azure/DB jobs and from
+    # app-service-setting-names-check.yml's 07:00 UTC run.
+    - cron: "0 8 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: opentofu-drift
+  cancel-in-progress: false
+
+# Issue #625 ("Operations: scheduled read-only drift plan with actionable
+# notification"). Uses the opentofu-plan environment only — that identity has
+# Reader on Queenzone-RG and cannot apply, so this workflow is structurally
+# incapable of changing production, regardless of what the plan proposes.
+# Drift is reported as a GitHub issue rather than only a workflow log, since
+# that is this repo's realistic notification surface for a solo maintainer.
+jobs:
+  drift-plan:
+    name: Detect drift (read-only)
+    runs-on: ubuntu-latest
+    environment: opentofu-plan
+    permissions:
+      id-token: write
+      contents: read
+      issues: write
+    env:
+      ARM_CLIENT_ID: ${{ vars.ARM_CLIENT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ vars.ARM_SUBSCRIPTION_ID }}
+      ARM_TENANT_ID: ${{ vars.ARM_TENANT_ID }}
+      ARM_USE_AZUREAD: "true"
+      ARM_USE_OIDC: "true"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup OpenTofu
+        uses: opentofu/setup-opentofu@v2
+        with:
+          tofu_version: 1.12.5
+          tofu_wrapper: false
+
+      - name: Fetch Bitwarden OpenTofu plan secrets
+        id: bitwarden-secrets
+        uses: bitwarden/sm-action@v3.0.1
+        with:
+          access_token: ${{ secrets.BITWARDEN_SECRETS_MANAGER_ACCESS_TOKEN }}
+          secrets: ${{ vars.BITWARDEN_OPENTOFU_PLAN_SECRETS }}
+
+      - name: Verify Cloudflare plan token is configured
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ steps.bitwarden-secrets.outputs.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::error::CLOUDFLARE_API_TOKEN is not configured. Create the CLOUDFLARE_API_TOKEN_TOFU_PLAN Bitwarden secret and map it via the BITWARDEN_OPENTOFU_PLAN_SECRETS repository variable before this workflow can plan Cloudflare resources (see docs/architecture/opentofu-state-and-identity.md)."
+            exit 1
+          fi
+
+      - name: OpenTofu init
+        working-directory: infra/environments/production
+        run: tofu init -input=false -reconfigure -backend-config=../../backend/production.backend.hcl
+
+      - name: OpenTofu plan (detect drift)
+        id: plan
+        working-directory: infra/environments/production
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ steps.bitwarden-secrets.outputs.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set +e
+          tofu plan -input=false -detailed-exitcode -out=tfplan
+          exit_code=$?
+          echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
+          if [ "$exit_code" -eq 1 ]; then
+            echo "::error::tofu plan failed — see the log above."
+            exit 1
+          fi
+          exit 0
+
+      - name: Render plan as JSON
+        if: steps.plan.outputs.exit_code == '2'
+        working-directory: infra/environments/production
+        run: tofu show -json tfplan > plan.json
+
+      - name: Build drift summary
+        if: steps.plan.outputs.exit_code == '2'
+        shell: pwsh
+        run: |
+          # Reuses the same redaction logic as the plan/apply workflows; the
+          # exit code from `tofu plan -detailed-exitcode` (2) is what tells
+          # us drift exists, not this script's own destroy/replace gate.
+          ./scripts/Test-OpenTofuPlanSafety.ps1 `
+            -PlanJsonPath infra/environments/production/plan.json `
+            -SummaryPath drift-summary.md
+        continue-on-error: true
+
+      - name: Open or update the drift issue
+        if: steps.plan.outputs.exit_code == '2'
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const fs = require('fs');
+            const summary = fs.existsSync('drift-summary.md')
+              ? fs.readFileSync('drift-summary.md', 'utf8')
+              : 'OpenTofu detected drift, but the summary could not be generated — see the workflow run logs.';
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = `OpenTofu detected drift between the committed configuration and live production on ${new Date().toISOString().slice(0, 10)}.\n\n${summary}\n\nWorkflow run: ${runUrl}\n\nThis is read-only detection — nothing was applied. Investigate whether the drift is expected (a manual/break-glass change per docs/architecture/opentofu-state-and-identity.md) and either reconcile it back into a PR or document why it is intentional.`;
+
+            try {
+              await github.rest.issues.createLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: 'opentofu-drift',
+                color: '5319E7',
+                description: 'Scheduled OpenTofu drift-plan output (see .github/workflows/opentofu-drift.yml)',
+              });
+            } catch (error) {
+              if (error.status !== 422) {
+                throw error;
+              }
+            }
+
+            const openIssues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'opentofu-drift',
+            });
+
+            if (openIssues.data.length > 0) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: openIssues.data[0].number,
+                body,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: `OpenTofu drift detected — ${new Date().toISOString().slice(0, 10)}`,
+                body,
+                labels: ['opentofu-drift'],
+              });
+            }

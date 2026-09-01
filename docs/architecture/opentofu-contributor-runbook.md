@@ -65,6 +65,8 @@ tofu -chdir=infra/environments/production show $env:TEMP\queenzone-production.tf
 
 Plan files and state are sensitive and must remain outside the repository. Do not apply a plan containing an unexplained delete or replacement.
 
+A pull request touching `infra/**` runs this same plan automatically (read-only, posted as a PR comment) via [`opentofu-plan.yml`](../../.github/workflows/opentofu-plan.yml); merging to `main` runs an approval-gated apply via [`opentofu-apply.yml`](../../.github/workflows/opentofu-apply.yml). See [`opentofu-ci-and-runbooks.md`](opentofu-ci-and-runbooks.md) for how those fit together, drift detection, and rollback guidance.
+
 ## First import of a resource
 
 1. Re-probe the live resource immediately before declaring it.

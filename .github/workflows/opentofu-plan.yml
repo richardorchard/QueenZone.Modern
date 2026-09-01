@@ -1,0 +1,154 @@
+name: OpenTofu plan
+
+on:
+  pull_request:
+    paths:
+      - "infra/**"
+      - ".github/workflows/opentofu-*.yml"
+      - "scripts/Test-OpenTofu*.ps1"
+      - ".opentofu-version"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: opentofu-plan-${{ github.event.pull_request.number }}
+  # Safe to cancel — this workflow is entirely read-only (fmt/validate/plan).
+  cancel-in-progress: true
+
+# Issue #625, step 8 of epic #615. Two jobs:
+#   fmt-validate - runs for every PR, including forks, with no cloud
+#     credentials (scripts/Test-OpenTofu.ps1, -backend=false).
+#   plan - only for same-repo PRs (never forks): a real read-only production
+#     plan using the opentofu-plan environment/OIDC identity (Reader on
+#     Queenzone-RG; see docs/architecture/opentofu-state-and-identity.md).
+#     Fails closed on any proposed delete/replace
+#     (scripts/Test-OpenTofuPlanSafety.ps1) and posts a redacted summary as a
+#     single, updated PR comment. No plan file is uploaded from this
+#     workflow — nothing to leak, and it never needs to.
+#
+# Apply is a separate workflow (opentofu-apply.yml) gated on the protected
+# opentofu-apply environment, entirely independent of this one and of
+# .github/workflows/deploy.yml.
+jobs:
+  fmt-validate:
+    name: Format, safety, and local validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup OpenTofu
+        uses: opentofu/setup-opentofu@v2
+        with:
+          tofu_version: 1.12.5
+          tofu_wrapper: false
+
+      - name: Format, safety, init, and validate
+        shell: pwsh
+        run: ./scripts/Test-OpenTofu.ps1
+
+      - name: Self-test plan safety checker
+        shell: pwsh
+        run: ./scripts/Test-OpenTofuPlanSafety.ps1 -SelfTest
+
+  plan:
+    name: Production plan (read-only)
+    needs: fmt-validate
+    runs-on: ubuntu-latest
+    # Untrusted forks never reach this job: the opentofu-plan GitHub
+    # environment only trusts OIDC exchanges from this repository's
+    # protected branches, but this check keeps a fork PR from even
+    # attempting the exchange (and failing loudly) in the first place.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    environment: opentofu-plan
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: write
+    env:
+      ARM_CLIENT_ID: ${{ vars.ARM_CLIENT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ vars.ARM_SUBSCRIPTION_ID }}
+      ARM_TENANT_ID: ${{ vars.ARM_TENANT_ID }}
+      ARM_USE_AZUREAD: "true"
+      ARM_USE_OIDC: "true"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup OpenTofu
+        uses: opentofu/setup-opentofu@v2
+        with:
+          tofu_version: 1.12.5
+          tofu_wrapper: false
+
+      - name: Fetch Bitwarden OpenTofu plan secrets
+        id: bitwarden-secrets
+        uses: bitwarden/sm-action@v3.0.1
+        with:
+          access_token: ${{ secrets.BITWARDEN_SECRETS_MANAGER_ACCESS_TOKEN }}
+          secrets: ${{ vars.BITWARDEN_OPENTOFU_PLAN_SECRETS }}
+
+      - name: Verify Cloudflare plan token is configured
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ steps.bitwarden-secrets.outputs.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::error::CLOUDFLARE_API_TOKEN is not configured. Create the CLOUDFLARE_API_TOKEN_TOFU_PLAN Bitwarden secret and map it via the BITWARDEN_OPENTOFU_PLAN_SECRETS repository variable before this workflow can plan Cloudflare resources (see docs/architecture/opentofu-state-and-identity.md)."
+            exit 1
+          fi
+
+      - name: OpenTofu init
+        working-directory: infra/environments/production
+        run: tofu init -input=false -reconfigure -backend-config=../../backend/production.backend.hcl
+
+      - name: OpenTofu plan
+        working-directory: infra/environments/production
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ steps.bitwarden-secrets.outputs.CLOUDFLARE_API_TOKEN }}
+        run: tofu plan -input=false -out=tfplan
+
+      - name: Render plan as JSON
+        working-directory: infra/environments/production
+        run: tofu show -json tfplan > plan.json
+
+      - name: Check plan safety and build summary
+        shell: pwsh
+        run: |
+          ./scripts/Test-OpenTofuPlanSafety.ps1 `
+            -PlanJsonPath infra/environments/production/plan.json `
+            -SummaryPath plan-summary.md
+
+      - name: Post plan summary to the PR
+        if: always()
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const fs = require('fs');
+            const summary = fs.existsSync('plan-summary.md')
+              ? fs.readFileSync('plan-summary.md', 'utf8')
+              : 'OpenTofu plan did not produce a summary — see the workflow run logs.';
+            const marker = '<!-- opentofu-plan-summary -->';
+            const body = `${marker}\n${summary}`;
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find((comment) => comment.body && comment.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
