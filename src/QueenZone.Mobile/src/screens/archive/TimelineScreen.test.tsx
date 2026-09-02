@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { FlatList } from 'react-native';
 import { screen, userEvent, waitFor } from '@testing-library/react-native';
-import { fetchTimelinePage } from '../../api';
+import { fetchOnThisDay, fetchTimelinePage } from '../../api';
 import type { TimelineEvent } from '../../api/types';
 import { pagedResponse } from '../../test/fixtures';
 import { fakeNavigation, flushVirtualizedList, renderWithProviders } from '../../test/render';
@@ -12,11 +12,13 @@ jest.mock('../../api', () => {
   const actual = jest.requireActual('../../api');
   return {
     ...actual,
+    fetchOnThisDay: jest.fn(),
     fetchTimelinePage: jest.fn(),
   };
 });
 
 const fetchTimeline = fetchTimelinePage as jest.MockedFunction<typeof fetchTimelinePage>;
+const fetchDay = fetchOnThisDay as jest.MockedFunction<typeof fetchOnThisDay>;
 
 function eventFixture(overrides: Partial<TimelineEvent> = {}): TimelineEvent {
   return {
@@ -35,6 +37,8 @@ function eventFixture(overrides: Partial<TimelineEvent> = {}): TimelineEvent {
 describe('TimelineScreen', () => {
   beforeEach(() => {
     fetchTimeline.mockReset();
+    fetchDay.mockReset();
+    fetchDay.mockResolvedValue(null);
     fetchTimeline.mockResolvedValue(
       pagedResponse([eventFixture(), eventFixture({ id: 10, title: 'Another' })], 1, 1),
     );
@@ -94,6 +98,73 @@ describe('TimelineScreen', () => {
     expect(screen.getByRole('button', { name: 'Another' }).props.accessibilityState).toEqual({
       expanded: false,
     });
+    await waitFor(() =>
+      expect(FlatList.prototype.scrollToIndex).toHaveBeenCalledWith(
+        expect.objectContaining({ index: expect.any(Number) }),
+      ),
+    );
+  });
+
+  it('reapplies a new focusId when Timeline is already mounted', async () => {
+    const navigation = fakeNavigation();
+    const view = renderWithProviders(
+      <TimelineScreen
+        navigation={navigation as never}
+        route={{ key: 'timeline', name: 'Timeline', params: { focusId: 12 } } as never}
+      />,
+      { navigation: false },
+    );
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Live Aid' })).toBeOnTheScreen());
+    expect(screen.getByRole('button', { name: 'Live Aid' }).props.accessibilityState).toEqual({
+      expanded: true,
+    });
+    await waitFor(() =>
+      expect(FlatList.prototype.scrollToIndex).toHaveBeenCalledWith(
+        expect.objectContaining({ index: expect.any(Number) }),
+      ),
+    );
+    (FlatList.prototype.scrollToIndex as jest.Mock).mockClear();
+
+    view.rerender(
+      <TimelineScreen
+        navigation={navigation as never}
+        route={{ key: 'timeline', name: 'Timeline', params: { focusId: 10 } } as never}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Another' }).props.accessibilityState).toEqual({
+        expanded: true,
+      }),
+    );
+    expect(screen.getByRole('button', { name: 'Live Aid' }).props.accessibilityState).toEqual({
+      expanded: false,
+    });
+    await waitFor(() =>
+      expect(FlatList.prototype.scrollToIndex).toHaveBeenCalledWith(
+        expect.objectContaining({ index: expect.any(Number) }),
+      ),
+    );
+  });
+
+  it('includes the on-this-day event when focusId is missing from the loaded page', async () => {
+    fetchTimeline.mockResolvedValue(pagedResponse([eventFixture({ id: 10, title: 'Another' })], 1, 1));
+    fetchDay.mockResolvedValue(eventFixture());
+
+    renderWithProviders(
+      <TimelineScreen
+        navigation={fakeNavigation() as never}
+        route={{ key: 'timeline', name: 'Timeline', params: { focusId: 12 } } as never}
+      />,
+      { navigation: false },
+    );
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Live Aid' })).toBeOnTheScreen());
+    expect(screen.getByRole('button', { name: 'Live Aid' }).props.accessibilityState).toEqual({
+      expanded: true,
+    });
+    expect(screen.getByText('Wembley Stadium.')).toBeOnTheScreen();
     await waitFor(() =>
       expect(FlatList.prototype.scrollToIndex).toHaveBeenCalledWith(
         expect.objectContaining({ index: expect.any(Number) }),

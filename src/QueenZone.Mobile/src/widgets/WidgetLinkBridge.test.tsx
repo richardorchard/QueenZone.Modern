@@ -85,6 +85,28 @@ describe('WidgetLinkBridge', () => {
     await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('Tabs', timelineFocusDestination));
   });
 
+  it('re-navigates Timeline with a new focusId from a later day-face tap', async () => {
+    let handler: ((event: { url: string }) => void) | undefined;
+    addEventListener.mockImplementation((_type, next) => {
+      handler = next as (event: { url: string }) => void;
+      return { remove: jest.fn() } as never;
+    });
+    getInitialURL.mockResolvedValue('queenzone://timeline/12');
+    renderWithProviders(<WidgetLinkBridge />);
+
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('Tabs', timelineFocusDestination));
+    mockNavigate.mockClear();
+
+    await act(async () => {
+      handler?.({ url: 'queenzone://timeline/99' });
+    });
+
+    expect(mockNavigate).toHaveBeenCalledWith('Tabs', {
+      screen: 'ArchiveTab',
+      params: { screen: 'Timeline', params: { focusId: 99 }, initial: false },
+    });
+  });
+
   it('opens the Timeline list from a day-face URL with no usable id', async () => {
     getInitialURL.mockResolvedValue('queenzone://timeline');
     renderWithProviders(<WidgetLinkBridge />);
