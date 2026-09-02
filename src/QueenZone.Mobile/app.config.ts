@@ -115,6 +115,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       // react-native-android-widget's work-runtime does not clash with a
       // transitive work-runtime-ktx 2.7.1 (duplicate OneTimeWorkRequestKt).
       './plugins/withAndroidWorkRuntimeAlignment.cjs',
+      // iOS expo-audio 57.0.4: currentStatus must not call currentDate() (#1234).
+      './plugins/withExpoAudioIosCurrentOffsetFromLive.cjs',
       // After expo-media-library: drop READ_MEDIA_* so add-only save does not
       // request photo/video/audio read at install (#1230 / #1232).
       './plugins/withAndroidAddOnlyPhotos.cjs',
