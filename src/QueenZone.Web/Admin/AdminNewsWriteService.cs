@@ -33,7 +33,7 @@ public sealed class AdminNewsWriteService(
         {
             await newsForumTopicService.EnsureTopicOnFirstPublishAsync(article, cancellationToken);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             logger.LogWarning(
                 ex,
@@ -50,7 +50,7 @@ public sealed class AdminNewsWriteService(
                 article.Title,
                 cancellationToken);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             logger.LogWarning(
                 ex,
@@ -89,7 +89,8 @@ public sealed class AdminNewsWriteService(
                     ct),
                 cancellationToken);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException and not AdminNewsPromotionException)
+        catch (Exception ex) when (ex is not OperationCanceledException and not AdminNewsPromotionException
+            and not OptimisticConcurrencyException)
         {
             logger.LogError(
                 ex,

@@ -1,5 +1,6 @@
 using Azure.Storage.Blobs;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Logging.Abstractions;
 using QueenZone.Storage;
 
 namespace QueenZone.Web.Health;
@@ -10,8 +11,11 @@ namespace QueenZone.Web.Health;
 /// </summary>
 public sealed class BlobReadyHealthCheck(
     IBlobUploadService blobUploadService,
-    IServiceProvider serviceProvider) : IHealthCheck
+    IServiceProvider serviceProvider,
+    ILogger<BlobReadyHealthCheck>? logger = null) : IHealthCheck
 {
+    private readonly ILogger<BlobReadyHealthCheck> effectiveLogger = logger ?? NullLogger<BlobReadyHealthCheck>.Instance;
+
     public const string Name = "blob";
 
     public async Task<HealthCheckResult> CheckHealthAsync(
@@ -39,8 +43,9 @@ public sealed class BlobReadyHealthCheck(
         {
             throw;
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            effectiveLogger.LogWarning(ex, "Blob storage readiness check failed.");
             return HealthCheckResult.Unhealthy("Blob storage check failed.");
         }
     }

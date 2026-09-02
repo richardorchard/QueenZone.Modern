@@ -8,7 +8,8 @@ public sealed class ActionModel(
     INewsDiscoveryRepository discoveryRepository,
     IAdminNewsRepository adminNewsRepository,
     AdminNewsWriteService adminNewsWriteService,
-    NewsDraftGenerationService draftGenerationService) : AdminNewsDiscoveryPageModel
+    NewsDraftGenerationService draftGenerationService,
+    ILogger<ActionModel> logger) : AdminNewsDiscoveryPageModel
 {
     public async Task<IActionResult> OnPostRejectAsync(int id, CancellationToken cancellationToken)
     {
@@ -155,6 +156,10 @@ public sealed class ActionModel(
         {
             return RedirectToReview(id, ex.Message);
         }
+        catch (OptimisticConcurrencyException)
+        {
+            return RedirectToReview(id, OptimisticConcurrencyException.UserMessage);
+        }
 
         return Redirect($"/admin/news/{newsId}/edit");
     }
@@ -227,8 +232,9 @@ public sealed class ActionModel(
                 TempData["DiscoveryMessageKind"] = "error";
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
+            logger.LogError(ex, "Draft generation failed for discovery candidate {CandidateId}", id);
             var hadDraft = await discoveryRepository.GetDraftByCandidateIdAsync(id, cancellationToken) is not null;
             var operationName = hadDraft ? "regeneration" : "generation";
             TempData["DiscoveryMessage"] = $"Draft {operationName} failed: {ex.Message}";

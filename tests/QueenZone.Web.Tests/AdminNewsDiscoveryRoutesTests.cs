@@ -784,6 +784,25 @@ public sealed partial class AdminNewsDiscoveryRoutesTests : IClassFixture<WebApp
     }
 
     [Fact]
+    public async Task PromoteActionShowsConflictMessage_WhenConcurrencyExceptionIsThrown()
+    {
+        var discoveryStore = new SharedNewsDiscoveryStore();
+        var inner = new InMemoryNewsDiscoveryRepository(discoveryStore);
+        var candidateId = await NewsDiscoveryTestSeeder.SeedDraftedCandidateAsync(inner);
+        var discoveryRepository = new ConfigurableNewsDiscoveryRepository(inner)
+        {
+            TryUpdateCandidateStatusHandler = (_, _, _) => throw new OptimisticConcurrencyException(),
+        };
+        var client = CreateClient(AdminEmail, new SharedNewsStore(), discoveryStore, discoveryRepository: discoveryRepository);
+
+        var response = await PostActionAsync(client, $"/admin/news-discovery/{candidateId}/promote", candidateId);
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+
+        var reviewBody = await client.GetStringAsync($"/admin/news-discovery/{candidateId}");
+        Assert.Contains(OptimisticConcurrencyException.UserMessage, reviewBody);
+    }
+
+    [Fact]
     public async Task PromoteActionShowsErrorWhenCandidateIsNotDrafted()
     {
         var discoveryStore = new SharedNewsDiscoveryStore();

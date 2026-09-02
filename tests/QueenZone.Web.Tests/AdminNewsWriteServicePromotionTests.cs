@@ -94,6 +94,28 @@ public sealed class AdminNewsWriteServicePromotionTests
         Assert.Contains("creating the admin draft", ex.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task PromoteDiscoveryCandidateAsync_PropagatesConcurrencyExceptionUnwrapped()
+    {
+        var newsStore = new SharedNewsStore();
+        var innerAdmin = new InMemoryAdminNewsRepository(newsStore);
+        var admin = new FailingCreateAdminNewsRepository(innerAdmin, new OptimisticConcurrencyException());
+        var discovery = new InMemoryNewsDiscoveryRepository(new SharedNewsDiscoveryStore());
+        var candidateId = await NewsDiscoveryTestSeeder.SeedDraftedCandidateAsync(discovery);
+        var candidate = await discovery.GetCandidateByIdAsync(candidateId);
+        var agentDraft = await discovery.GetDraftByCandidateIdAsync(candidateId);
+        Assert.NotNull(candidate);
+        Assert.NotNull(agentDraft);
+        var service = CreateService(admin, discovery, new InMemoryNewsAuditRepository(newsStore));
+
+        await Assert.ThrowsAsync<OptimisticConcurrencyException>(() =>
+            service.PromoteDiscoveryCandidateAsync(
+                candidate,
+                agentDraft,
+                NewsDiscoveryPromoteDraft.Build(agentDraft, candidate),
+                "editor@test.local"));
+    }
+
     private static AdminNewsWriteService CreateService(
         IAdminNewsRepository admin,
         INewsDiscoveryRepository discovery,

@@ -31,6 +31,30 @@ internal sealed class NoOpNotificationDispatcher : INotificationDispatcher
         Task.CompletedTask;
 }
 
+internal sealed class ThrowingNotificationDispatcher(Exception exception) : INotificationDispatcher
+{
+    public Task NotifyForumReplyAsync(
+        int topicId,
+        int postId,
+        Guid authorMemberId,
+        string topicTitle,
+        CancellationToken cancellationToken = default) =>
+        throw exception;
+
+    public Task NotifyPrivateMessageAsync(
+        Guid conversationId,
+        Guid recipientMemberId,
+        Guid senderMemberId,
+        CancellationToken cancellationToken = default) =>
+        throw exception;
+
+    public Task NotifyNewsPublishedAsync(
+        int articleId,
+        string title,
+        CancellationToken cancellationToken = default) =>
+        throw exception;
+}
+
 internal sealed class RecordingPushTransport : IPushTransport
 {
     public List<(IReadOnlyList<PushDeviceToken> Tokens, PushNotificationPayload Payload)> Sends { get; } = [];

@@ -94,6 +94,34 @@ public sealed class DirectPushTransportTests
     }
 
     [Fact]
+    public async Task SendException_IsCaughtAndLogged_ForApnsAndFcm()
+    {
+        var logger = new CollectingLogger<DirectPushTransport>();
+        var handler = new RecordingHttpMessageHandler
+        {
+            ThrowException = new HttpRequestException("connection reset"),
+        };
+        var transport = CreateTransport(handler, CreateConfiguredOptions(), accessToken: "ya29.test", logger);
+        var memberId = Guid.NewGuid();
+
+        await transport.SendAsync(
+            [
+                DeviceTokenTestData.PushToken(memberId, PushDevicePlatform.Apns, "apns-throws"),
+                DeviceTokenTestData.PushToken(memberId, PushDevicePlatform.Fcm, "fcm-throws"),
+            ],
+            PushNotificationPayload.News(1, "Title"));
+
+        Assert.Contains(
+            logger.Entries,
+            entry => entry.Message.Contains("APNs send failed", StringComparison.Ordinal)
+                && entry.Exception is HttpRequestException);
+        Assert.Contains(
+            logger.Entries,
+            entry => entry.Message.Contains("FCM send failed", StringComparison.Ordinal)
+                && entry.Exception is HttpRequestException);
+    }
+
+    [Fact]
     public void BuildBodies_Match757Contract()
     {
         var payload = PushNotificationPayload.News(88, "Headline");
@@ -185,10 +213,17 @@ public sealed class DirectPushTransportTests
 
         public string ResponseBody { get; set; } = string.Empty;
 
+        public Exception? ThrowException { get; set; }
+
         protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
+            if (ThrowException is not null)
+            {
+                throw ThrowException;
+            }
+
             var body = request.Content is null
                 ? string.Empty
                 : await request.Content.ReadAsStringAsync(cancellationToken);

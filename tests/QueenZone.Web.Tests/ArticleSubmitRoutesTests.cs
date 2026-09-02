@@ -5,7 +5,9 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using QueenZone.Data;
+using QueenZone.Data.Entities;
 using QueenZone.Web;
 
 namespace QueenZone.Web.Tests;
@@ -218,7 +220,7 @@ public sealed partial class ArticleSubmitRoutesTests : IClassFixture<WebApplicat
                 HandleCookies = true,
                 AllowAutoRedirect = false,
             },
-            host: isolated);
+            sourceFactory: isolated);
         var submissionId = await SubmitArticleAsync(member, "Prepared member feature", "prepared-member-feature", isolated);
 
         var admin = AdminHttpTestHelpers.CreateClient(isolated, AdminEmail);
@@ -474,6 +476,72 @@ public sealed partial class ArticleSubmitRoutesTests : IClassFixture<WebApplicat
     }
 
     [Fact]
+    public async Task Admin_ApproveAndPublish_StillSucceeds_WhenSearchIndexFails()
+    {
+        var failingFactory = factory.WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<ISearchIndexService>();
+                services.AddSingleton<ISearchIndexService>(new ThrowingSearchIndexService());
+            });
+        });
+
+        var memberClient = await CreateSignedInMemberClientAsync(
+            email: "article-search-failure@example.com",
+            displayName: "Search Failure Author",
+            subject: "google-article-search-failure",
+            options: new WebApplicationFactoryClientOptions
+            {
+                HandleCookies = true,
+                AllowAutoRedirect = false,
+            },
+            sourceFactory: failingFactory);
+
+        var publishId = await SubmitArticleAsync(
+            memberClient, "Search failure story", "search-failure-story", sourceFactory: failingFactory);
+
+        var admin = CreateAdminClient(AdminEmail, sourceFactory: failingFactory);
+
+        await PostAdminActionAsync(admin, publishId, new Dictionary<string, string>
+        {
+            ["submitAction"] = "approve",
+            ["Slug"] = "search-failure-story",
+            ["ReviewNotes"] = "Approved",
+        });
+
+        var publishResponse = await PostAdminActionAsync(admin, publishId, new Dictionary<string, string>
+        {
+            ["submitAction"] = "publish",
+            ["Slug"] = "search-failure-story",
+        });
+
+        Assert.Equal(HttpStatusCode.Redirect, publishResponse.StatusCode);
+        var repository = failingFactory.Services.GetRequiredService<IArticleSubmissionRepository>();
+        Assert.Equal(ArticleSubmissionStatus.Published, (await repository.GetByIdAsync(publishId))!.Status);
+    }
+
+    private sealed class ThrowingSearchIndexService : ISearchIndexService
+    {
+        public Task UpsertAsync(SearchDocumentEntity document, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("Simulated index failure.");
+
+        public Task RemoveAsync(string sourceKey, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("Simulated index failure.");
+
+        public Task ReplaceContentTypeAsync(
+            string contentType,
+            IReadOnlyList<SearchDocumentEntity> documents,
+            CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("Simulated index failure.");
+
+        public Task<IReadOnlyDictionary<string, int>> GetContentTypeCountsAsync(
+            CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("Simulated index failure.");
+    }
+
+    [Fact]
     public async Task GetEditDraft_LoadsExistingDraftForMember()
     {
         var client = await CreateSignedInMemberClientAsync(
@@ -530,7 +598,7 @@ public sealed partial class ArticleSubmitRoutesTests : IClassFixture<WebApplicat
         HttpClient client,
         string title,
         string slug,
-        WebApplicationFactory<Program>? host = null)
+        WebApplicationFactory<Program>? sourceFactory = null)
     {
         var draftId = await SaveDraftAsync(client, title, MinBody());
         var formPage = await client.GetStringAsync("/submit/article");
@@ -546,7 +614,7 @@ public sealed partial class ArticleSubmitRoutesTests : IClassFixture<WebApplicat
         var response = await client.PostAsync("/submit/article", content);
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
 
-        var repository = (host ?? factory).Services.GetRequiredService<IArticleSubmissionRepository>();
+        var repository = (sourceFactory ?? factory).Services.GetRequiredService<IArticleSubmissionRepository>();
         var pending = await repository.GetPendingAsync(1, 50);
         return pending.Single(item => item.Title == title).Id;
     }
@@ -582,9 +650,9 @@ public sealed partial class ArticleSubmitRoutesTests : IClassFixture<WebApplicat
         return await client.PostAsync($"/admin/articles/{id:D}/action", new FormUrlEncodedContent(form));
     }
 
-    private HttpClient CreateAdminClient(string? email = null)
+    private HttpClient CreateAdminClient(string? email = null, WebApplicationFactory<Program>? sourceFactory = null)
     {
-        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var client = (sourceFactory ?? factory).CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
         if (!string.IsNullOrWhiteSpace(email))
         {
             client.DefaultRequestHeaders.Add(TestAuthHandler.UserEmailHeader, email);
@@ -598,9 +666,9 @@ public sealed partial class ArticleSubmitRoutesTests : IClassFixture<WebApplicat
         string displayName,
         string subject,
         WebApplicationFactoryClientOptions? options = null,
-        WebApplicationFactory<Program>? host = null)
+        WebApplicationFactory<Program>? sourceFactory = null)
     {
-        var client = (host ?? factory).CreateClient(options ?? new WebApplicationFactoryClientOptions
+        var client = (sourceFactory ?? factory).CreateClient(options ?? new WebApplicationFactoryClientOptions
         {
             HandleCookies = true,
             AllowAutoRedirect = true,

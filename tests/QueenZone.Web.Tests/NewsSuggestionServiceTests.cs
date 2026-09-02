@@ -250,6 +250,47 @@ public sealed class NewsSuggestionServiceTests
     }
 
     [Fact]
+    public async Task PromoteToAdminDraftAsync_PropagatesConcurrencyExceptionUnwrapped()
+    {
+        var newsStore = new SharedNewsStore();
+        var inner = new InMemoryNewsSuggestionRepository();
+        var created = await inner.CreateAsync(
+            new NewsSuggestion(
+                Guid.NewGuid(),
+                Guid.NewGuid(),
+                "https://example.com/concurrency-promote",
+                NewsCandidateDedupe.ComputeUrlHash("https://example.com/concurrency-promote"),
+                "Headline",
+                null,
+                NewsSuggestionStatus.Pending,
+                DateTimeOffset.UtcNow,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null),
+            CancellationToken.None);
+        var suggestions = new ConfigurableNewsSuggestionRepository(inner)
+        {
+            PromoteHandler = (_, _, _, _, _) => throw new OptimisticConcurrencyException(),
+        };
+        var service = new NewsSuggestionService(
+            suggestions,
+            Options.Create(new NewsSuggestionOptions()),
+            new InMemoryAdminNewsRepository(newsStore),
+            new InMemoryNewsAuditRepository(newsStore));
+
+        await Assert.ThrowsAsync<OptimisticConcurrencyException>(() =>
+            service.PromoteToAdminDraftAsync(
+                created,
+                NewsSuggestionPromoteDraft.Build(created),
+                "editor@test.local",
+                null));
+    }
+
+    [Fact]
     public void ValidateUrl_RejectsOverlongUrl()
     {
         var error = NewsSuggestionService.ValidateUrl("https://example.com/" + new string('a', 2000));

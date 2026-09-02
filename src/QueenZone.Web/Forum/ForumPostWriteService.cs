@@ -311,7 +311,7 @@ public sealed class ForumPostWriteService(
                     title,
                     cancellationToken);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 logger.LogWarning(
                     ex,

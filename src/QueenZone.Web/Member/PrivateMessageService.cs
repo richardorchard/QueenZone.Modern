@@ -243,7 +243,7 @@ public sealed class PrivateMessageService(
                 senderMemberId,
                 cancellationToken);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             logger.LogWarning(
                 ex,
