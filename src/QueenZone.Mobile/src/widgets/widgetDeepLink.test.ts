@@ -12,6 +12,7 @@ import {
   widgetQuoteDeepLinkUrl,
   widgetTimelineDeepLinkUrl,
   widgetTimelineListDeepLinkUrl,
+  widgetTriviaDeepLinkUrl,
 } from './widgetDeepLink.ts';
 
 describe('widgetDeepLink', () => {
@@ -28,6 +29,8 @@ describe('widgetDeepLink', () => {
     assert.equal(isWidgetDeepLinkUrl('queenzone://timeline/12'), true);
     assert.equal(isWidgetDeepLinkUrl('queenzone://quotes/9'), true);
     assert.equal(isWidgetDeepLinkUrl('queenzone://quotes/9/'), true);
+    assert.equal(isWidgetDeepLinkUrl('queenzone://trivia'), true);
+    assert.equal(isWidgetDeepLinkUrl('queenzone://trivia/'), true);
   });
 
   it('rejects other schemes, hosts, and malformed input', () => {
@@ -49,6 +52,8 @@ describe('widgetDeepLink', () => {
     assert.equal(widgetFaceDeepLinkUrl('quote'), 'queenzone://home');
     assert.equal(widgetFaceDeepLinkUrl(null, 9, 12), 'queenzone://timeline/12');
     assert.equal(widgetFaceDeepLinkUrl(null, 9), 'queenzone://timeline');
+    assert.equal(widgetFaceDeepLinkUrl('trivia', 9, 12), 'queenzone://trivia');
+    assert.equal(widgetTriviaDeepLinkUrl, 'queenzone://trivia');
   });
 
   it('parses a positive integer quote id and rejects missing or invalid ids', () => {
@@ -106,6 +111,17 @@ describe('widgetDeepLink', () => {
     openWidgetDestination({ navigate: navigate as never }, 'queenzone://timeline/12');
   });
 
+  it('navigates a trivia URL onto Archive Trivia', () => {
+    const navigate = (name: string, params: unknown) => {
+      assert.equal(name, 'Tabs');
+      assert.deepEqual(params, {
+        screen: 'ArchiveTab',
+        params: { screen: 'Trivia', initial: false },
+      });
+    };
+    openWidgetDestination({ navigate: navigate as never }, 'queenzone://trivia');
+  });
+
   it('navigates a no-id day-face URL onto Timeline without focus params', () => {
     const destinations: unknown[] = [];
     const navigate = (_name: string, params: unknown) => {
@@ -140,5 +156,8 @@ describe('widgetDeepLink', () => {
     assert.equal(consumeInitialWidgetUrl('queenzone://timeline/12'), null);
     assert.equal(consumeInitialWidgetUrl('queenzone://quotes/9'), null);
     assert.equal(consumeInitialWidgetUrl('queenzone://home'), null);
+    resetInitialWidgetUrlConsumption();
+    assert.equal(consumeInitialWidgetUrl('queenzone://trivia'), 'queenzone://trivia');
+    assert.equal(consumeInitialWidgetUrl('queenzone://trivia'), null);
   });
 });
