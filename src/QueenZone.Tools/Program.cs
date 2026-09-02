@@ -43,6 +43,11 @@ internal static class ToolsApp
             return await RunImportQuotesAsync(args);
         }
 
+        if (args.Length > 0 && string.Equals(args[0], "import-trivia", StringComparison.OrdinalIgnoreCase))
+        {
+            return await RunImportTriviaAsync(args);
+        }
+
         if (args.Length == 0 || string.Equals(args[0], "import-history", StringComparison.OrdinalIgnoreCase))
         {
             return await RunImportHistoryAsync(args);
@@ -128,6 +133,44 @@ internal static class ToolsApp
         return 0;
     }
 
+    private static async Task<int> RunImportTriviaAsync(string[] args)
+    {
+        var options = ImportOptions.Parse(args, "import-trivia");
+        if (!options.IsValid)
+        {
+            PrintUsage(options.ErrorMessage);
+            return 2;
+        }
+
+        if (!File.Exists(options.CsvPath))
+        {
+            Console.Error.WriteLine($"CSV file was not found: {options.CsvPath}");
+            return 2;
+        }
+
+        if (options.DryRun)
+        {
+            var rows = TriviaFactCsvImporter.ReadRows(options.CsvPath);
+            Console.WriteLine($"Rows read: {rows.Count}");
+            Console.WriteLine("Dry run only. No database changes were made.");
+            return 0;
+        }
+
+        var dbOptions = new DbContextOptionsBuilder<QueenZoneDbContext>()
+            .UseSqlServer(options.ConnectionString)
+            .Options;
+
+        await using var dbContext = new QueenZoneDbContext(dbOptions);
+        var importer = new TriviaFactCsvImporter(dbContext);
+        var result = await importer.ImportAsync(options.CsvPath, DateTime.UtcNow);
+
+        Console.WriteLine($"Rows read: {result.RowsRead}");
+        Console.WriteLine($"Created: {result.Created}");
+        Console.WriteLine($"Updated: {result.Updated}");
+        Console.WriteLine($"Unchanged: {result.Unchanged}");
+        return 0;
+    }
+
     private static void PrintUsage(string errorMessage)
     {
         Console.Error.WriteLine(errorMessage);
@@ -137,6 +180,8 @@ internal static class ToolsApp
         Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- import-history --csv <path> --dry-run");
         Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- import-quotes --csv <path> --connection-string <connection-string>");
         Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- import-quotes --csv <path> --dry-run");
+        Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- import-trivia --csv <path> --connection-string <connection-string>");
+        Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- import-trivia --csv <path> --dry-run");
         Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- check-photos [options]");
         Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- generate-photo-thumbs [options]");
         Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- check-links [options]");
