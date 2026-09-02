@@ -4,7 +4,7 @@ using QueenZone.Web.Pages.Admin.News;
 
 namespace QueenZone.Web.Pages.Admin.Articles;
 
-[RequestFormLimits(MultipartBodyLengthLimit = 16 * 1024 * 1024)]
+[RequestFormLimits(MultipartBodyLengthLimit = 16 * 1024 * 1024, ValueLengthLimit = 16 * 1024 * 1024)]
 [RequestSizeLimit(16 * 1024 * 1024)]
 public sealed class EditModel(
     IEditorialArticleRepository editorialArticles,
@@ -63,7 +63,7 @@ public sealed class EditModel(
         var existing = Form.Id is Guid existingId ? await editorialArticles.GetAsync(existingId, ct) : null;
         var sanitizedBody = ugcHtml.Sanitize(Form.Body);
         Validate(sanitizedBody);
-        var draft = new AdminNewsDraft(Form.Title, Form.Slug, Form.Excerpt, sanitizedBody, Form.PublishedAt, null, Form.ImageBlobKey, Form.ImageGalleryPicId);
+        var draft = new AdminNewsDraft(Form.Title, Form.Slug, Form.Excerpt, sanitizedBody, Form.ResolvedPublishedAt, null, Form.ImageBlobKey, Form.ImageGalleryPicId);
         var galleryError = await NewsArticleGalleryPicker.ValidatePicAsync(adminPhotoRepository, Form.ArticleImage, Form.ImageGalleryPicId, ct);
         if (galleryError is not null) Errors.Add(galleryError);
         var applied = await imageService.TryApplyAsync(Form.ArticleImage, Form.ToCrop(), draft, User, Errors.Count == 0, ct);

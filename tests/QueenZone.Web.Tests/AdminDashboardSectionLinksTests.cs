@@ -25,6 +25,11 @@ public sealed class AdminDashboardSectionLinksTests : IClassFixture<QueenZoneWeb
         var body = await response.Content.ReadAsStringAsync();
         Assert.Contains("Admin sections", body);
         Assert.Contains("href=\"/admin/news\"", body);
+        Assert.Contains("News articles", body);
+        Assert.Contains("href=\"/admin/articles\"", body);
+        Assert.Contains(">Articles</span>", body);
+        Assert.Contains("Editorial articles, archive pieces, and member submissions", body);
+        Assert.DoesNotContain("Article submissions", body);
         Assert.Contains("href=\"/admin/news-discovery\"", body);
         Assert.Contains("href=\"/admin/photos\"", body);
         Assert.Contains("href=\"/admin/biography\"", body);
@@ -35,7 +40,6 @@ public sealed class AdminDashboardSectionLinksTests : IClassFixture<QueenZoneWeb
         Assert.Contains("href=\"/admin/freddie-tributes\"", body);
         Assert.Contains("href=\"/admin/photo-submissions\"", body);
         Assert.Contains("href=\"/admin/news-suggestions\"", body);
-        Assert.Contains("href=\"/admin/articles\"", body);
         Assert.Contains("href=\"/admin/help\"", body);
         Assert.Contains("href=\"/admin/private-messages\"", body);
     }
