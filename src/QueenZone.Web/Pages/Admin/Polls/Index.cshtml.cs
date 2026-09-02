@@ -1,7 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
-using Microsoft.Data.SqlClient;
-using Microsoft.EntityFrameworkCore;
 using QueenZone.Data;
 
 namespace QueenZone.Web.Pages.Admin.Polls;
@@ -11,9 +9,6 @@ public sealed class IndexModel(
     IOutputCacheStore outputCacheStore,
     ILogger<IndexModel> logger) : AdminPollPageModel
 {
-    internal const string PublishPersistenceFailureMessage =
-        "Could not publish this poll. The previous Home poll is unchanged. Retry publish.";
-
     public IReadOnlyList<HomePollAdminItem> Polls { get; private set; } = [];
 
     public PollFormViewModel? CreateForm { get; private set; }
@@ -63,37 +58,14 @@ public sealed class IndexModel(
             TempData[MessageKey] = ex.Message;
             TempData[MessageKindKey] = "error";
         }
-        catch (Exception ex) when (ex is not OperationCanceledException && IsPublishPersistenceFailure(ex))
+        catch (Exception ex) when (ex is not OperationCanceledException && AdminHomePollPublishError.IsPersistenceFailure(ex))
         {
             logger.LogWarning(ex, "Admin home poll publish failed for {PollId}.", id);
-            TempData[MessageKey] = PublishPersistenceFailureMessage;
+            TempData[MessageKey] = AdminHomePollPublishError.Message;
             TempData[MessageKindKey] = "error";
         }
 
         return Redirect("/admin/polls");
-    }
-
-    internal static bool IsPublishPersistenceFailure(Exception exception)
-    {
-        if (exception is DbUpdateException)
-        {
-            return true;
-        }
-
-        if (SiteSearchSqlTimeout.IsCommandTimeout(exception))
-        {
-            return true;
-        }
-
-        for (var current = exception; current is not null; current = current.InnerException)
-        {
-            if (current is SqlException sql && sql.Number is 2601 or 2627)
-            {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     public async Task<IActionResult> OnPostCloseAsync(Guid id, CancellationToken cancellationToken)

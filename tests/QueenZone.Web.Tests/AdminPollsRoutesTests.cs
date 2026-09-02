@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using QueenZone.Data;
-using QueenZone.Web.Pages.Admin.Polls;
+using QueenZone.Web;
 
 namespace QueenZone.Web.Tests;
 
@@ -118,7 +118,7 @@ public sealed class AdminPollsRoutesTests
         Assert.DoesNotContain("404", published.Headers.Location.OriginalString, StringComparison.Ordinal);
 
         var page = await client.GetStringAsync("/admin/polls");
-        Assert.Contains(IndexModel.PublishPersistenceFailureMessage, page, StringComparison.Ordinal);
+        Assert.Contains(AdminHomePollPublishError.Message, page, StringComparison.Ordinal);
         Assert.DoesNotContain("Page Not Found", page, StringComparison.Ordinal);
     }
 
