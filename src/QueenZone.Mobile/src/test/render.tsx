@@ -1,3 +1,4 @@
+import { HeaderHeightContext } from '@react-navigation/elements';
 import { NavigationContainer } from '@react-navigation/native';
 import { act, render, type RenderOptions } from '@testing-library/react-native';
 import type { ReactElement } from 'react';
@@ -8,6 +9,9 @@ const safeAreaMetrics = {
   frame: { x: 0, y: 0, width: 390, height: 844 },
   insets: { top: 47, left: 0, right: 0, bottom: 34 },
 };
+
+/** Native-stack header stand-in for screens that call `useHeaderHeight()`. */
+export const testHeaderHeight = 96;
 
 type Options = RenderOptions & {
   navigation?: boolean;
@@ -20,7 +24,9 @@ export function renderWithProviders(ui: ReactElement, options: Options = {}) {
   return render(content, {
     wrapper: ({ children }) => (
       <SafeAreaProvider initialMetrics={safeAreaMetrics}>
-        <ThemeProvider>{children}</ThemeProvider>
+        <HeaderHeightContext.Provider value={testHeaderHeight}>
+          <ThemeProvider>{children}</ThemeProvider>
+        </HeaderHeightContext.Provider>
       </SafeAreaProvider>
     ),
     ...renderOptions,

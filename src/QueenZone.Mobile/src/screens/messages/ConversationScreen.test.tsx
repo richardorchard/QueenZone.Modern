@@ -1,4 +1,3 @@
-import { HeaderHeightContext } from '@react-navigation/elements';
 import { Alert, FlatList, Keyboard, KeyboardAvoidingView, Platform, RefreshControl } from 'react-native';
 import { act, fireEvent, screen, userEvent, waitFor } from '@testing-library/react-native';
 import { ApiError } from '../../api/client';
@@ -16,7 +15,7 @@ import { enqueueMessageReply, useOfflineQueue } from '../../offlineQueue';
 import { conversationDetailFixture, memberProfileFixture } from '../../test/fixtures';
 import { testIds } from '../../test/testIds';
 import { createMockSession } from '../../test/mockSession';
-import { fakeNavigation, flushVirtualizedList, renderWithProviders } from '../../test/render';
+import { fakeNavigation, flushVirtualizedList, renderWithProviders, testHeaderHeight } from '../../test/render';
 import { space } from '../../theme';
 import { ConversationScreen, messageBubbleRenderProbe } from './ConversationScreen';
 
@@ -78,16 +77,12 @@ const blockConversationParticipantMock = blockConversationParticipant as jest.Mo
   typeof blockConversationParticipant
 >;
 
-const conversationHeaderHeight = 96;
-
 function renderConversation(navigation = fakeNavigation()) {
   return renderWithProviders(
-    <HeaderHeightContext.Provider value={conversationHeaderHeight}>
-      <ConversationScreen
-        navigation={navigation as never}
-        route={{ key: 'conversation', name: 'Conversation', params: { id: conversationId } } as never}
-      />
-    </HeaderHeightContext.Provider>,
+    <ConversationScreen
+      navigation={navigation as never}
+      route={{ key: 'conversation', name: 'Conversation', params: { id: conversationId } } as never}
+    />,
   );
 }
 
@@ -583,7 +578,7 @@ describe('ConversationScreen', () => {
 
     const avoiding = screen.UNSAFE_getByType(KeyboardAvoidingView);
     expect(avoiding.props.behavior).toBe('padding');
-    expect(avoiding.props.keyboardVerticalOffset).toBe(conversationHeaderHeight);
+    expect(avoiding.props.keyboardVerticalOffset).toBe(testHeaderHeight);
   });
 
   it('keeps the composer as a sibling of the thread list, not a FlatList footer', async () => {
@@ -612,7 +607,7 @@ describe('ConversationScreen', () => {
     const addListener = jest.spyOn(Keyboard, 'addListener').mockImplementation((event, callback) => {
       listeners[event] ??= [];
       listeners[event].push(callback as () => void);
-      return { remove: jest.fn() };
+      return { remove: jest.fn() } as unknown as ReturnType<typeof Keyboard.addListener>;
     });
 
     fetchConversationMock.mockResolvedValue(conversationDetail([]));
