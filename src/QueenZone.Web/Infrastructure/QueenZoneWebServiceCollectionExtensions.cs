@@ -305,6 +305,12 @@ public static class QueenZoneWebServiceCollectionExtensions
         {
             options.HeaderName = EditorImageUploadEndpoints.AntiforgeryHeaderName;
         });
+        // Per-field cap. MultipartBodyLengthLimit is a different knob; page-level
+        // [RequestFormLimits] is not applied until after UseAntiforgery reads the form.
+        services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
+        {
+            options.ValueLengthLimit = 16 * 1024 * 1024;
+        });
         return services;
     }
 
