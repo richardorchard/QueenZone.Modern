@@ -92,6 +92,7 @@ export const testIds = {
   memberGate: 'member-gate',
   inboxScreen: 'inbox-screen',
   archivedScreen: 'archived-screen',
+  conversationComposer: 'conversation-composer',
 
   notificationBanner: 'notification-banner',
 
