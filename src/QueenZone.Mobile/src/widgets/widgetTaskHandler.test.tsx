@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 import type { WidgetTaskHandlerProps } from 'react-native-android-widget';
-import { fetchOnThisDay, fetchRandomQuote } from '../api/content';
+import { fetchOnThisDay, fetchRandomQuote, fetchRandomTrivia } from '../api/content';
 import {
   readCachedWidgetProps,
   readLastWidgetRefreshAt,
@@ -19,6 +19,7 @@ jest.mock('./widgetCache', () => ({
 jest.mock('../api/content', () => ({
   fetchOnThisDay: jest.fn(),
   fetchRandomQuote: jest.fn(),
+  fetchRandomTrivia: jest.fn(),
 }));
 
 jest.mock('./OnThisDayAndroidWidget', () => ({
@@ -35,6 +36,7 @@ const writeRefreshAt = writeLastWidgetRefreshAt as jest.MockedFunction<typeof wr
 const readRefreshAt = readLastWidgetRefreshAt as jest.MockedFunction<typeof readLastWidgetRefreshAt>;
 const fetchDay = fetchOnThisDay as jest.MockedFunction<typeof fetchOnThisDay>;
 const fetchQuote = fetchRandomQuote as jest.MockedFunction<typeof fetchRandomQuote>;
+const fetchTrivia = fetchRandomTrivia as jest.MockedFunction<typeof fetchRandomTrivia>;
 
 const cachedProps = { quoteText: 'A kind of magic', quoteWhoSaid: 'Freddie Mercury' };
 
@@ -59,6 +61,8 @@ describe('widgetTaskHandler', () => {
     readRefreshAt.mockResolvedValue(null);
     fetchDay.mockReset();
     fetchQuote.mockReset();
+    fetchTrivia.mockReset();
+    fetchTrivia.mockResolvedValue(null);
   });
 
   afterEach(() => {
@@ -72,6 +76,7 @@ describe('widgetTaskHandler', () => {
       await widgetTaskHandler(props);
       expect(fetchDay).not.toHaveBeenCalled();
       expect(fetchQuote).not.toHaveBeenCalled();
+      expect(fetchTrivia).not.toHaveBeenCalled();
       expect(readCached).toHaveBeenCalled();
       expect(props.renderWidget).toHaveBeenCalled();
     },
@@ -101,6 +106,7 @@ describe('widgetTaskHandler', () => {
 
     expect(fetchDay).toHaveBeenCalledTimes(1);
     expect(fetchQuote).toHaveBeenCalledTimes(1);
+    expect(fetchTrivia).toHaveBeenCalledTimes(1);
     expect(writeCached).toHaveBeenCalledWith({
       formattedDate: '30 June 1980',
       summary: 'Queen released The Game.',
@@ -115,6 +121,7 @@ describe('widgetTaskHandler', () => {
   it('keeps the last cached snapshot when WIDGET_UPDATE fetch fails', async () => {
     fetchDay.mockRejectedValue(new Error('offline'));
     fetchQuote.mockRejectedValue(new Error('offline'));
+    fetchTrivia.mockRejectedValue(new Error('offline'));
 
     const props = handlerProps('WIDGET_UPDATE');
     await widgetTaskHandler(props);
@@ -161,6 +168,7 @@ describe('widgetTaskHandler', () => {
 
     expect(fetchDay).not.toHaveBeenCalled();
     expect(fetchQuote).toHaveBeenCalledTimes(1);
+    expect(fetchTrivia).toHaveBeenCalledTimes(1);
     expect(writeCached).toHaveBeenCalledWith({
       formattedDate: undefined,
       summary: undefined,

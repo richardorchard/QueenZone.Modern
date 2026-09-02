@@ -1,8 +1,8 @@
 import * as BackgroundTask from 'expo-background-task';
 import * as TaskManager from 'expo-task-manager';
 import { Platform } from 'react-native';
-import { fetchOnThisDay, fetchRandomQuote } from '../api/content';
-import type { RandomQuote, TimelineEvent } from '../api/types';
+import { fetchOnThisDay, fetchRandomQuote, fetchRandomTrivia } from '../api/content';
+import type { RandomQuote, RandomTrivia, TimelineEvent } from '../api/types';
 import type { OnThisDayAndroidWidgetProps } from './OnThisDayAndroidWidget';
 import {
   readCachedWidgetProps,
@@ -29,6 +29,8 @@ export const WIDGET_BACKGROUND_MIN_INTERVAL_MINUTES = 240;
 export type WidgetContent = {
   onThisDay: TimelineEvent | null;
   quote: RandomQuote | null;
+  /** Omit to keep last-good trivia (HomeScreen sync). Explicit `null` clears the face. */
+  trivia?: RandomTrivia | null;
 };
 
 export function nextQuoteRefreshDelayMs(random: () => number = Math.random): number {
@@ -49,13 +51,16 @@ export function isSameLocalCalendarDay(leftMs: number, rightMs: number): boolean
 function toWidgetProps(content: WidgetContent): OnThisDayAndroidWidgetProps {
   const quoteId = content.quote && content.quote.id > 0 ? content.quote.id : undefined;
   const eventId = content.onThisDay && content.onThisDay.id > 0 ? content.onThisDay.id : undefined;
+  const triviaId = content.trivia && content.trivia.id > 0 ? content.trivia.id : undefined;
   return {
     formattedDate: content.onThisDay?.formattedDate,
     summary: content.onThisDay?.summary,
     quoteText: content.quote?.text,
     quoteWhoSaid: content.quote?.whoSaid,
+    ...(content.trivia?.text ? { triviaText: content.trivia.text } : {}),
     ...(quoteId != null ? { quoteId } : {}),
     ...(eventId != null ? { eventId } : {}),
+    ...(triviaId != null ? { triviaId } : {}),
   };
 }
 
@@ -88,6 +93,17 @@ function dayFromProps(props: OnThisDayAndroidWidgetProps): TimelineEvent | null 
   };
 }
 
+function triviaFromProps(props: OnThisDayAndroidWidgetProps): RandomTrivia | null {
+  if (!props.triviaText) {
+    return null;
+  }
+  const triviaId = Number(props.triviaId);
+  return {
+    id: Number.isInteger(triviaId) && triviaId > 0 ? triviaId : 0,
+    text: props.triviaText,
+  };
+}
+
 function iosTimelineEntries(props: OnThisDayAndroidWidgetProps) {
   const now = Date.now();
   const times = new Set([now, nextWidgetFaceSlotMs(now), now + nextQuoteRefreshDelayMs()]);
@@ -97,7 +113,7 @@ function iosTimelineEntries(props: OnThisDayAndroidWidgetProps) {
 }
 
 function hasWidgetContent(content: WidgetContent): boolean {
-  return content.onThisDay != null || content.quote != null;
+  return content.onThisDay != null || content.quote != null || content.trivia != null;
 }
 
 /**
@@ -107,7 +123,9 @@ function hasWidgetContent(content: WidgetContent): boolean {
  * view (`{ onThisDay: null, quote: null }`) must not skip the next overnight fetch.
  */
 export async function syncHomeWidget(content: WidgetContent): Promise<void> {
-  const props = toWidgetProps(content);
+  const cached = await readCachedWidgetProps();
+  const trivia = content.trivia !== undefined ? content.trivia : triviaFromProps(cached);
+  const props = toWidgetProps({ ...content, trivia });
   await writeCachedWidgetProps(props);
 
   if (Platform.OS === 'ios') {
@@ -148,9 +166,10 @@ function shouldFetchOnThisDay(lastRefreshAt: number | null, now: number): boolea
 }
 
 /**
- * Fetches a new random quote (and on-this-day when the calendar day changed) and
- * pushes them to the widget. A failed quote fetch keeps the last good quote.
- * Returns false when nothing new could be fetched so the last snapshot stays up.
+ * Fetches a new random quote and trivia (and on-this-day when the calendar day
+ * changed) and pushes them to the widget. A failed quote or trivia fetch keeps
+ * the last good value. Returns false when nothing new could be fetched so the
+ * last snapshot stays up.
  */
 export async function refreshHomeWidget(): Promise<boolean> {
   if (await shouldSkipBackgroundRefresh()) {
@@ -160,10 +179,12 @@ export async function refreshHomeWidget(): Promise<boolean> {
   const cached = await readCachedWidgetProps();
   let quote = quoteFromProps(cached);
   let onThisDay = dayFromProps(cached);
+  let trivia = triviaFromProps(cached);
   const dayDue = shouldFetchOnThisDay(await readLastWidgetRefreshAt(), Date.now());
 
   let quoteFetched = false;
   let dayFetched = false;
+  let triviaFetched = false;
 
   const quoteTask = fetchRandomQuote()
     .then((fresh) => {
@@ -174,6 +195,17 @@ export async function refreshHomeWidget(): Promise<boolean> {
     })
     .catch(() => {
       /* last good quote stays */
+    });
+
+  const triviaTask = fetchRandomTrivia()
+    .then((fresh) => {
+      if (fresh) {
+        trivia = fresh;
+      }
+      triviaFetched = true;
+    })
+    .catch(() => {
+      /* last good trivia stays */
     });
 
   const dayTask = dayDue
@@ -187,13 +219,13 @@ export async function refreshHomeWidget(): Promise<boolean> {
         })
     : Promise.resolve();
 
-  await Promise.all([quoteTask, dayTask]);
+  await Promise.all([quoteTask, triviaTask, dayTask]);
 
-  if (!quoteFetched && !dayFetched) {
+  if (!quoteFetched && !dayFetched && !triviaFetched) {
     return false;
   }
 
-  await syncHomeWidget({ onThisDay, quote });
+  await syncHomeWidget({ onThisDay, quote, trivia });
   return true;
 }
 

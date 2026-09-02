@@ -9,7 +9,8 @@ import {
 } from './widgetDeepLink';
 
 /** Handles taps on the OS home screen widget — iOS `widgetURL` and Android `OPEN_URI`.
- * Quote face with an id opens the quote page; day face opens Timeline (focus when id is present). */
+ * Quote face with an id opens the quote page; day face opens Timeline (focus when id is present);
+ * trivia face opens Archive Trivia (`queenzone://trivia`). */
 export function WidgetLinkBridge() {
   const navigation = useNavigation<WidgetNavigation>();
   const navigationRef = useRef(navigation);

@@ -6,6 +6,9 @@ export const widgetDeepLinkUrl = 'queenzone://home';
 /** Day face with no usable event id — Timeline list, no expand. */
 export const widgetTimelineListDeepLinkUrl = 'queenzone://timeline';
 
+/** Trivia face — Archive Trivia screen. Screen may fetch a new random fact. */
+export const widgetTriviaDeepLinkUrl = 'queenzone://trivia';
+
 const widgetHomeHosts = new Set(['home', 'timeline']);
 
 function widgetHost(parsed: URL): string {
@@ -26,6 +29,9 @@ export function widgetTimelineDeepLinkUrl(id: number): string {
 
 /** Face-specific tap URL. Quote face with a real id opens that quote; day face opens Timeline. */
 export function widgetFaceDeepLinkUrl(face: WidgetFace | null, quoteId?: number, eventId?: number): string {
+  if (face === 'trivia') {
+    return widgetTriviaDeepLinkUrl;
+  }
   if (face === 'quote') {
     if (quoteId != null && quoteId > 0) {
       return widgetQuoteDeepLinkUrl(quoteId);
@@ -87,7 +93,16 @@ function isWidgetTimelineUrl(url: string): boolean {
   }
 }
 
-/** True for Home, Timeline (list or by id), and quote-by-id (`queenzone://quotes/{id}`). */
+function isWidgetTriviaUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'queenzone:' && widgetHost(parsed) === 'trivia';
+  } catch {
+    return false;
+  }
+}
+
+/** True for Home, Timeline (list or by id), quote-by-id, and trivia (`queenzone://trivia`). */
 export function isWidgetDeepLinkUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
@@ -95,7 +110,7 @@ export function isWidgetDeepLinkUrl(url: string): boolean {
       return false;
     }
     const host = widgetHost(parsed);
-    return widgetHomeHosts.has(host) || host === 'quotes';
+    return widgetHomeHosts.has(host) || host === 'quotes' || host === 'trivia';
   } catch {
     return false;
   }
@@ -138,10 +153,19 @@ export type WidgetTimelineDestination = {
   params: { screen: 'Timeline'; params?: { focusId: number }; initial: false };
 };
 
+export type WidgetTriviaDestination = {
+  screen: 'ArchiveTab';
+  params: { screen: 'Trivia'; initial: false };
+};
+
 export type WidgetNavigation = {
   navigate: (
     name: 'Tabs',
-    params: WidgetHomeDestination | WidgetQuoteDestination | WidgetTimelineDestination,
+    params:
+      | WidgetHomeDestination
+      | WidgetQuoteDestination
+      | WidgetTimelineDestination
+      | WidgetTriviaDestination,
   ) => void;
 };
 
@@ -163,6 +187,14 @@ export function openWidgetDestination(navigation: WidgetNavigation, url?: string
         eventId != null
           ? { screen: 'Timeline', params: { focusId: eventId }, initial: false }
           : { screen: 'Timeline', initial: false },
+    });
+    return;
+  }
+
+  if (url && isWidgetTriviaUrl(url)) {
+    navigation.navigate('Tabs', {
+      screen: 'ArchiveTab',
+      params: { screen: 'Trivia', initial: false },
     });
     return;
   }

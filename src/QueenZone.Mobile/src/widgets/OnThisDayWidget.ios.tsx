@@ -14,10 +14,10 @@ import type { WidgetProps } from './widgetCopy';
 
 /**
  * Props pushed from the app via `syncHomeWidget` (see widgetSync.tsx). Both halves are
- * optional and independent — either can be missing (no event today, no published quotes).
- * When both exist the widget shows one face at a time on a 4-hour UTC slot; quote
- * reloads every few hours with jitter; on-this-day is only refetched on a new
- * calendar day.
+ * optional and independent — either can be missing (no event today, no published quotes,
+ * no published trivia). When more than one exists the widget shows one face at a time
+ * on a 4-hour UTC slot (day → quote → trivia); quote and trivia reload every few hours
+ * with jitter; on-this-day is only refetched on a new calendar day.
  *
  * `createWidget` still has to store a layout string so `updateTimeline` can
  * write props into the app group. The home-screen pixels come from native
@@ -36,13 +36,27 @@ function OnThisDayWidgetView(props: OnThisDayWidgetProps) {
 
   const hasDay = Boolean(props.formattedDate && props.summary);
   const hasQuote = Boolean(props.quoteText && props.quoteWhoSaid);
+  const hasTrivia = Boolean(props.triviaText);
+  const faces: string[] = [];
+  if (hasDay) {
+    faces.push('day');
+  }
+  if (hasQuote) {
+    faces.push('quote');
+  }
+  if (hasTrivia) {
+    faces.push('trivia');
+  }
   const slot = Math.floor(Date.now() / (4 * 60 * 60 * 1000));
-  const showDay = hasDay && hasQuote ? slot % 2 === 0 : hasDay;
-  const showQuote = hasDay && hasQuote ? slot % 2 !== 0 : hasQuote;
+  const face = faces.length ? faces[slot % faces.length] : null;
+  const showDay = face === 'day';
+  const showQuote = face === 'quote';
+  const showTrivia = face === 'trivia';
   const quoteId = Number(props.quoteId);
   const eventId = Number(props.eventId);
-  const tapUrl =
-    showQuote && quoteId > 0
+  const tapUrl = showTrivia
+    ? 'queenzone://trivia'
+    : showQuote && quoteId > 0
       ? `queenzone://quotes/${quoteId}`
       : showDay && eventId > 0
         ? `queenzone://timeline/${eventId}`
@@ -61,7 +75,7 @@ function OnThisDayWidgetView(props: OnThisDayWidgetProps) {
       ]}
     >
       <Text modifiers={[foregroundStyle('#B89A4A'), font({ size: 10, weight: 'semibold' })]}>
-        {showDay || (!hasDay && !hasQuote) ? 'ON THIS DAY' : 'QUEEN QUOTES'}
+        {showTrivia ? 'QUEEN FACTS' : showDay || !face ? 'ON THIS DAY' : 'QUEEN QUOTES'}
       </Text>
       {showDay ? (
         <Text
@@ -99,7 +113,20 @@ function OnThisDayWidgetView(props: OnThisDayWidgetProps) {
           {`— ${props.quoteWhoSaid}`}
         </Text>
       ) : null}
-      {!hasDay && !hasQuote ? (
+      {showTrivia ? (
+        <Text
+          modifiers={[
+            foregroundStyle('#F2F1ED'),
+            font({ size: 17 }),
+            minimumScaleFactor(0.65),
+            lineLimit(6),
+            truncationMode('tail'),
+          ]}
+        >
+          {props.triviaText}
+        </Text>
+      ) : null}
+      {!face ? (
         <Text
           modifiers={[
             foregroundStyle('#B8B6B0'),
