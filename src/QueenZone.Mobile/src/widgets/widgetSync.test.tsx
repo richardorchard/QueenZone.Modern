@@ -176,6 +176,22 @@ describe('syncHomeWidget', () => {
     });
   });
 
+  it('keeps cached eventId when Home syncs the same day copy without an id', async () => {
+    Object.defineProperty(Platform, 'OS', { value: 'android' });
+    readCached.mockResolvedValue({
+      formattedDate: '30 June 1980',
+      summary: 'Queen released The Game.',
+      eventId: 1,
+    });
+
+    await syncHomeWidget({
+      onThisDay: { ...content.onThisDay, id: 0 },
+      quote: content.quote,
+    });
+
+    expect(writeCached).toHaveBeenCalledWith(widgetProps);
+  });
+
   it('omits eventId when the on-this-day row has no usable id', async () => {
     Object.defineProperty(Platform, 'OS', { value: 'android' });
     await syncHomeWidget({

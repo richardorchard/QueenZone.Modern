@@ -93,6 +93,26 @@ function dayFromProps(props: OnThisDayAndroidWidgetProps): TimelineEvent | null 
   };
 }
 
+/** Same class as trivia wipe: keep App Group eventId when day copy is present. */
+function withCachedEventId(
+  onThisDay: TimelineEvent | null,
+  cached: OnThisDayAndroidWidgetProps,
+): TimelineEvent | null {
+  if (onThisDay == null || onThisDay.id > 0) {
+    return onThisDay;
+  }
+  const cachedDay = dayFromProps(cached);
+  if (
+    cachedDay &&
+    cachedDay.id > 0 &&
+    cachedDay.formattedDate === onThisDay.formattedDate &&
+    cachedDay.summary === onThisDay.summary
+  ) {
+    return { ...onThisDay, id: cachedDay.id };
+  }
+  return onThisDay;
+}
+
 function triviaFromProps(props: OnThisDayAndroidWidgetProps): RandomTrivia | null {
   if (!props.triviaText) {
     return null;
@@ -125,7 +145,8 @@ function hasWidgetContent(content: WidgetContent): boolean {
 export async function syncHomeWidget(content: WidgetContent): Promise<void> {
   const cached = await readCachedWidgetProps();
   const trivia = content.trivia !== undefined ? content.trivia : triviaFromProps(cached);
-  const props = toWidgetProps({ ...content, trivia });
+  const onThisDay = withCachedEventId(content.onThisDay, cached);
+  const props = toWidgetProps({ ...content, onThisDay, trivia });
   await writeCachedWidgetProps(props);
 
   if (Platform.OS === 'ios') {
