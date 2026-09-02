@@ -357,7 +357,7 @@ public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForu
 
         // Set-based UPDATEs by AuthorMemberId (plus unlinked exact-name posts). Do not
         // materialize starter ids and .Contains() them — that IN-list plan timed out on
-        // the 1M+ post archive. Do not EXEC ModernForum_RefreshReadStats here: that full
+        // the 1M+ post archive. Do not refresh all forum read stats here: that full
         // MERGE belongs after import/reconciliation, not on an admin POST.
         await StartedAuthorThreads(memberId, name)
             .Where(thread => !thread.IsHidden)

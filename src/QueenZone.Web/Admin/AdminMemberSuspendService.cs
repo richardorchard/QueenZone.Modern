@@ -20,7 +20,7 @@ public sealed class AdminMemberSuspendService(
         "Member suspended and their forum topics and posts hidden. Their session will end on their next request.";
 
     public const string HideTimeoutMessage =
-        "Could not hide this member's forum content because the database timed out. The account is still active. Retry suspend.";
+        "Could not hide forum content for this member because the database timed out. The account is still active. Retry suspend.";
 
     public const string RevokeFailedMessage =
         "Member is suspended and their forum content is hidden, but their sessions could not be revoked. Retry suspend to revoke sessions.";

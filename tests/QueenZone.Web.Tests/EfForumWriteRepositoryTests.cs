@@ -278,9 +278,9 @@ public sealed class EfForumWriteRepositoryTests : IAsyncDisposable
     {
         var path = Path.Combine(FindRepoRoot(), "src", "QueenZone.Data", "Repositories", "EfForumWriteRepository.cs");
         var source = File.ReadAllText(path);
-        Assert.DoesNotContain("ModernForum_RefreshReadStats", source);
         Assert.DoesNotContain("ExecuteSqlRaw", source);
         Assert.DoesNotContain("RefreshReadStatsIfSqlServer", source);
+        Assert.DoesNotContain("ModernForum_RefreshReadStats", source);
     }
 
     [Fact]
