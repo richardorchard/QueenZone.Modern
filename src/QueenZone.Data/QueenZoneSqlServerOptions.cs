@@ -24,8 +24,13 @@ public static class QueenZoneSqlServerOptions
     /// <summary>Default EF command timeout for web request paths (seconds).</summary>
     public const int DefaultCommandTimeoutSeconds = 30;
 
-    /// <summary>Design-time migrations and rare long admin/import operations (seconds).</summary>
-    public const int LongRunningCommandTimeoutSeconds = 300;
+    /// <summary>
+    /// Design-time migrations and rare long admin/import operations (seconds).
+    /// 300s was not enough for the ModernForumPost BodyHtml varchar→nvarchar(max)
+    /// size-of-data ALTER (~1M posts); the CI <c>dotnet ef database update</c> job
+    /// uses <see cref="QueenZoneDbContextFactory"/> and this value.
+    /// </summary>
+    public const int LongRunningCommandTimeoutSeconds = 1800;
 
     /// <summary>Max transient retries for Azure SQL.</summary>
     public const int MaxRetryCount = 5;
