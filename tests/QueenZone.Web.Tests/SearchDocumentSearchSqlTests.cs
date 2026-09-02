@@ -29,6 +29,42 @@ public sealed class SearchDocumentSearchSqlTests
     }
 
     [Fact]
+    public void SearchDocument_fts_uses_auto_change_tracking_not_a_sync_rebuild()
+    {
+        var migration = ReadRepoFile(
+            Path.Combine("src", "QueenZone.Data", "Migrations", "20260804113500_AddSearchDocumentFullTextSearch.cs"));
+
+        Assert.Contains("WITH CHANGE_TRACKING AUTO", migration, StringComparison.Ordinal);
+        Assert.DoesNotContain("CHANGE_TRACKING OFF", migration, StringComparison.Ordinal);
+        Assert.DoesNotContain("CHANGE_TRACKING MANUAL", migration, StringComparison.Ordinal);
+        Assert.DoesNotContain("START FULL POPULATION", migration, StringComparison.Ordinal);
+        Assert.DoesNotContain("START UPDATE POPULATION", migration, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Article_search_sync_is_single_row_upsert_not_a_content_type_replace()
+    {
+        var upsert = ReadRepoFile(
+            Path.Combine("src", "QueenZone.Data", "Repositories", "EfSearchIndexService.cs"));
+        var status = ReadRepoFile(
+            Path.Combine("src", "QueenZone.Web", "Pages", "Admin", "Articles", "Status.cshtml.cs"));
+        var action = ReadRepoFile(
+            Path.Combine("src", "QueenZone.Web", "Pages", "Admin", "Articles", "Action.cshtml.cs"));
+        var upsertMethod = upsert[upsert.IndexOf("public async Task UpsertAsync", StringComparison.Ordinal)..];
+        upsertMethod = upsertMethod[..upsertMethod.IndexOf("public async Task RemoveAsync", StringComparison.Ordinal)];
+
+        Assert.Contains("searchIndexService.UpsertAsync", status, StringComparison.Ordinal);
+        Assert.Contains("searchIndexService.UpsertAsync", action, StringComparison.Ordinal);
+        Assert.DoesNotContain("ReplaceContentTypeAsync", status, StringComparison.Ordinal);
+        Assert.DoesNotContain("ReplaceContentTypeAsync", action, StringComparison.Ordinal);
+        Assert.DoesNotContain("BeginTransactionAsync", upsertMethod, StringComparison.Ordinal);
+        Assert.DoesNotContain("FULLTEXT", upsertMethod, StringComparison.Ordinal);
+        Assert.DoesNotContain("POPULATION", upsertMethod, StringComparison.Ordinal);
+        Assert.Equal(30, QueenZoneSqlServerOptions.DefaultCommandTimeoutSeconds);
+        Assert.Equal(1000, SiteSearchLimits.MaxRankedMatches);
+    }
+
+    [Fact]
     public void Migration_embeds_the_capped_procedure()
     {
         var migration = ReadRepoFile(

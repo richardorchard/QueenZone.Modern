@@ -1,5 +1,13 @@
+using System.Net;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
+using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using QueenZone.Data;
+using QueenZone.Web.Pages;
 
 namespace QueenZone.Web.Tests;
 
@@ -46,6 +54,46 @@ public sealed class SearchPageTests : IClassFixture<WebApplicationFactory<Progra
 
         Assert.Contains("QueenZone modernisation begins", body);
         Assert.Contains("/news/1003/", body);
+    }
+
+    [Fact]
+    public async Task SearchPage_sql_timeout_renders_in_page_unavailable_not_not_found()
+    {
+        using var timeoutFactory = QueenZoneWebApplicationFactory.WithServices(services =>
+        {
+            services.RemoveAll<ISiteSearchService>();
+            services.AddSingleton<ISiteSearchService>(new TimeoutSiteSearchService());
+        });
+        using var client = timeoutFactory.CreateAnonymousClient(allowAutoRedirect: false);
+
+        using var response = await client.GetAsync("/search?q=Bohemian+Rhapsody");
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains(SearchModel.UnavailableMessage, body, StringComparison.Ordinal);
+        Assert.Contains("Bohemian Rhapsody", body, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("role=\"alert\"", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("Page Not Found", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("No results found", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("Something went wrong", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task SearchPage_sql_timeout_sets_unavailable_flag()
+    {
+        var model = new SearchModel(new TimeoutSiteSearchService())
+        {
+            Query = "Bohemian Rhapsody",
+            PageContext = new PageContext
+            {
+                ViewData = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary()),
+            },
+        };
+
+        await model.OnGetAsync(CancellationToken.None);
+
+        Assert.True(model.SearchUnavailable);
+        Assert.Null(model.Results);
     }
 
     [Fact]

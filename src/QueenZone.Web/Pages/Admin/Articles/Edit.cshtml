@@ -4,6 +4,7 @@
 @inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
 @{
   var f = Model.Form;
+  var formAction = f.Id is Guid existingId ? $"/admin/articles/editor/{existingId}" : "/admin/articles/editor";
   var token = Antiforgery.GetAndStoreTokens(ViewContext.HttpContext).RequestToken;
   ViewData["TextareaId"] = "article-body";
   ViewData["TextareaName"] = "Form.Body";
@@ -18,7 +19,7 @@
   <h1>@(f.Id is null ? "Create article" : "Edit article")</h1>
   <p><a href="/admin/articles">Back to articles</a></p>
   @if (Model.Errors.Count > 0) { <ul class="admin-errors">@foreach (var error in Model.Errors) { <li>@error</li> }</ul> }
-  <form method="post" enctype="multipart/form-data" class="admin-form qz-form" data-busy-submit data-busy-label="Saving…">
+  <form method="post" action="@formAction" enctype="multipart/form-data" class="admin-form qz-form" data-busy-submit data-busy-label="Saving…">
     <input type="hidden" name="__RequestVerificationToken" value="@token" />
     <input type="hidden" asp-for="Form.Id" /><input type="hidden" asp-for="Form.LegacyArticleId" /><input type="hidden" asp-for="Form.SourceSubmissionId" />
     <fieldset class="qz-fieldset"><legend class="qz-legend">Content</legend>

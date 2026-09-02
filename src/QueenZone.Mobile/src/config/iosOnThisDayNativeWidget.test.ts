@@ -51,12 +51,16 @@ describe('applyOnThisDayNativeWidget', () => {
     assert.match(first, /queenzone:\/\/home/);
     assert.equal(first.includes('queenzone://quotes/\\(quoteId)'), true);
     assert.equal(first.includes('queenzone://timeline/\\(eventId)'), true);
+    assert.match(first, /queenzone:\/\/trivia/);
     assert.match(first, /queenzone:\/\/timeline"/);
     assert.match(first, /intProp\("quoteId"\)/);
     assert.match(first, /intProp\("eventId"\)/);
     assert.match(first, /containerBackground/);
     assert.match(first, /foregroundColor/);
     assert.match(first, /QUEEN QUOTES/);
+    assert.match(first, /QUEEN FACTS/);
+    assert.match(first, /stringProp\("triviaText"\)/);
+    assert.match(first, /faces\.append\("trivia"\)/);
     assert.match(first, /4 \* 3600/);
     assert.match(first, /crest-widget-watermark/);
     assert.match(first, /ZStack/);
@@ -72,6 +76,8 @@ describe('applyOnThisDayNativeWidget', () => {
     assert.match(first, /Text\(formattedDate\)/);
     assert.equal(first.includes('Text("“\\(quoteText)”")'), true);
     assert.equal(first.includes('Text("— \\(quoteWhoSaid)")'), true);
+    assert.match(first, /Text\(triviaText\)/);
+    assert.equal(first.includes('queenzone://trivia/'), false);
     assert.equal(first.includes('.lineLimit(3)'), false);
     assert.equal(first.includes('formattedDate): \\(summary)'), false);
     assert.equal(first.includes('” — \\(quoteWhoSaid)'), false);

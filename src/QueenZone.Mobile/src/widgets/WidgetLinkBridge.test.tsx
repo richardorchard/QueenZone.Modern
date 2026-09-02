@@ -42,6 +42,11 @@ const timelineListDestination = {
   params: { screen: 'Timeline', initial: false },
 };
 
+const triviaDestination = {
+  screen: 'ArchiveTab',
+  params: { screen: 'Trivia', initial: false },
+};
+
 describe('WidgetLinkBridge', () => {
   beforeEach(() => {
     resetInitialWidgetUrlConsumption();
@@ -85,6 +90,30 @@ describe('WidgetLinkBridge', () => {
     renderWithProviders(<WidgetLinkBridge />);
 
     await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('Tabs', timelineListDestination));
+  });
+
+  it('opens Trivia from a cold-start trivia URL', async () => {
+    getInitialURL.mockResolvedValue('queenzone://trivia');
+    renderWithProviders(<WidgetLinkBridge />);
+
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('Tabs', triviaDestination));
+  });
+
+  it('opens Trivia from a later trivia url event', async () => {
+    let handler: ((event: { url: string }) => void) | undefined;
+    addEventListener.mockImplementation((_type, next) => {
+      handler = next as (event: { url: string }) => void;
+      return { remove: jest.fn() } as never;
+    });
+
+    renderWithProviders(<WidgetLinkBridge />);
+    await waitFor(() => expect(addEventListener).toHaveBeenCalled());
+
+    await act(async () => {
+      handler?.({ url: 'queenzone://trivia' });
+    });
+
+    expect(mockNavigate).toHaveBeenCalledWith('Tabs', triviaDestination);
   });
 
   it('opens Home from a later url event', async () => {

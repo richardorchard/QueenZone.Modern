@@ -6,10 +6,12 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using QueenZone.Data;
 using QueenZone.Data.Entities;
 using QueenZone.Storage;
 using QueenZone.Web;
+using QueenZone.Web.Pages.Admin.Articles;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.PixelFormats;
@@ -92,9 +94,27 @@ public sealed partial class ArticleSubmitRoutesTests : IClassFixture<WebApplicat
         Assert.Contains("data-aspect-width=\"3\"", body);
         Assert.Contains("data-aspect-height=\"2\"", body);
         Assert.Contains("data-container=\"ugc-articles\"", body);
+        Assert.Contains("action=\"/admin/articles/editor\"", body);
         Assert.Contains("Author", body);
         Assert.Contains("Category", body);
         Assert.Contains("Tags", body);
+    }
+
+    [Fact]
+    public void Articles_editor_form_value_length_limit_is_aligned_with_page_cap()
+    {
+        var options = factory.Services.GetRequiredService<IOptions<Microsoft.AspNetCore.Http.Features.FormOptions>>().Value;
+        Assert.Equal(16 * 1024 * 1024, options.ValueLengthLimit);
+    }
+
+    [Fact]
+    public async Task Legacy_editor_form_posts_to_action_without_legacyId_query()
+    {
+        var body = await CreateAdminClient(AdminEmail).GetStringAsync("/admin/articles/editor?legacyId=101");
+        Assert.Contains("action=\"/admin/articles/editor\"", body);
+        Assert.DoesNotContain("action=\"/admin/articles/editor?legacyId=", body);
+        Assert.Contains("name=\"Form.LegacyArticleId\"", body);
+        Assert.Contains("value=\"101\"", body);
     }
 
     [Fact]
@@ -166,6 +186,8 @@ public sealed partial class ArticleSubmitRoutesTests : IClassFixture<WebApplicat
         Assert.Equal(HttpStatusCode.Redirect, create.StatusCode);
         var editPath = create.Headers.Location!.OriginalString;
         Assert.StartsWith("/admin/articles/editor/", editPath);
+        var editHtml = await admin.GetStringAsync(editPath);
+        Assert.Contains($"action=\"{editPath}\"", editHtml);
 
         var save = await PostEditorialImageAsync(
             admin,
@@ -211,6 +233,116 @@ public sealed partial class ArticleSubmitRoutesTests : IClassFixture<WebApplicat
         var body = await response.Content.ReadAsStringAsync();
         Assert.Contains("admin-errors", body);
         Assert.DoesNotContain("Broken image draft", await CreateAdminClient(AdminEmail).GetStringAsync("/admin/articles"));
+    }
+
+    [Fact]
+    public async Task Admin_can_save_large_legacy_body_and_cropped_image_on_form_action()
+    {
+        using var isolated = factory.WithWebHostBuilder(_ => { });
+        var admin = AdminHttpTestHelpers.CreateClient(isolated, AdminEmail);
+        var largeBody = LargeLegacyBody();
+        var fields = LegacyImageFields(largeBody);
+
+        var response = await PostEditorialImageAsync(
+            admin,
+            "/admin/articles/editor?legacyId=101",
+            "/admin/articles/editor",
+            fields);
+
+        Assert.True(
+            response.StatusCode is HttpStatusCode.Redirect or HttpStatusCode.OK,
+            $"Unexpected status {response.StatusCode}");
+        Assert.NotEqual("/error/400", response.Headers.Location?.OriginalString);
+        if (response.StatusCode == HttpStatusCode.Redirect)
+        {
+            var editPath = response.Headers.Location!.OriginalString;
+            Assert.Matches("^/admin/articles/editor/[0-9a-fA-F-]{36}$", editPath);
+            var editorial = isolated.Services.GetRequiredService<IEditorialArticleRepository>();
+            var saved = await editorial.GetAsync(Guid.Parse(editPath.Split('/').Last()));
+            Assert.NotNull(saved);
+            Assert.Equal(101, saved.LegacyArticleId);
+            Assert.False(string.IsNullOrWhiteSpace(saved.ImageBlobKey));
+            Assert.Equal(EditorialArticleStatus.Draft, saved.Status);
+        }
+        else
+        {
+            var html = await response.Content.ReadAsStringAsync();
+            Assert.Contains("admin-errors", html);
+            Assert.DoesNotContain("Something went wrong", html);
+        }
+    }
+
+    [Fact]
+    public async Task Admin_save_large_legacy_body_to_legacyId_query_is_not_400()
+    {
+        using var isolated = factory.WithWebHostBuilder(_ => { });
+        var admin = AdminHttpTestHelpers.CreateClient(isolated, AdminEmail);
+        var response = await PostEditorialImageAsync(
+            admin,
+            "/admin/articles/editor?legacyId=101",
+            "/admin/articles/editor?legacyId=101",
+            LegacyImageFields(LargeLegacyBody()));
+
+        Assert.True(
+            response.StatusCode is HttpStatusCode.Redirect or HttpStatusCode.OK,
+            $"Unexpected status {response.StatusCode}");
+        Assert.NotEqual(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.NotEqual("/error/400", response.Headers.Location?.OriginalString);
+        if (response.StatusCode == HttpStatusCode.OK)
+        {
+            var html = await response.Content.ReadAsStringAsync();
+            Assert.Contains("admin-errors", html);
+            Assert.DoesNotContain("Something went wrong", html);
+        }
+    }
+
+    [Fact]
+    public async Task Admin_save_draft_without_antiforgery_returns_200_with_in_page_error()
+    {
+        var client = CreateAdminClient(AdminEmail);
+        using var content = new MultipartFormDataContent();
+        content.Add(new StringContent("101"), "Form.LegacyArticleId");
+        content.Add(new StringContent("Missing token archive"), "Form.Title");
+        content.Add(new StringContent("Updated archive excerpt."), "Form.Excerpt");
+        content.Add(new StringContent("<p>Body with a card image.</p>"), "Form.Body");
+        content.Add(new StringContent("Archive Editor"), "Form.AuthorName");
+        content.Add(new StringContent("Features"), "Form.Category");
+        var file = new ByteArrayContent(await CreateCardPngAsync());
+        file.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/png");
+        content.Add(file, "Form.ArticleImage", "hero.png");
+
+        var response = await client.PostAsync("/admin/articles/editor", content);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+        Assert.Contains("admin-errors", html);
+        Assert.Contains(EditorialArticleEditorRequestGuardFilter.AntiforgeryError, html);
+        Assert.DoesNotContain("Something went wrong", html);
+    }
+
+    [Fact]
+    public async Task Admin_save_draft_bind_failure_returns_200_with_in_page_error()
+    {
+        var client = CreateAdminClient(AdminEmail);
+        var response = await PostEditorialImageAsync(
+            client,
+            "/admin/articles/editor?legacyId=101",
+            "/admin/articles/editor",
+            new()
+            {
+                ["Form.LegacyArticleId"] = "101",
+                ["Form.Title"] = "Bound poorly",
+                ["Form.Excerpt"] = "Should stay on the form.",
+                ["Form.Body"] = "<p>Valid body with an unreadable publication date.</p>",
+                ["Form.AuthorName"] = "Archive Editor",
+                ["Form.Category"] = "Features",
+                ["Form.PublishedAt"] = "not-a-date",
+            });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+        Assert.Contains("admin-errors", html);
+        Assert.DoesNotContain("Something went wrong", html);
+        Assert.DoesNotContain("Bound poorly", await CreateAdminClient(AdminEmail).GetStringAsync("/admin/articles"));
     }
 
     [Fact]
@@ -834,6 +966,21 @@ public sealed partial class ArticleSubmitRoutesTests : IClassFixture<WebApplicat
             },
             fileFieldName: "Form.ArticleImage");
     }
+
+    private static Dictionary<string, string> LegacyImageFields(string body) => new()
+    {
+        ["Form.LegacyArticleId"] = "101",
+        ["Form.Title"] = "Cropped archive feature",
+        ["Form.Slug"] = "cropped-archive-feature",
+        ["Form.Excerpt"] = "Updated archive excerpt with image.",
+        ["Form.Body"] = body,
+        ["Form.AuthorName"] = "Archive Editor",
+        ["Form.Category"] = "Features",
+        ["Form.PublishedAt"] = "2026-08-31",
+    };
+
+    private static string LargeLegacyBody() =>
+        "<p>" + new string('x', (4 * 1024 * 1024) + 8192) + "</p>";
 
     private static async Task<byte[]> CreateCardPngAsync(int width = 600, int height = 400)
     {
