@@ -66,12 +66,18 @@ export {
 export type { CachedResult, ForumReplyWrite, ForumTopicWrite, OfflineReadOptions } from './forum';
 export type { CacheSource } from '../cache/withOfflineCache';
 export {
+  cacheForumAttachment,
   fetchForumAttachment,
   isCookieGatedForumAttachmentPath,
   openForumAttachmentFile,
   openForumAttachmentImage,
+  saveForumAttachmentImage,
 } from './forumAttachment';
-export type { ForumAttachmentBytes, OpenForumAttachmentFileOptions } from './forumAttachment';
+export type {
+  CachedForumAttachment,
+  ForumAttachmentBytes,
+  OpenForumAttachmentFileOptions,
+} from './forumAttachment';
 export { createPhotoSubmission } from './photoSubmissions';
 export {
   createNewsSuggestion,

@@ -1,14 +1,24 @@
 import { useCallback, useState } from 'react';
 import { Image as ExpoImage } from 'expo-image';
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { ApiError, openForumAttachmentFile, openForumAttachmentImage, type ForumAttachment } from '../../api';
+import {
+  ApiError,
+  cacheForumAttachment,
+  openForumAttachmentFile,
+  openForumAttachmentImage,
+  saveForumAttachmentImage,
+  type ForumAttachment,
+} from '../../api';
 import { getAppConfig } from '../../config';
+import { SaveToPhotosError } from '../../media/saveToPhotos';
 import { isSmokeAttachEnabled } from '../../session/smokeAttach';
 import { ArchiveImage } from '../../ui/ArchiveImage';
+import { Button } from '../../ui/Button';
 import { resolveContentUrl } from '../../ui/html/resolveContentUrl';
 import { usePressProps, pressedStyle } from '../../ui/press';
 import { testIds } from '../../test/testIds';
 import { radius, space, type, useTheme } from '../../theme';
+import { ForumAttachmentAudioPlayer } from './ForumAttachmentAudioPlayer';
 import { attachmentAction, attachmentMeta, imagePreviewUrl } from './forumThreadMeta';
 
 function smokeAttachAllowed(): boolean {
@@ -31,10 +41,22 @@ export function ForumAttachmentList({
 }) {
   const { c } = useTheme();
   const press = usePressProps();
-  const [viewer, setViewer] = useState<{ uri: string; label: string } | null>(null);
+  const [viewer, setViewer] = useState<{
+    uri: string;
+    label: string;
+    downloadUrl: string;
+    fileName: string;
+  } | null>(null);
+  const [audio, setAudio] = useState<{
+    fileUri: string;
+    fileName: string;
+    downloadUrl: string;
+  } | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [errorKey, setErrorKey] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [saveBusy, setSaveBusy] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [opened, setOpened] = useState(false);
   const label = attachments.length === 1 ? 'Attachment' : 'Attachments';
 
@@ -50,6 +72,7 @@ export function ForumAttachmentList({
       const key = `${attachment.downloadUrl}-${attachment.fileName}`;
       setErrorKey(null);
       setErrorMessage(null);
+      setSaveError(null);
       setBusyKey(key);
       try {
         if (!accessToken) {
@@ -57,7 +80,28 @@ export function ForumAttachmentList({
         }
         if (action === 'view-image') {
           const uri = await openForumAttachmentImage(attachment.downloadUrl, accessToken);
-          setViewer({ uri, label: attachment.fileName });
+          setViewer({
+            uri,
+            label: attachment.fileName,
+            downloadUrl: attachment.downloadUrl,
+            fileName: attachment.fileName,
+          });
+          return;
+        }
+        if (action === 'play-audio') {
+          const cached = await cacheForumAttachment(
+            attachment.downloadUrl,
+            accessToken,
+            attachment.fileName,
+          );
+          setAudio({
+            fileUri: cached.fileUri,
+            fileName: attachment.fileName,
+            downloadUrl: attachment.downloadUrl,
+          });
+          if (smokeAttachAllowed()) {
+            setOpened(true);
+          }
           return;
         }
         await openForumAttachmentFile(attachment.downloadUrl, accessToken, attachment.fileName, {
@@ -75,6 +119,42 @@ export function ForumAttachmentList({
     },
     [accessToken, interactionsEnabled, isSignedIn],
   );
+
+  const saveImage = useCallback(async () => {
+    if (!viewer || !accessToken) {
+      return;
+    }
+    setSaveError(null);
+    setSaveBusy(true);
+    try {
+      await saveForumAttachmentImage(viewer.downloadUrl, accessToken, viewer.fileName);
+    } catch (err: unknown) {
+      setSaveError(
+        err instanceof SaveToPhotosError || err instanceof ApiError
+          ? err.message
+          : 'Unable to open this attachment.',
+      );
+    } finally {
+      setSaveBusy(false);
+    }
+  }, [accessToken, viewer]);
+
+  const saveAudioFile = useCallback(async () => {
+    if (!audio || !accessToken) {
+      return;
+    }
+    setSaveError(null);
+    setSaveBusy(true);
+    try {
+      await openForumAttachmentFile(audio.downloadUrl, accessToken, audio.fileName, {
+        present: !smokeAttachAllowed(),
+      });
+    } catch (err: unknown) {
+      setSaveError(err instanceof ApiError ? err.message : 'Unable to open this attachment.');
+    } finally {
+      setSaveBusy(false);
+    }
+  }, [accessToken, audio]);
 
   return (
     <View style={styles.attachments}>
@@ -145,22 +225,67 @@ export function ForumAttachmentList({
         animationType="fade"
         onRequestClose={() => setViewer(null)}
       >
-        <Pressable
-          style={[styles.viewerBackdrop, { backgroundColor: c.surfaceScrim }]}
-          onPress={() => setViewer(null)}
-          testID={testIds.forumThreadAttachmentViewer}
-          accessibilityRole="button"
-          accessibilityLabel="Close attachment"
-        >
+        <View style={[styles.viewerBackdrop, { backgroundColor: c.surfaceScrim }]}>
+          <Pressable
+            style={styles.viewerClose}
+            onPress={() => setViewer(null)}
+            testID={testIds.forumThreadAttachmentViewer}
+            accessibilityRole="button"
+            accessibilityLabel="Close attachment"
+          >
+            {viewer ? (
+              <ExpoImage
+                source={{ uri: viewer.uri }}
+                style={styles.viewerImage}
+                contentFit="contain"
+                accessibilityLabel={viewer.label}
+              />
+            ) : null}
+          </Pressable>
           {viewer ? (
-            <ExpoImage
-              source={{ uri: viewer.uri }}
-              style={styles.viewerImage}
-              contentFit="contain"
-              accessibilityLabel={viewer.label}
-            />
+            <View style={styles.viewerActions}>
+              <Button
+                label="Save to Photos"
+                onPress={() => {
+                  void saveImage();
+                }}
+                loading={saveBusy}
+                testID={testIds.forumThreadAttachmentSave}
+              />
+              {saveError ? (
+                <Text style={[type.caption, { color: c.textMuted, textAlign: 'center' }]}>{saveError}</Text>
+              ) : null}
+            </View>
           ) : null}
-        </Pressable>
+        </View>
+      </Modal>
+      <Modal
+        visible={audio != null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAudio(null)}
+      >
+        <View style={[styles.viewerBackdrop, { backgroundColor: c.surfaceScrim }]}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setAudio(null)}
+            accessibilityRole="button"
+            accessibilityLabel="Close attachment"
+          />
+          {audio ? (
+            <View style={[styles.audioSheet, { backgroundColor: c.surfaceSheet }]}>
+              <ForumAttachmentAudioPlayer
+                fileUri={audio.fileUri}
+                fileName={audio.fileName}
+                onSaveToFiles={() => {
+                  void saveAudioFile();
+                }}
+                saveBusy={saveBusy}
+                saveError={saveError}
+              />
+            </View>
+          ) : null}
+        </View>
       </Modal>
     </View>
   );
@@ -189,8 +314,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: space.xl,
   },
+  viewerClose: {
+    flex: 1,
+    justifyContent: 'center',
+  },
   viewerImage: {
     width: '100%',
     height: '80%',
+  },
+  viewerActions: {
+    gap: space.sm,
+    paddingTop: space.md,
+  },
+  audioSheet: {
+    padding: space.lg,
+    borderRadius: radius.sm,
+    gap: space.md,
   },
 });

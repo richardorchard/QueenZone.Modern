@@ -47,6 +47,15 @@
         }
       ],
       [
+        "expo-media-library",
+        {
+          "photosPermission": false,
+          "savePhotosPermission": "Allow QueenZone to save pictures to your photo library.",
+          "granularPermissions": [],
+          "isAccessMediaLocationEnabled": false
+        }
+      ],
+      [
         "expo-audio",
         {
           "enableBackgroundPlayback": true,
