@@ -108,6 +108,8 @@ jobs:
           EXPO_PUBLIC_APP_ENV: development
           EXPO_PUBLIC_API_BASE_URL: http://10.0.2.2:5098
           SENTRY_DISABLE_AUTO_UPLOAD: "true"
+          QUEENZONE_MOBILE_SMOKE_EMBED: "1"
+          FORCE_BUNDLING: "1"
         run: |
           npx expo prebuild --platform android
           cd android
@@ -240,6 +242,8 @@ jobs:
           EXPO_PUBLIC_APP_ENV: development
           EXPO_PUBLIC_API_BASE_URL: http://127.0.0.1:5098
           SENTRY_DISABLE_AUTO_UPLOAD: "true"
+          QUEENZONE_MOBILE_SMOKE_EMBED: "1"
+          FORCE_BUNDLING: "1"
         run: |
           npx expo prebuild --platform ios --clean
           cd ios
@@ -372,6 +376,8 @@ jobs:
           EXPO_PUBLIC_APP_ENV: development
           EXPO_PUBLIC_API_BASE_URL: http://10.0.2.2:5098
           SENTRY_DISABLE_AUTO_UPLOAD: "true"
+          QUEENZONE_MOBILE_SMOKE_EMBED: "1"
+          FORCE_BUNDLING: "1"
         run: |
           npx expo prebuild --platform android
           cd android
@@ -496,6 +502,8 @@ jobs:
           EXPO_PUBLIC_APP_ENV: development
           EXPO_PUBLIC_API_BASE_URL: http://127.0.0.1:5098
           SENTRY_DISABLE_AUTO_UPLOAD: "true"
+          QUEENZONE_MOBILE_SMOKE_EMBED: "1"
+          FORCE_BUNDLING: "1"
         run: |
           npx expo prebuild --platform ios --clean
           cd ios

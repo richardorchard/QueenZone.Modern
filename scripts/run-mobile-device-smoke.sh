@@ -287,6 +287,8 @@ build_android() {
     export EXPO_PUBLIC_APP_ENV=development
     export EXPO_PUBLIC_API_BASE_URL="http://10.0.2.2:${port}"
     export SENTRY_DISABLE_AUTO_UPLOAD=true
+    export QUEENZONE_MOBILE_SMOKE_EMBED=1
+    export FORCE_BUNDLING=1
     echo "Baking Android smoke APK for ${EXPO_PUBLIC_API_BASE_URL}"
     npx expo prebuild --platform android
     (
@@ -303,6 +305,8 @@ build_ios() {
     export EXPO_PUBLIC_APP_ENV=development
     export EXPO_PUBLIC_API_BASE_URL="http://127.0.0.1:${port}"
     export SENTRY_DISABLE_AUTO_UPLOAD=true
+    export QUEENZONE_MOBILE_SMOKE_EMBED=1
+    export FORCE_BUNDLING=1
     echo "Baking iOS Simulator smoke app for ${EXPO_PUBLIC_API_BASE_URL}"
     npx expo prebuild --platform ios --clean
     cd ios
