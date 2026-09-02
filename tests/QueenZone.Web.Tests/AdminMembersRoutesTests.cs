@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using QueenZone.Data;
 using QueenZone.Web;
 
@@ -199,6 +200,99 @@ public sealed class AdminMembersRoutesTests : IClassFixture<WebApplicationFactor
     }
 
     [Fact]
+    public async Task Suspend_SecondPostIsIdempotent()
+    {
+        const string email = "idempotent-spammer@example.com";
+        await CreateSignedInMemberClientAsync(email, "Idempotent Spammer", "google-idempotent-spammer");
+        var memberId = await GetMemberIdForEmailAsync(email);
+        var forum = factory.Services.GetRequiredService<IForumWriteRepository>();
+        await forum.CreateThreadAsync(new NewForumThread(
+            1, memberId, "Idempotent Spammer", "Idempotent spam", "<p>spam</p>", DateTimeOffset.UtcNow));
+
+        var admin = CreateAdminClient(AdminEmail);
+        var firstDetail = await admin.GetStringAsync($"/admin/members/{memberId}");
+        var first = await admin.PostAsync(
+            $"/admin/members/{memberId}/Suspend",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(firstDetail),
+                ["Reason"] = "Repeat suspend",
+            }));
+        Assert.Equal(HttpStatusCode.Redirect, first.StatusCode);
+        Assert.Equal($"/admin/members/{memberId}", first.Headers.Location!.OriginalString);
+
+        var secondDetail = await admin.GetStringAsync($"/admin/members/{memberId}");
+        Assert.Contains(AdminMemberSuspendService.SuccessMessage, secondDetail);
+        var second = await admin.PostAsync(
+            $"/admin/members/{memberId}/Suspend",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(secondDetail),
+                ["Reason"] = "Repeat suspend",
+            }));
+        Assert.Equal(HttpStatusCode.Redirect, second.StatusCode);
+        Assert.Equal($"/admin/members/{memberId}", second.Headers.Location!.OriginalString);
+        Assert.DoesNotContain("/error/", second.Headers.Location.OriginalString, StringComparison.Ordinal);
+
+        var after = await admin.GetStringAsync($"/admin/members/{memberId}");
+        Assert.Contains(AdminMemberSuspendService.SuccessMessage, after);
+        Assert.True((await factory.Services.GetRequiredService<IMemberAccountRepository>().FindByIdAsync(memberId))!.IsSuspended);
+        Assert.DoesNotContain("Idempotent spam", await factory.CreateClient().GetStringAsync("/api/v1/forum/categories/1/topics"));
+    }
+
+    [Fact]
+    public async Task Suspend_WhenHideTimesOut_RedirectsToMemberPageWithError_Not404()
+    {
+        const string email = "timeout-spammer@example.com";
+        var timeoutFactory = CreateTimeoutHideFactory();
+        var memberId = await CreateMemberAsync(timeoutFactory, email, "Timeout Spammer", "google-timeout-spammer");
+        var admin = CreateAdminClient(timeoutFactory, AdminEmail);
+        var detail = await admin.GetStringAsync($"/admin/members/{memberId}");
+        var response = await admin.PostAsync(
+            $"/admin/members/{memberId}/Suspend",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(detail),
+                ["Reason"] = "Spam",
+            }));
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal($"/admin/members/{memberId}", response.Headers.Location!.OriginalString);
+        Assert.DoesNotContain("/error/", response.Headers.Location.OriginalString, StringComparison.Ordinal);
+        Assert.DoesNotContain("404", response.Headers.Location.OriginalString, StringComparison.Ordinal);
+
+        var page = await admin.GetStringAsync($"/admin/members/{memberId}");
+        Assert.Contains(AdminMemberSuspendService.HideTimeoutMessage, page);
+        Assert.DoesNotContain("Page Not Found", page);
+        Assert.False((await timeoutFactory.Services.GetRequiredService<IMemberAccountRepository>().FindByIdAsync(memberId))!.IsSuspended);
+    }
+
+    [Fact]
+    public async Task Suspend_WhenRevokeFails_RedirectsToMemberPageWithRetryRevokeError()
+    {
+        const string email = "revoke-fail@example.com";
+        var revokeFactory = CreateRevokeFailFactory();
+        var memberId = await CreateMemberAsync(revokeFactory, email, "Revoke Fail", "google-revoke-fail");
+        var admin = CreateAdminClient(revokeFactory, AdminEmail);
+        var detail = await admin.GetStringAsync($"/admin/members/{memberId}");
+        var response = await admin.PostAsync(
+            $"/admin/members/{memberId}/Suspend",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(detail),
+                ["Reason"] = "Spam",
+            }));
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal($"/admin/members/{memberId}", response.Headers.Location!.OriginalString);
+        Assert.DoesNotContain("/error/", response.Headers.Location.OriginalString, StringComparison.Ordinal);
+
+        var page = await admin.GetStringAsync($"/admin/members/{memberId}");
+        Assert.Contains(AdminMemberSuspendService.RevokeFailedMessage, page);
+        Assert.True((await revokeFactory.Services.GetRequiredService<IMemberAccountRepository>().FindByIdAsync(memberId))!.IsSuspended);
+    }
+
+    [Fact]
     public async Task HideForumContent_DoesNotSuspendMember_AndUnhideRestoresContent()
     {
         const string email = "hide-only@example.com";
@@ -268,9 +362,38 @@ public sealed class AdminMembersRoutesTests : IClassFixture<WebApplicationFactor
         _ = second;
     }
 
-    private HttpClient CreateAdminClient(string? email = null)
+    private WebApplicationFactory<Program> CreateTimeoutHideFactory()
     {
-        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var timeout = SiteSearchSqlTimeoutTests.CreateSqlException(
+            SiteSearchSqlTimeout.SqlErrorNumber,
+            "Execution Timeout Expired. The timeout period elapsed prior to completion of the operation or the server is not responding.");
+        return factory.WithWebHostBuilder(builder =>
+        {
+            builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<IForumWriteRepository>();
+                services.AddSingleton<IForumWriteRepository>(
+                    new TimeoutHideForumWriteRepository(new InMemoryForumWriteRepository(), timeout));
+            });
+        });
+    }
+
+    private WebApplicationFactory<Program> CreateRevokeFailFactory() =>
+        factory.WithWebHostBuilder(builder =>
+        {
+            builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<IMobileAuthGrantRepository>();
+                services.AddSingleton<IMobileAuthGrantRepository>(new ThrowingRevokeMobileAuthGrantRepository());
+            });
+        });
+
+    private HttpClient CreateAdminClient(string? email = null) =>
+        CreateAdminClient(factory, email);
+
+    private static HttpClient CreateAdminClient(WebApplicationFactory<Program> host, string? email = null)
+    {
+        var client = host.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
         if (!string.IsNullOrWhiteSpace(email))
         {
             client.DefaultRequestHeaders.Add(TestAuthHandler.UserEmailHeader, email);
@@ -279,9 +402,13 @@ public sealed class AdminMembersRoutesTests : IClassFixture<WebApplicationFactor
         return client;
     }
 
-    private async Task<HttpClient> CreateSignedInMemberClientAsync(string email, string displayName, string subject)
+    private Task<HttpClient> CreateSignedInMemberClientAsync(string email, string displayName, string subject) =>
+        CreateSignedInMemberClientAsync(factory, email, displayName, subject);
+
+    private static async Task<HttpClient> CreateSignedInMemberClientAsync(
+        WebApplicationFactory<Program> host, string email, string displayName, string subject)
     {
-        var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        var client = host.CreateClient(new WebApplicationFactoryClientOptions
         {
             HandleCookies = true,
             AllowAutoRedirect = false,
@@ -299,12 +426,22 @@ public sealed class AdminMembersRoutesTests : IClassFixture<WebApplicationFactor
         return client;
     }
 
-    private async Task<Guid> GetMemberIdForEmailAsync(string email)
+    private async Task<Guid> GetMemberIdForEmailAsync(string email) =>
+        await GetMemberIdForEmailAsync(factory, email);
+
+    private static async Task<Guid> GetMemberIdForEmailAsync(WebApplicationFactory<Program> host, string email)
     {
-        var members = factory.Services.GetRequiredService<IMemberAccountRepository>();
+        var members = host.Services.GetRequiredService<IMemberAccountRepository>();
         var account = await members.FindByEmailAsync(email);
         Assert.NotNull(account);
         return account!.Id;
+    }
+
+    private async Task<Guid> CreateMemberAsync(
+        WebApplicationFactory<Program> host, string email, string displayName, string subject)
+    {
+        await CreateSignedInMemberClientAsync(host, email, displayName, subject);
+        return await GetMemberIdForEmailAsync(host, email);
     }
 
     private static string ExtractAntiforgeryToken(string html)
@@ -313,5 +450,98 @@ public sealed class AdminMembersRoutesTests : IClassFixture<WebApplicationFactor
             html, """name="__RequestVerificationToken"[^>]*value="(?<token>[^"]+)""");
         Assert.True(match.Success, "Antiforgery token was not found in the form.");
         return match.Groups["token"].Value;
+    }
+
+    private sealed class TimeoutHideForumWriteRepository(
+        IForumWriteRepository inner,
+        Exception timeout) : IForumWriteRepository
+    {
+        public Task<ForumThreadCreateResult> CreateThreadAsync(
+            NewForumThread thread, CancellationToken cancellationToken = default) =>
+            inner.CreateThreadAsync(thread, cancellationToken);
+
+        public Task<int> CreatePostAsync(NewForumPost post, CancellationToken cancellationToken = default) =>
+            inner.CreatePostAsync(post, cancellationToken);
+
+        public Task<ForumEditablePost?> GetPostAsync(int postId, CancellationToken cancellationToken = default) =>
+            inner.GetPostAsync(postId, cancellationToken);
+
+        public Task<ForumPostUpdateResult> UpdatePostAsync(
+            int postId,
+            Guid editorMemberId,
+            string sanitisedBody,
+            bool isAdmin,
+            int editWindowMinutes,
+            DateTimeOffset? expectedUpdatedAt = null,
+            CancellationToken cancellationToken = default) =>
+            inner.UpdatePostAsync(
+                postId, editorMemberId, sanitisedBody, isAdmin, editWindowMinutes, expectedUpdatedAt, cancellationToken);
+
+        public Task<ForumWriteThread?> GetThreadAsync(int topicId, CancellationToken cancellationToken = default) =>
+            inner.GetThreadAsync(topicId, cancellationToken);
+
+        public Task<int> CountPostsByMemberSinceAsync(
+            Guid memberId, DateTimeOffset since, CancellationToken cancellationToken = default) =>
+            inner.CountPostsByMemberSinceAsync(memberId, since, cancellationToken);
+
+        public Task<int> CountApprovedPostsByMemberAsync(
+            Guid memberId, CancellationToken cancellationToken = default) =>
+            inner.CountApprovedPostsByMemberAsync(memberId, cancellationToken);
+
+        public Task<ForumAuthorContentSummary> GetAuthorForumContentSummaryAsync(
+            Guid? memberId, string displayName, CancellationToken cancellationToken = default) =>
+            inner.GetAuthorForumContentSummaryAsync(memberId, displayName, cancellationToken);
+
+        public Task<ForumAuthorContentSummary?> FindNoAccountForumAuthorAsync(
+            string displayName, CancellationToken cancellationToken = default) =>
+            inner.FindNoAccountForumAuthorAsync(displayName, cancellationToken);
+
+        public Task HideAuthorForumContentAsync(
+            Guid? memberId, string displayName, CancellationToken cancellationToken = default) =>
+            throw timeout;
+
+        public Task UnhideAuthorForumContentAsync(
+            Guid? memberId, string displayName, CancellationToken cancellationToken = default) =>
+            inner.UnhideAuthorForumContentAsync(memberId, displayName, cancellationToken);
+
+        public Task<int> EnsureCategoryAsync(
+            string slug, string name, CancellationToken cancellationToken = default) =>
+            inner.EnsureCategoryAsync(slug, name, cancellationToken);
+    }
+
+    private sealed class ThrowingRevokeMobileAuthGrantRepository : IMobileAuthGrantRepository
+    {
+        public Task StoreAuthorizationCodeAsync(
+            QueenZone.Data.Entities.MobileAuthAuthorizationCodeEntity code,
+            CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
+        public Task<QueenZone.Data.Entities.MobileAuthAuthorizationCodeEntity?> RedeemAuthorizationCodeAsync(
+            string codeHash,
+            DateTime utcNow,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<QueenZone.Data.Entities.MobileAuthAuthorizationCodeEntity?>(null);
+
+        public Task StoreRefreshTokenAsync(
+            QueenZone.Data.Entities.MobileAuthRefreshTokenEntity token,
+            CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
+        public Task<QueenZone.Data.Entities.MobileAuthRefreshTokenEntity?> FindRefreshTokenByHashAsync(
+            string tokenHash,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<QueenZone.Data.Entities.MobileAuthRefreshTokenEntity?>(null);
+
+        public Task<bool> TryRevokeRefreshTokenAsync(
+            string tokenHash,
+            DateTime utcNow,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(false);
+
+        public Task<int> RevokeAllRefreshTokensForMemberAsync(
+            Guid memberAccountId,
+            DateTime utcNow,
+            CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("token store unavailable");
     }
 }

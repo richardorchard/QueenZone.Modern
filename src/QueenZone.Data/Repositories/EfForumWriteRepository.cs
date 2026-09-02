@@ -354,17 +354,18 @@ public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForu
         CancellationToken cancellationToken = default)
     {
         var name = displayName.Trim();
-        var startedThreadIds = await StartedThreadIds(memberId, name, cancellationToken);
 
-        await dbContext.ModernForumThreads
-            .Where(thread => startedThreadIds.Contains(thread.Id) && !thread.IsHidden)
+        // Set-based UPDATEs by AuthorMemberId (plus unlinked exact-name posts). Do not
+        // materialize starter ids and .Contains() them — that IN-list plan timed out on
+        // the 1M+ post archive. Do not refresh all forum read stats here: that full
+        // MERGE belongs after import/reconciliation, not on an admin POST.
+        await StartedAuthorThreads(memberId, name)
+            .Where(thread => !thread.IsHidden)
             .ExecuteUpdateAsync(setters => setters.SetProperty(thread => thread.IsHidden, true), cancellationToken);
 
         await AuthorPosts(memberId, name)
             .Where(post => !post.IsHidden)
             .ExecuteUpdateAsync(setters => setters.SetProperty(post => post.IsHidden, true), cancellationToken);
-
-        await RefreshReadStatsIfSqlServerAsync(cancellationToken);
     }
 
     public async Task UnhideAuthorForumContentAsync(
@@ -373,17 +374,14 @@ public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForu
         CancellationToken cancellationToken = default)
     {
         var name = displayName.Trim();
-        var startedThreadIds = await StartedThreadIds(memberId, name, cancellationToken);
 
-        await dbContext.ModernForumThreads
-            .Where(thread => startedThreadIds.Contains(thread.Id) && thread.IsHidden)
+        await StartedAuthorThreads(memberId, name)
+            .Where(thread => thread.IsHidden)
             .ExecuteUpdateAsync(setters => setters.SetProperty(thread => thread.IsHidden, false), cancellationToken);
 
         await AuthorPosts(memberId, name)
             .Where(post => post.IsHidden)
             .ExecuteUpdateAsync(setters => setters.SetProperty(post => post.IsHidden, false), cancellationToken);
-
-        await RefreshReadStatsIfSqlServerAsync(cancellationToken);
     }
 
     // SQL Server's column collation (SQL_Latin1_General_CP1_CI_AS) is already case-insensitive
@@ -412,12 +410,21 @@ public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForu
             : post.AuthorMemberId == null && post.AuthorDisplayName.ToUpper() == normalizedName);
     }
 
+    // Threads this author started: their AuthorMemberId (or unlinked exact-name) post is
+    // the starter. Composed as IQueryable so hide/unhide stay one set-based UPDATE.
+    private IQueryable<ModernForumThreadEntity> StartedAuthorThreads(Guid? memberId, string displayName) =>
+        dbContext.ModernForumThreads.Where(thread =>
+            AuthorPosts(memberId, displayName).Any(post =>
+                post.ThreadId == thread.Id
+                && !dbContext.ModernForumPosts.Any(earlier =>
+                    earlier.ThreadId == post.ThreadId && earlier.LegacyPostId < post.LegacyPostId)));
+
     // Materializes each stage instead of composing one deeply nested query: embedding these
     // correlated-subquery-heavy pieces via .Contains() against unmaterialized IQueryables (as
     // before) let SQL Server's optimizer fall back to a plan that re-scanned the 1M+ row forum
     // archive per candidate, timing out on the production database. Running each stage as its
     // own simple, sargable query and combining the (small) id lists in memory keeps every
-    // individual query fast.
+    // individual query fast. Used by the summary read path only — hide/unhide must not use this.
     private async Task<IReadOnlyList<long>> StartedThreadIds(
         Guid? memberId, string displayName, CancellationToken cancellationToken)
     {
@@ -450,11 +457,6 @@ public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForu
 
         return matchingStarterThreadIds.Union(unlinkedStarterThreadIds).ToList();
     }
-
-    private Task RefreshReadStatsIfSqlServerAsync(CancellationToken cancellationToken) =>
-        dbContext.Database.IsSqlServer()
-            ? dbContext.Database.ExecuteSqlRawAsync("EXEC dbo.ModernForum_RefreshReadStats;", cancellationToken)
-            : Task.CompletedTask;
 
     private async Task<int> AllocateNextTopicIdAsync(CancellationToken cancellationToken) =>
         await AllocateNextLegacyIdAsync(
