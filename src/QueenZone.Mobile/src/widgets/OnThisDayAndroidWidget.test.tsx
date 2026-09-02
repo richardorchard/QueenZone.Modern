@@ -145,7 +145,7 @@ describe('OnThisDayAndroidWidget', () => {
     expect(screen.queryByText('Queen released The Game.')).toBeNull();
     expect(
       screen.getByTestId(
-        `tw:${allThree.triviaText}:${WIDGET_QUOTE_MAX_LINES}:${WIDGET_QUOTE_MAX_PT_SMALL}`,
+        `tw:${allThree.triviaText}:${WIDGET_QUOTE_MAX_LINES}:${widgetPrimaryFontSize(allThree.triviaText, 'small')}`,
       ),
     ).toBeOnTheScreen();
   });
