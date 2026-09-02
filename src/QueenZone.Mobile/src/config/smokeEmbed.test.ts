@@ -3,10 +3,12 @@ import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 import { createRequire } from 'node:module';
 
+type EnvBag = Record<string, string | undefined>;
+
 const require = createRequire(import.meta.url);
 const smokeEmbed = require('../../plugins/smokeEmbed.cjs') as {
-  isSmokeEmbedEnabled: (env?: NodeJS.ProcessEnv) => boolean;
-  filterExpoPluginsForSmokeEmbed: (plugins: unknown[], env?: NodeJS.ProcessEnv) => unknown[];
+  isSmokeEmbedEnabled: (env?: EnvBag) => boolean;
+  filterExpoPluginsForSmokeEmbed: (plugins: unknown[], env?: EnvBag) => unknown[];
   smokeEmbedAutolinking: () => { exclude: string[] };
   applyAndroidBundleInDebug: (contents: string) => string;
   DEV_CLIENT_PACKAGES: string[];

@@ -15,8 +15,11 @@ const {
   smokeEmbedAutolinking,
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- CJS loaded by Expo, not Metro.
 } = require('./plugins/smokeEmbed.cjs') as {
-  filterExpoPluginsForSmokeEmbed: (plugins: ExpoConfig['plugins'], env?: NodeJS.ProcessEnv) => ExpoConfig['plugins'];
-  isSmokeEmbedEnabled: (env?: NodeJS.ProcessEnv) => boolean;
+  filterExpoPluginsForSmokeEmbed: (
+    plugins: ExpoConfig['plugins'],
+    env?: Record<string, string | undefined>,
+  ) => ExpoConfig['plugins'];
+  isSmokeEmbedEnabled: (env?: Record<string, string | undefined>) => boolean;
   smokeEmbedAutolinking: () => { exclude: string[] };
 };
 
