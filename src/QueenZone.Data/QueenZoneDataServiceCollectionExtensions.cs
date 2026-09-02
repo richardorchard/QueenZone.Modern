@@ -73,6 +73,7 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddScoped<IAdminQueenHistoryRepository, EfAdminQueenHistoryRepository>();
         services.AddScoped<IPhotoSubmissionRepository, EfPhotoSubmissionRepository>();
         services.AddScoped<IArticleSubmissionRepository, EfArticleSubmissionRepository>();
+        services.AddScoped<IEditorialArticleRepository, EfEditorialArticleRepository>();
         services.AddScoped<IArticleRepository, EfArticleRepository>();
         services.AddScoped<INewsSuggestionRepository, EfNewsSuggestionRepository>();
         services.AddScoped<IHelpRequestRepository, EfHelpRequestRepository>();
@@ -105,7 +106,7 @@ public static class QueenZoneDataServiceCollectionExtensions
         var store = new SharedNewsStore(SampleNewsData.CreateSeedArticles());
         services.AddSingleton(store);
         services.AddSingleton<INewsRepository, InMemoryNewsRepository>();
-        services.AddSingleton<IArticlesRepository>(_ => new InMemoryArticlesRepository(SampleArticlesData.CreateSeedArticles()));
+        services.AddSingleton<IArticlesRepository>(sp => new InMemoryArticlesRepository(SampleArticlesData.CreateSeedArticles(), sp.GetRequiredService<IEditorialArticleRepository>()));
         var biographyStore = new SharedBiographyStore(SampleBiographyData.CreateSeedChapters());
         services.AddSingleton(biographyStore);
         services.AddSingleton<IBiographyRepository>(_ => new InMemoryBiographyRepository(biographyStore));
@@ -193,8 +194,10 @@ public static class QueenZoneDataServiceCollectionExtensions
             return new InMemoryArticleSubmissionRepository(id =>
                 members.FindByIdAsync(id).GetAwaiter().GetResult());
         });
+        services.AddSingleton<IEditorialArticleRepository>(sp =>
+            new InMemoryEditorialArticleRepository(sp.GetService<TimeProvider>()));
         services.AddSingleton<IArticleRepository>(sp =>
-            new InMemoryArticleRepository(sp.GetRequiredService<IArticleSubmissionRepository>()));
+            new InMemoryArticleRepository(sp.GetRequiredService<IArticleSubmissionRepository>(), sp.GetRequiredService<IEditorialArticleRepository>()));
         services.AddSingleton<IMemberPublicActivityRepository, InMemoryMemberPublicActivityRepository>();
         services.AddSingleton<ILinksRepository>(_ => new InMemoryLinksRepository(SampleLinksData.CreateSeedCategories()));
         services.AddSingleton(_ => new SharedFreddieTributeStore(SampleFreddieTributeData.CreateSeedTributes()));

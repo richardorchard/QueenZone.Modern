@@ -3,8 +3,18 @@
 @using QueenZone.Data
 
 <div class="admin-shell">
-  <h1>Article submissions</h1>
+  <h1>Articles</h1>
   <p><a href="/admin">Admin home</a></p>
+  <p><a class="qz-button" href="/admin/articles/editor">Create article</a></p>
+
+  <h2>Editorial articles and edits</h2>
+  @if (Model.EditorialArticles.Count == 0) { <p>No editorial drafts or edits.</p> }
+  else { <table class="admin-table"><thead><tr><th>Title</th><th>Author</th><th>Category</th><th>Status</th><th>Updated</th></tr></thead><tbody>@foreach (var article in Model.EditorialArticles) { <tr><td><a href="/admin/articles/editor/@article.Id">@article.Title</a></td><td>@article.AuthorName</td><td>@article.Category</td><td>@article.Status</td><td>@article.UpdatedAt.ToString("yyyy-MM-dd HH:mm")</td></tr> }</tbody></table> }
+
+  <h2>Published archive</h2>
+  <table class="admin-table"><thead><tr><th>Title</th><th>Category</th><th>Published</th><th></th></tr></thead><tbody>@foreach (var article in Model.LegacyArticles) { <tr><td>@article.Title</td><td>@article.CategoryName</td><td>@article.PublishedAt.ToString("yyyy-MM-dd")</td><td><a href="/admin/articles/editor?legacyId=@article.Id">Edit</a></td></tr> }</tbody></table>
+
+  <h2>Member submissions</h2>
 
   @if (Model.Submissions.Count == 0)
   {

@@ -70,6 +70,202 @@ public sealed partial class ArticleSubmitRoutesTests : IClassFixture<WebApplicat
     }
 
     [Fact]
+    public async Task AdminArticles_shows_unified_editor_submission_and_archive_sections()
+    {
+        var body = await CreateAdminClient(AdminEmail).GetStringAsync("/admin/articles");
+        Assert.Contains("Create article", body);
+        Assert.Contains("Editorial articles and edits", body);
+        Assert.Contains("Member submissions", body);
+        Assert.Contains("Published archive", body);
+    }
+
+    [Fact]
+    public async Task Admin_editor_reuses_rich_text_gallery_and_three_by_two_crop()
+    {
+        var body = await CreateAdminClient(AdminEmail).GetStringAsync("/admin/articles/editor");
+        Assert.Contains("class=\"qz-rte\"", body);
+        Assert.Contains("Choose from gallery", body);
+        Assert.Contains("data-aspect-width=\"3\"", body);
+        Assert.Contains("data-aspect-height=\"2\"", body);
+        Assert.Contains("Author", body);
+        Assert.Contains("Category", body);
+        Assert.Contains("Tags", body);
+    }
+
+    [Fact]
+    public async Task Admin_can_create_preview_publish_and_read_editorial_article()
+    {
+        var client = CreateAdminClient(AdminEmail);
+        var response = await AdminHttpTestHelpers.PostArticleAsync(client, "/admin/articles/editor", "/admin/articles/editor", new()
+        {
+            ["Form.Title"] = "A night at the opera",
+            ["Form.Slug"] = "a-night-at-the-opera-editorial",
+            ["Form.Excerpt"] = "A detailed editorial feature.",
+            ["Form.Body"] = "<p>This is the complete article body.</p>",
+            ["Form.AuthorName"] = "Richard Orchard",
+            ["Form.Category"] = "Features",
+            ["Form.Tags"] = "queen,albums",
+            ["Form.PublishedAt"] = "2026-09-01",
+        });
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        var editPath = response.Headers.Location!.OriginalString;
+        var id = Guid.Parse(editPath.Split('/').Last());
+
+        var editBody = await client.GetStringAsync(editPath);
+        var token = AdminHttpTestHelpers.ExtractAntiforgeryToken(editBody);
+        var publish = await client.PostAsync($"/admin/articles/editor/{id}/status", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = token,
+            ["status"] = EditorialArticleStatus.Published,
+        }));
+        Assert.Equal(HttpStatusCode.Redirect, publish.StatusCode);
+
+        var publicBody = await factory.CreateClient().GetStringAsync("/articles/a-night-at-the-opera-editorial");
+        Assert.Contains("A night at the opera", publicBody);
+        Assert.Contains("Richard Orchard", publicBody);
+        Assert.Contains("This is the complete article body", publicBody);
+        var homeBody = await factory.CreateClient().GetStringAsync("/");
+        Assert.Contains("A night at the opera", homeBody);
+        Assert.Contains("/articles/a-night-at-the-opera-editorial", homeBody);
+
+        token = AdminHttpTestHelpers.ExtractAntiforgeryToken(await client.GetStringAsync(editPath));
+        await client.PostAsync($"/admin/articles/editor/{id}/status", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = token,
+            ["status"] = EditorialArticleStatus.Unpublished,
+        }));
+        var afterUnpublishSave = await AdminHttpTestHelpers.PostArticleAsync(client, editPath, editPath, new()
+        {
+            ["Form.Title"] = "Working copy after unpublish",
+            ["Form.Slug"] = "working-copy-after-unpublish",
+            ["Form.Excerpt"] = "A detailed editorial feature.",
+            ["Form.Body"] = "<p>This is the complete article body.</p>",
+            ["Form.AuthorName"] = "Richard Orchard",
+            ["Form.Category"] = "Features",
+            ["Form.Tags"] = "queen,albums",
+            ["Form.PublishedAt"] = "2026-09-01",
+        });
+        Assert.Equal(HttpStatusCode.Redirect, afterUnpublishSave.StatusCode);
+        var hiddenAfterSave = await factory.CreateClient().GetAsync("/articles/a-night-at-the-opera-editorial");
+        var hiddenWorkingCopy = await factory.CreateClient().GetAsync("/articles/working-copy-after-unpublish");
+        Assert.Equal(HttpStatusCode.NotFound, hiddenAfterSave.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, hiddenWorkingCopy.StatusCode);
+    }
+
+    [Fact]
+    public async Task Admin_can_draft_and_publish_legacy_article_without_changing_its_id()
+    {
+        using var isolated = factory.WithWebHostBuilder(_ => { });
+        var admin = AdminHttpTestHelpers.CreateClient(isolated, AdminEmail);
+        var formPath = "/admin/articles/editor?legacyId=101";
+        var response = await AdminHttpTestHelpers.PostArticleAsync(admin, formPath, "/admin/articles/editor", new()
+        {
+            ["Form.LegacyArticleId"] = "101",
+            ["Form.Title"] = "Edited Bohemian Rhapsody feature",
+            ["Form.Slug"] = "edited-bohemian-rhapsody-feature",
+            ["Form.Excerpt"] = "Updated archive excerpt.",
+            ["Form.Body"] = "<p>Updated archive article body.</p>",
+            ["Form.AuthorName"] = "Archive Editor",
+            ["Form.Category"] = "Features",
+            ["Form.Source"] = "https://example.test/archive-source",
+            ["Form.PublishedAt"] = "2026-08-31",
+        });
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        var editPath = response.Headers.Location!.OriginalString;
+        var id = Guid.Parse(editPath.Split('/').Last());
+
+        var beforePublish = await isolated.CreateClient().GetStringAsync("/articles/101/inside-the-making-of-bohemian-rhapsody");
+        Assert.DoesNotContain("Updated archive article body", beforePublish);
+
+        var token = AdminHttpTestHelpers.ExtractAntiforgeryToken(await admin.GetStringAsync(editPath));
+        await admin.PostAsync($"/admin/articles/editor/{id}/status", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = token,
+            ["status"] = EditorialArticleStatus.Published,
+        }));
+
+        var afterPublish = await isolated.CreateClient().GetStringAsync("/articles/101/edited-bohemian-rhapsody-feature");
+        Assert.Contains("Updated archive article body", afterPublish);
+        Assert.Contains("https://example.test/archive-source", afterPublish);
+        Assert.Contains("Archive Editor", afterPublish);
+
+        var searchStore = isolated.Services.GetRequiredService<SharedSearchIndexStore>();
+        Assert.Contains(
+            searchStore.GetAll(),
+            document => document.SourceKey == "legacy-article:101"
+                && document.Title == "Edited Bohemian Rhapsody feature");
+
+        token = AdminHttpTestHelpers.ExtractAntiforgeryToken(await admin.GetStringAsync(editPath));
+        var unpublish = await admin.PostAsync($"/admin/articles/editor/{id}/status", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = token,
+            ["status"] = EditorialArticleStatus.Unpublished,
+        }));
+        Assert.Equal(HttpStatusCode.Redirect, unpublish.StatusCode);
+        var hidden = await isolated.CreateClient().GetAsync("/articles/101/edited-bohemian-rhapsody-feature");
+        Assert.Equal(HttpStatusCode.NotFound, hidden.StatusCode);
+        Assert.DoesNotContain(searchStore.GetAll(), document => document.SourceKey == "legacy-article:101");
+    }
+
+    [Fact]
+    public async Task Admin_prepare_edit_and_publish_member_submission()
+    {
+        using var isolated = factory.WithWebHostBuilder(_ => { });
+        var member = await CreateSignedInMemberClientAsync(
+            email: "article-prepare@example.com",
+            displayName: "Prepare Author",
+            subject: "google-article-prepare",
+            options: new WebApplicationFactoryClientOptions
+            {
+                HandleCookies = true,
+                AllowAutoRedirect = false,
+            },
+            sourceFactory: isolated);
+        var submissionId = await SubmitArticleAsync(member, "Prepared member feature", "prepared-member-feature", isolated);
+
+        var admin = AdminHttpTestHelpers.CreateClient(isolated, AdminEmail);
+        var review = await admin.GetStringAsync($"/admin/articles/{submissionId:D}");
+        Assert.Contains("Edit and prepare article", review);
+
+        var prepare = await admin.PostAsync(
+            $"/admin/articles/{submissionId:D}?handler=Prepare",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(review),
+            }));
+        Assert.Equal(HttpStatusCode.Redirect, prepare.StatusCode);
+        var editPath = prepare.Headers.Location!.OriginalString;
+        Assert.StartsWith("/admin/articles/editor/", editPath);
+
+        var save = await AdminHttpTestHelpers.PostArticleAsync(admin, editPath, editPath, new()
+        {
+            ["Form.Title"] = "Prepared member feature",
+            ["Form.Slug"] = "prepared-member-feature",
+            ["Form.Excerpt"] = "Edited excerpt from the unified editor.",
+            ["Form.Body"] = "<p>" + MinBody() + "</p>",
+            ["Form.AuthorName"] = "Prepare Author",
+            ["Form.Category"] = "Feature",
+            ["Form.Tags"] = "prepared",
+            ["Form.PublishedAt"] = "2026-09-01",
+        });
+        Assert.Equal(HttpStatusCode.Redirect, save.StatusCode);
+
+        var editorId = Guid.Parse(editPath.Split('/').Last());
+        var token = AdminHttpTestHelpers.ExtractAntiforgeryToken(await admin.GetStringAsync(editPath));
+        var publish = await admin.PostAsync($"/admin/articles/editor/{editorId}/status", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = token,
+            ["status"] = EditorialArticleStatus.Published,
+        }));
+        Assert.Equal(HttpStatusCode.Redirect, publish.StatusCode);
+
+        var publicBody = await isolated.CreateClient().GetStringAsync("/articles/prepared-member-feature");
+        Assert.Contains("Prepared member feature", publicBody);
+        Assert.Contains("Prepare Author", publicBody);
+        Assert.Contains("Edited excerpt from the unified editor.", publicBody);
+    }
+
+    [Fact]
     public async Task PostAutosave_Returns403_WithoutAntiforgery()
     {
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions

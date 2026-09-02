@@ -17,11 +17,13 @@ public sealed class EfArticlesRepository : IArticlesRepository
     private readonly string archivePageSql;
     private readonly string byIdSql;
     private readonly string sitemapSql;
+    private readonly IEditorialArticleRepository? editorialArticles;
 
     [ExcludeFromCodeCoverage]
-    public EfArticlesRepository(QueenZoneDbContext dbContext)
+    public EfArticlesRepository(QueenZoneDbContext dbContext, IEditorialArticleRepository editorialArticles)
     {
         this.dbContext = dbContext;
+        this.editorialArticles = editorialArticles;
         (latestSql, countSql, archivePageSql, byIdSql, sitemapSql) = EfProductionSql.CreateArticlesQueries();
     }
 
@@ -35,7 +37,8 @@ public sealed class EfArticlesRepository : IArticlesRepository
         string countSql,
         string archivePageSql,
         string byIdSql,
-        string sitemapSql)
+        string sitemapSql,
+        IEditorialArticleRepository? editorialArticles = null)
     {
         this.dbContext = dbContext;
         this.latestSql = latestSql;
@@ -43,6 +46,7 @@ public sealed class EfArticlesRepository : IArticlesRepository
         this.archivePageSql = archivePageSql;
         this.byIdSql = byIdSql;
         this.sitemapSql = sitemapSql;
+        this.editorialArticles = editorialArticles;
     }
 
     public async Task<IReadOnlyList<ArticleItem>> GetLatestAsync(int count, CancellationToken cancellationToken = default)
@@ -51,7 +55,7 @@ public sealed class EfArticlesRepository : IArticlesRepository
         var rows = await dbContext.Database
             .SqlQueryRaw<ArticleRow>(latestSql, take)
             .ToListAsync(cancellationToken);
-        return rows.Select(MapList).ToList();
+        return await ApplyOverlaysAsync(rows.Select(MapList).ToList(), cancellationToken);
     }
 
     public async Task<int> GetPublishedCountAsync(CancellationToken cancellationToken = default)
@@ -60,7 +64,9 @@ public sealed class EfArticlesRepository : IArticlesRepository
         var values = await dbContext.Database
             .SqlQueryRaw<int>(countSql)
             .ToListAsync(cancellationToken);
-        return values.FirstOrDefault();
+        if (editorialArticles is null) return values.FirstOrDefault();
+        var hidden = (await editorialArticles.GetAllAsync(cancellationToken)).Count(x => x.LegacyArticleId is not null && x.HasPublishedVersion && x.Status == EditorialArticleStatus.Unpublished);
+        return Math.Max(0, values.FirstOrDefault() - hidden);
     }
 
     public async Task<IReadOnlyList<ArticleItem>> GetArchivePageAsync(
@@ -74,7 +80,7 @@ public sealed class EfArticlesRepository : IArticlesRepository
         var rows = await dbContext.Database
             .SqlQueryRaw<ArticleRow>(archivePageSql, offset, take)
             .ToListAsync(cancellationToken);
-        return rows.Select(MapList).ToList();
+        return await ApplyOverlaysAsync(rows.Select(MapList).ToList(), cancellationToken);
     }
 
     public async Task<ArticleItem?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
@@ -83,14 +89,23 @@ public sealed class EfArticlesRepository : IArticlesRepository
             .SqlQueryRaw<ArticleRow>(byIdSql, id)
             .ToListAsync(cancellationToken);
         var row = rows.FirstOrDefault();
-        return row is null ? null : MapDetail(row);
+        if (row is null) return null;
+        return (await ApplyOverlaysAsync([MapDetail(row)], cancellationToken)).SingleOrDefault();
     }
 
     public async Task<IReadOnlyList<SitemapContentEntry>> GetPublishedSitemapEntriesAsync(
-        CancellationToken cancellationToken = default) =>
-        await dbContext.Database
+        CancellationToken cancellationToken = default)
+    {
+        var rows = await dbContext.Database
             .SqlQueryRaw<SitemapContentEntry>(sitemapSql)
             .ToListAsync(cancellationToken);
+        if (editorialArticles is null) return rows;
+        var overlays = await editorialArticles.GetPublishedLegacyOverlaysAsync(rows.Select(x => x.Id), cancellationToken);
+        return rows.Where(row => !overlays.TryGetValue(row.Id, out var edit) || edit.Status != EditorialArticleStatus.Unpublished)
+            .Select(row => overlays.TryGetValue(row.Id, out var edit)
+                ? new SitemapContentEntry(row.Id, edit.Title, edit.PublishedAt.UtcDateTime)
+                : row).ToList();
+    }
 
     /// <summary>
     /// List/archive mapping: derive excerpt from optional body preview; never keep full body on list items.
@@ -117,6 +132,15 @@ public sealed class EfArticlesRepository : IArticlesRepository
             row.Source,
             row.CategoryName,
             row.IsPublished);
+
+    private async Task<IReadOnlyList<ArticleItem>> ApplyOverlaysAsync(IReadOnlyList<ArticleItem> items, CancellationToken ct)
+    {
+        if (editorialArticles is null || items.Count == 0) return items;
+        var overlays = await editorialArticles.GetPublishedLegacyOverlaysAsync(items.Select(x => x.Id), ct);
+        return items.Where(item => !overlays.TryGetValue(item.Id, out var edit) || edit.Status != EditorialArticleStatus.Unpublished).Select(item => overlays.TryGetValue(item.Id, out var edit)
+            ? item with { Title = edit.Title, Excerpt = edit.Excerpt, Body = string.IsNullOrEmpty(item.Body) ? string.Empty : edit.Body, PublishedAt = edit.PublishedAt.UtcDateTime, Source = edit.Source, CategoryName = edit.Category, ImageBlobKey = edit.ImageBlobKey, AuthorName = edit.AuthorName, Tags = edit.Tags }
+            : item).ToList();
+    }
 
     internal sealed class ArticleRow
     {

@@ -8,4 +8,7 @@ public sealed record ArticleItem(
     DateTime PublishedAt,
     string? Source,
     string? CategoryName,
-    bool IsPublished);
+    bool IsPublished,
+    string? ImageBlobKey = null,
+    string? AuthorName = null,
+    string? Tags = null);
