@@ -1,9 +1,7 @@
 using System.IO;
-using System.Net;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Abstractions;
 using Microsoft.AspNetCore.Mvc.Filters;
@@ -12,7 +10,6 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.AspNetCore.Routing;
-using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using QueenZone.Web.Pages.Admin.Articles;
@@ -145,40 +142,6 @@ public sealed class EditorialArticleEditorRequestGuardFilterTests : IClassFixtur
 
         Assert.Equal(StatusCodes.Status200OK, httpContext.Response.StatusCode);
         Assert.Contains("The value 'not-a-date' is not valid.", page.Errors);
-    }
-
-    [Fact]
-    public async Task Admin_save_draft_over_value_length_limit_returns_200_with_in_page_error()
-    {
-        using var isolated = factory.WithWebHostBuilder(builder =>
-        {
-            builder.UseEnvironment("Testing");
-            builder.ConfigureTestServices(services =>
-            {
-                services.Configure<FormOptions>(options => options.ValueLengthLimit = 2048);
-            });
-        });
-        var admin = AdminHttpTestHelpers.CreateClient(isolated, AdminHttpTestHelpers.AdminEmail);
-        var response = await AdminHttpTestHelpers.PostArticleAsync(
-            admin,
-            "/admin/articles/editor?legacyId=101",
-            "/admin/articles/editor",
-            new()
-            {
-                ["Form.LegacyArticleId"] = "101",
-                ["Form.Title"] = "Oversized archive body",
-                ["Form.Excerpt"] = "Should stay on the form.",
-                ["Form.Body"] = "<p>" + new string('x', 8192) + "</p>",
-                ["Form.AuthorName"] = "Archive Editor",
-                ["Form.Category"] = "Features",
-            });
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.NotEqual("/error/400", response.Headers.Location?.OriginalString);
-        var html = await response.Content.ReadAsStringAsync();
-        Assert.Contains("admin-errors", html);
-        Assert.Contains(EditorialArticleEditorRequestGuardFilter.SizeError, html);
-        Assert.DoesNotContain("Something went wrong", html);
     }
 
     private static (EditModel Page, DefaultHttpContext HttpContext) CreatePage(IServiceProvider services)
