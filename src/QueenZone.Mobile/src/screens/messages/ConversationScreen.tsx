@@ -10,6 +10,7 @@ import {
   View,
   type ListRenderItem,
 } from 'react-native';
+import { useHeaderHeight } from '@react-navigation/elements';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MoreHorizontal } from 'lucide-react-native';
@@ -54,6 +55,7 @@ export function ConversationScreen({ navigation, route }: Props) {
 function ConversationThread({ navigation, route }: Props) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
+  const headerHeight = useHeaderHeight();
   const { accessToken, profile } = useSession();
   const listRef = useRef<FlatList<ThreadListItem<DisplayMessage>>>(null);
   const conversationId = parseConversationId(route.params.id);
@@ -171,6 +173,7 @@ function ConversationThread({ navigation, route }: Props) {
     <KeyboardAvoidingView
       style={[styles.flex, { backgroundColor: c.surfacePage }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight : 0}
     >
       <FlatList
         ref={listRef}

@@ -1,5 +1,5 @@
-import { memo, useCallback, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { memo, useCallback, useEffect, useState } from 'react';
+import { Keyboard, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ApiError } from '../../api/client';
 import { fonts, palette, radius, space, type, useTheme } from '../../theme';
@@ -22,6 +22,21 @@ type Props = {
 };
 
 /**
+ * Home-indicator inset stays when the keyboard is closed. On iOS, drop it
+ * while the keyboard is open so it does not stack on KeyboardAvoidingView
+ * padding. Android keeps the safe-area inset (adjustResize).
+ */
+export function conversationComposerPaddingBottom(
+  insetBottom: number,
+  keyboardOpen: boolean,
+): number {
+  if (Platform.OS === 'ios' && keyboardOpen) {
+    return space.md;
+  }
+  return Math.max(insetBottom, space.md);
+}
+
+/**
  * Owns reply-draft state so keystrokes never re-render the conversation list.
  */
 export const ConversationComposer = memo(function ConversationComposer({
@@ -36,9 +51,23 @@ export const ConversationComposer = memo(function ConversationComposer({
 }: Props) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
   const [draft, setDraft] = useState('');
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (Platform.OS !== 'ios') {
+      return;
+    }
+
+    const show = Keyboard.addListener('keyboardWillShow', () => setKeyboardOpen(true));
+    const hide = Keyboard.addListener('keyboardWillHide', () => setKeyboardOpen(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
 
   const submit = useCallback(async () => {
     const validation = validateReplyBody(draft);
@@ -66,7 +95,7 @@ export const ConversationComposer = memo(function ConversationComposer({
         {
           borderTopColor: c.hairline,
           backgroundColor: c.surfacePage,
-          paddingBottom: Math.max(insets.bottom, space.md),
+          paddingBottom: conversationComposerPaddingBottom(insets.bottom, keyboardOpen),
         },
       ]}
     >

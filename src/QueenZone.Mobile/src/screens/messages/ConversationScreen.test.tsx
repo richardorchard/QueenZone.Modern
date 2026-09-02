@@ -1,5 +1,6 @@
-import { Alert, RefreshControl } from 'react-native';
-import { fireEvent, screen, userEvent, waitFor } from '@testing-library/react-native';
+import { HeaderHeightContext } from '@react-navigation/elements';
+import { Alert, FlatList, Keyboard, KeyboardAvoidingView, Platform, RefreshControl } from 'react-native';
+import { act, fireEvent, screen, userEvent, waitFor } from '@testing-library/react-native';
 import { ApiError } from '../../api/client';
 import type { CachedResult } from '../../api';
 import {
@@ -16,6 +17,7 @@ import { conversationDetailFixture, memberProfileFixture } from '../../test/fixt
 import { testIds } from '../../test/testIds';
 import { createMockSession } from '../../test/mockSession';
 import { fakeNavigation, flushVirtualizedList, renderWithProviders } from '../../test/render';
+import { space } from '../../theme';
 import { ConversationScreen, messageBubbleRenderProbe } from './ConversationScreen';
 
 const conversationId = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
@@ -76,12 +78,16 @@ const blockConversationParticipantMock = blockConversationParticipant as jest.Mo
   typeof blockConversationParticipant
 >;
 
-function renderConversation() {
+const conversationHeaderHeight = 96;
+
+function renderConversation(navigation = fakeNavigation()) {
   return renderWithProviders(
-    <ConversationScreen
-      navigation={fakeNavigation() as never}
-      route={{ key: 'conversation', name: 'Conversation', params: { id: conversationId } } as never}
-    />,
+    <HeaderHeightContext.Provider value={conversationHeaderHeight}>
+      <ConversationScreen
+        navigation={navigation as never}
+        route={{ key: 'conversation', name: 'Conversation', params: { id: conversationId } } as never}
+      />
+    </HeaderHeightContext.Provider>,
   );
 }
 
@@ -366,12 +372,7 @@ describe('ConversationScreen', () => {
     );
     archiveConversationMock.mockResolvedValueOnce(undefined);
 
-    renderWithProviders(
-      <ConversationScreen
-        navigation={navigation as never}
-        route={{ key: 'conversation', name: 'Conversation', params: { id: conversationId } } as never}
-      />,
-    );
+    renderConversation(navigation);
     await waitFor(() => expect(screen.getByText('Hello')).toBeOnTheScreen());
 
     const user = userEvent.setup();
@@ -423,12 +424,7 @@ describe('ConversationScreen', () => {
     );
     blockConversationParticipantMock.mockResolvedValue(undefined);
 
-    const main = renderWithProviders(
-      <ConversationScreen
-        navigation={navigation as never}
-        route={{ key: 'conversation', name: 'Conversation', params: { id: conversationId } } as never}
-      />,
-    );
+    const main = renderConversation(navigation);
     await waitFor(() => expect(main.getByText('Hello')).toBeOnTheScreen());
 
     // The native-stack header isn't mounted by this harness (navigation is a
@@ -577,6 +573,81 @@ describe('ConversationScreen', () => {
       conversationId,
       expect.objectContaining({ memberId: 'member-from-jwt' }),
     );
+  });
+
+  it('offsets KeyboardAvoidingView by the native-stack header height on iOS', async () => {
+    fetchConversationMock.mockResolvedValue(conversationDetail([]));
+
+    renderConversation();
+    await waitFor(() => expect(screen.getByLabelText('Reply')).toBeOnTheScreen());
+
+    const avoiding = screen.UNSAFE_getByType(KeyboardAvoidingView);
+    expect(avoiding.props.behavior).toBe('padding');
+    expect(avoiding.props.keyboardVerticalOffset).toBe(conversationHeaderHeight);
+  });
+
+  it('keeps the composer as a sibling of the thread list, not a FlatList footer', async () => {
+    fetchConversationMock.mockResolvedValue(conversationDetail([]));
+
+    renderConversation();
+    await waitFor(() => expect(screen.getByLabelText('Reply')).toBeOnTheScreen());
+
+    const list = screen.UNSAFE_getByType(FlatList);
+    expect(list.props.ListFooterComponent).toBeFalsy();
+    expect(screen.getByLabelText('Reply')).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Send reply' })).toBeOnTheScreen();
+  });
+
+  it('keeps the home-indicator inset on the composer while the keyboard is closed', async () => {
+    fetchConversationMock.mockResolvedValue(conversationDetail([]));
+
+    renderConversation();
+    await waitFor(() => expect(screen.getByLabelText('Reply')).toBeOnTheScreen());
+
+    expect(screen.getByLabelText('Reply').parent).toHaveStyle({ paddingBottom: 34 });
+  });
+
+  it('drops the home-indicator inset from the composer while the iOS keyboard is open', async () => {
+    const listeners: Record<string, Array<() => void>> = {};
+    const addListener = jest.spyOn(Keyboard, 'addListener').mockImplementation((event, callback) => {
+      listeners[event] ??= [];
+      listeners[event].push(callback as () => void);
+      return { remove: jest.fn() };
+    });
+
+    fetchConversationMock.mockResolvedValue(conversationDetail([]));
+    renderConversation();
+    await waitFor(() => expect(screen.getByLabelText('Reply')).toBeOnTheScreen());
+
+    act(() => {
+      listeners.keyboardWillShow?.forEach((listener) => listener());
+    });
+    expect(screen.getByLabelText('Reply').parent).toHaveStyle({ paddingBottom: space.md });
+
+    act(() => {
+      listeners.keyboardWillHide?.forEach((listener) => listener());
+    });
+    expect(screen.getByLabelText('Reply').parent).toHaveStyle({ paddingBottom: 34 });
+
+    addListener.mockRestore();
+  });
+
+  it('leaves KeyboardAvoidingView behavior undefined on Android', async () => {
+    const originalOs = Platform.OS;
+    Object.defineProperty(Platform, 'OS', { configurable: true, value: 'android' });
+
+    try {
+      fetchConversationMock.mockResolvedValue(conversationDetail([]));
+      renderConversation();
+      await waitFor(() => expect(screen.getByLabelText('Reply')).toBeOnTheScreen());
+
+      const avoiding = screen.UNSAFE_getByType(KeyboardAvoidingView);
+      expect(avoiding.props.behavior).toBeUndefined();
+      expect(avoiding.props.keyboardVerticalOffset).toBe(0);
+      expect(screen.getByLabelText('Reply').parent).toHaveStyle({ paddingBottom: 34 });
+    } finally {
+      Object.defineProperty(Platform, 'OS', { configurable: true, value: originalOs });
+    }
   });
 });
 
