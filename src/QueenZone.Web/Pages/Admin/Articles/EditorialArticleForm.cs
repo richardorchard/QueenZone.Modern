@@ -18,7 +18,7 @@ public sealed class EditorialArticleForm
     public string? Source { get; set; }
     public string? ImageBlobKey { get; set; }
     public int? ImageGalleryPicId { get; set; }
-    public DateTime PublishedAt { get; set; } = DateTime.UtcNow.Date;
+    public DateTime? PublishedAt { get; set; } = DateTime.UtcNow.Date;
     public IFormFile? ArticleImage { get; set; }
     public int? CropX { get; set; }
     public int? CropY { get; set; }
@@ -30,7 +30,7 @@ public sealed class EditorialArticleForm
 
     public EditorialArticleDraft ToDraft(string sanitizedBody, string? imageKey = null) => new(
         Id, LegacyArticleId, SourceSubmissionId, Title, Slug, Excerpt, sanitizedBody, AuthorName, Category,
-        Tags, Source, imageKey ?? ImageBlobKey, new DateTimeOffset(DateTime.SpecifyKind(PublishedAt, DateTimeKind.Utc)));
+        Tags, Source, imageKey ?? ImageBlobKey, new DateTimeOffset(DateTime.SpecifyKind(ResolvedPublishedAt, DateTimeKind.Utc)));
 
     public static EditorialArticleForm From(EditorialArticle x) => new()
     {
@@ -48,4 +48,6 @@ public sealed class EditorialArticleForm
         ImageBlobKey = x.ImageBlobKey,
         PublishedAt = x.PublishedAt.UtcDateTime,
     };
+
+    internal DateTime ResolvedPublishedAt => PublishedAt ?? DateTime.UtcNow.Date;
 }

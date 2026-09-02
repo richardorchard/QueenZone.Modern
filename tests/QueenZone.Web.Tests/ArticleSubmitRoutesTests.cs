@@ -8,7 +8,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using QueenZone.Data;
 using QueenZone.Data.Entities;
+using QueenZone.Storage;
 using QueenZone.Web;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.PixelFormats;
 
 namespace QueenZone.Web.Tests;
 
@@ -87,9 +91,126 @@ public sealed partial class ArticleSubmitRoutesTests : IClassFixture<WebApplicat
         Assert.Contains("Choose from gallery", body);
         Assert.Contains("data-aspect-width=\"3\"", body);
         Assert.Contains("data-aspect-height=\"2\"", body);
+        Assert.Contains("data-container=\"ugc-articles\"", body);
         Assert.Contains("Author", body);
         Assert.Contains("Category", body);
         Assert.Contains("Tags", body);
+    }
+
+    [Fact]
+    public async Task GetEditor_missing_legacy_returns_404()
+    {
+        var client = CreateAdminClient(AdminEmail);
+        var response = await client.GetAsync("/admin/articles/editor?legacyId=999999");
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Admin_can_save_cropped_image_on_legacy_editor_url()
+    {
+        using var isolated = factory.WithWebHostBuilder(_ => { });
+        var admin = AdminHttpTestHelpers.CreateClient(isolated, AdminEmail);
+        var formPath = "/admin/articles/editor?legacyId=101";
+        var response = await PostEditorialImageAsync(
+            admin,
+            formPath,
+            "/admin/articles/editor",
+            new()
+            {
+                ["Form.LegacyArticleId"] = "101",
+                ["Form.Title"] = "Cropped archive feature",
+                ["Form.Slug"] = "cropped-archive-feature",
+                ["Form.Excerpt"] = "Updated archive excerpt with image.",
+                ["Form.Body"] = "<p>Updated archive article body with a card image.</p>",
+                ["Form.AuthorName"] = "Archive Editor",
+                ["Form.Category"] = "Features",
+                ["Form.PublishedAt"] = "2026-08-31",
+            });
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        var editPath = response.Headers.Location!.OriginalString;
+        Assert.Matches("^/admin/articles/editor/[0-9a-fA-F-]{36}$", editPath);
+
+        var editorial = isolated.Services.GetRequiredService<IEditorialArticleRepository>();
+        var saved = await editorial.GetAsync(Guid.Parse(editPath.Split('/').Last()));
+        Assert.NotNull(saved);
+        Assert.Equal(101, saved.LegacyArticleId);
+        Assert.False(string.IsNullOrWhiteSpace(saved.ImageBlobKey));
+        Assert.Equal(EditorialArticleStatus.Draft, saved.Status);
+
+        var blobs = isolated.Services.GetRequiredService<IBlobUploadService>();
+        Assert.NotNull(await blobs.OpenReadAsync(BlobUploadContainers.Articles, saved.ImageBlobKey!));
+
+        var beforePublish = await isolated.CreateClient().GetStringAsync("/articles/101/inside-the-making-of-bohemian-rhapsody");
+        Assert.DoesNotContain("Updated archive article body with a card image", beforePublish);
+    }
+
+    [Fact]
+    public async Task Admin_can_save_cropped_image_on_create_and_guid_editor()
+    {
+        using var isolated = factory.WithWebHostBuilder(_ => { });
+        var admin = AdminHttpTestHelpers.CreateClient(isolated, AdminEmail);
+        var create = await PostEditorialImageAsync(
+            admin,
+            "/admin/articles/editor",
+            "/admin/articles/editor",
+            new()
+            {
+                ["Form.Title"] = "New featured article",
+                ["Form.Slug"] = "new-featured-article",
+                ["Form.Excerpt"] = "A new editorial with a card image.",
+                ["Form.Body"] = "<p>Create path body with an attached card image.</p>",
+                ["Form.AuthorName"] = "QueenZone Editorial",
+                ["Form.Category"] = "Feature",
+            });
+        Assert.Equal(HttpStatusCode.Redirect, create.StatusCode);
+        var editPath = create.Headers.Location!.OriginalString;
+        Assert.StartsWith("/admin/articles/editor/", editPath);
+
+        var save = await PostEditorialImageAsync(
+            admin,
+            editPath,
+            editPath,
+            new()
+            {
+                ["Form.Title"] = "New featured article",
+                ["Form.Slug"] = "new-featured-article",
+                ["Form.Excerpt"] = "Edited excerpt after the first image save.",
+                ["Form.Body"] = "<p>Guid editor path body with a replacement card image.</p>",
+                ["Form.AuthorName"] = "QueenZone Editorial",
+                ["Form.Category"] = "Feature",
+                ["Form.PublishedAt"] = "2026-09-01",
+            });
+        Assert.Equal(HttpStatusCode.Redirect, save.StatusCode);
+        Assert.Equal(editPath, save.Headers.Location!.OriginalString);
+    }
+
+    [Fact]
+    public async Task Admin_save_draft_invalid_image_returns_200_with_field_errors()
+    {
+        var client = CreateAdminClient(AdminEmail);
+        var response = await AdminHttpTestHelpers.PostArticleMultipartAsync(
+            client,
+            "/admin/articles/editor",
+            "/admin/articles/editor",
+            new()
+            {
+                ["Form.Title"] = "Broken image draft",
+                ["Form.Excerpt"] = "Should stay on the form.",
+                ["Form.Body"] = "<p>Body is valid but the image is not.</p>",
+                ["Form.AuthorName"] = "QueenZone Editorial",
+                ["Form.Category"] = "Feature",
+                ["Form.PublishedAt"] = "2026-09-01",
+            },
+            "not-an-image"u8.ToArray(),
+            "notes.txt",
+            "text/plain",
+            fileFieldName: "Form.ArticleImage");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("admin-errors", body);
+        Assert.DoesNotContain("Broken image draft", await CreateAdminClient(AdminEmail).GetStringAsync("/admin/articles"));
     }
 
     [Fact]
@@ -110,6 +231,10 @@ public sealed partial class ArticleSubmitRoutesTests : IClassFixture<WebApplicat
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
         var editPath = response.Headers.Location!.OriginalString;
         var id = Guid.Parse(editPath.Split('/').Last());
+
+        var preview = await client.GetAsync($"/admin/articles/editor/{id}/preview");
+        Assert.Equal(HttpStatusCode.OK, preview.StatusCode);
+        Assert.Contains("A night at the opera", await preview.Content.ReadAsStringAsync());
 
         var editBody = await client.GetStringAsync(editPath);
         var token = AdminHttpTestHelpers.ExtractAntiforgeryToken(editBody);
@@ -684,6 +809,38 @@ public sealed partial class ArticleSubmitRoutesTests : IClassFixture<WebApplicat
             $"Unexpected callback status code: {callbackResponse.StatusCode}");
 
         return client;
+    }
+
+    private static async Task<HttpResponseMessage> PostEditorialImageAsync(
+        HttpClient client,
+        string formPath,
+        string postPath,
+        Dictionary<string, string> fields)
+    {
+        return await AdminHttpTestHelpers.PostArticleMultipartAsync(
+            client,
+            formPath,
+            postPath,
+            fields,
+            await CreateCardPngAsync(),
+            "hero.png",
+            "image/png",
+            new Dictionary<string, string>
+            {
+                ["Form.CropX"] = "0",
+                ["Form.CropY"] = "0",
+                ["Form.CropWidth"] = "600",
+                ["Form.CropHeight"] = "400",
+            },
+            fileFieldName: "Form.ArticleImage");
+    }
+
+    private static async Task<byte[]> CreateCardPngAsync(int width = 600, int height = 400)
+    {
+        using var image = new Image<Rgba32>(width, height);
+        await using var stream = new MemoryStream();
+        await image.SaveAsync(stream, new PngEncoder());
+        return stream.ToArray();
     }
 
     private static string MinBody() => new('x', EfArticleSubmissionRepository.MinBodyVisibleChars);

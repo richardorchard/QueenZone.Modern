@@ -153,9 +153,7 @@ public static class EditorImageUploadEndpoints
             return Results.BadRequest(new { error = "A file is required." });
         }
 
-        var containerName = string.IsNullOrWhiteSpace(container)
-            ? BlobUploadContainers.Forum
-            : container.Trim();
+        var containerName = ResolveContainer(container);
 
         if (!AllowedContainers.Contains(containerName)
             || UgcProxyPaths.TryMapContainerToArea(containerName) is null)
@@ -351,6 +349,19 @@ public static class EditorImageUploadEndpoints
             container = result.Container,
             blobName = result.BlobName,
         });
+    }
+
+    /// <summary>
+    /// Accepts blob container names (<c>ugc-articles</c>) and area aliases (<c>articles</c>).
+    /// Omitted/blank values keep the forum default — callers that mean articles must send
+    /// <c>container=articles</c> or <c>ugc-articles</c>.
+    /// </summary>
+    internal static string ResolveContainer(string? container)
+    {
+        var raw = string.IsNullOrWhiteSpace(container)
+            ? BlobUploadContainers.Forum
+            : container.Trim();
+        return UgcProxyPaths.TryMapAreaToContainer(raw) ?? raw;
     }
 
     internal static long ResolveMaxBytes(BlobUploadOptions options, string containerName)

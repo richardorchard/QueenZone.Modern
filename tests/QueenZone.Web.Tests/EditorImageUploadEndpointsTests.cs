@@ -177,6 +177,38 @@ public sealed class EditorImageUploadEndpointsTests : IClassFixture<WebApplicati
         Assert.Contains("-thumb.webp", thumbUrl);
     }
 
+    [Theory]
+    [InlineData(null, BlobUploadContainers.Forum)]
+    [InlineData("", BlobUploadContainers.Forum)]
+    [InlineData("articles", BlobUploadContainers.Articles)]
+    [InlineData("ugc-articles", BlobUploadContainers.Articles)]
+    [InlineData("forum", BlobUploadContainers.Forum)]
+    public void ResolveContainer_accepts_area_alias_and_blob_name(string? container, string expected)
+    {
+        Assert.Equal(expected, EditorImageUploadEndpoints.ResolveContainer(container));
+    }
+
+    [Fact]
+    public async Task UploadAsync_accepts_articles_area_alias()
+    {
+        var (httpContext, antiforgery) = CreateAuthenticatedHttpContext();
+        var stub = new StubBlobUploadService();
+        var file = CreateFormFile("x.png", "image/png", await CreatePngBytesAsync());
+        var result = await EditorImageUploadEndpoints.UploadAsync(
+            httpContext,
+            file,
+            container: "articles",
+            stub,
+            antiforgery,
+            CancellationToken.None);
+
+        var (status, body) = await ExecuteAsync(result);
+        Assert.Equal(StatusCodes.Status200OK, status);
+        Assert.Equal(BlobUploadContainers.Articles, stub.LastContainer);
+        using var doc = JsonDocument.Parse(body);
+        Assert.StartsWith("/ugc/articles/", doc.RootElement.GetProperty("url").GetString());
+    }
+
     [Fact]
     public async Task UploadAsync_defaults_to_forum_container()
     {
@@ -329,6 +361,41 @@ public sealed class EditorImageUploadEndpointsTests : IClassFixture<WebApplicati
         Assert.Equal(2, stub.UploadCount);
     }
 
+    [Fact]
+    public async Task Http_route_accepts_articles_container_with_antiforgery()
+    {
+        var stub = new StubBlobUploadService();
+        await using var custom = factory.WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.ConfigureServices(services => services.AddSingleton<IBlobUploadService>(stub));
+        });
+
+        var client = custom.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false,
+            HandleCookies = true,
+        });
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserEmailHeader, AdminHttpTestHelpers.AdminEmail);
+
+        var html = await client.GetStringAsync("/admin/articles/editor");
+        var token = AdminHttpTestHelpers.ExtractAntiforgeryToken(html);
+        using var form = await CreatePngFormAsync(token, container: "articles");
+        using var request = new HttpRequestMessage(HttpMethod.Post, EditorImageUploadEndpoints.Route)
+        {
+            Content = form,
+        };
+        request.Headers.TryAddWithoutValidation(EditorImageUploadEndpoints.AntiforgeryHeaderName, token);
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var url = doc.RootElement.GetProperty("url").GetString();
+        Assert.StartsWith("/ugc/articles/", url);
+        Assert.Equal(BlobUploadContainers.Articles, stub.LastContainer);
+        Assert.Equal(2, stub.UploadCount);
+    }
+
     private (HttpContext HttpContext, IAntiforgery Antiforgery) CreateAuthenticatedHttpContext()
     {
         var httpContext = new DefaultHttpContext
@@ -370,7 +437,9 @@ public sealed class EditorImageUploadEndpointsTests : IClassFixture<WebApplicati
         return AdminHttpTestHelpers.ExtractAntiforgeryToken(html);
     }
 
-    private static async Task<MultipartFormDataContent> CreatePngFormAsync(string? token = null)
+    private static async Task<MultipartFormDataContent> CreatePngFormAsync(
+        string? token = null,
+        string? container = null)
     {
         var content = new MultipartFormDataContent();
         var file = new ByteArrayContent(await CreatePngBytesAsync());
@@ -379,6 +448,11 @@ public sealed class EditorImageUploadEndpointsTests : IClassFixture<WebApplicati
         if (!string.IsNullOrEmpty(token))
         {
             content.Add(new StringContent(token), "__RequestVerificationToken");
+        }
+
+        if (!string.IsNullOrEmpty(container))
+        {
+            content.Add(new StringContent(container), "container");
         }
 
         return content;
