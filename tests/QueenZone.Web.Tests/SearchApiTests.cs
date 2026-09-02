@@ -1,6 +1,12 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using QueenZone.Data;
 using QueenZone.Data.Entities;
 using QueenZone.Web.Pages;
@@ -138,6 +144,88 @@ public sealed class SearchApiTests : IClassFixture<QueenZoneWebApplicationFactor
         Assert.Equal(ApiPagination.MaxPageSize, payload.PageSize);
         Assert.True(payload.Items.Count <= ApiPagination.MaxPageSize);
         Assert.All(payload.Items, item => Assert.False(string.IsNullOrWhiteSpace(item.SourceKey)));
+    }
+
+    [Fact]
+    public async Task Search_sql_timeout_returns_problem_details_504_not_empty_page()
+    {
+        using var timeoutFactory = QueenZoneWebApplicationFactory.WithServices(services =>
+        {
+            services.RemoveAll<ISiteSearchService>();
+            services.AddSingleton<ISiteSearchService>(new TimeoutSiteSearchService());
+        });
+        using var client = timeoutFactory.CreateAnonymousClient();
+
+        using var response = await client.GetAsync($"{SearchApiEndpoints.Path}?q=Bohemian+Rhapsody");
+
+        Assert.Equal(HttpStatusCode.GatewayTimeout, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(StatusCodes.Status504GatewayTimeout, problem.GetProperty("status").GetInt32());
+        Assert.Equal("Gateway Timeout", problem.GetProperty("title").GetString());
+        Assert.Equal(SearchApiEndpoints.TimeoutDetail, problem.GetProperty("detail").GetString());
+        Assert.False(problem.TryGetProperty("items", out _));
+        Assert.DoesNotContain("Page Not Found", await response.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Search_raw_sql_timeout_logs_warning_and_returns_504()
+    {
+        var logger = new CollectingLogger<object>();
+        var loggerFactory = new CollectingLoggerFactory(logger);
+        var timeout = SiteSearchSqlTimeoutTests.CreateSqlException(
+            SiteSearchSqlTimeout.SqlErrorNumber,
+            "Execution Timeout Expired. The timeout period elapsed prior to completion of the operation or the server is not responding.");
+
+        var result = await SearchApiEndpoints.SearchAsync(
+            new TimeoutSiteSearchService(timeout),
+            loggerFactory,
+            "Bohemian Rhapsody",
+            null,
+            1,
+            20,
+            CancellationToken.None);
+
+        var problem = Assert.IsType<ProblemHttpResult>(result);
+        Assert.Equal(StatusCodes.Status504GatewayTimeout, problem.StatusCode);
+        Assert.Equal(SearchApiEndpoints.TimeoutDetail, problem.ProblemDetails.Detail);
+        var warning = Assert.Single(logger.Entries);
+        Assert.Equal(LogLevel.Warning, warning.Level);
+        Assert.Contains("Bohemian Rhapsody", warning.Message, StringComparison.Ordinal);
+        Assert.Same(timeout, warning.Exception);
+    }
+
+    [Fact]
+    public async Task Search_typed_timeout_returns_504_without_double_logging()
+    {
+        var logger = new CollectingLogger<object>();
+        var result = await SearchApiEndpoints.SearchAsync(
+            new TimeoutSiteSearchService(),
+            new CollectingLoggerFactory(logger),
+            "Bohemian Rhapsody",
+            null,
+            1,
+            20,
+            CancellationToken.None);
+
+        Assert.IsType<ProblemHttpResult>(result);
+        Assert.Empty(logger.Entries);
+    }
+
+    [Fact]
+    public async Task Search_empty_query_still_returns_ok_when_logger_is_present()
+    {
+        var result = await SearchApiEndpoints.SearchAsync(
+            new InMemorySiteSearchService(new SharedSearchIndexStore()),
+            NullLoggerFactory.Instance,
+            "   ",
+            null,
+            1,
+            20,
+            CancellationToken.None);
+
+        var ok = Assert.IsType<Ok<ApiPagedResponse<SearchResultDto>>>(result);
+        Assert.Empty(ok.Value!.Items);
     }
 
     [Fact]
