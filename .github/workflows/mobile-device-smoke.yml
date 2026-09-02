@@ -108,6 +108,8 @@ jobs:
           EXPO_PUBLIC_APP_ENV: development
           EXPO_PUBLIC_API_BASE_URL: http://10.0.2.2:5098
           SENTRY_DISABLE_AUTO_UPLOAD: "true"
+          QUEENZONE_MOBILE_SMOKE_EMBED: "1"
+          FORCE_BUNDLING: "1"
         run: |
           npx expo prebuild --platform android
           cd android
@@ -119,6 +121,24 @@ jobs:
           curl -Ls "https://get.maestro.mobile.dev" | bash
           echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
 
+      # android-emulator-runner executes `script` line-by-line via `sh -c`.
+      # Keep that script a single static invocation. Compute prove_failure in
+      # this prior run step (schedule has no inputs, so default is off) (#1225).
+      - name: Prepare Android smoke harness
+        working-directory: .
+        run: |
+          mkdir -p src/QueenZone.Mobile/maestro-results
+          {
+            echo "event_name=${GITHUB_EVENT_NAME}"
+            echo "job=mobile-android-smoke"
+            echo "prepared_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > src/QueenZone.Mobile/maestro-results/harness.log
+          if [ "${{ github.event.inputs.prove_failure }}" = "true" ]; then
+            echo "PROVE_FAILURE_ARGS=--prove-failure" >> "$GITHUB_ENV"
+          else
+            echo "PROVE_FAILURE_ARGS=" >> "$GITHUB_ENV"
+          fi
+
       - name: Run Android device smoke
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -128,20 +148,21 @@ jobs:
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
-          script: |
-            PROVE=""
-            if [ "${{ github.event.inputs.prove_failure }}" = "true" ]; then
-              PROVE="--prove-failure"
-            fi
-            unset ConnectionStrings__QueenZoneLegacy || true
-            unset ConnectionStrings__BlobStorage || true
-            unset ConnectionStrings__SqlServerTest || true
-            ./scripts/run-mobile-device-smoke.sh \
-              --platform android \
-              --skip-build \
-              --no-build \
-              --apk src/QueenZone.Mobile/android/app/build/outputs/apk/debug/app-debug.apk \
-              $PROVE
+          script: ./scripts/run-mobile-device-smoke.sh --platform android --skip-build --no-build --apk src/QueenZone.Mobile/android/app/build/outputs/apk/debug/app-debug.apk $PROVE_FAILURE_ARGS
+
+      - name: Collect leftover Android smoke logs
+        if: failure()
+        working-directory: .
+        run: |
+          mkdir -p src/QueenZone.Mobile/maestro-results
+          if [ ! -s src/QueenZone.Mobile/maestro-results/harness.log ]; then
+            echo "emulator-runner exited before the smoke script wrote harness.log" > src/QueenZone.Mobile/maestro-results/harness.log
+          fi
+          adb logcat -d > src/QueenZone.Mobile/maestro-results/logcat.txt 2>/dev/null || true
+          for f in "$HOME"/.android/*.log "$HOME"/.android/avd/*/*.log; do
+            [ -f "$f" ] || continue
+            cp "$f" "src/QueenZone.Mobile/maestro-results/$(basename "$f")" || true
+          done
 
       - name: Upload Android smoke diagnostics
         if: failure()
@@ -150,7 +171,7 @@ jobs:
           name: mobile-android-smoke-${{ github.run_id }}
           path: |
             src/QueenZone.Mobile/maestro-results/
-          if-no-files-found: ignore
+          if-no-files-found: error
           retention-days: 7
 
   mobile-ios-smoke:
@@ -221,6 +242,8 @@ jobs:
           EXPO_PUBLIC_APP_ENV: development
           EXPO_PUBLIC_API_BASE_URL: http://127.0.0.1:5098
           SENTRY_DISABLE_AUTO_UPLOAD: "true"
+          QUEENZONE_MOBILE_SMOKE_EMBED: "1"
+          FORCE_BUNDLING: "1"
         run: |
           npx expo prebuild --platform ios --clean
           cd ios
@@ -353,6 +376,8 @@ jobs:
           EXPO_PUBLIC_APP_ENV: development
           EXPO_PUBLIC_API_BASE_URL: http://10.0.2.2:5098
           SENTRY_DISABLE_AUTO_UPLOAD: "true"
+          QUEENZONE_MOBILE_SMOKE_EMBED: "1"
+          FORCE_BUNDLING: "1"
         run: |
           npx expo prebuild --platform android
           cd android
@@ -364,6 +389,16 @@ jobs:
           curl -Ls "https://get.maestro.mobile.dev" | bash
           echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
 
+      - name: Prepare Android journeys harness
+        working-directory: .
+        run: |
+          mkdir -p src/QueenZone.Mobile/maestro-results
+          {
+            echo "event_name=${GITHUB_EVENT_NAME}"
+            echo "job=mobile-android-journeys"
+            echo "prepared_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > src/QueenZone.Mobile/maestro-results/harness.log
+
       - name: Run Android device journeys
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -373,16 +408,21 @@ jobs:
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
-          script: |
-            unset ConnectionStrings__QueenZoneLegacy || true
-            unset ConnectionStrings__BlobStorage || true
-            unset ConnectionStrings__SqlServerTest || true
-            ./scripts/run-mobile-device-smoke.sh \
-              --platform android \
-              --suite journeys \
-              --skip-build \
-              --no-build \
-              --apk src/QueenZone.Mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          script: ./scripts/run-mobile-device-smoke.sh --platform android --suite journeys --skip-build --no-build --apk src/QueenZone.Mobile/android/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Collect leftover Android journeys logs
+        if: failure()
+        working-directory: .
+        run: |
+          mkdir -p src/QueenZone.Mobile/maestro-results
+          if [ ! -s src/QueenZone.Mobile/maestro-results/harness.log ]; then
+            echo "emulator-runner exited before the smoke script wrote harness.log" > src/QueenZone.Mobile/maestro-results/harness.log
+          fi
+          adb logcat -d > src/QueenZone.Mobile/maestro-results/logcat.txt 2>/dev/null || true
+          for f in "$HOME"/.android/*.log "$HOME"/.android/avd/*/*.log; do
+            [ -f "$f" ] || continue
+            cp "$f" "src/QueenZone.Mobile/maestro-results/$(basename "$f")" || true
+          done
 
       - name: Upload Android journeys diagnostics
         if: failure()
@@ -391,7 +431,7 @@ jobs:
           name: mobile-android-journeys-${{ github.run_id }}
           path: |
             src/QueenZone.Mobile/maestro-results/
-          if-no-files-found: ignore
+          if-no-files-found: error
           retention-days: 7
 
   mobile-ios-journeys:
@@ -462,6 +502,8 @@ jobs:
           EXPO_PUBLIC_APP_ENV: development
           EXPO_PUBLIC_API_BASE_URL: http://127.0.0.1:5098
           SENTRY_DISABLE_AUTO_UPLOAD: "true"
+          QUEENZONE_MOBILE_SMOKE_EMBED: "1"
+          FORCE_BUNDLING: "1"
         run: |
           npx expo prebuild --platform ios --clean
           cd ios

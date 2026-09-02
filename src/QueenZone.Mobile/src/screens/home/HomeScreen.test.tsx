@@ -130,6 +130,12 @@ describe('HomeScreen', () => {
     await flushVirtualizedList();
   });
 
+  it('exposes home-screen and home-hero testIDs for Debug device smoke', async () => {
+    renderHome();
+    expect(screen.getByTestId(testIds.homeScreen)).toBeOnTheScreen();
+    await waitFor(() => expect(screen.getByTestId(testIds.homeHero)).toBeOnTheScreen());
+  });
+
   it('opens live news and forum rows with numeric ids, not placeholders', async () => {
     const { navigation } = renderHome();
     await waitFor(() => expect(screen.getByRole('button', { name: 'Live Aid remembered' })).toBeOnTheScreen());

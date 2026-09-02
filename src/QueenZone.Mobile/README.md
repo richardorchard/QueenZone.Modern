@@ -445,7 +445,10 @@ Shared flows live in [`maestro/`](maestro/). Android and iOS use the same YAML; 
 Local (repo root). Install [Maestro](https://maestro.mobile.dev) first
 (`curl -Ls "https://get.maestro.mobile.dev" | bash`). Unset any
 `ConnectionStrings__*` env vars. The script starts the Testing host on
-port 5098, bakes a Debug binary, and runs `maestro/smoke.yaml`.
+port 5098, bakes a Debug binary with the JS bundle embedded
+(`QUEENZONE_MOBILE_SMOKE_EMBED=1`, no expo-dev-client launcher), and runs
+`maestro/smoke.yaml`. That keeps `__DEV__` true for `queenzone://smoke-auth`
+and still points `EXPO_PUBLIC_API_BASE_URL` at the Testing host, not prod.
 
 ```bash
 # Android: start an API 36 emulator first
