@@ -48,7 +48,12 @@ public sealed class EfEditorialArticleRepository(QueenZoneDbContext dbContext, T
         row.Source = string.IsNullOrWhiteSpace(draft.Source) ? null : draft.Source.Trim();
         row.ImageBlobKey = draft.ImageBlobKey;
         row.PublishedAt = draft.PublishedAt;
-        row.Status = EditorialArticleStatus.Draft;
+        // Visibility SoT is Status. Unpublished stays sticky until explicit Publish.
+        // Edit-while-live (Status != Unpublished) may return to Draft; Live* is not a flag and is not cleared.
+        if (row.Status != EditorialArticleStatus.Unpublished)
+        {
+            row.Status = EditorialArticleStatus.Draft;
+        }
         row.UpdatedAt = timeProvider.GetUtcNow();
         row.UpdatedBy = editor;
         await dbContext.SaveChangesAsync(ct);

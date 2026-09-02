@@ -100,7 +100,10 @@ public static class PublicContentMapper
             item.PublishedAt,
             item.Source,
             item.CategoryName,
-            ArticlesRoutes.GetArticleDetailPath(item.Id, item.Title));
+            ArticlesRoutes.GetArticleDetailPath(item.Id, item.Title),
+            NewsArticleImage.ResolveImageUrl(item.ImageBlobKey, null),
+            item.AuthorName,
+            item.Tags);
 
     public static ForumCategorySummary ToForumCategorySummary(ForumCategoryItem category) =>
         new(

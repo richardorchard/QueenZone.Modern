@@ -43,7 +43,8 @@ public sealed class DetailModel(
             canonicalPath,
             detail.PublishedAt,
             detail.Excerpt,
-            siteOptions.Value.PublicBaseUrl);
+            siteOptions.Value.PublicBaseUrl,
+            detail.AuthorName);
 
         return Page();
     }

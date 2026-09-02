@@ -412,6 +412,88 @@ public sealed class EfPublicReadRepositoryTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task Articles_archive_pages_beyond_the_first_hundred_from_sql()
+    {
+        dbContext.Database.ExecuteSqlRaw(
+            """
+            CREATE TABLE IF NOT EXISTS ArticlesPaged (
+                Id INTEGER NOT NULL,
+                Title TEXT NOT NULL,
+                Body TEXT NOT NULL,
+                PublishedAt TEXT NOT NULL,
+                Source TEXT,
+                CategoryName TEXT,
+                IsPublished INTEGER NOT NULL
+            );
+            """);
+        for (var id = 1; id <= 120; id++)
+        {
+            dbContext.Database.ExecuteSqlRaw(
+                """
+                INSERT INTO ArticlesPaged (Id, Title, Body, PublishedAt, Source, CategoryName, IsPublished)
+                VALUES ({0}, {1}, 'Body', {2}, NULL, 'Features', 1);
+                """,
+                id,
+                $"Archive feature {id:000}",
+                new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddDays(id).ToString("yyyy-MM-dd"));
+        }
+
+        const string listSelect = """
+            SELECT Id, Title, CAST('' AS TEXT) AS Body, PublishedAt, Source, CategoryName, IsPublished
+            FROM ArticlesPaged
+            WHERE IsPublished = 1
+            """;
+        var editorial = new InMemoryEditorialArticleRepository();
+        var overlay = await editorial.SaveDraftAsync(
+            new EditorialArticleDraft(
+                null,
+                15,
+                null,
+                "Overlay on feature 15",
+                null,
+                "Overlay excerpt",
+                "<p>Overlay body</p>",
+                "Archive Editor",
+                "Features",
+                "overlay",
+                null,
+                "editors/admin/015.webp",
+                DateTimeOffset.Parse("2026-09-01T00:00:00Z")),
+            "admin");
+        await editorial.SetStatusAsync(overlay.Id, EditorialArticleStatus.Published, "admin");
+
+        var repository = new EfArticlesRepository(
+            dbContext,
+            latestSql: listSelect + " ORDER BY PublishedAt DESC, Id DESC LIMIT {0}",
+            countSql: "SELECT COUNT(*) AS Value FROM ArticlesPaged WHERE IsPublished = 1",
+            archivePageSql: listSelect + " ORDER BY PublishedAt DESC, Id DESC LIMIT {1} OFFSET {0}",
+            byIdSql: listSelect + " AND Id = {0}",
+            sitemapSql: """
+                SELECT Id, Title, PublishedAt, CAST(NULL AS TEXT) AS Slug
+                FROM ArticlesPaged WHERE IsPublished = 1
+                """,
+            editorialArticles: editorial);
+
+        Assert.Equal(120, await repository.GetPublishedCountAsync());
+
+        var pageSix = await repository.GetArchivePageAsync(6, 20);
+        Assert.Equal(20, pageSix.Count);
+        Assert.Equal(20, pageSix[0].Id);
+        Assert.Equal(1, pageSix[^1].Id);
+        Assert.DoesNotContain(pageSix, item => item.Id > 20);
+        Assert.Contains(pageSix, item => item.Id == 15 && item.Title == "Overlay on feature 15");
+
+        var pageOne = await repository.GetArchivePageAsync(1, 20);
+        Assert.Equal(20, pageOne.Count);
+        Assert.DoesNotContain(pageOne, item => item.Id == 15);
+
+        var latest = await repository.GetLatestAsync(5);
+        Assert.Equal(5, latest.Count);
+        Assert.Equal(120, latest[0].Id);
+        Assert.Equal(116, latest[^1].Id);
+    }
+
+    [Fact]
     public async Task FreddieTributes_maps_public_page_and_random_without_email()
     {
         dbContext.Database.ExecuteSqlRaw(

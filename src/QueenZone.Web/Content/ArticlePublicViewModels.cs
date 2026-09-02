@@ -22,4 +22,7 @@ public sealed record ArticleDetailItem(
     DateTime PublishedAt,
     string? Source,
     string? CategoryName,
-    string DetailPath);
+    string DetailPath,
+    string? ImageUrl = null,
+    string? AuthorName = null,
+    string? Tags = null);

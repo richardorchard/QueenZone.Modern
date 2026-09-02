@@ -20,7 +20,7 @@ public sealed class InMemoryArticlesRepository(IReadOnlyList<ArticleItem> seedAr
     public async Task<ArticleItem?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         var item = publishedItems.SingleOrDefault(item => item.Id == id);
-        return item is null ? null : (await ApplyAsync([item], cancellationToken)).Single();
+        return item is null ? null : (await ApplyAsync([item], cancellationToken)).SingleOrDefault();
     }
 
     public async Task<IReadOnlyList<SitemapContentEntry>> GetPublishedSitemapEntriesAsync(CancellationToken cancellationToken = default) =>

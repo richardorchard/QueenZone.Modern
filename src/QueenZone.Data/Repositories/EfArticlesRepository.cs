@@ -37,7 +37,8 @@ public sealed class EfArticlesRepository : IArticlesRepository
         string countSql,
         string archivePageSql,
         string byIdSql,
-        string sitemapSql)
+        string sitemapSql,
+        IEditorialArticleRepository? editorialArticles = null)
     {
         this.dbContext = dbContext;
         this.latestSql = latestSql;
@@ -45,15 +46,16 @@ public sealed class EfArticlesRepository : IArticlesRepository
         this.archivePageSql = archivePageSql;
         this.byIdSql = byIdSql;
         this.sitemapSql = sitemapSql;
+        this.editorialArticles = editorialArticles;
     }
 
     public async Task<IReadOnlyList<ArticleItem>> GetLatestAsync(int count, CancellationToken cancellationToken = default)
     {
         var take = Math.Clamp(count, 1, MaxLatestCount);
         var rows = await dbContext.Database
-            .SqlQueryRaw<ArticleRow>(latestSql, MaxLatestCount)
+            .SqlQueryRaw<ArticleRow>(latestSql, take)
             .ToListAsync(cancellationToken);
-        return (await ApplyOverlaysAsync(rows.Select(MapList).ToList(), cancellationToken)).Take(take).ToList();
+        return await ApplyOverlaysAsync(rows.Select(MapList).ToList(), cancellationToken);
     }
 
     public async Task<int> GetPublishedCountAsync(CancellationToken cancellationToken = default)
@@ -76,9 +78,9 @@ public sealed class EfArticlesRepository : IArticlesRepository
         var take = Math.Clamp(pageSize, 1, MaxPageSize);
         var offset = (normalizedPage - 1) * take;
         var rows = await dbContext.Database
-            .SqlQueryRaw<ArticleRow>(archivePageSql, 0, MaxPageSize)
+            .SqlQueryRaw<ArticleRow>(archivePageSql, offset, take)
             .ToListAsync(cancellationToken);
-        return (await ApplyOverlaysAsync(rows.Select(MapList).ToList(), cancellationToken)).Skip(offset).Take(take).ToList();
+        return await ApplyOverlaysAsync(rows.Select(MapList).ToList(), cancellationToken);
     }
 
     public async Task<ArticleItem?> GetByIdAsync(int id, CancellationToken cancellationToken = default)

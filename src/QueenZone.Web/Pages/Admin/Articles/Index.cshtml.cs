@@ -12,7 +12,7 @@ public sealed class IndexModel(IArticleSubmissionRepository articleSubmissionRep
     {
         Submissions = await articleSubmissionRepository.GetPendingAsync(Math.Max(1, page), 50, cancellationToken);
         EditorialArticles = await editorialArticles.GetAllAsync(cancellationToken);
-        LegacyArticles = await legacyArticles.GetArchivePageAsync(1, 100, cancellationToken);
+        LegacyArticles = await LoadAllLegacyArchiveAsync(legacyArticles, cancellationToken);
         ViewData["Title"] = "Articles";
     }
 }

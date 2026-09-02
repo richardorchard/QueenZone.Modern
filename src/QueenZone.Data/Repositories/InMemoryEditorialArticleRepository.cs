@@ -19,7 +19,13 @@ public sealed class InMemoryEditorialArticleRepository(TimeProvider? timeProvide
             var id = draft.Id ?? Guid.NewGuid();
             var slug = NewsSlug.Resolve(draft.Title, draft.Slug);
             if (rows.Values.Any(x => x.Id != id && x.Slug == slug) || live.Values.Any(x => x.Id != id && x.Slug == slug)) throw new InvalidOperationException("That article slug is already in use.");
-            var row = new EditorialArticle(id, draft.LegacyArticleId, draft.SourceSubmissionId, draft.Title.Trim(), slug, draft.Excerpt.Trim(), draft.Body, draft.AuthorName.Trim(), draft.Category.Trim(), draft.Tags, draft.Source, draft.ImageBlobKey, EditorialArticleStatus.Draft, draft.PublishedAt, clock.GetUtcNow(), editor, live.GetValueOrDefault(id)?.ImageBlobKey, live.ContainsKey(id));
+            var existing = rows.GetValueOrDefault(id);
+            // Visibility SoT is Status. Unpublished stays sticky until explicit Publish.
+            // Edit-while-live may return to Draft. Live* snapshot in `live` is not cleared.
+            var status = existing?.Status == EditorialArticleStatus.Unpublished
+                ? EditorialArticleStatus.Unpublished
+                : EditorialArticleStatus.Draft;
+            var row = new EditorialArticle(id, draft.LegacyArticleId, draft.SourceSubmissionId, draft.Title.Trim(), slug, draft.Excerpt.Trim(), draft.Body, draft.AuthorName.Trim(), draft.Category.Trim(), draft.Tags, draft.Source, draft.ImageBlobKey, status, draft.PublishedAt, clock.GetUtcNow(), editor, live.GetValueOrDefault(id)?.ImageBlobKey, live.ContainsKey(id));
             rows[id] = row; return Task.FromResult(row);
         }
     }

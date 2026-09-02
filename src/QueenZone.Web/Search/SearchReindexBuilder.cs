@@ -153,7 +153,12 @@ public sealed class SearchReindexBuilder(
         await searchIndexService.ReplaceContentTypeAsync(SiteSearchContentType.FanPerformance, documents, cancellationToken);
     }
 
-    private static SearchDocumentEntity MapLegacyArticle(ArticleItem item)
+    /// <summary>
+    /// Maps one published legacy archive article to its <see cref="SearchDocumentEntity"/> shape.
+    /// Exposed so admin publish/unpublish handlers can upsert a single document immediately rather
+    /// than waiting for the next full reindex — see <c>Admin/Articles/Status.cshtml.cs</c>.
+    /// </summary>
+    public static SearchDocumentEntity MapLegacyArticle(ArticleItem item)
     {
         var plainBody = SearchDocumentText.ToPlainText(item.Body);
         return new SearchDocumentEntity

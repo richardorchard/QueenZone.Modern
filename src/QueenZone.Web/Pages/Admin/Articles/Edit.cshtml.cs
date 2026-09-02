@@ -90,7 +90,7 @@ public sealed class EditModel(
         if (string.IsNullOrWhiteSpace(body)) Errors.Add("Body is required.");
     }
 
-    private async Task LoadCategoriesAsync(CancellationToken ct) => Categories = (await legacyArticles.GetArchivePageAsync(1, 100, ct))
+    private async Task LoadCategoriesAsync(CancellationToken ct) => Categories = (await LoadAllLegacyArchiveAsync(legacyArticles, ct))
         .Select(x => x.CategoryName).Where(x => !string.IsNullOrWhiteSpace(x)).Cast<string>()
         .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x).ToList();
 }
