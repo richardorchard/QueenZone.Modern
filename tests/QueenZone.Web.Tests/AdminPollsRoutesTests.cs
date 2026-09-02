@@ -108,7 +108,10 @@ public sealed class AdminPollsRoutesTests
         });
         using var client = isolated.CreateAdminClient();
 
-        var published = await PostActionAsync(client, "Publish", Guid.NewGuid());
+        await PostCreateAsync(client, "Draft?", "Yes", "No");
+        using var scope = isolated.Services.CreateScope();
+        var pollId = (await scope.ServiceProvider.GetRequiredService<IHomePollRepository>().GetAllAsync())[0].Id;
+        var published = await PostActionAsync(client, "Publish", pollId);
         Assert.Equal(HttpStatusCode.Redirect, published.StatusCode);
         Assert.Equal("/admin/polls", published.Headers.Location!.OriginalString);
         Assert.DoesNotContain("/error/", published.Headers.Location.OriginalString, StringComparison.Ordinal);
