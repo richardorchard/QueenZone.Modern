@@ -46,6 +46,36 @@ public sealed class HomePollRepositoryTests
     }
 
     [Fact]
+    public async Task Hide_current_then_publish_other_makes_only_the_new_poll_current()
+    {
+        var first = await repository.CreateAsync(new AdminHomePollDraft("First?", ["Yes", "No"]), Guid.NewGuid());
+        var second = await repository.CreateAsync(new AdminHomePollDraft("Second?", ["Left", "Right"]), Guid.NewGuid());
+        await repository.PublishAsync(first);
+        await repository.HideAsync(first);
+        await repository.PublishAsync(second);
+
+        var current = await repository.GetCurrentAsync(null);
+        Assert.Equal(second, current!.PollId);
+        Assert.False((await repository.GetByIdAsync(first))!.IsCurrent);
+        Assert.True((await repository.GetByIdAsync(second))!.IsCurrent);
+    }
+
+    [Fact]
+    public async Task Republish_of_the_current_poll_is_idempotent_success()
+    {
+        var pollId = await repository.CreateAsync(new AdminHomePollDraft("Q?", ["A", "B"]), Guid.NewGuid());
+        await repository.PublishAsync(pollId);
+        var firstPublishedAt = (await repository.GetByIdAsync(pollId))!.PublishedAt;
+
+        await repository.PublishAsync(pollId);
+
+        var again = await repository.GetByIdAsync(pollId);
+        Assert.True(again!.IsCurrent);
+        Assert.Equal(firstPublishedAt, again.PublishedAt);
+        Assert.Equal(pollId, (await repository.GetCurrentAsync(null))!.PollId);
+    }
+
+    [Fact]
     public async Task Guest_sees_counts_and_cannot_be_marked_as_voter()
     {
         var pollId = await repository.CreateAsync(new AdminHomePollDraft("Q?", ["A", "B"]), Guid.NewGuid());

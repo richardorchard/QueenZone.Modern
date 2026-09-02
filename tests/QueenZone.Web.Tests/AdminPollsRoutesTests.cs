@@ -1,7 +1,9 @@
 using System.Net;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using QueenZone.Data;
+using QueenZone.Web.Pages.Admin.Polls;
 
 namespace QueenZone.Web.Tests;
 
@@ -55,6 +57,66 @@ public sealed class AdminPollsRoutesTests
         var deleted = await PostActionAsync(client, "Delete", pollId);
         Assert.Equal(HttpStatusCode.Redirect, deleted.StatusCode);
         Assert.Empty(await polls.GetAllAsync());
+    }
+
+    [Fact]
+    public async Task Admin_publishing_a_second_poll_makes_it_the_only_current()
+    {
+        using var isolated = IsolatedHomePolls();
+        using var client = isolated.CreateAdminClient();
+
+        await PostCreateAsync(client, "First poll?", "A", "B");
+        await PostCreateAsync(client, "Second poll?", "C", "D");
+
+        using var scope = isolated.Services.CreateScope();
+        var polls = scope.ServiceProvider.GetRequiredService<IHomePollRepository>();
+        var all = await polls.GetAllAsync();
+        var first = all.Single(item => item.Question == "First poll?");
+        var second = all.Single(item => item.Question == "Second poll?");
+
+        var publishedFirst = await PostActionAsync(client, "Publish", first.Id);
+        Assert.Equal(HttpStatusCode.Redirect, publishedFirst.StatusCode);
+        Assert.Equal(first.Id, (await polls.GetCurrentAsync(null))!.PollId);
+
+        var publishedSecond = await PostActionAsync(client, "Publish", second.Id);
+        Assert.Equal(HttpStatusCode.Redirect, publishedSecond.StatusCode);
+        Assert.Equal("/admin/polls", publishedSecond.Headers.Location!.OriginalString);
+        Assert.DoesNotContain("/error/", publishedSecond.Headers.Location.OriginalString, StringComparison.Ordinal);
+
+        var current = await polls.GetCurrentAsync(null);
+        Assert.Equal(second.Id, current!.PollId);
+        Assert.False((await polls.GetByIdAsync(first.Id))!.IsCurrent);
+        Assert.True((await polls.GetByIdAsync(second.Id))!.IsCurrent);
+
+        var page = await client.GetStringAsync("/admin/polls");
+        Assert.Contains("Published poll. It is now the Home poll.", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("Page Not Found", page, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Publish_DbUpdateException_redirects_with_tempdata_error_not_404()
+    {
+        var store = new SharedHomePollStore();
+        var inner = new InMemoryHomePollRepository(store);
+        using var isolated = QueenZoneWebApplicationFactory.WithServices(services =>
+        {
+            services.RemoveAll<SharedHomePollStore>();
+            services.RemoveAll<IHomePollRepository>();
+            services.AddSingleton(store);
+            services.AddSingleton<IHomePollRepository>(
+                new ThrowingPublishHomePollRepository(inner, CreateUniqueConstraintException()));
+        });
+        using var client = isolated.CreateAdminClient();
+
+        var published = await PostActionAsync(client, "Publish", Guid.NewGuid());
+        Assert.Equal(HttpStatusCode.Redirect, published.StatusCode);
+        Assert.Equal("/admin/polls", published.Headers.Location!.OriginalString);
+        Assert.DoesNotContain("/error/", published.Headers.Location.OriginalString, StringComparison.Ordinal);
+        Assert.DoesNotContain("404", published.Headers.Location.OriginalString, StringComparison.Ordinal);
+
+        var page = await client.GetStringAsync("/admin/polls");
+        Assert.Contains(IndexModel.PublishPersistenceFailureMessage, page, StringComparison.Ordinal);
+        Assert.DoesNotContain("Page Not Found", page, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -147,5 +209,52 @@ public sealed class AdminPollsRoutesTests
                 ["__RequestVerificationToken"] = token,
                 ["id"] = id.ToString(),
             }));
+    }
+
+    private static DbUpdateException CreateUniqueConstraintException() =>
+        new(
+            "Cannot insert duplicate key row in object 'dbo.HomePolls' with unique index 'UX_HomePolls_IsCurrent'. The duplicate key value is (1).",
+            SiteSearchSqlTimeoutTests.CreateSqlException(
+                2601,
+                "Cannot insert duplicate key row in object 'dbo.HomePolls' with unique index 'UX_HomePolls_IsCurrent'. The duplicate key value is (1)."));
+
+    private sealed class ThrowingPublishHomePollRepository(
+        IHomePollRepository inner,
+        Exception exception) : IHomePollRepository
+    {
+        public Task<HomePollResults?> GetCurrentAsync(
+            Guid? viewerMemberId,
+            CancellationToken cancellationToken = default) =>
+            inner.GetCurrentAsync(viewerMemberId, cancellationToken);
+
+        public Task<IReadOnlyList<HomePollAdminItem>> GetAllAsync(CancellationToken cancellationToken = default) =>
+            inner.GetAllAsync(cancellationToken);
+
+        public Task<HomePollAdminDetail?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+            inner.GetByIdAsync(id, cancellationToken);
+
+        public Task<Guid> CreateAsync(
+            AdminHomePollDraft draft,
+            Guid createdByMemberId,
+            CancellationToken cancellationToken = default) =>
+            inner.CreateAsync(draft, createdByMemberId, cancellationToken);
+
+        public Task UpdateAsync(Guid id, AdminHomePollDraft draft, CancellationToken cancellationToken = default) =>
+            inner.UpdateAsync(id, draft, cancellationToken);
+
+        public Task PublishAsync(Guid id, CancellationToken cancellationToken = default) =>
+            throw exception;
+
+        public Task CloseAsync(Guid id, CancellationToken cancellationToken = default) =>
+            inner.CloseAsync(id, cancellationToken);
+
+        public Task HideAsync(Guid id, CancellationToken cancellationToken = default) =>
+            inner.HideAsync(id, cancellationToken);
+
+        public Task DeleteAsync(Guid id, CancellationToken cancellationToken = default) =>
+            inner.DeleteAsync(id, cancellationToken);
+
+        public Task CastVoteAsync(Guid optionId, Guid memberId, CancellationToken cancellationToken = default) =>
+            inner.CastVoteAsync(optionId, memberId, cancellationToken);
     }
 }
