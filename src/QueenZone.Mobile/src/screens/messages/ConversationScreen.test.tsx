@@ -604,7 +604,7 @@ describe('ConversationScreen', () => {
     renderConversation();
     await waitFor(() => expect(screen.getByLabelText('Reply')).toBeOnTheScreen());
 
-    expect(screen.getByLabelText('Reply').parent).toHaveStyle({ paddingBottom: 34 });
+    expect(screen.getByTestId(testIds.conversationComposer)).toHaveStyle({ paddingBottom: 34 });
   });
 
   it('drops the home-indicator inset from the composer while the iOS keyboard is open', async () => {
@@ -622,12 +622,12 @@ describe('ConversationScreen', () => {
     act(() => {
       listeners.keyboardWillShow?.forEach((listener) => listener());
     });
-    expect(screen.getByLabelText('Reply').parent).toHaveStyle({ paddingBottom: space.md });
+    expect(screen.getByTestId(testIds.conversationComposer)).toHaveStyle({ paddingBottom: space.md });
 
     act(() => {
       listeners.keyboardWillHide?.forEach((listener) => listener());
     });
-    expect(screen.getByLabelText('Reply').parent).toHaveStyle({ paddingBottom: 34 });
+    expect(screen.getByTestId(testIds.conversationComposer)).toHaveStyle({ paddingBottom: 34 });
 
     addListener.mockRestore();
   });
@@ -644,7 +644,7 @@ describe('ConversationScreen', () => {
       const avoiding = screen.UNSAFE_getByType(KeyboardAvoidingView);
       expect(avoiding.props.behavior).toBeUndefined();
       expect(avoiding.props.keyboardVerticalOffset).toBe(0);
-      expect(screen.getByLabelText('Reply').parent).toHaveStyle({ paddingBottom: 34 });
+      expect(screen.getByTestId(testIds.conversationComposer)).toHaveStyle({ paddingBottom: 34 });
     } finally {
       Object.defineProperty(Platform, 'OS', { configurable: true, value: originalOs });
     }

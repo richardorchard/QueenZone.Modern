@@ -3,6 +3,7 @@ import { Keyboard, Platform, Pressable, StyleSheet, Text, TextInput, View } from
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ApiError } from '../../api/client';
 import { fonts, palette, radius, space, type, useTheme } from '../../theme';
+import { testIds } from '../../test/testIds';
 import { Button } from '../../ui/Button';
 import { conversationBodyMaxLength, validateReplyBody } from './inboxMeta';
 
@@ -90,6 +91,7 @@ export const ConversationComposer = memo(function ConversationComposer({
 
   return (
     <View
+      testID={testIds.conversationComposer}
       style={[
         styles.composer,
         {
