@@ -39,10 +39,10 @@
   Pass --no-restore to dotnet test.
 
 .EXAMPLE
-  pwsh -File ./scripts/Invoke-WebTestsShard.ps1 -ShardIndex 0 -ShardCount 3 -IncludeSmallProjects
+  pwsh -File ./scripts/Invoke-WebTestsShard.ps1 -ShardIndex 0 -ShardCount 4 -IncludeSmallProjects
 
 .EXAMPLE
-  pwsh -File ./scripts/Invoke-WebTestsShard.ps1 -ShardIndex 1 -ShardCount 3 -CollectCoverage
+  pwsh -File ./scripts/Invoke-WebTestsShard.ps1 -ShardIndex 1 -ShardCount 4 -CollectCoverage
 #>
 [CmdletBinding()]
 param(
@@ -52,7 +52,7 @@ param(
 
     [Parameter()]
     [ValidateRange(1, 64)]
-    [int] $ShardCount = 3,
+    [int] $ShardCount = 4,
 
     [Parameter()]
     [string] $Configuration = "Release",

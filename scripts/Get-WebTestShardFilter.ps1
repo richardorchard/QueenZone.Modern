@@ -35,10 +35,10 @@
   Run fixture-based assertions against the weight and assignment helpers, then exit.
 
 .EXAMPLE
-  pwsh -File ./scripts/Get-WebTestShardFilter.ps1 -ShardIndex 0 -ShardCount 3
+  pwsh -File ./scripts/Get-WebTestShardFilter.ps1 -ShardIndex 0 -ShardCount 4
 
 .EXAMPLE
-  pwsh -File ./scripts/Get-WebTestShardFilter.ps1 -ShardCount 3 -List
+  pwsh -File ./scripts/Get-WebTestShardFilter.ps1 -ShardCount 4 -List
 #>
 [CmdletBinding()]
 param(
@@ -48,7 +48,7 @@ param(
 
     [Parameter()]
     [ValidateRange(1, 64)]
-    [int] $ShardCount = 3,
+    [int] $ShardCount = 4,
 
     [Parameter()]
     [string] $TestsRoot = "",
