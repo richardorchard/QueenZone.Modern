@@ -115,6 +115,9 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       // react-native-android-widget's work-runtime does not clash with a
       // transitive work-runtime-ktx 2.7.1 (duplicate OneTimeWorkRequestKt).
       './plugins/withAndroidWorkRuntimeAlignment.cjs',
+      // After expo-media-library: drop READ_MEDIA_* so add-only save does not
+      // request photo/video/audio read at install (#1230 / #1232).
+      './plugins/withAndroidAddOnlyPhotos.cjs',
       ...(smokeEmbed ? ['./plugins/smokeEmbed.cjs'] : []),
       // After expo-widgets writes ExpoWidgetsTarget: render On This Day in
       // SwiftUI so the gallery/home snapshot is never a Release EmptyView.

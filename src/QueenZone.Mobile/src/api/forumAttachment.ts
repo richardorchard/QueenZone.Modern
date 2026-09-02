@@ -1,5 +1,7 @@
-import { Linking, Share } from 'react-native';
 import { getAppConfig } from '../config';
+import { saveLocalFileToPhotos } from '../media/saveToPhotos';
+import { shareLocalFile } from '../media/shareLocalFile';
+import { writeCachedLocalFile } from '../media/writeCachedFile';
 import { resolveContentUrl } from '../ui/html/resolveContentUrl';
 import { ApiError } from './client';
 
@@ -7,7 +9,17 @@ export type ForumAttachmentBytes = {
   finalUrl: string;
   contentType: string;
   dataUri: string;
+  bytes: Uint8Array;
 };
+
+export type CachedForumAttachment = {
+  fileUri: string;
+  contentType: string;
+  dataUri: string;
+};
+
+const OPEN_FAILED = 'This attachment cannot be opened from the app.';
+const SHARE_FAILED = 'Unable to open this attachment.';
 
 /** Cookie-gated website path. Never load this in Image / WebView / Linking. */
 export function isCookieGatedForumAttachmentPath(path: string | null | undefined): boolean {
@@ -30,12 +42,12 @@ export async function fetchForumAttachment(
   signal?: AbortSignal,
 ): Promise<ForumAttachmentBytes> {
   if (isCookieGatedForumAttachmentPath(downloadUrl)) {
-    throw ApiError.http(400, 'This attachment cannot be opened from the app.');
+    throw ApiError.http(400, OPEN_FAILED);
   }
 
   const url = resolveContentUrl(downloadUrl, getAppConfig().apiBaseUrl);
   if (!url) {
-    throw ApiError.http(400, 'This attachment cannot be opened from the app.');
+    throw ApiError.http(400, OPEN_FAILED);
   }
 
   const response = await fetch(url, {
@@ -61,6 +73,7 @@ export async function fetchForumAttachment(
     finalUrl: response.url,
     contentType,
     dataUri: `data:${contentType};base64,${bytesToBase64(bytes)}`,
+    bytes,
   };
 }
 
@@ -73,27 +86,48 @@ export async function openForumAttachmentImage(
   accessToken: string,
   signal?: AbortSignal,
 ): Promise<string> {
-  const cached = imageCache.get(downloadUrl);
-  if (cached) {
-    return cached;
-  }
-
-  const fetched = await fetchForumAttachment(downloadUrl, accessToken, signal);
-  if (isCookieGatedForumAttachmentPath(fetched.finalUrl)) {
-    throw ApiError.http(400, 'This attachment cannot be opened from the app.');
-  }
-
-  imageCache.set(downloadUrl, fetched.dataUri);
-  return fetched.dataUri;
+  const loaded = await loadForumAttachment(downloadUrl, accessToken, signal);
+  imageCache.set(downloadUrl, loaded.dataUri);
+  return loaded.dataUri;
 }
 
 export type OpenForumAttachmentFileOptions = {
   signal?: AbortSignal;
-  /** When false, skip the OEM share / Linking sheet after a successful Bearer fetch. */
+  /** When false, skip the Files share sheet after a successful Bearer fetch. */
   present?: boolean;
 };
 
-/** Open a non-image after a Bearer fetch. Follows a public CDN redirect; otherwise shares the bytes. */
+/** Bearer GET → cache file named with `fileName`. Used by play + Files save. */
+export async function cacheForumAttachment(
+  downloadUrl: string,
+  accessToken: string,
+  fileName: string,
+  signal?: AbortSignal,
+): Promise<CachedForumAttachment> {
+  const loaded = await loadForumAttachment(downloadUrl, accessToken, signal);
+  const cacheKey = `${downloadUrl}\0${fileName}`;
+  const cachedUri = fileUriCache.get(cacheKey);
+  if (cachedUri) {
+    return { fileUri: cachedUri, contentType: loaded.contentType, dataUri: loaded.dataUri };
+  }
+
+  const fileUri = await writeCachedLocalFile(fileName, loaded.bytes);
+  fileUriCache.set(cacheKey, fileUri);
+  return { fileUri, contentType: loaded.contentType, dataUri: loaded.dataUri };
+}
+
+/** Image save: cached file → add-only Photos. Not the share sheet. */
+export async function saveForumAttachmentImage(
+  downloadUrl: string,
+  accessToken: string,
+  fileName: string,
+  signal?: AbortSignal,
+): Promise<void> {
+  const cached = await cacheForumAttachment(downloadUrl, accessToken, fileName, signal);
+  await saveLocalFileToPhotos(cached.fileUri);
+}
+
+/** Non-image (and audio Files): cache file → Sharing.shareAsync. Cancel is not an error. */
 export async function openForumAttachmentFile(
   downloadUrl: string,
   accessToken: string,
@@ -101,31 +135,43 @@ export async function openForumAttachmentFile(
   options?: OpenForumAttachmentFileOptions,
 ): Promise<void> {
   const present = options?.present ?? true;
-  const fetched = await fetchForumAttachment(downloadUrl, accessToken, options?.signal);
-  if (
-    fetched.finalUrl &&
-    !isCookieGatedForumAttachmentPath(fetched.finalUrl) &&
-    /^https?:\/\//i.test(fetched.finalUrl) &&
-    !/\/api\/v1\/forum\/attachments(?:\/|$)/i.test(fetched.finalUrl)
-  ) {
-    if (present) {
-      await Linking.openURL(fetched.finalUrl);
-    }
-    return;
-  }
-
+  const cached = await cacheForumAttachment(downloadUrl, accessToken, fileName, options?.signal);
   if (!present) {
     return;
   }
 
-  await Share.share({
-    title: fileName,
-    message: fileName,
-    url: fetched.dataUri,
-  });
+  try {
+    await shareLocalFile(cached.fileUri, cached.contentType, fileName);
+  } catch (error: unknown) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw ApiError.http(500, SHARE_FAILED);
+  }
+}
+
+async function loadForumAttachment(
+  downloadUrl: string,
+  accessToken: string,
+  signal?: AbortSignal,
+): Promise<ForumAttachmentBytes> {
+  const cached = attachmentCache.get(downloadUrl);
+  if (cached) {
+    return cached;
+  }
+
+  const fetched = await fetchForumAttachment(downloadUrl, accessToken, signal);
+  if (isCookieGatedForumAttachmentPath(fetched.finalUrl)) {
+    throw ApiError.http(400, OPEN_FAILED);
+  }
+
+  attachmentCache.set(downloadUrl, fetched);
+  return fetched;
 }
 
 const imageCache = new Map<string, string>();
+const attachmentCache = new Map<string, ForumAttachmentBytes>();
+const fileUriCache = new Map<string, string>();
 
 function bytesToBase64(bytes: Uint8Array): string {
   let binary = '';

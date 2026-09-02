@@ -100,6 +100,46 @@ jest.mock('expo-image', () => {
   return { Image: View };
 });
 
+jest.mock('expo-media-library/legacy', () => ({
+  getPermissionsAsync: jest.fn(async () => ({ granted: true, canAskAgain: true, status: 'granted' })),
+  requestPermissionsAsync: jest.fn(async () => ({
+    granted: true,
+    canAskAgain: true,
+    status: 'granted',
+  })),
+  saveToLibraryAsync: jest.fn(async () => {}),
+}));
+
+jest.mock('expo-sharing', () => ({
+  isAvailableAsync: jest.fn(async () => true),
+  shareAsync: jest.fn(async () => {}),
+}));
+
+jest.mock('expo-file-system/legacy', () => ({
+  cacheDirectory: 'file:///cache/',
+  EncodingType: { Base64: 'base64' },
+  writeAsStringAsync: jest.fn(async () => {}),
+}));
+
+jest.mock('expo-audio', () => ({
+  setAudioModeAsync: jest.fn(async () => {}),
+  useAudioPlayer: () => ({
+    play: jest.fn(),
+    pause: jest.fn(),
+    replace: jest.fn(),
+  }),
+  useAudioPlayerStatus: () => ({
+    playing: false,
+    isLoaded: true,
+    currentTime: 0,
+    duration: 0,
+    didJustFinish: false,
+    isBuffering: false,
+    playbackState: 'ready',
+    reasonForWaitingToPlay: '',
+  }),
+}));
+
 jest.mock('lucide-react-native', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- Jest CJS mock factory.
   const React = require('react');

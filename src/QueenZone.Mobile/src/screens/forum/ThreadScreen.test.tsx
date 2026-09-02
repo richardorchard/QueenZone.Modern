@@ -7,8 +7,10 @@ import {
   fetchForumTopicPostsResult,
   fetchForumTopicResult,
   fetchForumTopicWatch,
+  cacheForumAttachment,
   openForumAttachmentFile,
   openForumAttachmentImage,
+  saveForumAttachmentImage,
   unwatchForumTopic,
   voteForumTopicPoll,
   watchForumTopic,
@@ -45,6 +47,8 @@ jest.mock('../../api', () => {
     closeForumTopicPoll: jest.fn(),
     openForumAttachmentFile: jest.fn(),
     openForumAttachmentImage: jest.fn(),
+    cacheForumAttachment: jest.fn(),
+    saveForumAttachmentImage: jest.fn(),
   };
 });
 
@@ -116,6 +120,10 @@ const unwatchTopic = unwatchForumTopic as jest.MockedFunction<typeof unwatchForu
 const votePoll = voteForumTopicPoll as jest.MockedFunction<typeof voteForumTopicPoll>;
 const openAttachment = openForumAttachmentFile as jest.MockedFunction<typeof openForumAttachmentFile>;
 const openImage = openForumAttachmentImage as jest.MockedFunction<typeof openForumAttachmentImage>;
+const cacheAttachment = cacheForumAttachment as jest.MockedFunction<typeof cacheForumAttachment>;
+const saveImageAttachment = saveForumAttachmentImage as jest.MockedFunction<
+  typeof saveForumAttachmentImage
+>;
 
 function renderThread(navigation = fakeNavigation()) {
   return {
@@ -309,6 +317,14 @@ describe('ThreadScreen attachments', () => {
     openAttachment.mockResolvedValue(undefined);
     openImage.mockReset();
     openImage.mockResolvedValue('data:image/jpeg;base64,dGVzdA==');
+    cacheAttachment.mockReset();
+    cacheAttachment.mockResolvedValue({
+      fileUri: 'file:///cache/brighton-rock-solo.mp3',
+      contentType: 'audio/mpeg',
+      dataUri: 'data:audio/mpeg;base64,AA==',
+    });
+    saveImageAttachment.mockReset();
+    saveImageAttachment.mockResolvedValue(undefined);
   });
 
   afterEach(async () => {
@@ -605,7 +621,7 @@ describe('ThreadScreen attachments', () => {
     expect(screen.getByTestId(testIds.forumThreadAttachmentOpened)).toBeOnTheScreen();
   });
 
-  it('lets a signed-in member download a sound-file attachment', async () => {
+  it('lets a signed-in member play a sound-file attachment', async () => {
     mockSession.isSignedIn = true;
     mockSession.accessToken = 'tok';
     mockNetworkPosts(
@@ -635,26 +651,28 @@ describe('ThreadScreen attachments', () => {
     const user = userEvent.setup();
     await user.press(screen.getByRole('button', { name: /brighton-rock-solo.mp3/ }));
     await waitFor(() =>
-      expect(openAttachment).toHaveBeenCalledWith(
+      expect(cacheAttachment).toHaveBeenCalledWith(
         '/api/v1/forum/attachments/legacy/1201',
         'tok',
         'brighton-rock-solo.mp3',
-        { present: false },
       ),
     );
     expect(openImage).not.toHaveBeenCalled();
-    expect(openAttachment.mock.calls[0]?.[0]).not.toContain('/forum/attachment/legacy/');
+    expect(openAttachment).not.toHaveBeenCalled();
+    expect(cacheAttachment.mock.calls[0]?.[0]).not.toContain('/forum/attachment/legacy/');
+    expect(screen.getByTestId(testIds.forumThreadAttachmentAudio)).toBeOnTheScreen();
+    expect(screen.getByTestId(testIds.forumThreadAttachmentSaveFile)).toBeOnTheScreen();
     expect(screen.getByTestId(testIds.forumThreadAttachmentOpened)).toBeOnTheScreen();
   });
 
   it('shows an error when a sound-file downloadUrl is cookie-gated', async () => {
     mockSession.isSignedIn = true;
     mockSession.accessToken = 'tok';
-    openAttachment.mockImplementationOnce(async (downloadUrl: string, accessToken: string, fileName: string) => {
+    cacheAttachment.mockImplementationOnce(async (downloadUrl: string, accessToken: string, fileName: string) => {
       const actual = jest.requireActual<{
-        openForumAttachmentFile: typeof openForumAttachmentFile;
+        cacheForumAttachment: typeof cacheForumAttachment;
       }>('../../api');
-      return actual.openForumAttachmentFile(downloadUrl, accessToken, fileName);
+      return actual.cacheForumAttachment(downloadUrl, accessToken, fileName);
     });
     mockNetworkPosts(
       pagedResponse(
@@ -722,6 +740,7 @@ describe('ThreadScreen attachments', () => {
     expect(screen.queryByTestId(testIds.forumThreadAttachmentViewer)).toBeNull();
     expect(openAttachment).not.toHaveBeenCalled();
     expect(openImage).not.toHaveBeenCalled();
+    expect(saveImageAttachment).not.toHaveBeenCalled();
   });
 });
 
