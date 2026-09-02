@@ -1,13 +1,17 @@
 using System.Diagnostics.CodeAnalysis;
+using Microsoft.Extensions.Logging;
 
 namespace QueenZone.Data;
 
 /// <summary>
 /// Calls <c>dbo.SearchDocument_Search</c> for ranked, paginated whole-site search.
 /// Passes <see cref="SiteSearchLimits.MaxRankedMatches"/> so common terms stay inside the
-/// command timeout.
+/// command timeout. SQL command timeouts are logged at Warning and thrown as
+/// <see cref="SiteSearchTimeoutException"/> — the 30-second command timeout is unchanged.
 /// </summary>
-public sealed class EfSiteSearchService(QueenZoneDbContext dbContext) : ISiteSearchService
+public sealed class EfSiteSearchService(
+    QueenZoneDbContext dbContext,
+    ILogger<EfSiteSearchService> logger) : ISiteSearchService
 {
     private const int MaxPageSize = 100;
 
@@ -26,8 +30,13 @@ public sealed class EfSiteSearchService(QueenZoneDbContext dbContext) : ISiteSea
         var normalizedPage = Math.Max(page, 1);
         var take = Math.Clamp(pageSize, 1, MaxPageSize);
         var offset = (normalizedPage - 1) * take;
+        var trimmed = query.Trim();
 
-        return await ExecuteSearchAsync(query.Trim(), contentType, offset, take, normalizedPage, cancellationToken);
+        return await SiteSearchSqlTimeout.ExecuteAsync(
+            ct => ExecuteSearchAsync(trimmed, contentType, offset, take, normalizedPage, ct),
+            logger,
+            trimmed,
+            cancellationToken);
     }
 
     [ExcludeFromCodeCoverage]

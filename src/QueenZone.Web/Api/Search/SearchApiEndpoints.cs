@@ -11,6 +11,8 @@ public static class SearchApiEndpoints
 {
     public const string Path = "/api/v1/search";
 
+    public const string TimeoutDetail = "Site search took too long. Try again shortly.";
+
     public static void MapSearchApiEndpoints(this WebApplication app)
     {
         app.MapGet(Path, SearchAsync)
@@ -20,11 +22,13 @@ public static class SearchApiEndpoints
             .WithSummary("Paged whole-site search against the SearchDocument index. Empty q returns an empty page.")
             .DisableAntiforgery()
             .RequireRateLimiting(QueenZoneRateLimitPolicies.Search)
-            .Produces<ApiPagedResponse<SearchResultDto>>();
+            .Produces<ApiPagedResponse<SearchResultDto>>()
+            .ProducesProblem(StatusCodes.Status504GatewayTimeout);
     }
 
     internal static async Task<IResult> SearchAsync(
         ISiteSearchService siteSearchService,
+        ILoggerFactory loggerFactory,
         string? q,
         string? type,
         int? page,
@@ -33,19 +37,41 @@ public static class SearchApiEndpoints
     {
         var request = ApiPagination.Normalize(page, pageSize, SearchModel.PageSize);
         var contentType = SiteSearchContentType.Normalize(type);
-        var results = await siteSearchService.SearchAsync(
-            q ?? string.Empty,
-            contentType,
-            request.Page,
-            request.PageSize,
-            cancellationToken);
+        try
+        {
+            var results = await siteSearchService.SearchAsync(
+                q ?? string.Empty,
+                contentType,
+                request.Page,
+                request.PageSize,
+                cancellationToken);
 
-        var response = ApiPagedResponse<SearchResultDto>.Create(
-            SearchApiMapper.ToItems(results.Results),
-            request.Page,
-            request.PageSize,
-            results.TotalCount);
+            var response = ApiPagedResponse<SearchResultDto>.Create(
+                SearchApiMapper.ToItems(results.Results),
+                request.Page,
+                request.PageSize,
+                results.TotalCount);
 
-        return Results.Ok(response);
+            return Results.Ok(response);
+        }
+        catch (Exception ex) when (ex is SiteSearchTimeoutException || SiteSearchSqlTimeout.IsCommandTimeout(ex))
+        {
+            if (ex is not SiteSearchTimeoutException)
+            {
+                SiteSearchSqlTimeout.CreateAndLog(
+                    loggerFactory.CreateLogger(nameof(SearchApiEndpoints)),
+                    q ?? string.Empty,
+                    TimeSpan.Zero,
+                    ex);
+            }
+
+            return TimeoutProblem();
+        }
     }
+
+    internal static IResult TimeoutProblem() =>
+        Results.Problem(
+            statusCode: StatusCodes.Status504GatewayTimeout,
+            title: "Gateway Timeout",
+            detail: TimeoutDetail);
 }

@@ -4,6 +4,14 @@ using QueenZone.Data.Entities;
 namespace QueenZone.Data;
 
 /// <summary>Plain EF Core writes against the modern <c>SearchDocument</c> table.</summary>
+/// <remarks>
+/// Article publish (#1211) calls <see cref="UpsertAsync"/> / <see cref="RemoveAsync"/> for one
+/// <c>SourceKey</c> after the editorial save has already committed. That is a short
+/// single-row UPDATE/INSERT — not <see cref="ReplaceContentTypeAsync"/>, not a user
+/// transaction, and not FTS DDL. The SearchDocument full-text index is
+/// <c>CHANGE_TRACKING AUTO</c> (background crawl), so these writes do not hold table
+/// locks or trigger a synchronous catalog rebuild.
+/// </remarks>
 public sealed class EfSearchIndexService(QueenZoneDbContext dbContext) : ISearchIndexService
 {
     public async Task UpsertAsync(SearchDocumentEntity document, CancellationToken cancellationToken = default)
