@@ -125,7 +125,7 @@ internal sealed class DirectPushTransport(
                 category,
                 error);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             logger.LogWarning(
                 ex,
@@ -197,7 +197,7 @@ internal sealed class DirectPushTransport(
                 payload.Category,
                 error);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             logger.LogWarning(
                 ex,

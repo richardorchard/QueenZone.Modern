@@ -110,6 +110,10 @@ public sealed class ActionModel(
         {
             return RedirectWithMessage(id, ex.Message, "error");
         }
+        catch (OptimisticConcurrencyException)
+        {
+            return RedirectWithMessage(id, OptimisticConcurrencyException.UserMessage, "error");
+        }
 
         return Redirect($"/admin/news/{newsId}/edit");
     }

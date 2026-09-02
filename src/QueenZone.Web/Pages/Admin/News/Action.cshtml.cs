@@ -76,7 +76,7 @@ public sealed class ActionModel(
         {
             await discoveryRepository.ClearPromotedNewsLinksAsync(id, cancellationToken);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             // Best-effort cleanup when discovery tables are unavailable or unmigrated.
             // Delete the news row even if provenance unlink fails; do not hide the failure from logs.
@@ -125,7 +125,7 @@ public sealed class ActionModel(
                 await searchIndexService.UpsertAsync(SearchReindexBuilder.MapNews(published), cancellationToken);
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             logger.LogWarning(ex, "Best-effort search index upsert failed for news article {NewsId}", id);
         }
@@ -137,7 +137,7 @@ public sealed class ActionModel(
         {
             await searchIndexService.RemoveAsync($"news:{id}", cancellationToken);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             logger.LogWarning(ex, "Best-effort search index removal failed for news article {NewsId}", id);
         }
