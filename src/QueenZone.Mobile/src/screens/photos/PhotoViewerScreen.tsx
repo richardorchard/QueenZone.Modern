@@ -1,5 +1,5 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { ChevronLeft, ChevronRight, X } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, Download, X } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,6 +18,7 @@ import {
   resolvedPhotoSize,
   schedulePhotoGallerySwipe,
 } from './photoGalleryMeta';
+import { saveGalleryPhoto, saveGalleryPhotoCopy } from './saveGalleryPhoto';
 import { ZoomableArchiveImage } from './ZoomableArchiveImage';
 
 type Props = NativeStackScreenProps<PhotosStackParamList, 'PhotoViewer'>;
@@ -31,8 +32,10 @@ export function PhotoViewerScreen({ navigation, route }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [reloadToken, setReloadToken] = useState(0);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const photoRef = useRef<PhotoDetail | null>(null);
   const swipeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveBusyRef = useRef(false);
   photoRef.current = photo;
 
   useEffect(() => {
@@ -102,6 +105,27 @@ export function PhotoViewerScreen({ navigation, route }: Props) {
     setChromeVisible((value) => !value);
   }, []);
 
+  useEffect(() => {
+    setSaveError(null);
+  }, [picId]);
+
+  const handleSave = useCallback(async () => {
+    const current = photoRef.current;
+    if (current == null || saveBusyRef.current) {
+      return;
+    }
+
+    saveBusyRef.current = true;
+    setSaveError(null);
+    try {
+      await saveGalleryPhoto(current.imageUrl);
+    } catch (err: unknown) {
+      setSaveError(err instanceof Error ? err.message : saveGalleryPhotoCopy.failed);
+    } finally {
+      saveBusyRef.current = false;
+    }
+  }, []);
+
   if (loading && !photo) {
     return <LoadingBlock label="Loading photograph…" />;
   }
@@ -151,7 +175,18 @@ export function PhotoViewerScreen({ navigation, route }: Props) {
             <Text style={[type.eyebrow, { color: c.textMuted }]}>
               {photoCounterLabel(photo.index, photo.count)}
             </Text>
-            <View style={{ width: 44 }} />
+            {image ? (
+              <IconButton
+                icon={Download}
+                accessibilityLabel="Save to Photos"
+                testID={testIds.photoViewerSave}
+                onPress={() => {
+                  void handleSave();
+                }}
+              />
+            ) : (
+              <View style={{ width: 44 }} />
+            )}
           </View>
           {photo.previous ? (
             <View style={{ position: 'absolute', left: 4, top: '45%' }}>
@@ -182,6 +217,9 @@ export function PhotoViewerScreen({ navigation, route }: Props) {
           >
             <Text style={[type.cardTitle, { color: c.textPrimary }]}>{photo.title}</Text>
             <MetaLine parts={photoDetailMeta(photo)} />
+            {saveError ? (
+              <Text style={[type.caption, { color: c.textMuted }]}>{saveError}</Text>
+            ) : null}
           </View>
         </View>
       ) : null}
