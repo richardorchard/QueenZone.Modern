@@ -1,5 +1,6 @@
 using System.IO;
 using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -41,8 +42,7 @@ internal sealed class EditorialArticleEditorRequestGuardFilter(ILogger<Editorial
 
     public async Task OnResultExecutionAsync(ResultExecutingContext context, ResultExecutionDelegate next)
     {
-        if (context.Controller is EditModel page
-            && context.Result is IStatusCodeActionResult { StatusCode: StatusCodes.Status400BadRequest })
+        if (context.Controller is EditModel page && IsBadRequest(context))
         {
             var (message, reason) = Describe(context.HttpContext, page);
             await FailAsync(page, message, reason, context.HttpContext.RequestAborted);
@@ -52,6 +52,10 @@ internal sealed class EditorialArticleEditorRequestGuardFilter(ILogger<Editorial
 
         await next();
     }
+
+    private static bool IsBadRequest(ResultExecutingContext context) =>
+        context.Result is IStatusCodeActionResult { StatusCode: StatusCodes.Status400BadRequest }
+        || context.HttpContext.Response.StatusCode == StatusCodes.Status400BadRequest;
 
     internal static bool IsHandled(Exception exception) =>
         exception is BadHttpRequestException or InvalidDataException or AntiforgeryValidationException;

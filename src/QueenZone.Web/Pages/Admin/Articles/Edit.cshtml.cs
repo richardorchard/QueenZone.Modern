@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using QueenZone.Data;
@@ -7,6 +8,7 @@ namespace QueenZone.Web.Pages.Admin.Articles;
 
 [RequestFormLimits(MultipartBodyLengthLimit = 16 * 1024 * 1024, ValueLengthLimit = 16 * 1024 * 1024)]
 [RequestSizeLimit(16 * 1024 * 1024)]
+[IgnoreAntiforgeryToken]
 [TypeFilter(typeof(EditorialArticleEditorRequestGuardFilter))]
 public sealed class EditModel(
     IEditorialArticleRepository editorialArticles,
@@ -14,7 +16,9 @@ public sealed class EditModel(
     NewsArticleImageService imageService,
     IAdminPhotoRepository adminPhotoRepository,
     UgcHtml ugcHtml,
-    PublicQueryCacheService publicQueryCache) : AdminArticlesPageModel, IAsyncExceptionFilter
+    PublicQueryCacheService publicQueryCache,
+    IAntiforgery antiforgery,
+    ILogger<EditModel> logger) : AdminArticlesPageModel, IAsyncExceptionFilter
 {
     [BindProperty] public EditorialArticleForm Form { get; set; } = new();
     public List<string> Errors { get; } = [];
@@ -62,6 +66,35 @@ public sealed class EditModel(
     public async Task<IActionResult> OnPostAsync(Guid? id, CancellationToken ct)
     {
         Form.Id = id ?? Form.Id;
+        try
+        {
+            await antiforgery.ValidateRequestAsync(HttpContext);
+        }
+        catch (AntiforgeryValidationException ex)
+        {
+            logger.LogWarning(ex, "Articles editor POST rejected: {Reason}", ex.Message);
+            AddError(EditorialArticleEditorRequestGuardFilter.AntiforgeryError);
+            await PrepareRedisplayAsync(ct);
+            return Page();
+        }
+
+        if (!ModelState.IsValid)
+        {
+            foreach (var entry in ModelState)
+            {
+                foreach (var error in entry.Value.Errors)
+                {
+                    AddError(string.IsNullOrWhiteSpace(error.ErrorMessage)
+                        ? EditorialArticleEditorRequestGuardFilter.BindError
+                        : error.ErrorMessage);
+                }
+            }
+
+            logger.LogWarning(
+                "Articles editor POST bind failed: {Keys}",
+                string.Join(", ", ModelState.Where(entry => entry.Value is { Errors.Count: > 0 }).Select(entry => entry.Key)));
+        }
+
         var existing = Form.Id is Guid existingId ? await editorialArticles.GetAsync(existingId, ct) : null;
         var sanitizedBody = ugcHtml.Sanitize(Form.Body);
         Validate(sanitizedBody);
@@ -90,7 +123,6 @@ public sealed class EditModel(
             return;
         }
 
-        var logger = HttpContext.RequestServices.GetRequiredService<ILogger<EditModel>>();
         logger.LogWarning(context.Exception, "Articles editor POST rejected: {Reason}", context.Exception.Message);
         AddError(EditorialArticleEditorRequestGuardFilter.MessageFor(context.Exception));
         await PrepareRedisplayAsync(context.HttpContext.RequestAborted);
