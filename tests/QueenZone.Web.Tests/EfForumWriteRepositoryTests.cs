@@ -93,6 +93,19 @@ public sealed class EfForumWriteRepositoryTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task AllocateNextLegacyIdAsync_UnknownSequenceName_ThrowsArgumentOutOfRangeException()
+    {
+        var exception = await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+            repository.AllocateNextLegacyIdAsync(
+                "NotARealSequence",
+                static (_, _) => Task.FromResult(1),
+                CancellationToken.None));
+
+        Assert.Equal("sequenceName", exception.ParamName);
+        Assert.Equal("NotARealSequence", exception.ActualValue);
+    }
+
+    [Fact]
     public async Task CreateThreadAsync_AllocatesMonotonicLegacyIdsAcrossCreates()
     {
         var member = await SeedMemberAsync();
