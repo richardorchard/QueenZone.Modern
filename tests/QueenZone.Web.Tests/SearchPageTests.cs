@@ -115,8 +115,8 @@ public sealed class SearchPageTests : IClassFixture<WebApplicationFactory<Progra
         var section = AssertSingleSearchSection(body);
 
         Assert.Contains("<form", section, StringComparison.Ordinal);
-        Assert.Contains("""aria-label="Filter search results by content type"""", section, StringComparison.Ordinal);
-        Assert.Contains("""class="qz-tag-row u-mt-4"""", section, StringComparison.Ordinal);
+        Assert.Contains("aria-label=\"Filter search results by content type\"", section, StringComparison.Ordinal);
+        Assert.Contains("class=\"qz-tag-row u-mt-4\"", section, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -156,7 +156,7 @@ public sealed class SearchPageTests : IClassFixture<WebApplicationFactory<Progra
         var body = await client.GetStringAsync("/search");
         var section = AssertSingleSearchSection(body);
 
-        Assert.Contains("""class="qz-tag-row u-mt-5"""", section, StringComparison.Ordinal);
+        Assert.Contains("class=\"qz-tag-row u-mt-5\"", section, StringComparison.Ordinal);
         Assert.DoesNotContain("Filter search results by content type", section, StringComparison.Ordinal);
     }
 
@@ -188,7 +188,7 @@ public sealed class SearchPageTests : IClassFixture<WebApplicationFactory<Progra
         var paragraph = section.LastIndexOf("<p", messageAt, StringComparison.Ordinal);
         Assert.True(paragraph >= 0 && paragraph < messageAt, "expected a paragraph wrapping the message");
         Assert.Contains(spacingClass, section[paragraph..messageAt], StringComparison.Ordinal);
-        Assert.Contains("""class="qz-tag-row u-mt-4"""", section, StringComparison.Ordinal);
+        Assert.Contains("class=\"qz-tag-row u-mt-4\"", section, StringComparison.Ordinal);
     }
 
     [Fact]
