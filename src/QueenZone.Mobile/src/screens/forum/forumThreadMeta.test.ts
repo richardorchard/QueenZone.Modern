@@ -6,6 +6,7 @@ import {
   formatMemberSince,
   formatPostTimestamp,
   imagePreviewUrl,
+  isAudioAttachment,
   parseTopicId,
   topicReplyAllowed,
   watchButtonLabel,
@@ -129,13 +130,19 @@ describe('forum thread meta', () => {
       isImage: false,
       thumbnailUrl: null,
       url: '/forum/attachment/legacy/1201',
+      extension: 'MP3',
+      fileName: 'brighton-rock-solo.mp3',
     };
     assert.equal(attachmentAction(legacyJpg, true), 'view-image');
     assert.equal(attachmentAction(legacyJpg, false), 'none');
     assert.equal(attachmentAction(thumbed, true), 'view-image');
     assert.equal(attachmentAction(pdf, true), 'open-file');
     assert.equal(attachmentAction(pdf, false), 'none');
-    assert.equal(attachmentAction(mp3, true), 'open-file');
+    assert.equal(attachmentAction(mp3, true), 'play-audio');
     assert.equal(attachmentAction(mp3, false), 'none');
+    assert.equal(isAudioAttachment({ extension: 'mp3' }), true);
+    assert.equal(isAudioAttachment({ contentType: 'audio/wav' }), true);
+    assert.equal(isAudioAttachment({ isImage: true, extension: 'mp3' }), false);
+    assert.equal(isAudioAttachment({ extension: 'pdf' }), false);
   });
 });

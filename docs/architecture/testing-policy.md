@@ -279,7 +279,7 @@ CI also collects coverage from the deterministic test suite (merged across Web.T
 | `scripts/Get-WebTestShardFilter.ps1` | Discovers `*Tests` classes and assigns them with greedy balance. Checked-in observed class durations take precedence; new classes fall back to case count × host-kind heuristics. Emits an xUnit `--filter`. |
 | `scripts/Invoke-WebTestsShard.ps1` | Runs one shard's filtered Web.Tests (`-SmallProjectsOnly` runs just the Tools/Storage/NewsAgent projects instead) |
 | `scripts/Update-WebTestDurations.ps1` | Merges shard TRX timings into a noise-damped class-duration map. CI uploads the suggested map for periodic review and commit. |
-| `.github/workflows/ci.yml` jobs `test` + `small-projects-tests` + `coverage` | Matrix `shard: [0, 1, 2]` for Web.Tests, a separate parallel job for the small projects, then merge Cobertura, update observed timings, and run the coverage gate |
+| `.github/workflows/ci.yml` jobs `test` + `small-projects-tests` + `coverage` | Matrix `shard: [0, 1, 2, 3]` for Web.Tests, a separate parallel job for the small projects, then merge Cobertura, update observed timings, and run the coverage gate |
 
 The `build` job uploads `src/**/bin/Release`, `tests/**/bin/Release`, and `src/QueenZone.Web/obj/Release`. Keep PDBs — Coverlet maps executed lines from them, so a `--no-build` shard without symbols collapses global coverage. Keep `*.xml` — NewsAgent tests copy fixture XML into the output directory and `--no-build` shards read those files from disk. Shards must keep the QueenZone.Web `obj` tree — ASP.NET Core’s `WebApplicationFactory` resolves compressed static web assets under `src/QueenZone.Web/obj/.../compressed/`. Uploading only `bin` causes `DirectoryNotFoundException` in Development-environment host tests (for example `StaticAssetCacheHeadersTests`). Other project `obj` trees are not required for `--no-build` shard runs.
 
@@ -289,11 +289,12 @@ The `build` job uploads `src/**/bin/Release`, `tests/**/bin/Release`, and `src/Q
 
 ```powershell
 powershell -File ./scripts/Get-WebTestShardFilter.ps1 -SelfTest
-powershell -File ./scripts/Get-WebTestShardFilter.ps1 -ShardCount 3 -List
+powershell -File ./scripts/Get-WebTestShardFilter.ps1 -ShardCount 4 -List
 dotnet build QueenZone.sln --configuration Release
-powershell -File ./scripts/Invoke-WebTestsShard.ps1 -ShardIndex 0 -ShardCount 3 -NoBuild -NoRestore
-powershell -File ./scripts/Invoke-WebTestsShard.ps1 -ShardIndex 1 -ShardCount 3 -NoBuild -NoRestore
-powershell -File ./scripts/Invoke-WebTestsShard.ps1 -ShardIndex 2 -ShardCount 3 -NoBuild -NoRestore
+powershell -File ./scripts/Invoke-WebTestsShard.ps1 -ShardIndex 0 -ShardCount 4 -NoBuild -NoRestore
+powershell -File ./scripts/Invoke-WebTestsShard.ps1 -ShardIndex 1 -ShardCount 4 -NoBuild -NoRestore
+powershell -File ./scripts/Invoke-WebTestsShard.ps1 -ShardIndex 2 -ShardCount 4 -NoBuild -NoRestore
+powershell -File ./scripts/Invoke-WebTestsShard.ps1 -ShardIndex 3 -ShardCount 4 -NoBuild -NoRestore
 powershell -File ./scripts/Invoke-WebTestsShard.ps1 -SmallProjectsOnly -NoBuild -NoRestore
 ```
 
@@ -403,7 +404,7 @@ These four **GitHub check names** (the job `name:` values in `ci.yml`) must be r
 - `Mobile iOS build`
 - `Mobile API consumer contracts`
 
-**Required-context migration:** after this workflow reaches `main`, add `test (2)` to protected `main`. Keep `test (0)` and `test (1)`. A workflow file cannot update branch protection itself.
+**Required-context migration:** after this workflow reaches `main`, add `test (3)` to protected `main`. Keep `test (0)`, `test (1)`, and `test (2)`. Do not require `test (3)` before this change merges — other open PRs still run three shards and would stay blocked. A workflow file cannot update branch protection itself.
 
 Android and iOS are equal: when native inputs change, both native compile jobs run. Pure TypeScript/TSX changes run the JS, coverage, Doctor, and relevant contract checks without recompiling either native project. Other PRs receive skip-success stubs (`mobile-js-ok`, `mobile-android-ok`, `mobile-ios-ok`) with the exact required check names. `mobile-api-contracts-ok` is the matching stub for `Mobile API consumer contracts`.
 
@@ -471,7 +472,7 @@ Pull requests that do not change the website skip `build` / `test` / coverage / 
 - Mixed mobile + web PRs run both pipelines. Mixed API + mobile client PRs run contracts **and** native jobs.
 - Deploy uses the same classifier so an infra-only or mobile-only merge does not zip-deploy unchanged website binaries. Mixed web+mobile merges still deploy the website; `resolve-ci-run` must not wait for Mobile iOS/Android to finish the overall `ci.yml` conclusion (see `scripts/Resolve-CiPublishRun.sh`).
 
-Skipped non-matrix jobs still report under their required check names, which GitHub treats as satisfied. The `test` matrix is different: skipping it entirely would report a single `test` check and never create the required `test (0)` / `test (1)` / `test (2)` checks, leaving the PR blocked forever. `ci.yml` therefore runs a lightweight `test-docs-ok` matrix on non-web PRs that emits success for those exact names without running the .NET suite. Mobile jobs similarly emit skip-success stubs when their JS or native inputs are unchanged. `mobile-api-contracts-ok` does the same for `Mobile API consumer contracts` when contract paths are unchanged.
+Skipped non-matrix jobs still report under their required check names, which GitHub treats as satisfied. The `test` matrix is different: skipping it entirely would report a single `test` check and never create the required `test (0)` / `test (1)` / `test (2)` / `test (3)` checks, leaving the PR blocked forever. `ci.yml` therefore runs a lightweight `test-docs-ok` matrix on non-web PRs that emits success for those exact names without running the .NET suite. Mobile jobs similarly emit skip-success stubs when their JS or native inputs are unchanged. `mobile-api-contracts-ok` does the same for `Mobile API consumer contracts` when contract paths are unchanged.
 
 ### EF migration consistency
 

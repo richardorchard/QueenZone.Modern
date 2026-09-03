@@ -6,7 +6,7 @@ namespace QueenZone.Web.Pages.Admin.Members;
 public sealed class ActionModel(
     IMemberAccountRepository memberAccountRepository,
     IForumWriteRepository forumWriteRepository,
-    IMobileAuthGrantRepository mobileAuthGrantRepository) : AdminMembersPageModel
+    AdminMemberSuspendService adminMemberSuspendService) : AdminMembersPageModel
 {
     [BindProperty]
     public string? Reason { get; set; }
@@ -18,20 +18,18 @@ public sealed class ActionModel(
             return RedirectWithMessage(id, "A reason is required to suspend a member.", "error");
         }
 
-        var updated = await memberAccountRepository.SuspendAsync(
+        var result = await adminMemberSuspendService.SuspendAsync(
             id, Reason.Trim(), EditorEmail, DateTime.UtcNow, cancellationToken);
-        if (updated is null)
+
+        return result.Status switch
         {
-            return NotFound();
-        }
-
-        await forumWriteRepository.HideAuthorForumContentAsync(id, updated.DisplayName, cancellationToken);
-        await mobileAuthGrantRepository.RevokeAllRefreshTokensForMemberAsync(id, DateTime.UtcNow, cancellationToken);
-
-        return RedirectWithMessage(
-            id,
-            "Member suspended and their forum topics and posts hidden. Their session will end on their next request.",
-            "success");
+            AdminMemberSuspendStatus.NotFound => NotFound(),
+            AdminMemberSuspendStatus.HideTimedOut => RedirectWithMessage(
+                id, AdminMemberSuspendService.HideTimeoutMessage, "error"),
+            AdminMemberSuspendStatus.RevokeFailed => RedirectWithMessage(
+                id, AdminMemberSuspendService.RevokeFailedMessage, "error"),
+            _ => RedirectWithMessage(id, AdminMemberSuspendService.SuccessMessage, "success"),
+        };
     }
 
     public async Task<IActionResult> OnPostReinstateAsync(Guid id, CancellationToken cancellationToken)

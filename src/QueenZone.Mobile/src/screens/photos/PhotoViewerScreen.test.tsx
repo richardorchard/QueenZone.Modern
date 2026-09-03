@@ -2,10 +2,12 @@ import { act, screen, userEvent, waitFor } from '@testing-library/react-native';
 import { fetchPhotoDetail } from '../../api';
 import { ApiError } from '../../api/client';
 import type { PhotoDetail } from '../../api/types';
+import { SaveToPhotosError, saveToPhotosCopy } from '../../media/saveToPhotos';
 import { deferred } from '../../test/fixtures';
 import { fakeNavigation, renderWithProviders } from '../../test/render';
 import { testIds } from '../../test/testIds';
 import { PhotoViewerScreen } from './PhotoViewerScreen';
+import { saveGalleryPhoto } from './saveGalleryPhoto';
 
 jest.mock('../../api', () => {
   const actual = jest.requireActual('../../api');
@@ -15,7 +17,16 @@ jest.mock('../../api', () => {
   };
 });
 
+jest.mock('./saveGalleryPhoto', () => {
+  const actual = jest.requireActual('./saveGalleryPhoto');
+  return {
+    ...actual,
+    saveGalleryPhoto: jest.fn(),
+  };
+});
+
 const fetchPhoto = fetchPhotoDetail as jest.MockedFunction<typeof fetchPhotoDetail>;
+const savePhoto = saveGalleryPhoto as jest.MockedFunction<typeof saveGalleryPhoto>;
 
 type RecordedGesture = {
   handlers: {
@@ -109,6 +120,8 @@ async function flushGallerySwipe() {
 describe('PhotoViewerScreen', () => {
   beforeEach(() => {
     fetchPhoto.mockReset();
+    savePhoto.mockReset();
+    savePhoto.mockResolvedValue(undefined);
   });
 
   it('shows loading then the photograph chrome', async () => {
@@ -337,5 +350,73 @@ describe('PhotoViewerScreen', () => {
     expect(navigation.setParams).not.toHaveBeenCalled();
     pendingNext.resolve(photoDetail({ picId: 102, title: 'Wembley', index: 1 }));
     await waitFor(() => expect(screen.getByText('Wembley')).toBeOnTheScreen());
+  });
+
+  it('saves the full imageUrl from the viewer chrome, not the thumbnail', async () => {
+    await loadPhoto();
+    expect(screen.getByTestId(testIds.photoViewerSave)).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Save to Photos' })).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Close' })).toBeOnTheScreen();
+    expect(screen.getByText('Live Aid')).toBeOnTheScreen();
+
+    const user = userEvent.setup();
+    await user.press(screen.getByTestId(testIds.photoViewerSave));
+    await waitFor(() =>
+      expect(savePhoto).toHaveBeenCalledWith('https://cdn.queenzone.org/brian-may/img-101.jpg'),
+    );
+    expect(savePhoto).not.toHaveBeenCalledWith(
+      'https://cdn.queenzone.org/brian-may/img-101-t.jpg',
+    );
+  });
+
+  it('hides Save with the rest of the chrome and shows a permission-denied error', async () => {
+    savePhoto.mockRejectedValueOnce(
+      new SaveToPhotosError('permission-denied', saveToPhotosCopy.denied),
+    );
+    await loadPhoto();
+    const user = userEvent.setup();
+    await user.press(screen.getByTestId(testIds.photoViewerSave));
+    await waitFor(() => expect(screen.getByText(saveToPhotosCopy.denied)).toBeOnTheScreen());
+
+    act(() => recordedGestures().singleTap.handlers.onEnd?.({}));
+    expect(screen.queryByTestId(testIds.photoViewerSave)).toBeNull();
+    expect(screen.queryByText('Live Aid')).toBeNull();
+    act(() => recordedGestures().singleTap.handlers.onEnd?.({}));
+    expect(screen.getByTestId(testIds.photoViewerSave)).toBeOnTheScreen();
+    expect(screen.getByText('Live Aid')).toBeOnTheScreen();
+  });
+
+  it('ignores a second Save tap while the first is in flight', async () => {
+    const pending = deferred<void>();
+    savePhoto.mockReturnValueOnce(pending.promise);
+    await loadPhoto();
+    const user = userEvent.setup();
+    await user.press(screen.getByTestId(testIds.photoViewerSave));
+    await user.press(screen.getByTestId(testIds.photoViewerSave));
+    expect(savePhoto).toHaveBeenCalledTimes(1);
+    pending.resolve();
+    await waitFor(() => expect(savePhoto).toHaveBeenCalledTimes(1));
+  });
+
+  it('shows a fallback save error for unexpected failures', async () => {
+    savePhoto.mockRejectedValueOnce('boom');
+    await loadPhoto();
+    const user = userEvent.setup();
+    await user.press(screen.getByTestId(testIds.photoViewerSave));
+    await waitFor(() =>
+      expect(screen.getByText('Unable to save this picture.')).toBeOnTheScreen(),
+    );
+  });
+
+  it('omits Save when the image URL is not on the CDN', async () => {
+    await loadPhoto(
+      photoDetail({
+        imageUrl: 'https://www.queenzone.org/not-cdn.jpg',
+        previous: null,
+        next: null,
+      }),
+    );
+    expect(screen.queryByTestId(testIds.photoViewerSave)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Save to Photos' })).toBeNull();
   });
 });

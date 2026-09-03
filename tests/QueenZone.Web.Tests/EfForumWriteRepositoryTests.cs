@@ -1,5 +1,7 @@
+using System.Data.Common;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using QueenZone.Data;
 using QueenZone.Data.Entities;
 
@@ -10,12 +12,14 @@ public sealed class EfForumWriteRepositoryTests : IAsyncDisposable
     private readonly SqliteConnection connection = new("DataSource=:memory:");
     private readonly QueenZoneDbContext dbContext;
     private readonly EfForumWriteRepository repository;
+    private readonly List<string> executedSql = [];
 
     public EfForumWriteRepositoryTests()
     {
         connection.Open();
         var options = new DbContextOptionsBuilder<QueenZoneDbContext>()
             .UseSqlite(connection)
+            .AddInterceptors(new RecordingCommandInterceptor(executedSql))
             .Options;
         dbContext = new QueenZoneDbContext(options);
         dbContext.Database.EnsureCreated();
@@ -210,6 +214,12 @@ public sealed class EfForumWriteRepositoryTests : IAsyncDisposable
 
         Assert.Equal(3, await repository.CountApprovedPostsByMemberAsync(spammer.Id));
 
+        executedSql.Clear();
+        await repository.HideAuthorForumContentAsync(spammer.Id, spammer.DisplayName);
+        Assert.DoesNotContain(
+            executedSql,
+            sql => sql.Contains("RefreshReadStats", StringComparison.OrdinalIgnoreCase));
+
         await repository.HideAuthorForumContentAsync(spammer.Id, spammer.DisplayName);
 
         // ExecuteUpdateAsync bypasses the change tracker, so re-query untracked to see the write.
@@ -249,7 +259,11 @@ public sealed class EfForumWriteRepositoryTests : IAsyncDisposable
             .Where(post => post.LegacyPostId == unlinkedId)
             .ExecuteUpdateAsync(setters => setters.SetProperty(post => post.AuthorMemberId, (Guid?)null));
 
+        executedSql.Clear();
         await repository.HideAuthorForumContentAsync(spammer.Id, spammer.DisplayName);
+        Assert.DoesNotContain(
+            executedSql,
+            sql => sql.Contains("RefreshReadStats", StringComparison.OrdinalIgnoreCase));
 
         Assert.True((await dbContext.ModernForumPosts.AsNoTracking().SingleAsync(p => p.LegacyPostId == unlinkedId)).IsHidden);
         Assert.False((await dbContext.ModernForumPosts.AsNoTracking().SingleAsync(p => p.LegacyPostId == otherId)).IsHidden);
@@ -257,6 +271,16 @@ public sealed class EfForumWriteRepositoryTests : IAsyncDisposable
         Assert.Equal(2, summary.PostCount);
         Assert.Equal(1, summary.ThreadCount);
         Assert.True(summary.IsHidden);
+    }
+
+    [Fact]
+    public void HideAndUnhide_SourceDoesNotCallRefreshReadStats()
+    {
+        var path = Path.Combine(FindRepoRoot(), "src", "QueenZone.Data", "Repositories", "EfForumWriteRepository.cs");
+        var source = File.ReadAllText(path);
+        Assert.DoesNotContain("ExecuteSqlRaw", source);
+        Assert.DoesNotContain("RefreshReadStatsIfSqlServer", source);
+        Assert.DoesNotContain("ModernForum_RefreshReadStats", source);
     }
 
     [Fact]
@@ -497,5 +521,43 @@ public sealed class EfForumWriteRepositoryTests : IAsyncDisposable
                 FOREIGN KEY (ThreadId) REFERENCES ModernForumThread (Id)
             );
             """);
+    }
+
+    private static string FindRepoRoot()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null)
+        {
+            if (File.Exists(Path.Combine(dir.FullName, "QueenZone.sln")))
+            {
+                return dir.FullName;
+            }
+
+            dir = dir.Parent;
+        }
+
+        throw new InvalidOperationException("Could not find QueenZone.sln from the test output directory.");
+    }
+
+    private sealed class RecordingCommandInterceptor(List<string> commands) : DbCommandInterceptor
+    {
+        public override InterceptionResult<int> NonQueryExecuting(
+            DbCommand command,
+            CommandEventData eventData,
+            InterceptionResult<int> result)
+        {
+            commands.Add(command.CommandText);
+            return result;
+        }
+
+        public override ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(
+            DbCommand command,
+            CommandEventData eventData,
+            InterceptionResult<int> result,
+            CancellationToken cancellationToken = default)
+        {
+            commands.Add(command.CommandText);
+            return new ValueTask<InterceptionResult<int>>(result);
+        }
     }
 }

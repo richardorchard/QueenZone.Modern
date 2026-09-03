@@ -113,10 +113,39 @@ unset ConnectionStrings__BlobStorage || true
 unset ConnectionStrings__SqlServerTest || true
 
 mkdir -p "$results_dir"
+{
+  echo "started_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  echo "platform=$platform"
+  echo "suite=$suite"
+  echo "prove_failure=$prove_failure"
+} > "$results_dir/harness.log"
 export QUEENZONE_MOBILE_CONTRACT_FIXTURE="$fixture"
 
 host_pid=""
+collect_diagnostics() {
+  local reason="${1:-unknown}"
+  echo "collect_diagnostics reason=$reason" >> "$results_dir/harness.log"
+  if [ "$platform" = "android" ] && command -v adb >/dev/null; then
+    adb logcat -d > "$results_dir/logcat.txt" 2>/dev/null || true
+    for f in "$HOME"/.android/*.log "$HOME"/.android/avd/*/*.log; do
+      [ -f "$f" ] || continue
+      cp "$f" "$results_dir/$(basename "$f")" 2>/dev/null || true
+    done
+  fi
+  if [ "$platform" = "ios" ]; then
+    xcrun simctl spawn booted log show --last 5m --style compact \
+      > "$results_dir/simulator.log" 2>/dev/null || true
+  fi
+  if [ -f "$host_log" ]; then
+    cp "$host_log" "$results_dir/contract-host.log" 2>/dev/null || true
+  fi
+}
+
 cleanup() {
+  local status=$?
+  if [ "$status" -ne 0 ]; then
+    collect_diagnostics "exit-$status"
+  fi
   if [ -n "${host_pid}" ] && kill -0 "$host_pid" 2>/dev/null; then
     kill "$host_pid" 2>/dev/null || true
     wait "$host_pid" 2>/dev/null || true
@@ -258,6 +287,8 @@ build_android() {
     export EXPO_PUBLIC_APP_ENV=development
     export EXPO_PUBLIC_API_BASE_URL="http://10.0.2.2:${port}"
     export SENTRY_DISABLE_AUTO_UPLOAD=true
+    export QUEENZONE_MOBILE_SMOKE_EMBED=1
+    export FORCE_BUNDLING=1
     echo "Baking Android smoke APK for ${EXPO_PUBLIC_API_BASE_URL}"
     npx expo prebuild --platform android
     (
@@ -274,6 +305,8 @@ build_ios() {
     export EXPO_PUBLIC_APP_ENV=development
     export EXPO_PUBLIC_API_BASE_URL="http://127.0.0.1:${port}"
     export SENTRY_DISABLE_AUTO_UPLOAD=true
+    export QUEENZONE_MOBILE_SMOKE_EMBED=1
+    export FORCE_BUNDLING=1
     echo "Baking iOS Simulator smoke app for ${EXPO_PUBLIC_API_BASE_URL}"
     npx expo prebuild --platform ios --clean
     cd ios
@@ -382,14 +415,7 @@ set -e
 
 if [ "$maestro_status" -ne 0 ]; then
   echo "Maestro failed with status $maestro_status" >&2
-  if [ "$platform" = "android" ] && command -v adb >/dev/null; then
-    adb logcat -d > "$results_dir/logcat.txt" || true
-  fi
-  if [ "$platform" = "ios" ]; then
-    xcrun simctl spawn booted log show --last 5m --style compact \
-      > "$results_dir/simulator.log" 2>/dev/null || true
-  fi
-  cp "$host_log" "$results_dir/contract-host.log" 2>/dev/null || true
+  collect_diagnostics "maestro-$maestro_status"
 fi
 
 exit "$maestro_status"

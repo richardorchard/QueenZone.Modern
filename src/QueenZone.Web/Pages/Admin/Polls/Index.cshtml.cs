@@ -6,7 +6,8 @@ namespace QueenZone.Web.Pages.Admin.Polls;
 
 public sealed class IndexModel(
     IHomePollRepository homePollRepository,
-    IOutputCacheStore outputCacheStore) : AdminPollPageModel
+    IOutputCacheStore outputCacheStore,
+    ILogger<IndexModel> logger) : AdminPollPageModel
 {
     public IReadOnlyList<HomePollAdminItem> Polls { get; private set; } = [];
 
@@ -55,6 +56,12 @@ public sealed class IndexModel(
         catch (HomePollException ex)
         {
             TempData[MessageKey] = ex.Message;
+            TempData[MessageKindKey] = "error";
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException && AdminHomePollPublishError.IsPersistenceFailure(ex))
+        {
+            logger.LogWarning(ex, "Admin home poll publish failed for {PollId}.", id);
+            TempData[MessageKey] = AdminHomePollPublishError.Message;
             TempData[MessageKindKey] = "error";
         }
 

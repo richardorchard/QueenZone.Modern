@@ -9,6 +9,19 @@ const {
   resolveMarketingVersion,
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- CJS loaded by Expo, not Metro.
 } = require('./apiEnvironments.cjs') as typeof import('./apiEnvironments.cjs');
+const {
+  filterExpoPluginsForSmokeEmbed,
+  isSmokeEmbedEnabled,
+  smokeEmbedAutolinking,
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- CJS loaded by Expo, not Metro.
+} = require('./plugins/smokeEmbed.cjs') as {
+  filterExpoPluginsForSmokeEmbed: (
+    plugins: ExpoConfig['plugins'],
+    env?: Record<string, string | undefined>,
+  ) => ExpoConfig['plugins'];
+  isSmokeEmbedEnabled: (env?: Record<string, string | undefined>) => boolean;
+  smokeEmbedAutolinking: () => { exclude: string[] };
+};
 
 /**
  * Dynamic Expo config: embeds appEnv + apiBaseUrl into `extra` so native and
@@ -51,6 +64,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     prefix: marketingVersionPrefix,
     runNumber: process.env.GITHUB_RUN_NUMBER,
   });
+  const smokeEmbed = isSmokeEmbedEnabled(process.env);
   return {
     ...config,
     name: config.name ?? 'QueenZone',
@@ -89,14 +103,24 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     plugins: [
       // app.json registers @sentry/react-native/expo; keep a single configured
       // copy here so org/project env still apply and the plugin is not doubled.
-      ...(config.plugins ?? []).filter((plugin) => {
-        const name = Array.isArray(plugin) ? plugin[0] : plugin;
-        return name !== '@sentry/react-native/expo' && name !== '@sentry/react-native';
-      }),
+      // Smoke embed also drops expo-dev-client so Debug launch is the app, not
+      // the development-server launcher (#1225).
+      ...(filterExpoPluginsForSmokeEmbed(
+        (config.plugins ?? []).filter((plugin) => {
+          const name = Array.isArray(plugin) ? plugin[0] : plugin;
+          return name !== '@sentry/react-native/expo' && name !== '@sentry/react-native';
+        }),
+      ) ?? []),
       // CNG: android/ is generated in CI. Force WorkManager 2.8.1 so
       // react-native-android-widget's work-runtime does not clash with a
       // transitive work-runtime-ktx 2.7.1 (duplicate OneTimeWorkRequestKt).
       './plugins/withAndroidWorkRuntimeAlignment.cjs',
+      // iOS expo-audio 57.0.4: currentStatus must not call currentDate() (#1234).
+      './plugins/withExpoAudioIosCurrentOffsetFromLive.cjs',
+      // After expo-media-library: drop READ_MEDIA_* so add-only save does not
+      // request photo/video/audio read at install (#1230 / #1232).
+      './plugins/withAndroidAddOnlyPhotos.cjs',
+      ...(smokeEmbed ? ['./plugins/smokeEmbed.cjs'] : []),
       // After expo-widgets writes ExpoWidgetsTarget: render On This Day in
       // SwiftUI so the gallery/home snapshot is never a Release EmptyView.
       './plugins/withIosOnThisDayNativeWidget.cjs',
@@ -125,5 +149,6 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         },
       ],
     ],
-  };
+    ...(smokeEmbed ? { autolinking: smokeEmbedAutolinking() } : {}),
+  } as ExpoConfig;
 };
