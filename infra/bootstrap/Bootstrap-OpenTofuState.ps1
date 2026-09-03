@@ -97,7 +97,7 @@ function Ensure-CustomRoleDefinition {
 
     $existing = @(Try-AzJson @("role", "definition", "list", "--name", $Name, "--scope", $AssignableScope))
     if ($existing.Count -gt 0) {
-        return $existing[0].roleName
+        return $Name
     }
 
     if (-not $PSCmdlet.ShouldProcess($Name, "Create custom role definition")) {
@@ -116,8 +116,12 @@ function Ensure-CustomRoleDefinition {
     $definitionFile = Join-Path ([System.IO.Path]::GetTempPath()) "queenzone-$($Name -replace '[^a-zA-Z0-9]', '-').json"
     try {
         $definition | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $definitionFile -Encoding utf8NoBOM
-        $created = Invoke-AzJson @("role", "definition", "create", "--role-definition", $definitionFile)
-        return $created.roleName
+        # `az role definition create`'s response does not flatten the same
+        # way `list`/`show` do (roleName is not present at the top level),
+        # so read it back only to confirm the call succeeded — the name we
+        # need is the one we already set above.
+        $null = Invoke-AzJson @("role", "definition", "create", "--role-definition", $definitionFile)
+        return $Name
     }
     finally {
         Remove-Item -LiteralPath $definitionFile -Force -ErrorAction SilentlyContinue
