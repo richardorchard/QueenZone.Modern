@@ -55,6 +55,9 @@ updates:
         applies-to: version-updates
         patterns:
           - "*"
+        exclude-patterns:
+          # 4.6.0 peers worklets 0.12.x; Expo 57 stays on worklets 0.10.1.
+          - "react-native-reanimated"
         update-types:
           - "minor"
           - "patch"

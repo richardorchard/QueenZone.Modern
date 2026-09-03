@@ -14,14 +14,13 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: opentofu-apply
-  # Never cancel an in-flight apply — same reasoning as deploy.yml: cancelling
-  # mid-apply can leave Azure/Cloudflare state half-updated. The AzureRM
-  # backend's blob lease would also block a second concurrent apply anyway;
-  # this concurrency group just makes that explicit and queues instead of
-  # erroring.
-  cancel-in-progress: false
+# Concurrency is set per-job below, not per-workflow: the plan job is
+# read-only and always safe to preempt, but a shared workflow-level group
+# would let a plan run stuck waiting on the apply job's approval gate
+# (abandoned, forgotten, or superseded by a later push) block every
+# subsequent run indefinitely — confirmed the hard way on 2026-09-03, where
+# a stale unapproved run from an earlier merge silently blocked a later
+# workflow_dispatch until someone noticed and cancelled it by hand.
 
 # Issue #625, step 8 of epic #615. Structurally separate from
 # .github/workflows/deploy.yml (application releases) and from
@@ -46,6 +45,12 @@ jobs:
     name: Production plan
     runs-on: ubuntu-latest
     environment: opentofu-plan
+    concurrency:
+      group: opentofu-apply-plan
+      # Read-only and produces nothing durable until the apply job's
+      # approval gate — always safe to cancel in favour of a newer run,
+      # unlike the apply job below.
+      cancel-in-progress: true
     permissions:
       id-token: write
       contents: read
@@ -134,6 +139,16 @@ jobs:
     # reviewer. The reviewer can read the plan job's step summary (posted
     # above) before approving.
     environment: opentofu-apply
+    concurrency:
+      group: opentofu-apply
+      # Never cancel an in-flight (or approval-pending) apply — same
+      # reasoning as deploy.yml: cancelling mid-apply can leave
+      # Azure/Cloudflare state half-updated. The AzureRM backend's blob
+      # lease would also block a second concurrent apply anyway; this
+      # concurrency group just makes that explicit and queues instead of
+      # erroring. Deliberately its own group, separate from the plan job
+      # above — see the workflow-level comment for why.
+      cancel-in-progress: false
     permissions:
       id-token: write
       contents: read
