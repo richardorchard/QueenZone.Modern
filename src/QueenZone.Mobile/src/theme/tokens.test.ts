@@ -77,11 +77,35 @@ describe('spacing and motion match spacing.css foundation', () => {
     assert.equal(radius.pill, 999);
   });
 
+  it('keeps avatar, thumb, and card sizes distinct from section xxl', () => {
+    assert.equal(space.avatar, 34);
+    assert.equal(space.thumb, 64);
+    assert.equal(space.card, 148);
+    assert.equal(space.xxl, 34);
+    assert.equal(radius.avatar, 17);
+  });
+
   it('keeps motion durations and ease-out curve', () => {
     assert.equal(motion.fast, 180);
     assert.equal(motion.base, 320);
     assert.equal(motion.slow, 620);
     assert.deepEqual([...motion.easing], [0.22, 0.61, 0.36, 1]);
+  });
+});
+
+describe('conversation thread tokens', () => {
+  it('dark uses the ConversationScreen hexes; outgoing border stays borderStrong', () => {
+    assert.equal(dark.surfaceThread, '#0C0C0C');
+    assert.equal(dark.bubbleOutgoing, '#171717');
+    assert.equal(dark.ruleSubtle, 'rgba(255,255,255,0.14)');
+    assert.equal(dark.borderStrong, 'rgba(255,255,255,0.28)');
+  });
+
+  it('light uses grey50 / grey100 / hairline so thread chrome is not black-on-black', () => {
+    assert.equal(light.surfaceThread, palette.grey50);
+    assert.equal(light.bubbleOutgoing, palette.grey100);
+    assert.equal(light.ruleSubtle, light.hairline);
+    assert.equal(light.ruleSubtle, palette.grey200);
   });
 });
 

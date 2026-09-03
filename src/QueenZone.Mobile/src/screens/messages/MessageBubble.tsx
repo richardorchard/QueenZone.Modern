@@ -2,7 +2,7 @@ import { memo, useCallback, useReducer } from 'react';
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Flag } from 'lucide-react-native';
 import { removeOfflineItem, updateOfflineItem, flushOfflineQueue } from '../../offlineQueue';
-import { fonts, palette, radius, space, type } from '../../theme';
+import { fonts, palette, radius, space, type, useTheme } from '../../theme';
 import { Button } from '../../ui/Button';
 import { testIds } from '../../test/testIds';
 import {
@@ -17,9 +17,6 @@ import { messageFromUnknownError, queueStatusLabel, type DisplayMessage } from '
 export const messageBubbleRenderProbe: { current: (() => void) | null } = {
   current: null,
 };
-
-const outgoingBubbleBackground = '#171717';
-const outgoingBubbleBorder = 'rgba(255,255,255,0.28)';
 
 type ReportState = {
   reporting: boolean;
@@ -76,6 +73,7 @@ export const MessageBubble = memo(function MessageBubble({
   onSubmitReport: (messageId: string, reason?: string) => Promise<void>;
 }) {
   messageBubbleRenderProbe.current?.();
+  const { c } = useTheme();
   const [report, dispatch] = useReducer(reportReducer, initialReportState);
 
   const startReport = useCallback(() => {
@@ -113,7 +111,12 @@ export const MessageBubble = memo(function MessageBubble({
     return (
       <View style={styles.outgoingRow}>
         <Text style={[styles.attribution, { color: attributionColor }]}>{attribution}</Text>
-        <View style={[styles.bubble, styles.outgoingBubble]}>
+        <View
+          style={[
+            styles.bubble,
+            { backgroundColor: c.bubbleOutgoing, borderWidth: 1, borderColor: c.borderStrong },
+          ]}
+        >
           <Text style={styles.outgoingText}>{item.body}</Text>
         </View>
         {item.queueState ? (
@@ -238,7 +241,6 @@ const styles = StyleSheet.create({
   incomingRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   incomingContent: { flex: 1, maxWidth: '80%', alignItems: 'flex-start', gap: 6 },
   bubble: { borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 12, maxWidth: '80%' },
-  outgoingBubble: { backgroundColor: outgoingBubbleBackground, borderWidth: 1, borderColor: outgoingBubbleBorder },
   incomingBubble: { backgroundColor: palette.warmWhite, alignSelf: 'stretch', maxWidth: undefined },
   outgoingText: { fontFamily: fonts.body, fontSize: 16.5, lineHeight: 24.75, color: palette.white },
   incomingText: { fontFamily: fonts.body, fontSize: 16.5, lineHeight: 24.75, color: palette.charcoal },

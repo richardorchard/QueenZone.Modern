@@ -1,6 +1,9 @@
 import { Platform, type PressableStateCallbackType, type StyleProp, type ViewStyle } from 'react-native';
 import { useTheme } from '../theme';
 
+/** iOS pressed opacity used by `pressedStyle`. */
+export const pressedOpacity = 0.85;
+
 /** Platform press feedback in one place — never branch inside a screen. */
 export function usePressProps(borderless = false) {
   const { c, chrome } = useTheme();
@@ -20,5 +23,5 @@ export function pressedStyle(
   if (Platform.OS !== 'ios' || !pressed) {
     return extra ?? null;
   }
-  return [{ opacity: 0.85 }, extra];
+  return [{ opacity: pressedOpacity }, extra];
 }

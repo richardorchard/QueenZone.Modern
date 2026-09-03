@@ -3,7 +3,8 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SearchRouteScreen } from '../screens/archive/SearchScreen';
 import { StoryScreen } from '../screens/archive/StoryScreen';
 import { NewsStoryScreen } from '../screens/news/NewsStoryScreen';
-import { commonScreens } from './stacks';
+import { dark, light } from '../theme';
+import { commonScreens, stackScreenOptions } from './stacks';
 import type { CommonStackParamList, StoryRouteParamList } from './types';
 
 type SharedParams = CommonStackParamList & StoryRouteParamList;
@@ -43,5 +44,25 @@ describe('commonScreens', () => {
       { name: 'Search', component: SearchRouteScreen },
       { name: 'Story', component: StoryScreen },
     ]);
+  });
+});
+
+describe('stackScreenOptions', () => {
+  it('derives header chrome from the given colour scheme', () => {
+    const darkOptions = stackScreenOptions(dark);
+    expect(darkOptions.headerStyle).toEqual({ backgroundColor: dark.surfacePage });
+    expect(darkOptions.headerTintColor).toBe(dark.accentPrimary);
+    expect(darkOptions.headerTitleStyle).toEqual({
+      color: dark.textPrimary,
+      fontWeight: '600',
+    });
+    expect(darkOptions.headerShadowVisible).toBe(false);
+    expect(darkOptions.contentStyle).toEqual({ backgroundColor: dark.surfacePage });
+
+    const lightOptions = stackScreenOptions(light);
+    expect(lightOptions.headerStyle).toEqual({ backgroundColor: light.surfacePage });
+    expect(lightOptions.headerTintColor).toBe(light.accentPrimary);
+    expect(lightOptions.contentStyle).toEqual({ backgroundColor: light.surfacePage });
+    expect(lightOptions.headerStyle).not.toEqual(darkOptions.headerStyle);
   });
 });

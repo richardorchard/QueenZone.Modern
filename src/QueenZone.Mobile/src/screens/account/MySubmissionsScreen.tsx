@@ -326,8 +326,8 @@ const styles = StyleSheet.create({
     gap: space.md,
   },
   thumb: {
-    width: 64,
-    height: 64,
+    width: space.thumb,
+    height: space.thumb,
     borderRadius: radius.xs,
   },
   cardBody: {

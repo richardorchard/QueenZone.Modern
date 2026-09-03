@@ -102,9 +102,9 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   avatar: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: space.avatar,
+    height: space.avatar,
+    borderRadius: radius.avatar,
     backgroundColor: 'rgba(255,255,255,0.10)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.18)',

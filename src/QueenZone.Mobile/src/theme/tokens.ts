@@ -57,6 +57,8 @@ export const dark = {
   surfaceSheet: '#1E1E1E',
   surfaceScrim: 'rgba(0,0,0,0.50)',
   surfaceBarBlur: 'rgba(17,17,17,0.90)',
+  surfaceThread: '#0C0C0C',
+  bubbleOutgoing: '#171717',
 
   textPrimary: '#FFFFFF',
   textSecondary: 'rgba(255,255,255,0.66)',
@@ -66,6 +68,7 @@ export const dark = {
   hairline: 'rgba(255,255,255,0.12)',
   border: 'rgba(255,255,255,0.16)',
   borderStrong: 'rgba(255,255,255,0.28)',
+  ruleSubtle: 'rgba(255,255,255,0.14)',
 
   /** On dark, GOLD replaces Royal Blue for links/active state (contrast). */
   accentPrimary: palette.gold,
@@ -88,6 +91,8 @@ export const light = {
   surfaceSheet: palette.white,
   surfaceScrim: 'rgba(17,17,17,0.62)',
   surfaceBarBlur: 'rgba(255,255,255,0.90)',
+  surfaceThread: palette.grey50,
+  bubbleOutgoing: palette.grey100,
 
   textPrimary: palette.charcoal,
   textSecondary: palette.grey600,
@@ -97,6 +102,7 @@ export const light = {
   hairline: palette.grey200,
   border: palette.grey200,
   borderStrong: palette.grey300,
+  ruleSubtle: palette.grey200,
 
   accentPrimary: palette.blue,
   accentPress: palette.blueDeep,
@@ -172,6 +178,7 @@ export const type = {
 /**
  * Spacing — 4px base matching --space-1…--space-5; xl = --gutter (24).
  * xxl / section are mobile section rhythm from STYLE_GUIDE (34 / 44).
+ * avatar / thumb / card are component sizes — do not overload xxl.
  */
 export const space = {
   xs: 4, // --space-1
@@ -182,6 +189,9 @@ export const space = {
   xl: 24, // --space-5 / --gutter
   xxl: 34, // section header offset
   section: 44, // before footer
+  avatar: 34,
+  thumb: 64,
+  card: 148,
 } as const;
 
 /** Radii — --radius-xs/sm/md/pill from spacing.css; sheet/fab from handoff chrome. */
@@ -193,6 +203,7 @@ export const radius = {
   fab: 18,
   sheet: 20,
   sheetIos: 14,
+  avatar: 17,
 } as const;
 
 export const shadow = {

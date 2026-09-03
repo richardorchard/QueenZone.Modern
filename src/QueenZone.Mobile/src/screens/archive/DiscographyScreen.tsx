@@ -67,8 +67,8 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   thumb: {
-    width: 64,
-    height: 64,
+    width: space.thumb,
+    height: space.thumb,
     borderRadius: radius.xs,
   },
   text: {

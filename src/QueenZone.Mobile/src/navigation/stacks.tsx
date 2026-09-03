@@ -1,7 +1,7 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import type { ReactNode } from 'react';
 import { testIds } from '../test/testIds';
-import { dark } from '../theme';
+import { useTheme, type ColorScheme } from '../theme';
 import { HomeScreen } from '../screens/home/HomeScreen';
 import { QuoteScreen } from '../screens/home/QuoteScreen';
 
@@ -49,13 +49,15 @@ import type {
   PhotosStackParamList,
 } from './types';
 
-export const stackScreenOptions = {
-  headerStyle: { backgroundColor: dark.surfacePage },
-  headerTintColor: dark.accentPrimary,
-  headerTitleStyle: { color: dark.textPrimary, fontWeight: '600' as const },
-  headerShadowVisible: false,
-  contentStyle: { backgroundColor: dark.surfacePage },
-};
+export function stackScreenOptions(c: ColorScheme) {
+  return {
+    headerStyle: { backgroundColor: c.surfacePage },
+    headerTintColor: c.accentPrimary,
+    headerTitleStyle: { color: c.textPrimary, fontWeight: '600' as const },
+    headerShadowVisible: false,
+    contentStyle: { backgroundColor: c.surfacePage },
+  };
+}
 
 const Home = createNativeStackNavigator<HomeStackParamList>();
 const News = createNativeStackNavigator<NewsStackParamList>();
@@ -94,8 +96,9 @@ export function commonScreens(Stack: CommonStackScreens, options?: CommonScreens
 }
 
 export function HomeStack() {
+  const { c } = useTheme();
   return (
-    <Home.Navigator screenOptions={stackScreenOptions}>
+    <Home.Navigator screenOptions={stackScreenOptions(c)}>
       <Home.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
       <Home.Screen name="Quote" component={QuoteScreen} />
       {commonScreens(Home, { story: 'news' })}
@@ -123,8 +126,9 @@ export function HomeStack() {
 }
 
 export function NewsStack() {
+  const { c } = useTheme();
   return (
-    <News.Navigator screenOptions={stackScreenOptions}>
+    <News.Navigator screenOptions={stackScreenOptions(c)}>
       <News.Screen
         name="NewsIndex"
         component={NewsIndexScreen}
@@ -139,8 +143,9 @@ export function NewsStack() {
 }
 
 export function PhotosStack() {
+  const { c } = useTheme();
   return (
-    <Photos.Navigator screenOptions={stackScreenOptions}>
+    <Photos.Navigator screenOptions={stackScreenOptions(c)}>
       <Photos.Screen
         name="PhotoIndex"
         component={PhotosScreen}
@@ -172,8 +177,9 @@ export function PhotosStack() {
 }
 
 export function ArchiveStack() {
+  const { c } = useTheme();
   return (
-    <Archive.Navigator screenOptions={stackScreenOptions}>
+    <Archive.Navigator screenOptions={stackScreenOptions(c)}>
       <Archive.Screen
         name="ArchiveHub"
         component={ArchiveHubScreen}
@@ -220,8 +226,9 @@ export function ArchiveStack() {
 }
 
 export function ForumStack() {
+  const { c } = useTheme();
   return (
-    <Forum.Navigator screenOptions={stackScreenOptions}>
+    <Forum.Navigator screenOptions={stackScreenOptions(c)}>
       <Forum.Screen
         name="ForumIndex"
         component={ForumScreen}

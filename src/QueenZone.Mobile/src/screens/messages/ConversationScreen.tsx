@@ -177,7 +177,7 @@ function ConversationThread({ navigation, route }: Props) {
     >
       <FlatList
         ref={listRef}
-        style={[styles.flex, { backgroundColor: threadListBackground }]}
+        style={[styles.flex, { backgroundColor: c.surfaceThread }]}
         data={threadItems}
         keyExtractor={threadKeyExtractor}
         refreshControl={
@@ -226,13 +226,6 @@ function ConversationThread({ navigation, route }: Props) {
     </KeyboardAvoidingView>
   );
 }
-
-/**
- * Thread list sits one step darker than the header/composer chrome — a new
- * value from the redesign handoff (`design/design_handoff_private_messages`),
- * not yet a shared theme token.
- */
-const threadListBackground = '#0C0C0C';
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
