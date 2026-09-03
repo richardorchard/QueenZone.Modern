@@ -71,15 +71,9 @@
         }
       </div>
     }
-  </div>
-</section>
-
-@if (!string.IsNullOrWhiteSpace(Model.Query))
-{
-  <section class="qz-section">
-    <div class="qz-container qz-container--search">
-
-      <nav class="qz-tag-row" aria-label="Filter search results by content type">
+    else
+    {
+      <nav class="qz-tag-row u-mt-4" aria-label="Filter search results by content type">
         <a class="qz-tag @(Model.ActiveContentType is null ? "qz-tag--active" : "")" href="@BuildSearchLink(null)">All</a>
         @foreach (var type in filterTypes)
         {
@@ -133,7 +127,6 @@
           p => BuildSearchLink(Model.ActiveContentType, p));
         <partial name="_ArchivePagination" model="pagination" />
       }
-
-    </div>
-  </section>
-}
+    }
+  </div>
+</section>
