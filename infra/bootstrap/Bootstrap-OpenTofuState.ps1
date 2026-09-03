@@ -87,6 +87,43 @@ function Ensure-RoleAssignment {
     }
 }
 
+function Ensure-CustomRoleDefinition {
+    param(
+        [Parameter(Mandatory)][string]$Name,
+        [Parameter(Mandatory)][string[]]$Actions,
+        [Parameter(Mandatory)][string]$AssignableScope,
+        [Parameter(Mandatory)][string]$Description
+    )
+
+    $existing = @(Try-AzJson @("role", "definition", "list", "--name", $Name, "--scope", $AssignableScope))
+    if ($existing.Count -gt 0) {
+        return $existing[0].roleName
+    }
+
+    if (-not $PSCmdlet.ShouldProcess($Name, "Create custom role definition")) {
+        return $Name
+    }
+
+    $definition = @{
+        Name             = $Name
+        IsCustom         = $true
+        Description      = $Description
+        Actions          = $Actions
+        NotActions       = @()
+        AssignableScopes = @($AssignableScope)
+    }
+
+    $definitionFile = Join-Path ([System.IO.Path]::GetTempPath()) "queenzone-$($Name -replace '[^a-zA-Z0-9]', '-').json"
+    try {
+        $definition | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $definitionFile -Encoding utf8NoBOM
+        $created = Invoke-AzJson @("role", "definition", "create", "--role-definition", $definitionFile)
+        return $created.roleName
+    }
+    finally {
+        Remove-Item -LiteralPath $definitionFile -Force -ErrorAction SilentlyContinue
+    }
+}
+
 function Ensure-WorkloadIdentity {
     param(
         [Parameter(Mandatory)][string]$DisplayName,
@@ -296,6 +333,20 @@ $workloadScope = "/subscriptions/$SubscriptionId/resourceGroups/$WorkloadResourc
 Ensure-RoleAssignment -PrincipalObjectId $operatorObjectId -PrincipalType User -Role "Storage Blob Data Contributor" -Scope $containerScope
 Ensure-RoleAssignment -PrincipalObjectId $planIdentity.PrincipalObjectId -PrincipalType ServicePrincipal -Role "Storage Blob Data Contributor" -Scope $containerScope
 Ensure-RoleAssignment -PrincipalObjectId $planIdentity.PrincipalObjectId -PrincipalType ServicePrincipal -Role "Reader" -Scope $workloadScope
+
+# Reader does not cover Microsoft.Web/sites/config/list/action — Azure gates
+# that "list" action separately from */read even though it is read-only,
+# because it can return app-service config content. Without this, tofu plan
+# fails reading azurerm_linux_web_app auth settings with a 403
+# AuthorizationFailed (confirmed on PR #1208's first real production plan
+# run). Scoped to exactly this one action, nothing else.
+$planConfigReaderRole = Ensure-CustomRoleDefinition `
+    -Name "QueenZone OpenTofu Plan - App Service Config Reader" `
+    -Description "Read-only list access to App Service site config (e.g. auth settings) that the built-in Reader role excludes. Used only by the QueenZone OpenTofu Plan identity." `
+    -Actions @("Microsoft.Web/sites/config/list/action") `
+    -AssignableScope $workloadScope
+Ensure-RoleAssignment -PrincipalObjectId $planIdentity.PrincipalObjectId -PrincipalType ServicePrincipal -Role $planConfigReaderRole -Scope $workloadScope
+
 Ensure-RoleAssignment -PrincipalObjectId $applyIdentity.PrincipalObjectId -PrincipalType ServicePrincipal -Role "Storage Blob Data Contributor" -Scope $containerScope
 Ensure-RoleAssignment -PrincipalObjectId $applyIdentity.PrincipalObjectId -PrincipalType ServicePrincipal -Role "Contributor" -Scope $workloadScope
 
