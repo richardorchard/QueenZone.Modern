@@ -21,8 +21,12 @@ resource "azapi_resource" "storage_account" {
       publicNetworkAccess          = "Enabled"
       supportsHttpsTrafficOnly     = true
       encryption = {
-        keySource                       = "Microsoft.Storage"
-        requireInfrastructureEncryption = false
+        keySource = "Microsoft.Storage"
+        # requireInfrastructureEncryption is immutable after account
+        # creation -- the live account has it unset (null), and Azure
+        # rejects any attempt to set it (to true OR false) after the fact
+        # with AccountPropertyCannotBeUpdated. Omit it entirely so this
+        # resource's PUT never tries to touch it again.
         services = {
           blob = {
             enabled = true
