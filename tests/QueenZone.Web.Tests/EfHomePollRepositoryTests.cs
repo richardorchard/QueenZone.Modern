@@ -33,6 +33,38 @@ public sealed class EfHomePollRepositoryTests : IAsyncDisposable
 
         var current = await repository.GetCurrentAsync(null);
         Assert.Equal(second, current!.PollId);
+        Assert.False((await repository.GetByIdAsync(first))!.IsCurrent);
+        Assert.Equal(1, await dbContext.HomePolls.CountAsync(poll => poll.IsCurrent));
+    }
+
+    [Fact]
+    public async Task Hide_current_then_publish_other_makes_only_the_new_poll_current()
+    {
+        var first = await repository.CreateAsync(new AdminHomePollDraft("First?", ["A", "B"]), Guid.NewGuid());
+        var second = await repository.CreateAsync(new AdminHomePollDraft("Second?", ["C", "D"]), Guid.NewGuid());
+        await repository.PublishAsync(first);
+        await repository.HideAsync(first);
+        await repository.PublishAsync(second);
+
+        var current = await repository.GetCurrentAsync(null);
+        Assert.Equal(second, current!.PollId);
+        Assert.False((await repository.GetByIdAsync(first))!.IsCurrent);
+        Assert.Equal(1, await dbContext.HomePolls.CountAsync(poll => poll.IsCurrent));
+    }
+
+    [Fact]
+    public async Task Republish_of_the_current_poll_is_idempotent_success()
+    {
+        var pollId = await repository.CreateAsync(new AdminHomePollDraft("Again?", ["A", "B"]), Guid.NewGuid());
+        await repository.PublishAsync(pollId);
+        var firstPublishedAt = (await repository.GetByIdAsync(pollId))!.PublishedAt;
+
+        await repository.PublishAsync(pollId);
+
+        var again = await repository.GetByIdAsync(pollId);
+        Assert.True(again!.IsCurrent);
+        Assert.Equal(firstPublishedAt, again.PublishedAt);
+        Assert.Equal(pollId, (await repository.GetCurrentAsync(null))!.PollId);
         Assert.Equal(1, await dbContext.HomePolls.CountAsync(poll => poll.IsCurrent));
     }
 
