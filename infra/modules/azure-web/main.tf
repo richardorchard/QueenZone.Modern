@@ -86,6 +86,18 @@ resource "azurerm_linux_web_app" "production" {
   client_affinity_enabled    = false
   client_certificate_enabled = false
 
+  # sensitive({}) rather than omitting the argument: ignore_changes alone
+  # does not stop OpenTofu's plan renderer from printing the full live
+  # app_settings map (every key/value in plaintext) as unchanged context
+  # whenever any OTHER attribute on this resource changes — which happens
+  # on every import. Confirmed the hard way: real secrets (OAuth client
+  # secrets, signing keys, private keys) were printed in full in GitHub
+  # Actions logs on 2026-09-03 across every real plan/apply run before this
+  # fix. Marking the configured value sensitive redacts it as
+  # "(sensitive value)" in all cases; ignore_changes still keeps OpenTofu
+  # from ever touching the live map (ADR 0008).
+  app_settings = sensitive({})
+
   tags = {
     "hidden-link: /app-insights-resource-id" = replace(
       azurerm_application_insights.production.id,
