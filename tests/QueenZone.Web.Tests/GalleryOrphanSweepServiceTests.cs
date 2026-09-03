@@ -97,6 +97,21 @@ public sealed class GalleryOrphanSweepServiceTests
     }
 
     [Fact]
+    public async Task SweepAsync_HonoursAlreadyCancelledToken()
+    {
+        var store = new SharedPhotoStore(SamplePhotoData.CreateSeedCategories());
+        var adminPhotoRepository = new InMemoryAdminPhotoRepository(store);
+        var galleryPhotoBlobService = new RecordingGalleryPhotoBlobService();
+        var service = CreateService(adminPhotoRepository, galleryPhotoBlobService, dryRun: false);
+
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => service.SweepAsync(cts.Token));
+        Assert.Empty(galleryPhotoBlobService.Deleted);
+    }
+
+    [Fact]
     public async Task SweepAsync_CountsDeleteFailuresAndKeepsGoing()
     {
         var store = new SharedPhotoStore(SamplePhotoData.CreateSeedCategories());

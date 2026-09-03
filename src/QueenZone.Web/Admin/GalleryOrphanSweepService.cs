@@ -24,9 +24,12 @@ public sealed class GalleryOrphanSweepService(
     IOptions<GalleryOrphanSweepOptions> options,
     ILogger<GalleryOrphanSweepService> logger)
 {
+    private const int CategorySweepMaxDegreeOfParallelism = 4;
+
     public async Task<GalleryOrphanSweepResult> SweepAsync(CancellationToken cancellationToken = default)
     {
-        var cutoff = timeProvider.GetUtcNow() - TimeSpan.FromMinutes(options.Value.GracePeriodMinutes);
+        var sweepOptions = options.Value;
+        var cutoff = timeProvider.GetUtcNow() - TimeSpan.FromMinutes(sweepOptions.GracePeriodMinutes);
         var categories = await adminPhotoRepository.GetCategoriesAsync(cancellationToken);
 
         var scanned = 0;
@@ -34,52 +37,67 @@ public sealed class GalleryOrphanSweepService(
         var deleted = 0;
         var failures = 0;
 
-        foreach (var category in categories)
-        {
-            var container = PhotoLegacyPath.BlobContainerName(category.Name);
-            var blobs = await galleryPhotoBlobService.ListBlobsAsync(container, cancellationToken);
-            if (blobs.Count == 0)
+        await Parallel.ForEachAsync(
+            categories,
+            new ParallelOptions
             {
-                continue;
-            }
-
-            scanned += blobs.Count;
-            var referenced = await adminPhotoRepository.GetReferencedBlobNamesAsync(category.CatId, cancellationToken);
-            var referencedNames = new HashSet<string>(referenced, StringComparer.OrdinalIgnoreCase);
-
-            foreach (var blob in blobs)
+                MaxDegreeOfParallelism = CategorySweepMaxDegreeOfParallelism,
+                CancellationToken = cancellationToken,
+            },
+            async (category, categoryCancellationToken) =>
             {
-                if (referencedNames.Contains(blob.BlobName) || blob.LastModified > cutoff)
+                var container = PhotoLegacyPath.BlobContainerName(category.Name);
+                var blobs = await galleryPhotoBlobService.ListBlobsAsync(container, categoryCancellationToken);
+                if (blobs.Count == 0)
                 {
-                    continue;
+                    return;
                 }
 
-                found++;
-                if (options.Value.DryRun)
-                {
-                    logger.LogInformation(
-                        "Orphan gallery blob detected (dry run): {Container}/{BlobName}, last modified {LastModified}",
-                        container,
-                        blob.BlobName,
-                        blob.LastModified);
-                    continue;
-                }
+                Interlocked.Add(ref scanned, blobs.Count);
+                var referenced = await adminPhotoRepository.GetReferencedBlobNamesAsync(
+                    category.CatId,
+                    categoryCancellationToken);
+                var referencedNames = new HashSet<string>(referenced, StringComparer.OrdinalIgnoreCase);
 
-                try
+                foreach (var blob in blobs)
                 {
-                    await galleryPhotoBlobService.DeleteAsync(container, blob.BlobName, cancellationToken);
-                    deleted++;
-                    logger.LogInformation(
-                        "Deleted orphan gallery blob {Container}/{BlobName}", container, blob.BlobName);
+                    if (referencedNames.Contains(blob.BlobName) || blob.LastModified > cutoff)
+                    {
+                        continue;
+                    }
+
+                    Interlocked.Increment(ref found);
+                    if (sweepOptions.DryRun)
+                    {
+                        logger.LogInformation(
+                            "Orphan gallery blob detected (dry run): {Container}/{BlobName}, last modified {LastModified}",
+                            container,
+                            blob.BlobName,
+                            blob.LastModified);
+                        continue;
+                    }
+
+                    try
+                    {
+                        await galleryPhotoBlobService.DeleteAsync(
+                            container,
+                            blob.BlobName,
+                            categoryCancellationToken);
+                        Interlocked.Increment(ref deleted);
+                        logger.LogInformation(
+                            "Deleted orphan gallery blob {Container}/{BlobName}", container, blob.BlobName);
+                    }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        Interlocked.Increment(ref failures);
+                        logger.LogWarning(
+                            ex,
+                            "Failed to delete orphan gallery blob {Container}/{BlobName}",
+                            container,
+                            blob.BlobName);
+                    }
                 }
-                catch (Exception ex) when (ex is not OperationCanceledException)
-                {
-                    failures++;
-                    logger.LogWarning(
-                        ex, "Failed to delete orphan gallery blob {Container}/{BlobName}", container, blob.BlobName);
-                }
-            }
-        }
+            });
 
         return new GalleryOrphanSweepResult(scanned, found, deleted, failures);
     }
