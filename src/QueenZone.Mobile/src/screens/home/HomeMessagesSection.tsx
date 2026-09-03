@@ -101,9 +101,9 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   avatar: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: space.avatar,
+    height: space.avatar,
+    borderRadius: radius.avatar,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',

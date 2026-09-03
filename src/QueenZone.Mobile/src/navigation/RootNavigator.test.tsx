@@ -44,6 +44,7 @@ jest.mock('./stacks', () => {
     PhotosStack: stub('Photos stack'),
     ArchiveStack: stub('Archive stack'),
     ForumStack: stub('Forum stack'),
+    stackScreenOptions: () => ({}),
   };
 });
 

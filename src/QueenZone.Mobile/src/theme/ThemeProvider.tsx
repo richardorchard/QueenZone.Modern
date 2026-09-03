@@ -28,7 +28,6 @@ type ThemeContextValue = {
   c: ColorScheme;
   mode: ThemeMode;
   preference: ThemePreference;
-  setPreference: (preference: ThemePreference) => void;
   palette: typeof palette;
   type: typeof type;
   fonts: typeof fonts;
@@ -54,7 +53,6 @@ type Props = {
  */
 export function ThemeProvider({ children, preference: preferenceProp = 'dark' }: Props) {
   const systemScheme = useColorScheme();
-  // Controlled for now — Settings can later lift preference into session state.
   const preference = preferenceProp;
 
   const mode: ThemeMode =
@@ -65,9 +63,6 @@ export function ThemeProvider({ children, preference: preferenceProp = 'dark' }:
       c: mode === 'light' ? light : dark,
       mode,
       preference,
-      setPreference: () => {
-        /* preference is prop-controlled until Settings wires persistence */
-      },
       palette,
       type,
       fonts,

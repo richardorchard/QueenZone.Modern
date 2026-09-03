@@ -196,6 +196,7 @@ function MainTabs() {
 }
 
 export function RootNavigator() {
+  const { c } = useTheme();
   return (
     <View style={{ flex: 1 }}>
       <RootStack.Navigator screenOptions={{ headerShown: false }}>
@@ -204,7 +205,7 @@ export function RootNavigator() {
           name="SignIn"
           component={SignInScreen}
           options={({ navigation }) => ({
-            ...stackScreenOptions,
+            ...stackScreenOptions(c),
             headerShown: true,
             title: 'Sign in',
             presentation: 'fullScreenModal',

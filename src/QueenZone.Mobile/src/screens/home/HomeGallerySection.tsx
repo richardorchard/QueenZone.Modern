@@ -65,9 +65,9 @@ export const HomeGallerySection = memo(function HomeGallerySection({
 
 const styles = StyleSheet.create({
   skeletonRow: { flexDirection: 'row', paddingHorizontal: space.xl, gap: 10 },
-  skeletonTile: { width: 148, height: 148, borderRadius: radius.xs },
+  skeletonTile: { width: space.card, height: space.card, borderRadius: radius.xs },
   scrollContent: { paddingHorizontal: space.xl, gap: 10 },
-  tile: { width: 148, gap: 9 },
-  thumb: { width: 148, height: 148, borderRadius: radius.xs },
+  tile: { width: space.card, gap: 9 },
+  thumb: { width: space.card, height: space.card, borderRadius: radius.xs },
   tileTitle: { fontSize: 14 },
 });
