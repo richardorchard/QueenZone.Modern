@@ -58,6 +58,11 @@ updates:
         exclude-patterns:
           # 4.6.0 peers worklets 0.12.x; Expo 57 stays on worklets 0.10.1.
           - "react-native-reanimated"
+          # Expo 57 pins; 19.2.8 also fights react-test-renderer / react-dom 19.2.3 overrides.
+          - "react"
+          - "react-native-safe-area-context"
+          - "react-native-screens"
+          - "react-native-svg"
         update-types:
           - "minor"
           - "patch"
