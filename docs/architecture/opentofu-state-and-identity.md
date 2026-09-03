@@ -2,7 +2,7 @@
 
 Issue: [#616](https://github.com/richardorchard/QueenZone.Modern/issues/616), step 2 of epic [#615](https://github.com/richardorchard/QueenZone.Modern/issues/615).
 
-**Bootstrapped and locally verified:** 2026-08-13. No application resource was imported or changed.
+**Bootstrapped and locally verified:** 2026-08-13. **First real production plan/apply:** 2026-09-03 — see [`opentofu-ci-and-runbooks.md`](opentofu-ci-and-runbooks.md#what-actually-happened-on-the-first-real-apply). Production is now under full OpenTofu management (76 resources imported across Azure and Cloudflare, zero deletes).
 
 ## Boundary
 
@@ -54,7 +54,7 @@ tofu -chdir=infra/environments/production init `
   -migrate-state
 ```
 
-Before confirming migration, copy any local state outside the repository and inspect `tofu state list`. Never commit a state file or pass credentials through `-backend-config`. No production state exists until the later import issues begin.
+Before confirming migration, copy any local state outside the repository and inspect `tofu state list`. Never commit a state file or pass credentials through `-backend-config`. Production state now exists and is fully populated — see [`opentofu-ci-and-runbooks.md`](opentofu-ci-and-runbooks.md#what-actually-happened-on-the-first-real-apply).
 
 ## Cloudflare token strategy
 
@@ -69,9 +69,9 @@ Add only permissions required by an observed provider denial. Do not grant accou
 
 Store the values in the `Queenzone Development` Bitwarden Secrets Manager project as `CLOUDFLARE_API_TOKEN_TOFU_PLAN` and `CLOUDFLARE_API_TOKEN_TOFU_APPLY`. GitHub later retrieves them through its existing Bitwarden Secrets Manager action into the matching protected environment. OpenTofu reads `CLOUDFLARE_API_TOKEN` from the process environment; the value must never appear in HCL, `.tfvars`, workflow output, plans, or state.
 
-Those two OpenTofu token names are **not created yet**. Live Worker publishes use `CLOUDFLARE_WORKER_READWRITE` (Workers Scripts Edit). Inventory/ops reads use `CLOUDFLARE_API_TOKEN_READONLY`. Do not reuse the Worker token as the future OpenTofu apply token unless its zone/DNS/settings scopes are reviewed.
+Both tokens were created and wired on 2026-09-01, ahead of the first real production plan/apply on 2026-09-03. Live Worker publishes use `CLOUDFLARE_WORKER_READWRITE` (Workers Scripts Edit); do not reuse it as the OpenTofu apply token — the scopes differ and were reviewed separately when these two were created. Inventory/ops reads use the unrelated `CLOUDFLARE_API_TOKEN_READONLY`.
 
-The bootstrap does not create the OpenTofu tokens. They are a blocking prerequisite for the plan/apply workflows in [`opentofu-ci-and-runbooks.md`](opentofu-ci-and-runbooks.md) — create them and wire their Bitwarden output names via the `BITWARDEN_OPENTOFU_PLAN_SECRETS`/`BITWARDEN_OPENTOFU_APPLY_SECRETS` repository variables before the first real plan or apply run.
+The bootstrap does not create the OpenTofu tokens — they were created manually per the table above. Their Bitwarden output names are wired via the `BITWARDEN_OPENTOFU_PLAN_SECRETS`/`BITWARDEN_OPENTOFU_APPLY_SECRETS` repository variables, consumed by the workflows in [`opentofu-ci-and-runbooks.md`](opentofu-ci-and-runbooks.md). Follow the rotation sequence below if either token needs replacing.
 
 Rotation sequence:
 
