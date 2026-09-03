@@ -54,8 +54,8 @@ resource "azurerm_mssql_database" "production" {
   name      = var.sql_database_name
   server_id = azapi_resource.sql_server.id
 
-  sku_name                            = "Basic"
-  max_size_gb                         = 2
+  sku_name                            = "S0"
+  max_size_gb                         = 10
   collation                           = "SQL_Latin1_General_CP1_CI_AS"
   storage_account_type                = "Local"
   zone_redundant                      = false

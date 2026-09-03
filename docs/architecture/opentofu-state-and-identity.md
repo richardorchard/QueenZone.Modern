@@ -26,10 +26,12 @@ The non-secret backend settings are committed at [`infra/backend/production.back
 | Principal | State scope | Azure production scope | GitHub trust |
 | --- | --- | --- | --- |
 | Authorised local operator | `Storage Blob Data Contributor` on `tfstate` only | Existing operator access; bootstrap adds none | N/A |
-| `QueenZone OpenTofu Plan` | `Storage Blob Data Contributor` on `tfstate` only | `Reader` on `Queenzone-RG` | `opentofu-plan` environment |
+| `QueenZone OpenTofu Plan` | `Storage Blob Data Contributor` on `tfstate` only | `Reader` on `Queenzone-RG`, plus the custom `QueenZone OpenTofu Plan - App Service Config Reader` role (`Microsoft.Web/sites/config/list/action` only) on `Queenzone-RG` | `opentofu-plan` environment |
 | `QueenZone OpenTofu Apply` | `Storage Blob Data Contributor` on `tfstate` only | `Contributor` on `Queenzone-RG` | approval-gated `opentofu-apply` environment |
 
 Neither workload identity is Owner or User Access Administrator. Contributor is limited to the QueenZone resource group and cannot change Azure RBAC. State access is a separate container-scoped data-plane assignment, not storage-account key access.
+
+The built-in `Reader` role does not cover `Microsoft.Web/sites/config/list/action` — Azure gates that "list" action separately even though it is read-only, since it can return app-service config content (e.g. auth settings). `azurerm_linux_web_app` needs it to read auth settings during a plan, so the plan identity also holds a minimal custom role granting exactly that one action on `Queenzone-RG` (confirmed the hard way on PR #1208's first real production plan run — see [`Bootstrap-OpenTofuState.ps1`](../../infra/bootstrap/Bootstrap-OpenTofuState.ps1)).
 
 Both GitHub environments accept protected branches only. The apply environment requires `richardorchard` approval. The federated subjects name the environments, so an untrusted fork or pull request cannot exchange its OIDC token unless it first passes the repository environment controls. The manual [`opentofu-backend-smoke.yml`](../../.github/workflows/opentofu-backend-smoke.yml) workflow verifies each identity without declaring or importing application resources. Full plan/apply automation, drift detection, and the rest of the operational runbooks are in [`opentofu-ci-and-runbooks.md`](opentofu-ci-and-runbooks.md) (#625).
 
