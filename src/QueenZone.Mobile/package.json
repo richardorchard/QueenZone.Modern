@@ -59,7 +59,7 @@
     "expo-task-manager": "~57.0.15",
     "expo-web-browser": "~57.0.2",
     "expo-widgets": "~57.0.16",
-    "lucide-react-native": "^1.37.0",
+    "lucide-react-native": "^1.38.0",
     "react": "19.2.3",
     "react-native": "0.86.3",
     "react-native-android-widget": "^0.22.1",
