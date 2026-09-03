@@ -105,4 +105,15 @@ resource "azurerm_role_assignment" "mobile_publisher" {
   principal_id                     = var.publisher_principal_id
   principal_type                   = "ServicePrincipal"
   skip_service_principal_aad_check = true
+
+  lifecycle {
+    # skip_service_principal_aad_check is a create-time-only client hint
+    # with no live Azure representation to reconcile against post-import.
+    # azurerm_role_assignment has no update API at all (role assignments
+    # are immutable once created), so any drift here -- real or not --
+    # hard-fails with "doesn't support update" instead of a normal diff.
+    # Keep the value above for if this resource is ever recreated, but
+    # never try to "update" it on the existing resource.
+    ignore_changes = [skip_service_principal_aad_check]
+  }
 }
