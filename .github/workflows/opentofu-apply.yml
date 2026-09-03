@@ -170,15 +170,19 @@ jobs:
             exit 1
           fi
 
-      # actions/upload-artifact preserves the uploader's relative path
-      # (infra/environments/production/tfplan) inside the artifact, so this
-      # restores to the repo root rather than re-nesting under
-      # infra/environments/production.
+      # actions/upload-artifact does NOT preserve the uploader's relative
+      # path for a single explicit file — it flattens
+      # infra/environments/production/tfplan to just tfplan at the
+      # artifact's root (confirmed the hard way: run 33713676359's first
+      # real apply failed on "stat tfplan: no such file or directory"
+      # because it downloaded to the repo root instead). Download straight
+      # into the directory OpenTofu runs from below instead of relying on
+      # path preservation.
       - name: Download plan artifact
         uses: actions/download-artifact@v8
         with:
           name: opentofu-production-plan-${{ github.run_id }}
-          path: .
+          path: infra/environments/production
 
       - name: OpenTofu init
         working-directory: infra/environments/production
