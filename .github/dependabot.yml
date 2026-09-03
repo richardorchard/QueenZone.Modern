@@ -63,6 +63,8 @@ updates:
           - "react-native-safe-area-context"
           - "react-native-screens"
           - "react-native-svg"
+          # Expo 57 expo-doctor rejected 7.13.0 on #1259; keep ~7.11.0 until Expo 58.
+          - "@sentry/react-native"
         update-types:
           - "minor"
           - "patch"
