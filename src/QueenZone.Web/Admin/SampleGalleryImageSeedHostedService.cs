@@ -12,13 +12,15 @@ namespace QueenZone.Web;
 /// Registered only with in-memory data. Never runs against Azure Blob.
 /// </summary>
 public sealed class SampleGalleryImageSeedHostedService(
-    IGalleryPhotoBlobService galleryPhotoBlobService,
+    IServiceScopeFactory scopeFactory,
     ILogger<SampleGalleryImageSeedHostedService> logger) : IHostedService
 {
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         try
         {
+            await using var scope = scopeFactory.CreateAsyncScope();
+            var galleryPhotoBlobService = scope.ServiceProvider.GetRequiredService<IGalleryPhotoBlobService>();
             foreach (var category in SamplePhotoData.CreateSeedCategories())
             {
                 foreach (var item in category.Items)
