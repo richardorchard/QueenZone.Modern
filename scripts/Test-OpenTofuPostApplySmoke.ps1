@@ -187,9 +187,18 @@ try {
     else {
         Write-Host "INFO  Application Insights query did not return a result (non-blocking)."
     }
+    # This check is explicitly non-blocking, but the az CLI call above can
+    # leave $LASTEXITCODE non-zero. GitHub Actions' pwsh step wrapper checks
+    # $LASTEXITCODE at the very end of the script regardless of the script's
+    # own control flow, so a stale non-zero value here fails the whole step
+    # even after "All OpenTofu post-apply checks passed" -- confirmed the
+    # hard way on run 33727676793: every check reported OK/INFO, yet the
+    # step still failed with exit code 1.
+    $global:LASTEXITCODE = 0
 }
 catch {
     Write-Host "INFO  Skipping Application Insights check: $($_.Exception.Message) (non-blocking)."
+    $global:LASTEXITCODE = 0
 }
 
 if ($failed -gt 0) {
