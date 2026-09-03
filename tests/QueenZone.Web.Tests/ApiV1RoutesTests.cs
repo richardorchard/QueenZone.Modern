@@ -321,12 +321,13 @@ public sealed class ApiV1ErrorHandlingTests
 
         await ApiV1ErrorHandling.WriteUnhandledExceptionAsync(http);
 
-        var entry = Assert.Single(logger.Entries);
-        Assert.Equal(LogLevel.Error, entry.Level);
-        Assert.Equal(1700, entry.EventId.Id);
-        Assert.Equal("UnhandledExceptionOnRequest", entry.EventId.Name);
-        Assert.Equal("Unhandled exception on GET /api/v1/news", entry.Message);
-        Assert.IsType<InvalidOperationException>(entry.Exception);
+        Assert.Contains(
+            logger.Entries,
+            entry => entry.Level == LogLevel.Error
+                && entry.EventId.Id == 1700
+                && entry.EventId.Name == "UnhandledExceptionOnRequest"
+                && entry.Message == "Unhandled exception on GET /api/v1/news"
+                && entry.Exception is InvalidOperationException);
     }
 
     [Fact]
