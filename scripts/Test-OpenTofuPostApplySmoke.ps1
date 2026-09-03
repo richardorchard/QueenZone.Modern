@@ -37,6 +37,38 @@ $ErrorActionPreference = "Stop"
 
 $failed = 0
 
+# On PS 7+ (pwsh, what the GitHub Actions runner uses), a non-2xx response's
+# exception carries $_.Exception.Response as a System.Net.Http.HttpResponseMessage,
+# whose .Headers is an HttpResponseHeaders instance -- it does NOT support
+# ["Header-Name"] indexer syntax the way the success-path Invoke-WebRequest
+# headers (or PS 5.1's WebException/WebHeaderCollection) do. Left as-is, a
+# header lookup on the error path silently returns nothing even when the
+# header is genuinely present (confirmed the hard way: cdn.queenzone.org's
+# CF-Ray check failed post-apply smoke on a real 400 response that a manual
+# curl proved DID carry CF-Ray). Normalize to a plain hashtable so downstream
+# code can always use ["Header-Name"] regardless of PS edition or code path.
+function ConvertTo-HeaderTable {
+    param($Headers)
+
+    $table = @{}
+    if ($null -eq $Headers) {
+        return $table
+    }
+
+    if ($Headers -is [System.Net.Http.Headers.HttpHeaders]) {
+        foreach ($entry in $Headers) {
+            $table[$entry.Key] = ($entry.Value -join ", ")
+        }
+    }
+    else {
+        foreach ($name in $Headers.Keys) {
+            $table[$name] = $Headers[$name]
+        }
+    }
+
+    return $table
+}
+
 # Invoke-WebRequest throws on a non-2xx response on both PS 5.1 and PS 7+;
 # in both cases the thrown exception's Response carries the real status code
 # and headers, so a non-2xx response is not itself a probe failure here —
@@ -48,7 +80,7 @@ function Invoke-StatusProbe {
         $response = Invoke-WebRequest -Uri $Uri -UseBasicParsing -TimeoutSec 30
         return [pscustomobject]@{
             StatusCode = [int]$response.StatusCode
-            Headers    = $response.Headers
+            Headers    = ConvertTo-HeaderTable -Headers $response.Headers
             Content    = $response.Content
             Error      = $null
         }
@@ -58,7 +90,7 @@ function Invoke-StatusProbe {
         if ($null -ne $webResponse -and $webResponse.PSObject.Properties.Name -contains "StatusCode") {
             return [pscustomobject]@{
                 StatusCode = [int]$webResponse.StatusCode
-                Headers    = $webResponse.Headers
+                Headers    = ConvertTo-HeaderTable -Headers $webResponse.Headers
                 Content    = $null
                 Error      = $null
             }
