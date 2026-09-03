@@ -1,7 +1,16 @@
 appId: org.queenzone.mobile
 ---
+# Journeys is a cold simctl install with no 01-launch. launchApp first so
+# openLink is not the SpringBoard "Open in QueenZone?" prompt (#1247).
 # Files first, then Debug inject. OEM Files sheet is not the gate (#1072).
+- launchApp:
+    clearState: true
+    clearKeychain: true
 - openLink: ${SMOKE_AUTH_URL}
+- extendedWaitUntil:
+    visible:
+      id: tab-forum
+    timeout: 45000
 - tapOn:
     id: tab-forum
 - extendedWaitUntil:
