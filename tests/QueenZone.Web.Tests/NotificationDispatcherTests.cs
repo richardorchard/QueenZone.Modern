@@ -173,6 +173,12 @@ public sealed class NotificationDispatcherTests
 
         await dispatcher.NotifyPrivateMessageAsync(Guid.NewGuid(), recipient, Guid.NewGuid());
 
+        Assert.Contains(
+            logger.Entries,
+            entry => entry.EventId.Id == 1400
+                && entry.EventId.Name == "PushDispatchFailedForCategory"
+                && entry.Message.Contains("Push dispatch failed for category", StringComparison.Ordinal)
+                && entry.Exception is InvalidOperationException);
         Assert.DoesNotContain(
             logger.Entries,
             entry => entry.Message.Contains(deviceToken, StringComparison.Ordinal));

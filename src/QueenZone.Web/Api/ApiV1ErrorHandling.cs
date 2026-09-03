@@ -7,7 +7,7 @@ namespace QueenZone.Web;
 /// JSON Problem Details for <c>/api/v1</c> so the mobile client never receives the HTML error pages.
 /// OAuth token/authorize responses that already wrote a body are left untouched.
 /// </summary>
-public static class ApiV1ErrorHandling
+public static partial class ApiV1ErrorHandling
 {
     public static IApplicationBuilder UseApiV1ExceptionHandler(this IApplicationBuilder app)
     {
@@ -52,9 +52,9 @@ public static class ApiV1ErrorHandling
         var error = context.Features.Get<IExceptionHandlerFeature>()?.Error;
         if (error is not null)
         {
-            logger.LogError(
+            Log.UnhandledExceptionOnRequest(
+                logger,
                 error,
-                "Unhandled exception on {Method} {Path}",
                 SanitizeHttpMethodForLog(context.Request.Method),
                 SanitizeForLog(context.Request.Path.Value));
         }

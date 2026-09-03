@@ -7,7 +7,7 @@ using Microsoft.Extensions.Options;
 
 namespace QueenZone.Web;
 
-internal sealed class DirectPushTransport(
+internal sealed partial class DirectPushTransport(
     IHttpClientFactory httpClientFactory,
     IOptions<PushNotificationOptions> options,
     IFcmAccessTokenProvider fcmAccessTokenProvider,
@@ -61,9 +61,7 @@ internal sealed class DirectPushTransport(
         var jwt = apnsJwtFactory.TryCreateToken(apns);
         if (jwt is null)
         {
-            logger.LogWarning(
-                "PushNotifications APNs credentials are not configured; skipping APNs sends for category {Category}.",
-                payload.Category);
+            Log.ApnsCredentialsNotConfigured(logger, payload.Category);
             return;
         }
 
@@ -119,17 +117,13 @@ internal sealed class DirectPushTransport(
             }
 
             var error = await ReadProviderErrorAsync(response, device.Token, cancellationToken);
-            logger.LogWarning(
-                "APNs send failed for member {MemberId} category {Category}: {Error}",
-                device.MemberAccountId,
-                category,
-                error);
+            Log.ApnsSendFailed(logger, device.MemberAccountId, category, error);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            logger.LogWarning(
+            Log.ApnsSendFailedWithException(
+                logger,
                 ex,
-                "APNs send failed for member {MemberId} category {Category}: {Error}",
                 device.MemberAccountId,
                 category,
                 ex.Message);
@@ -144,18 +138,14 @@ internal sealed class DirectPushTransport(
         var projectId = options.Value.Fcm.ProjectId?.Trim();
         if (!OptionsValidation.LooksConfigured(projectId))
         {
-            logger.LogWarning(
-                "PushNotifications FCM credentials are not configured; skipping FCM sends for category {Category}.",
-                payload.Category);
+            Log.FcmCredentialsNotConfigured(logger, payload.Category);
             return;
         }
 
         var accessToken = await fcmAccessTokenProvider.GetAccessTokenAsync(cancellationToken);
         if (string.IsNullOrWhiteSpace(accessToken))
         {
-            logger.LogWarning(
-                "PushNotifications FCM credentials are not configured; skipping FCM sends for category {Category}.",
-                payload.Category);
+            Log.FcmAccessTokenNotConfigured(logger, payload.Category);
             return;
         }
 
@@ -191,17 +181,13 @@ internal sealed class DirectPushTransport(
             }
 
             var error = await ReadProviderErrorAsync(response, device.Token, cancellationToken);
-            logger.LogWarning(
-                "FCM send failed for member {MemberId} category {Category}: {Error}",
-                device.MemberAccountId,
-                payload.Category,
-                error);
+            Log.FcmSendFailed(logger, device.MemberAccountId, payload.Category, error);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            logger.LogWarning(
+            Log.FcmSendFailedWithException(
+                logger,
                 ex,
-                "FCM send failed for member {MemberId} category {Category}: {Error}",
                 device.MemberAccountId,
                 payload.Category,
                 ex.Message);

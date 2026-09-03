@@ -4,7 +4,7 @@ using QueenZone.Data.Entities;
 
 namespace QueenZone.Web;
 
-public sealed class NotificationDispatcher(
+public sealed partial class NotificationDispatcher(
     INotificationPreferenceRepository preferenceRepository,
     IDeviceTokenRepository deviceTokenRepository,
     ITopicWatchLookup topicWatchLookup,
@@ -68,9 +68,9 @@ public sealed class NotificationDispatcher(
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            logger.LogWarning(
+            Log.PushDispatchFailedForCategory(
+                logger,
                 ex,
-                "Push dispatch failed for category {Category}: {Error}",
                 category.ToPayloadValue(),
                 ex.Message);
         }

@@ -25,6 +25,56 @@ public sealed class DirectPushTransportTests
     }
 
     [Fact]
+    public async Task MissingCredentials_LogsConfiguredSkipEvents()
+    {
+        var logger = new CollectingLogger<DirectPushTransport>();
+        var handler = new RecordingHttpMessageHandler();
+        var transport = CreateTransport(handler, new PushNotificationOptions(), logger: logger);
+        var memberId = Guid.NewGuid();
+
+        await transport.SendAsync(
+            [DeviceTokenTestData.PushToken(memberId, PushDevicePlatform.Apns, "apns-tok"),
+                DeviceTokenTestData.PushToken(memberId, PushDevicePlatform.Fcm, "fcm-tok")],
+            PushNotificationPayload.News(1, "Title"));
+
+        Assert.Contains(
+            logger.Entries,
+            entry => entry.EventId.Id == 1500
+                && entry.EventId.Name == "ApnsCredentialsNotConfigured"
+                && entry.Message.Contains(
+                    "PushNotifications APNs credentials are not configured; skipping APNs sends for category news.",
+                    StringComparison.Ordinal));
+        Assert.Contains(
+            logger.Entries,
+            entry => entry.EventId.Id == 1503
+                && entry.EventId.Name == "FcmCredentialsNotConfigured"
+                && entry.Message.Contains(
+                    "PushNotifications FCM credentials are not configured; skipping FCM sends for category news.",
+                    StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task MissingFcmAccessToken_LogsAndSkipsFcm()
+    {
+        var logger = new CollectingLogger<DirectPushTransport>();
+        var handler = new RecordingHttpMessageHandler();
+        var transport = CreateTransport(handler, CreateConfiguredOptions(), accessToken: null, logger);
+
+        await transport.SendAsync(
+            [DeviceTokenTestData.PushToken(Guid.NewGuid(), PushDevicePlatform.Fcm, "fcm-tok")],
+            PushNotificationPayload.News(1, "Title"));
+
+        Assert.Empty(handler.Requests);
+        Assert.Contains(
+            logger.Entries,
+            entry => entry.EventId.Id == 1504
+                && entry.EventId.Name == "FcmAccessTokenNotConfigured"
+                && entry.Message.Contains(
+                    "PushNotifications FCM credentials are not configured; skipping FCM sends for category news.",
+                    StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task ApnsAndFcm_SendOneRequestPerDevice()
     {
         var handler = new RecordingHttpMessageHandler();
@@ -86,8 +136,40 @@ public sealed class DirectPushTransportTests
 
         Assert.Contains(
             logger.Entries,
-            entry => entry.Message.Contains(memberId.ToString(), StringComparison.Ordinal)
-                && entry.Message.Contains("privateMessage", StringComparison.Ordinal));
+            entry => entry.EventId.Id == 1501
+                && entry.EventId.Name == "ApnsSendFailed"
+                && entry.Message.Contains(memberId.ToString(), StringComparison.Ordinal)
+                && entry.Message.Contains("privateMessage", StringComparison.Ordinal)
+                && entry.Message.Contains("APNs send failed", StringComparison.Ordinal));
+        Assert.DoesNotContain(
+            logger.Entries,
+            entry => entry.Message.Contains(secret, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task FcmProviderError_LogsMemberAndCategory_NotToken()
+    {
+        var logger = new CollectingLogger<DirectPushTransport>();
+        var handler = new RecordingHttpMessageHandler
+        {
+            StatusCode = HttpStatusCode.BadRequest,
+            ResponseBody = """{"error":"UNREGISTERED","token":"fcm-secret-xyz"}""",
+        };
+        var transport = CreateTransport(handler, CreateConfiguredOptions(), accessToken: "ya29.test", logger);
+        const string secret = "fcm-secret-xyz";
+        var memberId = Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
+
+        await transport.SendAsync(
+            [DeviceTokenTestData.PushToken(memberId, PushDevicePlatform.Fcm, secret)],
+            PushNotificationPayload.News(1, "Title"));
+
+        Assert.Contains(
+            logger.Entries,
+            entry => entry.EventId.Id == 1505
+                && entry.EventId.Name == "FcmSendFailed"
+                && entry.Message.Contains(memberId.ToString(), StringComparison.Ordinal)
+                && entry.Message.Contains("news", StringComparison.Ordinal)
+                && entry.Message.Contains("FCM send failed", StringComparison.Ordinal));
         Assert.DoesNotContain(
             logger.Entries,
             entry => entry.Message.Contains(secret, StringComparison.Ordinal));
@@ -113,11 +195,15 @@ public sealed class DirectPushTransportTests
 
         Assert.Contains(
             logger.Entries,
-            entry => entry.Message.Contains("APNs send failed", StringComparison.Ordinal)
+            entry => entry.EventId.Id == 1502
+                && entry.EventId.Name == "ApnsSendFailedWithException"
+                && entry.Message.Contains("APNs send failed", StringComparison.Ordinal)
                 && entry.Exception is HttpRequestException);
         Assert.Contains(
             logger.Entries,
-            entry => entry.Message.Contains("FCM send failed", StringComparison.Ordinal)
+            entry => entry.EventId.Id == 1506
+                && entry.EventId.Name == "FcmSendFailedWithException"
+                && entry.Message.Contains("FCM send failed", StringComparison.Ordinal)
                 && entry.Exception is HttpRequestException);
     }
 

@@ -1,8 +1,10 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace QueenZone.Web.Tests;
 
@@ -296,6 +298,35 @@ public sealed class ApiV1ErrorHandlingTests
         var sanitized = ApiV1ErrorHandling.SanitizeForLog(longPath);
         Assert.Equal(256, sanitized.Length);
         Assert.StartsWith("/api/v1/", sanitized, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Unhandled_exception_writer_logs_event_id_and_template()
+    {
+        var logger = new CollectingLogger<object>();
+        var services = new ServiceCollection();
+        services.AddSingleton<ILoggerFactory>(new CollectingLoggerFactory(logger));
+        var http = new DefaultHttpContext
+        {
+            RequestServices = services.BuildServiceProvider(),
+        };
+        http.Request.Method = HttpMethods.Get;
+        http.Request.Path = "/api/v1/news";
+        http.Response.Body = new MemoryStream();
+        http.Features.Set<IExceptionHandlerFeature>(new ExceptionHandlerFeature
+        {
+            Error = new InvalidOperationException("boom"),
+            Path = "/api/v1/news",
+        });
+
+        await ApiV1ErrorHandling.WriteUnhandledExceptionAsync(http);
+
+        var entry = Assert.Single(logger.Entries);
+        Assert.Equal(LogLevel.Error, entry.Level);
+        Assert.Equal(1700, entry.EventId.Id);
+        Assert.Equal("UnhandledExceptionOnRequest", entry.EventId.Name);
+        Assert.Equal("Unhandled exception on GET /api/v1/news", entry.Message);
+        Assert.IsType<InvalidOperationException>(entry.Exception);
     }
 
     [Fact]

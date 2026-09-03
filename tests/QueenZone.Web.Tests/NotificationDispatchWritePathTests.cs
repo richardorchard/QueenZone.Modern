@@ -122,7 +122,14 @@ public sealed class NotificationDispatchWritePathTests : IClassFixture<QueenZone
         var result = await service.ComposeAsync(alice.Id, bob.Id, "Still delivered despite dispatcher failure");
 
         Assert.True(result.Succeeded);
-        Assert.Contains(logger.Entries, entry => entry.Message.Contains("Push dispatch failed", StringComparison.Ordinal));
+        Assert.Contains(
+            logger.Entries,
+            entry => entry.EventId.Id == 1200
+                && entry.EventId.Name == "PushDispatchFailedAfterPrivateMessage"
+                && entry.Message.Contains(
+                    "Push dispatch failed after private message to member",
+                    StringComparison.Ordinal)
+                && entry.Exception is InvalidOperationException);
     }
 
     [Fact]
