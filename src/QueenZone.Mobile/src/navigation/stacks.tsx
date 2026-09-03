@@ -1,5 +1,5 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import type { ComponentType, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { testIds } from '../test/testIds';
 import { dark } from '../theme';
 import { HomeScreen } from '../screens/home/HomeScreen';
@@ -67,16 +67,28 @@ type CommonScreensOptions = {
   story?: 'news' | 'archive';
 };
 
+type CommonStackScreenComponent =
+  | typeof SearchRouteScreen
+  | typeof NewsStoryScreen
+  | typeof StoryScreen;
+
 type CommonStackScreens = {
-  Screen: (props: { name: 'Search' | 'Story'; component: ComponentType }) => ReactNode;
+  // TypedNavigator.Screen is generic over each stack's ParamList; the helper
+  // only registers Search (all five) and Story (Home / News / Archive).
+  Screen: (props: never) => unknown;
 };
 
 export function commonScreens(Stack: CommonStackScreens, options?: CommonScreensOptions) {
+  const Screen = Stack.Screen as (props: {
+    name: 'Search' | 'Story';
+    component: CommonStackScreenComponent;
+  }) => ReactNode;
+
   return (
     <>
-      <Stack.Screen name="Search" component={SearchRouteScreen} />
-      {options?.story === 'news' ? <Stack.Screen name="Story" component={NewsStoryScreen} /> : null}
-      {options?.story === 'archive' ? <Stack.Screen name="Story" component={StoryScreen} /> : null}
+      <Screen name="Search" component={SearchRouteScreen} />
+      {options?.story === 'news' ? <Screen name="Story" component={NewsStoryScreen} /> : null}
+      {options?.story === 'archive' ? <Screen name="Story" component={StoryScreen} /> : null}
     </>
   );
 }

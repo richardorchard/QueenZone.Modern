@@ -9,7 +9,7 @@ import type { CommonStackParamList, StoryRouteParamList } from './types';
 type SharedParams = CommonStackParamList & StoryRouteParamList;
 const Stack = createNativeStackNavigator<SharedParams>();
 
-function screenEntries(node: ReactNode): Array<{ name: string; component: unknown }> {
+function screenEntries(node: ReactNode): { name: string; component: unknown }[] {
   return Children.toArray(node).flatMap((child) => {
     if (!isValidElement(child)) {
       return [];
