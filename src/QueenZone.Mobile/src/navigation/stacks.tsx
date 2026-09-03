@@ -1,4 +1,5 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import type { ComponentType, ReactNode } from 'react';
 import { testIds } from '../test/testIds';
 import { dark } from '../theme';
 import { HomeScreen } from '../screens/home/HomeScreen';
@@ -62,13 +63,30 @@ const Photos = createNativeStackNavigator<PhotosStackParamList>();
 const Archive = createNativeStackNavigator<ArchiveStackParamList>();
 const Forum = createNativeStackNavigator<ForumStackParamList>();
 
+type CommonScreensOptions = {
+  story?: 'news' | 'archive';
+};
+
+type CommonStackScreens = {
+  Screen: (props: { name: 'Search' | 'Story'; component: ComponentType }) => ReactNode;
+};
+
+export function commonScreens(Stack: CommonStackScreens, options?: CommonScreensOptions) {
+  return (
+    <>
+      <Stack.Screen name="Search" component={SearchRouteScreen} />
+      {options?.story === 'news' ? <Stack.Screen name="Story" component={NewsStoryScreen} /> : null}
+      {options?.story === 'archive' ? <Stack.Screen name="Story" component={StoryScreen} /> : null}
+    </>
+  );
+}
+
 export function HomeStack() {
   return (
     <Home.Navigator screenOptions={stackScreenOptions}>
       <Home.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
       <Home.Screen name="Quote" component={QuoteScreen} />
-      <Home.Screen name="Story" component={NewsStoryScreen} />
-      <Home.Screen name="Search" component={SearchRouteScreen} />
+      {commonScreens(Home, { story: 'news' })}
       <Home.Screen
         name="Profile"
         component={ProfileScreen}
@@ -103,8 +121,7 @@ export function NewsStack() {
           headerRight: () => <NewsIndexHeaderRight navigation={navigation} />,
         })}
       />
-      <News.Screen name="Story" component={NewsStoryScreen} />
-      <News.Screen name="Search" component={SearchRouteScreen} />
+      {commonScreens(News, { story: 'news' })}
     </News.Navigator>
   );
 }
@@ -137,7 +154,7 @@ export function PhotosStack() {
         }}
       />
       <Photos.Screen name="PhotoSubmit" component={PhotoSubmitScreen} options={{ title: 'Submit a photo' }} />
-      <Photos.Screen name="Search" component={SearchRouteScreen} />
+      {commonScreens(Photos)}
     </Photos.Navigator>
   );
 }
@@ -179,14 +196,13 @@ export function ArchiveStack() {
         component={FanPerformanceDetailScreen}
         options={{ title: 'Fan performance' }}
       />
-      <Archive.Screen name="Story" component={StoryScreen} />
       <Archive.Screen name="Trivia" component={TriviaScreen} options={{ title: 'Trivia' }} />
       <Archive.Screen
         name="AboutArchive"
         component={AboutArchiveScreen}
         options={{ title: 'The archive' }}
       />
-      <Archive.Screen name="Search" component={SearchRouteScreen} />
+      {commonScreens(Archive, { story: 'archive' })}
     </Archive.Navigator>
   );
 }
@@ -205,7 +221,7 @@ export function ForumStack() {
       <Forum.Screen name="Category" component={CategoryScreen} options={{ title: 'Board' }} />
       <Forum.Screen name="Thread" component={ThreadScreen} />
       <Forum.Screen name="Composer" component={ComposerScreen} options={{ title: 'Compose', presentation: 'modal' }} />
-      <Forum.Screen name="Search" component={SearchRouteScreen} />
+      {commonScreens(Forum)}
     </Forum.Navigator>
   );
 }

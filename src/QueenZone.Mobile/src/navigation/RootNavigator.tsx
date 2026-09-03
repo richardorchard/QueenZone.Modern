@@ -2,10 +2,11 @@ import { getFocusedRouteNameFromRoute, type RouteProp } from '@react-navigation/
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Archive, Camera, House, MessageSquare, Newspaper, type LucideIcon } from 'lucide-react-native';
-import { Platform, View } from 'react-native';
+import { useMemo } from 'react';
+import { Platform, View, type ViewStyle } from 'react-native';
 import { SignInScreen } from '../screens/account/SignInScreen';
 import { testIds } from '../test/testIds';
-import { useTheme, type ColorScheme } from '../theme';
+import { useTheme } from '../theme';
 import { NotificationBridge } from '../notifications/NotificationBridge';
 import { NewsShareBridge } from '../share/news/NewsShare';
 import { WidgetLinkBridge } from '../widgets/WidgetLinkBridge';
@@ -56,25 +57,20 @@ function tabIcon(Icon: LucideIcon) {
   };
 }
 
-function tabBarStyleFor(c: ColorScheme, hide: boolean) {
-  if (hide) {
-    return { display: 'none' as const };
-  }
-  return {
-    backgroundColor: c.surfacePage,
-    borderTopColor: c.hairline,
-    borderTopWidth: 1,
-  };
+const hiddenTabBarStyle = { display: 'none' } as const satisfies ViewStyle;
+
+function tabBarStyleFor(visibleTabBarStyle: ViewStyle, hide: boolean) {
+  return hide ? hiddenTabBarStyle : visibleTabBarStyle;
 }
 
 function hideTabBarIfDetail(
-  c: ColorScheme,
+  visibleTabBarStyle: ViewStyle,
   route: RouteProp<RootTabParamList, keyof RootTabParamList>,
   initialRouteName: string,
 ) {
   const focused = getFocusedRouteNameFromRoute(route) ?? initialRouteName;
   return {
-    tabBarStyle: tabBarStyleFor(c, shouldHideTabBar(focused)),
+    tabBarStyle: tabBarStyleFor(visibleTabBarStyle, shouldHideTabBar(focused)),
   };
 }
 
@@ -108,6 +104,14 @@ export function reselectRoot(
 function MainTabs() {
   const { c, chrome } = useTheme();
   const platformChrome = Platform.OS === 'android' ? chrome.android : chrome.ios;
+  const visibleTabBarStyle = useMemo(
+    () => ({
+      backgroundColor: c.surfacePage,
+      borderTopColor: c.hairline,
+      borderTopWidth: 1,
+    }),
+    [c.surfacePage, c.hairline],
+  );
 
   return (
     <Tab.Navigator
@@ -115,7 +119,7 @@ function MainTabs() {
         headerShown: false,
         tabBarActiveTintColor: c.accentPrimary,
         tabBarInactiveTintColor: c.textMuted,
-        tabBarStyle: tabBarStyleFor(c, false),
+        tabBarStyle: tabBarStyleFor(visibleTabBarStyle, false),
         tabBarLabelStyle: {
           fontSize: platformChrome.tabLabel,
           letterSpacing: 0.4,
@@ -131,7 +135,7 @@ function MainTabs() {
           tabBarAccessibilityLabel: 'Home',
           tabBarButtonTestID: testIds.tabHome,
           tabBarIcon: tabIcon(House),
-          ...hideTabBarIfDetail(c, route, 'Home'),
+          ...hideTabBarIfDetail(visibleTabBarStyle, route, 'Home'),
         })}
         listeners={reselectRoot('HomeTab', 'Home')}
       />
@@ -143,7 +147,7 @@ function MainTabs() {
           tabBarAccessibilityLabel: 'News',
           tabBarButtonTestID: testIds.tabNews,
           tabBarIcon: tabIcon(Newspaper),
-          ...hideTabBarIfDetail(c, route, 'NewsIndex'),
+          ...hideTabBarIfDetail(visibleTabBarStyle, route, 'NewsIndex'),
         })}
         listeners={reselectRoot('NewsTab', 'NewsIndex')}
       />
@@ -159,7 +163,7 @@ function MainTabs() {
             fontSize: platformChrome.tabLabel,
             letterSpacing: 0.2,
           },
-          ...hideTabBarIfDetail(c, route, 'PhotoIndex'),
+          ...hideTabBarIfDetail(visibleTabBarStyle, route, 'PhotoIndex'),
         })}
         listeners={reselectRoot('PhotosTab', 'PhotoIndex')}
       />
@@ -171,7 +175,7 @@ function MainTabs() {
           tabBarAccessibilityLabel: 'Archive',
           tabBarButtonTestID: testIds.tabArchive,
           tabBarIcon: tabIcon(Archive),
-          ...hideTabBarIfDetail(c, route, 'ArchiveHub'),
+          ...hideTabBarIfDetail(visibleTabBarStyle, route, 'ArchiveHub'),
         })}
         listeners={reselectRoot('ArchiveTab', 'ArchiveHub', { always: true })}
       />
@@ -183,7 +187,7 @@ function MainTabs() {
           tabBarAccessibilityLabel: 'Forum',
           tabBarButtonTestID: testIds.tabForum,
           tabBarIcon: tabIcon(MessageSquare),
-          ...hideTabBarIfDetail(c, route, 'ForumIndex'),
+          ...hideTabBarIfDetail(visibleTabBarStyle, route, 'ForumIndex'),
         })}
         listeners={reselectRoot('ForumTab', 'ForumIndex')}
       />

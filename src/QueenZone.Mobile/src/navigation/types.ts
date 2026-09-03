@@ -10,11 +10,17 @@ export type SignInParams = {
   returnTo?: SignInReturnTo;
 };
 
+export type CommonStackParamList = {
+  Search: undefined;
+};
+
+export type StoryRouteParamList = {
+  Story: { id: number };
+};
+
 export type HomeStackParamList = {
   Home: undefined;
   Quote: { id: number };
-  Story: { id: number };
-  Search: undefined;
   Profile: undefined;
   Settings: undefined;
   Contact: undefined;
@@ -26,21 +32,20 @@ export type HomeStackParamList = {
   DeleteAccount: undefined;
   MySubmissions: undefined;
   SuggestNews: undefined;
-};
+} & CommonStackParamList &
+  StoryRouteParamList;
 
 export type NewsStackParamList = {
   NewsIndex: { refreshAt?: number } | undefined;
-  Story: { id: number };
-  Search: undefined;
-};
+} & CommonStackParamList &
+  StoryRouteParamList;
 
 export type PhotosStackParamList = {
   PhotoIndex: undefined;
   PhotoCategory: { slug: string; name?: string };
   PhotoViewer: { slug: string; picId: number; size?: string };
   PhotoSubmit: undefined;
-  Search: undefined;
-};
+} & CommonStackParamList;
 
 export type ArchiveStackParamList = {
   ArchiveHub: undefined;
@@ -53,11 +58,10 @@ export type ArchiveStackParamList = {
   FreddieTribute: undefined;
   FanPerformances: undefined;
   FanPerformanceDetail: { id: number };
-  Story: { id: number };
   Trivia: undefined;
   AboutArchive: undefined;
-  Search: undefined;
-};
+} & CommonStackParamList &
+  StoryRouteParamList;
 
 export type ForumStackParamList = {
   ForumIndex: undefined;
@@ -70,8 +74,7 @@ export type ForumStackParamList = {
     categoryName?: string;
     isLocked?: boolean;
   };
-  Search: undefined;
-};
+} & CommonStackParamList;
 
 export type RootTabParamList = {
   HomeTab: NavigatorScreenParams<HomeStackParamList>;
