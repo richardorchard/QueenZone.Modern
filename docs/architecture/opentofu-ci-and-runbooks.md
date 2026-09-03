@@ -10,25 +10,21 @@ identities, lock recovery, backup/restore, credential rotation). It does not
 repeat that content — it explains how the automated workflows fit together,
 gives rollback guidance by resource class, and links disaster recovery.
 
-## Prerequisite: Cloudflare plan/apply tokens
+## Cloudflare plan/apply tokens
 
 Every plan or apply touches `module.cloudflare_edge` alongside the Azure
-modules, since the production root plans them together. Before the workflows
-below can succeed:
+modules, since the production root plans them together. Both tokens
+(`CLOUDFLARE_API_TOKEN_TOFU_PLAN` / `_APPLY`, scoped read-only for plan and
+edit for apply — never the Global API Key) were created and wired on
+2026-09-01, per `opentofu-state-and-identity.md`'s "Cloudflare token
+strategy": stored in the `Queenzone Development` Bitwarden project, with the
+`BITWARDEN_OPENTOFU_PLAN_SECRETS` / `BITWARDEN_OPENTOFU_APPLY_SECRETS`
+repository variables mapping each to `CLOUDFLARE_API_TOKEN`
+([`bitwarden-secrets.md`](../bitwarden-secrets.md) has the exact format).
 
-1. Create the two Cloudflare API tokens described in
-   `opentofu-state-and-identity.md`'s "Cloudflare token strategy" (scoped to
-   read-only for plan, edit for apply — never the Global API Key).
-2. Store them in the `Queenzone Development` Bitwarden project as
-   `CLOUDFLARE_API_TOKEN_TOFU_PLAN` and `CLOUDFLARE_API_TOKEN_TOFU_APPLY`.
-3. Add two GitHub repository variables, `BITWARDEN_OPENTOFU_PLAN_SECRETS` and
-   `BITWARDEN_OPENTOFU_APPLY_SECRETS`, each mapping the matching Bitwarden
-   secret ID to `CLOUDFLARE_API_TOKEN`, following the exact format documented
-   in [`bitwarden-secrets.md`](../bitwarden-secrets.md).
-
-Until this is done, every workflow below fails fast at an explicit
-"`CLOUDFLARE_API_TOKEN` is not configured" step rather than hanging or
-failing unpredictably later.
+If either token is ever missing or revoked, every workflow below fails fast
+at an explicit "`CLOUDFLARE_API_TOKEN` is not configured" step rather than
+hanging or failing unpredictably later.
 
 ## How the workflows fit together
 
@@ -54,9 +50,22 @@ branch, not the PR branch).
 `opentofu-apply.yml`'s `apply` job applies the **exact binary plan artifact**
 produced by its own `plan` job in the same run — never a freshly generated
 plan — so "apply only a plan produced from the reviewed commit" holds by
-construction, not by convention. Nothing else can run between the two jobs:
-the workflow's `concurrency` group serializes runs, and the AzureRM backend's
-blob lease would block a second writer regardless.
+construction, not by convention.
+
+Concurrency is set **per job**, not per workflow: `plan` has its own group
+(`opentofu-apply-plan`, `cancel-in-progress: true`) since it's read-only and
+always safe to preempt with a newer run; `apply` has a separate group
+(`opentofu-apply`, `cancel-in-progress: false`) since two applies must never
+race, and the AzureRM backend's blob lease would block a second writer
+regardless. This split exists because a shared group originally blocked a
+*new run's read-only plan job* behind an old run's `apply` job sitting
+unapproved at the reviewer gate — confirmed the hard way on 2026-09-03. The
+split only fixes the plan-stage case: a genuinely abandoned, unapproved
+`apply` run still correctly blocks a new `apply` from starting (that's
+intentional), and GitHub Actions has no built-in timeout for pending
+environment approvals, so an abandoned `apply` run still needs a human to
+explicitly reject or cancel it (`gh run cancel <id>`, or Cancel workflow in
+the Actions UI) before a later run's `apply` job can proceed.
 
 This is entirely separate from
 [`deploy.yml`](../../.github/workflows/deploy.yml) (application releases,
@@ -145,14 +154,83 @@ directly to the resulting `docs/architecture/disaster-recovery.md` and note
 which parts of a real incident OpenTofu's runbooks cover versus which parts
 that document covers.
 
-## First real apply after this issue lands
+## What actually happened on the first real apply
 
-PR #892 (Cloudflare edge import) added
-`ip_restriction_default_action = "Deny"` to the production web app's
-`site_config` but never ran it through a real apply — there was no apply
-pipeline yet. The first `opentofu-apply.yml` run after this issue merges will
-very likely propose that change. It is a real, deliberate, network-facing
-change (tightening the App Service's default access-restriction behavior)
-and — like every apply — still requires manual approval on the
-`opentofu-apply` environment before anything happens. Review that diff
-carefully rather than approving on reflex just because it's the "first" run.
+The first real `opentofu-apply.yml` run against production happened
+2026-09-03. What follows is what was actually found and fixed getting there,
+kept as a reference for the next time a change ripples this widely.
+
+- The `opentofu-plan` identity's `Reader` role didn't cover
+  `Microsoft.Web/sites/config/list/action` (a "list" action Azure gates
+  separately from `*/read`), so the very first plan failed reading the web
+  app's auth settings. Fixed by adding a minimal custom role — see
+  `opentofu-state-and-identity.md`'s identity table.
+- `actions/upload-artifact` doesn't preserve a single file's full relative
+  path the way the workflow assumed, so the plan artifact landed in the
+  wrong directory and `apply` couldn't find it. Fixed in
+  `opentofu-apply.yml`'s download step.
+- The plan's redacted safety summary bucketed *any* resource with an
+  `import {}` block as "import," even when it also carried real `update` (or
+  worse) actions — silently hiding real changes behind a benign-looking
+  label. In this case the hidden changes were themselves benign (import-time
+  reconciliation, not anything destructive), including PR #892's
+  `ip_restriction_default_action = "Deny"` finally taking effect, but the
+  masking itself is a real gap worth knowing about if you're relying on the
+  plan summary to judge risk before approving.
+- `azurerm_linux_web_app.production`'s `app_settings` was never assigned in
+  config (only referenced in `ignore_changes`, per ADR 0008), so OpenTofu's
+  plan renderer printed the full live map — every secret in it, in
+  plaintext — as unchanged context whenever any other attribute on the
+  resource changed, which happens on every import. Real secrets leaked into
+  several GitHub Actions run logs before this was caught; those runs were
+  deleted and the exposed credentials rotated. Fixed by marking the value
+  `sensitive({})`. See the "Known plan/apply quirks" section below —
+  this class of bug can recur on any resource with a similar map/dict
+  attribute.
+- Config for the SQL database (`sku_name`/`max_size_gb`) and one storage
+  account's `requireInfrastructureEncryption` had drifted from the live
+  resources (config predates this stack having ever been applied for real).
+  Fixed by correcting config to match live reality — see "Known plan/apply
+  quirks" for the general principle.
+- `azurerm_role_assignment.mobile_publisher` failed with "doesn't support
+  update" — Azure RBAC role assignments are immutable, and the provider has
+  no update implementation at all for this resource type. Fixed with
+  `ignore_changes` on the one create-time-only attribute that had no live
+  value to reconcile against.
+- `Test-OpenTofuPostApplySmoke.ps1` had two independent bugs surface on the
+  same run: header extraction failed on non-2xx responses under `pwsh`
+  (`HttpResponseHeaders` doesn't support `["Name"]` indexer syntax the way
+  the success-path headers or PS 5.1's `WebHeaderCollection` do), and a
+  stale `$LASTEXITCODE` from the non-blocking Application Insights check
+  leaked through to fail the whole step even after every check reported OK.
+  Both fixed in the script.
+
+## Known plan/apply quirks
+
+- **`azapi_resource` always shows as "changing," even with zero real
+  drift.** Its `output` and `sensitive_body` fields are write-only/computed
+  and get re-diffed on every plan regardless of whether the actual `body`
+  differs. Before treating an `azapi_resource` "N to change" as a real
+  change, check whether `body` is in the diff's unchanged-attributes-hidden
+  count — if so, it's this artifact, not a real change.
+- **The `queenzone` storage account's custom domain and its Cloudflare proxy
+  fight each other.** Azure only verifies a storage account's `customDomain`
+  CNAME at the moment of a PUT to that resource (which `azapi_resource`
+  issues on *any* drift, not just custom-domain changes), but
+  `cloudflare_dns_record.cdn` is configured `proxied = true` permanently.
+  Any `opentofu-apply` that touches this storage account while the record is
+  proxied will fail domain verification. To force a change through: un-proxy
+  (grey-cloud) `cdn.queenzone.org` in the Cloudflare dashboard, wait for DNS
+  to resolve directly to `queenzone.blob.core.windows.net` (verify with
+  `nslookup cdn.queenzone.org 1.1.1.1` — it should NOT return Cloudflare
+  anycast IPs), apply, then re-proxy. Once bound, the verification doesn't
+  need to happen again until the next PUT to this resource.
+- **If apply fails with an "immutable"/"doesn't support update" error, check
+  live reality before assuming config is right.** Several 2026-09-03
+  failures (SQL `max_size_gb`, a storage account's
+  `requireInfrastructureEncryption`, the mobile-builds role assignment) were
+  all config that had silently drifted from, or never matched, the actual
+  live resource — not bugs in the resources themselves. `az <resource> show`
+  the live value first; the fix is usually correcting config to match
+  reality, or `ignore_changes` for genuinely create-time-only attributes
+  with no live representation to reconcile against.
