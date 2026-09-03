@@ -103,6 +103,10 @@ jobs:
           restore-keys: |
             gradle-smoke-${{ runner.os }}-
 
+      - name: Preinstall Android NDK 27.1.12297006
+        working-directory: .
+        run: ./scripts/preinstall-android-ndk.sh
+
       - name: Assemble Android Debug smoke APK
         env:
           EXPO_PUBLIC_APP_ENV: development
@@ -156,7 +160,7 @@ jobs:
         run: |
           mkdir -p src/QueenZone.Mobile/maestro-results
           if [ ! -s src/QueenZone.Mobile/maestro-results/harness.log ]; then
-            echo "emulator-runner exited before the smoke script wrote harness.log" > src/QueenZone.Mobile/maestro-results/harness.log
+            echo "assemble failed before the smoke script wrote harness.log" > src/QueenZone.Mobile/maestro-results/harness.log
           fi
           adb logcat -d > src/QueenZone.Mobile/maestro-results/logcat.txt 2>/dev/null || true
           for f in "$HOME"/.android/*.log "$HOME"/.android/avd/*/*.log; do
@@ -371,6 +375,10 @@ jobs:
           restore-keys: |
             gradle-smoke-${{ runner.os }}-
 
+      - name: Preinstall Android NDK 27.1.12297006
+        working-directory: .
+        run: ./scripts/preinstall-android-ndk.sh
+
       - name: Assemble Android Debug smoke APK
         env:
           EXPO_PUBLIC_APP_ENV: development
@@ -416,7 +424,7 @@ jobs:
         run: |
           mkdir -p src/QueenZone.Mobile/maestro-results
           if [ ! -s src/QueenZone.Mobile/maestro-results/harness.log ]; then
-            echo "emulator-runner exited before the smoke script wrote harness.log" > src/QueenZone.Mobile/maestro-results/harness.log
+            echo "assemble failed before the smoke script wrote harness.log" > src/QueenZone.Mobile/maestro-results/harness.log
           fi
           adb logcat -d > src/QueenZone.Mobile/maestro-results/logcat.txt 2>/dev/null || true
           for f in "$HOME"/.android/*.log "$HOME"/.android/avd/*/*.log; do
