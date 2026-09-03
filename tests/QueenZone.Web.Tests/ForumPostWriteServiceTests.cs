@@ -133,6 +133,59 @@ public sealed class ForumPostWriteServiceTests : IClassFixture<QueenZoneWebAppli
     }
 
     [Fact]
+    public async Task CreateReply_autosuspends_new_account_with_auto_generated_looking_email_even_without_a_link()
+    {
+        using var scope = factory.Services.CreateScope();
+        var memberId = await CreateMemberAsync(
+            scope, DateTime.UtcNow, email: "outlook_D2B04D13FE864466@outlook.com");
+        var service = scope.ServiceProvider.GetRequiredService<ForumPostWriteService>();
+
+        var outcome = await service.CreateReplyAsync(
+            memberId, "Service Tester", 1002, "Excited to join this community!", attachments: null);
+
+        Assert.True(outcome.Succeeded);
+        var repository = scope.ServiceProvider.GetRequiredService<IMemberAccountRepository>();
+        var account = await repository.FindByIdAsync(memberId);
+        Assert.NotNull(account);
+        Assert.True(account!.IsSuspended);
+        Assert.Equal(ForumPostWriteService.AutoModeratorEmail, account.SuspendedByAdminEmail);
+    }
+
+    [Fact]
+    public async Task CreateReply_does_not_flag_older_account_with_auto_generated_looking_email()
+    {
+        using var scope = factory.Services.CreateScope();
+        var memberId = await CreateMemberAsync(
+            scope, DateTime.UtcNow - TimeSpan.FromHours(1), email: "outlook_D2B04D13FE864466@outlook.com");
+        var service = scope.ServiceProvider.GetRequiredService<ForumPostWriteService>();
+
+        var outcome = await service.CreateReplyAsync(
+            memberId, "Service Tester", 1002, "Excited to join this community!", attachments: null);
+
+        Assert.True(outcome.Succeeded);
+        var repository = scope.ServiceProvider.GetRequiredService<IMemberAccountRepository>();
+        var account = await repository.FindByIdAsync(memberId);
+        Assert.False(account!.IsSuspended);
+    }
+
+    [Fact]
+    public async Task CreateReply_does_not_flag_new_account_with_merely_unusual_email()
+    {
+        using var scope = factory.Services.CreateScope();
+        var memberId = await CreateMemberAsync(
+            scope, DateTime.UtcNow, email: "outlook.fan.since.1998@outlook.com");
+        var service = scope.ServiceProvider.GetRequiredService<ForumPostWriteService>();
+
+        var outcome = await service.CreateReplyAsync(
+            memberId, "Service Tester", 1002, "Excited to join this community!", attachments: null);
+
+        Assert.True(outcome.Succeeded);
+        var repository = scope.ServiceProvider.GetRequiredService<IMemberAccountRepository>();
+        var account = await repository.FindByIdAsync(memberId);
+        Assert.False(account!.IsSuspended);
+    }
+
+    [Fact]
     public async Task CreateTopic_trustedSystemAuthor_does_not_autosuspend_new_account_link_post()
     {
         using var scope = factory.Services.CreateScope();
@@ -196,13 +249,13 @@ public sealed class ForumPostWriteServiceTests : IClassFixture<QueenZoneWebAppli
         Assert.True(trusted.Succeeded);
     }
 
-    private static async Task<Guid> CreateMemberAsync(IServiceScope scope, DateTime createdAt)
+    private static async Task<Guid> CreateMemberAsync(IServiceScope scope, DateTime createdAt, string? email = null)
     {
         var repository = scope.ServiceProvider.GetRequiredService<IMemberAccountRepository>();
         var member = new MemberAccount
         {
             Id = Guid.NewGuid(),
-            Email = $"{Guid.NewGuid():N}@example.test",
+            Email = email ?? $"{Guid.NewGuid():N}@example.test",
             DisplayName = "New Member",
             CreatedAt = createdAt,
         };
