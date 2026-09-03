@@ -77,7 +77,7 @@ public sealed class ForumWriteOutcome
 /// <c>/api/v1/forum</c> writes so mobile posts hit the same sanitization,
 /// attachment rules, and <see cref="ForumPostRateLimiter"/> as the website.
 /// </summary>
-public sealed class ForumPostWriteService(
+public sealed partial class ForumPostWriteService(
     IForumRepository forumRepository,
     IForumWriteRepository forumWriteRepository,
     MemberAccountService memberAccountService,
@@ -326,9 +326,9 @@ public sealed class ForumPostWriteService(
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                logger.LogWarning(
+                Log.PushDispatchFailedAfterForumReply(
+                    logger,
                     ex,
-                    "Push dispatch failed after forum reply {TopicId}/{PostId} by member {MemberId}: {Error}",
                     topicId,
                     postId,
                     memberId,
@@ -416,8 +416,8 @@ public sealed class ForumPostWriteService(
 
         await forumWriteRepository.HideAuthorForumContentAsync(
             memberId, suspended.DisplayName, cancellationToken);
-        logger.LogWarning(
-            "Auto-suspended member {MemberId}: {Signature} {ElapsedSeconds:0}s after registration.",
+        Log.AutoSuspendedMember(
+            logger,
             memberId,
             signature,
             (postedAt.UtcDateTime - accountCreatedAt.Value).TotalSeconds);

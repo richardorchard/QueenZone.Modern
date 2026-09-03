@@ -93,7 +93,7 @@ internal sealed class FakeTopicWatchLookup : ITopicWatchLookup
 
 internal sealed class CollectingLogger<T> : ILogger<T>
 {
-    public List<(LogLevel Level, string Message, Exception? Exception)> Entries { get; } = [];
+    public List<(LogLevel Level, EventId EventId, string Message, Exception? Exception)> Entries { get; } = [];
 
     public IDisposable BeginScope<TState>(TState state)
         where TState : notnull => NullScope.Instance;
@@ -107,7 +107,7 @@ internal sealed class CollectingLogger<T> : ILogger<T>
         Exception? exception,
         Func<TState, Exception?, string> formatter)
     {
-        Entries.Add((logLevel, formatter(state, exception), exception));
+        Entries.Add((logLevel, eventId, formatter(state, exception), exception));
     }
 
     private sealed class NullScope : IDisposable

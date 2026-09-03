@@ -4,7 +4,7 @@ using QueenZone.Data.Entities;
 
 namespace QueenZone.Web;
 
-public sealed class PrivateMessageService(
+public sealed partial class PrivateMessageService(
     IPrivateMessageRepository privateMessageRepository,
     IMemberAccountRepository memberAccountRepository,
     IMemberFollowRepository memberFollowRepository,
@@ -245,9 +245,9 @@ public sealed class PrivateMessageService(
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            logger.LogWarning(
+            Log.PushDispatchFailedAfterPrivateMessage(
+                logger,
                 ex,
-                "Push dispatch failed after private message to member {MemberId} conversation {ConversationId}: {Error}",
                 recipientMemberId,
                 conversationId,
                 ex.Message);
