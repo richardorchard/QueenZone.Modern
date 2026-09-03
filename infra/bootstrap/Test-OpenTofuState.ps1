@@ -115,8 +115,9 @@ Assert-WorkloadIdentity `
     -FederatedCredentialName "github-opentofu-plan" `
     -EnvironmentName "opentofu-plan" `
     -ExpectedRoles @{
-        "Storage Blob Data Contributor" = $containerId
-        "Reader"                        = $workloadScope
+        "Storage Blob Data Contributor"                       = $containerId
+        "Reader"                                              = $workloadScope
+        "QueenZone OpenTofu Plan - App Service Config Reader" = $workloadScope
     }
 Assert-WorkloadIdentity `
     -DisplayName "QueenZone OpenTofu Apply" `

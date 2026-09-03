@@ -18,7 +18,7 @@ The bootstrap is idempotent. It creates or verifies:
 - Entra-only blob access, TLS 1.2, blob versioning, 30-day blob/container soft delete, and a `CanNotDelete` lock;
 - separate `QueenZone OpenTofu Plan` and `QueenZone OpenTofu Apply` Entra applications;
 - GitHub environment OIDC credentials for `opentofu-plan` and `opentofu-apply`;
-- container-scoped state access, Reader for plan, and resource-group-scoped Contributor for apply;
+- container-scoped state access, Reader plus a minimal custom `config/list` role for plan, and resource-group-scoped Contributor for apply;
 - protected-branch-only GitHub environments, with `opentofu-apply` requiring approval.
 
 The script does not create Cloudflare tokens, import application resources, or run an OpenTofu apply against production resources.
