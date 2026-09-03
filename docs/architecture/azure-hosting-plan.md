@@ -36,6 +36,10 @@ Optional later:
 
 - Staging slot for production swaps.
 
+## Region
+
+Production's target Azure region is **`eastus`** (moving from the current `australiaeast`), decided in [ADR 0017](../decisions/0017-production-region-eastus.md) as part of [epic #1264](https://github.com/richardorchard/QueenZone.Modern/issues/1264). The dev environment stays in `australiaeast`. See that ADR for the reasoning and for confirmation that the SQL server and storage account move alongside the App Service.
+
 ## Scale and cost model (single instance)
 
 Production runs on **one** App Service worker on plan **ASP-Queenzone** (**B1 Basic**). That is intentional: stay on the lowest paid plan currently in use and **do not** add Azure Cache for Redis or other paid distributed cache for multi-instance correctness.
