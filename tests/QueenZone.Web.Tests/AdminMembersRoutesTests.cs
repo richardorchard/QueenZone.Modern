@@ -259,7 +259,6 @@ public sealed class AdminMembersRoutesTests : IClassFixture<WebApplicationFactor
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
         Assert.Equal($"/admin/members/{memberId}", response.Headers.Location!.OriginalString);
         Assert.DoesNotContain("/error/", response.Headers.Location.OriginalString, StringComparison.Ordinal);
-        Assert.DoesNotContain("404", response.Headers.Location.OriginalString, StringComparison.Ordinal);
 
         var page = await admin.GetStringAsync($"/admin/members/{memberId}");
         Assert.Contains(AdminMemberSuspendService.HideTimeoutMessage, page);
