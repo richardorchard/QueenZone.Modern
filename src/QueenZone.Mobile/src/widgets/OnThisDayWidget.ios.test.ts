@@ -16,6 +16,7 @@ describe('OnThisDayWidget.ios referential freedom', () => {
     for (const ident of [
       'widgetHasDay',
       'widgetHasQuote',
+      'widgetHasTrivia',
       'widgetEyebrow',
       'widgetDayText',
       'widgetDayPrimary',
@@ -23,6 +24,7 @@ describe('OnThisDayWidget.ios referential freedom', () => {
       'widgetQuoteText',
       'widgetQuotePrimary',
       'widgetQuoteSecondary',
+      'widgetTriviaPrimary',
       'widgetEmptyText',
       'widgetDeepLinkUrl',
       'WIDGET_QUOTE_MAX_PT_SMALL',
@@ -39,6 +41,7 @@ describe('OnThisDayWidget.ios referential freedom', () => {
     assert.match(viewBody, /queenzone:\/\/home/);
     assert.match(viewBody, /queenzone:\/\/quotes\/\$\{quoteId\}/);
     assert.match(viewBody, /queenzone:\/\/timeline\/\$\{eventId\}/);
+    assert.match(viewBody, /queenzone:\/\/trivia/);
     assert.match(viewBody, /queenzone:\/\/timeline/);
     assert.match(viewBody, /props\.quoteId/);
     assert.match(viewBody, /props\.eventId/);
@@ -49,7 +52,10 @@ describe('OnThisDayWidget.ios referential freedom', () => {
     assert.match(viewBody, /Open QueenZone to load today's story\./);
     assert.match(viewBody, /ON THIS DAY/);
     assert.match(viewBody, /QUEEN QUOTES/);
+    assert.match(viewBody, /QUEEN FACTS/);
+    assert.match(viewBody, /props\.triviaText/);
     assert.match(viewBody, /4 \* 60 \* 60 \* 1000/);
+    assert.equal(viewBody.includes('queenzone://trivia/'), false);
   });
 
   it('splits primary and secondary and uses the small-ceiling scale band', () => {

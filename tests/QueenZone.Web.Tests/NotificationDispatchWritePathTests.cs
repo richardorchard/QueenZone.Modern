@@ -75,6 +75,57 @@ public sealed class NotificationDispatchWritePathTests : IClassFixture<QueenZone
     }
 
     [Fact]
+    public async Task DispatcherThrow_DoesNotFailPrivateMessageWrite()
+    {
+        var members = new InMemoryMemberAccountRepository();
+        var alice = await members.CreateAsync(new MemberAccount
+        {
+            Id = Guid.NewGuid(),
+            Email = "dispatcher-throw-alice@example.com",
+            DisplayName = "Alice",
+            CreatedAt = DateTime.UtcNow,
+        });
+        var bob = await members.CreateAsync(new MemberAccount
+        {
+            Id = Guid.NewGuid(),
+            Email = "dispatcher-throw-bob@example.com",
+            DisplayName = "Bob",
+            CreatedAt = DateTime.UtcNow,
+        });
+        var messages = new InMemoryPrivateMessageRepository(id =>
+            members.FindByIdAsync(id).GetAwaiter().GetResult());
+        var follows = new InMemoryMemberFollowRepository();
+        var rateLimiter = new PrivateMessageRateLimiter(
+            messages,
+            TimeProvider.System,
+            Options.Create(new PrivateMessageRateLimitOptions
+            {
+                WindowMinutes = 10,
+                MaxMessagesPerWindow = 1000,
+                MaxNewRecipientsPerWindow = 1000,
+                MaxDuplicateMessagesPerWindow = 1000,
+                NewAccountAgeDays = 3,
+                NewAccountMaxMessagesPerWindow = 1000,
+                NewAccountMaxNewRecipientsPerWindow = 1000,
+            }),
+            NullLogger<PrivateMessageRateLimiter>.Instance);
+        var logger = new CollectingLogger<PrivateMessageService>();
+        var service = new PrivateMessageService(
+            messages,
+            members,
+            follows,
+            rateLimiter,
+            new ThrowingNotificationDispatcher(new InvalidOperationException("dispatcher down")),
+            logger,
+            TimeProvider.System);
+
+        var result = await service.ComposeAsync(alice.Id, bob.Id, "Still delivered despite dispatcher failure");
+
+        Assert.True(result.Succeeded);
+        Assert.Contains(logger.Entries, entry => entry.Message.Contains("Push dispatch failed", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task ForumReply_DispatchesOnce_WhenWatchersExist()
     {
         var transport = new RecordingPushTransport();
@@ -120,6 +171,41 @@ public sealed class NotificationDispatchWritePathTests : IClassFixture<QueenZone
             Assert.Equal(reply.PostId.ToString(), send.Payload.Data["postId"]);
             Assert.Equal(watcher, Assert.Single(send.Tokens).MemberAccountId);
         }
+    }
+
+    [Fact]
+    public async Task ForumReply_DispatcherThrow_DoesNotFailTheReply()
+    {
+        using var scopedFactory = QueenZoneWebApplicationFactory.WithServices(services =>
+        {
+            services.RemoveAll<INotificationDispatcher>();
+            services.AddSingleton<INotificationDispatcher>(
+                new ThrowingNotificationDispatcher(new InvalidOperationException("dispatcher down")));
+        });
+
+        var author = Guid.NewGuid();
+        await SeedFactoryTokenAsync(scopedFactory, author, "author-tok");
+
+        using var scope = scopedFactory.Services.CreateScope();
+        var write = scope.ServiceProvider.GetRequiredService<ForumPostWriteService>();
+        var topic = await write.CreateTopicAsync(
+            author,
+            "Author",
+            1,
+            "Dispatcher throw thread",
+            "Starter body",
+            attachments: null,
+            poll: null);
+        Assert.True(topic.Succeeded);
+
+        var reply = await write.CreateReplyAsync(
+            author,
+            "Author",
+            topic.TopicId,
+            "A reply that should still succeed despite dispatcher failure",
+            attachments: null);
+
+        Assert.True(reply.Succeeded);
     }
 
     [Fact]

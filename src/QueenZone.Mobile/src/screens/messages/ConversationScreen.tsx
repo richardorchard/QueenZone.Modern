@@ -1,140 +1,48 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef } from 'react';
 import {
   Alert,
   FlatList,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   RefreshControl,
   StyleSheet,
   Text,
-  TextInput,
   View,
   type ListRenderItem,
 } from 'react-native';
+import { useHeaderHeight } from '@react-navigation/elements';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Flag, MoreHorizontal } from 'lucide-react-native';
-import { ApiError, isOfflineFailure, isTimeoutFailure } from '../../api/client';
-import type { CacheSource } from '../../api';
-import {
-  archiveConversation,
-  blockConversationParticipant,
-  fetchConversationResult,
-  replyToConversation,
-  reportConversationMessage,
-  type ConversationDetail,
-  type ConversationMessage,
-} from '../../api/messages';
-import type { HomeStackParamList } from '../../navigation/types';
+import { MoreHorizontal } from 'lucide-react-native';
 import { resolvePushMemberId } from '../../notifications/pushMemberId';
-import {
-  enqueueMessageReply,
-  flushOfflineQueue,
-  removeOfflineItem,
-  updateOfflineItem,
-  useOfflineQueue,
-  type OfflineQueueItem,
-} from '../../offlineQueue';
+import { useOfflineQueue } from '../../offlineQueue';
 import { MemberGate } from '../../session/MemberGate';
 import { useSession } from '../../session/SessionContext';
-import { fonts, palette, radius, space, type, useTheme } from '../../theme';
-import { Button } from '../../ui/Button';
+import { fonts, palette, space, type, useTheme } from '../../theme';
 import { IconButton } from '../../ui/IconButton';
 import { ErrorBlock, LoadingBlock, OfflineBanner } from '../../ui/ScreenStates';
 import { testIds } from '../../test/testIds';
 import {
   buildThreadItems,
-  conversationPageSize,
-  formatMessageClockTime,
   initialsFor,
   parseConversationId,
-  reportReasonMaxLength,
   sendingBlockedNotice,
-  validateReportReason,
   type ThreadListItem,
 } from './inboxMeta';
+import { overlayQueuedMessages, type DisplayMessage } from './conversationMeta';
 import { ConversationComposer } from './ConversationComposer';
+import { DateDivider } from './DateDivider';
+import { MessageBubble } from './MessageBubble';
+import { useConversation } from './useConversation';
+import type { HomeStackParamList } from '../../navigation/types';
+
+export { messageBubbleRenderProbe } from './MessageBubble';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'Conversation'>;
-
-type DisplayMessage = ConversationMessage & {
-  queueState?: OfflineQueueItem['state'];
-  queueError?: string | null;
-};
-
-function overlayQueuedMessages(
-  detail: ConversationDetail | null,
-  queueItems: OfflineQueueItem[],
-  conversationId: string | null,
-  memberId: string | null,
-): DisplayMessage[] {
-  const messages: DisplayMessage[] = [...(detail?.messages ?? [])];
-  if (!conversationId || !memberId) {
-    return messages;
-  }
-  const pending = queueItems.filter(
-    (item) =>
-      item.kind === 'message.reply' &&
-      'conversationId' in item.target &&
-      item.target.conversationId === conversationId,
-  );
-  for (const item of pending) {
-    if (messages.some((message) => message.id === item.operationId)) {
-      continue;
-    }
-    messages.push({
-      id: item.operationId,
-      senderMemberId: memberId,
-      senderDisplayName: 'You',
-      body: item.payload.body,
-      createdAt: item.createdAt,
-      isMine: true,
-      sortKey: Number.MAX_SAFE_INTEGER,
-      reportedByViewer: false,
-      queueState: item.state,
-      queueError: item.lastError,
-    });
-  }
-  return messages;
-}
-
-function queueStatusLabel(state: OfflineQueueItem['state']): string {
-  if (state === 'sending') {
-    return 'Sending…';
-  }
-  if (state === 'needs_attention') {
-    return 'Needs attention';
-  }
-  return 'Queued';
-}
-
-/**
- * Thread list sits one step darker than the header/composer chrome — a new
- * value from the redesign handoff (`design/design_handoff_private_messages`),
- * not yet a shared theme token.
- */
-const threadListBackground = '#0C0C0C';
-const outgoingBubbleBackground = '#171717';
-const outgoingBubbleBorder = 'rgba(255,255,255,0.28)';
-const dividerRule = 'rgba(255,255,255,0.14)';
-
-function messageFromUnknownError(err: unknown): string {
-  return err instanceof ApiError ? err.message : 'Something went wrong.';
-}
-
-function isStaleReadFailure(err: unknown): boolean {
-  return isOfflineFailure(err) || isTimeoutFailure(err);
-}
 
 function threadKeyExtractor(item: ThreadListItem<DisplayMessage>): string {
   return item.id;
 }
-
-/** Test-only. Production leaves this unset so bubble commits stay uninstrumented. */
-export const messageBubbleRenderProbe: { current: (() => void) | null } = {
-  current: null,
-};
 
 export function ConversationScreen({ navigation, route }: Props) {
   return (
@@ -147,43 +55,28 @@ export function ConversationScreen({ navigation, route }: Props) {
 function ConversationThread({ navigation, route }: Props) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
+  const headerHeight = useHeaderHeight();
   const { accessToken, profile } = useSession();
   const listRef = useRef<FlatList<ThreadListItem<DisplayMessage>>>(null);
   const conversationId = parseConversationId(route.params.id);
   const memberId = accessToken ? resolvePushMemberId(accessToken, profile?.memberId) : null;
   const queueItems = useOfflineQueue(memberId);
-  const [detail, setDetail] = useState<ConversationDetail | null>(null);
-  const [source, setSource] = useState<CacheSource>('network');
-  const [cachedAt, setCachedAt] = useState<string | null>(null);
-  const detailRef = useRef<ConversationDetail | null>(null);
-  detailRef.current = detail;
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [reloadToken, setReloadToken] = useState(0);
-  const [archiving, setArchiving] = useState(false);
-  const [archiveError, setArchiveError] = useState<string | null>(null);
-  const [, setBlocking] = useState(false);
-  const [blockError, setBlockError] = useState<string | null>(null);
+
+  const scrollToEnd = useCallback(() => {
+    listRef.current?.scrollToEnd({ animated: false });
+  }, []);
+  const onArchived = useCallback(() => {
+    navigation.navigate('Inbox');
+  }, [navigation]);
+
+  const conversation = useConversation(conversationId, accessToken, memberId, {
+    scrollToEnd,
+    onArchived,
+  });
+  const { detail, source, cachedAt, error, loading, refreshing } = conversation;
 
   const correspondentName = detail?.otherParticipantDisplayName ?? 'Conversation';
   const offlineSnapshot = source === 'cache';
-
-  const handleArchive = useCallback(async () => {
-    if (!accessToken || !conversationId) {
-      return;
-    }
-    setArchiveError(null);
-    setArchiving(true);
-    try {
-      await archiveConversation(accessToken, conversationId);
-      navigation.navigate('Inbox');
-    } catch (err: unknown) {
-      setArchiveError(messageFromUnknownError(err));
-    } finally {
-      setArchiving(false);
-    }
-  }, [accessToken, conversationId, navigation]);
 
   const confirmArchive = useCallback(() => {
     Alert.alert(
@@ -191,26 +84,10 @@ function ConversationThread({ navigation, route }: Props) {
       `Archive your conversation with ${correspondentName}? You can find it later in Archived messages.`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Archive', style: 'destructive', onPress: () => void handleArchive() },
+        { text: 'Archive', style: 'destructive', onPress: () => void conversation.archive() },
       ],
     );
-  }, [correspondentName, handleArchive]);
-
-  const handleBlock = useCallback(async () => {
-    if (!accessToken || !conversationId) {
-      return;
-    }
-    setBlockError(null);
-    setBlocking(true);
-    try {
-      await blockConversationParticipant(accessToken, conversationId);
-      setReloadToken((n) => n + 1);
-    } catch (err: unknown) {
-      setBlockError(messageFromUnknownError(err));
-    } finally {
-      setBlocking(false);
-    }
-  }, [accessToken, conversationId]);
+  }, [conversation, correspondentName]);
 
   const confirmBlock = useCallback(() => {
     Alert.alert(
@@ -218,10 +95,10 @@ function ConversationThread({ navigation, route }: Props) {
       `Block ${correspondentName}? They will no longer be able to send you private messages.`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Block', style: 'destructive', onPress: () => void handleBlock() },
+        { text: 'Block', style: 'destructive', onPress: () => void conversation.block() },
       ],
     );
-  }, [correspondentName, handleBlock]);
+  }, [conversation, correspondentName]);
 
   const openOverflowMenu = useCallback(() => {
     Alert.alert(correspondentName, undefined, [
@@ -257,125 +134,6 @@ function ConversationThread({ navigation, route }: Props) {
     });
   }, [c.textPrimary, correspondentName, navigation, openOverflowMenu, source]);
 
-  const load = useCallback(
-    async (signal: AbortSignal, mode: 'initial' | 'refresh') => {
-      if (!accessToken || !conversationId) {
-        setDetail(null);
-        setError(conversationId ? 'Sign in to continue.' : 'This conversation is not available.');
-        setLoading(false);
-        setRefreshing(false);
-        return;
-      }
-
-      if (mode === 'initial') {
-        setLoading(true);
-      } else {
-        setRefreshing(true);
-      }
-      setError(null);
-
-      try {
-        const next = await fetchConversationResult(accessToken, conversationId, {
-          pageSize: conversationPageSize,
-          signal,
-          memberId,
-          networkOnly: mode === 'refresh',
-        });
-        if (signal.aborted) {
-          return;
-        }
-        setDetail(next.data);
-        setSource(next.source);
-        setCachedAt(next.cachedAt);
-        requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: false }));
-      } catch (err: unknown) {
-        if (signal.aborted || (err instanceof Error && err.name === 'AbortError')) {
-          return;
-        }
-        if (mode === 'refresh' && detailRef.current && isStaleReadFailure(err)) {
-          setSource('cache');
-          return;
-        }
-        setDetail(null);
-        setError(messageFromUnknownError(err));
-      } finally {
-        if (!signal.aborted) {
-          setLoading(false);
-          setRefreshing(false);
-        }
-      }
-    },
-    [accessToken, conversationId, memberId],
-  );
-
-  useEffect(() => {
-    const controller = new AbortController();
-    void load(controller.signal, 'initial');
-    return () => controller.abort();
-  }, [load, reloadToken]);
-
-  const sendReply = useCallback(
-    async (body: string) => {
-      if (!accessToken || !conversationId || !memberId) {
-        throw new Error('Sign in to continue.');
-      }
-
-      const queued = await enqueueMessageReply({
-        memberId,
-        conversationId,
-        body,
-      });
-      void flushOfflineQueue();
-      requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
-
-      void (async () => {
-        try {
-          const next = await replyToConversation(
-            accessToken,
-            conversationId,
-            queued.payload.body,
-            undefined,
-            queued.operationId,
-          );
-          await removeOfflineItem(queued.operationId);
-          setDetail(next);
-          setSource('network');
-          setCachedAt(new Date().toISOString());
-        } catch (err: unknown) {
-          if (isOfflineFailure(err) || isTimeoutFailure(err)) {
-            return;
-          }
-        }
-      })();
-    },
-    [accessToken, conversationId, memberId],
-  );
-
-  const submitReport = useCallback(
-    async (messageId: string, reason?: string) => {
-      if (!accessToken || !conversationId) {
-        throw new Error('Sign in to continue.');
-      }
-      await reportConversationMessage(accessToken, conversationId, messageId, reason);
-      setDetail((current) =>
-        current
-          ? {
-              ...current,
-              messages: current.messages.map((item) =>
-                item.id === messageId ? { ...item, reportedByViewer: true } : item,
-              ),
-            }
-          : current,
-      );
-    },
-    [accessToken, conversationId],
-  );
-
-  const refresh = useCallback(() => {
-    const controller = new AbortController();
-    void load(controller.signal, 'refresh');
-  }, [load]);
-
   const pendingMessages = useMemo(
     () => overlayQueuedMessages(detail, queueItems, conversationId, memberId),
     [conversationId, detail, memberId, queueItems],
@@ -392,10 +150,10 @@ function ConversationThread({ navigation, route }: Props) {
           correspondentName={correspondentName}
           isFirstOfRun={item.isFirstOfRun}
           interactionsEnabled={!offlineSnapshot && !item.message.queueState}
-          onSubmitReport={submitReport}
+          onSubmitReport={conversation.submitReport}
         />
       ),
-    [correspondentName, offlineSnapshot, submitReport],
+    [conversation.submitReport, correspondentName, offlineSnapshot],
   );
 
   if (loading && !detail) {
@@ -403,7 +161,7 @@ function ConversationThread({ navigation, route }: Props) {
   }
 
   if (error && !detail) {
-    return <ErrorBlock message={error} onRetry={() => setReloadToken((n) => n + 1)} />;
+    return <ErrorBlock message={error} onRetry={conversation.reload} />;
   }
 
   const canSendReply = detail?.canSendReply === true;
@@ -415,6 +173,7 @@ function ConversationThread({ navigation, route }: Props) {
     <KeyboardAvoidingView
       style={[styles.flex, { backgroundColor: c.surfacePage }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight : 0}
     >
       <FlatList
         ref={listRef}
@@ -424,7 +183,7 @@ function ConversationThread({ navigation, route }: Props) {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={refresh}
+            onRefresh={conversation.refresh}
             tintColor={c.accentPrimary}
           />
         }
@@ -440,12 +199,12 @@ function ConversationThread({ navigation, route }: Props) {
         <ConversationComposer
           correspondentName={correspondentName}
           canSend={Boolean(accessToken)}
-          archiving={archiving}
+          archiving={conversation.archiving}
           archiveDisabled={offlineSnapshot}
-          archiveError={archiveError}
-          blockError={blockError}
+          archiveError={conversation.archiveError}
+          blockError={conversation.blockError}
           onArchive={confirmArchive}
-          onSend={sendReply}
+          onSend={conversation.sendReply}
         />
       ) : notice ? (
         <View
@@ -459,8 +218,8 @@ function ConversationThread({ navigation, route }: Props) {
           ]}
         >
           <Text style={[type.body, { color: c.textSecondary }]}>{notice}</Text>
-          {blockError ? (
-            <Text style={[type.caption, { color: c.textSecondary }]}>{blockError}</Text>
+          {conversation.blockError ? (
+            <Text style={[type.caption, { color: c.textSecondary }]}>{conversation.blockError}</Text>
           ) : null}
         </View>
       ) : null}
@@ -468,183 +227,12 @@ function ConversationThread({ navigation, route }: Props) {
   );
 }
 
-const DateDivider = memo(function DateDivider({ label }: { label: string }) {
-  return (
-    <View style={styles.dividerRow}>
-      <View style={styles.dividerRule} />
-      <Text style={[type.eyebrow, { color: 'rgba(255,255,255,0.5)' }]}>{label}</Text>
-      <View style={styles.dividerRule} />
-    </View>
-  );
-});
-
-const MessageBubble = memo(function MessageBubble({
-  item,
-  correspondentName,
-  isFirstOfRun,
-  interactionsEnabled,
-  onSubmitReport,
-}: {
-  item: DisplayMessage;
-  correspondentName: string;
-  isFirstOfRun: boolean;
-  interactionsEnabled: boolean;
-  onSubmitReport: (messageId: string, reason?: string) => Promise<void>;
-}) {
-  messageBubbleRenderProbe.current?.();
-  const [reporting, setReporting] = useState(false);
-  const [reportReason, setReportReason] = useState('');
-  const [reportError, setReportError] = useState<string | null>(null);
-  const [reportBusy, setReportBusy] = useState(false);
-
-  const startReport = useCallback(() => {
-    setReporting(true);
-    setReportReason('');
-    setReportError(null);
-  }, []);
-
-  const cancelReport = useCallback(() => {
-    setReporting(false);
-    setReportReason('');
-    setReportError(null);
-  }, []);
-
-  const submitReport = useCallback(async () => {
-    const validation = validateReportReason(reportReason);
-    if (validation) {
-      setReportError(validation);
-      return;
-    }
-    setReportBusy(true);
-    setReportError(null);
-    try {
-      await onSubmitReport(item.id, reportReason.trim() || undefined);
-      setReporting(false);
-      setReportReason('');
-    } catch (err: unknown) {
-      setReportError(messageFromUnknownError(err));
-    } finally {
-      setReportBusy(false);
-    }
-  }, [item.id, onSubmitReport, reportReason]);
-
-  const time = formatMessageClockTime(item.createdAt);
-  const attribution = item.isMine
-    ? `YOU · ${time}`
-    : isFirstOfRun
-      ? `${item.senderDisplayName.toUpperCase()} · ${time}`
-      : time;
-  const attributionColor = item.isMine ? 'rgba(255,255,255,0.62)' : 'rgba(255,255,255,0.72)';
-
-  if (item.isMine) {
-    return (
-      <View style={styles.outgoingRow}>
-        <Text style={[styles.attribution, { color: attributionColor }]}>{attribution}</Text>
-        <View style={[styles.bubble, styles.outgoingBubble]}>
-          <Text style={styles.outgoingText}>{item.body}</Text>
-        </View>
-        {item.queueState ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={queueStatusLabel(item.queueState)}
-            testID={testIds.pendingMessage}
-            onPress={() => {
-              if (item.queueState !== 'needs_attention') {
-                return;
-              }
-              Alert.alert(item.queueError ?? 'This message could not be sent.', undefined, [
-                { text: 'Dismiss', style: 'cancel' },
-                {
-                  text: 'Discard',
-                  style: 'destructive',
-                  onPress: () => {
-                    void removeOfflineItem(item.id);
-                  },
-                },
-                {
-                  text: 'Retry',
-                  onPress: () => {
-                    void updateOfflineItem(item.id, {
-                      state: 'queued',
-                      nextRetryAt: new Date().toISOString(),
-                      lastError: null,
-                    }).then(() => {
-                      void flushOfflineQueue();
-                    });
-                  },
-                },
-              ]);
-            }}
-          >
-            <Text style={[styles.attribution, { color: palette.gold }]}>
-              {queueStatusLabel(item.queueState)}
-            </Text>
-          </Pressable>
-        ) : null}
-      </View>
-    );
-  }
-
-  return (
-    <View style={styles.incomingRow}>
-      {isFirstOfRun ? (
-        <View style={[styles.avatar, styles.incomingAvatar, { backgroundColor: palette.burgundy }]}>
-          <Text style={styles.avatarLabelSmall}>{initialsFor(correspondentName)}</Text>
-        </View>
-      ) : (
-        <View style={styles.avatarSpacer} />
-      )}
-      <View style={styles.incomingContent}>
-        <Text style={[styles.attribution, { color: attributionColor }]}>{attribution}</Text>
-        <View style={[styles.bubble, styles.incomingBubble]}>
-          <Text style={styles.incomingText}>{item.body}</Text>
-        </View>
-        {item.reportedByViewer ? (
-          <View style={styles.reportedRow}>
-            <Flag size={11} strokeWidth={2} color={palette.gold} />
-            <Text style={styles.reportedLabel}>REPORTED</Text>
-          </View>
-        ) : !interactionsEnabled ? null : reporting ? (
-          <View style={styles.reportForm}>
-            <TextInput
-              value={reportReason}
-              onChangeText={setReportReason}
-              placeholder="Optional reason"
-              placeholderTextColor="rgba(255,255,255,0.45)"
-              accessibilityLabel="Optional reason"
-              maxLength={reportReasonMaxLength}
-              editable={!reportBusy}
-              style={styles.reportField}
-            />
-            {reportError ? (
-              <Text style={[type.caption, { color: 'rgba(255,255,255,0.66)' }]}>{reportError}</Text>
-            ) : null}
-            <View style={styles.reportActions}>
-              <Button
-                label="Submit report"
-                size="sm"
-                onPress={() => {
-                  void submitReport();
-                }}
-                loading={reportBusy}
-              />
-              <Button label="Cancel" size="sm" variant="ghost" onPress={cancelReport} disabled={reportBusy} />
-            </View>
-          </View>
-        ) : (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Report message"
-            onPress={startReport}
-            hitSlop={8}
-          >
-            <Text style={styles.reportTrigger}>Report message</Text>
-          </Pressable>
-        )}
-      </View>
-    </View>
-  );
-});
+/**
+ * Thread list sits one step darker than the header/composer chrome — a new
+ * value from the redesign handoff (`design/design_handoff_private_messages`),
+ * not yet a shared theme token.
+ */
+const threadListBackground = '#0C0C0C';
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
@@ -657,49 +245,5 @@ const styles = StyleSheet.create({
     letterSpacing: 0.7,
     color: palette.white,
   },
-  avatarLabelSmall: {
-    fontFamily: fonts.titling,
-    fontSize: 10,
-    letterSpacing: 0.6,
-    color: palette.white,
-  },
-  avatarSpacer: { width: 28, height: 28 },
-  incomingAvatar: { width: 28, height: 28, marginTop: 18 },
-  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  dividerRule: { flex: 1, height: 1, backgroundColor: dividerRule },
-  attribution: {
-    fontFamily: fonts.titling,
-    fontSize: 9.5,
-    letterSpacing: 1.9,
-  },
-  outgoingRow: { alignItems: 'flex-end', gap: 6 },
-  incomingRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  incomingContent: { flex: 1, maxWidth: '80%', alignItems: 'flex-start', gap: 6 },
-  bubble: { borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 12, maxWidth: '80%' },
-  outgoingBubble: { backgroundColor: outgoingBubbleBackground, borderWidth: 1, borderColor: outgoingBubbleBorder },
-  incomingBubble: { backgroundColor: palette.warmWhite, alignSelf: 'stretch', maxWidth: undefined },
-  outgoingText: { fontFamily: fonts.body, fontSize: 16.5, lineHeight: 24.75, color: palette.white },
-  incomingText: { fontFamily: fonts.body, fontSize: 16.5, lineHeight: 24.75, color: palette.charcoal },
-  reportedRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 2 },
-  reportedLabel: { fontFamily: fonts.titling, fontSize: 9, letterSpacing: 1.6, color: palette.gold },
-  reportTrigger: {
-    fontFamily: fonts.body,
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.5)',
-    textDecorationLine: 'underline',
-  },
-  reportForm: { alignSelf: 'stretch', gap: space.sm },
-  reportField: {
-    minHeight: 40,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-    borderRadius: radius.md,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontFamily: fonts.body,
-    fontSize: 16,
-    color: palette.white,
-  },
-  reportActions: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
   notice: { paddingHorizontal: space.base, paddingTop: space.md, borderTopWidth: StyleSheet.hairlineWidth },
 });

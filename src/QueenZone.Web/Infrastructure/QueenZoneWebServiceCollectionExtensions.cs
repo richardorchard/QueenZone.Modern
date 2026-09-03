@@ -293,6 +293,7 @@ public static class QueenZoneWebServiceCollectionExtensions
         services.AddScoped<INewsForumTopicService, NewsForumTopicService>();
         services.AddScoped<NewsDiscussionComposer>();
         services.AddScoped<AdminNewsWriteService>();
+        services.AddScoped<AdminMemberSuspendService>();
         services.AddScoped<NewsArticleImageService>();
         services.AddSingleton<IGoogleAnalyticsDataClient, GoogleAnalyticsDataClient>();
         services.AddScoped<IGoogleAnalyticsTrafficService, GoogleAnalyticsTrafficService>();
@@ -304,6 +305,12 @@ public static class QueenZoneWebServiceCollectionExtensions
         services.AddAntiforgery(options =>
         {
             options.HeaderName = EditorImageUploadEndpoints.AntiforgeryHeaderName;
+        });
+        // Per-field cap. MultipartBodyLengthLimit is a different knob; page-level
+        // [RequestFormLimits] is not applied until after UseAntiforgery reads the form.
+        services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
+        {
+            options.ValueLengthLimit = 16 * 1024 * 1024;
         });
         return services;
     }

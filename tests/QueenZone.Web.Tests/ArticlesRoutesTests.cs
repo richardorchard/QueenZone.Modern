@@ -109,6 +109,57 @@ public sealed class ArticlesRoutesTests : IClassFixture<WebApplicationFactory<Pr
     }
 
     [Fact]
+    public async Task ArticleDetailRendersOverlayImageAuthorAndTags()
+    {
+        var editorial = new InMemoryEditorialArticleRepository();
+        var articles = new QueenZone.Data.InMemoryArticlesRepository(
+            [
+                new ArticleItem(
+                    5004,
+                    "Legacy archive title",
+                    "Legacy excerpt.",
+                    "<p>Legacy body.</p>",
+                    new DateTime(2026, 5, 4, 9, 0, 0, DateTimeKind.Utc),
+                    null,
+                    "Features",
+                    true),
+            ],
+            editorial);
+        var draft = await editorial.SaveDraftAsync(
+            new EditorialArticleDraft(
+                null,
+                5004,
+                null,
+                "Overlay archive title",
+                null,
+                "Overlay excerpt.",
+                "<p>Overlay body.</p>",
+                "Overlay Author",
+                "Features",
+                "overlay,tags",
+                null,
+                "editors/admin/overlay.webp",
+                DateTimeOffset.Parse("2026-05-04T09:00:00Z")),
+            "admin");
+        await editorial.SetStatusAsync(draft.Id, EditorialArticleStatus.Published, "admin");
+
+        var client = factory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+            {
+                services.AddSingleton<IArticlesRepository>(articles);
+            })).CreateClient();
+
+        var body = await client.GetStringAsync("/articles/5004/overlay-archive-title");
+
+        Assert.Contains("Overlay archive title", body);
+        Assert.Contains("Overlay Author", body);
+        Assert.Contains("overlay", body);
+        Assert.Contains("tags", body);
+        Assert.Contains(NewsArticleImage.ResolveImageUrl("editors/admin/overlay.webp", null)!, body);
+        Assert.DoesNotContain("/design-system/assets/img-hero.jpg", body);
+    }
+
+    [Fact]
     public async Task ArticleDetailRendersCompletePublishedArticle()
     {
         var client = factory.CreateClient();

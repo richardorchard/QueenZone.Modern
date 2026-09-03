@@ -138,6 +138,133 @@ namespace QueenZone.Data.Migrations
                     b.ToTable("DeviceTokens", (string)null);
                 });
 
+            modelBuilder.Entity("QueenZone.Data.Entities.EditorialArticleEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AuthorName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Excerpt")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("ImageBlobKey")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<int?>("LegacyArticleId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("LiveAuthorName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("LiveBody")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("LiveCategory")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("LiveExcerpt")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("LiveImageBlobKey")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTimeOffset?>("LivePublishedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("LiveSlug")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("LiveSource")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("LiveTags")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("LiveTitle")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<DateTimeOffset>("PublishedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("Source")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<Guid?>("SourceSubmissionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("Tags")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("UpdatedBy")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("nvarchar(320)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LegacyArticleId")
+                        .IsUnique()
+                        .HasFilter("[LegacyArticleId] IS NOT NULL");
+
+                    b.HasIndex("LiveSlug")
+                        .IsUnique()
+                        .HasFilter("[LiveSlug] IS NOT NULL");
+
+                    b.HasIndex("Slug")
+                        .IsUnique();
+
+                    b.HasIndex("SourceSubmissionId")
+                        .IsUnique()
+                        .HasFilter("[SourceSubmissionId] IS NOT NULL");
+
+                    b.ToTable("EditorialArticles", (string)null);
+                });
+
             modelBuilder.Entity("QueenZone.Data.Entities.ForumPollEntity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -934,9 +1061,7 @@ namespace QueenZone.Data.Migrations
 
                     b.Property<string>("BodyHtml")
                         .IsRequired()
-                        .HasMaxLength(8000)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(8000)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<int>("EditCount")
                         .ValueGeneratedOnAdd()
@@ -975,9 +1100,7 @@ namespace QueenZone.Data.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<string>("SignatureHtml")
-                        .HasMaxLength(8000)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(8000)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<long>("ThreadId")
                         .HasColumnType("bigint");

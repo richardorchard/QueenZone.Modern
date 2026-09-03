@@ -111,6 +111,30 @@ public sealed class PublicContentMapperTests
     }
 
     [Fact]
+    public void ToArticleDetailItem_MapsOverlayImageAuthorAndTags()
+    {
+        var item = new ArticleItem(
+            101,
+            "Studio essay",
+            "Excerpt",
+            "Body",
+            new DateTime(2023, 5, 5, 0, 0, 0, DateTimeKind.Utc),
+            null,
+            "Recording",
+            true,
+            "editors/admin/card.webp",
+            "Archive Editor",
+            "queen,freddie");
+
+        var view = PublicContentMapper.ToArticleDetailItem(item);
+
+        Assert.Equal(NewsArticleImage.ResolveImageUrl("editors/admin/card.webp", null), view.ImageUrl);
+        Assert.Equal("Archive Editor", view.AuthorName);
+        Assert.Equal("queen,freddie", view.Tags);
+        Assert.Equal("/articles/101/studio-essay", view.DetailPath);
+    }
+
+    [Fact]
     public void ToForumThreadHeader_TrimsNamesAndBuildsPaths()
     {
         var header = new ForumTopicHeader(1002, " Ranking every studio album ", 3, " The Music ");

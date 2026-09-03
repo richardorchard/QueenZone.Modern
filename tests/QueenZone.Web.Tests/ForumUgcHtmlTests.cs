@@ -66,4 +66,15 @@ public sealed class ForumUgcHtmlTests
 
         Assert.Equal(string.Empty, sanitizer.NormalizeForStorage("   "));
     }
+
+    [Fact]
+    public void NormalizeForStorage_RoundTripsBmpAndSupplementaryPlaneEmoji()
+    {
+        var sanitizer = Create();
+
+        Assert.Equal("<p>True ❤️</p>", sanitizer.NormalizeForStorage("True ❤️"));
+        Assert.Equal("<p>🎸</p>", sanitizer.NormalizeForStorage("🎸"));
+        Assert.Equal("<p>True ❤️</p>", sanitizer.NormalizeForStorage("<p>True ❤️</p>"));
+        Assert.Equal("<p>🎸</p>", sanitizer.NormalizeForStorage("<p>🎸</p>"));
+    }
 }

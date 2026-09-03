@@ -8,8 +8,9 @@
  * SwiftUI works before the first app launch (empty-state copy) and after
  * Home / background refresh writes real on-this-day + quote data.
  *
- * When both halves are present the native view shows one face at a time on a
- * 4-hour UTC slot (`entry.date`), matching `widgetActiveFace` in widgetCopy.ts.
+ * When more than one face is present the native view shows one at a time on a
+ * 4-hour UTC slot (`entry.date`), matching `widgetActiveFace` in widgetCopy.ts
+ * (day → quote → trivia; skip missing).
  * Primary/secondary type-scale literals match widgetCopy.ts (17/22, 0.65, 6, 9/11, 2).
  */
 const fs = require('fs');
@@ -34,21 +35,22 @@ struct OnThisDayNativeEntryView: View {
   private var quoteWhoSaid: String { stringProp("quoteWhoSaid") }
   private var quoteId: Int { intProp("quoteId") }
   private var eventId: Int { intProp("eventId") }
+  private var triviaText: String { stringProp("triviaText") }
   private var hasDay: Bool { !formattedDate.isEmpty && !summary.isEmpty }
   private var hasQuote: Bool { !quoteText.isEmpty && !quoteWhoSaid.isEmpty }
-  private var showDay: Bool {
-    if hasDay && hasQuote {
-      let slot = Int(floor(entry.date.timeIntervalSince1970 / (4 * 3600)))
-      return slot % 2 == 0
-    }
-    return hasDay
+  private var hasTrivia: Bool { !triviaText.isEmpty }
+  private var activeFace: String? {
+    var faces: [String] = []
+    if hasDay { faces.append("day") }
+    if hasQuote { faces.append("quote") }
+    if hasTrivia { faces.append("trivia") }
+    guard !faces.isEmpty else { return nil }
+    let slot = Int(floor(entry.date.timeIntervalSince1970 / (4 * 3600)))
+    return faces[slot % faces.count]
   }
-  private var showQuote: Bool {
-    if hasDay && hasQuote {
-      return !showDay
-    }
-    return hasQuote
-  }
+  private var showDay: Bool { activeFace == "day" }
+  private var showQuote: Bool { activeFace == "quote" }
+  private var showTrivia: Bool { activeFace == "trivia" }
   private var primaryCeiling: CGFloat { family == .systemMedium ? 22 : 17 }
   private var secondaryPt: CGFloat { family == .systemMedium ? 11 : 9 }
 
@@ -63,7 +65,7 @@ struct OnThisDayNativeEntryView: View {
           .accessibilityHidden(true)
       }
       VStack(alignment: .leading, spacing: 6) {
-        Text(showDay || (!hasDay && !hasQuote) ? "ON THIS DAY" : "QUEEN QUOTES")
+        Text(showTrivia ? "QUEEN FACTS" : (showDay || activeFace == nil ? "ON THIS DAY" : "QUEEN QUOTES"))
           .font(.system(size: 10, weight: .semibold))
           .foregroundColor(Color(red: 184 / 255, green: 154 / 255, blue: 74 / 255))
         if showDay {
@@ -92,7 +94,16 @@ struct OnThisDayNativeEntryView: View {
             .foregroundColor(Color(red: 184 / 255, green: 182 / 255, blue: 176 / 255))
             .lineLimit(2)
         }
-        if !hasDay && !hasQuote {
+        if showTrivia {
+          Text(triviaText)
+            .font(.system(size: primaryCeiling))
+            .foregroundColor(Color(red: 242 / 255, green: 241 / 255, blue: 237 / 255))
+            .minimumScaleFactor(0.65)
+            .lineLimit(6)
+            .truncationMode(.tail)
+            .frame(maxHeight: .infinity, alignment: .topLeading)
+        }
+        if activeFace == nil {
           Text("Open QueenZone to load today's story.")
             .font(.system(size: primaryCeiling))
             .foregroundColor(Color(red: 184 / 255, green: 182 / 255, blue: 176 / 255))
@@ -118,6 +129,9 @@ struct OnThisDayNativeEntryView: View {
   }
 
   private var tapURL: URL? {
+    if showTrivia {
+      return URL(string: "queenzone://trivia")
+    }
     if showQuote && quoteId > 0 {
       return URL(string: "queenzone://quotes/\\(quoteId)")
     }
@@ -221,7 +235,7 @@ function withIosOnThisDayNativeWidget(config) {
 const plugin = createRunOncePlugin(
   withIosOnThisDayNativeWidget,
   'withIosOnThisDayNativeWidget',
-  '1.4.0',
+  '1.5.0',
 );
 
 plugin.applyOnThisDayNativeWidget = applyOnThisDayNativeWidget;

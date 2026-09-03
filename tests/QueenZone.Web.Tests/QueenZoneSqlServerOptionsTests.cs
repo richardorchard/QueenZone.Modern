@@ -10,9 +10,19 @@ public sealed class QueenZoneSqlServerOptionsTests
     {
         Assert.True(QueenZoneSqlServerOptions.DefaultCommandTimeoutSeconds < 300);
         Assert.Equal(30, QueenZoneSqlServerOptions.DefaultCommandTimeoutSeconds);
-        Assert.Equal(300, QueenZoneSqlServerOptions.LongRunningCommandTimeoutSeconds);
+        Assert.Equal(1800, QueenZoneSqlServerOptions.LongRunningCommandTimeoutSeconds);
         Assert.True(QueenZoneSqlServerOptions.MaxRetryCount > 0);
         Assert.True(QueenZoneSqlServerOptions.MaxRetryDelaySeconds > 0);
+    }
+
+    [Fact]
+    public void DesignTimeFactory_uses_long_running_command_timeout()
+    {
+        var factory = new QueenZoneDbContextFactory();
+        using var context = factory.CreateDbContext([]);
+        Assert.Equal(
+            QueenZoneSqlServerOptions.LongRunningCommandTimeoutSeconds,
+            context.Database.GetCommandTimeout());
     }
 
     [Fact]

@@ -121,6 +121,8 @@ describe('PhotoCategoryScreen', () => {
     );
 
     const user = userEvent.setup();
+    expect(screen.queryByRole('button', { name: 'Save to Photos' })).toBeNull();
+    expect(screen.queryByTestId(testIds.photoViewerSave)).toBeNull();
     await user.press(screen.getByRole('button', { name: 'Live Aid' }));
     expect(navigation.navigate).toHaveBeenCalledWith('PhotoViewer', { slug: 'brian-may', picId: 101 });
   });

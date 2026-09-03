@@ -330,6 +330,55 @@ public sealed partial class NewsSuggestionRoutesTests : IClassFixture<WebApplica
     }
 
     [Fact]
+    public async Task AdminPromote_ShowsConflictMessage_WhenConcurrencyExceptionIsThrown()
+    {
+        var uniqueSuffix = DateTime.UtcNow.ToString("yyyyMMddHHmmssfff", System.Globalization.CultureInfo.InvariantCulture);
+        var inner = new InMemoryNewsSuggestionRepository();
+        var failingRepository = new ConfigurableNewsSuggestionRepository(inner)
+        {
+            PromoteHandler = (_, _, _, _, _) => throw new OptimisticConcurrencyException(),
+        };
+        var failingFactory = factory.WithWebHostBuilder(builder =>
+        {
+            builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<INewsSuggestionRepository>();
+                services.AddSingleton<INewsSuggestionRepository>(failingRepository);
+            });
+        });
+        var memberClient = await CreateSignedInMemberClientAsync(
+            failingFactory,
+            email: "news-suggestion-concurrency@example.com",
+            displayName: "Concurrency Fan",
+            subject: "google-news-suggestion-concurrency",
+            options: new WebApplicationFactoryClientOptions
+            {
+                HandleCookies = true,
+                AllowAutoRedirect = false,
+            });
+        var suggestionId = await SubmitSuggestionAsync(
+            failingFactory,
+            memberClient,
+            $"https://example.com/suggestion-concurrency-{uniqueSuffix}",
+            "Suggestion concurrency conflict");
+        var admin = CreateAdminClient(failingFactory, AdminEmail);
+
+        var response = await PostAdminActionAsync(
+            admin,
+            $"/admin/news-suggestions/{suggestionId}/promote",
+            new Dictionary<string, string> { ["reviewNotes"] = "Trying concurrent promote" });
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        var detail = await admin.GetStringAsync($"/admin/news-suggestions/{suggestionId}");
+        Assert.Contains(OptimisticConcurrencyException.UserMessage, detail);
+
+        var suggestion = await failingRepository.GetByIdAsync(suggestionId);
+        Assert.NotNull(suggestion);
+        Assert.Equal(NewsSuggestionStatus.Pending, suggestion.Status);
+        Assert.Null(suggestion.PromotedNewsId);
+    }
+
+    [Fact]
     public async Task Post_InvalidHttpsUrl_ShowsValidationError()
     {
         var client = await CreateSignedInMemberClientAsync(

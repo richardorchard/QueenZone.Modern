@@ -47,6 +47,7 @@ export const testIds = {
   photosScreen: 'photos-screen',
   photoCategoryScreen: 'photo-category-screen',
   photoViewerScreen: 'photo-viewer-screen',
+  photoViewerSave: 'photo-viewer-save',
 
   archiveHubScreen: 'archive-hub-screen',
   articleStoryScreen: 'article-story-screen',
@@ -65,6 +66,10 @@ export const testIds = {
   forumThreadAttachment: 'forum-thread-attachment',
   forumThreadAttachmentViewer: 'forum-thread-attachment-viewer',
   forumThreadAttachmentOpened: 'forum-thread-attachment-opened',
+  forumThreadAttachmentSave: 'forum-thread-attachment-save',
+  forumThreadAttachmentAudio: 'forum-thread-attachment-audio',
+  forumThreadAttachmentAudioPlay: 'forum-thread-attachment-audio-play',
+  forumThreadAttachmentSaveFile: 'forum-thread-attachment-save-file',
   offlineBanner: 'offline-banner',
   pendingMessage: 'pending-message',
   pendingForumPost: 'pending-forum-post',
@@ -92,6 +97,7 @@ export const testIds = {
   memberGate: 'member-gate',
   inboxScreen: 'inbox-screen',
   archivedScreen: 'archived-screen',
+  conversationComposer: 'conversation-composer',
 
   notificationBanner: 'notification-banner',
 

@@ -69,6 +69,8 @@ public sealed class QueenZoneDbContext : DbContext
 
     public DbSet<ArticleSubmissionEntity> ArticleSubmissions => Set<ArticleSubmissionEntity>();
 
+    public DbSet<EditorialArticleEntity> EditorialArticles => Set<EditorialArticleEntity>();
+
     public DbSet<NewsSuggestionEntity> NewsSuggestions => Set<NewsSuggestionEntity>();
 
     public DbSet<HelpRequestEntity> HelpRequests => Set<HelpRequestEntity>();
@@ -367,8 +369,8 @@ public sealed class QueenZoneDbContext : DbContext
             entity.ToTable("ModernForumPost", table => table.ExcludeFromMigrations());
             entity.HasKey(post => post.Id);
             entity.Property(post => post.AuthorDisplayName).HasMaxLength(100).IsRequired();
-            entity.Property(post => post.BodyHtml).HasMaxLength(8000).IsUnicode(false).IsRequired();
-            entity.Property(post => post.SignatureHtml).HasMaxLength(8000).IsUnicode(false);
+            entity.Property(post => post.BodyHtml).IsUnicode().HasColumnType("nvarchar(max)").IsRequired();
+            entity.Property(post => post.SignatureHtml).IsUnicode().HasColumnType("nvarchar(max)");
             entity.Property(post => post.Attachment).HasMaxLength(120).IsUnicode(false);
             entity.Property(post => post.FileSize).HasMaxLength(12).IsUnicode(false);
             entity.Property(post => post.EditCount).HasDefaultValue(0);
@@ -793,6 +795,35 @@ public sealed class QueenZoneDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(a => a.AuthorMemberId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<EditorialArticleEntity>(entity =>
+        {
+            entity.ToTable("EditorialArticles");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Title).HasMaxLength(300).IsRequired();
+            entity.Property(x => x.Slug).HasMaxLength(300).IsRequired();
+            entity.Property(x => x.Excerpt).HasMaxLength(500).IsRequired();
+            entity.Property(x => x.Body).IsRequired();
+            entity.Property(x => x.AuthorName).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.Category).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.Tags).HasMaxLength(500);
+            entity.Property(x => x.Source).HasMaxLength(2000);
+            entity.Property(x => x.ImageBlobKey).HasMaxLength(1000);
+            entity.Property(x => x.Status).HasMaxLength(30).IsRequired();
+            entity.Property(x => x.UpdatedBy).HasMaxLength(320).IsRequired();
+            entity.Property(x => x.LiveTitle).HasMaxLength(300);
+            entity.Property(x => x.LiveSlug).HasMaxLength(300);
+            entity.Property(x => x.LiveExcerpt).HasMaxLength(500);
+            entity.Property(x => x.LiveAuthorName).HasMaxLength(200);
+            entity.Property(x => x.LiveCategory).HasMaxLength(100);
+            entity.Property(x => x.LiveTags).HasMaxLength(500);
+            entity.Property(x => x.LiveSource).HasMaxLength(2000);
+            entity.Property(x => x.LiveImageBlobKey).HasMaxLength(1000);
+            entity.HasIndex(x => x.LegacyArticleId).IsUnique().HasFilter("[LegacyArticleId] IS NOT NULL");
+            entity.HasIndex(x => x.SourceSubmissionId).IsUnique().HasFilter("[SourceSubmissionId] IS NOT NULL");
+            entity.HasIndex(x => x.Slug).IsUnique();
+            entity.HasIndex(x => x.LiveSlug).IsUnique().HasFilter("[LiveSlug] IS NOT NULL");
         });
 
         modelBuilder.Entity<SearchDocumentEntity>(entity =>

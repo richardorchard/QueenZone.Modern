@@ -28,7 +28,7 @@ internal sealed class GoogleFcmAccessTokenProvider(
             return await credential.UnderlyingCredential.GetAccessTokenForRequestAsync(
                 cancellationToken: cancellationToken);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             logger.LogWarning(ex, "FCM access token could not be minted; skipping FCM sends.");
             return null;

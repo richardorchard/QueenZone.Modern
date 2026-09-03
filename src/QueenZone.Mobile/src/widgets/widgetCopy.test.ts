@@ -23,17 +23,21 @@ import {
   widgetGraphemeCount,
   widgetHasDay,
   widgetHasQuote,
+  widgetHasTrivia,
   widgetPrimaryCeilingPt,
   widgetPrimaryFontSize,
   widgetQuotePrimary,
   widgetQuoteSecondary,
   widgetQuoteText,
   widgetSecondaryPt,
+  widgetTriviaPrimary,
 } from './widgetCopy.ts';
 
 const day = { formattedDate: '30 June 1980', summary: 'Queen released The Game.' };
 const quote = { quoteText: 'A kind of magic', quoteWhoSaid: 'Freddie Mercury' };
+const trivia = { triviaText: 'Freddie wrote Crazy Little Thing Called Love in minutes.' };
 const both = { ...day, ...quote };
+const allThree = { ...day, ...quote, ...trivia };
 
 describe('widgetCopy', () => {
   it('requires both date and summary for the on-this-day half', () => {
@@ -51,6 +55,13 @@ describe('widgetCopy', () => {
   it('uses a gold Queen Quotes eyebrow on the quote face', () => {
     assert.equal(widgetEyebrow('day'), 'ON THIS DAY');
     assert.equal(widgetEyebrow('quote'), 'QUEEN QUOTES');
+    assert.equal(widgetEyebrow('trivia'), 'QUEEN FACTS');
+  });
+
+  it('requires trivia text only — no category or speaker', () => {
+    assert.equal(widgetHasTrivia(trivia), true);
+    assert.equal(widgetHasTrivia({ triviaId: 4 }), false);
+    assert.equal(widgetHasTrivia({}), false);
   });
 
   it('rotates between faces on a 4-hour UTC slot when both halves exist', () => {
@@ -60,6 +71,20 @@ describe('widgetCopy', () => {
     assert.equal(widgetActiveFace(both, WIDGET_FACE_SLOT_MS * 2), 'day');
     assert.equal(nextWidgetFaceSlotMs(0), WIDGET_FACE_SLOT_MS);
     assert.equal(nextWidgetFaceSlotMs(WIDGET_FACE_SLOT_MS - 1), WIDGET_FACE_SLOT_MS);
+  });
+
+  it('rotates day → quote → trivia when all three faces exist', () => {
+    assert.equal(widgetActiveFace(allThree, 0), 'day');
+    assert.equal(widgetActiveFace(allThree, WIDGET_FACE_SLOT_MS), 'quote');
+    assert.equal(widgetActiveFace(allThree, WIDGET_FACE_SLOT_MS * 2), 'trivia');
+    assert.equal(widgetActiveFace(allThree, WIDGET_FACE_SLOT_MS * 3), 'day');
+  });
+
+  it('skips a missing trivia face so day+quote stays % 2', () => {
+    assert.equal(widgetActiveFace(both, WIDGET_FACE_SLOT_MS * 2), 'day');
+    assert.equal(widgetActiveFace({ ...day, ...trivia }, WIDGET_FACE_SLOT_MS), 'trivia');
+    assert.equal(widgetActiveFace({ ...quote, ...trivia }, 0), 'quote');
+    assert.equal(widgetActiveFace(trivia, WIDGET_FACE_SLOT_MS), 'trivia');
   });
 
   it('keeps a single face when only one half is available', () => {
@@ -79,6 +104,7 @@ describe('widgetCopy', () => {
     assert.equal(widgetQuoteSecondary(quote), '— Freddie Mercury');
     assert.equal(widgetDayPrimary(day), 'Queen released The Game.');
     assert.equal(widgetDaySecondary(day), '30 June 1980');
+    assert.equal(widgetTriviaPrimary(trivia), trivia.triviaText);
     assert.notEqual(widgetQuotePrimary(quote), widgetQuoteText(quote));
     assert.notEqual(widgetDayPrimary(day), widgetDayText(day));
   });

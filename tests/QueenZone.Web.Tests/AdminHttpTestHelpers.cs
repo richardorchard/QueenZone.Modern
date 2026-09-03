@@ -51,7 +51,8 @@ internal static partial class AdminHttpTestHelpers
         byte[] imageBytes,
         string fileName,
         string contentType,
-        IReadOnlyDictionary<string, string>? crop = null)
+        IReadOnlyDictionary<string, string>? crop = null,
+        string fileFieldName = "articleImage")
     {
         var formPage = await client.GetStringAsync(formPath);
         fields[AdminNewsPageModel.AntiforgeryTokenFieldName] = ExtractAntiforgeryToken(formPage);
@@ -72,7 +73,7 @@ internal static partial class AdminHttpTestHelpers
 
         var file = new ByteArrayContent(imageBytes);
         file.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
-        content.Add(file, "articleImage", fileName);
+        content.Add(file, fileFieldName, fileName);
         return await client.PostAsync(postPath, content);
     }
 

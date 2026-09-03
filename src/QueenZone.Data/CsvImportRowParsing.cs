@@ -2,7 +2,7 @@ namespace QueenZone.Data;
 
 /// <summary>
 /// Small parsing helpers shared by the CSV importers (<see cref="QueenHistoryCsvImporter"/>,
-/// <see cref="QuoteCsvImporter"/>) that upsert rows keyed by a (SourceType, SourceKey) pair.
+/// <see cref="QuoteCsvImporter"/>, <see cref="TriviaFactCsvImporter"/>).
 /// </summary>
 internal static class CsvImportRowParsing
 {

@@ -13,6 +13,7 @@ import {
   widgetQuotePrimary,
   widgetQuoteSecondary,
   widgetSecondaryPt,
+  widgetTriviaPrimary,
   type WidgetProps,
 } from './widgetCopy';
 import { widgetFaceDeepLinkUrl } from './widgetDeepLink';
@@ -36,6 +37,7 @@ export function OnThisDayAndroidWidget(props: OnThisDayAndroidWidgetProps) {
   const secondarySize = widgetSecondaryPt(family);
   const dayPrimary = widgetDayPrimary(props);
   const quotePrimary = widgetQuotePrimary(props);
+  const triviaPrimary = widgetTriviaPrimary(props);
 
   return (
     <OverlapWidget
@@ -120,6 +122,17 @@ export function OnThisDayAndroidWidget(props: OnThisDayAndroidWidgetProps) {
             text={widgetQuoteSecondary(props)}
             style={{ fontSize: secondarySize, color: mutedCream, width: 'match_parent' }}
             maxLines={WIDGET_QUOTE_SECONDARY_MAX_LINES}
+          />
+        ) : null}
+        {face === 'trivia' ? (
+          <TextWidget
+            text={triviaPrimary}
+            style={{
+              fontSize: widgetPrimaryFontSize(triviaPrimary, family),
+              color: cream,
+              width: 'match_parent',
+            }}
+            maxLines={WIDGET_QUOTE_MAX_LINES}
           />
         ) : null}
         {face == null ? (

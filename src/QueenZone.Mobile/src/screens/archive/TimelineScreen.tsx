@@ -1,7 +1,7 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Linking, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
-import { fetchTimelinePage, type TimelineEvent } from '../../api';
+import { fetchOnThisDay, fetchTimelinePage, type TimelineEvent } from '../../api';
 import { usePagedContent } from '../../hooks/usePagedContent';
 import { HeaderBackButton } from '../../navigation/headerButtons';
 import { goBackOrFallback } from '../../navigation/nestedTab';
@@ -36,8 +36,9 @@ export function TimelineScreen({ navigation, route }: Props) {
   const { c } = useTheme();
   const focusId = usableFocusId(route.params?.focusId);
   const [expandedId, setExpandedId] = useState<number | null>(focusId);
+  const [includedFocus, setIncludedFocus] = useState<TimelineEvent | null>(null);
   const listRef = useRef<FlatList<TimelineRow>>(null);
-  const didScrollFocus = useRef(false);
+  const scrolledFocusId = useRef<number | null>(null);
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -55,15 +56,48 @@ export function TimelineScreen({ navigation, route }: Props) {
     100,
   );
 
+  const items = useMemo(() => {
+    if (includedFocus && !paged.items.some((event) => event.id === includedFocus.id)) {
+      return [...paged.items, includedFocus];
+    }
+    return paged.items;
+  }, [includedFocus, paged.items]);
+
+  useEffect(() => {
+    setIncludedFocus((current) => (current?.id === focusId ? current : null));
+  }, [focusId]);
+
+  useEffect(() => {
+    if (focusId == null || paged.loading) {
+      return;
+    }
+    if (items.some((event) => event.id === focusId)) {
+      return;
+    }
+    let cancelled = false;
+    fetchOnThisDay()
+      .then((event) => {
+        if (!cancelled && event != null && event.id === focusId) {
+          setIncludedFocus(event);
+        }
+      })
+      .catch(() => {
+        /* paging may still surface the row */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [focusId, items, paged.loading]);
+
   useEffect(() => {
     if (focusId == null) {
       return;
     }
-    if (paged.loading || paged.loadingMore) {
+    if (items.some((event) => event.id === focusId)) {
+      setExpandedId(focusId);
       return;
     }
-    if (paged.items.some((event) => event.id === focusId)) {
-      setExpandedId(focusId);
+    if (paged.loading || paged.loadingMore) {
       return;
     }
     if (paged.hasMore) {
@@ -72,18 +106,18 @@ export function TimelineScreen({ navigation, route }: Props) {
     }
     setExpandedId(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- omit the whole paged object; named fields are already listed.
-  }, [focusId, paged.hasMore, paged.items, paged.loadMore, paged.loading, paged.loadingMore]);
+  }, [focusId, items, paged.hasMore, paged.loadMore, paged.loading, paged.loadingMore]);
 
   const sections = useMemo(() => {
     const map = new Map<string, TimelineEvent[]>();
-    for (const event of paged.items) {
+    for (const event of items) {
       const key = decadeLabel(event.eventDate);
       const list = map.get(key) ?? [];
       list.push(event);
       map.set(key, list);
     }
     return Array.from(map.entries()).map(([decade, events]) => ({ decade, events }) satisfies DecadeSection);
-  }, [paged.items]);
+  }, [items]);
 
   const rows = useMemo(() => {
     const next: TimelineRow[] = [];
@@ -104,14 +138,14 @@ export function TimelineScreen({ navigation, route }: Props) {
   }, [focusId, rows]);
 
   useEffect(() => {
-    if (focusIndex < 0 || didScrollFocus.current) {
+    if (focusId == null || focusIndex < 0 || scrolledFocusId.current === focusId) {
       return;
     }
-    didScrollFocus.current = true;
+    scrolledFocusId.current = focusId;
     requestAnimationFrame(() => {
       listRef.current?.scrollToIndex({ index: focusIndex, animated: true, viewPosition: 0.25 });
     });
-  }, [focusIndex]);
+  }, [focusId, focusIndex]);
 
   if (paged.loading && paged.items.length === 0) {
     return <LoadingBlock label="Loading timeline…" />;

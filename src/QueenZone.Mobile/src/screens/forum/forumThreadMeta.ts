@@ -7,9 +7,50 @@ export type AttachmentPreviewInput = {
   isImage: boolean;
   thumbnailUrl: string | null;
   url: string;
+  extension?: string;
+  fileName?: string;
 };
 
-export type AttachmentAction = 'none' | 'view-image' | 'open-file';
+export type AttachmentAction = 'none' | 'view-image' | 'play-audio' | 'open-file';
+
+const AUDIO_EXTENSIONS = new Set([
+  'mp3',
+  'wav',
+  'm4a',
+  'aac',
+  'ogg',
+  'oga',
+  'flac',
+  'wma',
+  'opus',
+  'aiff',
+  'aif',
+  'weba',
+  'caf',
+]);
+
+export function isAudioAttachment(item: {
+  isImage?: boolean;
+  extension?: string | null;
+  fileName?: string | null;
+  contentType?: string | null;
+}): boolean {
+  if (item.isImage) {
+    return false;
+  }
+  const type = item.contentType?.trim().toLowerCase() ?? '';
+  if (type.startsWith('audio/')) {
+    return true;
+  }
+  const fromExtension = item.extension?.trim().replace(/^\./, '').toLowerCase() ?? '';
+  if (fromExtension && AUDIO_EXTENSIONS.has(fromExtension)) {
+    return true;
+  }
+  const name = item.fileName?.trim() ?? '';
+  const dot = name.lastIndexOf('.');
+  const fromName = dot >= 0 ? name.slice(dot + 1).toLowerCase() : '';
+  return fromName.length > 0 && AUDIO_EXTENSIONS.has(fromName);
+}
 
 /** Matches website topic pages and `/api/v1/forum/topics/{id}/posts` (`ForumRoutes.PostsPageSize`). */
 export const forumPostsPageSize = 15;
@@ -100,7 +141,7 @@ export function imagePreviewUrl(item: AttachmentPreviewInput): string | null {
 
 /**
  * Signed-in image always opens via Bearer `downloadUrl` (thumb or not).
- * Signed-in non-image (PDF, sound, anything else) stays `open-file`.
+ * Signed-in audio plays from a cached file URI. Other non-images share to Files.
  * Signed-out stays metadata-only.
  */
 export function attachmentAction(
@@ -112,6 +153,9 @@ export function attachmentAction(
   }
   if (item.isImage) {
     return 'view-image';
+  }
+  if (isAudioAttachment(item)) {
+    return 'play-audio';
   }
   return 'open-file';
 }

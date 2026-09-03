@@ -158,7 +158,8 @@ public sealed class NewsSuggestionService(
                     ct),
                 cancellationToken);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException and not AdminNewsPromotionException)
+        catch (Exception ex) when (ex is not OperationCanceledException and not AdminNewsPromotionException
+            and not OptimisticConcurrencyException)
         {
             log.LogError(
                 ex,

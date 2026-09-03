@@ -1,0 +1,3 @@
+@page "/admin/articles/editor/{id:guid}/preview"
+@model PreviewModel
+@if (Model.Article is { } article) { <div class="qz-reading"><p><a href="/admin/articles/editor/@article.Id">Back to editor</a></p><article><h1>@article.Title</h1><p>@article.Excerpt</p>@if (!string.IsNullOrWhiteSpace(article.ImageBlobKey)) { <img src="@NewsArticleImage.ResolveImageUrl(article.ImageBlobKey, null)" alt="" /> }<p>By @article.AuthorName</p><div class="article-body">@Html.Raw(Model.Body)</div></article></div> }

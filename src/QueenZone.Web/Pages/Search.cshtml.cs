@@ -8,6 +8,8 @@ public sealed class SearchModel(ISiteSearchService siteSearchService) : PageMode
 {
     public const int PageSize = 20;
 
+    public const string UnavailableMessage = "Search is temporarily unavailable. Try again shortly.";
+
     [BindProperty(Name = "q", SupportsGet = true)]
     public string? Query { get; set; }
 
@@ -27,6 +29,12 @@ public sealed class SearchModel(ISiteSearchService siteSearchService) : PageMode
 
     public int TotalPages { get; private set; }
 
+    /// <summary>
+    /// True when <c>dbo.SearchDocument_Search</c> hit a SQL command timeout.
+    /// Renders an in-page unavailable state instead of bubbling a 500 to /error.
+    /// </summary>
+    public bool SearchUnavailable { get; private set; }
+
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
         ViewData["CanonicalPath"] = "/search";
@@ -39,7 +47,14 @@ public sealed class SearchModel(ISiteSearchService siteSearchService) : PageMode
         }
 
         CurrentPage = Math.Max(1, CurrentPage);
-        Results = await siteSearchService.SearchAsync(Query, ActiveContentType, CurrentPage, PageSize, cancellationToken);
-        TotalPages = ArchivePagination.GetTotalPages(Results.TotalCount, PageSize);
+        try
+        {
+            Results = await siteSearchService.SearchAsync(Query, ActiveContentType, CurrentPage, PageSize, cancellationToken);
+            TotalPages = ArchivePagination.GetTotalPages(Results.TotalCount, PageSize);
+        }
+        catch (Exception ex) when (ex is SiteSearchTimeoutException || SiteSearchSqlTimeout.IsCommandTimeout(ex))
+        {
+            SearchUnavailable = true;
+        }
     }
 }

@@ -43,6 +43,11 @@ const bothHalves = {
   quoteWhoSaid: 'Freddie Mercury',
 };
 
+const allThree = {
+  ...bothHalves,
+  triviaText: 'Freddie wrote Crazy Little Thing Called Love in minutes.',
+};
+
 const source = readFileSync(path.join(__dirname, 'OnThisDayAndroidWidget.tsx'), 'utf8');
 
 describe('OnThisDayAndroidWidget', () => {
@@ -127,6 +132,30 @@ describe('OnThisDayAndroidWidget', () => {
       screen.getByTestId(`tw:${longPrimary}:${WIDGET_QUOTE_MAX_LINES}:${longSize}`),
     ).toBeOnTheScreen();
     expect(screen.getByText('— Freddie Mercury')).toBeOnTheScreen();
+  });
+
+  it('shows only the Queen Facts face in the third 4-hour slot', () => {
+    jest.spyOn(Date, 'now').mockReturnValue(WIDGET_FACE_SLOT_MS * 2);
+    renderWithProviders(<OnThisDayAndroidWidget {...allThree} />, { navigation: false });
+
+    expect(screen.getByText('QUEEN FACTS')).toBeOnTheScreen();
+    expect(screen.getByText(allThree.triviaText)).toBeOnTheScreen();
+    expect(screen.queryByText('ON THIS DAY')).toBeNull();
+    expect(screen.queryByText('QUEEN QUOTES')).toBeNull();
+    expect(screen.queryByText('Queen released The Game.')).toBeNull();
+    expect(
+      screen.getByTestId(
+        `tw:${allThree.triviaText}:${WIDGET_QUOTE_MAX_LINES}:${widgetPrimaryFontSize(allThree.triviaText, 'small')}`,
+      ),
+    ).toBeOnTheScreen();
+  });
+
+  it('skips trivia and keeps day+quote rotation when triviaText is missing', () => {
+    jest.spyOn(Date, 'now').mockReturnValue(WIDGET_FACE_SLOT_MS * 2);
+    renderWithProviders(<OnThisDayAndroidWidget {...bothHalves} />, { navigation: false });
+
+    expect(screen.getByText('ON THIS DAY')).toBeOnTheScreen();
+    expect(screen.queryByText('QUEEN FACTS')).toBeNull();
   });
 
   it('falls back to quote-only copy when there is no event', () => {

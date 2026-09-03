@@ -6,6 +6,7 @@ namespace QueenZone.Web.Pages;
 
 public sealed class IndexModel(
     PublicQueryCacheService publicQueryCache,
+    IArticleRepository articleRepository,
     NewsDiscussionComposer newsDiscussion,
     IQuoteRepository quoteRepository,
     IHomePollRepository homePollRepository,
@@ -59,14 +60,32 @@ public sealed class IndexModel(
         }
 
         var articles = await publicQueryCache.GetLatestArticlesAsync(ArticlesRoutes.HomeFeaturedCount, cancellationToken);
-        FeaturedArticles = articles
+        var community = await articleRepository.GetPageAsync(1, ArticlesRoutes.HomeFeaturedCount, ct: cancellationToken);
+        var teasers = articles.Select(item => new
+        {
+            item.PublishedAt,
+            item.Title,
+            item.Excerpt,
+            Category = string.IsNullOrWhiteSpace(item.CategoryName) ? "Feature" : item.CategoryName,
+            Image = NewsArticleImage.ResolveImageUrl(item.ImageBlobKey, null),
+            Href = ArticlesRoutes.GetArticleDetailPath(item),
+        }).Concat(community.Select(item => new
+        {
+            PublishedAt = item.PublishedAt.UtcDateTime,
+            item.Title,
+            Excerpt = item.Excerpt ?? string.Empty,
+            Category = string.IsNullOrWhiteSpace(item.Category) ? "Feature" : item.Category,
+            Image = NewsArticleImage.ResolveImageUrl(item.CoverImageBlobPath, null),
+            Href = ArticlesRoutes.GetCommunityArticleDetailPath(item.Slug),
+        })).OrderByDescending(item => item.PublishedAt).Take(ArticlesRoutes.HomeFeaturedCount).ToList();
+        FeaturedArticles = teasers
             .Select((item, index) => new HomeArticleTeaser(
-                FeaturedArticleImages[index % FeaturedArticleImages.Length],
-                string.IsNullOrWhiteSpace(item.CategoryName) ? "Feature" : item.CategoryName,
+                item.Image ?? FeaturedArticleImages[index % FeaturedArticleImages.Length],
+                item.Category,
                 item.Title,
                 item.Excerpt,
                 item.PublishedAt.ToString("dd MMMM yyyy"),
-                ArticlesRoutes.GetArticleDetailPath(item)))
+                item.Href))
             .ToList();
 
         var categories = await publicQueryCache.GetPhotoCategoriesAsync(cancellationToken);

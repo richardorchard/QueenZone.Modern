@@ -1,7 +1,7 @@
 import * as BackgroundTask from 'expo-background-task';
 import * as TaskManager from 'expo-task-manager';
 import { Platform } from 'react-native';
-import { fetchOnThisDay, fetchRandomQuote } from '../api/content';
+import { fetchOnThisDay, fetchRandomQuote, fetchRandomTrivia } from '../api/content';
 import {
   HOME_WIDGET_BACKGROUND_TASK,
   WIDGET_BACKGROUND_MIN_INTERVAL_MINUTES,
@@ -53,6 +53,7 @@ jest.mock('./OnThisDayAndroidWidget', () => ({
 jest.mock('../api/content', () => ({
   fetchOnThisDay: jest.fn(),
   fetchRandomQuote: jest.fn(),
+  fetchRandomTrivia: jest.fn(),
 }));
 
 const writeCached = writeCachedWidgetProps as jest.MockedFunction<typeof writeCachedWidgetProps>;
@@ -61,6 +62,7 @@ const readRefreshAt = readLastWidgetRefreshAt as jest.MockedFunction<typeof read
 const readCached = readCachedWidgetProps as jest.MockedFunction<typeof readCachedWidgetProps>;
 const fetchDay = fetchOnThisDay as jest.MockedFunction<typeof fetchOnThisDay>;
 const fetchQuote = fetchRandomQuote as jest.MockedFunction<typeof fetchRandomQuote>;
+const fetchTrivia = fetchRandomTrivia as jest.MockedFunction<typeof fetchRandomTrivia>;
 const defineTask = TaskManager.defineTask as jest.MockedFunction<typeof TaskManager.defineTask>;
 const isTaskRegistered = TaskManager.isTaskRegisteredAsync as jest.MockedFunction<
   typeof TaskManager.isTaskRegisteredAsync
@@ -109,6 +111,8 @@ describe('syncHomeWidget', () => {
     readCached.mockResolvedValue({});
     fetchDay.mockReset();
     fetchQuote.mockReset();
+    fetchTrivia.mockReset();
+    fetchTrivia.mockResolvedValue(null);
     defineTask.mockClear();
     isTaskRegistered.mockReset();
     isTaskRegistered.mockResolvedValue(false);
@@ -151,6 +155,41 @@ describe('syncHomeWidget', () => {
     ]);
     jest.spyOn(Date, 'now').mockRestore();
     jest.spyOn(Math, 'random').mockRestore();
+  });
+
+  it('keeps last-good trivia when Home syncs only onThisDay and quote', async () => {
+    Object.defineProperty(Platform, 'OS', { value: 'android' });
+    readCached.mockResolvedValue({
+      triviaText: 'Freddie wrote Crazy Little Thing Called Love in minutes.',
+      triviaId: 4,
+    });
+
+    await syncHomeWidget({
+      onThisDay: content.onThisDay,
+      quote: content.quote,
+    });
+
+    expect(writeCached).toHaveBeenCalledWith({
+      ...widgetProps,
+      triviaText: 'Freddie wrote Crazy Little Thing Called Love in minutes.',
+      triviaId: 4,
+    });
+  });
+
+  it('keeps cached eventId when Home syncs the same day copy without an id', async () => {
+    Object.defineProperty(Platform, 'OS', { value: 'android' });
+    readCached.mockResolvedValue({
+      formattedDate: '30 June 1980',
+      summary: 'Queen released The Game.',
+      eventId: 1,
+    });
+
+    await syncHomeWidget({
+      onThisDay: { ...content.onThisDay, id: 0 },
+      quote: content.quote,
+    });
+
+    expect(writeCached).toHaveBeenCalledWith(widgetProps);
   });
 
   it('omits eventId when the on-this-day row has no usable id', async () => {
@@ -200,6 +239,8 @@ describe('refreshHomeWidget', () => {
     readCached.mockResolvedValue({});
     fetchDay.mockReset();
     fetchQuote.mockReset();
+    fetchTrivia.mockReset();
+    fetchTrivia.mockResolvedValue(null);
   });
 
   it('fetches on-this-day plus a new quote and pushes on iOS', async () => {
@@ -211,15 +252,35 @@ describe('refreshHomeWidget', () => {
 
     expect(fetchDay).toHaveBeenCalledTimes(1);
     expect(fetchQuote).toHaveBeenCalledTimes(1);
+    expect(fetchTrivia).toHaveBeenCalledTimes(1);
     expect(mockUpdateTimeline).toHaveBeenCalledWith(
       expect.arrayContaining([expect.objectContaining({ props: widgetProps })]),
     );
+  });
+
+  it('includes trivia in the snapshot when the random fetch returns a fact', async () => {
+    Object.defineProperty(Platform, 'OS', { value: 'android' });
+    fetchDay.mockResolvedValue(content.onThisDay);
+    fetchQuote.mockResolvedValue(content.quote);
+    fetchTrivia.mockResolvedValue({
+      id: 4,
+      text: 'Freddie wrote Crazy Little Thing Called Love in minutes.',
+    });
+
+    await expect(refreshHomeWidget()).resolves.toBe(true);
+
+    expect(writeCached).toHaveBeenCalledWith({
+      ...widgetProps,
+      triviaText: 'Freddie wrote Crazy Little Thing Called Love in minutes.',
+      triviaId: 4,
+    });
   });
 
   it('does not replace the last snapshot when both fetches fail', async () => {
     Object.defineProperty(Platform, 'OS', { value: 'android' });
     fetchDay.mockRejectedValue(new Error('offline'));
     fetchQuote.mockRejectedValue(new Error('offline'));
+    fetchTrivia.mockRejectedValue(new Error('offline'));
 
     await expect(refreshHomeWidget()).resolves.toBe(false);
 
@@ -279,6 +340,25 @@ describe('refreshHomeWidget', () => {
     jest.spyOn(Date, 'now').mockRestore();
   });
 
+  it('keeps the last good trivia when the trivia fetch fails', async () => {
+    Object.defineProperty(Platform, 'OS', { value: 'android' });
+    readCached.mockResolvedValue({
+      triviaText: 'Freddie wrote Crazy Little Thing Called Love in minutes.',
+      triviaId: 4,
+    });
+    fetchDay.mockResolvedValue(content.onThisDay);
+    fetchQuote.mockResolvedValue(content.quote);
+    fetchTrivia.mockRejectedValue(new Error('offline'));
+
+    await expect(refreshHomeWidget()).resolves.toBe(true);
+
+    expect(writeCached).toHaveBeenCalledWith({
+      ...widgetProps,
+      triviaText: 'Freddie wrote Crazy Little Thing Called Love in minutes.',
+      triviaId: 4,
+    });
+  });
+
   it('keeps the last good quote when the quote fetch fails', async () => {
     Object.defineProperty(Platform, 'OS', { value: 'android' });
     readCached.mockResolvedValue({
@@ -331,6 +411,7 @@ describe('refreshHomeWidget', () => {
 
     expect(fetchDay).not.toHaveBeenCalled();
     expect(fetchQuote).not.toHaveBeenCalled();
+    expect(fetchTrivia).not.toHaveBeenCalled();
     expect(writeCached).not.toHaveBeenCalled();
   });
 
@@ -354,6 +435,8 @@ describe('runHomeWidgetBackgroundRefresh', () => {
   afterEach(() => {
     fetchDay.mockReset();
     fetchQuote.mockReset();
+    fetchTrivia.mockReset();
+    fetchTrivia.mockResolvedValue(null);
     readRefreshAt.mockReset();
     readRefreshAt.mockResolvedValue(null);
     readCached.mockReset();
@@ -365,6 +448,7 @@ describe('runHomeWidgetBackgroundRefresh', () => {
   it('reports failure when the background fetch fails', async () => {
     fetchDay.mockRejectedValue(new Error('offline'));
     fetchQuote.mockRejectedValue(new Error('offline'));
+    fetchTrivia.mockRejectedValue(new Error('offline'));
 
     await expect(runHomeWidgetBackgroundRefresh()).resolves.toBe(BackgroundTask.BackgroundTaskResult.Failed);
     expect(writeCached).not.toHaveBeenCalled();

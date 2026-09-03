@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Logging.Abstractions;
 using QueenZone.Data;
 
 namespace QueenZone.Web.Health;
@@ -23,21 +24,24 @@ public sealed class SqlReadyHealthCheck : IHealthCheck
     private readonly IServiceScopeFactory scopeFactory;
     private readonly TimeSpan connectTimeout;
     private readonly Func<QueenZoneDbContext, CancellationToken, Task<bool>> canConnectAsync;
+    private readonly ILogger<SqlReadyHealthCheck> logger;
 
-    public SqlReadyHealthCheck(IServiceScopeFactory scopeFactory)
-        : this(scopeFactory, DefaultConnectTimeout)
+    public SqlReadyHealthCheck(IServiceScopeFactory scopeFactory, ILogger<SqlReadyHealthCheck>? logger = null)
+        : this(scopeFactory, DefaultConnectTimeout, logger: logger)
     {
     }
 
     internal SqlReadyHealthCheck(
         IServiceScopeFactory scopeFactory,
         TimeSpan connectTimeout,
-        Func<QueenZoneDbContext, CancellationToken, Task<bool>>? canConnectAsync = null)
+        Func<QueenZoneDbContext, CancellationToken, Task<bool>>? canConnectAsync = null,
+        ILogger<SqlReadyHealthCheck>? logger = null)
     {
         this.scopeFactory = scopeFactory;
         this.connectTimeout = connectTimeout;
         this.canConnectAsync = canConnectAsync
             ?? ((dbContext, token) => dbContext.Database.CanConnectAsync(token));
+        this.logger = logger ?? NullLogger<SqlReadyHealthCheck>.Instance;
     }
 
     public async Task<HealthCheckResult> CheckHealthAsync(
@@ -69,8 +73,9 @@ public sealed class SqlReadyHealthCheck : IHealthCheck
         {
             throw;
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            logger.LogWarning(ex, "SQL readiness check failed.");
             // Do not return exception text — connection strings must not leak to probes.
             return HealthCheckResult.Unhealthy("SQL check failed.");
         }

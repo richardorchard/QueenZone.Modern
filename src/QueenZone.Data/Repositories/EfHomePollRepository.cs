@@ -149,6 +149,10 @@ public sealed class EfHomePollRepository(QueenZoneDbContext dbContext, TimeProvi
                 other.IsCurrent = false;
             }
 
+            // SQL Server evaluates UX_HomePolls_IsCurrent per UPDATE. One SaveChanges can
+            // emit the promote first and collide on (1). Persist demotions, then promote.
+            await dbContext.SaveChangesAsync(cancellationToken);
+
             poll.IsCurrent = true;
             poll.PublishedAt ??= now;
             await dbContext.SaveChangesAsync(cancellationToken);

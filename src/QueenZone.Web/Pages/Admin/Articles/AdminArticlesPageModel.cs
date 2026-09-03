@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using QueenZone.Data;
 
 namespace QueenZone.Web.Pages.Admin.Articles;
 
@@ -19,4 +20,23 @@ public abstract class AdminArticlesPageModel : PageModel
         ?? User.FindFirstValue("preferred_username")
         ?? User.Identity?.Name
         ?? "unknown";
+
+    protected static async Task<IReadOnlyList<ArticleItem>> LoadAllLegacyArchiveAsync(
+        IArticlesRepository legacyArticles,
+        CancellationToken cancellationToken)
+    {
+        const int pageSize = 100;
+        var items = new List<ArticleItem>();
+        for (var page = 1; ; page++)
+        {
+            var batch = await legacyArticles.GetArchivePageAsync(page, pageSize, cancellationToken);
+            items.AddRange(batch);
+            if (batch.Count < pageSize)
+            {
+                break;
+            }
+        }
+
+        return items;
+    }
 }

@@ -5,9 +5,11 @@ export type WidgetProps = {
   quoteWhoSaid?: string;
   quoteId?: number;
   eventId?: number;
+  triviaText?: string;
+  triviaId?: number;
 };
 
-export type WidgetFace = 'day' | 'quote';
+export type WidgetFace = 'day' | 'quote' | 'trivia';
 
 /**
  * Shared copy helpers for Android and tests. The iOS `'widget'` view must inline
@@ -28,24 +30,44 @@ export function widgetHasQuote(props: WidgetProps): boolean {
   return Boolean(props.quoteText && props.quoteWhoSaid);
 }
 
+/** Face copy is `triviaText` only — category/difficulty/source stay off the widget. */
+export function widgetHasTrivia(props: WidgetProps): boolean {
+  return Boolean(props.triviaText);
+}
+
 export function nextWidgetFaceSlotMs(atMs: number): number {
   return Math.floor(atMs / WIDGET_FACE_SLOT_MS) * WIDGET_FACE_SLOT_MS + WIDGET_FACE_SLOT_MS;
 }
 
+/**
+ * Present faces in order day → quote → trivia. `slot = floor(utcMs / 4h)`.
+ * Show `faces[slot % n]`. Skip missing so day+quote only stays `% 2`.
+ */
 export function widgetActiveFace(props: WidgetProps, atMs: number = Date.now()): WidgetFace | null {
-  const hasDay = widgetHasDay(props);
-  const hasQuote = widgetHasQuote(props);
-  if (!hasDay && !hasQuote) {
+  const faces: WidgetFace[] = [];
+  if (widgetHasDay(props)) {
+    faces.push('day');
+  }
+  if (widgetHasQuote(props)) {
+    faces.push('quote');
+  }
+  if (widgetHasTrivia(props)) {
+    faces.push('trivia');
+  }
+  if (faces.length === 0) {
     return null;
   }
-  if (hasDay && hasQuote) {
-    return Math.floor(atMs / WIDGET_FACE_SLOT_MS) % 2 === 0 ? 'day' : 'quote';
-  }
-  return hasDay ? 'day' : 'quote';
+  return faces[Math.floor(atMs / WIDGET_FACE_SLOT_MS) % faces.length] ?? null;
 }
 
 export function widgetEyebrow(face: WidgetFace): string {
-  return face === 'day' ? 'ON THIS DAY' : 'QUEEN QUOTES';
+  if (face === 'day') {
+    return 'ON THIS DAY';
+  }
+  if (face === 'quote') {
+    return 'QUEEN QUOTES';
+  }
+  return 'QUEEN FACTS';
 }
 
 export function widgetDayText(props: WidgetProps): string {
@@ -134,4 +156,8 @@ export function widgetDayPrimary(props: WidgetProps): string {
 
 export function widgetDaySecondary(props: WidgetProps): string {
   return props.formattedDate ?? '';
+}
+
+export function widgetTriviaPrimary(props: WidgetProps): string {
+  return props.triviaText ?? '';
 }
