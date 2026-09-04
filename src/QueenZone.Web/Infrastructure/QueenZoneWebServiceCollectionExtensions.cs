@@ -261,6 +261,7 @@ public static class QueenZoneWebServiceCollectionExtensions
         services.AddScoped<TopicWatchService>();
         services.AddScoped<PhotoSubmissionService>();
         services.AddScoped<AdminPhotoService>();
+        services.AddScoped<AdminFanPerformanceWriteService>();
         services.AddScoped<PhotoSubmissionPromotionService>();
         services.AddScoped<GalleryOrphanSweepService>();
         services.AddHostedService<GalleryOrphanSweepHostedService>();

@@ -11,6 +11,7 @@ public sealed class PublicQueryCacheOptionsValidator : IValidateOptions<PublicQu
             || options.ForumStatsCacheDuration <= TimeSpan.Zero
             || options.OnThisDayCacheDuration <= TimeSpan.Zero
             || options.PhotoCacheDuration <= TimeSpan.Zero
+            || options.FanPerformanceCacheDuration <= TimeSpan.Zero
             || options.LiveActivityCacheDuration <= TimeSpan.Zero)
         {
             return ValidateOptionsResult.Fail(
