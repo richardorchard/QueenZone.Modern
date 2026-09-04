@@ -15,7 +15,7 @@ jest.mock('./client', () => ({
 const fetchJsonMock = fetchJson as jest.MockedFunction<typeof fetchJson>;
 const sendJsonMock = sendJson as jest.MockedFunction<typeof sendJson>;
 
-const sample = { forumReply: true, privateMessage: true, news: false };
+const sample = { forumReply: true, privateMessage: true, news: true };
 
 describe('parseNotificationPreferences', () => {
   it('reads the three category toggles', () => {

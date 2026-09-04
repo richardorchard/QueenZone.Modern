@@ -20,8 +20,8 @@ public interface INotificationPreferenceRepository
 
     /// <summary>
     /// Members with an explicit enabled row for <paramref name="category"/>.
-    /// Does not apply defaults — missing rows are omitted. Use this for
-    /// <see cref="NotificationCategory.News"/> fan-out (default is off).
+    /// Does not apply defaults — missing rows are omitted. News dispatch still
+    /// uses this list (stored enabled rows only).
     /// </summary>
     Task<IReadOnlyList<Guid>> ListEnabledAsync(
         NotificationCategory category,

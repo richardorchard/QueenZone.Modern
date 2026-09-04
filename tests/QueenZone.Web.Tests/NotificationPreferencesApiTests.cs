@@ -79,7 +79,7 @@ public sealed class NotificationPreferencesApiTests : IClassFixture<QueenZoneWeb
         Assert.NotNull(body);
         Assert.True(body!.ForumReply);
         Assert.True(body.PrivateMessage);
-        Assert.False(body.News);
+        Assert.True(body.News);
     }
 
     [Fact]
@@ -170,7 +170,7 @@ public sealed class NotificationPreferencesApiTests : IClassFixture<QueenZoneWeb
         var body = await response.Content.ReadFromJsonAsync<NotificationPreferencesResponse>(JsonOptions);
         Assert.True(body!.ForumReply);
         Assert.True(body.PrivateMessage);
-        Assert.False(body.News);
+        Assert.True(body.News);
         Assert.Empty(FindRows(secondId));
         Assert.NotEmpty(FindRows(firstId));
     }

@@ -4,7 +4,7 @@ namespace QueenZone.Data;
 
 public readonly record struct NotificationPreferences(bool ForumReply, bool PrivateMessage, bool News)
 {
-    public static NotificationPreferences Defaults { get; } = new(true, true, false);
+    public static NotificationPreferences Defaults { get; } = new(true, true, true);
 
     public bool IsEnabled(NotificationCategory category) => category switch
     {

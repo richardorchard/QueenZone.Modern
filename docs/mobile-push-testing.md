@@ -104,18 +104,19 @@ drops the send.
   2. Signed in as someone else, post a reply on that topic (website or app).
 - **Tap-through:** forum thread (`topicId`, optional `postId`).
 
-#### News (default off, first publish only)
+#### News (preference default on, first publish only)
 
 - **Fires when:** an unpublished article is published, and only to members who
-  have opted in. News uses stored enabled rows only; a member who never
-  touched the toggle is not in the audience.
+  have a stored News-enabled row. News dispatch still uses stored enabled
+  rows only; a member who never touched the toggle is not in the audience
+  even though the preference GET default is on.
 - **Does not fire:** create/save draft; edit a published article; Publish on
   an already-published row. Unpublish then Publish is another
   unpublished→published transition and will send again — use a throwaway draft
   for this check.
-- **Preference:** default off. The toggle is mobile Settings only: Profile →
-  **Account settings** → Notifications → **News**. Turn it on on the
-  TestFlight device before publishing.
+- **Preference:** default on. The toggle is mobile Settings only: Profile →
+  **Account settings** → Notifications → **News**. Toggle it off then on
+  on the TestFlight device before publishing so a stored enabled row exists.
 - **Trigger on live:** as admin, `https://www.queenzone.org/admin/news` →
   **Create article** → Save (draft) → **Publish** on the list or edit page.
 - **Tap-through:** news story (`articleId`). Title is the article title; body
@@ -259,18 +260,19 @@ drops the send.
   2. Signed in as someone else, post a reply on that topic (website or app).
 - **Tap-through:** forum thread (`topicId`, optional `postId`).
 
-#### News (default off, first publish only)
+#### News (preference default on, first publish only)
 
 - **Fires when:** an unpublished article is published, and only to members who
-  have opted in. News uses stored enabled rows only; a member who never
-  touched the toggle is not in the audience.
+  have a stored News-enabled row. News dispatch still uses stored enabled
+  rows only; a member who never touched the toggle is not in the audience
+  even though the preference GET default is on.
 - **Does not fire:** create/save draft; edit a published article; Publish on
   an already-published row. Unpublish then Publish is another
   unpublished→published transition and will send again — use a throwaway draft
   for this check.
-- **Preference:** default off. The toggle is mobile Settings only: Profile →
-  **Account settings** → Notifications → **News**. Turn it on on the
-  Android device before publishing.
+- **Preference:** default on. The toggle is mobile Settings only: Profile →
+  **Account settings** → Notifications → **News**. Toggle it off then on
+  on the Android device before publishing so a stored enabled row exists.
 - **Trigger on live:** as admin, `https://www.queenzone.org/admin/news` →
   **Create article** → Save (draft) → **Publish** on the list or edit page.
 - **Tap-through:** news story (`articleId`). Title is the article title; body

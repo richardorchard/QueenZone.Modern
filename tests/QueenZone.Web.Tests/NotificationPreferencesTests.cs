@@ -6,16 +6,16 @@ namespace QueenZone.Web.Tests;
 public sealed class NotificationPreferencesTests
 {
     [Fact]
-    public void Defaults_AreForumAndMessageOn_NewsOff()
+    public void Defaults_AreForumMessageAndNewsOn()
     {
         var defaults = NotificationPreferences.Defaults;
 
         Assert.True(defaults.ForumReply);
         Assert.True(defaults.PrivateMessage);
-        Assert.False(defaults.News);
+        Assert.True(defaults.News);
         Assert.True(defaults.IsEnabled(NotificationCategory.ForumReply));
         Assert.True(defaults.IsEnabled(NotificationCategory.PrivateMessage));
-        Assert.False(defaults.IsEnabled(NotificationCategory.News));
+        Assert.True(defaults.IsEnabled(NotificationCategory.News));
     }
 
     [Fact]
