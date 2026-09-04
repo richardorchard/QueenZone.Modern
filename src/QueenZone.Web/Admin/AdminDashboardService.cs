@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Options;
 using QueenZone.Data;
 using QueenZone.Web.Pages.Admin;
 
@@ -37,8 +38,14 @@ public sealed class AdminDashboardService(IServiceScopeFactory scopeFactory)
             sp => sp.GetRequiredService<IArticleSubmissionRepository>()
                 .GetDashboardCountsAsync(utcNowOffset, cancellationToken));
         var fanPerformanceCountsTask = RunAsync(
-            sp => sp.GetRequiredService<IFanPerformanceSubmissionRepository>()
-                .GetDashboardCountsAsync(utcNowOffset, cancellationToken));
+            sp =>
+            {
+                var staleAfterDays = sp.GetService<IOptions<FanPerformanceSubmissionOptions>>()
+                    ?.Value.StaleAfterDays
+                    ?? FanPerformanceDashboardCounts.DefaultStaleAfterDays;
+                return sp.GetRequiredService<IFanPerformanceSubmissionRepository>()
+                    .GetDashboardCountsAsync(utcNowOffset, staleAfterDays, cancellationToken);
+            });
         var openHelpRequestsTask = RunAsync(
             sp => sp.GetRequiredService<IHelpRequestRepository>()
                 .CountOpenAsync(cancellationToken));

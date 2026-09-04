@@ -238,26 +238,18 @@ public sealed class InMemoryFanPerformanceSubmissionRepository : IFanPerformance
         }
     }
 
-    public Task<SubmissionTypeCounts> GetDashboardCountsAsync(
+    public Task<FanPerformanceDashboardCounts> GetDashboardCountsAsync(
         DateTimeOffset utcNow,
+        int staleAfterDays = FanPerformanceDashboardCounts.DefaultStaleAfterDays,
         CancellationToken cancellationToken = default)
     {
-        var today = utcNow.UtcDateTime.Date;
-        var weekAgo = today.AddDays(-6);
-        var monthAgo = utcNow.AddDays(-30);
-
         lock (sync)
         {
-            var pending = submissions.Count(row => FanPerformanceSubmissionWorkflow.CanAdminAct(row.Status));
-            var receivedToday = submissions.Count(row => row.SubmittedAt.UtcDateTime.Date >= today);
-            var receivedThisWeek = submissions.Count(row => row.SubmittedAt.UtcDateTime.Date >= weekAgo);
-            var last30 = submissions.Where(row => row.SubmittedAt >= monthAgo).ToList();
-            var approvedLast30 = last30.Count(row => row.Status == FanPerformanceSubmissionStatus.Approved);
-            var rejectedLast30 = last30.Count(row => row.Status == FanPerformanceSubmissionStatus.Rejected);
-            var pendingLast30 = last30.Count(row => FanPerformanceSubmissionWorkflow.CanAdminAct(row.Status));
-
-            return Task.FromResult(new SubmissionTypeCounts(
-                pending, receivedToday, receivedThisWeek, approvedLast30, rejectedLast30, pendingLast30));
+            var rows = submissions
+                .Select(row => (row.Status, row.SubmittedAt))
+                .ToList();
+            return Task.FromResult(
+                FanPerformanceDashboardCountCalculator.FromRows(rows, utcNow, staleAfterDays));
         }
     }
 

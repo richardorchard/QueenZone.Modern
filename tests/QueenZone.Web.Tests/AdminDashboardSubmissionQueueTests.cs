@@ -1,6 +1,9 @@
 using System.Net;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using QueenZone.Data;
 using QueenZone.Data.Entities;
 using QueenZone.Web;
@@ -173,7 +176,7 @@ public sealed class AdminDashboardSubmissionQueueTests : IClassFixture<WebApplic
         var repo = new InMemoryFanPerformanceSubmissionRepository();
         var counts = await repo.GetDashboardCountsAsync(DateTimeOffset.UtcNow);
 
-        Assert.Equal(SubmissionTypeCounts.Empty, counts);
+        Assert.Equal(FanPerformanceDashboardCounts.Empty, counts);
     }
 
     [Fact]
@@ -191,6 +194,42 @@ public sealed class AdminDashboardSubmissionQueueTests : IClassFixture<WebApplic
         Assert.Equal(2, counts.Pending);
         Assert.Equal(2, counts.ReceivedToday);
         Assert.Equal(2, counts.ReceivedThisWeek);
+        Assert.Equal(0, counts.StalePendingCount);
+    }
+
+    [Fact]
+    public async Task FanPerformanceRepo_GetDashboardCounts_CountsStaleOpenItems_WithDefaultSevenDays()
+    {
+        var member = SampleMember();
+        var repo = new InMemoryFanPerformanceSubmissionRepository(id => id == member.Id ? member : null);
+        var utcNow = new DateTimeOffset(2026, 9, 4, 12, 0, 0, TimeSpan.Zero);
+
+        var fresh = await repo.CreateAsync(SampleFanPerformanceSubmission(member.Id));
+        var stalePending = await repo.CreateAsync(SampleFanPerformanceSubmission(member.Id));
+        var staleNeedsInfo = await repo.CreateAsync(SampleFanPerformanceSubmission(member.Id));
+        var staleApproved = await repo.CreateAsync(SampleFanPerformanceSubmission(member.Id));
+
+        repo.SetTimestamps(fresh.Id, utcNow.AddDays(-6), null);
+        repo.SetTimestamps(stalePending.Id, utcNow.AddDays(-7), null);
+        await repo.UpdateStatusAsync(
+            staleNeedsInfo.Id,
+            FanPerformanceSubmissionStatus.NeedsInfo,
+            "admin@test.local",
+            "Please name the song",
+            null);
+        repo.SetTimestamps(staleNeedsInfo.Id, utcNow.AddDays(-10), utcNow.AddDays(-1));
+        await repo.PromoteAsync(staleApproved.Id, 42, "admin@test.local", "internal");
+        repo.SetTimestamps(staleApproved.Id, utcNow.AddDays(-20), utcNow.AddDays(-19));
+
+        var counts = await repo.GetDashboardCountsAsync(utcNow);
+
+        Assert.Equal(3, counts.Pending);
+        Assert.Equal(2, counts.StalePendingCount);
+        Assert.Equal(10, counts.OldestOpenAgeDays);
+
+        var fallback = await repo.GetDashboardCountsAsync(utcNow, staleAfterDays: 0);
+        Assert.Equal(counts.StalePendingCount, fallback.StalePendingCount);
+        Assert.Equal(counts.OldestOpenAgeDays, fallback.OldestOpenAgeDays);
     }
 
     // ── SubmissionQueueStats helper ─────────────────────────────────────────
@@ -202,7 +241,12 @@ public sealed class AdminDashboardSubmissionQueueTests : IClassFixture<WebApplic
             Pending: 3, ReceivedToday: 1, ReceivedThisWeek: 2,
             ApprovedLast30Days: 4, RejectedLast30Days: 2, StillPendingFromLast30Days: 1);
 
-        var stats = new SubmissionQueueStats(counts, counts, counts, counts, []);
+        var stats = new SubmissionQueueStats(
+            counts,
+            counts,
+            counts,
+            new FanPerformanceDashboardCounts(counts, 0, null),
+            []);
 
         Assert.Equal(16, stats.TotalApprovedLast30Days);
         Assert.Equal(8, stats.TotalRejectedLast30Days);
@@ -231,6 +275,36 @@ public sealed class AdminDashboardSubmissionQueueTests : IClassFixture<WebApplic
         Assert.Contains("/admin/articles", body);
         Assert.Contains("Fan performances", body);
         Assert.Contains("/admin/fan-performance-submissions", body);
+        Assert.DoesNotContain("stale", body, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task AdminDashboard_ShowsFanPerformanceStaleCount_WhenOpenItemOlderThanSevenDays()
+    {
+        var member = SampleMember();
+        var repository = new InMemoryFanPerformanceSubmissionRepository(id => id == member.Id ? member : null);
+        var stale = await repository.CreateAsync(SampleFanPerformanceSubmission(member.Id));
+        repository.SetTimestamps(stale.Id, DateTimeOffset.UtcNow.AddDays(-8), null);
+
+        var staleFactory = factory.WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<IFanPerformanceSubmissionRepository>();
+                services.AddSingleton<IFanPerformanceSubmissionRepository>(repository);
+            });
+        });
+
+        var client = staleFactory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Test-User-Email", AdminEmail);
+
+        var body = await client.GetStringAsync("/admin");
+
+        Assert.Contains("Fan performances", body);
+        Assert.Contains("/admin/fan-performance-submissions", body);
+        Assert.Contains("1 stale", body);
+        Assert.Contains("oldest waiting 8 days", body);
     }
 
     [Fact]

@@ -6,7 +6,7 @@ public record SubmissionQueueStats(
     SubmissionTypeCounts Photos,
     SubmissionTypeCounts NewsSuggestions,
     SubmissionTypeCounts Articles,
-    SubmissionTypeCounts FanPerformances,
+    FanPerformanceDashboardCounts FanPerformances,
     IReadOnlyList<SubmissionContributor> TopContributors)
 {
     public static readonly SubmissionQueueStats Empty =
@@ -14,7 +14,7 @@ public record SubmissionQueueStats(
             SubmissionTypeCounts.Empty,
             SubmissionTypeCounts.Empty,
             SubmissionTypeCounts.Empty,
-            SubmissionTypeCounts.Empty,
+            FanPerformanceDashboardCounts.Empty,
             []);
 
     public int TotalApprovedLast30Days =>

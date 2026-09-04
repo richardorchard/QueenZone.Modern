@@ -85,6 +85,9 @@ public static class QueenZoneWebServiceCollectionExtensions
         services.AddOptions<NewsSuggestionOptions>()
             .Bind(configuration.GetSection(NewsSuggestionOptions.SectionName));
 
+        services.AddOptions<FanPerformanceSubmissionOptions>()
+            .Bind(configuration.GetSection(FanPerformanceSubmissionOptions.SectionName));
+
         services.AddOptions<HelpRequestOptions>()
             .Bind(configuration.GetSection(HelpRequestOptions.SectionName));
 

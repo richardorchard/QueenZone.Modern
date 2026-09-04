@@ -9,6 +9,13 @@ public sealed class FanPerformanceRoutesTests
         Assert.Equal("/fan-performances", FanPerformanceRoutes.GetIndexPath());
 
     [Fact]
+    public void GetPublicPath_UsesArchiveAnchorForPromotedStageId()
+    {
+        Assert.Equal("fan-performance-187", FanPerformanceRoutes.GetPublicItemAnchorId(187));
+        Assert.Equal("/fan-performances#fan-performance-187", FanPerformanceRoutes.GetPublicPath(187));
+    }
+
+    [Fact]
     public void GetPagePath_UsesIndexPathForFirstPage() =>
         Assert.Equal("/fan-performances", FanPerformanceRoutes.GetPagePath(1));
 

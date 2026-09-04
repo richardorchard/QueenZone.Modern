@@ -18,7 +18,7 @@ else
   <ol class="qz-stage-list" data-qz-stage-list>
     @foreach (var performance in Model.Items)
     {
-      <li class="qz-stage-row" data-qz-stage-id="@performance.Id">
+      <li class="qz-stage-row" id="@FanPerformanceRoutes.GetPublicItemAnchorId(performance.Id)" data-qz-stage-id="@performance.Id">
         <div class="qz-card__kicker"><time datetime="@performance.DateAdded.ToString("yyyy-MM-dd")">@performance.DateAdded.ToString("dd MMMM yyyy")</time></div>
         <div class="qz-stage-row__track">
           @if (performance.AudioPlayPath is not null)
