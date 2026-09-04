@@ -63,5 +63,29 @@
         </a>
       }
     </div>
+
+    <details class="qz-account-fallback">
+      <summary>Other ways to sign in</summary>
+      <p class="qz-account-fallback__hint">
+        For reviewers and accounts without access to a social provider.
+      </p>
+      @if (Model.PasswordSignInError is not null)
+      {
+        <p class="qz-account-notice qz-account-notice--error">@Model.PasswordSignInError</p>
+      }
+      <form method="post" asp-page="./Login" asp-route-returnUrl="@Model.ReturnUrl">
+        <div class="qz-form-field">
+          <label asp-for="Input.Email">Email</label>
+          <input asp-for="Input.Email" type="email" autocomplete="username" required />
+          <span asp-validation-for="Input.Email" class="qz-field-error"></span>
+        </div>
+        <div class="qz-form-field">
+          <label asp-for="Input.Password">Password</label>
+          <input asp-for="Input.Password" type="password" autocomplete="current-password" required />
+          <span asp-validation-for="Input.Password" class="qz-field-error"></span>
+        </div>
+        <button type="submit" class="qz-button qz-button--secondary">Sign in</button>
+      </form>
+    </details>
   </div>
 </section>
