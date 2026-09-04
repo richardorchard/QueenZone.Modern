@@ -1,0 +1,81 @@
+@page "/admin/fan-performance-reports"
+@model QueenZone.Web.Pages.Admin.FanPerformanceReports.IndexModel
+@using QueenZone.Data
+
+<div class="admin-shell">
+  <h1>Fan performance reports</h1>
+  <p>
+    <a href="/admin">Back to admin</a>
+  </p>
+  <p>
+    Listener reports of published fan performances. Hide unpublishes the row (<code>DISPLAY = 0</code>)
+    without deleting the audio blob. This queue is separate from the submission review queue.
+  </p>
+
+  <form method="get" class="admin-search-form">
+    <label>
+      Status
+      <select name="status">
+        @if (string.Equals(Model.StatusFilter, "all", StringComparison.OrdinalIgnoreCase))
+        {
+          <option value="all" selected>All</option>
+        }
+        else
+        {
+          <option value="all">All</option>
+        }
+        @foreach (var status in FanPerformanceReportStatus.All)
+        {
+          if (string.Equals(Model.StatusFilter, status, StringComparison.Ordinal))
+          {
+            <option value="@status" selected>@status</option>
+          }
+          else
+          {
+            <option value="@status">@status</option>
+          }
+        }
+      </select>
+    </label>
+    <button type="submit" class="qz-button">Filter</button>
+  </form>
+
+  @if (Model.List.Items.Count == 0)
+  {
+    <p>No reports in this view.</p>
+  }
+  else
+  {
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Performance</th>
+          <th>Reporter</th>
+          <th>Reason</th>
+          <th>Reported</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @foreach (var item in Model.List.Items)
+        {
+          <tr>
+            <td>
+              @(string.IsNullOrWhiteSpace(item.TitleSnapshot) ? $"#{item.StageId}" : item.TitleSnapshot)
+              @if (!string.IsNullOrWhiteSpace(item.PerformedBySnapshot))
+              {
+                <span class="qz-meta"> · @item.PerformedBySnapshot</span>
+              }
+            </td>
+            <td>@item.ReporterDisplayName</td>
+            <td>@(string.IsNullOrWhiteSpace(item.Reason) ? "—" : item.Reason)</td>
+            <td>@item.CreatedAt.ToString("u")</td>
+            <td><partial name="_SubmissionStatusBadge" model="item.Status" /></td>
+            <td><a href="/admin/fan-performance-reports/@item.Id">Open</a></td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+</div>

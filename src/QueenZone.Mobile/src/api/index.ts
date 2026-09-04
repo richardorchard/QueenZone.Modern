@@ -81,6 +81,11 @@ export type {
 } from './forumAttachment';
 export { createPhotoSubmission } from './photoSubmissions';
 export {
+  createFanPerformanceSubmission,
+  reportFanPerformance,
+  fanPerformanceSubmissionsPath,
+} from './fanPerformanceSubmissions';
+export {
   createNewsSuggestion,
   newsSuggestionsPath,
   parseNewsSuggestionCreated,

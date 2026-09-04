@@ -291,4 +291,6 @@ public sealed record FanPerformanceDto(
     DateTime DateAdded,
     int? DurationSeconds,
     string DetailPath,
-    string AudioPath);
+    string AudioPath,
+    Guid? ContributorMemberId = null,
+    string? ContributorDisplayName = null);

@@ -4,7 +4,9 @@ using QueenZone.Data;
 
 namespace QueenZone.Web.Pages.FanPerformances;
 
-public abstract class FanPerformanceArchivePageModel(PublicQueryCacheService publicQueryCache) : PageModel
+public abstract class FanPerformanceArchivePageModel(
+    PublicQueryCacheService publicQueryCache,
+    FanPerformanceCreditResolver creditResolver) : PageModel
 {
     public FanPerformanceListViewModel PerformanceList { get; private set; } = FanPerformanceListViewModel.Empty;
 
@@ -22,7 +24,9 @@ public abstract class FanPerformanceArchivePageModel(PublicQueryCacheService pub
         }
 
         var visibleCount = await publicQueryCache.GetFanPerformanceVisibleCountAsync(cancellationToken);
-        var items = await publicQueryCache.GetFanPerformancePageAsync(page, FanPerformanceRoutes.PageSize, cancellationToken);
+        var items = await creditResolver.EnrichAsync(
+            await publicQueryCache.GetFanPerformancePageAsync(page, FanPerformanceRoutes.PageSize, cancellationToken),
+            cancellationToken);
         var totalPages = FanPerformanceRoutes.ResolveTotalPages(
             page,
             items.Count,
@@ -74,7 +78,10 @@ public abstract class FanPerformanceArchivePageModel(PublicQueryCacheService pub
                 performance.PerformedBy,
                 performance.Description,
                 performance.DateAdded,
-                isSignedIn ? FanPerformanceRoutes.GetAudioPath(performance.Id, performance.Title) : null))
+                isSignedIn ? FanPerformanceRoutes.GetAudioPath(performance.Id, performance.Title) : null,
+                performance.ContributorMemberId,
+                performance.ContributorDisplayName,
+                isSignedIn ? FanPerformanceRoutes.GetReportPath(performance.Id) : null))
             .ToList();
 
         IReadOnlyList<FanPerformanceCatalogEntry> catalog = [];

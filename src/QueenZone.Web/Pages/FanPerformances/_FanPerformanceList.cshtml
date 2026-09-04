@@ -52,6 +52,10 @@ else
           <div class="qz-stage-row__copy">
             <h2>@performance.Title</h2>
             <p class="qz-meta">Performed by @performance.PerformedBy</p>
+            @if (performance.ContributorMemberId is Guid contributorId && !string.IsNullOrWhiteSpace(performance.ContributorDisplayName))
+            {
+              <p class="qz-meta">Submitted by <a class="qz-attribution-link" href="/members/@contributorId">@performance.ContributorDisplayName</a></p>
+            }
           </div>
         </div>
         @if (performance.AudioPlayPath is null)
@@ -67,6 +71,10 @@ else
         @if (!string.IsNullOrWhiteSpace(performance.Description))
         {
           <p class="qz-stage-row__description">@performance.Description</p>
+        }
+        @if (performance.ReportPath is not null)
+        {
+          <p class="qz-meta"><a href="@performance.ReportPath">Report this performance</a></p>
         }
       </li>
     }

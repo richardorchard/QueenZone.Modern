@@ -26,6 +26,7 @@ import { TimelineEventScreen } from '../screens/archive/TimelineEventScreen';
 import { FreddieTributeScreen } from '../screens/archive/FreddieTributeScreen';
 import { FanPerformancesScreen } from '../screens/archive/FanPerformancesScreen';
 import { FanPerformanceDetailScreen } from '../screens/archive/FanPerformanceDetailScreen';
+import { FanPerformanceSubmitScreen } from '../screens/archive/FanPerformanceSubmitScreen';
 import { StoryScreen } from '../screens/archive/StoryScreen';
 import { AboutArchiveScreen } from '../screens/archive/AboutArchiveScreen';
 import { TriviaScreen } from '../screens/archive/TriviaScreen';
@@ -215,6 +216,11 @@ export function ArchiveStack() {
         name="FanPerformanceDetail"
         component={FanPerformanceDetailScreen}
         options={{ title: 'Fan performance' }}
+      />
+      <Archive.Screen
+        name="FanPerformanceSubmit"
+        component={FanPerformanceSubmitScreen}
+        options={{ title: 'Submit a fan performance' }}
       />
       <Archive.Screen name="Trivia" component={TriviaScreen} options={{ title: 'Trivia' }} />
       <Archive.Screen

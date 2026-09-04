@@ -70,6 +70,8 @@ public sealed class QueenZoneDbContext : DbContext
     public DbSet<FanPerformanceSubmissionAuditLogEntity> FanPerformanceSubmissionAuditLogs =>
         Set<FanPerformanceSubmissionAuditLogEntity>();
 
+    public DbSet<FanPerformanceReportEntity> FanPerformanceReports => Set<FanPerformanceReportEntity>();
+
     public DbSet<PhotoAdminAuditLogEntity> PhotoAdminAuditLogs => Set<PhotoAdminAuditLogEntity>();
 
     public DbSet<ArticleSubmissionEntity> ArticleSubmissions => Set<ArticleSubmissionEntity>();
@@ -920,6 +922,39 @@ public sealed class QueenZoneDbContext : DbContext
             entity.HasOne(submission => submission.Submitter)
                 .WithMany()
                 .HasForeignKey(submission => submission.SubmitterMemberId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<FanPerformanceReportEntity>(entity =>
+        {
+            entity.ToTable("FanPerformanceReports");
+            entity.HasKey(report => report.Id);
+
+            entity.Property(report => report.Reason)
+                .HasMaxLength(FanPerformanceReportLimits.MaxReasonLength)
+                .IsRequired();
+            entity.Property(report => report.Status)
+                .HasMaxLength(50)
+                .IsRequired();
+            entity.Property(report => report.CreatedAt).IsRequired();
+            entity.Property(report => report.TitleSnapshot)
+                .HasMaxLength(FanPerformanceReportLimits.MaxSnapshotLength);
+            entity.Property(report => report.PerformedBySnapshot)
+                .HasMaxLength(FanPerformanceReportLimits.MaxSnapshotLength);
+            entity.Property(report => report.ReviewedBy).HasMaxLength(256);
+
+            entity.HasIndex(report => new { report.ReporterMemberId, report.StageId })
+                .IsUnique()
+                .HasFilter("[Status] = 'Open'")
+                .HasDatabaseName("UX_FanPerformanceReports_Reporter_Stage_Open");
+
+            entity.HasIndex(report => new { report.Status, report.CreatedAt })
+                .IsDescending(false, true)
+                .HasDatabaseName("IX_FanPerformanceReports_Status_CreatedAt");
+
+            entity.HasOne(report => report.Reporter)
+                .WithMany()
+                .HasForeignKey(report => report.ReporterMemberId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 

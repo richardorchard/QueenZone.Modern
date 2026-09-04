@@ -275,6 +275,7 @@ app.MapSearchApiEndpoints();
 app.MapForumApiEndpoints();
 app.MapContactApiEndpoints();
 app.MapMeApiEndpoints();
+app.MapFanPerformanceReportApiEndpoints();
 app.MapMessagesApiEndpoints();
 app.MapSubmissionsApiEndpoints();
 app.MapMemberApiEndpoints();

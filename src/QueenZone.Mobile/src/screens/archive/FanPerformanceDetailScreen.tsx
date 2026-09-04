@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Pause, Play, SkipBack, SkipForward } from 'lucide-react-native';
 import { ApiError, fetchFanPerformanceDetail, fetchFanPerformancesPage, toPlainText, type FanPerformance } from '../../api';
+import { reportFanPerformance } from '../../api/fanPerformanceSubmissions';
 import { useFanPerformancePlayer } from '../../audio/FanPerformancePlayer';
 import { formatTrackDuration } from '../../audio/formatDuration';
 import type { ArchiveStackParamList } from '../../navigation/types';
@@ -31,6 +32,10 @@ function FanPerformancePlayerPanel({ navigation, route }: Props) {
   const [loading, setLoading] = useState(true);
   const [reloadToken, setReloadToken] = useState(0);
   const [barWidth, setBarWidth] = useState(0);
+  const [reportReason, setReportReason] = useState('');
+  const [reportError, setReportError] = useState<string | null>(null);
+  const [reportStatus, setReportStatus] = useState<string | null>(null);
+  const [reporting, setReporting] = useState(false);
 
   useLayoutEffect(() => {
     navigation.setOptions({ title: track?.title ?? 'Fan performance' });
@@ -94,6 +99,11 @@ function FanPerformancePlayerPanel({ navigation, route }: Props) {
           .filter(Boolean)
           .join(' · ')}
       </Text>
+      {track.contributorDisplayName ? (
+        <Text style={[type.meta, { color: c.textMuted, marginTop: space.sm }]}>
+          Submitted by {track.contributorDisplayName}
+        </Text>
+      ) : null}
       {description ? (
         <Text style={[type.body, { color: c.textSecondary, marginTop: space.xl }]}>{description}</Text>
       ) : null}
@@ -194,6 +204,66 @@ function FanPerformancePlayerPanel({ navigation, route }: Props) {
           </View>
         </View>
       )}
+
+      {accessToken || isSignedIn ? (
+        <View style={styles.report} testID={testIds.fanPerformanceReport}>
+          <Text style={[type.cardTitle, { color: c.textPrimary }]}>Report this performance</Text>
+          {reportStatus ? (
+            <Text style={[type.body, { color: c.textSecondary }]}>{reportStatus}</Text>
+          ) : (
+            <>
+              <TextInput
+                value={reportReason}
+                onChangeText={setReportReason}
+                accessibilityLabel="Report reason"
+                placeholder="Why should this recording be hidden?"
+                placeholderTextColor={c.textMuted}
+                multiline
+                style={[
+                  styles.reportInput,
+                  { color: c.textPrimary, borderColor: c.border, backgroundColor: c.surfaceCard },
+                ]}
+              />
+              {reportError ? <Text style={[type.body, { color: c.danger }]}>{reportError}</Text> : null}
+              <Button
+                label="Send report"
+                loading={reporting}
+                testID={testIds.fanPerformanceReportSend}
+                onPress={() => {
+                  void (async () => {
+                    if (!accessToken) {
+                      openSignIn(navigation, {
+                        tab: 'ArchiveTab',
+                        screen: 'FanPerformanceDetail',
+                        params: { id },
+                      });
+                      return;
+                    }
+                    if (!reportReason.trim()) {
+                      setReportError('A reason is required.');
+                      return;
+                    }
+                    setReporting(true);
+                    setReportError(null);
+                    try {
+                      const created = await reportFanPerformance(id, reportReason.trim(), accessToken);
+                      setReportStatus(
+                        created.alreadyReported
+                          ? 'You have already reported this performance.'
+                          : 'Thanks. The admin team will review this performance.',
+                      );
+                    } catch (err: unknown) {
+                      setReportError(err instanceof ApiError ? err.message : 'Could not send the report.');
+                    } finally {
+                      setReporting(false);
+                    }
+                  })();
+                }}
+              />
+            </>
+          )}
+        </View>
+      ) : null}
     </ScrollView>
   );
 }
@@ -207,6 +277,17 @@ const styles = StyleSheet.create({
   },
   player: {
     marginTop: space.xxl,
+  },
+  report: {
+    marginTop: space.section,
+    gap: space.sm,
+  },
+  reportInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    minHeight: 88,
+    paddingHorizontal: space.md,
+    paddingVertical: space.sm,
   },
   seekTrack: {
     height: 8,

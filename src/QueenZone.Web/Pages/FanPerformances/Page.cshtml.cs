@@ -4,7 +4,10 @@ using Microsoft.AspNetCore.RateLimiting;
 namespace QueenZone.Web.Pages.FanPerformances;
 
 [EnableRateLimiting(FanPerformanceRateLimitingOptions.BrowsePolicy)]
-public sealed class ArchivePageModel(PublicQueryCacheService publicQueryCache) : FanPerformanceArchivePageModel(publicQueryCache)
+public sealed class ArchivePageModel(
+    PublicQueryCacheService publicQueryCache,
+    FanPerformanceCreditResolver creditResolver)
+    : FanPerformanceArchivePageModel(publicQueryCache, creditResolver)
 {
     [BindProperty(SupportsGet = true)]
     public int PageNumber { get; set; }

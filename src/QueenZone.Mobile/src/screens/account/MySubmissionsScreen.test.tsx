@@ -19,6 +19,7 @@ const fetchMock = jest.fn<Promise<Response>, [RequestInfo | URL, RequestInit?]>(
 const photosUrl = submissionsApiUrl('http://qz.test', 'photos');
 const newsUrl = submissionsApiUrl('http://qz.test', 'news');
 const articlesUrl = submissionsApiUrl('http://qz.test', 'articles');
+const fanPerformancesUrl = submissionsApiUrl('http://qz.test', 'fan-performances');
 
 const photoPayload = {
   items: [
@@ -77,6 +78,27 @@ const articlePayload = {
   totalPages: 1,
 };
 
+const fanPerformancePayload = {
+  items: [
+    {
+      id: 'fan-1',
+      title: 'Reaching Out cover',
+      coveredSong: 'Reaching Out',
+      performedBy: 'Stage Fan',
+      submittedAt: '2024-04-01T12:00:00.000Z',
+      status: { status: 'success', statusLabel: 'Approved', statusTone: 'success' },
+      notes: null,
+      rejectionReason: null,
+      promotedStageId: 187,
+      publishedPath: '/fan-performances#fan-performance-187',
+    },
+  ],
+  page: 1,
+  pageSize: 20,
+  totalCount: 1,
+  totalPages: 1,
+};
+
 function mockSubmissionPages() {
   fetchMock.mockImplementation(async (input) => {
     const url = String(input);
@@ -88,6 +110,9 @@ function mockSubmissionPages() {
     }
     if (url === articlesUrl) {
       return jsonResponse(articlePayload);
+    }
+    if (url === fanPerformancesUrl) {
+      return jsonResponse(fanPerformancePayload);
     }
     throw new Error(`unexpected fetch ${url}`);
   });
@@ -120,6 +145,7 @@ describe('MySubmissionsScreen', () => {
     });
     expect(fetchMock).toHaveBeenCalledWith(newsUrl, expect.any(Object));
     expect(fetchMock).toHaveBeenCalledWith(articlesUrl, expect.any(Object));
+    expect(fetchMock).toHaveBeenCalledWith(fanPerformancesUrl, expect.any(Object));
   });
 
   it('switches tabs to news and articles', async () => {
@@ -135,12 +161,18 @@ describe('MySubmissionsScreen', () => {
     expect(screen.getByText('A Night at the Archive')).toBeOnTheScreen();
     expect(screen.getByText('Published on the website')).toBeOnTheScreen();
     expect(screen.queryByText('Continue editing on the website')).toBeNull();
+
+    await user.press(screen.getByRole('tab', { name: 'Fan performances' }));
+    expect(screen.getByText('Reaching Out cover')).toBeOnTheScreen();
+    expect(screen.getByText('Reaching Out · Stage Fan')).toBeOnTheScreen();
+    expect(screen.getByText('Published on the fan stage')).toBeOnTheScreen();
   });
 
   it('shows a load error and retries', async () => {
     fetchMock.mockImplementationOnce(async () => jsonResponse({ detail: 'Could not load your submissions.' }, 500));
     fetchMock.mockImplementationOnce(async () => jsonResponse(newsPayload));
     fetchMock.mockImplementationOnce(async () => jsonResponse(articlePayload));
+    fetchMock.mockImplementationOnce(async () => jsonResponse(fanPerformancePayload));
     renderSubmissions();
     await waitFor(() => expect(screen.getByText('Could not load your submissions.')).toBeOnTheScreen());
 

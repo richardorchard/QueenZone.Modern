@@ -12,12 +12,14 @@ import { getAppConfig } from '../../config/appConfig';
 import {
   memberAuthHeaders,
   parseArticleSubmissions,
+  parseFanPerformanceSubmissions,
   parseNewsSuggestions,
   parsePhotoSubmissions,
   readProblemDetail,
   resolveMediaUrl,
   submissionsApiUrl,
   type ArticleSubmissionItem,
+  type FanPerformanceSubmissionItem,
   type NewsSuggestionItem,
   type PhotoSubmissionItem,
   type SubmissionKind,
@@ -32,6 +34,7 @@ const kinds: { value: SubmissionKind; label: string }[] = [
   { value: 'photos', label: 'Photos' },
   { value: 'news', label: 'News suggestions' },
   { value: 'articles', label: 'Articles' },
+  { value: 'fan-performances', label: 'Fan performances' },
 ];
 
 export function MySubmissionsScreen() {
@@ -51,6 +54,7 @@ function MySubmissionsList() {
   const [photos, setPhotos] = useState<PhotoSubmissionItem[]>([]);
   const [news, setNews] = useState<NewsSuggestionItem[]>([]);
   const [articles, setArticles] = useState<ArticleSubmissionItem[]>([]);
+  const [performances, setPerformances] = useState<FanPerformanceSubmissionItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -60,6 +64,7 @@ function MySubmissionsList() {
       setPhotos([]);
       setNews([]);
       setArticles([]);
+      setPerformances([]);
       setError(
         'Live submission status needs a QueenZone member token. After a real sign-in, pull to refresh to see pending, approved, and rejected items.',
       );
@@ -70,16 +75,18 @@ function MySubmissionsList() {
     setError(null);
     try {
       const headers = memberAuthHeaders(accessToken);
-      const [photoRes, newsRes, articleRes] = await Promise.all([
+      const [photoRes, newsRes, articleRes, performanceRes] = await Promise.all([
         fetch(submissionsApiUrl(apiBaseUrl, 'photos'), { headers }),
         fetch(submissionsApiUrl(apiBaseUrl, 'news'), { headers }),
         fetch(submissionsApiUrl(apiBaseUrl, 'articles'), { headers }),
+        fetch(submissionsApiUrl(apiBaseUrl, 'fan-performances'), { headers }),
       ]);
 
-      const [photoPayload, newsPayload, articlePayload] = await Promise.all([
+      const [photoPayload, newsPayload, articlePayload, performancePayload] = await Promise.all([
         photoRes.json().catch(() => null),
         newsRes.json().catch(() => null),
         articleRes.json().catch(() => null),
+        performanceRes.json().catch(() => null),
       ]);
 
       if (!photoRes.ok) {
@@ -94,9 +101,14 @@ function MySubmissionsList() {
         throw new Error(readProblemDetail(articlePayload, 'Could not load your submissions.'));
       }
 
+      if (!performanceRes.ok) {
+        throw new Error(readProblemDetail(performancePayload, 'Could not load your submissions.'));
+      }
+
       setPhotos(parsePhotoSubmissions(photoPayload).items);
       setNews(parseNewsSuggestions(newsPayload).items);
       setArticles(parseArticleSubmissions(articlePayload).items);
+      setPerformances(parseFanPerformanceSubmissions(performancePayload).items);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Could not load your submissions.');
     } finally {
@@ -122,14 +134,17 @@ function MySubmissionsList() {
       ? 'You have not submitted any photos yet.'
       : kind === 'news'
         ? 'You have not suggested any news yet.'
-        : 'You have not submitted any articles yet.';
+        : kind === 'articles'
+          ? 'You have not submitted any articles yet.'
+          : 'You have not submitted any fan performances yet.';
 
   const isEmpty =
     loaded
     && !error
     && ((kind === 'photos' && photos.length === 0)
       || (kind === 'news' && news.length === 0)
-      || (kind === 'articles' && articles.length === 0));
+      || (kind === 'articles' && articles.length === 0)
+      || (kind === 'fan-performances' && performances.length === 0));
 
   return (
     <ScrollView
@@ -144,7 +159,7 @@ function MySubmissionsList() {
         My submissions
       </Text>
       <Text style={[type.body, { color: c.textSecondary }]} allowFontScaling>
-        Track photos, news suggestions, and articles you have submitted. Pull to refresh after an admin reviews them.
+        Track photos, news suggestions, articles, and fan performances you have submitted. Pull to refresh after an admin reviews them.
       </Text>
 
       <View style={styles.tabs} accessibilityRole="tablist">
@@ -248,6 +263,23 @@ function MySubmissionsList() {
               ) : null}
               {item.publishedPath ? (
                 <Text style={[type.caption, { color: c.accentPrimary }]}>Published on the website</Text>
+              ) : null}
+            </View>
+          ))
+        : null}
+
+      {kind === 'fan-performances'
+        ? performances.map((item) => (
+            <View key={item.id} style={[styles.card, { borderColor: c.border, backgroundColor: c.surfaceCard }]}>
+              <Text style={[type.cardTitle, { color: c.textPrimary }]}>{item.title}</Text>
+              <StatusBadge tone={item.status.statusTone} label={item.status.statusLabel} />
+              <Text style={[type.caption, { color: c.textMuted }]}>
+                {item.coveredSong} · {item.performedBy}
+              </Text>
+              <Text style={[type.caption, { color: c.textMuted }]}>{formatWhen(item.submittedAt)}</Text>
+              {item.notes ? <Text style={[type.body, { color: c.textSecondary }]}>{item.notes}</Text> : null}
+              {item.publishedPath ? (
+                <Text style={[type.caption, { color: c.accentPrimary }]}>Published on the fan stage</Text>
               ) : null}
             </View>
           ))

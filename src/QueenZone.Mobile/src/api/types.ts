@@ -235,6 +235,15 @@ export type FanPerformance = {
   durationSeconds: number | null;
   detailPath: string;
   audioPath: string;
+  contributorMemberId?: string | null;
+  contributorDisplayName?: string | null;
+};
+
+export type FanPerformanceSubmissionCreated = {
+  id: string;
+  status: string;
+  title: string;
+  submittedAt: string;
 };
 
 /** Shape for `/api/v1/forum/stats`. `threadCount` matches website `GetForumThreadCountAsync`. */

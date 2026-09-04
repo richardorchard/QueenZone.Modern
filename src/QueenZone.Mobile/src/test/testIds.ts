@@ -95,6 +95,11 @@ export const testIds = {
   fanPerformancesShufflePlayAll: 'fan-performances-shuffle-play-all',
   fanPerformanceRowPrefix: 'fan-performance-',
   fanPerformancePlayPrefix: 'fan-performance-play-',
+  fanPerformanceSubmit: 'fan-performance-submit',
+  fanPerformanceSubmitPick: 'fan-performance-submit-pick',
+  fanPerformanceSubmitSend: 'fan-performance-submit-send',
+  fanPerformanceReport: 'fan-performance-report',
+  fanPerformanceReportSend: 'fan-performance-report-send',
 
   signInClose: 'sign-in-close',
 

@@ -38,6 +38,10 @@ public static class FanPerformanceRoutes
         return safe.Length > 100 ? safe[..100] : safe;
     }
 
+    public static string GetReportPath(int id) => $"{GetIndexPath()}/{id}/report";
+
+    public static string GetApiReportPath(int id) => $"/api/v1/me/fan-performances/{id}/report";
+
     public static string GetLoginPath(string returnPath) =>
         $"/account/login?returnUrl={Uri.EscapeDataString(returnPath)}";
 

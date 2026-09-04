@@ -101,6 +101,40 @@ public sealed class SubmissionsApiTests : IClassFixture<QueenZoneWebApplicationF
     }
 
     [Fact]
+    public async Task FanPerformances_return_rejection_notes_and_published_path()
+    {
+        var owner = await CreateMemberAsync("subs-fp-owner@example.com", "Owner Fan");
+        var other = await CreateMemberAsync("subs-fp-other@example.com", "Other Fan");
+        var performances = factory.Services.GetRequiredService<IFanPerformanceSubmissionRepository>();
+
+        var mine = await performances.CreateAsync(NewFanPerformance(owner.Id, "Owner cover"));
+        await performances.CreateAsync(NewFanPerformance(other.Id, "Other cover secret"));
+        await performances.PromoteAsync(mine.Id, 187, "admin@test.local", "Published");
+
+        var rejected = await performances.CreateAsync(NewFanPerformance(owner.Id, "Rejected cover"));
+        await performances.UpdateStatusAsync(
+            rejected.Id,
+            FanPerformanceSubmissionStatus.Rejected,
+            "admin@test.local",
+            null,
+            "Too quiet");
+
+        using var client = CreateMemberClient(owner);
+        using var response = await client.GetAsync($"{SubmissionsApiEndpoints.FanPerformancesPath}?page=1&pageSize=20");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<ApiPagedResponse<FanPerformanceSubmissionItemDto>>();
+        Assert.NotNull(payload);
+        Assert.DoesNotContain(payload!.Items, row => row.Title == "Other cover secret");
+        var approved = Assert.Single(payload.Items, row => row.Title == "Owner cover");
+        Assert.Equal(187, approved.PromotedStageId);
+        Assert.Equal("/fan-performances#fan-performance-187", approved.PublishedPath);
+        var denied = Assert.Single(payload.Items, row => row.Title == "Rejected cover");
+        Assert.Equal("Too quiet", denied.Notes);
+        Assert.Equal("Too quiet", denied.RejectionReason);
+    }
+
+    [Fact]
     public async Task News_and_articles_match_my_submissions_fields_including_published_links()
     {
         var owner = await CreateMemberAsync("subs-mixed-owner@example.com", "Owner Fan");
@@ -413,6 +447,21 @@ public sealed class SubmissionsApiTests : IClassFixture<QueenZoneWebApplicationF
             CreatedAt = DateTime.UtcNow,
         });
     }
+
+    private static NewFanPerformanceSubmission NewFanPerformance(Guid memberId, string title) =>
+        new(
+            memberId,
+            title,
+            "Reaching Out",
+            "Owner Fan",
+            null,
+            $"members/{memberId:N}/cover.mp3",
+            "cover.mp3",
+            2048,
+            "audio/mpeg",
+            120,
+            DateTimeOffset.UtcNow,
+            FanPerformanceSubmissionRights.DeclarationVersion);
 
     private static NewPhotoSubmission NewPhoto(Guid memberId, string title) =>
         new(

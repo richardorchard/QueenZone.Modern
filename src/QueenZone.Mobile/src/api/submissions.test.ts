@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import {
   memberAuthHeaders,
   parseArticleSubmissions,
+  parseFanPerformanceSubmissions,
   parseNewsSuggestions,
   parsePhotoSubmissions,
   readProblemDetail,
@@ -120,6 +121,34 @@ describe('parseArticleSubmissions', () => {
 
     assert.equal(page.items[0]?.canContinueEditing, true);
     assert.equal(page.items[0]?.status.statusTone, 'pending');
+  });
+});
+
+describe('parseFanPerformanceSubmissions', () => {
+  it('reads notes, rejection reason, and published path', () => {
+    const page = parseFanPerformanceSubmissions({
+      items: [
+        {
+          id: '44444444-4444-4444-4444-444444444444',
+          title: 'Reaching Out cover',
+          coveredSong: 'Reaching Out',
+          performedBy: 'Stage Fan',
+          submittedAt: '2026-09-01T12:00:00Z',
+          status: { status: 'Approved', statusLabel: 'Approved', statusTone: 'success' },
+          notes: null,
+          rejectionReason: null,
+          promotedStageId: 187,
+          publishedPath: '/fan-performances#fan-performance-187',
+        },
+      ],
+      page: 1,
+      pageSize: 20,
+      totalCount: 1,
+      totalPages: 1,
+    });
+
+    assert.equal(page.items[0]?.promotedStageId, 187);
+    assert.match(page.items[0]?.publishedPath ?? '', /fan-performance-187/);
   });
 });
 

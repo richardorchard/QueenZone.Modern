@@ -20,6 +20,8 @@ public static class SubmissionsApiEndpoints
 
     public const string ArticlesPath = RootPath + "/articles";
 
+    public const string FanPerformancesPath = RootPath + "/fan-performances";
+
     public static void MapSubmissionsApiEndpoints(this WebApplication app)
     {
         var group = app.MapGroup(RootPath)
@@ -44,6 +46,12 @@ public static class SubmissionsApiEndpoints
             .WithName("GetMyArticleSubmissions")
             .WithSummary("Paged list of the signed-in member's article submissions and review status.")
             .Produces<ApiPagedResponse<ArticleSubmissionItemDto>>()
+            .ProducesProblem(StatusCodes.Status401Unauthorized);
+
+        group.MapGet("/fan-performances", GetFanPerformancesAsync)
+            .WithName("GetMyFanPerformanceSubmissions")
+            .WithSummary("Paged list of the signed-in member's fan-performance submissions and review status.")
+            .Produces<ApiPagedResponse<FanPerformanceSubmissionItemDto>>()
             .ProducesProblem(StatusCodes.Status401Unauthorized);
     }
 
@@ -150,6 +158,31 @@ public static class SubmissionsApiEndpoints
         httpContext.Response.Headers.CacheControl = "no-store";
         return Results.Ok(ApiPagedResponse<ArticleSubmissionItemDto>.Create(
             SubmissionsApiMapper.ToArticles(result.Items),
+            request.Page,
+            request.PageSize,
+            result.TotalCount));
+    }
+
+    internal static async Task<IResult> GetFanPerformancesAsync(
+        HttpContext httpContext,
+        [FromServices] IFanPerformanceSubmissionRepository fanPerformanceSubmissionRepository,
+        int? page,
+        int? pageSize,
+        CancellationToken cancellationToken)
+    {
+        var unauthorized = UnauthorizedIfMissingMember(httpContext, out var memberId);
+        if (unauthorized is not null)
+        {
+            return unauthorized;
+        }
+
+        var request = ApiPagination.Normalize(page, pageSize);
+        var result = await fanPerformanceSubmissionRepository.GetBySubmitterAsync(
+            memberId, request.Page, request.PageSize, cancellationToken);
+
+        httpContext.Response.Headers.CacheControl = "no-store";
+        return Results.Ok(ApiPagedResponse<FanPerformanceSubmissionItemDto>.Create(
+            SubmissionsApiMapper.ToFanPerformances(result.Items),
             request.Page,
             request.PageSize,
             result.TotalCount));

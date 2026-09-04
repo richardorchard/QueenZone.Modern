@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Microsoft.AspNetCore.Mvc;
 using QueenZone.Data;
 
 namespace QueenZone.Web;
@@ -19,6 +20,10 @@ public static class MemberApiEndpoints
     public const string PhotoSubmissionsPath = $"{RootPath}/photo-submissions";
 
     public const string NewsSuggestionsPath = $"{RootPath}/news-suggestions";
+
+    public const string FanPerformanceSubmissionsPath = $"{RootPath}/fan-performance-submissions";
+
+    public const int FanPerformanceRequestSizeLimitBytes = 28_000_000;
 
     public static void MapMemberApiEndpoints(this WebApplication app)
     {
@@ -48,6 +53,20 @@ public static class MemberApiEndpoints
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status429TooManyRequests)
+            .DisableAntiforgery();
+
+        group.MapPost("/fan-performance-submissions", CreateFanPerformanceSubmissionAsync)
+            .WithName("CreateMemberFanPerformanceSubmission")
+            .WithSummary("Submit a fan performance for review. Same FanPerformanceSubmissionService and daily quota as /submit/fan-performance.")
+            .RequireAuthorization(MemberAuthenticationSchemes.MobileMemberPolicy)
+            .RequireRateLimiting(QueenZoneRateLimitPolicies.MemberWrite)
+            .Accepts<FanPerformanceSubmissionRequestDto>("multipart/form-data")
+            .Produces<FanPerformanceSubmissionCreatedDto>(StatusCodes.Status201Created)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests)
+            .WithMetadata(new RequestSizeLimitAttribute(FanPerformanceRequestSizeLimitBytes))
+            .WithMetadata(new RequestFormLimitsAttribute { MultipartBodyLengthLimit = FanPerformanceRequestSizeLimitBytes })
             .DisableAntiforgery();
     }
 
@@ -158,6 +177,99 @@ public static class MemberApiEndpoints
         }
 
         return files.FirstOrDefault(file => file is { Length: > 0 });
+    }
+
+    private static IFormFile? FindAudioFile(IFormFileCollection files)
+    {
+        foreach (var name in new[] { "audio", "Audio", "audioFile", "AudioFile" })
+        {
+            var file = files.GetFile(name);
+            if (file is { Length: > 0 })
+            {
+                return file;
+            }
+        }
+
+        return files.FirstOrDefault(file => file is { Length: > 0 });
+    }
+
+    private static bool ParseRightsAccepted(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        return value.Equals("true", StringComparison.OrdinalIgnoreCase)
+            || value.Equals("on", StringComparison.OrdinalIgnoreCase)
+            || value.Equals("1", StringComparison.OrdinalIgnoreCase);
+    }
+
+    internal static async Task<IResult> CreateFanPerformanceSubmissionAsync(
+        ClaimsPrincipal user,
+        HttpRequest request,
+        FanPerformanceSubmissionService fanPerformanceSubmissionService,
+        CancellationToken cancellationToken)
+    {
+        var memberId = ForumMember.GetMemberId(user);
+        if (memberId is null)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status401Unauthorized,
+                title: "Unauthorized");
+        }
+
+        if (!request.HasFormContentType)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Bad Request",
+                detail: "Fan performance submissions must be sent as multipart/form-data.");
+        }
+
+        var form = await request.ReadFormAsync(cancellationToken);
+        var title = FirstNonEmpty(form["title"].ToString(), form["Title"].ToString());
+        var coveredSong = FirstNonEmpty(form["coveredSong"].ToString(), form["CoveredSong"].ToString());
+        var performedBy = FirstNonEmpty(form["performedBy"].ToString(), form["PerformedBy"].ToString());
+        var description = FirstNonEmpty(form["description"].ToString(), form["Description"].ToString());
+        var rightsAccepted = ParseRightsAccepted(
+            FirstNonEmpty(
+                form["rightsDeclarationAccepted"].ToString(),
+                form["RightsDeclarationAccepted"].ToString()));
+        var audio = FindAudioFile(form.Files);
+        if (audio is null)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Bad Request",
+                detail: "An audio file is required.");
+        }
+
+        await using var stream = audio.OpenReadStream();
+        var result = await fanPerformanceSubmissionService.SubmitAsync(
+            memberId.Value,
+            title ?? string.Empty,
+            coveredSong ?? string.Empty,
+            performedBy ?? string.Empty,
+            description,
+            rightsAccepted,
+            stream,
+            audio.FileName,
+            cancellationToken);
+
+        if (!result.Succeeded || result.Submission is null)
+        {
+            return MapSubmitFailure(result.Error ?? "Could not submit fan performance.");
+        }
+
+        var submission = result.Submission;
+        return Results.Created(
+            $"{FanPerformanceSubmissionsPath}/{submission.Id:D}",
+            new FanPerformanceSubmissionCreatedDto(
+                submission.Id,
+                submission.Status,
+                submission.Title,
+                submission.SubmittedAt));
     }
 
     internal static async Task<IResult> CreateNewsSuggestionAsync(

@@ -287,7 +287,9 @@ public static class ContentApiMapper
             performance.DateAdded,
             durationSeconds,
             FanPerformanceRoutes.GetIndexPath(),
-            FanPerformanceRoutes.GetApiAudioPath(performance.Id));
+            FanPerformanceRoutes.GetApiAudioPath(performance.Id),
+            performance.ContributorMemberId,
+            performance.ContributorDisplayName);
 
     public static IReadOnlyList<FanPerformanceDto> ToFanPerformanceDtos(
         IReadOnlyList<FanPerformance> items,

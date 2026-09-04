@@ -60,6 +60,23 @@ public static class SubmissionsApiMapper
     public static IReadOnlyList<ArticleSubmissionItemDto> ToArticles(IEnumerable<ArticleSubmission> items) =>
         items.Select(ToArticle).ToList();
 
+    public static FanPerformanceSubmissionItemDto ToFanPerformance(FanPerformanceSubmission item) =>
+        new(
+            item.Id,
+            item.Title,
+            item.CoveredSong,
+            item.PerformedBy,
+            item.SubmittedAt,
+            ToStatus(item.Status),
+            FanPerformanceSubmissionFeedback.GetMemberFacingNotes(item),
+            EmptyToNull(item.RejectionReason),
+            item.PromotedStageId,
+            FanPerformanceSubmissionFeedback.GetPublishedPath(item));
+
+    public static IReadOnlyList<FanPerformanceSubmissionItemDto> ToFanPerformances(
+        IEnumerable<FanPerformanceSubmission> items) =>
+        items.Select(ToFanPerformance).ToList();
+
     public static string? ResolvePublishedNewsPath(NewsSuggestion suggestion, NewsItem? news)
     {
         if (suggestion.Status != NewsSuggestionStatus.Promoted

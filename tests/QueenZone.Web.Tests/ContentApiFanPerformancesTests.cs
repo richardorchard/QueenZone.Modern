@@ -87,6 +87,52 @@ public sealed class ContentApiFanPerformancesTests : IClassFixture<QueenZoneWebA
     }
 
     [Fact]
+    public async Task FanPerformance_list_and_detail_include_contributor_credit_when_approved_submission_exists()
+    {
+        var member = await factory.Services.GetRequiredService<IMemberAccountRepository>()
+            .CreateAsync(new MemberAccount
+            {
+                Id = Guid.NewGuid(),
+                Email = "credit-fan@example.com",
+                DisplayName = "Credit Fan",
+                CreatedAt = DateTime.UtcNow,
+            });
+        var submissions = factory.Services.GetRequiredService<IFanPerformanceSubmissionRepository>();
+        var created = await submissions.CreateAsync(new NewFanPerformanceSubmission(
+            member.Id,
+            "Credit cover",
+            "Reaching Out",
+            "Mike Ryde",
+            null,
+            "pending/credit.mp3",
+            "credit.mp3",
+            1024,
+            "audio/mpeg",
+            120,
+            DateTimeOffset.UtcNow,
+            FanPerformanceSubmissionRights.DeclarationVersion));
+        await submissions.PromoteAsync(created.Id, 187, "admin@test.local", null);
+
+        using var client = factory.CreateAnonymousClient();
+        using var listResponse = await client.GetAsync($"{ContentApiEndpoints.RootPath}/fan-performances");
+        var list = await listResponse.Content.ReadFromJsonAsync<ApiPagedResponse<FanPerformanceDto>>();
+        var credited = Assert.Single(list!.Items, item => item.Id == 187);
+        Assert.Equal(member.Id, credited.ContributorMemberId);
+        Assert.Equal("Credit Fan", credited.ContributorDisplayName);
+        Assert.Equal("Mike Ryde", credited.PerformedBy);
+
+        using var detailResponse = await client.GetAsync($"{ContentApiEndpoints.RootPath}/fan-performances/187");
+        var detail = await detailResponse.Content.ReadFromJsonAsync<FanPerformanceDto>();
+        Assert.Equal(member.Id, detail!.ContributorMemberId);
+        Assert.Equal("Credit Fan", detail.ContributorDisplayName);
+        Assert.All(list.Items.Where(item => item.Id != 187), item =>
+        {
+            Assert.Null(item.ContributorMemberId);
+            Assert.Null(item.ContributorDisplayName);
+        });
+    }
+
+    [Fact]
     public async Task FanPerformance_detail_returns_problem_details_for_missing_id()
     {
         using var client = factory.CreateAnonymousClient();
