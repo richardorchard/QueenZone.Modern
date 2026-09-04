@@ -1,7 +1,7 @@
 appId: org.queenzone.mobile
 ---
 # Forum tab-root identity header (not the Home masthead). Badge is GET /api/v1/me/messages/unread-count only (#1074).
-- openLink: ${SMOKE_AUTH_URL}
+- runFlow: open-smoke-auth.yaml
 - tapOn:
     id: tab-forum
 - extendedWaitUntil:

@@ -124,6 +124,13 @@ jobs:
         run: |
           curl -Ls "https://get.maestro.mobile.dev" | bash
           echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.maestro/bin:$PATH"
+          if ! command -v maestro >/dev/null; then
+            echo "::error::Maestro install finished but maestro is not on PATH ($HOME/.maestro/bin)."
+            ls -la "$HOME/.maestro/bin" || true
+            exit 1
+          fi
+          maestro --version
 
       # android-emulator-runner executes `script` line-by-line via `sh -c`.
       # Keep that script a single static invocation. Compute prove_failure in
@@ -156,13 +163,14 @@ jobs:
 
       - name: Collect leftover Android smoke logs
         if: failure()
+        timeout-minutes: 2
         working-directory: .
         run: |
           mkdir -p src/QueenZone.Mobile/maestro-results
           if [ ! -s src/QueenZone.Mobile/maestro-results/harness.log ]; then
             echo "assemble failed before the smoke script wrote harness.log" > src/QueenZone.Mobile/maestro-results/harness.log
           fi
-          adb logcat -d > src/QueenZone.Mobile/maestro-results/logcat.txt 2>/dev/null || true
+          timeout 30 adb logcat -d > src/QueenZone.Mobile/maestro-results/logcat.txt 2>/dev/null || true
           for f in "$HOME"/.android/*.log "$HOME"/.android/avd/*/*.log; do
             [ -f "$f" ] || continue
             cp "$f" "src/QueenZone.Mobile/maestro-results/$(basename "$f")" || true
@@ -267,6 +275,13 @@ jobs:
         run: |
           curl -Ls "https://get.maestro.mobile.dev" | bash
           echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.maestro/bin:$PATH"
+          if ! command -v maestro >/dev/null; then
+            echo "::error::Maestro install finished but maestro is not on PATH ($HOME/.maestro/bin)."
+            ls -la "$HOME/.maestro/bin" || true
+            exit 1
+          fi
+          maestro --version
 
       - name: Boot iPhone Simulator
         working-directory: .
@@ -396,6 +411,13 @@ jobs:
         run: |
           curl -Ls "https://get.maestro.mobile.dev" | bash
           echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.maestro/bin:$PATH"
+          if ! command -v maestro >/dev/null; then
+            echo "::error::Maestro install finished but maestro is not on PATH ($HOME/.maestro/bin)."
+            ls -la "$HOME/.maestro/bin" || true
+            exit 1
+          fi
+          maestro --version
 
       - name: Prepare Android journeys harness
         working-directory: .
@@ -420,13 +442,14 @@ jobs:
 
       - name: Collect leftover Android journeys logs
         if: failure()
+        timeout-minutes: 2
         working-directory: .
         run: |
           mkdir -p src/QueenZone.Mobile/maestro-results
           if [ ! -s src/QueenZone.Mobile/maestro-results/harness.log ]; then
             echo "assemble failed before the smoke script wrote harness.log" > src/QueenZone.Mobile/maestro-results/harness.log
           fi
-          adb logcat -d > src/QueenZone.Mobile/maestro-results/logcat.txt 2>/dev/null || true
+          timeout 30 adb logcat -d > src/QueenZone.Mobile/maestro-results/logcat.txt 2>/dev/null || true
           for f in "$HOME"/.android/*.log "$HOME"/.android/avd/*/*.log; do
             [ -f "$f" ] || continue
             cp "$f" "src/QueenZone.Mobile/maestro-results/$(basename "$f")" || true
@@ -531,6 +554,13 @@ jobs:
         run: |
           curl -Ls "https://get.maestro.mobile.dev" | bash
           echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.maestro/bin:$PATH"
+          if ! command -v maestro >/dev/null; then
+            echo "::error::Maestro install finished but maestro is not on PATH ($HOME/.maestro/bin)."
+            ls -la "$HOME/.maestro/bin" || true
+            exit 1
+          fi
+          maestro --version
 
       - name: Boot iPhone Simulator
         working-directory: .

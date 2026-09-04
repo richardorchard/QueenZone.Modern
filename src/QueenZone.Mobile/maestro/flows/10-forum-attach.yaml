@@ -2,11 +2,17 @@ appId: org.queenzone.mobile
 ---
 # Journeys is a cold simctl install with no 01-launch. launchApp first so
 # openLink is not the SpringBoard "Open in QueenZone?" prompt (#1247).
-# Files first, then Debug inject. OEM Files sheet is not the gate (#1072).
+# Wait for home-screen before the deep link: SessionProvider mounts only
+# after BootSplash leaves booting, and iOS still shows the Open confirm
+# on a fresh install (#1281). Files first, then Debug inject (#1072).
 - launchApp:
     clearState: true
     clearKeychain: true
-- openLink: ${SMOKE_AUTH_URL}
+- extendedWaitUntil:
+    visible:
+      id: home-screen
+    timeout: 45000
+- runFlow: open-smoke-auth.yaml
 - extendedWaitUntil:
     visible:
       id: tab-forum
@@ -61,6 +67,7 @@ appId: org.queenzone.mobile
       platform: iOS
     commands:
       - openLink: ${SMOKE_ATTACH_URL}
+      - runFlow: accept-ios-open-link.yaml
 - extendedWaitUntil:
     visible: attach.txt
     timeout: 15000

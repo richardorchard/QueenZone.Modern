@@ -126,7 +126,13 @@ collect_diagnostics() {
   local reason="${1:-unknown}"
   echo "collect_diagnostics reason=$reason" >> "$results_dir/harness.log"
   if [ "$platform" = "android" ] && command -v adb >/dev/null; then
-    adb logcat -d > "$results_dir/logcat.txt" 2>/dev/null || true
+    # Leftover adb after emulator teardown can hang forever (journeys
+    # 33795259183 leftover collect sat until the job was cancelled).
+    if command -v timeout >/dev/null; then
+      timeout 30 adb logcat -d > "$results_dir/logcat.txt" 2>/dev/null || true
+    else
+      adb logcat -d > "$results_dir/logcat.txt" 2>/dev/null || true
+    fi
     for f in "$HOME"/.android/*.log "$HOME"/.android/avd/*/*.log; do
       [ -f "$f" ] || continue
       cp "$f" "$results_dir/$(basename "$f")" 2>/dev/null || true
@@ -379,8 +385,18 @@ if [ "$suite" = "journeys" ]; then
   push_attach_fixture
 fi
 
+# Installer writes $HOME/.maestro/bin. GITHUB_PATH should expose it to later
+# steps; iOS smoke 33733955768 still failed with "Maestro is not on PATH"
+# after the install step. Always prepend before probing (#1281).
+if [ -d "${HOME}/.maestro/bin" ]; then
+  PATH="${HOME}/.maestro/bin:${PATH}"
+  export PATH
+fi
+
 if ! command -v maestro >/dev/null; then
   echo "Maestro is not on PATH. Install with: curl -Ls \"https://get.maestro.mobile.dev\" | bash" >&2
+  echo "Looked in: ${HOME}/.maestro/bin" >&2
+  ls -la "${HOME}/.maestro/bin" >&2 || true
   exit 1
 fi
 
@@ -415,6 +431,22 @@ set -e
 
 if [ "$maestro_status" -ne 0 ]; then
   echo "Maestro failed with status $maestro_status" >&2
+  if [ -f "$results_dir/junit.xml" ]; then
+    node -e '
+      const fs = require("fs");
+      const xml = fs.readFileSync(process.argv[1], "utf8");
+      const cases = [...xml.matchAll(/<testcase\b([^>]*)>([\s\S]*?)<\/testcase>/g)];
+      for (const c of cases) {
+        const name = /name="([^"]*)"/.exec(c[1])?.[1] ?? "?";
+        const file = /file="([^"]*)"/.exec(c[1])?.[1] ?? "";
+        const fail = /<failure(?:\s[^>]*)?>([^<]*)<\/failure>/.exec(c[2]);
+        if (fail) {
+          console.error("Maestro failing flow: " + (file || name));
+          console.error("Maestro failing selector: " + fail[1].trim());
+        }
+      }
+    ' "$results_dir/junit.xml" >&2 || true
+  fi
   collect_diagnostics "maestro-$maestro_status"
 fi
 
