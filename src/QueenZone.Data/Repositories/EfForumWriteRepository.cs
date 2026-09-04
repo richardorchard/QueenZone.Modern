@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using System.Data;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.EntityFrameworkCore;
@@ -11,6 +12,9 @@ public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForu
     private const int BodyHtmlMaxLength = 8000;
     internal const string TopicIdSequence = "ForumLegacyTopicIdSeq";
     internal const string PostIdSequence = "ForumLegacyPostIdSeq";
+
+    private static readonly FrozenSet<string> KnownLegacyIdSequences =
+        FrozenSet.ToFrozenSet([TopicIdSequence, PostIdSequence], StringComparer.Ordinal);
 
     public Task<ForumThreadCreateResult> CreateThreadAsync(NewForumThread thread, CancellationToken cancellationToken = default)
     {
@@ -472,11 +476,19 @@ public sealed class EfForumWriteRepository(QueenZoneDbContext dbContext) : IForu
                 (await db.ModernForumPosts.MaxAsync(post => (int?)post.LegacyPostId, ct) ?? 0) + 1,
             cancellationToken);
 
-    private async Task<int> AllocateNextLegacyIdAsync(
+    internal async Task<int> AllocateNextLegacyIdAsync(
         string sequenceName,
         Func<QueenZoneDbContext, CancellationToken, Task<int>> fallback,
         CancellationToken cancellationToken)
     {
+        if (!KnownLegacyIdSequences.Contains(sequenceName))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(sequenceName),
+                sequenceName,
+                "Unknown forum legacy id sequence.");
+        }
+
         if (!IsSqlServer())
         {
             return await fallback(dbContext, cancellationToken);
