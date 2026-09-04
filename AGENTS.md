@@ -31,7 +31,7 @@ Do not build visitor-facing or admin pages by streaming inline HTML from minimal
 
 The React Native client lives at `src/QueenZone.Mobile/` as an Expo development-build project (TypeScript, `expo-dev-client`, Continuous Native Generation). Keep it out of `QueenZone.sln`. Expo Go is not a supported runtime. Native `ios/` and `android/` output is generated at build time and is not committed. Navigation is React Navigation (bottom tabs + native stacks per tab); signed-out vs signed-in surfaces follow ADR 0012. See `src/QueenZone.Mobile/README.md`.
 
-Mobile server state uses the in-repo hooks, not a query library: `useHomeSection` for home sections, `useDetailQuery` for a single resource, `usePagedContent` for paginated and infinite lists, all fetching through `src/cache/fetchCached.ts` with a key from `src/cache/keys.ts`. Do not add `@tanstack/react-query` or another server-state library, and do not add a new bespoke pub/sub module for cache invalidation — see ADR 0018 for the decision and its revisit trigger.
+Mobile server state uses the in-repo hooks, not a query library: `useHomeSection` for home sections, `useDetailQuery` for a single resource, `usePagedContent` for paginated and infinite lists, all fetching through `src/cache/fetchCached.ts` with a key from `src/cache/keys.ts` (same `cacheKey` shares one in-flight promise). Do not add `@tanstack/react-query` or another server-state library, and do not add a new bespoke pub/sub module for cache invalidation — see ADR 0018 for the decision and its revisit trigger.
 
 ## Branch And Pull Request Policy
 

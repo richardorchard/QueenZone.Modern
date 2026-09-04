@@ -11,9 +11,12 @@ export type FetchCachedOptions = FetchJsonOptions &
     cache?: ContentCache;
   };
 
+const inFlight = new Map<string, Promise<CachedResult<unknown>>>();
+
 /**
  * Network-first fetch with offline cache fallback for previously opened details.
  * Mirrors the PWA navigate strategy in `wwwroot/sw.js`.
+ * Concurrent callers with the same `cacheKey` share one in-flight promise.
  */
 export async function fetchJsonWithOfflineCache<T>(
   path: string,
@@ -28,10 +31,23 @@ export async function fetchJsonWithOfflineCacheResult<T>(
   options: FetchCachedOptions,
 ): Promise<CachedResult<T>> {
   const { cacheKey, cache = getContentCache(), invalidateOn, fallback, ...fetchOptions } = options;
-  return withOfflineCacheResult(cache, cacheKey, () => fetchJson<T>(path, fetchOptions), {
+
+  const existing = inFlight.get(cacheKey);
+  if (existing) {
+    return existing as Promise<CachedResult<T>>;
+  }
+
+  const pending = withOfflineCacheResult(cache, cacheKey, () => fetchJson<T>(path, fetchOptions), {
     invalidateOn,
     fallback,
+  }).finally(() => {
+    if (inFlight.get(cacheKey) === pending) {
+      inFlight.delete(cacheKey);
+    }
   });
+
+  inFlight.set(cacheKey, pending);
+  return pending;
 }
 
 export type { CachedResult };

@@ -72,6 +72,7 @@ of the ~30% of React Query the app is missing.
 An in-flight promise map keyed by `cacheKey` belongs in
 `src/cache/fetchCached.ts`. All three hooks route through it, so one change
 closes the gap for every caller without touching hook APIs or their tests.
+Implemented in `src/QueenZone.Mobile/src/cache/fetchCached.ts` (#1284).
 
 ### 3. Replace the epoch modules with one subscribable store primitive
 
