@@ -1,6 +1,6 @@
 using QueenZone.Data;
 
-namespace QueenZone.Web;
+namespace QueenZone.Routing;
 
 public static class BiographyRoutes
 {

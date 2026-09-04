@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\QueenZone.Data\QueenZone.Data.csproj" />
     <ProjectReference Include="..\QueenZone.NewsAgent\QueenZone.NewsAgent.csproj" />
+    <ProjectReference Include="..\QueenZone.Search.Shared\QueenZone.Search.Shared.csproj" />
     <ProjectReference Include="..\QueenZone.Storage\QueenZone.Storage.csproj" />
   </ItemGroup>
 
@@ -36,6 +37,8 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="QueenZone.Web.Tests" />
+    <Using Include="QueenZone.Routing" />
+    <Using Include="QueenZone.Search.Shared" />
   </ItemGroup>
 
   <Target Name="SetBuildMetadata" BeforeTargets="GetAssemblyVersion;GetAssemblyAttributes;GenerateAssemblyInfo">

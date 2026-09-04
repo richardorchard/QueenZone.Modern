@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -9,23 +9,21 @@
 
   <ItemGroup>
     <PackageReference Include="coverlet.collector" />
-    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
-    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
   </ItemGroup>
 
   <ItemGroup>
     <Using Include="Xunit" />
-    <Using Include="QueenZone.Routing" />
-    <Using Include="QueenZone.Search.Shared" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\QueenZone.Web\QueenZone.Web.csproj" />
-    <ProjectReference Include="..\..\src\QueenZone.NewsAgent\QueenZone.NewsAgent.csproj" />
+    <ProjectReference Include="..\..\src\QueenZone.Search.Shared\QueenZone.Search.Shared.csproj" />
+    <ProjectReference Include="..\..\src\QueenZone.Data\QueenZone.Data.csproj" />
   </ItemGroup>
 
 </Project>

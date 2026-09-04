@@ -1,11 +1,11 @@
-namespace QueenZone.Web;
+namespace QueenZone.Routing;
 
 /// <summary>
 /// Shared pagination math and pagination-nav view-model building used by the
 /// News, Articles, and Forum archive/category/topic pages. Rendering happens
 /// in the <c>_ArchivePagination</c> Razor partial.
 /// </summary>
-internal static class ArchivePagination
+public static class ArchivePagination
 {
     /// <summary>First/last cluster size when the current page is near either end of a long archive.</summary>
     private const int EdgePageCount = 4;

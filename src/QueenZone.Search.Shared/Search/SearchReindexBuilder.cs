@@ -1,15 +1,16 @@
 using QueenZone.Data;
 using QueenZone.Data.Entities;
+using QueenZone.Routing;
 
-namespace QueenZone.Web.Search;
+namespace QueenZone.Search.Shared;
 
 /// <summary>
 /// Repeatable batch job that rebuilds <c>SearchDocument</c> rows for one or more content types by
 /// reading the same public repositories the archive pages already use — so the visibility rules
 /// applied there (published/display flags) are exactly the rules search inherits. Lives in
-/// QueenZone.Web (not QueenZone.Data) because it needs the same canonical-URL route helpers
+/// QueenZone.Search.Shared (not QueenZone.Data) because it needs the same canonical-URL route helpers
 /// (<see cref="NewsRoutes"/>, <see cref="ForumRoutes"/>, <see cref="ArticlesRoutes"/>) that
-/// <see cref="Sitemap.ForumSitemapBuilder"/> uses for the same reason.
+/// the public sitemap builders use for the same reason.
 /// </summary>
 /// <remarks>
 /// Covers News, Forum threads, Community Articles, legacy Articles, Biography, Discography,
@@ -258,7 +259,7 @@ public sealed class SearchReindexBuilder(
     /// <summary>
     /// Maps one public forum thread to its title-oriented <see cref="SearchDocumentEntity"/> shape.
     /// Exposed so create/reply handlers can upsert a single document immediately rather than
-    /// waiting for the next full reindex — see <see cref="ForumSearchIndexSynchronizer"/>.
+    /// waiting for the next full reindex — see <c>ForumSearchIndexSynchronizer</c>.
     /// </summary>
     public static SearchDocumentEntity MapForumThread(ForumTopicSitemapItem item) =>
         new()

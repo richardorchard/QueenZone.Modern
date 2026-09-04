@@ -1,4 +1,4 @@
-namespace QueenZone.Web;
+namespace QueenZone.Routing;
 
 /// <summary>
 /// Data for the shared <c>_ArchivePagination</c> partial. <see cref="Pages"/> entries

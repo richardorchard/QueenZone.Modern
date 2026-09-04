@@ -1,6 +1,6 @@
-using QueenZone.Web;
+using QueenZone.Routing;
 
-namespace QueenZone.Web.Tests;
+namespace QueenZone.Search.Shared.Tests;
 
 public sealed class ArticlesPaginationTests
 {

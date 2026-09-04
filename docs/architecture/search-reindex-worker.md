@@ -4,7 +4,7 @@ Operational guide for the standalone worker that keeps the unified `/search` `Se
 
 ## Why a separate worker
 
-`SearchReindexBuilder.ReindexAllAsync()` (`src/QueenZone.Web/Search/SearchReindexBuilder.cs`) rebuilds `SearchDocument` rows for every indexed content type. Two other mechanisms already keep search partially fresh:
+`SearchReindexBuilder.ReindexAllAsync()` (`src/QueenZone.Search.Shared/Search/SearchReindexBuilder.cs`) rebuilds `SearchDocument` rows for every indexed content type. Two other mechanisms already keep search partially fresh:
 
 - Best-effort immediate upserts on News/Community-Article admin publish/unpublish/delete (swallow-and-log on failure — the scheduled reindex here is their correctness backstop).
 - A manual, in-process, non-durable admin-triggered job (`SearchReindexJobService`, `/admin/search`) — fine for an operator-initiated rebuild, but not durable across app restarts and not automatic.
@@ -86,4 +86,4 @@ Never commit API keys or connection strings. Use:
 ## Related
 
 - `docs/architecture/news-agent-scheduling.md` — the pattern this worker mirrors
-- `src/QueenZone.Web/Search/SearchReindexBuilder.cs` — what actually gets reindexed
+- `src/QueenZone.Search.Shared/Search/SearchReindexBuilder.cs` — what actually gets reindexed

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using QueenZone.Search.Shared;
 
 namespace QueenZone.Web.Search;
 

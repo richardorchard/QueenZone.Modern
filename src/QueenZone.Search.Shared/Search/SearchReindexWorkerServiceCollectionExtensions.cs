@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace QueenZone.Web.Search;
+namespace QueenZone.Search.Shared;
 
 /// <summary>
 /// DI registration for the standalone <c>QueenZone.SearchReindex.Worker</c> console host, which
