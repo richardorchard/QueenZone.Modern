@@ -1,3 +1,8 @@
+using Microsoft.AspNetCore.Identity;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
+using QueenZone.Data;
+using QueenZone.Data.Entities;
 using QueenZone.Tools;
 
 namespace QueenZone.Tools.Tests;
@@ -101,5 +106,105 @@ public sealed class CreateReviewerAccountCommandTests
         {
             Console.SetError(originalError);
         }
+    }
+
+    [Fact]
+    public async Task ToolsApp_routes_create_reviewer_account_command_to_usage_error_on_invalid_options()
+    {
+        using var error = new StringWriter();
+        var originalError = Console.Error;
+        Console.SetError(error);
+        try
+        {
+            var exitCode = await ToolsApp.RunAsync(["create-reviewer-account"]);
+
+            Assert.Equal(2, exitCode);
+            Assert.Contains("--email is required.", error.ToString());
+        }
+        finally
+        {
+            Console.SetError(originalError);
+        }
+    }
+
+    [Fact]
+    public async Task RunCoreAsync_WithNewEmail_CreatesAccountWithHashedPassword()
+    {
+        using var connection = new SqliteConnection("Data Source=:memory:");
+        await using var dbContext = CreateSqliteDbContext(connection);
+        var options = CreateReviewerAccountOptions.Parse([
+            "create-reviewer-account",
+            "--email", "new-reviewer@example.com",
+            "--password", "a-long-enough-password",
+            "--display-name", "App Reviewer",
+            "--connection-string", "unused",
+        ]);
+        Assert.True(options.IsValid);
+
+        var exitCode = await CreateReviewerAccountCommand.RunCoreAsync(options, dbContext);
+
+        Assert.Equal(0, exitCode);
+        var account = await dbContext.MemberAccounts.SingleAsync(a => a.Email == "new-reviewer@example.com");
+        Assert.Equal("App Reviewer", account.DisplayName);
+        Assert.NotNull(account.PasswordHash);
+        var hasher = new PasswordHasher<MemberAccount>();
+        Assert.Equal(
+            PasswordVerificationResult.Success,
+            hasher.VerifyHashedPassword(account, account.PasswordHash!, "a-long-enough-password"));
+    }
+
+    [Fact]
+    public async Task RunCoreAsync_WithExistingSuspendedAccount_ResetsPasswordAndUnsuspends()
+    {
+        using var connection = new SqliteConnection("Data Source=:memory:");
+        await using var dbContext = CreateSqliteDbContext(connection);
+        var hasher = new PasswordHasher<MemberAccount>();
+        var existing = new MemberAccount
+        {
+            Id = Guid.NewGuid(),
+            Email = "existing-reviewer@example.com",
+            NormalizedEmail = "EXISTING-REVIEWER@EXAMPLE.COM",
+            DisplayName = "Old Name",
+            CreatedAt = DateTime.UtcNow,
+            IsSuspended = true,
+            SuspendedAt = DateTime.UtcNow,
+            SuspendedReason = "bot suspicion",
+            SuspendedByAdminEmail = "admin@example.com",
+        };
+        existing.PasswordHash = hasher.HashPassword(existing, "old-password-value");
+        dbContext.MemberAccounts.Add(existing);
+        await dbContext.SaveChangesAsync();
+
+        var options = CreateReviewerAccountOptions.Parse([
+            "create-reviewer-account",
+            "--email", "existing-reviewer@example.com",
+            "--password", "brand-new-password",
+            "--display-name", "App Reviewer",
+            "--connection-string", "unused",
+        ]);
+        Assert.True(options.IsValid);
+
+        var exitCode = await CreateReviewerAccountCommand.RunCoreAsync(options, dbContext);
+
+        Assert.Equal(0, exitCode);
+        var account = await dbContext.MemberAccounts.SingleAsync(a => a.Id == existing.Id);
+        Assert.False(account.IsSuspended);
+        Assert.Null(account.SuspendedAt);
+        Assert.Null(account.SuspendedReason);
+        Assert.Null(account.SuspendedByAdminEmail);
+        Assert.Equal(
+            PasswordVerificationResult.Success,
+            hasher.VerifyHashedPassword(account, account.PasswordHash!, "brand-new-password"));
+    }
+
+    private static QueenZoneDbContext CreateSqliteDbContext(SqliteConnection connection)
+    {
+        connection.Open();
+        var options = new DbContextOptionsBuilder<QueenZoneDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        var dbContext = new QueenZoneDbContext(options);
+        dbContext.Database.EnsureCreated();
+        return dbContext;
     }
 }

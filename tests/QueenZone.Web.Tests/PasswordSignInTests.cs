@@ -78,6 +78,33 @@ public sealed partial class PasswordSignInTests : IClassFixture<WebApplicationFa
     }
 
     [Fact]
+    public async Task Post_WithInvalidEmail_ShowsValidationErrorAndDoesNotSignIn()
+    {
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            HandleCookies = true,
+            AllowAutoRedirect = false,
+        });
+
+        var loginPage = await client.GetStringAsync("/account/login");
+        using var content = new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = ExtractAntiforgeryToken(loginPage),
+            ["Input.Email"] = "not-an-email",
+            ["Input.Password"] = "",
+        });
+
+        var response = await client.PostAsync("/account/login", content);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("Enter your email and password.", body);
+
+        var probeResponse = await client.GetAsync("/account/member-probe");
+        Assert.Equal(HttpStatusCode.Redirect, probeResponse.StatusCode);
+    }
+
+    [Fact]
     public async Task Post_WithUnknownEmail_DoesNotSignIn()
     {
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions

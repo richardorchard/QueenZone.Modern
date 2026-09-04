@@ -27,7 +27,11 @@ internal static class CreateReviewerAccountCommand
             .UseSqlServer(options.ConnectionString)
             .Options;
         await using var dbContext = new QueenZoneDbContext(dbOptions);
+        return await RunCoreAsync(options, dbContext);
+    }
 
+    internal static async Task<int> RunCoreAsync(CreateReviewerAccountOptions options, QueenZoneDbContext dbContext)
+    {
         var normalizedEmail = options.Email.Trim().ToUpperInvariant();
         var account = await dbContext.MemberAccounts
             .SingleOrDefaultAsync(a => a.NormalizedEmail == normalizedEmail);
