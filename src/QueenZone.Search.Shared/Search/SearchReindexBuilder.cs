@@ -219,10 +219,18 @@ public sealed class SearchReindexBuilder(
             Category = historyEvent.Category.ToString(),
         };
 
-    private static SearchDocumentEntity MapFanPerformance(FanPerformance performance) =>
+    /// <summary>Stable search index identity for a published fan performance, e.g. <c>fan-performance:187</c>.</summary>
+    public static string FanPerformanceSourceKey(int id) => $"fan-performance:{id}";
+
+    /// <summary>
+    /// Maps one visible fan performance to its <see cref="SearchDocumentEntity"/> shape. Exposed so
+    /// admin publish/update/hide handlers can upsert or remove a single document immediately rather
+    /// than waiting for the next full reindex.
+    /// </summary>
+    public static SearchDocumentEntity MapFanPerformance(FanPerformance performance) =>
         new()
         {
-            SourceKey = $"fan-performance:{performance.Id}",
+            SourceKey = FanPerformanceSourceKey(performance.Id),
             ContentType = SiteSearchContentType.FanPerformance,
             Title = performance.Title,
             Body = performance.Description,

@@ -2,17 +2,22 @@ namespace QueenZone.Data;
 
 public sealed class InMemoryFanPerformanceRepository : IFanPerformanceRepository
 {
-    private readonly IReadOnlyList<FanPerformance> performances;
+    private readonly SharedFanPerformanceStore store;
 
     public InMemoryFanPerformanceRepository(IReadOnlyList<FanPerformance> performances)
+        : this(new SharedFanPerformanceStore(performances))
     {
-        this.performances = performances;
+    }
+
+    public InMemoryFanPerformanceRepository(SharedFanPerformanceStore store)
+    {
+        this.store = store;
     }
 
     public Task<IReadOnlyList<FanPerformance>> GetPageAsync(int page, int pageSize, CancellationToken cancellationToken = default)
     {
-        IReadOnlyList<FanPerformance> paged = performances
-            .OrderByDescending(performance => performance.DateAdded)
+        var visible = store.GetVisible();
+        IReadOnlyList<FanPerformance> paged = visible
             .Skip(Math.Max(page - 1, 0) * pageSize)
             .Take(pageSize)
             .ToList();
@@ -21,8 +26,8 @@ public sealed class InMemoryFanPerformanceRepository : IFanPerformanceRepository
     }
 
     public Task<int> GetVisibleCountAsync(CancellationToken cancellationToken = default) =>
-        Task.FromResult(performances.Count);
+        Task.FromResult(store.GetVisible().Count);
 
     public Task<FanPerformance?> GetByIdAsync(int id, CancellationToken cancellationToken = default) =>
-        Task.FromResult(performances.FirstOrDefault(performance => performance.Id == id));
+        Task.FromResult(store.GetVisibleById(id));
 }

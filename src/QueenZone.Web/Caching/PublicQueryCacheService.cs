@@ -13,7 +13,8 @@ public sealed class PublicQueryCacheService(
     IForumRepository forumRepository,
     IQueenHistoryRepository queenHistoryRepository,
     IPhotoRepository photoRepository,
-    ILiveActivityQueryService liveActivityQuery)
+    ILiveActivityQueryService liveActivityQuery,
+    IFanPerformanceRepository fanPerformanceRepository)
 {
     private static readonly MemoryCacheEntryOptions VersionEntryOptions = new()
     {
@@ -158,6 +159,39 @@ public sealed class PublicQueryCacheService(
             () => liveActivityQuery.GetNewForumRepliesTodayAsync(cancellationToken),
             cancellationToken);
 
+    public Task<IReadOnlyList<FanPerformance>> GetFanPerformancePageAsync(
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        var version = GetFanPerformanceCacheVersion();
+        return GetOrCreateAsync(
+            PublicQueryCacheKeys.FanPerformancePage(version, page, pageSize),
+            options.Value.FanPerformanceCacheDuration,
+            () => fanPerformanceRepository.GetPageAsync(page, pageSize, cancellationToken),
+            cancellationToken);
+    }
+
+    public Task<int> GetFanPerformanceVisibleCountAsync(CancellationToken cancellationToken = default)
+    {
+        var version = GetFanPerformanceCacheVersion();
+        return GetOrCreateAsync(
+            PublicQueryCacheKeys.FanPerformanceVisibleCount(version),
+            options.Value.FanPerformanceCacheDuration,
+            () => fanPerformanceRepository.GetVisibleCountAsync(cancellationToken),
+            cancellationToken);
+    }
+
+    public Task<FanPerformance?> GetFanPerformanceByIdAsync(int id, CancellationToken cancellationToken = default)
+    {
+        var version = GetFanPerformanceCacheVersion();
+        return GetOrCreateAsync(
+            PublicQueryCacheKeys.FanPerformanceById(version, id),
+            options.Value.FanPerformanceCacheDuration,
+            () => fanPerformanceRepository.GetByIdAsync(id, cancellationToken),
+            cancellationToken);
+    }
+
     /// <summary>
     /// Invalidates all public news cache entries (latest lists for any count and published count)
     /// by bumping the news cache version. Call after publish, unpublish, delete of published news,
@@ -206,11 +240,22 @@ public sealed class PublicQueryCacheService(
         cache.Set(PublicQueryCacheKeys.HistoryVersion, CreateCacheVersion(), VersionEntryOptions);
     }
 
+    /// <summary>
+    /// Bumps the fan-performance cache version so archive pages and the
+    /// <c>/api/v1</c> content projection refresh after admin writes.
+    /// </summary>
+    public void InvalidateFanPerformanceCache()
+    {
+        cache.Set(PublicQueryCacheKeys.FanPerformanceVersion, CreateCacheVersion(), VersionEntryOptions);
+    }
+
     private string GetNewsCacheVersion() => GetOrInitVersion(PublicQueryCacheKeys.NewsVersion);
 
     private string GetPhotoCacheVersion() => GetOrInitVersion(PublicQueryCacheKeys.PhotoVersion);
 
     private string GetHistoryCacheVersion() => GetOrInitVersion(PublicQueryCacheKeys.HistoryVersion);
+
+    private string GetFanPerformanceCacheVersion() => GetOrInitVersion(PublicQueryCacheKeys.FanPerformanceVersion);
 
     private string GetOrInitVersion(string key)
     {

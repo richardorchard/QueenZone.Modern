@@ -15,6 +15,9 @@ public sealed class PublicQueryCacheOptions
     /// <summary>Photography archive changes rarely; default is generous.</summary>
     public TimeSpan PhotoCacheDuration { get; init; } = TimeSpan.FromMinutes(30);
 
+    /// <summary>Fan-performance archive changes rarely; default matches photography.</summary>
+    public TimeSpan FanPerformanceCacheDuration { get; init; } = TimeSpan.FromMinutes(30);
+
     /// <summary>Short-lived: the mobile home screen's live-activity strip is meant to feel current.</summary>
     public TimeSpan LiveActivityCacheDuration { get; init; } = TimeSpan.FromSeconds(45);
 }

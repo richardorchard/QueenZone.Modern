@@ -26,6 +26,14 @@ public static class PublicQueryCacheKeys
 
     public const string PhotoVersion = Prefix + ":photo:version";
 
+    public const string FanPerformanceVersion = Prefix + ":fan-performance:version";
+
+    public const string FanPerformancePageSegment = Prefix + ":fan-performance:page";
+
+    public const string FanPerformanceCountSegment = Prefix + ":fan-performance:count";
+
+    public const string FanPerformanceByIdSegment = Prefix + ":fan-performance:by-id";
+
     public const string HistoryVersion = Prefix + ":history:version";
 
     public const string PhotoCategoriesSegment = Prefix + ":photo:categories";
@@ -62,4 +70,13 @@ public static class PublicQueryCacheKeys
 
     public static string ForumRecentThreads(int count) =>
         $"{ForumRecentThreadsSegment}:{count}";
+
+    public static string FanPerformancePage(string version, int page, int pageSize) =>
+        $"{FanPerformancePageSegment}:v{version}:{page}:{pageSize}";
+
+    public static string FanPerformanceVisibleCount(string version) =>
+        $"{FanPerformanceCountSegment}:v{version}";
+
+    public static string FanPerformanceById(string version, int id) =>
+        $"{FanPerformanceByIdSegment}:v{version}:{id}";
 }
