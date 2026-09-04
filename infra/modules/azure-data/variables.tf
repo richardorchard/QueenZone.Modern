@@ -91,6 +91,12 @@ variable "storage_custom_domain_name" {
   nullable    = true
 }
 
+variable "manage_blob_service" {
+  description = "Whether this module manages blob-service settings instead of using Azure's automatic default service."
+  type        = bool
+  default     = true
+}
+
 variable "containers" {
   description = "Live Blob container ACLs approved for import. None means private; test and missing future UGC containers are excluded."
   type        = map(string)

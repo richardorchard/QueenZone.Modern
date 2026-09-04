@@ -40,4 +40,5 @@ module "azure_data" {
   sql_database_max_size_gb               = 2
   storage_account_name                   = "queenzonedev"
   storage_custom_domain_name             = null
+  manage_blob_service                    = false
 }

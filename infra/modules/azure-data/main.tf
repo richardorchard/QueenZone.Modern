@@ -1,5 +1,6 @@
 locals {
-  sql_server_id = var.existing_sql_server_id != null ? var.existing_sql_server_id : azapi_resource.sql_server[0].id
+  sql_server_id   = var.existing_sql_server_id != null ? var.existing_sql_server_id : azapi_resource.sql_server[0].id
+  blob_service_id = var.manage_blob_service ? azapi_resource.blob_service[0].id : "${azapi_resource.storage_account.id}/blobServices/default"
 }
 
 resource "azapi_resource" "sql_server" {
@@ -175,6 +176,8 @@ resource "azapi_resource" "storage_account" {
 }
 
 resource "azapi_resource" "blob_service" {
+  count = var.manage_blob_service ? 1 : 0
+
   type      = "Microsoft.Storage/storageAccounts/blobServices@2026-04-01"
   name      = "default"
   parent_id = azapi_resource.storage_account.id
@@ -211,7 +214,7 @@ resource "azapi_resource" "container" {
 
   type      = "Microsoft.Storage/storageAccounts/blobServices/containers@2026-04-01"
   name      = each.key
-  parent_id = azapi_resource.blob_service.id
+  parent_id = local.blob_service_id
 
   body = {
     properties = {

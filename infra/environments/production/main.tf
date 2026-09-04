@@ -57,6 +57,11 @@ moved {
   to   = module.azure_data.azurerm_mssql_server_extended_auditing_policy.production[0]
 }
 
+moved {
+  from = module.azure_data.azapi_resource.blob_service
+  to   = module.azure_data.azapi_resource.blob_service[0]
+}
+
 module "azure_mobile_builds" {
   source = "../../modules/azure-mobile-builds"
 
