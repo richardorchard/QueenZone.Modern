@@ -11,7 +11,7 @@ Issue: [#624](https://github.com/richardorchard/QueenZone.Modern/issues/624) (Op
 
 Sanitised machine-readable IDs and import hints live under [`infra/import/`](../../infra/import/).
 
-## Dev environment (Phase 1 verified; Phase 2 declared 2026-09-04)
+## Dev environment (Phases 1–2 verified; Phase 3 cutover declared 2026-09-04)
 
 Issue #1265 adds `infra/environments/dev` with a separate `dev.tfstate`.
 These resources are **provisioned and verified** in `australiaeast`:
@@ -34,8 +34,15 @@ an empty `queenzone-dev-db` database on the existing
 `queenzone-sql-server` and the separate `queenzonedev` storage account in
 the dev state. The database and account are pending the approval-gated apply;
 they are not imports and contain no production data. DNS/managed TLS remain
-Phase 3. See the
-[dev provisioning runbook](opentofu-dev-environment.md) for permissions and apply verification.
+Phase 3 decommissioned the unused `queenzone-dev` Static Web App and its
+APK-distribution workflow. The production Cloudflare root now declares the
+`dev.queenzone.org` CNAME at
+`queenzone-devbox.azurewebsites.net`; it retains the same resource address and
+`prevent_destroy` protection. After that production apply, the dev root
+creates the hostname binding and Azure-managed certificate. See
+[#1267](https://github.com/richardorchard/QueenZone.Modern/issues/1267) and the
+[dev provisioning runbook](opentofu-dev-environment.md) for the required apply
+order and verification steps.
 
 ## Scope boundaries
 
