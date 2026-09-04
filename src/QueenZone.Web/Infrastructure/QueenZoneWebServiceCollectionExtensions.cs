@@ -260,7 +260,9 @@ public static class QueenZoneWebServiceCollectionExtensions
         services.AddScoped<MemberFollowService>();
         services.AddScoped<TopicWatchService>();
         services.AddScoped<PhotoSubmissionService>();
+        services.AddScoped<FanPerformanceSubmissionService>();
         services.AddScoped<AdminPhotoService>();
+        services.AddScoped<AdminFanPerformanceWriteService>();
         services.AddScoped<PhotoSubmissionPromotionService>();
         services.AddScoped<GalleryOrphanSweepService>();
         services.AddHostedService<GalleryOrphanSweepHostedService>();
@@ -271,6 +273,7 @@ public static class QueenZoneWebServiceCollectionExtensions
         services.AddScoped<PublicWarmupService>();
         services.AddScoped<UgcHtml>();
         services.AddScoped<FanPerformanceDurationResolver>();
+        services.AddScoped<FanPerformanceAudioUploadService>();
         services.AddScoped<ForumPostRateLimiter>();
         services.AddSingleton<MemberUploadQuotaService>();
         services.AddScoped<ForumAttachmentValidator>();

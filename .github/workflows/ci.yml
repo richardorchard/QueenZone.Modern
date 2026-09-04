@@ -46,7 +46,7 @@ jobs:
             >> "$GITHUB_OUTPUT"
 
   # JS preflight + coverage gate for src/QueenZone.Mobile (#871 Option A).
-  # After npm ci: #837 advisory gate, typecheck, lint, discovered unit tests with
+  # After npm ci --no-audit: #837 advisory gate, typecheck, lint, discovered unit tests with
   # coverage, pinned Expo Doctor, then the documented mobile coverage floors.
   # Native Android/iOS compile builds run in mobile-android/mobile-ios below.
   # Mixed web+mobile PRs run this alongside the .NET suite; mobile-only PRs
@@ -82,7 +82,9 @@ jobs:
           cache-dependency-path: src/QueenZone.Mobile/package-lock.json
 
       - name: Install
-        run: npm ci
+        # Skip npm ci's implicit audit. A second `npm audit --json` in the
+        # next step was hanging until the 300s fetch-timeout (#1309 CI).
+        run: npm ci --no-audit
 
       - name: Enforce npm advisory policy
         run: node scripts/check-npm-advisories.mjs

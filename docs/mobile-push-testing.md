@@ -1,8 +1,8 @@
 # Mobile push verification
 
 How to prove push delivery on a real device. iOS uses TestFlight and
-production APNs. Android uses the existing test-distribution APK
-(`dev.queenzone.org`) and real FCM. This is receive + record.
+production APNs. Android uses Google Play internal testing and real FCM. This
+is receive + record.
 
 ## iOS TestFlight / production APNs
 
@@ -160,25 +160,24 @@ fills it in.
 
 ## Android / FCM
 
-How to prove real FCM delivery on a real Android phone. The test-distribution
-APK is already published; do not run
-`.github/workflows/publish-mobile-test-build.yml` for this check. Android
-push does not need a store listing.
+How to prove real FCM delivery on a real Android phone. Install the current
+Google Play internal-testing build; do not run
+`.github/workflows/publish-android-google-play.yml` for this check.
 
 Local toolchain setup (Node, JDK, Android SDK) lives in
 [`mobile-development-environment.md`](mobile-development-environment.md). That
-guide is not required to receive a test-distribution push.
+guide is not required to receive an internal-testing push.
 
 ### Real FCM only
 
-The test-distribution APK ([ADR 0013](decisions/0013-static-web-app-mobile-test-distribution.md))
-is a signed release build. Sign-in registers an FCM token with the live API.
+The Android Google Play internal-testing build is a signed release build.
+Sign-in registers an FCM token with the live API.
 The live API must send with the real FCM credentials from
 [#847](https://github.com/richardorchard/QueenZone.Modern/issues/847).
 
 | What | Value |
 | --- | --- |
-| Test-distribution | [ADR 0013](decisions/0013-static-web-app-mobile-test-distribution.md), `https://dev.queenzone.org` — [`.github/workflows/publish-mobile-test-build.yml`](../.github/workflows/publish-mobile-test-build.yml) (already publishing; do not change it for this check) |
+| Android install | Google Play internal testing — [`.github/workflows/publish-android-google-play.yml`](../.github/workflows/publish-android-google-play.yml) |
 | App API origin | `https://www.queenzone.org` (`EXPO_PUBLIC_APP_ENV=staging` still uses that public origin) |
 | App Service | `PushNotifications__Fcm__ProjectId` and `PushNotifications__Fcm__ServiceAccountJson` (see [`bitwarden-secrets.md`](bitwarden-secrets.md)) |
 | Firebase | project `queenzone-mobile`, Android app `org.queenzone.mobile` (`src/QueenZone.Mobile/google-services.json` is client config, not the sender credential) |
@@ -186,22 +185,18 @@ The live API must send with the real FCM credentials from
 
 FCM HTTP v1 has no APNs-style sandbox vs production token split. Do not
 substitute the Play publishing service account
-(`GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`) for the FCM sender. Play internal track
-is a different install path; this check uses the public APK on
-`dev.queenzone.org`.
+(`GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`) for the FCM sender. Play internal testing
+is the Android installation path for this check.
 
 ### What you need
 
 - A real Android phone. Do not use the emulator for this check.
-- The current QueenZone test-distribution APK installed from
-  `https://dev.queenzone.org` (**Download latest APK**). If a Play-signed or
-  locally signed build is already installed, uninstall it first — those
-  signing certificates cannot update one another.
+- The current QueenZone build installed through Google Play internal testing.
 - Two member accounts. The receiver is the Android sign-in. The sender is
   someone else — you never get a push for your own message or your own reply.
 - For news only: an admin session on `https://www.queenzone.org/admin/news`.
 
-Trigger every category against the same live API the test-distribution app
+Trigger every category against the same live API the internal-testing app
 already uses (`https://www.queenzone.org`). A local or in-memory host will not
 reach that device token.
 
@@ -210,7 +205,7 @@ reach that device token.
 Private messages are default-on and fan out to one recipient. Use this before
 forum or news.
 
-1. On the Android phone, open the test-distribution build and sign in as the
+1. On the Android phone, open the Play internal-test build and sign in as the
    **receiver**.
 2. Allow notifications when the OS prompt appears. Sign-in is what registers
    the FCM token with `https://www.queenzone.org`. If you previously denied
@@ -243,7 +238,7 @@ drops the send.
 
 - **Fires when:** another member DMs you (new conversation or reply).
 - **Does not fire:** you message yourself; you are the sender.
-- **Preference:** default on. Mute only from the test-distribution app:
+- **Preference:** default on. Mute only from the Play internal-test app:
   Profile (Home masthead avatar) → **Account settings** → Notifications →
   **Private messages**.
 - **Trigger on live:** `https://www.queenzone.org/messages/compose`, or
@@ -258,7 +253,7 @@ drops the send.
 - **Preference:** default on, but Watch is a separate opt-in. The mobile
   Settings toggle **Forum replies** does not subscribe you to a topic.
 - **Trigger on live:**
-  1. Signed in as the receiver, open the topic in the test-distribution app
+  1. Signed in as the receiver, open the topic in the Play internal-test app
      or at `https://www.queenzone.org/forum/topic/{id}/{slug}` and tap
      **Watch topic**.
   2. Signed in as someone else, post a reply on that topic (website or app).
@@ -295,8 +290,8 @@ an in-app banner; tapping that banner should open the same destination.
 
 ### If nothing arrives
 
-1. Confirm a real device, test-distribution install from
-   `https://dev.queenzone.org`, signed-in receiver, and notifications allowed.
+1. Confirm a real device, Google Play internal-testing install, signed-in
+   receiver, and notifications allowed.
 2. Confirm the sender is a different member and the category rules above.
 3. Empty audience (nobody Watching / news not opted in) or no stored token:
    silent skip. There is no success log to look for.
@@ -313,17 +308,17 @@ categories delivered and tapped through. Do not re-test to fill this table.
 
 | Category | Build | Delivered | Tap-through | Date | Notes |
 | --- | --- | --- | --- | --- | --- |
-| Private message | test-distribution APK (`dev.queenzone.org`) | yes | yes | 30 Aug 2026 | Richard, real Android device |
-| Forum reply | test-distribution APK (`dev.queenzone.org`) | yes | yes | 30 Aug 2026 | Watch required; tap opened the thread |
-| News | test-distribution APK (`dev.queenzone.org`) | yes | yes | 30 Aug 2026 | tap opened the story |
+| Private message | Legacy APK distribution (retired) | yes | yes | 30 Aug 2026 | Richard, real Android device |
+| Forum reply | Legacy APK distribution (retired) | yes | yes | 30 Aug 2026 | Watch required; tap opened the thread |
+| News | Legacy APK distribution (retired) | yes | yes | 30 Aug 2026 | tap opened the story |
 
 ## Related
 
 - [ADR 0013](decisions/0013-static-web-app-mobile-test-distribution.md) —
-  Android test-distribution at `dev.queenzone.org`
+  retired Android APK distribution
 - [ADR 0014](decisions/0014-push-notification-transport-and-dispatch.md) —
   direct APNs/FCM, inline dispatch
 - [`bitwarden-secrets.md`](bitwarden-secrets.md) — APNs and FCM App Service
   setting names
 - [`src/QueenZone.Mobile/README.md`](../src/QueenZone.Mobile/README.md) —
-  how TestFlight and test-distribution builds are published (not this ticket)
+  how TestFlight and Google Play builds are published (not this ticket)

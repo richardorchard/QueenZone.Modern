@@ -55,6 +55,7 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddScoped<IPhotoRepository, EfPhotoRepository>();
         services.AddScoped<IAdminPhotoRepository, EfAdminPhotoRepository>();
         services.AddScoped<IFanPerformanceRepository, EfFanPerformanceRepository>();
+        services.AddScoped<IAdminFanPerformanceRepository, EfAdminFanPerformanceRepository>();
         services.AddScoped<ILegacyMemberLookupRepository, EfMemberLookupRepository>();
         services.AddScoped<IDiscographyRepository, EfDiscographyRepository>();
         services.AddScoped<INewsForumDiscussionLookup, EfNewsForumDiscussionLookup>();
@@ -72,6 +73,7 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddScoped<IQueenHistoryRepository, EfQueenHistoryRepository>();
         services.AddScoped<IAdminQueenHistoryRepository, EfAdminQueenHistoryRepository>();
         services.AddScoped<IPhotoSubmissionRepository, EfPhotoSubmissionRepository>();
+        services.AddScoped<IFanPerformanceSubmissionRepository, EfFanPerformanceSubmissionRepository>();
         services.AddScoped<IArticleSubmissionRepository, EfArticleSubmissionRepository>();
         services.AddScoped<IEditorialArticleRepository, EfEditorialArticleRepository>();
         services.AddScoped<IArticleRepository, EfArticleRepository>();
@@ -145,7 +147,10 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddSingleton(photoStore);
         services.AddSingleton<IPhotoRepository>(_ => new InMemoryPhotoRepository(photoStore));
         services.AddSingleton<IAdminPhotoRepository>(_ => new InMemoryAdminPhotoRepository(photoStore));
-        services.AddSingleton<IFanPerformanceRepository>(_ => new InMemoryFanPerformanceRepository(SampleFanPerformanceData.CreateSeedPerformances()));
+        var fanPerformanceStore = new SharedFanPerformanceStore(SampleFanPerformanceData.CreateSeedPerformances());
+        services.AddSingleton(fanPerformanceStore);
+        services.AddSingleton<IFanPerformanceRepository>(_ => new InMemoryFanPerformanceRepository(fanPerformanceStore));
+        services.AddSingleton<IAdminFanPerformanceRepository>(_ => new InMemoryAdminFanPerformanceRepository(fanPerformanceStore));
         services.AddSingleton<ILegacyMemberLookupRepository>(_ => new InMemoryLegacyMemberLookupRepository(SampleLegacyMemberData.CreateSeedMatches()));
         services.AddSingleton<IDiscographyRepository>(_ => new InMemoryDiscographyRepository(SampleDiscographyData.CreateSeedAlbums()));
         var historyStore = new SharedQueenHistoryStore(SampleQueenHistoryData.CreateSeedEvents());
@@ -171,6 +176,12 @@ public static class QueenZoneDataServiceCollectionExtensions
         {
             var members = sp.GetRequiredService<IMemberAccountRepository>();
             return new InMemoryPhotoSubmissionRepository(id =>
+                members.FindByIdAsync(id).GetAwaiter().GetResult());
+        });
+        services.AddSingleton<IFanPerformanceSubmissionRepository>(sp =>
+        {
+            var members = sp.GetRequiredService<IMemberAccountRepository>();
+            return new InMemoryFanPerformanceSubmissionRepository(id =>
                 members.FindByIdAsync(id).GetAwaiter().GetResult());
         });
         services.AddSingleton<INewsSuggestionRepository>(sp =>

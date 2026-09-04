@@ -13,6 +13,8 @@ public sealed class MySubmissionsModel(
     INewsSuggestionRepository newsSuggestionRepository,
     IArticleSubmissionRepository articleSubmissionRepository,
     ITriviaFactSubmissionRepository triviaFactSubmissionRepository,
+    IFanPerformanceSubmissionRepository fanPerformanceSubmissionRepository,
+    FanPerformanceSubmissionService fanPerformanceSubmissionService,
     INewsRepository newsRepository) : PageModel
 {
     public const int PageSize = 10;
@@ -21,6 +23,7 @@ public sealed class MySubmissionsModel(
     public const string TabNews = "news";
     public const string TabArticles = "articles";
     public const string TabTrivia = "trivia";
+    public const string TabPerformances = "performances";
 
     public string ActiveTab { get; private set; } = TabPhotos;
 
@@ -34,6 +37,8 @@ public sealed class MySubmissionsModel(
 
     public IReadOnlyList<TriviaFactSubmission> TriviaSubmissions { get; private set; } = [];
 
+    public IReadOnlyList<FanPerformanceSubmission> FanPerformanceSubmissions { get; private set; } = [];
+
     public ArchivePaginationViewModel? Pagination { get; private set; }
 
     public async Task<IActionResult> OnGetAsync(string? tab, int? page, CancellationToken cancellationToken)
@@ -44,47 +49,55 @@ public sealed class MySubmissionsModel(
             return Redirect("/account/login");
         }
 
-        ActiveTab = NormalizeTab(tab);
-        CurrentPage = Math.Max(1, page ?? 1);
+        return await LoadAsync(memberId.Value, tab, page, cancellationToken);
+    }
 
-        switch (ActiveTab)
+    public async Task<IActionResult> OnPostWithdrawFanPerformanceAsync(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var memberId = await GetCurrentMemberIdAsync();
+        if (memberId is null)
         {
-            case TabNews:
-                {
-                    var result = await newsSuggestionRepository.GetBySubmitterAsync(
-                        memberId.Value, CurrentPage, PageSize, cancellationToken);
-                    NewsSuggestions = await MapNewsRowsAsync(result.Items, cancellationToken);
-                    Pagination = BuildPagination(result.TotalCount);
-                    break;
-                }
-            case TabArticles:
-                {
-                    var result = await articleSubmissionRepository.GetDraftsForMemberAsync(
-                        memberId.Value, CurrentPage, PageSize, cancellationToken);
-                    ArticleSubmissions = result.Items;
-                    Pagination = BuildPagination(result.TotalCount);
-                    break;
-                }
-            case TabTrivia:
-                {
-                    var result = await triviaFactSubmissionRepository.GetBySubmitterAsync(
-                        memberId.Value, CurrentPage, PageSize, cancellationToken);
-                    TriviaSubmissions = result.Items;
-                    Pagination = BuildPagination(result.TotalCount);
-                    break;
-                }
-            default:
-                {
-                    var result = await photoSubmissionRepository.GetBySubmitterAsync(
-                        memberId.Value, CurrentPage, PageSize, cancellationToken);
-                    PhotoSubmissions = result.Items;
-                    Pagination = BuildPagination(result.TotalCount);
-                    break;
-                }
+            return Redirect("/account/login");
         }
 
-        ViewData["Title"] = "My submissions";
-        return Page();
+        var result = await fanPerformanceSubmissionService.WithdrawAsync(
+            memberId.Value,
+            id,
+            cancellationToken);
+        if (!result.Succeeded)
+        {
+            ModelState.AddModelError(string.Empty, result.Error ?? "Could not withdraw the submission.");
+            return await LoadAsync(memberId.Value, TabPerformances, page: 1, cancellationToken);
+        }
+
+        return Redirect(GetTabHref(TabPerformances));
+    }
+
+    public async Task<IActionResult> OnPostReplyFanPerformanceAsync(
+        Guid id,
+        string? reply,
+        CancellationToken cancellationToken)
+    {
+        var memberId = await GetCurrentMemberIdAsync();
+        if (memberId is null)
+        {
+            return Redirect("/account/login");
+        }
+
+        var result = await fanPerformanceSubmissionService.ReplyNeedsInfoAsync(
+            memberId.Value,
+            id,
+            reply,
+            cancellationToken);
+        if (!result.Succeeded)
+        {
+            ModelState.AddModelError(string.Empty, result.Error ?? "Could not send the reply.");
+            return await LoadAsync(memberId.Value, TabPerformances, page: 1, cancellationToken);
+        }
+
+        return Redirect(GetTabHref(TabPerformances));
     }
 
     public string GetTabHref(string tab) =>
@@ -128,12 +141,70 @@ public sealed class MySubmissionsModel(
         return rows;
     }
 
+    private async Task<IActionResult> LoadAsync(
+        Guid memberId,
+        string? tab,
+        int? page,
+        CancellationToken cancellationToken)
+    {
+        ActiveTab = NormalizeTab(tab);
+        CurrentPage = Math.Max(1, page ?? 1);
+
+        switch (ActiveTab)
+        {
+            case TabNews:
+                {
+                    var result = await newsSuggestionRepository.GetBySubmitterAsync(
+                        memberId, CurrentPage, PageSize, cancellationToken);
+                    NewsSuggestions = await MapNewsRowsAsync(result.Items, cancellationToken);
+                    Pagination = BuildPagination(result.TotalCount);
+                    break;
+                }
+            case TabArticles:
+                {
+                    var result = await articleSubmissionRepository.GetDraftsForMemberAsync(
+                        memberId, CurrentPage, PageSize, cancellationToken);
+                    ArticleSubmissions = result.Items;
+                    Pagination = BuildPagination(result.TotalCount);
+                    break;
+                }
+            case TabTrivia:
+                {
+                    var result = await triviaFactSubmissionRepository.GetBySubmitterAsync(
+                        memberId, CurrentPage, PageSize, cancellationToken);
+                    TriviaSubmissions = result.Items;
+                    Pagination = BuildPagination(result.TotalCount);
+                    break;
+                }
+            case TabPerformances:
+                {
+                    var result = await fanPerformanceSubmissionRepository.GetBySubmitterAsync(
+                        memberId, CurrentPage, PageSize, cancellationToken);
+                    FanPerformanceSubmissions = result.Items;
+                    Pagination = BuildPagination(result.TotalCount);
+                    break;
+                }
+            default:
+                {
+                    var result = await photoSubmissionRepository.GetBySubmitterAsync(
+                        memberId, CurrentPage, PageSize, cancellationToken);
+                    PhotoSubmissions = result.Items;
+                    Pagination = BuildPagination(result.TotalCount);
+                    break;
+                }
+        }
+
+        ViewData["Title"] = "My submissions";
+        return Page();
+    }
+
     private static string NormalizeTab(string? tab) =>
         tab?.Trim().ToLowerInvariant() switch
         {
             TabNews => TabNews,
             TabArticles => TabArticles,
             TabTrivia => TabTrivia,
+            TabPerformances => TabPerformances,
             _ => TabPhotos,
         };
 

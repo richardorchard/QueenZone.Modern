@@ -16,7 +16,7 @@ Shared upload infrastructure lives in `QueenZone.Storage`. Web (and future worke
 | `UploadQuotas:MaxUploadsPerDay` | Max upload operations per principal per UTC day (default 50). |
 | `UploadQuotas:MaxBytesPerDay` | Max total bytes per principal per UTC day (default 100 MiB). |
 
-Per-member quotas (`MemberUploadQuotaService`) apply to editor images, forum attachments, avatars, and photo submissions. They are **process-local** (`IMemoryCache`) and fit single-instance B1 hosting; container MIME/size allowlists remain enforced separately. Antivirus scanning of uploads is **not planned**.
+Per-member quotas (`MemberUploadQuotaService`) apply to editor images, forum attachments, avatars, photo submissions, and pending fan-performance audio. They are **process-local** (`IMemoryCache`) and fit single-instance B1 hosting; container MIME/size allowlists remain enforced separately. Antivirus scanning of uploads is **not planned**. The daily byte cap stays at `UploadQuotas:MaxBytesPerDay` (100 MiB) — do not raise it for 25 MB audio files.
 
 Mobile photo submit (`POST /api/v1/member/photo-submissions`) reuses `PhotoSubmissionService.SubmitAsync` — the same `IBlobUploadService` / `ugc-photos` path and quota consume as website `/submit/photo`. Do not add a second mobile-only limit.
 
@@ -36,6 +36,9 @@ Keep UGC separate from the legacy photo archive behind `cdn.queenzone.org`.
 | `ugc-forum` | Forum attachments / pasted images |
 | `ugc-photos` | Photo submissions |
 | `ugc-articles` | News/article rich-text images |
+| `ugc-fan-performances` | Pending member fan-performance audio (MP3/FLAC only, 25 MB). Never write pending audio to `songfiles`. |
+
+`ugc-fan-performances` allow-list is `audio/mpeg`, `audio/mp3`, `audio/flac`, and `audio/x-flac`. **m4a / `audio/mp4` / `audio/x-m4a` / AAC are rejected.** Validation uses magic-byte sniffing (`ID3`, MPEG frame sync, `fLaC`); a `.mp3`/`.flac` name with non-audio bytes is rejected. Oversized payloads fail in `BlobUploadValidator` with a clear `BlobUploadException` (Kestrel’s 30 MB default body cap already fits 25 MB). The submit endpoint in #1293 must set multipart/`RequestSizeLimit` to at least ~26 MB (25 MB + multipart overhead) so FormOptions does not reject first. Do not raise the 25 MB product ceiling or a global `FormOptions` / `MaxRequestBodySize` here.
 
 Containers are created with **no public access** (`PublicAccessType.None`). Do not put new UGC into legacy gallery folders.
 
@@ -64,7 +67,7 @@ Two Cloudflare hostnames proxy the legacy Azure Blob containers. They behave dif
 
 Fan-performance audio is **not** a public CDN object. The member-authenticated app proxy `GET /fan-performances/{id}/audio` streams from the private `songfiles` container and sets `Content-Disposition`. Do not emit `cdn2.queenzone.org/songfiles/…` or raw blob URLs in HTML.
 
-**ACL note:** `songfiles` is private (#177). Legacy `attachments` remain public blob access; URL guessing still bypasses the app gate for those files. Private modern UGC containers present: `ugc-avatars`, `ugc-forum` (`ugc-photos` / `ugc-articles` not created yet).
+**ACL note:** `songfiles` is private (#177). Legacy `attachments` remain public blob access; URL guessing still bypasses the app gate for those files. Private modern UGC containers present: `ugc-avatars`, `ugc-forum` (`ugc-photos` / `ugc-articles` / `ugc-fan-performances` not created in Azure yet; `CreateIfNotExists` uses `PublicAccessType.None`). Pending fan-performance audio must stay in `ugc-fan-performances` until a later review step copies an approved file into `songfiles`.
 
 ### Forum attachments
 

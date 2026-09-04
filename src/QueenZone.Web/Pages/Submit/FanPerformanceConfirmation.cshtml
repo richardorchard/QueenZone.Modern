@@ -1,0 +1,52 @@
+@page "/submit/fan-performance/confirmation/{id:guid}"
+@model FanPerformanceConfirmationModel
+
+@{
+  var submission = Model.Submission!;
+}
+
+<partial name="_PageHero" model='@(("Community", "Fan performance submitted", "Your recording is under review.", ""))' />
+
+<section class="qz-section">
+  <div class="qz-container qz-prose">
+    <p class="qz-account-notice qz-account-notice--success" role="status">Your fan performance is under review.</p>
+
+    <div class="qz-account-settings">
+      <dl class="qz-account-settings__meta">
+        <div>
+          <dt>Title</dt>
+          <dd>@submission.Title</dd>
+        </div>
+        <div>
+          <dt>Queen song covered</dt>
+          <dd>@submission.CoveredSong</dd>
+        </div>
+        <div>
+          <dt>Performed by</dt>
+          <dd>@submission.PerformedBy</dd>
+        </div>
+        @if (!string.IsNullOrWhiteSpace(submission.Description))
+        {
+          <div>
+            <dt>Description</dt>
+            <dd>@submission.Description</dd>
+          </div>
+        }
+        <div>
+          <dt>Status</dt>
+          <dd>@submission.Status</dd>
+        </div>
+        <div>
+          <dt>Submitted</dt>
+          <dd>@submission.SubmittedAt.ToString("u")</dd>
+        </div>
+      </dl>
+    </div>
+
+    <p>
+      <a href="/account/my-submissions?tab=performances">View your submissions</a>
+      ·
+      <a href="/submit/fan-performance">Submit another performance</a>
+    </p>
+  </div>
+</section>

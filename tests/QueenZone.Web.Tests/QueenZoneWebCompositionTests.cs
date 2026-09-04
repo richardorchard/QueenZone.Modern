@@ -65,6 +65,11 @@ public sealed class QueenZoneWebCompositionTests
                 scope.ServiceProvider.GetRequiredService<ITopicWatchLookup>(),
                 scope.ServiceProvider.GetRequiredService<ITopicWatchRepository>());
             Assert.NotNull(scope.ServiceProvider.GetRequiredService<AdminNewsWriteService>());
+            Assert.NotNull(scope.ServiceProvider.GetRequiredService<IAdminFanPerformanceRepository>());
+            Assert.NotNull(scope.ServiceProvider.GetRequiredService<AdminFanPerformanceWriteService>());
+            Assert.NotNull(scope.ServiceProvider.GetRequiredService<FanPerformanceAudioUploadService>());
+            Assert.NotNull(scope.ServiceProvider.GetRequiredService<IFanPerformanceSubmissionRepository>());
+            Assert.NotNull(scope.ServiceProvider.GetRequiredService<FanPerformanceSubmissionService>());
         }
 
         Assert.Equal(["admin@test.local"], provider.GetRequiredService<IOptions<AdminOptions>>().Value.AllowedEmails);
@@ -79,6 +84,10 @@ public sealed class QueenZoneWebCompositionTests
         Assert.Equal(30, provider.GetRequiredService<IOptions<AuthRateLimitingOptions>>().Value.IpPermitLimit);
         Assert.Equal(10, provider.GetRequiredService<IOptions<AuthRateLimitingOptions>>().Value.AccountPermitLimit);
         Assert.Equal(10 * 1024 * 1024, provider.GetRequiredService<IOptions<BlobUploadOptions>>().Value.DefaultMaxBytes);
+        Assert.Equal(
+            25 * 1024 * 1024,
+            provider.GetRequiredService<IOptions<BlobUploadOptions>>().Value
+                .Containers[BlobUploadContainers.FanPerformances].MaxBytes);
 
         // #336: web composition uses editorial AI surface only (not discovery worker pipeline).
         using (var newsScope = provider.CreateScope())

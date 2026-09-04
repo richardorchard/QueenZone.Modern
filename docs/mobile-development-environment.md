@@ -188,7 +188,7 @@ and CocoaPods. Clean-checkout commands live in
 
 ## References
 
-- [Mobile push verification](mobile-push-testing.md) — iOS TestFlight / production APNs and Android test-distribution / FCM receive + record on a real device
+- [Mobile push verification](mobile-push-testing.md) — iOS TestFlight / production APNs and Android Google Play internal testing / FCM receive + record on a real device
 - [React Native: Set Up Your Environment](https://reactnative.dev/docs/next/set-up-your-environment)
 - [Android Studio installation](https://developer.android.com/studio/install)
 - [Android 16 SDK setup](https://developer.android.com/about/versions/16/setup-sdk)

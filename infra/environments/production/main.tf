@@ -39,6 +39,29 @@ module "azure_data" {
   location            = var.azure_location
 }
 
+# azure-data can also attach a database to an existing logical server for the
+# dev root. Preserve these imported production resource addresses as indexed
+# optional resources without proposing a replacement.
+moved {
+  from = module.azure_data.azapi_resource.sql_server
+  to   = module.azure_data.azapi_resource.sql_server[0]
+}
+
+moved {
+  from = module.azure_data.azurerm_mssql_firewall_rule.azure_services
+  to   = module.azure_data.azurerm_mssql_firewall_rule.azure_services[0]
+}
+
+moved {
+  from = module.azure_data.azurerm_mssql_server_extended_auditing_policy.production
+  to   = module.azure_data.azurerm_mssql_server_extended_auditing_policy.production[0]
+}
+
+moved {
+  from = module.azure_data.azapi_resource.blob_service
+  to   = module.azure_data.azapi_resource.blob_service[0]
+}
+
 module "azure_mobile_builds" {
   source = "../../modules/azure-mobile-builds"
 

@@ -46,7 +46,7 @@ Use **EF Core as the single data-access library** in `QueenZone.Data`, while kee
 | Biography | `IBiographyRepository` | `EfBiographyRepository` | EF Core + stored procedures / SQL | Reads: `Q_BIO_LIST_SP`, `Q_BIO_DISPLAY_SP`. Admin create/update mirrors `Q_BIO_UPDATE_SP` against `Q_BIO_T`. |
 | Photography | `IPhotoRepository` | `EfPhotoRepository` | EF Core + targeted SQL (`PhotoSqlQueries`) | Counts/paging/neighbor navigation; legacy `Q_PIC_CAT_PAGE4_SP` avoided (full-category temp table) |
 | Discography | `IDiscographyRepository` | `EfDiscographyRepository` | EF Core + stored procedures | `Q_ALBUM_*` procs |
-| Fan performances | `IFanPerformanceRepository` | `EfFanPerformanceRepository` | EF Core + stored procedures / SQL | `Q_STAGE_T_PAGE_SP` + direct count/detail SQL |
+| Fan performances | `IFanPerformanceRepository` / `IAdminFanPerformanceRepository` | `EfFanPerformanceRepository` / `EfAdminFanPerformanceRepository` | EF Core + stored procedures / EfSql | Public reads: `Q_STAGE_T_PAGE_SP` + count/detail SQL. Admin create/update/hide write existing `Q_STAGE_T` columns (photo-style; table stays outside EF schema ownership). |
 | Legacy member lookup | `ILegacyMemberLookupRepository` | `EfMemberLookupRepository` | EF Core + SQL | Legacy `USERS_T` read |
 | Forum (default) | `IForumRepository` | `ModernForumRepository` | EF Core + stored procedures | Modern `ModernForum*` tables; procs in `docs/sql/006-modern-forum-read-path.sql` |
 | Forum (rollback) | `IForumRepository` | `LegacyForumRepository` | EF Core + SQL / stored procedures | Opt-out via `ForumData:UseModernForumReads = false` |

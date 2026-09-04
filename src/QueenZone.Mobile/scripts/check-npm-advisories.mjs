@@ -69,7 +69,8 @@ export function parseAuditJson(text) {
 
   if (parsed.error && !parsed.vulnerabilities) {
     const summary = parsed.error.summary || parsed.error.detail || parsed.error.code || 'npm audit failed';
-    throw new Error(`Missing npm audit output: ${summary}`);
+    const code = parsed.error.code ? ` code=${parsed.error.code}` : '';
+    throw new Error(`Missing npm audit output: ${summary}${code}`);
   }
 
   if (!parsed.vulnerabilities || typeof parsed.vulnerabilities !== 'object' || Array.isArray(parsed.vulnerabilities)) {
@@ -251,18 +252,49 @@ export function loadAllowlist(filePath) {
   return parsed;
 }
 
-export function runNpmAudit(cwd) {
-  const result = spawnSync('npm', ['audit', '--json'], {
-    cwd,
-    encoding: 'utf8',
-    maxBuffer: 20 * 1024 * 1024,
-  });
+const AUDIT_ATTEMPTS = 2;
+const AUDIT_FETCH_TIMEOUT_MS = 600_000;
 
-  if (result.error) {
-    throw new Error(`Missing npm audit output: ${result.error.message}`);
+export function auditStdout(result) {
+  const stdout = String(result?.stdout ?? '').trim();
+  if (stdout) {
+    return stdout;
   }
 
-  return parseAuditJson(result.stdout);
+  return String(result?.stderr ?? '');
+}
+
+export function npmAuditArgs(fetchTimeoutMs = AUDIT_FETCH_TIMEOUT_MS) {
+  return [`--fetch-timeout=${fetchTimeoutMs}`, 'audit', '--json'];
+}
+
+export function runNpmAudit(cwd, { attempts = AUDIT_ATTEMPTS, fetchTimeoutMs = AUDIT_FETCH_TIMEOUT_MS } = {}) {
+  let lastError;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    // Pass fetch-timeout as an npm global CLI flag. GHA ignored NPM_CONFIG_*
+    // and still died at the default 300s on a second audit after `npm ci`.
+    const result = spawnSync('npm', npmAuditArgs(fetchTimeoutMs), {
+      cwd,
+      encoding: 'utf8',
+      maxBuffer: 20 * 1024 * 1024,
+    });
+
+    if (result.error) {
+      lastError = new Error(`Missing npm audit output: ${result.error.message}`);
+    } else {
+      try {
+        return parseAuditJson(auditStdout(result));
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+      }
+    }
+
+    if (attempt < attempts) {
+      console.error(`npm audit attempt ${attempt}/${attempts} failed (${lastError.message}); retrying.`);
+    }
+  }
+
+  throw lastError;
 }
 
 function parseArgs(argv) {
@@ -464,6 +496,29 @@ function runSelfTest() {
 
   assert('audit without vulnerabilities map fails', () => {
     expectThrow(() => parseAuditJson('{"error":{"code":"ENOTFOUND"}}'), /Missing npm audit output/);
+  });
+
+  assert('audit fetch-timeout JSON fails closed', () => {
+    expectThrow(
+      () => parseAuditJson('{"error":{"summary":"npm audit failed","code":"ECONNRESET"}}'),
+      /Missing npm audit output: npm audit failed/,
+    );
+  });
+
+  assert('auditStdout prefers stdout then stderr', () => {
+    if (auditStdout({ stdout: ' {"ok":true} ', stderr: 'warn' }) !== '{"ok":true}') {
+      throw new Error('expected trimmed stdout');
+    }
+    if (auditStdout({ stdout: '', stderr: '{"error":true}' }) !== '{"error":true}') {
+      throw new Error('expected stderr fallback');
+    }
+  });
+
+  assert('npmAuditArgs passes fetch-timeout as an npm global flag', () => {
+    const args = npmAuditArgs(600000);
+    if (args[0] !== '--fetch-timeout=600000' || args[1] !== 'audit' || args[2] !== '--json') {
+      throw new Error(JSON.stringify(args));
+    }
   });
 
   assert('moderate does not fail', () => {

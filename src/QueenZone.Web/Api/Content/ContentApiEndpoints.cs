@@ -18,6 +18,8 @@ namespace QueenZone.Web;
 /// and CDN URLs from <see cref="PhotoImageUrl"/>. Category list/detail/items
 /// use <see cref="PublicQueryCacheService"/> (same helpers as Razor photography
 /// pages); detail neighbors still come from <see cref="IPhotoRepository"/>.
+/// Fan-performance list/detail use the same query cache so admin publish/hide
+/// is visible without a process restart.
 /// Category items default and clamp <c>pageSize</c> to
 /// <see cref="PhotoRoutes.CategoryPageSize"/>.
 /// </summary>
@@ -658,15 +660,15 @@ public static class ContentApiEndpoints
     }
 
     internal static async Task<IResult> GetFanPerformancesAsync(
-        IFanPerformanceRepository fanPerformanceRepository,
+        PublicQueryCacheService publicQueryCache,
         FanPerformanceDurationResolver durationResolver,
         int? page,
         int? pageSize,
         CancellationToken cancellationToken)
     {
         var request = ApiPagination.Normalize(page, pageSize);
-        var items = await fanPerformanceRepository.GetPageAsync(request.Page, request.PageSize, cancellationToken);
-        var totalCount = await fanPerformanceRepository.GetVisibleCountAsync(cancellationToken);
+        var items = await publicQueryCache.GetFanPerformancePageAsync(request.Page, request.PageSize, cancellationToken);
+        var totalCount = await publicQueryCache.GetFanPerformanceVisibleCountAsync(cancellationToken);
         var durations = await durationResolver.ResolveManyAsync(items, cancellationToken);
 
         var response = ApiPagedResponse<FanPerformanceDto>.Create(
@@ -679,12 +681,12 @@ public static class ContentApiEndpoints
     }
 
     internal static async Task<IResult> GetFanPerformanceDetailAsync(
-        IFanPerformanceRepository fanPerformanceRepository,
+        PublicQueryCacheService publicQueryCache,
         FanPerformanceDurationResolver durationResolver,
         int id,
         CancellationToken cancellationToken)
     {
-        var performance = await fanPerformanceRepository.GetByIdAsync(id, cancellationToken);
+        var performance = await publicQueryCache.GetFanPerformanceByIdAsync(id, cancellationToken);
         if (performance is null)
         {
             return Results.Problem(
