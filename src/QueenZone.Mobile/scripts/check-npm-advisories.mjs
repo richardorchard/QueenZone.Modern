@@ -251,18 +251,47 @@ export function loadAllowlist(filePath) {
   return parsed;
 }
 
-export function runNpmAudit(cwd) {
-  const result = spawnSync('npm', ['audit', '--json'], {
-    cwd,
-    encoding: 'utf8',
-    maxBuffer: 20 * 1024 * 1024,
-  });
+const AUDIT_ATTEMPTS = 3;
+const AUDIT_FETCH_TIMEOUT_MS = 600_000;
 
-  if (result.error) {
-    throw new Error(`Missing npm audit output: ${result.error.message}`);
+export function auditStdout(result) {
+  const stdout = String(result?.stdout ?? '').trim();
+  if (stdout) {
+    return stdout;
   }
 
-  return parseAuditJson(result.stdout);
+  return String(result?.stderr ?? '');
+}
+
+export function runNpmAudit(cwd, { attempts = AUDIT_ATTEMPTS, fetchTimeoutMs = AUDIT_FETCH_TIMEOUT_MS } = {}) {
+  let lastError;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const result = spawnSync('npm', ['audit', '--json'], {
+      cwd,
+      encoding: 'utf8',
+      maxBuffer: 20 * 1024 * 1024,
+      env: {
+        ...process.env,
+        NPM_CONFIG_FETCH_TIMEOUT: String(fetchTimeoutMs),
+      },
+    });
+
+    if (result.error) {
+      lastError = new Error(`Missing npm audit output: ${result.error.message}`);
+    } else {
+      try {
+        return parseAuditJson(auditStdout(result));
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+      }
+    }
+
+    if (attempt < attempts) {
+      console.error(`npm audit attempt ${attempt}/${attempts} failed (${lastError.message}); retrying.`);
+    }
+  }
+
+  throw lastError;
 }
 
 function parseArgs(argv) {
@@ -464,6 +493,22 @@ function runSelfTest() {
 
   assert('audit without vulnerabilities map fails', () => {
     expectThrow(() => parseAuditJson('{"error":{"code":"ENOTFOUND"}}'), /Missing npm audit output/);
+  });
+
+  assert('audit fetch-timeout JSON fails closed', () => {
+    expectThrow(
+      () => parseAuditJson('{"error":{"summary":"npm audit failed","code":"ECONNRESET"}}'),
+      /Missing npm audit output: npm audit failed/,
+    );
+  });
+
+  assert('auditStdout prefers stdout then stderr', () => {
+    if (auditStdout({ stdout: ' {"ok":true} ', stderr: 'warn' }) !== '{"ok":true}') {
+      throw new Error('expected trimmed stdout');
+    }
+    if (auditStdout({ stdout: '', stderr: '{"error":true}' }) !== '{"error":true}') {
+      throw new Error('expected stderr fallback');
+    }
   });
 
   assert('moderate does not fail', () => {
