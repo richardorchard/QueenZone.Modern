@@ -1,0 +1,7 @@
+appId: org.queenzone.mobile
+---
+# Inject the Testing fixture token. Caller must already show chrome so
+# SessionProvider (Linking) is mounted — App.tsx BootSplash keeps it off
+# until after 'booting'. Fresh-install iOS still shows the Open confirm.
+- openLink: ${SMOKE_AUTH_URL}
+- runFlow: accept-ios-open-link.yaml

@@ -4,6 +4,7 @@ import { createNavigationContainerRef, NavigationContainer } from '@react-naviga
 import { fireEvent, screen } from '@testing-library/react-native';
 import { Pressable, Text } from 'react-native';
 import { createMockSession } from '../test/mockSession';
+import { testIds } from '../test/testIds';
 import { renderWithProviders } from '../test/render';
 import { nestedTabParams } from './nestedTab';
 import { reselectRoot, RootNavigator } from './RootNavigator';
@@ -49,11 +50,13 @@ jest.mock('./stacks', () => {
 });
 
 describe('RootNavigator', () => {
-  it('shows the five public tabs', () => {
+  it('shows the five public tabs and keeps home/forum Maestro testIDs after commonScreens', () => {
     renderWithProviders(<RootNavigator />);
     for (const name of ['Home', 'News', 'Photography', 'Archive', 'Forum']) {
       expect(screen.getByLabelText(name)).toBeOnTheScreen();
     }
+    expect(screen.getByTestId(testIds.tabHome)).toBeOnTheScreen();
+    expect(screen.getByTestId(testIds.tabForum)).toBeOnTheScreen();
     expect(screen.getByText('Home stack')).toBeOnTheScreen();
   });
 
