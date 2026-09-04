@@ -6,6 +6,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Needed for Microsoft.AspNetCore.Identity.PasswordHasher<T>, used to hash reviewer/local
+         account passwords with the same algorithm as QueenZone.Web's MemberAccountService. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Azure.Storage.Blobs" />
     <PackageReference Include="HtmlSanitizer" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
