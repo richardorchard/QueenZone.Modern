@@ -78,7 +78,52 @@ internal static class BlobContentSniffer
             return "application/zip";
         }
 
+        // ID3v2 tag (MP3). JPEG already returned above (0xFF 0xD8 0xFF).
+        if (header.Length >= 3
+            && header[0] == (byte)'I'
+            && header[1] == (byte)'D'
+            && header[2] == (byte)'3')
+        {
+            return "audio/mpeg";
+        }
+
+        // FLAC stream marker.
+        if (header.Length >= 4
+            && header[0] == (byte)'f'
+            && header[1] == (byte)'L'
+            && header[2] == (byte)'a'
+            && header[3] == (byte)'C')
+        {
+            return "audio/flac";
+        }
+
+        if (HasMpegFrameSync(header))
+        {
+            return "audio/mpeg";
+        }
+
         return null;
+    }
+
+    private static bool HasMpegFrameSync(ReadOnlySpan<byte> header)
+    {
+        var last = header.Length - 2;
+        for (var i = 0; i <= last; i++)
+        {
+            if (header[i] != 0xFF || (header[i + 1] & 0xE0) != 0xE0)
+            {
+                continue;
+            }
+
+            var version = (header[i + 1] >> 3) & 0b11;
+            var layer = (header[i + 1] >> 1) & 0b11;
+            if (version != 0b01 && layer != 0b00)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public static string? GuessContentTypeFromExtension(string extension)
@@ -97,6 +142,8 @@ internal static class BlobContentSniffer
             ".docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             ".xls" => "application/vnd.ms-excel",
             ".xlsx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            ".mp3" => "audio/mpeg",
+            ".flac" => "audio/flac",
             _ => null,
         };
     }

@@ -272,6 +272,7 @@ public static class QueenZoneWebServiceCollectionExtensions
         services.AddScoped<PublicWarmupService>();
         services.AddScoped<UgcHtml>();
         services.AddScoped<FanPerformanceDurationResolver>();
+        services.AddScoped<FanPerformanceAudioUploadService>();
         services.AddScoped<ForumPostRateLimiter>();
         services.AddSingleton<MemberUploadQuotaService>();
         services.AddScoped<ForumAttachmentValidator>();
