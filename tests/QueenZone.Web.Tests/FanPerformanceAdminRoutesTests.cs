@@ -11,6 +11,7 @@ using Microsoft.Extensions.Options;
 using QueenZone.Data;
 using QueenZone.Storage;
 using QueenZone.Web;
+using QueenZone.Web.Pages.Admin.FanPerformanceSubmissions;
 
 namespace QueenZone.Web.Tests;
 
@@ -248,4 +249,18 @@ public sealed partial class FanPerformanceAdminRoutesTests : IClassFixture<WebAp
 
     [GeneratedRegex("""name="__RequestVerificationToken" value="(?<token>[^"]+)""", RegexOptions.IgnoreCase)]
     private static partial Regex AntiforgeryTokenRegex();
+}
+
+public sealed class FanPerformanceAdminIndexFormattingTests
+{
+    [Theory]
+    [InlineData(null, "—")]
+    [InlineData(-1, "—")]
+    [InlineData(0, "0:00")]
+    [InlineData(75, "1:15")]
+    [InlineData(125, "2:05")]
+    public void FormatDuration_RendersMinutesAndSeconds(int? seconds, string expected)
+    {
+        Assert.Equal(expected, IndexModel.FormatDuration(seconds));
+    }
 }

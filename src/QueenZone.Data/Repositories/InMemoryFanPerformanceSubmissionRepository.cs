@@ -336,6 +336,16 @@ public sealed class InMemoryFanPerformanceSubmissionRepository : IFanPerformance
         }
     }
 
+    /// <summary>Test helper: simulate a partial promote that recorded <c>PromotedStageId</c> without approving.</summary>
+    public void ForcePromotedStageId(Guid id, int promotedStageId)
+    {
+        lock (sync)
+        {
+            var entity = submissions.Single(row => row.Id == id);
+            entity.PromotedStageId = promotedStageId;
+        }
+    }
+
     private FanPerformanceSubmission Map(FanPerformanceSubmissionEntity entity)
     {
         var member = resolveMember?.Invoke(entity.SubmitterMemberId);

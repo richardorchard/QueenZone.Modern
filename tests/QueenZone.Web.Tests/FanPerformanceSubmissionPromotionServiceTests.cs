@@ -75,6 +75,73 @@ public sealed class FanPerformanceSubmissionPromotionServiceTests
     }
 
     [Fact]
+    public async Task PromoteAsync_UsesFlacExtension_WhenOriginalNameIsNotAudio()
+    {
+        var submissionRepository = new InMemoryFanPerformanceSubmissionRepository();
+        var store = new SharedFanPerformanceStore();
+        var adminRepository = new InMemoryAdminFanPerformanceRepository(store);
+        var backend = new InMemoryBlobStorageBackend();
+        var blobs = new AzureBlobUploadService(backend, Options.Create(new BlobUploadOptions()));
+        var service = CreateService(submissionRepository, adminRepository, blobs);
+
+        var created = await submissionRepository.CreateAsync(
+            new NewFanPerformanceSubmission(
+                memberId,
+                "Flac cover",
+                "Reaching Out",
+                "A fan",
+                "Living room take",
+                $"members/{memberId:N}/take.bin",
+                "take.bin",
+                400,
+                "audio/flac",
+                1,
+                DateTimeOffset.UtcNow,
+                FanPerformanceSubmissionRights.DeclarationVersion));
+        var flacBytes = new byte[400];
+        "fLaC"u8.CopyTo(flacBytes);
+        await using (var payload = new MemoryStream(flacBytes))
+        {
+            await blobs.UploadAsync(
+                payload,
+                "take.bin",
+                BlobUploadContainers.FanPerformances,
+                new BlobUploadContext { PreferredBlobName = created.BlobPath });
+        }
+
+        var stageId = await service.PromoteAsync(created, "admin@test.local", null, null);
+        var published = await adminRepository.GetByIdAsync(stageId);
+        Assert.Equal($"{created.Id:N}.flac", published!.AudioFileName);
+        Assert.True(backend.Exists(SongFileUrl.ContainerName, published.AudioFileName));
+    }
+
+    [Fact]
+    public async Task PromoteAsync_EnsuresApproved_WhenPromotedStageIdSetButStatusIsNotApproved()
+    {
+        var submissionRepository = new InMemoryFanPerformanceSubmissionRepository();
+        var store = new SharedFanPerformanceStore();
+        var adminRepository = new InMemoryAdminFanPerformanceRepository(store);
+        var backend = new InMemoryBlobStorageBackend();
+        var blobs = new AzureBlobUploadService(backend, Options.Create(new BlobUploadOptions()));
+        var service = CreateService(submissionRepository, adminRepository, blobs);
+
+        var submission = await CreateApprovableSubmissionAsync(submissionRepository, backend, blobs);
+        submissionRepository.ForcePromotedStageId(submission.Id, 77);
+
+        var stageId = await service.PromoteAsync(
+            (await submissionRepository.GetByIdAsync(submission.Id))!,
+            "admin@test.local",
+            "Retry after partial promote",
+            null);
+
+        Assert.Equal(77, stageId);
+        var updated = await submissionRepository.GetByIdAsync(submission.Id);
+        Assert.Equal(FanPerformanceSubmissionStatus.Approved, updated!.Status);
+        Assert.Equal(77, updated.PromotedStageId);
+        Assert.Empty((await adminRepository.GetPageAsync(new AdminFanPerformanceListFilter(), 1, 50)).Items);
+    }
+
+    [Fact]
     public async Task PromoteAsync_Throws_WhenRightsDeclarationMissing()
     {
         var submissionRepository = new InMemoryFanPerformanceSubmissionRepository();
