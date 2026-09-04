@@ -4,6 +4,8 @@ Issue: [#619](https://github.com/richardorchard/QueenZone.Modern/issues/619), st
 
 ## Foundation boundary
 
+The separate dev root and first-use setup are described in the [dev provisioning runbook](opentofu-dev-environment.md).
+
 The production root is [`infra/environments/production/`](../../infra/environments/production/). It pins OpenTofu **1.12.5**, AzureRM **5.0.1**, and Cloudflare **5.23.0**. The dependency lock file contains official checksums for Linux AMD64, Windows AMD64, macOS AMD64, and macOS ARM64.
 
 Issue #619 declared no managed resources. The current adoption state is:
@@ -27,7 +29,7 @@ Install the version in `.opentofu-version`, then run:
 
 The default uses `-backend=false` and needs no cloud credentials. The remote check uses the Entra-authenticated backend from #616. Cloudflare credentials are not required until a configuration reads Cloudflare data or plans managed resources.
 
-The validation script runs formatting, credential-pattern checks, lifecycle checks, `init`, and `validate` for the production root and every module. Critical Azure/Cloudflare resources fail validation unless they set `lifecycle { prevent_destroy = true }`; broad `ignore_changes = all` is forbidden.
+The validation script runs formatting, credential-pattern checks, lifecycle checks, `init`, and `validate` for both production and dev roots and their modules. Critical Azure/Cloudflare resources fail validation unless they set `lifecycle { prevent_destroy = true }`; broad `ignore_changes = all` is forbidden.
 
 ## Provider upgrades
 

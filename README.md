@@ -469,3 +469,11 @@ photographs, audio, video, lyrics, editorial material, logos, trademarks, or
 third-party components. Those materials remain subject to their respective rights
 and licences. See [Third-Party Notices](THIRD-PARTY-NOTICES.md) for key bundled and
 direct dependencies.
+
+### Dev Azure environment
+
+The isolated dev App Service is declared in `infra/environments/dev`, with its
+own state key. Run `./scripts/Test-OpenTofu.ps1` to validate both environments.
+See the [dev provisioning runbook](docs/architecture/opentofu-dev-environment.md)
+for first-use permissions, approval and DNS handoff. This declaration does not
+deploy the application or change the production release flow.
