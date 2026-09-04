@@ -1,4 +1,6 @@
-namespace QueenZone.Web.Tests;
+using QueenZone.Routing;
+
+namespace QueenZone.Search.Shared.Tests;
 
 public sealed class FanPerformanceRoutesTests
 {

@@ -1,4 +1,4 @@
-namespace QueenZone.Web.Search;
+namespace QueenZone.Search.Shared;
 
 public sealed record SearchReindexCommandOptions(bool Force)
 {

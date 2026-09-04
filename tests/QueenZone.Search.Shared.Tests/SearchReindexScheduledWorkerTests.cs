@@ -2,9 +2,9 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using QueenZone.Data;
 using QueenZone.Data.Entities;
-using QueenZone.Web.Search;
+using QueenZone.Search.Shared;
 
-namespace QueenZone.Web.Tests;
+namespace QueenZone.Search.Shared.Tests;
 
 public sealed class SearchReindexScheduledWorkerTests
 {

@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace QueenZone.Web;
+namespace QueenZone.Routing;
 
 public static class FanPerformanceRoutes
 {

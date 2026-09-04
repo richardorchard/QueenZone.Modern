@@ -325,7 +325,7 @@ public static class QueenZoneWebServiceCollectionExtensions
         // repositories directly and do not use the Testing web host composition. E2E falls
         // through to the real legacy data branch below, but only after E2EConnectionGuard
         // confirms the connection string targets the disposable SQL Express mirror.
-        services.AddScoped<Search.SearchReindexBuilder>();
+        services.AddScoped<SearchReindexBuilder>();
         services.AddScoped<Search.ForumSearchIndexSynchronizer>();
         // In-process single-flight job for /admin/search (single-instance hosting).
         services.AddSingleton<Search.SearchReindexJobService>();

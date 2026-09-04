@@ -2,7 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using QueenZone.Data;
-using QueenZone.Web.Search;
+using QueenZone.Search.Shared;
 
 var options = SearchReindexCommandOptions.Parse(args);
 if (options is null)

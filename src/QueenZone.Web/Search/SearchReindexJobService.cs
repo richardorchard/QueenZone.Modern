@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Hosting;
 using QueenZone.Data;
+using QueenZone.Search.Shared;
 
 namespace QueenZone.Web.Search;
 

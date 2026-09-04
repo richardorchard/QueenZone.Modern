@@ -118,7 +118,8 @@ if ($IncludeSmallProjects -or $SmallProjectsOnly) {
     $smallProjects = @(
         "tests/QueenZone.Tools.Tests/QueenZone.Tools.Tests.csproj",
         "tests/QueenZone.Storage.Tests/QueenZone.Storage.Tests.csproj",
-        "tests/QueenZone.NewsAgent.Tests/QueenZone.NewsAgent.Tests.csproj"
+        "tests/QueenZone.NewsAgent.Tests/QueenZone.NewsAgent.Tests.csproj",
+        "tests/QueenZone.Search.Shared.Tests/QueenZone.Search.Shared.Tests.csproj"
     )
     foreach ($project in $smallProjects) {
         Invoke-DotNetTest -Project $project

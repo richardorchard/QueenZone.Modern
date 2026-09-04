@@ -2,7 +2,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using QueenZone.Data;
 
-namespace QueenZone.Web.Search;
+namespace QueenZone.Search.Shared;
 
 /// <summary>
 /// Standalone-worker entry point for issue #527: periodically calls

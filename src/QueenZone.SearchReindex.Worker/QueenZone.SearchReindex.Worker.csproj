@@ -15,16 +15,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!--
-      SearchReindexBuilder lives in QueenZone.Web (it needs NewsRoutes/ForumRoutes/etc. route
-      helpers that live there — see remarks on SearchReindexBuilder), unlike QueenZone.NewsAgent
-      which is a dependency-free class library. So unlike QueenZone.NewsAgent.Worker, this
-      project must reference the ASP.NET Core web app project directly as a build-time library
-      dependency. Moving SearchReindexBuilder/route helpers into a shared non-Web project would
-      remove this, but that's a larger refactor out of scope for #527.
-    -->
     <ProjectReference Include="..\QueenZone.Data\QueenZone.Data.csproj" />
-    <ProjectReference Include="..\QueenZone.Web\QueenZone.Web.csproj" />
+    <ProjectReference Include="..\QueenZone.Search.Shared\QueenZone.Search.Shared.csproj" />
   </ItemGroup>
 
   <ItemGroup>
