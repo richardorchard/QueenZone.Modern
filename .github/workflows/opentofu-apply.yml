@@ -245,11 +245,11 @@ jobs:
         run: ./scripts/Test-OpenTofuPostApplySmoke.ps1
 
   dev-post-apply-smoke:
-    name: Dev HTTPS placeholder
+    name: Dev custom-domain HTTPS
     if: inputs.root != 'production'
     needs: apply
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Verify Azure default HTTPS endpoint
-        run: curl --fail --silent --show-error --retry 12 --retry-all-errors --retry-delay 10 https://queenzone-devbox.azurewebsites.net/ --output /dev/null
+      - name: Verify dev custom-domain HTTPS endpoint
+        run: curl --fail --silent --show-error --retry 12 --retry-all-errors --retry-delay 10 https://dev.queenzone.org/ --output /dev/null

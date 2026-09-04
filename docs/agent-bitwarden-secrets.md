@@ -91,8 +91,8 @@ bws secret list "1c16fd2d-4bfb-4eb7-8357-b49400233490"
 
 ## Android test-build signing
 
-The stable test signing material used by
-`.github/workflows/publish-mobile-test-build.yml` is stored in this project:
+The stable Android signing material used by
+`.github/workflows/publish-android-google-play.yml` is stored in this project:
 
 - `ANDROID_TEST_KEYSTORE_BASE64`
 - `ANDROID_TEST_KEYSTORE_PASSWORD`
